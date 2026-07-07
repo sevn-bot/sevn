@@ -22,4 +22,5 @@ a model or many, to serve you or somebody.<br>
 Tools when you need hands, quiet when you don't,<br>
 Your gateway, your rules — I run where you chose.<br>
 </em>
+  born 7-7-26 on 07:07 PM CEST
 </p>
