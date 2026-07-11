@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-15T13:39:27.323414+00:00",
+  "generated_at": "2026-07-11T18:49:25.423104+00:00",
   "nav": {
     "groups": [
       {
@@ -1227,6 +1227,14 @@
     {
       "method": "GET",
       "path": "/api/v1/traces/{span_id}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tracing/logfire"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/tracing/logfire"
     },
     {
       "method": "GET",

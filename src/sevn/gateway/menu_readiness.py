@@ -110,6 +110,8 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C20.5",
         "C20.6",
         "C20.7",
+        "C20.8",
+        "C20.9",
         # My sevn bot — service restarts (owner, 2-step)
         "C18.4",
         "C18.5",

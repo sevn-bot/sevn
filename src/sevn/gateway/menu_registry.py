@@ -952,6 +952,24 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         owner_only=True,
     )
     add(
+        "C20.8",
+        _exact("cfg:logs:toggle_logfire"),
+        "C",
+        "logs",
+        "Toggle Logfire export",
+        implemented=True,
+        owner_only=True,
+    )
+    add(
+        "C20.9",
+        _exact("form:logs:logfire_token"),
+        "C",
+        "logs",
+        "Set Logfire token (form)",
+        implemented=True,
+        owner_only=True,
+    )
+    add(
         "C20.7",
         _exact("cfg:logs:deployment_id"),
         "C",

@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from sevn.gateway.channel_router import ChannelRouter, IncomingMessage
 
 from sevn.agent.providers.budget import BudgetRegime
+from sevn.agent.tracing.logfire_config import logfire_export_status
 from sevn.config.defaults import (
     DEFAULT_GATEWAY_AUTO_RESUME_B,
     DEFAULT_RLM_C_D_BACKEND,
@@ -1155,6 +1156,23 @@ def _tracing_redaction_enabled(workspace: WorkspaceConfig) -> bool:
     return DEFAULT_TRACE_REDACTION_ENABLED
 
 
+def _logfire_export_enabled(workspace: WorkspaceConfig) -> bool:
+    """Return whether a ``logfire`` sink is configured in ``tracing.sinks[]``.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        bool: True when Logfire export is enabled in config.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> _logfire_export_enabled(WorkspaceConfig.minimal())
+        False
+    """
+    return logfire_export_status(workspace).enabled
+
+
 def _webchat_tts_inline_enabled(workspace: WorkspaceConfig) -> bool:
     """Return effective ``channels.webchat.tts_inline`` (defaults to ``True``).
 
@@ -1470,6 +1488,7 @@ def _build_logs_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str,
         True
     """
     redaction = _tracing_redaction_enabled(workspace)
+    logfire = _logfire_export_enabled(workspace)
     return [
         [
             {"text": "📄 Tail gateway", "callback_data": "cfg:logs:tail:gateway:0"},
@@ -1481,6 +1500,15 @@ def _build_logs_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str,
         [
             {"text": "🧵 Recent traces", "callback_data": "cfg:logs:traces:0"},
             {"text": "🔎 Trace by id", "callback_data": "form:logs:span_id"},
+        ],
+        [
+            {
+                "text": f"Logfire export: {'on' if logfire else 'off'} (toggle)",
+                "callback_data": "cfg:logs:toggle_logfire",
+            },
+        ],
+        [
+            {"text": "🔑 Set Logfire token", "callback_data": "form:logs:logfire_token"},
         ],
         [
             {
@@ -3466,14 +3494,16 @@ def config_menu_message_text(
         from sevn.gateway.webapp_qa import resolve_webapp_public_base, webapp_https_disabled_notice
 
         redaction = _tracing_redaction_enabled(workspace)
+        logfire = _logfire_export_enabled(workspace)
         lines = [
             "Logs",
             "",
             "Owner-only operator diagnostics (mirrors /logs + /traces).",
             "",
-            "Tap a button below to tail service logs, browse recent traces,",
-            "grep by pattern, or flip trace redaction.",
+            "Tail service logs, browse recent traces, grep by pattern,",
+            "configure Logfire export, or flip trace redaction.",
             "",
+            f"Logfire export: {'on' if logfire else 'off'}",
             f"Trace redaction: {'on' if redaction else 'off'}",
         ]
         webapp_notice = webapp_https_disabled_notice(resolve_webapp_public_base(workspace))

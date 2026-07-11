@@ -24,6 +24,10 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
+from sevn.agent.tracing.logfire_config import (
+    apply_logfire_export_to_sevn_doc,
+    logfire_export_status_from_doc,
+)
 from sevn.agent.tracing.redaction_config import (
     apply_trace_redaction_to_sevn_doc,
     effective_trace_redaction_enabled_from_doc,
@@ -1400,6 +1404,8 @@ class MenuActionRouter:
             return None
         if suffix == "toggle_redaction":
             return await self._handle_logs_toggle_redaction(msg, callback_data)
+        if suffix == "toggle_logfire":
+            return await self._handle_logs_toggle_logfire(msg, callback_data)
         if suffix.startswith("tail:"):
             return await self._handle_logs_tail(msg, suffix)
         if suffix.startswith("traces:"):
@@ -1435,6 +1441,38 @@ class MenuActionRouter:
         )
         self._reload_workspace()
         toast = f"Trace redaction: {'on' if new_value else 'off'}"
+        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+        return None if answered else toast
+
+    async def _handle_logs_toggle_logfire(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """Flip Logfire export by adding/removing the ``logfire`` trace sink.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Toast when refresh failed.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_logs_toggle_logfire)
+            True
+        """
+        doc = load_raw_sevn_json(self._sevn_json)
+        current = logfire_export_status_from_doc(doc).enabled
+        new_value = not current
+
+        mutate_sevn_json(
+            self._sevn_json,
+            lambda d: apply_logfire_export_to_sevn_doc(d, enabled=new_value, keep_local_sinks=True),
+        )
+        self._reload_workspace()
+        toast = f"Logfire export: {'on' if new_value else 'off'} — restart gateway"
         answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
         return None if answered else toast
 
