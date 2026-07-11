@@ -250,10 +250,12 @@ async def validate_workspace_layout_at_boot(
     try:
         from sevn.config.loader import load_workspace
         from sevn.second_brain.layout_probe import fix_second_brain_layout
+        from sevn.second_brain.witchcraft_reindex import maybe_reindex_workspace_on_startup
 
         cfg, _loaded = load_workspace(sevn_json=layout.sevn_json_path)
         if cfg.second_brain is not None and cfg.second_brain.enabled:
             fix_second_brain_layout(config=cfg, content_root=content_root)
+            maybe_reindex_workspace_on_startup(config=cfg, content_root=content_root)
     except Exception:
         logger.bind(subsystem="second_brain").warning(
             "second_brain bootstrap at boot failed (non-fatal)"

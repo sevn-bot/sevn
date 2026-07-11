@@ -15,6 +15,7 @@ are cut into a dated, versioned section at release time.
 - Bundled skills, workspace templates, doctor solutions, docs site (`about-sevn.bot/`), readme pipeline (`docs/readmes/`), brand assets, and remaining test suites for the pre-0.0.1 migration import (I5)
 - Core runtime packages for the pre-0.0.1 migration import (config, storage, workspace, gateway, agent, security, proxy, and related tests)
 - Configurable Second Brain vault path via `second_brain.paths.vault` (CLI setup, Telegram `/config`, onboarding, doctor)
+- Witchcraft semantic reindex for the Second Brain vault via `sevn second-brain setup --reindex` and automatically at gateway boot
 
 ### Changed
 
