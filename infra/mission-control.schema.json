@@ -1,0 +1,2699 @@
+{
+  "generated_at": "2026-06-15T13:39:27.323414+00:00",
+  "nav": {
+    "groups": [
+      {
+        "name": "Core",
+        "tabs": [
+          {
+            "kind": "wired",
+            "name": "Overview",
+            "path": "/mission/overview",
+            "slug": "overview"
+          },
+          {
+            "kind": "wired",
+            "name": "Chat",
+            "path": "/mission/chat",
+            "slug": "chat"
+          },
+          {
+            "kind": "wired",
+            "name": "Canvas (OpenUI)",
+            "path": "/mission/canvas-openui",
+            "slug": "canvas-openui"
+          },
+          {
+            "kind": "wired",
+            "name": "Sessions",
+            "path": "/mission/sessions",
+            "slug": "sessions"
+          }
+        ]
+      },
+      {
+        "name": "Observability",
+        "tabs": [
+          {
+            "kind": "wired",
+            "name": "Traces",
+            "path": "/mission/traces",
+            "slug": "traces"
+          },
+          {
+            "kind": "wired",
+            "name": "Audit & Analytics",
+            "path": "/mission/audit-analytics",
+            "slug": "audit-analytics"
+          },
+          {
+            "kind": "wired",
+            "name": "Providers & LLMs",
+            "path": "/mission/providers-llms",
+            "slug": "providers-llms"
+          },
+          {
+            "kind": "wired",
+            "name": "Budget & Cost",
+            "path": "/mission/budget-cost",
+            "slug": "budget-cost"
+          },
+          {
+            "kind": "wired",
+            "name": "Channels",
+            "path": "/mission/channels",
+            "slug": "channels"
+          },
+          {
+            "kind": "wired",
+            "name": "Alerts & Logs",
+            "path": "/mission/alerts-logs",
+            "slug": "alerts-logs"
+          }
+        ]
+      },
+      {
+        "name": "Agent",
+        "tabs": [
+          {
+            "kind": "wired",
+            "name": "Agent Config",
+            "path": "/mission/agent-config",
+            "slug": "agent-config"
+          },
+          {
+            "kind": "wired",
+            "name": "Model Params",
+            "path": "/mission/model-params",
+            "slug": "model-params"
+          },
+          {
+            "kind": "wired",
+            "name": "Tools & Permissions",
+            "path": "/mission/tools-permissions",
+            "slug": "tools-permissions"
+          },
+          {
+            "kind": "wired",
+            "name": "Skills",
+            "path": "/mission/skills",
+            "slug": "skills"
+          },
+          {
+            "kind": "wired",
+            "name": "MCP Servers",
+            "path": "/mission/mcp-servers",
+            "slug": "mcp-servers"
+          },
+          {
+            "kind": "wired",
+            "name": "Coding Agents",
+            "path": "/mission/coding-agents",
+            "slug": "coding-agents"
+          }
+        ]
+      },
+      {
+        "name": "Knowledge",
+        "tabs": [
+          {
+            "kind": "wired",
+            "name": "Memory",
+            "path": "/mission/memory",
+            "slug": "memory"
+          },
+          {
+            "kind": "wired",
+            "name": "Second Brain",
+            "path": "/mission/second-brain",
+            "slug": "second-brain"
+          },
+          {
+            "kind": "wired",
+            "name": "Workspace Files",
+            "path": "/mission/workspace-files",
+            "slug": "workspace-files"
+          },
+          {
+            "kind": "wired",
+            "name": "Code Understanding",
+            "path": "/mission/code-understanding",
+            "slug": "code-understanding"
+          }
+        ]
+      },
+      {
+        "name": "Self-improve",
+        "tabs": [
+          {
+            "kind": "wired",
+            "name": "Jobs",
+            "path": "/mission/jobs",
+            "slug": "jobs"
+          },
+          {
+            "kind": "wired",
+            "name": "Trajectories",
+            "path": "/mission/trajectories",
+            "slug": "trajectories"
+          },
+          {
+            "kind": "wired",
+            "name": "Feedback",
+            "path": "/mission/feedback",
+            "slug": "feedback"
+          },
+          {
+            "kind": "wired",
+            "name": "RLM Config",
+            "path": "/mission/rlm-training",
+            "slug": "rlm-training"
+          },
+          {
+            "kind": "wired",
+            "name": "Experiments & Metrics",
+            "path": "/mission/experiments-metrics",
+            "slug": "experiments-metrics"
+          }
+        ]
+      },
+      {
+        "name": "Evolution",
+        "tabs": [
+          {
+            "kind": "wired",
+            "name": "Issues",
+            "path": "/mission/issues",
+            "slug": "issues"
+          },
+          {
+            "kind": "wired",
+            "name": "Pipelines",
+            "path": "/mission/pipelines",
+            "slug": "pipelines"
+          },
+          {
+            "kind": "wired",
+            "name": "Approvals",
+            "path": "/mission/approvals",
+            "slug": "approvals"
+          },
+          {
+            "kind": "wired",
+            "name": "Spec-Kit",
+            "path": "/mission/spec-kit",
+            "slug": "spec-kit"
+          },
+          {
+            "kind": "wired",
+            "name": "Evolution Traces",
+            "path": "/mission/evolution-traces",
+            "slug": "evolution-traces"
+          },
+          {
+            "kind": "wired",
+            "name": "Stats",
+            "path": "/mission/stats",
+            "slug": "stats"
+          }
+        ]
+      },
+      {
+        "name": "Ops",
+        "tabs": [
+          {
+            "kind": "wired",
+            "name": "Cron",
+            "path": "/mission/cron",
+            "slug": "cron"
+          },
+          {
+            "kind": "wired",
+            "name": "Security",
+            "path": "/mission/security",
+            "slug": "security"
+          },
+          {
+            "kind": "wired",
+            "name": "Secrets",
+            "path": "/mission/secrets",
+            "slug": "secrets"
+          },
+          {
+            "kind": "wired",
+            "name": "Egress proxy",
+            "path": "/mission/egress-proxy",
+            "slug": "egress-proxy"
+          },
+          {
+            "kind": "wired",
+            "name": "Tunnels & Infra",
+            "path": "/mission/tunnels-infra",
+            "slug": "tunnels-infra"
+          },
+          {
+            "kind": "wired",
+            "name": "Backup & Snapshots",
+            "path": "/mission/backup-snapshots",
+            "slug": "backup-snapshots"
+          },
+          {
+            "kind": "wired",
+            "name": "Config",
+            "path": "/mission/config",
+            "slug": "config"
+          },
+          {
+            "kind": "wired",
+            "name": "Schema & Ontology",
+            "path": "/mission/schema-ontology",
+            "slug": "schema-ontology"
+          },
+          {
+            "kind": "wired",
+            "name": "sevn CLI",
+            "path": "/mission/sevn-cli",
+            "slug": "sevn-cli"
+          },
+          {
+            "kind": "wired",
+            "name": "Terminal",
+            "path": "/mission/terminal",
+            "slug": "terminal"
+          }
+        ]
+      },
+      {
+        "name": "Surfaces",
+        "tabs": [
+          {
+            "kind": "wired",
+            "name": "Telegram Menu",
+            "path": "/mission/telegram-menu",
+            "slug": "telegram-menu"
+          },
+          {
+            "kind": "wired",
+            "name": "Web Apps",
+            "path": "/mission/web-apps",
+            "slug": "web-apps"
+          },
+          {
+            "kind": "wired",
+            "name": "Onboarding",
+            "path": "/mission/onboarding",
+            "slug": "onboarding"
+          },
+          {
+            "kind": "wired",
+            "name": "Users & RBAC",
+            "path": "/mission/users-rbac",
+            "slug": "users-rbac"
+          }
+        ]
+      }
+    ],
+    "post_v1_placeholder_slugs": [],
+    "tab_count": 45,
+    "tabs": [
+      {
+        "group": "Core",
+        "name": "Overview",
+        "path": "/mission/overview",
+        "slug": "overview"
+      },
+      {
+        "group": "Core",
+        "name": "Chat",
+        "path": "/mission/chat",
+        "slug": "chat"
+      },
+      {
+        "group": "Core",
+        "name": "Canvas (OpenUI)",
+        "path": "/mission/canvas-openui",
+        "slug": "canvas-openui"
+      },
+      {
+        "group": "Core",
+        "name": "Sessions",
+        "path": "/mission/sessions",
+        "slug": "sessions"
+      },
+      {
+        "group": "Observability",
+        "name": "Traces",
+        "path": "/mission/traces",
+        "slug": "traces"
+      },
+      {
+        "group": "Observability",
+        "name": "Audit & Analytics",
+        "path": "/mission/audit-analytics",
+        "slug": "audit-analytics"
+      },
+      {
+        "group": "Observability",
+        "name": "Providers & LLMs",
+        "path": "/mission/providers-llms",
+        "slug": "providers-llms"
+      },
+      {
+        "group": "Observability",
+        "name": "Budget & Cost",
+        "path": "/mission/budget-cost",
+        "slug": "budget-cost"
+      },
+      {
+        "group": "Observability",
+        "name": "Channels",
+        "path": "/mission/channels",
+        "slug": "channels"
+      },
+      {
+        "group": "Observability",
+        "name": "Alerts & Logs",
+        "path": "/mission/alerts-logs",
+        "slug": "alerts-logs"
+      },
+      {
+        "group": "Agent",
+        "name": "Agent Config",
+        "path": "/mission/agent-config",
+        "slug": "agent-config"
+      },
+      {
+        "group": "Agent",
+        "name": "Model Params",
+        "path": "/mission/model-params",
+        "slug": "model-params"
+      },
+      {
+        "group": "Agent",
+        "name": "Tools & Permissions",
+        "path": "/mission/tools-permissions",
+        "slug": "tools-permissions"
+      },
+      {
+        "group": "Agent",
+        "name": "Skills",
+        "path": "/mission/skills",
+        "slug": "skills"
+      },
+      {
+        "group": "Agent",
+        "name": "MCP Servers",
+        "path": "/mission/mcp-servers",
+        "slug": "mcp-servers"
+      },
+      {
+        "group": "Agent",
+        "name": "Coding Agents",
+        "path": "/mission/coding-agents",
+        "slug": "coding-agents"
+      },
+      {
+        "group": "Knowledge",
+        "name": "Memory",
+        "path": "/mission/memory",
+        "slug": "memory"
+      },
+      {
+        "group": "Knowledge",
+        "name": "Second Brain",
+        "path": "/mission/second-brain",
+        "slug": "second-brain"
+      },
+      {
+        "group": "Knowledge",
+        "name": "Workspace Files",
+        "path": "/mission/workspace-files",
+        "slug": "workspace-files"
+      },
+      {
+        "group": "Knowledge",
+        "name": "Code Understanding",
+        "path": "/mission/code-understanding",
+        "slug": "code-understanding"
+      },
+      {
+        "group": "Self-improve",
+        "name": "Jobs",
+        "path": "/mission/jobs",
+        "slug": "jobs"
+      },
+      {
+        "group": "Self-improve",
+        "name": "Trajectories",
+        "path": "/mission/trajectories",
+        "slug": "trajectories"
+      },
+      {
+        "group": "Self-improve",
+        "name": "Feedback",
+        "path": "/mission/feedback",
+        "slug": "feedback"
+      },
+      {
+        "group": "Self-improve",
+        "name": "RLM Config",
+        "path": "/mission/rlm-training",
+        "slug": "rlm-training"
+      },
+      {
+        "group": "Self-improve",
+        "name": "Experiments & Metrics",
+        "path": "/mission/experiments-metrics",
+        "slug": "experiments-metrics"
+      },
+      {
+        "group": "Evolution",
+        "name": "Issues",
+        "path": "/mission/issues",
+        "slug": "issues"
+      },
+      {
+        "group": "Evolution",
+        "name": "Pipelines",
+        "path": "/mission/pipelines",
+        "slug": "pipelines"
+      },
+      {
+        "group": "Evolution",
+        "name": "Approvals",
+        "path": "/mission/approvals",
+        "slug": "approvals"
+      },
+      {
+        "group": "Evolution",
+        "name": "Spec-Kit",
+        "path": "/mission/spec-kit",
+        "slug": "spec-kit"
+      },
+      {
+        "group": "Evolution",
+        "name": "Evolution Traces",
+        "path": "/mission/evolution-traces",
+        "slug": "evolution-traces"
+      },
+      {
+        "group": "Evolution",
+        "name": "Stats",
+        "path": "/mission/stats",
+        "slug": "stats"
+      },
+      {
+        "group": "Ops",
+        "name": "Cron",
+        "path": "/mission/cron",
+        "slug": "cron"
+      },
+      {
+        "group": "Ops",
+        "name": "Security",
+        "path": "/mission/security",
+        "slug": "security"
+      },
+      {
+        "group": "Ops",
+        "name": "Secrets",
+        "path": "/mission/secrets",
+        "slug": "secrets"
+      },
+      {
+        "group": "Ops",
+        "name": "Egress proxy",
+        "path": "/mission/egress-proxy",
+        "slug": "egress-proxy"
+      },
+      {
+        "group": "Ops",
+        "name": "Tunnels & Infra",
+        "path": "/mission/tunnels-infra",
+        "slug": "tunnels-infra"
+      },
+      {
+        "group": "Ops",
+        "name": "Backup & Snapshots",
+        "path": "/mission/backup-snapshots",
+        "slug": "backup-snapshots"
+      },
+      {
+        "group": "Ops",
+        "name": "Config",
+        "path": "/mission/config",
+        "slug": "config"
+      },
+      {
+        "group": "Ops",
+        "name": "Schema & Ontology",
+        "path": "/mission/schema-ontology",
+        "slug": "schema-ontology"
+      },
+      {
+        "group": "Ops",
+        "name": "sevn CLI",
+        "path": "/mission/sevn-cli",
+        "slug": "sevn-cli"
+      },
+      {
+        "group": "Ops",
+        "name": "Terminal",
+        "path": "/mission/terminal",
+        "slug": "terminal"
+      },
+      {
+        "group": "Surfaces",
+        "name": "Telegram Menu",
+        "path": "/mission/telegram-menu",
+        "slug": "telegram-menu"
+      },
+      {
+        "group": "Surfaces",
+        "name": "Web Apps",
+        "path": "/mission/web-apps",
+        "slug": "web-apps"
+      },
+      {
+        "group": "Surfaces",
+        "name": "Onboarding",
+        "path": "/mission/onboarding",
+        "slug": "onboarding"
+      },
+      {
+        "group": "Surfaces",
+        "name": "Users & RBAC",
+        "path": "/mission/users-rbac",
+        "slug": "users-rbac"
+      }
+    ],
+    "wired_slugs": [
+      "agent-config",
+      "alerts-logs",
+      "approvals",
+      "audit-analytics",
+      "backup-snapshots",
+      "budget-cost",
+      "canvas-openui",
+      "channels",
+      "chat",
+      "code-understanding",
+      "coding-agents",
+      "config",
+      "cron",
+      "egress-proxy",
+      "evolution-traces",
+      "experiments-metrics",
+      "feedback",
+      "issues",
+      "jobs",
+      "mcp-servers",
+      "memory",
+      "model-params",
+      "onboarding",
+      "overview",
+      "pipelines",
+      "providers-llms",
+      "rlm-training",
+      "schema-ontology",
+      "second-brain",
+      "secrets",
+      "security",
+      "sessions",
+      "sevn-cli",
+      "skills",
+      "spec-kit",
+      "stats",
+      "telegram-menu",
+      "terminal",
+      "tools-permissions",
+      "traces",
+      "trajectories",
+      "tunnels-infra",
+      "users-rbac",
+      "web-apps",
+      "workspace-files"
+    ]
+  },
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/secrets"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/secrets/{alias}"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/secrets/{alias}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/agent/approvals/pending"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/agent/approvals/{decision_id}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/agent/config"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/agent/config"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/agent/llm-params"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/agent/llm-params"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/agent/mcp-servers"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/agent/mcp-servers"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/agent/permissions"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/agent/permissions"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/agent/skills"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/agent/skills/bundled"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/agent/skills/install"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/agent/skills/{skill_name}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/agent/skills/{skill_name}/promote"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/agent/skills/{skill_name}/toggle"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/agent/tools-health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/alerts/rollup"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/analytics/approvals"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/analytics/daily-volume"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/analytics/tool-frequency"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/audit/timeline"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/logout"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/status"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/backup/manifest"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/budget/summary"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/channels/config"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/channels/config"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/channels/status"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/chat/fork"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/chat/token"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/cli/run"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/cli/shortcuts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/coding-agents"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/coding-agents"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/coding-agents/artifacts"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/coding-agents/artifacts/{run_id}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/config"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/config"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/config/full"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/config/full"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/config/full/validate"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/config/validate"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/cron/config"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/cron/jobs"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/cron/jobs"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/cron/jobs/{job_id}"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/cron/jobs/{job_id}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/cron/jobs/{job_id}/run"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dashboard/canvas"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dashboard/nav"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/evolution/approvals"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/evolution/approvals/{approval_id}/approve"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/evolution/approvals/{approval_id}/edit"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/evolution/approvals/{approval_id}/reject"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/evolution/issues"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/evolution/issues"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/evolution/issues/import"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/evolution/issues/sync"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/evolution/issues/{issue_id}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/evolution/pipelines"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/evolution/pipelines/{issue_id}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/evolution/pipelines/{issue_id}/kill"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/evolution/pipelines/{issue_id}/poll"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/evolution/pipelines/{issue_id}/run"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/evolution/stats"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/evolution/traces"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/files"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/files"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/files/content"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/files/content"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/files/rename"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/files/tree"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge/code-understanding"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge/graph"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge/memory"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge/second-brain"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge/workspace-files"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/migrate/preview"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/mission/providers/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/mission/sessions"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/mission/sessions/{session_id}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/ops/actions/capabilities"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/ops/backup/export"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/ops/backup/import"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/ops/daemons"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/ops/daemons/{service}/{action}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/ops/dreaming/run"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/ops/reload-config"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/ops/snapshots"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/ops/snapshots/{snapshot_id}/restore"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/page-agent/intent"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/providers/health"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/providers/{provider_id}/oauth/reauth"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/proxy/logs"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/proxy/restart"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/proxy/status"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/run"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/runs/snapshots"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/runs/{run_id}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/schema/ontology"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/secrets/aliases"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/secrets/aliases/{logical_key}/reveal"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/secrets/store"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/secrets/store/entries"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/secrets/store/entries/{alias}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/secrets/store/entries/{alias}"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/secrets/store/entries/{alias}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/security"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/security"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/self_improve/cycle"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/self_improve/experiments"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/self_improve/feedback"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/self_improve/jobs"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/self_improve/jobs"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/self_improve/jobs/{job_id}/approve_plan"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/self_improve/jobs/{job_id}/eval_report"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/self_improve/rlm-training"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/self_improve/trajectories"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sessions"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sessions/{session_id}/api-calls"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sessions/{session_id}/api-calls/export.csv"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/sessions/{session_id}/turns/{turn_id}/replay"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/spec-kit/constitution"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/spec-kit/constitution"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/spec-kit/constitution/template"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/spec-kit/options"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/spec-kit/options"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/spec-kit/runs"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/spec-kit/test-invoke"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/surfaces/onboarding"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/surfaces/telegram-menu"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/surfaces/telegram-menu"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/surfaces/users-rbac"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/surfaces/web-apps"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/surfaces/web-apps"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/system/logging"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/system/logging"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/system/upgrade-restart"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/terminal/session"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/traces"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/traces/query"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/traces/{span_id}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tunnels/process"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tunnels/start"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tunnels/status"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tunnels/stop"
+    }
+  ],
+  "schema_version": 1,
+  "shell": {
+    "key_selectors": {
+      "active_tab": ".sidebar__item[aria-current=\"page\"]",
+      "auth_badge": "#auth-badge",
+      "global_search": "#global-search",
+      "log_retention_form": "#log-retention-form",
+      "log_retention_modal": "#log-retention-modal",
+      "login_error": "#login-error",
+      "login_form": "#login-form",
+      "login_panel": "#login-panel",
+      "login_password": "#login-password",
+      "panel": "#content > article.card",
+      "sidebar": "#tabs",
+      "sidebar_group": ".sidebar__group",
+      "sidebar_item": ".sidebar__item",
+      "system_menu_panel": "#system-menu-panel",
+      "system_menu_toggle": "#system-menu-toggle"
+    },
+    "system_menu_actions": [
+      {
+        "endpoint": "/api/v1/system/logging",
+        "id": "logging-save",
+        "label": "Save logging retention",
+        "method": "PUT",
+        "needs_seed": true,
+        "selector": "#log-retention-form"
+      }
+    ]
+  },
+  "tab_count": 45,
+  "tabs": {
+    "agent-config": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/agent/config",
+          "id": "save",
+          "label": "Save agent config",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#agent-config-save-btn"
+        }
+      ],
+      "group": "agent",
+      "key_selectors": {
+        "reset_btn": "#agent-reset-suggestions-btn",
+        "save_btn": "#agent-config-save-btn",
+        "slot_editor": "#agent-slot-editor",
+        "status": "#agent-config-status",
+        "unified_model": "#agent-unified-model"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/agent/config"
+      ],
+      "title": "Agent Config",
+      "views": [
+        {
+          "id": "main",
+          "label": "Agent config",
+          "selector": "#agent-slot-editor"
+        }
+      ]
+    },
+    "alerts-logs": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/proxy/logs",
+          "id": "refresh-logs",
+          "label": "Refresh logs",
+          "method": "GET",
+          "selector": "#alerts-refresh-logs"
+        }
+      ],
+      "group": "observability",
+      "key_selectors": {
+        "log_tail": ".log-tail",
+        "refresh_logs": "#alerts-refresh-logs"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/alerts/rollup",
+        "/api/v1/proxy/logs"
+      ],
+      "title": "Alerts & Logs",
+      "views": [
+        {
+          "id": "main",
+          "label": "Alerts & Logs",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "approvals": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/evolution/approvals/{approval_id}/approve",
+          "id": "approve",
+          "label": "Approve",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": ".approval-approve"
+        },
+        {
+          "endpoint": "/api/v1/evolution/approvals/{approval_id}/reject",
+          "id": "reject",
+          "label": "Reject",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": ".approval-reject"
+        }
+      ],
+      "group": "evolution",
+      "key_selectors": {},
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/evolution/approvals"
+      ],
+      "title": "Approvals",
+      "views": [
+        {
+          "id": "main",
+          "label": "Approvals",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "audit-analytics": {
+      "actions": [],
+      "group": "observability",
+      "key_selectors": {},
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/audit/timeline",
+        "/api/v1/analytics/tool-frequency",
+        "/api/v1/analytics/daily-volume",
+        "/api/v1/analytics/approvals"
+      ],
+      "title": "Audit & Analytics",
+      "views": [
+        {
+          "id": "main",
+          "label": "Audit & Analytics",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "backup-snapshots": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/ops/backup/export",
+          "id": "export",
+          "label": "Export backup",
+          "method": "GET",
+          "selector": "#backup-export-btn"
+        },
+        {
+          "endpoint": "/api/v1/ops/backup/import",
+          "id": "import",
+          "label": "Import backup",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": "#backup-import-input"
+        },
+        {
+          "endpoint": "/api/v1/ops/snapshots",
+          "id": "create-snapshot",
+          "label": "Create snapshot",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": "#snapshot-create-btn"
+        },
+        {
+          "destructive": true,
+          "endpoint": "/api/v1/ops/snapshots/{snapshot_id}/restore",
+          "id": "restore-snapshot",
+          "label": "Restore snapshot",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": ".snapshot-restore-btn"
+        }
+      ],
+      "group": "ops",
+      "key_selectors": {
+        "create_btn": "#snapshot-create-btn",
+        "export_btn": "#backup-export-btn",
+        "import_input": "#backup-import-input",
+        "restore_btn": ".snapshot-restore-btn"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/backup/manifest"
+      ],
+      "title": "Backup & Snapshots",
+      "views": [
+        {
+          "id": "main",
+          "label": "Backup & Snapshots",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "budget-cost": {
+      "actions": [],
+      "group": "observability",
+      "key_selectors": {},
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/budget/summary"
+      ],
+      "title": "Budget & Cost",
+      "views": [
+        {
+          "id": "main",
+          "label": "Budget & Cost",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "canvas-openui": {
+      "actions": [],
+      "group": "core",
+      "key_selectors": {
+        "frame": ".mission-canvas-frame",
+        "iframe": ".mission-canvas-iframe"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/dashboard/canvas"
+      ],
+      "title": "Canvas (OpenUI)",
+      "views": [
+        {
+          "id": "main",
+          "label": "Canvas (OpenUI)",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "channels": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/channels/config",
+          "id": "save-config",
+          "label": "Save channel settings",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#channels-config-form"
+        }
+      ],
+      "group": "observability",
+      "key_selectors": {
+        "form": "#channels-config-form"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/channels/status",
+        "/api/v1/channels/config"
+      ],
+      "title": "Channels",
+      "views": [
+        {
+          "id": "main",
+          "label": "Channels",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "chat": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/chat/token",
+          "id": "mint-token",
+          "label": "Mint webchat token",
+          "method": "POST",
+          "selector": "#chat-composer"
+        },
+        {
+          "endpoint": "/api/v1/chat/fork",
+          "id": "fork",
+          "label": "Fork session",
+          "method": "POST",
+          "selector": "#chat-fork-btn"
+        }
+      ],
+      "group": "core",
+      "key_selectors": {
+        "composer": "#chat-composer",
+        "input": "#chat-input",
+        "log": "#chat-log",
+        "session_id": "#chat-session-id",
+        "status": "#chat-status",
+        "tool_cards": "#chat-tool-cards"
+      },
+      "kind": "wired",
+      "read_endpoints": [],
+      "title": "Chat",
+      "views": [
+        {
+          "id": "main",
+          "label": "Chat",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "code-understanding": {
+      "actions": [],
+      "group": "knowledge",
+      "key_selectors": {},
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/knowledge/code-understanding",
+        "/api/v1/knowledge/graph"
+      ],
+      "title": "Code Understanding",
+      "views": [
+        {
+          "id": "main",
+          "label": "Code Understanding",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "coding-agents": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/coding-agents",
+          "id": "save",
+          "label": "Save coding agents",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#coding-agents-save"
+        }
+      ],
+      "group": "agent",
+      "key_selectors": {
+        "list": "#coding-agents-list",
+        "panel": "#coding-agents-panel",
+        "save": "#coding-agents-save"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/coding-agents"
+      ],
+      "title": "Coding Agents",
+      "views": [
+        {
+          "id": "main",
+          "label": "Coding Agents",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "config": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/config/full",
+          "id": "validate",
+          "label": "Validate config",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#config-validate-btn"
+        },
+        {
+          "endpoint": "/api/v1/config/full",
+          "id": "save",
+          "label": "Save config",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#config-save-btn"
+        }
+      ],
+      "group": "ops",
+      "key_selectors": {
+        "error_panel": "#config-error-panel",
+        "mode_text": "#config-mode-text",
+        "mode_tree": "#config-mode-tree",
+        "save_btn": "#config-save-btn",
+        "status": "#config-editor-status",
+        "validate_btn": "#config-validate-btn"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/config/full"
+      ],
+      "title": "Config",
+      "views": [
+        {
+          "id": "tree",
+          "label": "Config tree",
+          "selector": "#config-tree-panel"
+        },
+        {
+          "id": "text",
+          "label": "Config text",
+          "selector": "#config-editor"
+        }
+      ]
+    },
+    "cron": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/cron/jobs",
+          "id": "create",
+          "label": "Create job",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": "#cron-create-form"
+        },
+        {
+          "endpoint": "/api/v1/cron/jobs/{job_id}/run",
+          "id": "run",
+          "label": "Run job",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": ".cron-run-btn"
+        },
+        {
+          "endpoint": "/api/v1/cron/jobs/{job_id}",
+          "id": "toggle",
+          "label": "Toggle job",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": ".cron-toggle-btn"
+        },
+        {
+          "destructive": true,
+          "endpoint": "/api/v1/cron/jobs/{job_id}",
+          "id": "delete",
+          "label": "Delete job",
+          "method": "DELETE",
+          "needs_seed": true,
+          "selector": ".cron-delete-btn"
+        },
+        {
+          "endpoint": "/api/v1/cron/config",
+          "id": "pause-all",
+          "label": "Pause scheduler",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#cron-config-form"
+        }
+      ],
+      "group": "ops",
+      "key_selectors": {
+        "config_form": "#cron-config-form",
+        "create_form": "#cron-create-form",
+        "new_id": "#cron-new-id"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/cron/jobs"
+      ],
+      "title": "Cron",
+      "views": [
+        {
+          "id": "main",
+          "label": "Cron",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "egress-proxy": {
+      "actions": [
+        {
+          "destructive": true,
+          "endpoint": "/api/v1/proxy/restart",
+          "id": "restart",
+          "label": "Restart proxy",
+          "method": "POST",
+          "selector": "#proxy-restart-btn"
+        },
+        {
+          "endpoint": "/api/v1/proxy/logs",
+          "id": "refresh-logs",
+          "label": "Refresh proxy logs",
+          "method": "GET",
+          "selector": "#proxy-refresh-logs-btn"
+        }
+      ],
+      "group": "ops",
+      "key_selectors": {
+        "log_tail": "#proxy-log-tail",
+        "refresh_logs_btn": "#proxy-refresh-logs-btn",
+        "restart_btn": "#proxy-restart-btn"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/proxy/status",
+        "/api/v1/proxy/logs"
+      ],
+      "title": "Egress proxy",
+      "views": [
+        {
+          "id": "main",
+          "label": "Egress proxy",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "evolution-traces": {
+      "actions": [],
+      "group": "evolution",
+      "key_selectors": {},
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/evolution/traces"
+      ],
+      "title": "Evolution Traces",
+      "views": [
+        {
+          "id": "main",
+          "label": "Evolution Traces",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "experiments-metrics": {
+      "actions": [],
+      "group": "self-improve",
+      "key_selectors": {},
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/self_improve/experiments"
+      ],
+      "title": "Experiments & Metrics",
+      "views": [
+        {
+          "id": "main",
+          "label": "Experiments & Metrics",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "feedback": {
+      "actions": [],
+      "group": "self-improve",
+      "key_selectors": {},
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/self_improve/feedback"
+      ],
+      "title": "Feedback",
+      "views": [
+        {
+          "id": "main",
+          "label": "Feedback",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "issues": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/evolution/issues/import",
+          "id": "import",
+          "label": "Import issue",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": "#gh-import-btn"
+        },
+        {
+          "endpoint": "/api/v1/evolution/issues/sync",
+          "id": "sync",
+          "label": "Sync issues",
+          "method": "POST",
+          "selector": "#gh-sync-btn"
+        },
+        {
+          "endpoint": "/api/v1/evolution/pipelines/{issue_id}/run",
+          "id": "run-pipeline",
+          "label": "Run pipeline",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": "#run-submit-btn"
+        }
+      ],
+      "group": "evolution",
+      "key_selectors": {
+        "import_btn": "#gh-import-btn",
+        "import_number": "#gh-import-number",
+        "run_form": "#issues-run-form",
+        "run_submit": "#run-submit-btn",
+        "sync_btn": "#gh-sync-btn"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/evolution/issues"
+      ],
+      "title": "Issues",
+      "views": [
+        {
+          "id": "main",
+          "label": "Issues",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "jobs": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/self_improve/jobs",
+          "id": "enqueue",
+          "label": "Enqueue job",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": "#si-enqueue-job"
+        },
+        {
+          "endpoint": "/api/v1/self_improve/cycle",
+          "id": "cycle",
+          "label": "Run cycle",
+          "method": "POST",
+          "selector": "#si-cycle-btn"
+        }
+      ],
+      "group": "self-improve",
+      "key_selectors": {
+        "cycle": "#si-cycle-btn",
+        "enqueue": "#si-enqueue-job"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/self_improve/jobs",
+        "/api/v1/self_improve/jobs/{job_id}/eval_report"
+      ],
+      "title": "Jobs",
+      "views": [
+        {
+          "id": "list",
+          "label": "Jobs list",
+          "selector": "#content > article.card"
+        },
+        {
+          "id": "eval-report",
+          "label": "Eval report",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "mcp-servers": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/agent/mcp-servers",
+          "id": "save",
+          "label": "Save MCP servers",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#mcp-servers-form"
+        }
+      ],
+      "group": "agent",
+      "key_selectors": {
+        "form": "#mcp-servers-form"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/agent/mcp-servers"
+      ],
+      "title": "MCP Servers",
+      "views": [
+        {
+          "id": "main",
+          "label": "MCP Servers",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "memory": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/files/content",
+          "id": "save-file",
+          "label": "Save file",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#file-editor-save"
+        },
+        {
+          "endpoint": "/api/v1/files",
+          "id": "new-file",
+          "label": "New file",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": "#file-editor-new"
+        },
+        {
+          "destructive": true,
+          "endpoint": "/api/v1/files",
+          "id": "delete-file",
+          "label": "Delete file",
+          "method": "DELETE",
+          "needs_seed": true,
+          "selector": "#file-editor-delete"
+        }
+      ],
+      "group": "knowledge",
+      "key_selectors": {
+        "editor_content": "#file-editor-content",
+        "editor_delete": "#file-editor-delete",
+        "editor_new": "#file-editor-new",
+        "editor_path": "#file-editor-path",
+        "editor_save": "#file-editor-save"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/knowledge/memory",
+        "/api/v1/files/content"
+      ],
+      "title": "Memory",
+      "views": [
+        {
+          "id": "main",
+          "label": "Memory",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "model-params": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/agent/llm-params",
+          "id": "save",
+          "label": "Save model params",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#model-params-save-btn"
+        }
+      ],
+      "group": "agent",
+      "key_selectors": {
+        "form": "#model-params-form",
+        "save_btn": "#model-params-save-btn",
+        "status": "#model-params-status"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/agent/llm-params"
+      ],
+      "title": "Model Params",
+      "views": [
+        {
+          "id": "main",
+          "label": "Model Params",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "onboarding": {
+      "actions": [],
+      "group": "surfaces",
+      "key_selectors": {},
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/surfaces/onboarding"
+      ],
+      "title": "Onboarding",
+      "views": [
+        {
+          "id": "main",
+          "label": "Onboarding",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "overview": {
+      "actions": [],
+      "group": "core",
+      "key_selectors": {
+        "badges": ".mission-overview-badges",
+        "grid": ".mission-overview-grid",
+        "live_activity": "#live-activity-feed"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/runs/snapshots",
+        "/api/v1/budget/summary",
+        "/api/v1/proxy/status",
+        "/api/v1/sessions",
+        "/api/v1/providers/health"
+      ],
+      "title": "Overview",
+      "views": [
+        {
+          "id": "main",
+          "label": "Overview",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "pipelines": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/evolution/pipelines/{issue_id}/run",
+          "id": "run",
+          "label": "Run pipeline",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": ".pipeline-run"
+        },
+        {
+          "endpoint": "/api/v1/evolution/pipelines/{issue_id}/poll",
+          "id": "poll",
+          "label": "Poll pipeline",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": ".pipeline-poll"
+        },
+        {
+          "destructive": true,
+          "endpoint": "/api/v1/evolution/pipelines/{issue_id}/kill",
+          "id": "kill",
+          "label": "Kill pipeline",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": ".pipeline-kill"
+        }
+      ],
+      "group": "evolution",
+      "key_selectors": {},
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/evolution/pipelines"
+      ],
+      "title": "Pipelines",
+      "views": [
+        {
+          "id": "main",
+          "label": "Pipelines",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "providers-llms": {
+      "actions": [],
+      "group": "observability",
+      "key_selectors": {},
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/providers/health"
+      ],
+      "title": "Providers & LLMs",
+      "views": [
+        {
+          "id": "main",
+          "label": "Providers & LLMs",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "rlm-training": {
+      "actions": [],
+      "group": "self-improve",
+      "key_selectors": {},
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/self_improve/rlm-training"
+      ],
+      "title": "RLM Config",
+      "views": [
+        {
+          "id": "main",
+          "label": "RLM Config",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "schema-ontology": {
+      "actions": [],
+      "group": "ops",
+      "key_selectors": {},
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/schema/ontology"
+      ],
+      "title": "Schema & Ontology",
+      "views": [
+        {
+          "id": "main",
+          "label": "Schema & Ontology",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "second-brain": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/files/content",
+          "id": "save-file",
+          "label": "Save file",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#file-editor-save"
+        }
+      ],
+      "group": "knowledge",
+      "key_selectors": {
+        "editor_path": "#file-editor-path",
+        "editor_save": "#file-editor-save"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/knowledge/second-brain"
+      ],
+      "title": "Second Brain",
+      "views": [
+        {
+          "id": "main",
+          "label": "Second Brain",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "secrets": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/secrets/store/entries/{alias}",
+          "id": "reveal",
+          "label": "Reveal store entry",
+          "method": "GET",
+          "needs_seed": true,
+          "selector": "#secrets-reveal-btn"
+        },
+        {
+          "endpoint": "/api/v1/secrets/store/entries/{alias}",
+          "id": "save",
+          "label": "Save store entry",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#secrets-save-btn"
+        },
+        {
+          "destructive": true,
+          "endpoint": "/api/v1/secrets/store/entries/{alias}",
+          "id": "delete",
+          "label": "Delete store entry",
+          "method": "DELETE",
+          "needs_seed": true,
+          "selector": "#secrets-delete-btn"
+        }
+      ],
+      "group": "ops",
+      "key_selectors": {
+        "alias": "#secrets-alias",
+        "delete_btn": "#secrets-delete-btn",
+        "exposed_banner": "#secrets-exposed-banner",
+        "reveal_btn": "#secrets-reveal-btn",
+        "save_btn": "#secrets-save-btn",
+        "show_values": "#secrets-show-values",
+        "value": "#secrets-value"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/secrets/aliases",
+        "/api/v1/secrets/aliases/{logical_key}/reveal",
+        "/api/v1/secrets/store",
+        "/api/v1/secrets/store/entries"
+      ],
+      "title": "Secrets",
+      "views": [
+        {
+          "id": "main",
+          "label": "Secrets",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "security": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/security",
+          "id": "save",
+          "label": "Save security toggles",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#security-toggles-form"
+        }
+      ],
+      "group": "ops",
+      "key_selectors": {
+        "form": "#security-toggles-form"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/security"
+      ],
+      "title": "Security",
+      "views": [
+        {
+          "id": "main",
+          "label": "Security",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "sessions": {
+      "actions": [],
+      "group": "core",
+      "key_selectors": {},
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/sessions",
+        "/api/v1/sessions/{session_id}/api-calls"
+      ],
+      "title": "Sessions",
+      "views": [
+        {
+          "id": "list",
+          "label": "Sessions list",
+          "selector": "#content > article.card"
+        },
+        {
+          "id": "api-calls",
+          "label": "Session API calls",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "sevn-cli": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/cli/run",
+          "id": "run",
+          "label": "Run CLI command",
+          "method": "POST",
+          "selector": "#cli-run-btn"
+        }
+      ],
+      "group": "ops",
+      "key_selectors": {
+        "args": "#cli-args",
+        "output": "#cli-output",
+        "run_btn": "#cli-run-btn"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/cli/shortcuts"
+      ],
+      "title": "sevn CLI",
+      "views": [
+        {
+          "id": "main",
+          "label": "sevn CLI",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "skills": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/agent/skills/install",
+          "id": "install",
+          "label": "Install skill",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": "#skill-install-form"
+        },
+        {
+          "endpoint": "/api/v1/agent/skills/{skill_name}/promote",
+          "id": "promote",
+          "label": "Promote skill",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": ".skill-promote-btn"
+        },
+        {
+          "endpoint": "/api/v1/agent/skills/{skill_name}/toggle",
+          "id": "toggle",
+          "label": "Toggle skill",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": ".skill-toggle-btn"
+        },
+        {
+          "destructive": true,
+          "endpoint": "/api/v1/agent/skills/{skill_name}",
+          "id": "uninstall",
+          "label": "Uninstall skill",
+          "method": "DELETE",
+          "needs_seed": true,
+          "selector": ".skill-uninstall-btn"
+        }
+      ],
+      "group": "agent",
+      "key_selectors": {
+        "install_form": "#skill-install-form",
+        "install_select": "#skill-install-select"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/agent/skills",
+        "/api/v1/agent/skills/bundled"
+      ],
+      "title": "Skills",
+      "views": [
+        {
+          "id": "main",
+          "label": "Skills",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "spec-kit": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/spec-kit/constitution",
+          "id": "save-constitution",
+          "label": "Save constitution",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#spec-kit-save"
+        },
+        {
+          "endpoint": "/api/v1/spec-kit/constitution/template",
+          "id": "reset-template",
+          "label": "Reset template",
+          "method": "GET",
+          "selector": "#spec-kit-reset"
+        },
+        {
+          "endpoint": "/api/v1/spec-kit/options",
+          "id": "save-options",
+          "label": "Save options",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#spec-kit-options-save"
+        },
+        {
+          "endpoint": "/api/v1/spec-kit/test-invoke",
+          "id": "test-invoke",
+          "label": "Test invoke",
+          "method": "POST",
+          "selector": "#spec-kit-test-plan"
+        }
+      ],
+      "group": "evolution",
+      "key_selectors": {
+        "constitution": "#spec-kit-constitution",
+        "options": "#spec-kit-options",
+        "options_save": "#spec-kit-options-save",
+        "reset": "#spec-kit-reset",
+        "save": "#spec-kit-save",
+        "test_plan": "#spec-kit-test-plan"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/spec-kit/constitution",
+        "/api/v1/spec-kit/options",
+        "/api/v1/spec-kit/runs"
+      ],
+      "title": "Spec-Kit",
+      "views": [
+        {
+          "id": "main",
+          "label": "Spec-Kit",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "stats": {
+      "actions": [],
+      "group": "evolution",
+      "key_selectors": {},
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/evolution/stats"
+      ],
+      "title": "Stats",
+      "views": [
+        {
+          "id": "main",
+          "label": "Stats",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "telegram-menu": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/surfaces/telegram-menu",
+          "id": "save",
+          "label": "Save telegram menu",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#telegram-menu-form"
+        }
+      ],
+      "group": "surfaces",
+      "key_selectors": {
+        "form": "#telegram-menu-form"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/surfaces/telegram-menu"
+      ],
+      "title": "Telegram Menu",
+      "views": [
+        {
+          "id": "main",
+          "label": "Telegram Menu",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "terminal": {
+      "actions": [
+        {
+          "destructive": true,
+          "endpoint": "/api/v1/terminal/session",
+          "id": "connect",
+          "label": "Connect terminal",
+          "method": "POST",
+          "selector": "#terminal-connect-btn"
+        }
+      ],
+      "group": "ops",
+      "key_selectors": {
+        "connect_btn": "#terminal-connect-btn",
+        "disconnect_btn": "#terminal-disconnect-btn",
+        "mount": "#terminal-mount",
+        "status": "#terminal-status"
+      },
+      "kind": "wired",
+      "read_endpoints": [],
+      "title": "Terminal",
+      "views": [
+        {
+          "id": "main",
+          "label": "Terminal",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "tools-permissions": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/agent/approvals/{decision_id}",
+          "id": "approve",
+          "label": "Approve pending tool",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": ".tool-approval-btn"
+        },
+        {
+          "endpoint": "/api/v1/agent/permissions",
+          "id": "save-permissions",
+          "label": "Save permissions",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#permissions-form"
+        }
+      ],
+      "group": "agent",
+      "key_selectors": {
+        "approval_btn": ".tool-approval-btn",
+        "permissions_editor": "#permissions-editor",
+        "permissions_form": "#permissions-form",
+        "tools_editor": "#tools-editor"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/agent/tools-health",
+        "/api/v1/agent/permissions",
+        "/api/v1/agent/approvals/pending"
+      ],
+      "title": "Tools & Permissions",
+      "views": [
+        {
+          "id": "main",
+          "label": "Tools & Permissions",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "traces": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/sessions/{session_id}/turns/{turn_id}/replay",
+          "id": "replay-turn",
+          "label": "Replay turn",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": "#trace-replay-turn"
+        }
+      ],
+      "group": "observability",
+      "key_selectors": {
+        "detail": "#trace-detail",
+        "filters": "#trace-filters",
+        "replay_status": "#trace-replay-status",
+        "replay_turn": "#trace-replay-turn",
+        "trace_row": ".trace-row[data-span-id]"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/traces",
+        "/api/v1/traces/{span_id}"
+      ],
+      "title": "Traces",
+      "views": [
+        {
+          "id": "list",
+          "label": "Trace list",
+          "selector": "#trace-filters"
+        },
+        {
+          "id": "detail",
+          "label": "Trace detail",
+          "selector": "#trace-detail"
+        }
+      ]
+    },
+    "trajectories": {
+      "actions": [],
+      "group": "self-improve",
+      "key_selectors": {},
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/self_improve/trajectories"
+      ],
+      "title": "Trajectories",
+      "views": [
+        {
+          "id": "main",
+          "label": "Trajectories",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "tunnels-infra": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/ops/reload-config",
+          "id": "reload-config",
+          "label": "Reload config",
+          "method": "POST",
+          "selector": "#ops-reload-config-btn"
+        },
+        {
+          "endpoint": "/api/v1/ops/dreaming/run",
+          "id": "dreaming-run",
+          "label": "Run dreaming",
+          "method": "POST",
+          "selector": "#ops-dreaming-run-btn"
+        },
+        {
+          "destructive": true,
+          "endpoint": "/api/v1/ops/daemons/{service}/{action}",
+          "id": "daemon-action",
+          "label": "Daemon action",
+          "method": "POST",
+          "selector": ".daemon-action-btn"
+        }
+      ],
+      "group": "ops",
+      "key_selectors": {
+        "daemon_action": ".daemon-action-btn",
+        "dreaming_btn": "#ops-dreaming-run-btn",
+        "reload_btn": "#ops-reload-config-btn"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/tunnels/status",
+        "/api/v1/ops/daemons"
+      ],
+      "title": "Tunnels & Infra",
+      "views": [
+        {
+          "id": "main",
+          "label": "Tunnels & Infra",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "users-rbac": {
+      "actions": [],
+      "group": "surfaces",
+      "key_selectors": {},
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/surfaces/users-rbac"
+      ],
+      "title": "Users & RBAC",
+      "views": [
+        {
+          "id": "main",
+          "label": "Users & RBAC",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "web-apps": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/surfaces/web-apps",
+          "id": "save",
+          "label": "Save web apps",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#web-apps-form"
+        }
+      ],
+      "group": "surfaces",
+      "key_selectors": {
+        "form": "#web-apps-form"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/surfaces/web-apps"
+      ],
+      "title": "Web Apps",
+      "views": [
+        {
+          "id": "main",
+          "label": "Web Apps",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "workspace-files": {
+      "actions": [
+        {
+          "endpoint": "/api/v1/files/content",
+          "id": "save-file",
+          "label": "Save file",
+          "method": "PUT",
+          "needs_seed": true,
+          "selector": "#file-editor-save"
+        }
+      ],
+      "group": "knowledge",
+      "key_selectors": {
+        "editor_path": "#file-editor-path",
+        "editor_save": "#file-editor-save"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/knowledge/workspace-files",
+        "/api/v1/files/tree",
+        "/api/v1/files/content"
+      ],
+      "title": "Workspace Files",
+      "views": [
+        {
+          "id": "main",
+          "label": "Workspace Files",
+          "selector": "#content > article.card"
+        }
+      ]
+    }
+  }
+}

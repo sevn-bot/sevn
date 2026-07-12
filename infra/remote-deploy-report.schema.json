@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sevn.bot/schemas/remote-deploy-report.schema.json",
+  "title": "sevn remote deploy report",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "generated_at",
+    "host_id",
+    "bundle_path",
+    "bot_name",
+    "mode",
+    "steps",
+    "remote",
+    "errors"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "generated_at": { "type": "string", "minLength": 1 },
+    "host_id": { "type": "string", "minLength": 1 },
+    "bundle_path": { "type": "string" },
+    "bot_name": { "type": "string" },
+    "mode": { "type": "string", "enum": ["deploy", "check", "dry-run"] },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "status"],
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "status": {
+            "type": "string",
+            "enum": ["ok", "failed", "skipped", "planned"]
+          },
+          "duration_ms": { "type": "integer", "minimum": 0 },
+          "detail": { "type": "string" },
+          "remote_path": { "type": "string" },
+          "url": { "type": "string" },
+          "command": { "type": "string" }
+        }
+      }
+    },
+    "remote": {
+      "type": "object",
+      "properties": {
+        "sevn_version": { "type": "string" },
+        "sevn_home": { "type": "string" },
+        "gateway_active": { "type": "boolean" },
+        "proxy_active": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "errors": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

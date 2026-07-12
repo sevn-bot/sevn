@@ -1,0 +1,226 @@
+{
+  "$defs": {
+    "ComplexityTier": {
+      "description": "Executor dispatch tier (`specs/10-schema-ontology.md` \u00a73.2).",
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "title": "ComplexityTier",
+      "type": "string"
+    },
+    "Intent": {
+      "description": "Conversational role for one Triager emission (`specs/10-schema-ontology.md` \u00a73.1).",
+      "enum": [
+        "GREETING",
+        "FOLLOWUP",
+        "NEW_REQUEST",
+        "UNKNOWN"
+      ],
+      "title": "Intent",
+      "type": "string"
+    },
+    "TelegramFollowupAnchor": {
+      "additionalProperties": false,
+      "description": "Telegram FOLLOWUP anchor (`specs/10-schema-ontology.md` \u00a72.2; `specs/18-channel-telegram.md`).\n\nAttributes:\n    channel (Literal[\"telegram\"]): Discriminator literal for the union.\n    chat_id (int): Telegram chat id the followup attaches to.\n    topic_id (int | None): Forum topic id, ``None`` for chat-level threads.\n    message_id (int | None): Anchor message id (current user message).\n    reply_to_message_id (int | None): ``reply_to_message.message_id`` when set.",
+      "properties": {
+        "channel": {
+          "const": "telegram",
+          "default": "telegram",
+          "title": "Channel",
+          "type": "string"
+        },
+        "chat_id": {
+          "title": "Chat Id",
+          "type": "integer"
+        },
+        "message_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Message Id"
+        },
+        "reply_to_message_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reply To Message Id"
+        },
+        "topic_id": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Topic Id"
+        }
+      },
+      "required": [
+        "chat_id"
+      ],
+      "title": "TelegramFollowupAnchor",
+      "type": "object"
+    },
+    "WebUIFollowupAnchor": {
+      "additionalProperties": false,
+      "description": "Web UI / WebChat FOLLOWUP anchor (`specs/10-schema-ontology.md` \u00a72.2; `specs/19-channel-webui.md`).\n\nAttributes:\n    channel (Literal[\"webui\"]): Discriminator literal for the union.\n    session_id (str): Gateway session id the followup attaches to.\n    message_id (str | None): Anchor message id within the SPA transcript.",
+      "properties": {
+        "channel": {
+          "const": "webui",
+          "default": "webui",
+          "title": "Channel",
+          "type": "string"
+        },
+        "message_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Message Id"
+        },
+        "session_id": {
+          "title": "Session Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id"
+      ],
+      "title": "WebUIFollowupAnchor",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Validated structured output from the Triager LLM call (`specs/10-schema-ontology.md` \u00a72.2).",
+  "properties": {
+    "complexity": {
+      "$ref": "#/$defs/ComplexityTier"
+    },
+    "confidence": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "disregard": {
+      "default": false,
+      "title": "Disregard",
+      "type": "boolean"
+    },
+    "first_message": {
+      "title": "First Message",
+      "type": "string"
+    },
+    "followup_anchor": {
+      "anyOf": [
+        {
+          "discriminator": {
+            "mapping": {
+              "telegram": "#/$defs/TelegramFollowupAnchor",
+              "webui": "#/$defs/WebUIFollowupAnchor"
+            },
+            "propertyName": "channel"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/TelegramFollowupAnchor"
+            },
+            {
+              "$ref": "#/$defs/WebUIFollowupAnchor"
+            }
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Followup Anchor"
+    },
+    "intent": {
+      "$ref": "#/$defs/Intent"
+    },
+    "mcp_servers_required": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Mcp Servers Required",
+      "type": "array"
+    },
+    "permission_scope_narrowing": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Permission Scope Narrowing"
+    },
+    "replay_provider_history": {
+      "default": false,
+      "title": "Replay Provider History",
+      "type": "boolean"
+    },
+    "requires_document": {
+      "title": "Requires Document",
+      "type": "boolean"
+    },
+    "requires_vision": {
+      "title": "Requires Vision",
+      "type": "boolean"
+    },
+    "skills": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Skills",
+      "type": "array"
+    },
+    "tools": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tools",
+      "type": "array"
+    }
+  },
+  "required": [
+    "intent",
+    "complexity",
+    "first_message",
+    "tools",
+    "skills",
+    "mcp_servers_required",
+    "confidence",
+    "requires_vision",
+    "requires_document"
+  ],
+  "title": "TriageResult",
+  "type": "object"
+}

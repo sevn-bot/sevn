@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sevn.bot/schemas/agent-context.schema.meta.json",
+  "title": "Agent context manifest golden",
+  "type": "object",
+  "required": ["schema_version", "generated_at", "git_commit", "agents"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"type": "integer", "const": 1},
+    "generated_at": {"type": "string", "minLength": 1},
+    "git_commit": {"type": "string", "minLength": 1},
+    "agents": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/agent"}}
+  },
+  "$defs": {
+    "block": {
+      "type": "object",
+      "required": ["id", "label", "content_type"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "label": {"type": "string", "minLength": 1},
+        "content_type": {
+          "type": "string",
+          "enum": [
+            "static_rules", "registry", "personality", "transcript", "tools_catalog",
+            "skills_catalog", "workspace_memory", "turn_metadata", "message_history",
+            "tool_schemas", "json_phase", "multimodal", "canned_reply", "workspace_persona",
+            "segmented_text", "playbooks", "gateway_inject", "triager_opener"
+          ]
+        },
+        "description": {"type": "string"},
+        "conditional": {"type": "string"},
+        "blocks": {"type": "array", "items": {"$ref": "#/$defs/block"}}
+      },
+      "additionalProperties": false
+    },
+    "slot": {
+      "type": "object",
+      "required": ["order", "id", "role", "content_type", "label"],
+      "properties": {
+        "order": {"type": "integer", "minimum": 1},
+        "id": {"type": "string", "minLength": 1},
+        "role": {"type": "string", "enum": ["system", "user", "assistant", "tool"]},
+        "content_type": {"$ref": "#/$defs/block/properties/content_type"},
+        "label": {"type": "string", "minLength": 1},
+        "description": {"type": "string"},
+        "conditional": {"type": "string"},
+        "blocks": {"type": "array", "items": {"$ref": "#/$defs/block"}},
+        "segments": {"type": "array", "items": {"$ref": "#/$defs/segment"}}
+      },
+      "additionalProperties": false
+    },
+    "segment": {
+      "type": "object",
+      "required": ["id", "label", "content_type"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "label": {"type": "string", "minLength": 1},
+        "content_type": {"$ref": "#/$defs/block/properties/content_type"},
+        "description": {"type": "string"},
+        "conditional": {"type": "string"},
+        "blocks": {"type": "array", "items": {"$ref": "#/$defs/block"}}
+      },
+      "additionalProperties": false
+    },
+    "agent": {
+      "type": "object",
+      "required": ["id", "label", "uses_llm", "wire", "slots"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "label": {"type": "string", "minLength": 1},
+        "uses_llm": {"type": "boolean"},
+        "wire": {"type": "string", "enum": ["pydantic_ai", "json_phase", "gateway_only"]},
+        "slots": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/slot"}},
+        "variants": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["system_block_ids"],
+            "properties": {"system_block_ids": {"type": "array", "items": {"type": "string"}}},
+            "additionalProperties": false
+          }
+        },
+        "intro_system_blocks": {"type": "array", "items": {"$ref": "#/$defs/block"}}
+      },
+      "additionalProperties": false
+    }
+  }
+}

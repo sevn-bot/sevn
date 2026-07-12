@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sevn.bot/infra/onboarding_profiles_fragment.schema.json",
+  "title": "Onboarding profile fragment",
+  "description": "Partial `sevn.json` overlays under `src/sevn/data/onboarding_profiles/fragments/` (`specs/22-onboarding.md` §3.1).",
+  "type": "object",
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "capabilities_defaults": {
+      "type": "object",
+      "additionalProperties": { "type": "boolean" },
+      "description": "Optional per-profile capability_id overrides (`specs/22-onboarding.md` comprehensive setup D13)."
+    }
+  },
+  "additionalProperties": true
+}

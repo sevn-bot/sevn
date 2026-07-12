@@ -1,0 +1,483 @@
+{
+  "agents": [
+    {
+      "id": "triager",
+      "label": "Triager",
+      "slots": [
+        {
+          "blocks": [
+            {
+              "content_type": "workspace_persona",
+              "id": "persona",
+              "label": "Persona bundle"
+            },
+            {
+              "content_type": "static_rules",
+              "id": "json_mandate",
+              "label": "TriageResult JSON mandate"
+            }
+          ],
+          "content_type": "workspace_persona",
+          "id": "system_prompt",
+          "label": "System prompt",
+          "order": 1,
+          "role": "system"
+        },
+        {
+          "content_type": "segmented_text",
+          "id": "user_blob",
+          "label": "User prompt (segmented)",
+          "order": 2,
+          "role": "user",
+          "segments": [
+            {
+              "content_type": "static_rules",
+              "id": "static_prefix",
+              "label": "Static prefix"
+            },
+            {
+              "content_type": "registry",
+              "id": "registry_block",
+              "label": "Registry block"
+            },
+            {
+              "conditional": "skip_personality false",
+              "content_type": "personality",
+              "id": "personality_block",
+              "label": "Personality block"
+            },
+            {
+              "blocks": [
+                {
+                  "content_type": "turn_metadata",
+                  "id": "turn_context",
+                  "label": "Turn context"
+                },
+                {
+                  "content_type": "transcript",
+                  "id": "transcript",
+                  "label": "Transcript"
+                },
+                {
+                  "content_type": "turn_metadata",
+                  "id": "lcm_stub",
+                  "label": "LCM summary stub"
+                },
+                {
+                  "content_type": "turn_metadata",
+                  "id": "last_routing",
+                  "label": "Last routing"
+                },
+                {
+                  "conditional": "inject_group_triage_block",
+                  "content_type": "static_rules",
+                  "id": "group_triage",
+                  "label": "Group triage instruction"
+                },
+                {
+                  "conditional": "code_orientation_block present",
+                  "content_type": "playbooks",
+                  "id": "code_orientation",
+                  "label": "Code orientation"
+                },
+                {
+                  "conditional": "attachment_hints non-empty",
+                  "content_type": "multimodal",
+                  "id": "attachments",
+                  "label": "Attachments"
+                },
+                {
+                  "content_type": "turn_metadata",
+                  "id": "current_message",
+                  "label": "Current message"
+                }
+              ],
+              "content_type": "segmented_text",
+              "id": "suffix",
+              "label": "Suffix segment"
+            }
+          ]
+        }
+      ],
+      "uses_llm": true,
+      "wire": "pydantic_ai"
+    },
+    {
+      "id": "tier_a",
+      "label": "Tier A",
+      "slots": [
+        {
+          "content_type": "canned_reply",
+          "id": "first_message",
+          "label": "Triager first message",
+          "order": 1,
+          "role": "assistant"
+        }
+      ],
+      "uses_llm": false,
+      "wire": "gateway_only"
+    },
+    {
+      "id": "tier_b",
+      "label": "Tier B",
+      "slots": [
+        {
+          "blocks": [
+            {
+              "content_type": "playbooks",
+              "id": "identity_boundary",
+              "label": "Identity Boundary"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "identity_answer",
+              "label": "Identity Answer"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "workspace_roots",
+              "label": "Workspace Roots"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "workspace_code_search",
+              "label": "Workspace Code Search"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "hallucination_guard",
+              "label": "Hallucination Guard"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "tools_vs_skills",
+              "label": "Tools Vs Skills"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "no_silent_substitution",
+              "label": "No Silent Substitution"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "retrieval_honesty",
+              "label": "Retrieval Honesty"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "live_factual",
+              "label": "Live Factual"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "github_repo_eval",
+              "label": "Github Repo Eval"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "persistence",
+              "label": "Persistence"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "sessions_context",
+              "label": "Sessions Context"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "architecture_context",
+              "label": "Architecture Context"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "log_query_playbook",
+              "label": "Log Query Playbook"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "log_provenance_playbook",
+              "label": "Log Provenance Playbook"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "list_registry_playbook",
+              "label": "List Registry Playbook"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "last30days_playbook",
+              "label": "Last30Days Playbook"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "codemode_playbook",
+              "label": "Codemode Playbook"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "index_architecture",
+              "label": "Index Architecture"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "brevity",
+              "label": "Brevity"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "telegram_formatting",
+              "label": "Telegram Formatting"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "no_preamble_echo",
+              "label": "No Preamble Echo"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "spill_recovery",
+              "label": "Spill Recovery"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "tool_economy",
+              "label": "Tool Economy"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "process_install",
+              "label": "Process Install"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "playwright_browser",
+              "label": "Playwright Browser"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "bound_skill_playbook",
+              "label": "Bound Skill Playbook"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "triager_bound_mandate",
+              "label": "Triager Bound Mandate"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "memorize",
+              "label": "Memorize"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "file_link",
+              "label": "File Link"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "repo_access",
+              "label": "Repo Access"
+            },
+            {
+              "content_type": "playbooks",
+              "id": "persona",
+              "label": "Persona"
+            }
+          ],
+          "content_type": "playbooks",
+          "id": "system_prompt",
+          "label": "System prompt",
+          "order": 1,
+          "role": "system"
+        },
+        {
+          "blocks": [
+            {
+              "content_type": "tools_catalog",
+              "id": "lazy_load_guidance",
+              "label": "Lazy-load guidance"
+            },
+            {
+              "content_type": "static_rules",
+              "id": "error_handling_rule",
+              "label": "Tool error handling"
+            },
+            {
+              "content_type": "tools_catalog",
+              "id": "tool_catalog",
+              "label": "Full tool catalog"
+            },
+            {
+              "content_type": "tools_catalog",
+              "id": "triager_narrowed_tools",
+              "label": "Triager-narrowed tools"
+            },
+            {
+              "content_type": "skills_catalog",
+              "id": "triager_narrowed_skills",
+              "label": "Triager-narrowed skills"
+            },
+            {
+              "content_type": "gateway_inject",
+              "id": "gateway_extra_instructions",
+              "label": "Gateway extra instructions"
+            },
+            {
+              "content_type": "triager_opener",
+              "id": "triager_opener_note",
+              "label": "Triager opener note"
+            }
+          ],
+          "content_type": "tools_catalog",
+          "id": "instructions",
+          "label": "Dynamic instructions",
+          "order": 2,
+          "role": "system"
+        },
+        {
+          "content_type": "message_history",
+          "id": "message_history",
+          "label": "Message history",
+          "order": 3,
+          "role": "user"
+        },
+        {
+          "content_type": "multimodal",
+          "id": "user_prompt",
+          "label": "Current user prompt",
+          "order": 4,
+          "role": "user"
+        },
+        {
+          "content_type": "tool_schemas",
+          "id": "tool_schemas",
+          "label": "Tool schemas",
+          "order": 5,
+          "role": "tool"
+        }
+      ],
+      "uses_llm": true,
+      "variants": {
+        "first_session_intro": {
+          "system_block_ids": [
+            "identity_boundary",
+            "identity_answer",
+            "hallucination_guard",
+            "tools_vs_skills",
+            "persistence",
+            "brevity",
+            "telegram_formatting",
+            "no_preamble_echo",
+            "memorize",
+            "persona_intro"
+          ]
+        },
+        "full_turn": {
+          "system_block_ids": [
+            "identity_boundary",
+            "identity_answer",
+            "workspace_roots",
+            "workspace_code_search",
+            "hallucination_guard",
+            "tools_vs_skills",
+            "no_silent_substitution",
+            "retrieval_honesty",
+            "live_factual",
+            "github_repo_eval",
+            "persistence",
+            "sessions_context",
+            "architecture_context",
+            "log_query_playbook",
+            "log_provenance_playbook",
+            "list_registry_playbook",
+            "last30days_playbook",
+            "codemode_playbook",
+            "index_architecture",
+            "brevity",
+            "telegram_formatting",
+            "no_preamble_echo",
+            "spill_recovery",
+            "tool_economy",
+            "process_install",
+            "playwright_browser",
+            "bound_skill_playbook",
+            "triager_bound_mandate",
+            "memorize",
+            "file_link",
+            "repo_access",
+            "persona"
+          ]
+        }
+      },
+      "wire": "pydantic_ai"
+    },
+    {
+      "id": "tier_c_dspy",
+      "label": "Tier C/D (dspy)",
+      "slots": [
+        {
+          "content_type": "json_phase",
+          "id": "decompose",
+          "label": "Decompose",
+          "order": 1,
+          "role": "user"
+        },
+        {
+          "content_type": "turn_metadata",
+          "id": "plan_gate",
+          "label": "Plan gate",
+          "order": 2,
+          "role": "system"
+        },
+        {
+          "content_type": "json_phase",
+          "id": "rlm_outer",
+          "label": "RLM outer loop",
+          "order": 3,
+          "role": "user"
+        },
+        {
+          "content_type": "json_phase",
+          "id": "synthesize",
+          "label": "Synthesize",
+          "order": 4,
+          "role": "user"
+        }
+      ],
+      "uses_llm": true,
+      "wire": "json_phase"
+    },
+    {
+      "id": "tier_c_lambda",
+      "label": "Tier C/D (lambda)",
+      "slots": [
+        {
+          "content_type": "turn_metadata",
+          "id": "plan_gate",
+          "label": "Plan gate",
+          "order": 1,
+          "role": "system"
+        },
+        {
+          "content_type": "json_phase",
+          "id": "lambda_macro",
+          "label": "Lambda macro",
+          "order": 2,
+          "role": "user"
+        },
+        {
+          "content_type": "json_phase",
+          "id": "synthesize",
+          "label": "Synthesize",
+          "order": 3,
+          "role": "user"
+        }
+      ],
+      "uses_llm": true,
+      "wire": "json_phase"
+    }
+  ],
+  "generated_at": "2026-06-17T20:37:32+00:00",
+  "git_commit": "504753e1b",
+  "schema_version": 1
+}

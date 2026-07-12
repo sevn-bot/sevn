@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sevn.bot/schema/onboarding_profile_fragment.json",
+  "title": "sevn onboarding preset fragment (partial sevn.json)",
+  "type": "object",
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 }
+  },
+  "additionalProperties": true
+}

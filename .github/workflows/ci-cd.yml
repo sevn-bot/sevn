@@ -1,0 +1,241 @@
+# CI disabled until open-source migration — restore commented `on:` block below to re-enable.
+#
+# SPDX-License-Identifier: MIT
+#
+# Six-phase delivery pipeline.
+# Normative spec: specs/25-cicd-full.md (Phase 5 of the build).
+#
+# publish-ghcr: pushes sandbox/proxy/gateway images to GHCR on main and v* tags.
+#
+# Trigger → phase mapping (specs/25-cicd-full.md §2.3):
+#   push to main         → phase1 → phase2 → phase3        (build/deploy Dev + smoke)
+#   push tag 'v*'        → phase4 → phase5 → phase6        (production deploy + release)
+#   workflow_dispatch    → full chain phase1…phase6        (manual / break-glass)
+#
+# Pull requests are intentionally NOT triggered here. The single PR verify gate
+# is `.github/workflows/ci.yml` (Option A from the Phase 5 brief), which gates
+# main/develop/test-pre. Re-running Phase 1 on PRs in two workflows would just
+# double-charge runners. This delivery DAG keys on `main` / `v*` only, so
+# `test-pre` activity never triggers a deploy.
+#
+# Fork safety (specs/25-cicd-full.md §2.4):
+#   This workflow does not run on pull_request at all, so fork-PR-secret leaks
+#   are structurally impossible here. The PR verify gate (ci.yml) runs on fork
+#   PRs by GitHub default but without repository secrets.
+#
+# Checkout identity (specs/25-cicd-full.md §2.5):
+#   `actions/checkout@v5` defaults to `${{ github.repository }}`. Any future
+#   cross-repo automation (e.g. operator code-hub sync) MUST NOT override this
+#   action's checkout target — that is a runtime concern, not a CI concern.
+#
+# Concurrency:
+#   One workflow-level group keyed on the ref so only one production deploy
+#   can run for a given tag/branch at a time. `cancel-in-progress: false` so
+#   a tag-push deploy is never killed by an overlapping main-push run.
+
+name: CI/CD (six-phase delivery)
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+concurrency:
+  group: prod-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  phase1:
+    name: Phase 1 — Verify CI
+    # Run on main pushes and manual dispatch. Tag pushes also re-run Phase 1
+    # so the tagged SHA's verify is re-confirmed before production deploy
+    # (specs/25-cicd-full.md §2.3 "Tag eligibility").
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: ./.github/actions/bootstrap
+
+      - name: Full gate
+        run: make ci
+
+  publish-ghcr:
+    name: Publish container images to GHCR
+    needs: [phase1]
+    if: >-
+      github.event_name == 'push' && (
+        github.ref == 'refs/heads/main' ||
+        startsWith(github.ref, 'refs/tags/v')
+      )
+    runs-on: ubuntu-latest
+    environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || 'development' }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Set lowercase image prefix
+        run: echo "IMAGE_REPOSITORY=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push sandbox image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: docker/Dockerfile.sandbox
+          push: true
+          cache-from: type=gha,scope=sandbox
+          cache-to: type=gha,mode=max,scope=sandbox
+          tags: |
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/sandbox:${{ github.sha }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/sandbox:latest
+            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/sandbox:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
+
+      - name: Build and push proxy image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: docker/Dockerfile.proxy
+          push: true
+          cache-from: type=gha,scope=proxy
+          cache-to: type=gha,mode=max,scope=proxy
+          tags: |
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/proxy:${{ github.sha }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/proxy:latest
+            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/proxy:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
+
+      - name: Build and push gateway image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: docker/Dockerfile.gateway
+          push: true
+          cache-from: type=gha,scope=gateway
+          cache-to: type=gha,mode=max,scope=gateway
+          tags: |
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway:${{ github.sha }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway:latest
+            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/gateway:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
+
+      - name: Build and push gateway browser image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: docker/Dockerfile.gateway.browser
+          platforms: linux/amd64,linux/arm64
+          push: true
+          cache-from: type=gha,scope=gateway-browser
+          cache-to: type=gha,mode=max,scope=gateway-browser
+          tags: |
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.browser:${{ github.sha }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.browser:latest
+            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/gateway.browser:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
+
+      - name: Build and push gateway GUI image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: docker/Dockerfile.gateway.gui
+          platforms: linux/amd64,linux/arm64
+          push: true
+          cache-from: type=gha,scope=gateway-gui
+          cache-to: type=gha,mode=max,scope=gateway-gui
+          tags: |
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.gui:${{ github.sha }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.gui:latest
+            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/gateway.gui:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
+
+  phase2:
+    name: Phase 2 — Build & Deploy → Dev (STUB)
+    needs: [phase1]
+    environment: development
+    # Only on main push or manual dispatch; tag pushes skip Dev and go to prod.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stub — build artefacts and deploy to Dev environment
+        run: |
+          echo "::warning title=Stub phase::Phase 2 is a stub — no real Dev deployment performed (specs/25-cicd-full.md §2.1)"
+          echo "STUB: build artefacts (wheel/sdist; sandbox image when Dockerfile lands)"
+          echo "STUB: deploy to GitHub Environment 'development'"
+          echo "See specs/25-cicd-full.md §2.1 (Phase 2) and §4.5 (artefact-only default)"
+
+  phase3:
+    name: Phase 3 — Test Dev (STUB)
+    needs: [phase2]
+    environment: development
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stub — smoke Dev topology
+        run: |
+          echo "::warning title=Stub phase::Phase 3 is a stub — no real Dev smoke performed (specs/25-cicd-full.md §2.1)"
+          echo "STUB: smoke deployed Dev (health, one critical journey, webhook sample)"
+          echo "STUB: NOT a repeat of Phase 1 (specs/25-cicd-full.md §2.1)"
+
+  phase4:
+    name: Phase 4 — Deploy → Production (STUB)
+    needs: [phase1, publish-ghcr]
+    environment: production
+    # Production deploy is tag-gated by default (specs/25-cicd-full.md §2.3).
+    # On manual dispatch we also allow this so the full chain is exercisable.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stub — deploy tagged SHA to Production environment
+        run: |
+          echo "::warning title=Stub phase::Phase 4 is a stub — no real Production deployment performed (specs/25-cicd-full.md §2.1)"
+          echo "STUB: deploy tagged SHA to GitHub Environment 'production'"
+          echo "Tag: ${{ github.ref }}"
+          echo "See specs/25-cicd-full.md §2.1 (Phase 4) and §2.3 (tag eligibility)"
+
+  phase5:
+    name: Phase 5 — Test Production (STUB)
+    needs: [phase4]
+    environment: production
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stub — read-only production probes
+        run: |
+          echo "::warning title=Stub phase::Phase 5 is a stub — no real Production probes performed (specs/25-cicd-full.md §2.1)"
+          echo "STUB: read-only probes (health, version, getMe-style, webhook echo)"
+          echo "STUB: optional synthetic / shadow path (no mutation of real user data)"
+          echo "See specs/25-cicd-full.md §2.1 (Phase 5)"
+
+  phase6:
+    name: Phase 6 — Release
+    needs: [phase5]
+    environment: production
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Create GitHub Release (tagged build)
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: false

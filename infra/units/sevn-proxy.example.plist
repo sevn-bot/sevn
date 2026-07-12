@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Example launchd job for the egress proxy (`specs/07-egress-proxy.md`).
+  Install: cp to ~/Library/LaunchAgents/ai.sevn.proxy.example.plist, edit paths and env,
+  then launchctl bootstrap gui/$UID ~/Library/LaunchAgents/ai.sevn.proxy.example.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>ai.sevn.proxy.example</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/sevn/.venv/bin/uvicorn</string>
+        <string>sevn.proxy.app:app</string>
+        <string>--host</string>
+        <string>127.0.0.1</string>
+        <string>--port</string>
+        <string>8787</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/opt/sevn</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>

@@ -1,0 +1,47 @@
+# CI disabled until open-source migration — restore commented `on:` block below to re-enable.
+#
+# Publish sevn.bot style guide to GitHub Pages (built from styles/sevn/style).
+name: Style guide (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - styles/sevn/style/**
+      - .github/workflows/style-guide-pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-style-guide
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - name: Prepare site
+        run: |
+          mkdir -p _site
+          cp -R styles/sevn/style/. _site/
+          if [ -f _site/style-guide.html ]; then
+            cp _site/style-guide.html _site/index.html
+          fi
+
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

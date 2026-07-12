@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "workspace_root": ".",
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 13002,
+    "token": "e2e-dev-token",
+    "queue_mode": "cancel"
+  },
+  "security": {
+    "scanner": {
+      "heuristic_only": true
+    }
+  },
+  "telemetry": {
+    "enabled": false
+  },
+  "channels": {
+    "webchat": {
+      "jwt_secret": "e2e-webchat-secret",
+      "public": false,
+      "jwt_ttl_seconds": 3600,
+      "allowed_origins": ["http://127.0.0.1:13002"]
+    }
+  }
+}

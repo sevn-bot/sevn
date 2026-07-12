@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+# Improve eval graph in Docker (`specs/33-self-improvement.md` §4.3; plan E-0A).
+services:
+  improve-evals:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gateway
+    volumes:
+      - ..:/work
+    working_dir: /work
+    environment:
+      SEVN_REPO_ROOT: /work
+      SEVN_IMPROVE_EVAL_IN_PROCESS: "1"
+    entrypoint:
+      - python
+      - -m
+      - sevn.self_improve.eval.launcher

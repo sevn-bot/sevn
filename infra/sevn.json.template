@@ -1,0 +1,278 @@
+// sevn.json.template — JSON with Comments (JSONC). Validators: use a JSONC-capable parser, or strip // and /* */ lines.
+// Copy to workspace root as sevn.json and fill values. Validate: `sevn config validate` / `sevn doctor` against infra/sevn.schema.json.
+// Secrets: use ${SECRET:source:key} or ${ENV:VAR} — never commit plaintext secrets.
+// Normative key catalogue: infra/sevn.schema.json | Long text + collection: infra/sevn_config_long_description.json
+
+{
+  "$schema": "./sevn.schema.json",
+
+  // Workspace config schema version; onboarding refuses unknown values; bump via `sevn migrate` after upgrades.
+  "schema_version": 1,
+
+  // Path anchoring workspace content (MEMORY.md, skills/,.sevn/, …); tilde expands to home.
+  "workspace_root": ".",
+
+  // IANA timezone for cron (e.g. Europe/Paris); omit for UTC. the design docs
+  "timezone": "UTC",
+
+  "gateway": {
+    // Bind address for FastAPI/uvicorn gateway HTTP/WS.
+    "host": "127.0.0.1",
+    // HTTP listen port.
+    "port": 3001,
+    // Gateway auth token — use ${SECRET:...} or ${ENV:SEVN_GATEWAY_TOKEN}; required for most routes. the design docs
+    "token": "${SECRET:keychain:sevn.gateway.token}",
+    // Trust X-Forwarded-* when behind tunnel/reverse proxy (narrow in prod). the design docs
+    "proxy_headers": true,
+    // "cancel" | "steer" — inbound queue vs mid-flight steer. the design docsb
+    "queue_mode": "cancel",
+    // Steer buffer bounds when queue_mode is steer.
+    "steer": {
+      "max_pending": 8,
+      "degrade_to_cancel_after_ms": 30000
+    },
+    // SIGTERM drain timeout (seconds); confirm default in code. the design docs
+    "shutdown_timeout_s": 20,
+    // Substrings triggering TTS in when_asked mode. the design docs
+    "voice_trigger_keywords": ["read aloud", "voice"]
+  },
+
+  "proxy": {
+    // Unified egress proxy bind (LiteLLM + integrations). the design docs
+    "host": "127.0.0.1",
+    "port": 3002,
+    // Decrypted secret cache TTL at proxy (seconds). the design docs
+    "secret_ttl_seconds": 300
+  },
+
+  // keychain | openbao | proton-pass | encrypted-file — where proxy resolves ${SECRET:...}. the design docs
+  "secrets_backend": "keychain",
+
+  "infrastructure": {
+    // Sandbox snapshot / image rebuild cadence (minutes). the design docs
+    "snapshot_interval_minutes": 30,
+    // Docker socket path on Linux server installs.
+    "docker_socket": "/var/run/docker.sock",
+    // Extra repos cloned into sandbox /repos/ shelf. the design docs
+    "preload_repos": ["./"],
+    "backup": {
+      // local | s3 | rsync — v1 implements local only; others reserved. the design docs
+      "target": "local",
+      "cadence": "nightly",
+      "retention_days": 14,
+      "s3": { "bucket": "", "prefix": "", "region": "", "key_ref": "" },
+      "rsync": { "host": "", "path": "", "ssh_key_ref": "" }
+    },
+    // Dashboard git integration gate. the design docs
+    "version_control": { "enabled": false }
+  },
+
+  "notifications": {
+    "health_alert": true,
+    "provider_fallback_digest": false,
+    "provider_fallback_per_turn": false,
+    "trigger_dead_letter": false
+  },
+
+  // Per channel adapter name (telegram, webchat, …). enabled gates plugin load. the design docs
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "mcp_enabled": ["cgr"]
+    },
+    "webchat": {
+      "enabled": true,
+      "mcp_enabled": ["cgr", "linear"]
+    }
+  },
+
+  // Reserved / TBD — multi-agent bindings removed; see infra/sevn.schema.json x-sevn-todo. the design docs
+  "agents": {},
+
+  "providers": {
+    // SUBSCRIPTION | PER_TOKEN | FREE_LOCAL style string per plan. the design docs
+    "default_regime": "SUBSCRIPTION",
+    // When true (default), scanner, LCM, memory aux, and all tier slots use triager model id.
+    "use_main_model_for_all": true,
+    // LiteLLM model ids per tier; C.sub_lm / D.sub_lm for DSPy REPL; C.lambda_leaf / D.lambda_leaf for λ-RLM. §2.1
+    "tier_default": {
+      "triager": "minimax/text-01",
+      "B": "anthropic/claude-haiku-4-5",
+      "C": "anthropic/claude-sonnet-4-6",
+      "D": "anthropic/claude-sonnet-4-6",
+      "C.sub_lm": "anthropic/claude-haiku-4-5",
+      "D.sub_lm": "anthropic/claude-haiku-4-5",
+      "C.lambda_leaf": "anthropic/claude-haiku-4-5",
+      "D.lambda_leaf": "anthropic/claude-haiku-4-5"
+    },
+    "fallback_chain": {
+      "B": ["anthropic/claude-haiku-4-5", "openai/gpt-5-mini"],
+      "C": ["anthropic/claude-sonnet-4-6", "openai/gpt-5"],
+      "D": ["anthropic/claude-sonnet-4-6", "openai/gpt-5"]
+    },
+    // API keys: reference secret store — never inline. CGR also reads these for subprocess env. the design docs
+    "openai": { "api_key": "${SECRET:keychain:providers.openai.api_key}" },
+    "anthropic": { "api_key": "${SECRET:keychain:providers.anthropic.api_key}" },
+    "google": { "api_key": "${SECRET:keychain:providers.google.api_key}" },
+    "groq": { "api_key": "${SECRET:keychain:providers.groq.api_key}" },
+    "mistral": { "api_key": "${SECRET:keychain:providers.mistral.api_key}" },
+    "ollama": {},
+    "model_budgets": {}
+  },
+
+  "rlm": {
+    // "dspy" | "lambda_rlm" — C/D inner executor. the design docsa
+    "c_d_backend": "dspy",
+    "lambda_tool_allowlist": [],
+    "lambda_tool_allowlist_C": [],
+    "lambda_tool_allowlist_D": [],
+    "lambda_max_leaf_llm_calls": null,
+    "max_llm_calls": null,
+    // "docker" | "pyodide_deno" — DSPy RLM interpreter. the design docs J0
+    "sandbox": "docker"
+  },
+
+  // Plan approval gate for C/D. the design docs
+  "plan_approval": { "enabled": false },
+
+  "permissions": {
+    // Named PermissionConfig JSON bodies for Triager narrowing. the design docs Q1
+    "profiles": {},
+    "scope_narrowing": { "enabled": false }
+  },
+
+  "triager": {
+    "group_scope": "per_chat",
+    "model": "minimax/text-01"
+  },
+
+  "tracing": {
+    "retention_days": 14,
+    "sinks": [
+      { "type": "sqlite" },
+      { "type": "jsonl_file", "path": ".sevn/traces/" }
+    ]
+  },
+
+  // Per-turn diagnostic JSONL bundles (default off). See WORKSPACE.md `.sevn/turns/`.
+  "diagnostics": {
+    "turn_bundles": { "enabled": false }
+  },
+
+  "memory": {
+    "pre_compaction_flush": { "enabled": true },
+    "dreaming": { "enabled": false }
+  },
+
+  // Cap on merged memory_search output (chars). the design docs
+  "memory_search_max_chars": 12000,
+
+  // MCP stdio servers: id -> command. the design docs
+  "mcp_servers": {
+    "cgr": { "command": "cgr", "args": ["mcp-server"] },
+    "linear": { "command": "mcp-linear", "args": [] }
+  },
+  // Workspace-default MCP server ids; [] or omit = none enabled (safe default).
+  "mcp_enabled": [],
+
+  // Ordered STT provider ids before Triager. the design docs
+  "stt_providers": ["openai", "whisper_cpp"],
+
+  "voice": {
+    "stt_confidence_reprompt_threshold": 0.7
+  },
+
+  // secrets_only | strict — Logfire/loguru redaction posture. the design docs M6
+  "logging": { "pii_mode": "secrets_only" },
+
+  "triggers": {
+    "paused": false,
+    "webhooks_paused": false,
+    "cron_paused": false,
+    "api_paused": false,
+    "max_parallel_runs": 4,
+    "sources": {
+      "github": { "prompt_template": "" }
+    },
+    "cron": {
+      "require_approval": true,
+      "run_history_archive_after_days": 30
+    },
+    "api": {
+      "default_rate_limit": { "enabled": false },
+      "callers": {}
+    }
+  },
+
+  // Owner cron/API PermissionConfig templates — merge semantics TBD. the design docs
+  "permission_templates": {},
+
+  "second_brain": { "paths": {} },
+
+  "openui": { "enabled": true, "renderer": "default" },
+
+  // Bundled-skill activation flags. the design docs
+  "skills": {
+    // Opt-in to the `computer-use` skill (trycua/cua Cua Driver, macOS-only, MCP passthrough). Default false.
+    // When true on Darwin, onboarding installs cua-driver and prompts for Accessibility + Screen Recording entitlements.
+    // the design docsa, the design docs
+    "computer_use": { "enabled": false }
+  },
+
+  "doctor": { "strict": false },
+
+  "subagents": { "max_concurrent": 5 },
+  "max_concurrent_subagents_total": 20,
+
+  "add_core_tools_to_all_context": true,
+
+  "use_code_graph_rag": false,
+  "code_graph_rag": {
+    "orchestrator": { "provider": "google", "primary_model": "gemini-2.0-flash" },
+    "cypher": { "provider": "google", "primary_model": "gemini-2.0-flash" },
+    "memgraph_host": "127.0.0.1",
+    "memgraph_port": 7687,
+    "json_export_rel_path": ".sevn/code_graph_export.json",
+    "export_on_startup": false,
+    "watch_enabled": false,
+    "watch_debounce_seconds": 2
+  },
+
+  "witchcraft_enabled": false,
+  "witchcraft": {
+    "db_path": ".sevn/witchcraft.sqlite",
+    "index_messages": false,
+    "reindex_on_startup": false,
+    "model_backend": "t5-quantized"
+  },
+
+  "cloudflare_agent_memory_enabled": false,
+  "cloudflare_agent_memory": {
+    "api_token_secret": "${SECRET:keychain:cloudflare_agent_memory.api_token}",
+    "account_id": "",
+    "api_base_url": "",
+    "http_timeout_ms": 8000,
+    "max_retries": 2,
+    "use_egress_proxy": true,
+    "profile_template": "{session_key}",
+    "shared_profiles": {},
+    "ingest_on_compaction": true,
+    "ingest_min_messages": 1,
+    "ingest_max_messages_per_call": 200,
+    "ingest_include_assistant": true,
+    "tools_enabled": true,
+    "memory_search_merge": false,
+    "recall_default_limit": 1,
+    "preamble_enabled": false,
+    "preamble_queries": [],
+    "preamble_max_tokens": 512,
+    "redact_patterns": [],
+    "skip_channels": []
+  },
+
+  // LEGACY alternate shape — prefer channels.telegram.bot_token. the design docs vs 04-tools.md
+  "telegram": {
+    "bot_token": "${ENV:SEVN_TELEGRAM_BOT_TOKEN}",
+    "claude_agent_topic_id": null
+  }
+}

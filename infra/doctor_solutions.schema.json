@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sevn.bot/infra/doctor_solutions.schema.json",
+  "title": "sevn doctor solutions catalog",
+  "description": "Bundled remediation catalog keyed by doctor check id (`specs/23-cli.md` §3; plan cli-comprehensive-parity-doctor W3).",
+  "type": "object",
+  "required": ["schema_version", "solutions"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "solutions": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/solution_entry" },
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "severity": {
+      "type": "string",
+      "enum": ["info", "warn", "error"]
+    },
+    "solution_entry": {
+      "type": "object",
+      "required": ["title", "severity", "explanation", "remediation", "auto_fixable"],
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string", "minLength": 1 },
+        "severity": { "$ref": "#/$defs/severity" },
+        "explanation": { "type": "string", "minLength": 1 },
+        "remediation": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "fix_command": { "type": ["string", "null"] },
+        "auto_fixable": { "type": "boolean" },
+        "docs_url": { "type": ["string", "null"] },
+        "agent_only": {
+          "type": "boolean",
+          "description": "When true, no canned operator fix — diagnostic agent path only."
+        }
+      }
+    }
+  }
+}

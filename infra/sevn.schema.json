@@ -1,0 +1,2268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sevn.bot/schema/sevn.json",
+  "title": "sevn workspace configuration (sevn.json)",
+  "description": "Synthesized from the design docs. Keys reflect architecture intent; types and required fields may be tightened when implementation lands.",
+  "long_description": "This file is the machine-readable catalogue of workspace configuration for sevn.bot: the `sevn.json` file at the workspace (or repo) root. It is intentionally assembled from architecture planning documents rather than from a single shipped binary, so implementers can validate operator edits in CI, in `sevn doctor`, and in editors that support JSON Schema. The schema uses `additionalProperties` liberally where channel plugins or forward-compatible blocks are expected. Non-normative gaps, naming forks between docs, and keys that are still design-only are called out in `x-sevn-todo` and in per-field `$comment` where helpful. Runtime-only values (minted session tokens, shadow workspace paths) belong in environment variables documented under `x-sevn-env-allowlist`, not as literals in `sevn.json`. The `x-sevn-process-settings-env` list and `process_settings: true` markers on matching allowlist rows mirror `ProcessSettings` in code (the design docs).",
+  "type": "object",
+  "additionalProperties": true,
+  "$defs": {
+    "tier_default_entry": {
+      "description": "LiteLLM model id string, or primary/vision object for vision routing (doc 13).",
+      "long_description": "Each tier entry in `providers.tier_default` tells the gateway which LiteLLM model id to resolve first for that logical role (Triager, tier B/C/D outer models, `C.sub_lm` / `D.sub_lm` for DSPy REPL inner calls, and `C.lambda_leaf` / `D.lambda_leaf` for opt-in λ-RLM leaf calls). A plain string means a single primary model. An object with `primary` and optional `vision` lets `resolve_model` pick a vision-capable route when the Triager sets `requires_vision=true`, without maintaining a separate `fallback_chain_vision` in v1. Values must match ids the proxy can route after merging shipped `models.json` overlay with workspace overrides. See `13-llm-providers.md` §2.1–2.2 for the resolution algorithm and vision behaviour.",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "properties": {
+            "primary": { "type": "string" },
+            "vision": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "trace_sink_entry": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["jsonl_file", "sqlite", "logfire", "otel"]
+        },
+        "path": { "type": "string" },
+        "token_ref": {
+          "type": "string",
+          "description": "Bearer token for otel/logfire sinks. Accepted: ${ENV:VAR}, ${SECRET:<source>:<logical_key>}, or a bare logical key. Resolved by the gateway at sink construction (build_gateway_trace_sink_async on boot), not the egress proxy."
+        },
+        "project": { "type": "string" },
+        "endpoint": { "type": "string" },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "provider_registry_entry": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "One named provider in the registry (D2): credential ref, base URLs, transport.",
+      "properties": {
+        "api_key": {
+          "type": "string",
+          "description": "Literal or ${SECRET:…} ref for this provider's API key; resolved per request at the egress proxy."
+        },
+        "auth_mode": {
+          "type": "string",
+          "enum": ["api_key", "oauth"],
+          "default": "api_key",
+          "description": "OpenAI auth selector (D1): api_key uses pay-as-you-go sk- keys on chat-completions; oauth uses ChatGPT subscription Codex OAuth (oauth.openai) and the Codex Responses transport."
+        },
+        "base_url": {
+          "type": "string",
+          "description": "Primary upstream base URL for this provider when applicable."
+        },
+        "openai_base_url": {
+          "type": "string",
+          "description": "OpenAI-compatible base URL override for this provider."
+        },
+        "anthropic_base_url": {
+          "type": "string",
+          "description": "Anthropic-compatible base URL override for this provider."
+        },
+        "transport": {
+          "type": "string",
+          "enum": ["anthropic", "chat_completions"],
+          "description": "Default wire transport for this provider's catalog models when not overridden per model id."
+        }
+      }
+    },
+    "provider_model_override": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "Override provider registry name for this catalog model id (D1)."
+        },
+        "transport": {
+          "type": "string",
+          "enum": ["anthropic", "chat_completions", "responses", "bedrock"],
+          "description": "Per-model transport override."
+        }
+      }
+    }
+  },
+  "x-sevn-todo": [
+    "Align root `telegram` vs `channels.telegram`: coding-standards example uses top-level `telegram`; gateway docs use `channels.<name>`. Pick one canonical path and deprecate the other.",
+    "Define `agents` object (09-infrastructure example) vs 11-onboarding note that multi-agent bindings were removed — clarify whether `agents` remains for future or delete from examples.",
+    "Self-improve caps (`max_runs_per_day`, `improve_budget_units_per_day`, etc.): field names TBD (Closed) and the design docs (READY).",
+    "Confirm workspace feature flag name: `permissions.scope_narrowing.enabled` (02-rlm-routing.md) vs `permission_scope_narrowing.enabled` (archive RLM Q1 resolution text) — schema uses `permissions.scope_narrowing` to match doc 02.",
+    "Map which `sevn.json` keys get `SEVN_<DOT_AS_UNDERSCORE>` overrides vs code-only defaults (09-infrastructure: curated allowlist, not all keys).",
+    "Model budgets key path: doc 13 says `providers.model_budgets[<model_id>]` with 'exact key path TBD'.",
+    "Cron named templates: confirm JSON path for owner-declared PermissionConfig template bodies referenced by `sevn_cron_jobs` rows (doc 14 §4.2).",
+    "custom_metrics.json path is dashboard-owned, not necessarily inside this schema (the design docs Q23)."
+  ],
+  "x-sevn-process-settings-env": [
+    "SEVN_HOME",
+    "SEVN_GATEWAY_TOKEN",
+    "SEVN_GATEWAY_URL",
+    "SEVN_PROXY_URL",
+    "SEVN_SESSION_TOKEN",
+    "SEVN_WORKSPACE",
+    "SEVN_UNSAFE_PARTIAL_HOOKS"
+  ],
+  "x-sevn-env-allowlist": [
+    {
+      "name": "SEVN_HOME",
+      "process_settings": true,
+      "description": "Operator state root; default ~/.sevn (the design docs).",
+      "long_description": "Directory used for operator-local state: hints for launchd/systemd, cached device codes for OAuth-style flows, advisory lock under `run/`, and similar artefacts. defaults to `~/.sevn`; the bound workspace root defaults to `{SEVN_HOME}/workspace` after onboarding and **must not be relocated** in v1. Parsed by `ProcessSettings.home` (the design docs). Distinct from runtime-injected **`SEVN_WORKSPACE`** (sandbox shadow)."
+    },
+    {
+      "name": "SEVN_GATEWAY_TOKEN",
+      "process_settings": true,
+      "description": "HTTP gateway auth token; same as CLI when calling a running gateway (the design docs).",
+      "long_description": "Bearer or header value required by most FastAPI routes on the gateway. The CLI uses the same credential for `sevn doctor` and other gateway HTTP calls (the design docs, §2.10 exit 3 when missing). Parsed by `ProcessSettings.gateway_token`. Rotation and storage follow the design docs; never commit literals."
+    },
+    {
+      "name": "SEVN_GATEWAY_URL",
+      "process_settings": true,
+      "description": "Optional full gateway HTTP base URL for CLI and scripts; wins over `sevn.json` `gateway.host`/`gateway.port` (the design docs).",
+      "long_description": "When set to a non-empty value after trim, the `sevn` CLI uses this URL as the complete gateway base—including scheme, host, port, and optional path prefix—instead of composing `http://` from `gateway.host` and `gateway.port` in `sevn.json`. Strip a single trailing slash before use; invalid URLs fail the CLI with exit code 2. Must not embed credentials; use `SEVN_GATEWAY_TOKEN` for auth. Parsed by `ProcessSettings.gateway_url` (the design docs)."
+    },
+    {
+      "name": "SEVN_PROXY_URL",
+      "process_settings": true,
+      "description": "Unified egress proxy base URL; gateway, sandboxes, and `sevn doctor` when set (the design docs).",
+      "long_description": "Base URL of the separate proxy process that holds provider credentials, exposes `/llm/*`, and authenticates with per-run session tokens. The gateway and sandboxes use this URL with `SEVN_SESSION_TOKEN`. The CLI reads the same value via `ProcessSettings.proxy_url` for proxy `/healthz` in `sevn doctor` when set (the design docs). Infrastructure playbooks wire this into systemd and container boot scripts."
+    },
+    {
+      "name": "SEVN_SESSION_TOKEN",
+      "process_settings": true,
+      "description": "Per-run sandbox token minted by proxy; not a workspace file secret (the design docs).",
+      "long_description": "Short-lived opaque token minted by the proxy when the gateway starts a run; it binds to a frozen `PermissionConfig` ceiling for that sandbox lifetime. All LLM and `integration_call` traffic from the run presents this token. TTL and revoke-on-teardown semantics are in the design docs / egress-proxy specs. Not a field in `sevn.json`. Parsed by `ProcessSettings.session_token`."
+    },
+    {
+      "name": "SEVN_TELEGRAM_BOT_TOKEN",
+      "description": "Example env reference for `${ENV:...}` secret indirection (17-coding-standards.md); canonical storage is keychain/proxy.",
+      "long_description": "Illustrates the `${ENV:VAR_NAME}` indirection style in coding standards: the workspace file references the variable name, and the proxy or host environment supplies the value at process start. Telegram’s bot token is a special case because the gateway adapter must call the Bot API directly; resolution still goes through the secrets architecture rather than embedding the token in JSON committed to git. Operators on macOS/Linux typically map this to keychain entries surfaced by the dashboard."
+    },
+    {
+      "name": "SEVN_DISABLE_AUTO_MERGE",
+      "description": "Incident kill-switch; overrides workspace toggles (the design docs Q43, RESOLVED — env wins).",
+      "long_description": "Fail-safe for incidents: when set, forces off automatic merge / promotion stages in the self-improve loop while still allowing sampling and evaluation to run, so operators can stop bleeding without disabling telemetry. Env overrides persisted workspace toggles when present (Q43). Resolved name `SEVN_DISABLE_AUTO_MERGE`; mirror config knob exposed via dashboard / `sevn.json` for durable state."
+    },
+    {
+      "name": "SEVN_DISABLE_SELF_IMPROVE",
+      "description": "Process kill-switch — forces effective `self_improve.enabled=false` (the design docs).",
+      "long_description": "When set to `1`, gateways and workers treat the self-improve subsystem as disabled regardless of `sevn.json`, mirroring other incident toggles. Operators keep cron registrations off and refuse enqueue paths while this env is active. Documented alongside onboarding env tables (the design docs)."
+    },
+    {
+      "name": "SEVN_CLI_AGENT",
+      "description": "Reserved — not used v1; gateway token suffices for `sevn agent` (the design docs O13).",
+      "long_description": "Historically sketched for an extra CLI capability bit. **v1 resolution:** `sevn agent` uses the same `SEVN_GATEWAY_TOKEN` as other gateway calls — no separate CLI-agent credential. Keep the name in the allowlist only if implementation still reads it; otherwise remove in a schema cleanup PR."
+    },
+    {
+      "name": "SEVN_WORKSPACE",
+      "process_settings": true,
+      "description": "Injected shadow workspace path for skill/tool subprocesses — runtime env, not persisted in sevn.json (the design docs).",
+      "long_description": "For skill scripts and certain tools, the gateway sets this to a temporary shadow directory that symlinks visible workspace entries but excludes `.llmignore/`. The real workspace root remains `workspace_root` in `sevn.json`; this env var is injected by the runtime and must not be used as the sole `sevn.json` discovery root for the gateway. Parsed by `ProcessSettings.workspace_shadow`."
+    },
+    {
+      "name": "SEVN_UNSAFE_PARTIAL_HOOKS",
+      "process_settings": true,
+      "description": "When true, skip broken ``sevn.plugin_hooks`` entry points at gateway startup instead of failing fast (the design docs).",
+      "long_description": "Development-only escape hatch: if a third-party hook distribution fails import, the gateway logs a warning and continues boot. Production images should leave this unset/false so policy gaps surface immediately. Parsed by `ProcessSettings.unsafe_partial_plugin_hooks`."
+    },
+    {
+      "name": "SEVN_SKILL_DIR",
+      "description": "Runtime: skill directory inside subprocess (04b-skills.md).",
+      "long_description": "Absolute path to the unpacked skill directory for the script currently executing under `run_skill_script` / runnable entrypoints. Skills use it to load bundled assets and sibling scripts without guessing relative to the operator’s cwd. Together with `SEVN_WORKSPACE` (shadow) it enforces the security model where skills do not receive a second authenticated IPC channel back to the gateway."
+    },
+    {
+      "name": "SEVN_CDP_URL",
+      "description": "Browser automation CDP endpoint; operator override wins over per-session registry (04b-skills.md).",
+      "long_description": "HTTP endpoint for Chrome DevTools Protocol used by browser-related bundled skills. When set globally, skills attach-only to that browser and `close_browser` returns `EXTERNAL_CDP` unless `--force` (D6). When unset, the gateway injects a session-scoped URL from `.sevn/browser-sessions/<session_id>.json` after spawn (DevToolsActivePort discovery per D2); legacy attach attempts may use a deterministic port seed hint. Operators running remote browsers or Grid-style setups set this once for attach-only mode; per-conversation isolation requires leaving it unset so each `SEVN_SESSION_ID` owns its registry row."
+    },
+    {
+      "name": "SEVN_CHROME_EXECUTABLE",
+      "description": "Optional Chrome/Chromium/Brave path for browser skills (04b-skills.md).",
+      "long_description": "When the skill needs to launch its own browser binary (as opposed to attaching via CDP), this env var selects which Chromium-compatible binary to start—useful on Linux servers with multiple installs, Docker images with Brave at `/usr/bin/brave-browser`, or Nix-style paths. If unset, skills fall back to PATH discovery per `skills.browser.engine` (Chrome/Chromium before Brave in `auto` mode). Should point to a binary approved by the operator’s security policy, not a user-downloaded unknown."
+    },
+    {
+      "name": "SEVN_BROWSER_AUTOCLOSE",
+      "description": "0 = keep browser; 1 = kill after script (04b-skills.md).",
+      "long_description": "Controls lifecycle of browser processes spawned by skills: keeping the browser (`0`) amortizes cold start across repeated skill invocations in one session; autoclosing (`1`) reduces resource usage and cross-talk on shared hosts. Interpreted as a small integer string in the usual Unix env convention. Documented in the browser skill section of `04b-skills.md` alongside CDP attach behaviour."
+    },
+    {
+      "name": "SEVN_CONTENT_ROOT",
+      "description": "Runtime: workspace content root for browser profile/registry paths (not shadow SEVN_WORKSPACE).",
+      "long_description": "Injected by `SkillsManager` for browser skill subprocesses. Points at the real workspace content root so session profiles (`.sevn/browser-profiles/<session_id>/`) and registry files (`.sevn/browser-sessions/<session_id>.json`) persist across turns even when `SEVN_WORKSPACE` is a shadow tree. Operators should not set this manually except for ad-hoc script debugging."
+    },
+    {
+      "name": "SEVN_SESSION_ID",
+      "description": "Runtime: gateway conversation session id for scoped browser profile/CDP (04b-skills.md).",
+      "long_description": "Set on skill subprocess env by the gateway from the active `gateway_sessions` row. Browser skills use it to isolate profiles and CDP ports per conversation. Legacy or no-session skill runs fall back to profile id `default`."
+    },
+    {
+      "name": "SEVN_BROWSER_PROFILE_DIR",
+      "description": "Override persistent Chrome user-data-dir for browser skills.",
+      "long_description": "Wins over `skills.browser.profile_dir` and session-scoped default paths. Useful for operator-managed profiles or debugging; normally left unset so each gateway session gets an isolated directory under `<content_root>/.sevn/browser-profiles/`."
+    },
+    {
+      "name": "SEVN_BROWSER_HEADLESS",
+      "description": "Force headless browser spawns when set to 1/true.",
+      "long_description": "When unset, headed Chrome or Brave is preferred on hosts with a discoverable binary unless `skills.browser.headless` is true (D13). When set (including `0`/`false` for headed), this env var wins over `skills.browser.headless` in sevn.json — use in Docker GUI images where bootstrap JSON may still set `headless: true`. Interpreted as a small integer or boolean string in the usual Unix env convention."
+    },
+    {
+      "name": "SEVN_BROWSER_EXTRA_ARGS",
+      "description": "Space-separated extra flags appended when spawning Chrome-compatible browsers.",
+      "long_description": "Injected at spawn time by `spawn_chrome` and the native CDP engine. Docker images that run Brave as root typically set `--no-sandbox` here (never hardcoded in Python). Operators may add `--disable-dev-shm-usage` or site-specific mitigations. Parsed as a simple whitespace split; quote complex values in compose env files."
+    },
+    {
+      "name": "SEVN_BROWSER_ENGINE",
+      "description": "Override `skills.browser.engine` (`auto`, `chrome`, `chromium`, `brave`).",
+      "long_description": "Process-level preference for which Chromium-compatible family to resolve when `SEVN_CHROME_EXECUTABLE` is unset. Wins over `skills.browser.engine` in sevn.json. `auto` prefers Chrome/Chromium before Brave so host Chrome installs keep working; set `brave` in Docker/browser images."
+    },
+    {
+      "name": "SEVN_SKILL_FULL_WORKSPACE",
+      "description": "Proposed opt-in for vetted core skills only (architecture-questions-skills.md); not normative v1.",
+      "long_description": "Hypothesized escape hatch discussed in skills Q&A: a deliberately scary env var that would allow a tiny allowlist of core skills to see the real workspace instead of the shadow tree. v1 normative posture is shadow-only with no opt-out from inside the skill process. If ever implemented, would require explicit operator acknowledgement in SKILL.md and strict gateway checks; schema retains the name so design discussions and future validators stay synchronized."
+    },
+    {
+      "name": "SEVN_BETA",
+      "description": "Proposed prototype gate (architecture-questions-skills.md).",
+      "long_description": "Suggested global flag from skills Q&A to gate experimental skill behaviour or unsafe shortcuts until quality bars pass. Not part of locked v1 behaviour. When unset or `0`, only stable code paths run; when enabled by operators who accept risk, implementations may unlock prototype tools or looser timeouts. Product should document exact semantics before relying on it in playbooks."
+    },
+    {
+      "name": "HTTP_PROXY",
+      "description": "Container boot wiring alongside proxy env (09-infrastructure.md §1).",
+      "long_description": "Standard forward-proxy environment variable injected in hardened systemd/Docker boot scripts alongside `SEVN_PROXY_URL` and `SEVN_SESSION_TOKEN` so processes that still speak raw HTTPS through a corporate proxy can reach the internet without embedding corporate credentials in `sevn.json`. Distinct from sevn’s unified egress proxy: this is the generic ecosystem variable respected by many HTTP clients. Used in infrastructure examples for containerized gateway+proxy stacks."
+    }
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Onboarding refuses unknown versions; `sevn migrate` upgrades (see the design docs B6).",
+      "long_description": "Monotonic integer version of the workspace config shape, distinct from application semver. On first boot or after pulling upgrades, the gateway and CLI compare this to the set of versions they understand; unknown values fail fast with a clear message so operators never run half-migrated configs. The `sevn migrate` command (or dashboard equivalent) bumps this field after rewriting keys, with a backup written as `sevn.json.vN` per onboarding Q&A. Align schema file and Pydantic `WorkspaceConfig` when adding breaking key renames or type changes."
+    },
+    "workspace_root": {
+      "type": "string",
+      "default": ".",
+      "description": "Workspace content root relative to sevn.json parent, or absolute (tilde expands).",
+      "long_description": "Path relative to the directory containing `sevn.json` (default `.` — same folder as the config file) or an absolute path with `~` for the operator home directory. Anchors markdown soul files, `skills/`, `.sevn/` artefacts, and logs. Bound CLI installs keep `sevn.json` at `{SEVN_HOME}/workspace/sevn.json` with `.` so content lives alongside the config. Tools must expand tilde before joining paths so a literal `~` segment is never created under the workspace parent."
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Artifact output directory settings for generated tool/skill files.",
+      "properties": {
+        "output_dir": {
+          "type": "string",
+          "default": "out",
+          "description": "Workspace-relative directory for generated artifacts (default out/)."
+        },
+        "per_session": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true, confine artifacts under output_dir/<session_id>/."
+        }
+      }
+    },
+    "timezone": {
+      "type": "string",
+      "description": "IANA tz for cron schedules; missing → UTC (14-api-webhooks.md §4.1, archive api-webhooks Q&A).",
+      "long_description": "IANA time zone database identifier (e.g. `Europe/Paris`) applied when parsing and firing `sevn_cron_jobs` schedules so wall-clock cron matches operator expectations. Webhooks and interactive Telegram traffic remain UTC-logged internally as today; this key specifically scopes cron’s notion of local midnight and business-hour ticks. If omitted, the scheduler normalizes to UTC and documents that in traces to avoid silent offset bugs when fleets span regions."
+    },
+    "onboarding": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Wizard provenance (the design docs).",
+      "properties": {
+        "applied_profile": {
+          "type": ["string", "null"],
+          "description": "Last completed preset `profile_id`, or null when skipped/custom."
+        },
+        "personality": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Wizard-only draft fields pre-promote; merged into USER.md/SOUL.md/IDENTITY.md on promote.",
+          "properties": {
+            "name": { "type": "string" },
+            "role": { "type": "string" },
+            "timezone": { "type": "string" },
+            "style": { "type": "string" },
+            "style_detail": { "type": "string" },
+            "language": { "type": "string" },
+            "preferences": { "type": "string" },
+            "preferences_detail": { "type": "string" },
+            "vibe": { "type": "string" },
+            "emoji": { "type": "string" }
+          }
+        },
+        "capability_selections": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Wizard-draft capability_id selections before promote maps to real config_paths."
+        }
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Product telemetry opt-in (the design docs). v1 shape is `{ \"enabled\": boolean }` only; extend via schema_version bump.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Explicit opt-in; default false at promotion when operator declines (the design docs)."
+        }
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "`deployment.profile` gates production sandbox policy (the design docs).",
+      "properties": {
+        "profile": {
+          "type": "string",
+          "$comment": "Normative prod gate: rejects `security.sandbox.allow_subprocess_fallback: true` when `production`. See the design docs."
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "description": "Operator diagnostic artefacts (turn bundles, future sinks).",
+      "additionalProperties": true,
+      "properties": {
+        "turn_bundles": {
+          "type": "object",
+          "description": "Per-turn JSONL bundles under `<content_root>/.sevn/turns/` (logs + messages + traces).",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, the gateway post-turn hook writes one bundle per inbound turn and upserts `index.json`."
+            }
+          },
+          "$comment": "Default off — zero behaviour change until enabled. Offline backfill: `sevn turn-bundle export`. Explorer: `sevn turn-bundle view`. Waveorch remediation: `make build-plan-from-errors` in wave-orchestrator/."
+        }
+      }
+    },
+    "sandbox": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Tool/skill sandbox resource caps (the design docs).",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["pyodide_deno", "docker"],
+          "description": "Onboarding wizard sandbox driver selection."
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "$comment": "Gates opting into Docker-backed isolation when daemon present; subprocess fallback stays explicit via `security.sandbox.allow_subprocess_fallback`."
+        },
+        "max_cpu": { "type": "number" },
+        "max_mem_mb": { "type": "integer" },
+        "max_disk_mb": { "type": "integer" },
+        "max_pids": { "type": "integer" },
+        "max_lifetime": {
+          "type": "integer",
+          "description": "Seconds; orphan sweeper uses `2×` this TTL (the design docs)."
+        },
+        "snapshot_interval_minutes": { "type": "integer", "minimum": 1 },
+        "snapshot_retention_count": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 3,
+          "description": "When >0, keep this many newest tarballs; 0 disables pruning.",
+          "$comment": "the design docs + the design docs (Wave 3 default **3**)."
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Security posture overlays (the design docs ABAC adjuncts alongside `permissions`).",
+      "properties": {
+        "sandbox": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "allow_subprocess_fallback": {
+              "type": "boolean",
+              "default": false,
+              "$comment": "Forbidden when `deployment.profile=production`; validated by Pydantic."
+            }
+          }
+        },
+        "repl": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "scan_tool_results": {
+              "type": "string",
+              "enum": ["raw", "llm_guard"],
+              "default": "raw"
+            }
+          }
+        },
+        "scanner": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "LLM Guard scanner chain and payload caps (the design docs).",
+          "properties": {
+            "model": {
+              "type": ["string", "null"],
+              "description": "Optional scanner classify model override; when unset and use_main_model_for_all is true, inherits triager model."
+            },
+            "max_inbound_bytes": {
+              "type": "integer",
+              "minimum": 1024,
+              "maximum": 16777216,
+              "default": 524288,
+              "$comment": "UTF-8 byte cap per inbound/feedback/tool scan; gateway max-message (the design docs) should match."
+            }
+          }
+        }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "description": "Gateway HTTP bind and queue settings. The `sevn` CLI composes `http://{host}:{port}` when `SEVN_GATEWAY_URL` is unset (the design docs).",
+      "additionalProperties": true,
+      "required": ["token"],
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Listen address; defaults in code match `src/sevn/config/defaults.py` when absent. Used by CLI URL resolver after `SEVN_GATEWAY_URL` (the design docs)."
+        },
+        "port": {
+          "type": "integer",
+          "description": "Listen port; defaults in code match `src/sevn/config/defaults.py` when absent (the design docs)."
+        },
+        "token": {
+          "type": "string",
+          "description": "Gateway auth; prefer secret ref patterns from 17-coding-standards / keychain (09-infrastructure.md §4 example).",
+          "long_description": "Shared secret (or reference thereto) required by most HTTP routes on the gateway for dashboard, CLI, and API clients. In production it should be stored via `${SECRET:...}` or `${ENV:...}` indirection per coding standards so repos never contain literals. It pairs with `SEVN_GATEWAY_TOKEN` when operators export env for scripts. Rotation invalidates all non-Telegram clients until they pick up the new value; wire this into Mission Control rotation UX described in infrastructure and dashboard docs."
+        },
+        "proxy_headers": { "type": "boolean" },
+        "queue_mode": {
+          "type": "string",
+          "enum": ["cancel", "steer"],
+          "default": "cancel",
+          "$comment": "Maintainer: the design docsb (Queue mode). cancel=auto-abort in-flight on new user text; steer=buffer until safe injection point or degrade_to_cancel. Interacts with harness tiers per same section."
+        },
+        "steer": {
+          "type": "object",
+          "properties": {
+            "max_pending": { "type": "integer" },
+            "degrade_to_cancel_after_ms": { "type": "integer" }
+          },
+          "additionalProperties": true,
+          "$comment": "Maintainer: Nested steer object matches the design docsb table (keys max_pending, degrade_to_cancel_after_ms). the design docs table uses shorthand gateway.steer.* — same semantics; validate nested shape in code."
+        },
+        "shutdown_timeout_s": {
+          "type": "number",
+          "$comment": "Maintainer: the design docs (Graceful shutdown). Drain in-flight runs before SIGTERM teardown; prose default 20s — confirm in src/sevn/config/defaults.py when implemented."
+        },
+        "voice_trigger_keywords": {
+          "type": "array",
+          "items": { "type": "string" },
+          "$comment": "Maintainer: the design docs (Voice TTS) and 01-gateway-channels.md §7.2 — keywords evaluated at gateway for when_asked TTS; not STT. Array of substrings or patterns per product decision."
+        },
+        "restart": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Boot resume policy (the design docs).",
+          "properties": {
+            "auto_resume_b": {
+              "type": "boolean",
+              "default": false,
+              "$comment": "When true, tier-B may auto-continue from last snapshot without owner prompt."
+            }
+          }
+        },
+        "tool_as_skill_auto_route": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, run_skill_script/run_skill_runnable with a registered tool name auto-invokes that tool (default off; SKILL_IS_ACTUALLY_TOOL redirect first)."
+        },
+        "budget": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Per-turn executor round caps and cascade wall-clock timeouts (the design docs).",
+            "properties": {
+            "tier_b_executor_timeout_s": {
+              "type": "number",
+              "minimum": 1,
+              "default": 180,
+              "description": "Per-step tier-B wall-clock cap within the cascade (seconds)."
+            },
+            "tier_cd_executor_timeout_s": {
+              "type": "number",
+              "minimum": 1,
+              "default": 300,
+              "description": "Per-step tier-C/D wall-clock cap within the cascade (seconds)."
+            },
+            "cascade_budget_s": {
+              "type": "number",
+              "minimum": 1,
+              "default": 270,
+              "description": "Cumulative wall-clock cap across the B→retry→C/D cascade (seconds)."
+            },
+            "triager_max_output_tokens": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 4096,
+              "description": "sevn.json ceiling for triager max output tokens; runtime uses min(ceiling, LLM_params_config.json)."
+            },
+            "tier_b_max_output_tokens": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 20000,
+              "description": "sevn.json ceiling for tier-B max output tokens; runtime uses min(ceiling, LLM_params_config.json)."
+            },
+            "tier_cd_max_output_tokens": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 4096,
+              "description": "sevn.json ceiling for tier-C/D max output tokens; runtime uses min(ceiling, LLM_params_config.json)."
+            },
+            "guard_max_output_tokens": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 256,
+              "description": "sevn.json ceiling for LLM guard scanner max output tokens."
+            },
+            "lcm_max_output_tokens": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 4096,
+              "description": "sevn.json ceiling for LCM summarisation max output tokens."
+            },
+            "dreaming_max_output_tokens": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 256,
+              "description": "sevn.json ceiling for dreaming ranker max output tokens."
+            },
+            "user_model_max_output_tokens": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 2048,
+              "description": "sevn.json ceiling for user-model extractor max output tokens."
+            }
+          }
+        },
+        "first_session_intro": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "BOOTSTRAP conversation on the first user message per scope (the design docs, gateway first-session intro).",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "When true, first-scope messages run tier-B BOOTSTRAP intro instructions."
+            },
+            "max_questions": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 6,
+              "description": "Maximum bootstrap questions before suggesting skip."
+            },
+            "skip_quick_action": {
+              "type": "boolean",
+              "default": true
+            },
+            "max_output_tokens": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 4096,
+              "description": "Provider max_tokens for the first-session tier-B intro turn only (default 4096; clamped to gateway.budget.tier_b_max_output_tokens in code)."
+            }
+          }
+        }
+      }
+    },
+    "replay": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Turn replay caps (the design docs).",
+      "properties": {
+        "max_per_day": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 20
+        }
+      }
+    },
+    "dashboard": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Mission Control operator surface (the design docs).",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Master gate for Mission Control routes and SPA mount."
+        },
+        "local_open": {
+          "type": "boolean",
+          "description": "Allow loopback clients to skip dashboard login when effective (the design docs). Default true when gateway.host is loopback-only and infrastructure.tunnel.mode is none; forced false when a tunnel is active."
+        },
+        "login_password": {
+          "type": "string",
+          "description": "Owner password for tunneled/remote Mission Control login (prefer ${SECRET:...} indirection)."
+        },
+        "jwt_secret": {
+          "type": "string",
+          "description": "Signing secret for aud=dashboard JWTs (prefer ${SECRET:...} indirection)."
+        },
+        "jwt_ttl_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 86400,
+          "description": "Dashboard JWT lifetime in seconds (default 24h)."
+        },
+        "page_agent": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean", "default": true }
+          }
+        }
+      }
+    },
+    "harness": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Harness snapshot toggles (the design docs).",
+      "properties": {
+        "snapshot": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "triager_tier_a": {
+              "type": "boolean",
+              "default": false,
+              "$comment": "Optional Triager-only checkpoints; default off to limit write volume."
+            }
+          }
+        }
+      }
+    },
+    "proxy": {
+      "type": "object",
+      "description": "Egress proxy bind and cache TTL. Doctor/onboarding use `SEVN_PROXY_URL` from the process allowlist when set (the design docs, §5; the design docs).",
+      "additionalProperties": true,
+      "properties": {
+        "host": { "type": "string" },
+        "port": { "type": "integer" },
+        "secret_ttl_seconds": { "type": "integer", "default": 300 }
+      },
+      "$comment": "Maintainer: the design docs (Configuration file example). LiteLLM + integrations process; host/port bind; secret_ttl_seconds = in-memory decrypted secret cache TTL at proxy (see the design docs)."
+    },
+    "secrets_backend": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": ["keychain", "openbao", "proton-pass", "encrypted-file"],
+          "description": "Legacy shorthand; coerced to a structured chain at parse time."
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "cache_ttl_seconds": { "type": "integer", "minimum": 0 },
+            "write_targets": {},
+            "chain": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["encrypted_file", "macos_keychain", "linux_secret_service", "openbao", "proton_pass"]
+                  },
+                  "path": { "type": "string" },
+                  "key_source": {
+                    "type": "string",
+                    "enum": ["passphrase", "master_key"],
+                    "description": "Encrypted-file unlock mechanism (06-secrets.md §5). Default `passphrase` (PBKDF2 from SEVN_SECRETS_PASSPHRASE). `master_key` uses the raw 32-byte SEVN_SECRETS_MASTER_KEY. Exactly one is used; the other env var is ignored."
+                  }
+                }
+              }
+            },
+            "encrypted_file": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "path": { "type": "string" },
+                "key_source": {
+                  "type": "string",
+                  "enum": ["passphrase", "master_key"],
+                  "description": "Default encrypted-file unlock mechanism when a chain entry omits it; see chain[].key_source."
+                }
+              }
+            }
+          }
+        }
+      ],
+      "description": "Where proxy resolves secrets (05-security-sandbox.md §2.1, 09-infrastructure.md §4). Accepts a legacy string shorthand or a structured object with a backend `chain`. Linux desktop keyrings map to keychain-equivalent adapters in implementation — see 05 table.",
+      "long_description": "Selects which backend adapter the unified egress proxy uses first in its configured fallback chain to decrypt `SECRET:` references and provider keys. macOS Keychain, Linux libsecret/GNOME Keyring, OpenBao, Proton Pass CLI, and encrypted-file are the v1-classified options in doc 05; HashiCorp Vault is explicitly out of scope. For the encrypted-file backend, `key_source` declares the unlock mechanism explicitly (default `passphrase`); a bare `SEVN_SECRETS_MASTER_KEY` is inert unless `key_source: master_key` is set. The gateway itself never reads this for bulk secret material—only the proxy does—so tightening this value is a proxy-deployment concern. WSL2 and Docker-on-Mac playbooks describe how the proxy still reaches the chosen backend."
+    },
+    "infrastructure": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "snapshot_interval_minutes": {
+          "type": "integer",
+          "default": 30,
+          "$comment": "Maintainer: the design docs (Snapshot cron). Drives sandbox image / repo snapshot cadence; incremental vs full rebuild rules in same section."
+        },
+        "docker_socket": { "type": "string" },
+        "preload_repos": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "backup": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "target": {
+              "type": "string",
+              "enum": ["local", "s3", "rsync"],
+              "$comment": "Maintainer: the design docs — backup.target enum includes s3|rsync for forward compatibility; v1 product implements local tar only; warn if non-local without breaking parse."
+            },
+            "cadence": { "type": "string" },
+            "retention_days": { "type": "integer" },
+            "s3": { "type": "object", "additionalProperties": true },
+            "rsync": { "type": "object", "additionalProperties": true }
+          }
+        },
+        "version_control": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" }
+          },
+          "additionalProperties": true,
+          "$comment": "Maintainer: the design docs (workspace file tree / git). Gates dashboard git actions from Mission Control; exact RBAC in the design docs — schema reserves flag only."
+        },
+        "tunnel": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["none", "tailscale_serve", "tailscale_funnel", "cloudflare", "cloudflare_quick", "ngrok"],
+              "default": "none",
+              "description": "How the gateway is exposed for webhooks (onboarding preference)."
+            },
+            "tunnel_id": {
+              "type": "string",
+              "description": "Cloudflare tunnel UUID (cloudflare mode). Obtain from `cloudflared tunnel create`."
+            },
+            "token": {
+              "type": "string",
+              "description": "Cloudflare tunnel token; prefer ${SECRET:...} reference. Mutually exclusive with config_path."
+            },
+            "config_path": {
+              "type": "string",
+              "description": "Absolute path to cloudflared config YAML (cloudflare mode). Used when token is absent."
+            },
+            "hostname": {
+              "type": "string",
+              "description": "Public hostname served by the tunnel (e.g. bot.example.com). Displayed as public_url in dashboard; used as the ngrok reserved --domain when set."
+            },
+            "ngrok_authtoken": {
+              "type": "string",
+              "description": "ngrok authtoken (ngrok mode); prefer ${SECRET:...} reference. Passed to ngrok via NGROK_AUTHTOKEN when starting."
+            },
+            "local_port": {
+              "type": "integer",
+              "description": "Local gateway port forwarded by ngrok/tailscale modes. Defaults to gateway.port when unset."
+            },
+            "auto_start": {
+              "type": "boolean",
+              "default": false,
+              "description": "Start cloudflared alongside the gateway on boot. Default false."
+            },
+            "metrics_addr": {
+              "type": "string",
+              "default": "localhost:20241",
+              "description": "cloudflared metrics server address for health probes. Default localhost:20241."
+            }
+          }
+        }
+      }
+    },
+    "notifications": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "health_alert": { "type": "boolean", "default": true },
+        "provider_fallback_digest": { "type": "boolean" },
+        "provider_fallback_per_turn": { "type": "boolean" },
+        "trigger_dead_letter": { "type": "boolean" }
+      },
+      "$comment": "Maintainer: Cross-doc — the design docs (health_alert), 13-llm-providers.md §2.3 (provider_fallback_* digest vs noisy per-turn), 14-api-webhooks.md §6 (trigger_dead_letter optional Telegram)."
+    },
+    "channels": {
+      "type": "object",
+      "description": "Per adapter name; `enabled` gates plugin load (01-gateway-channels.md §10.3).",
+      "long_description": "Map from channel adapter name (e.g. `telegram`, `webchat`, or future `sevn-channel-*` plugin entry-point names) to channel-specific configuration objects. At startup the gateway iterates installed `sevn.channels` entry points and only instantiates adapters whose `enabled` flag is true here, so operators can install plugins without activating them. Each value typically carries transport tokens (by reference), DM policies, allowed groups, optional `mcp_enabled` defaults, TTS/STT overrides where not global, and adapter-specific ids such as `claude_agent_topic_id`. Unknown keys under each channel object are preserved for forward-compatible plugin options.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "busy_input_mode": {
+            "type": "string",
+            "enum": ["interrupt", "queue", "steer"],
+            "description": "Busy-session input policy for this adapter."
+          },
+          "session_reset_policy": {
+            "type": "string",
+            "enum": ["daily", "idle", "both"]
+          },
+          "session_idle_timeout_seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 86400
+          },
+          "allow_admin_from": {
+            "type": "array",
+            "items": { "type": ["string", "integer"] }
+          },
+          "group_allow_admin_from": {
+            "type": "array",
+            "items": { "type": ["string", "integer"] }
+          },
+          "user_allowed_commands": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "group_user_allowed_commands": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "mcp_enabled": {
+            "type": "array",
+            "items": { "type": "string" },
+            "$comment": "Maintainer: the design docs (MCP precedence). Session mcp_enabled overrides channel list overrides workspace mcp_enabled; absent at all levels means no MCP for that session."
+          },
+          "rich": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": ["off", "auto", "all"],
+                "default": "auto"
+              }
+            },
+            "$comment": "Bot API 10.1 rich messages (`channels.telegram.rich`; D3)."
+          },
+          "inline": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "enabled": { "type": "boolean", "default": false },
+              "feedback": { "type": "boolean", "default": false },
+              "cache_time_agent": { "type": "integer", "minimum": 0, "default": 10 },
+              "cache_time_static": { "type": "integer", "minimum": 0, "default": 300 },
+              "sources": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "agent": { "type": "boolean", "default": true },
+                  "second_brain": { "type": "boolean", "default": true },
+                  "printing_press": { "type": "boolean", "default": true },
+                  "artifacts": { "type": "boolean", "default": true }
+                }
+              }
+            },
+            "$comment": "Telegram inline mode (`channels.telegram.inline`; D7/D8)."
+          },
+          "webapp": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "viewer_enabled": { "type": "boolean", "default": false },
+              "share_to_story": { "type": "boolean", "default": true }
+            },
+            "$comment": "Telegram Mini App viewer (`channels.telegram.webapp`; M1/M2)."
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "agents": {
+      "type": "object",
+      "additionalProperties": true,
+      "$comment": "Maintainer: the design docs JSONC example includes agents{} — the design docs removed multi-agent bindings. Either delete before v1 ship or redefine; do not validate strictly until product decision (x-sevn-todo)."
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "codemode": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, tier-B wraps triager-listed registry tools in CodeMode run_code (W8). Defaults to true for minimax/* models (D5); explicit false overrides. Web tools (serp, get_page_content, web_fetch) always use local ToolExecutor dispatch under CodeMode — not provider-native WebSearch/WebFetch."
+            },
+            "max_retries": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 3,
+              "description": "Per-turn retry budget for the CodeMode run_code tool before pydantic-ai fails the tool call."
+            }
+          },
+          "$comment": "W8 — sole owner of CodeMode flag; default false preserves flat tools until operator opt-in."
+        },
+        "diagnostics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "When false, `sevn doctor --with-agent` refuses unless `--model` is set."
+            },
+            "model": {
+              "type": "string",
+              "description": "Optional catalog model id for the CLI diagnostic agent; defaults to the tier-B slot when omitted."
+            }
+          },
+          "$comment": "W4 — doctor --with-agent diagnostic agent slot (CLI doctor diagnostic agent)."
+        }
+      }
+    },
+    "providers": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "default_regime": {
+          "type": "string",
+          "description": "BudgetRegime string; see 13-llm-providers.md.",
+          "long_description": "Default `BudgetRegime` applied when a model’s overlay does not specify one, typically one of the subscription / per-token / free-local families described in `13-llm-providers.md` and `02-rlm-routing.md`. It influences caching aggressiveness, throttling, and inner-loop LLM call budgets (`RegimeBudget.rlm_for`). OAuth-backed providers usually default to subscription; operators may override per model via `model_budgets`. The dashboard should warn when regime disagrees with auth mode for a provider."
+        },
+        "use_main_model_for_all": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true (default), every LLM slot inherits providers.tier_default.triager.",
+          "$comment": "the design docs — scanner, LCM, memory aux, and tier defaults resolve via model_resolution.py."
+        },
+        "tier_default": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/tier_default_entry" },
+          "$comment": "Maintainer: the design docs JSON example — tier_default keys; sub_lm used only when rlm.c_d_backend=dspy; lambda_leaf only when lambda_rlm. Tier A unused in some docs — confirm if reserved."
+        },
+        "fallback_chain": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "native_model": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "triager": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, Triager uses native pydantic-ai models via the egress bridge (W3)."
+            },
+            "tier_b": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, Tier B uses native pydantic-ai models via the egress bridge (W3)."
+            }
+          },
+          "$comment": "W3 — parallel to FunctionModel; default false preserves today's path until golden parity (W12)."
+        },
+        "models": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/provider_model_override" },
+          "description": "Per catalog model id overrides for provider name and transport (D1)."
+        },
+        "google": { "$ref": "#/$defs/provider_registry_entry" },
+        "openai": { "$ref": "#/$defs/provider_registry_entry" },
+        "groq": { "$ref": "#/$defs/provider_registry_entry" },
+        "anthropic": { "$ref": "#/$defs/provider_registry_entry" },
+        "mistral": { "$ref": "#/$defs/provider_registry_entry" },
+        "ollama": { "$ref": "#/$defs/provider_registry_entry" },
+        "minimax": {
+          "allOf": [
+            { "$ref": "#/$defs/provider_registry_entry" },
+            {
+              "type": "object",
+              "properties": {
+                "base_url": {
+                  "type": "string",
+                  "description": "OpenAI-compatible API base URL for MiniMax (proxy factory boot).",
+                  "$comment": "the design docs — Anthropic-compatible MiniMax API base when any catalog model uses minimax/ prefix; default DEFAULT_MINIMAX_ANTHROPIC_BASE_URL in defaults.py when absent."
+                },
+                "openai_base_url": {
+                  "type": "string",
+                  "description": "OpenAI chat-completions base URL for MiniMax when transport is chat_completions.",
+                  "$comment": "W1 — defaults to DEFAULT_MINIMAX_OPENAI_BASE_URL (https://api.minimax.io/v1)."
+                },
+                "transport": {
+                  "type": "string",
+                  "enum": ["anthropic", "chat_completions"],
+                  "default": "chat_completions",
+                  "description": "Wire transport for minimax/* catalog models. 'chat_completions' (default) uses the OpenAI-compat /v1 endpoint; 'anthropic' uses the Anthropic-compat endpoint.",
+                  "$comment": "Matches DEFAULT_MINIMAX_TRANSPORT (chat_completions) in src/sevn/config/defaults.py."
+                }
+              }
+            }
+          ],
+          "properties": {
+            "consumption_type": {
+              "type": "string",
+              "enum": ["api", "subscription"],
+              "default": "subscription",
+              "description": "Billing model for MiniMax: 'subscription' (Token Plan, 5-hour/weekly windows) or 'api' (pay-as-you-go). 'subscription' suppresses the token_budget mission-control alert since per-token totals are not the limiting resource."
+            }
+          }
+        },
+        "model_budgets": {
+          "type": "object",
+          "additionalProperties": true,
+          "$comment": "Maintainer: the design docs — per-model_id ModelBudget overrides merged over shipped models.json; doc says exact key path TBD; fail-fast on unknown routed tier model per §2.4."
+        }
+      }
+    },
+    "rlm": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "c_d_backend": {
+          "type": "string",
+          "enum": ["dspy", "lambda_rlm"],
+          "default": "dspy"
+        },
+        "lambda_tool_allowlist": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "lambda_tool_allowlist_C": {
+          "type": "array",
+          "items": { "type": "string" },
+          "$comment": "Maintainer: the design docs — if product ships split allowlists, C vs D combinator leaves differ; if only lambda_tool_allowlist present, single list applies to both (see the design docsa)."
+        },
+        "lambda_tool_allowlist_D": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "lambda_max_leaf_llm_calls": { "type": "integer" },
+        "max_llm_calls": {
+          "type": "integer",
+          "$comment": "Maintainer: the design docs (diagram J0 RegimeBudget.rlm_for table) and the design docs — overrides inner dspy.RLM max_llm_calls-style budget; distinct from outer C/D round budget in harness doc 19."
+        },
+        "sandbox": {
+          "type": "string",
+          "enum": ["docker", "pyodide_deno"],
+          "$comment": "Maintainer: the design docs J0 sandbox row — docker vs pyodide_deno auto-pick at workspace load; override wins. Default DSPy RLM interpreter only; not λ combinator control plane."
+        },
+        "docker_image": {
+          "type": "string",
+          "description": "Override base image tag for DSPy Docker REPL (the design docs)."
+        },
+        "repl_lifetime": {
+          "type": "string",
+          "enum": ["per_turn", "per_session", "per_run"],
+          "default": "per_turn",
+          "$comment": "DSPy REPL lifecycle (the design docs)."
+        }
+      }
+    },
+    "executors": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "tier_cd": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "lambda_rlm": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false,
+                  "$comment": "Opt-in λ-RLM C/D path (the design docs). When false, harness forces dspy regardless of rlm.c_d_backend."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "plan_approval": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "default_profile": {
+          "type": "string",
+          "$comment": "Maintainer: W4 ABAC — names the active profile key in `permissions.profiles`; unset = AllowAllPermissionPolicy (single-operator default)."
+        },
+        "profiles": {
+          "type": "object",
+          "additionalProperties": true,
+          "$comment": "Maintainer: map profile name -> PermissionConfig. Supported `mode` values: `abac` (deny egress/exec/mutating for untrusted principals; owner resolved from channel + allowed_users), `deny_all` (DenyingPermissionPolicy), or omit `mode` and use `deny_tools` list for static deny-by-name. Default when no profile is set: AllowAllPermissionPolicy (loopback/owner-DM Telegram unchanged)."
+        },
+        "scope_narrowing": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "$comment": "Maintainer: the design docs Q1 — when false, structured-output schema for Triager must omit permission_scope_narrowing entirely (token + safety); when true, Triager emits profile + optional removed_caps."
+            }
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "triager": {
+      "type": "object",
+      "properties": {
+        "group_scope": { "type": "string" },
+        "model": { "type": "string", "$comment": "Maintainer: the design docs Triager model row — LiteLLM route id resolved like other tiers via proxy; not a TriageResult field (the design docs)." },
+        "tier_b_tool_cap": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "$comment": "Maintainer: the design docs — max Triager-selected tool names for tier B; Pydantic default matches src/sevn/config/defaults.py."
+        },
+        "tier_b_skill_cap": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 7,
+          "$comment": "Maintainer: the design docs — max Triager-selected skill names for tier B."
+        },
+        "complexity_clamp_confidence_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.85,
+          "description": "Below this Triager confidence, short/vague C/D routes clamp to tier B."
+        },
+        "complexity_clamp_short_word_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 6,
+          "description": "Word-count ceiling for the complexity clamp when confidence is low."
+        }
+      },
+      "additionalProperties": true
+    },
+    "tracing": {
+      "type": "object",
+      "properties": {
+        "retention_days": { "type": "integer" },
+        "sinks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/trace_sink_entry" }
+        }
+      },
+      "additionalProperties": true,
+      "$comment": "Maintainer: the design docs JSON example — sinks[] drives TraceSink fan-out; retention_days for file/sqlite sinks; token_ref resolved gateway-side at boot (${ENV:} / ${SECRET:} / bare logical key). Default if unset: JSONL only per §3."
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "pre_compaction_flush": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "model": { "type": ["string", "null"] }
+          },
+          "additionalProperties": true,
+          "$comment": "Maintainer: the design docs — flush model defaults to lcm.summary_model when null."
+        },
+        "dreaming": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "promotion_mode": { "type": "string", "enum": ["auto", "ack_required"], "default": "auto" },
+            "cron": { "type": "string", "default": "0 3 * * *", "minLength": 9 },
+            "threshold": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.5 },
+            "max_promotions_per_run": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256,
+              "default": 8
+            },
+            "backfill_days": { "type": "integer", "minimum": 1, "maximum": 3650, "default": 90 },
+            "scoring": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "recall_weight": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.5 },
+                "diversity_weight": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.3 },
+                "recency_weight": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.2 },
+                "adaptive": { "type": "boolean", "default": false },
+                "llm_ranker": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "enabled": { "type": "boolean", "default": false },
+                    "model": { "type": ["string", "null"], "default": null }
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "Maintainer: the design docs — optional scored promotion to MEMORY.md; default off; cron reconciles trigger_cron_jobs row sevn_memory_dreaming."
+        },
+        "user_model": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "extractor_model": { "type": ["string", "null"] },
+            "max_facts": { "type": "integer", "minimum": 1, "maximum": 512, "default": 64 },
+            "max_inject_tokens": { "type": "integer", "minimum": 0, "default": 600 },
+            "bump_throttle_minutes": { "type": "integer", "minimum": 0, "default": 60 },
+            "deny_topics": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": []
+            },
+            "trigger_tiers": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": ["B", "C", "D"]
+            }
+          },
+          "$comment": "Maintainer: the design docs — opt-in inferred operator profile; off by default."
+        }
+      }
+    },
+    "lcm": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "fresh_tail_count": { "type": "integer", "minimum": 1 },
+        "autocompact_disabled": { "type": "boolean" },
+        "summary_model": { "type": ["string", "null"] },
+        "leaf_target_tokens": { "type": "integer", "minimum": 64 },
+        "condensed_target_tokens": { "type": "integer", "minimum": 64 },
+        "leaf_chunk_tokens": { "type": "integer", "minimum": 256 },
+        "leaf_min_fanout": { "type": "integer", "minimum": 1 },
+        "condensed_min_fanout": { "type": "integer", "minimum": 1 },
+        "incremental_max_depth": { "type": "integer", "minimum": 0 },
+        "large_file_token_threshold": { "type": "integer", "minimum": 256 },
+        "topic_search_max_sessions": { "type": "integer", "minimum": 1 },
+        "summary_language": { "type": "string", "minLength": 1 },
+        "dedup_overlap_threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+        "smart_collapse_enabled": { "type": "boolean" },
+        "uncached_suffix_fraction": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "uncached_suffix_floor_tokens": { "type": "integer", "minimum": 0 },
+        "uncached_suffix_ceiling_tokens": { "type": "integer", "minimum": 1 }
+      },
+      "$comment": "Maintainer: the design docs — nested under lcm key in sevn.json."
+    },
+    "memory_search_max_chars": {
+      "type": "integer",
+      "$comment": "Maintainer: the design docs (Federated memory_search) — caps merged tool output size when source=all; log on truncation; pagination out of v1 scope."
+    },
+    "mcp_servers": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "command": { "type": "string" },
+          "args": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": true
+      },
+      "$comment": "Maintainer: the design docs example — map server id -> {command, args} for MCPServerStdio; keys referenced by mcp_enabled / channels.*.mcp_enabled / session override."
+    },
+    "mcp_enabled": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Workspace-default MCP server ids; absent → none enabled (04-tools.md).",
+      "long_description": "Ordered list of MCP server ids (keys in `mcp_servers`) that are allowed at the workspace level before per-channel and per-session layers further restrict exposure. Safe default in architecture is empty/absent meaning **no** MCP tools are reachable until an operator explicitly opts in—this avoids accidentally giving every session access to Linear, Notion, or browser automation. Precedence is session override > channel `mcp_enabled` > this list. Changing MCP exposure bumps Triager registry cache version per RLM Q&A so descriptions blocks stay coherent."
+    },
+    "stt_providers": {
+      "type": "array",
+      "items": { "type": "string" },
+      "$comment": "Maintainer: the design docs — ordered provider ids for voice STT before Triager; default chain in prose (whisper.cpp -> OpenAI -> …). the design docs resolved per-workspace list."
+    },
+    "voice": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "$comment": "Master switch for inbound STT and outbound TTS (voice D9)."
+        },
+        "stt_confidence_reprompt_threshold": {
+          "type": "number",
+          "default": 0.7,
+          "$comment": "Maintainer: the design docs S1 — below-threshold STT confidence triggers gateway re-prompt; Triager not run until user confirms; default 0.7."
+        }
+      },
+      "additionalProperties": true
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "retention_days": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 10,
+          "$comment": "the design docs — rotated gateway-*.log / proxy-*.log older than this (mtime) processed by retention sweeper."
+        },
+        "archive_mode": {
+          "type": "string",
+          "enum": ["delete", "copy", "r2", "gcs"],
+          "default": "copy",
+          "$comment": "delete | copy (local archive_destination) | r2 | gcs — cloud modes require logging.cloud.* bucket_ref secrets."
+        },
+        "archive_destination": {
+          "type": "string",
+          "default": "logs/archive",
+          "$comment": "Relative to content_root when archive_mode is copy."
+        },
+        "cloud": {
+          "type": "object",
+          "properties": {
+            "r2": {
+              "type": "object",
+              "properties": {
+                "bucket_ref": { "type": "string" },
+                "prefix": { "type": "string", "default": "sevn-logs/" }
+              },
+              "additionalProperties": false
+            },
+            "gcs": {
+              "type": "object",
+              "properties": {
+                "bucket_ref": { "type": "string" },
+                "prefix": { "type": "string", "default": "sevn-logs/" }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "pii_mode": {
+          "type": "string",
+          "enum": ["secrets_only", "strict"],
+          "default": "secrets_only",
+          "$comment": "Maintainer: the design docs M6 — redact helper loads rules from config; secrets_only default for personal bots; strict for multi-tenant PII posture."
+        },
+        "tool_debug_result_max_chars": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "default": null,
+          "$comment": "Max chars for the tool_call.finish/cached result preview in gateway DEBUG logs; null = bounded by TOOL_DEBUG_RESULT_LOG_HARD_CAP. Full result is always returned to the model; this caps only the log rendering."
+        }
+      },
+      "additionalProperties": true
+    },
+    "triggers": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "paused": { "type": "boolean" },
+        "webhooks_paused": { "type": "boolean" },
+        "cron_paused": { "type": "boolean" },
+        "api_paused": { "type": "boolean" },
+        "max_parallel_runs": { "type": "integer", "default": 4 },
+        "max_concurrent": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 4,
+          "$comment": "Alias / preferred name for semaphore sizing (the design docs); falls back to max_parallel_runs when absent in code."
+        },
+        "max_inline_bytes": {
+          "type": "integer",
+          "minimum": 256,
+          "default": 65536,
+          "$comment": "Compose prompt spill threshold (the design docs)."
+        },
+        "webhook_dedupe_ttl_s": {
+          "type": "integer",
+          "minimum": 60,
+          "default": 604800,
+          "$comment": "Webhook dedupe TTL seconds (the design docs)."
+        },
+        "sources": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "prompt_template": { "type": "string" }
+            },
+            "additionalProperties": true
+          },
+          "$comment": "Maintainer: the design docs — triggers.sources.<source>.prompt_template replaces shipped compose_prompt prose; placeholders against source PayloadModel; large payload path rules in same section."
+        },
+        "cron": {
+          "type": "object",
+          "properties": {
+            "require_approval": { "type": "boolean", "default": true },
+            "run_history_archive_after_days": { "type": "integer", "default": 30 }
+          },
+          "additionalProperties": true
+        },
+        "api": {
+          "type": "object",
+          "properties": {
+            "default_rate_limit": {
+              "type": "object",
+              "properties": {
+                "enabled": { "type": "boolean", "default": false }
+              },
+              "additionalProperties": true
+            },
+            "callers": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "requests_per_minute": {
+                    "oneOf": [
+                      { "type": "integer", "minimum": 1 },
+                      { "type": "null" }
+                    ]
+                  }
+                },
+                "additionalProperties": true
+              },
+              "$comment": "Maintainer: the design docs — POST /api/v1/run auth; map caller id -> requests_per_minute; null disables throttle for that caller; workspace triggers.api.default_rate_limit.enabled default false (solo bots)."
+            }
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "plugin_hooks": {
+      "type": "object",
+      "description": "Per plugin-id gates for setuptools ``sevn.plugin_hooks`` (the design docs).",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean", "default": false },
+          "trust_level": {
+            "type": "string",
+            "enum": ["default", "owner"],
+            "default": "default"
+          },
+          "timeout_s": {
+            "oneOf": [{ "type": "number", "exclusiveMinimum": 0 }, { "type": "null" }],
+            "default": null
+          },
+          "runs_after": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": []
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "my_sevn": {
+      "type": "object",
+      "description": "Operator binding to the sevn.bot source repo and evolution defaults (the design docs).",
+      "additionalProperties": true,
+      "properties": {
+        "repo_url": {
+          "type": "string",
+          "default": "https://github.com/sevn-bot/sevn"
+        },
+        "sync": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "cron": { "type": "string", "default": "0 4 * * *" }
+          }
+        },
+        "issues": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "prefer_github": { "type": "boolean", "default": true },
+            "auto_file_on_failure": { "type": "boolean", "default": false },
+            "sync_enabled": { "type": "boolean", "default": true },
+            "sync_cron": { "type": "string", "default": "0 */6 * * *" },
+            "webhook_import": { "type": "boolean", "default": true },
+            "auto_run_on_import": { "type": "boolean", "default": false },
+            "label_map": {
+              "type": "object",
+              "additionalProperties": { "type": "string" },
+              "default": { "bug": "bug", "enhancement": "feature", "feature": "feature" }
+            }
+          }
+        },
+        "bugs": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "require_approval": { "type": "boolean", "default": false },
+            "use_spec_kit": { "type": "boolean", "default": false }
+          }
+        },
+        "features": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "require_approval": { "type": "boolean", "default": true }
+          }
+        },
+        "executors": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "bug": { "type": "string", "enum": ["local", "cursor_cloud"], "default": "local" },
+            "feature": {
+              "type": "string",
+              "enum": ["local", "cursor_cloud"],
+              "default": "cursor_cloud"
+            }
+          }
+        },
+        "pipelines": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Dry-run defaults and budget knobs for evolution pipelines (FL-2).",
+          "properties": {
+            "ci_dry_run_default": { "type": "boolean", "default": true },
+            "promotion_dry_run_default": { "type": "boolean", "default": true },
+            "spec_kit_dry_run_default": { "type": "boolean", "default": false },
+            "local_implement_max_turns": { "type": "integer", "minimum": 1, "maximum": 200, "default": 20 }
+          }
+        },
+        "promotion": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "mode": { "type": "string", "default": "pr" }
+          }
+        },
+        "workspace_backup": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Private GitHub workspace backup target (onboarding comprehensive setup D7).",
+          "properties": {
+            "repo_url": {
+              "type": "string",
+              "description": "Full https://github.com/{owner}/{repo} URL."
+            },
+            "branch": { "type": "string", "default": "main" },
+            "auto_push": { "type": "boolean", "default": false }
+          }
+        }
+      }
+    },
+    "self_improve": {
+      "type": "object",
+      "description": "Opt-in trajectory sampling + bounded patch proposals (the design docs).",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "preset": { "type": "string", "enum": ["A", "B", "C"], "default": "A" },
+        "auto_merge_enabled": { "type": "boolean", "default": false },
+        "sampler": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "max_candidates": { "type": "integer", "minimum": 10, "maximum": 500, "default": 100 },
+            "seed_rotate_daily": { "type": "boolean", "default": true },
+            "explicit_feedback_floor_pct": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.2
+            },
+            "clean_pre_filter_ratio": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.1
+            },
+            "coverage": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "per_channel_pct_max": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.4 },
+                "per_channel_pct_min": {
+                  "type": "object",
+                  "additionalProperties": { "type": "number", "minimum": 0, "maximum": 1 },
+                  "default": { "voice": 0.05 }
+                },
+                "per_intent_pct_max": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.4 },
+                "per_tier_pct_max": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.4 }
+              }
+            }
+          }
+        },
+        "jobs": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "max_git_operations_per_day": { "type": "integer", "minimum": 1 },
+            "max_concurrent_writers": { "type": "integer", "minimum": 1, "default": 1 }
+          }
+        },
+        "eval": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "token_budget_daily": { "oneOf": [{ "type": "string" }, { "type": "integer", "minimum": 1 }] },
+            "docker_required": { "type": "boolean", "default": true },
+            "eval_network": {
+              "type": "string",
+              "enum": ["offline", "replay", "live_budget"],
+              "default": "offline"
+            }
+          }
+        },
+        "hub": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "use_github": { "type": "boolean", "default": true },
+            "provider": { "type": "string", "enum": ["github"], "default": "github" },
+            "repo": { "type": "string", "default": "" },
+            "default_branch": { "type": "string", "default": "main" }
+          }
+        },
+        "allowed_globs": { "type": "array", "items": { "type": "string" } },
+        "deny_globs": { "type": "array", "items": { "type": "string" } },
+        "allow_dependency_changes": { "type": "boolean", "default": false },
+        "allow_config_changes": { "type": "boolean", "default": false },
+        "allow_lcm_memory_changes": { "type": "boolean", "default": false },
+        "require_human_approval": { "type": "boolean", "default": false },
+        "patch_author": {
+          "type": "string",
+          "enum": ["pydantic_agent"],
+          "default": "pydantic_agent"
+        },
+        "ASK_FOR_FEEDBACK": { "type": "boolean", "default": false },
+        "export": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "allow_user_lines": { "type": "boolean", "default": false }
+          }
+        },
+        "trajectories": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "ingest_on_turn": { "type": "boolean", "default": true },
+            "ingest_cron": {
+              "type": "string",
+              "default": "0 4 * * *",
+              "$comment": "Nightly cron backfill for trajectory_fact ingest; reconciles trigger_cron_jobs row sevn_self_improve_trajectory_ingest."
+            }
+          }
+        },
+        "spec_kit": {
+          "type": "object",
+          "description": "Optional spec-kit plan stage before patch author (the design docs).",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "require_plan_before_patch": { "type": "boolean", "default": true },
+            "require_hitl_for_plan": { "type": "boolean", "default": false }
+          }
+        }
+      }
+    },
+    "spec_kit": {
+      "type": "object",
+      "description": "Spec-kit constitution paths and CLI integration (the design docs).",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "constitution_path": {
+          "type": "string",
+          "default": "evolution/spec-kit/CONSTITUTION.md"
+        },
+        "features_dir": { "type": "string", "default": "evolution/features" },
+        "improve_dir": { "type": "string", "default": "workspace/.sevn/improve/spec-kit" },
+        "cli_command": { "oneOf": [{ "type": "string" }, { "type": "null" }], "default": null },
+        "integration": { "type": "string", "default": "copilot" },
+        "options": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "dry_run_default": { "type": "boolean", "default": false },
+            "pin_spec_kit_version": { "oneOf": [{ "type": "string" }, { "type": "null" }], "default": null }
+          }
+        }
+      }
+    },
+    "permission_templates": {
+      "type": "object",
+      "additionalProperties": true,
+      "$comment": "Maintainer: the design docs + §4.2 — cron rows reference template name + overrides; static defaults in code the design docs Impl must define merge: owner keys extend or shadow shipped template ids (x-sevn-todo)."
+    },
+    "second_brain": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "paths": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "vault": {
+              "type": "string",
+              "description": "Workspace-relative Obsidian vault folder (e.g. obsidian/alex_AI). Unset preserves second_brain/users/<scope>/ layout."
+            }
+          }
+        }
+      },
+      "additionalProperties": true,
+      "$comment": "second_brain.paths.vault — workspace-relative Obsidian vault root under content root; unset uses legacy second_brain/users/<scope>/ layout."
+    },
+    "openui": {
+      "type": "object",
+      "description": "OpenUI generated HTML: token TTL, caps, CSP asset origins, rasteriser (the design docs).",
+      "additionalProperties": true,
+      "properties": {
+        "token_ttl_seconds": { "type": "integer", "minimum": 60, "maximum": 86400, "default": 21600 },
+        "callback_timeout_seconds": { "type": "integer", "minimum": 60, "maximum": 86400, "default": 1800 },
+        "soft_cap_bytes": { "type": "integer", "minimum": 1024, "default": 131072 },
+        "hard_cap_bytes": { "type": "integer", "minimum": 4096, "default": 1048576 },
+        "allowed_asset_origins": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "rasteriser": {
+          "type": "string",
+          "enum": ["weasyprint", "playwright"],
+          "default": "weasyprint",
+          "description": "v1 implements weasyprint only; playwright must error at config validation (the design docs)."
+        }
+      },
+      "$comment": "Normative: the design docs — no openui.enabled toggle; tool openui_render is always registered for tier B/C/D."
+    },
+    "code_understanding": {
+      "type": "object",
+      "description": "Code-orientation stack toggles (the design docs).",
+      "additionalProperties": true,
+      "properties": {
+        "mycode": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean", "default": true }
+          }
+        },
+        "code_graph_rag": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean", "default": false }
+          }
+        },
+        "code_review_graph": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "repo_root": { "type": ["string", "null"], "default": null },
+            "command": { "type": ["string", "null"], "default": null },
+            "tool_preset": {
+              "type": "string",
+              "enum": ["read_only", "full"],
+              "default": "read_only"
+            },
+            "mcp": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": { "type": "boolean", "default": false }
+              }
+            }
+          },
+          "$comment": "Maintainer: the design docs / §10.7 — SQLite MCP via PyPI code-review-graph; host-gateway stdio registration when enabled + mcp.enabled."
+        },
+        "roam_code": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean", "default": true }
+          }
+        },
+        "graphify": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "mcp": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": { "type": "boolean", "default": false }
+              }
+            }
+          }
+        }
+      },
+      "$comment": "Normative: the design docs — independent layer toggles; defaults mirror the design docs"
+    },
+    "skills": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Bundled-skill activation flags (the design docs). Per-skill nested objects with at least `enabled`; absent skill key means use the skill's own default (most defaults are `true` for shipped core skills, `false` for opt-in / planned skills).",
+      "long_description": "Workspace-level activation toggles for bundled skills declared in the design docs. Each direct child key is the skill name (kebab-cased name flattened to snake_case for JSON, e.g. `computer-use` → `computer_use`) and its value is an object whose `enabled` boolean controls whether the harness exposes that skill to the Triager skills universe and registers any associated MCP server. Skills with extra knobs (e.g. computer-use's gating of the upstream Cua Driver MCP server) live under the same nested object so per-skill configuration stays colocated. Unlisted skills follow the default specified in their normative section in 04b-skills.md.",
+      "properties": {
+        "computer_use": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "target": {
+              "type": "string",
+              "enum": ["host", "docker", "cloud", "lume"],
+              "default": "host",
+              "description": "Active provider: host uses cua-driver MCP; docker/cloud/lume use `cua do switch`."
+            },
+            "command": {
+              "type": "string",
+              "description": "Override cua-driver (host target) or cua CLI (sandbox targets) executable path."
+            },
+            "snapshot": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "annotate": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "When true, prefer AI-annotated `cua do snapshot` (requires ANTHROPIC_API_KEY)."
+                }
+              }
+            },
+            "trajectory": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Record session trajectories via the cua CLI."
+                },
+                "share": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Offer trajectory share links to the operator at session end."
+                },
+                "export_dir": {
+                  "type": "string",
+                  "description": "Optional directory for trajectory HTML export output."
+                }
+              }
+            }
+          },
+          "additionalProperties": true,
+          "$comment": "Maintainer: the design docs — opt-in `computer-use` skill (trycua/cua). Default false. Host target: cua-driver MCP passthrough. Sandbox targets (docker/cloud/lume): `cua` CLI via `cua do switch`. macOS-only; fail fast at load when enabled on unsupported hosts."
+        },
+        "cua_agent": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Opt-in autonomous GUI loop; requires computer-use enabled and per-run approval."
+            },
+            "require_computer_use": {
+              "type": "boolean",
+              "default": true,
+              "description": "When true, cua-agent fails fast unless skills.computer_use.enabled is true."
+            },
+            "approval": {
+              "type": "string",
+              "enum": ["per_run"],
+              "default": "per_run",
+              "description": "Autonomous loop requires explicit operator approval each run (HITL)."
+            }
+          },
+          "$comment": "Maintainer: the design docs — opt-in `cua-agent` skill (autonomous loop). Default false. Requires computer-use when require_computer_use is true. macOS-only; per-run HITL approval at script boundary."
+        },
+        "lume": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Opt-in Apple-Silicon VM lifecycle via the lume CLI."
+            },
+            "command": {
+              "type": "string",
+              "description": "Override lume executable path."
+            }
+          },
+          "$comment": "Maintainer: the design docs — opt-in `lume` skill (VM lifecycle). Default false. macOS Apple-Silicon only; fail fast at load when enabled on unsupported hosts."
+        },
+        "browser": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Session-scoped Playwright browser lifecycle (profile, CDP registry, idle close).",
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "profile_dir": {
+              "type": "string",
+              "description": "Override Chrome profile directory; default `<content_root>/.sevn/browser-profiles/<session_id>`."
+            },
+            "idle_close_seconds": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "description": "Close sevn-spawned browsers after this many idle seconds; `0` disables the gateway background pass."
+            },
+            "headless": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, spawn headless Chrome; default false on host when a Chrome binary exists (headed operator goal)."
+            },
+            "engine": {
+              "type": "string",
+              "enum": ["auto", "chrome", "chromium", "brave"],
+              "default": "auto",
+              "description": "Which Chromium-compatible browser to prefer when resolving the spawn binary (`auto`: Chrome/Chromium before Brave)."
+            }
+          },
+          "$comment": "Maintainer: browser-session-lifecycle W5 — D8 idle TTL, D13 headed default, Brave multi-arch Docker; registry under `.sevn/browser-sessions/`."
+        },
+        "openwiki": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Opt-in LangChain OpenWiki CLI skill (npm global; credentials via sevn secrets)."
+            },
+            "provider": {
+              "type": "string",
+              "enum": ["openrouter", "openai", "anthropic", "fireworks", "baseten"],
+              "default": "openrouter",
+              "description": "OpenWiki inference provider forwarded as OPENWIKI_PROVIDER."
+            },
+            "model_id": {
+              "type": "string",
+              "description": "Optional model id forwarded as OPENWIKI_MODEL_ID."
+            },
+            "api_key": {
+              "type": "string",
+              "description": "Primary LLM API key ref (${SECRET:…}) forwarded to the configured provider env var. When omitted, sevn auto-maps from assigned provider secrets."
+            },
+            "api_keys": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Optional per-provider API key refs forwarded as OpenWiki env vars.",
+              "properties": {
+                "openrouter_api_key": { "type": "string", "description": "→ OPENROUTER_API_KEY" },
+                "openai_api_key": { "type": "string", "description": "→ OPENAI_API_KEY" },
+                "anthropic_api_key": { "type": "string", "description": "→ ANTHROPIC_API_KEY" },
+                "fireworks_api_key": { "type": "string", "description": "→ FIREWORKS_API_KEY" },
+                "baseten_api_key": { "type": "string", "description": "→ BASETEN_API_KEY" },
+                "langsmith_api_key": { "type": "string", "description": "→ LANGSMITH_API_KEY (optional tracing)" }
+              }
+            }
+          },
+          "$comment": "Maintainer: openwiki bundled skill — host npm CLI; credentials resolved from sevn secrets into subprocess env."
+        },
+        "printing_press_library": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Printing Press starter-pack skill (espn, flight_goat, movie_goat, recipe_goat Go CLIs on PATH).",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "When true, the skill is exposed to the Triager skills universe. Set false to hide when binaries are not installed."
+            },
+            "api_keys": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "Optional API key refs forwarded as env vars to the CLI wrappers.",
+              "properties": {
+                "tmdb_api_key": {
+                  "type": "string",
+                  "description": "TMDb v3 API key for movie-goat (free at https://www.themoviedb.org/settings/api)."
+                },
+                "omdb_api_key": {
+                  "type": "string",
+                  "description": "OMDb API key for movie-goat ratings enrichment (optional, free at http://www.omdbapi.com/apikey.aspx)."
+                },
+                "flightaware_api_key": {
+                  "type": "string",
+                  "description": "FlightAware AeroAPI key for flight-goat reliability data (optional)."
+                },
+                "usda_fdc_api_key": {
+                  "type": "string",
+                  "description": "USDA FoodData Central API key for recipe-goat nutrition lookups (optional)."
+                }
+              }
+            }
+          },
+          "$comment": "Maintainer: printing-press-library bundled skill — PP4; binaries installed via `make printing-press-starter-pack`."
+        }
+      }
+    },
+    "tools": {
+      "type": "object",
+      "description": "Per-plugin coarse gates for setuptools entry-point group `sevn.tools` (the design docs, §5).",
+      "properties": {
+        "browser": {
+          "type": "object",
+          "description": "sevn-native CDP browser tool (optional extra browser-cdp; MIT websockets).",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable the browser CDP tool when the engine is installed."
+            },
+            "allow_eval": {
+              "type": "boolean",
+              "default": false,
+              "description": "Allow the gated raw eval action (default off)."
+            },
+            "spawn_on_miss": {
+              "type": "boolean",
+              "default": true,
+              "description": "Spawn headed host Chrome when no CDP endpoint is reachable."
+            },
+            "gmail": {
+              "type": "object",
+              "properties": {
+                "allow_write": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Allow gmail compose/reply write ops."
+                }
+              },
+              "additionalProperties": true
+            },
+            "youtube": {
+              "type": "object",
+              "properties": {
+                "allow_write": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Allow youtube comment/reply write ops."
+                }
+              },
+              "additionalProperties": true
+            },
+            "linkedin": {
+              "type": "object",
+              "properties": {
+                "allow_write": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "Allow linkedin block/connect write ops."
+                }
+              },
+              "additionalProperties": true
+            },
+            "social": {
+              "type": "object",
+              "description": "Per-site social write kill-switches (x, facebook, instagram, linkedin, reddit, tiktok).",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "allow_write": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                },
+                "additionalProperties": true
+              }
+            }
+          },
+          "additionalProperties": true,
+          "$comment": "Maintainer: cdp-browser-automator-wave-plan W11 — recipe write gates default opt-in."
+        }
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean", "default": true }
+        },
+        "additionalProperties": true,
+        "$comment": "Keys match the first segment of `plugin.tool` entry-point names; omitted plugins default enabled true."
+      },
+      "$comment": "Maintainer: the design docs — registry merges these into `load_plugin_tools` toggles."
+    },
+    "doctor": {
+      "type": "object",
+      "description": "Optional workspace defaults for `sevn doctor` (the design docs, §5).",
+      "properties": {
+        "strict": {
+          "type": "boolean",
+          "description": "When true, implementations may treat doctor warnings as failures without argv (the design docs); CLI `sevn doctor --strict` elevates warnings for this run."
+        }
+      },
+      "additionalProperties": true,
+      "$comment": "Normative CLI probe order and exit policy: the design docs"
+    },
+    "subagents": {
+      "type": "object",
+      "properties": {
+        "max_concurrent": { "type": "integer", "default": 5 }
+      },
+      "additionalProperties": true,
+      "$comment": "Maintainer: the design docs (per-session cap) and 11-onboarding.md §2 — subagents.max_concurrent default 5; interacts with harness zombie pool doc 19."
+    },
+    "max_concurrent_subagents_total": {
+      "type": "integer",
+      "default": 20,
+      "$comment": "Maintainer: the design docs H2 — max_concurrent_subagents_total default 20 across workspace; hard cap with owner-visible errors when exceeded."
+    },
+    "add_core_tools_to_all_context": {
+      "type": "boolean",
+      "$comment": "Maintainer: the design docs E2 (ADD_CORE_TOOLS_TO_ALL_CONTEXT) — descriptions-block policy for RLM; JSON key snake_case Config File Convention."
+    },
+    "use_code_graph_rag": { "type": "boolean" },
+    "code_graph_rag": {
+      "type": "object",
+      "additionalProperties": true,
+      "$comment": "Maintainer: the design docs — merged with code defaults; orchestrator/cypher roles, memgraph_*, watch_*, export paths; API keys stay top-level providers.* not nested here."
+    },
+    "witchcraft_enabled": { "type": "boolean", "default": false },
+    "witchcraft": {
+      "type": "object",
+      "properties": {
+        "db_path": { "type": "string" },
+        "index_messages": { "type": "boolean" },
+        "reindex_on_startup": { "type": "boolean" },
+        "model_backend": { "type": "string" }
+      },
+      "additionalProperties": true,
+      "$comment": "Maintainer: the design docs Witchcraft section — semantic_search tool registration gated by witchcraft_enabled + binary availability; db_path relative to workspace unless absolute."
+    },
+    "cloudflare_agent_memory_enabled": {
+      "type": "boolean",
+      "default": false,
+      "$comment": "Maintainer: the design docs — flat master toggle pairs with cloudflare_agent_memory object; tools register when enabled (same pattern as Witchcraft in 03-memory.md)."
+    },
+    "cloudflare_agent_memory": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "api_token_secret": { "type": "string" },
+        "account_id": { "type": "string" },
+        "api_base_url": { "type": "string" },
+        "http_timeout_ms": { "type": "integer" },
+        "max_retries": { "type": "integer" },
+        "use_egress_proxy": { "type": "boolean" },
+        "profile_template": { "type": "string" },
+        "shared_profiles": { "type": "object", "additionalProperties": true },
+        "ingest_on_compaction": { "type": "boolean" },
+        "ingest_min_messages": { "type": "integer" },
+        "ingest_max_messages_per_call": { "type": "integer" },
+        "ingest_include_assistant": { "type": "boolean" },
+        "tools_enabled": { "type": "boolean" },
+        "memory_search_merge": { "type": "boolean" },
+        "recall_default_limit": { "type": "integer" },
+        "preamble_enabled": { "type": "boolean" },
+        "preamble_queries": { "type": "array", "items": { "type": "string" } },
+        "preamble_max_tokens": { "type": "integer" },
+        "redact_patterns": { "type": "array", "items": { "type": "string" } },
+        "skip_channels": { "type": "array", "items": { "type": "string" } }
+      },
+      "$comment": "Maintainer: the design docs proposed table — auth/ingest/preamble/privacy keys; several flat names in §7.1 vs nested here: dedupe on implement (x-sevn-todo); api_token_secret is ref not inline secret."
+    },
+    "telegram": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "bot_token": { "type": "string" },
+        "claude_agent_topic_id": { "type": "integer", "$comment": "Post-v1: Telegram forum topic for Claude Agent path (the design docs). v1 may omit or ignore. Maintainer: the design docs when live." }
+      },
+      "$comment": "Maintainer: the design docs example fragment uses top-level telegram{} — conflicts with the design docs channels.telegram pattern; accept both in parser until x-sevn-todo resolution; do not document both long-term."
+    },
+    "docs": {
+      "type": "object",
+      "description": "Documentation tooling (README pipeline). Draft schema — wired in W3.",
+      "long_description": "Operator-facing README generation and staleness gate (`sevn readme`, `make readme-check`). LLM calls use the egress proxy and Transport shapes; the generator never holds provider API keys. CI defaults to offline/template mode (`offline_default: true`). Normative authoring contract: docs/readmes/STANDARD.md; manifest: docs/readmes/manifest.toml.",
+      "properties": {
+        "readme": {
+          "type": "object",
+          "description": "README pipeline generator and gate settings.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "When false, `sevn readme` commands and `make readme-check` are no-ops (or skipped in CI)."
+            },
+            "manifest_path": {
+              "type": "string",
+              "default": "docs/readmes/manifest.toml",
+              "description": "Path to the curated README manifest (profile, source_globs, specs, tier_owner)."
+            },
+            "offline_default": {
+              "type": "boolean",
+              "default": true,
+              "description": "Default generation mode: template-only (no LLM). CI and non-interactive runs use this."
+            },
+            "transport": {
+              "type": "string",
+              "enum": ["anthropic", "openai_chat", "openai_responses", "bedrock_converse"],
+              "default": "anthropic",
+              "description": "Transport shape for LLM mode; routes via egress proxy `/llm/*` (same transports as gateway LLM egress)."
+            },
+            "model": {
+              "type": "string",
+              "default": "claude-sonnet-4-6",
+              "description": "LiteLLM model id for LLM-mode section polish (`sevn readme generate --llm`)."
+            },
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2,
+              "default": 0.2,
+              "description": "Sampling temperature for LLM-mode section generation."
+            }
+          },
+          "additionalProperties": false,
+          "$comment": "Maintainer: readme-pipeline W0 draft — implementation lands W2–W3; keys mirror docs/readmes/STANDARD.md §F."
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

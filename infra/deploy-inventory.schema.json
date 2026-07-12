@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sevn.bot/schemas/deploy-inventory.schema.json",
+  "title": "sevn remote deploy inventory (JSON view)",
+  "type": "object",
+  "required": ["hosts"],
+  "additionalProperties": false,
+  "properties": {
+    "hosts": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["host", "user", "identity_file", "remote_home"],
+        "additionalProperties": false,
+        "properties": {
+          "host": { "type": "string", "minLength": 1 },
+          "user": { "type": "string", "minLength": 1 },
+          "identity_file": { "type": "string", "minLength": 1 },
+          "remote_home": { "type": "string", "minLength": 1 },
+          "remote_workspace": { "type": "string", "minLength": 1 },
+          "gateway_port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+          "proxy_port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+        }
+      }
+    }
+  }
+}

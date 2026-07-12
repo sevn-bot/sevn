@@ -1,0 +1,1 @@
+{"channel":"webchat","created_at":"2026-05-18T17:09:52Z","kind":"blocked_inbound","schema_version":1,"text":"ping from playwright","user_id":"owner","verdict":{"provider_used":null,"reasons":["policy"],"scores":{"toxicity_heuristic":0.0},"verdict":"block"}}

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "targets": [
+    {
+      "id": "bundled-core",
+      "kind": "skill_dir_glob",
+      "path": "src/sevn/data/bundled_skills/core/*/"
+    },
+    {
+      "id": "claude-skills",
+      "kind": "skill_dir_glob",
+      "path": ".claude/skills/*/"
+    },
+    {
+      "id": "tool-docs",
+      "kind": "file_glob",
+      "path": "src/sevn/data/workspace_templates/tools/*.md"
+    }
+  ],
+  "ci_options": {
+    "no_llm": true,
+    "fail_severities": ["HIGH", "CRITICAL"]
+  }
+}

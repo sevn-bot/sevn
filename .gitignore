@@ -1,35 +1,147 @@
-# --- Non-public staging (NEVER commit) ---
-# Personal holding area for material not yet ready to be public.
-/local/
-
-# --- Secrets / environment ---
+# --- Secrets (never commit; keep *.example tracked) ---
 .env
 .env.*
 !.env.example
-*.local
+.envrc
+test_env.env
+secrets_backup_env.env
 *.pem
 *.key
 secrets.*
+/deploy/inventory.toml
+infra/cloudflared/config.yml
+!infra/cloudflared/config.example.yml
 
-# --- Python ---
+# --- Docs: publish readmes + brand only ---
+docs/*
+!docs/readmes/
+!docs/readmes/**
+!docs/brand/
+!docs/brand/**
+
+# --- Operator-private (details not listed here) ---
+.ignorelocal/
+
+# --- Operator wave kits (private checkout only) ---
+/build-plan-from-review/
+/spec-kit-wave/
+/wave-orchestrator/
+
+# --- Accidental operator workspace at repo root ---
+/AGENTS.md
+/BOOTSTRAP.md
+/IDENTITY.md
+/MEMORY.md
+/SOUL.md
+/TOOLS.md
+/USER.md
+/skills/
+/.sevn/
+/prompts/
+
+# --- Python / packaging / test artefacts ---
 __pycache__/
 *.py[cod]
-*.egg-info/
-.eggs/
+*$py.class
+*.so
+.Python
 build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+pip-log.txt
+pip-delete-this-directory.txt
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
 .venv/
 venv/
 env/
+ENV/
+env.bak/
+venv.bak/
 .mypy_cache/
-.pytest_cache/
+.dmypy.json
+dmypy.json
 .ruff_cache/
-.coverage
-htmlcov/
+.pyre/
+.pytype/
+cython_debug/
+.pypirc
+.ci-progress
 
-# --- OS / editor ---
+# --- Generated build outputs (fixed paths) ---
+src/sevn/ui/style/*
+!src/sevn/ui/style/__init__.py
+src/sevn/data/sevn_config_long_description.json
+
+# --- CI reports ---
+reports/*
+
+
+# --- Infra E2E workspaces: ignore test runtime; keep committed fixtures only ---
+infra/ci-workspace/*
+!infra/ci-workspace/sevn.json
+!infra/ci-workspace/README.md
+infra/e2e-workspace/*
+!infra/e2e-workspace/sevn.json
+!infra/e2e-workspace/.llmignore/
+!infra/e2e-workspace/.llmignore/**
+infra/e2e-mission-control-workspace/*
+!infra/e2e-mission-control-workspace/sevn.json
+!infra/e2e-mission-control-workspace/.gitkeep
+infra/e2e-onboarding-workspace/*
+!infra/e2e-onboarding-workspace/.gitkeep
+infra/e2e-onboarding-home/*
+!infra/e2e-onboarding-home/.gitkeep
+infra/e2e-webchat-home/*
+!infra/e2e-webchat-home/.gitkeep
+infra/e2e-mission-control-home/*
+!infra/e2e-mission-control-home/.gitkeep
+
+# --- Telegram Playwright tester ---
+tools/telegram-tester/artifacts/
+tools/telegram-tester/.browser-profile/
+
+# --- Playwright / Node ---
+node_modules/
+test-results/
+playwright-report/
+/playwright/.cache/
+
+# --- OS / editor noise ---
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
 *.swp
+.cursorignore
+.cursorindexingignore
+/style
+/pyclaww
+/.cursor
+/.claude
+.index/code_index/INDEX.md
+CLAUDE.md

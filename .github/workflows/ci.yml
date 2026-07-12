@@ -1,0 +1,88 @@
+# Phase 1 of specs/25-cicd-full.md — the PR verify gate.
+#
+# The full `make ci` step set is split across parallel jobs so wall-clock is
+# the slowest job, not the sum of every tier on one runner:
+#
+#   - test         → `make test`, sharded 4× with pytest-split (matrix)
+#   - static       → `make ci-static` (lockcheck, lint, typecheck, pyright,
+#                    doctest, build, doctor-solutions)
+#   - drift-gates  → `make ci-infra ci-docs ci-skills ci-parity`
+#
+# Together these equal `make ci` MINUS `security` (bandit + pip-audit), which
+# is a network-flaky, rarely-regressing tier moved to the weekly
+# ci-supplementary.yml run and the post-merge `make ci` in ci-cd.yml. Container
+# image builds + compose/sandbox integration live in docker.yml (path-filtered).
+#
+# Gated branches: main / develop / test-pre / pre-0.0.1. Fork PRs run without secrets by
+# GitHub default — the gate must stay green on mocks/offline fixtures only.
+#
+# Branch protection: require "Verify (static + build)", "Verify (drift gates)",
+# and the four "Verify (tests …)" shard checks.
+#
+# Tier ownership: `ci-static` + sharded `test` + `ci-infra ci-docs ci-skills
+# ci-parity` together equal `make ci` minus `security` (run daily, see
+# ci-supplementary.yml). Keep these jobs in lockstep with the Makefile targets.
+# No workflow behavior change — retriggers the gate after tests 4/4 was cancelled.
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop, test-pre, pre-0.0.1]
+  push:
+    branches: [main, develop, test-pre, pre-0.0.1]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Verify (tests ${{ matrix.group }}/4)
+    if: hashFiles('src/sevn/**') != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: ./.github/actions/bootstrap
+
+      # pytest-split partitions the suite into 4 balanced shards; each shard
+      # still fans out across xdist workers on its runner.
+      - name: Unit tests (shard ${{ matrix.group }} of 4)
+        env:
+          SEVN_TEST_SPLITS: "4"
+          SEVN_TEST_GROUP: ${{ matrix.group }}
+        run: make test
+
+  static:
+    name: Verify (static + build)
+    if: hashFiles('src/sevn/**') != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: ./.github/actions/bootstrap
+
+      # lockcheck, lint, typecheck, pyright, doctest, build, doctor-solutions.
+      # Pyright lives here (no separate duplicate job).
+      - name: Static, doctest, build tier
+        run: make ci-static
+
+  drift-gates:
+    name: Verify (drift gates)
+    if: hashFiles('src/sevn/**') != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: ./.github/actions/bootstrap
+
+      - name: Infra + docs + skills + parity tiers
+        run: make ci-infra ci-docs ci-skills ci-parity

@@ -1,0 +1,71 @@
+# SPDX-License-Identifier: MIT
+#
+# Supplementary CI splits.
+# Normative spec: specs/25-cicd-full.md §4.1 (workflow files) and §4.2.
+#
+# Scheduled / supply-chain jobs kept OFF the PR verify gate (ci.yml):
+#   - security (daily): bandit + pip-audit. pip-audit's OSV.dev call is
+#     network-flaky and dependency CVEs rarely land in a single PR, so it runs
+#     daily here and post-merge via `make ci` in ci-cd.yml — not per PR.
+#   - cache-bust-rebuild (weekly): no-cache image rebuild drift canary.
+#   - macos-keychain-smoke (weekly): macOS Keychain backend probe (macOS
+#     runners bill at 10× — a rarely-changing code path does not belong on the
+#     PR path).
+#
+# Jobs are gated on which cron fired so the daily audit does not also trigger
+# the heavy weekly rebuild.
+
+name: CI supplementary
+
+on:
+  schedule:
+    - cron: "17 5 * * *"  # daily 05:17 UTC — security audit
+    - cron: "17 5 * * 1"  # Mondays 05:17 UTC — weekly image + keychain probes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    name: Dependency + static security audit (bandit + pip-audit)
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 5 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: ./.github/actions/bootstrap
+
+      - name: bandit + pip-audit (OSV.dev)
+        run: make security
+
+  cache-bust-rebuild:
+    name: Weekly no-cache image rebuild (drift canary)
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 5 * * 1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Clean rebuild all images without cache
+        run: |
+          # No type=gha cache here on purpose — a green run proves the images
+          # still build from a cold context (catches dependency / base-image
+          # drift that the cached PR builds would otherwise mask).
+          docker build --no-cache --pull -f docker/Dockerfile.sandbox -t sevn-sandbox:nightly .
+          docker build --no-cache --pull -f docker/Dockerfile.proxy -t sevn-proxy:nightly .
+          docker build --no-cache --pull -f docker/Dockerfile.gateway -t sevn-gateway:nightly .
+
+  macos-keychain-smoke:
+    name: macOS Keychain backend smoke
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 5 * * 1'
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: ./.github/actions/bootstrap
+
+      - name: Import macOS Keychain backend + benign probe (specs/06-secrets.md §10.5)
+        run: |
+          uv run python -c "import asyncio; from sevn.security.secrets.backends.macos_keychain import MacOSKeychainBackend; asyncio.run(MacOSKeychainBackend().get('__ci_probe_unused__')); print('macos_keychain_import_ok')"

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "workspace_root": ".",
+  "gateway": {
+    "host": "0.0.0.0",
+    "port": 3001,
+    "token": "e2e-dev-token",
+    "queue_mode": "cancel"
+  },
+  "security": {
+    "scanner": {
+      "heuristic_only": true
+    }
+  },
+  "telemetry": {
+    "enabled": false
+  },
+  "channels": {
+    "webchat": {
+      "jwt_secret": "e2e-webchat-secret",
+      "public": false,
+      "jwt_ttl_seconds": 3600,
+      "allowed_origins": ["http://127.0.0.1:13001", "http://127.0.0.1:13002"]
+    }
+  },
+  "tracing": {
+    "retention_days": 14,
+    "sinks": [
+      { "type": "sqlite" },
+      { "type": "jsonl_file", "path": ".sevn/traces/" }
+    ]
+  }
+}

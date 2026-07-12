@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# sevn.bot git wrapper — blocks `git clean -x`/`-X`. Installed by make install-git-guards.
+# Prepends repo bin/ to PATH (see .envrc) so plain `git` hits this script before Homebrew git.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+real_git_file=""
+if [[ -f "${repo_root}/.git" ]]; then
+  gitdir="$(sed -n 's/^gitdir: //p' "${repo_root}/.git" | head -1 | tr -d '[:space:]')"
+  if [[ -n "$gitdir" ]]; then
+    real_git_file="${gitdir}/sevn-real-git-path"
+  fi
+fi
+if [[ -z "$real_git_file" ]]; then
+  real_git_file="${repo_root}/.git/sevn-real-git-path"
+fi
+
+if [[ -f "$real_git_file" ]]; then
+  # shellcheck disable=SC1090
+  real_git="$(<"$real_git_file")"
+else
+  real_git="$(PATH="${PATH//${repo_root}/bin:/}" command -v git)"
+fi
+
+if [[ ! -x "$real_git" ]]; then
+  echo "sevn git wrapper: real git not executable at $real_git (run make install-git-guards)" >&2
+  exit 1
+fi
+
+if [[ "${1:-}" == "clean" ]]; then
+  shift
+  exec "${repo_root}/scripts/git_clean_guard.sh" "$@"
+fi
+
+exec "$real_git" "$@"
