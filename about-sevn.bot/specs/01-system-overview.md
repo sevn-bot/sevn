@@ -8,7 +8,7 @@ summary: 'Give implementers a single picture of the runtime before feature work:
   boundaries under src/sevn/, allowed import directions, and the shared protocols
   that keep LLM wiring, observability, and '
 last_updated: '2026-07-12'
-fingerprint: sha256:c2c49c58e5fe66aefdf3ab011a74b3002f22fb005da302dadbcba8a1c1313ce9
+fingerprint: sha256:ba4a1e6ab9997c28e29203ece7b1117bb69681d89f23cc908f87933c282024a9
 related: []
 sources:
 - src/sevn/**
@@ -1025,6 +1025,9 @@ interfaces:
 - name: apply_traces_migrations
   file: src/sevn/agent/tracing/traces_migrate.py
   symbol: apply_traces_migrations
+- name: ensure_trace_connection
+  file: src/sevn/agent/tracing/traces_migrate.py
+  symbol: ensure_trace_connection
 - name: ensure_traces_db
   file: src/sevn/agent/tracing/traces_migrate.py
   symbol: ensure_traces_db
@@ -11417,9 +11420,6 @@ interfaces:
 - name: list_gateway_sessions
   file: src/sevn/ui/dashboard/query/storage.py
   symbol: list_gateway_sessions
-- name: ensure_trace_connection
-  file: src/sevn/ui/dashboard/query/traces.py
-  symbol: ensure_trace_connection
 - name: get_span_with_children
   file: src/sevn/ui/dashboard/query/traces.py
   symbol: get_span_with_children

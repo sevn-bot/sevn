@@ -8,7 +8,7 @@ summary: 'Deliver Mission Control: a same-process dashboard (prd-07-mission-cont
   so the owner can inspect traces, costs, provider health, in-flight runs, proxy status,
   and config without opening SQLite from'
 last_updated: '2026-07-12'
-fingerprint: sha256:648629cf3d66ca390d23d54a48ad55571bfd47d4c27d741c38e4a0487b97333d
+fingerprint: sha256:4614069da5c2e6e4f697b84098973623cfde5154a5745367fd1e223ffe7bb3e6
 related: []
 sources:
 - src/sevn/ui/**
@@ -633,9 +633,6 @@ interfaces:
 - name: list_gateway_sessions
   file: src/sevn/ui/dashboard/query/storage.py
   symbol: list_gateway_sessions
-- name: ensure_trace_connection
-  file: src/sevn/ui/dashboard/query/traces.py
-  symbol: ensure_trace_connection
 - name: get_span_with_children
   file: src/sevn/ui/dashboard/query/traces.py
   symbol: get_span_with_children

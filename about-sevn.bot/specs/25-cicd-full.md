@@ -8,7 +8,7 @@ summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict de
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
 last_updated: '2026-07-12'
-fingerprint: sha256:5c8f75d7d8ecdfa8a3356d67974c60f0c657941685fa48731978dc0ce42ea3e8
+fingerprint: sha256:afcc19f2cf0dca1832b10a230d4153cacf342ee8044fe8107f8d41b39b5bb855
 related: []
 sources:
 - src/sevn/**
@@ -1027,6 +1027,9 @@ interfaces:
 - name: apply_traces_migrations
   file: src/sevn/agent/tracing/traces_migrate.py
   symbol: apply_traces_migrations
+- name: ensure_trace_connection
+  file: src/sevn/agent/tracing/traces_migrate.py
+  symbol: ensure_trace_connection
 - name: ensure_traces_db
   file: src/sevn/agent/tracing/traces_migrate.py
   symbol: ensure_traces_db
@@ -11419,9 +11422,6 @@ interfaces:
 - name: list_gateway_sessions
   file: src/sevn/ui/dashboard/query/storage.py
   symbol: list_gateway_sessions
-- name: ensure_trace_connection
-  file: src/sevn/ui/dashboard/query/traces.py
-  symbol: ensure_trace_connection
 - name: get_span_with_children
   file: src/sevn/ui/dashboard/query/traces.py
   symbol: get_span_with_children

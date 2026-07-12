@@ -8,7 +8,7 @@ summary: 'Deliver src/sevn/self_improve/: ingest traces + session artefacts + ex
   user feedback into trajectory_fact rows, deterministically shortlist turns for review
   or patching, optionally run an in-pro'
 last_updated: '2026-07-12'
-fingerprint: sha256:169de897e7c7896a0b6965ea95c8e9e68840f339dfe422b957a74c222e4f2661
+fingerprint: sha256:b6b6582757fd76c55bfc0be5f46765cebbf119bb8f422676f5e40774240cd753
 related: []
 sources:
 - src/sevn/self_improve/**
