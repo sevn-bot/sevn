@@ -8,7 +8,7 @@ summary: 'Give implementers a single picture of the runtime before feature work:
   boundaries under src/sevn/, allowed import directions, and the shared protocols
   that keep LLM wiring, observability, and '
 last_updated: '2026-07-12'
-fingerprint: sha256:a3b42b5a5f5666810ed56591001059d40981b1fed60dfa92622aa86e31d6f3b1
+fingerprint: sha256:2b27a65b498e9b2e5930483107b540a2dd9fb1ebdd2b4281096f14842356ae28
 related: []
 sources:
 - src/sevn/**
