@@ -8,7 +8,7 @@ summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–�
   a single, tool-less outbound generation step that emits validated TriageResult consumed
   by tier dispatch (A / B / C / D), MCP e'
 last_updated: '2026-07-12'
-fingerprint: sha256:d84825ec55c18dd461c20eeeb340b8345804f552c691e6e6e6721515c2181e3b
+fingerprint: sha256:366b2924f59ea8525676910651b8aee806866e0cedd5138959564e767cb4acec
 related: []
 sources:
 - src/sevn/agent/**
@@ -1025,6 +1025,9 @@ interfaces:
 - name: apply_traces_migrations
   file: src/sevn/agent/tracing/traces_migrate.py
   symbol: apply_traces_migrations
+- name: ensure_trace_connection
+  file: src/sevn/agent/tracing/traces_migrate.py
+  symbol: ensure_trace_connection
 - name: ensure_traces_db
   file: src/sevn/agent/tracing/traces_migrate.py
   symbol: ensure_traces_db

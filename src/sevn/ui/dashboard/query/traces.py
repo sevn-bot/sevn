@@ -1,53 +1,30 @@
 """Parameterized trace SQL readers for Mission Control.
 
 Module: sevn.ui.dashboard.query.traces
-Depends: json, sqlite3, sevn.agent.tracing.redacting_sink, sevn.agent.tracing.traces_migrate, sevn.storage.sqlite
+Depends: json, sqlite3, sevn.agent.tracing.redacting_sink, sevn.agent.tracing.traces_migrate
 
 Exports:
-    ensure_trace_connection — open and migrate ``traces.db`` via spec 04 helper.
     list_trace_events — cursor-paginated trace browse.
     get_span_with_children — one span plus descendant tree for detail view.
     list_provider_calls — per-session provider-call rows.
+
+Re-exports :func:`sevn.agent.tracing.traces_migrate.ensure_trace_connection` for
+backward-compatible dashboard imports.
 """
 
 from __future__ import annotations
 
 import json
 import sqlite3
-from pathlib import Path
 from typing import Any
 
 from sevn.agent.tracing.redacting_sink import TraceRedactionPolicy, redact_attrs
-from sevn.agent.tracing.traces_migrate import apply_traces_migrations
-from sevn.storage.sqlite import connect_sqlite
+from sevn.agent.tracing.traces_migrate import ensure_trace_connection
 
 _TRACE_COLUMNS = """
     span_id, parent_span_id, session_id, turn_id, tier, kind,
     ts_start_ns, ts_end_ns, status, attrs_json
 """
-
-
-def ensure_trace_connection(db_path: Path) -> sqlite3.Connection:
-    """Open ``traces.db`` and apply owner spec migrations.
-
-    Args:
-        db_path (Path): Trace database path under ``.sevn``.
-
-    Returns:
-        sqlite3.Connection: Open connection; caller closes it.
-
-    Examples:
-        >>> import tempfile
-        >>> from pathlib import Path
-        >>> conn = ensure_trace_connection(Path(tempfile.mkdtemp()) / "traces.db")
-        >>> conn.execute("SELECT name FROM sqlite_master WHERE name='trace_events'").fetchone()[0]
-        'trace_events'
-        >>> conn.close()
-    """
-
-    conn = connect_sqlite(db_path)
-    apply_traces_migrations(conn)
-    return conn
 
 
 def _mask_llmignore_paths(value: object) -> object:
@@ -402,3 +379,19 @@ def list_provider_calls(
     items = [_row_to_span(row, policy) for row in rows]
     next_cursor = None if len(items) <= limit else str(items[limit - 1]["ts_start_ns"])
     return {"items": items[:limit], "next_cursor": next_cursor, "has_more": next_cursor is not None}
+
+
+__all__ = [
+    "ensure_trace_connection",
+    "get_span_with_children",
+    "list_provider_calls",
+    "list_trace_events",
+]
+
+
+__all__ = [
+    "ensure_trace_connection",
+    "get_span_with_children",
+    "list_provider_calls",
+    "list_trace_events",
+]

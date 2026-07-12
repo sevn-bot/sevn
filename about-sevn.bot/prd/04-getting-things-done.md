@@ -8,7 +8,7 @@ summary: A general-purpose AI assistant earns its keep by doing things—answeri
   fetching pages, opening PRs, and acting on the operator's behalf via tools, skills,
   and tiered executors.
 last_updated: '2026-07-12'
-fingerprint: sha256:546a492de4503069ee653938062fffd4dcf3082277c12a2527fa34b82ec21e7a
+fingerprint: sha256:280d2c84a1efa462502ef63fd99fff240234a153b456dd9042733bb7965afcf6
 related: []
 sources:
 - src/sevn/agent/**

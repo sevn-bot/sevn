@@ -20,12 +20,12 @@ from typing import Final
 
 from loguru import logger
 
+from sevn.agent.tracing.traces_migrate import ensure_trace_connection
 from sevn.config.sections.self_improve import SelfImproveTrajectoriesWorkspaceConfig
 from sevn.config.workspace_config import WorkspaceConfig  # noqa: TC001 — runtime cron reconcile
 from sevn.self_improve.trajectories.runner import run_trajectory_ingest
 from sevn.storage.paths import traces_sqlite_path
 from sevn.triggers.cron import compute_next_fire_ns
-from sevn.ui.dashboard.query.traces import ensure_trace_connection
 from sevn.workspace.layout import WorkspaceLayout  # noqa: TC001 — cron dispatch layout arg
 
 TRAJECTORY_INGEST_CRON_JOB_ID: Final[str] = "sevn_self_improve_trajectory_ingest"
