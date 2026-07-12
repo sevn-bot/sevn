@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tools — sevn.bot help</title>
+  <link rel="icon" href="assets/logos/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="assets/index.css" />
+  <style>
+    .help-shell { display: grid; grid-template-columns: 220px 1fr; gap: 2rem; max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    @media (max-width: 800px) { .help-shell { grid-template-columns: 1fr; } }
+    .help-nav { position: sticky; top: 1rem; align-self: start; }
+    .help-nav a { display: block; padding: 0.35rem 0; color: var(--sevn-fg-muted); text-decoration: none; font-size: 0.92rem; }
+    .help-nav a:hover, .help-nav a.active { color: var(--sevn-primary); }
+    .help-main h1 { margin-top: 0; font-size: 1.75rem; color: var(--sevn-fg-strong); }
+    .help-summary { color: var(--sevn-fg-muted); font-size: 1.05rem; margin-bottom: 1.5rem; max-width: 60ch; }
+    .help-footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--sevn-border); font-size: 0.78rem; color: var(--sevn-fg-muted); }
+    .help-generated-note { font-size: 0.85rem; color: var(--sevn-fg-muted); font-style: italic; margin-bottom: 1rem; }
+    .help-body p { line-height: 1.6; max-width: 65ch; }
+    .help-body ul, .help-body ol { max-width: 65ch; line-height: 1.6; }
+    .help-body a { color: var(--sevn-primary); }
+    .catalog-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 1rem 0; }
+    .catalog-table th, .catalog-table td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--sevn-border); vertical-align: top; }
+    .catalog-table th { color: var(--sevn-fg-muted); font-weight: 600; }
+    .badge { display: inline-block; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; }
+    .badge-available { background: #1b3d1f; color: #81c784; }
+    .badge-soon { background: #4a3410; color: #ffb74d; }
+    .badge-unavailable { background: #333; color: #bbb; }
+  </style>
+</head>
+<body>
+  <div class="help-shell">
+    <nav class="help-nav" aria-label="Help pages">
+      <strong style="display:block;margin-bottom:0.75rem;color:var(--sevn-fg-strong);">sevn.bot help</strong>
+      <a href="index.html">Home</a>
+      <a href="getting-started.html">Getting started</a>
+      <a href="mission-control.html">Mission Control</a>
+      <a href="telegram-menu.html">Telegram settings</a>
+      <a href="tools.html" class="active">Tools</a>
+      <a href="skills.html">Skills</a>
+      <a href="config.html">Settings</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <a href="agent-context.html">Agent context</a>
+    </nav>
+    <main class="help-main">
+      <h1>Tools</h1>
+<p class="help-summary">Built-in capabilities the assistant can call during a conversation.</p>      <p class="help-generated-note">This page is updated automatically when the product changes.</p>
+<div class="help-body"><p>Tools are native actions registered for each session — search, file access, skill runners, and more. The assistant chooses tools based on your message; you do not invoke them manually unless using slash shortcuts.</p>
+</div>
+<table class="catalog-table">
+  <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>browser</code></td>
+      <td>Drive host Chrome over CDP (sevn-native engine). Tabs, navigate, extract, click/fill/type via synthetic input, screenshot, cookies, plus recipe actions (Google/Gmail/Maps/YouTube/Telegram/social).</td>
+    </tr>
+    <tr>
+      <td><code>copy_file</code></td>
+      <td>Copy a workspace file or directory tree to a new path.</td>
+    </tr>
+    <tr>
+      <td><code>create_folder</code></td>
+      <td>Create a workspace directory.</td>
+    </tr>
+    <tr>
+      <td><code>delete</code></td>
+      <td>Delete a workspace file or directory tree (requires your approval).</td>
+    </tr>
+    <tr>
+      <td><code>edit</code></td>
+      <td>Replace exactly one unique occurrence of text in a file.</td>
+    </tr>
+    <tr>
+      <td><code>file_evolution_issue</code></td>
+      <td>File a bug or feature request (saved locally; optional GitHub mirror).</td>
+    </tr>
+    <tr>
+      <td><code>file_info</code></td>
+      <td>Show size, modification time, type, and permissions for a workspace path.</td>
+    </tr>
+    <tr>
+      <td><code>find_file</code></td>
+      <td>Find files by exact or partial filename under a workspace folder.</td>
+    </tr>
+    <tr>
+      <td><code>get_module_docstring</code></td>
+      <td>Read the module-level docstring from a Python file.</td>
+    </tr>
+    <tr>
+      <td><code>get_page_content</code></td>
+      <td>Fetch a web page and return clean markdown text.</td>
+    </tr>
+    <tr>
+      <td><code>get_symbol_docstring</code></td>
+      <td>Read the docstring for a class or function in a Python file.</td>
+    </tr>
+    <tr>
+      <td><code>glob</code></td>
+      <td>Find files under a workspace folder using a name pattern.</td>
+    </tr>
+    <tr>
+      <td><code>history</code></td>
+      <td>Recall past conversations/sessions: search prior message history (what was asked or said before, earlier/previous sessions) as inline rows. Prefer this over ``read`` on session files. Pass ``query`` to search across visible sessions; ``session_id`` for one session. To find history by date, pass ``when`` (e.g. &#34;yesterday&#34;, &#34;today&#34;, &#34;last_7_days&#34;, &#34;this_week&#34;) or explicit ``since``/``until`` dates — relative terms are resolved server-side, so you do NOT need to compute the date yourself. ``when``/``since``/``until`` combine with ``query`` and work with no query at all (e.g. what did we talk about yesterday).</td>
+    </tr>
+    <tr>
+      <td><code>integration_call</code></td>
+      <td>Call a third-party API through the egress proxy (when enabled).</td>
+    </tr>
+    <tr>
+      <td><code>list_dir</code></td>
+      <td>List files in a workspace directory.</td>
+    </tr>
+    <tr>
+      <td><code>list_registry</code></td>
+      <td>List enabled registry tool names and bundled skill names for this session.</td>
+    </tr>
+    <tr>
+      <td><code>list_symbols</code></td>
+      <td>List classes and functions in a Python file with line numbers.</td>
+    </tr>
+    <tr>
+      <td><code>llm_guard_scan</code></td>
+      <td>Check suspicious text for prompt injection or policy issues.</td>
+    </tr>
+    <tr>
+      <td><code>load_skill</code></td>
+      <td>Load documentation and scripts for a named skill so the assistant can use it.</td>
+    </tr>
+    <tr>
+      <td><code>load_tool</code></td>
+      <td>Load the full schema and capabilities for another tool.</td>
+    </tr>
+    <tr>
+      <td><code>log_query</code></td>
+      <td>Read workspace logs with tail offset, line ranges, or a starting line (gateway, proxy, rotated).</td>
+    </tr>
+    <tr>
+      <td><code>memory_get</code></td>
+      <td>Retrieve the latest stored memory snippet for a session.</td>
+    </tr>
+    <tr>
+      <td><code>memory_search</code></td>
+      <td>Search across stored memories, daily logs, and MEMORY.md.</td>
+    </tr>
+    <tr>
+      <td><code>memory_store</code></td>
+      <td>Save a short memory snippet for later recall.</td>
+    </tr>
+    <tr>
+      <td><code>message</code></td>
+      <td>Send a proactive text message on your active channel.</td>
+    </tr>
+    <tr>
+      <td><code>move_file</code></td>
+      <td>Move or rename a workspace file or directory.</td>
+    </tr>
+    <tr>
+      <td><code>openui_render</code></td>
+      <td>Publish agent-authored HTML as a live page or image (with a text fallback if rendering fails).</td>
+    </tr>
+    <tr>
+      <td><code>process</code></td>
+      <td>Start, stop, list, or read output from background workspace commands.</td>
+    </tr>
+    <tr>
+      <td><code>promote_generated_skill</code></td>
+      <td>Move a generated skill into your user skills folder and enable it.</td>
+    </tr>
+    <tr>
+      <td><code>read</code></td>
+      <td>Read a workspace file (with line numbers) or list a directory.</td>
+    </tr>
+    <tr>
+      <td><code>read_transcript</code></td>
+      <td>Read recent turns from the current conversation transcript.</td>
+    </tr>
+    <tr>
+      <td><code>run_skill_runnable</code></td>
+      <td>Run a packaged runnable from a skill.</td>
+    </tr>
+    <tr>
+      <td><code>run_skill_script</code></td>
+      <td>Run a script bundled with an enabled skill.</td>
+    </tr>
+    <tr>
+      <td><code>sandbox_exec</code></td>
+      <td>Run a command in the isolated sandbox (when enabled).</td>
+    </tr>
+    <tr>
+      <td><code>search_in_file</code></td>
+      <td>Search file contents in the workspace with a regular expression.</td>
+    </tr>
+    <tr>
+      <td><code>send_file</code></td>
+      <td>Send a workspace file to you on your active channel.</td>
+    </tr>
+    <tr>
+      <td><code>serp</code></td>
+      <td>Search the web with DuckDuckGo (no API key required).</td>
+    </tr>
+    <tr>
+      <td><code>skill_create</code></td>
+      <td>Scaffold a new skill under your workspace generated skills folder.</td>
+    </tr>
+    <tr>
+      <td><code>terminal_close</code></td>
+      <td>Close a persistent terminal session opened earlier.</td>
+    </tr>
+    <tr>
+      <td><code>terminal_run</code></td>
+      <td>Run a command in a terminal session or sandbox.</td>
+    </tr>
+    <tr>
+      <td><code>terminal_spawn</code></td>
+      <td>Open a persistent interactive shell session.</td>
+    </tr>
+    <tr>
+      <td><code>tts</code></td>
+      <td>Convert text to speech and send audio on your active channel.</td>
+    </tr>
+    <tr>
+      <td><code>web_fetch</code></td>
+      <td>Make an HTTP request through the egress proxy (method, headers, body).</td>
+    </tr>
+    <tr>
+      <td><code>web_search</code></td>
+      <td>Search the web for up-to-date information.</td>
+    </tr>
+    <tr>
+      <td><code>write</code></td>
+      <td>Write or overwrite a workspace file (creates parent folders as needed).</td>
+    </tr>
+  </tbody>
+</table>
+      <footer class="help-footer">
+        Generated 2026-07-12 from commit a1d5b1f.
+        Edit <code>about-sevn.bot/_sources/tools.yaml</code> or templates — not the HTML directly.
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

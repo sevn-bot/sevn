@@ -1,0 +1,15 @@
+{% extends "base.html.j2" %}
+{% block content %}
+<div class="help-body">{{ body_html | safe }}</div>
+<table class="catalog-table">
+  <thead><tr><th>Tool</th><th>What it does</th></tr></thead>
+  <tbody>
+  {% for tool in tools %}
+    <tr>
+      <td><code>{{ tool.name }}</code></td>
+      <td>{{ tool.description }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

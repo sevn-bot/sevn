@@ -1,0 +1,11 @@
+title: Mission Control
+summary: Preview the web dashboard — explore tabs by group, hover for a short hint, tap a tab for details.
+body: |
+  <p>Mission Control is the owner dashboard served at <code>/mission/</code> on your gateway. Use the preview below to explore each group:</p>
+  <ul>
+    <li><strong>Hover</strong> a tab for a one-line summary.</li>
+    <li><strong>Tap a group</strong> (Core, Observability, …) to open that section.</li>
+    <li><strong>Tap a tab</strong> inside a group to read what it does (preview only — unwired tabs may still show “coming soon” in the live UI).</li>
+  </ul>
+  <p>On your own machine with <code>dashboard.local_open</code>, loopback access may skip login; tunneled or remote access requires the dashboard password.</p>
+  <p><em>This is a documentation preview, not your live gateway.</em></p>

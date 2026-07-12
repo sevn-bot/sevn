@@ -1,0 +1,29 @@
+title: Settings reference
+summary: Common workspace options you may tune after setup.
+body: |
+  <p>Most settings live in <code>sevn.json</code> in your workspace. The setup wizard sets sensible defaults; use Mission Control or edit the file directly for advanced changes. Secrets (API keys, tokens) should use secret references — never paste raw keys into this file.</p>
+fields:
+  - path: gateway.queue_mode
+    title: Message queue behavior
+    description: When you send a new message while the bot is still replying, cancel stops the in-flight reply; steer waits to inject your new message at a safe point.
+  - path: gateway.port
+    title: Gateway port
+    description: TCP port for the web UI, API, and WebSocket chat. Default is 3001 on localhost.
+  - path: channels.telegram.enabled
+    title: Telegram channel
+    description: Turn the Telegram bot adapter on or off. Requires a bot token stored as a secret.
+  - path: channels.telegram.quick_actions
+    title: Reply quick actions
+    description: Show Regen, thumbs up/down, Share, and Feedback buttons under assistant messages in Telegram.
+  - path: voice.tts_mode
+    title: Text-to-speech mode
+    description: Control when the bot reads replies aloud — off, every reply, or only when you ask.
+  - path: models.triager
+    title: Triager model
+    description: The model that classifies your intent and routes the conversation to the right executor tier.
+  - path: memory.lcm.enabled
+    title: Long conversation memory
+    description: Keep lossless message history and summaries so the assistant can search past context.
+  - path: self_improve.enabled
+    title: Self-improvement jobs
+    description: Allow scheduled or manual jobs that propose small improvements to your workspace configuration.

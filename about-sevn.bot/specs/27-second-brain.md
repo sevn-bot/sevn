@@ -1,0 +1,249 @@
+---
+id: spec-27-second-brain
+kind: spec
+title: Second Brain — Spec
+status: draft
+owner: Alex
+summary: 'Deliver the Second Brain subsystem: filesystem wiki engine + agent surface
+  so operators curate sources in raw/ and maintain a structured wiki/ with index.md,
+  log.md, lint reports, and provenance-beari'
+last_updated: '2026-07-07'
+fingerprint: sha256:474701a1501fb3dd2635d7dc51085c655a1445573f95efe8bfd71dde0b804973
+related: []
+sources:
+- src/sevn/second_brain/**
+parent_prd: prd-09-knowledge-base
+depends_on:
+- spec-00-foundation
+- spec-01-system-overview
+- spec-02-config-and-workspace
+- spec-03-storage
+- spec-04-tracing
+- spec-07-egress-proxy
+- spec-09-security-scanner
+- spec-11-tools-registry
+- spec-12-skills-system
+- spec-15-memory-lcm
+- spec-17-gateway
+- spec-18-channel-telegram
+- spec-24-dashboard
+build_phase: null
+interfaces:
+- name: legacy_native_second_brain_ingest_stub_enabled
+  file: src/sevn/second_brain/__init__.py
+  symbol: legacy_native_second_brain_ingest_stub_enabled
+- name: register_second_brain_tools
+  file: src/sevn/second_brain/__init__.py
+  symbol: register_second_brain_tools
+- name: second_brain_ingest_stub_tool
+  file: src/sevn/second_brain/__init__.py
+  symbol: second_brain_ingest_stub_tool
+- name: second_brain_query_tool
+  file: src/sevn/second_brain/__init__.py
+  symbol: second_brain_query_tool
+- name: wiki_apply_tool
+  file: src/sevn/second_brain/__init__.py
+  symbol: wiki_apply_tool
+- name: wiki_get_tool
+  file: src/sevn/second_brain/__init__.py
+  symbol: wiki_get_tool
+- name: wiki_lint_tool
+  file: src/sevn/second_brain/__init__.py
+  symbol: wiki_lint_tool
+- name: wiki_search_tool
+  file: src/sevn/second_brain/__init__.py
+  symbol: wiki_search_tool
+- name: SecondBrainError
+  file: src/sevn/second_brain/errors.py
+  symbol: SecondBrainError
+- name: SecondBrainMergeNeededError
+  file: src/sevn/second_brain/errors.py
+  symbol: SecondBrainMergeNeededError
+- name: SecondBrainPathError
+  file: src/sevn/second_brain/errors.py
+  symbol: SecondBrainPathError
+- name: SecondBrainFetchError
+  file: src/sevn/second_brain/fetch.py
+  symbol: SecondBrainFetchError
+- name: fetch_url_to_raw
+  file: src/sevn/second_brain/fetch.py
+  symbol: fetch_url_to_raw
+- name: compose_page
+  file: src/sevn/second_brain/frontmatter.py
+  symbol: compose_page
+- name: dumps_frontmatter
+  file: src/sevn/second_brain/frontmatter.py
+  symbol: dumps_frontmatter
+- name: missing_okf_type
+  file: src/sevn/second_brain/frontmatter.py
+  symbol: missing_okf_type
+- name: normalise_agent_keys
+  file: src/sevn/second_brain/frontmatter.py
+  symbol: normalise_agent_keys
+- name: okf_type_required
+  file: src/sevn/second_brain/frontmatter.py
+  symbol: okf_type_required
+- name: split_frontmatter
+  file: src/sevn/second_brain/frontmatter.py
+  symbol: split_frontmatter
+- name: raw_content_hash
+  file: src/sevn/second_brain/ingest.py
+  symbol: raw_content_hash
+- name: run_ingest
+  file: src/sevn/second_brain/ingest.py
+  symbol: run_ingest
+- name: run_ingest_stub
+  file: src/sevn/second_brain/ingest_stub.py
+  symbol: run_ingest_stub
+- name: index_line_targets
+  file: src/sevn/second_brain/links.py
+  symbol: index_line_targets
+- name: iter_internal_link_targets
+  file: src/sevn/second_brain/links.py
+  symbol: iter_internal_link_targets
+- name: resolve_wiki_target
+  file: src/sevn/second_brain/links.py
+  symbol: resolve_wiki_target
+- name: LintIssue
+  file: src/sevn/second_brain/lint_local.py
+  symbol: LintIssue
+- name: issues_to_json
+  file: src/sevn/second_brain/lint_local.py
+  symbol: issues_to_json
+- name: lint_wiki_tree
+  file: src/sevn/second_brain/lint_local.py
+  symbol: lint_wiki_tree
+- name: SecondBrainMergeToolError
+  file: src/sevn/second_brain/merge.py
+  symbol: SecondBrainMergeToolError
+- name: try_git_merge
+  file: src/sevn/second_brain/merge.py
+  symbol: try_git_merge
+- name: assert_wiki_relative_safe
+  file: src/sevn/second_brain/paths.py
+  symbol: assert_wiki_relative_safe
+- name: effective_scope
+  file: src/sevn/second_brain/paths.py
+  symbol: effective_scope
+- name: outputs_dir_for_scope
+  file: src/sevn/second_brain/paths.py
+  symbol: outputs_dir_for_scope
+- name: raw_dir_for_scope
+  file: src/sevn/second_brain/paths.py
+  symbol: raw_dir_for_scope
+- name: resolve_raw_file
+  file: src/sevn/second_brain/paths.py
+  symbol: resolve_raw_file
+- name: resolve_wiki_file
+  file: src/sevn/second_brain/paths.py
+  symbol: resolve_wiki_file
+- name: shared_wiki_root
+  file: src/sevn/second_brain/paths.py
+  symbol: shared_wiki_root
+- name: user_scope_root
+  file: src/sevn/second_brain/paths.py
+  symbol: user_scope_root
+- name: vault_root
+  file: src/sevn/second_brain/paths.py
+  symbol: vault_root
+- name: wiki_dir_for_scope
+  file: src/sevn/second_brain/paths.py
+  symbol: wiki_dir_for_scope
+- name: second_brain_query
+  file: src/sevn/second_brain/query.py
+  symbol: second_brain_query
+- name: SearchHit
+  file: src/sevn/second_brain/search.py
+  symbol: SearchHit
+- name: wiki_search
+  file: src/sevn/second_brain/search.py
+  symbol: wiki_search
+- name: content_sha256_hex
+  file: src/sevn/second_brain/wiki_io.py
+  symbol: content_sha256_hex
+- name: file_sha256_hex
+  file: src/sevn/second_brain/wiki_io.py
+  symbol: file_sha256_hex
+- name: wiki_apply_atomic
+  file: src/sevn/second_brain/wiki_io.py
+  symbol: wiki_apply_atomic
+- name: wiki_read
+  file: src/sevn/second_brain/wiki_io.py
+  symbol: wiki_read
+- name: WitchcraftConfig
+  file: src/sevn/second_brain/witchcraft_bridge.py
+  symbol: WitchcraftConfig
+- name: build_wiki_index
+  file: src/sevn/second_brain/witchcraft_bridge.py
+  symbol: build_wiki_index
+- name: index_age_seconds
+  file: src/sevn/second_brain/witchcraft_bridge.py
+  symbol: index_age_seconds
+- name: maybe_reindex_on_startup
+  file: src/sevn/second_brain/witchcraft_bridge.py
+  symbol: maybe_reindex_on_startup
+- name: maybe_semantic_scores
+  file: src/sevn/second_brain/witchcraft_bridge.py
+  symbol: maybe_semantic_scores
+- name: schedule_reindex_debounced
+  file: src/sevn/second_brain/witchcraft_bridge.py
+  symbol: schedule_reindex_debounced
+- name: semantic_mode_allowed
+  file: src/sevn/second_brain/witchcraft_bridge.py
+  symbol: semantic_mode_allowed
+- name: witchcraft_indexer_available
+  file: src/sevn/second_brain/witchcraft_bridge.py
+  symbol: witchcraft_indexer_available
+specs: []
+personas: []
+---
+
+## Purpose
+
+Offline scaffold for Second Brain — Spec (spec-27-second-brain) — Purpose.
+
+## Public Interface
+
+Offline scaffold for Second Brain — Spec (spec-27-second-brain) — Public Interface.
+
+## Data Model
+
+### §5 Configuration
+
+| Key | Role |
+|-----|------|
+| `second_brain.enabled` | Master toggle |
+| `second_brain.paths.vault` | Workspace-relative Obsidian vault folder (e.g. `obsidian/alex_AI`); unset → legacy layout |
+| `second_brain.paths.wiki` | **Read alias only** for `vault`; doctor warns; writes normalize to `vault` |
+
+## Internal Architecture
+
+### §3.2 Vault layout
+
+Paths resolve under the workspace content root. When `second_brain.paths.vault` is **unset**, the legacy layout applies: `second_brain/users/<scope>/{raw,wiki,outputs}`. When set, `default_scope` uses `<workspace>/<paths.vault>/` directly (no `users/<scope>/` segment). Non-default scopes keep the legacy path. `shared/wiki` remains at `second_brain/shared/wiki`.
+
+Bootstrap (`ensure_second_brain_scope_layout`) idempotently creates `raw/`, `wiki/`, `wiki/ingests/`, `outputs/`, stub `wiki/index.md`, `wiki/log.md`, and optional `MODEL.md`.
+
+## Behavior
+
+Offline scaffold for Second Brain — Spec (spec-27-second-brain) — Behavior.
+
+## Failure Modes
+
+Offline scaffold for Second Brain — Spec (spec-27-second-brain) — Failure Modes.
+
+## Test Strategy
+
+Unit tests under `tests/second_brain/` cover path resolution, bootstrap idempotency, config validation, CLI setup, Telegram menu captions, and onboarding capability manifest rows.
+
+## 10. Build Checklist
+
+### 10.1 Custom vault paths — append-only
+
+- [x] Config model `SecondBrainPathsConfig` + schema `second_brain.paths.vault` (2026-07-11 ✅: `src/sevn/config/sections/features.py`, `infra/sevn.schema.json`)
+- [x] Path resolution `resolve_scope_root` + caller migration (2026-07-11 ✅: `src/sevn/second_brain/paths.py`, gateway/dashboard/skills)
+- [x] Bootstrap `ensure_second_brain_scope_layout` + gateway boot hook (2026-07-11 ✅: `src/sevn/second_brain/bootstrap.py`, `layout_validate.py`)
+- [x] Doctor probe `second_brain_vault_layout` + fix (2026-07-11 ✅: `layout_probe.py`, `cli/doctor/probes.py`)
+- [x] CLI `sevn second-brain setup` + `sevn config second-brain` (2026-07-11 ✅: `cli/commands/second_brain_cmd.py`)
+- [x] Telegram `/config` vault path + browse forms (2026-07-11 ✅: `menu.py`, `menu_form_handler.py`)
+- [x] Onboarding text + folder_picker controls (2026-07-11 ✅: `onboarding_capabilities.json`, web wizard)

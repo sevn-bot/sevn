@@ -1,0 +1,149 @@
+/* sevn.bot — base.css
+ * Reset, html/body baselines, focus-visible policy, ::selection.
+ * Theme tokens (--bg, --fg, --surface, etc.) are mapped in theme-dark.css / theme-light.css.
+ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  border: 0 solid transparent;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  font-variant-ligatures: contextual;
+  tab-size: 4;
+  font-family: var(--sevn-font-sans);
+  color-scheme: var(--sevn-color-scheme, dark);
+}
+
+body {
+  min-height: 100vh;
+  font-family: var(--sevn-font-sans);
+  font-size: var(--sevn-fs-base);
+  line-height: var(--sevn-lh-base);
+  font-weight: var(--sevn-fw-400);
+  color: var(--sevn-fg);
+  background: var(--sevn-bg);
+  background-image: var(--sevn-bg-image, none);
+  letter-spacing: var(--sevn-tracking-tight);
+}
+
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+}
+
+button, input, select, textarea {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
+button {
+  background: none;
+  cursor: pointer;
+}
+
+a {
+  color: var(--sevn-fg-link, var(--sevn-primary));
+  text-decoration: none;
+  text-underline-offset: 2px;
+  transition: color var(--sevn-duration-fast) var(--sevn-ease-out);
+}
+
+a:hover {
+  color: var(--sevn-primary-light);
+}
+
+p {
+  text-wrap: pretty;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  text-wrap: balance;
+  letter-spacing: var(--sevn-tracking-tighter);
+  font-weight: var(--sevn-fw-600);
+  color: var(--sevn-fg-strong);
+}
+
+hr {
+  border-top: 1px solid var(--sevn-border);
+  height: 0;
+}
+
+/* ---------- Focus policy ---------- */
+:focus { outline: none; }
+
+:focus-visible {
+  outline: 2px solid var(--sevn-primary);
+  outline-offset: 2px;
+  border-radius: var(--sevn-radius-sm);
+}
+
+/* Inputs/cards keep their own border but get a halo */
+.input:focus-visible,
+.textarea:focus-visible,
+.select:focus-visible {
+  outline-offset: 0;
+  outline: none;
+  border-color: var(--sevn-primary);
+  box-shadow: 0 0 0 3px rgba(95, 177, 247, 0.18);
+}
+
+/* ---------- Selection ---------- */
+::selection {
+  background: rgba(95, 177, 247, 0.30);
+  color: var(--sevn-fg-strong);
+}
+
+::-moz-selection {
+  background: rgba(95, 177, 247, 0.30);
+  color: var(--sevn-fg-strong);
+}
+
+/* ---------- Scrollbars (dark default) ---------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sevn-base-300) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track { background: transparent; }
+
+*::-webkit-scrollbar-thumb {
+  background: var(--sevn-base-300);
+  border-radius: var(--sevn-radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--sevn-base-400);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,0 +1,8 @@
+# about-docs reference allowlist — folders/paths a published doc may cite.
+# Gitignore glob syntax. The hook (scripts/check_about_docs_refs.py) reads this.
+# Doc-to-doc links (by id) and https:// URLs are always allowed and not listed here.
+
+src/**
+wave-orchestrator/**
+about-sevn.bot/**
+.github/workflows/**

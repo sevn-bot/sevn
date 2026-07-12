@@ -1,0 +1,86 @@
+/* sevn.bot — color tokens
+ * Source of truth. theme-dark.css and theme-light.css map roles onto these.
+ *
+ * Brand pair:
+ *   primary  — clear sky blue   #5fb1f7   (confident carrier; assistant accents, focus, charts)
+ *   accent   — signal red       #ff3b3b   (action / critical ONLY — never decorative)
+ * Base: warm slate-black         #0c0a09  → #181513 → #26211d
+ */
+
+:root {
+  /* ---------- Brand: primary (clear sky blue) ---------- */
+  --sevn-primary-pale:  #d6ecff;
+  --sevn-primary-light: #9dd0fb;
+  --sevn-primary:       #5fb1f7;
+  --sevn-primary-dark:  #2a7fc6;
+
+  /* ---------- Brand: accent (signal red — action/critical only) ---------- */
+  --sevn-accent-pale:   #ffd6d6;
+  --sevn-accent-light:  #ff7a7a;
+  --sevn-accent:        #ff3b3b;
+  --sevn-accent-dark:   #b51e1e;
+
+  /* ---------- Deep neutral (warm slate-black) ---------- */
+  --sevn-base-000: #07060500;       /* full transparent */
+  --sevn-base-050: #0c0a09;         /* page */
+  --sevn-base-100: #14110f;         /* surface 1 */
+  --sevn-base-150: #181513;         /* surface 2 — cards */
+  --sevn-base-200: #26211d;         /* surface 3 — popovers, raised */
+  --sevn-base-300: #322c27;         /* hairlines on raised surfaces */
+  --sevn-base-400: #423a33;         /* dividers */
+
+  /* Navy alphas for overlays, scrims, focus halos */
+  --sevn-base-a80: rgba(12, 10, 9, 0.80);
+  --sevn-base-a60: rgba(12, 10, 9, 0.60);
+  --sevn-base-a40: rgba(12, 10, 9, 0.40);
+  --sevn-base-a20: rgba(12, 10, 9, 0.20);
+
+  /* ---------- Slate scale (body / muted text on dark) ---------- */
+  --sevn-slate-200: #ece7e1;        /* high-emphasis body */
+  --sevn-slate-300: #c8c1b8;        /* default body */
+  --sevn-slate-400: #948b80;        /* muted */
+  --sevn-slate-500: #6b6359;        /* very muted */
+  --sevn-slate-600: #4a4239;        /* faint */
+  --sevn-slate-base: #c8c1b8;       /* alias for default */
+
+  /* ---------- Light surfaces & true white tones ---------- */
+  --sevn-light-050: #fbf9f6;        /* page (light theme) */
+  --sevn-light-100: #f4f0ea;        /* surface 1 */
+  --sevn-light-150: #ebe5dc;        /* surface 2 */
+  --sevn-light-200: #ddd5c9;        /* surface 3 */
+  --sevn-light-300: #c4baa9;        /* hairlines */
+  --sevn-white:     #ffffff;
+
+  /* ---------- Status (warm-amber for warnings; primary for info; accent for critical only) ---------- */
+  --sevn-success:   #6a9c78;        /* warm desaturated green — calm, not playful */
+  --sevn-warning:   #c89a52;        /* neutral amber */
+  --sevn-info:      var(--sevn-primary);
+  --sevn-critical:  var(--sevn-accent);
+
+  /* ---------- Gradients ---------- */
+  --sevn-gradient-brand:    linear-gradient(135deg, #5fb1f7 0%, #ff3b3b 100%);
+  --sevn-gradient-brand-soft: linear-gradient(135deg, rgba(95,177,247,0.85) 0%, rgba(255,59,59,0.85) 100%);
+  --sevn-gradient-dark:     linear-gradient(160deg, #181513 0%, #0c0a09 100%);
+  --sevn-glow-primary:      radial-gradient(ellipse at center, rgba(95,177,247,0.20) 0%, rgba(95,177,247,0) 65%);
+  --sevn-glow-accent:       radial-gradient(ellipse at center, rgba(255,59,59,0.18) 0%, rgba(255,59,59,0) 65%);
+
+  /* ---------- Chart palette (mono-blue ramp; accent for anomalies only) ---------- */
+  --sevn-chart-1: #5fb1f7;
+  --sevn-chart-2: #2a7fc6;
+  --sevn-chart-3: #9dd0fb;
+  --sevn-chart-4: #1a5a96;
+  --sevn-chart-5: #bcdff9;
+  --sevn-chart-anomaly: #ff3b3b;
+  --sevn-chart-grid: rgba(236, 231, 225, 0.06);
+  --sevn-chart-axis: rgba(236, 231, 225, 0.45);
+
+  /* ---------- Syntax palette (code blocks) ---------- */
+  --sevn-syntax-fg:       #ece7e1;
+  --sevn-syntax-comment:  #6b6359;
+  --sevn-syntax-keyword:  #5fb1f7;
+  --sevn-syntax-string:   #c89a52;
+  --sevn-syntax-number:   #9dd0fb;
+  --sevn-syntax-fn:       #d6ecff;
+  --sevn-syntax-builtin:  #ff7a7a;
+  --sevn-syntax-punct:    #948b80;
+}

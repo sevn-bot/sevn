@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>sevn.bot — Telegram /config Menu (live state)</title>
+  <style>
+    :root {
+      --tg-bg: #0e1621; --tg-panel: #17212b; --tg-bubble: #182533; --tg-accent: #2b5278;
+      --tg-text: #f5f5f5; --tg-muted: #8b9bab; --tg-btn: #2b5278; --tg-btn-hover: #3d6a99;
+      --ready: #4caf50; --wip: #ff9800; --stub: #9e9e9e; --not: #f44336;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, sans-serif; background: #0a1018; color: var(--tg-text); line-height: 1.5; }
+    header { padding: 1.25rem 1.5rem; border-bottom: 1px solid #243447; background: var(--tg-panel); }
+    header h1 { margin: 0 0 0.35rem; font-size: 1.25rem; }
+    header p { margin: 0; color: var(--tg-muted); font-size: 0.9rem; }
+    header p + p { margin-top: 0.35rem; }
+    main { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 1.5rem; padding: 1.5rem; max-width: 1400px; margin: 0 auto; }
+    @media (max-width: 960px) { main { grid-template-columns: 1fr; } }
+    .phone { background: var(--tg-bg); border-radius: 16px; border: 1px solid #243447; overflow: hidden; }
+    .bar { background: var(--tg-accent); padding: 0.65rem 1rem; font-weight: 600; }
+    .bubble { background: var(--tg-bubble); margin: 1rem; padding: 0.75rem 1rem; border-radius: 12px; white-space: pre-wrap; font-size: 0.82rem; max-height: 280px; overflow-y: auto; }
+    .keys { padding: 0 0.75rem 1rem; display: flex; flex-direction: column; gap: 6px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .row.single { grid-template-columns: 1fr; }
+    .keys button { background: var(--tg-btn); border: none; color: var(--tg-text); padding: 0.55rem 0.4rem; border-radius: 8px; font-size: 0.78rem; cursor: pointer; }
+    .keys button:hover:not(:disabled) { background: var(--tg-btn-hover); }
+    .keys button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #tree h2 { margin-top: 0; }
+    .legend { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; font-size: 0.85rem; }
+    .legend span::before { content: "●"; margin-right: 0.35rem; }
+    .legend .ready::before { color: var(--ready); }
+    .legend .wip::before { color: var(--wip); }
+    .legend .stub::before { color: var(--stub); }
+    .legend .not::before { color: var(--not); }
+    #tree details { margin: 0.35rem 0 0.35rem 1rem; border-left: 2px solid #243447; padding-left: 0.75rem; }
+    #tree summary { cursor: pointer; font-weight: 600; }
+    #tree .meta { color: var(--tg-muted); margin: 0.35rem 0 0.65rem 0; font-size: 0.88rem; }
+    #tree .meta strong { color: var(--tg-text); }
+    #tree .meta.long { color: #b8c5d3; line-height: 1.55; max-width: 52rem; }
+    #tree .meta.currently { color: #ffd180; line-height: 1.55; max-width: 52rem; border-left: 2px solid #ff9800; padding-left: 0.65rem; margin-left: -0.65rem; }
+    #tree .meta.currently strong { color: #ffd180; }
+    #tree .live-note { font-size: 0.82rem; color: #7a8fa3; font-style: italic; margin-top: 0.5rem; }
+    .badge { display: inline-block; font-size: 0.68rem; padding: 0.1rem 0.45rem; border-radius: 4px; margin-left: 0.35rem; vertical-align: middle; }
+    .badge.ready { background: #1b3d1f; color: #81c784; }
+    .badge.wip { background: #4a3410; color: #ffb74d; }
+    .badge.stub { background: #333; color: #bbb; }
+    .badge.not { background: #4a1515; color: #ef9a9a; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Telegram <code>/config</code> menu — live state + gaps</h1>
+    <p>Tracks what the running bot actually exposes today, not the plan. Readiness mirrors <code>src/sevn/gateway/menu_readiness.py</code> (the <code>_READY_SPEC_IDS</code> allow-list) and behavior is read from <code>menu_registry.py</code> + the section keyboard builders in <code>menu.py</code>.</p>
+    <p>Pressable today (in <code>_READY_SPEC_IDS</code> or exempt): root section tiles + Back/Home/Close; <strong>Session</strong> QA + queue (C1.1–C1.6); <strong>Channels</strong> reply keyboard + routing footer (C5.1–C5.2); model paginated pickers (page callbacks exempt); <strong>Security</strong> owner guard kill-switches (C11.3–C11.5); <strong>Logs</strong> tail/grep/traces + trace-redaction toggle (C20.1–C20.6); <strong>My sevn bot</strong> restarts + deployment id (C18.4–C18.5, C20.7); <strong>sevn.bot</strong> sync/issues (C21.1–C21.3); <strong>CodeMode</strong> tier-B toggle (C24.1). Everything else stays visible with a 🚧 prefix and answers <code>cfg:disabled:*</code> until its registry id is added. Pure URL rows are exempt from callback gating.</p>
+  </header>
+  <main>
+    <section id="mock"></section>
+    <section id="tree"></section>
+  </main>
+  <script>
+    /** @typedef {{ label: string, status: string, short: string, long: string, currently?: string }} Btn */
+
+    function btn(label, status, short, long, currently) {
+      return { label, status, short, long, currently };
+    }
+
+    const SECTIONS = {
+      session: {
+        title: "Session",
+        status: "Ready",
+        short: "Quick-action bar on assistant replies (Regen, 👍/👎, Share, Feedback) and per-session queue mode (cancel ↔ steer).",
+        long: "Section caption rebuilds from workspace.channels.telegram.quick_actions and gateway.queue_mode. Tapping a QA toggle writes the boolean to sevn.json via mutate_sevn_json, calls _reload_workspace(), and edits the menu message in place — the next assistant reply picks up the new QA visibility through the standard quick-actions assembly path.\n\nQueue toggle cycles gateway.queue_mode through cancel → steer → multi. The button text shows the current value and the next state in parentheses.\n\nAll six Session buttons (C1.1–C1.6) are in the Ready allow-list, so they tap through without a disabled toast.",
+        currently: "All six Session buttons tap through. Queue toggle persists to sevn.json and _reload_workspace() refreshes ChannelRouter._queue_mode without restart (TE-2). QA toggles flow through because the QA assembly re-reads workspace.channels.telegram.quick_actions on each reply.",
+        buttons: [
+          btn("Regen", "Ready",
+            "Show or hide the Regen button on the next bot reply.",
+            "Writes channels.telegram.quick_actions.show_regen via cfg:toggle:…:true|false. QA assembly reads the flag per reply, so disabling drops the Regen button from the inline markup on the next message.",
+            "Works live — flag is read on each reply build."),
+          btn("👍 Up", "Ready",
+            "Show or hide the thumbs-up feedback button.",
+            "Writes channels.telegram.quick_actions.show_thumbs_up. qa:<id>:up callbacks are still wired through QuickActionCallbackHandler whether or not the button renders.",
+            "Works live."),
+          btn("👎 Down", "Ready",
+            "Show or hide the thumbs-down feedback button.",
+            "Writes channels.telegram.quick_actions.show_thumbs_down. Mirror of Up; same QA bar render path.",
+            "Works live."),
+          btn("Share", "Ready",
+            "Show or hide Share on assistant replies.",
+            "Writes channels.telegram.quick_actions.show_share. When enabled, the QA row includes a WebApp URL button pointing at /webapp/share.",
+            "Works live (Share button is a WebApp URL, surfaced/hidden by this toggle)."),
+          btn("Feedback", "Ready",
+            "Show or hide free-form Feedback on replies.",
+            "Writes channels.telegram.quick_actions.show_feedback. When enabled, the QA row includes a WebApp URL button at /webapp/feedback for structured comment capture.",
+            "Works live."),
+          btn("Queue: cancel ↔ steer", "Ready",
+            "Cycle gateway.queue_mode (cancel → steer → multi).",
+            "Cycles between cancel and steer in sevn.json. cancel cancels the in-flight dispatch task when a new message arrives; steer is the intended in-turn mid-flight injection mode.",
+            "Works live — _reload_workspace() updates ChannelRouter._queue_mode immediately (TE-2)."),
+        ],
+      },
+      agents: {
+        title: "Agents",
+        status: "WIP",
+        short: "Agent display name (Telegram form) and persona/IDENTITY editors via Mission Control.",
+        long: "Section caption shows the resolved agent.display_name and lists the persona files (IDENTITY.md, SOUL.md, USER.md). Keyboard always includes Edit display name; persona and IDENTITY rows appear only when web_ui.url is configured.\n\nForm wiring exists (MenuFormHandler) but C19.1–C19.3 are not in _READY_SPEC_IDS, so all three render with 🚧 in the live bot.",
+        currently: "Only Edit display name renders in the callback keyboard (gated 🚧). Edit persona and Open IDENTITY.md are URL rows when web_ui.url is set — they use url, not callback_data, so the structural docs gate treats them as catalog-only; live labels are ✏️ Edit persona and 📄 Open IDENTITY.md.",
+        buttons: [
+          btn("Edit display name", "WIP",
+            "Form wizard for agent.display_name (form:agent:display_name).",
+            "Multi-step Telegram form that validates input and writes agent.display_name in sevn.json via MenuFormHandler. Implemented end-to-end (C19.2) but the form launcher is gated.",
+            "Gated — tap shows 🚧 disabled toast even though the form handler is wired."),
+          btn("Edit persona", "WIP",
+            "URL to Mission Control persona editor.",
+            "Resolved via _mission_control_url(workspace). Row is omitted when web_ui.url is unset — there is no Advanced fallback.",
+            "URL button. Omitted entirely when no web_ui.url. When present, gated 🚧 prefix is shown (text only — URL still opens)."),
+          btn("Open IDENTITY.md", "WIP",
+            "Deep-link to Mission Control #identity.",
+            "URL to web_ui.url#identity for canonical identity edits. Omitted when no web_ui.url.",
+            "URL button; same gating semantics as Edit persona."),
+        ],
+      },
+      models: {
+        title: "Models",
+        status: "WIP",
+        short: "Triager / Tier B / Tier C/D pickers, unified-model toggle, last-pick swap.",
+        long: "Section caption shows resolved model ids per tier (Triager, Tier B; Tier C/D appear only when Unified is off). Pickers paginate the providers.models catalog under cfg:models:page:<slot>:<idx>; page callbacks are exempt from gating (like section tiles). Selecting a row writes the slot via cfg:models:pick:<slot>:<idx> (handled by MenuActionRouter._handle_models_pick).\n\nSwap exchanges providers.tier_default.B with providers.last_used_model for quick A/B (C4.5). Unified toggle and swap remain gated; triager / tier B / tier C/D picker entry points are Ready.",
+        currently: "Pick Triager, Pick Tier B, and Pick Tier C/D tap through and open paginated catalog pages. Unified model toggle and ↔ Swap last model still show 🚧. Open Models tab is a URL row — rendered only when web_ui.url is set (label may show 🚧; URL still opens).",
+        buttons: [
+          btn("Unified model", "WIP",
+            "Toggle providers.use_main_model_for_all.",
+            "Boolean toggle that collapses tier slots onto a single catalog id when true. cfg:toggle:providers.use_main_model_for_all:true|false.",
+            "Gated 🚧 — disabled toast even though the toggle handler is implemented."),
+          btn("Pick Triager", "Ready",
+            "Open paginated picker for the triager slot (cfg:models:page:triager:0).",
+            "Renders catalog page with ✅ on current selection; Prev/Next when catalog exceeds MODELS_PICKER_PAGE_SIZE.",
+            "Works live — picker page callbacks are exempt from gating."),
+          btn("Pick Tier B", "Ready",
+            "Open paginated picker for the tier_b slot.",
+            "Same picker UX as triager; sets providers.tier_default.B via _handle_models_pick.",
+            "Works live."),
+          btn("Pick Tier C/D", "Ready",
+            "Open paginated picker for the tier_cd slot.",
+            "Heavy executor selection; may be constrained by RLM backend allowlist when λ-RLM is enabled.",
+            "Works live."),
+          btn("↔ Swap last model", "WIP",
+            "cfg:models:swap — swap Tier B with providers.last_used_model.",
+            "Reads providers.last_used_model, writes the current Tier B id back into it, and assigns the saved value to providers.tier_default.B.",
+            "Gated 🚧."),
+          btn("Open Models tab", "WIP",
+            "URL button to web_ui.url#models.",
+            "Rendered only when web_ui.url is set. Omitted entirely from the keyboard when no Mission Control URL is configured.",
+            "URL works when present; not rendered in workspaces without web_ui.url."),
+        ],
+      },
+      voice: {
+        title: "Voice",
+        status: "WIP",
+        short: "TTS mode for outbound replies: off, all, or when_asked.",
+        long: "Three exact-callback buttons (cfg:voice:mode:off|all|when_asked) write voice.tts_mode in sevn.json via the _SECTION_TOGGLES map in MenuActionRouter. _reload_workspace() refreshes the VoiceRuntimeSettings on the router.\n\nSTT provider cycling is registered in the spec (C3.4) but not rendered by _build_voice_keyboard_rows.",
+        currently: "All three TTS mode buttons are gated 🚧. STT cycle is not in the keyboard at all — only TTS toggles render.",
+        buttons: [
+          btn("TTS: off", "WIP",
+            "Set voice.tts_mode = off.",
+            "Disables outbound audio. Caption shows the active mode (no ✅ in label — the label is exact-match, not a toggle).",
+            "Gated 🚧."),
+          btn("TTS: all", "WIP",
+            "Set voice.tts_mode = all.",
+            "Attach TTS to every assistant reply when the configured backend succeeds; failures fall back to text with logged warnings.",
+            "Gated 🚧."),
+          btn("TTS: when_asked", "WIP",
+            "Set voice.tts_mode = when_asked.",
+            "Speak only when the user explicitly requests voice (via /voice or matching cue).",
+            "Gated 🚧."),
+          btn("STT: whisper_cpp 🔁", "WIP",
+            "TODO: short (Cycles voice.stt_providers primary; wired TMF Wave W4)",
+            "TODO: long (cfg:voice:stt:next)"),
+
+        ],
+      },
+      channels: {
+        title: "Channels",
+        status: "WIP",
+        short: "Reply keyboard, routing footer, DM admission policy (+ schema-gated webchat TTS row).",
+        long: "Reply keyboard (C5.1) and Show routing (C5.2) are the only Channels buttons in the Ready allow-list. DM policy (C5.3) cycles open → pairing → allowlist → disabled, and writes are picked up by the TelegramAdapter via _reload_workspace() (which re-builds the adapter cfg). Telegram mode (poll/webhook) is a read-only caption only — no button. Webchat TTS inline (C5.5) only renders when the schema declares channels.webchat.tts_inline; in the bundled schema it is currently absent and the row is omitted.",
+        currently: "Reply keyboard and Show routing are pressable and reflect through to the adapter on next message. DM policy cycle is gated 🚧 (handler exists). Telegram mode is caption-only — documented below but never a keyboard row.",
+        buttons: [
+          btn("Reply keyboard", "Ready",
+            "Toggle channels.telegram.reply_keyboard.enabled.",
+            "When on, Telegram shows a persistent /new /menu /help keyboard below the composer. _reload_workspace() pushes the new setting onto TelegramAdapter._cfg without restart.",
+            "Works live."),
+          btn("Show routing", "Ready",
+            "Toggle channels.telegram.show_routing.",
+            "Appends triage intent and executor tier as a footer on every assistant reply. Useful for staging bots; noisier for end users.",
+            "Works live."),
+          btn("DM policy cycle", "WIP",
+            "Cycle channels.telegram.dm_policy through open → pairing → allowlist → disabled.",
+            "Each tap writes the next enum value to sevn.json. _reload_workspace() rebuilds TelegramAdapter._cfg.dm_policy, so changes apply without restart once gating is lifted.",
+            "Gated 🚧 — disabled toast despite working handler + adapter reload."),
+          btn("Telegram mode (caption only)", "Stub",
+            "Read-only line in the section caption — not a button.",
+            "Caption renders the current poll/webhook mode via _telegram_mode(workspace). Switching modes is a CLI/dashboard concern.",
+            "Caption-only by design; no inline keyboard row is built for it."),
+        ],
+      },
+      secrets: {
+        title: "Secrets",
+        status: "WIP",
+        short: "Owner-only secret-ref wizard and a caption listing logical key names.",
+        long: "+ Add secret launches form:secret_wizard (registered with MenuFormHandler) which prompts for ref name + value and writes via the configured secrets backend. List refs is a caption refresh that re-renders the section message with the workspace ref ids — values are never shown in Telegram. Remove ref (C6.3) is not implemented.",
+        currently: "+ Add secret is gated 🚧. List refs is a caption-refresh action documented here; it may not appear as a separate keyboard row depending on build.",
+        buttons: [
+          btn("+ Add secret", "WIP",
+            "Start form:secret_wizard.",
+            "Owner-only wizard. Form handler is implemented; writes through the active secrets backend and updates workspace ref metadata in sevn.json.",
+            "Gated 🚧 — form handler is wired but the launcher returns the disabled toast."),
+          btn("List refs (caption)", "WIP",
+            "caption:secrets:refs — re-render section caption with ref key names.",
+            "Reads logical secret keys from workspace + raw sevn.json and emits a bullet list (top 20, '… and N more' for overflow).",
+            "Gated 🚧."),
+        ],
+      },
+      skills: {
+        title: "Skills",
+        status: "WIP",
+        short: "Open Skills tab (URL), schema-gated per-skill toggles, refresh index.",
+        long: "Open Skills tab is a URL button (omitted when web_ui.url is unset). Per-skill toggles only render when sevn.schema.json declares a skills.<id>.enabled child path; the bundled schema currently has no such children for most skills, so toggle rows are typically absent. Refresh index is wired (cfg:skills:refresh).",
+        currently: "Open Skills tab, per-skill toggles, and Refresh index are documented here for when web_ui.url or schema paths exist. With the default bundled schema and no skills.<id>.enabled children, the live keyboard is often empty — only URL / schema-gated rows appear when configured.",
+        buttons: [
+          btn("Open Skills tab", "WIP",
+            "URL to web_ui.url#skills.",
+            "Omitted entirely when no web_ui.url is configured.",
+            "URL works when present; 🚧 prefix on label."),
+          btn("Enable/disable skill", "WIP",
+            "Schema-gated cfg:toggle:skills.<id>.enabled rows.",
+            "Top-N (after _SKILLS_MENU_LIMIT) toggles, one per discovered skill id whose schema declares an enabled child.",
+            "Rendered only when schema permits — in practice often zero rows. When rendered, gated 🚧."),
+          btn("Refresh index", "WIP",
+            "cfg:skills:refresh — re-render section caption with the latest index.",
+            "Caption-refresh action; never restarts the gateway.",
+            "Gated 🚧."),
+        ],
+      },
+      tools: {
+        title: "Tools",
+        status: "WIP",
+        short: "Open Tools tab + MCP link (same URL), schema-gated plugin toggles.",
+        long: "When web_ui.url is set the keyboard emits two URL rows: 'Open Tools tab' and 'MCP servers' (both point at web_ui.url#tools — MCP is intentionally not a separate matrix). Plugin toggles render when the schema declares tools.<plugin>.enabled children.\n\nThe Tools section crash from earlier dogfooding was fixed in 699db02 (sevn.schema.json now ships in the wheel via sevn.data).",
+        currently: "Open Tools tab and MCP servers are URL rows (same web_ui.url#tools target) when web_ui.url is set — url-only, not in the callback docs gate. Plugin toggles render only when the schema declares tools.<plugin>.enabled; often zero rows in the default workspace.",
+        buttons: [
+          btn("Open Tools tab", "WIP",
+            "URL to web_ui.url#tools.",
+            "Primary surface for tools + MCP. Omitted without web_ui.url.",
+            "URL works when present; 🚧 prefix on label."),
+          btn("MCP servers", "WIP",
+            "Second URL row — same web_ui.url#tools target.",
+            "Kept as a separate row so MCP is discoverable from Tools; intentionally not a Telegram matrix (C8.3).",
+            "Same URL as Open Tools tab; renders only when web_ui.url is set."),
+          btn("Enable plugin tool", "WIP",
+            "Schema-gated cfg:toggle:tools.<plugin>.enabled rows.",
+            "Top-N plugin toggles per _list_tool_plugin_prefixes() when the schema declares the enabled child.",
+            "Rendered only when schema permits. Gated 🚧 when present."),
+        ],
+      },
+      rlm: {
+        title: "RLM",
+        status: "WIP",
+        short: "λ-RLM enable, Tier C/D backend cycle (conditional), Open RLM tab.",
+        long: "λ-RLM toggle (C9.1) writes executors.tier_cd.lambda_rlm.enabled. Backend cycle (C9.2) only renders when λ-RLM is on AND rlm.lambda_tool_allowlist is non-empty AND rlm.c_d_backend exists in the schema; otherwise the section caption notes that allowlist + schema gating are required. REPL lifetime + complexity caps are caption-only (C9.3).",
+        currently: "λ-RLM toggle is gated 🚧. Tier C/D backend cycle and Open RLM tab are conditional — backend cycle only when λ-RLM is on and allowlist/schema permit; Open RLM tab is a URL row when web_ui.url is set.",
+        buttons: [
+          btn("λ-RLM enabled", "WIP",
+            "Toggle executors.tier_cd.lambda_rlm.enabled.",
+            "Reloads executor gating on next turn (the menu calls _reload_workspace()). Tier C/D routing downgrades when off.",
+            "Gated 🚧."),
+          btn("Tier C/D backend cycle", "WIP",
+            "Cycle rlm.c_d_backend across configured options.",
+            "Renders only when λ-RLM is on, allowlist non-empty, and the schema declares rlm.c_d_backend. Otherwise the caption tells the operator what's missing.",
+            "Conditionally rendered. When present, gated 🚧."),
+          btn("Open RLM tab", "WIP",
+            "URL to web_ui.url#rlm.",
+            "Mission Control surface for allowlist and trace inspection.",
+            "URL works when present; 🚧 prefix on label."),
+        ],
+      },
+      code: {
+        title: "Code",
+        status: "WIP",
+        short: "MYCODE index + code-review-graph toggles (+ Mission Control link).",
+        long: "MYCODE (C10.1) toggles code_understanding.mycode.enabled — runtime tool registration is rebuilt on _reload_workspace(). Code review graph (C10.2) toggles code_understanding.code_review_graph.enabled, which controls the code-review-graph MCP tool exposure.",
+        currently: "MYCODE and Review graph toggles are gated 🚧. Open Code tab is a URL row when web_ui.url is set; omitted without Mission Control URL.",
+        buttons: [
+          btn("MYCODE", "WIP",
+            "Toggle code_understanding.mycode.enabled.",
+            "Index builds may take time on first enable; disabling stops new jobs but does not delete existing graph data.",
+            "Gated 🚧."),
+          btn("Review graph", "WIP",
+            "Toggle code_understanding.code_review_graph.enabled.",
+            "Gates the code-review-graph MCP tool exposure. Requires MCP runtime configured in Tools.",
+            "Gated 🚧."),
+          btn("Open Code tab", "WIP",
+            "URL to web_ui.url#code.",
+            "Index status, roots, graphify integration.",
+            "URL works when present; 🚧 prefix on label."),
+        ],
+      },
+      security: {
+        title: "Security",
+        status: "WIP",
+        short: "Heuristic-only LLM-guard scanner toggle and per-owner kill-switches.",
+        long: "Heuristic-only (C11.1) flips security.scanner.heuristic_only. C11.3–C11.5 are owner-actor kill-switches under channels.telegram.owner_scanner_overrides: each disables LLMGuardScanner for one content kind (text / links / documents) when the message sender is the owner. A mixed-kind message (e.g. text + link) is only skipped when every kind present has its toggle on. _reload_workspace() rebuilds LLMGuardScanner from the new workspace, so changes apply on the next inbound message without restart.",
+        currently: "Skip guard on my text / links / documents are Ready (C11.3–C11.5). Heuristic-only (C11.1) is still gated 🚧. Open Security tab is a URL row when web_ui.url is set; omitted when no Mission Control URL is configured.",
+        buttons: [
+          btn("Heuristic-only", "WIP",
+            "Toggle security.scanner.heuristic_only.",
+            "Heuristic-only is recommended for dev/staging; full scan may add latency but improves blocking signal.",
+            "Gated 🚧 — scanner reload is wired."),
+          btn("Skip guard on my text", "Ready",
+            "Toggle channels.telegram.owner_scanner_overrides.disable_text.",
+            "When ON, your plain-text messages bypass LLMGuardScanner. OFF (default) keeps inbound text scanned. Applies in any chat where you are the actor (owner DM, group, topic).",
+            "Works live — scanner reload picks the new flag up on the next message."),
+          btn("Skip guard on my links", "Ready",
+            "Toggle channels.telegram.owner_scanner_overrides.disable_links.",
+            "Skips scanning when your message text contains http(s)://, t.me/, or tg:// URLs. Mixed-kind messages (text + link) are only skipped when every kind present has its toggle on.",
+            "Works live."),
+          btn("Skip guard on my documents", "Ready",
+            "Toggle channels.telegram.owner_scanner_overrides.disable_documents.",
+            "Skips scanning when your message includes a document, photo, audio, video, or voice attachment. OFF by default.",
+            "Works live."),
+          btn("Open Security tab", "WIP",
+            "URL to web_ui.url#security.",
+            "Rule tuning, blocked-message audit. Omitted when web_ui.url is unset.",
+            "URL works when present; not rendered without web_ui.url."),
+        ],
+      },
+      self_improve: {
+        title: "Self-Improve",
+        status: "WIP",
+        short: "Enable flag and Mission Control jobs/traces link.",
+        long: "Self-improve toggle (C12.1) writes self_improve.enabled. Caption also shows the configured preset (A by default). Run-improve-now (C12.3) is intentionally not surfaced in Telegram — CLI/dashboard only.",
+        currently: "Self-improve toggle is gated 🚧. View jobs / Traces is a URL row when web_ui.url is set (catalog-only in the callback docs gate).",
+        buttons: [
+          btn("Self-improve enabled", "WIP",
+            "Toggle self_improve.enabled.",
+            "Master switch for the self-improve scheduler and hook surface. Does not immediately run a job.",
+            "Gated 🚧."),
+          btn("View jobs / Traces", "WIP",
+            "URL to web_ui.url#traces.",
+            "Job timeline, eval artifacts, lesson promotion.",
+            "URL works when present; 🚧 prefix on label."),
+        ],
+      },
+      second_brain: {
+        title: "Second Brain",
+        status: "WIP",
+        short: "Long-term memory pipeline enable flag (+ Open Second Brain tab).",
+        long: "Second Brain toggle (C13.1) writes second_brain.enabled. Ingest schedule appears as caption text only because ingest_batch_cron is not declared as a schema toggle path. Open Second Brain tab (C13.3) is a URL row.",
+        currently: "Toggle is gated 🚧. Open Second Brain tab is a URL row when web_ui.url is set (catalog-only in callback docs gate). Ingest schedule is caption-only — never a keyboard button.",
+        buttons: [
+          btn("Second Brain enabled", "WIP",
+            "Toggle second_brain.enabled.",
+            "Master switch for the ingest/dreaming/promotion pipeline.",
+            "Gated 🚧."),
+          btn("Open Second Brain tab", "WIP",
+            "URL to web_ui.url#second_brain.",
+            "Mission Control surface for corpus review and ingest controls.",
+            "URL works when present; 🚧 prefix on label."),
+          btn("Ingest schedule (caption only)", "Stub",
+            "Read-only line in the section caption — not a button.",
+            "Caption shows the ingest schedule string. Toggling it requires a schema-declared path; not yet present.",
+            "Caption-only by design."),
+        ],
+      },
+      integrations: {
+        title: "Integrations",
+        status: "Stub",
+        short: "+ Add integration URL, schema-gated per-id toggles, refresh list.",
+        long: "+ Add integration is a URL row to web_ui.url#integrations (no Telegram form yet). Per-id toggles render only when the schema declares integration.<id>.enabled — in the bundled schema this is typically absent and the section caption notes 'Per-integration toggles appear when integration.<id>.enabled is in schema.' Refresh list is wired (cfg:integrations:refresh).",
+        currently: "+ Add integration is a URL row when web_ui.url is set (catalog-only in callback docs gate). Per-id toggles need schema paths — usually empty. Refresh list is the only callback row in the default keyboard (gated 🚧).",
+        buttons: [
+          btn("+ Add integration", "Stub",
+            "URL to web_ui.url#integrations.",
+            "Browser-only flow — no Telegram wizard exists for OAuth or webhook integrations yet.",
+            "URL works when present; 🚧 prefix on label."),
+          btn("Toggle integration", "Stub",
+            "Schema-gated cfg:toggle:integration.<id>.enabled rows.",
+            "Each row appears only when sevn.schema.json declares the matching enabled child path.",
+            "Rendered only when schema permits. Usually empty in current builds."),
+          btn("Refresh list", "Stub",
+            "cfg:integrations:refresh — recompute integration id caption.",
+            "Caption-refresh action; never restarts the gateway.",
+            "Gated 🚧."),
+        ],
+      },
+      dashboard: {
+        title: "Dashboard",
+        status: "WIP",
+        short: "Pinned status message lifecycle (+ Mission Control link).",
+        long: "Three pin lifecycle buttons plus an optional Mission Control URL:\n• Create/update pin (cfg:dashboard:create_pin) — posts or edits a pinned message with model + voice + queue summary, then calls pinChatMessage.\n• Refresh pin (cfg:dashboard:refresh_pin) — re-renders an existing pin; no-ops with a toast if no pin is registered for this chat/topic.\n• Unpin (cfg:dashboard:unpin) — unpins via the adapter and drops the registry row.\n• Open Mission Control — URL row when web_ui.url is set.",
+        currently: "Pin lifecycle buttons (create/update, refresh, unpin) are gated 🚧. Open Mission Control is a URL row when web_ui.url is set — catalog-only in the callback docs gate.",
+        buttons: [
+          btn("Create/update pin", "WIP",
+            "cfg:dashboard:create_pin — post or edit the pinned status message.",
+            "Requires the bot to have pin permissions in the chat. Caption text comes from dashboard_pin.default_pin_text(model_id, voice_mode).",
+            "Gated 🚧 — handler is wired."),
+          btn("Refresh pin", "WIP",
+            "cfg:dashboard:refresh_pin — re-render the pinned caption.",
+            "No-ops with 'No pinned dashboard in this topic.' toast if there is no pin entry for the (chat, topic). Debounced via DashboardPinPublisher.schedule_render.",
+            "Gated 🚧."),
+          btn("Unpin", "WIP",
+            "cfg:dashboard:unpin — remove the pin and drop the registry row.",
+            "Calls unpinChatMessage via the adapter; safe to retry if the message was already unpinned.",
+            "Gated 🚧."),
+          btn("Open Mission Control", "WIP",
+            "URL row to the bare web_ui.url (no fragment).",
+            "Generic Mission Control link, distinct from per-section #tools/#models deep links.",
+            "URL works when present; 🚧 prefix on label."),
+        ],
+      },
+      shortcuts: {
+        title: "Shortcuts",
+        status: "WIP",
+        short: "Custom slash shortcuts: + Add wizard and per-shortcut delete.",
+        long: "Per-row 🗑 /<name> delete buttons (act:shortcut_delete:<name>) are built from the workspace shortcuts.json (filtered by owner/auth and capped at _SHORTCUTS_MENU_LIMIT). + Add shortcut (form:shortcut_add) launches a multi-step form. Successful CRUD republishes setMyCommands so Telegram autocomplete tracks workspace shortcuts. Edit/Run rows (C16.3/C16.4) are not implemented.",
+        currently: "+ Add shortcut is gated 🚧. Per-shortcut 🗑 delete rows are built dynamically from shortcuts.json (not fixed catalog labels) — documented here as Delete shortcut.",
+        buttons: [
+          btn("+ Add shortcut", "WIP",
+            "form:shortcut_add — multi-step form to register a slash shortcut.",
+            "Validates against Telegram command rules before persisting to shortcuts.json and republishing setMyCommands.",
+            "Gated 🚧."),
+          btn("Delete shortcut", "WIP",
+            "Per-row act:shortcut_delete:<name>.",
+            "Owner/auth filtered; republishes setMyCommands after deletion.",
+            "Gated 🚧."),
+        ],
+      },
+      notifications: {
+        title: "Notifications",
+        status: "WIP",
+        short: "Telegram notify policy cycle: all → errors → none.",
+        long: "Single button cycling channels.telegram.telegram_notify_policy through the _NOTIFY_POLICY_CYCLE enum. Caption shows the current value and arrow to the next state.",
+        currently: "Gated 🚧 — taps return the disabled toast even though the cycle handler is implemented.",
+        buttons: [
+          btn("Notify policy cycle", "WIP",
+            "Cycle channels.telegram.telegram_notify_policy.",
+            "all sends informational pushes; errors limits to failures; none silences proactive pushes (user messages still flow either way).",
+            "Gated 🚧."),
+        ],
+      },
+      advanced: {
+        title: "Advanced",
+        status: "WIP",
+        short: "Auto-resume tier B, trace redaction, nested RLM / Self-Improve / Second Brain / Sub-agents / CodeMode, Mission Control.",
+        long: "Two JSON toggles (gateway.restart.auto_resume_b, tracing.redaction.enabled), five nested section tiles (RLM, Self-Improve, Second Brain, Sub-agents, CodeMode — moved from root), and an Open Mission Control URL when web_ui.url is set. Gateway/proxy restart moved to My sevn bot (owner, two-step confirm). Trace redaction also appears under Logs (C20.6, Ready); the Advanced copy (C18.2) remains gated. Validate config (C18.6) is not implemented.",
+        currently: "Auto-resume tier B and the Advanced trace-redaction toggle (C18.2) are gated 🚧. Nested section tiles (RLM, Self-Improve, Second Brain, Sub-agents, CodeMode) navigate Ready — inner actions stay gated except CodeMode toggle (C24.1) and Sub-agents controls (C25.1–C25.7). Open Mission Control is a URL row when configured.",
+        buttons: [
+          btn("Auto-resume tier B", "WIP",
+            "Toggle gateway.restart.auto_resume_b.",
+            "Controls whether Tier B harness sessions attempt resume after gateway restart. JSON-only — no live runtime side effects.",
+            "Gated 🚧."),
+          btn("Trace redaction", "WIP",
+            "Toggle tracing.redaction.enabled.",
+            "PII/secret scrubbing in trace sinks before export.",
+            "Gated 🚧."),
+          btn("🧭 RLM", "Ready",
+            "cfg:section:rlm — opens the RLM submenu.",
+            "λ-RLM toggle, Tier C/D backend cycle, REPL lifetime caption, Open RLM tab URL.",
+            "Navigation tile — taps through; inner RLM actions remain gated 🚧."),
+          btn("📈 Self-Improve", "Ready",
+            "cfg:section:self_improve — opens the Self-Improve submenu.",
+            "Self-improve enabled toggle and View jobs / Traces URL.",
+            "Navigation tile — taps through; inner actions remain gated 🚧."),
+          btn("📚 Second Brain", "Ready",
+            "cfg:section:second_brain — opens the Second Brain submenu.",
+            "Second Brain enabled toggle and Open Second Brain tab URL.",
+            "Navigation tile — taps through; inner actions remain gated 🚧."),
+          btn("🤖 Sub-agents", "Ready",
+            "cfg:section:subagents — opens the Sub-agents submenu.",
+            "Enabled toggle, live L1/L2 counts, limit forms, queue mode (cancel/steer/multi), Running kill submenu.",
+            "Navigation tile — taps through; inner Sub-agents actions are Ready (C25.1–C25.7)."),
+          btn("🧪 CodeMode", "Ready",
+            "cfg:section:codemode — opens the CodeMode submenu.",
+            "Tier-B Monty run_code toggle (agent.codemode.enabled); default off.",
+            "Navigation tile — taps through; CodeMode toggle inside is Ready (C24.1)."),
+          btn("Open Mission Control", "WIP",
+            "URL to the bare web_ui.url (no fragment).",
+            "Duplicated here for convenience from Dashboard.",
+            "URL works when present; 🚧 prefix on label."),
+        ],
+      },
+      subagents: {
+        title: "Sub-agents",
+        status: "Ready",
+        short: "Level-1/level-2 limits, global override, queue mode (incl. multi), live counts, Running kill submenu.",
+        long: "Sub-agents toggle (C25.1) writes subagents.enabled. Caption shows live L1/L2 running counts from the in-process supervisor, effective per-role limits (respecting max_override), and gateway.queue_mode. Limit forms (C25.3–C25.4) write subagents.max_override and subagents.agents.<role>.{max_level1,max_level2}. Queue cycle toggles cancel → steer → multi. Running (C25.2) opens a kill submenu with owner-only act:subagents:kill:<id> and Kill all L1 (C25.6).",
+        currently: "All Sub-agents controls are Ready (C25.1–C25.7 in _READY_SPEC_IDS). Reach via Advanced → Sub-agents. Kill buttons require owner flag and a wired subagent_supervisor.",
+        buttons: [
+          btn("Sub-agents enabled", "Ready",
+            "Toggle subagents.enabled.",
+            "Master switch for the L1/L2 supervisor and spawn limits.",
+            "Works live (C25.1)."),
+          btn("Running L1/L2 counts", "Ready",
+            "cfg:section:subagents_running — opens the Running submenu.",
+            "Shows live registry counts and per-run kill buttons.",
+            "Works live (C25.2)."),
+          btn("Global override", "Ready",
+            "form:subagents_max_override — numeric wizard for subagents.max_override.",
+            "Empty reply clears the override; integer applies as a ceiling on every limit (D2).",
+            "Works live (C25.3)."),
+          btn("Per-role limits", "Ready",
+            "form:subagents_limits:<role> — two-step L1 then L2 wizard.",
+            "One button per triager/tier_b/tier_c/tier_d role.",
+            "Works live (C25.4)."),
+          btn("Queue mode cycle", "Ready",
+            "cfg:toggle:gateway.queue_mode:<next> — cycles cancel → steer → multi.",
+            "Same queue semantics as Session section; duplicated here for operator convenience.",
+            "Works live (shared with C1.6)."),
+          btn("Open Sub-agents panel", "Ready",
+            "URL to web_ui.url#subagents.",
+            "Mission Control panel with counts, running table, and kill controls.",
+            "URL works when present (C25.7)."),
+        ],
+      },
+      subagents_running: {
+        title: "Sub-agents — Running",
+        status: "Ready",
+        short: "Owner-only kill buttons for active sub-agent runs.",
+        long: "Lists up to eight running sub-agent rows with act:subagents:kill:<id> buttons (owner-only). Kill all L1 (C25.6) cancels every active level-1 run via the supervisor (cascades to L2 children). Non-owners see rows without kill buttons.",
+        currently: "Kill per run (C25.5) and Kill all L1 (C25.6) are Ready for owners when subagent_supervisor is wired.",
+        buttons: [
+          btn("Kill sub-agent", "Ready",
+            "act:subagents:kill:<id> — cooperative cancel for one run.",
+            "Owner-only; routes through SubAgentSupervisor.kill (D4).",
+            "Works live (C25.5)."),
+          btn("Kill all L1", "Ready",
+            "act:subagents:kill_all — cancel all active level-1 runs.",
+            "Owner-only; does not require picking individual ids.",
+            "Works live (C25.6)."),
+          btn("Back to Sub-agents", "Ready",
+            "cfg:section:subagents — return to the limits screen.",
+            "Navigation only.",
+            "Works live."),
+        ],
+      },
+      codemode: {
+        title: "CodeMode",
+        status: "Ready",
+        short: "Tier-B CodeMode toggle (Monty run_code over triager-listed tools).",
+        long: "CodeMode toggle (C24.1) writes agent.codemode.enabled. When on, tier-B may wrap triager-scoped tools in pydantic-ai-harness CodeMode run_code composites; default off preserves flat tool calls. Sandbox path skips permission hook — enable only for trusted workloads.",
+        currently: "Toggle is Ready (C24.1 in _READY_SPEC_IDS). Reach via Advanced → CodeMode.",
+        buttons: [
+          btn("CodeMode", "Ready",
+            "Toggle agent.codemode.enabled.",
+            "Master switch for tier-B Monty composites. No gateway restart required; applies on next tier-B turn.",
+            "Works live."),
+        ],
+      },
+      logs: {
+        title: "Logs",
+        status: "Ready",
+        short: "Owner-only log tail, trace browse, and grep.",
+        long: "Mirrors the /logs and /traces slash commands from Telegram. Tail buttons stream recent gateway or proxy log lines into the chat. Trace actions list or look up distributed spans. Grep and trace-by-id open short prompt forms.",
+        currently: "Six log/trace actions are Ready (C20.1–C20.6, Wave TE-9). Deployment id (C20.7) lives under My sevn bot. Grep logs and Trace by id open form submenus first. Advanced still has a duplicate trace-redaction toggle (C18.2) that remains gated.",
+        buttons: [
+          btn("Tail gateway", "Ready",
+            "Show the latest gateway service log lines in the chat.",
+            "cfg:logs:tail:gateway:0 — streams a tail of the gateway unit log file so you can spot startup errors or recent warnings without SSH.",
+            "Works live (C20.1)."),
+          btn("Tail proxy", "Ready",
+            "Show the latest proxy service log lines in the chat.",
+            "cfg:logs:tail:proxy:0 — same as Tail gateway but for the outbound proxy process that talks to model providers.",
+            "Works live (C20.2)."),
+          btn("Grep logs", "Ready",
+            "Search log files for a text pattern.",
+            "form:logs:grep — opens a short Telegram form where you enter a grep pattern; results are posted back into the chat.",
+            "Works live (C20.3)."),
+          btn("Recent traces", "Ready",
+            "List recent distributed trace spans.",
+            "cfg:logs:traces:0 — shows the newest trace entries so you can follow a request across gateway, proxy, and tools.",
+            "Works live (C20.4)."),
+          btn("Trace by id", "Ready",
+            "Look up one trace span by its id.",
+            "form:logs:span_id — paste a span id from Recent traces or Mission Control to fetch that trace.",
+            "Works live (C20.5)."),
+          btn("Trace redaction: on/off (toggle)", "Ready",
+            "Toggle whether traces scrub secrets before export.",
+            "cfg:logs:toggle_redaction — flips tracing.redaction.enabled; when on, trace sinks redact API keys and other sensitive fields before they leave your machine.",
+            "Works live (C20.6). Duplicate Advanced toggle (C18.2) remains gated."),
+          btn("Logfire export: on/off (toggle)", "Ready",
+            "Toggle exporting traces to Pydantic Logfire.",
+            "cfg:logs:toggle_logfire — adds or removes the logfire entry in tracing.sinks[]; when on, gateway OTel spans are exported to your Logfire project (service name from the sink's project field).",
+            "Works live (C20.8). Needs a Logfire token (row below) before spans actually export."),
+          btn("Set Logfire token", "Ready",
+            "Store the Logfire write token as a managed secret.",
+            "form:logs:logfire_token — opens a Telegram form; the pasted token is stored via the secrets manager and referenced from tracing.sinks[].token_ref, never written to sevn.json in plaintext.",
+            "Works live (C20.9)."),
+        ],
+      },
+      sevn_bot: {
+        title: "sevn.bot",
+        status: "Ready",
+        short: "Upstream sevn.bot checkout: sync from GitHub, list bug/feature evolution issues.",
+        long: "Sync runs sevn sync --latest (git fetch, fast-forward/reset, make setup, optional gateway restart) on the checkout resolved from my_sevn.repo_path. Bugs and Features list recent evolution issues filed in the workspace.",
+        currently: "Sync is owner-only. Bugs/Features post a short issue list into chat.",
+        buttons: [
+          btn("Sync (latest)", "Ready",
+            "Run sevn sync --latest on the resolved checkout.",
+            "Same as gh sync / CLI sevn sync --latest: updates the source tree and may restart the gateway when its user unit is active.",
+            "Works live (owner-only)."),
+          btn("Bugs", "Ready",
+            "List recent bug-kind evolution issues.",
+            "Shows up to eight open/recent bug issues with id, title, and state.",
+            "Works live."),
+          btn("Features", "Ready",
+            "List recent feature-kind evolution issues.",
+            "Shows up to eight open/recent feature issues with id, title, and state.",
+            "Works live."),
+        ],
+      },
+      my_sevn_bot: {
+        title: "My sevn bot",
+        status: "Ready",
+        short: "This gateway instance: deployment id and owner service restarts.",
+        long: "Deployment id mirrors /status. Restart gateway/proxy use a two-step confirm keyboard then service manager (owner-only).",
+        currently: "Deployment id works for all operators; restarts are owner-only and live.",
+        buttons: [
+          btn("Restart gateway", "Ready",
+            "Two-step confirm; restarts the gateway user unit.",
+            "Telegram disconnects briefly while the gateway process restarts.",
+            "Works live (owner-only)."),
+          btn("Restart proxy", "Ready",
+            "Two-step confirm; restarts the proxy user unit.",
+            "Outbound provider traffic may pause during restart.",
+            "Works live (owner-only)."),
+          btn("Deployment id", "Ready",
+            "Show the current deployment identifier in chat.",
+            "cfg:logs:deployment_id — mirrors /status; moved here from Logs (registry C20.7).",
+            "Works live (C20.7)."),
+        ],
+      },
+      help: {
+        title: "Commands",
+        status: "Ready",
+        short: "Slash command shortcuts (/new, /menu, /help, /status, …).",
+        long: "Caption lists every /config root section with readiness tier. Per-level ❓ Help on any screen describes buttons on that screen. Type slash commands in chat: /new /menu /help /config /status /stop /voice /model.",
+        currently: "Caption-only section in the live menu; slash shortcuts work when typed in chat.",
+        buttons: [],
+      },
+
+    };
+
+    const HELP_SECTION = {
+      title: "Help",
+      status: "Ready",
+      short: "Read-only catalog of every /config root section.",
+      long: "Help is a caption-only section — _build_help_keyboard_rows() returns an empty list, so the rendered screen has only the Back/Home chrome. config_menu_help_catalog_text() prints each root tile with its tier ([Ready] / [WIP] / [Stub] / [Not Started]) along with the short/long lines from _CONFIG_SECTION_CATALOG.\n\nSlash commands remain available by typing them: /new /menu /help /config /status /stop /voice /model.",
+      currently: "Works as intended — pure caption, no buttons besides Back/Home.",
+      buttons: [],
+    };
+
+    const ROOT_TILES = [
+      ["session", "📦 Session"], ["agents", "🤖 Agents"], ["models", "🧠 Models"], ["voice", "🎙 Voice"],
+      ["channels", "🔌 Channels"], ["secrets", "🔐 Secrets"], ["skills", "🧩 Skills"], ["tools", "🛠 Tools"],
+      ["code", "💻 Code"], ["security", "🛡 Security"], ["integrations", "🌐 Integrations"], ["dashboard", "📊 Dashboard"],
+      ["shortcuts", "⌨️ Shortcuts"], ["notifications", "🔔 Notifications"], ["advanced", "⚙️ Advanced"],
+      ["logs", "📜 Logs"],
+      ["help", "❓ Commands"],
+      ["sevn_bot", "sevn.bot"],
+      ["my_sevn_bot", "🤖 My sevn bot"],
+    ];
+
+    let stack = ["root"];
+    const mockEl = document.getElementById("mock");
+    const treeEl = document.getElementById("tree");
+
+    function badge(st) {
+      const c = { Ready: "ready", WIP: "wip", Stub: "stub", "Not Started": "not" }[st] || "wip";
+      return `<span class="badge ${c}">${st}</span>`;
+    }
+    function prefix(st) {
+      if (st === "Ready") return "";
+      if (st === "WIP") return "🚧 ";
+      if (st === "Stub") return "📋 ";
+      return "🔒 ";
+    }
+    function esc(s) {
+      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+    function liveNote(st) {
+      if (st === "Ready") {
+        return "Live bot: button taps through immediately — writes sevn.json (or invokes the registered handler) and edits the menu in place.";
+      }
+      if (st === "Stub") {
+        return "Live bot: visible with 📋 prefix; tap shows the standard 'not active yet' toast (or, for URL buttons, opens the link).";
+      }
+      if (st === "Not Started") {
+        return "Live bot: visible with 🔒 prefix; tap shows toast 'Not active yet — see /config → Help for status.'";
+      }
+      return "Live bot: visible with 🚧 prefix; the handler is wired in code but the callback is rewritten to cfg:disabled:<spec_id>, which answers the disabled toast. Lift by adding the spec id to menu_readiness._READY_SPEC_IDS.";
+    }
+
+    function helpCaption() {
+      const lines = [
+        "Help — /config menu catalog",
+        "",
+        "Each section below matches a root tile. Buttons marked 🚧/🔒 inside a section are visible but not active until added to _READY_SPEC_IDS.",
+        "",
+      ];
+      for (const [id, label] of ROOT_TILES) {
+        const s = SECTIONS[id];
+        lines.push(`▸ ${label} [${s.status}]`, s.short, "", s.long.split("\n")[0], "");
+      }
+      lines.push("Slash shortcuts (type in chat): /new /menu /help /config /status /stop /voice /model");
+      return lines.join("\n");
+    }
+
+    function renderMock() {
+      const id = stack.at(-1);
+      let title = "sevn — /config";
+      let caption = "Tap a section (mock only — buttons navigate or show disabled styling).";
+      let rows = [];
+      if (id === "root") {
+        for (let i = 0; i < ROOT_TILES.length; i += 2) {
+          rows.push(ROOT_TILES.slice(i, i + 2).map(([nav, label]) => ({ nav, label, status: "Ready" })));
+        }
+        rows.push([
+          { nav: "level_help", label: "❓ Help", status: "Ready" },
+          { nav: "home", label: "🏠 Home", status: "Ready" },
+          { nav: "close", label: "❌ Close", status: "Ready" },
+        ]);
+      } else if (id === "help") {
+        title = "Help";
+        caption = helpCaption();
+      } else {
+        const s = SECTIONS[id];
+        title = s.title;
+        caption = `${s.title}\n\n${s.short}\n\n${s.long}` + (s.currently ? `\n\nCurrently: ${s.currently}` : "");
+        for (let i = 0; i < s.buttons.length; i += 2) {
+          rows.push(s.buttons.slice(i, i + 2).map((b) => ({ label: b.label, status: b.status })));
+        }
+      }
+      rows.push([
+        { nav: "back", label: "⬅ Back", status: "Ready" },
+        { nav: "level_help", label: "❓ Help", status: "Ready" },
+        { nav: "home", label: "🏠 Home", status: "Ready" },
+        { nav: "close", label: "❌ Close", status: "Ready" },
+      ]);
+      const keyRows = rows.map((row) => {
+        const cls = row.length === 1 ? "row single" : "row";
+        const inner = row.map((b) => {
+          const locked = b.status && b.status !== "Ready";
+          const nav = b.nav ? ` data-nav="${b.nav}"` : "";
+          return `<button${nav}${locked ? " disabled" : ""}>${prefix(b.status || "Ready")}${esc(b.label)}</button>`;
+        }).join("");
+        return `<div class="${cls}">${inner}</div>`;
+      }).join("");
+      mockEl.innerHTML = `<div class="phone"><div class="bar">${esc(title)}</div><div class="bubble">${esc(caption)}</div><div class="keys">${keyRows}</div></div>`;
+      mockEl.querySelectorAll("button[data-nav]").forEach((btn) => {
+        btn.onclick = () => {
+          const nav = btn.getAttribute("data-nav");
+          if (nav === "back") stack.length > 1 ? stack.pop() : (stack = ["root"]);
+          else if (nav === "home") stack = ["root"];
+          else stack.push(nav);
+          renderMock();
+        };
+      });
+    }
+
+    function renderTree() {
+      let html = `<h2>Full menu tree</h2><div class="legend"><span class="ready">Ready</span><span class="wip">WIP</span><span class="stub">Stub</span><span class="not">Not Started</span></div>`;
+      html += `<details open><summary>/config root ${badge("Ready")}</summary>
+        <p class="meta"><strong>Short:</strong> Top-level launcher for 19 config sections plus chrome.</p>
+        <p class="meta long"><strong>Long:</strong> Opening /config (or cfg:nav:home from an inline menu) shows a grid of section tiles. Each tile navigates to cfg:section:* without executing side effects. Root tiles and chrome (Back, Home, Close) are exempt from operator gating. Close dismisses the config message; Home returns here from any depth.</p>
+        <p class="meta currently"><strong>Currently:</strong> All 19 root tiles render and navigate as expected. RLM, Self-Improve, and Second Brain are nested under Advanced (not root). Drill into a section to see which inner buttons are actually pressable.</p>`;
+
+      for (const [id, label] of ROOT_TILES) {
+        const s = SECTIONS[id];
+        html += `<details><summary>${esc(label)} ${badge(s.status)}</summary>
+          <p class="meta"><strong>Short:</strong> ${esc(s.short)}</p>
+          <p class="meta long"><strong>Long:</strong> ${esc(s.long).replace(/\n/g, "<br/>")}</p>`;
+        if (s.currently) {
+          html += `<p class="meta currently"><strong>Currently:</strong> ${esc(s.currently).replace(/\n/g, "<br/>")}</p>`;
+        }
+        for (const b of s.buttons) {
+          html += `<details><summary>${esc(b.label)} ${badge(b.status)}</summary>
+            <p class="meta"><strong>Short:</strong> ${esc(b.short)}</p>
+            <p class="meta long"><strong>Long:</strong> ${esc(b.long).replace(/\n/g, "<br/>")}</p>`;
+          if (b.currently) {
+            html += `<p class="meta currently"><strong>Currently:</strong> ${esc(b.currently).replace(/\n/g, "<br/>")}</p>`;
+          }
+          html += `<p class="meta live-note">${esc(liveNote(b.status))}</p>
+          </details>`;
+        }
+        html += `</details>`;
+      }
+
+      html += `<details><summary>❓ Help ${badge(HELP_SECTION.status)}</summary>
+        <p class="meta"><strong>Short:</strong> ${esc(HELP_SECTION.short)}</p>
+        <p class="meta long"><strong>Long:</strong> ${esc(HELP_SECTION.long).replace(/\n/g, "<br/>")}</p>
+        <p class="meta currently"><strong>Currently:</strong> ${esc(HELP_SECTION.currently)}</p>
+      </details>`;
+
+      html += `<details><summary>Chrome: Back / Home / Close ${badge("Ready")}</summary>
+        <p class="meta"><strong>Short:</strong> Navigation only — never gated.</p>
+        <p class="meta long"><strong>Long:</strong> Back (cfg:nav:back) pops one level on the config stack. Home (cfg:nav:home) jumps to root tiles. Close (cfg:nav:close) removes the config message. These callbacks are exempt from readiness gating and always answer immediately.</p>
+        <p class="meta currently"><strong>Currently:</strong> Works as designed.</p>
+      </details></details>`;
+
+      treeEl.innerHTML = html;
+    }
+
+    renderMock();
+    renderTree();
+  </script>
+</body>
+</html>

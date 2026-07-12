@@ -1,0 +1,47 @@
+title: Tools
+summary: Built-in capabilities the assistant can call during a conversation.
+body: |
+  <p>Tools are native actions registered for each session — search, file access, skill runners, and more. The assistant chooses tools based on your message; you do not invoke them manually unless using slash shortcuts.</p>
+overrides:
+  copy_file: Copy a workspace file or directory tree to a new path.
+  create_folder: Create a workspace directory.
+  delete: Delete a workspace file or directory tree (requires your approval).
+  edit: Replace exactly one unique occurrence of text in a file.
+  file_evolution_issue: File a bug or feature request (saved locally; optional GitHub mirror).
+  file_info: Show size, modification time, type, and permissions for a workspace path.
+  find_file: Find files by exact or partial filename under a workspace folder.
+  get_module_docstring: Read the module-level docstring from a Python file.
+  get_page_content: Fetch a web page and return clean markdown text.
+  get_symbol_docstring: Read the docstring for a class or function in a Python file.
+  glob: Find files under a workspace folder using a name pattern.
+  integration_call: Call a third-party API through the egress proxy (when enabled).
+  list_dir: List files in a workspace directory.
+  list_symbols: List classes and functions in a Python file with line numbers.
+  llm_guard_scan: Check suspicious text for prompt injection or policy issues.
+  load_skill: Load documentation and scripts for a named skill so the assistant can use it.
+  load_tool: Load the full schema and capabilities for another tool.
+  log_query: Read workspace logs with tail offset, line ranges, or a starting line (gateway, proxy, rotated).
+  memory_get: Retrieve the latest stored memory snippet for a session.
+  memory_search: Search across stored memories, daily logs, and MEMORY.md.
+  memory_store: Save a short memory snippet for later recall.
+  message: Send a proactive text message on your active channel.
+  move_file: Move or rename a workspace file or directory.
+  openui_render: Publish agent-authored HTML as a live page or image (with a text fallback if rendering fails).
+  process: Start, stop, list, or read output from background workspace commands.
+  promote_generated_skill: Move a generated skill into your user skills folder and enable it.
+  read: Read a workspace file (with line numbers) or list a directory.
+  read_transcript: Read recent turns from the current conversation transcript.
+  run_skill_runnable: Run a packaged runnable from a skill.
+  run_skill_script: Run a script bundled with an enabled skill.
+  sandbox_exec: Run a command in the isolated sandbox (when enabled).
+  search_in_file: Search file contents in the workspace with a regular expression.
+  send_file: Send a workspace file to you on your active channel.
+  serp: Search the web with DuckDuckGo (no API key required).
+  skill_create: Scaffold a new skill under your workspace generated skills folder.
+  terminal_close: Close a persistent terminal session opened earlier.
+  terminal_run: Run a command in a terminal session or sandbox.
+  terminal_spawn: Open a persistent interactive shell session.
+  tts: Convert text to speech and send audio on your active channel.
+  web_fetch: Make an HTTP request through the egress proxy (method, headers, body).
+  web_search: Search the web for up-to-date information.
+  write: Write or overwrite a workspace file (creates parent folders as needed).

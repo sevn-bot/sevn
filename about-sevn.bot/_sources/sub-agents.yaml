@@ -1,0 +1,44 @@
+title: Sub-agents
+summary: Two-level concurrent agents — tracked role runs (L1) that may spawn workers and specialists (L2), with limits, kill controls, and multi queue mode.
+body: |
+  <p>sevn.bot runs up to <strong>N concurrent level-1 sub-agents per role</strong>
+  (triager, tier B, C, D — default 5 each). Each level-1 run may spawn up to
+  <strong>M level-2 workers</strong> (default 3 per parent). Level 2 cannot spawn
+  further — the depth cap is hard at two levels.</p>
+  <h2>Topology chart</h2>
+  <p>The diagram below is generated deterministically from
+  <code>about-sevn.bot/_sources/subagents-topology.json</code> via
+  <code>make subagents-chart</code>. It shows role nodes, the L1→L2 spawn path,
+  the <code>media_generator</code> specialist example, and the
+  <code>multi</code> queue classifier.</p>
+  <h2>Level 1 — tracked role runs</h2>
+  <p>Every triager and tier B/C/D executor turn registers as a level-1 sub-agent
+  run in the gateway registry. Each run gets a short id (e.g. <code>a1f3</code>),
+  is traced, counts against per-role limits, and is killable from Mission Control,
+  Telegram <code>/config → Sub-agents</code>, or <code>sevn subagents kill</code>.</p>
+  <h2>Level 2 — workers and specialists</h2>
+  <p>Tier B (and C/D where allowed) exposes the <code>spawn_subagent</code> tool.
+  By default it is <strong>fire-and-forget</strong>: the tool returns a run id
+  immediately and announces the result back when the worker finishes. Pass
+  <code>wait: true</code> when a skill needs the artifact inline (bounded by the
+  parent turn's cascade budget).</p>
+  <p>Named <strong>specialists</strong> (first example: <code>media_generator</code>
+  on MiniMax-3) are configured under <code>subagents.specialists</code>. The triager
+  may attach <code>specialist_grants</code> to a tier-B dispatch; tier B may also
+  spawn assigned specialists directly.</p>
+  <h2>Multi queue mode</h2>
+  <p>When <code>gateway.queue_mode</code> (or per-channel <code>busy_input_mode</code>)
+  is <code>multi</code>, a message arriving while a session is busy is classified
+  as <em>related steer</em>, <em>supersede / cancel</em>, or <em>new task</em>.
+  A new task spawns a fresh level-1 tier-B sub-agent on the same session. Classifier
+  timeout or limit exceeded falls back to steer with a one-line operator notice.</p>
+  <h2>Operator surfaces</h2>
+  <ul>
+    <li><a href="mission-control.html">Mission Control</a> — Sub-agents panel: L1/L2 count chips, running table, kill buttons, recent history</li>
+    <li><a href="telegram-menu.html">Telegram settings</a> — Sub-agents section: limits, live counts, Running kill submenu</li>
+    <li><code>sevn subagents list|kill|limits</code> and <code>sevn config subagents</code> on the CLI</li>
+    <li><a href="config.html">Settings</a> — <code>subagents.*</code> and <code>gateway.queue_mode</code> keys</li>
+  </ul>
+  <h2>Further reading</h2>
+  <p>Design spec 36 in the repository docs tree; subsystem README under
+  <code>docs/readmes/</code> for engineers maintaining the gateway and agent packages.</p>

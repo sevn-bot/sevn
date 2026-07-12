@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Troubleshooting — sevn.bot help</title>
+  <link rel="icon" href="assets/logos/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="assets/index.css" />
+  <style>
+    .help-shell { display: grid; grid-template-columns: 220px 1fr; gap: 2rem; max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    @media (max-width: 800px) { .help-shell { grid-template-columns: 1fr; } }
+    .help-nav { position: sticky; top: 1rem; align-self: start; }
+    .help-nav a { display: block; padding: 0.35rem 0; color: var(--sevn-fg-muted); text-decoration: none; font-size: 0.92rem; }
+    .help-nav a:hover, .help-nav a.active { color: var(--sevn-primary); }
+    .help-main h1 { margin-top: 0; font-size: 1.75rem; color: var(--sevn-fg-strong); }
+    .help-summary { color: var(--sevn-fg-muted); font-size: 1.05rem; margin-bottom: 1.5rem; max-width: 60ch; }
+    .help-footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--sevn-border); font-size: 0.78rem; color: var(--sevn-fg-muted); }
+    .help-generated-note { font-size: 0.85rem; color: var(--sevn-fg-muted); font-style: italic; margin-bottom: 1rem; }
+    .help-body p { line-height: 1.6; max-width: 65ch; }
+    .help-body ul, .help-body ol { max-width: 65ch; line-height: 1.6; }
+    .help-body a { color: var(--sevn-primary); }
+    .catalog-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 1rem 0; }
+    .catalog-table th, .catalog-table td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--sevn-border); vertical-align: top; }
+    .catalog-table th { color: var(--sevn-fg-muted); font-weight: 600; }
+    .badge { display: inline-block; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; }
+    .badge-available { background: #1b3d1f; color: #81c784; }
+    .badge-soon { background: #4a3410; color: #ffb74d; }
+    .badge-unavailable { background: #333; color: #bbb; }
+  </style>
+</head>
+<body>
+  <div class="help-shell">
+    <nav class="help-nav" aria-label="Help pages">
+      <strong style="display:block;margin-bottom:0.75rem;color:var(--sevn-fg-strong);">sevn.bot help</strong>
+      <a href="index.html">Home</a>
+      <a href="getting-started.html">Getting started</a>
+      <a href="mission-control.html">Mission Control</a>
+      <a href="telegram-menu.html">Telegram settings</a>
+      <a href="tools.html">Tools</a>
+      <a href="skills.html">Skills</a>
+      <a href="config.html">Settings</a>
+      <a href="troubleshooting.html" class="active">Troubleshooting</a>
+      <a href="agent-context.html">Agent context</a>
+    </nav>
+    <main class="help-main">
+      <h1>Troubleshooting</h1>
+<p class="help-summary">Common problems and what to try first.</p><div class="help-body"><h2>Bot does not respond in Telegram</h2>
+<ul>
+  <li>Confirm the gateway is running: <code>sevn doctor</code> should report green checks.</li>
+  <li>Verify your bot token is stored correctly and Telegram channel is enabled in config.</li>
+  <li>Check gateway logs in your workspace <code>logs/</code> directory.</li>
+</ul>
+<h2>Model errors or empty replies</h2>
+<ul>
+  <li>Confirm your API key or subscription auth is set in secrets and the egress proxy is running.</li>
+  <li>Run <code>sevn config validate</code> to catch schema issues.</li>
+  <li>Try a different model in Mission Control or <code>sevn.json</code>.</li>
+</ul>
+<h2>Web UI will not load</h2>
+<ul>
+  <li>Ensure you are using the URL and port from onboarding (default <code>http://127.0.0.1:3001</code>).</li>
+  <li>If behind a tunnel, confirm <code>gateway.proxy_headers</code> matches your reverse proxy setup.</li>
+</ul>
+<h2>Settings button does nothing in Telegram</h2>
+<p>Some menu buttons are visible but marked coming soon — see the <a href="telegram-menu.html">settings preview</a> for current availability. Buttons marked Available should respond immediately.</p>
+<h2>Still stuck?</h2>
+<p>Run <code>sevn doctor --json</code> and share the output (redact secrets) when asking for help in the community channels.</p>
+</div>
+      <footer class="help-footer">
+        Generated 2026-07-12 from commit a1d5b1f.
+        Edit <code>about-sevn.bot/_sources/troubleshooting.yaml</code> or templates — not the HTML directly.
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

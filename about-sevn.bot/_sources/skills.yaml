@@ -1,0 +1,14 @@
+title: Skills
+summary: Optional packages that add scripts and workflows the assistant can run.
+body: |
+  <p>Skills bundle scripts and instructions for specific tasks — email, browser automation, GitHub, memory search, and more. Enable skills in Mission Control or your workspace config; the assistant loads them with <code>load_skill</code> when relevant.</p>
+overrides:
+  lcm: Search and recall conversation history without losing detail.
+  email-management: Search and send email through configured accounts.
+  playwright-browser: Automate web pages in a controlled browser session.
+  github-manager: Work with repositories, branches, and CI from chat.
+  last30days: Multi-source social research for the last 30 days (Reddit, X, YouTube, HN, Polymarket).
+  mycode: Scan and orient within a codebase checkout.
+  scheduling: Add and manage scheduled reminders and cron-style jobs.
+  second_brain: Ingest notes and files into your knowledge base.
+  pdf: Extract text and metadata from PDF documents.

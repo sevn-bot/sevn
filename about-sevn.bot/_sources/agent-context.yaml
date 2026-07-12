@@ -1,0 +1,9 @@
+title: Agent context
+summary: >
+  Ordered diagrams of what each LLM agent receives on a turn — system prompts,
+  instructions, history, tools, and tier C/D phase JSON. Generated from the
+  agent-context manifest when the product changes.
+body: |
+  <p>Each gateway turn may invoke one or more LLM agents. The graphs below show
+  <strong>wire order</strong> and <strong>content type</strong> for every slot.
+  An example turn panel shows real char counts from a deployed trace (operator text redacted).</p>

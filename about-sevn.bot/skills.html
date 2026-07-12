@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Skills — sevn.bot help</title>
+  <link rel="icon" href="assets/logos/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="assets/index.css" />
+  <style>
+    .help-shell { display: grid; grid-template-columns: 220px 1fr; gap: 2rem; max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    @media (max-width: 800px) { .help-shell { grid-template-columns: 1fr; } }
+    .help-nav { position: sticky; top: 1rem; align-self: start; }
+    .help-nav a { display: block; padding: 0.35rem 0; color: var(--sevn-fg-muted); text-decoration: none; font-size: 0.92rem; }
+    .help-nav a:hover, .help-nav a.active { color: var(--sevn-primary); }
+    .help-main h1 { margin-top: 0; font-size: 1.75rem; color: var(--sevn-fg-strong); }
+    .help-summary { color: var(--sevn-fg-muted); font-size: 1.05rem; margin-bottom: 1.5rem; max-width: 60ch; }
+    .help-footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--sevn-border); font-size: 0.78rem; color: var(--sevn-fg-muted); }
+    .help-generated-note { font-size: 0.85rem; color: var(--sevn-fg-muted); font-style: italic; margin-bottom: 1rem; }
+    .help-body p { line-height: 1.6; max-width: 65ch; }
+    .help-body ul, .help-body ol { max-width: 65ch; line-height: 1.6; }
+    .help-body a { color: var(--sevn-primary); }
+    .catalog-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 1rem 0; }
+    .catalog-table th, .catalog-table td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--sevn-border); vertical-align: top; }
+    .catalog-table th { color: var(--sevn-fg-muted); font-weight: 600; }
+    .badge { display: inline-block; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; }
+    .badge-available { background: #1b3d1f; color: #81c784; }
+    .badge-soon { background: #4a3410; color: #ffb74d; }
+    .badge-unavailable { background: #333; color: #bbb; }
+  </style>
+</head>
+<body>
+  <div class="help-shell">
+    <nav class="help-nav" aria-label="Help pages">
+      <strong style="display:block;margin-bottom:0.75rem;color:var(--sevn-fg-strong);">sevn.bot help</strong>
+      <a href="index.html">Home</a>
+      <a href="getting-started.html">Getting started</a>
+      <a href="mission-control.html">Mission Control</a>
+      <a href="telegram-menu.html">Telegram settings</a>
+      <a href="tools.html">Tools</a>
+      <a href="skills.html" class="active">Skills</a>
+      <a href="config.html">Settings</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <a href="agent-context.html">Agent context</a>
+    </nav>
+    <main class="help-main">
+      <h1>Skills</h1>
+<p class="help-summary">Optional packages that add scripts and workflows the assistant can run.</p>      <p class="help-generated-note">This page is updated automatically when the product changes.</p>
+<div class="help-body"><p>Skills bundle scripts and instructions for specific tasks — email, browser automation, GitHub, memory search, and more. Enable skills in Mission Control or your workspace config; the assistant loads them with <code>load_skill</code> when relevant.</p>
+</div>
+<table class="catalog-table">
+  <thead><tr><th>Skill</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>browser-harness</code></td>
+      <td>Thin CDP harness with extendable helpers.py for open-ended browser control.</td>
+    </tr>
+    <tr>
+      <td><code>canvas</code></td>
+      <td>Cursor Canvas and rich analytical layouts via OpenUI compose helpers .</td>
+    </tr>
+    <tr>
+      <td><code>code_graph_rag</code></td>
+      <td>CGR export reader + allowlisted cgr CLI .</td>
+    </tr>
+    <tr>
+      <td><code>computer-use</code></td>
+      <td>Drive a computer via trycua/cua — host cua-driver MCP passthrough plus sandbox providers (docker/cloud/lume) through the cua CLI; opt-in; macOS-only</td>
+    </tr>
+    <tr>
+      <td><code>conventional_commit</code></td>
+      <td>Draft git commit messages using Conventional Commits 1.0.0. Use when the operator asks to commit, record changes in git, or before running git commit after editing code (including the sevn.bot checkout).</td>
+    </tr>
+    <tr>
+      <td><code>cua-agent</code></td>
+      <td>Autonomous GUI loop via cua-agent — model drives the screen toward a goal; requires computer-use enabled and explicit per-run operator approval (HITL).</td>
+    </tr>
+    <tr>
+      <td><code>cursor_cloud</code></td>
+      <td>Delegate code+PR work to Cursor Cloud Agent; returns PR, dashboard, and artifact links.</td>
+    </tr>
+    <tr>
+      <td><code>email-management</code></td>
+      <td>Search and send email through configured accounts.</td>
+    </tr>
+    <tr>
+      <td><code>facebook-use</code></td>
+      <td>Facebook workflows via a logged-in browser profile or CDP attach (feed read, search).</td>
+    </tr>
+    <tr>
+      <td><code>gh-issues</code></td>
+      <td>GitHub issue lifecycle — list, view, create, comment via integration_call.</td>
+    </tr>
+    <tr>
+      <td><code>gh-pr</code></td>
+      <td>Pull request lifecycle — list, view, create, merge, close, reviewers via integration_call.</td>
+    </tr>
+    <tr>
+      <td><code>github-manager</code></td>
+      <td>Work with repositories, branches, and CI from chat.</td>
+    </tr>
+    <tr>
+      <td><code>graphify</code></td>
+      <td>Knowledge-graph orientation for code .</td>
+    </tr>
+    <tr>
+      <td><code>job-ops</code></td>
+      <td>Discover jobs across global + Europe boards, AI fit-score them against your resume, and optionally tailor a CV summary.</td>
+    </tr>
+    <tr>
+      <td><code>kokoro-tts</code></td>
+      <td>Local Kokoro ONNX text-to-speech engine backing the voice TTS pipeline (kokoro backend). Not a model-facing research skill.</td>
+    </tr>
+    <tr>
+      <td><code>last30days</code></td>
+      <td>Multi-source social research for the last 30 days (Reddit, X, YouTube, HN, Polymarket).</td>
+    </tr>
+    <tr>
+      <td><code>lcm</code></td>
+      <td>Search and recall conversation history without losing detail.</td>
+    </tr>
+    <tr>
+      <td><code>linkedin-use</code></td>
+      <td>LinkedIn staff/company/connection scraping via logged-in browser + Voyager API (StaffSpy port).</td>
+    </tr>
+    <tr>
+      <td><code>lume</code></td>
+      <td>Apple-Silicon VM lifecycle via the lume CLI (run/stop/ls/pull); opt-in; also a computer-use sandbox target via `cua do switch lume`</td>
+    </tr>
+    <tr>
+      <td><code>mycode</code></td>
+      <td>Scan and orient within a codebase checkout.</td>
+    </tr>
+    <tr>
+      <td><code>openwiki</code></td>
+      <td>LLM-generated agent wiki for a codebase (LangChain OpenWiki CLI).</td>
+    </tr>
+    <tr>
+      <td><code>pdf</code></td>
+      <td>Extract text and metadata from PDF documents.</td>
+    </tr>
+    <tr>
+      <td><code>playwright-browser</code></td>
+      <td>Automate web pages in a controlled browser session.</td>
+    </tr>
+    <tr>
+      <td><code>printing-press-library</code></td>
+      <td>Starter-pack Printing Press CLIs — ESPN, flights, movies, recipes (Go binaries on PATH).</td>
+    </tr>
+    <tr>
+      <td><code>roam_code</code></td>
+      <td>Lightweight roam-code path Q&amp;A .</td>
+    </tr>
+    <tr>
+      <td><code>scheduling</code></td>
+      <td>Add and manage scheduled reminders and cron-style jobs.</td>
+    </tr>
+    <tr>
+      <td><code>second_brain</code></td>
+      <td>Ingest notes and files into your knowledge base.</td>
+    </tr>
+    <tr>
+      <td><code>sessions_management</code></td>
+      <td>Gateway sessions, history, send, spawn, yield, and status .</td>
+    </tr>
+    <tr>
+      <td><code>sevn-diagnostics</code></td>
+      <td>sevn.bot operator repair playbooks for `sevn doctor --with-agent`: gateway token, secrets store unlock, proxy health, model auth, browser/CDP, and voice backends. Uses the bundled solutions catalog — do not duplicate remediation text here.</td>
+    </tr>
+    <tr>
+      <td><code>skill_management</code></td>
+      <td>Authoring workflows for generated skills; pairs with native skill_create and promote_generated_skill .</td>
+    </tr>
+    <tr>
+      <td><code>telegram</code></td>
+      <td>Telegram inline custom buttons and forum supergroup helpers (Bot API + allowlist/userbot hooks).</td>
+    </tr>
+    <tr>
+      <td><code>telegram_test</code></td>
+      <td>Run host-side Playwright Telegram E2E (sevn telegram-test) while building sevn.bot. Use after gateway/menu/session/diagnostics changes. Not in gateway container.</td>
+    </tr>
+    <tr>
+      <td><code>x-use</code></td>
+      <td>X (Twitter) workflows via a logged-in browser profile or CDP attach (timeline, search).</td>
+    </tr>
+    <tr>
+      <td><code>yt-dlp</code></td>
+      <td>Download video/audio and metadata with yt-dlp (YouTube, Vimeo, X, TikTok, and allowlisted hosts).</td>
+    </tr>
+  </tbody>
+</table>
+      <footer class="help-footer">
+        Generated 2026-07-12 from commit a1d5b1f.
+        Edit <code>about-sevn.bot/_sources/skills.yaml</code> or templates — not the HTML directly.
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

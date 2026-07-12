@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sub-agents — sevn.bot help</title>
+  <link rel="icon" href="assets/logos/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="assets/index.css" />
+  <style>
+    .help-shell { display: grid; grid-template-columns: 220px 1fr; gap: 2rem; max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    @media (max-width: 800px) { .help-shell { grid-template-columns: 1fr; } }
+    .help-nav { position: sticky; top: 1rem; align-self: start; }
+    .help-nav a { display: block; padding: 0.35rem 0; color: var(--sevn-fg-muted); text-decoration: none; font-size: 0.92rem; }
+    .help-nav a:hover, .help-nav a.active { color: var(--sevn-primary); }
+    .help-main h1 { margin-top: 0; font-size: 1.75rem; color: var(--sevn-fg-strong); }
+    .help-summary { color: var(--sevn-fg-muted); font-size: 1.05rem; margin-bottom: 1.5rem; max-width: 60ch; }
+    .help-footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--sevn-border); font-size: 0.78rem; color: var(--sevn-fg-muted); }
+    .help-generated-note { font-size: 0.85rem; color: var(--sevn-fg-muted); font-style: italic; margin-bottom: 1rem; }
+    .help-body p { line-height: 1.6; max-width: 65ch; }
+    .help-body ul, .help-body ol { max-width: 65ch; line-height: 1.6; }
+    .help-body a { color: var(--sevn-primary); }
+    .catalog-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 1rem 0; }
+    .catalog-table th, .catalog-table td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--sevn-border); vertical-align: top; }
+    .catalog-table th { color: var(--sevn-fg-muted); font-weight: 600; }
+    .badge { display: inline-block; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; }
+    .badge-available { background: #1b3d1f; color: #81c784; }
+    .badge-soon { background: #4a3410; color: #ffb74d; }
+    .badge-unavailable { background: #333; color: #bbb; }
+  </style>
+  <style>
+    .subagents-chart-wrap { max-width: 100%; overflow-x: auto; margin: 1.25rem 0 2rem; border: 1px solid var(--sevn-border); border-radius: 8px; padding: 0.75rem; background: #12151a; }
+    .subagents-chart-wrap img, .subagents-chart-wrap object { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <div class="help-shell">
+    <nav class="help-nav" aria-label="Help pages">
+      <strong style="display:block;margin-bottom:0.75rem;color:var(--sevn-fg-strong);">sevn.bot help</strong>
+      <a href="index.html">Home</a>
+      <a href="getting-started.html">Getting started</a>
+      <a href="mission-control.html">Mission Control</a>
+      <a href="sub-agents.html" class="active">Sub-agents</a>
+      <a href="telegram-menu.html">Telegram settings</a>
+      <a href="tools.html">Tools</a>
+      <a href="skills.html">Skills</a>
+      <a href="config.html">Settings</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <a href="agent-context.html">Agent context</a>
+    </nav>
+    <main class="help-main">
+      <h1>Sub-agents</h1>
+<p class="help-summary">Two-level concurrent agents — tracked role runs (L1) that may spawn workers and specialists (L2), with limits, kill controls, and multi queue mode.</p><div class="help-body">
+  <p>sevn.bot runs up to <strong>N concurrent level-1 sub-agents per role</strong>
+(triager, tier B, C, D — default 5 each). Each level-1 run may spawn up to
+<strong>M level-2 workers</strong> (default 3 per parent). Level 2 cannot spawn
+further — the depth cap is hard at two levels.</p>
+<h2>Topology chart</h2>
+<p>The diagram below is generated deterministically from
+<code>about-sevn.bot/_sources/subagents-topology.json</code> via
+<code>make subagents-chart</code>. It shows role nodes, the L1→L2 spawn path,
+the <code>media_generator</code> specialist example, and the
+<code>multi</code> queue classifier.</p>
+<h2>Level 1 — tracked role runs</h2>
+<p>Every triager and tier B/C/D executor turn registers as a level-1 sub-agent
+run in the gateway registry. Each run gets a short id (e.g. <code>a1f3</code>),
+is traced, counts against per-role limits, and is killable from Mission Control,
+Telegram <code>/config → Sub-agents</code>, or <code>sevn subagents kill</code>.</p>
+<h2>Level 2 — workers and specialists</h2>
+<p>Tier B (and C/D where allowed) exposes the <code>spawn_subagent</code> tool.
+By default it is <strong>fire-and-forget</strong>: the tool returns a run id
+immediately and announces the result back when the worker finishes. Pass
+<code>wait: true</code> when a skill needs the artifact inline (bounded by the
+parent turn's cascade budget).</p>
+<p>Named <strong>specialists</strong> (first example: <code>media_generator</code>
+on MiniMax-3) are configured under <code>subagents.specialists</code>. The triager
+may attach <code>specialist_grants</code> to a tier-B dispatch; tier B may also
+spawn assigned specialists directly.</p>
+<h2>Multi queue mode</h2>
+<p>When <code>gateway.queue_mode</code> (or per-channel <code>busy_input_mode</code>)
+is <code>multi</code>, a message arriving while a session is busy is classified
+as <em>related steer</em>, <em>supersede / cancel</em>, or <em>new task</em>.
+A new task spawns a fresh level-1 tier-B sub-agent on the same session. Classifier
+timeout or limit exceeded falls back to steer with a one-line operator notice.</p>
+<h2>Operator surfaces</h2>
+<ul>
+  <li><a href="mission-control.html">Mission Control</a> — Sub-agents panel: L1/L2 count chips, running table, kill buttons, recent history</li>
+  <li><a href="telegram-menu.html">Telegram settings</a> — Sub-agents section: limits, live counts, Running kill submenu</li>
+  <li><code>sevn subagents list|kill|limits</code> and <code>sevn config subagents</code> on the CLI</li>
+  <li><a href="config.html">Settings</a> — <code>subagents.*</code> and <code>gateway.queue_mode</code> keys</li>
+</ul>
+<h2>Further reading</h2>
+<p>Design spec 36 in the repository docs tree; subsystem README under
+<code>docs/readmes/</code> for engineers maintaining the gateway and agent packages.</p>
+
+  <div class="subagents-chart-wrap" aria-label="Sub-agents topology chart">
+    <object data="assets/subagents-chart.svg" type="image/svg+xml" width="800" height="480">
+      <img src="assets/subagents-chart.svg" alt="Sub-agents topology: L1 roles, L2 workers, multi queue classifier, and kill surfaces" width="800" height="480" />
+    </object>
+  </div>
+</div>
+      <footer class="help-footer">
+        Generated 2026-07-11 from commit c89351d.
+        Edit <code>about-sevn.bot/_sources/sub-agents.yaml</code> or templates — not the HTML directly.
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

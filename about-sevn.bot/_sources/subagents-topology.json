@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "title": "sevn.bot sub-agents topology",
+  "defaults": {
+    "max_level1_default": 5,
+    "max_level2_default": 3,
+    "max_override": null
+  },
+  "roles": [
+    {"id": "triager", "label": "Triager", "level": 1},
+    {"id": "tier_b", "label": "Tier B", "level": 1},
+    {"id": "tier_c", "label": "Tier C", "level": 1},
+    {"id": "tier_d", "label": "Tier D", "level": 1}
+  ],
+  "specialists": [
+    {
+      "id": "media_generator",
+      "label": "media_generator",
+      "provider": "minimax",
+      "model": "minimax-3",
+      "assigned_to": ["tier_b"],
+      "requestable_by": ["triager", "tier_b"],
+      "max_concurrent": 2,
+      "skill": "media_generation"
+    }
+  ],
+  "nodes": [
+    {"id": "gateway", "label": "Gateway / Session", "kind": "hub", "x": 400, "y": 40},
+    {"id": "registry", "label": "SubAgentRegistry", "kind": "service", "x": 400, "y": 420},
+    {"id": "supervisor", "label": "SubAgentSupervisor", "kind": "service", "x": 640, "y": 420},
+    {"id": "l2_generic", "label": "L2 worker", "kind": "worker", "x": 200, "y": 300},
+    {"id": "multi_classifier", "label": "Relatedness classifier", "kind": "decision", "x": 640, "y": 160}
+  ],
+  "edges": [
+    {"from": "gateway", "to": "triager", "label": "L1 register"},
+    {"from": "gateway", "to": "tier_b", "label": "L1 register"},
+    {"from": "gateway", "to": "tier_c", "label": "L1 register"},
+    {"from": "gateway", "to": "tier_d", "label": "L1 register"},
+    {"from": "tier_b", "to": "l2_generic", "label": "spawn_subagent"},
+    {"from": "tier_b", "to": "media_generator", "label": "spawn specialist"},
+    {"from": "triager", "to": "tier_b", "label": "specialist_grants"},
+    {"from": "gateway", "to": "multi_classifier", "label": "queue_mode multi"},
+    {"from": "multi_classifier", "to": "tier_b", "label": "new_task"},
+    {"from": "supervisor", "to": "registry", "label": "persist"},
+    {"from": "registry", "to": "gateway", "label": "counts / kill"}
+  ],
+  "multi_queue": {
+    "labels": ["related_steer", "supersede_cancel", "new_task"],
+    "fallback": "steer"
+  },
+  "surfaces": [
+    {"id": "mission_control", "label": "Mission Control"},
+    {"id": "telegram_config", "label": "Telegram /config"},
+    {"id": "cli", "label": "sevn subagents"}
+  ]
+}

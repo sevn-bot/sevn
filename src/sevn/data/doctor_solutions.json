@@ -485,6 +485,19 @@
       "severity": "warn",
       "title": "SQLite WAL"
     },
+    "subagents_registry": {
+      "auto_fixable": false,
+      "docs_url": "specs/36-sub-agents.md",
+      "explanation": "Sub-agent registry storage probe failed or orphaned runs remain after a crash.",
+      "fix_command": null,
+      "remediation": [
+        "Restart the gateway so the boot orphan sweep reconciles stale running rows.",
+        "Inspect `subagent_runs` in sevn.db when orphaned_runs stays non-zero.",
+        "Use `sevn subagents list --all` or Mission Control Sub-agents panel for live status."
+      ],
+      "severity": "warn",
+      "title": "Sub-agents storage"
+    },
     "telegram_probe": {
       "agent_only": true,
       "auto_fixable": false,

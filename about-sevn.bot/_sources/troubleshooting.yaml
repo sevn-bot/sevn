@@ -1,0 +1,24 @@
+title: Troubleshooting
+summary: Common problems and what to try first.
+body: |
+  <h2>Bot does not respond in Telegram</h2>
+  <ul>
+    <li>Confirm the gateway is running: <code>sevn doctor</code> should report green checks.</li>
+    <li>Verify your bot token is stored correctly and Telegram channel is enabled in config.</li>
+    <li>Check gateway logs in your workspace <code>logs/</code> directory.</li>
+  </ul>
+  <h2>Model errors or empty replies</h2>
+  <ul>
+    <li>Confirm your API key or subscription auth is set in secrets and the egress proxy is running.</li>
+    <li>Run <code>sevn config validate</code> to catch schema issues.</li>
+    <li>Try a different model in Mission Control or <code>sevn.json</code>.</li>
+  </ul>
+  <h2>Web UI will not load</h2>
+  <ul>
+    <li>Ensure you are using the URL and port from onboarding (default <code>http://127.0.0.1:3001</code>).</li>
+    <li>If behind a tunnel, confirm <code>gateway.proxy_headers</code> matches your reverse proxy setup.</li>
+  </ul>
+  <h2>Settings button does nothing in Telegram</h2>
+  <p>Some menu buttons are visible but marked coming soon — see the <a href="telegram-menu.html">settings preview</a> for current availability. Buttons marked Available should respond immediately.</p>
+  <h2>Still stuck?</h2>
+  <p>Run <code>sevn doctor --json</code> and share the output (redact secrets) when asking for help in the community channels.</p>

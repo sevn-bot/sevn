@@ -1,0 +1,6 @@
+ref=main
+synced=2026-06-15T08:00:00Z
+espn_go_module=github.com/mvanhorn/printing-press-library/library/media-and-entertainment/espn/cmd/espn-pp-cli
+flight_goat_go_module=github.com/mvanhorn/printing-press-library/library/travel/flight-goat/cmd/flight-goat-pp-cli
+movie_goat_go_module=github.com/mvanhorn/printing-press-library/library/media-and-entertainment/movie-goat/cmd/movie-goat-pp-cli
+recipe_goat_go_module=github.com/mvanhorn/printing-press-library/library/food-and-dining/recipe-goat/cmd/recipe-goat-pp-cli

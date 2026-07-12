@@ -1,0 +1,15 @@
+{% extends "base.html.j2" %}
+{% block content %}
+<div class="help-body">{{ body_html | safe }}</div>
+<table class="catalog-table">
+  <thead><tr><th>Setting</th><th>Description</th></tr></thead>
+  <tbody>
+  {% for field in config_fields %}
+    <tr>
+      <td><strong>{{ field.title }}</strong><br><code>{{ field.path }}</code></td>
+      <td>{{ field.description }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

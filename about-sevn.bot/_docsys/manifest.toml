@@ -1,0 +1,575 @@
+version = 1
+
+[[entry]]
+id = "prd-00-main"
+kind = "prd"
+title = "sevn.bot — Umbrella PRD"
+status = "ready"
+old_path = "prd/00-main.md"
+new_path = "about-sevn.bot/prd/00-main.md"
+sources = []
+
+[[entry]]
+id = "prd-01-conversational-experience"
+kind = "prd"
+title = "Conversational Experience — PRD"
+status = "ready"
+old_path = "prd/01-conversational-experience.md"
+new_path = "about-sevn.bot/prd/01-conversational-experience.md"
+sources = ["src/sevn/gateway/**", "src/sevn/channels/**"]
+parent_prd = "prd-00-main"
+specs = ["spec-17-gateway", "spec-18-channel-telegram", "spec-19-channel-webui", "spec-20-voice", "spec-29-openui"]
+
+[[entry]]
+id = "prd-02-personality-and-memory"
+kind = "prd"
+title = "Personality & Memory — PRD"
+status = "ready"
+old_path = "prd/02-personality-and-memory.md"
+new_path = "about-sevn.bot/prd/02-personality-and-memory.md"
+sources = ["src/sevn/lcm/**"]
+parent_prd = "prd-00-main"
+specs = ["spec-15-memory-lcm", "spec-31-memory-dreaming", "spec-32-memory-honcho", "spec-17-gateway", "spec-18-channel-telegram", "spec-19-channel-webui", "spec-20-voice", "spec-21-executor-tier-cd", "spec-29-openui"]
+
+[[entry]]
+id = "prd-03-trust-and-control"
+kind = "prd"
+title = "Trust & Control — PRD"
+status = "ready"
+old_path = "prd/03-trust-and-control.md"
+new_path = "about-sevn.bot/prd/03-trust-and-control.md"
+sources = ["src/sevn/security/**", "src/sevn/secrets/**"]
+parent_prd = "prd-00-main"
+specs = ["spec-06-secrets", "spec-07-egress-proxy", "spec-08-sandbox", "spec-09-security-scanner", "spec-17-gateway", "spec-18-channel-telegram", "spec-19-channel-webui", "spec-20-voice", "spec-29-openui"]
+
+[[entry]]
+id = "prd-04-getting-things-done"
+kind = "prd"
+title = "Getting Things Done — PRD"
+status = "ready"
+old_path = "prd/04-getting-things-done.md"
+new_path = "about-sevn.bot/prd/04-getting-things-done.md"
+sources = ["src/sevn/agent/**", "src/sevn/tools/**"]
+parent_prd = "prd-00-main"
+specs = ["spec-10-schema-ontology", "spec-11-tools-registry", "spec-12-skills-system", "spec-13-rlm-triager", "spec-14-executor-tier-b", "spec-16-harness-discipline", "spec-21-executor-tier-cd", "spec-17-gateway", "spec-18-channel-telegram", "spec-19-channel-webui", "spec-20-voice", "spec-29-openui", "spec-36-sub-agents"]
+
+[[entry]]
+id = "prd-05-cost-and-providers"
+kind = "prd"
+title = "Cost & Providers — PRD"
+status = "ready"
+old_path = "prd/05-cost-and-providers.md"
+new_path = "about-sevn.bot/prd/05-cost-and-providers.md"
+sources = ["src/sevn/proxy/**", "src/sevn/voice/**"]
+parent_prd = "prd-00-main"
+specs = ["spec-05-llm-transports", "spec-06-secrets", "spec-07-egress-proxy", "spec-20-voice"]
+
+[[entry]]
+id = "prd-06-setup-and-operations"
+kind = "prd"
+title = "Setup & Operations — PRD"
+status = "ready"
+old_path = "prd/06-setup-and-operations.md"
+new_path = "about-sevn.bot/prd/06-setup-and-operations.md"
+sources = ["src/sevn/config/**", "src/sevn/cli/**"]
+parent_prd = "prd-00-main"
+specs = ["spec-02-config-and-workspace", "spec-07-egress-proxy", "spec-22-onboarding", "spec-23-cli", "spec-24-dashboard", "spec-25-cicd-full"]
+
+[[entry]]
+id = "prd-07-mission-control"
+kind = "prd"
+title = "Mission Control — PRD"
+status = "ready"
+old_path = "prd/07-mission-control.md"
+new_path = "about-sevn.bot/prd/07-mission-control.md"
+sources = ["src/sevn/ui/**"]
+parent_prd = "prd-00-main"
+specs = ["spec-04-tracing", "spec-07-egress-proxy", "spec-24-dashboard", "spec-35-bot-evolution"]
+
+[[entry]]
+id = "prd-08-coding-companion"
+kind = "prd"
+title = "Coding Companion — PRD"
+status = "ready"
+old_path = "prd/08-coding-companion.md"
+new_path = "about-sevn.bot/prd/08-coding-companion.md"
+sources = ["src/sevn/code_understanding/**"]
+parent_prd = "prd-00-main"
+specs = ["spec-21-executor-tier-cd", "spec-26-claude-agent", "spec-28-code-understanding"]
+
+[[entry]]
+id = "prd-09-knowledge-base"
+kind = "prd"
+title = "Knowledge Base — PRD"
+status = "ready"
+old_path = "prd/09-knowledge-base.md"
+new_path = "about-sevn.bot/prd/09-knowledge-base.md"
+sources = ["src/sevn/second_brain/**"]
+parent_prd = "prd-00-main"
+specs = ["spec-27-second-brain"]
+
+[[entry]]
+id = "prd-10-generated-ui"
+kind = "prd"
+title = "Generated UI — PRD"
+status = "ready"
+old_path = "prd/10-generated-ui.md"
+new_path = "about-sevn.bot/prd/10-generated-ui.md"
+sources = ["src/sevn/ui/openui/**"]
+parent_prd = "prd-00-main"
+specs = ["spec-29-openui", "spec-17-gateway", "spec-18-channel-telegram", "spec-19-channel-webui", "spec-20-voice", "spec-21-executor-tier-cd"]
+
+[[entry]]
+id = "prd-11-automation-and-triggers"
+kind = "prd"
+title = "Automation and Triggers — PRD"
+status = "ready"
+old_path = "prd/11-automation-and-triggers.md"
+new_path = "about-sevn.bot/prd/11-automation-and-triggers.md"
+sources = ["src/sevn/triggers/**"]
+parent_prd = "prd-00-main"
+specs = ["spec-30-non-interactive-triggers", "spec-17-gateway", "spec-18-channel-telegram", "spec-19-channel-webui", "spec-20-voice", "spec-21-executor-tier-cd"]
+
+[[entry]]
+id = "prd-12-self-improvement"
+kind = "prd"
+title = "Self-Improvement — PRD"
+status = "ready"
+old_path = "prd/12-self-improvement.md"
+new_path = "about-sevn.bot/prd/12-self-improvement.md"
+sources = ["src/sevn/self_improve/**"]
+parent_prd = "prd-00-main"
+specs = ["spec-33-self-improvement", "spec-17-gateway", "spec-24-dashboard", "spec-19-channel-webui", "spec-18-channel-telegram", "spec-20-voice", "spec-21-executor-tier-cd", "spec-04-tracing"]
+
+[[entry]]
+id = "prd-13-extensibility"
+kind = "prd"
+title = "Extensibility — PRD"
+status = "ready"
+old_path = "prd/13-extensibility.md"
+new_path = "about-sevn.bot/prd/13-extensibility.md"
+sources = ["src/sevn/plugins/**", "src/sevn/skills/**"]
+parent_prd = "prd-00-main"
+specs = ["spec-34-plugin-hooks", "spec-11-tools-registry", "spec-12-skills-system", "spec-01-system-overview", "spec-17-gateway", "spec-18-channel-telegram", "spec-19-channel-webui", "spec-20-voice", "spec-21-executor-tier-cd", "spec-30-non-interactive-triggers"]
+
+[[entry]]
+id = "prd-14-live-session-failures-and-fixes"
+kind = "prd"
+title = "Live-session failures & fixes — PRD"
+status = "draft"
+old_path = "prd/14-live-session-failures-and-fixes.md"
+new_path = "about-sevn.bot/prd/14-live-session-failures-and-fixes.md"
+sources = []
+parent_prd = "prd-00-main"
+
+[[entry]]
+id = "spec-01-system-overview"
+kind = "spec"
+title = "System overview — Spec"
+status = "done"
+old_path = "specs/01-system-overview.md"
+new_path = "about-sevn.bot/specs/01-system-overview.md"
+sources = ["src/sevn/**"]
+parent_prd = "prd-00-main"
+depends_on = ["spec-00-foundation"]
+
+[[entry]]
+id = "spec-00-foundation"
+kind = "spec"
+title = "Foundation — Spec"
+status = "done"
+old_path = "specs/00-foundation.md"
+new_path = "about-sevn.bot/specs/00-foundation.md"
+sources = ["src/sevn/**"]
+
+[[entry]]
+id = "spec-02-config-and-workspace"
+kind = "spec"
+title = "Config and workspace — Spec"
+status = "done"
+old_path = "specs/02-config-and-workspace.md"
+new_path = "about-sevn.bot/specs/02-config-and-workspace.md"
+sources = ["src/sevn/config/**"]
+parent_prd = "prd-06-setup-and-operations"
+depends_on = ["spec-00-foundation"]
+
+[[entry]]
+id = "spec-03-storage"
+kind = "spec"
+title = "Storage — Spec"
+status = "done"
+old_path = "specs/03-storage.md"
+new_path = "about-sevn.bot/specs/03-storage.md"
+sources = ["src/sevn/storage/**"]
+parent_prd = "prd-02-personality-and-memory"
+depends_on = ["spec-00-foundation", "spec-01-system-overview", "spec-02-config-and-workspace"]
+
+[[entry]]
+id = "spec-04-tracing"
+kind = "spec"
+title = "Tracing — Spec"
+status = "done"
+old_path = "specs/04-tracing.md"
+new_path = "about-sevn.bot/specs/04-tracing.md"
+sources = ["src/sevn/tracing/**"]
+parent_prd = "prd-07-mission-control"
+depends_on = ["spec-00-foundation", "spec-01-system-overview", "spec-02-config-and-workspace", "spec-03-storage"]
+
+[[entry]]
+id = "spec-05-llm-transports"
+kind = "spec"
+title = "LLM transports — Spec"
+status = "done"
+old_path = "specs/05-llm-transports.md"
+new_path = "about-sevn.bot/specs/05-llm-transports.md"
+sources = ["src/sevn/proxy/**"]
+parent_prd = "prd-05-cost-and-providers"
+depends_on = ["spec-00-foundation", "spec-02-config-and-workspace"]
+
+[[entry]]
+id = "spec-06-secrets"
+kind = "spec"
+title = "Secrets — Spec"
+status = "done"
+old_path = "specs/06-secrets.md"
+new_path = "about-sevn.bot/specs/06-secrets.md"
+sources = ["src/sevn/secrets/**"]
+parent_prd = "prd-03-trust-and-control"
+depends_on = ["spec-00-foundation", "spec-02-config-and-workspace"]
+
+[[entry]]
+id = "spec-07-egress-proxy"
+kind = "spec"
+title = "Egress proxy — Spec"
+status = "done"
+old_path = "specs/07-egress-proxy.md"
+new_path = "about-sevn.bot/specs/07-egress-proxy.md"
+sources = ["src/sevn/proxy/**"]
+parent_prd = "prd-03-trust-and-control"
+depends_on = ["spec-00-foundation", "spec-02-config-and-workspace", "spec-05-llm-transports", "spec-06-secrets"]
+
+[[entry]]
+id = "spec-08-sandbox"
+kind = "spec"
+title = "Sandbox — Spec"
+status = "done"
+old_path = "specs/08-sandbox.md"
+new_path = "about-sevn.bot/specs/08-sandbox.md"
+sources = ["src/sevn/security/**"]
+parent_prd = "prd-03-trust-and-control"
+depends_on = ["spec-00-foundation", "spec-01-system-overview", "spec-02-config-and-workspace", "spec-06-secrets", "spec-07-egress-proxy", "spec-17-gateway"]
+
+[[entry]]
+id = "spec-09-security-scanner"
+kind = "spec"
+title = "Security scanner — Spec"
+status = "done"
+old_path = "specs/09-security-scanner.md"
+new_path = "about-sevn.bot/specs/09-security-scanner.md"
+sources = ["src/sevn/security/**"]
+parent_prd = "prd-03-trust-and-control"
+
+[[entry]]
+id = "spec-10-schema-ontology"
+kind = "spec"
+title = "Schema & ontology — Spec"
+status = "done"
+old_path = "specs/10-schema-ontology.md"
+new_path = "about-sevn.bot/specs/10-schema-ontology.md"
+sources = ["src/sevn/config/**"]
+parent_prd = "prd-04-getting-things-done"
+depends_on = ["spec-00-foundation", "spec-01-system-overview", "spec-02-config-and-workspace", "spec-03-storage", "spec-04-tracing", "spec-05-llm-transports", "spec-06-secrets", "spec-07-egress-proxy", "spec-08-sandbox", "spec-09-security-scanner"]
+
+[[entry]]
+id = "spec-11-tools-registry"
+kind = "spec"
+title = "Tools registry — Spec"
+status = "done"
+old_path = "specs/11-tools-registry.md"
+new_path = "about-sevn.bot/specs/11-tools-registry.md"
+sources = ["src/sevn/tools/**"]
+parent_prd = "prd-04-getting-things-done"
+depends_on = ["spec-00-foundation", "spec-01-system-overview", "spec-05-llm-transports", "spec-06-secrets", "spec-08-sandbox", "spec-09-security-scanner", "spec-10-schema-ontology"]
+
+[[entry]]
+id = "spec-12-skills-system"
+kind = "spec"
+title = "Skills system — Spec"
+status = "done"
+old_path = "specs/12-skills-system.md"
+new_path = "about-sevn.bot/specs/12-skills-system.md"
+sources = ["src/sevn/skills/**"]
+parent_prd = "prd-04-getting-things-done"
+depends_on = ["spec-00-foundation", "spec-01-system-overview", "spec-02-config-and-workspace", "spec-04-tracing", "spec-06-secrets", "spec-07-egress-proxy", "spec-08-sandbox", "spec-09-security-scanner", "spec-10-schema-ontology", "spec-11-tools-registry"]
+
+[[entry]]
+id = "spec-13-rlm-triager"
+kind = "spec"
+title = "RLM Triager — Spec"
+status = "done"
+old_path = "specs/13-rlm-triager.md"
+new_path = "about-sevn.bot/specs/13-rlm-triager.md"
+sources = ["src/sevn/agent/**"]
+parent_prd = "prd-04-getting-things-done"
+depends_on = ["spec-05-llm-transports"]
+
+[[entry]]
+id = "spec-14-executor-tier-b"
+kind = "spec"
+title = "Executor tier B — Spec"
+status = "done"
+old_path = "specs/14-executor-tier-b.md"
+new_path = "about-sevn.bot/specs/14-executor-tier-b.md"
+sources = ["src/sevn/agent/**"]
+parent_prd = "prd-04-getting-things-done"
+depends_on = ["spec-02-config-and-workspace", "spec-05-llm-transports", "spec-13-rlm-triager"]
+
+[[entry]]
+id = "spec-15-memory-lcm"
+kind = "spec"
+title = "Memory — LCM (Lossless Context Management) — Spec"
+status = "done"
+old_path = "specs/15-memory-lcm.md"
+new_path = "about-sevn.bot/specs/15-memory-lcm.md"
+sources = ["src/sevn/memory/**"]
+parent_prd = "prd-02-personality-and-memory"
+depends_on = ["spec-03-storage", "spec-04-tracing", "spec-05-llm-transports", "spec-10-schema-ontology"]
+
+[[entry]]
+id = "spec-16-harness-discipline"
+kind = "spec"
+title = "Harness discipline — Spec"
+status = "done"
+old_path = "specs/16-harness-discipline.md"
+new_path = "about-sevn.bot/specs/16-harness-discipline.md"
+sources = ["src/sevn/runtime/**"]
+parent_prd = "prd-04-getting-things-done"
+depends_on = ["spec-02-config-and-workspace", "spec-13-rlm-triager", "spec-14-executor-tier-b"]
+
+[[entry]]
+id = "spec-17-gateway"
+kind = "spec"
+title = "Gateway — Spec"
+status = "done"
+old_path = "specs/17-gateway.md"
+new_path = "about-sevn.bot/specs/17-gateway.md"
+sources = ["src/sevn/gateway/**"]
+parent_prd = "prd-01-conversational-experience"
+depends_on = ["spec-02-config-and-workspace", "spec-05-llm-transports", "spec-13-rlm-triager", "spec-14-executor-tier-b", "spec-16-harness-discipline"]
+
+[[entry]]
+id = "spec-18-channel-telegram"
+kind = "spec"
+title = "Channel — Telegram — Spec"
+status = "done"
+old_path = "specs/18-channel-telegram.md"
+new_path = "about-sevn.bot/specs/18-channel-telegram.md"
+sources = ["src/sevn/channels/**"]
+parent_prd = "prd-01-conversational-experience"
+depends_on = ["spec-02-config-and-workspace", "spec-05-llm-transports", "spec-06-secrets", "spec-07-egress-proxy", "spec-09-security-scanner", "spec-17-gateway"]
+
+[[entry]]
+id = "spec-19-channel-webui"
+kind = "spec"
+title = "Channel — Web UI — Spec"
+status = "done"
+old_path = "specs/19-channel-webui.md"
+new_path = "about-sevn.bot/specs/19-channel-webui.md"
+sources = ["src/sevn/channels/**"]
+parent_prd = "prd-01-conversational-experience"
+depends_on = ["spec-17-gateway"]
+
+[[entry]]
+id = "spec-20-voice"
+kind = "spec"
+title = "Voice (STT / TTS) — Spec"
+status = "done"
+old_path = "specs/20-voice.md"
+new_path = "about-sevn.bot/specs/20-voice.md"
+sources = ["src/sevn/voice/**"]
+parent_prd = "prd-01-conversational-experience"
+depends_on = ["spec-02-config-and-workspace", "spec-05-llm-transports", "spec-06-secrets", "spec-07-egress-proxy", "spec-09-security-scanner", "spec-17-gateway"]
+
+[[entry]]
+id = "spec-21-executor-tier-cd"
+kind = "spec"
+title = "Executor tier C/D — Spec"
+status = "done"
+old_path = "specs/21-executor-tier-cd.md"
+new_path = "about-sevn.bot/specs/21-executor-tier-cd.md"
+sources = ["src/sevn/coding_agents/**"]
+parent_prd = "prd-04-getting-things-done"
+depends_on = ["spec-02-config-and-workspace", "spec-05-llm-transports", "spec-13-rlm-triager", "spec-14-executor-tier-b", "spec-16-harness-discipline"]
+
+[[entry]]
+id = "spec-22-onboarding"
+kind = "spec"
+title = "Onboarding — Spec"
+status = "done"
+old_path = "specs/22-onboarding.md"
+new_path = "about-sevn.bot/specs/22-onboarding.md"
+sources = ["src/sevn/onboarding/**"]
+parent_prd = "prd-06-setup-and-operations"
+depends_on = ["spec-02-config-and-workspace", "spec-17-gateway"]
+
+[[entry]]
+id = "spec-23-cli"
+kind = "spec"
+title = "CLI — Spec"
+status = "done"
+old_path = "specs/23-cli.md"
+new_path = "about-sevn.bot/specs/23-cli.md"
+sources = ["src/sevn/cli/**"]
+parent_prd = "prd-06-setup-and-operations"
+depends_on = ["spec-02-config-and-workspace", "spec-06-secrets", "spec-07-egress-proxy", "spec-17-gateway", "spec-22-onboarding"]
+
+[[entry]]
+id = "spec-24-dashboard"
+kind = "spec"
+title = "Mission Control (dashboard) — Spec"
+status = "done"
+old_path = "specs/24-dashboard.md"
+new_path = "about-sevn.bot/specs/24-dashboard.md"
+sources = ["src/sevn/ui/**"]
+parent_prd = "prd-07-mission-control"
+depends_on = ["spec-02-config-and-workspace", "spec-05-llm-transports", "spec-06-secrets", "spec-07-egress-proxy", "spec-16-harness-discipline", "spec-17-gateway", "spec-22-onboarding", "spec-23-cli"]
+
+[[entry]]
+id = "spec-25-cicd-full"
+kind = "spec"
+title = "CI/CD (mature pipeline) — Spec"
+status = "done"
+old_path = "specs/25-cicd-full.md"
+new_path = "about-sevn.bot/specs/25-cicd-full.md"
+sources = ["src/sevn/**", "wave-orchestrator/**", ".github/workflows/**"]
+parent_prd = "prd-06-setup-and-operations"
+depends_on = ["spec-00-foundation"]
+
+[[entry]]
+id = "spec-26-claude-agent"
+kind = "spec"
+title = "Claude Agent — Spec"
+status = "rejected"
+old_path = "specs/26-claude-agent.md"
+new_path = "about-sevn.bot/specs/26-claude-agent.md"
+sources = ["src/sevn/coding_agents/**"]
+parent_prd = "prd-08-coding-companion"
+
+[[entry]]
+id = "spec-27-second-brain"
+kind = "spec"
+title = "Second Brain — Spec"
+status = "draft"
+old_path = "specs/27-second-brain.md"
+new_path = "about-sevn.bot/specs/27-second-brain.md"
+sources = ["src/sevn/second_brain/**"]
+parent_prd = "prd-09-knowledge-base"
+depends_on = ["spec-00-foundation", "spec-01-system-overview", "spec-02-config-and-workspace", "spec-03-storage", "spec-04-tracing", "spec-07-egress-proxy", "spec-09-security-scanner", "spec-11-tools-registry", "spec-12-skills-system", "spec-15-memory-lcm", "spec-17-gateway", "spec-18-channel-telegram", "spec-24-dashboard"]
+
+[[entry]]
+id = "spec-28-code-understanding"
+kind = "spec"
+title = "Code understanding — Spec"
+status = "done"
+old_path = "specs/28-code-understanding.md"
+new_path = "about-sevn.bot/specs/28-code-understanding.md"
+sources = ["src/sevn/code_understanding/**"]
+parent_prd = "prd-08-coding-companion"
+depends_on = ["spec-00-foundation", "spec-01-system-overview", "spec-02-config-and-workspace", "spec-06-secrets", "spec-07-egress-proxy", "spec-08-sandbox", "spec-09-security-scanner", "spec-11-tools-registry", "spec-12-skills-system", "spec-13-rlm-triager"]
+
+[[entry]]
+id = "spec-29-openui"
+kind = "spec"
+title = "OpenUI — Spec"
+status = "done"
+old_path = "specs/29-openui.md"
+new_path = "about-sevn.bot/specs/29-openui.md"
+sources = ["src/sevn/ui/openui/**"]
+parent_prd = "prd-10-generated-ui"
+depends_on = ["spec-00-foundation", "spec-01-system-overview", "spec-02-config-and-workspace", "spec-03-storage", "spec-04-tracing", "spec-06-secrets", "spec-09-security-scanner", "spec-11-tools-registry", "spec-13-rlm-triager", "spec-14-executor-tier-b", "spec-16-harness-discipline", "spec-17-gateway", "spec-18-channel-telegram", "spec-19-channel-webui", "spec-21-executor-tier-cd", "spec-24-dashboard"]
+
+[[entry]]
+id = "spec-29-cursor-cloud-agent"
+kind = "spec"
+title = "Cursor Cloud Agent — Spec"
+status = "done"
+old_path = "specs/29-cursor-cloud-agent.md"
+new_path = "about-sevn.bot/specs/29-cursor-cloud-agent.md"
+sources = ["src/sevn/integrations/**"]
+parent_prd = "prd-04-getting-things-done"
+depends_on = ["spec-06-secrets", "spec-07-egress-proxy", "spec-12-skills-system"]
+
+[[entry]]
+id = "spec-30-non-interactive-triggers"
+kind = "spec"
+title = "Non-interactive triggers — Spec"
+status = "done"
+old_path = "specs/30-non-interactive-triggers.md"
+new_path = "about-sevn.bot/specs/30-non-interactive-triggers.md"
+sources = ["src/sevn/triggers/**"]
+parent_prd = "prd-11-automation-and-triggers"
+depends_on = ["spec-01-system-overview", "spec-02-config-and-workspace", "spec-03-storage", "spec-04-tracing", "spec-05-llm-transports", "spec-06-secrets", "spec-07-egress-proxy", "spec-08-sandbox", "spec-09-security-scanner", "spec-10-schema-ontology", "spec-11-tools-registry", "spec-12-skills-system", "spec-13-rlm-triager", "spec-14-executor-tier-b", "spec-15-memory-lcm", "spec-16-harness-discipline", "spec-17-gateway", "spec-18-channel-telegram", "spec-19-channel-webui", "spec-21-executor-tier-cd", "spec-22-onboarding", "spec-23-cli", "spec-24-dashboard", "spec-34-plugin-hooks"]
+
+[[entry]]
+id = "spec-31-memory-dreaming"
+kind = "spec"
+title = "Memory — Dreaming — Spec"
+status = "done"
+old_path = "specs/31-memory-dreaming.md"
+new_path = "about-sevn.bot/specs/31-memory-dreaming.md"
+sources = ["src/sevn/memory/dreaming/**"]
+parent_prd = "prd-02-personality-and-memory"
+depends_on = ["spec-02-config-and-workspace", "spec-03-storage", "spec-04-tracing", "spec-05-llm-transports", "spec-09-security-scanner", "spec-15-memory-lcm", "spec-23-cli", "spec-24-dashboard", "spec-30-non-interactive-triggers"]
+
+[[entry]]
+id = "spec-32-memory-honcho"
+kind = "spec"
+title = "Memory — Honcho-style user model — Spec"
+status = "done"
+old_path = "specs/32-memory-honcho.md"
+new_path = "about-sevn.bot/specs/32-memory-honcho.md"
+sources = ["src/sevn/memory/**"]
+parent_prd = "prd-02-personality-and-memory"
+depends_on = ["spec-05-llm-transports", "spec-15-memory-lcm"]
+
+[[entry]]
+id = "spec-33-self-improvement"
+kind = "spec"
+title = "Self-improvement — Spec"
+status = "done"
+old_path = "specs/33-self-improvement.md"
+new_path = "about-sevn.bot/specs/33-self-improvement.md"
+sources = ["src/sevn/self_improve/**"]
+parent_prd = "prd-12-self-improvement"
+
+[[entry]]
+id = "spec-34-plugin-hooks"
+kind = "spec"
+title = "Plugin hooks & channel plugins — Spec"
+status = "done"
+old_path = "specs/34-plugin-hooks.md"
+new_path = "about-sevn.bot/specs/34-plugin-hooks.md"
+sources = ["src/sevn/plugins/**"]
+parent_prd = "prd-13-extensibility"
+depends_on = ["spec-01-system-overview", "spec-02-config-and-workspace", "spec-04-tracing", "spec-06-secrets", "spec-08-sandbox", "spec-11-tools-registry", "spec-16-harness-discipline", "spec-17-gateway", "spec-18-channel-telegram", "spec-23-cli", "spec-24-dashboard", "spec-30-non-interactive-triggers"]
+
+[[entry]]
+id = "spec-35-bot-evolution"
+kind = "spec"
+title = "Bot evolution — Spec"
+status = "draft"
+old_path = "specs/35-bot-evolution.md"
+new_path = "about-sevn.bot/specs/35-bot-evolution.md"
+sources = ["src/sevn/evolution/**"]
+parent_prd = "prd-07-mission-control"
+depends_on = ["spec-28-code-understanding", "spec-33-self-improvement", "spec-24-dashboard", "spec-22-onboarding", "spec-21-executor-tier-cd", "spec-02-config-and-workspace"]
+
+[[entry]]
+id = "spec-36-sub-agents"
+kind = "spec"
+title = "Sub-agents (L1/L2) — Spec"
+status = "done"
+new_path = "about-sevn.bot/specs/36-sub-agents.md"
+sources = ["src/sevn/agent/subagents/**", "src/sevn/config/sections/subagents.py", "src/sevn/cli/commands/subagents_cmd.py", "src/sevn/data/bundled_skills/core/media_generation/**"]
+parent_prd = "prd-04-getting-things-done"
+depends_on = ["spec-00-foundation", "spec-01-system-overview", "spec-02-config-and-workspace", "spec-03-storage", "spec-04-tracing", "spec-12-skills-system", "spec-13-rlm-triager", "spec-14-executor-tier-b", "spec-17-gateway", "spec-18-channel-telegram", "spec-21-executor-tier-cd", "spec-23-cli", "spec-24-dashboard"]

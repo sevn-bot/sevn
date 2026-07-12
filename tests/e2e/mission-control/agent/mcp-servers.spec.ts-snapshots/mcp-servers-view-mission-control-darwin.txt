@@ -1,0 +1,1 @@
+Agent MCP Servers Effective MCP stdio descriptor registry (operator mcp_servers + synthetic gateways). Workspace mcp_enabled: [] No rows yet. 0 server(s) Enablement Toggle which servers are in workspace mcp_enabled (writes sevn.json). No MCP servers discovered. Save enabled servers

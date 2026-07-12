@@ -1,0 +1,230 @@
+/* sevn.bot — chat surface.
+ * No green/blue consumer bubbles. Assistant messages get a thin primary left edge on a raised surface;
+ * user messages are label + flowing text, no fill.
+ */
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sevn-space-6);
+}
+
+.msg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sevn-space-2);
+  max-width: 760px;
+  width: 100%;
+}
+
+.msg__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sevn-space-2);
+  font-size: var(--sevn-fs-xs);
+  color: var(--sevn-fg-muted);
+  letter-spacing: var(--sevn-tracking-tight);
+  white-space: nowrap;
+  flex-wrap: nowrap;
+  min-height: 1.25rem;
+}
+.msg__meta > * { flex-shrink: 0; }
+.msg__meta .who { font-weight: var(--sevn-fw-600); color: var(--sevn-fg); }
+.msg__meta .who--assistant { color: var(--sevn-primary-light); }
+.msg__meta .who--user      { color: var(--sevn-fg-strong); }
+.msg__meta time { font-family: var(--sevn-font-mono); color: var(--sevn-fg-faint); }
+
+.msg__body {
+  font-size: var(--sevn-fs-md);
+  line-height: var(--sevn-lh-md);
+  color: var(--sevn-fg-strong);
+}
+.msg__body p + p { margin-top: var(--sevn-space-3); }
+
+/* assistant variant: raised card with primary left edge */
+.msg--assistant .msg__body {
+  position: relative;
+  background: var(--sevn-surface-2);
+  border: 1px solid var(--sevn-border);
+  border-left: 2px solid var(--sevn-primary);
+  border-radius: 0 var(--sevn-radius-lg) var(--sevn-radius-lg) 0;
+  padding: var(--sevn-space-4) var(--sevn-space-5);
+  box-shadow: var(--sevn-hairline-top), var(--sevn-shadow-xs);
+}
+
+/* user variant: no fill */
+.msg--user .msg__body {
+  padding-left: var(--sevn-space-3);
+  border-left: 2px solid var(--sevn-border);
+}
+
+/* quick-action bar under each assistant reply */
+.qab {
+  display: flex;
+  align-items: center;
+  gap: var(--sevn-space-1);
+  flex-wrap: wrap;
+}
+.qab__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sevn-space-1-5);
+  height: 1.75rem;
+  padding: 0 var(--sevn-space-2);
+  font-size: var(--sevn-fs-xs);
+  font-weight: var(--sevn-fw-500);
+  color: var(--sevn-fg-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--sevn-radius-md);
+  cursor: pointer;
+  transition: background var(--sevn-duration-fast) var(--sevn-ease-out),
+              color var(--sevn-duration-fast) var(--sevn-ease-out),
+              border-color var(--sevn-duration-fast) var(--sevn-ease-out);
+}
+.qab__btn:hover {
+  color: var(--sevn-fg-strong);
+  background: var(--sevn-hover-bg);
+  border-color: var(--sevn-border);
+}
+.qab__btn .glyph { font-size: 0.95em; }
+.qab__btn--steer { color: var(--sevn-primary-light); }
+.qab__btn--label { display: none; }
+@media (min-width: 720px) {
+  .qab__btn--label { display: inline; }
+}
+
+/* composer */
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sevn-space-2);
+  padding: var(--sevn-space-3);
+  background: var(--sevn-surface-2);
+  border: 1px solid var(--sevn-border);
+  border-radius: var(--sevn-radius-xl);
+  box-shadow: var(--sevn-hairline-top), var(--sevn-shadow-md);
+}
+.composer:focus-within {
+  border-color: var(--sevn-primary);
+  box-shadow: var(--sevn-hairline-top), 0 0 0 3px rgba(95,177,247,0.18), var(--sevn-shadow-md);
+}
+.composer textarea {
+  width: 100%;
+  min-height: 1.75rem;
+  max-height: 12rem;
+  padding: var(--sevn-space-1) var(--sevn-space-2);
+  background: transparent;
+  border: 0;
+  resize: none;
+  font-family: var(--sevn-font-sans);
+  font-size: var(--sevn-fs-md);
+  line-height: var(--sevn-lh-base);
+  color: var(--sevn-fg-strong);
+  outline: 0;
+}
+.composer textarea::placeholder { color: var(--sevn-fg-faint); }
+.composer__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sevn-space-1);
+}
+.composer__hint {
+  margin-left: auto;
+  font-size: var(--sevn-fs-xs);
+  color: var(--sevn-fg-faint);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sevn-space-1);
+}
+
+/* plan-approval card */
+.plan-card {
+  background: var(--sevn-surface-2);
+  border: 1px solid var(--sevn-border);
+  border-left: 2px solid var(--sevn-primary);
+  border-radius: 0 var(--sevn-radius-lg) var(--sevn-radius-lg) 0;
+  padding: var(--sevn-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sevn-space-3);
+}
+.plan-card__title {
+  font-size: var(--sevn-fs-xs);
+  letter-spacing: var(--sevn-tracking-widest);
+  text-transform: uppercase;
+  color: var(--sevn-primary-light);
+  font-weight: var(--sevn-fw-600);
+}
+.plan-card ol {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sevn-space-2);
+  counter-reset: step;
+}
+.plan-card li {
+  display: flex;
+  gap: var(--sevn-space-3);
+  padding-left: 0;
+  font-size: var(--sevn-fs-sm);
+  color: var(--sevn-fg);
+  counter-increment: step;
+}
+.plan-card li::before {
+  content: counter(step);
+  flex: 0 0 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--sevn-font-mono);
+  font-size: var(--sevn-fs-xs);
+  color: var(--sevn-primary-light);
+  background: var(--sevn-surface-primary-tint);
+  border: 1px solid rgba(95,177,247,0.30);
+  border-radius: var(--sevn-radius-full);
+}
+.plan-card__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sevn-space-2);
+}
+
+/* streaming caret / thinking indicator (no <think> blocks) */
+.thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sevn-space-1);
+  font-size: var(--sevn-fs-xs);
+  color: var(--sevn-fg-muted);
+  font-family: var(--sevn-font-mono);
+}
+.thinking__caret {
+  width: 8px;
+  height: 14px;
+  background: var(--sevn-primary);
+  display: inline-block;
+  border-radius: 1px;
+  animation: sevn-caret 1.05s steps(2, end) infinite;
+  box-shadow: 0 0 12px rgba(95,177,247,0.6);
+}
+@keyframes sevn-caret {
+  0%, 50%   { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.thinking__dots { display: inline-flex; gap: 3px; }
+.thinking__dots span {
+  width: 4px; height: 4px;
+  background: var(--sevn-primary);
+  border-radius: var(--sevn-radius-full);
+  opacity: 0.4;
+  animation: sevn-dot 1.2s var(--sevn-ease-in-out) infinite;
+}
+.thinking__dots span:nth-child(2) { animation-delay: 0.15s; }
+.thinking__dots span:nth-child(3) { animation-delay: 0.30s; }
+@keyframes sevn-dot {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30%           { opacity: 1;   transform: translateY(-2px); }
+}
