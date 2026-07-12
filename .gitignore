@@ -1,0 +1,35 @@
+# --- Non-public staging (NEVER commit) ---
+# Personal holding area for material not yet ready to be public.
+/local/
+
+# --- Secrets / environment ---
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+secrets.*
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- OS / editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
