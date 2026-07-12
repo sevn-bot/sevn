@@ -134,6 +134,23 @@ async def test_get_browser_session_context_manager(
     fake_cdp.set_result("Target.getTargets", {"targetInfos": [{"targetId": "p1", "type": "page"}]})
     fake_cdp.set_result("Target.attachToTarget", {"sessionId": "S1"})
     _patch_attach(monkeypatch, fake_cdp)
+
+    def _fake_resolve_start_request(
+        *,
+        cdp_url: str | None = None,
+        user_data_dir: str | None = None,
+    ) -> object:
+        from sevn.onboarding.browser_automation import BrowserStartRequest
+
+        return BrowserStartRequest(
+            cdp_url=cdp_url or "http://127.0.0.1:9222",
+            user_data_dir=user_data_dir or "/tmp/sevn-test-onboard-profile",
+        )
+
+    monkeypatch.setattr(
+        "sevn.onboarding.browser_automation.resolve_start_request",
+        _fake_resolve_start_request,
+    )
     import sevn.onboarding.browser_automation as ba
 
     ba.reset_browser_session_for_tests()

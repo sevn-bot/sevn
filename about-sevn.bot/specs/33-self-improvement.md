@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver src/sevn/self_improve/: ingest traces + session artefacts + explicit
   user feedback into trajectory_fact rows, deterministically shortlist turns for review
   or patching, optionally run an in-pro'
-last_updated: '2026-06-19'
-fingerprint: sha256:710137dcdc0d946a20ddea47e0f2fbe5ccf0db00201db95e1396925e927a0964
+last_updated: '2026-07-12'
+fingerprint: sha256:169de897e7c7896a0b6965ea95c8e9e68840f339dfe422b957a74c222e4f2661
 related: []
 sources:
 - src/sevn/self_improve/**
@@ -321,6 +321,7 @@ interfaces:
   symbol: OwnerPrincipal
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

@@ -25,6 +25,7 @@ are cut into a dated, versioned section at release time.
 ### Fixed
 
 - CI failures from `secrets.*` gitignore rule excluding `src/sevn/config/sections/secrets.py` (ModuleNotFoundError and mypy `no-any-return` on CI)
+- PR #6 CI gates: skip optional `wave-orchestrator/` about-docs paths on public clones, defer spec-36 until F3, remove premature `subagents_registry` doctor catalog entry, and mock CDP attach in onboarding browser context-manager test
 
 ### Security
 

@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver src/sevn/evolution/ and the operator-facing Evolution surface so
   sevn.bot can evolve its own codebase as a first-class product pillar — not an optional
   add-on — spanning understand → file work
-last_updated: '2026-06-19'
-fingerprint: sha256:18b9ae53689cdf50a785f92fb8a3cdf3d82571c9ea190bd165899f7a87f5be4d
+last_updated: '2026-07-12'
+fingerprint: sha256:9b3c337dbc7b272dfeeed4530df44d6f79fb344bec56c314fff513a5a80b8bd5
 related: []
 sources:
 - src/sevn/evolution/**
@@ -279,6 +279,7 @@ interfaces:
   symbol: run_ci_smoke
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

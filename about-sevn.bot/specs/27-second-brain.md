@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the Second Brain subsystem: filesystem wiki engine + agent surface
   so operators curate sources in raw/ and maintain a structured wiki/ with index.md,
   log.md, lint reports, and provenance-beari'
-last_updated: '2026-07-07'
-fingerprint: sha256:474701a1501fb3dd2635d7dc51085c655a1445573f95efe8bfd71dde0b804973
+last_updated: '2026-07-12'
+fingerprint: sha256:12c8243b0fcc82e791221e55eb0e0bf9567ac67714950e6a56b301a790a18944
 related: []
 sources:
 - src/sevn/second_brain/**
@@ -53,6 +53,9 @@ interfaces:
 - name: wiki_search_tool
   file: src/sevn/second_brain/__init__.py
   symbol: wiki_search_tool
+- name: ensure_second_brain_scope_layout
+  file: src/sevn/second_brain/bootstrap.py
+  symbol: ensure_second_brain_scope_layout
 - name: SecondBrainError
   file: src/sevn/second_brain/errors.py
   symbol: SecondBrainError
@@ -68,6 +71,12 @@ interfaces:
 - name: fetch_url_to_raw
   file: src/sevn/second_brain/fetch.py
   symbol: fetch_url_to_raw
+- name: list_workspace_subdirs
+  file: src/sevn/second_brain/folder_picker.py
+  symbol: list_workspace_subdirs
+- name: normalise_browse_path
+  file: src/sevn/second_brain/folder_picker.py
+  symbol: normalise_browse_path
 - name: compose_page
   file: src/sevn/second_brain/frontmatter.py
   symbol: compose_page
@@ -95,6 +104,15 @@ interfaces:
 - name: run_ingest_stub
   file: src/sevn/second_brain/ingest_stub.py
   symbol: run_ingest_stub
+- name: SecondBrainLayoutProbe
+  file: src/sevn/second_brain/layout_probe.py
+  symbol: SecondBrainLayoutProbe
+- name: fix_second_brain_layout
+  file: src/sevn/second_brain/layout_probe.py
+  symbol: fix_second_brain_layout
+- name: probe_second_brain_vault_layout
+  file: src/sevn/second_brain/layout_probe.py
+  symbol: probe_second_brain_vault_layout
 - name: index_line_targets
   file: src/sevn/second_brain/links.py
   symbol: index_line_targets
@@ -122,9 +140,15 @@ interfaces:
 - name: assert_wiki_relative_safe
   file: src/sevn/second_brain/paths.py
   symbol: assert_wiki_relative_safe
+- name: display_scope_root_relative
+  file: src/sevn/second_brain/paths.py
+  symbol: display_scope_root_relative
 - name: effective_scope
   file: src/sevn/second_brain/paths.py
   symbol: effective_scope
+- name: legacy_shared_vault_root
+  file: src/sevn/second_brain/paths.py
+  symbol: legacy_shared_vault_root
 - name: outputs_dir_for_scope
   file: src/sevn/second_brain/paths.py
   symbol: outputs_dir_for_scope
@@ -134,6 +158,12 @@ interfaces:
 - name: resolve_raw_file
   file: src/sevn/second_brain/paths.py
   symbol: resolve_raw_file
+- name: resolve_scope_root
+  file: src/sevn/second_brain/paths.py
+  symbol: resolve_scope_root
+- name: resolve_vault_base
+  file: src/sevn/second_brain/paths.py
+  symbol: resolve_vault_base
 - name: resolve_wiki_file
   file: src/sevn/second_brain/paths.py
   symbol: resolve_wiki_file
@@ -194,8 +224,18 @@ interfaces:
 - name: witchcraft_indexer_available
   file: src/sevn/second_brain/witchcraft_bridge.py
   symbol: witchcraft_indexer_available
+- name: maybe_reindex_workspace_on_startup
+  file: src/sevn/second_brain/witchcraft_reindex.py
+  symbol: maybe_reindex_workspace_on_startup
+- name: reindex_workspace_wiki
+  file: src/sevn/second_brain/witchcraft_reindex.py
+  symbol: reindex_workspace_wiki
+- name: resolve_index_wiki_paths
+  file: src/sevn/second_brain/witchcraft_reindex.py
+  symbol: resolve_index_wiki_paths
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

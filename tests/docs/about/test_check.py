@@ -87,3 +87,52 @@ def test_clean_state_or_drift(tmp_path):
     # We can't verify clean state without the correct fingerprint
     # so this test just documents the contract.
     assert result is not None  # Placeholder assertion
+
+
+def test_wave_orchestrator_paths_optional_when_missing(tmp_path):
+    """Operator-only wave-orchestrator paths must not fail public CI clones."""
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    docs_dir = repo_dir / "about-sevn.bot" / "specs"
+    docs_dir.mkdir(parents=True)
+    allowlist_dir = repo_dir / "about-sevn.bot" / "_docsys"
+    allowlist_dir.mkdir(parents=True)
+    allowlist_dir.joinpath("allowed-refs.txt").write_text(
+        "src/**\nwave-orchestrator/**\n",
+        encoding="utf-8",
+    )
+    (repo_dir / "src" / "sevn" / "gateway").mkdir(parents=True)
+    (repo_dir / "src" / "sevn" / "gateway" / "agent_turn.py").write_text(
+        "def run(): pass\n",
+        encoding="utf-8",
+    )
+
+    doc_file = docs_dir / "25-cicd-full.md"
+    doc_file.write_text(
+        """---
+id: spec-25-cicd-full
+kind: spec
+title: CI/CD
+status: done
+owner: Alex
+summary: CI pipeline.
+last_updated: 2026-07-08
+parent_prd: prd-06-setup-and-operations
+sources:
+  - src/sevn/gateway/**
+  - wave-orchestrator/**
+interfaces:
+  - name: run
+    file: wave-orchestrator/src/waveorch/cli.py
+    symbol: run
+fingerprint: sha256:fakefingerprintvalue
+---
+
+## Purpose
+CI pipeline.
+""",
+        encoding="utf-8",
+    )
+
+    issues = check_about_docs(repo_dir)
+    assert not any("wave-orchestrator" in issue for issue in issues)

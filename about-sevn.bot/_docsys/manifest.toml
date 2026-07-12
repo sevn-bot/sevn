@@ -51,7 +51,7 @@ old_path = "prd/04-getting-things-done.md"
 new_path = "about-sevn.bot/prd/04-getting-things-done.md"
 sources = ["src/sevn/agent/**", "src/sevn/tools/**"]
 parent_prd = "prd-00-main"
-specs = ["spec-10-schema-ontology", "spec-11-tools-registry", "spec-12-skills-system", "spec-13-rlm-triager", "spec-14-executor-tier-b", "spec-16-harness-discipline", "spec-21-executor-tier-cd", "spec-17-gateway", "spec-18-channel-telegram", "spec-19-channel-webui", "spec-20-voice", "spec-29-openui", "spec-36-sub-agents"]
+specs = ["spec-10-schema-ontology", "spec-11-tools-registry", "spec-12-skills-system", "spec-13-rlm-triager", "spec-14-executor-tier-b", "spec-16-harness-discipline", "spec-21-executor-tier-cd", "spec-17-gateway", "spec-18-channel-telegram", "spec-19-channel-webui", "spec-20-voice", "spec-29-openui"]
 
 [[entry]]
 id = "prd-05-cost-and-providers"
@@ -563,13 +563,3 @@ new_path = "about-sevn.bot/specs/35-bot-evolution.md"
 sources = ["src/sevn/evolution/**"]
 parent_prd = "prd-07-mission-control"
 depends_on = ["spec-28-code-understanding", "spec-33-self-improvement", "spec-24-dashboard", "spec-22-onboarding", "spec-21-executor-tier-cd", "spec-02-config-and-workspace"]
-
-[[entry]]
-id = "spec-36-sub-agents"
-kind = "spec"
-title = "Sub-agents (L1/L2) — Spec"
-status = "done"
-new_path = "about-sevn.bot/specs/36-sub-agents.md"
-sources = ["src/sevn/agent/subagents/**", "src/sevn/config/sections/subagents.py", "src/sevn/cli/commands/subagents_cmd.py", "src/sevn/data/bundled_skills/core/media_generation/**"]
-parent_prd = "prd-04-getting-things-done"
-depends_on = ["spec-00-foundation", "spec-01-system-overview", "spec-02-config-and-workspace", "spec-03-storage", "spec-04-tracing", "spec-12-skills-system", "spec-13-rlm-triager", "spec-14-executor-tier-b", "spec-17-gateway", "spec-18-channel-telegram", "spec-21-executor-tier-cd", "spec-23-cli", "spec-24-dashboard"]
