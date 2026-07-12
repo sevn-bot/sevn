@@ -1,0 +1,81 @@
+/* sevn.bot — badges & status pills */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sevn-space-1);
+  height: 1.25rem;
+  padding: 0 var(--sevn-space-2);
+  font-family: var(--sevn-font-sans);
+  font-size: var(--sevn-fs-xs);
+  font-weight: var(--sevn-fw-500);
+  letter-spacing: var(--sevn-tracking-tight);
+  color: var(--sevn-fg);
+  background: var(--sevn-surface-3);
+  border: 1px solid var(--sevn-border);
+  border-radius: var(--sevn-radius-full);
+  white-space: nowrap;
+}
+
+.badge--mono { font-family: var(--sevn-font-mono); font-variant-numeric: tabular-nums; }
+
+.badge-primary {
+  color: var(--sevn-primary-light);
+  background: var(--sevn-surface-primary-tint);
+  border-color: rgba(95, 177, 247, 0.30);
+}
+.badge-accent {
+  color: var(--sevn-accent-light);
+  background: var(--sevn-surface-accent-tint);
+  border-color: rgba(255, 59, 59, 0.30);
+}
+.badge-slate {
+  color: var(--sevn-fg-muted);
+  background: var(--sevn-surface-2);
+  border-color: var(--sevn-border);
+}
+.badge-success {
+  color: var(--sevn-success);
+  background: var(--sevn-surface-success-tint);
+  border-color: rgba(106, 156, 120, 0.30);
+}
+.badge-warning {
+  color: var(--sevn-warning);
+  background: var(--sevn-surface-warning-tint);
+  border-color: rgba(200, 154, 82, 0.30);
+}
+
+/* status badge: dot + label */
+.badge-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sevn-space-2);
+  height: 1.25rem;
+  padding: 0 var(--sevn-space-2);
+  font-size: var(--sevn-fs-xs);
+  font-weight: var(--sevn-fw-500);
+  color: var(--sevn-fg);
+  background: var(--sevn-surface-2);
+  border: 1px solid var(--sevn-border);
+  border-radius: var(--sevn-radius-full);
+}
+
+.badge-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: var(--sevn-radius-full);
+  background: var(--sevn-fg-muted);
+  box-shadow: 0 0 0 0 currentColor;
+}
+
+.badge-status--live::before    { background: var(--sevn-primary); animation: sevn-pulse 1.6s var(--sevn-ease-in-out) infinite; }
+.badge-status--ok::before      { background: var(--sevn-success); }
+.badge-status--warn::before    { background: var(--sevn-warning); }
+.badge-status--error::before   { background: var(--sevn-accent); }
+.badge-status--idle::before    { background: var(--sevn-fg-faint); }
+
+@keyframes sevn-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(95, 177, 247, 0.5); }
+  50%      { box-shadow: 0 0 0 4px rgba(95, 177, 247, 0); }
+}

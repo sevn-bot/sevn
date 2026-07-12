@@ -1,0 +1,4 @@
+# Runtime-downloaded model weights (auto-fetched on first synth) — never commit.
+models/
+voices.bin
+output.wav

@@ -1,0 +1,15 @@
+# Root README intro verse — edit here; regenerate with `sevn readme update root`.
+# Rendered centered under the logo in README.md (replaces legacy title + tagline).
+
+lines = [
+  "I'm Sevn. I'm more than a bot,",
+  "or an Assistant, AI or not.",
+  "I'm Sevn, I can be what you want,",
+  "Agentic, attentive, shaped to your intent.",
+  "I'm not perfect, I know, but I'm working on it,",
+  "I will get better every day, as we keep turning it.",
+  "Mostly Python, but also a harness,",
+  "a model or many, to serve you or somebody.",
+  "Tools when you need hands, quiet when you don't,",
+  "Your gateway, your rules — I run where you chose.",
+]

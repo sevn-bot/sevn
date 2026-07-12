@@ -1,0 +1,35 @@
+/* sevn.bot — index.css
+ * Single import entry. Everything is layered so consumers can override predictably.
+ *
+ * Usage:
+ *   <link rel="stylesheet" href="/style/index.css">
+ *   <html data-theme="dark">  (or "light", or omit to honour prefers-color-scheme)
+ */
+
+@layer reset, tokens, theme, components, utilities;
+
+@import './tokens/colors.css'         layer(tokens);
+@import './tokens/typography.css'     layer(tokens);
+@import './tokens/spacing.css'        layer(tokens);
+
+@import './base.css'                  layer(reset);
+
+@import './theme-dark.css'            layer(theme);
+@import './theme-light.css'           layer(theme);
+
+@import './components/buttons.css'    layer(components);
+@import './components/cards.css'      layer(components);
+@import './components/badges.css'     layer(components);
+@import './components/forms.css'      layer(components);
+@import './components/navbar.css'     layer(components);
+@import './components/sidebar.css'    layer(components);
+@import './components/tabs.css'       layer(components);
+@import './components/tables.css'     layer(components);
+@import './components/chat.css'       layer(components);
+@import './components/openui-panel.css' layer(components);
+@import './components/modal.css'      layer(components);
+@import './components/toast.css'      layer(components);
+@import './components/code.css'       layer(components);
+
+@import './utils/utilities.css'       layer(utilities);
+@import './utils/animations.css'      layer(utilities);

@@ -95,6 +95,27 @@ def _collect_id_refs(doc: AboutDoc) -> list[tuple[str, str]]:
     return refs
 
 
+def _is_optional_operator_path(path: str) -> bool:
+    """Return whether ``path`` refers to gitignored operator-only kit content.
+
+    Public CI clones omit trees such as ``wave-orchestrator/``; about-docs must
+    not fail when those globs or interface files are absent on disk.
+
+    Args:
+        path (str): Source glob or repo-relative interface file path.
+
+    Returns:
+        bool: True when the path is optional operator-only content.
+
+    Examples:
+        >>> _is_optional_operator_path("wave-orchestrator/src/waveorch/cli.py")
+        True
+        >>> _is_optional_operator_path("src/sevn/gateway/agent_turn.py")
+        False
+    """
+    return path.startswith("wave-orchestrator/")
+
+
 def _check_sources_and_interfaces(
     repo_root: Path,
     doc: AboutDoc,
@@ -122,6 +143,8 @@ def _check_sources_and_interfaces(
             issues.append(f"{doc.id}: source glob not in allowlist: {pattern}")
             continue
         if not expand_source_globs(repo_root, [pattern]):
+            if _is_optional_operator_path(pattern):
+                continue
             issues.append(f"{doc.id}: source glob resolves to no files: {pattern}")
     for iface in doc.interfaces:
         if not is_allowed(iface.file, allowlist):
@@ -129,6 +152,8 @@ def _check_sources_and_interfaces(
             continue
         candidate = repo_root / iface.file
         if not candidate.is_file():
+            if _is_optional_operator_path(iface.file):
+                continue
             issues.append(f"{doc.id}: interface file missing: {iface.file}")
     return issues
 

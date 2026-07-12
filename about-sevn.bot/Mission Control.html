@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>sevn.bot — Mission Control tabs (live state)</title>
+  <style>
+    :root {
+      --mc-bg: #0e1621; --mc-panel: #17212b; --mc-bubble: #182533; --mc-accent: #2b5278;
+      --mc-text: #f5f5f5; --mc-muted: #8b9bab; --mc-btn: #2b5278; --mc-btn-hover: #3d6a99;
+      --ready: #4caf50; --wip: #ff9800; --stub: #9e9e9e; --not: #f44336;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, sans-serif; background: #0a1018; color: var(--mc-text); line-height: 1.5; }
+    header { padding: 1.25rem 1.5rem; border-bottom: 1px solid #243447; background: var(--mc-panel); }
+    header h1 { margin: 0 0 0.35rem; font-size: 1.25rem; }
+    header p { margin: 0; color: var(--mc-muted); font-size: 0.9rem; }
+    header p + p { margin-top: 0.35rem; }
+    main { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 1.5rem; padding: 1.5rem; max-width: 1400px; margin: 0 auto; }
+    @media (max-width: 960px) { main { grid-template-columns: 1fr; } }
+    .sidebar-mock { background: var(--mc-bg); border-radius: 16px; border: 1px solid #243447; overflow: hidden; }
+    .bar { background: var(--mc-accent); padding: 0.65rem 1rem; font-weight: 600; }
+    .groups { padding: 0.75rem; display: flex; flex-direction: column; gap: 4px; }
+    .groups button { background: var(--mc-btn); border: none; color: var(--mc-text); padding: 0.5rem 0.65rem; border-radius: 8px; font-size: 0.78rem; cursor: pointer; text-align: left; }
+    .groups button:hover { background: var(--mc-btn-hover); }
+    #tree h2 { margin-top: 0; }
+    .legend { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; font-size: 0.85rem; }
+    .legend span::before { content: "●"; margin-right: 0.35rem; }
+    .legend .ready::before { color: var(--ready); }
+    .legend .wip::before { color: var(--wip); }
+    .legend .stub::before { color: var(--stub); }
+    #tree details { margin: 0.35rem 0 0.35rem 1rem; border-left: 2px solid #243447; padding-left: 0.75rem; }
+    #tree summary { cursor: pointer; font-weight: 600; }
+    #tree .meta { color: var(--mc-muted); margin: 0.35rem 0 0.65rem 0; font-size: 0.88rem; }
+    #tree .meta strong { color: var(--mc-text); }
+    #tree .meta.long { color: #b8c5d3; line-height: 1.55; max-width: 52rem; }
+    .badge { display: inline-block; font-size: 0.68rem; padding: 0.1rem 0.45rem; border-radius: 4px; margin-left: 0.35rem; vertical-align: middle; }
+    .badge.ready { background: #1b3d1f; color: #81c784; }
+    .badge.wip { background: #4a3410; color: #ffb74d; }
+    .badge.stub { background: #333; color: #bbb; }
+    .badge.not { background: #4a1515; color: #ef9a9a; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Mission Control — live tab inventory + gaps</h1>
+    <p>Tracks the sidebar tabs the gateway exposes today via <code>src/sevn/ui/dashboard/tab_registry.py</code> (<code>DASHBOARD_GROUPS</code>, <code>WIRED_SLUGS</code>). User-facing copy is generated into <code>about-sevn.bot/mission-control.html</code> by <code>make about-site</code>.</p>
+    <p>Run <code>make mission-control-docs-check</code> after changing the registry or this file. On failure, <code>make mission-control-docs-scaffold</code> inserts <code>TAB(...)</code> stubs — replace <code>TODO:</code> prose by hand.</p>
+  </header>
+  <main>
+    <section id="mock"></section>
+    <section id="tree"></section>
+  </main>
+  <script>
+    /** @typedef {{ label: string, status: string, short: string, long: string }} Tab */
+
+    function TAB(label, status, short, long) {
+      return { label, status, short, long };
+    }
+
+    const GROUPS = {      core: {
+        title: "Core",
+        status: "WIP",
+        short: "TODO: group short",
+        long: "TODO: group long",
+        tabs: [
+          TAB("Overview", "Ready",
+            "TODO: short",
+            "TODO: long (/overview)"),
+          TAB("Chat", "Ready",
+            "Owner webchat console — server-mint JWT, streaming replies, stop/fork.",
+            "In-dashboard agent chat via POST /api/v1/chat/token (owner+CSRF, server sets sub) and WebSocket /ws/webchat. New session forks scope; Stop sends cancel frame."),
+          TAB("Canvas (OpenUI)", "Ready",
+            "TODO: short",
+            "TODO: long (/canvas-openui)"),
+          TAB("Sessions", "Ready",
+            "TODO: short",
+            "TODO: long (/sessions)"),
+
+
+
+        ],
+      },
+      observability: {
+        title: "Observability",
+        status: "WIP",
+        short: "TODO: group short",
+        long: "TODO: group long",
+        tabs: [
+          TAB("Traces", "Ready",
+            "TODO: short",
+            "TODO: long (/traces)"),
+          TAB("Providers & LLMs", "Ready",
+            "TODO: short",
+            "TODO: long (/providers-llms)"),
+          TAB("Budget & Cost", "Ready",
+            "TODO: short",
+            "TODO: long (/budget-cost)"),
+          TAB("Channels", "Ready",
+            "TODO: short",
+            "TODO: long (/channels)"),
+          TAB("Sub-agents", "Ready",
+            "Live L1/L2 counts, running table with kill buttons, recent history, read-only limits.",
+            "Observability panel over the gateway sub-agent registry: count chips by level/role, a running table (id, role, specialist, task, status, age) with per-row and kill-all actions, recent rows from <code>subagent_runs</code>, and read-only limit summary with link to config editing. Data via <code>GET /api/v1/mission/subagents</code>; kill via <code>POST /api/v1/mission/subagents/{id}/kill</code> and <code>POST /api/v1/mission/subagents/kill_all</code> (owner+CSRF)."),
+          TAB("Alerts & Logs", "Ready",
+            "TODO: short",
+            "TODO: long (/alerts-logs)"),
+          TAB("Audit & Analytics", "Ready",
+            "Audit timeline, tool-frequency charts, and approval history from traces.db.",
+            "Read-only observability over <code>traces.db</code>: chronological audit timeline (tool calls, mission ops, provider events), 30-day tool-frequency and daily-volume charts, and approval audit rows. Data via <code>GET /api/v1/audit/timeline</code> and <code>/api/v1/analytics/*</code>."),
+
+
+
+
+
+
+        ],
+      },
+      agent: {
+        title: "Agent",
+        status: "WIP",
+        short: "TODO: group short",
+        long: "TODO: group long",
+        tabs: [
+          TAB("Agent Config", "Ready",
+            "TODO: short",
+            "TODO: long (/agent-config)"),
+          TAB("Tools & Permissions", "Ready",
+            "TODO: short",
+            "TODO: long (/tools-permissions)"),
+          TAB("Skills", "Ready",
+            "TODO: short",
+            "TODO: long (/skills)"),
+          TAB("MCP Servers", "Ready",
+            "TODO: short",
+            "TODO: long (/mcp-servers)"),
+          TAB("Claude Agent", "Stub",
+            "TODO: short",
+            "TODO: long (/claude-agent)"),
+          TAB("Model Params", "Ready",
+            "TODO: short",
+            "TODO: long (/model-params)"),
+          TAB("Coding Agents", "Ready",
+            "ALRCA + LAP agent registry, Telegram bindings, enable toggles.",
+            "Configure coding agents under coding_agents.* in sevn.json: enable ALRCA executors (claude_code/cursor/codex) or LiteLLM LAP bridges, bind Telegram group/topic ids for direct operator chat (bypasses Triager), and inspect last-run status. Replaces the legacy claude-agent post-v1 stub."),
+
+
+
+
+
+
+
+        ],
+      },
+      knowledge: {
+        title: "Knowledge",
+        status: "WIP",
+        short: "TODO: group short",
+        long: "TODO: group long",
+        tabs: [
+          TAB("Memory", "Ready",
+            "TODO: short",
+            "TODO: long (/memory)"),
+          TAB("Second Brain", "Ready",
+            "TODO: short",
+            "TODO: long (/second-brain)"),
+          TAB("Workspace Files", "Ready",
+            "TODO: short",
+            "TODO: long (/workspace-files)"),
+          TAB("Code Understanding", "Ready",
+            "TODO: short",
+            "TODO: long (/code-understanding)"),
+
+
+
+
+        ],
+      },
+      self-improve: {
+        title: "Self-improve",
+        status: "WIP",
+        short: "TODO: group short",
+        long: "TODO: group long",
+        tabs: [
+          TAB("Jobs", "Ready",
+            "TODO: short",
+            "TODO: long (/jobs)"),
+          TAB("Trajectories", "Ready",
+            "TODO: short",
+            "TODO: long (/trajectories)"),
+          TAB("Feedback", "Ready",
+            "TODO: short",
+            "TODO: long (/feedback)"),
+          TAB("RLM Config", "Ready",
+            "Read-only view of RLM configuration, job queue, and trajectory aggregate stats.",
+            "Displays the current RLM (Reinforcement Learning from Mistakes) configuration alongside a job-queue summary and trajectory aggregates. All data is read-only; <code>read_only: true</code> is enforced server-side. No training or fine-tuning pipeline is exposed here — see backlog #9 Path B for future trainer work."),
+          TAB("Experiments & Metrics", "Ready",
+            "TODO: short",
+            "TODO: long (/experiments-metrics)"),
+
+
+
+
+
+        ],
+      },
+      evolution: {
+        title: "Evolution",
+        status: "WIP",
+        short: "TODO: group short",
+        long: "TODO: group long",
+        tabs: [
+          TAB("Issues", "Ready",
+            "TODO: short",
+            "TODO: long (/issues)"),
+          TAB("Pipelines", "Ready",
+            "TODO: short",
+            "TODO: long (/pipelines)"),
+          TAB("Approvals", "Ready",
+            "TODO: short",
+            "TODO: long (/approvals)"),
+          TAB("Spec-Kit", "Ready",
+            "TODO: short",
+            "TODO: long (/spec-kit)"),
+          TAB("Evolution Traces", "Ready",
+            "TODO: short",
+            "TODO: long (/evolution-traces)"),
+          TAB("Stats", "Ready",
+            "TODO: short",
+            "TODO: long (/stats)"),
+
+
+
+
+
+
+        ],
+      },
+      ops: {
+        title: "Ops",
+        status: "WIP",
+        short: "TODO: group short",
+        long: "TODO: group long",
+        tabs: [
+          TAB("Cron", "Ready",
+            "TODO: short",
+            "TODO: long (/cron)"),
+          TAB("Security", "Ready",
+            "TODO: short",
+            "TODO: long (/security)"),
+          TAB("Secrets", "Ready",
+            "TODO: short",
+            "TODO: long (/secrets)"),
+          TAB("Egress proxy", "Ready",
+            "TODO: short",
+            "TODO: long (/egress-proxy)"),
+          TAB("Tunnels & Infra", "Ready",
+            "Cloudflared lifecycle — start/stop tunnel, process health, public URL",
+            "Full cloudflared lifecycle manager: spawns/terminates cloudflared as a child process (SIGTERM + SIGKILL after 5 s); exposes GET /api/v1/tunnels/process for live pid/healthy/public_url; POST /api/v1/tunnels/start and /tunnels/stop require confirm=true and owner+CSRF. Tunnel mode, config-derived tunnel_active, and gateway bind shown alongside doctor probes. Start/Stop buttons in dashboard visible when mode=cloudflare. Schema adds tunnel_id, token (prefer ${SECRET:...}), config_path, hostname, auto_start, metrics_addr under infrastructure.tunnel."),
+          TAB("Backup & Snapshots", "Ready",
+            "TODO: short",
+            "TODO: long (/backup-snapshots)"),
+          TAB("Config", "Ready",
+            "TODO: short",
+            "TODO: long (/config)"),
+          TAB("Schema & Ontology", "Ready",
+            "TODO: short",
+            "TODO: long (/schema-ontology)"),
+          TAB("sevn CLI", "Ready",
+            "Run sevn subcommands from the browser",
+            "Workspace-scoped CLI console: shortcut buttons and a free-form args box call POST /api/v1/cli/run (owner+CSRF). Output appears in scrollback; destructive subcommands require an explicit confirm token."),
+          TAB("Terminal", "Ready",
+            "TODO: short",
+            "TODO: long (/terminal)"),
+
+
+
+
+
+
+
+
+
+
+        ],
+      },
+      surfaces: {
+        title: "Surfaces",
+        status: "WIP",
+        short: "TODO: group short",
+        long: "TODO: group long",
+        tabs: [
+          TAB("Telegram Menu", "Ready",
+            "TODO: short",
+            "TODO: long (/telegram-menu)"),
+          TAB("Web Apps", "Ready",
+            "TODO: short",
+            "TODO: long (/web-apps)"),
+          TAB("Onboarding", "Ready",
+            "TODO: short",
+            "TODO: long (/onboarding)"),
+          TAB("Users & RBAC", "Ready",
+            "TODO: short",
+            "TODO: long (/users-rbac)"),
+
+
+
+
+        ],
+      },
+
+    };
+
+    const GROUP_NAV = [
+      ["core", "Core"],
+      ["observability", "Observability"],
+      ["agent", "Agent"],
+      ["knowledge", "Knowledge"],
+      ["self-improve", "Self-improve"],
+      ["evolution", "Evolution"],
+      ["ops", "Ops"],
+      ["surfaces", "Surfaces"],
+    ];
+  </script>
+</body>
+</html>

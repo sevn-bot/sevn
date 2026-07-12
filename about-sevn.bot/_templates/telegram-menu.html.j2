@@ -1,0 +1,138 @@
+{% extends "base.html.j2" %}
+{% block extra_head %}
+<style>
+  :root {
+    --tg-bg: #0e1621; --tg-bubble: #182533; --tg-accent: #2b5278;
+    --tg-text: #f5f5f5; --tg-btn: #2b5278; --tg-btn-hover: #3d6a99;
+  }
+  .tg-wrap { max-width: 420px; margin: 0 auto 2rem; }
+  .phone { background: var(--tg-bg); border-radius: 16px; border: 1px solid #243447; overflow: hidden; }
+  .bar { background: var(--tg-accent); padding: 0.65rem 1rem; font-weight: 600; color: var(--tg-text); }
+  .bubble { background: var(--tg-bubble); margin: 1rem; padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.85rem; color: var(--tg-text); min-height: 3rem; white-space: pre-wrap; line-height: 1.45; }
+  .keys { padding: 0 0.75rem 1rem; display: flex; flex-direction: column; gap: 6px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .row.single { grid-template-columns: 1fr; }
+  .keys button { background: var(--tg-btn); border: none; color: var(--tg-text); padding: 0.55rem 0.4rem; border-radius: 8px; font-size: 0.78rem; cursor: pointer; }
+  .keys button:hover:not(:disabled) { background: var(--tg-btn-hover); }
+  .keys button:disabled { opacity: 0.55; cursor: help; }
+  .keys button.nav-tile { cursor: pointer; }
+  .legend { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; font-size: 0.85rem; color: var(--sevn-fg-muted); }
+</style>
+{% endblock %}
+{% block content %}
+<div class="help-body">{{ body_html | safe }}</div>
+<p class="legend">
+  <span><span class="badge badge-available">Available</span> active in the live bot today</span>
+  <span><span class="badge badge-soon">Coming soon</span> visible but not active yet</span>
+  <span><span class="badge badge-unavailable">Not yet available</span> planned</span>
+</p>
+<div class="tg-wrap">
+  <div class="phone" id="phone">
+    <div class="bar">sevn.bot · /config</div>
+    <div class="bubble" id="bubble">Tap a section below to explore settings.</div>
+    <div class="keys" id="keys"></div>
+  </div>
+</div>
+<script>
+const SECTIONS = {{ sections | tojson }};
+const ROOT_TILES = {{ root_tiles | tojson }};
+
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function badgeClass(status) {
+  if (status === "Available") return "badge-available";
+  if (status === "Not yet available") return "badge-unavailable";
+  return "badge-soon";
+}
+
+let current = "root";
+
+function sectionIntro(sec) {
+  return "<strong>" + esc(sec.title) + "</strong> <span class=\"badge " + badgeClass(sec.status) + "\">" + esc(sec.status) + "</span><br><br>" + esc(sec.short);
+}
+
+function showActionDetail(btn) {
+  const bubble = document.getElementById("bubble");
+  bubble.innerHTML = "<strong>" + esc(btn.label) + "</strong> <span class=\"badge " + badgeClass(btn.status) + "\">" + esc(btn.status) + "</span><br><br>" + esc(btn.long || btn.short);
+}
+
+function render() {
+  const bubble = document.getElementById("bubble");
+  const keys = document.getElementById("keys");
+  keys.innerHTML = "";
+
+  if (current === "root") {
+    bubble.textContent = "Choose a settings area. Hover for a hint; tap a tile to open that section.";
+    let row = [];
+    ROOT_TILES.forEach(t => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "nav-tile";
+      b.textContent = t.label;
+      if (t.short) b.title = t.short;
+      b.onclick = () => { current = t.section; render(); };
+      row.push(b);
+      if (row.length === 2) {
+        const div = document.createElement("div");
+        div.className = "row";
+        row.forEach(el => div.appendChild(el));
+        keys.appendChild(div);
+        row = [];
+      }
+    });
+    if (row.length) {
+      const div = document.createElement("div");
+      div.className = row.length === 1 ? "row single" : "row";
+      row.forEach(el => div.appendChild(el));
+      keys.appendChild(div);
+    }
+    return;
+  }
+
+  const sec = SECTIONS.find(s => s.id === current);
+  if (!sec) { current = "root"; render(); return; }
+
+  bubble.innerHTML = sectionIntro(sec);
+
+  const back = document.createElement("div");
+  back.className = "row single";
+  const backBtn = document.createElement("button");
+  backBtn.type = "button";
+  backBtn.className = "nav-tile";
+  backBtn.textContent = "◀ All sections";
+  backBtn.title = "Return to the main settings menu";
+  backBtn.onclick = () => { current = "root"; render(); };
+  back.appendChild(backBtn);
+  keys.appendChild(back);
+
+  let row = [];
+  sec.buttons.forEach(btn => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = btn.label;
+    if (btn.short) b.title = btn.short;
+    if (btn.status !== "Available") b.disabled = true;
+    if (btn.final) {
+      b.onclick = () => showActionDetail(btn);
+    }
+    row.push(b);
+    if (row.length === 2) {
+      const div = document.createElement("div");
+      div.className = "row";
+      row.forEach(el => div.appendChild(el));
+      keys.appendChild(div);
+      row = [];
+    }
+  });
+  if (row.length) {
+    const div = document.createElement("div");
+    div.className = row.length === 1 ? "row single" : "row";
+    row.forEach(el => div.appendChild(el));
+    keys.appendChild(div);
+  }
+}
+render();
+</script>
+{% endblock %}

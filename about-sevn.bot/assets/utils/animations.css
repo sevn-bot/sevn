@@ -1,0 +1,48 @@
+/* sevn.bot — animation primitives.
+ * Restraint by default (≤200ms state, ≤500ms entrance). Spring/bounce only for celebration.
+ */
+
+@keyframes sevn-fade-in-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes sevn-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes sevn-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+@keyframes sevn-pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(95,177,247,0.5); }
+  50%      { box-shadow: 0 0 0 6px rgba(95,177,247,0); }
+}
+@keyframes sevn-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+@keyframes sevn-caret-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.animate-fade-in-up { animation: sevn-fade-in-up var(--sevn-duration-slow) var(--sevn-ease-out) both; }
+.animate-fade-in    { animation: sevn-fade-in    var(--sevn-duration-base) var(--sevn-ease-out) both; }
+.animate-float      { animation: sevn-float 3s var(--sevn-ease-in-out) infinite; }
+.animate-pulse      { animation: sevn-pulse-glow 1.6s var(--sevn-ease-in-out) infinite; }
+.animate-caret      { animation: sevn-caret-blink 1.05s steps(2,end) infinite; }
+.animate-shimmer {
+  background: linear-gradient(90deg, var(--sevn-surface-2) 0%, var(--sevn-surface-3) 50%, var(--sevn-surface-2) 100%);
+  background-size: 200% 100%;
+  animation: sevn-shimmer 1.6s var(--sevn-ease-in-out) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up,
+  .animate-fade-in,
+  .animate-float,
+  .animate-pulse,
+  .animate-shimmer,
+  .animate-caret { animation: none !important; }
+}

@@ -1,0 +1,31 @@
+title: Getting started
+summary: Install sevn.bot, complete setup, and send your first message.
+body: |
+  <h2>Install</h2>
+  <pre><code>git clone https://github.com/sevn-bot/sevn.git
+  cd sevn
+  make setup
+
+  sevn onboard</code></pre>
+  <p><code>make setup</code> installs uv (when missing), fetches Python 3.12+ via uv, and installs dependencies. <code>sevn onboard</code> runs the setup wizard and registers gateway + proxy daemons by default.</p>
+  <p>Prefer the terminal UI? Run <code>sevn onboard --cli</code> instead of the default browser wizard.</p>
+  <h2>Keep your install up to date</h2>
+  <p>From inside your clone, pull the latest source and reinstall when you want a manual update:</p>
+  <pre><code>sevn sync --latest</code></pre>
+  <h2>Remote VPS deploy</h2>
+  <p>To provision a bot on a server you control, export a bundle with <code>sevn export-secrets</code>, copy <code>deploy/inventory.example.toml</code> to a local inventory file, then run <code>make deploy-remote-check</code> and <code>make deploy-remote</code>. See the operator runbook in the repository checkout.</p>
+  <h2>First conversation</h2>
+  <p>After the gateway is running, open Telegram and message your bot, or visit the web UI URL shown at the end of onboarding. Type naturally — the assistant routes your message, picks tools when needed, and replies in the same channel.</p>
+  <h2>Useful commands in Telegram</h2>
+  <ul>
+    <li><code>/new</code> — start a fresh conversation</li>
+    <li><code>/config</code> — open the inline settings menu (<a href="telegram-menu.html">preview here</a>)</li>
+    <li><code>/help</code> — short command list</li>
+    <li><code>/status</code> — gateway health snapshot</li>
+  </ul>
+  <h2>Next steps</h2>
+  <ul>
+    <li>Explore <a href="mission-control.html">Mission Control</a> tabs when the web dashboard is enabled</li>
+    <li>Explore <a href="config.html">common settings</a> you may want to tune</li>
+    <li>Read <a href="troubleshooting.html">troubleshooting</a> if something does not connect</li>
+  </ul>

@@ -1,0 +1,34 @@
+{
+  "elements": [
+    {
+      "name": "Amazon",
+      "staffCount": 750000,
+      "type": "PUBLIC_COMPANY",
+      "description": "E-commerce and cloud",
+      "companyIndustries": [{"localizedName": "Internet"}],
+      "headquarter": {
+        "line1": "410 Terry Ave N",
+        "city": "Seattle",
+        "country": "US",
+        "postalCode": "98109"
+      },
+      "companyPageUrl": "https://www.amazon.com",
+      "trackingInfo": {"objectUrn": "urn:li:company:1586"},
+      "universalName": "amazon",
+      "logo": {
+        "image": {
+          "com.linkedin.common.VectorImage": {
+            "rootUrl": "https://media.licdn.com/",
+            "artifacts": [{"fileIdentifyingUrlPathSegment": "logo.png"}]
+          }
+        }
+      },
+      "backgroundCoverPhoto": {
+        "com.linkedin.common.VectorImage": {
+          "rootUrl": "https://media.licdn.com/",
+          "artifacts": [{"fileIdentifyingUrlPathSegment": "banner.png"}]
+        }
+      }
+    }
+  ]
+}

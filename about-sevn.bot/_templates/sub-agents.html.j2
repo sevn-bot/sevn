@@ -1,0 +1,17 @@
+{% extends "base.html.j2" %}
+{% block extra_head %}
+  <style>
+    .subagents-chart-wrap { max-width: 100%; overflow-x: auto; margin: 1.25rem 0 2rem; border: 1px solid var(--sevn-border); border-radius: 8px; padding: 0.75rem; background: #12151a; }
+    .subagents-chart-wrap img, .subagents-chart-wrap object { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+  </style>
+{% endblock %}
+{% block content %}
+<div class="help-body">
+  {{ body_html | safe }}
+  <div class="subagents-chart-wrap" aria-label="Sub-agents topology chart">
+    <object data="assets/subagents-chart.svg" type="image/svg+xml" width="800" height="480">
+      <img src="assets/subagents-chart.svg" alt="Sub-agents topology: L1 roles, L2 workers, multi queue classifier, and kill surfaces" width="800" height="480" />
+    </object>
+  </div>
+</div>
+{% endblock %}

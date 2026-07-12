@@ -1,0 +1,1 @@
+Core Chat Talk to sevn as the dashboard owner via /ws/webchat. Token is server-minted — no client-controlled identity. 503 /api/v1/chat/token Reconnect New session Stop Message Send

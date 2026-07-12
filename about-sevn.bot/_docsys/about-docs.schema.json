@@ -1,0 +1,219 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sevn.bot/schema/about-docs.schema.json",
+  "title": "About Docs Frontmatter Schema",
+  "description": "YAML frontmatter schema for the about-docs system. Code-owned, machine-validated fields for PRD and spec documents under about-sevn.bot/prd/ and about-sevn.bot/specs/. The Pydantic model src/sevn/docs/about/model.py is the runtime source of truth and must export a schema equivalent to this file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "kind",
+    "title",
+    "status",
+    "owner",
+    "summary",
+    "last_updated"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^(prd|spec)-\\d{2}-[a-z0-9-]+$",
+      "description": "Stable slug. Pattern: kind-NN-slug (e.g. spec-17-gateway, prd-04-getting-things-done). Used for all doc-to-doc links."
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "prd",
+        "spec"
+      ],
+      "description": "Document kind discriminator."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable title."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "scaffold",
+        "ready",
+        "done",
+        "rejected"
+      ],
+      "description": "Document status."
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Owner name (default: Alex)."
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "One-line summary (<=200 chars). LLM-owned; rendered in the generated index."
+    },
+    "last_updated": {
+      "type": "string",
+      "format": "date",
+      "description": "ISO date when the doc was last regenerated. Code-owned; managed by extract/generate."
+    },
+    "fingerprint": {
+      "type": "string",
+      "description": "Digest of sources at last regen (e.g. sha256:...). Code-owned; managed by extract/generate; do not hand-edit."
+    },
+    "related": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(prd|spec)-\\d{2}-[a-z0-9-]+$"
+      },
+      "description": "Cross-links to other about-docs by id (never by path)."
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Source globs under allowed roots describing the code this doc covers. Drives the fingerprint drift gate. Required for specs; optional for prds."
+    },
+    "parent_prd": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^prd-\\d{2}-[a-z0-9-]+$",
+      "description": "For a spec: the PRD it implements. For a prd: its umbrella PRD (null for prd-00-main)."
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^spec-\\d{2}-[a-z0-9-]+$"
+      },
+      "description": "spec-only: other specs that must exist first."
+    },
+    "build_phase": {
+      "type": "string",
+      "description": "spec-only: build phase identifier (e.g. Phase 2)."
+    },
+    "interfaces": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/interface"
+      },
+      "description": "spec-only: public symbols extracted from AST."
+    },
+    "specs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^spec-\\d{2}-[a-z0-9-]+$"
+      },
+      "description": "prd-only: implementing specs, by id."
+    },
+    "personas": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "prd-only: named personas referenced in the body."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "spec"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "parent_prd",
+          "sources"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "specs"
+              ]
+            },
+            {
+              "required": [
+                "personas"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "prd"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "parent_prd"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "depends_on"
+              ]
+            },
+            {
+              "required": [
+                "build_phase"
+              ]
+            },
+            {
+              "required": [
+                "interfaces"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "interface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "file"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Public symbol name."
+        },
+        "file": {
+          "type": "string",
+          "description": "Real source path under allowed roots."
+        },
+        "symbol": {
+          "type": "string",
+          "description": "Optional symbol reference (function, class, etc.)."
+        }
+      }
+    }
+  }
+}

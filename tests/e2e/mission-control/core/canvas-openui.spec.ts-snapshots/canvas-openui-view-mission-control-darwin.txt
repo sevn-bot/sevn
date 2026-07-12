@@ -1,0 +1,1 @@
+Core Canvas (OpenUI) No live OpenUI canvas yet. Ask the agent to render a layout with openui_render or the bundled canvas skill. When a render exists, this tab embeds GET /openui/<token> in a sandboxed iframe (no scripts).

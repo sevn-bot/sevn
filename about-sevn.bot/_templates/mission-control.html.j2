@@ -1,0 +1,100 @@
+{% extends "base.html.j2" %}
+{% block extra_head %}
+<style>
+  :root {
+    --mc-bg: #0e1621; --mc-bubble: #182533; --mc-accent: #2b5278;
+    --mc-text: #f5f5f5; --mc-btn: #2b5278; --mc-btn-hover: #3d6a99;
+  }
+  .mc-wrap { max-width: 420px; margin: 0 auto 2rem; }
+  .sidebar-mock { background: var(--mc-bg); border-radius: 16px; border: 1px solid #243447; overflow: hidden; }
+  .bar { background: var(--mc-accent); padding: 0.65rem 1rem; font-weight: 600; color: var(--mc-text); }
+  .bubble { background: var(--mc-bubble); margin: 1rem; padding: 0.75rem 1rem; border-radius: 12px; font-size: 0.85rem; color: var(--mc-text); min-height: 3rem; white-space: pre-wrap; line-height: 1.45; }
+  .groups { padding: 0 0.75rem 1rem; display: flex; flex-direction: column; gap: 4px; }
+  .groups button { background: var(--mc-btn); border: none; color: var(--mc-text); padding: 0.5rem 0.65rem; border-radius: 8px; font-size: 0.78rem; cursor: pointer; text-align: left; }
+  .groups button:hover { background: var(--mc-btn-hover); }
+  .groups button.tab-btn { margin-left: 0.75rem; font-size: 0.74rem; }
+  .legend { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; font-size: 0.85rem; color: var(--sevn-fg-muted); }
+</style>
+{% endblock %}
+{% block content %}
+<div class="help-body">{{ body_html | safe }}</div>
+<p class="legend">
+  <span><span class="badge badge-available">Available</span> wired in the live dashboard today</span>
+  <span><span class="badge badge-soon">Coming soon</span> visible but not fully wired</span>
+  <span><span class="badge badge-unavailable">Not yet available</span> planned</span>
+</p>
+<div class="mc-wrap">
+  <div class="sidebar-mock" id="sidebar">
+    <div class="bar">sevn.bot · Mission Control</div>
+    <div class="bubble" id="bubble">Choose a group below to explore tabs.</div>
+    <div class="groups" id="groups"></div>
+  </div>
+</div>
+<script>
+const GROUPS = {{ groups | tojson }};
+const GROUP_NAV = {{ group_nav | tojson }};
+
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function badgeClass(status) {
+  if (status === "Available") return "badge-available";
+  if (status === "Not yet available") return "badge-unavailable";
+  return "badge-soon";
+}
+
+let currentGroup = null;
+
+function groupIntro(grp) {
+  return "<strong>" + esc(grp.title) + "</strong> <span class=\"badge " + badgeClass(grp.status) + "\">" + esc(grp.status) + "</span><br><br>" + esc(grp.short);
+}
+
+function showTabDetail(tab) {
+  const bubble = document.getElementById("bubble");
+  bubble.innerHTML = "<strong>" + esc(tab.label) + "</strong> <span class=\"badge " + badgeClass(tab.status) + "\">" + esc(tab.status) + "</span><br><br>" + esc(tab.long || tab.short);
+}
+
+function render() {
+  const bubble = document.getElementById("bubble");
+  const groupsEl = document.getElementById("groups");
+  groupsEl.innerHTML = "";
+
+  if (!currentGroup) {
+    bubble.textContent = "Choose a sidebar group. Hover for a hint; tap a group to list its tabs.";
+    GROUP_NAV.forEach(g => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = g.label;
+      if (g.short) b.title = g.short;
+      b.onclick = () => { currentGroup = g.id; render(); };
+      groupsEl.appendChild(b);
+    });
+    return;
+  }
+
+  const grp = GROUPS.find(x => x.id === currentGroup);
+  if (!grp) { currentGroup = null; render(); return; }
+
+  bubble.innerHTML = groupIntro(grp);
+
+  const back = document.createElement("button");
+  back.type = "button";
+  back.textContent = "← All groups";
+  back.onclick = () => { currentGroup = null; render(); };
+  groupsEl.appendChild(back);
+
+  (grp.tabs || []).forEach(tab => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "tab-btn";
+    b.textContent = tab.label;
+    if (tab.short) b.title = tab.short;
+    b.onclick = () => showTabDetail(tab);
+    groupsEl.appendChild(b);
+  });
+}
+
+render();
+</script>
+{% endblock %}

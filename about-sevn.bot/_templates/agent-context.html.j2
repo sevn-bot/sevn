@@ -1,0 +1,56 @@
+{% extends "base.html.j2" %}
+{% block extra_head %}
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    .ctx-nav { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1.25rem 0 2rem; }
+    .ctx-nav a { font-size: 0.85rem; padding: 0.35rem 0.75rem; border-radius: 6px; border: 1px solid var(--sevn-border); color: var(--sevn-fg-muted); text-decoration: none; }
+    .ctx-nav a:hover { color: var(--sevn-primary); border-color: var(--sevn-primary); }
+    .ctx-agent { margin-bottom: 3rem; }
+    .ctx-mermaid { background: #1a1f26; border: 1px solid var(--sevn-border); border-radius: 8px; padding: 1rem; margin: 1rem 0; overflow-x: auto; }
+    .ctx-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin: 1rem 0; }
+    .ctx-table th, .ctx-table td { text-align: left; padding: 0.45rem 0.65rem; border-bottom: 1px solid var(--sevn-border); vertical-align: top; }
+    .type-badge { display: inline-block; font-size: 0.72rem; padding: 0.12rem 0.45rem; border-radius: 4px; font-family: ui-monospace, monospace; background: #333; color: #ccc; }
+    .ctx-example { margin-top: 1.25rem; padding: 1rem; border-left: 3px solid var(--sevn-primary); background: #1a1f26; font-size: 0.88rem; }
+    .ctx-example dl { margin: 0; display: grid; grid-template-columns: 10rem 1fr; gap: 0.25rem 1rem; }
+    .ctx-example dt { color: var(--sevn-fg-muted); }
+    .ctx-example dd { margin: 0; font-family: ui-monospace, monospace; font-size: 0.82rem; }
+  </style>
+{% endblock %}
+{% block content %}
+  <div class="help-body">{{ body_html | safe }}</div>
+  <nav class="ctx-nav" aria-label="Agent sections">
+    {% for agent in manifest.agents %}<a href="#agent-{{ agent.id }}">{{ agent.label }}</a>{% endfor %}
+  </nav>
+  {% for agent in manifest.agents %}
+  <section class="ctx-agent" id="agent-{{ agent.id }}">
+    <h2>{{ agent.label }}</h2>
+    <p>{% if agent.uses_llm %}Uses LLM{% else %}No executor LLM{% endif %} · wire: <code>{{ agent.wire }}</code></p>
+    <div class="ctx-mermaid"><pre class="mermaid">{{ agent_mermaid[agent.id] }}</pre></div>
+    <table class="ctx-table">
+      <thead><tr><th>#</th><th>Slot</th><th>Role</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>
+        {% for slot in agent.slots %}
+        <tr>
+          <td>{{ slot.order }}</td>
+          <td><strong>{{ slot.label }}</strong><br><code>{{ slot.id }}</code></td>
+          <td><code>{{ slot.role }}</code></td>
+          <td><span class="type-badge">{{ slot.content_type }}</span></td>
+          <td>{% if slot.description %}{{ slot.description }}{% endif %}{% if slot.blocks %}<ul>{% for block in slot.blocks %}<li><code>{{ block.id }}</code></li>{% endfor %}</ul>{% endif %}{% if slot.segments %}<ul>{% for seg in slot.segments %}<li><code>{{ seg.id }}</code></li>{% endfor %}</ul>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if example_turn and example_turn.spans %}
+      {% set span_key = 'triager.context' if agent.id == 'triager' else ('tier_b.context' if agent.id == 'tier_b' else none) %}
+      {% if span_key and example_turn.spans.get(span_key) %}
+      <div class="ctx-example"><h3>Example turn</h3><dl>
+        {% for slot_id, slot_data in example_turn.spans[span_key].slots.items() %}
+        <dt>{{ slot_id }}</dt><dd>{% if slot_data is mapping %}{% for k, v in slot_data.items() %}{{ k }}={{ v }}{% if not loop.last %}; {% endif %}{% endfor %}{% else %}{{ slot_data }}{% endif %}</dd>
+        {% endfor %}
+      </dl></div>
+      {% endif %}
+    {% endif %}
+  </section>
+  {% endfor %}
+  <script>mermaid.initialize({ startOnLoad: true, theme: "dark", securityLevel: "loose" });</script>
+{% endblock %}

@@ -1,0 +1,11 @@
+Apache License 2.0
+
+Upstream Printing Press Library CLIs (espn-pp-cli, flight-goat-pp-cli,
+movie-goat-pp-cli, recipe-goat-pp-cli) are authored by Matt Van Horn and
+contributors and licensed under the Apache License, Version 2.0.
+
+See https://github.com/mvanhorn/printing-press-library for the full license text.
+
+sevn.bot wrapper scripts (scripts/espn.py, scripts/flight_goat.py,
+scripts/movie_goat.py, scripts/recipe_goat.py, scripts/_pp_cli.py) are part
+of the sevn.bot project under its own license.

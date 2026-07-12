@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- Bundled skills, workspace templates, doctor solutions, docs site (`about-sevn.bot/`), readme pipeline (`docs/readmes/`), brand assets, and remaining test suites for the pre-0.0.1 migration import (I5)
 - Core runtime packages for the pre-0.0.1 migration import (config, storage, workspace, gateway, agent, security, proxy, and related tests)
 - Configurable Second Brain vault path via `second_brain.paths.vault` (CLI setup, Telegram `/config`, onboarding, doctor)
 
@@ -24,6 +25,8 @@ are cut into a dated, versioned section at release time.
 ### Fixed
 
 - CI failures from `secrets.*` gitignore rule excluding `src/sevn/config/sections/secrets.py` (ModuleNotFoundError and mypy `no-any-return` on CI)
+- PR #6 CI gates: skip optional `wave-orchestrator/` about-docs paths on public clones, defer spec-36 until F3, remove premature `subagents_registry` doctor catalog entry, and mock CDP attach in onboarding browser context-manager test
+- PR #6 CI: vendor changelog validator into tracked `scripts/` + `infra/`, stabilize GitHub webhook dedupe test with file-backed sqlite, disable replay worker in dashboard CSRF gate test to avoid xdist hang, and generate code index before `ci-parity` drift gate
 
 ### Security
 

@@ -105,6 +105,7 @@ See [README catalog](docs/readmes/INDEX.md) and [Architecture](about-sevn.bot/AR
 | [Self-improvement](docs/readmes/self-improve.md) | `subsystem` | Self-upgrade harness, eval workers, spec-kit stages, and improve jobs. |
 | [Integrations](docs/readmes/integrations.md) | `subsystem` | Cursor Cloud, GitHub skill clients, and external integration call paths. |
 | [Onboarding](docs/readmes/onboarding.md) | `guide` | Operator setup: CLI, web wizard, Telegram flows, daemon install, and profiles. |
+| [Sub-agents](docs/readmes/subagents.md) | `subsystem` | Level-1 role runs, level-2 workers, specialists, multi queue mode, registry, and kill surfaces. |
 
 <a id="quick-start-tldr"></a>
 

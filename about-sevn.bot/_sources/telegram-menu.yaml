@@ -1,0 +1,10 @@
+title: Telegram settings menu
+summary: Preview the /config menu — hover for a short hint, tap an action button for details.
+body: |
+  <p>In Telegram, send <code>/config</code> to open the settings menu. Use the preview below to explore each section:</p>
+  <ul>
+    <li><strong>Hover</strong> a button for a one-line summary.</li>
+    <li><strong>Tap a section tile</strong> (Session, Models, …) to open that group.</li>
+    <li><strong>Tap an action button</strong> inside a section to read what it does (preview only — the live bot may still show “coming soon” on inactive buttons).</li>
+  </ul>
+  <p><em>This is a documentation preview, not the live bot.</em></p>

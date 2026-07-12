@@ -299,28 +299,28 @@ about-docs-schema: ## Export about-docs JSON Schema to about-sevn.bot/_docsys/ab
 	$(UV) run sevn about-docs schema
 
 about-docs-check: ## Validate about-docs (schema, drift, references, index)
-	PYTHONPATH=. $(UV) run sevn about-docs check
+	PYTHONPATH=. $(UV) run sevn about-docs check --repo .
 
 changelog-check: ## Changelog gate: Keep-a-Changelog lint + Unreleased diff gate (SEVN_CI_BASE=<ref>)
-	python3 spec-kit-wave/src/skw/changelog_validate.py --repo . --base $${SEVN_CI_BASE:-origin/main}
+	python3 scripts/changelog_validate.py --repo . --base $${SEVN_CI_BASE:-origin/main}
 
 changelog-eval: ## Advisory LLM double-score of Unreleased entries (not in CI; needs model access — MODEL=, BASE=)
 	PYTHONPATH=spec-kit-wave/src $(UV) run python -m skw.changelog_eval --repo . \
 		$(if $(MODEL),--model $(MODEL),) $(if $(BASE),--base $(BASE),)
 
 about-docs-migrate: ## Migrate legacy root prd/specs seed into about-sevn.bot/
-	PYTHONPATH=. $(UV) run sevn about-docs migrate
+	PYTHONPATH=. $(UV) run sevn about-docs migrate --repo .
 
 about-docs-index: ## Render prd/spec README index tables
-	PYTHONPATH=. $(UV) run sevn about-docs index
+	PYTHONPATH=. $(UV) run sevn about-docs index --repo .
 
 about-docs-extract: ## Extract code-owned frontmatter for one doc (DOC_ID=spec-17-gateway)
 	@test -n "$(DOC_ID)" || (echo "usage: make about-docs-extract DOC_ID=spec-17-gateway" && exit 1)
-	PYTHONPATH=. $(UV) run sevn about-docs extract $(DOC_ID)
+	PYTHONPATH=. $(UV) run sevn about-docs extract $(DOC_ID) --repo .
 
 about-docs-generate: ## Generate offline body for one doc (DOC_ID=spec-17-gateway)
 	@test -n "$(DOC_ID)" || (echo "usage: make about-docs-generate DOC_ID=spec-17-gateway" && exit 1)
-	PYTHONPATH=. $(UV) run sevn about-docs generate $(DOC_ID)
+	PYTHONPATH=. $(UV) run sevn about-docs generate $(DOC_ID) --repo .
 
 about-site: ## Regenerate about-sevn.bot user help HTML + assets
 	$(UV) run python scripts/build_about_site.py build
@@ -358,7 +358,7 @@ ci-docs: telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme
 
 ci-skills: skills-core-check skillspector-check skills-index-check dreaming-allowlist-check ## Skills inventory tier
 
-ci-parity: deploy-remote-report-check code-index-check ## Parity tier (public)
+ci-parity: code-index deploy-remote-report-check code-index-check ## Parity tier (public)
 
 ci: ci-core ci-infra ci-docs ci-skills ci-parity ## Full gate (same as CI)
 
@@ -368,7 +368,7 @@ CI_STEPS := lockcheck lint typecheck pyright test doctest security build doctor-
 	config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards agent-context-manifest-check \
 	telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check about-site-check about-docs-check about-docs-schema changelog-check \
 	skills-core-check skillspector-check skills-index-check dreaming-allowlist-check \
-	deploy-remote-report-check code-index-check
+	code-index deploy-remote-report-check code-index-check
 
 ci-steps: ## Print the ordered `make ci` step list (consumed by ci-resume)
 	@echo $(CI_STEPS)

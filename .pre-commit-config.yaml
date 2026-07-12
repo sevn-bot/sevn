@@ -113,7 +113,7 @@ repos:
 
       - id: changelog-staged-check
         name: Changelog gate (staged src/scripts require a staged Unreleased entry)
-        entry: python3 spec-kit-wave/src/skw/changelog_validate.py --repo . --staged
+        entry: python3 scripts/changelog_validate.py --repo . --staged
         language: system
         # commit-msg stage: pre-commit appends the message file path (read for the
         # `changelog: skip` trailer); the hook inspects the staged index itself, so

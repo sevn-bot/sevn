@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent context — sevn.bot help</title>
+  <link rel="icon" href="assets/logos/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="assets/index.css" />
+  <style>
+    .help-shell { display: grid; grid-template-columns: 220px 1fr; gap: 2rem; max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    @media (max-width: 800px) { .help-shell { grid-template-columns: 1fr; } }
+    .help-nav { position: sticky; top: 1rem; align-self: start; }
+    .help-nav a { display: block; padding: 0.35rem 0; color: var(--sevn-fg-muted); text-decoration: none; font-size: 0.92rem; }
+    .help-nav a:hover, .help-nav a.active { color: var(--sevn-primary); }
+    .help-main h1 { margin-top: 0; font-size: 1.75rem; color: var(--sevn-fg-strong); }
+    .help-summary { color: var(--sevn-fg-muted); font-size: 1.05rem; margin-bottom: 1.5rem; max-width: 60ch; }
+    .help-footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--sevn-border); font-size: 0.78rem; color: var(--sevn-fg-muted); }
+    .help-generated-note { font-size: 0.85rem; color: var(--sevn-fg-muted); font-style: italic; margin-bottom: 1rem; }
+    .help-body p { line-height: 1.6; max-width: 65ch; }
+    .help-body ul, .help-body ol { max-width: 65ch; line-height: 1.6; }
+    .help-body a { color: var(--sevn-primary); }
+    .catalog-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 1rem 0; }
+    .catalog-table th, .catalog-table td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--sevn-border); vertical-align: top; }
+    .catalog-table th { color: var(--sevn-fg-muted); font-weight: 600; }
+    .badge { display: inline-block; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; }
+    .badge-available { background: #1b3d1f; color: #81c784; }
+    .badge-soon { background: #4a3410; color: #ffb74d; }
+    .badge-unavailable { background: #333; color: #bbb; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    .ctx-nav { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1.25rem 0 2rem; }
+    .ctx-nav a { font-size: 0.85rem; padding: 0.35rem 0.75rem; border-radius: 6px; border: 1px solid var(--sevn-border); color: var(--sevn-fg-muted); text-decoration: none; }
+    .ctx-nav a:hover { color: var(--sevn-primary); border-color: var(--sevn-primary); }
+    .ctx-agent { margin-bottom: 3rem; }
+    .ctx-mermaid { background: #1a1f26; border: 1px solid var(--sevn-border); border-radius: 8px; padding: 1rem; margin: 1rem 0; overflow-x: auto; }
+    .ctx-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin: 1rem 0; }
+    .ctx-table th, .ctx-table td { text-align: left; padding: 0.45rem 0.65rem; border-bottom: 1px solid var(--sevn-border); vertical-align: top; }
+    .type-badge { display: inline-block; font-size: 0.72rem; padding: 0.12rem 0.45rem; border-radius: 4px; font-family: ui-monospace, monospace; background: #333; color: #ccc; }
+    .ctx-example { margin-top: 1.25rem; padding: 1rem; border-left: 3px solid var(--sevn-primary); background: #1a1f26; font-size: 0.88rem; }
+    .ctx-example dl { margin: 0; display: grid; grid-template-columns: 10rem 1fr; gap: 0.25rem 1rem; }
+    .ctx-example dt { color: var(--sevn-fg-muted); }
+    .ctx-example dd { margin: 0; font-family: ui-monospace, monospace; font-size: 0.82rem; }
+  </style>
+</head>
+<body>
+  <div class="help-shell">
+    <nav class="help-nav" aria-label="Help pages">
+      <strong style="display:block;margin-bottom:0.75rem;color:var(--sevn-fg-strong);">sevn.bot help</strong>
+      <a href="index.html">Home</a>
+      <a href="getting-started.html">Getting started</a>
+      <a href="mission-control.html">Mission Control</a>
+      <a href="telegram-menu.html">Telegram settings</a>
+      <a href="tools.html">Tools</a>
+      <a href="skills.html">Skills</a>
+      <a href="config.html">Settings</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <a href="agent-context.html" class="active">Agent context</a>
+    </nav>
+    <main class="help-main">
+      <h1>Agent context</h1>
+<p class="help-summary">Ordered diagrams of what each LLM agent receives on a turn — system prompts, instructions, history, tools, and tier C/D phase JSON. Generated from the agent-context manifest when the product changes.
+</p>      <p class="help-generated-note">This page is updated automatically when the product changes.</p>
+  <div class="help-body"><p>Each gateway turn may invoke one or more LLM agents. The graphs below show
+<strong>wire order</strong> and <strong>content type</strong> for every slot.
+An example turn panel shows real char counts from a deployed trace (operator text redacted).</p>
+</div>
+  <nav class="ctx-nav" aria-label="Agent sections">
+<a href="#agent-triager">Triager</a><a href="#agent-tier_a">Tier A</a><a href="#agent-tier_b">Tier B</a><a href="#agent-tier_c_dspy">Tier C/D (dspy)</a><a href="#agent-tier_c_lambda">Tier C/D (lambda)</a>  </nav>
+  <section class="ctx-agent" id="agent-triager">
+    <h2>Triager</h2>
+    <p>Uses LLM · wire: <code>pydantic_ai</code></p>
+    <div class="ctx-mermaid"><pre class="mermaid">flowchart TD
+  triager_system_prompt[&#34;System prompt&lt;br/&gt;role:system&lt;br/&gt;workspace_persona&#34;]
+  triager_user_blob[&#34;User prompt (segmented)&lt;br/&gt;role:user&lt;br/&gt;segmented_text&#34;]
+  triager_system_prompt --&gt; triager_user_blob</pre></div>
+    <table class="ctx-table">
+      <thead><tr><th>#</th><th>Slot</th><th>Role</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><strong>System prompt</strong><br><code>system_prompt</code></td>
+          <td><code>system</code></td>
+          <td><span class="type-badge">workspace_persona</span></td>
+          <td><ul><li><code>persona</code></li><li><code>json_mandate</code></li></ul></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><strong>User prompt (segmented)</strong><br><code>user_blob</code></td>
+          <td><code>user</code></td>
+          <td><span class="type-badge">segmented_text</span></td>
+          <td><ul><li><code>static_prefix</code></li><li><code>registry_block</code></li><li><code>personality_block</code></li><li><code>suffix</code></li></ul></td>
+        </tr>
+      </tbody>
+    </table>
+      <div class="ctx-example"><h3>Example turn</h3><dl>
+        <dt>system_prompt</dt><dd>persona_chars=4200; persona_truncated=False</dd>
+        <dt>user_blob</dt><dd>static_prefix_chars=4800; registry_block_chars=92000; personality_block_chars=3100; suffix_chars=890; user_blob_chars=101200; user_blob_truncated=False</dd>
+      </dl></div>
+  </section>
+  <section class="ctx-agent" id="agent-tier_a">
+    <h2>Tier A</h2>
+    <p>No executor LLM · wire: <code>gateway_only</code></p>
+    <div class="ctx-mermaid"><pre class="mermaid">flowchart TD
+  tier_a_first_message[&#34;Triager first message&lt;br/&gt;role:assistant&lt;br/&gt;canned_reply&#34;]</pre></div>
+    <table class="ctx-table">
+      <thead><tr><th>#</th><th>Slot</th><th>Role</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><strong>Triager first message</strong><br><code>first_message</code></td>
+          <td><code>assistant</code></td>
+          <td><span class="type-badge">canned_reply</span></td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+  <section class="ctx-agent" id="agent-tier_b">
+    <h2>Tier B</h2>
+    <p>Uses LLM · wire: <code>pydantic_ai</code></p>
+    <div class="ctx-mermaid"><pre class="mermaid">flowchart TD
+  tier_b_system_prompt[&#34;System prompt&lt;br/&gt;role:system&lt;br/&gt;playbooks&#34;]
+  tier_b_instructions[&#34;Dynamic instructions&lt;br/&gt;role:system&lt;br/&gt;tools_catalog&#34;]
+  tier_b_system_prompt --&gt; tier_b_instructions
+  tier_b_message_history[&#34;Message history&lt;br/&gt;role:user&lt;br/&gt;message_history&#34;]
+  tier_b_instructions --&gt; tier_b_message_history
+  tier_b_user_prompt[&#34;Current user prompt&lt;br/&gt;role:user&lt;br/&gt;multimodal&#34;]
+  tier_b_message_history --&gt; tier_b_user_prompt
+  tier_b_tool_schemas[&#34;Tool schemas&lt;br/&gt;role:tool&lt;br/&gt;tool_schemas&#34;]
+  tier_b_user_prompt --&gt; tier_b_tool_schemas</pre></div>
+    <table class="ctx-table">
+      <thead><tr><th>#</th><th>Slot</th><th>Role</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><strong>System prompt</strong><br><code>system_prompt</code></td>
+          <td><code>system</code></td>
+          <td><span class="type-badge">playbooks</span></td>
+          <td><ul><li><code>identity_boundary</code></li><li><code>identity_answer</code></li><li><code>workspace_roots</code></li><li><code>workspace_code_search</code></li><li><code>hallucination_guard</code></li><li><code>tools_vs_skills</code></li><li><code>no_silent_substitution</code></li><li><code>retrieval_honesty</code></li><li><code>live_factual</code></li><li><code>github_repo_eval</code></li><li><code>persistence</code></li><li><code>sessions_context</code></li><li><code>architecture_context</code></li><li><code>log_query_playbook</code></li><li><code>log_provenance_playbook</code></li><li><code>list_registry_playbook</code></li><li><code>last30days_playbook</code></li><li><code>codemode_playbook</code></li><li><code>index_architecture</code></li><li><code>brevity</code></li><li><code>telegram_formatting</code></li><li><code>no_preamble_echo</code></li><li><code>spill_recovery</code></li><li><code>tool_economy</code></li><li><code>process_install</code></li><li><code>playwright_browser</code></li><li><code>bound_skill_playbook</code></li><li><code>triager_bound_mandate</code></li><li><code>memorize</code></li><li><code>file_link</code></li><li><code>repo_access</code></li><li><code>persona</code></li></ul></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><strong>Dynamic instructions</strong><br><code>instructions</code></td>
+          <td><code>system</code></td>
+          <td><span class="type-badge">tools_catalog</span></td>
+          <td><ul><li><code>lazy_load_guidance</code></li><li><code>error_handling_rule</code></li><li><code>tool_catalog</code></li><li><code>triager_narrowed_tools</code></li><li><code>triager_narrowed_skills</code></li><li><code>gateway_extra_instructions</code></li><li><code>triager_opener_note</code></li></ul></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><strong>Message history</strong><br><code>message_history</code></td>
+          <td><code>user</code></td>
+          <td><span class="type-badge">message_history</span></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><strong>Current user prompt</strong><br><code>user_prompt</code></td>
+          <td><code>user</code></td>
+          <td><span class="type-badge">multimodal</span></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><strong>Tool schemas</strong><br><code>tool_schemas</code></td>
+          <td><code>tool</code></td>
+          <td><span class="type-badge">tool_schemas</span></td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+      <div class="ctx-example"><h3>Example turn</h3><dl>
+        <dt>system_prompt</dt><dd>system_prompt_chars=88000; system_prompt_truncated=False</dd>
+        <dt>instructions</dt><dd>instructions_chars=12400; instructions_truncated=False</dd>
+        <dt>message_history</dt><dd>message_history_count=2</dd>
+        <dt>user_prompt</dt><dd>[REDACTED: tools list request]</dd>
+        <dt>tool_schemas</dt><dd>tools=[&#39;glob&#39;, &#39;list_dir&#39;, &#39;read&#39;]; skills=[]</dd>
+      </dl></div>
+  </section>
+  <section class="ctx-agent" id="agent-tier_c_dspy">
+    <h2>Tier C/D (dspy)</h2>
+    <p>Uses LLM · wire: <code>json_phase</code></p>
+    <div class="ctx-mermaid"><pre class="mermaid">flowchart TD
+  tier_c_dspy_decompose[&#34;Decompose&lt;br/&gt;role:user&lt;br/&gt;json_phase&#34;]
+  tier_c_dspy_plan_gate[&#34;Plan gate&lt;br/&gt;role:system&lt;br/&gt;turn_metadata&#34;]
+  tier_c_dspy_decompose --&gt; tier_c_dspy_plan_gate
+  tier_c_dspy_rlm_outer[&#34;RLM outer loop&lt;br/&gt;role:user&lt;br/&gt;json_phase&#34;]
+  tier_c_dspy_plan_gate --&gt; tier_c_dspy_rlm_outer
+  tier_c_dspy_synthesize[&#34;Synthesize&lt;br/&gt;role:user&lt;br/&gt;json_phase&#34;]
+  tier_c_dspy_rlm_outer --&gt; tier_c_dspy_synthesize</pre></div>
+    <table class="ctx-table">
+      <thead><tr><th>#</th><th>Slot</th><th>Role</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><strong>Decompose</strong><br><code>decompose</code></td>
+          <td><code>user</code></td>
+          <td><span class="type-badge">json_phase</span></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><strong>Plan gate</strong><br><code>plan_gate</code></td>
+          <td><code>system</code></td>
+          <td><span class="type-badge">turn_metadata</span></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><strong>RLM outer loop</strong><br><code>rlm_outer</code></td>
+          <td><code>user</code></td>
+          <td><span class="type-badge">json_phase</span></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><strong>Synthesize</strong><br><code>synthesize</code></td>
+          <td><code>user</code></td>
+          <td><span class="type-badge">json_phase</span></td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+  <section class="ctx-agent" id="agent-tier_c_lambda">
+    <h2>Tier C/D (lambda)</h2>
+    <p>Uses LLM · wire: <code>json_phase</code></p>
+    <div class="ctx-mermaid"><pre class="mermaid">flowchart TD
+  tier_c_lambda_plan_gate[&#34;Plan gate&lt;br/&gt;role:system&lt;br/&gt;turn_metadata&#34;]
+  tier_c_lambda_lambda_macro[&#34;Lambda macro&lt;br/&gt;role:user&lt;br/&gt;json_phase&#34;]
+  tier_c_lambda_plan_gate --&gt; tier_c_lambda_lambda_macro
+  tier_c_lambda_synthesize[&#34;Synthesize&lt;br/&gt;role:user&lt;br/&gt;json_phase&#34;]
+  tier_c_lambda_lambda_macro --&gt; tier_c_lambda_synthesize</pre></div>
+    <table class="ctx-table">
+      <thead><tr><th>#</th><th>Slot</th><th>Role</th><th>Type</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><strong>Plan gate</strong><br><code>plan_gate</code></td>
+          <td><code>system</code></td>
+          <td><span class="type-badge">turn_metadata</span></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><strong>Lambda macro</strong><br><code>lambda_macro</code></td>
+          <td><code>user</code></td>
+          <td><span class="type-badge">json_phase</span></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><strong>Synthesize</strong><br><code>synthesize</code></td>
+          <td><code>user</code></td>
+          <td><span class="type-badge">json_phase</span></td>
+          <td></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+  <script>mermaid.initialize({ startOnLoad: true, theme: "dark", securityLevel: "loose" });</script>
+      <footer class="help-footer">
+        Generated 2026-07-12 from commit 7c61c73.
+        Edit <code>about-sevn.bot/_sources/agent-context.yaml</code> or templates — not the HTML directly.
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

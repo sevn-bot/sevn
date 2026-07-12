@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Getting started — sevn.bot help</title>
+  <link rel="icon" href="assets/logos/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="assets/index.css" />
+  <style>
+    .help-shell { display: grid; grid-template-columns: 220px 1fr; gap: 2rem; max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    @media (max-width: 800px) { .help-shell { grid-template-columns: 1fr; } }
+    .help-nav { position: sticky; top: 1rem; align-self: start; }
+    .help-nav a { display: block; padding: 0.35rem 0; color: var(--sevn-fg-muted); text-decoration: none; font-size: 0.92rem; }
+    .help-nav a:hover, .help-nav a.active { color: var(--sevn-primary); }
+    .help-main h1 { margin-top: 0; font-size: 1.75rem; color: var(--sevn-fg-strong); }
+    .help-summary { color: var(--sevn-fg-muted); font-size: 1.05rem; margin-bottom: 1.5rem; max-width: 60ch; }
+    .help-footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--sevn-border); font-size: 0.78rem; color: var(--sevn-fg-muted); }
+    .help-generated-note { font-size: 0.85rem; color: var(--sevn-fg-muted); font-style: italic; margin-bottom: 1rem; }
+    .help-body p { line-height: 1.6; max-width: 65ch; }
+    .help-body ul, .help-body ol { max-width: 65ch; line-height: 1.6; }
+    .help-body a { color: var(--sevn-primary); }
+    .catalog-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 1rem 0; }
+    .catalog-table th, .catalog-table td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--sevn-border); vertical-align: top; }
+    .catalog-table th { color: var(--sevn-fg-muted); font-weight: 600; }
+    .badge { display: inline-block; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; }
+    .badge-available { background: #1b3d1f; color: #81c784; }
+    .badge-soon { background: #4a3410; color: #ffb74d; }
+    .badge-unavailable { background: #333; color: #bbb; }
+  </style>
+</head>
+<body>
+  <div class="help-shell">
+    <nav class="help-nav" aria-label="Help pages">
+      <strong style="display:block;margin-bottom:0.75rem;color:var(--sevn-fg-strong);">sevn.bot help</strong>
+      <a href="index.html">Home</a>
+      <a href="getting-started.html" class="active">Getting started</a>
+      <a href="mission-control.html">Mission Control</a>
+      <a href="telegram-menu.html">Telegram settings</a>
+      <a href="tools.html">Tools</a>
+      <a href="skills.html">Skills</a>
+      <a href="config.html">Settings</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <a href="agent-context.html">Agent context</a>
+    </nav>
+    <main class="help-main">
+      <h1>Getting started</h1>
+<p class="help-summary">Install sevn.bot, complete setup, and send your first message.</p><div class="help-body"><h2>Install</h2>
+<pre><code>git clone https://github.com/sevn-bot/sevn.git
+cd sevn
+make setup
+
+sevn onboard</code></pre>
+<p><code>make setup</code> installs uv (when missing), fetches Python 3.12+ via uv, and installs dependencies. <code>sevn onboard</code> runs the setup wizard and registers gateway + proxy daemons by default.</p>
+<p>Prefer the terminal UI? Run <code>sevn onboard --cli</code> instead of the default browser wizard.</p>
+<h2>Keep your install up to date</h2>
+<p>From inside your clone, pull the latest source and reinstall when you want a manual update:</p>
+<pre><code>sevn sync --latest</code></pre>
+<h2>Remote VPS deploy</h2>
+<p>To provision a bot on a server you control, export a bundle with <code>sevn export-secrets</code>, copy <code>deploy/inventory.example.toml</code> to a local inventory file, then run <code>make deploy-remote-check</code> and <code>make deploy-remote</code>. See the operator runbook in the repository checkout.</p>
+<h2>First conversation</h2>
+<p>After the gateway is running, open Telegram and message your bot, or visit the web UI URL shown at the end of onboarding. Type naturally — the assistant routes your message, picks tools when needed, and replies in the same channel.</p>
+<h2>Useful commands in Telegram</h2>
+<ul>
+  <li><code>/new</code> — start a fresh conversation</li>
+  <li><code>/config</code> — open the inline settings menu (<a href="telegram-menu.html">preview here</a>)</li>
+  <li><code>/help</code> — short command list</li>
+  <li><code>/status</code> — gateway health snapshot</li>
+</ul>
+<h2>Next steps</h2>
+<ul>
+  <li>Explore <a href="mission-control.html">Mission Control</a> tabs when the web dashboard is enabled</li>
+  <li>Explore <a href="config.html">common settings</a> you may want to tune</li>
+  <li>Read <a href="troubleshooting.html">troubleshooting</a> if something does not connect</li>
+</ul>
+</div>
+      <footer class="help-footer">
+        Generated 2026-07-12 from commit 7c61c73.
+        Edit <code>about-sevn.bot/_sources/getting-started.yaml</code> or templates — not the HTML directly.
+      </footer>
+    </main>
+  </div>
+</body>
+</html>
