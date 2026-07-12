@@ -1,0 +1,126 @@
+/* sevn.bot — buttons.
+ * .btn (base) + variants: primary, accent (action/critical only), outline, ghost, danger.
+ * Sizes: sm / base / lg.
+ */
+
+.btn {
+  --btn-bg: var(--sevn-surface-2);
+  --btn-fg: var(--sevn-fg-strong);
+  --btn-border: var(--sevn-border);
+  --btn-hover-bg: var(--sevn-surface-3);
+  --btn-active-bg: var(--sevn-base-200);
+  --btn-shadow: var(--sevn-shadow-sm);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sevn-space-2);
+  height: 2rem;                 /* base */
+  padding: 0 var(--sevn-space-3);
+  font-family: var(--sevn-font-sans);
+  font-size: var(--sevn-fs-sm);
+  font-weight: var(--sevn-fw-500);
+  letter-spacing: var(--sevn-tracking-tight);
+  color: var(--btn-fg);
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  border-radius: var(--sevn-radius-md);
+  box-shadow: var(--btn-shadow);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition:
+    background var(--sevn-duration-fast) var(--sevn-ease-out),
+    border-color var(--sevn-duration-fast) var(--sevn-ease-out),
+    color var(--sevn-duration-fast) var(--sevn-ease-out),
+    box-shadow var(--sevn-duration-fast) var(--sevn-ease-out),
+    transform var(--sevn-duration-instant) var(--sevn-ease-out);
+}
+
+.btn:hover  { background: var(--btn-hover-bg); border-color: var(--sevn-border-strong); }
+.btn:active { background: var(--btn-active-bg); transform: translateY(1px); }
+.btn:disabled,
+.btn[aria-disabled='true'] {
+  opacity: 0.5;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.btn .btn__icon {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+}
+
+/* sizes */
+.btn--sm  { height: 1.625rem; padding: 0 var(--sevn-space-2-5, var(--sevn-space-2)); font-size: var(--sevn-fs-xs); border-radius: var(--sevn-radius-sm); }
+.btn--lg  { height: 2.5rem; padding: 0 var(--sevn-space-4); font-size: var(--sevn-fs-base); }
+
+/* primary — confident, blue */
+.btn-primary {
+  --btn-bg: var(--sevn-primary);
+  --btn-fg: var(--sevn-base-050);
+  --btn-border: var(--sevn-primary);
+  --btn-hover-bg: var(--sevn-primary-light);
+  --btn-active-bg: var(--sevn-primary-dark);
+}
+.btn-primary:hover { box-shadow: var(--sevn-shadow-glow-primary); border-color: var(--sevn-primary-light); }
+
+/* accent — action / critical only. Use sparingly. */
+.btn-accent {
+  --btn-bg: var(--sevn-accent);
+  --btn-fg: var(--sevn-white);
+  --btn-border: var(--sevn-accent);
+  --btn-hover-bg: var(--sevn-accent-light);
+  --btn-active-bg: var(--sevn-accent-dark);
+}
+.btn-accent:hover { box-shadow: var(--sevn-shadow-glow-accent); border-color: var(--sevn-accent-light); }
+
+/* outline — quiet primary */
+.btn-outline {
+  --btn-bg: transparent;
+  --btn-fg: var(--sevn-primary-light);
+  --btn-border: var(--sevn-primary-dark);
+  --btn-hover-bg: var(--sevn-surface-primary-tint);
+}
+
+/* ghost — chromeless, for icon-only and toolbar buttons */
+.btn-ghost {
+  --btn-bg: transparent;
+  --btn-fg: var(--sevn-fg);
+  --btn-border: transparent;
+  --btn-hover-bg: var(--sevn-hover-bg);
+  --btn-active-bg: var(--sevn-active-bg);
+  box-shadow: none;
+}
+.btn-ghost:hover { color: var(--sevn-fg-strong); border-color: transparent; }
+
+/* danger — destructive confirmations only */
+.btn-danger {
+  --btn-bg: transparent;
+  --btn-fg: var(--sevn-accent-light);
+  --btn-border: rgba(255, 59, 59, 0.40);
+  --btn-hover-bg: rgba(255, 59, 59, 0.10);
+}
+
+/* icon-only square */
+.btn--icon { width: 2rem; padding: 0; }
+.btn--icon.btn--sm { width: 1.625rem; }
+.btn--icon.btn--lg { width: 2.5rem; }
+
+/* keyboard hint pill (rendered inside ghost buttons / hints) */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  height: 1.125rem;
+  padding: 0 var(--sevn-space-1-5);
+  font-family: var(--sevn-font-mono);
+  font-size: var(--sevn-fs-xs);
+  font-weight: var(--sevn-fw-500);
+  color: var(--sevn-fg-muted);
+  background: var(--sevn-surface-3);
+  border: 1px solid var(--sevn-border);
+  border-radius: var(--sevn-radius-sm);
+  box-shadow: var(--sevn-hairline-bottom);
+  letter-spacing: var(--sevn-tracking-normal);
+}

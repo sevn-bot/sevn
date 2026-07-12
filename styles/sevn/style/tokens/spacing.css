@@ -1,0 +1,73 @@
+/* sevn.bot — spacing, radius, shadow, z-index, motion tokens */
+
+:root {
+  /* ---------- Spacing scale (rem; 1rem = 16px) ---------- */
+  --sevn-space-px:   1px;
+  --sevn-space-0-5:  0.125rem;  /* 2 */
+  --sevn-space-1:    0.25rem;   /* 4 */
+  --sevn-space-1-5:  0.375rem;  /* 6 */
+  --sevn-space-2:    0.5rem;    /* 8 */
+  --sevn-space-3:    0.75rem;   /* 12 */
+  --sevn-space-4:    1rem;      /* 16 */
+  --sevn-space-5:    1.25rem;   /* 20 */
+  --sevn-space-6:    1.5rem;    /* 24 */
+  --sevn-space-7:    1.75rem;   /* 28 */
+  --sevn-space-8:    2rem;      /* 32 */
+  --sevn-space-9:    2.25rem;   /* 36 */
+  --sevn-space-10:   2.5rem;    /* 40 */
+  --sevn-space-12:   3rem;      /* 48 */
+  --sevn-space-16:   4rem;      /* 64 */
+  --sevn-space-20:   5rem;      /* 80 */
+  --sevn-space-24:   6rem;      /* 96 */
+  --sevn-space-32:   8rem;      /* 128 */
+
+  /* ---------- Radius scale (gentle: 6-8px default) ---------- */
+  --sevn-radius-none: 0;
+  --sevn-radius-sm:   4px;
+  --sevn-radius-md:   6px;    /* default for chips, inputs */
+  --sevn-radius-lg:   8px;    /* default for cards, buttons */
+  --sevn-radius-xl:   12px;
+  --sevn-radius-2xl:  16px;
+  --sevn-radius-3xl:  24px;
+  --sevn-radius-full: 9999px;
+
+  /* ---------- Shadows (dark-tuned; light overrides in theme-light) ---------- */
+  --sevn-shadow-xs:  0 1px 0 0 rgba(0, 0, 0, 0.45);
+  --sevn-shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.45);
+  --sevn-shadow-md:  0 4px 8px -2px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
+  --sevn-shadow-lg:  0 12px 24px -8px rgba(0, 0, 0, 0.55), 0 4px 8px -4px rgba(0, 0, 0, 0.4);
+  --sevn-shadow-xl:  0 24px 48px -12px rgba(0, 0, 0, 0.65), 0 8px 16px -4px rgba(0, 0, 0, 0.45);
+
+  /* Brand-glow shadows (used sparingly: focus, hero CTA, status pulse) */
+  --sevn-shadow-glow-primary: 0 0 0 1px rgba(95,177,247,0.35), 0 8px 24px -4px rgba(95,177,247,0.35);
+  --sevn-shadow-glow-accent:  0 0 0 1px rgba(255,59,59,0.40), 0 8px 24px -4px rgba(255,59,59,0.30);
+  --sevn-shadow-glow-brand:   0 0 0 1px rgba(95,177,247,0.30), 0 12px 32px -8px rgba(255,59,59,0.20), 0 12px 32px -8px rgba(95,177,247,0.20);
+
+  /* Inset hairline used to create "elevated surface" feel without a real lift */
+  --sevn-hairline-top:    inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
+  --sevn-hairline-bottom: inset 0 -1px 0 0 rgba(0, 0, 0, 0.5);
+
+  /* ---------- Z-index scale ---------- */
+  --sevn-z-base:    0;
+  --sevn-z-raised:  10;
+  --sevn-z-sticky:  100;
+  --sevn-z-drawer:  500;
+  --sevn-z-modal:   1000;
+  --sevn-z-toast:   2000;
+  --sevn-z-tooltip: 3000;
+
+  /* ---------- Motion: durations + easings ---------- */
+  --sevn-duration-instant: 80ms;
+  --sevn-duration-fast:    140ms;
+  --sevn-duration-base:    200ms;
+  --sevn-duration-slow:    320ms;
+  --sevn-duration-slower:  500ms;
+
+  /* Restraint by default; spring/bounce only for celebration */
+  --sevn-ease-linear:   linear;
+  --sevn-ease-out:      cubic-bezier(0.22, 1, 0.36, 1);
+  --sevn-ease-in:       cubic-bezier(0.55, 0, 0.78, 0.06);
+  --sevn-ease-in-out:   cubic-bezier(0.65, 0, 0.35, 1);
+  --sevn-ease-spring:   cubic-bezier(0.22, 1.4, 0.36, 1);    /* gentle overshoot */
+  --sevn-ease-bounce:   cubic-bezier(0.34, 1.56, 0.64, 1);   /* save for celebration */
+}

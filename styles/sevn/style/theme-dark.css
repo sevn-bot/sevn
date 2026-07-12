@@ -1,0 +1,42 @@
+/* sevn.bot — dark theme (default).
+ * Maps semantic role variables onto the raw color tokens. Components consume the role names.
+ */
+
+:root,
+:root[data-theme='dark'] {
+  --sevn-color-scheme: dark;
+
+  /* surfaces */
+  --sevn-bg:           var(--sevn-base-050);
+  --sevn-bg-image:     radial-gradient(ellipse at 80% -10%, rgba(95,177,247,0.05) 0%, rgba(0,0,0,0) 55%),
+                       radial-gradient(ellipse at 0% 100%, rgba(255,59,59,0.04) 0%, rgba(0,0,0,0) 50%);
+  --sevn-surface-1:    var(--sevn-base-100);
+  --sevn-surface-2:    var(--sevn-base-150);
+  --sevn-surface-3:    var(--sevn-base-200);
+  --sevn-surface-glass: rgba(20, 17, 15, 0.72);
+
+  /* foreground */
+  --sevn-fg:           var(--sevn-slate-300);
+  --sevn-fg-strong:    var(--sevn-slate-200);
+  --sevn-fg-muted:     var(--sevn-slate-400);
+  --sevn-fg-faint:     var(--sevn-slate-500);
+  --sevn-fg-inverse:   var(--sevn-base-050);
+  --sevn-fg-link:      var(--sevn-primary);
+
+  /* borders */
+  --sevn-border:       var(--sevn-base-300);
+  --sevn-border-strong: var(--sevn-base-400);
+  --sevn-border-faint: rgba(236, 231, 225, 0.06);
+
+  /* interactive */
+  --sevn-hover-bg:     rgba(236, 231, 225, 0.04);
+  --sevn-active-bg:    rgba(236, 231, 225, 0.08);
+  --sevn-selected-bg:  rgba(95, 177, 247, 0.10);
+  --sevn-selected-fg:  var(--sevn-primary-light);
+
+  /* tinted surfaces */
+  --sevn-surface-primary-tint: rgba(95, 177, 247, 0.08);
+  --sevn-surface-accent-tint:  rgba(255, 59, 59, 0.08);
+  --sevn-surface-success-tint: rgba(106, 156, 120, 0.10);
+  --sevn-surface-warning-tint: rgba(200, 154, 82, 0.10);
+}

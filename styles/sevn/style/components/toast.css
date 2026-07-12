@@ -1,0 +1,62 @@
+/* sevn.bot — toasts.
+ * info → primary, success → success token, warning → warning token, critical → accent (sparingly).
+ */
+
+.toast-stack {
+  position: fixed;
+  bottom: var(--sevn-space-4);
+  right: var(--sevn-space-4);
+  z-index: var(--sevn-z-toast);
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--sevn-space-2);
+  width: min(360px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sevn-space-3);
+  padding: var(--sevn-space-3) var(--sevn-space-4);
+  background: var(--sevn-surface-2);
+  border: 1px solid var(--sevn-border);
+  border-left: 2px solid var(--sevn-primary);
+  border-radius: var(--sevn-radius-md);
+  box-shadow: var(--sevn-shadow-lg);
+  font-size: var(--sevn-fs-sm);
+  color: var(--sevn-fg-strong);
+  pointer-events: auto;
+  animation: sevn-toast-in var(--sevn-duration-slow) var(--sevn-ease-spring);
+}
+.toast__icon {
+  width: 14px; height: 14px;
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--sevn-primary);
+}
+.toast__title { font-weight: var(--sevn-fw-600); }
+.toast__body  { color: var(--sevn-fg-muted); margin-top: 2px; }
+.toast__close {
+  margin-left: auto;
+  width: 20px; height: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--sevn-fg-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  border-radius: var(--sevn-radius-sm);
+}
+.toast__close:hover { color: var(--sevn-fg-strong); background: var(--sevn-hover-bg); }
+
+.toast--success  { border-left-color: var(--sevn-success); }
+.toast--success  .toast__icon { color: var(--sevn-success); }
+.toast--warning  { border-left-color: var(--sevn-warning); }
+.toast--warning  .toast__icon { color: var(--sevn-warning); }
+.toast--critical { border-left-color: var(--sevn-accent); background: var(--sevn-surface-accent-tint); }
+.toast--critical .toast__icon { color: var(--sevn-accent); }
+
+@keyframes sevn-toast-in {
+  from { opacity: 0; transform: translateX(20px) scale(0.98); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}

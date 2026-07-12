@@ -1,0 +1,157 @@
+/** sevn.bot — Tailwind config (v3-compatible; v4 reads via @theme directive in app CSS).
+ *  Token values mirror style/tokens/tokens.ts — single source of truth lives in CSS variables.
+ *  Tailwind utilities resolve to var(--sevn-*) so live theme switching keeps working.
+ */
+const v = (name) => `var(--sevn-${name})`;
+
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './**/*.{html,js,jsx,ts,tsx}',
+    '!./node_modules/**',
+  ],
+  darkMode: ['selector', '[data-theme="dark"]'],
+  theme: {
+    colors: {
+      transparent: 'transparent',
+      current: 'currentColor',
+
+      primary: {
+        pale:  v('primary-pale'),
+        light: v('primary-light'),
+        DEFAULT: v('primary'),
+        dark:  v('primary-dark'),
+      },
+      accent: {
+        pale:  v('accent-pale'),
+        light: v('accent-light'),
+        DEFAULT: v('accent'),
+        dark:  v('accent-dark'),
+      },
+      base: {
+        50:  v('base-050'),
+        100: v('base-100'),
+        150: v('base-150'),
+        200: v('base-200'),
+        300: v('base-300'),
+        400: v('base-400'),
+      },
+      slate: {
+        200: v('slate-200'),
+        300: v('slate-300'),
+        400: v('slate-400'),
+        500: v('slate-500'),
+        600: v('slate-600'),
+      },
+      light: {
+        50:  v('light-050'),
+        100: v('light-100'),
+        150: v('light-150'),
+        200: v('light-200'),
+        300: v('light-300'),
+      },
+      white: v('white'),
+
+      // semantic roles — these honour theme switches
+      bg:           v('bg'),
+      surface:      v('surface-2'),
+      'surface-1':  v('surface-1'),
+      'surface-2':  v('surface-2'),
+      'surface-3':  v('surface-3'),
+      fg:           v('fg'),
+      'fg-strong':  v('fg-strong'),
+      'fg-muted':   v('fg-muted'),
+      'fg-faint':   v('fg-faint'),
+      border:       v('border'),
+
+      success:  v('success'),
+      warning:  v('warning'),
+      info:     v('info'),
+      critical: v('critical'),
+    },
+    fontFamily: {
+      sans: v('font-sans').split(',').map(s => s.trim()),
+      mono: v('font-mono').split(',').map(s => s.trim()),
+    },
+    fontSize: {
+      xs:    [v('fs-xs'),    { lineHeight: v('lh-xs') }],
+      sm:    [v('fs-sm'),    { lineHeight: v('lh-sm') }],
+      base:  [v('fs-base'),  { lineHeight: v('lh-base') }],
+      md:    [v('fs-md'),    { lineHeight: v('lh-md') }],
+      lg:    [v('fs-lg'),    { lineHeight: v('lh-lg') }],
+      xl:    [v('fs-xl'),    { lineHeight: v('lh-xl') }],
+      '2xl': [v('fs-2xl'),   { lineHeight: v('lh-2xl') }],
+      '3xl': [v('fs-3xl'),   { lineHeight: v('lh-3xl') }],
+      '4xl': [v('fs-4xl'),   { lineHeight: v('lh-4xl') }],
+      '5xl': [v('fs-5xl'),   { lineHeight: v('lh-5xl') }],
+      '6xl': [v('fs-6xl'),   { lineHeight: v('lh-6xl') }],
+    },
+    spacing: {
+      px:   v('space-px'),
+      0:    '0',
+      0.5:  v('space-0-5'),
+      1:    v('space-1'),
+      1.5:  v('space-1-5'),
+      2:    v('space-2'),
+      3:    v('space-3'),
+      4:    v('space-4'),
+      5:    v('space-5'),
+      6:    v('space-6'),
+      8:    v('space-8'),
+      10:   v('space-10'),
+      12:   v('space-12'),
+      16:   v('space-16'),
+      20:   v('space-20'),
+      24:   v('space-24'),
+      32:   v('space-32'),
+    },
+    borderRadius: {
+      none: v('radius-none'),
+      sm:   v('radius-sm'),
+      md:   v('radius-md'),
+      DEFAULT: v('radius-lg'),
+      lg:   v('radius-lg'),
+      xl:   v('radius-xl'),
+      '2xl': v('radius-2xl'),
+      '3xl': v('radius-3xl'),
+      full: v('radius-full'),
+    },
+    boxShadow: {
+      none: 'none',
+      xs:   v('shadow-xs'),
+      sm:   v('shadow-sm'),
+      md:   v('shadow-md'),
+      lg:   v('shadow-lg'),
+      xl:   v('shadow-xl'),
+      'glow-primary': v('shadow-glow-primary'),
+      'glow-accent':  v('shadow-glow-accent'),
+      'glow-brand':   v('shadow-glow-brand'),
+    },
+    transitionDuration: {
+      instant: v('duration-instant'),
+      fast:    v('duration-fast'),
+      DEFAULT: v('duration-base'),
+      base:    v('duration-base'),
+      slow:    v('duration-slow'),
+      slower:  v('duration-slower'),
+    },
+    transitionTimingFunction: {
+      DEFAULT: v('ease-out'),
+      out:     v('ease-out'),
+      in:      v('ease-in'),
+      'in-out': v('ease-in-out'),
+      spring:  v('ease-spring'),
+      bounce:  v('ease-bounce'),
+    },
+    extend: {
+      backgroundImage: {
+        'sevn-brand':       v('gradient-brand'),
+        'sevn-brand-soft':  v('gradient-brand-soft'),
+        'sevn-dark':        v('gradient-dark'),
+        'sevn-glow-primary': v('glow-primary'),
+        'sevn-glow-accent':  v('glow-accent'),
+      },
+    },
+  },
+  plugins: [],
+};

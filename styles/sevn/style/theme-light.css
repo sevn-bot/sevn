@@ -1,0 +1,66 @@
+/* sevn.bot — light theme. Derived from dark; same roles, light values. */
+
+:root[data-theme='light'] {
+  --sevn-color-scheme: light;
+
+  --sevn-bg:           var(--sevn-light-050);
+  --sevn-bg-image:     radial-gradient(ellipse at 80% -10%, rgba(95,177,247,0.10) 0%, rgba(0,0,0,0) 55%),
+                       radial-gradient(ellipse at 0% 100%, rgba(255,59,59,0.06) 0%, rgba(0,0,0,0) 50%);
+  --sevn-surface-1:    var(--sevn-light-100);
+  --sevn-surface-2:    var(--sevn-white);
+  --sevn-surface-3:    var(--sevn-light-150);
+  --sevn-surface-glass: rgba(251, 249, 246, 0.78);
+
+  --sevn-fg:           #2a241e;
+  --sevn-fg-strong:    #16110d;
+  --sevn-fg-muted:     #6b6359;
+  --sevn-fg-faint:     #948b80;
+  --sevn-fg-inverse:   var(--sevn-white);
+  --sevn-fg-link:      var(--sevn-primary-dark);
+
+  --sevn-border:       var(--sevn-light-200);
+  --sevn-border-strong: var(--sevn-light-300);
+  --sevn-border-faint: rgba(0, 0, 0, 0.05);
+
+  --sevn-hover-bg:     rgba(12, 10, 9, 0.04);
+  --sevn-active-bg:    rgba(12, 10, 9, 0.07);
+  --sevn-selected-bg:  rgba(42, 127, 198, 0.10);
+  --sevn-selected-fg:  var(--sevn-primary-dark);
+
+  --sevn-surface-primary-tint: rgba(42, 127, 198, 0.08);
+  --sevn-surface-accent-tint:  rgba(181, 30, 30, 0.06);
+  --sevn-surface-success-tint: rgba(106, 156, 120, 0.12);
+  --sevn-surface-warning-tint: rgba(200, 154, 82, 0.12);
+
+  /* lighter shadow palette */
+  --sevn-shadow-xs:  0 1px 0 0 rgba(12, 10, 9, 0.06);
+  --sevn-shadow-sm:  0 1px 2px rgba(12, 10, 9, 0.06), 0 0 0 1px rgba(12, 10, 9, 0.04);
+  --sevn-shadow-md:  0 4px 8px -2px rgba(12, 10, 9, 0.10), 0 2px 4px -2px rgba(12, 10, 9, 0.06);
+  --sevn-shadow-lg:  0 12px 24px -8px rgba(12, 10, 9, 0.12), 0 4px 8px -4px rgba(12, 10, 9, 0.06);
+  --sevn-shadow-xl:  0 24px 48px -12px rgba(12, 10, 9, 0.18), 0 8px 16px -4px rgba(12, 10, 9, 0.08);
+
+  --sevn-hairline-top:    inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
+  --sevn-hairline-bottom: inset 0 -1px 0 0 rgba(12, 10, 9, 0.05);
+
+  --sevn-chart-grid: rgba(12, 10, 9, 0.06);
+  --sevn-chart-axis: rgba(12, 10, 9, 0.55);
+}
+
+/* prefers-color-scheme on first load */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --sevn-color-scheme: light;
+    --sevn-bg:           var(--sevn-light-050);
+    --sevn-bg-image:     radial-gradient(ellipse at 80% -10%, rgba(95,177,247,0.10) 0%, rgba(0,0,0,0) 55%),
+                         radial-gradient(ellipse at 0% 100%, rgba(255,59,59,0.06) 0%, rgba(0,0,0,0) 50%);
+    --sevn-surface-1:    var(--sevn-light-100);
+    --sevn-surface-2:    var(--sevn-white);
+    --sevn-surface-3:    var(--sevn-light-150);
+    --sevn-fg:           #2a241e;
+    --sevn-fg-strong:    #16110d;
+    --sevn-fg-muted:     #6b6359;
+    --sevn-fg-faint:     #948b80;
+    --sevn-border:       var(--sevn-light-200);
+    --sevn-border-strong: var(--sevn-light-300);
+  }
+}
