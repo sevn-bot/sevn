@@ -140,8 +140,11 @@ Thumbs.db
 .cursorignore
 .cursorindexingignore
 /style
-/pyclaww
 /.cursor
 /.claude
 .index/code_index/INDEX.md
 CLAUDE.md
+/graphify-out/cache
+/graphify-out
+.index/graphify
+.index/mycode/MYCODE.md
