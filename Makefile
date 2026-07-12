@@ -358,7 +358,7 @@ ci-docs: telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme
 
 ci-skills: skills-core-check skillspector-check skills-index-check dreaming-allowlist-check ## Skills inventory tier
 
-ci-parity: deploy-remote-report-check code-index-check ## Parity tier (public)
+ci-parity: code-index deploy-remote-report-check code-index-check ## Parity tier (public)
 
 ci: ci-core ci-infra ci-docs ci-skills ci-parity ## Full gate (same as CI)
 
@@ -368,7 +368,7 @@ CI_STEPS := lockcheck lint typecheck pyright test doctest security build doctor-
 	config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards agent-context-manifest-check \
 	telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check about-site-check about-docs-check about-docs-schema changelog-check \
 	skills-core-check skillspector-check skills-index-check dreaming-allowlist-check \
-	deploy-remote-report-check code-index-check
+	code-index deploy-remote-report-check code-index-check
 
 ci-steps: ## Print the ordered `make ci` step list (consumed by ci-resume)
 	@echo $(CI_STEPS)
