@@ -3,6 +3,7 @@
 # The full `make ci` step set is split across parallel jobs so wall-clock is
 # the slowest job, not the sum of every tier on one runner:
 #
+#   - toolchain    → `make lockcheck` when the tree has no src/sevn (I1-style PRs)
 #   - test         → `make test`, sharded 4× with pytest-split (matrix)
 #   - static       → `make ci-static` (lockcheck, lint, typecheck, pyright,
 #                    doctest, build, doctor-solutions)
@@ -22,7 +23,9 @@
 # Tier ownership: `ci-static` + sharded `test` + `ci-infra ci-docs ci-skills
 # ci-parity` together equal `make ci` minus `security` (run daily, see
 # ci-supplementary.yml). Keep these jobs in lockstep with the Makefile targets.
-# No workflow behavior change — retriggers the gate after tests 4/4 was cancelled.
+#
+# hashFiles() in job-level `if` is evaluated before checkout and is always empty;
+# path gates belong on steps after actions/checkout.
 name: CI
 
 on:
@@ -40,9 +43,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  toolchain:
+    name: Verify (toolchain)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: ./.github/actions/bootstrap
+
+      - name: Lockfile check (no src/sevn)
+        if: hashFiles('src/sevn/**') == ''
+        run: make lockcheck
+
   test:
     name: Verify (tests ${{ matrix.group }}/4)
-    if: hashFiles('src/sevn/**') != ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -56,6 +70,7 @@ jobs:
       # pytest-split partitions the suite into 4 balanced shards; each shard
       # still fans out across xdist workers on its runner.
       - name: Unit tests (shard ${{ matrix.group }} of 4)
+        if: hashFiles('src/sevn/**') != ''
         env:
           SEVN_TEST_SPLITS: "4"
           SEVN_TEST_GROUP: ${{ matrix.group }}
@@ -65,7 +80,6 @@ jobs:
 
   static:
     name: Verify (static + build)
-    if: hashFiles('src/sevn/**') != ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -75,11 +89,11 @@ jobs:
       # lockcheck, lint, typecheck, pyright, doctest, build, doctor-solutions.
       # Pyright lives here (no separate duplicate job).
       - name: Static, doctest, build tier
+        if: hashFiles('src/sevn/**') != ''
         run: make ci-static
 
   drift-gates:
     name: Verify (drift gates)
-    if: hashFiles('src/sevn/**') != '' && hashFiles('about-sevn.bot/**') != ''
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -87,4 +101,5 @@ jobs:
       - uses: ./.github/actions/bootstrap
 
       - name: Infra + docs + skills + parity tiers
+        if: hashFiles('about-sevn.bot/**') != ''
         run: make ci-infra ci-docs ci-skills ci-parity
