@@ -151,8 +151,8 @@
     },
     "subagents": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-12T19:21:09Z",
-      "digest": "953f10551fe1b63c1d601b663b6963208bc8090e364e34843ed3418b6a241b6f",
+      "computed_at": "2026-07-12T20:13:16Z",
+      "digest": "c50930064af844b0000a2140f3079467e207777f625b556aae9088c67679b8f1",
       "source_globs": [
         "src/sevn/agent/subagents/**",
         "src/sevn/config/sections/subagents.py",
