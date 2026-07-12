@@ -2,8 +2,8 @@
   "entries": {
     "agent": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-12T19:21:09Z",
-      "digest": "d84825ec55c18dd461c20eeeb340b8345804f552c691e6e6e6721515c2181e3b",
+      "computed_at": "2026-07-12T20:36:25Z",
+      "digest": "366b2924f59ea8525676910651b8aee806866e0cedd5138959564e767cb4acec",
       "source_globs": [
         "src/sevn/agent/**"
       ]
@@ -125,8 +125,8 @@
     },
     "self-improve": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-12T14:07:01Z",
-      "digest": "169de897e7c7896a0b6965ea95c8e9e68840f339dfe422b957a74c222e4f2661",
+      "computed_at": "2026-07-12T20:36:35Z",
+      "digest": "b6b6582757fd76c55bfc0be5f46765cebbf119bb8f422676f5e40774240cd753",
       "source_globs": [
         "src/sevn/self_improve/**"
       ]
@@ -173,8 +173,8 @@
     },
     "tracing": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-12T19:21:09Z",
-      "digest": "93d5ab92c472d557c4dc5b9ec2f8e427239a7c7226f6ebdfeb623826560e485a",
+      "computed_at": "2026-07-12T20:36:31Z",
+      "digest": "8faec56a862295a5c98de37fceb2ec709d951fa0932d9c9dc6daa5fa847827b8",
       "source_globs": [
         "src/sevn/tracing/**",
         "src/sevn/agent/tracing/**"
@@ -190,8 +190,8 @@
     },
     "ui-mission-control": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-12T14:06:58Z",
-      "digest": "648629cf3d66ca390d23d54a48ad55571bfd47d4c27d741c38e4a0487b97333d",
+      "computed_at": "2026-07-12T20:36:28Z",
+      "digest": "4614069da5c2e6e4f697b84098973623cfde5154a5745367fd1e223ffe7bb3e6",
       "source_globs": [
         "src/sevn/ui/**"
       ]
