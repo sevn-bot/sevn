@@ -1,0 +1,68 @@
+{
+  "case_id": "log_query_01",
+  "version": 1,
+  "transport_responses": [
+    {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "id": "c1",
+                "type": "function",
+                "function": {
+                  "name": "load_tool",
+                  "arguments": "{\"name\": \"log_query\"}"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1,
+        "completion_tokens": 1
+      }
+    },
+    {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "id": "c2",
+                "type": "function",
+                "function": {
+                  "name": "log_query",
+                  "arguments": "{\"pattern\":\"gateway\",\"lines\":5}"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1,
+        "completion_tokens": 1
+      }
+    },
+    {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": "Log tail shown"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1,
+        "completion_tokens": 1
+      }
+    }
+  ],
+  "provider_turn_messages": [],
+  "final_text": "Log tail shown"
+}

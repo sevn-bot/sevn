@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "providers": {
+    "use_main_model_for_all": true,
+    "tier_default": {
+      "triager": "llama3"
+    }
+  },
+  "capabilities_defaults": {
+    "extra.browser": false,
+    "extra.bedrock": false,
+    "skill.printing_press_library": false,
+    "memory.lcm": true,
+    "telemetry.enabled": false
+  }
+}

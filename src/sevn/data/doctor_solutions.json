@@ -1,0 +1,567 @@
+{
+  "schema_version": 1,
+  "solutions": {
+    "auto_run_on_import": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "Evolution auto-run on import is enabled (risky).",
+      "fix_command": null,
+      "remediation": [
+        "Disable `my_sevn.issues.auto_run_on_import` unless intentional.",
+        "Review evolution pipeline dry-run flags."
+      ],
+      "severity": "warn",
+      "title": "auto_run_on_import"
+    },
+    "browser_extra": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "Playwright browser extra is not installed.",
+      "fix_command": null,
+      "remediation": [
+        "Run `uv sync --extra browser && playwright install chromium`.",
+        "Enable browser skills in sevn.json when ready."
+      ],
+      "severity": "warn",
+      "title": "Browser (Playwright)"
+    },
+    "browser_readiness": {
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "No browser binary is resolved for the configured engine (Brave/Chromium).",
+      "fix_command": null,
+      "remediation": [
+        "Install Chrome or Brave on the host, or use Docker profile browser/gui with Brave preinstalled.",
+        "Set SEVN_CHROME_EXECUTABLE or skills.browser.engine in sevn.json when using a custom binary."
+      ],
+      "severity": "warn",
+      "title": "Browser readiness"
+    },
+    "code_orientation": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "Code-understanding indexes are missing or stale.",
+      "fix_command": null,
+      "remediation": [
+        "Set `SEVN_REPO_ROOT` or configure code_understanding paths.",
+        "Run `sevn doctor --code-orientation` to refresh Graphify/MYCODE caches."
+      ],
+      "severity": "warn",
+      "title": "Code orientation"
+    },
+    "cua_cli_binary": {
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "The cua sandbox CLI (`pip install cua`) is required when cua-agent is enabled or computer-use uses a sandbox target.",
+      "fix_command": "pip install cua",
+      "remediation": [
+        "Run `pip install cua` or use the onboarding install action for skill.computer_use.cua_cli.",
+        "Re-run `sevn doctor` after installing."
+      ],
+      "severity": "warn",
+      "title": "cua CLI"
+    },
+    "openwiki_cli": {
+      "auto_fixable": false,
+      "docs_url": "https://github.com/langchain-ai/openwiki",
+      "explanation": "The LangChain OpenWiki npm CLI must be on PATH when skills.openwiki.enabled is true.",
+      "fix_command": "sevn openwiki install",
+      "remediation": [
+        "Run `sevn openwiki install` (or `npm install -g openwiki` when npm is preferred).",
+        "Re-run `sevn doctor` after installing."
+      ],
+      "severity": "warn",
+      "title": "OpenWiki CLI"
+    },
+    "openwiki_credentials": {
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "OpenWiki needs an LLM API key when the skill is enabled. sevn resolves skills.openwiki.api_key, per-provider api_keys, assigned provider secrets, or integration.openwiki.llm_api_key.",
+      "fix_command": "sevn openwiki configure --stdin",
+      "remediation": [
+        "Run `sevn openwiki configure --stdin` or `sevn secrets set integration.openwiki.llm_api_key`.",
+        "Optional: set skills.openwiki.api_key to ${SECRET:…} and skills.openwiki.provider.",
+        "Re-run `sevn doctor` after storing secrets."
+      ],
+      "severity": "warn",
+      "title": "OpenWiki credentials"
+    },
+    "cua_driver_binary": {
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "The cua-driver binary is required for computer-use with the host target (MCP passthrough). Run the cua-driver install.sh action when missing.",
+      "fix_command": null,
+      "remediation": [
+        "Run the cua-driver install.sh onboarding action or install from trycua/cua releases.",
+        "Ensure `cua-driver` is on PATH before enabling skills.computer_use."
+      ],
+      "severity": "warn",
+      "title": "cua-driver"
+    },
+    "cua_tcc_accessibility": {
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "macOS Accessibility (TCC) is required for computer-use on the host target. Grant it under System Settings → Privacy & Security → Accessibility.",
+      "fix_command": null,
+      "remediation": [
+        "Open System Settings → Privacy & Security → Accessibility.",
+        "Enable the terminal or app that runs sevn (and CuaDriver.app when using the daemon path)."
+      ],
+      "severity": "warn",
+      "title": "Cua Accessibility (TCC)"
+    },
+    "cua_tcc_automation": {
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "macOS Automation (Apple Events) may be required for GUI control via computer-use.",
+      "fix_command": null,
+      "remediation": [
+        "Open System Settings → Privacy & Security → Automation.",
+        "Allow the sevn host process to control System Events and target applications."
+      ],
+      "severity": "warn",
+      "title": "Cua Automation (TCC)"
+    },
+    "cua_tcc_screen_recording": {
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "macOS Screen Recording (TCC) is required for screenshots and vision capture modes.",
+      "fix_command": null,
+      "remediation": [
+        "Open System Settings → Privacy & Security → Screen Recording.",
+        "Enable the terminal or app that runs sevn (and CuaDriver.app when applicable)."
+      ],
+      "severity": "warn",
+      "title": "Cua Screen Recording (TCC)"
+    },
+    "docker": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "Docker CLI or daemon is unavailable.",
+      "fix_command": null,
+      "remediation": [
+        "Install Docker and ensure `docker info` succeeds.",
+        "Required for sandbox execution in production profiles."
+      ],
+      "severity": "warn",
+      "title": "Docker"
+    },
+    "extensions": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "Plugin entry points failed to load.",
+      "fix_command": null,
+      "remediation": [
+        "Fix setuptools entry points for hooks/channels/dashboard badges.",
+        "Reinstall the package after correcting pyproject plugin tables."
+      ],
+      "severity": "warn",
+      "title": "Extensions"
+    },
+    "gateway_health": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "Gateway HTTP /health probe failed.",
+      "fix_command": null,
+      "remediation": [
+        "Start gateway with `sevn gateway start`.",
+        "Check gateway logs under workspace/logs/."
+      ],
+      "severity": "warn",
+      "title": "Gateway /health"
+    },
+    "gateway_ready": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "Gateway /ready reported not ready.",
+      "fix_command": null,
+      "remediation": [
+        "Wait for migrations and channel startup.",
+        "Inspect gateway logs for failing subsystems."
+      ],
+      "severity": "warn",
+      "title": "Gateway /ready"
+    },
+    "gateway_token_configured": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "Gateway bearer token is not configured.",
+      "fix_command": null,
+      "remediation": [
+        "Run `sevn secrets set gateway.token <value>` or complete onboarding.",
+        "Restart the gateway after updating secrets."
+      ],
+      "severity": "warn",
+      "title": "Gateway token"
+    },
+    "keychain_unlock": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "Encrypted secrets store cannot unlock after reboot.",
+      "fix_command": null,
+      "remediation": [
+        "Run `sevn secrets store-passphrase` on macOS.",
+        "Export the unlock env var before starting gateway daemons."
+      ],
+      "severity": "warn",
+      "title": "Keychain unlock"
+    },
+    "llm_reachability": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "Configured LLM endpoint is unreachable via proxy.",
+      "fix_command": null,
+      "remediation": [
+        "Check provider API keys and proxy routing.",
+        "Run `sevn proxy status` and review proxy logs."
+      ],
+      "severity": "warn",
+      "title": "LLM reachability"
+    },
+    "provider_credentials": {
+      "agent_only": true,
+      "auto_fixable": true,
+      "docs_url": "specs/02-config-and-workspace.md",
+      "explanation": "An assigned model slot references a provider with no resolvable API key.",
+      "fix_command": "sevn doctor --fix --yes",
+      "remediation": [
+        "Set providers.<name>.api_key in sevn.json with a ${SECRET:…} ref and store the key.",
+        "Run `sevn doctor --fix` to prompt and store missing provider keys.",
+        "Per-provider secrets: store SEVN_SECRET_{PROVIDER} and set providers.<name>.api_key refs.",
+        "Env escape hatches: OPENAI_API_KEY or ANTHROPIC_API_KEY."
+      ],
+      "severity": "warn",
+      "title": "Provider credentials"
+    },
+    "openai_oauth_credential": {
+      "agent_only": true,
+      "auto_fixable": true,
+      "docs_url": "specs/02-config-and-workspace.md",
+      "explanation": "OpenAI is in Codex OAuth mode but oauth.openai is missing or expired.",
+      "fix_command": "sevn doctor --fix --yes",
+      "remediation": [
+        "Run `sevn providers oauth login --provider openai` to sign in with ChatGPT.",
+        "Run `sevn doctor --fix` to prompt for Codex OAuth reauth interactively.",
+        "Ensure providers.openai.auth_mode is oauth only when using subscription OAuth (D1)."
+      ],
+      "severity": "warn",
+      "title": "OpenAI OAuth (Codex)"
+    },
+    "llmignore": {
+      "auto_fixable": true,
+      "docs_url": "specs/09-security-scanner.md",
+      "explanation": "The workspace `.llmignore/` directory is missing or a symlink (unsafe).",
+      "fix_command": "sevn doctor --fix --yes",
+      "remediation": [
+        "Run `sevn doctor --fix --yes` to create the standard blocked/quarantine/incidents layout.",
+        "If a symlink remains, replace it with a real directory per specs/09-security-scanner.md."
+      ],
+      "severity": "warn",
+      "title": ".llmignore layout"
+    },
+    "lume_binary": {
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "The lume CLI is required when skills.lume is enabled (Apple-Silicon VM lifecycle).",
+      "fix_command": null,
+      "remediation": [
+        "Run the lume install.sh onboarding action or install lume for your platform.",
+        "Ensure `lume` is on PATH before enabling skills.lume."
+      ],
+      "severity": "warn",
+      "title": "lume CLI"
+    },
+    "my_sevn": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "my_sevn bot checkout or sync settings need attention.",
+      "fix_command": null,
+      "remediation": [
+        "Verify `my_sevn.repo_url` and sync settings in sevn.json.",
+        "Run `sevn sync` when the checkout path is configured."
+      ],
+      "severity": "warn",
+      "title": "my_sevn"
+    },
+    "operator_lock": {
+      "auto_fixable": true,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "An advisory operator lock file blocks mutating CLI commands.",
+      "fix_command": "sevn doctor --fix --yes",
+      "remediation": [
+        "Stop any other running `sevn` command if one is active.",
+        "Run `sevn doctor --fix --yes` to clear a stale lock, or remove the lock file manually."
+      ],
+      "severity": "warn",
+      "title": "Operator lock"
+    },
+    "pdf_extra": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "PDF Python extra not installed.",
+      "fix_command": null,
+      "remediation": [
+        "Run `uv sync` with the PDF extra if using PDF tools.",
+        "WeasyPrint system libraries may also be required."
+      ],
+      "severity": "warn",
+      "title": "PDF extra"
+    },
+    "pdf_weasyprint": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "WeasyPrint native libraries missing.",
+      "fix_command": null,
+      "remediation": [
+        "Install PDF native libs (`make pdf-native-libs` on macOS).",
+        "Optional unless PDF skills are enabled."
+      ],
+      "severity": "warn",
+      "title": "PDF (WeasyPrint)"
+    },
+    "pp_espn": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "espn-pp-cli binary missing.",
+      "fix_command": null,
+      "remediation": [
+        "Run `make printing-press-starter-pack`.",
+        "Enable the printing-press espn skill when installed."
+      ],
+      "severity": "warn",
+      "title": "printing-press espn"
+    },
+    "pp_flight_goat": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "flight-goat-pp-cli binary missing.",
+      "fix_command": null,
+      "remediation": [
+        "Run `make printing-press-starter-pack`.",
+        "Enable the flight-goat skill when installed."
+      ],
+      "severity": "warn",
+      "title": "printing-press flight-goat"
+    },
+    "pp_movie_goat": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "movie-goat-pp-cli binary missing.",
+      "fix_command": null,
+      "remediation": [
+        "Run `make printing-press-starter-pack`.",
+        "Enable the movie-goat skill when installed."
+      ],
+      "severity": "warn",
+      "title": "printing-press movie-goat"
+    },
+    "pp_recipe_goat": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "recipe-goat-pp-cli binary missing.",
+      "fix_command": null,
+      "remediation": [
+        "Run `make printing-press-starter-pack`.",
+        "Enable the recipe-goat skill when installed."
+      ],
+      "severity": "warn",
+      "title": "printing-press recipe-goat"
+    },
+    "proxy_healthz": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "Egress proxy is not reachable.",
+      "fix_command": null,
+      "remediation": [
+        "Start the proxy with `sevn proxy start` or docker compose.",
+        "Verify `SEVN_PROXY_URL` and proxy token settings."
+      ],
+      "severity": "warn",
+      "title": "Proxy /healthz"
+    },
+    "pyodide_deno": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "Pyodide/Deno sandbox driver is misconfigured.",
+      "fix_command": null,
+      "remediation": [
+        "Install Deno and configure sandbox exec driver.",
+        "See specs/09-security-scanner.md sandbox section."
+      ],
+      "severity": "warn",
+      "title": "Pyodide sandbox"
+    },
+    "secrets_backend": {
+      "auto_fixable": true,
+      "docs_url": "specs/06-secrets.md",
+      "explanation": "Legacy plaintext secret files remain under `.sevn/secrets/`.",
+      "fix_command": "sevn doctor --fix --yes",
+      "remediation": [
+        "Review unexpected files under `.sevn/secrets/` before migrating.",
+        "Run `sevn doctor --fix --yes` or `sevn doctor --migrate-secrets --yes` to promote into encrypted store.enc."
+      ],
+      "severity": "error",
+      "title": "Legacy plaintext secrets"
+    },
+    "sevn_cli": {
+      "auto_fixable": true,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "A broken `sevn` symlink on PATH points to a missing target.",
+      "fix_command": "sevn doctor --fix --yes",
+      "remediation": [
+        "Run `sevn doctor --fix --yes` to remove the broken symlink.",
+        "Reinstall with `make install-cli` (uv tool install)."
+      ],
+      "severity": "warn",
+      "title": "sevn CLI on PATH"
+    },
+    "sevn_json": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "Workspace config is missing or invalid.",
+      "fix_command": null,
+      "remediation": [
+        "Ensure `workspace/sevn.json` exists and passes `sevn config validate`.",
+        "Re-run onboarding with `sevn onboard` if this is a fresh install."
+      ],
+      "severity": "warn",
+      "title": "sevn.json"
+    },
+    "skillspector": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "SkillSpector scan reported issues.",
+      "fix_command": null,
+      "remediation": [
+        "Run `make skillspector-check` for details.",
+        "Fix or disable affected bundled skills."
+      ],
+      "severity": "warn",
+      "title": "SkillSpector"
+    },
+    "skillspector_extra": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "SkillSpector CLI extra is missing.",
+      "fix_command": null,
+      "remediation": [
+        "Install dev extras and ensure skillspector is on PATH.",
+        "Run `make skillspector-check` locally."
+      ],
+      "severity": "warn",
+      "title": "SkillSpector CLI"
+    },
+    "sqlite": {
+      "auto_fixable": true,
+      "docs_url": "specs/03-storage.md",
+      "explanation": "The sevn.db write-ahead log is unusually large and may slow startup.",
+      "fix_command": "sevn doctor --fix --yes",
+      "remediation": [
+        "Ensure no gateway process holds the database open.",
+        "Run `sevn doctor --fix --yes` to checkpoint and truncate the WAL."
+      ],
+      "severity": "warn",
+      "title": "SQLite WAL"
+    },
+    "telegram_probe": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "Telegram Bot API probe failed or is not implemented.",
+      "fix_command": null,
+      "remediation": [
+        "Verify bot token and network egress.",
+        "Use gateway channel status for production diagnostics."
+      ],
+      "severity": "warn",
+      "title": "Telegram probe"
+    },
+    "voice_backends": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "Voice STT/TTS backends failed probe.",
+      "fix_command": null,
+      "remediation": [
+        "Configure voice providers in sevn.json.",
+        "Install optional voice extras and system dependencies."
+      ],
+      "severity": "warn",
+      "title": "Voice backends"
+    },
+    "webapp_https": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "Telegram WebApp base URL is not HTTPS.",
+      "fix_command": null,
+      "remediation": [
+        "Set `channels.telegram.webapp_base_url` to an HTTPS origin.",
+        "Use a tunnel or reverse proxy for local development."
+      ],
+      "severity": "warn",
+      "title": "WebApp HTTPS"
+    },
+    "browser_cdp_engine": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "sevn-native browser CDP engine (websockets) is not installed.",
+      "fix_command": "uv sync --extra browser-cdp",
+      "remediation": [
+        "Run `uv sync --extra browser-cdp` to install the MIT websockets dependency.",
+        "Attach Chrome with remote debugging or set tools.browser.spawn_on_miss=true."
+      ],
+      "severity": "warn",
+      "title": "Browser (CDP engine)"
+    },
+    "witchcraft_probe": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/23-cli.md",
+      "explanation": "Second-brain witchcraft probe failed.",
+      "fix_command": null,
+      "remediation": [
+        "Verify witchcraft binary and second_brain settings.",
+        "Disable witchcraft when not using second-brain features."
+      ],
+      "severity": "warn",
+      "title": "Witchcraft"
+    },
+    "second_brain_vault_layout": {
+      "agent_only": false,
+      "auto_fixable": true,
+      "docs_url": "specs/27-second-brain.md",
+      "explanation": "Second Brain vault layout is incomplete or uses legacy paths.wiki alias.",
+      "fix_command": "sevn second-brain setup",
+      "remediation": [
+        "Run `sevn second-brain setup --vault <path>` or `sevn doctor --fix` to bootstrap raw/, wiki/, and outputs/.",
+        "Set `second_brain.paths.vault` to a workspace-relative Obsidian folder when using a custom vault."
+      ],
+      "severity": "warn",
+      "title": "Second Brain vault"
+    }
+  }
+}

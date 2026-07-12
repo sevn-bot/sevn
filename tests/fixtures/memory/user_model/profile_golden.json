@@ -1,0 +1,16 @@
+{
+  "workspace_id": "fixture-ws",
+  "updated_at": "2026-05-13T12:00:00+00:00",
+  "schema_version": 1,
+  "facts": [
+    {
+      "id": "f_lang",
+      "topic": "language_preference",
+      "value": "Prefers Python for services.",
+      "confidence": "high",
+      "source_session_ids": ["sess-a"],
+      "last_observed_at": "2026-05-13T11:00:00+00:00",
+      "superseded_by_id": null
+    }
+  ]
+}

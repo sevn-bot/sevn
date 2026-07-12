@@ -1,0 +1,68 @@
+{
+  "case_id": "pdf_doc_01",
+  "version": 1,
+  "transport_responses": [
+    {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "id": "c1",
+                "type": "function",
+                "function": {
+                  "name": "load_tool",
+                  "arguments": "{\"name\": \"read\"}"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1,
+        "completion_tokens": 1
+      }
+    },
+    {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "id": "c2",
+                "type": "function",
+                "function": {
+                  "name": "read",
+                  "arguments": "{\"path\":\"report.pdf\"}"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1,
+        "completion_tokens": 1
+      }
+    },
+    {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": "Report summary here."
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1,
+        "completion_tokens": 1
+      }
+    }
+  ],
+  "provider_turn_messages": [],
+  "final_text": "Report summary here."
+}

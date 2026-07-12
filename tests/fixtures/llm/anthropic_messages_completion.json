@@ -1,0 +1,10 @@
+{
+  "id": "msg_fixture",
+  "type": "message",
+  "role": "assistant",
+  "content": [],
+  "usage": {
+    "input_tokens": 42,
+    "output_tokens": 7
+  }
+}

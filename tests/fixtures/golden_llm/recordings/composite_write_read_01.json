@@ -1,0 +1,114 @@
+{
+  "case_id": "composite_write_read_01",
+  "version": 1,
+  "transport_responses": [
+    {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "id": "c1",
+                "type": "function",
+                "function": {
+                  "name": "load_tool",
+                  "arguments": "{\"name\":\"write\"}"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1,
+        "completion_tokens": 1
+      }
+    },
+    {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "id": "c2",
+                "type": "function",
+                "function": {
+                  "name": "write",
+                  "arguments": "{\"path\":\"scratch.txt\",\"content\":\"scratch data\"}"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1,
+        "completion_tokens": 1
+      }
+    },
+    {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "id": "c3",
+                "type": "function",
+                "function": {
+                  "name": "load_tool",
+                  "arguments": "{\"name\":\"read\"}"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1,
+        "completion_tokens": 1
+      }
+    },
+    {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "id": "c4",
+                "type": "function",
+                "function": {
+                  "name": "read",
+                  "arguments": "{\"path\":\"scratch.txt\"}"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1,
+        "completion_tokens": 1
+      }
+    },
+    {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": "scratch data confirmed"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1,
+        "completion_tokens": 1
+      }
+    }
+  ],
+  "provider_turn_messages": [],
+  "final_text": "scratch data confirmed"
+}

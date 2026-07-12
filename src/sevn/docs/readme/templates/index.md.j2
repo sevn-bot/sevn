@@ -1,0 +1,10 @@
+<!-- generated: do not edit by hand; run `sevn readme update {{ slug }}` -->
+# {{ title }}
+
+> **Summary.** Generated catalog of every subsystem README with profile, one-line summary, and staleness status.
+
+| Slug | Title | Profile | Summary | Status |
+|------|-------|---------|---------|--------|
+{% for entry in entries -%}
+| [{{ entry.slug }}]({{ entry.path }}) | {{ entry.title }} | `{{ entry.profile }}` | {{ entry.summary }} | {{ entry.status }} |
+{% endfor %}

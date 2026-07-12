@@ -1,0 +1,22 @@
+{
+  "case_id": "text_only_01",
+  "version": 1,
+  "transport_responses": [
+    {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": "Hello — happy to help."
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 1,
+        "completion_tokens": 1
+      }
+    }
+  ],
+  "provider_turn_messages": [],
+  "final_text": "Hello — happy to help."
+}

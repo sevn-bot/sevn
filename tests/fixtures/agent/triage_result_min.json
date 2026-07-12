@@ -1,0 +1,11 @@
+{
+  "intent": "NEW_REQUEST",
+  "complexity": "B",
+  "first_message": "I'll take a look.",
+  "tools": [],
+  "skills": [],
+  "mcp_servers_required": [],
+  "confidence": 0.88,
+  "requires_vision": false,
+  "requires_document": false
+}

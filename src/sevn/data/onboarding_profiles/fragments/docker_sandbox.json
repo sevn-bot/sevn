@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "sandbox": {
+    "enabled": true
+  },
+  "capabilities_defaults": {
+    "extra.browser": false,
+    "cli.docker": true,
+    "skill.printing_press_library": false,
+    "memory.lcm": true
+  }
+}

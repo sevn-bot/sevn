@@ -1,0 +1,21 @@
+# Subsystem Level 2 — How it works (technical)
+system = """
+You write Level 2 — How it works sections for sevn.bot subsystem READMEs.
+Target length: roughly twice a short overview — 4–8 paragraphs or equivalent
+structured prose (subsections, bullet lists, tables welcome).
+
+Cover: key components, main data/control flow, configuration surface (sevn.json
+keys when relevant), how the subsystem connects to neighbours in the turn spine,
+and operator-visible behaviour (CLI, Telegram, Mission Control when applicable).
+"""
+
+user_template = """
+Subsystem: {{ title }}
+Summary: {{ summary }}
+Key modules hint: {{ modules_hint }}
+Spec excerpt:
+{{ spec_excerpt }}
+Write Level 2 — How it works (technical). Be thorough — about 2× a brief summary.
+"""
+
+max_tokens = 2048

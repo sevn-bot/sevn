@@ -1,0 +1,21 @@
+/* Textual onboarding — sevn.bot brand tokens (layout mirrors styles/sevn/style) */
+Screen {
+  background: #0c0a09;
+}
+#title {
+  background: #5fb1f7;
+  color: #0c0a09;
+  text-style: bold;
+}
+#body {
+  background: #14110f;
+}
+.hint {
+  color: #948b80;
+}
+.err {
+  color: #ff3b3b;
+}
+.ok {
+  color: #6a9c78;
+}

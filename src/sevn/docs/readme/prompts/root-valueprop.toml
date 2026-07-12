@@ -1,0 +1,14 @@
+# Root README value proposition paragraph
+system = """
+You write the root README value prop for sevn.bot — 2–3 sentences, product-led.
+Theme: Sevn as an operator-owned agentic gateway — your machine, models, memory, and channels.
+"""
+
+user_template = """
+Package: {{ title }}
+Intro: {{ intro_hint }}
+Architecture one-liner: {{ architecture_hint }}
+Write the value prop paragraph (no heading).
+"""
+
+max_tokens = 256

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en" data-theme-pref="system">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>sevn.bot — webchat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/style/index.css" />
+    <link rel="stylesheet" href="/webapp/style.css" />
+  </head>
+  <body class="webchat-body">
+    <header class="navbar webchat-hdr">
+      <div class="navbar__brand">
+        <img class="webchat-logo webchat-logo--light" src="/style/logos/logo-mark.svg" alt="" width="22" height="22" />
+        <img class="webchat-logo webchat-logo--dark" src="/style/logos/logo-mark.svg" alt="" width="22" height="22" />
+        <span class="navbar__name">sevn<span class="suffix">.bot</span></span>
+      </div>
+      <div id="status" class="badge webchat-status" data-state="idle">idle</div>
+      <button type="button" class="btn btn-ghost btn-sm" data-sevn-theme-toggle title="Theme">
+        <span data-sevn-theme-label>system</span>
+      </button>
+    </header>
+    <p id="dev-banner" class="banner banner-warning webchat-dev-banner" hidden></p>
+    <main class="webchat-main">
+      <section id="log" class="chat" aria-live="polite"></section>
+      <section id="openui-host" class="openui-host" hidden></section>
+    </main>
+    <footer class="webchat-footer">
+      <form id="composer" class="composer">
+        <input
+          id="text"
+          name="text"
+          type="text"
+          class="input"
+          autocomplete="off"
+          placeholder="Type a message…"
+          required
+        />
+        <div class="composer__bar">
+          <button id="send" type="submit" class="btn btn-primary btn-sm">Send</button>
+        </div>
+      </form>
+    </footer>
+    <script src="/shared/theme.js"></script>
+    <script src="/webapp/app.js"></script>
+  </body>
+</html>

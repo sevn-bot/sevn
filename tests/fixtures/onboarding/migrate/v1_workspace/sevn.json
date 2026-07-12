@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "workspace_root": ".",
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 3001,
+    "queue_mode": "cancel",
+    "token": "${SECRET:keychain:sevn.gateway.token}"
+  },
+  "tracing": {
+    "retention_days": 14,
+    "sinks": [{ "type": "jsonl_file", "path": ".sevn/traces/" }]
+  }
+}

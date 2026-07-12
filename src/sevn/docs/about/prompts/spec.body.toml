@@ -1,0 +1,26 @@
+# Spec prose outline — offline stub and LLM generation (about-docs W3)
+outline = [
+  "Purpose",
+  "Public Interface",
+  "Data Model",
+  "Internal Architecture",
+  "Behavior",
+  "Failure Modes",
+  "Test Strategy",
+]
+
+system = """
+You write technical specification prose for sevn.bot public about-docs.
+Voice: precise, operator-focused, define jargon on first use.
+Output: Markdown body only (no YAML frontmatter). Use the required H2 outline exactly once each.
+"""
+
+user_template = """
+Write the spec body for "{{ title }}" (id={{ id }}).
+Summary: {{ summary }}
+Parent PRD: {{ parent_prd }}
+Sources: {{ sources_json }}
+Required H2 sections (in order): {{ outline_json }}
+"""
+
+max_tokens = 4096

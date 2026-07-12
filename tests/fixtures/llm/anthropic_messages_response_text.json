@@ -1,0 +1,15 @@
+{
+  "id": "msg_fixture_text",
+  "type": "message",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "text",
+      "text": "Routing to tier B."
+    }
+  ],
+  "usage": {
+    "input_tokens": 42,
+    "output_tokens": 7
+  }
+}

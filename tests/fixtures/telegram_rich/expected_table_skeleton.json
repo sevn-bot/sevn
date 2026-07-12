@@ -1,0 +1,29 @@
+{
+  "blocks": [
+    {
+      "type": "table",
+      "rows": [
+        [
+          {"text": {"text": [{"type": "text", "text": "Name"}]}, "align": "left"},
+          {"text": {"text": [{"type": "text", "text": "Q1"}]}, "align": "center"},
+          {"text": {"text": [{"type": "text", "text": "Q2"}]}, "align": "center"}
+        ],
+        [
+          {"text": {"text": [{"type": "text", "text": "Alpha"}]}, "align": "left"},
+          {"text": {"text": [{"type": "text", "text": "1"}]}, "align": "center"},
+          {"text": {"text": [{"type": "text", "text": "2"}]}, "align": "center"}
+        ],
+        [
+          {"text": {"text": [{"type": "text", "text": "Beta"}]}, "align": "left"},
+          {"text": {"text": [{"type": "text", "text": "3"}]}, "align": "center"},
+          {"text": {"text": [{"type": "text", "text": "4"}]}, "align": "center"}
+        ]
+      ],
+      "caption": {
+        "text": {
+          "text": [{"type": "text", "text": "Table caption: quarterly totals."}]
+        }
+      }
+    }
+  ]
+}

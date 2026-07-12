@@ -1,0 +1,213 @@
+{"id":"gr-0001","message":"[en] hello","locale":"en","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0002","message":"[es] hello","locale":"es","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0003","message":"[fr] hello","locale":"fr","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0004","message":"[de] hello","locale":"de","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0005","message":"[ja] hello","locale":"ja","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0006","message":"[pt] hello","locale":"pt","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0007","message":"[zh] hello","locale":"zh","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0008","message":"[en] hi there!","locale":"en","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0009","message":"[es] hi there!","locale":"es","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0010","message":"[fr] hi there!","locale":"fr","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0011","message":"[de] hi there!","locale":"de","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0012","message":"[ja] hi there!","locale":"ja","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0013","message":"[pt] hi there!","locale":"pt","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0014","message":"[zh] hi there!","locale":"zh","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0015","message":"[en] bonjour","locale":"en","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0016","message":"[es] bonjour","locale":"es","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0017","message":"[fr] bonjour","locale":"fr","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0018","message":"[de] bonjour","locale":"de","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0019","message":"[ja] bonjour","locale":"ja","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0020","message":"[pt] bonjour","locale":"pt","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0021","message":"[zh] bonjour","locale":"zh","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0022","message":"[en] hola — ¿cómo estás?","locale":"en","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0023","message":"[es] hola — ¿cómo estás?","locale":"es","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0024","message":"[fr] hola — ¿cómo estás?","locale":"fr","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0025","message":"[de] hola — ¿cómo estás?","locale":"de","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0026","message":"[ja] hola — ¿cómo estás?","locale":"ja","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0027","message":"[pt] hola — ¿cómo estás?","locale":"pt","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0028","message":"[zh] hola — ¿cómo estás?","locale":"zh","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0029","message":"[en] summarize my open tasks","locale":"en","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0030","message":"[es] summarize my open tasks","locale":"es","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0031","message":"[fr] summarize my open tasks","locale":"fr","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0032","message":"[de] summarize my open tasks","locale":"de","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0033","message":"[ja] summarize my open tasks","locale":"ja","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0034","message":"[pt] summarize my open tasks","locale":"pt","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0035","message":"[zh] summarize my open tasks","locale":"zh","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0036","message":"[en] write a python script to parse logs","locale":"en","labels":{"intent":"NEW_REQUEST","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0037","message":"[es] write a python script to parse logs","locale":"es","labels":{"intent":"NEW_REQUEST","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0038","message":"[fr] write a python script to parse logs","locale":"fr","labels":{"intent":"NEW_REQUEST","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0039","message":"[de] write a python script to parse logs","locale":"de","labels":{"intent":"NEW_REQUEST","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0040","message":"[ja] write a python script to parse logs","locale":"ja","labels":{"intent":"NEW_REQUEST","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0041","message":"[pt] write a python script to parse logs","locale":"pt","labels":{"intent":"NEW_REQUEST","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0042","message":"[zh] write a python script to parse logs","locale":"zh","labels":{"intent":"NEW_REQUEST","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0043","message":"[en] orchestrate multi-repo refactor across services","locale":"en","labels":{"intent":"NEW_REQUEST","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0044","message":"[es] orchestrate multi-repo refactor across services","locale":"es","labels":{"intent":"NEW_REQUEST","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0045","message":"[fr] orchestrate multi-repo refactor across services","locale":"fr","labels":{"intent":"NEW_REQUEST","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0046","message":"[de] orchestrate multi-repo refactor across services","locale":"de","labels":{"intent":"NEW_REQUEST","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0047","message":"[ja] orchestrate multi-repo refactor across services","locale":"ja","labels":{"intent":"NEW_REQUEST","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0048","message":"[pt] orchestrate multi-repo refactor across services","locale":"pt","labels":{"intent":"NEW_REQUEST","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0049","message":"[zh] orchestrate multi-repo refactor across services","locale":"zh","labels":{"intent":"NEW_REQUEST","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0050","message":"[en] yes, do that","locale":"en","labels":{"intent":"FOLLOW_UP","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0051","message":"[es] yes, do that","locale":"es","labels":{"intent":"FOLLOW_UP","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0052","message":"[fr] yes, do that","locale":"fr","labels":{"intent":"FOLLOW_UP","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0053","message":"[de] yes, do that","locale":"de","labels":{"intent":"FOLLOW_UP","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0054","message":"[ja] yes, do that","locale":"ja","labels":{"intent":"FOLLOW_UP","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0055","message":"[pt] yes, do that","locale":"pt","labels":{"intent":"FOLLOW_UP","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0056","message":"[zh] yes, do that","locale":"zh","labels":{"intent":"FOLLOW_UP","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0057","message":"[en] what did you mean by step 2?","locale":"en","labels":{"intent":"CLARIFICATION","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0058","message":"[es] what did you mean by step 2?","locale":"es","labels":{"intent":"CLARIFICATION","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0059","message":"[fr] what did you mean by step 2?","locale":"fr","labels":{"intent":"CLARIFICATION","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0060","message":"[de] what did you mean by step 2?","locale":"de","labels":{"intent":"CLARIFICATION","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0061","message":"[ja] what did you mean by step 2?","locale":"ja","labels":{"intent":"CLARIFICATION","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0062","message":"[pt] what did you mean by step 2?","locale":"pt","labels":{"intent":"CLARIFICATION","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0063","message":"[zh] what did you mean by step 2?","locale":"zh","labels":{"intent":"CLARIFICATION","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0064","message":"[en] that answer was wrong","locale":"en","labels":{"intent":"FEEDBACK","complexity":"B","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0065","message":"[es] that answer was wrong","locale":"es","labels":{"intent":"FEEDBACK","complexity":"B","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0066","message":"[fr] that answer was wrong","locale":"fr","labels":{"intent":"FEEDBACK","complexity":"B","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0067","message":"[de] that answer was wrong","locale":"de","labels":{"intent":"FEEDBACK","complexity":"B","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0068","message":"[ja] that answer was wrong","locale":"ja","labels":{"intent":"FEEDBACK","complexity":"B","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0069","message":"[pt] that answer was wrong","locale":"pt","labels":{"intent":"FEEDBACK","complexity":"B","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0070","message":"[zh] that answer was wrong","locale":"zh","labels":{"intent":"FEEDBACK","complexity":"B","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0071","message":"[en] asdf qwerty zxcv","locale":"en","labels":{"intent":"UNKNOWN","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0072","message":"[es] asdf qwerty zxcv","locale":"es","labels":{"intent":"UNKNOWN","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0073","message":"[fr] asdf qwerty zxcv","locale":"fr","labels":{"intent":"UNKNOWN","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0074","message":"[de] asdf qwerty zxcv","locale":"de","labels":{"intent":"UNKNOWN","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0075","message":"[ja] asdf qwerty zxcv","locale":"ja","labels":{"intent":"UNKNOWN","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0076","message":"[pt] asdf qwerty zxcv","locale":"pt","labels":{"intent":"UNKNOWN","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0077","message":"[zh] asdf qwerty zxcv","locale":"zh","labels":{"intent":"UNKNOWN","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0078","message":"[en] @bob did you see the game?","locale":"en","labels":{"intent":"UNKNOWN","complexity":"A","disregard":true,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0079","message":"[es] @bob did you see the game?","locale":"es","labels":{"intent":"UNKNOWN","complexity":"A","disregard":true,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0080","message":"[fr] @bob did you see the game?","locale":"fr","labels":{"intent":"UNKNOWN","complexity":"A","disregard":true,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0081","message":"[de] @bob did you see the game?","locale":"de","labels":{"intent":"UNKNOWN","complexity":"A","disregard":true,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0082","message":"[ja] @bob did you see the game?","locale":"ja","labels":{"intent":"UNKNOWN","complexity":"A","disregard":true,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0083","message":"[pt] @bob did you see the game?","locale":"pt","labels":{"intent":"UNKNOWN","complexity":"A","disregard":true,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0084","message":"[zh] @bob did you see the game?","locale":"zh","labels":{"intent":"UNKNOWN","complexity":"A","disregard":true,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0085","message":"[es] synthetic routing case 85: NEW_REQUEST/B","locale":"es","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0086","message":"[fr] synthetic routing case 86: FOLLOW_UP/C","locale":"fr","labels":{"intent":"FOLLOW_UP","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0087","message":"[de] synthetic routing case 87: CLARIFICATION/D","locale":"de","labels":{"intent":"CLARIFICATION","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0088","message":"[ja] synthetic routing case 88: FEEDBACK/A","locale":"ja","labels":{"intent":"FEEDBACK","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0089","message":"[pt] synthetic routing case 89: UNKNOWN/B","locale":"pt","labels":{"intent":"UNKNOWN","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0090","message":"[zh] synthetic routing case 90: GREETING/C","locale":"zh","labels":{"intent":"GREETING","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0091","message":"[en] synthetic routing case 91: NEW_REQUEST/D","locale":"en","labels":{"intent":"NEW_REQUEST","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0092","message":"[es] synthetic routing case 92: FOLLOW_UP/A","locale":"es","labels":{"intent":"FOLLOW_UP","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0093","message":"[fr] synthetic routing case 93: CLARIFICATION/B","locale":"fr","labels":{"intent":"CLARIFICATION","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0094","message":"[de] synthetic routing case 94: FEEDBACK/C","locale":"de","labels":{"intent":"FEEDBACK","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0095","message":"[ja] synthetic routing case 95: UNKNOWN/D","locale":"ja","labels":{"intent":"UNKNOWN","complexity":"D","disregard":true,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0096","message":"[pt] synthetic routing case 96: GREETING/A","locale":"pt","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0097","message":"[zh] synthetic routing case 97: NEW_REQUEST/B","locale":"zh","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0098","message":"[en] synthetic routing case 98: FOLLOW_UP/C","locale":"en","labels":{"intent":"FOLLOW_UP","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0099","message":"[es] synthetic routing case 99: CLARIFICATION/D","locale":"es","labels":{"intent":"CLARIFICATION","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0100","message":"[fr] synthetic routing case 100: FEEDBACK/A","locale":"fr","labels":{"intent":"FEEDBACK","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0101","message":"[de] synthetic routing case 101: UNKNOWN/B","locale":"de","labels":{"intent":"UNKNOWN","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0102","message":"[ja] synthetic routing case 102: GREETING/C","locale":"ja","labels":{"intent":"GREETING","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0103","message":"[pt] synthetic routing case 103: NEW_REQUEST/D","locale":"pt","labels":{"intent":"NEW_REQUEST","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0104","message":"[zh] synthetic routing case 104: FOLLOW_UP/A","locale":"zh","labels":{"intent":"FOLLOW_UP","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0105","message":"[en] synthetic routing case 105: CLARIFICATION/B","locale":"en","labels":{"intent":"CLARIFICATION","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0106","message":"[es] synthetic routing case 106: FEEDBACK/C","locale":"es","labels":{"intent":"FEEDBACK","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0107","message":"[fr] synthetic routing case 107: UNKNOWN/D","locale":"fr","labels":{"intent":"UNKNOWN","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0108","message":"[de] synthetic routing case 108: GREETING/A","locale":"de","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0109","message":"[ja] synthetic routing case 109: NEW_REQUEST/B","locale":"ja","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0110","message":"[pt] synthetic routing case 110: FOLLOW_UP/C","locale":"pt","labels":{"intent":"FOLLOW_UP","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0111","message":"[zh] synthetic routing case 111: CLARIFICATION/D","locale":"zh","labels":{"intent":"CLARIFICATION","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0112","message":"[en] synthetic routing case 112: FEEDBACK/A","locale":"en","labels":{"intent":"FEEDBACK","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0113","message":"[es] synthetic routing case 113: UNKNOWN/B","locale":"es","labels":{"intent":"UNKNOWN","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0114","message":"[fr] synthetic routing case 114: GREETING/C","locale":"fr","labels":{"intent":"GREETING","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0115","message":"[de] synthetic routing case 115: NEW_REQUEST/D","locale":"de","labels":{"intent":"NEW_REQUEST","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0116","message":"[ja] synthetic routing case 116: FOLLOW_UP/A","locale":"ja","labels":{"intent":"FOLLOW_UP","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0117","message":"[pt] synthetic routing case 117: CLARIFICATION/B","locale":"pt","labels":{"intent":"CLARIFICATION","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0118","message":"[zh] synthetic routing case 118: FEEDBACK/C","locale":"zh","labels":{"intent":"FEEDBACK","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0119","message":"[en] synthetic routing case 119: UNKNOWN/D","locale":"en","labels":{"intent":"UNKNOWN","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0120","message":"[es] synthetic routing case 120: GREETING/A","locale":"es","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0121","message":"[fr] synthetic routing case 121: NEW_REQUEST/B","locale":"fr","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0122","message":"[de] synthetic routing case 122: FOLLOW_UP/C","locale":"de","labels":{"intent":"FOLLOW_UP","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0123","message":"[ja] synthetic routing case 123: CLARIFICATION/D","locale":"ja","labels":{"intent":"CLARIFICATION","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0124","message":"[pt] synthetic routing case 124: FEEDBACK/A","locale":"pt","labels":{"intent":"FEEDBACK","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0125","message":"[zh] synthetic routing case 125: UNKNOWN/B","locale":"zh","labels":{"intent":"UNKNOWN","complexity":"B","disregard":true,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0126","message":"[en] synthetic routing case 126: GREETING/C","locale":"en","labels":{"intent":"GREETING","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0127","message":"[es] synthetic routing case 127: NEW_REQUEST/D","locale":"es","labels":{"intent":"NEW_REQUEST","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0128","message":"[fr] synthetic routing case 128: FOLLOW_UP/A","locale":"fr","labels":{"intent":"FOLLOW_UP","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0129","message":"[de] synthetic routing case 129: CLARIFICATION/B","locale":"de","labels":{"intent":"CLARIFICATION","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0130","message":"[ja] synthetic routing case 130: FEEDBACK/C","locale":"ja","labels":{"intent":"FEEDBACK","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0131","message":"[pt] synthetic routing case 131: UNKNOWN/D","locale":"pt","labels":{"intent":"UNKNOWN","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0132","message":"[zh] synthetic routing case 132: GREETING/A","locale":"zh","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0133","message":"[en] synthetic routing case 133: NEW_REQUEST/B","locale":"en","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0134","message":"[es] synthetic routing case 134: FOLLOW_UP/C","locale":"es","labels":{"intent":"FOLLOW_UP","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0135","message":"[fr] synthetic routing case 135: CLARIFICATION/D","locale":"fr","labels":{"intent":"CLARIFICATION","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0136","message":"[de] synthetic routing case 136: FEEDBACK/A","locale":"de","labels":{"intent":"FEEDBACK","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0137","message":"[ja] synthetic routing case 137: UNKNOWN/B","locale":"ja","labels":{"intent":"UNKNOWN","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0138","message":"[pt] synthetic routing case 138: GREETING/C","locale":"pt","labels":{"intent":"GREETING","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0139","message":"[zh] synthetic routing case 139: NEW_REQUEST/D","locale":"zh","labels":{"intent":"NEW_REQUEST","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0140","message":"[en] synthetic routing case 140: FOLLOW_UP/A","locale":"en","labels":{"intent":"FOLLOW_UP","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0141","message":"[es] synthetic routing case 141: CLARIFICATION/B","locale":"es","labels":{"intent":"CLARIFICATION","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0142","message":"[fr] synthetic routing case 142: FEEDBACK/C","locale":"fr","labels":{"intent":"FEEDBACK","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0143","message":"[de] synthetic routing case 143: UNKNOWN/D","locale":"de","labels":{"intent":"UNKNOWN","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0144","message":"[ja] synthetic routing case 144: GREETING/A","locale":"ja","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0145","message":"[pt] synthetic routing case 145: NEW_REQUEST/B","locale":"pt","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0146","message":"[zh] synthetic routing case 146: FOLLOW_UP/C","locale":"zh","labels":{"intent":"FOLLOW_UP","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0147","message":"[en] synthetic routing case 147: CLARIFICATION/D","locale":"en","labels":{"intent":"CLARIFICATION","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0148","message":"[es] synthetic routing case 148: FEEDBACK/A","locale":"es","labels":{"intent":"FEEDBACK","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0149","message":"[fr] synthetic routing case 149: UNKNOWN/B","locale":"fr","labels":{"intent":"UNKNOWN","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0150","message":"[de] synthetic routing case 150: GREETING/C","locale":"de","labels":{"intent":"GREETING","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0151","message":"[ja] synthetic routing case 151: NEW_REQUEST/D","locale":"ja","labels":{"intent":"NEW_REQUEST","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0152","message":"[pt] synthetic routing case 152: FOLLOW_UP/A","locale":"pt","labels":{"intent":"FOLLOW_UP","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0153","message":"[zh] synthetic routing case 153: CLARIFICATION/B","locale":"zh","labels":{"intent":"CLARIFICATION","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0154","message":"[en] synthetic routing case 154: FEEDBACK/C","locale":"en","labels":{"intent":"FEEDBACK","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0155","message":"[es] synthetic routing case 155: UNKNOWN/D","locale":"es","labels":{"intent":"UNKNOWN","complexity":"D","disregard":true,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0156","message":"[fr] synthetic routing case 156: GREETING/A","locale":"fr","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0157","message":"[de] synthetic routing case 157: NEW_REQUEST/B","locale":"de","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0158","message":"[ja] synthetic routing case 158: FOLLOW_UP/C","locale":"ja","labels":{"intent":"FOLLOW_UP","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0159","message":"[pt] synthetic routing case 159: CLARIFICATION/D","locale":"pt","labels":{"intent":"CLARIFICATION","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0160","message":"[zh] synthetic routing case 160: FEEDBACK/A","locale":"zh","labels":{"intent":"FEEDBACK","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0161","message":"[en] synthetic routing case 161: UNKNOWN/B","locale":"en","labels":{"intent":"UNKNOWN","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0162","message":"[es] synthetic routing case 162: GREETING/C","locale":"es","labels":{"intent":"GREETING","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0163","message":"[fr] synthetic routing case 163: NEW_REQUEST/D","locale":"fr","labels":{"intent":"NEW_REQUEST","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0164","message":"[de] synthetic routing case 164: FOLLOW_UP/A","locale":"de","labels":{"intent":"FOLLOW_UP","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0165","message":"[ja] synthetic routing case 165: CLARIFICATION/B","locale":"ja","labels":{"intent":"CLARIFICATION","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0166","message":"[pt] synthetic routing case 166: FEEDBACK/C","locale":"pt","labels":{"intent":"FEEDBACK","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0167","message":"[zh] synthetic routing case 167: UNKNOWN/D","locale":"zh","labels":{"intent":"UNKNOWN","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0168","message":"[en] synthetic routing case 168: GREETING/A","locale":"en","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0169","message":"[es] synthetic routing case 169: NEW_REQUEST/B","locale":"es","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0170","message":"[fr] synthetic routing case 170: FOLLOW_UP/C","locale":"fr","labels":{"intent":"FOLLOW_UP","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0171","message":"[de] synthetic routing case 171: CLARIFICATION/D","locale":"de","labels":{"intent":"CLARIFICATION","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0172","message":"[ja] synthetic routing case 172: FEEDBACK/A","locale":"ja","labels":{"intent":"FEEDBACK","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0173","message":"[pt] synthetic routing case 173: UNKNOWN/B","locale":"pt","labels":{"intent":"UNKNOWN","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0174","message":"[zh] synthetic routing case 174: GREETING/C","locale":"zh","labels":{"intent":"GREETING","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0175","message":"[en] synthetic routing case 175: NEW_REQUEST/D","locale":"en","labels":{"intent":"NEW_REQUEST","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0176","message":"[es] synthetic routing case 176: FOLLOW_UP/A","locale":"es","labels":{"intent":"FOLLOW_UP","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0177","message":"[fr] synthetic routing case 177: CLARIFICATION/B","locale":"fr","labels":{"intent":"CLARIFICATION","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0178","message":"[de] synthetic routing case 178: FEEDBACK/C","locale":"de","labels":{"intent":"FEEDBACK","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0179","message":"[ja] synthetic routing case 179: UNKNOWN/D","locale":"ja","labels":{"intent":"UNKNOWN","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0180","message":"[pt] synthetic routing case 180: GREETING/A","locale":"pt","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0181","message":"[zh] synthetic routing case 181: NEW_REQUEST/B","locale":"zh","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0182","message":"[en] synthetic routing case 182: FOLLOW_UP/C","locale":"en","labels":{"intent":"FOLLOW_UP","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0183","message":"[es] synthetic routing case 183: CLARIFICATION/D","locale":"es","labels":{"intent":"CLARIFICATION","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0184","message":"[fr] synthetic routing case 184: FEEDBACK/A","locale":"fr","labels":{"intent":"FEEDBACK","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0185","message":"[de] synthetic routing case 185: UNKNOWN/B","locale":"de","labels":{"intent":"UNKNOWN","complexity":"B","disregard":true,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0186","message":"[ja] synthetic routing case 186: GREETING/C","locale":"ja","labels":{"intent":"GREETING","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0187","message":"[pt] synthetic routing case 187: NEW_REQUEST/D","locale":"pt","labels":{"intent":"NEW_REQUEST","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0188","message":"[zh] synthetic routing case 188: FOLLOW_UP/A","locale":"zh","labels":{"intent":"FOLLOW_UP","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0189","message":"[en] synthetic routing case 189: CLARIFICATION/B","locale":"en","labels":{"intent":"CLARIFICATION","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0190","message":"[es] synthetic routing case 190: FEEDBACK/C","locale":"es","labels":{"intent":"FEEDBACK","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0191","message":"[fr] synthetic routing case 191: UNKNOWN/D","locale":"fr","labels":{"intent":"UNKNOWN","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0192","message":"[de] synthetic routing case 192: GREETING/A","locale":"de","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0193","message":"[ja] synthetic routing case 193: NEW_REQUEST/B","locale":"ja","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0194","message":"[pt] synthetic routing case 194: FOLLOW_UP/C","locale":"pt","labels":{"intent":"FOLLOW_UP","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0195","message":"[zh] synthetic routing case 195: CLARIFICATION/D","locale":"zh","labels":{"intent":"CLARIFICATION","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0196","message":"[en] synthetic routing case 196: FEEDBACK/A","locale":"en","labels":{"intent":"FEEDBACK","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0197","message":"[es] synthetic routing case 197: UNKNOWN/B","locale":"es","labels":{"intent":"UNKNOWN","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0198","message":"[fr] synthetic routing case 198: GREETING/C","locale":"fr","labels":{"intent":"GREETING","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0199","message":"[de] synthetic routing case 199: NEW_REQUEST/D","locale":"de","labels":{"intent":"NEW_REQUEST","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0200","message":"[ja] synthetic routing case 200: FOLLOW_UP/A","locale":"ja","labels":{"intent":"FOLLOW_UP","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0201","message":"[pt] synthetic routing case 201: CLARIFICATION/B","locale":"pt","labels":{"intent":"CLARIFICATION","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0202","message":"[zh] synthetic routing case 202: FEEDBACK/C","locale":"zh","labels":{"intent":"FEEDBACK","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0203","message":"[en] synthetic routing case 203: UNKNOWN/D","locale":"en","labels":{"intent":"UNKNOWN","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0204","message":"[es] synthetic routing case 204: GREETING/A","locale":"es","labels":{"intent":"GREETING","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0205","message":"[fr] synthetic routing case 205: NEW_REQUEST/B","locale":"fr","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0206","message":"[de] synthetic routing case 206: FOLLOW_UP/C","locale":"de","labels":{"intent":"FOLLOW_UP","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0207","message":"[ja] synthetic routing case 207: CLARIFICATION/D","locale":"ja","labels":{"intent":"CLARIFICATION","complexity":"D","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0208","message":"[pt] synthetic routing case 208: FEEDBACK/A","locale":"pt","labels":{"intent":"FEEDBACK","complexity":"A","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0209","message":"[zh] synthetic routing case 209: UNKNOWN/B","locale":"zh","labels":{"intent":"UNKNOWN","complexity":"B","disregard":false,"tools":["tick"],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0210","message":"[en] synthetic routing case 210: GREETING/C","locale":"en","labels":{"intent":"GREETING","complexity":"C","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0211","message":"[en] who are you?","locale":"en","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0212","message":"[en] what can you do?","locale":"en","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}
+{"id":"gr-0213","message":"[en] list your tools","locale":"en","labels":{"intent":"NEW_REQUEST","complexity":"B","disregard":false,"tools":[],"skills":[],"mcp_servers_required":[]}}

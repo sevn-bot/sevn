@@ -1,0 +1,11 @@
+{
+  "description": "Contract keys emitted by build_sandbox_child_env (specs/08-sandbox.md §2.2) for integration checks.",
+  "required_env_keys": [
+    "SEVN_PROXY_URL",
+    "SEVN_SESSION_TOKEN",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "NO_PROXY",
+    "SEVN_WORKSPACE"
+  ]
+}

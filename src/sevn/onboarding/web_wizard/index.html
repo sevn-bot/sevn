@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en" data-theme-pref="system">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>sevn.bot · setup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style/index.css">
+  <link rel="stylesheet" href="wizard/style.css">
+</head>
+<body>
+  <header class="wizard-topbar">
+    <div class="wizard-brand" aria-label="sevn.bot">
+      <img class="wizard-brand-logo wizard-brand-logo--light" src="style/logos/logo-primary.svg" alt="sevn.bot" width="140" height="40">
+      <img class="wizard-brand-logo wizard-brand-logo--dark" src="style/logos/logo-dark-bg.svg" alt="sevn.bot" width="140" height="40">
+      <small id="app-version" style="font-family:var(--sevn-font-mono);font-size:11px;color:var(--sevn-fg-faint);margin-left:4px;padding:2px 6px;border:1px solid var(--sevn-border-faint);border-radius:4px">setup</small>
+    </div>
+    <div class="wizard-progress">
+      <span class="wizard-progress-label" id="progressLabel">step 01 / 12</span>
+      <div class="wizard-progress-track"><div class="wizard-progress-fill" id="progressFill"></div></div>
+    </div>
+    <div class="wizard-topbar-right">
+      <a class="btn btn-ghost btn-sm iconbtn" href="https://github.com/sevn-bot/sevn" target="_blank" rel="noopener" title="View on GitHub" aria-label="GitHub">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 7.77 5.07 5.07 0 0 0 19.91 4S18.73 3.65 16 5.48a13.38 13.38 0 0 0-7 0C6.27 3.65 5.09 4 5.09 4A5.07 5.07 0 0 0 5 7.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 21.13V25"/></svg>
+      </a>
+      <a class="btn btn-ghost btn-sm" href="https://github.com/sevn-bot/sevn#readme" target="_blank" rel="noopener">docs</a>
+      <button type="button" class="btn btn-ghost btn-sm theme-toggle" id="themeToggle" data-sevn-theme-toggle title="Theme" aria-label="Theme">
+        <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+        <span id="themeLabel" data-sevn-theme-label style="font-family:var(--sevn-font-mono);font-size:11px;margin-left:4px">system</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="wizard-shell">
+    <aside class="wizard-sidebar">
+      <div class="wizard-sidebar-title">setup</div>
+      <nav id="stepsNav" aria-label="Setup steps"></nav>
+    </aside>
+
+    <main class="wizard-main">
+      <section class="wizard-step" data-step="existing" data-title="Existing install" data-sub="Reuse saved workspace data or wipe and start fresh.">
+        <div class="wizard-page-head">
+          <div>
+            <div class="wizard-crumb" data-crumb>00 · existing</div>
+            <h1 data-heading>Existing install</h1>
+            <p class="wizard-sub">Previous onboarding data was found under your operator home.</p>
+          </div>
+        </div>
+        <p class="wizard-desc">This may include promoted <code>sevn.json</code>, a wizard draft, or encrypted secrets. Continue with that data, or type <strong>DELETE</strong> to wipe the operator home and start with a blank wizard.</p>
+        <div id="install-gate-banner" class="banner banner-info" hidden></div>
+        <div id="install-candidate-list" class="card" hidden></div>
+        <div class="wizard-step-actions-top">
+          <button type="button" id="btn-install-reuse" class="btn btn-primary">Continue previous setup</button>
+          <span class="spacer"></span>
+          <button type="button" id="btn-install-wipe" class="btn btn-ghost">Start fresh (wipe)</button>
+        </div>
+        <div id="install-wipe-confirm" class="card" hidden style="margin-top:12px">
+          <p class="hint">This stops gateway/proxy units and permanently deletes the operator home tree.</p>
+          <div class="field">
+            <label for="install-wipe-input">Type DELETE to confirm</label>
+            <input type="text" class="input" id="install-wipe-input" autocomplete="off" placeholder="DELETE">
+          </div>
+          <button type="button" id="btn-install-wipe-confirm" class="btn btn-ghost">Confirm wipe</button>
+        </div>
+      </section>
+
+      <section class="wizard-step active" data-step="profile" data-title="Pick a preset to start from" data-sub="Preset fragments are deep-merged before the remaining setup steps. You can override anything later.">
+        <div class="wizard-page-head">
+          <div>
+            <div class="wizard-crumb" data-crumb>01 · profile</div>
+            <h1 data-heading>Pick a preset to start from</h1>
+            <p class="wizard-sub" data-sub>Preset fragments are deep-merged before the remaining setup steps. You can override anything later.</p>
+          </div>
+          <div class="head-meta" style="display:flex;gap:8px;align-items:center">
+            <span class="badge badge-success" id="configValidBadge" hidden><span class="badge__dot"></span>config valid</span>
+            <span class="badge" id="configPathBadge" style="font-family:var(--sevn-font-mono);font-size:11px"></span>
+          </div>
+        </div>
+        <div class="wizard-step-actions-top">
+          <button type="button" id="btn-profile-exit" class="btn btn-ghost">Exit</button>
+          <span class="spacer"></span>
+          <button type="button" id="btn-profile-next" class="btn btn-primary">Next</button>
+        </div>
+        <p class="wizard-desc">Presets tune model routing, sandbox defaults, and feature flags without embedding secrets. Choose one to pre-fill your draft, or skip to configure every step manually.</p>
+        <div id="profile-banner" class="banner banner-info" hidden></div>
+        <div id="profile-list" class="profile-grid"></div>
+      </section>
+
+      <section class="wizard-step" data-step="workspace" data-title="Workspace" data-sub="Where sevn stores markdown, skills, databases, and logs.">
+        <div class="wizard-page-head"><div><div class="wizard-crumb">02 · workspace</div><h1>Workspace</h1><p class="wizard-sub">Where sevn stores markdown, skills, databases, and logs.</p></div></div>
+        <p class="wizard-desc">Your config file lives at <code>{SEVN_HOME}/workspace/sevn.json</code>. With the default <code>.</code> workspace root, MEMORY.md, skills/, and logs live in that same folder.</p>
+        <div class="card">
+          <div class="field">
+            <label for="workspace_root">Workspace root</label>
+            <input type="text" class="input" id="workspace_root" data-field-id="workspace_root" value=".">
+            <div class="field-help-panel" data-help-for="workspace_root"></div>
+            <span class="err"></span>
+          </div>
+          <p id="workspace-status" class="hint" style="font-size:var(--sevn-fs-xs);color:var(--sevn-fg-muted)"></p>
+          <div class="field-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+            <div class="field">
+              <label for="gateway_host">Gateway host</label>
+              <input type="text" class="input" id="gateway_host" data-field-id="gateway.host" value="127.0.0.1">
+              <div class="field-help-panel" data-help-for="gateway.host"></div>
+              <span class="err"></span>
+            </div>
+            <div class="field">
+              <label for="gateway_port">Gateway port</label>
+              <input type="number" class="input" id="gateway_port" data-field-id="gateway.port" value="3001">
+              <div class="field-help-panel" data-help-for="gateway.port"></div>
+              <span class="err"></span>
+            </div>
+          </div>
+          <div class="field" style="margin-top:12px">
+            <label>Gateway auth token</label>
+            <p class="hint" style="font-size:var(--sevn-fs-xs);color:var(--sevn-fg-muted);margin:4px 0 8px">
+              Auto-generated for CLI and dashboard access. Stored in your secrets chain — only a reference is written to <code>sevn.json</code>.
+            </p>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <input type="text" class="input" id="gateway_token_display" readonly style="flex:1;min-width:200px;font-family:monospace;font-size:var(--sevn-fs-xs)" aria-label="Gateway token preview">
+              <button type="button" class="btn btn-secondary" id="gateway_token_copy">Copy</button>
+              <button type="button" class="btn btn-secondary" id="gateway_token_regen">Regenerate</button>
+            </div>
+            <input type="hidden" id="gateway_token_hidden" data-field-id="wizard.gateway_token">
+            <span class="err"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="wizard-step" data-step="my_sevn" data-title="My Sevn.bot" data-sub="Bind your bot to the sevn.bot repo and evolution defaults.">
+        <div class="wizard-page-head"><div><div class="wizard-crumb">03 · my sevn.bot</div><h1>My Sevn.bot</h1><p class="wizard-sub">Bot name, repo URL, daily sync, GitHub auth, workspace backup, and self-improve defaults.</p></div></div>
+        <p class="wizard-desc">How your assistant introduces itself and which upstream sevn.bot repository powers evolution workflows.</p>
+        <div id="my-sevn-github-banner" class="banner banner-info" hidden></div>
+        <div class="card">
+          <div class="field">
+            <label for="agent_name">Bot name</label>
+            <input type="text" class="input" id="agent_name" data-field-id="agent.display_name" placeholder="e.g. My sevn assistant" required>
+            <div class="field-help-panel" data-help-for="agent.display_name"></div>
+            <span class="err"></span>
+          </div>
+          <div class="field" style="margin-top:12px">
+            <label for="my_sevn_repo_url">Repository URL</label>
+            <input type="url" class="input" id="my_sevn_repo_url" data-field-id="my_sevn.repo_url" value="https://github.com/sevn-bot/sevn" required>
+            <p class="hint my-sevn-repo-help" style="font-size:var(--sevn-fs-xs);color:var(--sevn-fg-muted);margin-top:6px">Keeping <code>https://github.com/sevn-bot/sevn</code> means core checkout updates can overwrite local core changes. Evolution and self-improve are limited to <strong>non-core</strong> tools and skills. The upside is automatic bug and feature issue filing against upstream.</p>
+            <div class="field-help-panel" data-help-for="my_sevn.repo_url"></div>
+            <span class="err"></span>
+          </div>
+          <div class="field" style="margin-top:16px">
+            <h3 class="card__heading" style="margin-bottom:8px">GitHub authentication</h3>
+            <p class="hint" style="font-size:var(--sevn-fs-xs);color:var(--sevn-fg-muted);margin-bottom:8px">OAuth or a personal access token. Stored encrypted as <code>integration.github.token</code> — never written to sevn.json.</p>
+            <div class="field" style="margin-bottom:12px">
+              <label for="github_oauth_client_id">GitHub OAuth client ID (optional)</label>
+              <input type="text" class="input" id="github_oauth_client_id" autocomplete="off" placeholder="From your GitHub OAuth app">
+              <label for="github_oauth_client_secret" style="margin-top:8px;display:block">GitHub OAuth client secret</label>
+              <input type="password" class="input" id="github_oauth_client_secret" autocomplete="off" placeholder="OAuth app secret (session only)">
+              <p class="hint" style="font-size:var(--sevn-fs-xs);color:var(--sevn-fg-muted);margin-top:6px">Register callback <code id="github_oauth_callback_hint">http://127.0.0.1:8844/api/github/oauth/callback</code> on your OAuth app. Credentials stay in this wizard session only.</p>
+              <button type="button" class="btn btn-ghost btn-sm" id="btn-github-oauth-save" style="margin-top:8px">Save OAuth app credentials</button>
+              <span class="err" id="github-oauth-config-error"></span>
+            </div>
+            <div class="my-sevn-github-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-github-oauth">Connect GitHub (OAuth)</button>
+              <span id="github-status-text" class="hint" style="font-size:var(--sevn-fs-xs)">Not connected</span>
+              <button type="button" class="btn btn-ghost btn-sm" id="btn-github-disconnect" hidden>Use different account</button>
+            </div>
+            <div id="github-host-offer" class="banner banner-info" hidden style="margin-bottom:12px">
+              <span id="github-host-offer-text"></span>
+              <button type="button" class="btn btn-ghost btn-sm" id="btn-github-use-host" style="margin-left:8px">Use this account</button>
+            </div>
+            <label for="github_pat">GitHub personal access token (fallback)</label>
+            <input type="password" class="input" id="github_pat" data-field-id="wizard.github_token" autocomplete="off" placeholder="ghp_…">
+            <p class="hint" style="font-size:var(--sevn-fs-xs);color:var(--sevn-fg-muted);margin-top:6px">Create a token with <code>repo</code> and <code>read:user</code> scopes (<a href="https://github.com/settings/tokens/new?scopes=repo,read:user,workflow" target="_blank" rel="noopener">GitHub token settings</a>). Optional <code>workflow</code> for Actions-aware evolution.</p>
+            <button type="button" class="btn btn-ghost btn-sm" id="btn-github-pat-save" style="margin-top:8px">Save token</button>
+            <span class="err" id="github-pat-error"></span>
+          </div>
+          <div class="field" style="margin-top:16px">
+            <h3 class="card__heading" style="margin-bottom:8px">Workspace backup</h3>
+            <label for="my_sevn_workspace_backup_url">Backup repository URL</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
+              <input type="url" class="input" id="my_sevn_workspace_backup_url" data-field-id="my_sevn.workspace_backup.repo_url" placeholder="https://github.com/you/you.mysevnbackup" style="flex:1;min-width:200px">
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-create-backup-repo">Create repository</button>
+            </div>
+            <p class="hint" style="font-size:var(--sevn-fs-xs);color:var(--sevn-fg-muted);margin-top:6px">Private GitHub repo for workspace snapshots. Default name: <code>{your_login}.mysevnbackup</code>.</p>
+          </div>
+          <div class="field" style="margin-top:12px">
+            <label><input type="checkbox" data-field-id="my_sevn.sync.enabled" checked> Keep sync (daily <code>sevn sync</code>)</label>
+          </div>
+          <div class="field" style="margin-top:16px">
+            <h3 class="card__heading" style="margin-bottom:8px">Self-improve</h3>
+            <label><input type="checkbox" data-field-id="self_improve.enabled" checked> Self-improve on</label>
+            <details class="my-sevn-details" style="margin-top:8px">
+              <summary>What is self-improve?</summary>
+              <p class="hint" style="margin-top:8px">Trajectory sampling and bounded patch proposals from real conversations. When enabled, sevn.bot can propose small improvements to tools, skills, and workspace memory under operator control.</p>
+            </details>
+          </div>
+          <div class="field">
+            <label><input type="checkbox" data-field-id="self_improve.hub.use_github" checked> Use GitHub for self-improve hub</label>
+            <details class="my-sevn-details" style="margin-top:8px">
+              <summary>GitHub hub vs local-only</summary>
+              <p class="hint" style="margin-top:8px"><strong>GitHub hub</strong> mirrors issues and pull requests to your configured repo — evolution pipelines, bug filing, and spec-kit flows can open and track work on GitHub.</p>
+              <p class="hint" style="margin-top:8px"><strong>Local-only</strong> keeps self-improve proposals on disk with no remote issue mirror. Uncheck this box when you do not want GitHub API calls for the hub.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="wizard-step" data-step="model" data-title="Main model" data-sub="Triager and optional per-slot overrides.">
+        <div class="wizard-page-head wizard-page-head--split">
+          <div>
+            <div class="wizard-crumb">04 · model</div>
+            <h1>Main model</h1>
+            <p class="wizard-sub">Triager and optional per-slot overrides.</p>
+          </div>
+          <label class="model-unify-toggle" for="use_main_model_for_all">
+            <input type="checkbox" class="input" id="use_main_model_for_all" data-field-id="providers.use_main_model_for_all" checked>
+            <span>Use main model for all</span>
+          </label>
+        </div>
+        <p class="wizard-desc">By default every LLM slot (scanner, executor tiers, LCM, memory) uses the main triager model below. Uncheck to customize individual slots before save.</p>
+        <div class="card">
+          <div class="field">
+            <label for="triager_model">Main model (triager)</label>
+            <input type="text" class="input" id="triager_model" data-field-id="providers.tier_default.triager" placeholder="minimax/MiniMax-M2.7" required>
+            <div class="field-help-panel" data-help-for="providers.tier_default.triager"></div>
+            <span class="err"></span>
+          </div>
+          <div class="field">
+            <label for="minimax_consumption_type">MiniMax billing</label>
+            <select class="input" id="minimax_consumption_type" data-field-id="providers.minimax.consumption_type">
+              <option value="subscription" selected>Subscription (Token Plan — 5h/weekly windows)</option>
+              <option value="api">API (pay-as-you-go, per token)</option>
+            </select>
+            <p class="hint" style="font-size:var(--sevn-fs-xs);color:var(--sevn-fg-muted);margin:4px 0 0">Subscription suppresses the cumulative token-budget alert, since MiniMax Token Plan is limited by 5-hour/weekly windows rather than total tokens.</p>
+            <span class="err"></span>
+          </div>
+          <div id="provider-api-keys-multi" class="field" style="margin-top:12px">
+            <h3 class="card__heading">Provider API keys</h3>
+            <p class="hint" style="font-size:var(--sevn-fs-xs);color:var(--sevn-fg-muted);margin:4px 0 10px">Each assigned LLM provider needs its own API key (stored as <code>SEVN_SECRET_*</code> in your encrypted secrets).</p>
+            <div id="provider-api-keys-list"></div>
+            <div id="openai-oauth-panel" class="field" style="margin-top:10px" hidden>
+              <p class="hint" style="font-size:var(--sevn-fs-xs);color:var(--sevn-fg-muted);margin:4px 0 8px">Use your ChatGPT Plus/Pro/Team subscription instead of a pay-as-you-go API key. Stored encrypted as <code>oauth.openai</code>.</p>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-openai-oauth">Sign in with ChatGPT (Codex OAuth)</button>
+              <span class="err" id="openai-oauth-error"></span>
+              <p class="hint" id="openai-oauth-status" style="font-size:var(--sevn-fs-xs);color:var(--sevn-fg-muted);margin-top:6px"></p>
+            </div>
+          </div>
+        </div>
+        <div id="model-slots-panel" class="card model-slots-panel" hidden>
+          <h3 class="card__heading">Executor tiers</h3>
+          <div class="field"><label for="tier_b_model">Tier B</label><input type="text" class="input model-slot-input" id="tier_b_model" data-field-id="providers.tier_default.B" placeholder="same as main"><span class="err"></span></div>
+          <div class="field"><label for="tier_c_model">Tier C</label><input type="text" class="input model-slot-input" id="tier_c_model" data-field-id="providers.tier_default.C" placeholder="same as main"><span class="err"></span></div>
+          <div class="field"><label for="tier_d_model">Tier D</label><input type="text" class="input model-slot-input" id="tier_d_model" data-field-id="providers.tier_default.D" placeholder="same as main"><span class="err"></span></div>
+          <div class="field"><label for="tier_c_sub_lm">C sub-LM (DSPy)</label><input type="text" class="input model-slot-input" id="tier_c_sub_lm" data-field-id="providers.tier_default.C.sub_lm" placeholder="same as main"><span class="err"></span></div>
+          <div class="field"><label for="tier_d_sub_lm">D sub-LM (DSPy)</label><input type="text" class="input model-slot-input" id="tier_d_sub_lm" data-field-id="providers.tier_default.D.sub_lm" placeholder="same as main"><span class="err"></span></div>
+          <div class="field"><label for="tier_c_lambda">C λ-RLM leaf</label><input type="text" class="input model-slot-input" id="tier_c_lambda" data-field-id="providers.tier_default.C.lambda_leaf" placeholder="same as main"><span class="err"></span></div>
+          <div class="field"><label for="tier_d_lambda">D λ-RLM leaf</label><input type="text" class="input model-slot-input" id="tier_d_lambda" data-field-id="providers.tier_default.D.lambda_leaf" placeholder="same as main"><span class="err"></span></div>
+          <h3 class="card__heading" style="margin-top:16px">Memory &amp; LCM</h3>
+          <div class="field"><label for="lcm_summary_model">LCM summary</label><input type="text" class="input model-slot-input" id="lcm_summary_model" data-field-id="lcm.summary_model" placeholder="same as main"><span class="err"></span></div>
+          <div class="field"><label for="pre_compaction_model">Pre-compaction flush</label><input type="text" class="input model-slot-input" id="pre_compaction_model" data-field-id="memory.pre_compaction_flush.model" placeholder="same as main"><span class="err"></span></div>
+          <div class="field"><label for="dreaming_ranker_model">Dreaming LLM ranker</label><input type="text" class="input model-slot-input" id="dreaming_ranker_model" data-field-id="memory.dreaming.scoring.llm_ranker.model" placeholder="same as main"><span class="err"></span></div>
+          <div class="field"><label for="user_model_extractor">User-model extractor</label><input type="text" class="input model-slot-input" id="user_model_extractor" data-field-id="memory.user_model.extractor_model" placeholder="same as main"><span class="err"></span></div>
+          <h3 class="card__heading" style="margin-top:16px">Security scanner</h3>
+          <div class="field"><label for="scanner_model">Scanner classify model</label><input type="text" class="input model-slot-input" id="scanner_model" data-field-id="security.scanner.model" placeholder="same as main"><span class="err"></span></div>
+        </div>
+      </section>
+
+      <section class="wizard-step" data-step="capabilities" data-title="Capabilities &amp; dependencies" data-sub="Python extras, skills, gateway behaviour, and optional subsystems.">
+        <div class="wizard-page-head"><div><div class="wizard-crumb">05 · capabilities</div><h1>Capabilities &amp; dependencies</h1><p class="wizard-sub">Grouped inventory from the capability manifest — profile presets pre-check boxes; override anything here.</p></div></div>
+        <p class="wizard-desc">Every optional extra, bundled skill, CLI dependency, and gateway flag appears below. Installs run after promote (Validate step in a later wave).</p>
+        <div id="capabilities-groups" class="capability-groups"></div>
+        <div id="openwiki-credentials-panel" class="card" hidden style="margin-top:12px">
+          <h3 class="card__heading" style="margin-bottom:8px">OpenWiki LLM API key</h3>
+          <p class="hint" style="font-size:var(--sevn-fs-xs);color:var(--sevn-fg-muted);margin-bottom:8px">Optional when a provider key from Main model already covers OpenWiki. Stored as <code>integration.openwiki.llm_api_key</code>.</p>
+          <label for="openwiki_llm_api_key">OpenWiki API key</label>
+          <input type="password" class="input" id="openwiki_llm_api_key" data-field-id="wizard.openwiki_llm_api_key" autocomplete="off" placeholder="sk-…">
+          <p class="hint" style="font-size:var(--sevn-fs-xs);color:var(--sevn-fg-muted);margin-top:6px">Install runs on Deploy via <code>sevn openwiki install</code> when OpenWiki is selected.</p>
+        </div>
+        <p id="capabilities-agpl-notice" class="hint capability-agpl-notice" hidden style="margin-top:12px;font-size:var(--sevn-fs-xs)"></p>
+      </section>
+
+      <section class="wizard-step" data-step="channels" data-title="Channels" data-sub="Telegram and Web chat are always on.">
+        <div class="wizard-page-head"><div><div class="wizard-crumb">06 · channels</div><h1>Channels</h1><p class="wizard-sub">Telegram and Web chat are always enabled.</p></div></div>
+        <p class="wizard-desc">Enter credentials here; sevn.json keeps only <code>${ENV:…}</code> references. Web chat needs no extra token for local use.</p>
+        <div class="banner banner-info">Telegram + Web chat are enabled for every install.</div>
+        <input type="hidden" data-field-id="channels.telegram.enabled" value="true">
+        <input type="hidden" data-field-id="channels.webchat.enabled" value="true">
+        <input type="hidden" data-field-id="channels.telegram.bot_token_ref" value="${ENV:SEVN_TELEGRAM_BOT_TOKEN}">
+        <nav class="channel-sub-nav" aria-label="Channel types">
+          <button type="button" class="channel-sub-nav__tab active" data-channel-tab="telegram">Telegram</button>
+          <button type="button" class="channel-sub-nav__tab" data-channel-tab="discord" disabled title="Coming soon">Discord</button>
+          <button type="button" class="channel-sub-nav__tab" data-channel-tab="slack" disabled title="Coming soon">Slack</button>
+        </nav>
+        <div class="channel-panel" data-channel-panel="telegram">
+          <div class="card">
+            <h3 class="card__heading" style="margin-bottom:8px">Telegram Web &amp; BotFather</h3>
+            <p class="hint" style="font-size:var(--sevn-fs-xs);margin-bottom:10px">Use system Chrome (CDP) to log into <a href="https://web.telegram.org/k/" target="_blank" rel="noopener">Telegram Web</a> and automate @BotFather, or paste credentials manually below.</p>
+            <div class="channel-automation-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-telegram-login">Login to Telegram Web</button>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-telegram-automate">Run BotFather automation</button>
+            </div>
+            <p id="telegram-automation-status" class="hint" style="font-size:var(--sevn-fs-xs);margin-bottom:12px"></p>
+            <label class="channel-checkbox-row">
+              <input type="checkbox" data-field-id="wizard.telegram_create_new_bot" id="tg_create_new_bot" checked>
+              Create new bot via BotFather
+            </label>
+            <div class="field" id="tg-bot-name-field" style="margin-top:12px">
+              <label for="tg_bot_display_name">New bot name</label>
+              <input type="text" class="input" id="tg_bot_display_name" data-field-id="wizard.telegram_bot_name" placeholder="My Sevn Bot" autocomplete="off" required>
+              <p class="hint" style="font-size:var(--sevn-fs-xs);margin-top:6px">Required when creating a bot. sevn waits for you to sign in to Telegram Web, then drives @BotFather and fills your owner id from @getidsbot.</p>
+              <span class="err"></span>
+            </div>
+            <div class="field" id="tg-bot-username-field" hidden style="margin-top:12px">
+              <label for="tg_bot_username">Existing bot username</label>
+              <input type="text" class="input" id="tg_bot_username" data-field-id="wizard.telegram_bot_username" placeholder="my_sevn_bot" autocomplete="off">
+              <p class="hint" style="font-size:var(--sevn-fs-xs);margin-top:6px">Required when not creating a new bot — used to look up the token in BotFather (<code>/token</code>).</p>
+              <span class="err"></span>
+            </div>
+            <h3 class="card__heading" style="margin:20px 0 8px">Telegram bot token</h3>
+            <p class="hint" style="font-size:var(--sevn-fs-xs);margin-bottom:10px">Filled automatically after BotFather automation, or paste from <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> (<code>/newbot</code> or <code>/token</code>).</p>
+            <details class="details-faq"><summary>No Telegram account yet?</summary>
+              <p class="hint">Install Telegram on your phone, register with your number, then return to create a bot via @BotFather.</p>
+            </details>
+            <div class="field" style="margin-top:12px">
+              <label for="tg_bot_token">Bot token</label>
+              <input type="password" class="input" id="tg_bot_token" data-field-id="wizard.telegram_bot_token" autocomplete="off" required>
+              <button type="button" class="btn btn-ghost btn-sm" id="btn-store-credentials" style="margin-top:8px">Save channel secrets</button>
+              <span class="err"></span>
+            </div>
+            <h3 class="card__heading" style="margin:20px 0 8px">Your Telegram user id (owner)</h3>
+            <p class="hint" style="font-size:var(--sevn-fs-xs);margin-bottom:10px">Only this user can DM the bot and use quick-action buttons (👍/👎, Regen). DMs from everyone else are ignored (<code>dm_policy: pairing</code>).</p>
+            <details class="details-faq" open><summary>How to find your user id</summary>
+              <ol class="hint" style="margin:8px 0 0 18px;font-size:var(--sevn-fs-xs);line-height:1.6">
+                <li>Run <strong>Create bot via BotFather</strong> above — sevn reads your id from <a href="https://t.me/getidsbot" target="_blank" rel="noopener">@getidsbot</a> automatically.</li>
+                <li>Or message <a href="https://t.me/getidsbot" target="_blank" rel="noopener">@getidsbot</a> manually and tap <strong>Start</strong>.</li>
+                <li>Paste the numeric <strong>Id</strong> below (digits only).</li>
+              </ol>
+            </details>
+            <div class="field" style="margin-top:12px">
+              <label for="tg_owner_user_id">Telegram user id</label>
+              <input type="text" class="input" id="tg_owner_user_id" data-field-id="wizard.telegram_owner_user_id" inputmode="numeric" pattern="[0-9]+" placeholder="123456789" required>
+              <span class="err"></span>
+            </div>
+            <h3 class="card__heading" style="margin:20px 0 8px">Telegram user API (my.telegram.org)</h3>
+            <p class="hint" style="font-size:var(--sevn-fs-xs);margin-bottom:10px">Optional — for group automation. This is a <strong>separate</strong> sign-in from Telegram Web (different site). After one successful login in this Chrome profile, later runs reuse it. You can skip now and configure from the Telegram <code>/config</code> menu or Mission Control once the bot is running.</p>
+            <details class="details-faq" open><summary>Step-by-step: getting api_id &amp; api_hash</summary>
+              <ol class="hint" style="margin:8px 0 0 18px;font-size:var(--sevn-fs-xs);line-height:1.6">
+                <li>Click <strong>Get api_id &amp; api_hash</strong> — sign in on my.telegram.org in Chrome if prompted (phone + SMS/Telegram code the first time).</li>
+                <li>Phone below is optional — only used to pre-fill the auth form when set.</li>
+                <li>sevn reads an existing app or creates one, then fills the fields below.</li>
+                <li>If my.telegram.org rate-limits you, click <strong>Skip for now</strong> — onboarding continues without these credentials.</li>
+              </ol>
+            </details>
+            <div class="channel-automation-actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-telegram-my-api">Get api_id &amp; api_hash</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="btn-skip-telegram-my-api">Skip for now</button>
+            </div>
+            <div class="field-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+              <div class="field">
+                <label for="tg_api_id">api_id</label>
+                <input type="text" class="input" id="tg_api_id" data-field-id="wizard.telegram_api_id" inputmode="numeric" placeholder="123456">
+                <span class="err"></span>
+              </div>
+              <div class="field">
+                <label for="tg_api_hash">api_hash</label>
+                <input type="text" class="input" id="tg_api_hash" data-field-id="wizard.telegram_api_hash" placeholder="32-char hex string" autocomplete="off">
+                <span class="err"></span>
+              </div>
+            </div>
+            <div class="field" style="margin-top:12px">
+              <label for="tg_phone">Phone (+intl)</label>
+              <input type="text" class="input" id="tg_phone" data-field-id="wizard.telegram_phone" placeholder="+15551234567">
+              <span class="err"></span>
+            </div>
+            <p id="telegram-app-status" class="hint" style="margin-top:8px;font-size:var(--sevn-fs-xs)"></p>
+          </div>
+        </div>
+        <div class="channel-panel channel-panel--placeholder" data-channel-panel="discord" hidden>
+          <div class="card"><p class="hint">Discord channel setup is coming soon. The adapter remains available in the Capabilities inventory.</p></div>
+        </div>
+        <div class="channel-panel channel-panel--placeholder" data-channel-panel="slack" hidden>
+          <div class="card"><p class="hint">Slack channel setup is coming soon. The adapter remains available in the Capabilities inventory.</p></div>
+        </div>
+      </section>
+
+      <section class="wizard-step" data-step="secrets" data-title="Secrets backend" data-sub="Where API keys and tokens live outside sevn.json.">
+        <div class="wizard-page-head"><div><div class="wizard-crumb">07 · secrets</div><h1>Secrets backend</h1><p class="wizard-sub">Where API keys and tokens live outside sevn.json.</p></div></div>
+        <p class="wizard-desc">Provider keys, bot tokens, and your Telegram api_hash never belong in <code>sevn.json</code>. Pick where sevn stores them so the gateway and CLI can read them back at runtime. All values you've typed in the wizard get written to whichever backend you choose <strong>when you Save &amp; promote</strong>.</p>
+        <div class="card field">
+          <label for="secrets_type">Backend type</label>
+          <select class="select" id="secrets_type" data-field-id="secrets_backend.type">
+            <option value="encrypted_file" selected>encrypted_file (local file, AES-GCM)</option>
+            <option value="openbao">openbao (self-hosted vault)</option>
+          </select>
+          <div class="field-help-panel" data-help-for="secrets_backend.type"></div>
+        </div>
+
+        <div class="card" id="secrets-encrypted-file-panel">
+          <h3 class="card__heading" style="margin-bottom:8px">Encrypted file</h3>
+          <div id="secrets-keystore-reuse" class="banner banner-info" hidden style="margin-bottom:12px">
+            <p style="margin:0 0 8px">An encrypted keystore already exists for this install. Enter your passphrase below, or replace the keystore and re-enter credentials on the Channels step.</p>
+            <button type="button" id="btn-replace-keystore" class="btn btn-ghost btn-sm">Replace keystore</button>
+          </div>
+          <p class="hint" style="font-size:var(--sevn-fs-xs);margin-bottom:10px">A single AES-GCM-256 file under your workspace. Safe by default — but anyone who steals the file <strong>and</strong> your passphrase can read your secrets. Pick a passphrase you don't reuse.</p>
+          <div class="field">
+            <label for="secrets_enc_path">Store path <span class="hint" style="font-weight:normal">— leave blank for the default</span></label>
+            <input type="text" class="input" id="secrets_enc_path" data-field-id="secrets_backend.encrypted_file.path" placeholder=".sevn/secrets/store.enc">
+            <p class="hint" id="secrets_enc_path_resolved" style="font-size:var(--sevn-fs-xs);color:var(--sevn-fg-muted);margin-top:6px">Default: <code>&lt;workspace&gt;/.sevn/secrets/store.enc</code></p>
+            <span class="err"></span>
+          </div>
+          <div class="field" style="margin-top:12px">
+            <label for="secrets_passphrase">Passphrase <span class="hint" style="font-weight:normal">— required; used to derive the AES-GCM key</span></label>
+            <input type="password" class="input" id="secrets_passphrase" data-field-id="wizard.secrets_passphrase" autocomplete="new-password" placeholder="14+ chars; not your email password" required>
+            <p class="hint" style="font-size:var(--sevn-fs-xs);color:var(--sevn-fg-muted);margin-top:6px">Stored in the chain itself so the same gateway process can decrypt later. For daemon mode, export <code>SEVN_SECRETS_PASSPHRASE</code> in your launchd/systemd unit so sevn can decrypt at boot — the wizard will print a reminder on Save. This sets <code>key_source: passphrase</code> (the default). Headless/CI installs can instead set <code>secrets_backend.encrypted_file.key_source: master_key</code> in <code>sevn.json</code> and supply a 64-hex <code>SEVN_SECRETS_MASTER_KEY</code>.</p>
+            <span class="err"></span>
+          </div>
+          <div class="field" style="margin-top:12px">
+            <label for="secrets_passphrase_confirm">Confirm passphrase</label>
+            <input type="password" class="input" id="secrets_passphrase_confirm" autocomplete="new-password" placeholder="re-enter to confirm">
+            <span class="err" id="secrets_passphrase_mismatch" style="display:none">Passphrases do not match.</span>
+          </div>
+        </div>
+
+        <div class="card" id="secrets-openbao-panel" hidden>
+          <h3 class="card__heading" style="margin-bottom:8px">OpenBao</h3>
+          <p class="hint" style="font-size:var(--sevn-fs-xs)">OpenBao is the OSS HashiCorp Vault fork. The wizard captures the backend type only; finish wiring the <code>address</code>, <code>mount</code>, and <code>token</code> by editing <code>sevn.json</code> by hand once setup is complete — see <a href="https://openbao.org/docs/configuration/" target="_blank" rel="noopener">openbao.org/docs</a>.</p>
+        </div>
+      </section>
+
+      <section class="wizard-step" data-step="sandbox" data-title="Sandbox" data-sub="How tool runs are isolated from your host.">
+        <div class="wizard-page-head"><div><div class="wizard-crumb">08 · sandbox</div><h1>Sandbox</h1><p class="wizard-sub">How tool runs are isolated from your host.</p></div></div>
+        <p class="wizard-desc">Sevn runs tool code (shell commands, Python snippets, fetches) inside a <strong>sandbox</strong> so a buggy or hostile tool cannot touch your real filesystem, secrets, or network. Pick the mode that matches your machine — <strong>Use preset default</strong> is the right answer unless you have a specific reason to override.</p>
+        <input type="hidden" id="sandbox_mode" data-field-id="sandbox.mode" value="">
+
+        <div class="sandbox-option selected" data-sandbox="">
+          <label><input type="radio" name="sandbox_mode_ui" value="" checked> <strong>Use preset default</strong> <span class="sandbox-cost-tag recommended">recommended</span></label>
+          <div class="sandbox-detail">
+            <p>Inherits the sandbox mode from the profile you picked. The Good-value preset chooses <code>pyodide_deno</code> on macOS hosts and <code>docker</code> on Linux/Docker hosts — both safe defaults you don't need to think about.</p>
+          </div>
+        </div>
+
+        <div class="sandbox-option" data-sandbox="docker">
+          <label><input type="radio" name="sandbox_mode_ui" value="docker"> <strong>docker</strong> <span class="sandbox-cost-tag">requires Docker</span></label>
+          <div class="sandbox-detail">
+            <p>Runs each tool call in a throwaway Docker container — the strongest isolation. Best when you already have Docker Desktop (macOS) or a docker daemon (Linux) running. Adds ~1–3 s per tool call for container boot, but keeps host filesystem and network unreachable from tool code.</p>
+            <p>Pick this if: you want production-grade safety, or your tools need binaries that aren't available in the WASM sandbox.</p>
+          </div>
+        </div>
+
+        <div class="sandbox-option" data-sandbox="pyodide_deno">
+          <label><input type="radio" name="sandbox_mode_ui" value="pyodide_deno"> <strong>pyodide_deno</strong> <span class="sandbox-cost-tag">no install</span></label>
+          <div class="sandbox-detail">
+            <p>Runs Python via <a href="https://pyodide.org/" target="_blank" rel="noopener">Pyodide</a> (WASM) and JavaScript via <a href="https://deno.com/" target="_blank" rel="noopener">Deno</a>'s permissions model. No Docker needed; near-instant startup; safe by construction.</p>
+            <p>Pick this if: you're on a laptop without Docker, or you want the fastest possible tool turnaround. Note: tools that need native binaries (e.g. <code>ffmpeg</code>, custom system commands) won't work here.</p>
+          </div>
+        </div>
+
+        <div class="field-help-panel" data-help-for="sandbox.mode" style="margin-top:8px"></div>
+      </section>
+
+      <section class="wizard-step" data-step="tunnel" data-title="Public access" data-sub="Expose the gateway for webhooks (optional).">
+        <div class="wizard-page-head"><div><div class="wizard-crumb">09 · tunnel</div><h1>Public access</h1><p class="wizard-sub">Cloudflare, ngrok, or Tailscale — or polling only.</p></div></div>
+        <p class="wizard-desc">Telegram long-polling works without a tunnel. Pick a tunnel only if you need HTTPS webhooks reachable from the public internet. Not sure? Leave <strong>None</strong> selected.</p>
+        <input type="hidden" id="tunnel_mode" data-field-id="infrastructure.tunnel.mode" value="none">
+
+        <div class="tunnel-option selected" data-tunnel="none">
+          <label><input type="radio" name="tunnel_mode_ui" value="none" checked> <strong>None</strong> — Telegram long-polling (simplest, recommended) <span class="tunnel-cost-tag free">free</span></label>
+          <div class="tunnel-detail">
+            <p>Your bot pulls updates from Telegram every few seconds. No inbound ports, no extra software. Works on any laptop or home server.</p>
+          </div>
+        </div>
+
+        <div class="tunnel-option" data-tunnel="tailscale_serve">
+          <label><input type="radio" name="tunnel_mode_ui" value="tailscale_serve"> <strong>Tailscale Serve</strong> — private HTTPS over your tailnet <span class="tunnel-cost-tag free">free (Personal tier)</span></label>
+          <div class="tunnel-detail">
+            <p>HTTPS reachable only from devices on your Tailscale account. Best if you already use Tailscale.</p>
+            <ol>
+              <li>Install <a href="https://tailscale.com/download" target="_blank" rel="noopener">Tailscale</a> and sign in on this machine.</li>
+              <li>Run <code>tailscale serve --bg 3001</code> in a terminal once setup completes.</li>
+              <li>Optional: enter the tailnet hostname below so sevn can announce it.</li>
+            </ol>
+            <div class="field" style="margin-top:8px">
+              <label for="tunnel_tailscale_hostname">Tailnet hostname (optional)</label>
+              <input type="text" class="input" id="tunnel_tailscale_hostname" data-field-id="infrastructure.tunnel.tailscale.hostname" placeholder="my-mac.tail1234.ts.net">
+              <span class="err"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tunnel-option" data-tunnel="tailscale_funnel">
+          <label><input type="radio" name="tunnel_mode_ui" value="tailscale_funnel"> <strong>Tailscale Funnel</strong> — public HTTPS via your tailnet <span class="tunnel-cost-tag free">free (Personal tier)</span></label>
+          <div class="tunnel-detail">
+            <p>Exposes the gateway to the public internet through Tailscale's edge. Requires Funnel to be enabled on your tailnet.</p>
+            <ol>
+              <li>Install Tailscale and enable Funnel in the <a href="https://login.tailscale.com/admin/acls" target="_blank" rel="noopener">admin console ACLs</a>.</li>
+              <li>Run <code>tailscale funnel --bg 3001</code> after onboarding.</li>
+              <li>A gateway auth token is auto-generated on the workspace step and stored in your secrets chain — required when the gateway is reachable from the internet.</li>
+            </ol>
+            <div class="field" style="margin-top:8px">
+              <label for="tunnel_tailscale_hostname_funnel">Tailnet hostname (optional)</label>
+              <input type="text" class="input" id="tunnel_tailscale_hostname_funnel" data-field-id="infrastructure.tunnel.tailscale.hostname" placeholder="my-mac.tail1234.ts.net">
+              <span class="err"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tunnel-option" data-tunnel="cloudflare">
+          <label><input type="radio" name="tunnel_mode_ui" value="cloudflare"> <strong>Cloudflare Tunnel</strong> — production-grade public HTTPS <span class="tunnel-cost-tag free">free (Zero Trust 50-user plan)</span></label>
+          <div class="tunnel-detail">
+            <p>Cloudflare runs a tiny daemon (<code>cloudflared</code>) that punches an outbound connection to their edge — no firewall changes needed. Free for personal use.</p>
+            <ol>
+              <li>Sign in to <a href="https://one.dash.cloudflare.com" target="_blank" rel="noopener">Cloudflare Zero Trust</a>.</li>
+              <li>Go to <strong>Networks → Tunnels</strong>, click <strong>Create a tunnel</strong>, pick <strong>Cloudflared</strong>, give it a name.</li>
+              <li>Cloudflare shows a one-line <code>cloudflared service install &lt;TOKEN&gt;</code> command. Copy just the <strong>TOKEN</strong> (the long string at the end) and paste it below.</li>
+              <li>Alternatively, if you already ran <code>cloudflared tunnel login</code>, point sevn at the JSON credentials file (usually <code>~/.cloudflared/&lt;tunnel-uuid&gt;.json</code>).</li>
+            </ol>
+            <div class="field" style="margin-top:8px">
+              <label for="tunnel_cf_token">Cloudflare tunnel token</label>
+              <input type="text" class="input" id="tunnel_cf_token" data-field-id="infrastructure.tunnel.cloudflare.token" placeholder="eyJ… (paste from Cloudflare dashboard)" autocomplete="off">
+              <span class="err"></span>
+            </div>
+            <div class="field" style="margin-top:8px">
+              <label for="tunnel_cf_creds">…or path to credentials JSON</label>
+              <input type="text" class="input" id="tunnel_cf_creds" data-field-id="infrastructure.tunnel.cloudflare.credentials_file" placeholder="~/.cloudflared/abc123.json">
+              <span class="err"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="tunnel-option" data-tunnel="ngrok">
+          <label><input type="radio" name="tunnel_mode_ui" value="ngrok"> <strong>ngrok</strong> — quick public URL for demos <span class="tunnel-cost-tag freemium">freemium (random URL on free)</span></label>
+          <div class="tunnel-detail">
+            <p>Easiest public HTTPS. The free tier rotates URLs on each restart; demos only, not production.</p>
+            <ol>
+              <li>Sign up at <a href="https://dashboard.ngrok.com/signup" target="_blank" rel="noopener">ngrok.com</a>.</li>
+              <li>Copy your authtoken from the <a href="https://dashboard.ngrok.com/get-started/your-authtoken" target="_blank" rel="noopener">authtoken page</a> and paste it below.</li>
+              <li>After saving, sevn will run <code>ngrok http 3001</code> in the background when the gateway starts.</li>
+            </ol>
+            <div class="field" style="margin-top:8px">
+              <label for="tunnel_ngrok_token">ngrok authtoken</label>
+              <input type="text" class="input" id="tunnel_ngrok_token" data-field-id="infrastructure.tunnel.ngrok.authtoken" placeholder="2abcDEF… (from ngrok dashboard)" autocomplete="off">
+              <span class="err"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="wizard-step" data-step="personality" data-title="Personality (fast start)" data-sub="Optional operator profile and agent vibe — skip to keep bootstrap chat.">
+        <div class="wizard-page-head"><div><div class="wizard-crumb">10 · personality</div><h1>Personality (fast start)</h1><p class="wizard-sub">Optional operator profile and agent vibe — skip to keep bootstrap chat.</p></div></div>
+        <p class="wizard-desc">All fields are optional. Anything you enter is written into <code>USER.md</code>, <code>SOUL.md</code>, and <code>IDENTITY.md</code> when you save. Leave everything blank to keep the first-conversation <code>BOOTSTRAP.md</code> flow.</p>
+        <div class="card personality-grid">
+          <div class="field">
+            <label for="personality_name">Your name</label>
+            <input type="text" class="input" id="personality_name" data-field-id="onboarding.personality.name" placeholder="How should the bot address you?" autocomplete="name">
+            <span class="err"></span>
+          </div>
+          <div class="field">
+            <label for="personality_role">Your role</label>
+            <input type="text" class="input" id="personality_role" data-field-id="onboarding.personality.role" placeholder="What you do day to day">
+            <span class="err"></span>
+          </div>
+          <div class="field">
+            <label for="personality_timezone">Timezone</label>
+            <select class="input" id="personality_timezone" data-field-id="onboarding.personality.timezone">
+              <option value="">— detect or skip —</option>
+            </select>
+            <span class="err"></span>
+          </div>
+          <div class="field">
+            <label for="personality_language">Language</label>
+            <select class="input" id="personality_language" data-field-id="onboarding.personality.language">
+              <option value="">— optional —</option>
+            </select>
+            <span class="err"></span>
+          </div>
+          <div class="field">
+            <label for="personality_style">Communication style</label>
+            <select class="input" id="personality_style" data-field-id="onboarding.personality.style">
+              <option value="">— optional preset —</option>
+            </select>
+            <input type="text" class="input" id="personality_style_detail" data-field-id="onboarding.personality.style_detail" placeholder="Add detail (optional)" style="margin-top:8px">
+            <span class="err"></span>
+          </div>
+          <div class="field">
+            <span class="field-label" id="personality_preferences_label">Preferences</span>
+            <div id="personality_preferences_options" class="personality-multi-options" role="group" aria-labelledby="personality_preferences_label"></div>
+            <input type="hidden" id="personality_preferences" data-field-id="onboarding.personality.preferences">
+            <input type="text" class="input" id="personality_preferences_detail" data-field-id="onboarding.personality.preferences_detail" placeholder="Add detail (optional)" style="margin-top:8px">
+            <span class="err"></span>
+          </div>
+          <div class="field">
+            <label for="personality_vibe">Agent vibe</label>
+            <select class="input" id="personality_vibe" data-field-id="onboarding.personality.vibe">
+              <option value="">— optional preset —</option>
+            </select>
+            <span class="err"></span>
+          </div>
+          <div class="field">
+            <label for="personality_emoji">Agent emoji</label>
+            <select class="input" id="personality_emoji" data-field-id="onboarding.personality.emoji">
+              <option value="">— optional —</option>
+            </select>
+            <span class="err"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="wizard-step" data-step="validate" data-title="Live validation" data-sub="Schema and connectivity checks before promotion.">
+        <div class="wizard-page-head"><div><div class="wizard-crumb">11 · validate</div><h1>Live validation</h1><p class="wizard-sub">Schema and connectivity checks before promotion.</p></div></div>
+        <p class="wizard-desc">Validation runs the same probes as <code>sevn doctor</code>: workspace paths, secrets, proxy health, optional Telegram, and more. Fix errors before saving.</p>
+        <div id="validate-banner" class="banner banner-info">Run validation to preview probe results.</div>
+        <div id="validation-results" class="card validation-results"></div>
+        <button type="button" class="btn btn-primary" id="btn-validate">Run validation</button>
+        <div id="install-plan-panel" class="card install-plan-panel" hidden>
+          <h2 class="install-plan-title">Capability installs</h2>
+          <p id="install-plan-summary" class="hint">Dry-run plan from selected capabilities.</p>
+          <ul id="install-plan-steps" class="install-plan-steps"></ul>
+          <button type="button" class="btn btn-secondary" id="btn-run-installs">Run installs</button>
+        </div>
+        <pre id="install-progress-log" class="card install-progress-log" hidden></pre>
+      </section>
+
+      <section class="wizard-step" data-step="promote" data-title="Deploy" data-sub="Save configuration and install the bot — this brings it online.">
+        <div class="wizard-page-head"><div><div class="wizard-crumb">12 · deploy</div><h1>Deploy the bot</h1><p class="wizard-sub">Save configuration and install the bot — this brings it online.</p></div></div>
+        <p class="wizard-desc"><strong>This is the deploy step.</strong> Pressing <em>Save configuration</em> writes <code>sevn.json</code> atomically (temp file + fsync + rename so a crash mid-write cannot corrupt your config), seeds workspace files, stores your secrets, and registers / starts the gateway + proxy LaunchAgents on macOS (or systemd user units on Linux). After this finishes the bot is live and answering on Telegram / webchat.</p>
+        <div id="promote-banner" class="banner banner-info">Ready when validation passes.</div>
+        <button type="button" class="btn btn-primary" id="btn-save">Save configuration &amp; deploy</button>
+      </section>
+
+      <section class="wizard-step" data-step="handoff" data-title="Handoff" data-sub="Start the gateway and open Mission Control.">
+        <div class="wizard-page-head"><div><div class="wizard-crumb">13 · handoff</div><h1>Handoff</h1><p class="wizard-sub">Start the gateway and open Mission Control.</p></div></div>
+        <p class="wizard-desc">Narrative templates (MEMORY.md, SOUL.md, …) are created automatically when you save if files are missing.</p>
+        <div class="card banner banner-success">
+          <p><strong>sevn.json:</strong> <code id="handoff-path"></code></p>
+        </div>
+        <div class="card" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">
+          <button type="button" class="btn btn-primary" id="btn-run-doctor">Run sevn doctor</button>
+          <button type="button" class="btn btn-secondary" id="btn-run-gateway">Run gateway</button>
+        </div>
+        <pre id="handoff-log" class="card hint" style="margin-top:12px;max-height:200px;overflow:auto;font-size:11px;white-space:pre-wrap"></pre>
+      </section>
+
+      <div class="wizard-actions">
+        <button type="button" class="btn btn-ghost" id="btn-exit">Exit</button>
+        <button type="button" class="btn btn-ghost" id="btn-prev">Back</button>
+        <span class="wizard-hint">or <span class="wizard-kbd">⏎</span> to continue</span>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-primary" id="btn-next">Next</button>
+      </div>
+    </main>
+
+    <aside class="wizard-summary" aria-label="Configuration summary">
+      <div class="wizard-summary-title">Field summary</div>
+      <div id="fieldSummaryList" class="field-summary-list"></div>
+    </aside>
+  </div>
+
+  <div id="exit-confirm-modal" class="wizard-modal" hidden role="dialog" aria-modal="true" aria-labelledby="exit-confirm-title">
+    <div class="wizard-modal-backdrop"></div>
+    <div class="wizard-modal-card card">
+      <h2 id="exit-confirm-title" class="card__heading">Exit setup?</h2>
+      <p class="hint" style="margin:12px 0 16px">Any data you've entered in this session will not be saved. The onboarding server will stop and this tab will close.</p>
+      <div class="wizard-modal-actions">
+        <button type="button" id="btn-exit-cancel" class="btn btn-ghost">Cancel</button>
+        <button type="button" id="btn-exit-proceed" class="btn btn-primary">Exit anyway</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="unlock-keystore-modal" class="wizard-modal" hidden role="dialog" aria-modal="true" aria-labelledby="unlock-keystore-title">
+    <div class="wizard-modal-backdrop"></div>
+    <div class="wizard-modal-card card">
+      <h2 id="unlock-keystore-title" class="card__heading">Unlock encrypted keystore</h2>
+      <p class="hint" style="margin:12px 0 16px">This install uses an encrypted secrets file. Enter the passphrase to load saved credentials into the wizard.</p>
+      <div class="field">
+        <label for="unlock-keystore-input">Passphrase</label>
+        <input type="password" class="input" id="unlock-keystore-input" autocomplete="current-password">
+        <span class="err" id="unlock-keystore-error"></span>
+      </div>
+      <div class="wizard-modal-actions">
+        <button type="button" id="btn-unlock-cancel" class="btn btn-ghost">Cancel</button>
+        <button type="button" id="btn-unlock-proceed" class="btn btn-primary">Unlock</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="profile-inspector-modal" class="wizard-modal profile-inspector-modal" hidden role="dialog" aria-modal="true" aria-labelledby="profile-inspector-title">
+    <div class="wizard-modal-backdrop"></div>
+    <div class="wizard-modal-card card profile-inspector-card">
+      <h2 id="profile-inspector-title" class="card__heading">Profile inspector</h2>
+      <p class="hint profile-inspector-hint" id="profile-inspector-subtitle">Read-only preset values (double-click a profile card to open).</p>
+      <p class="err" id="profile-inspector-error" hidden></p>
+      <div class="profile-inspector-table-wrap" id="profile-inspector-table-wrap" hidden>
+        <table class="profile-inspector-table" aria-describedby="profile-inspector-subtitle">
+          <thead>
+            <tr>
+              <th scope="col">Tab</th>
+              <th scope="col">Field</th>
+              <th scope="col">Value</th>
+              <th scope="col">Explanation</th>
+            </tr>
+          </thead>
+          <tbody id="profile-inspector-tbody"></tbody>
+        </table>
+      </div>
+      <p class="hint profile-inspector-loading" id="profile-inspector-loading" hidden>Loading…</p>
+      <div class="wizard-modal-actions">
+        <button type="button" id="btn-profile-inspector-cancel" class="btn btn-ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="backup-repo-modal" class="wizard-modal" hidden role="dialog" aria-modal="true" aria-labelledby="backup-repo-title">
+    <div class="wizard-modal-backdrop"></div>
+    <div class="wizard-modal-card card">
+      <h2 id="backup-repo-title" class="card__heading">Create workspace backup repository</h2>
+      <p class="hint" style="margin:12px 0 16px">Creates a <strong>private</strong> GitHub repository via the API (or <code>gh repo create</code> when available).</p>
+      <div class="field">
+        <label for="backup-repo-name">Repository name</label>
+        <input type="text" class="input" id="backup-repo-name" placeholder="yourlogin.mysevnbackup">
+        <span class="err" id="backup-repo-error"></span>
+      </div>
+      <div class="wizard-modal-actions">
+        <button type="button" id="btn-backup-cancel" class="btn btn-ghost">Cancel</button>
+        <button type="button" id="btn-backup-create" class="btn btn-primary">Create private repo</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/shared/theme.js"></script>
+  <script src="wizard/app.js"></script>
+</body>
+</html>

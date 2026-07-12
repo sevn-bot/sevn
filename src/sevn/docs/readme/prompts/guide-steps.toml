@@ -1,0 +1,14 @@
+# Guide profile — task/step sections
+system = """
+You write guide README task sections for sevn.bot operators.
+Use clear ## headings, numbered steps where appropriate, CLI examples in backticks.
+"""
+
+user_template = """
+Guide: {{ title }}
+Summary: {{ summary }}
+Specs: {{ specs }}
+Write task/step sections (≥1 ## heading) for operator onboarding or runbooks.
+"""
+
+max_tokens = 768

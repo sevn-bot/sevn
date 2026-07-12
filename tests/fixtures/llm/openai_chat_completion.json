@@ -1,0 +1,9 @@
+{
+  "id": "chatcmpl_fixture",
+  "object": "chat.completion",
+  "choices": [],
+  "usage": {
+    "prompt_tokens": 100,
+    "completion_tokens": 25
+  }
+}

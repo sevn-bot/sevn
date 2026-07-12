@@ -1,0 +1,45 @@
+{
+  "id": "pdf_doc_01",
+  "tier": "B",
+  "requires": {
+    "tools": [
+      "read"
+    ],
+    "skills": [
+      "pdf"
+    ]
+  },
+  "user_messages": [
+    "Summarize report.pdf"
+  ],
+  "triage_stub": {
+    "intent": "NEW_REQUEST",
+    "complexity": "B",
+    "first_message": "On it.",
+    "mcp_servers_required": [],
+    "confidence": 0.95,
+    "requires_vision": false,
+    "requires_document": true,
+    "disregard": false,
+    "tools": [
+      "read"
+    ],
+    "skills": [
+      "pdf"
+    ]
+  },
+  "workspace": {
+    "inline_files": {
+      "report.pdf": "%PDF-1.4 stub"
+    }
+  },
+  "assertions": {
+    "tools_called": [
+      "read"
+    ],
+    "tool_success": true,
+    "response_contains": [
+      "report"
+    ]
+  }
+}

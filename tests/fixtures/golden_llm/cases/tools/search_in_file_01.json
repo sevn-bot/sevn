@@ -1,0 +1,41 @@
+{
+  "id": "search_in_file_01",
+  "tier": "B",
+  "requires": {
+    "tools": [
+      "search_in_file"
+    ],
+    "skills": []
+  },
+  "user_messages": [
+    "Use search_in_file for this task."
+  ],
+  "triage_stub": {
+    "intent": "NEW_REQUEST",
+    "complexity": "B",
+    "first_message": "On it.",
+    "mcp_servers_required": [],
+    "confidence": 0.95,
+    "requires_vision": false,
+    "requires_document": false,
+    "disregard": false,
+    "tools": [
+      "search_in_file"
+    ],
+    "skills": []
+  },
+  "workspace": {
+    "inline_files": {
+      "hay.txt": "hay needle stack\n"
+    }
+  },
+  "assertions": {
+    "tools_called": [
+      "search_in_file"
+    ],
+    "tool_success": true,
+    "response_contains": [
+      "Found"
+    ]
+  }
+}

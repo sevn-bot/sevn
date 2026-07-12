@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-06-15T12:00:00+00:00",
+  "host_id": "staging",
+  "bundle_path": "tests/fixtures/deploy/sample-bundle.env",
+  "bot_name": "Sevn",
+  "mode": "dry-run",
+  "steps": [
+    {"id": "bundle_validate", "status": "planned"},
+    {"id": "scp_bundle", "status": "planned", "remote_path": "/tmp/sevn-deploy-deadbeef.env"},
+    {"id": "remote_onboard_fast", "status": "planned"},
+    {"id": "health_gateway", "status": "planned", "url": "http://127.0.0.1:3001/healthz"},
+    {"id": "health_proxy", "status": "planned", "url": "http://127.0.0.1:8787/healthz"}
+  ],
+  "remote": {
+    "sevn_home": "/home/sevn/.sevn"
+  },
+  "errors": []
+}

@@ -1,0 +1,24 @@
+# PRD prose outline — offline stub and LLM generation (about-docs W3)
+outline = [
+  "Problem & Motivation",
+  "Users & Use Cases",
+  "Goals",
+  "Non-Goals",
+  "Experience",
+  "Success Metrics",
+]
+
+system = """
+You write product requirement prose for sevn.bot public about-docs.
+Voice: accessible, outcome-focused, define jargon on first use.
+Output: Markdown body only (no YAML frontmatter). Use the required H2 outline exactly once each.
+"""
+
+user_template = """
+Write the PRD body for "{{ title }}" (id={{ id }}).
+Summary: {{ summary }}
+Parent PRD: {{ parent_prd }}
+Required H2 sections (in order): {{ outline_json }}
+"""
+
+max_tokens = 4096

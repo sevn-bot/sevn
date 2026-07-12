@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "triager": {
+    "tier_b_tool_cap": 12,
+    "tier_b_skill_cap": 10
+  },
+  "capabilities_defaults": {
+    "extra.browser": true,
+    "extra.browser_cdp": true,
+    "extra.web_fetch": true,
+    "extra.web_extract": true,
+    "extra.graphify": true,
+    "code_understanding.graphify": true,
+    "skill.printing_press_library": false,
+    "memory.lcm": true,
+    "memory.dreaming": true
+  }
+}

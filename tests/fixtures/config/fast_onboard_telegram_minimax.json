@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "workspace_root": ".",
+  "agent": {
+    "display_name": "Luluu"
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "bot_token_ref": "${ENV:SEVN_TELEGRAM_BOT_TOKEN}"
+    },
+    "webchat": {
+      "enabled": true
+    }
+  },
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 3001,
+    "queue_mode": "cancel",
+    "token": "${SECRET:keychain:sevn.gateway.token}"
+  },
+  "providers": {
+    "tier_default": {
+      "triager": "minimax/MiniMax-M2.7"
+    },
+    "use_main_model_for_all": true
+  },
+  "sandbox": {
+    "mode": "docker"
+  }
+}

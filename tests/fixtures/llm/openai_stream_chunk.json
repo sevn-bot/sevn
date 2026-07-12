@@ -1,0 +1,13 @@
+{
+  "id": "chunk-1",
+  "object": "chat.completion.chunk",
+  "choices": [
+    {
+      "index": 0,
+      "delta": {
+        "content": "hi"
+      },
+      "finish_reason": null
+    }
+  ]
+}
