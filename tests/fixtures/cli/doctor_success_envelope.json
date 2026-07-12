@@ -1,0 +1,50 @@
+{
+  "ok": true,
+  "command": "sevn doctor",
+  "schema_version": "1.0.0",
+  "data": {
+    "checks": [
+      {
+        "id": "sevn_json",
+        "ok": true,
+        "detail": "/tmp/workspace/sevn.json"
+      },
+      {
+        "id": "sqlite",
+        "ok": true,
+        "detail": "sevn.db opened + migrations applied"
+      },
+      {
+        "id": "secrets_backend",
+        "ok": true,
+        "detail": "sentinel _sevn_probe read ok"
+      },
+      {
+        "id": "docker",
+        "ok": true,
+        "detail": "docker info succeeded"
+      },
+      {
+        "id": "proxy_healthz",
+        "ok": true,
+        "detail": "GET http://127.0.0.1:8787/healthz -> 200"
+      },
+      {
+        "id": "gateway_health",
+        "ok": true,
+        "detail": "{\"status\":\"ok\"}"
+      },
+      {
+        "id": "gateway_ready",
+        "ok": true,
+        "detail": "{\"ready\":true}"
+      },
+      {
+        "id": "llmignore",
+        "ok": true,
+        "detail": "/tmp/workspace/.llmignore"
+      }
+    ],
+    "warnings": []
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "id": "resp_fixture",
+  "object": "response",
+  "usage": {
+    "prompt_tokens": 3,
+    "completion_tokens": 9
+  }
+}

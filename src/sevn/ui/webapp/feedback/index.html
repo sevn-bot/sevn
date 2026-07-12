@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Feedback — sevn.bot</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 1rem;
+      }
+      label {
+        display: block;
+        margin: 0.5rem 0 0.25rem;
+      }
+      textarea,
+      select {
+        width: 100%;
+        box-sizing: border-box;
+      }
+      button {
+        margin-top: 0.75rem;
+        padding: 0.5rem 1rem;
+        width: 100%;
+      }
+      #status {
+        margin-top: 0.5rem;
+        color: #444;
+      }
+    </style>
+  </head>
+  <body>
+    <form id="fb-form">
+      <label for="what">What went wrong?</label>
+      <select id="what" name="what_wrong">
+        <option value="">—</option>
+        <option value="incorrect">Incorrect</option>
+        <option value="incomplete">Incomplete</option>
+        <option value="off_topic">Off topic</option>
+        <option value="too_long">Too long</option>
+        <option value="too_short">Too short</option>
+        <option value="tone">Tone</option>
+        <option value="refusal">Refusal</option>
+        <option value="other">Other</option>
+      </select>
+      <label for="severity">Severity</label>
+      <select id="severity" name="severity">
+        <option value="">—</option>
+        <option value="minor">Minor</option>
+        <option value="moderate">Moderate</option>
+        <option value="critical">Critical</option>
+      </select>
+      <label for="body">Free text</label>
+      <textarea id="body" name="body_text" rows="5" maxlength="2000"></textarea>
+      <button type="submit">Submit feedback</button>
+    </form>
+    <p id="status"></p>
+    <script>
+      (function () {
+        const params = new URLSearchParams(location.search);
+        const token = params.get("token") || "";
+        const statusEl = document.getElementById("status");
+        const form = document.getElementById("fb-form");
+        const tg = window.Telegram && window.Telegram.WebApp;
+        if (tg && typeof tg.ready === "function") {
+          tg.ready();
+        }
+        const initData =
+          tg && typeof tg.initData === "string" && tg.initData ? tg.initData : "";
+        if (!token || !initData) {
+          statusEl.textContent = "Missing token or Telegram initData.";
+          form.hidden = true;
+          return;
+        }
+        form.addEventListener("submit", function (ev) {
+          ev.preventDefault();
+          const what = document.getElementById("what").value;
+          const severity = document.getElementById("severity").value;
+          const bodyText = document.getElementById("body").value.trim();
+          if (!what && !severity && !bodyText) {
+            statusEl.textContent = "Add at least one field.";
+            return;
+          }
+          const submissionKey =
+            token + ":" + String(Date.now()) + ":" + Math.random().toString(16);
+          fetch("/webapp/feedback/submit", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              token: token,
+              init_data: initData,
+              submission_key: submissionKey,
+              fields: {
+                what_wrong: what,
+                severity: severity,
+                body_text: bodyText,
+              },
+            }),
+          })
+            .then(function (r) {
+              if (!r.ok) {
+                throw new Error("submit_failed");
+              }
+              return r.json();
+            })
+            .then(function () {
+              statusEl.textContent = "Thanks — logged.";
+              form.hidden = true;
+              if (tg && typeof tg.close === "function") {
+                setTimeout(function () {
+                  tg.close();
+                }, 800);
+              }
+            })
+            .catch(function () {
+              statusEl.textContent = "Submit failed.";
+            });
+        });
+      })();
+    </script>
+  </body>
+</html>

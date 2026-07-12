@@ -1,0 +1,42 @@
+{
+  "id": "glob_01",
+  "tier": "B",
+  "requires": {
+    "tools": [
+      "glob"
+    ],
+    "skills": []
+  },
+  "user_messages": [
+    "Use glob for this task."
+  ],
+  "triage_stub": {
+    "intent": "NEW_REQUEST",
+    "complexity": "B",
+    "first_message": "On it.",
+    "mcp_servers_required": [],
+    "confidence": 0.95,
+    "requires_vision": false,
+    "requires_document": false,
+    "disregard": false,
+    "tools": [
+      "glob"
+    ],
+    "skills": []
+  },
+  "workspace": {
+    "inline_files": {
+      "a.txt": "a\n",
+      "b.txt": "b\n"
+    }
+  },
+  "assertions": {
+    "tools_called": [
+      "glob"
+    ],
+    "tool_success": true,
+    "response_contains": [
+      "Found"
+    ]
+  }
+}

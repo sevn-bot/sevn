@@ -1,0 +1,510 @@
+"""Repo/metadata scanner for README generation context.
+
+Module: sevn.docs.readme.scanner
+Depends: ast, json, pathlib, re, tomllib, sevn.docs.readme.fingerprint, sevn.docs.readme.manifest
+
+Exports:
+    scan_repo_context — structured context dict for one README entry.
+    resolve_spec_path — locate a manifest spec path under the repo.
+    extract_module_symbols — AST inventory of public classes/functions per module.
+
+Examples:
+    >>> from pathlib import Path
+    >>> from sevn.docs.readme.manifest import get_entry, load_manifest
+    >>> m = load_manifest(Path("docs/readmes/manifest.toml"))
+    >>> ctx = scan_repo_context(Path("."), get_entry(m, "gateway"))
+    >>> ctx["slug"] == "gateway"
+    True
+"""
+
+from __future__ import annotations
+
+import ast
+import json
+import re
+import tomllib
+from pathlib import Path
+from typing import Any
+
+from loguru import logger
+
+from sevn.docs.readme.brand import load_root_intro_lines
+from sevn.docs.readme.fingerprint import expand_source_globs
+from sevn.docs.readme.manifest import ReadmeEntry
+
+_SPEC_HEADING = re.compile(r"^#{1,3}\s+", re.MULTILINE)
+
+
+def scan_repo_context(repo_root: Path, entry: ReadmeEntry) -> dict[str, Any]:
+    """Scan repo metadata and source globs for one manifest entry.
+
+        Args:
+    repo_root (Path): Repository root.
+    entry (ReadmeEntry): Manifest row to scan for.
+
+        Returns:
+            dict[str, Any]: Structured context for section renderers and templates.
+
+        Examples:
+            >>> from pathlib import Path as _P
+            >>> from sevn.docs.readme.manifest import get_entry, load_manifest
+            >>> m = load_manifest(_P("docs/readmes/manifest.toml"))
+            >>> ctx = scan_repo_context(_P("."), get_entry(m, "gateway"))
+            >>> "package" in ctx and "source_files" in ctx
+            True
+    """
+    repo_root = repo_root.resolve()
+    source_paths = expand_source_globs(repo_root, entry.source_globs, tracked_only=False)
+    source_files = [p.relative_to(repo_root).as_posix() for p in source_paths]
+    py_files = [rel for rel in source_files if rel.endswith(".py")]
+
+    context: dict[str, Any] = {
+        "slug": entry.slug,
+        "profile": entry.profile,
+        "title": entry.title,
+        "summary": entry.summary,
+        "tier_owner": entry.tier_owner,
+        "output": entry.output,
+        "specs": list(entry.specs),
+        "source_globs": list(entry.source_globs),
+        "source_dir": _primary_source_dir(entry.source_globs),
+        "source_files": source_files,
+        "source_py_files": py_files,
+        "source_excerpt": _build_source_excerpt(repo_root, py_files),
+        "spec_excerpt": _read_spec_excerpt(repo_root, list(entry.specs)),
+        "module_symbols": extract_module_symbols(repo_root, py_files),
+        "package": _read_pyproject(repo_root),
+        "sevn_config": _read_sevn_json(repo_root),
+        "claude_md_excerpt": _read_claude_excerpt(repo_root),
+        "specs_index": _list_specs(repo_root),
+        "graphify": _read_graphify(repo_root),
+        "references": list(entry.specs),
+    }
+    if entry.profile == "root":
+        context["intro_lines"] = load_root_intro_lines(repo_root)
+    return context
+
+
+def resolve_spec_path(repo_root: Path, spec_rel: str) -> Path | None:
+    """Resolve a manifest spec path to an on-disk file.
+
+        Args:
+    repo_root (Path): Repository root.
+    spec_rel (str): Manifest spec path (e.g. ``specs/17-gateway.md``).
+
+        Returns:
+            Path | None: Absolute path when found.
+
+        Examples:
+            >>> from pathlib import Path as _P
+            >>> p = resolve_spec_path(_P("."), "specs/01-system-overview.md")
+            >>> p is None or p.is_file()
+            True
+    """
+    repo_root = repo_root.resolve()
+    candidates = [
+        repo_root / spec_rel,
+        repo_root / "about-sevn.bot" / spec_rel.removeprefix("specs/"),
+        repo_root / "about-sevn.bot" / "specs" / Path(spec_rel).name,
+        repo_root / ".ignorelocal" / "design" / spec_rel,
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def extract_module_symbols(
+    repo_root: Path,
+    py_files: list[str],
+    *,
+    max_files: int = 10,
+    max_symbols_per_file: int = 8,
+) -> dict[str, list[str]]:
+    """Build a map of Python module paths to public class/function symbols.
+
+        Args:
+    repo_root (Path): Repository root.
+    py_files (list[str]): Repo-relative Python paths.
+    max_files (int): Maximum modules to scan.
+    max_symbols_per_file (int): Cap symbols listed per module.
+
+        Returns:
+            dict[str, list[str]]: ``src/...py`` → ``Class.method`` / ``function`` names.
+
+        Examples:
+            >>> import tempfile
+            >>> td = Path(tempfile.mkdtemp())
+            >>> p = td / "src/sevn/demo/a.py"
+            >>> p.parent.mkdir(parents=True)
+            >>> _ = p.write_text("class Foo:\\n    def bar(self): pass\\n", encoding="utf-8")
+            >>> syms = extract_module_symbols(td, ["src/sevn/demo/a.py"])
+            >>> "Foo.bar" in syms["src/sevn/demo/a.py"]
+            True
+    """
+    repo_root = repo_root.resolve()
+    out: dict[str, list[str]] = {}
+    for rel in py_files[:max_files]:
+        path = repo_root / rel
+        if not path.is_file():
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:
+            logger.debug("readme_scanner: syntax error in {}", rel)
+            continue
+        symbols: list[str] = []
+        for node in tree.body:
+            if isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
+                methods = [
+                    f"{node.name}.{child.name}"
+                    for child in node.body
+                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    and not child.name.startswith("_")
+                ]
+                symbols.extend(methods[:3])
+                if len(methods) > 3:
+                    symbols.append(f"{node.name} (+{len(methods) - 3} methods)")
+            elif isinstance(
+                node, (ast.FunctionDef, ast.AsyncFunctionDef)
+            ) and not node.name.startswith("_"):
+                symbols.append(node.name)
+        if symbols:
+            out[rel] = symbols[:max_symbols_per_file]
+    return out
+
+
+def _read_spec_excerpt(
+    repo_root: Path,
+    spec_paths: list[str],
+    *,
+    max_chars: int = 2400,
+) -> str:
+    """Read introductory prose from linked spec files.
+
+        Args:
+    repo_root (Path): Repository root.
+    spec_paths (list[str]): Manifest ``specs`` entries.
+    max_chars (int): Maximum combined excerpt length.
+
+        Returns:
+            str: Plain-text excerpt (may be empty).
+
+        Examples:
+            >>> isinstance(_read_spec_excerpt(Path("."), []), str)
+            True
+    """
+    chunks: list[str] = []
+    remaining = max_chars
+    for spec_rel in spec_paths:
+        path = resolve_spec_path(repo_root, spec_rel)
+        if path is None:
+            continue
+        raw = path.read_text(encoding="utf-8")
+        summary = _spec_frontmatter_summary(raw)
+        body = _spec_body_without_frontmatter(raw)
+        prose = _first_spec_prose(body, max_lines=40)
+        if summary and (not prose or prose.startswith("Offline scaffold")):
+            prose = summary
+        elif summary and prose:
+            prose = f"{summary}\n\n{prose}"
+        if not prose:
+            continue
+        chunk = f"From {spec_rel}:\n{prose}"
+        if len(chunk) > remaining:
+            chunk = chunk[:remaining].rsplit("\n", maxsplit=1)[0]
+        chunks.append(chunk)
+        remaining -= len(chunk)
+        if remaining <= 0:
+            break
+    return "\n\n".join(chunks).strip()
+
+
+def _spec_frontmatter_summary(text: str) -> str:
+    """Extract the ``summary`` field from YAML frontmatter when present.
+
+        Args:
+    text (str): Full spec file contents.
+
+        Returns:
+            str: Summary text or empty string.
+
+        Examples:
+            >>> _spec_frontmatter_summary("---\\nsummary: Hello world\\n---\\n")
+            'Hello world'
+    """
+    if not text.startswith("---"):
+        return ""
+    end = text.find("\n---", 3)
+    if end < 0:
+        return ""
+    block = text[3:end]
+    lines: list[str] = []
+    in_summary = False
+    for line in block.splitlines():
+        if line.startswith("summary:"):
+            rest = line.split(":", maxsplit=1)[1].strip()
+            if rest:
+                lines.append(rest.strip("'\""))
+            in_summary = True
+            continue
+        if in_summary:
+            if line.startswith((" ", "\t")):
+                lines.append(line.strip().strip("'\""))
+                continue
+            break
+    return " ".join(lines).strip()
+
+
+def _spec_body_without_frontmatter(text: str) -> str:
+    """Strip YAML frontmatter from a spec markdown file when present.
+
+        Args:
+    text (str): Full spec file contents.
+
+        Returns:
+            str: Body without leading ``---`` block.
+
+        Examples:
+            >>> _spec_body_without_frontmatter("---\\nid: x\\n---\\n\\n# Title\\n")
+            '\\n\\n# Title\\n'
+    """
+    if text.startswith("---"):
+        end = text.find("\n---", 3)
+        if end >= 0:
+            return text[end + 4 :]
+    return text
+
+
+def _first_spec_prose(body: str, *, max_lines: int = 40) -> str:
+    """Return the first substantive prose block from a spec body.
+
+        Args:
+    body (str): Spec markdown body.
+    max_lines (int): Line cap for the excerpt.
+
+        Returns:
+            str: Prose excerpt.
+
+        Examples:
+            >>> txt = "# Title\\n\\nIntro paragraph.\\n\\n## Section\\nMore."
+            >>> "Intro paragraph" in _first_spec_prose(txt)
+            True
+    """
+    lines: list[str] = []
+    for line in body.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            if lines:
+                lines.append("")
+            continue
+        if stripped.startswith("#"):
+            if lines:
+                break
+            continue
+        if stripped.startswith("```"):
+            break
+        lines.append(stripped)
+        if len(lines) >= max_lines:
+            break
+    return "\n".join(lines).strip()
+
+
+def _primary_source_dir(source_globs: tuple[str, ...]) -> str:
+    """Pick a badge/link source directory from manifest globs.
+
+        Args:
+    source_globs (tuple[str, ...]): Manifest ``source_globs`` patterns.
+
+        Returns:
+            str: Repo-relative directory prefix ending with ``/``.
+
+        Examples:
+            >>> _primary_source_dir(("src/sevn/gateway/**",))
+            'src/sevn/gateway/'
+    """
+    for pattern in source_globs:
+        if pattern.startswith("src/sevn/"):
+            head = pattern.split("/", maxsplit=3)
+            if len(head) >= 3:
+                return f"{head[0]}/{head[1]}/{head[2]}/"
+        if "/" not in pattern:
+            continue
+        prefix = pattern.split("*", maxsplit=1)[0]
+        if prefix.endswith("/"):
+            return prefix
+    if source_globs:
+        first = source_globs[0]
+        if first.endswith("/**"):
+            return first[:-3]
+        if "/" in first:
+            return first.rsplit("/", maxsplit=1)[0] + "/"
+    return "src/sevn/"
+
+
+def _read_pyproject(repo_root: Path) -> dict[str, str]:
+    """Read name/version/description from ``pyproject.toml``.
+
+        Args:
+    repo_root (Path): Repository root.
+
+        Returns:
+            dict[str, str]: Package metadata with ``name``, ``version``, ``description``.
+
+        Examples:
+            >>> from pathlib import Path as _P
+            >>> meta = _read_pyproject(_P("."))
+            >>> meta["name"]
+            'sevn'
+    """
+    path = repo_root / "pyproject.toml"
+    if not path.is_file():
+        return {"name": "sevn", "version": "0.0.0", "description": ""}
+    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    project = data.get("project")
+    if not isinstance(project, dict):
+        return {"name": "sevn", "version": "0.0.0", "description": ""}
+    return {
+        "name": str(project.get("name", "sevn")),
+        "version": str(project.get("version", "0.0.0")),
+        "description": str(project.get("description", "")),
+    }
+
+
+def _read_sevn_json(repo_root: Path) -> dict[str, Any] | None:
+    """Read ``sevn.json`` when present.
+
+        Args:
+    repo_root (Path): Repository root.
+
+        Returns:
+            dict[str, Any] | None: Parsed config or ``None`` when absent/invalid.
+
+        Examples:
+            >>> isinstance(_read_sevn_json(Path("/nonexistent")), (dict, type(None)))
+            True
+    """
+    for candidate in (repo_root / "sevn.json", repo_root / "config" / "sevn.json"):
+        if not candidate.is_file():
+            continue
+        try:
+            data = json.loads(candidate.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            logger.warning("readme_scanner: invalid sevn.json at {}", candidate)
+            return None
+        if isinstance(data, dict):
+            return data
+    return None
+
+
+def _read_claude_excerpt(repo_root: Path, *, max_lines: int = 40) -> str:
+    """Return the first ``max_lines`` of ``CLAUDE.md``.
+
+        Args:
+    repo_root (Path): Repository root.
+    max_lines (int): Maximum lines to include.
+
+        Returns:
+            str: Excerpt text (empty when file missing).
+
+        Examples:
+            >>> isinstance(_read_claude_excerpt(Path(".")), str)
+            True
+    """
+    path = repo_root / "CLAUDE.md"
+    if not path.is_file():
+        return ""
+    lines = path.read_text(encoding="utf-8").splitlines()[:max_lines]
+    return "\n".join(lines).strip()
+
+
+def _list_specs(repo_root: Path) -> list[str]:
+    """List ``specs/*.md`` paths relative to repo root.
+
+        Args:
+    repo_root (Path): Repository root.
+
+        Returns:
+            list[str]: Sorted spec paths (may be empty).
+
+        Examples:
+            >>> specs = _list_specs(Path("."))
+            >>> all(p.startswith("specs/") for p in specs) or specs == []
+            True
+    """
+    specs_dir = repo_root / ".ignorelocal" / "design" / "specs"
+    if not specs_dir.is_dir():
+        specs_dir = repo_root / "specs"
+    if not specs_dir.is_dir():
+        return []
+    prefix = specs_dir.relative_to(repo_root)
+    return sorted((prefix / p.name).as_posix() for p in specs_dir.glob("*.md"))
+
+
+def _read_graphify(repo_root: Path) -> dict[str, Any] | None:
+    """Load optional ``graphify-out/graph.json`` summary when present.
+
+        Args:
+    repo_root (Path): Repository root.
+
+        Returns:
+            dict[str, Any] | None: Node/edge counts or ``None`` when absent.
+
+        Examples:
+            >>> isinstance(_read_graphify(Path(".")), (dict, type(None)))
+            True
+    """
+    path = repo_root / "graphify-out" / "graph.json"
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        logger.debug("readme_scanner: invalid graphify graph.json at {}", path)
+        return None
+    if not isinstance(data, dict):
+        return None
+    nodes = data.get("nodes")
+    edges = data.get("edges")
+    return {
+        "path": path.relative_to(repo_root).as_posix(),
+        "node_count": len(nodes) if isinstance(nodes, list) else 0,
+        "edge_count": len(edges) if isinstance(edges, list) else 0,
+    }
+
+
+def _build_source_excerpt(repo_root: Path, py_files: list[str], *, max_files: int = 12) -> str:
+    """Build a compact excerpt listing key Python modules.
+
+        Args:
+    repo_root (Path): Repository root.
+    py_files (list[str]): Repo-relative Python paths.
+    max_files (int): Maximum files to list.
+
+        Returns:
+            str: Markdown bullet list excerpt.
+
+        Examples:
+            >>> import tempfile
+            >>> from pathlib import Path as _P
+            >>> td = _P(tempfile.mkdtemp())
+            >>> p = td / "src/a.py"
+            >>> p.parent.mkdir(parents=True)
+            >>> _ = p.write_text("# mod\\n", encoding="utf-8")
+            >>> "- `src/a.py`" in _build_source_excerpt(td, ["src/a.py"])
+            True
+    """
+    lines: list[str] = []
+    for rel in py_files[:max_files]:
+        path = repo_root / rel
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            logger.warning("readme_scanner: unable to read source file at {}", path)
+            continue
+        first = next((ln.strip() for ln in text.splitlines() if ln.strip()), "")
+        safe_first = first.replace("`", "'")[:120]
+        lines.append(f"- `{rel}` — {safe_first}")
+    if len(py_files) > max_files:
+        lines.append(f"- … and {len(py_files) - max_files} more Python modules")
+    return "\n".join(lines)

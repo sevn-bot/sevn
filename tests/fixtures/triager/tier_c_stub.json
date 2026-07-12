@@ -1,0 +1,12 @@
+{
+  "intent": "NEW_REQUEST",
+  "complexity": "C",
+  "first_message": "Drafting a plan.",
+  "tools": [],
+  "skills": [],
+  "mcp_servers_required": [],
+  "confidence": 0.95,
+  "requires_vision": false,
+  "requires_document": false,
+  "disregard": false
+}

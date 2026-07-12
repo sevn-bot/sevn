@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en" data-theme-pref="system">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>sevn.bot Mission Control</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/style/index.css" />
+    <link rel="stylesheet" href="/mission/style.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.3.0/css/xterm.css" />
+  </head>
+  <body>
+    <div class="mission-shell">
+      <aside class="sidebar" aria-label="Mission Control navigation">
+        <div class="mission-sidebar-head">
+          <img class="mission-logo mission-logo--light" src="/style/logos/logo-primary.svg" alt="sevn.bot" width="120" height="32" />
+          <img class="mission-logo mission-logo--dark" src="/style/logos/logo-dark-bg.svg" alt="sevn.bot" width="120" height="32" />
+          <span class="mission-sidebar-title">Mission Control</span>
+        </div>
+        <nav id="tabs" class="mission-nav"></nav>
+      </aside>
+      <div class="mission-main">
+        <header class="navbar mission-topbar">
+          <div class="navbar__search mission-search">
+            <label class="field" for="global-search">
+              <span class="label">Search traces</span>
+              <input id="global-search" class="input" type="search" placeholder="Search traces (Enter) · ⌘K palette" autocomplete="off" />
+            </label>
+            <span class="mission-palette-kbd" aria-hidden="true">⌘K</span>
+          </div>
+          <div class="navbar__actions">
+            <div class="mission-health-badges" aria-label="Live health">
+              <span id="proxy-health-badge" class="badge badge-muted" title="Egress proxy">Proxy …</span>
+              <span id="provider-health-badge" class="badge badge-muted" title="Providers">Providers …</span>
+              <span id="approval-pending-badge" class="badge badge-muted" title="Tool approvals" hidden>Approvals 0</span>
+            </div>
+            <span id="auth-badge" class="badge badge-muted" hidden></span>
+            <button id="theme" type="button" class="btn btn-ghost btn-sm" data-sevn-theme-toggle title="Theme">
+              <span id="themeLabel" data-sevn-theme-label>system</span>
+            </button>
+            <div class="mission-system-menu">
+              <button id="system-menu-toggle" type="button" class="btn btn-ghost btn-sm" aria-haspopup="menu" aria-expanded="false">System</button>
+              <div id="system-menu-panel" class="mission-menu-panel" role="menu" hidden>
+                <button type="button" class="btn btn-ghost btn-sm" id="system-upgrade" role="menuitem">Upgrade &amp; restart</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="system-logging" role="menuitem">Log retention</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="system-sign-out" role="menuitem">Sign out</button>
+              </div>
+            </div>
+          </div>
+        </header>
+        <div id="command-palette" class="modal-scrim" hidden role="presentation">
+          <div class="modal" role="dialog" aria-modal="true" aria-labelledby="palette-title">
+            <div class="modal__header">
+              <p class="modal__eyebrow">Mission Control</p>
+              <h2 id="palette-title" class="modal__title">Search</h2>
+              <p class="modal__sub">Tabs, traces, files (<code>file:…</code>), config (<code>config:…</code>)</p>
+            </div>
+            <div class="modal__body">
+              <input id="palette-query" class="input mission-palette-input" type="search" placeholder="Search…" autocomplete="off" />
+              <div id="palette-results" class="mission-palette-results" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+        <div id="log-retention-modal" class="modal-scrim" hidden role="presentation">
+          <div class="modal" role="dialog" aria-modal="true" aria-labelledby="logging-title">
+            <div class="modal__header">
+              <p class="modal__eyebrow">System</p>
+              <h2 id="logging-title" class="modal__title">Log retention</h2>
+            </div>
+            <form id="log-retention-form" class="modal__body">
+              <label class="field">
+                <span class="label">Retention (days)</span>
+                <input id="logging-retention-days" class="input" type="number" min="1" max="3650" required />
+              </label>
+              <label class="field">
+                <span class="label">Archive mode</span>
+                <select id="logging-archive-mode" class="input">
+                  <option value="copy">copy</option>
+                  <option value="move">move</option>
+                  <option value="r2">r2</option>
+                  <option value="gcs">gcs</option>
+                </select>
+              </label>
+              <label class="field">
+                <span class="label">Archive destination</span>
+                <input id="logging-archive-destination" class="input" type="text" />
+              </label>
+              <p id="log-retention-error" class="error" hidden></p>
+            </form>
+            <div class="modal__footer">
+              <button type="button" class="btn btn-ghost" id="log-retention-cancel">Cancel</button>
+              <button type="submit" form="log-retention-form" class="btn btn-primary">Save</button>
+            </div>
+          </div>
+        </div>
+        <div id="login-panel" class="mission-login card" hidden>
+          <h2>Sign in</h2>
+          <p class="muted">Owner password required for this session.</p>
+          <form id="login-form">
+            <label class="field">
+              <span class="label">Password</span>
+              <input id="login-password" class="input" type="password" autocomplete="current-password" required />
+            </label>
+            <p id="login-error" class="error" hidden></p>
+            <button type="submit" class="btn btn-primary">Sign in</button>
+          </form>
+        </div>
+        <section id="content" class="mission-content" aria-live="polite"></section>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="/shared/theme.js"></script>
+    <script src="/mission/app.js"></script>
+  </body>
+</html>

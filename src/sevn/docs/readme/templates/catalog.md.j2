@@ -1,0 +1,10 @@
+<!-- generated: do not edit by hand; run `sevn readme update {{ slug }}` -->
+# {{ title }}
+
+> **Summary.** {{ summary }}
+
+| Name | Path | Summary |
+|------|------|---------|
+{% for item in items -%}
+| `{{ item.name }}` | [`{{ item.path }}`]({{ item.path }}) | {{ item.summary }} |
+{% endfor %}

@@ -1,0 +1,63 @@
+{
+  "style": [
+    "Brief and direct",
+    "Detailed and thorough",
+    "Bullet lists",
+    "Casual and conversational",
+    "Formal and precise",
+    "Technical and exact",
+    "Warm and encouraging",
+    "Skeptical and questioning",
+    "Step-by-step tutorials",
+    "Executive summaries first"
+  ],
+  "preferences": [
+    "Prefer open-source tools",
+    "Avoid cloud-only services",
+    "Prioritize speed over polish",
+    "Prioritize correctness over speed",
+    "Minimize notifications",
+    "Morning deep-work blocks",
+    "Async communication preferred",
+    "No unsolicited suggestions",
+    "Always cite sources",
+    "Keep replies under 200 words"
+  ],
+  "languages": [
+    "English"
+  ],
+  "vibes": [
+    "Calm co-pilot",
+    "Sharp analyst",
+    "Friendly mentor",
+    "Direct operator",
+    "Curious researcher",
+    "Steady engineer",
+    "Creative brainstormer",
+    "Precise editor",
+    "Supportive assistant",
+    "No-nonsense fixer"
+  ],
+  "emojis": [
+    "🌿",
+    "⚡",
+    "🦊",
+    "🤖",
+    "🧠",
+    "🔥",
+    "✨",
+    "🎯",
+    "🛠️",
+    "📎",
+    "🌊",
+    "🚀",
+    "🦉",
+    "🐙",
+    "🌸",
+    "💡",
+    "🎨",
+    "🧭",
+    "☕",
+    "🌙"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "intent": "GREETING",
+  "complexity": "A",
+  "first_message": "Hello from fixture stub",
+  "tools": [],
+  "skills": [],
+  "mcp_servers_required": [],
+  "confidence": 1.0,
+  "requires_vision": false,
+  "disregard": false
+}

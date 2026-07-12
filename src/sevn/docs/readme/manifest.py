@@ -1,0 +1,167 @@
+"""Parse ``manifest.toml`` — curated README set for generation and gate.
+
+Module: sevn.docs.readme.manifest
+Depends: pathlib, tomllib, sevn.docs.readme.profiles
+
+Exports:
+    ReadmeEntry — one manifest row (slug, profile, source_globs, …).
+    ReadmeManifest — parsed manifest with version and entries.
+    load_manifest — read and validate ``manifest.toml``.
+    get_entry — lookup one entry by slug.
+
+Examples:
+    >>> from pathlib import Path
+    >>> m = load_manifest(Path("docs/readmes/manifest.toml"))
+    >>> any(e.slug == "gateway" for e in m.entries)
+    True
+"""
+
+from __future__ import annotations
+
+import tomllib
+from dataclasses import dataclass
+from pathlib import Path
+
+from sevn.docs.readme.profiles import PROFILE_TEMPLATES
+
+_VALID_PROFILES = frozenset(PROFILE_TEMPLATES)
+
+
+@dataclass(frozen=True)
+class ReadmeEntry:
+    """One README row from ``manifest.toml``."""
+
+    slug: str
+    title: str
+    summary: str
+    profile: str
+    tier_owner: str
+    output: str
+    source_globs: tuple[str, ...]
+    specs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ReadmeManifest:
+    """Parsed README manifest."""
+
+    version: int
+    entries: tuple[ReadmeEntry, ...]
+
+
+def load_manifest(path: Path) -> ReadmeManifest:
+    """Load and validate the README manifest at ``path``.
+
+        Args:
+    path (Path): Path to ``manifest.toml``.
+
+        Returns:
+            ReadmeManifest: Parsed entries with validated profile names.
+
+        Raises:
+            FileNotFoundError: When ``path`` is missing.
+            ValueError: When structure or profile names are invalid.
+
+        Examples:
+            >>> from pathlib import Path as _P
+            >>> m = load_manifest(_P("docs/readmes/manifest.toml"))
+            >>> m.version >= 1
+            True
+    """
+    raw = path.read_bytes()
+    data = tomllib.loads(raw.decode("utf-8"))
+    version = int(data.get("version", 0))
+    rows = data.get("readme")
+    if not isinstance(rows, list) or not rows:
+        msg = f"{path}: expected non-empty [[readme]] table array"
+        raise ValueError(msg)
+
+    entries: list[ReadmeEntry] = []
+    seen_slugs: set[str] = set()
+    for idx, row in enumerate(rows):
+        if not isinstance(row, dict):
+            msg = f"{path}: readme[{idx}] must be a table"
+            raise ValueError(msg)
+        slug = str(row.get("slug", "")).strip()
+        if not slug:
+            msg = f"{path}: readme[{idx}] missing slug"
+            raise ValueError(msg)
+        if slug in seen_slugs:
+            msg = f"{path}: duplicate slug {slug!r}"
+            raise ValueError(msg)
+        seen_slugs.add(slug)
+
+        profile = str(row.get("profile", "")).strip()
+        if profile not in _VALID_PROFILES:
+            known = ", ".join(sorted(_VALID_PROFILES))
+            msg = f"{path}: readme[{idx}] profile={profile!r}; expected one of: {known}"
+            raise ValueError(msg)
+
+        source_globs = _as_str_tuple(row.get("source_globs"))
+        if not source_globs:
+            msg = f"{path}: readme[{idx}] slug={slug!r} missing source_globs"
+            raise ValueError(msg)
+
+        entries.append(
+            ReadmeEntry(
+                slug=slug,
+                title=str(row.get("title", slug)).strip(),
+                summary=str(row.get("summary", "")).strip(),
+                profile=profile,
+                tier_owner=str(row.get("tier_owner", "")).strip(),
+                output=str(row.get("output", f"docs/readmes/{slug}.md")).strip(),
+                source_globs=source_globs,
+                specs=_as_str_tuple(row.get("specs")),
+            )
+        )
+
+    return ReadmeManifest(version=version, entries=tuple(entries))
+
+
+def get_entry(manifest: ReadmeManifest, slug: str) -> ReadmeEntry:
+    """Return the manifest entry for ``slug``.
+
+        Args:
+    manifest (ReadmeManifest): Loaded manifest.
+    slug (str): Entry slug (e.g. ``gateway``).
+
+        Returns:
+            ReadmeEntry: Matching row.
+
+        Raises:
+            KeyError: When ``slug`` is absent.
+
+        Examples:
+            >>> from pathlib import Path as _P
+            >>> m = load_manifest(_P("docs/readmes/manifest.toml"))
+            >>> get_entry(m, "gateway").profile
+            'subsystem'
+    """
+    for entry in manifest.entries:
+        if entry.slug == slug:
+            return entry
+    msg = f"manifest entry not found: {slug!r}"
+    raise KeyError(msg)
+
+
+def _as_str_tuple(value: object) -> tuple[str, ...]:
+    """Coerce a TOML list value to a tuple of non-empty strings.
+
+        Args:
+    value (object): Raw TOML value.
+
+        Returns:
+            tuple[str, ...]: Normalized strings.
+
+        Examples:
+            >>> _as_str_tuple(["a", ""])
+            ('a',)
+    """
+    if not isinstance(value, list):
+        return ()
+    out: list[str] = []
+    for item in value:
+        text = str(item).strip()
+        if text:
+            out.append(text)
+    return tuple(out)

@@ -1,0 +1,1 @@
+Line with *asterisk* and _underscore_ and `backtick` plus [bracket](url)

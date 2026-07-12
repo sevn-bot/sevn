@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "skills": {
+    "enabled": true
+  },
+  "tools": {
+    "add_core_tools_to_all_context": true
+  },
+  "triager": {
+    "tier_b_tool_cap": 10,
+    "tier_b_skill_cap": 7
+  },
+  "capabilities_defaults": {
+    "extra.browser": false,
+    "extra.web_fetch": true,
+    "skill.printing_press_library": false,
+    "memory.lcm": true
+  }
+}

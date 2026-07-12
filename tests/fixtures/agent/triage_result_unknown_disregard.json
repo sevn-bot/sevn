@@ -1,0 +1,12 @@
+{
+  "intent": "UNKNOWN",
+  "complexity": "A",
+  "first_message": "",
+  "tools": [],
+  "skills": [],
+  "mcp_servers_required": [],
+  "confidence": 0.0,
+  "requires_vision": false,
+  "requires_document": false,
+  "disregard": true
+}

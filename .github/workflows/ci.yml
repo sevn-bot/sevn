@@ -59,7 +59,9 @@ jobs:
         env:
           SEVN_TEST_SPLITS: "4"
           SEVN_TEST_GROUP: ${{ matrix.group }}
-        run: make test
+        run: |
+          cp infra/sevn_config_long_description.json src/sevn/data/sevn_config_long_description.json
+          make test
 
   static:
     name: Verify (static + build)
@@ -77,7 +79,7 @@ jobs:
 
   drift-gates:
     name: Verify (drift gates)
-    if: hashFiles('src/sevn/**') != ''
+    if: hashFiles('src/sevn/**') != '' && hashFiles('about-sevn.bot/**') != ''
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

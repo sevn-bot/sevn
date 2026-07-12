@@ -1,0 +1,135 @@
+:root {
+  --bg: var(--tg-theme-bg-color, #ffffff);
+  --text: var(--tg-theme-text-color, #111111);
+  --hint: var(--tg-theme-hint-color, #666666);
+  --link: var(--tg-theme-link-color, #2481cc);
+  --button: var(--tg-theme-button-color, #2481cc);
+  --button-text: var(--tg-theme-button-text-color, #ffffff);
+  --secondary-bg: var(--tg-theme-secondary-bg-color, #f4f4f5);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#viewer-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--secondary-bg);
+}
+
+#viewer-header h1 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+#viewer-root {
+  padding: 1rem;
+}
+
+#viewer-status {
+  color: var(--hint);
+}
+
+.viewer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.viewer-table th,
+.viewer-table td {
+  border: 1px solid var(--secondary-bg);
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+}
+
+.viewer-table th {
+  background: var(--secondary-bg);
+}
+
+.viewer-caption {
+  margin-top: 0.75rem;
+  color: var(--hint);
+  font-size: 0.85rem;
+}
+
+.viewer-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.5rem;
+}
+
+.viewer-gallery img {
+  width: 100%;
+  border-radius: 8px;
+  object-fit: cover;
+  aspect-ratio: 4 / 3;
+  background: var(--secondary-bg);
+}
+
+.viewer-slideshow {
+  position: relative;
+}
+
+.viewer-slide img {
+  width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 8px;
+  background: var(--secondary-bg);
+}
+
+.viewer-slide-caption {
+  margin-top: 0.5rem;
+  color: var(--hint);
+  font-size: 0.85rem;
+}
+
+.viewer-nav {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.75rem;
+  gap: 0.5rem;
+}
+
+.viewer-nav button {
+  flex: 1;
+  padding: 0.55rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--button);
+  color: var(--button-text);
+  font-size: 0.9rem;
+}
+
+.viewer-stream {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  background: var(--secondary-bg);
+  border-radius: 8px;
+  padding: 0.75rem;
+  min-height: 12rem;
+}
+
+#viewer-actions {
+  padding: 0 1rem 1rem;
+}
+
+#viewer-share-story {
+  width: 100%;
+  padding: 0.65rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--button);
+  color: var(--button-text);
+  font-size: 0.9rem;
+}

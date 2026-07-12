@@ -1,0 +1,135 @@
+<!-- generated: do not edit by hand; run `sevn readme update {{ slug }}` -->
+
+<a name="readme-top"></a>
+
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="styles/sevn/style/logos/logo-all-white.svg">
+  <img src="styles/sevn/style/logos/logo-primary.jpg" alt="sevn.bot" width="280">
+</picture>
+
+<p align="center">
+<em>
+{% for line in intro_lines -%}
+{{ line }}<br>
+{% endfor -%}
+</em>
+</p>
+
+[![Docs][docs-badge]][docs-link]
+[![Quick Start][quick-badge]][quick-link]
+[![Architecture][arch-badge]][arch-link]
+[![Report Bug][bug-badge]][bug-link]
+
+[![CI][ci-badge]][ci-link]
+[![License: MIT][license-badge]][license-link]
+[![Python 3.12+][python-badge]][python-link]
+[![Package][package-badge]][package-link]
+
+<img src="docs/brand/assets/hero.png" alt="sevn.bot product hero (placeholder)" width="800">
+
+</div>
+
+> [!NOTE]
+> Hero image is a **placeholder** until real product media lands (see `docs/brand/assets/MANIFEST.md`).
+
+---
+
+{{ value_prop }}
+
+<details>
+<summary><strong>Table of contents</strong></summary>
+
+- [Highlights](#highlights)
+- [Architecture at a glance](#architecture-at-a-glance)
+- [Subsystem map](#subsystem-map)
+- [Quick start](#quick-start-tldr)
+- [Security model](#security-model)
+- [Install](#install)
+- [Docs by goal](#docs-by-goal)
+- [Community](#community)
+- [License](#license)
+- [Acknowledgements](#acknowledgements)
+
+</details>
+
+## Highlights
+
+{% for item in highlights -%}
+- ![feature][feature-badge] {{ item }}
+{% endfor %}
+
+## Architecture at a glance
+
+<img src="docs/brand/assets/architecture.svg" alt="Architecture diagram (placeholder)" width="720">
+
+{% for bullet in architecture_bullets -%}
+- {{ bullet }}
+{% endfor %}
+
+See [README catalog](docs/readmes/INDEX.md) and [Architecture](about-sevn.bot/ARCHITECTURE.md).
+
+## Subsystem map
+
+| Subsystem | Profile | Summary |
+|-----------|---------|---------|
+{% for entry in subsystem_entries -%}
+| [{{ entry.title }}]({{ entry.path }}) | `{{ entry.profile }}` | {{ entry.summary }} |
+{% endfor %}
+
+<a id="quick-start-tldr"></a>
+
+## Quick start
+
+{{ quick_start }}
+
+## Security model
+
+Operator-owned gateway with paired egress proxy, secrets backends, and LLM Guard scanning. See [Security](docs/readmes/security.md) and [Secrets](docs/readmes/secrets.md).
+
+## Install
+
+{% for step in install_steps -%}
+1. {{ step }}
+{% endfor %}
+
+## Docs by goal
+
+| Goal | Start here |
+|------|------------|
+| Run the gateway | [Gateway](docs/readmes/gateway.md) |
+| Configure the workspace | [Config & workspace](docs/readmes/config-workspace.md) |
+| Browse all READMEs | [INDEX](docs/readmes/INDEX.md) |
+
+## Community
+
+Issues and discussions: [GitHub](https://github.com/{{ repo_owner }}/{{ repo_name }}).
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+## Acknowledgements
+
+Built on open-source tools documented throughout `docs/readmes/`.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+[docs-badge]: https://img.shields.io/badge/Docs-5fb1f7?style=for-the-badge&logo=readthedocs&logoColor=white
+[docs-link]: docs/readmes/INDEX.md
+[quick-badge]: https://img.shields.io/badge/Quick_Start-5fb1f7?style=for-the-badge&logo=rocket&logoColor=white
+[quick-link]: #quick-start-tldr
+[arch-badge]: https://img.shields.io/badge/Architecture-2a7fc6?style=for-the-badge&logo=diagramsdotnet&logoColor=white
+[arch-link]: about-sevn.bot/ARCHITECTURE.md
+[bug-badge]: https://img.shields.io/badge/Report_Bug-ff3b3b?style=for-the-badge&logo=githubissues&logoColor=white
+[bug-link]: https://github.com/{{ repo_owner }}/{{ repo_name }}/issues
+[ci-badge]: https://img.shields.io/badge/CI-6a9c78?style=for-the-badge&logo=githubactions&logoColor=white
+[ci-link]: .github/workflows/ci.yml
+[license-badge]: https://img.shields.io/badge/License-MIT-5fb1f7?style=for-the-badge
+[license-link]: LICENSE
+[python-badge]: https://img.shields.io/badge/Python-3.12+-2a7fc6?style=for-the-badge&logo=python&logoColor=white
+[python-link]: pyproject.toml
+[package-badge]: https://img.shields.io/badge/package-{{ package_version }}-c89a52?style=for-the-badge
+[package-link]: pyproject.toml
+[feature-badge]: https://img.shields.io/badge/-5fb1f7?style=flat-square

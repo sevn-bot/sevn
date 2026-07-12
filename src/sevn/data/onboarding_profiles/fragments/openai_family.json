@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "providers": {
+    "use_main_model_for_all": true,
+    "tier_default": {
+      "triager": "gpt-4o-mini"
+    }
+  },
+  "capabilities_defaults": {
+    "extra.web_fetch": true,
+    "extra.browser": false,
+    "skill.printing_press_library": false,
+    "memory.lcm": true
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "captured_at": "2026-06-17",
+  "branch": "feature/cli-comprehensive-parity-doctor",
+  "base_commit": "e897caed15f84963042627f5b716b042672846bc",
+  "command": "sevn doctor",
+  "schema_version": "1.0.0",
+  "envelope_keys": ["ok", "command", "schema_version", "data"],
+  "data_keys": ["checks", "warnings"],
+  "check_row_keys": ["id", "ok", "detail"],
+  "optional_check_row_keys": ["severity", "hint"],
+  "required_check_ids": [
+    "sevn_json",
+    "gateway_token_configured",
+    "my_sevn",
+    "code_orientation",
+    "operator_lock",
+    "sqlite",
+    "secrets_backend",
+    "webapp_https",
+    "docker",
+    "browser_extra",
+    "browser_cdp_engine",
+    "skillspector",
+    "pyodide_deno",
+    "proxy_healthz",
+    "gateway_health",
+    "gateway_ready",
+    "llmignore",
+    "pdf_weasyprint",
+    "pdf_extra",
+    "pp_espn",
+    "pp_flight_goat",
+    "pp_movie_goat",
+    "pp_recipe_goat",
+    "voice_backends",
+    "skillspector_extra"
+  ],
+  "conditional_check_ids": [
+    {
+      "id": "second_brain_vault_layout",
+      "when": "second_brain.enabled in workspace config"
+    },
+    {
+      "id": "keychain_unlock",
+      "when": "secrets backend uses encrypted file (section_uses_encrypted_file)"
+    },
+    {
+      "id": "auto_run_on_import",
+      "when": "my_sevn.issues.auto_run_on_import is true"
+    },
+    {
+      "id": "llm_reachability",
+      "when": "SEVN_PROXY_URL set and proxy /healthz ok"
+    },
+    {
+      "id": "witchcraft_probe",
+      "when": "second_brain.witchcraft_enabled in workspace config"
+    },
+    {
+      "id": "extensions",
+      "when": "doctor invoked with --extensions"
+    },
+    {
+      "id": "telegram_probe",
+      "when": "doctor invoked with --telegram-probe (stub; always fails today)"
+    }
+  ],
+  "anchor_file": "src/sevn/cli/commands/doctor.py",
+  "anchor_lines": "390-1065"
+}

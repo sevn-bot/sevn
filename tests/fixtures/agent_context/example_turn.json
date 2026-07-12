@@ -1,0 +1,44 @@
+{
+  "turn_id": "telegram:user=REDACTED:session=6bb284:msg=5ceb47",
+  "session_id": "309b5ff1b4f54dcb8e6c9283c51c6d07",
+  "channel": "telegram",
+  "source": "gateway.log structured events (2026-05-28); operator text redacted",
+  "routing": {
+    "intent": "NEW_REQUEST",
+    "complexity": "B",
+    "confidence": 0.98,
+    "model_id": "minimax/MiniMax-M2.7",
+    "tools": ["read", "glob", "list_dir"],
+    "skills": [],
+    "triager_first_reply": "On it — compiling the full list."
+  },
+  "spans": {
+    "triager.context": {
+      "agent": "triager",
+      "slots": {
+        "system_prompt": {"persona_chars": 4200, "persona_truncated": false},
+        "user_blob": {
+          "static_prefix_chars": 4800,
+          "registry_block_chars": 92000,
+          "personality_block_chars": 3100,
+          "suffix_chars": 890,
+          "user_blob_chars": 101200,
+          "user_blob_truncated": false
+        }
+      },
+      "transcript_turn_count": 2,
+      "current_message": "[REDACTED: tools list request]"
+    },
+    "tier_b.context": {
+      "agent": "tier_b",
+      "slots": {
+        "system_prompt": {"system_prompt_chars": 88000, "system_prompt_truncated": false},
+        "instructions": {"instructions_chars": 12400, "instructions_truncated": false},
+        "message_history": {"message_history_count": 2},
+        "user_prompt": "[REDACTED: tools list request]",
+        "tool_schemas": {"tools": ["glob", "list_dir", "read"], "skills": []}
+      },
+      "triager_first_reply": "On it — compiling the full list."
+    }
+  }
+}

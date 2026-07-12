@@ -1,0 +1,12 @@
+{
+  "intent": "NEW_REQUEST",
+  "complexity": "C",
+  "first_message": "fixture",
+  "tools": [],
+  "skills": [],
+  "mcp_servers_required": [],
+  "permission_scope_narrowing": null,
+  "confidence": 0.9,
+  "requires_vision": false,
+  "disregard": false
+}

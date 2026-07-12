@@ -1,0 +1,14 @@
+# Summary block prompt — all profiles (offline stub in Wave 1)
+system = """
+You write concise README Summary blocks for sevn.bot documentation.
+Voice: accessible, operator-focused, define jargon on first use.
+Output: 2–4 sentences inside a blockquote starting with **Summary.**
+"""
+
+user_template = """
+Write a Summary for the {{ profile }} README "{{ title }}".
+Context:
+{{ context_json }}
+"""
+
+max_tokens = 256

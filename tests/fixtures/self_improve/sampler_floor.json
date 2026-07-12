@@ -1,0 +1,30 @@
+{
+  "max_candidates": 12,
+  "explicit_feedback_floor_pct": 0.25,
+  "per_channel_pct_max": 0.6,
+  "per_intent_pct_max": 0.6,
+  "per_tier_pct_max": 0.6,
+  "candidates": [
+    {
+      "turn_id": "exp-a",
+      "bucket": "explicit_feedback",
+      "channel": "web",
+      "intent": null,
+      "complexity_tier": null
+    },
+    {
+      "turn_id": "ctrl-b",
+      "bucket": "control_random_sample",
+      "channel": "telegram",
+      "intent": null,
+      "complexity_tier": null
+    },
+    {
+      "turn_id": "ctrl-c",
+      "bucket": "control_random_sample",
+      "channel": "telegram",
+      "intent": null,
+      "complexity_tier": null
+    }
+  ]
+}

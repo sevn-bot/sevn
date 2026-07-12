@@ -1,0 +1,39 @@
+{
+  "id": "list_dir_01",
+  "tier": "B",
+  "requires": {
+    "tools": [
+      "list_dir"
+    ],
+    "skills": []
+  },
+  "user_messages": [
+    "Use list_dir for this task."
+  ],
+  "triage_stub": {
+    "intent": "NEW_REQUEST",
+    "complexity": "B",
+    "first_message": "On it.",
+    "mcp_servers_required": [],
+    "confidence": 0.95,
+    "requires_vision": false,
+    "requires_document": false,
+    "disregard": false,
+    "tools": [
+      "list_dir"
+    ],
+    "skills": []
+  },
+  "workspace": {
+    "inline_files": {}
+  },
+  "assertions": {
+    "tools_called": [
+      "list_dir"
+    ],
+    "tool_success": true,
+    "response_contains": [
+      "Listed"
+    ]
+  }
+}

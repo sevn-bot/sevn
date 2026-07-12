@@ -1,0 +1,83 @@
+[
+  {
+    "profile_id": "full_free",
+    "title": "Full free",
+    "short_description": "Balanced tier-B caps for exploratory use and demos.",
+    "capabilities_summary": "Core skills on · browser off · LCM on",
+    "tags": ["balanced", "default"],
+    "model": "gpt-4o-mini",
+    "host": "cloud"
+  },
+  {
+    "profile_id": "best_agent",
+    "title": "Best agent",
+    "short_description": "Higher skill surface for quality-first workflows.",
+    "capabilities_summary": "Browser + graphify · dreaming on · quality caps",
+    "tags": ["quality", "skills"],
+    "model": "claude-sonnet-4.5",
+    "host": "cloud"
+  },
+  {
+    "profile_id": "fastest",
+    "title": "Fastest",
+    "short_description": "Trim LCM work to reduce end-to-end latency.",
+    "capabilities_summary": "LCM off · minimal extras for latency",
+    "tags": ["latency", "lcm"],
+    "model": "groq/llama-3.1-70b",
+    "host": "cloud"
+  },
+  {
+    "profile_id": "openai_family",
+    "title": "OpenAI family",
+    "short_description": "LiteLLM routes biased to OpenAI-shaped models.",
+    "capabilities_summary": "OpenAI routing · web fetch on",
+    "tags": ["providers", "cloud"],
+    "model": "gpt-4o",
+    "host": "cloud"
+  },
+  {
+    "profile_id": "ollama_local",
+    "title": "Ollama / local first",
+    "short_description": "Prefer local Ollama routes for triager.",
+    "capabilities_summary": "Local Ollama · minimal cloud deps",
+    "tags": ["local", "ollama"],
+    "model": "llama3",
+    "host": "osx"
+  },
+  {
+    "profile_id": "docker_sandbox",
+    "title": "Docker-biased sandbox",
+    "short_description": "Enable Docker-backed sandbox defaults.",
+    "capabilities_summary": "Docker sandbox · browser off",
+    "tags": ["sandbox", "docker"],
+    "model": "claude-haiku-4.5",
+    "host": "docker"
+  },
+  {
+    "profile_id": "good_value_osx",
+    "title": "Good value",
+    "short_description": "MiniMax M2.7 triager on macOS — strong quality per dollar for daily use.",
+    "capabilities_summary": "Browser CDP · MiniMax daily driver",
+    "tags": ["value", "minimax"],
+    "model": "minimax/MiniMax-M2.7",
+    "host": "osx"
+  },
+  {
+    "profile_id": "good_value_docker",
+    "title": "Good value (Docker)",
+    "short_description": "MiniMax M2.7 with Docker sandbox isolation for tool runs.",
+    "capabilities_summary": "Docker sandbox · Brave browser profile · MiniMax",
+    "tags": ["value", "minimax", "docker"],
+    "model": "minimax/MiniMax-M2.7",
+    "host": "docker"
+  },
+  {
+    "profile_id": "good_value_docker_gui",
+    "title": "Good value (Docker GUI)",
+    "short_description": "MiniMax M2.7 with headed Brave via noVNC in the GUI gateway image.",
+    "capabilities_summary": "GUI noVNC · Brave headed · MiniMax",
+    "tags": ["value", "minimax", "docker", "gui"],
+    "model": "minimax/MiniMax-M2.7",
+    "host": "docker"
+  }
+]

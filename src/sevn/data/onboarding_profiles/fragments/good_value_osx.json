@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "providers": {
+    "use_main_model_for_all": true,
+    "tier_default": {
+      "triager": "minimax/MiniMax-M2.7"
+    },
+    "minimax": {
+      "base_url": "https://api.minimax.io/anthropic/v1"
+    }
+  },
+  "skills": {
+    "browser": {
+      "engine": "auto"
+    }
+  },
+  "capabilities_defaults": {
+    "extra.browser": true,
+    "extra.browser_cdp": true,
+    "extra.web_fetch": true,
+    "skill.printing_press_library": false,
+    "memory.lcm": true,
+    "cli.deno": true
+  }
+}

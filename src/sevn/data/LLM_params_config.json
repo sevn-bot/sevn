@@ -1,0 +1,101 @@
+{
+  "schema_version": 2,
+  "triager": {
+    "max_output_tokens": 4096,
+    "temperature": 0.0,
+    "reasoning": { "enabled": false, "type": "adaptive" },
+    "model_overrides": {
+      "minimax/*": {
+        "max_output_tokens": 4096,
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 40,
+        "reasoning": { "enabled": false, "type": "adaptive" }
+      }
+    }
+  },
+  "tier_b": {
+    "max_output_tokens": 20000,
+    "temperature": 0.0,
+    "reasoning": { "enabled": false, "type": "adaptive" },
+    "model_overrides": {
+      "minimax/*": {
+        "max_output_tokens": 4096,
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 40,
+        "reasoning": { "enabled": false, "type": "adaptive" }
+      }
+    }
+  },
+  "tier_cd": {
+    "max_output_tokens": 4096,
+    "temperature": 0.0,
+    "reasoning": { "enabled": false, "type": "adaptive" },
+    "model_overrides": {
+      "minimax/*": {
+        "max_output_tokens": 4096,
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 40,
+        "reasoning": { "enabled": false, "type": "adaptive" }
+      }
+    }
+  },
+  "guard": {
+    "max_output_tokens": 256,
+    "temperature": 0.0,
+    "reasoning": { "enabled": false, "type": "adaptive" },
+    "model_overrides": {
+      "minimax/*": {
+        "max_output_tokens": 256,
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 40,
+        "reasoning": { "enabled": false, "type": "adaptive" }
+      }
+    }
+  },
+  "lcm": {
+    "max_output_tokens": 4096,
+    "temperature": 0.2,
+    "reasoning": { "enabled": false, "type": "adaptive" },
+    "model_overrides": {
+      "minimax/*": {
+        "max_output_tokens": 4096,
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 40,
+        "reasoning": { "enabled": false, "type": "adaptive" }
+      }
+    }
+  },
+  "dreaming": {
+    "max_output_tokens": 256,
+    "temperature": 0.0,
+    "reasoning": { "enabled": false, "type": "adaptive" },
+    "model_overrides": {
+      "minimax/*": {
+        "max_output_tokens": 256,
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 40,
+        "reasoning": { "enabled": false, "type": "adaptive" }
+      }
+    }
+  },
+  "user_model": {
+    "max_output_tokens": 2048,
+    "temperature": 0.0,
+    "reasoning": { "enabled": false, "type": "adaptive" },
+    "model_overrides": {
+      "minimax/*": {
+        "max_output_tokens": 2048,
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 40,
+        "reasoning": { "enabled": false, "type": "adaptive" }
+      }
+    }
+  }
+}

@@ -1,0 +1,18 @@
+# Subsystem Level 1 — Overview (non-technical)
+system = """
+You write Level 1 — Overview sections for sevn.bot subsystem READMEs.
+Plain language for operators and non-technical users; define any necessary terms.
+2–4 short paragraphs: what this part of Sevn does, why it matters day-to-day,
+and how it fits the bigger picture (without internal module names).
+"""
+
+user_template = """
+Subsystem: {{ title }}
+Summary: {{ summary }}
+Source globs: {{ source_globs }}
+Spec excerpt:
+{{ spec_excerpt }}
+Write Level 1 — Overview (non-technical).
+"""
+
+max_tokens = 1024

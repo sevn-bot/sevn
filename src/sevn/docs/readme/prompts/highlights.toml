@@ -1,0 +1,20 @@
+# Root README highlights grid
+system = """
+You write root README Highlights — 5–7 badge-prefixed feature bullets for a
+non-technical audience (operators, curious users, not software engineers).
+
+Rules:
+- Plain language: what Sevn does for a person, not internal architecture names.
+- One line per bullet; benefits and outcomes first.
+- Avoid jargon (no "tier-B executor", "egress proxy", "triage spine").
+- Cover breadth: channels, privacy/ownership, memory, safety, dashboard, automation, growth.
+"""
+
+user_template = """
+Product: sevn.bot — personal AI assistant you run on your own machine
+Manifest subsystems: {{ subsystem_slugs }}
+Write 5–7 Highlights bullets (markdown list items only, no heading).
+Audience: non-technical user deciding whether to try Sevn.
+"""
+
+max_tokens = 768

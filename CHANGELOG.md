@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- Core runtime packages for the pre-0.0.1 migration import (config, storage, workspace, gateway, agent, security, proxy, and related tests)
 - Configurable Second Brain vault path via `second_brain.paths.vault` (CLI setup, Telegram `/config`, onboarding, doctor)
 
 ### Changed

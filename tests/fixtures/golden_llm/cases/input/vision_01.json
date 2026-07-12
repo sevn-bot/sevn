@@ -1,0 +1,41 @@
+{
+  "id": "vision_01",
+  "tier": "B",
+  "requires": {
+    "tools": [
+      "read"
+    ],
+    "skills": []
+  },
+  "user_messages": [
+    "Describe the attached image chart.png"
+  ],
+  "triage_stub": {
+    "intent": "NEW_REQUEST",
+    "complexity": "B",
+    "first_message": "On it.",
+    "mcp_servers_required": [],
+    "confidence": 0.95,
+    "requires_vision": true,
+    "requires_document": false,
+    "disregard": false,
+    "tools": [
+      "read"
+    ],
+    "skills": []
+  },
+  "workspace": {
+    "inline_files": {
+      "chart.png": "PNG_STUB_BYTES"
+    }
+  },
+  "assertions": {
+    "tools_called": [
+      "read"
+    ],
+    "tool_success": true,
+    "response_contains": [
+      "chart"
+    ]
+  }
+}

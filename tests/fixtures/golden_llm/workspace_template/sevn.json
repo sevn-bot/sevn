@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "workspace_root": ".",
+  "triager": {
+    "group_scope": "all",
+    "relax_greeting_lists": false
+  },
+  "providers": {
+    "tier_default": {
+      "triager": "stub/model",
+      "B": "openai/gpt-golden"
+    }
+  },
+  "permissions": {
+    "scope_narrowing": {
+      "enabled": false
+    }
+  },
+  "security": {
+    "scanner": {
+      "heuristic_only": true
+    }
+  },
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 3001,
+    "queue_mode": "cancel",
+    "token": "${SECRET:keychain:sevn.gateway.token}",
+    "output": {
+      "tier_b_answer_mode": "stream"
+    }
+  },
+  "tracing": {
+    "sinks": [{ "type": "jsonl_file", "path": ".sevn/traces/" }]
+  }
+}

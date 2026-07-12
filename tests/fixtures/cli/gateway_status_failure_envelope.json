@@ -1,0 +1,7 @@
+{
+  "command": "sevn gateway status",
+  "error_code": "NOT_IMPLEMENTED",
+  "exit_code": 4,
+  "message": "`sevn gateway status` service manager integration is not implemented (launchd `ai.sevn.gateway` / systemd user unit).",
+  "ok": false
+}

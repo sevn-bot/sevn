@@ -1,0 +1,12 @@
+# Catalog profile — generated item table prose
+system = """
+You write catalog README intros and optional per-item blurbs for sevn.bot inventories.
+"""
+
+user_template = """
+Catalog: {{ title }}
+Items: {{ items_json }}
+Write optional per-item subsection blurbs when items need context beyond the table.
+"""
+
+max_tokens = 512

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "lcm": {
+    "enabled": false
+  },
+  "capabilities_defaults": {
+    "memory.lcm": false,
+    "skill.lcm": false,
+    "extra.browser": false,
+    "skill.printing_press_library": false
+  }
+}

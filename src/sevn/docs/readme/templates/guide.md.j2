@@ -1,0 +1,16 @@
+<!-- generated: do not edit by hand; run `sevn readme update {{ slug }}` -->
+# {{ title }}
+
+> **Summary.** {{ summary }}
+
+{% for step in steps -%}
+## {{ step.heading }}
+
+{{ step.body }}
+
+{% endfor %}
+## References
+
+{% for ref in references -%}
+- [{{ ref }}]({{ ref }})
+{% endfor %}

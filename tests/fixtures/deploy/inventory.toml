@@ -1,0 +1,8 @@
+[hosts.staging]
+host = "203.0.113.10"
+user = "sevn"
+identity_file = "/tmp/sevn-deploy-test-id"
+remote_home = "/home/sevn/.sevn"
+remote_workspace = "workspace"
+gateway_port = 3001
+proxy_port = 8787

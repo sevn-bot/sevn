@@ -1,0 +1,80 @@
+/* Webchat — layout only (tokens from /style/index.css) */
+
+.webchat-body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--sevn-bg);
+  color: var(--sevn-fg);
+}
+
+.webchat-hdr {
+  flex-shrink: 0;
+}
+
+.webchat-logo--dark {
+  display: none;
+}
+
+:root[data-theme="dark"] .webchat-logo--light {
+  display: none;
+}
+
+:root[data-theme="dark"] .webchat-logo--dark {
+  display: inline-block;
+}
+
+.webchat-status[data-state="connected"] {
+  border-color: var(--sevn-success, var(--sevn-primary));
+  color: var(--sevn-success, var(--sevn-primary));
+}
+
+.webchat-status[data-state="error"] {
+  border-color: var(--sevn-danger, var(--sevn-accent));
+  color: var(--sevn-danger, var(--sevn-accent));
+}
+
+.webchat-dev-banner {
+  margin: 0;
+  border-radius: 0;
+}
+
+.webchat-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sevn-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sevn-space-4);
+}
+
+.webchat-footer {
+  flex-shrink: 0;
+  padding: var(--sevn-space-4);
+  border-top: 1px solid var(--sevn-border-faint);
+  background: var(--sevn-surface-1);
+}
+
+.webchat-footer .composer {
+  margin: 0;
+}
+
+.webchat-footer .composer .input {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: var(--sevn-space-2);
+}
+
+.openui-host iframe {
+  width: 100%;
+  min-height: 360px;
+  border: 1px solid var(--sevn-border);
+  border-radius: var(--sevn-radius-lg);
+}
+
+.msg--error .msg__body {
+  color: var(--sevn-danger, var(--sevn-accent));
+  border-left-color: var(--sevn-danger, var(--sevn-accent));
+}

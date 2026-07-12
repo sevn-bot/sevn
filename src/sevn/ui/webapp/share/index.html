@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Share — sevn.bot</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 1rem;
+      }
+      button {
+        margin: 0.25rem 0;
+        padding: 0.5rem 1rem;
+        width: 100%;
+      }
+      #status {
+        margin-top: 0.75rem;
+        color: #444;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="status">Loading share payload…</p>
+    <button id="share-btn" type="button" hidden>Share</button>
+    <button id="copy-btn" type="button" hidden>Copy to clipboard</button>
+    <script>
+      (function () {
+        const params = new URLSearchParams(location.search);
+        const token = params.get("token") || "";
+        const statusEl = document.getElementById("status");
+        const shareBtn = document.getElementById("share-btn");
+        const copyBtn = document.getElementById("copy-btn");
+        const tg = window.Telegram && window.Telegram.WebApp;
+        if (tg && typeof tg.ready === "function") {
+          tg.ready();
+        }
+        const initData =
+          tg && typeof tg.initData === "string" && tg.initData ? tg.initData : "";
+        if (!token || !initData) {
+          statusEl.textContent = "Missing token or Telegram initData.";
+          return;
+        }
+        fetch("/webapp/share/payload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: token, init_data: initData }),
+        })
+          .then(function (r) {
+            if (!r.ok) {
+              throw new Error("share_failed");
+            }
+            return r.json();
+          })
+          .then(function (payload) {
+            const text = typeof payload.text === "string" ? payload.text : "";
+            if (navigator.share) {
+              shareBtn.hidden = false;
+              shareBtn.addEventListener("click", function () {
+                navigator
+                  .share({ title: "sevn.bot", text: text })
+                  .catch(function () {
+                    statusEl.textContent = "Share cancelled.";
+                  });
+              });
+              statusEl.textContent = "Tap Share to open the OS share sheet.";
+              return;
+            }
+            copyBtn.hidden = false;
+            copyBtn.addEventListener("click", function () {
+              navigator.clipboard.writeText(text).then(
+                function () {
+                  statusEl.textContent = "Copied to clipboard.";
+                },
+                function () {
+                  statusEl.textContent = "Could not copy.";
+                },
+              );
+            });
+            statusEl.textContent = "Share API unavailable — copy instead.";
+          })
+          .catch(function () {
+            statusEl.textContent = "Could not load share payload.";
+          });
+      })();
+    </script>
+  </body>
+</html>

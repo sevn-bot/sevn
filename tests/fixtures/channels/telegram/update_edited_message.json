@@ -1,0 +1,9 @@
+{
+  "update_id": 900002,
+  "edited_message": {
+    "message_id": 43,
+    "from": {"id": 1002, "is_bot": false, "first_name": "Editor"},
+    "chat": {"id": 1002, "type": "private"},
+    "text": "revised text"
+  }
+}

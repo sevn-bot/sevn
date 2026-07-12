@@ -1,0 +1,2187 @@
+{
+  "schema_version": 1,
+  "groups": [
+    {
+      "id": "A",
+      "label": "Python extras",
+      "description": "Optional uv sync --extra dependencies.",
+      "sort_order": 1
+    },
+    {
+      "id": "B",
+      "label": "Bundled skills",
+      "description": "Core skills copied to the workspace on promote.",
+      "sort_order": 2
+    },
+    {
+      "id": "C",
+      "label": "External CLIs",
+      "description": "PATH binaries used by skills, voice, and evolution.",
+      "sort_order": 3
+    },
+    {
+      "id": "D",
+      "label": "Gateway & memory",
+      "description": "Gateway behaviour and memory subsystems.",
+      "sort_order": 4
+    },
+    {
+      "id": "E",
+      "label": "Channels",
+      "description": "Messaging adapters and planned stubs.",
+      "sort_order": 5
+    },
+    {
+      "id": "F",
+      "label": "Code understanding",
+      "description": "Repo orientation stack toggles.",
+      "sort_order": 6
+    },
+    {
+      "id": "G",
+      "label": "Self-improve & evolution",
+      "description": "My Sevn.bot tab controls.",
+      "sort_order": 7
+    }
+  ],
+  "capabilities": [
+    {
+      "capability_id": "extra.browser",
+      "group": "A",
+      "label": "Browser (Playwright)",
+      "description": "Playwright browser skills and CDP session lifecycle.",
+      "config_paths": [
+        "skills.browser.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "extra.browser.uv",
+          "kind": "uv_extra",
+          "argv": [
+            "browser"
+          ],
+          "fatal": true
+        },
+        {
+          "id": "extra.browser.cmd",
+          "kind": "subprocess",
+          "argv": [
+            "playwright",
+            "install",
+            "chromium"
+          ],
+          "fatal": true,
+          "idempotent_check": "playwright --version"
+        }
+      ]
+    },
+    {
+      "capability_id": "extra.browser_cdp",
+      "group": "A",
+      "label": "Browser (CDP engine)",
+      "description": "Native CDP browser engine for onboarding automation and the browser tool.",
+      "config_paths": [
+        "tools.browser.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "extra.browser_cdp.uv",
+          "kind": "uv_extra",
+          "argv": [
+            "browser-cdp"
+          ],
+          "fatal": true
+        }
+      ]
+    },
+    {
+      "capability_id": "extra.web_fetch",
+      "group": "A",
+      "label": "Web fetch (Brotli)",
+      "description": "Brotli decompression for proxy/web fetch tools.",
+      "config_paths": [
+        "onboarding.capability_selections.extra.web_fetch"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "extra.web_fetch.uv",
+          "kind": "uv_extra",
+          "argv": [
+            "web-fetch"
+          ],
+          "fatal": true
+        }
+      ]
+    },
+    {
+      "capability_id": "extra.web_extract",
+      "group": "A",
+      "label": "Web extract (readability)",
+      "description": "Readability main-content pass for get_page_content extract=auto.",
+      "config_paths": [
+        "onboarding.capability_selections.extra.web_extract"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "extra.web_extract.uv",
+          "kind": "uv_extra",
+          "argv": [
+            "web-extract"
+          ],
+          "fatal": true
+        }
+      ]
+    },
+    {
+      "capability_id": "extra.pdf",
+      "group": "A",
+      "label": "PDF extra",
+      "description": "Native PDF extract/render dependencies for the pdf skill.",
+      "config_paths": [
+        "skills.pdf.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "extra.pdf.uv",
+          "kind": "uv_extra",
+          "argv": [
+            "pdf"
+          ],
+          "fatal": true
+        },
+        {
+          "id": "extra.pdf.native_libs",
+          "kind": "make_target",
+          "argv": [
+            "pdf-native-libs"
+          ],
+          "fatal": false,
+          "note": "WeasyPrint Pango/Cairo natives (best-effort)."
+        }
+      ]
+    },
+    {
+      "capability_id": "extra.yt_dlp",
+      "group": "A",
+      "label": "yt-dlp extra",
+      "description": "yt-dlp Python extra for the yt-dlp skill.",
+      "config_paths": [
+        "skills.yt_dlp.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "extra.yt_dlp.uv",
+          "kind": "uv_extra",
+          "argv": [
+            "yt-dlp"
+          ],
+          "fatal": true
+        }
+      ]
+    },
+    {
+      "capability_id": "extra.graphify",
+      "group": "A",
+      "label": "Graphify extra",
+      "description": "Graphify CLI and MCP dependencies.",
+      "config_paths": [
+        "skills.graphify.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "extra.graphify.uv",
+          "kind": "uv_extra",
+          "argv": [
+            "graphify"
+          ],
+          "fatal": true
+        }
+      ]
+    },
+    {
+      "capability_id": "extra.openwiki",
+      "group": "A",
+      "label": "OpenWiki extra",
+      "description": "LangChain OpenWiki npm CLI for LLM-generated agent wikis.",
+      "config_paths": [
+        "skills.openwiki.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "extra.openwiki.node",
+          "kind": "subprocess",
+          "argv": [
+            "node",
+            "--version"
+          ],
+          "fatal": false,
+          "note": "Requires Node >= 20 on PATH."
+        },
+        {
+          "id": "extra.openwiki.npm",
+          "kind": "subprocess",
+          "argv": [
+            "npm",
+            "install",
+            "-g",
+            "openwiki"
+          ],
+          "fatal": false,
+          "idempotent_check": "import shutil, sys; sys.exit(0 if shutil.which('openwiki') else 1)",
+          "note": "Install upstream openwiki CLI globally (`sevn openwiki install`)."
+        }
+      ]
+    },
+    {
+      "capability_id": "extra.code_review_graph",
+      "group": "A",
+      "label": "Code review graph extra",
+      "description": "PyPI code-review-graph MCP server.",
+      "config_paths": [
+        "code_understanding.code_review_graph.mcp.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "extra.code_review_graph.uv",
+          "kind": "uv_extra",
+          "argv": [
+            "code-review-graph"
+          ],
+          "fatal": true
+        }
+      ]
+    },
+    {
+      "capability_id": "extra.code_graph_rag",
+      "group": "A",
+      "label": "Code graph RAG extra",
+      "description": "code-graph-rag Python extra plus cgr CLI on PATH.",
+      "config_paths": [
+        "code_understanding.code_graph_rag.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "extra.code_graph_rag.uv",
+          "kind": "uv_extra",
+          "argv": [
+            "code-graph-rag"
+          ],
+          "fatal": true
+        },
+        {
+          "id": "extra.code_graph_rag.cmd",
+          "kind": "subprocess",
+          "argv": [
+            "cgr",
+            "--version"
+          ],
+          "fatal": false,
+          "note": "Warn when cgr missing; install documented in manifest."
+        }
+      ]
+    },
+    {
+      "capability_id": "extra.bedrock",
+      "group": "A",
+      "label": "Bedrock transport",
+      "description": "AWS Bedrock converse transport extra.",
+      "config_paths": [
+        "onboarding.capability_selections.extra.bedrock"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "extra.bedrock.uv",
+          "kind": "uv_extra",
+          "argv": [
+            "bedrock"
+          ],
+          "fatal": true
+        }
+      ]
+    },
+    {
+      "capability_id": "extra.skillspector",
+      "group": "A",
+      "label": "SkillSpector (dev)",
+      "description": "Static skill scan tooling for CI/dev machines.",
+      "config_paths": [
+        "onboarding.capability_selections.extra.skillspector"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "extra.skillspector.uv",
+          "kind": "uv_extra",
+          "argv": [
+            "skillspector"
+          ],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.browser_harness",
+      "group": "B",
+      "label": "browser-harness",
+      "description": "Thin CDP harness with extendable helpers.py for open-ended browser control.",
+      "config_paths": [
+        "skills.browser_harness.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.browser_harness.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.canvas",
+      "group": "B",
+      "label": "canvas",
+      "description": "Cursor Canvas and rich analytical layouts via OpenUI compose helpers (`specs/11-tools-registry.md` §3.4, `specs/29-op...",
+      "config_paths": [
+        "skills.canvas.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.canvas.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.code_graph_rag",
+      "group": "B",
+      "label": "code_graph_rag",
+      "description": "CGR export reader + allowlisted cgr CLI (`specs/28-code-understanding.md` §2.2).",
+      "config_paths": [
+        "skills.code_graph_rag.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.code_graph_rag.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.computer_use",
+      "group": "B",
+      "label": "computer-use",
+      "description": "Drive a macOS host (cua-driver MCP) or sandbox providers (docker/cloud/lume/host via cua CLI); opt-in; macOS-only.",
+      "config_paths": [
+        "skills.computer_use.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.computer_use.cmd",
+          "kind": "subprocess",
+          "argv": [
+            "cua-driver",
+            "install"
+          ],
+          "fatal": true,
+          "note": "Host target: Cua Driver MCP (install.sh)."
+        },
+        {
+          "id": "skill.computer_use.cua_cli",
+          "kind": "subprocess",
+          "argv": [
+            "python3",
+            "-m",
+            "pip",
+            "install",
+            "cua"
+          ],
+          "fatal": false,
+          "idempotent_check": "import shutil, sys; sys.exit(0 if shutil.which('cua') else 1)",
+          "note": "Sandbox CLI for docker/cloud/lume/host providers; also required by cua-agent."
+        },
+        {
+          "id": "skill.computer_use.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "validate_computer_use_host on promote."
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.cua_agent",
+      "group": "B",
+      "label": "cua-agent",
+      "description": "Autonomous GUI loop toward a goal via trycua/cua; requires computer-use; per-run approval (opt-in; macOS-only).",
+      "config_paths": [
+        "skills.cua_agent.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "depends_on": [
+        "skill.computer_use"
+      ],
+      "install_actions": [
+        {
+          "id": "skill.cua_agent.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "validate_cua_agent_host on promote."
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.conventional_commit",
+      "group": "B",
+      "label": "conventional_commit",
+      "description": "Draft git commit messages using Conventional Commits 1.0.0. Use when the operator asks to commit, record changes in g...",
+      "config_paths": [
+        "skills.conventional_commit.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.conventional_commit.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.cursor_cloud",
+      "group": "B",
+      "label": "cursor_cloud",
+      "description": "Delegate code+PR work to Cursor Cloud Agent; returns PR, dashboard, and artifact links.",
+      "config_paths": [
+        "skills.cursor_cloud.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.cursor_cloud.secret",
+          "kind": "secret_required",
+          "argv": [
+            "integration.cursor.api_key"
+          ],
+          "fatal": true
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.email_management",
+      "group": "B",
+      "label": "email-management",
+      "description": "Multi-account IMAP and Gmail API mail read/search/send scripts.",
+      "config_paths": [
+        "skills.email_management.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.email_management.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.facebook_use",
+      "group": "B",
+      "label": "facebook-use",
+      "description": "Facebook workflows via a logged-in browser profile or CDP attach (feed read, search).",
+      "config_paths": [
+        "skills.facebook_use.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.facebook_use.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.gh_issues",
+      "group": "B",
+      "label": "gh-issues",
+      "description": "GitHub issue lifecycle — list, view, create, comment via integration_call.",
+      "config_paths": [
+        "skills.gh_issues.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.gh_issues.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.gh_pr",
+      "group": "B",
+      "label": "gh-pr",
+      "description": "Pull request lifecycle — list, view, create, merge, close, reviewers via integration_call.",
+      "config_paths": [
+        "skills.gh_pr.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.gh_pr.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.github_manager",
+      "group": "B",
+      "label": "github-manager",
+      "description": "Advanced GitHub operations — branches, Actions, CI/CD secrets, environments, deployments via integration_call.",
+      "config_paths": [
+        "skills.github_manager.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.github_manager.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.graphify",
+      "group": "B",
+      "label": "graphify",
+      "description": "Knowledge-graph orientation for code (`specs/28-code-understanding.md` §2.4).",
+      "config_paths": [
+        "skills.graphify.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.graphify.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.job_ops",
+      "group": "B",
+      "label": "job-ops",
+      "description": "Discover jobs across global + Europe boards, AI fit-score them against your resume, and optionally tailor a CV summary (JobOps port).",
+      "config_paths": [
+        "skills.job_ops.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.job_ops.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        },
+        {
+          "id": "skill.job_ops.uv",
+          "kind": "uv_extra",
+          "argv": [
+            "job-ops"
+          ],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.kokoro_tts",
+      "group": "B",
+      "label": "kokoro-tts",
+      "description": "Local Kokoro ONNX text-to-speech engine backing the voice TTS pipeline (kokoro backend).",
+      "config_paths": [
+        "skills.kokoro_tts.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.kokoro_tts.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.last30days",
+      "group": "B",
+      "label": "last30days",
+      "description": "Research any topic across Reddit, X, YouTube, HN, Polymarket, and the web from the last 30 days.",
+      "config_paths": [
+        "skills.last30days.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.last30days.cmd",
+          "kind": "subprocess",
+          "argv": [
+            "node",
+            "--version"
+          ],
+          "fatal": false,
+          "note": "Requires node on PATH."
+        },
+        {
+          "id": "skill.last30days.uv",
+          "kind": "uv_extra",
+          "argv": [
+            "yt-dlp"
+          ],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.lcm",
+      "group": "B",
+      "label": "lcm",
+      "description": "Lossless context search, drill-back, and conversation index (`specs/15-memory-lcm.md`).",
+      "config_paths": [
+        "skills.lcm.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.lcm.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.linkedin_use",
+      "group": "B",
+      "label": "linkedin-use",
+      "description": "LinkedIn staff/company/connection scraping via logged-in browser + Voyager API (StaffSpy port).",
+      "config_paths": [
+        "skills.linkedin_use.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.linkedin_use.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.lume",
+      "group": "B",
+      "label": "lume",
+      "description": "Apple Silicon VM lifecycle (run/stop/ls/pull) for trycua/cua lume provider; opt-in; macOS arm64 only.",
+      "config_paths": [
+        "skills.lume.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.lume.cmd",
+          "kind": "subprocess",
+          "argv": [
+            "bash",
+            "-c",
+            "curl -fsSL https://raw.githubusercontent.com/trycua/cua/main/libs/lume/scripts/install.sh | bash"
+          ],
+          "fatal": true,
+          "idempotent_check": "import shutil, sys; sys.exit(0 if shutil.which('lume') else 1)",
+          "note": "Apple Silicon macOS only (install.sh)."
+        },
+        {
+          "id": "skill.lume.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "validate_lume_host on promote."
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.mycode",
+      "group": "B",
+      "label": "mycode",
+      "description": "Deterministic repo scan + MYCODE.md write (`specs/28-code-understanding.md` §2.4).",
+      "config_paths": [
+        "skills.mycode.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.mycode.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.openwiki",
+      "group": "B",
+      "label": "openwiki",
+      "description": "LLM-generated agent wiki for a codebase (LangChain OpenWiki CLI).",
+      "config_paths": [
+        "skills.openwiki.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.openwiki.secret",
+          "kind": "secret_required",
+          "argv": [
+            "integration.openwiki.llm_api_key"
+          ],
+          "fatal": false
+        },
+        {
+          "id": "skill.openwiki.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "depends_on": [
+        "extra.openwiki"
+      ]
+    },
+    {
+      "capability_id": "skill.pdf",
+      "group": "B",
+      "label": "pdf",
+      "description": "Render markdown/HTML to workspace PDFs; extract text/tables; structured load/chunk.",
+      "config_paths": [
+        "skills.pdf.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.pdf.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.playwright_browser",
+      "group": "B",
+      "label": "playwright-browser",
+      "description": "Web automation with CDP-first Playwright scripts (navigate, screenshot, click, extract text).",
+      "config_paths": [
+        "skills.playwright_browser.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.playwright_browser.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.printing_press_library",
+      "group": "B",
+      "label": "printing-press-library",
+      "description": "Starter-pack Printing Press CLIs — ESPN, flights, movies, recipes (Go binaries on PATH).",
+      "config_paths": [
+        "skills.printing_press_library.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.printing_press_library.make",
+          "kind": "make_target",
+          "argv": [
+            "printing-press-starter-pack"
+          ],
+          "fatal": true
+        },
+        {
+          "id": "skill.printing_press_library.cmd",
+          "kind": "subprocess",
+          "argv": [
+            "npx",
+            "-y",
+            "@mvanhorn/printing-press-library",
+            "install",
+            "starter-pack"
+          ],
+          "fatal": false,
+          "note": "Fallback when make target unavailable."
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.roam_code",
+      "group": "B",
+      "label": "roam_code",
+      "description": "Lightweight roam-code path Q&A (`specs/28-code-understanding.md` §2.2).",
+      "config_paths": [
+        "skills.roam_code.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.roam_code.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.scheduling",
+      "group": "B",
+      "label": "scheduling",
+      "description": "Cron jobs and one-shot reminders via workspace trigger store (`specs/30-non-interactive-triggers.md`).",
+      "config_paths": [
+        "skills.scheduling.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.scheduling.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.second_brain",
+      "group": "B",
+      "label": "second_brain",
+      "description": "Karpathy-style raw→wiki ingest, lint, and file-back flows (`specs/27-second-brain.md`).",
+      "config_paths": [
+        "skills.second_brain.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.second_brain.bootstrap",
+          "kind": "second_brain_bootstrap",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.sessions_management",
+      "group": "B",
+      "label": "sessions_management",
+      "description": "Gateway sessions, history, send, spawn, yield, and status (`specs/17-gateway.md`).",
+      "config_paths": [
+        "skills.sessions_management.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.sessions_management.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.skill_management",
+      "group": "B",
+      "label": "skill_management",
+      "description": "Authoring workflows for generated skills; pairs with native skill_create and promote_generated_skill (`specs/12-skill...",
+      "config_paths": [
+        "skills.skill_management.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.skill_management.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.telegram",
+      "group": "B",
+      "label": "telegram",
+      "description": "Telegram inline custom buttons and forum supergroup helpers (Bot API + allowlist/userbot hooks).",
+      "config_paths": [
+        "skills.telegram.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.telegram.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.telegram_test",
+      "group": "B",
+      "label": "telegram_test",
+      "description": "Run host-side Playwright Telegram E2E (sevn telegram-test) while building sevn.bot. Use after gateway/menu/session/di...",
+      "config_paths": [
+        "skills.telegram_test.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.telegram_test.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.sevn_diagnostics",
+      "group": "B",
+      "label": "sevn-diagnostics",
+      "description": "sevn.bot operator repair playbooks for `sevn doctor --with-agent` (gateway, secrets, proxy, models, browser, voice).",
+      "config_paths": [
+        "skills.sevn_diagnostics.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.sevn_diagnostics.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.x_use",
+      "group": "B",
+      "label": "x-use",
+      "description": "X (Twitter) workflows via a logged-in browser profile or CDP attach (timeline, search).",
+      "config_paths": [
+        "skills.x_use.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.x_use.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.yt_dlp",
+      "group": "B",
+      "label": "yt-dlp",
+      "description": "Download video/audio and metadata with yt-dlp (YouTube, Vimeo, X, TikTok, and allowlisted hosts).",
+      "config_paths": [
+        "skills.yt_dlp.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.yt_dlp.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "cli.roam_code",
+      "group": "C",
+      "label": "roam-code CLI",
+      "description": "Lightweight roam-code path Q&A CLI.",
+      "config_paths": [
+        "code_understanding.roam_code.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "cli.roam_code.cmd",
+          "kind": "subprocess",
+          "argv": [
+            "uv",
+            "tool",
+            "install",
+            "roam-code"
+          ],
+          "fatal": true
+        }
+      ]
+    },
+    {
+      "capability_id": "cli.cgr",
+      "group": "C",
+      "label": "cgr CLI",
+      "description": "Code graph RAG export reader CLI.",
+      "config_paths": [
+        "code_understanding.code_graph_rag.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "cli.cgr.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Document cgr install; warn when code_graph_rag enabled."
+        }
+      ]
+    },
+    {
+      "capability_id": "cli.gh",
+      "group": "C",
+      "label": "GitHub CLI (gh)",
+      "description": "Optional; backup repo creation and evolution workflows.",
+      "config_paths": [
+        "self_improve.hub.use_github"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "cli.gh.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Optional PATH binary for backup and evolution."
+        }
+      ]
+    },
+    {
+      "capability_id": "cli.deno",
+      "group": "C",
+      "label": "Deno runtime",
+      "description": "Required when sandbox mode is pyodide_deno.",
+      "config_paths": [
+        "sandbox.mode"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "cli.deno.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Warn/install hint when sandbox.mode=pyodide_deno."
+        }
+      ]
+    },
+    {
+      "capability_id": "cli.docker",
+      "group": "C",
+      "label": "Docker",
+      "description": "Required when sandbox mode is docker.",
+      "config_paths": [
+        "sandbox.mode"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "cli.docker.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Warn when sandbox.mode=docker."
+        }
+      ]
+    },
+    {
+      "capability_id": "cli.whisper_cpp",
+      "group": "C",
+      "label": "whisper.cpp",
+      "description": "Voice STT chain provider (whisper_cpp tag).",
+      "config_paths": [
+        "voice.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "cli.whisper_cpp.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Voice STT chain tag whisper_cpp."
+        }
+      ]
+    },
+    {
+      "capability_id": "cli.edge_tts",
+      "group": "C",
+      "label": "edge-tts",
+      "description": "Voice TTS chain provider (edge_tts tag).",
+      "config_paths": [
+        "voice.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "cli.edge_tts.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Voice TTS chain tag edge_tts."
+        }
+      ]
+    },
+    {
+      "capability_id": "cli.kokoro",
+      "group": "C",
+      "label": "Kokoro TTS",
+      "description": "Workspace Kokoro skill path check.",
+      "config_paths": [
+        "voice.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "cli.kokoro.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Workspace skill path check."
+        }
+      ]
+    },
+    {
+      "capability_id": "gateway.queue_mode",
+      "group": "D",
+      "label": "Gateway queue mode",
+      "description": "cancel aborts in-flight work on new user text; steer buffers until safe injection.",
+      "config_paths": [
+        "gateway.queue_mode"
+      ],
+      "control": "select",
+      "default": "cancel",
+      "select_options": [
+        "cancel",
+        "steer"
+      ],
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "gateway.queue_mode.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "memory.lcm",
+      "group": "D",
+      "label": "Long conversation memory (LCM)",
+      "description": "Lossless context search and drill-back.",
+      "config_paths": [
+        "lcm.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "memory.lcm.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "memory.dreaming",
+      "group": "D",
+      "label": "Memory dreaming",
+      "description": "Optional scored promotion to MEMORY.md.",
+      "config_paths": [
+        "memory.dreaming.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "memory.dreaming.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "memory.honcho",
+      "group": "D",
+      "label": "Honcho user model",
+      "description": "Opt-in inferred operator profile.",
+      "config_paths": [
+        "memory.user_model.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "memory.honcho.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "memory.second_brain",
+      "group": "D",
+      "label": "Second Brain",
+      "description": "Karpathy-style raw→wiki ingest flows. Set an Obsidian vault folder under the workspace (optional).",
+      "config_paths": [
+        "second_brain.enabled",
+        "second_brain.paths.vault"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "memory.second_brain.bootstrap",
+          "kind": "second_brain_bootstrap",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "memory.second_brain.vault_path",
+      "group": "D",
+      "label": "Second Brain vault path",
+      "description": "Workspace-relative Obsidian vault folder (e.g. obsidian/alex_AI). Leave empty for default second_brain/users/<scope>/ layout.",
+      "config_paths": [
+        "second_brain.paths.vault"
+      ],
+      "control": "text",
+      "default": "",
+      "profile_overridable": true,
+      "depends_on": [
+        "memory.second_brain"
+      ],
+      "install_actions": [
+        {
+          "id": "memory.second_brain.vault_path.bootstrap",
+          "kind": "second_brain_bootstrap",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "memory.second_brain.vault_browse",
+      "group": "D",
+      "label": "Browse vault folder",
+      "description": "Pick a workspace subdirectory for the Second Brain vault (one level at a time).",
+      "config_paths": [
+        "second_brain.paths.vault"
+      ],
+      "control": "folder_picker",
+      "default": "",
+      "profile_overridable": true,
+      "depends_on": [
+        "memory.second_brain"
+      ],
+      "install_actions": [
+        {
+          "id": "memory.second_brain.vault_browse.bootstrap",
+          "kind": "second_brain_bootstrap",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "feature.witchcraft",
+      "group": "D",
+      "label": "Witchcraft semantic search",
+      "description": "Semantic search tool when binary available.",
+      "config_paths": [
+        "witchcraft_enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "feature.witchcraft.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "feature.cf_agent_memory",
+      "group": "D",
+      "label": "Cloudflare Agent Memory",
+      "description": "Cloudflare agent memory integration.",
+      "config_paths": [
+        "cloudflare_agent_memory_enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "feature.cf_agent_memory.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "infra.version_control",
+      "group": "D",
+      "label": "Workspace version control",
+      "description": "Mission Control git actions gate.",
+      "config_paths": [
+        "infrastructure.version_control.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "infra.version_control.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "telemetry.enabled",
+      "group": "D",
+      "label": "Product telemetry",
+      "description": "Explicit opt-in product telemetry.",
+      "config_paths": [
+        "telemetry.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "telemetry.enabled.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.telegram",
+      "group": "E",
+      "label": "Telegram",
+      "description": "Primary operator channel; credentials on Telegram sub-tab.",
+      "config_paths": [
+        "channels.telegram.enabled"
+      ],
+      "control": "hidden",
+      "default": true,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.telegram.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.webchat",
+      "group": "E",
+      "label": "Webchat",
+      "description": "Browser webchat channel adapter.",
+      "config_paths": [
+        "channels.webchat.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "channel.webchat.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.discord",
+      "group": "E",
+      "label": "Discord",
+      "description": "Discord adapter (token on future sub-tab).",
+      "config_paths": [
+        "channels.discord.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "channel.discord.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.slack",
+      "group": "E",
+      "label": "Slack",
+      "description": "Slack adapter (token on future sub-tab).",
+      "config_paths": [
+        "channels.slack.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "channel.slack.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.signal_stub",
+      "group": "E",
+      "label": "Signal (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.signal.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.signal_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.whatsapp_stub",
+      "group": "E",
+      "label": "WhatsApp (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.whatsapp.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.whatsapp_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.matrix_stub",
+      "group": "E",
+      "label": "Matrix (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.matrix.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.matrix_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.teams_stub",
+      "group": "E",
+      "label": "Microsoft Teams (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.teams.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.teams_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.email_stub",
+      "group": "E",
+      "label": "Email (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.email.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.email_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.sms_stub",
+      "group": "E",
+      "label": "SMS (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.sms.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.sms_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.dingtalk_stub",
+      "group": "E",
+      "label": "DingTalk (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.dingtalk.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.dingtalk_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.feishu_stub",
+      "group": "E",
+      "label": "Feishu (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.feishu.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.feishu_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.wecom_stub",
+      "group": "E",
+      "label": "WeCom (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.wecom.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.wecom_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.weixin_stub",
+      "group": "E",
+      "label": "Weixin (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.weixin.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.weixin_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.qq_stub",
+      "group": "E",
+      "label": "QQ (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.qq.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.qq_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.yuanbao_stub",
+      "group": "E",
+      "label": "Yuanbao (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.yuanbao.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.yuanbao_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.line_stub",
+      "group": "E",
+      "label": "LINE (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.line.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.line_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.ntfy_stub",
+      "group": "E",
+      "label": "ntfy (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.ntfy.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.ntfy_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.bluebubbles_stub",
+      "group": "E",
+      "label": "BlueBubbles (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.bluebubbles.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.bluebubbles_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.google_chat_stub",
+      "group": "E",
+      "label": "Google Chat (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.google_chat.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.google_chat_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.mattermost_stub",
+      "group": "E",
+      "label": "Mattermost (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.mattermost.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.mattermost_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "channel.homeassistant_stub",
+      "group": "E",
+      "label": "Home Assistant (coming soon)",
+      "description": "Planned channel adapter stub.",
+      "config_paths": [
+        "channels.homeassistant.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": false,
+      "install_actions": [
+        {
+          "id": "channel.homeassistant_stub.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Coming soon — noop install."
+        }
+      ]
+    },
+    {
+      "capability_id": "code_understanding.mycode",
+      "group": "F",
+      "label": "mycode",
+      "description": "Deterministic repo scan (core Python).",
+      "config_paths": [
+        "code_understanding.mycode.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "code_understanding.mycode.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "code_understanding.graphify",
+      "group": "F",
+      "label": "Graphify stack",
+      "description": "Knowledge-graph orientation for code.",
+      "config_paths": [
+        "code_understanding.graphify.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "code_understanding.graphify.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "depends_on": [
+        "extra.graphify"
+      ]
+    },
+    {
+      "capability_id": "code_understanding.roam_code",
+      "group": "F",
+      "label": "roam-code stack",
+      "description": "Lightweight roam-code path Q&A.",
+      "config_paths": [
+        "code_understanding.roam_code.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "code_understanding.roam_code.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "depends_on": [
+        "cli.roam_code"
+      ]
+    },
+    {
+      "capability_id": "code_understanding.code_graph_rag",
+      "group": "F",
+      "label": "Code graph RAG stack",
+      "description": "CGR export reader and allowlisted CLI.",
+      "config_paths": [
+        "code_understanding.code_graph_rag.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "code_understanding.code_graph_rag.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "depends_on": [
+        "extra.code_graph_rag",
+        "cli.cgr"
+      ]
+    },
+    {
+      "capability_id": "code_understanding.code_review_graph",
+      "group": "F",
+      "label": "Code review graph stack",
+      "description": "SQLite MCP via code-review-graph.",
+      "config_paths": [
+        "code_understanding.code_review_graph.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "code_understanding.code_review_graph.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "depends_on": [
+        "extra.code_review_graph"
+      ]
+    },
+    {
+      "capability_id": "self_improve.enabled",
+      "group": "G",
+      "label": "Self-improve loop",
+      "description": "Trajectory sampling and bounded patch proposals.",
+      "config_paths": [
+        "self_improve.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "self_improve.enabled.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "wizard_tab": "My Sevn.bot"
+    },
+    {
+      "capability_id": "self_improve.hub.github",
+      "group": "G",
+      "label": "GitHub evolution hub",
+      "description": "Mirror issues and PRs to GitHub (vs local-only).",
+      "config_paths": [
+        "self_improve.hub.use_github"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "self_improve.hub.github.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "wizard_tab": "My Sevn.bot"
+    },
+    {
+      "capability_id": "my_sevn.sync",
+      "group": "G",
+      "label": "Daily repo sync",
+      "description": "Scheduled checkout sync from my_sevn.repo_url.",
+      "config_paths": [
+        "my_sevn.sync.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "my_sevn.sync.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "wizard_tab": "My Sevn.bot"
+    },
+    {
+      "capability_id": "my_sevn.workspace_backup",
+      "group": "G",
+      "label": "Workspace backup repo",
+      "description": "Private GitHub repo for workspace backup.",
+      "config_paths": [
+        "my_sevn.workspace_backup.repo_url"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "my_sevn.workspace_backup.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false,
+          "note": "Create-repo flow in W4."
+        }
+      ],
+      "wizard_tab": "My Sevn.bot"
+    }
+  ]
+}

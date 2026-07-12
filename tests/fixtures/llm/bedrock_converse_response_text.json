@@ -1,0 +1,16 @@
+{
+  "output": {
+    "message": {
+      "role": "assistant",
+      "content": [
+        {
+          "text": "Bedrock reply."
+        }
+      ]
+    }
+  },
+  "usage": {
+    "inputTokens": 11,
+    "outputTokens": 22
+  }
+}
