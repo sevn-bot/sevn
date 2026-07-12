@@ -43,5 +43,5 @@
 | `semantic_search` | [`src/sevn/tools/semantic_search.py`](src/sevn/tools/semantic_search.py) | Module `src/sevn/tools/semantic_search.py`. |
 | `skills_register` | [`src/sevn/tools/skills_register.py`](src/sevn/tools/skills_register.py) | Module `src/sevn/tools/skills_register.py`. |
 | `spill_gc` | [`src/sevn/tools/spill_gc.py`](src/sevn/tools/spill_gc.py) | Module `src/sevn/tools/spill_gc.py`. |
+| `subagent_spawn` | [`src/sevn/tools/subagent_spawn.py`](src/sevn/tools/subagent_spawn.py) | Module `src/sevn/tools/subagent_spawn.py`. |
 | `terminal` | [`src/sevn/tools/terminal.py`](src/sevn/tools/terminal.py) | Module `src/sevn/tools/terminal.py`. |
-| `transcript` | [`src/sevn/tools/transcript.py`](src/sevn/tools/transcript.py) | Module `src/sevn/tools/transcript.py`. |

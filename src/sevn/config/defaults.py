@@ -665,6 +665,12 @@ DEFAULT_MINIMAX_ANTHROPIC_BASE_URL: Final[str] = "https://api.minimax.io/anthrop
 DEFAULT_MINIMAX_OPENAI_BASE_URL: Final[str] = "https://api.minimax.io/v1"
 DEFAULT_MINIMAX_TRANSPORT: Final[str] = "chat_completions"
 
+# Sub-agents (L1/L2) — `subagents` subtree (`specs/36-sub-agents.md` D2).
+DEFAULT_SUBAGENTS_ENABLED: Final[bool] = True
+DEFAULT_SUBAGENTS_MAX_LEVEL1: Final[int] = 5
+DEFAULT_SUBAGENTS_MAX_LEVEL2: Final[int] = 3
+DEFAULT_SUBAGENT_SPECIALIST_MAX_CONCURRENT: Final[int] = 2
+
 
 def _doctest_phase0_anchor() -> bool:
     """Trivial return used only to anchor doctests in CI.

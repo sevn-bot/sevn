@@ -33,7 +33,8 @@
     "pp_movie_goat",
     "pp_recipe_goat",
     "voice_backends",
-    "skillspector_extra"
+    "skillspector_extra",
+    "subagents_registry"
   ],
   "conditional_check_ids": [
     {

@@ -19,6 +19,7 @@ Examples:
 
 from __future__ import annotations
 
+import contextlib
 import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
@@ -366,7 +367,7 @@ def configure_proxy_otel(
         targets = [OtlpExportTarget(endpoint=endpoint, headers={}, service_name="sevn-proxy")]
 
     processors = _build_processors(targets, exporter_factory=exporter_factory)
-    logfire_token = ""
+    logfire_token = ""  # nosec B105 — empty default before workspace/env resolution
     service_name = "sevn-proxy"
     if workspace is not None:
         logfire_token = _resolve_logfire_token(workspace, resolved_tokens=resolved_tokens)
@@ -463,12 +464,24 @@ def instrumentation_capability() -> Instrumentation:
 def reset_otel_pipeline_for_tests() -> None:
     """Reset export flag and global provider (test isolation only).
 
+    OpenTelemetry allows only one ``set_tracer_provider`` call per process unless
+    the internal ``Once`` gate is cleared. Gateway lifespan tests configure OTel
+    first; unit tests that attach a recording exporter must reset that gate here.
+
     Examples:
         >>> reset_otel_pipeline_for_tests() is None
         True
     """
     global _export_configured
     _export_configured = False
+    current = trace.get_tracer_provider()
+    if isinstance(current, TracerProvider):
+        with contextlib.suppress(Exception):
+            current.shutdown()
+    import opentelemetry.trace as ot_trace
+
+    ot_trace._TRACER_PROVIDER_SET_ONCE._done = False
+    ot_trace._TRACER_PROVIDER = None
     trace.set_tracer_provider(TracerProvider())
 
 

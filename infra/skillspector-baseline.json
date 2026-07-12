@@ -132,6 +132,12 @@
       "rule_id": "OH1",
       "reason": "post_pending_review.py posts operator-approved draft review comments only",
       "reviewed": "2026-07-11"
+    },
+    {
+      "skill_path": ".claude/skills/changelog",
+      "rule_id": "TM1",
+      "reason": "Docs-only skill; references make/changelog-check and staged diff gates (no executable tool abuse)",
+      "reviewed": "2026-07-12"
     }
   ]
 }

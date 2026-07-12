@@ -19,7 +19,7 @@ Provide a single, testable configuration surface before storage, tracing, proxy,
 
 ### Components and layout
 
-Implementation lives under `src/sevn/config/`. The package contains 43 Python module(s); primary entry points include `src/sevn/config/__init__.py`, `src/sevn/config/defaults.py`, `src/sevn/config/errors.py`, `src/sevn/config/field_help.py`, and 2 more.
+Implementation lives under `src/sevn/config/`. The package contains 44 Python module(s); primary entry points include `src/sevn/config/__init__.py`, `src/sevn/config/defaults.py`, `src/sevn/config/errors.py`, `src/sevn/config/field_help.py`, and 2 more.
 
 ### Data and control flow
 
@@ -44,7 +44,7 @@ Provide a single, testable configuration surface before storage, tracing, proxy,
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/config/` (43 Python files). Normative design: `specs/02-config-and-workspace.md`.
+Primary source tree: `src/sevn/config/` (44 Python files). Normative design: `specs/02-config-and-workspace.md`.
 
 ### Module inventory
 
@@ -60,7 +60,7 @@ Primary source tree: `src/sevn/config/` (43 Python files). Normative design: `sp
 - `src/sevn/config/provider_registry.py` — """Resolve provider bindings and credentials from workspace config.
 - `src/sevn/config/provider_secrets.py` — """Canonical provider secret aliases and config binding helpers (D2/D6).
 - `src/sevn/config/sections/__init__.py` — """Domain modules for ''sevn.json'' Pydantic section models.
-- … and 31 more Python modules
+- … and 32 more Python modules
 
 ### Field Help (`src/sevn/config/field_help.py`)
 
@@ -133,7 +133,7 @@ Public entry points:
 
 ### Additional modules
 
-31 more Python files under `src/sevn/config/` — including `src/sevn/config/sections/accessors.py`, `src/sevn/config/sections/agent.py`, `src/sevn/config/sections/channels.py`, `src/sevn/config/sections/coding_agents.py`.
+32 more Python files under `src/sevn/config/` — including `src/sevn/config/sections/accessors.py`, `src/sevn/config/sections/agent.py`, `src/sevn/config/sections/channels.py`, `src/sevn/config/sections/coding_agents.py`.
 
 ### Extension and invariants
 

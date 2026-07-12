@@ -14,6 +14,7 @@ Exports:
     get_config_menu_nav — load per-message stack state.
     config_menu_nav_push_current — push without leaving screen (restart confirm).
     refresh_config_menu_message — re-edit caption + keyboard after config mutations.
+    subagent_menu_snapshot_from_router — live L1/L2 counts for Sub-agents menu screens.
     build_chat_menu_webapp_request — ``setChatMenuButton`` body for viewer launch (M2).
     sync_telegram_chat_menu_button — push or clear the chat menu Web App button (D12).
     MenuCallbackHandler — ``menu:*`` / ``nav:*`` edit-in-place handler (Wave B1).
@@ -117,6 +118,8 @@ ConfigSection = Literal[
     "rlm",
     "self_improve",
     "second_brain",
+    "subagents",
+    "subagents_running",
     "codemode",
     "integrations",
     "dashboard",
@@ -144,6 +147,8 @@ _CONFIG_SECTIONS: frozenset[str] = frozenset(
         "rlm",
         "self_improve",
         "second_brain",
+        "subagents",
+        "subagents_running",
         "codemode",
         "integrations",
         "dashboard",
@@ -715,7 +720,7 @@ def _gateway_queue_mode(workspace: WorkspaceConfig) -> str:
         workspace (WorkspaceConfig): Parsed workspace settings.
 
     Returns:
-        str: ``cancel`` or ``steer``.
+        str: ``cancel``, ``steer``, or ``multi``.
 
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
@@ -725,6 +730,28 @@ def _gateway_queue_mode(workspace: WorkspaceConfig) -> str:
     if workspace.gateway is not None and workspace.gateway.queue_mode is not None:
         return str(workspace.gateway.queue_mode)
     return "cancel"
+
+
+def _next_queue_mode(current: str) -> str:
+    """Return the next queue mode in the cancel → steer → multi cycle.
+
+    Args:
+        current (str): Active ``gateway.queue_mode``.
+
+    Returns:
+        str: Next mode in ``_QUEUE_MODE_CYCLE``.
+
+    Examples:
+        >>> _next_queue_mode("cancel")
+        'steer'
+        >>> _next_queue_mode("multi")
+        'cancel'
+    """
+    try:
+        idx = _QUEUE_MODE_CYCLE.index(current)
+    except ValueError:
+        idx = 0
+    return _QUEUE_MODE_CYCLE[(idx + 1) % len(_QUEUE_MODE_CYCLE)]
 
 
 def _config_bool_toggle_button(
@@ -797,7 +824,7 @@ def _build_session_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[s
     if pair:
         rows.append(pair)
     current = _gateway_queue_mode(workspace)
-    nxt = "steer" if current == "cancel" else "cancel"
+    nxt = _next_queue_mode(current)
     rows.append(
         [
             {
@@ -1318,8 +1345,12 @@ _ADVANCED_SECTION_TILES: tuple[tuple[str, str], ...] = (
     ("🧭 RLM", "rlm"),
     ("📈 Self-Improve", "self_improve"),
     ("📚 Second Brain", "second_brain"),
+    ("🤖 Sub-agents", "subagents"),
     ("🧪 CodeMode", "codemode"),
 )
+
+_SUBAGENT_ROLES: tuple[str, ...] = ("triager", "tier_b", "tier_c", "tier_d")
+_QUEUE_MODE_CYCLE: tuple[str, ...] = ("cancel", "steer", "multi")
 
 
 def _build_advanced_keyboard_rows(
@@ -2897,6 +2928,171 @@ def _build_second_brain_keyboard_rows(workspace: WorkspaceConfig) -> list[list[d
     return rows
 
 
+def _subagents_enabled(workspace: WorkspaceConfig) -> bool:
+    """Return whether the sub-agent supervisor is enabled (D2).
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        bool: ``subagents.enabled`` (default ``True``).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> _subagents_enabled(WorkspaceConfig.minimal())
+        True
+    """
+    cfg = workspace.subagents
+    if cfg is None:
+        return True
+    return bool(cfg.enabled)
+
+
+def _subagents_role_label(role: str) -> str:
+    """Map internal role id to a short menu label.
+
+    Args:
+        role (str): ``triager`` / ``tier_b`` / ``tier_c`` / ``tier_d``.
+
+    Returns:
+        str: Human-readable label.
+
+    Examples:
+        >>> _subagents_role_label("tier_b")
+        'Tier B'
+    """
+    labels = {
+        "triager": "Triager",
+        "tier_b": "Tier B",
+        "tier_c": "Tier C",
+        "tier_d": "Tier D",
+    }
+    return labels.get(role, role.replace("_", " ").title())
+
+
+def _build_subagents_keyboard_rows(
+    workspace: WorkspaceConfig,
+    *,
+    level1_count: int = 0,
+    level2_count: int = 0,
+) -> list[list[dict[str, Any]]]:
+    """Build Sub-agents section toggles, limit forms, queue cycle, and Running link.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+        level1_count (int): Live level-1 running count from the registry.
+        level2_count (int): Live level-2 running count from the registry.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_subagents_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"].startswith("cfg:toggle:subagents.enabled:")
+        True
+    """
+    enabled = _subagents_enabled(workspace)
+    rows: list[list[dict[str, Any]]] = [
+        [
+            _config_bool_toggle_button(
+                "Sub-agents",
+                "subagents.enabled",
+                enabled=enabled,
+            ),
+        ],
+        [
+            {
+                "text": f"Running L1:{level1_count} L2:{level2_count}",
+                "callback_data": "cfg:section:subagents_running",
+            },
+        ],
+        [
+            {
+                "text": "Global override",
+                "callback_data": "form:subagents_max_override",
+            },
+        ],
+    ]
+    mode = _gateway_queue_mode(workspace)
+    nxt = _next_queue_mode(mode)
+    rows.append(
+        [
+            {
+                "text": f"Queue: {mode} (-> {nxt})",
+                "callback_data": f"cfg:toggle:gateway.queue_mode:{nxt}",
+            },
+        ],
+    )
+    pair: list[dict[str, Any]] = []
+    for role in _SUBAGENT_ROLES:
+        pair.append(
+            {
+                "text": f"Limits {_subagents_role_label(role)}",
+                "callback_data": f"form:subagents_limits:{role}",
+            },
+        )
+        if len(pair) == 2:
+            rows.append(pair)
+            pair = []
+    if pair:
+        rows.append(pair)
+    url = _mission_control_url(workspace, fragment="subagents")
+    if url:
+        rows.append([{"text": "🌐 Open Sub-agents panel", "url": url}])
+    return rows
+
+
+def _build_subagents_running_keyboard_rows(
+    running_rows: tuple[dict[str, Any], ...],
+    *,
+    is_owner: bool,
+) -> list[list[dict[str, Any]]]:
+    """Build Running submenu kill buttons (owner-only) for active sub-agent runs.
+
+    Args:
+        running_rows (tuple[dict[str, Any], ...]): Serialized running rows (id/role/level).
+        is_owner (bool): When ``False``, omit kill buttons.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_subagents_running_keyboard_rows(
+        ...     ({"id": "a1", "role": "tier_b", "level": 1, "task_summary": "x"},),
+        ...     is_owner=True,
+        ... )
+        >>> rows[0][0]["callback_data"]
+        'act:subagents:kill:a1'
+    """
+    rows: list[list[dict[str, Any]]] = []
+    if running_rows and is_owner:
+        for row in running_rows[:8]:
+            run_id = str(row.get("id", "")).strip()
+            if not run_id:
+                continue
+            role = str(row.get("role", "?"))
+            level = row.get("level", "?")
+            rows.append(
+                [
+                    {
+                        "text": f"Kill {run_id} L{level} {role}",
+                        "callback_data": f"act:subagents:kill:{run_id}",
+                    },
+                ],
+            )
+        rows.append(
+            [
+                {
+                    "text": "Kill all L1",
+                    "callback_data": "act:subagents:kill_all",
+                },
+            ],
+        )
+    rows.append([{"text": "⬅ Sub-agents", "callback_data": "cfg:section:subagents"}])
+    return rows
+
+
 def _build_integrations_keyboard_rows(
     workspace: WorkspaceConfig,
     content_root: Path | None = None,
@@ -3011,6 +3207,40 @@ def _config_chrome(*, include_back: bool = True) -> list[list[dict[str, Any]]]:
     return [row]
 
 
+async def subagent_menu_snapshot_from_router(
+    router: ChannelRouter | None,
+) -> tuple[int, int, tuple[dict[str, Any], ...]]:
+    """Fetch live sub-agent counts and running rows for Telegram menu captions.
+
+    Args:
+        router (ChannelRouter | None): Gateway router (may lack supervisor when unwired).
+
+    Returns:
+        tuple[int, int, tuple[dict[str, Any], ...]]: ``(level1_count, level2_count, running_rows)``.
+
+    Examples:
+        >>> import asyncio
+        >>> asyncio.run(subagent_menu_snapshot_from_router(None))
+        (0, 0, ())
+    """
+    if router is None:
+        return 0, 0, ()
+    supervisor = getattr(router, "_subagent_supervisor", None)
+    if supervisor is None:
+        return 0, 0, ()
+    from sevn.gateway.mission_subagents_snapshot import _serialize_subagent_run
+
+    counts_map = await supervisor.registry.counts()
+    level1 = sum(count for (level, _role), count in counts_map.items() if level == 1)
+    level2 = sum(count for (level, _role), count in counts_map.items() if level == 2)
+    runs = await supervisor.registry.running()
+    rows = tuple(
+        _serialize_subagent_run(run)
+        for run in sorted(runs, key=lambda row: (row.level, row.role, row.id))
+    )
+    return level1, level2, rows
+
+
 def build_config_menu_keyboard(
     workspace: WorkspaceConfig,
     *,
@@ -3020,6 +3250,9 @@ def build_config_menu_keyboard(
     is_owner: bool = True,
     models_picker_slot: str | None = None,
     models_picker_page: int = 0,
+    subagent_level1_count: int = 0,
+    subagent_level2_count: int = 0,
+    subagent_running_rows: tuple[dict[str, Any], ...] = (),
 ) -> dict[str, Any]:
     """Build the 18-tile ``/config`` inline keyboard (`plan/telegram-commands-design.md` §5.1).
 
@@ -3031,6 +3264,9 @@ def build_config_menu_keyboard(
         is_owner (bool): Whether the user is workspace owner.
         models_picker_slot (str | None): When set on ``models`` section, show paginated picker.
         models_picker_page (int): Zero-based picker page index.
+        subagent_level1_count (int): Live L1 count for ``subagents`` section caption/button.
+        subagent_level2_count (int): Live L2 count for ``subagents`` section caption/button.
+        subagent_running_rows (tuple[dict[str, Any], ...]): Serialized running rows for kill UI.
 
     Returns:
         dict[str, Any]: ``reply_markup``-shaped dict for outbound metadata.
@@ -3107,6 +3343,17 @@ def build_config_menu_keyboard(
         rows_sec = _build_self_improve_keyboard_rows(workspace)
     elif section == "second_brain":
         rows_sec = _build_second_brain_keyboard_rows(workspace)
+    elif section == "subagents":
+        rows_sec = _build_subagents_keyboard_rows(
+            workspace,
+            level1_count=subagent_level1_count,
+            level2_count=subagent_level2_count,
+        )
+    elif section == "subagents_running":
+        rows_sec = _build_subagents_running_keyboard_rows(
+            subagent_running_rows,
+            is_owner=is_owner,
+        )
     elif section == "integrations":
         rows_sec = _build_integrations_keyboard_rows(workspace, content_root)
     elif section == "sevn_bot":
@@ -3156,6 +3403,7 @@ async def refresh_config_menu_message(
     is_owner: bool = True,
     models_picker_slot: str | None = None,
     models_picker_page: int | None = None,
+    router: ChannelRouter | None = None,
 ) -> bool:
     """Re-edit the originating ``/config`` message caption and keyboard.
 
@@ -3169,6 +3417,7 @@ async def refresh_config_menu_message(
         is_owner (bool): Whether the user is workspace owner.
         models_picker_slot (str | None): Override picker slot from ``ctx`` when set.
         models_picker_page (int | None): Override picker page from ``ctx`` when set.
+        router (ChannelRouter | None): Gateway router for live sub-agent snapshot rows.
 
     Returns:
         bool: ``True`` when the edit API call succeeds.
@@ -3181,6 +3430,11 @@ async def refresh_config_menu_message(
     active = section if section is not None else ctx.section
     picker_slot = models_picker_slot if models_picker_slot is not None else ctx.models_picker_slot
     picker_page = models_picker_page if models_picker_page is not None else ctx.models_picker_page
+    l1_count = 0
+    l2_count = 0
+    running_rows: tuple[dict[str, Any], ...] = ()
+    if active in {"subagents", "subagents_running"}:
+        l1_count, l2_count, running_rows = await subagent_menu_snapshot_from_router(router)
     return await _edit_menu_message(
         adapter,
         chat_id=ctx.chat_id,
@@ -3193,6 +3447,9 @@ async def refresh_config_menu_message(
             is_owner=is_owner,
             models_picker_slot=picker_slot,
             models_picker_page=picker_page,
+            subagent_level1_count=l1_count,
+            subagent_level2_count=l2_count,
+            subagent_running_rows=running_rows,
         ),
         reply_markup=_apply_operator_readiness_gate(
             build_config_menu_keyboard(
@@ -3203,6 +3460,9 @@ async def refresh_config_menu_message(
                 is_owner=is_owner,
                 models_picker_slot=picker_slot,
                 models_picker_page=picker_page,
+                subagent_level1_count=l1_count,
+                subagent_level2_count=l2_count,
+                subagent_running_rows=running_rows,
             ),
         ),
         message_thread_id=ctx.topic_id,
@@ -3218,6 +3478,9 @@ def config_menu_message_text(
     is_owner: bool = True,
     models_picker_slot: str | None = None,
     models_picker_page: int = 0,
+    subagent_level1_count: int = 0,
+    subagent_level2_count: int = 0,
+    subagent_running_rows: tuple[dict[str, Any], ...] = (),
 ) -> str:
     """Return caption text for a ``/config`` screen.
 
@@ -3229,6 +3492,9 @@ def config_menu_message_text(
         is_owner (bool): Whether the user is workspace owner.
         models_picker_slot (str | None): Active model picker slot when in picker view.
         models_picker_page (int): Zero-based picker page index.
+        subagent_level1_count (int): Live L1 count for sub-agents captions.
+        subagent_level2_count (int): Live L2 count for sub-agents captions.
+        subagent_running_rows (tuple[dict[str, Any], ...]): Running rows for kill UI.
 
     Returns:
         str: Plain-text caption edited in place with the keyboard.
@@ -3452,7 +3718,7 @@ def config_menu_message_text(
             f"Auto-resume tier B on restart: {'on' if auto_resume else 'off'}",
             f"Trace redaction: {'on' if redaction else 'off'}",
             "",
-            "Nested sections: RLM, Self-Improve, Second Brain, CodeMode.",
+            "Nested sections: RLM, Self-Improve, Second Brain, Sub-agents, CodeMode.",
         ]
         url = web_ui_url_from_workspace(workspace)
         if url:
@@ -3561,6 +3827,45 @@ def config_menu_message_text(
             lines.append("Configure web_ui.url for Mission Control Second Brain tab.")
         if not _schema_has_config_path("second_brain.ingest_batch_cron"):
             lines.append("Ingest schedule is caption-only (not in workspace schema).")
+        return "\n".join(lines)
+    if section == "subagents":
+        from sevn.config.sections.subagents import SubAgentsWorkspaceConfig, resolve_limits
+
+        cfg = workspace.subagents or SubAgentsWorkspaceConfig()
+        lines = [
+            "Sub-agents",
+            "",
+            f"Enabled: {'on' if _subagents_enabled(workspace) else 'off'}",
+            f"Running: L1={subagent_level1_count} L2={subagent_level2_count}",
+            f"Queue mode: {_gateway_queue_mode(workspace)}",
+            f"Defaults: L1={cfg.max_level1_default} L2={cfg.max_level2_default}",
+            f"Global override: {cfg.max_override!r}",
+            "",
+            "Per-role effective limits:",
+        ]
+        for role in _SUBAGENT_ROLES:
+            l1, l2 = resolve_limits(cfg, role)
+            lines.append(f"  {_subagents_role_label(role)}: L1={l1} L2={l2}")
+        url = web_ui_url_from_workspace(workspace)
+        if url:
+            lines.append(f"Mission Control: {url}#subagents")
+        return "\n".join(lines)
+    if section == "subagents_running":
+        lines = [
+            "Sub-agents — Running",
+            "",
+            f"Active runs: {len(subagent_running_rows)} (L1={subagent_level1_count} L2={subagent_level2_count})",
+        ]
+        if subagent_running_rows:
+            for row in subagent_running_rows[:8]:
+                lines.append(
+                    f"• {row.get('id')} L{row.get('level')} {row.get('role')} "
+                    f"— {row.get('task_summary', '')!r}",
+                )
+        else:
+            lines.append("No active sub-agent runs.")
+        if not is_owner:
+            lines.append("Kill controls are owner-only.")
         return "\n".join(lines)
     if section == "integrations":
         raw_doc = _raw_sevn_doc(content_root)
@@ -4035,6 +4340,13 @@ class ConfigMenuHandler:
         workspace = self._router._workspace
         content_root = getattr(self._router, "_content_root", None)
         is_owner = self._router._resolve_owner_flag(msg)
+        l1_count = 0
+        l2_count = 0
+        running_rows: tuple[dict[str, Any], ...] = ()
+        if frame.section in {"subagents", "subagents_running"}:
+            l1_count, l2_count, running_rows = await subagent_menu_snapshot_from_router(
+                self._router,
+            )
         await _edit_menu_message(
             adapter,
             chat_id=chat_id,
@@ -4047,6 +4359,9 @@ class ConfigMenuHandler:
                 is_owner=is_owner,
                 models_picker_slot=frame.models_picker_slot,
                 models_picker_page=frame.models_picker_page,
+                subagent_level1_count=l1_count,
+                subagent_level2_count=l2_count,
+                subagent_running_rows=running_rows,
             ),
             reply_markup=_apply_operator_readiness_gate(
                 build_config_menu_keyboard(
@@ -4057,6 +4372,9 @@ class ConfigMenuHandler:
                     is_owner=is_owner,
                     models_picker_slot=frame.models_picker_slot,
                     models_picker_page=frame.models_picker_page,
+                    subagent_level1_count=l1_count,
+                    subagent_level2_count=l2_count,
+                    subagent_running_rows=running_rows,
                 ),
             ),
             message_thread_id=message_thread_id,
@@ -4572,6 +4890,7 @@ __all__ = [
     "parse_menu_callback_data",
     "parse_models_callback_data",
     "refresh_config_menu_message",
+    "subagent_menu_snapshot_from_router",
     "sync_telegram_chat_menu_button",
     "web_ui_url_from_workspace",
 ]

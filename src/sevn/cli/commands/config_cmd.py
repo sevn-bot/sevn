@@ -239,6 +239,19 @@ def register(app: typer.Typer) -> None:
 
         show_second_brain_config(json_out=json_out)
 
+    @cfg.command("subagents")
+    def config_subagents(
+        json_out: bool = typer.Option(
+            False,
+            "--json",
+            help="Emit JSON envelope with limits, enabled flag, and orphan count.",
+        ),
+    ) -> None:
+        """Show sub-agent limits, enabled flag, and storage orphan count."""
+        from sevn.cli.commands.subagents_cmd import show_subagents_config
+
+        show_subagents_config(json_out=json_out)
+
     @cfg.command("tracing")
     def config_tracing(
         json_out: bool = typer.Option(

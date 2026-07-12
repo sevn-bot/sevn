@@ -19,7 +19,7 @@ The Triager is the routing brain (prd-04-getting-things-done §5.1–§5.2): a s
 
 ### Components and layout
 
-Implementation lives under `src/sevn/agent/`. The package contains 79 Python module(s); primary entry points include `src/sevn/agent/__init__.py`, `src/sevn/agent/adapters/__init__.py`, `src/sevn/agent/adapters/_monty_limits.py`, `src/sevn/agent/adapters/dspy_adapter.py`, and 2 more.
+Implementation lives under `src/sevn/agent/`. The package contains 90 Python module(s); primary entry points include `src/sevn/agent/__init__.py`, `src/sevn/agent/adapters/__init__.py`, `src/sevn/agent/adapters/_monty_limits.py`, `src/sevn/agent/adapters/dspy_adapter.py`, and 2 more.
 
 ### Data and control flow
 
@@ -53,7 +53,7 @@ From specs/16-harness-discipline.md:
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/agent/` (79 Python files). Normative design: `specs/13-rlm-triager.md`, `specs/14-executor-tier-b.md`, `specs/21-executor-tier-cd.md`, `specs/16-harness-discipline.md`.
+Primary source tree: `src/sevn/agent/` (90 Python files). Normative design: `specs/13-rlm-triager.md`, `specs/14-executor-tier-b.md`, `specs/21-executor-tier-cd.md`, `specs/16-harness-discipline.md`.
 
 ### Module inventory
 
@@ -69,7 +69,7 @@ Primary source tree: `src/sevn/agent/` (79 Python files). Normative design: `spe
 - `src/sevn/agent/adapters/tier_b_codemode.py` — """Tier-B CodeMode helpers ('specs/14-executor-tier-b.md' W8; D8/D9).
 - `src/sevn/agent/adapters/tier_b_hooks.py` — """Tier-B pydantic-ai lifecycle hooks ('specs/14-executor-tier-b.md'; W5).
 - `src/sevn/agent/adapters/tier_b_model.py` — """OpenAI Chat Completions bridge for tier-B ''FunctionModel'' ('specs/14-executor-tier-b.md' §2.3).
-- … and 67 more Python modules
+- … and 78 more Python modules
 
 ###  Monty Limits (`src/sevn/agent/adapters/_monty_limits.py`)
 
@@ -140,7 +140,7 @@ Public entry points:
 
 ### Additional modules
 
-67 more Python files under `src/sevn/agent/` — including `src/sevn/agent/adapters/tier_b_multimodal.py`, `src/sevn/agent/adapters/tier_b_overflow.py`, `src/sevn/agent/adapters/tier_b_skill_capabilities.py`, `src/sevn/agent/adapters/tier_b_tools.py`.
+78 more Python files under `src/sevn/agent/` — including `src/sevn/agent/adapters/tier_b_multimodal.py`, `src/sevn/agent/adapters/tier_b_overflow.py`, `src/sevn/agent/adapters/tier_b_skill_capabilities.py`, `src/sevn/agent/adapters/tier_b_tools.py`.
 
 ### Extension and invariants
 

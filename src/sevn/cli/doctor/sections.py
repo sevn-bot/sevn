@@ -68,6 +68,7 @@ CHECK_SECTIONS: dict[str, str] = {
     "pp_recipe_goat": "Optional extras",
     "witchcraft_probe": "Optional extras",
     "second_brain_vault_layout": "Workspace",
+    "subagents_registry": "Storage",
 }
 
 CHECK_TITLES: dict[str, str] = {
@@ -113,6 +114,7 @@ CHECK_TITLES: dict[str, str] = {
     "voice_backends": "Voice backends",
     "witchcraft_probe": "Witchcraft",
     "second_brain_vault_layout": "Second Brain vault",
+    "subagents_registry": "Sub-agents storage",
     "skillspector_extra": "SkillSpector CLI",
     "telegram_probe": "Telegram probe",
 }

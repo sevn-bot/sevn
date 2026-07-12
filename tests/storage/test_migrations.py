@@ -18,7 +18,7 @@ from sevn.storage import (
 
 
 def test_migration_head_matches_bundle() -> None:
-    assert MIGRATION_HEAD_VERSION == 22
+    assert MIGRATION_HEAD_VERSION == 23
 
 
 def test_apply_migrations_idempotent_memory() -> None:
@@ -259,6 +259,34 @@ def test_self_improve_tables_exist(tmp_path: Path) -> None:
             (name,),
         ).fetchone()
         assert row is not None
+    conn.close()
+
+
+def test_subagent_runs_table_exists(tmp_path: Path) -> None:
+    """Migration 23 — ``subagent_runs`` rows + status/parent/session indexes."""
+    conn = connect_sqlite(tmp_path / "d" / "sa.sqlite")
+    apply_migrations(conn)
+    row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='subagent_runs'",
+    ).fetchone()
+    assert row is not None
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(subagent_runs)").fetchall()}
+    assert {"id", "level", "role", "specialist", "parent_id", "status", "started_at_ns"} <= cols
+    for idx_name in (
+        "ix_subagent_runs_parent",
+        "ix_subagent_runs_session",
+        "ix_subagent_runs_status",
+    ):
+        idx = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND name=?",
+            (idx_name,),
+        ).fetchone()
+        assert idx is not None
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(
+            "INSERT INTO subagent_runs (id, level, role, session_id, channel, started_at_ns) "
+            "VALUES ('x1', 3, 'tier_b', 's', 'c', 1)",
+        )
     conn.close()
 
 

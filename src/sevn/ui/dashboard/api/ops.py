@@ -16,6 +16,9 @@ Exports:
     security_put — patch ``security.*`` toggles in ``sevn.json``.
     tracing_logfire_get — Logfire export status for Mission Control.
     tracing_logfire_put — enable/disable Logfire export and store tokens.
+    mission_subagents_get — live sub-agent counts, running rows, recent history.
+    mission_subagent_kill — kill one tracked sub-agent run (owner+CSRF).
+    mission_subagents_kill_all — kill all active level-1 runs (owner+CSRF).
     secrets_aliases — read-only redacted secret alias inventory.
     secrets_alias_reveal — owner+CSRF audited resolve for ``${SECRET:…}`` aliases.
     tunnels_status — tunnel mode, gateway bind, doctor-style probes + process health.
@@ -53,6 +56,11 @@ from sevn.config.workspace_config import (
     SecurityWorkspaceConfig,
     TriggersWorkspaceConfig,
     WorkspaceConfig,
+)
+from sevn.gateway.mission_api import (
+    fetch_subagents_mission_payload,
+    kill_all_subagents_mission,
+    kill_subagent_mission,
 )
 from sevn.infrastructure.tunnel_config import prepare_tunnel_runtime_cfg, tunnel_cfg_from_workspace
 from sevn.infrastructure.tunnel_manager import TunnelStatus, default_manager
@@ -1356,6 +1364,94 @@ async def tunnels_stop(
     return JSONResponse(content=_tunnel_status_dict(ts))
 
 
+@router.get("/mission/subagents")
+async def mission_subagents_get(
+    request: Request,
+    _claims: DashboardClaims = Depends(require_dashboard_owner),
+) -> dict[str, object]:
+    """Return sub-agent counts, running rows, limits, and recent history (W6.2).
+
+    Args:
+        request (Request): FastAPI request with supervisor/registry on ``app.state``.
+        _claims (DashboardClaims): Verified dashboard owner claims.
+
+    Returns:
+        dict[str, object]: Snapshot payload for the Mission Control sub-agents panel.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(mission_subagents_get)
+        True
+    """
+    return await fetch_subagents_mission_payload(request)
+
+
+@router.post("/mission/subagents/{subagent_id}/kill")
+async def mission_subagent_kill(
+    request: Request,
+    subagent_id: str,
+    _claims: DashboardClaims = Depends(require_dashboard_owner),
+    _csrf: None = Depends(require_dashboard_csrf),
+) -> dict[str, object]:
+    """Kill one tracked sub-agent run via the process supervisor (W6.2, D13).
+
+    Args:
+        request (Request): FastAPI request.
+        subagent_id (str): Short registry id.
+        _claims (DashboardClaims): Verified dashboard owner.
+        _csrf (None): CSRF guard.
+
+    Returns:
+        dict[str, object]: Kill outcome.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(mission_subagent_kill)
+        True
+    """
+    result = await kill_subagent_mission(request, subagent_id)
+    await emit_mission_audit(
+        request,
+        kind="mission.subagents.kill",
+        hub_type="mission.subagents.changed",
+        extra={"subagent_id": subagent_id, "killed": result.get("killed")},
+    )
+    return result
+
+
+@router.post("/mission/subagents/kill_all")
+async def mission_subagents_kill_all(
+    request: Request,
+    role: str | None = None,
+    _claims: DashboardClaims = Depends(require_dashboard_owner),
+    _csrf: None = Depends(require_dashboard_csrf),
+) -> dict[str, object]:
+    """Kill all active level-1 sub-agents, optionally scoped to one role (W6.2, D13).
+
+    Args:
+        request (Request): FastAPI request.
+        role (str | None): Optional ``triager``/``tier_b``/``tier_c``/``tier_d`` filter.
+        _claims (DashboardClaims): Verified dashboard owner.
+        _csrf (None): CSRF guard.
+
+    Returns:
+        dict[str, object]: Number of runs cancelled.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(mission_subagents_kill_all)
+        True
+    """
+    result = await kill_all_subagents_mission(request, role=role)
+    await emit_mission_audit(
+        request,
+        kind="mission.subagents.kill_all",
+        hub_type="mission.subagents.changed",
+        extra={"role": result.get("role"), "killed_count": result.get("killed_count")},
+    )
+    return result
+
+
 @router.get("/backup/manifest")
 async def backup_manifest(
     request: Request,
@@ -1443,6 +1539,9 @@ __all__ = [
     "config_get",
     "cron_config_put",
     "cron_jobs_list",
+    "mission_subagent_kill",
+    "mission_subagents_get",
+    "mission_subagents_kill_all",
     "router",
     "schema_ontology",
     "secrets_alias_reveal",

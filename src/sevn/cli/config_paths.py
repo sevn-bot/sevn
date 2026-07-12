@@ -47,7 +47,15 @@ _SLUG_MENU_SECTIONS: dict[str, tuple[str, ...]] = {
     "dashboard": ("dashboard",),
     "shortcuts": ("shortcuts",),
     "notifications": ("notifications",),
-    "advanced": ("advanced", "codemode", "rlm", "self_improve", "second_brain"),
+    "advanced": (
+        "advanced",
+        "codemode",
+        "rlm",
+        "self_improve",
+        "second_brain",
+        "subagents",
+        "subagents_running",
+    ),
     "logs": ("logs",),
     "help": ("help",),
     "sevn_bot": ("sevn_bot",),
@@ -65,7 +73,19 @@ _EXTRA_DOT_PATHS: dict[str, tuple[str, ...]] = {
     ),
     "voice": ("channels.telegram.tts_mode",),
     "dashboard": ("channels.telegram.pinned_status",),
-    "advanced": ("second_brain.paths.vault",),
+    "advanced": (
+        "second_brain.paths.vault",
+        "gateway.restart.auto_resume_b",
+        "tracing.redaction.enabled",
+    ),
+    "subagents": (
+        "subagents.enabled",
+        "subagents.max_level1_default",
+        "subagents.max_level2_default",
+        "subagents.max_override",
+        "subagents.timeout_s",
+        "gateway.queue_mode",
+    ),
     "logs": ("tracing.sinks",),
 }
 

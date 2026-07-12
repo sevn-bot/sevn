@@ -55,6 +55,10 @@ from sevn.agent.provider_history_keys import (
 )
 from sevn.agent.providers.budget import BudgetRegime, ModelBudget
 from sevn.agent.providers.resolve import resolve_model
+from sevn.agent.subagents.models import SubAgentLimitExceeded
+from sevn.agent.subagents.registry import SubAgentRegistry
+from sevn.agent.subagents.specialists import merge_specialist_grants
+from sevn.agent.subagents.supervisor import SubAgentSpec, SubAgentSupervisor
 from sevn.agent.tracing.sink import SYSTEM_TURN_ID, TraceSink
 from sevn.agent.triager.context import ApprovedUserTurn
 from sevn.agent.triager.errors import TriagerUnavailable
@@ -78,6 +82,7 @@ from sevn.config.model_resolution import (
     resolve_model_slot,
     resolve_transport_for_model_id,
 )
+from sevn.config.sections.subagents import Role as SubAgentRole
 from sevn.config.settings import ProcessSettings
 from sevn.config.sevn_repo import resolve_sevn_checkout_for_workspace
 from sevn.config.workspace_config import (
@@ -124,6 +129,7 @@ from sevn.gateway.first_session import (
 from sevn.gateway.menu import ConfigMenuHandler, MenuCallbackHandler
 from sevn.gateway.plan_gate import PlanGateCallbackHandler, PlanGateWaitRegistry, SqlitePlanGate
 from sevn.gateway.post_turn_hooks import PostTurnContext, run_post_turn_hooks
+from sevn.gateway.queue_multi import MultiSpawnOutcome
 from sevn.gateway.session_manager import latest_messages, load_session_row
 from sevn.gateway.telegram_quick_actions import (
     GATEWAY_OUTBOUND_PHASE_KEY,
@@ -552,6 +558,43 @@ async def _emit_no_answer_fallback(
         )
 
 
+def _specialist_grants_for_triage(
+    triage: TriageResult,
+    workspace: WorkspaceConfig,
+) -> frozenset[str]:
+    """Effective specialist grants for one triage dispatch (W8.3 skill binding).
+
+    Args:
+        triage (TriageResult): Parsed triager output.
+        workspace (WorkspaceConfig): Workspace config (``subagents`` subtree).
+
+    Returns:
+        frozenset[str]: Merged explicit + skill-bound specialist ids.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> from sevn.agent.triager.models import ComplexityTier, Intent, TriageResult
+        >>> triage = TriageResult(
+        ...     intent=Intent.NEW_REQUEST,
+        ...     complexity=ComplexityTier.B,
+        ...     first_message="ok",
+        ...     tools=[],
+        ...     skills=["media_generation"],
+        ...     mcp_servers_required=[],
+        ...     confidence=0.9,
+        ...     requires_vision=False,
+        ...     requires_document=False,
+        ... )
+        >>> _specialist_grants_for_triage(triage, WorkspaceConfig.minimal())
+        frozenset()
+    """
+    return merge_specialist_grants(
+        triage.specialist_grants,
+        triage.skills,
+        workspace.subagents,
+    )
+
+
 def build_intro_extra_instructions(
     *,
     workspace: WorkspaceConfig,
@@ -592,6 +635,59 @@ def build_intro_extra_instructions(
             bootstrap_body=bootstrap_body,
         )
     ]
+
+
+_ROLE_FOR_TIER: dict[ComplexityTier, SubAgentRole] = {
+    ComplexityTier.B: "tier_b",
+    ComplexityTier.C: "tier_c",
+    ComplexityTier.D: "tier_d",
+}
+"""Map a resolved dispatch tier to its level-1 sub-agent role (D1; W3.1)."""
+
+_L1_TASK_SUMMARY_MAX_CHARS = 200
+
+
+@dataclasses.dataclass
+class _L1TurnState:
+    """Mutable per-turn holder for the registered level-1 executor run id (W3.1).
+
+    Created fresh per turn in ``_run_guarded`` and threaded into ``_run`` so the
+    tier B/C/D executor's level-1 registration — set the moment the dispatch
+    tier is known — can be finalized (``done``/``failed``/``killed``) from
+    ``_run_guarded``'s existing ``try/except/finally`` regardless of which of
+    ``_run``'s many exit points the turn actually took (classic-path turns are
+    additive here: no ``subagent_supervisor`` wired ⇒ every subagent-related
+    branch below is a no-op, so behavior is unchanged — `plan/sub-agents-
+    orchestration-wave-plan.md` W3.1).
+    """
+
+    run_id: str | None = None
+
+
+def _l1_task_summary(triage: TriageResult | None, user_text: str) -> str:
+    """Short human-readable task description for a level-1 registry row (D3).
+
+    Prefers the triager-produced ``first_message`` (when non-empty); falls
+    back to the first line of the raw user message (used before triage
+    completes, e.g. for the triager's own level-1 row).
+
+    Args:
+        triage (TriageResult | None): Completed triage, or ``None`` before it runs.
+        user_text (str): Raw incoming user message text for this turn.
+
+    Returns:
+        str: Summary capped at ``_L1_TASK_SUMMARY_MAX_CHARS`` characters.
+
+    Examples:
+        >>> _l1_task_summary(None, "hello\\nworld")
+        'hello'
+        >>> _l1_task_summary(None, "   ")
+        ''
+    """
+    if triage is not None and (triage.first_message or "").strip():
+        return triage.first_message.strip()[:_L1_TASK_SUMMARY_MAX_CHARS]
+    first_line = user_text.strip().splitlines()[0] if user_text.strip() else ""
+    return first_line[:_L1_TASK_SUMMARY_MAX_CHARS]
 
 
 def build_agent_run_turn(
@@ -1011,13 +1107,22 @@ def build_agent_run_turn(
 
     router.route_incoming = _route_incoming_with_menu  # type: ignore[method-assign]
 
-    async def _run(session_id: str, correlation_id: str) -> None:
+    async def _run(session_id: str, correlation_id: str, *, l1_state: _L1TurnState) -> None:
         # Pick up /config toggles (e.g. channels.telegram.show_routing) without gateway restart.
         workspace = router._workspace
         tier_b_timeout_s = tier_b_executor_timeout_s(workspace)
         tier_cd_timeout_s = tier_cd_executor_timeout_s(workspace)
         # Cumulative wall-clock cap across the cascade (`PROBLEMS.md` Priority 1(e)).
         budget = CascadeBudget(cascade_budget_s(workspace))
+        # W3.1: read lazily (not a `build_agent_run_turn` constructor param) because the
+        # subagents boot hook runs *after* this closure is constructed at gateway boot
+        # (`run_boot_hooks` executes well after both `build_agent_run_turn` call sites in
+        # `http_server.py`) — mirrors how `_tool_context_for_turn` reads `router._voice_rt`
+        # / `router._tts`. `None` (unwired / most unit tests) makes every subagent-related
+        # branch below a no-op — classic single-turn behavior is unchanged.
+        subagent_supervisor: SubAgentSupervisor | None = getattr(
+            router, "_subagent_supervisor", None
+        )
 
         sess = await asyncio.to_thread(load_session_row, conn, session_id)
         if sess is None:
@@ -1098,6 +1203,9 @@ def build_agent_run_turn(
             logger.warning("agent_turn empty user text session_id={}", session_id)
             return
         turn_span_id = uuid.uuid4().hex
+        from sevn.agent.tracing.subagent_trace import bind_subagent_turn_context
+
+        bind_subagent_turn_context(turn_id=correlation_id, turn_span_id=turn_span_id)
         await _emit_gateway_span(
             trace,
             kind="gateway.turn.start",
@@ -1228,6 +1336,24 @@ def build_agent_run_turn(
                 attrs={"triager_enabled": False, "complexity": str(triage.complexity)},
             )
         else:
+            # W3.1: register the triager itself as a tracked level-1 run (D1/D3). Plain
+            # register()+mark_running() (not the limit-checked supervisor.spawn() path) —
+            # this is baseline visibility/Mission-Control tracking for the classic
+            # single-turn spine, not a gated spawn; enforcement lives in the L2
+            # spawn_subagent tool (W3.3) and the `multi` queue path (W4).
+            triager_run_id: str | None = None
+            triager_registry: SubAgentRegistry | None = None
+            if subagent_supervisor is not None:
+                triager_registry = subagent_supervisor.registry
+                triager_run = await triager_registry.register(
+                    level=1,
+                    role="triager",
+                    session_id=session_id,
+                    channel=sess.channel,
+                    task_summary=_l1_task_summary(None, user_text),
+                )
+                triager_run_id = triager_run.id
+                await triager_registry.mark_running(triager_run_id)
             try:
                 triage_started_ns = time_ns()
                 triage = await triage_turn(
@@ -1242,6 +1368,8 @@ def build_agent_run_turn(
                 )
                 triager_ms = max(1, int((time_ns() - triage_started_ns) / 1_000_000))
             except TriagerUnavailable:
+                if triager_run_id is not None and triager_registry is not None:
+                    await triager_registry.mark_failed(triager_run_id)
                 logger.exception("agent_turn triager unavailable session_id={}", session_id)
                 if bootstrap_active:
                     await _bootstrap_capture_after_turn(
@@ -1262,6 +1390,9 @@ def build_agent_run_turn(
                     metadata=route_meta,
                 )
                 return
+            else:
+                if triager_run_id is not None and triager_registry is not None:
+                    await triager_registry.mark_done(triager_run_id)
             await asyncio.to_thread(
                 persist_triage_decision,
                 conn,
@@ -1471,6 +1602,16 @@ def build_agent_run_turn(
         if triage.complexity in (ComplexityTier.C, ComplexityTier.D):
             if first_task is not None:
                 await first_task
+            if subagent_supervisor is not None:
+                cd_run = await subagent_supervisor.registry.register(
+                    level=1,
+                    role=_ROLE_FOR_TIER[triage.complexity],
+                    session_id=session_id,
+                    channel=sess.channel,
+                    task_summary=_l1_task_summary(triage, user_text),
+                )
+                l1_state.run_id = cd_run.id
+                await subagent_supervisor.registry.mark_running(cd_run.id)
             await _run_cd_dispatch(
                 router=router,
                 conn=conn,
@@ -1491,6 +1632,11 @@ def build_agent_run_turn(
                 plan_registry=plan_registry,
                 had_triager_first=had_triager_first,
                 timeout_s=budget.clamp(tier_cd_timeout_s),
+                subagent_supervisor=subagent_supervisor,
+                subagent_role=_ROLE_FOR_TIER[triage.complexity],
+                subagent_parent_id=l1_state.run_id,
+                subagent_specialist_grants=_specialist_grants_for_triage(triage, workspace),
+                subagent_remaining_budget_s=budget.remaining_s,
             )
             if await _bootstrap_capture_after_turn(
                 bootstrap_active=bootstrap_active,
@@ -1519,6 +1665,16 @@ def build_agent_run_turn(
                 metadata=route_meta,
             )
             return
+        if subagent_supervisor is not None:
+            b_run = await subagent_supervisor.registry.register(
+                level=1,
+                role="tier_b",
+                session_id=session_id,
+                channel=sess.channel,
+                task_summary=_l1_task_summary(triage, user_text),
+            )
+            l1_state.run_id = b_run.id
+            await subagent_supervisor.registry.mark_running(b_run.id)
         if tier_b_bundle_factory is not None:
             bundle = await tier_b_bundle_factory(workspace)
         else:
@@ -1641,6 +1797,11 @@ def build_agent_run_turn(
             runtime_bindings=bindings,
             plugin_hooks=_plugin_hooks_from_router(router),
             turn_span_id=turn_span_id,
+            subagent_supervisor=subagent_supervisor,
+            subagent_role="tier_b",
+            subagent_parent_id=l1_state.run_id,
+            subagent_specialist_grants=_specialist_grants_for_triage(triage, workspace),
+            subagent_remaining_budget_s=budget.remaining_s,
         )
 
         # Retry-storm guard (`specs/17-gateway.md` §3.4): the narrow first pass keeps the
@@ -1867,6 +2028,11 @@ def build_agent_run_turn(
                 transcript_turns=retry_windowed_turns,
                 transcript_rows=retry_windowed_rows,
                 operator_local_date=triage_ctx.operator_local_date,
+                subagent_supervisor=subagent_supervisor,
+                subagent_role="tier_b",
+                subagent_parent_id=l1_state.run_id,
+                subagent_specialist_grants=_specialist_grants_for_triage(triage, workspace),
+                subagent_remaining_budget_s=budget.remaining_s,
             )
             _log_b_turn_pass(
                 b_turn_kind="full_index",
@@ -1915,6 +2081,11 @@ def build_agent_run_turn(
                     had_triager_first=had_triager_first,
                     finalizer=finalizer,
                     timeout_s=budget.clamp(tier_cd_timeout_s),
+                    subagent_supervisor=subagent_supervisor,
+                    subagent_role="tier_b",
+                    subagent_parent_id=l1_state.run_id,
+                    subagent_specialist_grants=_specialist_grants_for_triage(triage, workspace),
+                    subagent_remaining_budget_s=budget.remaining_s,
                 )
                 return
             # Retry produced an outcome — fall through to the regular outcome
@@ -2039,6 +2210,7 @@ def build_agent_run_turn(
                 triager_ms=triager_ms,
                 enabled=show_routing,
                 sent=routing_footer_sent,
+                subagent_id=l1_state.run_id,
             )
             if finalizer is not None:
                 finalizer.metadata = _merge_provider_turn_metadata(finalizer.metadata, outcome)
@@ -2087,6 +2259,7 @@ def build_agent_run_turn(
                 triager_ms=triager_ms,
                 enabled=show_routing,
                 sent=routing_footer_sent,
+                subagent_id=l1_state.run_id,
             )
             routing_footer_sent = routing_footer_sent or applied
             chunk_meta = route_meta if i > 0 else _merge_provider_turn_metadata(route_meta, outcome)
@@ -2185,14 +2358,20 @@ def build_agent_run_turn(
             had_triager_first=had_triager_first,
             finalizer=finalizer,
             timeout_s=budget.clamp(tier_cd_timeout_s),
+            subagent_supervisor=subagent_supervisor,
+            subagent_role="tier_b",
+            subagent_parent_id=l1_state.run_id,
+            subagent_specialist_grants=_specialist_grants_for_triage(triage, workspace),
+            subagent_remaining_budget_s=budget.remaining_s,
         )
 
     async def _run_guarded(session_id: str, correlation_id: str) -> None:
         """Outer catch-all wrapping ``_run`` so unexpected failures still notify the user."""
         terminal_status = "ok"
         turn_wall_ns = time_ns()
+        l1_state = _L1TurnState()
         try:
-            await _run(session_id, correlation_id)
+            await _run(session_id, correlation_id, l1_state=l1_state)
         except asyncio.CancelledError:
             terminal_status = "cancelled"
             # P9: when cancel-mode already queued a replacement turn, skip the
@@ -2284,6 +2463,30 @@ def build_agent_run_turn(
                 reason="unhandled_exception",
             )
         finally:
+            # W3.1: finalize the tier B/C/D executor's level-1 registry row here — a
+            # single choke point that covers every one of ``_run``'s exit paths (many
+            # bare ``return`` statements plus C/D escalation from within the B branch)
+            # without threading finalize calls through each of them individually.
+            # No-op when sub-agents are unwired (``l1_state.run_id`` stays ``None``).
+            l1_executor_run_id = l1_state.run_id
+            if l1_executor_run_id is not None:
+                subagent_supervisor_for_finalize: SubAgentSupervisor | None = getattr(
+                    router, "_subagent_supervisor", None
+                )
+                if subagent_supervisor_for_finalize is not None:
+                    try:
+                        registry = subagent_supervisor_for_finalize.registry
+                        if terminal_status == "ok":
+                            await registry.mark_done(l1_executor_run_id)
+                        elif terminal_status == "cancelled":
+                            await registry.mark_killed(l1_executor_run_id)
+                        else:
+                            await registry.mark_failed(l1_executor_run_id)
+                    except Exception:
+                        logger.exception(
+                            "agent_turn.l1_executor_finalize_failed run_id={}",
+                            l1_executor_run_id,
+                        )
             await run_post_turn_hooks(
                 PostTurnContext(
                     router=router,
@@ -2295,6 +2498,205 @@ def build_agent_run_turn(
                     turn_wall_ns=turn_wall_ns,
                 )
             )
+
+    async def _run_spawned_l1_tier_b_body(
+        *,
+        session_id: str,
+        correlation_id: str,
+        subagent_id: str,
+    ) -> str:
+        """Execute one supervisor-spawned level-1 tier-B turn (D11 fresh budget)."""
+        sess = await asyncio.to_thread(load_session_row, conn, session_id)
+        if sess is None:
+            msg = f"missing session {session_id}"
+            raise RuntimeError(msg)
+        user_text = await asyncio.to_thread(
+            _user_message_text_for_turn,
+            conn,
+            session_id,
+            correlation_id,
+        )
+        if not user_text.strip():
+            return "No user message found for this sub-agent task."
+        workspace_local = router._workspace
+        budget = CascadeBudget(cascade_budget_s(workspace_local))
+        tier_b_timeout_s = tier_b_executor_timeout_s(workspace_local)
+        triage = passthrough_triage_result()
+        triage = triage.model_copy(update={"first_message": _l1_task_summary(triage, user_text)})
+        route_meta = await asyncio.to_thread(
+            _outbound_routing_metadata,
+            conn,
+            session_id,
+            sess.channel,
+            sess.user_id,
+        )
+        session_exe, session_tool_set = await asyncio.to_thread(
+            build_session_registry,
+            workspace_config=workspace_local,
+            runtime_bindings=bindings,
+            extra_mcp=mcp_defs,
+            workspace_root=layout.content_root,
+            layout=layout,
+            trace_sink=trace,
+            include_bootstrap_tools=False,
+        )
+        exe = session_exe
+        if tier_b_bundle_factory is not None:
+            bundle = await tier_b_bundle_factory(workspace_local)
+        else:
+            bundle = _resolve_tier_b_bundle(workspace_local, process)
+        triage_ctx = triage_context_from_session(
+            conn,
+            session_id,
+            workspace_local,
+            user_text,
+            layout=layout,
+            turn_id=correlation_id,
+            channel=sess.channel,
+            user_id=sess.user_id,
+        )
+        steer_buffer = _steer_buffer_for(router, session_id)
+        turn_span_id = uuid.uuid4().hex
+        spawn_supervisor: SubAgentSupervisor | None = getattr(router, "_subagent_supervisor", None)
+        tool_context = _tool_context_for_turn(
+            session_id=session_id,
+            correlation_id=correlation_id,
+            workspace=workspace_local,
+            layout=layout,
+            trace=trace,
+            tool_set=session_tool_set,
+            channel=sess.channel,
+            channel_adapter=router.adapter_named(sess.channel),
+            channel_router=router,
+            outbound_user_id=sess.user_id,
+            outbound_metadata=route_meta,
+            runtime_bindings=bindings,
+            plugin_hooks=_plugin_hooks_from_router(router),
+            turn_span_id=turn_span_id,
+            subagent_supervisor=spawn_supervisor,
+            subagent_role="tier_b",
+            subagent_parent_id=subagent_id,
+            subagent_specialist_grants=frozenset(),
+            subagent_remaining_budget_s=budget.remaining_s,
+        )
+        outcome = await asyncio.wait_for(
+            run_b_turn(
+                workspace=workspace_local,
+                session=SessionHandle(session_id=session_id),
+                turn_id=correlation_id,
+                triage=triage,
+                incoming_text=user_text,
+                tool_set=session_tool_set,
+                body_cache=LoadedBodyCache(capacity=8),
+                tool_executor=exe,
+                transport_bundle=bundle,
+                trace=trace,
+                steer_buffer=steer_buffer,
+                tool_context=tool_context,
+                extra_instructions=tier_b_repo_access_prompt(workspace_local, layout.content_root),
+                max_rounds=tier_b_rounds_expanded(workspace_local),
+                transcript_turns=list(triage_ctx.transcript_turns),
+                transcript_rows=list(triage_ctx.transcript_rows),
+            ),
+            timeout=budget.clamp(tier_b_timeout_s),
+        )
+        texts = [
+            str(part.text).strip()
+            for part in outcome.final_messages
+            if getattr(part, "text", None) and str(part.text).strip()
+        ]
+        reply = "\n\n".join(texts) if texts else "Done."
+        from sevn.gateway.routing_footer import telegram_show_routing_enabled
+
+        show_routing = sess.channel == "telegram" and telegram_show_routing_enabled(workspace_local)
+        if show_routing:
+            reply, _ = _apply_routing_footer_once(
+                reply,
+                triage=triage,
+                triager_ms=None,
+                enabled=True,
+                sent=False,
+                subagent_id=subagent_id,
+            )
+        await _route_assistant_text(
+            router,
+            sess.channel,
+            sess.user_id,
+            session_id,
+            reply,
+            metadata=route_meta,
+        )
+        return reply
+
+    async def _spawn_multi_l1_tier_b(session_id: str, correlation_id: str) -> MultiSpawnOutcome:
+        """Spawn a concurrent level-1 tier-B run for ``multi`` ``new_task`` (D6/D11)."""
+        supervisor: SubAgentSupervisor | None = getattr(router, "_subagent_supervisor", None)
+        if supervisor is None:
+            return MultiSpawnOutcome.LIMIT_STEER
+        sess = await asyncio.to_thread(load_session_row, conn, session_id)
+        if sess is None:
+            return MultiSpawnOutcome.LIMIT_STEER
+        user_text = await asyncio.to_thread(
+            _user_message_text_for_turn,
+            conn,
+            session_id,
+            correlation_id,
+        )
+        summary = _l1_task_summary(None, user_text)
+        run_id_holder: dict[str, str] = {"id": ""}
+
+        async def _body() -> str:
+            return await _run_spawned_l1_tier_b_body(
+                session_id=session_id,
+                correlation_id=correlation_id,
+                subagent_id=run_id_holder["id"],
+            )
+
+        spec = SubAgentSpec(
+            level=1,
+            role="tier_b",
+            body=_body,
+            session_id=session_id,
+            channel=sess.channel,
+            task_summary=summary,
+        )
+        result = await supervisor.spawn(spec)
+        if isinstance(result, SubAgentLimitExceeded):
+            logger.info(
+                "queue_multi_spawn_limit_exceeded session_id={} role={} current={} limit={}",
+                session_id,
+                result.role,
+                result.current,
+                result.limit,
+            )
+            return MultiSpawnOutcome.LIMIT_STEER
+        run_id_holder["id"] = result.id
+        return MultiSpawnOutcome.SPAWNED
+
+    router._spawn_multi_l1_tier_b = _spawn_multi_l1_tier_b  # type: ignore[attr-defined]
+
+    async def _classify_busy(
+        in_flight_summary: str,
+        queued_summaries: tuple[str, ...],
+        new_message: str,
+    ) -> tuple[str, bool]:
+        from sevn.agent.triager.relatedness import RelatednessInput, classify_relatedness
+
+        result = await classify_relatedness(
+            workspace=router._workspace,
+            inp=RelatednessInput(
+                in_flight_task_summary=in_flight_summary,
+                queued_task_summaries=queued_summaries,
+                new_message=new_message,
+            ),
+            session_id="multi",
+            turn_id="classify",
+            content_root=layout.content_root,
+            trace=trace,
+        )
+        return result.label, result.fallback
+
+    router._multi_classify_busy = _classify_busy  # type: ignore[attr-defined]
 
     return _run_guarded
 
@@ -2327,6 +2729,11 @@ async def _run_full_index_retry(
     transcript_turns: list[str] | None = None,
     transcript_rows: list[Any] | None = None,
     operator_local_date: str = "",
+    subagent_supervisor: SubAgentSupervisor | None = None,
+    subagent_role: str | None = None,
+    subagent_parent_id: str | None = None,
+    subagent_specialist_grants: frozenset[str] = frozenset(),
+    subagent_remaining_budget_s: Callable[[], float] | None = None,
 ) -> tuple[Any | None, str | None]:
     """Run one tier-B retry with the full skills/INDEX exposed (`PROBLEMS.md` 1(e)).
 
@@ -2368,6 +2775,14 @@ async def _run_full_index_retry(
         budget (CascadeBudget): Cumulative cascade wall-clock budget for the turn.
         operator_local_date (str): Operator-local calendar date ``YYYY-MM-DD`` for
             live-factual tier-B prompts.
+        subagent_supervisor (SubAgentSupervisor | None): Process-wide supervisor for the
+            ``spawn_subagent`` tool (W3.3); ``None`` when unwired.
+        subagent_role (str | None): Owning level-1 role for this dispatch (D1).
+        subagent_parent_id (str | None): This turn's registered level-1 run id.
+        subagent_specialist_grants (frozenset[str]): Specialist names the triager
+            granted this turn (D8/W3.4).
+        subagent_remaining_budget_s (Callable[[], float] | None): Zero-arg callable
+            returning the parent turn's remaining ``CascadeBudget`` seconds (D11).
 
     Returns:
         tuple[BTurnOutcome | None, str | None]: ``(outcome, None)`` on success
@@ -2419,6 +2834,11 @@ async def _run_full_index_retry(
                     runtime_bindings=bindings,
                     plugin_hooks=_plugin_hooks_from_router(router),
                     turn_span_id=turn_span_id,
+                    subagent_supervisor=subagent_supervisor,
+                    subagent_role=subagent_role,
+                    subagent_parent_id=subagent_parent_id,
+                    subagent_specialist_grants=subagent_specialist_grants,
+                    subagent_remaining_budget_s=subagent_remaining_budget_s,
                 ),
                 max_rounds=expanded_rounds,
                 streaming_sink=streaming_sink,
@@ -2475,6 +2895,11 @@ async def _run_b_fallback_for_cd(
     finalizer: TierBAnswerFinalizer | None,
     timeout_s: float | None,
     operator_local_date: str = "",
+    subagent_supervisor: SubAgentSupervisor | None = None,
+    subagent_role: str | None = None,
+    subagent_parent_id: str | None = None,
+    subagent_specialist_grants: frozenset[str] = frozenset(),
+    subagent_remaining_budget_s: Callable[[], float] | None = None,
 ) -> bool:
     """Answer a decompose-failed C/D turn with a plain tier-B pass on the same text.
 
@@ -2508,6 +2933,14 @@ async def _run_b_fallback_for_cd(
         timeout_s (float | None): Wall-clock cap; falls back to the tier-B timeout.
         operator_local_date (str): Operator-local calendar date ``YYYY-MM-DD`` for
             live-factual tier-B prompts.
+        subagent_supervisor (SubAgentSupervisor | None): Process-wide supervisor for the
+            ``spawn_subagent`` tool (W3.3); ``None`` when unwired.
+        subagent_role (str | None): Owning level-1 role for this dispatch (D1).
+        subagent_parent_id (str | None): This turn's registered level-1 run id.
+        subagent_specialist_grants (frozenset[str]): Specialist names the triager
+            granted this turn (D8/W3.4).
+        subagent_remaining_budget_s (Callable[[], float] | None): Zero-arg callable
+            returning the parent turn's remaining ``CascadeBudget`` seconds (D11).
 
     Returns:
         bool: ``True`` when a non-empty tier-B answer was delivered; ``False`` when
@@ -2572,6 +3005,11 @@ async def _run_b_fallback_for_cd(
                     runtime_bindings=bindings,
                     plugin_hooks=_plugin_hooks_from_router(router),
                     turn_span_id=turn_span_id,
+                    subagent_supervisor=subagent_supervisor,
+                    subagent_role=subagent_role,
+                    subagent_parent_id=subagent_parent_id,
+                    subagent_specialist_grants=subagent_specialist_grants,
+                    subagent_remaining_budget_s=subagent_remaining_budget_s,
                 ),
                 streaming_sink=streaming_sink,
                 return_partial_on_cancel=True,
@@ -2649,6 +3087,11 @@ async def _run_cd_dispatch(
     had_triager_first: bool = False,
     finalizer: TierBAnswerFinalizer | None = None,
     timeout_s: float | None = None,
+    subagent_supervisor: SubAgentSupervisor | None = None,
+    subagent_role: str | None = None,
+    subagent_parent_id: str | None = None,
+    subagent_specialist_grants: frozenset[str] = frozenset(),
+    subagent_remaining_budget_s: Callable[[], float] | None = None,
 ) -> None:
     """Execute ``run_cd_turn`` and map ``CdTurnOutcome`` payloads outbound.
 
@@ -2680,6 +3123,14 @@ async def _run_cd_dispatch(
             falls back to ``TIER_CD_EXECUTOR_TIMEOUT_S``; callers typically pass
             ``CascadeBudget.clamp(TIER_CD_EXECUTOR_TIMEOUT_S)`` so the
             180s cumulative cascade budget is enforced (Step 7b).
+        subagent_supervisor (SubAgentSupervisor | None): Process-wide supervisor for the
+            ``spawn_subagent`` tool (W3.3); ``None`` when unwired.
+        subagent_role (str | None): Owning level-1 role for this dispatch (D1).
+        subagent_parent_id (str | None): This turn's registered level-1 run id.
+        subagent_specialist_grants (frozenset[str]): Specialist names the triager
+            granted this turn (D8/W3.4).
+        subagent_remaining_budget_s (Callable[[], float] | None): Zero-arg callable
+            returning the parent turn's remaining ``CascadeBudget`` seconds (D11).
 
     Examples:
         >>> import inspect
@@ -2740,6 +3191,11 @@ async def _run_cd_dispatch(
                     runtime_bindings=bindings,
                     plugin_hooks=_plugin_hooks_from_router(router),
                     turn_span_id=turn_span_id,
+                    subagent_supervisor=subagent_supervisor,
+                    subagent_role=subagent_role,
+                    subagent_parent_id=subagent_parent_id,
+                    subagent_specialist_grants=subagent_specialist_grants,
+                    subagent_remaining_budget_s=subagent_remaining_budget_s,
                 ),
             ),
             timeout=timeout_s if timeout_s is not None else tier_cd_executor_timeout_s(workspace),
@@ -2820,6 +3276,11 @@ async def _run_cd_dispatch(
             had_triager_first=had_triager_first,
             finalizer=finalizer,
             timeout_s=timeout_s,
+            subagent_supervisor=subagent_supervisor,
+            subagent_role=subagent_role,
+            subagent_parent_id=subagent_parent_id,
+            subagent_specialist_grants=subagent_specialist_grants,
+            subagent_remaining_budget_s=subagent_remaining_budget_s,
         ):
             return
         # B fallback produced nothing usable — fall through to the normal outcome
@@ -3158,6 +3619,39 @@ def _outbound_routing_metadata(
     if channel == "telegram" and user_id.isdigit():
         return {"chat_id": int(user_id)}
     return {}
+
+
+def _user_message_text_for_turn(
+    conn: sqlite3.Connection,
+    session_id: str,
+    turn_id: str,
+) -> str:
+    """Return user message content for a specific ``turn_id`` when present.
+
+    Args:
+        conn (sqlite3.Connection): Gateway SQLite handle.
+        session_id (str): Owning session id.
+        turn_id (str): Turn correlation id.
+
+    Returns:
+        str: Matching user plaintext or the latest user line as fallback.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.isfunction(_user_message_text_for_turn)
+        True
+    """
+    row = conn.execute(
+        """
+        SELECT content FROM gateway_messages
+        WHERE session_id = ? AND role = 'user' AND kind = 'message' AND turn_id = ?
+        ORDER BY id DESC LIMIT 1
+        """,
+        (session_id, turn_id),
+    ).fetchone()
+    if row is not None and str(row[0] or "").strip():
+        return str(row[0])
+    return _latest_user_message_text(conn, session_id)
 
 
 def _latest_user_message_text(conn: sqlite3.Connection, session_id: str) -> str:
@@ -3526,6 +4020,11 @@ def _tool_context_for_turn(
     runtime_bindings: RuntimeToolBindings,
     plugin_hooks: Any | None,
     turn_span_id: str | None = None,
+    subagent_supervisor: SubAgentSupervisor | None = None,
+    subagent_role: str | None = None,
+    subagent_parent_id: str | None = None,
+    subagent_specialist_grants: frozenset[str] = frozenset(),
+    subagent_remaining_budget_s: Callable[[], float] | None = None,
 ) -> ToolContext:
     """Build the tier-B ``ToolContext`` template for one gateway dispatch.
     Args:
@@ -3543,6 +4042,15 @@ def _tool_context_for_turn(
         runtime_bindings (RuntimeToolBindings): Sandbox/MCP/integration hooks when wired.
         plugin_hooks (Any | None): Optional :class:`~sevn.plugins.runner.PluginHookChain`.
         turn_span_id (str | None): Turn root span id for trace parent linkage.
+        subagent_supervisor (SubAgentSupervisor | None): Process-wide supervisor for the
+            ``spawn_subagent`` tool (W3.3); ``None`` when unwired.
+        subagent_role (str | None): Owning level-1 role for this dispatch (D1).
+        subagent_parent_id (str | None): This turn's registered level-1 run id — the
+            required ``parent_id`` for any level-2 spawn.
+        subagent_specialist_grants (frozenset[str]): Specialist names the triager
+            granted this turn (D8/W3.4).
+        subagent_remaining_budget_s (Callable[[], float] | None): Zero-arg callable
+            returning the parent turn's remaining ``CascadeBudget`` seconds (D11).
     Returns:
         ToolContext: Cloned per tool dispatch inside ``run_b_turn``.
     Examples:
@@ -3608,6 +4116,11 @@ def _tool_context_for_turn(
         known_tool_names=known_tool_names,
         tool_debug_result_max_chars=tool_debug_result_max_chars(workspace),
         artifact_output_prefix=output_prefix,
+        subagent_supervisor=subagent_supervisor,
+        subagent_role=subagent_role,
+        subagent_parent_id=subagent_parent_id,
+        subagent_specialist_grants=subagent_specialist_grants,
+        subagent_remaining_budget_s=subagent_remaining_budget_s,
     )
 
 
@@ -3632,6 +4145,7 @@ def _apply_routing_footer_once(
     triager_ms: int | None,
     enabled: bool,
     sent: bool,
+    subagent_id: str | None = None,
 ) -> tuple[str, bool]:
     """Append routing footer to the first outbound bubble when enabled.
 
@@ -3641,6 +4155,7 @@ def _apply_routing_footer_once(
         triager_ms (int | None): Triager latency in milliseconds for footer metadata.
         enabled (bool): Whether ``telegram.show_routing`` is on for this channel.
         sent (bool): Whether footer was already attached this turn.
+        subagent_id (str | None): Level-1 sub-agent short id for parallel attribution (D7).
 
     Returns:
         tuple[str, bool]: Annotated text and whether footer was applied.
@@ -3654,7 +4169,12 @@ def _apply_routing_footer_once(
         return text, False
     from sevn.gateway.routing_footer import append_routing_footer
 
-    return append_routing_footer(text, triage, triager_ms=triager_ms), True
+    return append_routing_footer(
+        text,
+        triage,
+        triager_ms=triager_ms,
+        subagent_id=subagent_id,
+    ), True
 
 
 def _apply_tier_b_grounding_guard(

@@ -32,12 +32,12 @@ def test_tab_slug_matches_spa_rules() -> None:
     assert tab_slug("Budget & Cost") == "budget-cost"
 
 
-def test_registry_has_forty_five_tabs_in_eight_groups() -> None:
+def test_registry_has_forty_six_tabs_in_eight_groups() -> None:
     group_count = len(DASHBOARD_GROUPS)
     tab_count = sum(len(names) for _group, names in DASHBOARD_GROUPS)
     assert group_count == 8
-    assert tab_count == 45
-    assert len(TAB_SLUGS) == 45
+    assert tab_count == 46
+    assert len(TAB_SLUGS) == 46
 
 
 def test_wired_and_post_v1_sets_are_subsets() -> None:
@@ -52,7 +52,7 @@ def test_wired_and_post_v1_sets_are_subsets() -> None:
 def test_mc15_all_tabs_wired_or_post_v1_no_stubs() -> None:
     """Wave MC-15: every tab is wired or post-v1 placeholder (no registry stubs)."""
     assert TAB_SLUGS == WIRED_SLUGS | POST_V1_PLACEHOLDER_SLUGS
-    assert len(WIRED_SLUGS) == 45
+    assert len(WIRED_SLUGS) == 46
     assert len(POST_V1_PLACEHOLDER_SLUGS) == 0
     payload = build_nav_payload()
     kinds = {
@@ -65,9 +65,9 @@ def test_mc15_all_tabs_wired_or_post_v1_no_stubs() -> None:
 
 def test_build_nav_payload_shape() -> None:
     payload = build_nav_payload()
-    assert payload["tab_count"] == 45
+    assert payload["tab_count"] == 46
     assert len(payload["groups"]) == 8
-    assert len(payload["tabs"]) == 45
+    assert len(payload["tabs"]) == 46
     assert set(payload["wired_slugs"]) == set(WIRED_SLUGS)
     assert set(payload["post_v1_placeholder_slugs"]) == set(POST_V1_PLACEHOLDER_SLUGS)
     first_tab = payload["groups"][0]["tabs"][0]
@@ -135,6 +135,6 @@ def test_dashboard_nav_returns_registry_after_login(tmp_path: Path) -> None:
         resp = client.get("/api/v1/dashboard/nav")
         assert resp.status_code == 200
         body = resp.json()
-        assert body["tab_count"] == 45
+        assert body["tab_count"] == 46
         assert len(body["groups"]) == 8
         assert body["wired_slugs"] == sorted(WIRED_SLUGS)

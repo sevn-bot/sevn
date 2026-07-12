@@ -170,6 +170,9 @@ DEFAULT_SKILL_MANIFESTS: Final[dict[str, str]] = {
     "last30days": "Multi-source social/web research engine (Reddit, X, YouTube, HN, Polymarket).",
     "lcm": "Lossless-context skill menu (grep, describe, expand, fetch, meta, summaries).",
     "linkedin-use": "LinkedIn staff/company/connection scraping via logged-in browser + Voyager API.",
+    "media_generation": (
+        "MiniMax-backed image/video/music generation via the media_generator level-2 specialist."
+    ),
     "mycode": "Deterministic repo scan + MYCODE.md generation (alias mycode_scan).",
     "openwiki": "LLM-generated agent wiki for a codebase (LangChain OpenWiki CLI).",
     "pdf": "PDF generate, read, and load helpers routed through skill runners.",
@@ -1636,6 +1639,9 @@ def build_session_registry(
     from sevn.tools.browser import register_browser_tool
 
     register_browser_tool(exe, workspace_config)
+    from sevn.tools.subagent_spawn import register_subagent_spawn_tools
+
+    register_subagent_spawn_tools(exe, workspace_config)
     if include_bootstrap_tools:
         from sevn.tools.workspace_files import register_write_workspace_md
 

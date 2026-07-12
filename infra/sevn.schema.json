@@ -92,6 +92,49 @@
           "description": "Per-model transport override."
         }
       }
+    },
+    "subagent_role_limits": {
+      "type": "object",
+      "description": "Per-role `max_level1`/`max_level2` override (`about-sevn.bot/sub-agents.html` D2).",
+      "properties": {
+        "max_level1": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Override for this role's max concurrent level-1 sub-agents; null falls back to `subagents.max_level1_default`."
+        },
+        "max_level2": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Override for this role's max concurrent level-2 sub-agents; null falls back to `subagents.max_level2_default`."
+        }
+      },
+      "additionalProperties": false
+    },
+    "subagent_specialist": {
+      "type": "object",
+      "required": ["model", "provider"],
+      "description": "Level-2 specialist executor entry (`about-sevn.bot/sub-agents.html` D8).",
+      "long_description": "Example (documented default, not shipped as a config default — `subagents.specialists` defaults to an empty object): `media_generator` → `provider: \"minimax\"`, `model: \"minimax-3\"`, `assigned_to: [\"tier_b\"]`, `requestable_by: [\"triager\", \"tier_b\"]`, `max_concurrent: 2`. `assigned_to` statically binds the specialist to level-1 roles that may spawn it; `requestable_by` additionally allows the named roles to grant/request it at runtime (e.g. the triager attaching it to a tier-B dispatch).",
+      "properties": {
+        "model": { "type": "string", "description": "Model id/alias for this specialist (resolved via the provider's model catalog)." },
+        "provider": { "type": "string", "description": "Provider registry name (e.g. `minimax`)." },
+        "assigned_to": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["triager", "tier_b", "tier_c", "tier_d"] },
+          "default": [],
+          "description": "Level-1 roles statically assigned this specialist."
+        },
+        "requestable_by": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["triager", "tier_b", "tier_c", "tier_d"] },
+          "default": [],
+          "description": "Level-1 roles that may request/grant this specialist at runtime even if not in `assigned_to`."
+        },
+        "max_concurrent": { "type": "integer", "minimum": 1, "default": 2, "description": "Max concurrent running instances of this specialist across the workspace." },
+        "skill": { "type": ["string", "null"], "description": "Bundled skill name this specialist is wired to (e.g. `media_generation`)." },
+        "system_prompt_ref": { "type": ["string", "null"], "description": "Optional reference to a system-prompt override for this specialist." }
+      },
+      "additionalProperties": false
     }
   },
   "x-sevn-todo": [
@@ -455,9 +498,9 @@
         "proxy_headers": { "type": "boolean" },
         "queue_mode": {
           "type": "string",
-          "enum": ["cancel", "steer"],
+          "enum": ["cancel", "steer", "multi"],
           "default": "cancel",
-          "$comment": "Maintainer: the design docsb (Queue mode). cancel=auto-abort in-flight on new user text; steer=buffer until safe injection point or degrade_to_cancel. Interacts with harness tiers per same section."
+          "$comment": "Maintainer: the design docsb (Queue mode). cancel=auto-abort in-flight on new user text; steer=buffer until safe injection point or degrade_to_cancel; multi=triager relatedness classification chooses steer/cancel/spawn a new level-1 tier-B sub-agent (`about-sevn.bot/sub-agents.html` D6). Interacts with harness tiers per same section."
         },
         "steer": {
           "type": "object",
@@ -826,8 +869,8 @@
           "enabled": { "type": "boolean" },
           "busy_input_mode": {
             "type": "string",
-            "enum": ["interrupt", "queue", "steer"],
-            "description": "Busy-session input policy for this adapter."
+            "enum": ["interrupt", "queue", "steer", "multi"],
+            "description": "Busy-session input policy for this adapter; `multi` classifies the new message (steer/cancel/spawn a new level-1 sub-agent, `about-sevn.bot/sub-agents.html` D6)."
           },
           "session_reset_policy": {
             "type": "string",
@@ -2141,16 +2184,62 @@
     },
     "subagents": {
       "type": "object",
+      "description": "Sub-agents (L1/L2) orchestration subtree (`about-sevn.bot/sub-agents.html` D2).",
+      "long_description": "Configures the level-1/level-2 sub-agent system: `enabled` gates the whole feature (default true); `max_level1_default`/`max_level2_default` are the workspace-wide concurrency caps per level (defaults 5/3) used unless a role in `agents` overrides them; `max_override`, when set, is a hard ceiling applied on top of every resolved limit (workspace default or per-role); `timeout_s` is the optional per-sub-agent wall-clock timeout; `agents.<role>` (`triager`/`tier_b`/`tier_c`/`tier_d`) may override `max_level1`/`max_level2` for that role only; `specialists.<name>` declares a level-2 specialist executor (default empty — e.g. a `media_generator` entry bound to MiniMax-3, see D8) with `model`, `provider`, `assigned_to`, `requestable_by`, `max_concurrent`, and optional `skill`/`system_prompt_ref`.",
       "properties": {
-        "max_concurrent": { "type": "integer", "default": 5 }
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "$comment": "Master on/off for the sub-agent system (D2)."
+        },
+        "max_level1_default": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 5,
+          "$comment": "Workspace default max concurrent level-1 sub-agents per role, absent a per-role override (D2)."
+        },
+        "max_level2_default": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 3,
+          "$comment": "Workspace default max concurrent level-2 sub-agents per level-1 run, absent a per-role override (D2)."
+        },
+        "max_override": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "default": null,
+          "$comment": "Hard ceiling applied over every resolved max_level1/max_level2 (workspace default or per-role); null disables the ceiling (D2)."
+        },
+        "timeout_s": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "default": null,
+          "$comment": "Optional per-sub-agent wall-clock timeout in seconds; null falls back to the owning tier's default timeout (D11)."
+        },
+        "agents": {
+          "type": "object",
+          "description": "Per-role `max_level1`/`max_level2` overrides, keyed by level-1 role.",
+          "properties": {
+            "triager": { "$ref": "#/$defs/subagent_role_limits" },
+            "tier_b": { "$ref": "#/$defs/subagent_role_limits" },
+            "tier_c": { "$ref": "#/$defs/subagent_role_limits" },
+            "tier_d": { "$ref": "#/$defs/subagent_role_limits" }
+          },
+          "additionalProperties": false
+        },
+        "specialists": {
+          "type": "object",
+          "description": "Level-2 specialist executors by name (default empty; e.g. `media_generator`, D8).",
+          "additionalProperties": { "$ref": "#/$defs/subagent_specialist" }
+        }
       },
-      "additionalProperties": true,
-      "$comment": "Maintainer: the design docs (per-session cap) and 11-onboarding.md §2 — subagents.max_concurrent default 5; interacts with harness zombie pool doc 19."
+      "additionalProperties": false,
+      "$comment": "Maintainer: about-sevn.bot/sub-agents.html D2/D8 — L1/L2 sub-agent orchestration; supersedes the earlier speculative subagents.max_concurrent placeholder (unimplemented, no Python backing)."
     },
     "max_concurrent_subagents_total": {
       "type": "integer",
       "default": 20,
-      "$comment": "Maintainer: the design docs H2 — max_concurrent_subagents_total default 20 across workspace; hard cap with owner-visible errors when exceeded."
+      "$comment": "Maintainer: the design docs H2 — max_concurrent_subagents_total default 20 across workspace; hard cap with owner-visible errors when exceeded. Pre-existing, unimplemented placeholder distinct from `subagents.max_override` (about-sevn.bot/sub-agents.html D2); a workspace-total cap is explicitly out of scope for v1 (see sub-agents-orchestration risk #6) and may retire this key later."
     },
     "add_core_tools_to_all_context": {
       "type": "boolean",

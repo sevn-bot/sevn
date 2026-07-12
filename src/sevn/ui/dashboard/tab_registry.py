@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 
-# PRD §5.2 / `src/sevn/ui/spa/dashboard/app.js` — 45 tabs, 8 groups.
+# PRD §5.2 / `src/sevn/ui/spa/dashboard/app.js` — 46 tabs, 8 groups.
 DASHBOARD_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("Core", ("Overview", "Chat", "Canvas (OpenUI)", "Sessions")),
     (
@@ -24,6 +24,7 @@ DASHBOARD_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "Providers & LLMs",
             "Budget & Cost",
             "Channels",
+            "Sub-agents",
             "Alerts & Logs",
         ),
     ),
@@ -140,7 +141,7 @@ def _all_tab_slugs() -> frozenset[str]:
 
     Examples:
         >>> len(_all_tab_slugs())
-        45
+        46
     """
 
     slugs: set[str] = set()
@@ -163,6 +164,7 @@ WIRED_SLUGS: frozenset[str] = frozenset(
         "budget-cost",
         "providers-llms",
         "channels",
+        "sub-agents",
         "alerts-logs",
         "jobs",
         "issues",
@@ -216,7 +218,7 @@ def build_nav_payload() -> dict[str, object]:
         >>> len(payload["groups"])
         8
         >>> payload["tab_count"]
-        45
+        46
     """
 
     groups: list[dict[str, object]] = []

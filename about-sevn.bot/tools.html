@@ -35,6 +35,7 @@
       <a href="index.html">Home</a>
       <a href="getting-started.html">Getting started</a>
       <a href="mission-control.html">Mission Control</a>
+      <a href="sub-agents.html">Sub-agents</a>
       <a href="telegram-menu.html">Telegram settings</a>
       <a href="tools.html" class="active">Tools</a>
       <a href="skills.html">Skills</a>
@@ -203,6 +204,10 @@
       <td>Scaffold a new skill under your workspace generated skills folder.</td>
     </tr>
     <tr>
+      <td><code>spawn_subagent</code></td>
+      <td>Spawn a level-2 sub-agent to work on a sub-task in the background. Fire-and-forget by default — returns immediately with a run id, and the result is announced back once it finishes. Pass wait=true to block for the result inline instead (bounded by the remaining turn budget).</td>
+    </tr>
+    <tr>
       <td><code>terminal_close</code></td>
       <td>Close a persistent terminal session opened earlier.</td>
     </tr>
@@ -233,7 +238,7 @@
   </tbody>
 </table>
       <footer class="help-footer">
-        Generated 2026-07-12 from commit 5e89df0.
+        Generated 2026-07-12 from commit a1c6932.
         Edit <code>about-sevn.bot/_sources/tools.yaml</code> or templates — not the HTML directly.
       </footer>
     </main>

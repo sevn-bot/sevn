@@ -17,6 +17,8 @@ def test_render_gateway_metrics_includes_counters() -> None:
     assert "sevn_gateway_up 1" in body
     assert "sevn_active_sessions 3" in body
     assert "sevn_active_runs 1" in body
+    assert "sevn_subagents_running" in body
+    assert 'sevn_subagents_total{status="done"}' in body
 
 
 def test_metrics_endpoint_returns_prometheus_text(tmp_path: Path) -> None:
@@ -37,3 +39,4 @@ def test_metrics_endpoint_returns_prometheus_text(tmp_path: Path) -> None:
     assert r.status_code == 200
     assert "text/plain" in r.headers.get("content-type", "")
     assert "sevn_gateway_up" in r.text
+    assert "sevn_subagents_running" in r.text

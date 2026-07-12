@@ -33,6 +33,7 @@ from loguru import logger
 from sevn.config.defaults import DEFAULT_GATEWAY_SESSION_MESSAGE_CAP_DM
 from sevn.config.workspace_config import LcmWorkspaceConfig, WorkspaceConfig
 from sevn.gateway.browser_lifecycle import close_browser_for_rotate
+from sevn.gateway.queue_multi import MultiDispatchHooks, MultiSpawnOutcome
 from sevn.gateway.session_mirror import mark_session_superseded, mirror_gateway_message
 
 DispatchFn = Callable[[str, str], Coroutine[Any, Any, None]]
@@ -212,6 +213,8 @@ class SessionManager:
         self._turn_semaphore = asyncio.Semaphore(DEFAULT_MAX_CONCURRENT_TURNS)
         # P9: monotonic timestamp when cancel-mode superseded an in-flight turn.
         self._cancel_superseded_at: dict[str, float] = {}
+        # W4: per-session queued task summaries for ``multi`` relatedness prompts.
+        self._multi_queued_summaries: dict[str, list[str]] = {}
 
     @property
     def connection(self) -> sqlite3.Connection:
@@ -729,16 +732,27 @@ class SessionManager:
         correlation_id: str,
         queue_mode: str,
         dispatch: DispatchFn,
+        multi_hooks: MultiDispatchHooks | None = None,
+        new_message_text: str = "",
+        task_summary: str = "",
+        in_flight_task_summary: str = "",
     ) -> None:
         """Serialize ``dispatch(session_id, correlation_id)`` per ``session_id`` (`specs/17-gateway.md` §4.3).
         ``queue_mode`` ``cancel`` aborts an in-flight dispatch task for the session,
         drains queued correlation ids, then enqueues the latest id only.
+        ``queue_mode`` ``multi`` classifies busy-session arrivals (D6) into steer,
+        cancel, or a concurrent level-1 tier-B spawn.
         Args:
             session_id (str): Target session id.
             correlation_id (str): Per-turn correlation id for tracing.
-            queue_mode (str): ``queue`` or ``cancel`` policy.
+            queue_mode (str): ``cancel``, ``steer``, ``queue``, or ``multi`` policy.
             dispatch (DispatchFn): Stable callable invoked per turn (must be
                 identical across calls).
+            multi_hooks (MultiDispatchHooks | None): Classify/spawn/notify hooks for
+                ``multi`` when sub-agents are wired.
+            new_message_text (str): Raw inbound text for ``multi`` classification.
+            task_summary (str): Short summary for the new message (queued-task ledger).
+            in_flight_task_summary (str): Active L1 tier-B summary for classification.
         Raises:
             RuntimeError: When ``dispatch`` differs between calls.
         Examples:
@@ -751,10 +765,46 @@ class SessionManager:
         elif self._dispatch_fn is not dispatch:
             msg = "SessionManager.enqueue_dispatch requires a stable dispatch callable"
             raise RuntimeError(msg)
+        effective_mode = queue_mode
+        notice_line: str | None = None
+        if queue_mode == "multi" and multi_hooks is not None:
+            in_flight = self._active_dispatch_task.get(session_id)
+            busy = in_flight is not None and not in_flight.done()
+            if busy:
+                queued = tuple(self._multi_queued_summaries.get(session_id, ()))
+                label, classifier_fallback = await multi_hooks.classify_busy(
+                    in_flight_task_summary,
+                    queued,
+                    new_message_text,
+                )
+                if classifier_fallback:
+                    notice_line = (
+                        "Queue classifier timed out — steering this message into "
+                        "the in-flight task instead."
+                    )
+                if label == "supersede_cancel":
+                    effective_mode = "cancel"
+                    self._multi_queued_summaries.pop(session_id, None)
+                elif label == "new_task":
+                    spawn_outcome = await multi_hooks.spawn_new_task(session_id, correlation_id)
+                    if spawn_outcome == MultiSpawnOutcome.SPAWNED:
+                        logger.info(
+                            "gateway.queue_multi_spawned session_id={} correlation_id={}",
+                            session_id,
+                            correlation_id,
+                        )
+                        return
+                    effective_mode = "steer"
+                    notice_line = (
+                        "Sub-agent limit reached — steering this message into the "
+                        "in-flight task instead."
+                    )
+                else:
+                    effective_mode = "steer"
         q = self._queues.setdefault(session_id, asyncio.Queue())
         lock = self._enqueue_lock(session_id)
         async with lock:
-            if queue_mode == "cancel":
+            if effective_mode == "cancel":
                 existing = self._active_dispatch_task.get(session_id)
                 if existing is not None and not existing.done():
                     # Fire-and-forget cancel: never ``await existing`` here. This
@@ -774,8 +824,9 @@ class SessionManager:
                         break
                     else:
                         q.task_done()
+                self._multi_queued_summaries.pop(session_id, None)
             await q.put(correlation_id)
-            if queue_mode != "cancel":
+            if effective_mode != "cancel":
                 in_flight = self._active_dispatch_task.get(session_id)
                 if in_flight is not None and not in_flight.done() and q.qsize() >= 1:
                     # Steer/queue observability — TE-8 Playwright greps this
@@ -785,6 +836,11 @@ class SessionManager:
                         session_id,
                         q.qsize(),
                     )
+                if task_summary.strip():
+                    ledger = self._multi_queued_summaries.setdefault(session_id, [])
+                    ledger.append(task_summary.strip())
+        if notice_line and multi_hooks is not None:
+            await multi_hooks.notify_operator(session_id, notice_line)
         self._ensure_worker(session_id)
 
     def was_cancel_superseded_recently(
@@ -890,6 +946,11 @@ class SessionManager:
         try:
             while True:
                 cid = await q.get()
+                ledger = self._multi_queued_summaries.get(session_id)
+                if ledger:
+                    ledger.pop(0)
+                    if not ledger:
+                        self._multi_queued_summaries.pop(session_id, None)
                 # Global concurrent-turn cap (plan D9/W2.4). Acquired per turn and
                 # released in ``finally`` — never held across the cancel reap or
                 # the request path, so it never stalls the poll loop. Acquisition

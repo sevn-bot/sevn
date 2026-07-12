@@ -221,7 +221,27 @@
 
   "doctor": { "strict": false },
 
-  "subagents": { "max_concurrent": 5 },
+  // Sub-agents (L1/L2) orchestration — see about-sevn.bot/sub-agents.html. `specialists` defaults empty;
+  // documented example for media generation (W8 — not shipped as a default):
+  // "specialists": {
+  //   "media_generator": {
+  //     "model": "minimax-3",
+  //     "provider": "minimax",
+  //     "assigned_to": ["tier_b"],
+  //     "requestable_by": ["triager", "tier_b"],
+  //     "max_concurrent": 2,
+  //     "skill": "media_generation"
+  //   }
+  // }
+  "subagents": {
+    "enabled": true,
+    "max_level1_default": 5,
+    "max_level2_default": 3,
+    "max_override": null,
+    "timeout_s": null,
+    "agents": {},
+    "specialists": {}
+  },
   "max_concurrent_subagents_total": 20,
 
   "add_core_tools_to_all_context": true,

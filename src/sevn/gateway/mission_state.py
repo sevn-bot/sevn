@@ -103,6 +103,8 @@ class MissionControlState(MissionControlSnapshotsMixin):
         self._gateway_errors = 0
         self._gateway_escalations = 0
         self._gateway_disregards = 0
+        self._subagent_running: dict[str, int] = {}
+        self._subagent_total: dict[str, int] = {"done": 0, "failed": 0, "killed": 0}
 
     def _session(self, session_id: str) -> SessionMissionStats:
         """Return or create per-session mission stats.
@@ -316,7 +318,100 @@ class MissionControlState(MissionControlSnapshotsMixin):
             elif status in ERROR_STATUSES:
                 detail = str(event.attrs.get("error") or event.status or "error")
                 self.update_channel(channel_name, error=True, error_detail=detail)
+            return
+        if event.kind in ("subagent_spawned", "subagent_finished", "subagent_killed"):
+            await self._apply_subagent_telemetry(event)
         return
+
+    async def _apply_subagent_telemetry(self, event: TraceEvent) -> None:
+        """Update sub-agent running/total counters and activity feed (W5.2).
+
+        Args:
+            event (TraceEvent): ``subagent_spawned`` / ``subagent_finished`` /
+                ``subagent_killed`` row.
+
+        Examples:
+            >>> import asyncio
+            >>> from sevn.agent.tracing.sink import TraceEvent
+            >>> st = MissionControlState()
+            >>> ev = TraceEvent(
+            ...     kind="subagent_spawned",
+            ...     span_id="sub-a1",
+            ...     parent_span_id=None,
+            ...     session_id="s1",
+            ...     turn_id="t1",
+            ...     tier=None,
+            ...     ts_start_ns=1,
+            ...     ts_end_ns=2,
+            ...     status="pending",
+            ...     attrs={"subagent.id": "a1", "subagent.level": 1, "subagent.role": "tier_b"},
+            ... )
+            >>> asyncio.run(st._apply_subagent_telemetry(ev)) is None
+            True
+        """
+        attrs = event.attrs
+        raw_level = attrs.get("subagent.level")
+        if isinstance(raw_level, int):
+            level = raw_level
+        elif isinstance(raw_level, (str, float)):
+            try:
+                level = int(raw_level)
+            except (TypeError, ValueError):
+                level = 0
+        else:
+            level = 0
+        role = str(attrs.get("subagent.role") or "unknown")
+        key = f"{level}:{role}"
+        ts = event_timestamp(event)
+        session_id = event.session_id or ""
+        row = self._session(session_id) if session_id else None
+        if event.kind == "subagent_spawned":
+            self._subagent_running[key] = self._subagent_running.get(key, 0) + 1
+            if row is not None:
+                row.subagents_running_by_level_role[key] = (
+                    row.subagents_running_by_level_role.get(key, 0) + 1
+                )
+                row.last_activity_at = ts
+            self.record_activity(
+                AgentActivity(
+                    timestamp=ts,
+                    event_type="subagent",
+                    session_id=session_id,
+                    detail=f"spawned/{level}/{role}",
+                    metadata={
+                        "subagent_id": attrs.get("subagent.id"),
+                        "specialist": attrs.get("subagent.specialist"),
+                    },
+                ),
+            )
+            return
+        status = str(attrs.get("subagent.status") or event.status or "").strip().lower()
+        self._subagent_running[key] = max(0, self._subagent_running.get(key, 0) - 1)
+        if status in self._subagent_total:
+            self._subagent_total[status] = self._subagent_total.get(status, 0) + 1
+        if row is not None:
+            row.subagents_running_by_level_role[key] = max(
+                0,
+                row.subagents_running_by_level_role.get(key, 0) - 1,
+            )
+            if status:
+                row.subagents_total_by_status[status] = (
+                    row.subagents_total_by_status.get(status, 0) + 1
+                )
+            row.last_activity_at = ts
+        detail_kind = "killed" if event.kind == "subagent_killed" else "finished"
+        self.record_activity(
+            AgentActivity(
+                timestamp=ts,
+                event_type="subagent",
+                session_id=session_id,
+                detail=f"{detail_kind}/{level}/{role}/{status}",
+                metadata={
+                    "subagent_id": attrs.get("subagent.id"),
+                    "specialist": attrs.get("subagent.specialist"),
+                },
+            ),
+        )
 
     def register_provider(self, name: str) -> None:
         """Ensure ``name`` exists in the provider health map.

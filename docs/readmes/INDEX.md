@@ -1,5 +1,3 @@
-# README catalog
-
 <!-- generated: do not edit by hand; run `sevn readme update index` -->
 # README catalog
 

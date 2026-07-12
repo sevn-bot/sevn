@@ -31,8 +31,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
+    from sevn.agent.subagents.supervisor import SubAgentSupervisor
     from sevn.agent.tracing.sink import TraceSink
     from sevn.code_understanding.models import GraphifyProfile
     from sevn.plugins.runner import PluginHookChain
@@ -136,6 +138,28 @@ class ToolContext:
     looping model cannot spam the user with the same line or burn rounds re-sending
     the same content until the executor timeout (`specs/11-tools-registry.md` §10.13).
     """
+    subagent_supervisor: SubAgentSupervisor | None = None
+    """Process-wide :class:`~sevn.agent.subagents.supervisor.SubAgentSupervisor` (W3.3).
+
+    ``None`` when sub-agents are disabled or unwired (e.g. most unit tests);
+    the ``spawn_subagent`` tool returns a typed failure envelope in that case.
+    """
+    subagent_role: str | None = None
+    """Owning level-1 role for this dispatch (``tier_b``/``tier_c``/``tier_d``), when
+    the current turn is itself a registered level-1 sub-agent run (W3.1)."""
+    subagent_parent_id: str | None = None
+    """The current level-1 run's registry id — required as ``parent_id`` for any
+    level-2 spawn (D1 hard depth cap; W3.3)."""
+    subagent_specialist_grants: frozenset[str] = field(default_factory=frozenset)
+    """Specialist names the triager granted this turn's dispatch (D8/W3.4).
+
+    Lets ``spawn_subagent(specialist=...)`` succeed for a specialist not in
+    that specialist's static ``assigned_to`` when the specialist's
+    ``requestable_by`` includes ``"triager"``.
+    """
+    subagent_remaining_budget_s: Callable[[], float] | None = None
+    """Zero-arg callable returning the parent turn's remaining ``CascadeBudget``
+    seconds (D11); used to bound ``spawn_subagent(..., wait=True)``."""
 
 
 __all__ = ["ToolContext"]

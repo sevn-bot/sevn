@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-11T18:49:25.423104+00:00",
+  "generated_at": "2026-07-12T07:45:24.848401+00:00",
   "nav": {
     "groups": [
       {
@@ -63,6 +63,12 @@
             "name": "Channels",
             "path": "/mission/channels",
             "slug": "channels"
+          },
+          {
+            "kind": "wired",
+            "name": "Sub-agents",
+            "path": "/mission/sub-agents",
+            "slug": "sub-agents"
           },
           {
             "kind": "wired",
@@ -314,7 +320,7 @@
       }
     ],
     "post_v1_placeholder_slugs": [],
-    "tab_count": 45,
+    "tab_count": 46,
     "tabs": [
       {
         "group": "Core",
@@ -369,6 +375,12 @@
         "name": "Channels",
         "path": "/mission/channels",
         "slug": "channels"
+      },
+      {
+        "group": "Observability",
+        "name": "Sub-agents",
+        "path": "/mission/sub-agents",
+        "slug": "sub-agents"
       },
       {
         "group": "Observability",
@@ -624,6 +636,7 @@
       "skills",
       "spec-kit",
       "stats",
+      "sub-agents",
       "telegram-menu",
       "terminal",
       "tools-permissions",
@@ -982,6 +995,18 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/mission/subagents"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/mission/subagents/kill_all"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/mission/subagents/{subagent_id}/kill"
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/ops/actions/capabilities"
     },
     {
@@ -1283,7 +1308,7 @@
       }
     ]
   },
-  "tab_count": 45,
+  "tab_count": 46,
   "tabs": {
     "agent-config": {
       "actions": [
@@ -2425,6 +2450,47 @@
         {
           "id": "main",
           "label": "Stats",
+          "selector": "#content > article.card"
+        }
+      ]
+    },
+    "sub-agents": {
+      "actions": [
+        {
+          "destructive": true,
+          "endpoint": "/api/v1/mission/subagents/{id}/kill",
+          "id": "kill-run",
+          "label": "Kill sub-agent",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": ".subagent-kill-btn"
+        },
+        {
+          "destructive": true,
+          "endpoint": "/api/v1/mission/subagents/kill_all",
+          "id": "kill-all-role",
+          "label": "Kill all for role",
+          "method": "POST",
+          "needs_seed": true,
+          "selector": ".subagent-kill-all-btn"
+        }
+      ],
+      "group": "observability",
+      "key_selectors": {
+        "count_chips": ".subagents-count-chips",
+        "limits_panel": "#subagents-limits-panel",
+        "recent_table": "#subagents-recent-table",
+        "running_table": "#subagents-running-table"
+      },
+      "kind": "wired",
+      "read_endpoints": [
+        "/api/v1/mission/subagents"
+      ],
+      "title": "Sub-agents",
+      "views": [
+        {
+          "id": "main",
+          "label": "Sub-agents",
           "selector": "#content > article.card"
         }
       ]

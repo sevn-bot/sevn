@@ -1178,6 +1178,51 @@ def run_doctor_probes(
             "skillspector: CLI not on PATH — run make skillspector-check once to verify"
         )
 
+    orphaned_count = 0
+    try:
+        db_path = bw.layout.content_root / ".sevn" / "sevn.db"
+        if db_path.is_file():
+            from sevn.storage.migrate import apply_migrations
+
+            conn = sqlite3.connect(str(db_path))
+            try:
+                apply_migrations(conn)
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM subagent_runs WHERE status = 'orphaned'",
+                ).fetchone()
+                orphaned_count = int(row[0]) if row else 0
+            finally:
+                conn.close()
+    except Exception as exc:
+        result.add(
+            DoctorCheck(
+                id="subagents_registry",
+                section=section_for("subagents_registry"),
+                title=title_for("subagents_registry"),
+                ok=False,
+                severity="warn",
+                detail=f"subagent_runs storage probe failed: {exc}",
+            ),
+        )
+    else:
+        enabled = True
+        if bw.config.subagents is not None:
+            enabled = bool(bw.config.subagents.enabled)
+        detail = f"enabled={enabled}; orphaned_runs={orphaned_count}"
+        result.add(
+            DoctorCheck(
+                id="subagents_registry",
+                section=section_for("subagents_registry"),
+                title=title_for("subagents_registry"),
+                ok=True,
+                detail=detail,
+            ),
+        )
+        if orphaned_count:
+            result.warnings.append(
+                f"subagents: {orphaned_count} orphaned run(s) in storage — boot sweep marks stale rows",
+            )
+
     if options.with_telegram_probe:
         result.add(
             DoctorCheck(

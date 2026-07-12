@@ -1,5 +1,11 @@
 """Per-scope token bucket limiter (`specs/17-gateway.md` §4.3 step 3).
 
+Parallel level-1 sub-agent replies in ``multi`` queue mode each call
+:meth:`sevn.gateway.channel_router.ChannelRouter.route_outgoing`, which
+consumes one token per ``scope`` via :meth:`TokenBucketLimiter.allow` — the
+same path as classic single-turn sends, so interleaved multi-agent footers
+do not bypass rate limiting.
+
 Module: sevn.gateway.rate_limit
 Depends: asyncio, time
 

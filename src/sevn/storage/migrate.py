@@ -514,6 +514,30 @@ _MIGRATION_22: Final[tuple[str, ...]] = (
     )""",
 )
 
+# Level-1/level-2 sub-agent orchestration run rows (`specs/36-sub-agents.md`
+# D3/D10; `specs/03-storage.md`). Mirrors ``SubAgentRun`` registry fields for
+# restart reconciliation (boot orphan sweep) and Mission Control history.
+_MIGRATION_23: Final[tuple[str, ...]] = (
+    """CREATE TABLE IF NOT EXISTS subagent_runs (
+        id TEXT PRIMARY KEY NOT NULL,
+        level INTEGER NOT NULL CHECK (level IN (1, 2)),
+        role TEXT NOT NULL,
+        specialist TEXT,
+        parent_id TEXT,
+        session_id TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        task_summary TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'pending'
+            CHECK (status IN ('pending', 'running', 'done', 'failed', 'killed', 'orphaned')),
+        started_at_ns INTEGER NOT NULL,
+        finished_at_ns INTEGER,
+        trace_id TEXT
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_subagent_runs_parent ON subagent_runs(parent_id)",
+    "CREATE INDEX IF NOT EXISTS ix_subagent_runs_session ON subagent_runs(session_id)",
+    "CREATE INDEX IF NOT EXISTS ix_subagent_runs_status ON subagent_runs(status)",
+)
+
 MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (1, _MIGRATION_1),
     (2, _MIGRATION_2),
@@ -537,6 +561,7 @@ MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (20, _MIGRATION_20),
     (21, _MIGRATION_21),
     (22, _MIGRATION_22),
+    (23, _MIGRATION_23),
 )
 
 MIGRATION_HEAD_VERSION: Final[int] = max(v for v, _ in MIGRATIONS)

@@ -28,7 +28,7 @@ REPO = Path(__file__).resolve().parents[3]
 
 def test_all_registry_slugs_have_descriptors() -> None:
     assert missing_descriptor_slugs() == []
-    assert len(DASHBOARD_TAB_DESCRIPTORS) == 45
+    assert len(DASHBOARD_TAB_DESCRIPTORS) == 46
 
 
 def test_wired_slugs_covered_by_descriptors() -> None:

@@ -49,6 +49,8 @@ class MissionControlSnapshotsMixin:
     _gateway_errors: int
     _gateway_escalations: int
     _gateway_disregards: int
+    _subagent_running: dict[str, int]
+    _subagent_total: dict[str, int]
 
     def get_gateway_metrics(self) -> dict[str, Any]:
         """Return session/complexity/escalation/error aggregates from gateway traces.
@@ -81,9 +83,13 @@ class MissionControlSnapshotsMixin:
                     "disregards": s.disregards,
                     "last_complexity": s.last_complexity,
                     "last_activity_at": s.last_activity_at,
+                    "subagents_running_by_level_role": dict(s.subagents_running_by_level_role),
+                    "subagents_total_by_status": dict(s.subagents_total_by_status),
                 }
                 for sid, s in self._sessions.items()
             },
+            "subagents_running": dict(self._subagent_running),
+            "subagents_total": dict(self._subagent_total),
         }
 
     def get_channel_status(self) -> list[dict[str, Any]]:

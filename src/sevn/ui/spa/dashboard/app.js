@@ -1,7 +1,7 @@
 /** Inline fallback when ``GET /api/v1/dashboard/nav`` is unavailable (offline tests). */
 const INLINE_GROUPS = [
   ["Core", ["Overview", "Chat", "Canvas (OpenUI)", "Sessions"]],
-  ["Observability", ["Traces", "Audit & Analytics", "Providers & LLMs", "Budget & Cost", "Channels", "Alerts & Logs"]],
+  ["Observability", ["Traces", "Audit & Analytics", "Providers & LLMs", "Budget & Cost", "Channels", "Sub-agents", "Alerts & Logs"]],
   ["Agent", ["Agent Config", "Model Params", "Tools & Permissions", "Skills", "MCP Servers", "Coding Agents"]],
   ["Knowledge", ["Memory", "Second Brain", "Workspace Files", "Code Understanding"]],
   ["Self-improve", ["Jobs", "Trajectories", "Feedback", "RLM Config", "Experiments & Metrics"]],
@@ -20,6 +20,7 @@ const INLINE_WIRED_SLUGS = [
   "budget-cost",
   "providers-llms",
   "channels",
+  "sub-agents",
   "alerts-logs",
   "jobs",
   "issues",
@@ -1622,6 +1623,114 @@ async function renderChannels() {
       <button type="submit" class="btn">Save channel settings</button>
     </form>
   `;
+}
+
+async function renderSubagents() {
+  const data = await apiGet("/api/v1/mission/subagents");
+  const counts = data.counts || {};
+  const limits = data.limits || {};
+  const l1 = counts.level1_total ?? 0;
+  const l2 = counts.level2_total ?? 0;
+  const chips = `
+    <div class="subagents-count-chips mission-overview-badges">
+      <span class="badge badge-info">L1 running: ${l1}</span>
+      <span class="badge badge-info">L2 running: ${l2}</span>
+    </div>`;
+  const runningRows = (data.running || []).map((row) => ({
+    id: row.id,
+    level: row.level,
+    role: row.role,
+    specialist: row.specialist || "",
+    task: row.task_summary || "",
+    status: row.status,
+    age_s: row.age_s,
+    actions: `<button type="button" class="btn btn-sm btn-secondary subagent-kill-btn" data-subagent-id="${escapeHtml(row.id)}">Kill</button>`,
+  }));
+  const recentRows = (data.recent || []).map((row) => ({
+    id: row.id,
+    level: row.level,
+    role: row.role,
+    specialist: row.specialist || "",
+    task: row.task_summary || "",
+    status: row.status,
+  }));
+  const limitsByRole = limits.by_role || {};
+  const roleRows = Object.entries(limitsByRole).map(([role, caps]) => ({
+    role,
+    max_level1: caps.max_level1,
+    max_level2: caps.max_level2,
+  }));
+  return `
+    <p class="muted">Live registry + mission telemetry · kill routes through the gateway supervisor (owner-only).</p>
+    ${chips}
+    <h3>Running</h3>
+    <div id="subagents-running-table">
+      ${tableFromRows(runningRows, [
+        { key: "id", label: "ID" },
+        { key: "level", label: "Level" },
+        { key: "role", label: "Role" },
+        { key: "specialist", label: "Specialist" },
+        { key: "task", label: "Task" },
+        { key: "status", label: "Status" },
+        { key: "age_s", label: "Age (s)" },
+        { key: "actions", label: "Actions" },
+      ])}
+    </div>
+    <div class="form-actions">
+      <button type="button" class="btn btn-secondary subagent-kill-all-btn" data-role="">Kill all L1</button>
+      <button type="button" class="btn btn-secondary subagent-kill-all-btn" data-role="tier_b">Kill all tier B</button>
+    </div>
+    <h3>Recent history</h3>
+    <div id="subagents-recent-table">
+      ${tableFromRows(recentRows, [
+        { key: "id", label: "ID" },
+        { key: "level", label: "Level" },
+        { key: "role", label: "Role" },
+        { key: "specialist", label: "Specialist" },
+        { key: "task", label: "Task" },
+        { key: "status", label: "Status" },
+      ])}
+    </div>
+    <h3>Limits (read-only)</h3>
+    <div id="subagents-limits-panel" class="ops-panel">
+      <p class="muted">Edit limits in <a href="/mission/config">Ops → Config</a> under <code>subagents.*</code>.</p>
+      <p>enabled: <strong>${limits.enabled ? "yes" : "no"}</strong> · defaults L1/L2: <strong>${limits.max_level1_default}/${limits.max_level2_default}</strong> · override: <strong>${limits.max_override ?? "—"}</strong></p>
+      ${tableFromRows(roleRows, [
+        { key: "role", label: "Role" },
+        { key: "max_level1", label: "Max L1" },
+        { key: "max_level2", label: "Max L2" },
+      ])}
+    </div>
+  `;
+}
+
+function bindSubagentsHandlers() {
+  document.querySelectorAll(".subagent-kill-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.subagentId;
+      if (!id) return;
+      try {
+        await apiPost(`/api/v1/mission/subagents/${encodeURIComponent(id)}/kill`, {});
+        await renderContent();
+      } catch (err) {
+        alert(`Kill failed: ${err.message}`);
+      }
+    });
+  });
+  document.querySelectorAll(".subagent-kill-all-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const role = btn.dataset.role || "";
+      const url = role
+        ? `/api/v1/mission/subagents/kill_all?role=${encodeURIComponent(role)}`
+        : "/api/v1/mission/subagents/kill_all";
+      try {
+        await apiPost(url, {});
+        await renderContent();
+      } catch (err) {
+        alert(`Kill all failed: ${err.message}`);
+      }
+    });
+  });
 }
 
 async function renderCron() {
@@ -4182,6 +4291,7 @@ async function renderWiredTab(tab) {
   if (tabSlug === "budget-cost") return renderBudget();
     if (tabSlug === "providers-llms") return renderProviders();
   if (tabSlug === "channels") return renderChannels();
+  if (tabSlug === "sub-agents") return renderSubagents();
   if (tabSlug === "alerts-logs") return renderAlertsLogs();
   if (tabSlug === "jobs") return renderJobs();
   if (tabSlug === "trajectories") return renderTrajectories();
@@ -4296,6 +4406,9 @@ async function renderContent() {
     }
     if (tabSlug === "channels") {
       bindChannelsHandlers();
+    }
+    if (tabSlug === "sub-agents") {
+      bindSubagentsHandlers();
     }
     if (tabSlug === "tunnels-infra") {
       bindTunnelsInfraHandlers();
