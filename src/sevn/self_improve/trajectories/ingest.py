@@ -1,7 +1,7 @@
 """Ingest ``trajectory_fact`` rows from persisted trace spans (`specs/33-self-improvement.md` §3.1).
 
 Module: sevn.self_improve.trajectories.ingest
-Depends: json, sqlite3, datetime, pathlib, sevn.ui.dashboard.query.traces
+Depends: json, sqlite3, datetime, pathlib, sevn.agent.tracing.traces_migrate
 
 Exports:
     TrajectoryIngestResult — aggregate ingest counters.
@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from sevn.ui.dashboard.query.traces import ensure_trace_connection
+from sevn.agent.tracing.traces_migrate import ensure_trace_connection
 
 if TYPE_CHECKING:
     import sqlite3

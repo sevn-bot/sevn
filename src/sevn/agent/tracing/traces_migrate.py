@@ -5,6 +5,7 @@ Depends: sevn.storage.errors, sevn.storage.sqlite
 
 Exports:
     apply_traces_migrations — idempotent runner for the trace database.
+    ensure_trace_connection — open ``traces.db`` and apply migrations (caller closes).
     ensure_traces_db — connect, migrate, close for bootstrap.
 
 Examples:
@@ -137,6 +138,28 @@ def apply_traces_migrations(conn: sqlite3.Connection) -> None:
         except Exception as exc:
             conn.execute("ROLLBACK")
             raise MigrationError(f"Traces migration {version} failed: {exc}") from exc
+
+
+def ensure_trace_connection(db_path: Path) -> sqlite3.Connection:
+    """Open ``traces.db`` and apply owner spec migrations.
+
+    Args:
+        db_path (Path): Trace database path under ``.sevn``.
+
+    Returns:
+        sqlite3.Connection: Open connection; caller closes it.
+
+    Examples:
+        >>> import tempfile
+        >>> from pathlib import Path
+        >>> conn = ensure_trace_connection(Path(tempfile.mkdtemp()) / "traces.db")
+        >>> conn.execute("SELECT name FROM sqlite_master WHERE name='trace_events'").fetchone()[0]
+        'trace_events'
+        >>> conn.close()
+    """
+    conn = connect_sqlite(db_path)
+    apply_traces_migrations(conn)
+    return conn
 
 
 def ensure_traces_db(db_path: Path) -> None:
