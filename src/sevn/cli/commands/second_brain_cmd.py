@@ -18,10 +18,13 @@ import typer
 from sevn.cli.errors import CliPreconditionError
 from sevn.cli.workspace import load_bound_workspace
 from sevn.config.sections.features import _normalise_vault_path
+from sevn.config.workspace_config import WorkspaceConfig
 from sevn.gateway.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
 from sevn.onboarding.web_app import _set_nested
 from sevn.second_brain.bootstrap import ensure_second_brain_scope_layout
 from sevn.second_brain.paths import display_scope_root_relative, effective_scope, resolve_scope_root
+from sevn.second_brain.witchcraft_bridge import WitchcraftConfig, witchcraft_indexer_available
+from sevn.second_brain.witchcraft_reindex import reindex_workspace_wiki, resolve_index_wiki_paths
 
 
 def _layout_status(scope_root: Path) -> tuple[bool, list[str]]:
@@ -61,6 +64,42 @@ def _layout_status(scope_root: Path) -> tuple[bool, list[str]]:
     return not missing, missing
 
 
+def _run_reindex(config: WorkspaceConfig, content_root: Path) -> None:
+    """Build Witchcraft index for the resolved wiki vault.
+
+    Args:
+        config (WorkspaceConfig): Parsed workspace config.
+        content_root (Path): Workspace content root.
+
+    Raises:
+        CliPreconditionError: When Witchcraft is disabled or indexing fails.
+
+    Examples:
+        >>> import tempfile
+        >>> from pathlib import Path
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> try:
+        ...     _run_reindex(WorkspaceConfig.minimal(), Path(tempfile.mkdtemp()))
+        ... except Exception:
+        ...     pass
+    """
+    wc_cfg = WitchcraftConfig.from_workspace_config(config)
+    if wc_cfg is None:
+        raise CliPreconditionError(
+            "witchcraft_enabled is false — set witchcraft_enabled: true in sevn.json first"
+        )
+    paths = resolve_index_wiki_paths(config=config, content_root=content_root)
+    if paths is None:
+        raise CliPreconditionError("second_brain is disabled")
+    user_wiki, _shared = paths
+    ok = reindex_workspace_wiki(config=config, content_root=content_root)
+    if not ok:
+        raise CliPreconditionError(
+            "witchcraft reindex failed — install the witchcraft binary and ensure wiki has content"
+        )
+    typer.echo(f"Witchcraft index built for wiki: {user_wiki}")
+
+
 def register(app: typer.Typer) -> None:
     """Attach ``second-brain`` Typer subapp to ``app``.
 
@@ -83,6 +122,11 @@ def register(app: typer.Typer) -> None:
             help="Workspace-relative Obsidian vault folder (e.g. obsidian/alex_AI).",
         ),
         no_model: bool = typer.Option(False, "--no-model", help="Skip copying MODEL.md stub."),
+        reindex: bool = typer.Option(
+            False,
+            "--reindex",
+            help="Build Witchcraft semantic index when witchcraft_enabled is true.",
+        ),
     ) -> None:
         """Enable Second Brain, optionally set ``paths.vault``, and bootstrap layout."""
         bw = load_bound_workspace()
@@ -116,6 +160,15 @@ def register(app: typer.Typer) -> None:
         typer.echo(f"Absolute: {scope_root}")
         if created:
             typer.echo(f"Created: {', '.join(created)}")
+        if reindex:
+            _run_reindex(bw.config, content_root)
+        raise typer.Exit(0)
+
+    @sb.command("reindex")
+    def reindex_cmd() -> None:
+        """Build or refresh the Witchcraft semantic index for the resolved wiki vault."""
+        bw = load_bound_workspace()
+        _run_reindex(bw.config, bw.layout.content_root)
         raise typer.Exit(0)
 
 
@@ -147,6 +200,12 @@ def show_second_brain_config(*, json_out: bool = False) -> None:
     paths_raw = sb_dict.get("paths")
     paths_dict = paths_raw if isinstance(paths_raw, dict) else {}
     wiki_alias = bool(paths_dict.get("wiki")) and not paths_dict.get("vault")
+    wc_cfg = WitchcraftConfig.from_workspace_config(bw.config)
+    wiki_paths = resolve_index_wiki_paths(config=bw.config, content_root=content_root)
+    wiki_index_path = str(wiki_paths[0]) if wiki_paths is not None else None
+    witchcraft_ready = (
+        witchcraft_indexer_available(wc_cfg, workspace_path=content_root) if wc_cfg else False
+    )
     payload = {
         "enabled": bool(sb_cfg.enabled),
         "paths_vault": sb_cfg.paths.vault,
@@ -156,6 +215,9 @@ def show_second_brain_config(*, json_out: bool = False) -> None:
         "layout_complete": complete,
         "layout_missing": missing,
         "paths_wiki_alias": wiki_alias,
+        "witchcraft_enabled": wc_cfg is not None,
+        "witchcraft_index_ready": witchcraft_ready,
+        "wiki_index_path": wiki_index_path,
     }
     if json_out:
         emit_json_success(command="sevn config second-brain", data=payload)
@@ -172,6 +234,11 @@ def show_second_brain_config(*, json_out: bool = False) -> None:
             typer.echo(
                 "Warning: legacy second_brain.paths.wiki alias detected — run setup to normalize."
             )
+        if wc_cfg is not None:
+            typer.echo(f"Witchcraft: enabled (index ready: {'yes' if witchcraft_ready else 'no'})")
+            if wiki_index_path:
+                typer.echo(f"Wiki index path: {wiki_index_path}")
+            typer.echo("Run `sevn second-brain reindex` to build or refresh the semantic index.")
     raise typer.Exit(0)
 
 
