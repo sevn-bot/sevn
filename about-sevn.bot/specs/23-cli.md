@@ -8,7 +8,7 @@ summary: Deliver the primary operator and automation surface for install, upgrad
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
 last_updated: '2026-07-12'
-fingerprint: sha256:2fecff3426cc70ed9b449f891a5a1e19cc8f6799174dd1d606e0e6313bf3c33a
+fingerprint: sha256:2f09e11084d712a0380491908dcd201d57eaabdeb29624e89198a1aef9a0b6a4
 related: []
 sources:
 - src/sevn/cli/**
@@ -171,6 +171,12 @@ interfaces:
 - name: run_traces
   file: src/sevn/cli/commands/traces_cmd.py
   symbol: run_traces
+- name: register
+  file: src/sevn/cli/commands/tracing_cmd.py
+  symbol: register
+- name: show_tracing_config
+  file: src/sevn/cli/commands/tracing_cmd.py
+  symbol: show_tracing_config
 - name: register
   file: src/sevn/cli/commands/tunnel_cmd.py
   symbol: register

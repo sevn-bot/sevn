@@ -8,7 +8,7 @@ summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–�
   a single, tool-less outbound generation step that emits validated TriageResult consumed
   by tier dispatch (A / B / C / D), MCP e'
 last_updated: '2026-07-12'
-fingerprint: sha256:c85f7c7ab3ca210d49ad55ee6d1ef0e37b65c39c57eb11cbf11116930e789ffa
+fingerprint: sha256:ab9a9e449690f60cbe16951412b625727d35fd0f7ff87441678252d789103443
 related: []
 sources:
 - src/sevn/agent/**
@@ -809,6 +809,21 @@ interfaces:
 - name: wrap_trace_sink
   file: src/sevn/agent/tracing/emit.py
   symbol: wrap_trace_sink
+- name: LogfireExportStatus
+  file: src/sevn/agent/tracing/logfire_config.py
+  symbol: LogfireExportStatus
+- name: apply_logfire_export_to_sevn_doc
+  file: src/sevn/agent/tracing/logfire_config.py
+  symbol: apply_logfire_export_to_sevn_doc
+- name: logfire_export_status
+  file: src/sevn/agent/tracing/logfire_config.py
+  symbol: logfire_export_status
+- name: logfire_export_status_from_doc
+  file: src/sevn/agent/tracing/logfire_config.py
+  symbol: logfire_export_status_from_doc
+- name: logfire_sink_entry_for_tests
+  file: src/sevn/agent/tracing/logfire_config.py
+  symbol: logfire_sink_entry_for_tests
 - name: MultiSink
   file: src/sevn/agent/tracing/multi_sink.py
   symbol: MultiSink

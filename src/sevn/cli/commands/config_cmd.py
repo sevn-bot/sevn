@@ -239,6 +239,19 @@ def register(app: typer.Typer) -> None:
 
         show_second_brain_config(json_out=json_out)
 
+    @cfg.command("tracing")
+    def config_tracing(
+        json_out: bool = typer.Option(
+            False,
+            "--json",
+            help="Emit JSON envelope with Logfire export status.",
+        ),
+    ) -> None:
+        """Show trace export status and Logfire sink configuration."""
+        from sevn.cli.commands.tracing_cmd import show_tracing_config
+
+        show_tracing_config(json_out=json_out)
+
     @cfg.command("show")
     def config_show(
         json_out: bool = typer.Option(

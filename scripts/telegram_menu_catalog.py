@@ -76,6 +76,7 @@ _CALLBACK_DEV_NORM: tuple[tuple[str, str], ...] = (
     ("cfg:logs:traces:", "recent traces"),
     ("form:logs:span_id", "trace by id"),
     ("cfg:logs:toggle_redaction", "trace redaction"),
+    ("cfg:logs:toggle_logfire", "logfire export: on/off"),
     ("cfg:logs:deployment_id", "deployment id"),
     ("cfg:toggle:tracing.redaction.enabled:", "trace redaction"),
 )

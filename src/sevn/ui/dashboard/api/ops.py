@@ -14,6 +14,8 @@ Exports:
     cron_config_put — persist the ``triggers.paused`` scheduler flag.
     security_get — ``security.*`` subtree + scanner posture.
     security_put — patch ``security.*`` toggles in ``sevn.json``.
+    tracing_logfire_get — Logfire export status for Mission Control.
+    tracing_logfire_put — enable/disable Logfire export and store tokens.
     secrets_aliases — read-only redacted secret alias inventory.
     secrets_alias_reveal — owner+CSRF audited resolve for ``${SECRET:…}`` aliases.
     tunnels_status — tunnel mode, gateway bind, doctor-style probes + process health.
@@ -38,6 +40,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
+from sevn.agent.tracing.logfire_config import (
+    DEFAULT_LOGFIRE_TOKEN_REF,
+    LOGFIRE_SECRET_LOGICAL_KEY,
+    apply_logfire_export_to_sevn_doc,
+    logfire_export_status,
+)
 from sevn.cli.repo_sync import RepoSyncError, resolve_sevn_repo_root
 from sevn.cli.workspace_schema import load_workspace_json_schema
 from sevn.config.loader import load_workspace
@@ -841,6 +849,157 @@ async def security_put(
     ws = WorkspaceConfig.model_validate(on_disk)
     request.app.state.workspace = ws
     return JSONResponse(status_code=200, content=_security_payload(ws))
+
+
+def _logfire_payload(ws: WorkspaceConfig) -> dict[str, object]:
+    """Project Logfire export status for dashboard JSON responses.
+
+    Args:
+        ws (WorkspaceConfig): Parsed workspace configuration.
+
+    Returns:
+        dict[str, object]: Logfire export summary without secret values.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> _logfire_payload(WorkspaceConfig.minimal())["enabled"]
+        False
+    """
+    status = logfire_export_status(ws)
+    return {
+        "enabled": status.enabled,
+        "token_ref": status.token_ref,
+        "project": status.project,
+        "local_sinks": list(status.local_sinks),
+        "default_token_ref": DEFAULT_LOGFIRE_TOKEN_REF,
+        "secret_logical_key": LOGFIRE_SECRET_LOGICAL_KEY,
+    }
+
+
+@router.get("/tracing/logfire")
+async def tracing_logfire_get(
+    request: Request,
+    _claims: DashboardClaims = Depends(require_dashboard_owner),
+) -> dict[str, object]:
+    """Return Logfire trace export status for Mission Control.
+
+    Args:
+        request (Request): FastAPI request with workspace on ``app.state``.
+        _claims (DashboardClaims): Verified dashboard owner claims.
+
+    Returns:
+        dict[str, object]: Logfire export projection.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(tracing_logfire_get)
+        True
+    """
+    ws: WorkspaceConfig = request.app.state.workspace
+    return _logfire_payload(ws)
+
+
+@router.put("/tracing/logfire")
+async def tracing_logfire_put(
+    request: Request,
+    _claims: DashboardClaims = Depends(require_dashboard_owner),
+    _csrf: None = Depends(require_dashboard_csrf),
+) -> JSONResponse:
+    """Enable/disable Logfire export and optionally store a write token.
+
+    Body fields:
+        ``enabled`` (bool): Add or remove the ``logfire`` sink.
+        ``token`` (str, optional): Store in the workspace secrets chain.
+        ``token_ref`` (str, optional): Override ``tracing.sinks[].token_ref``.
+        ``project`` (str, optional): Override ``project`` / service name.
+        ``keep_local_sinks`` (bool, default true): Retain sqlite/jsonl sinks when enabling.
+
+    Args:
+        request (Request): JSON body with Logfire export fields.
+        _claims (DashboardClaims): Verified dashboard owner claims.
+        _csrf (None): Verified double-submit CSRF token.
+
+    Returns:
+        JSONResponse: ``200`` with updated projection or ``422`` on failure.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(tracing_logfire_put)
+        True
+    """
+    body = await _read_json_object(request)
+    enabled_raw = body.get("enabled")
+    if not isinstance(enabled_raw, bool):
+        return _error_response(
+            "invalid_body",
+            "body.enabled must be a boolean",
+            status_code=400,
+        )
+    token = body.get("token")
+    if token is not None and not isinstance(token, str):
+        return _error_response(
+            "invalid_body",
+            "body.token must be a string when present",
+            status_code=400,
+        )
+    token_ref = body.get("token_ref")
+    if token_ref is not None and not isinstance(token_ref, str):
+        return _error_response(
+            "invalid_body",
+            "body.token_ref must be a string when present",
+            status_code=400,
+        )
+    project = body.get("project")
+    if project is not None and not isinstance(project, str):
+        return _error_response(
+            "invalid_body",
+            "body.project must be a string when present",
+            status_code=400,
+        )
+    keep_local = body.get("keep_local_sinks", True)
+    if not isinstance(keep_local, bool):
+        return _error_response(
+            "invalid_body",
+            "body.keep_local_sinks must be a boolean when present",
+            status_code=400,
+        )
+
+    layout: WorkspaceLayout = request.app.state.layout
+    sevn_json = layout.sevn_json_path
+    if isinstance(token, str) and token.strip():
+        chain = secrets_chain_from_workspace(
+            layout.content_root, request.app.state.workspace.secrets_backend
+        )
+        try:
+            await chain.set(LOGFIRE_SECRET_LOGICAL_KEY, token.strip())
+        except Exception as exc:
+            return _error_response("secret_store_failed", str(exc), status_code=409)
+        token_ref = token_ref or DEFAULT_LOGFIRE_TOKEN_REF
+
+    on_disk = json.loads(sevn_json.read_text(encoding="utf-8"))
+    apply_logfire_export_to_sevn_doc(
+        on_disk,
+        enabled=enabled_raw,
+        token_ref=token_ref if isinstance(token_ref, str) else None,
+        project=project if isinstance(project, str) else None,
+        keep_local_sinks=keep_local,
+    )
+    try:
+        validate_workspace_document(on_disk)
+        write_draft(sevn_json, on_disk)
+        promote_draft(sevn_json, backup_previous=True)
+    except (ValidationError, ValueError, OSError) as exc:
+        return _validation_error_response(exc)
+    ws = WorkspaceConfig.model_validate(on_disk)
+    request.app.state.workspace = ws
+    await emit_mission_audit(
+        request,
+        kind="mission.tracing.logfire",
+        alias=LOGFIRE_SECRET_LOGICAL_KEY if isinstance(token, str) and token.strip() else None,
+        hub_type="mission.config.changed",
+        extra={"enabled": enabled_raw},
+    )
+    return JSONResponse(status_code=200, content=_logfire_payload(ws))
 
 
 @router.get("/secrets/aliases")

@@ -59,6 +59,7 @@ from sevn.cli.commands.sync_cmd import register as register_sync
 from sevn.cli.commands.telegram_test import register as register_telegram_test
 from sevn.cli.commands.tools_cmd import register as register_tools
 from sevn.cli.commands.traces_cmd import register as register_traces
+from sevn.cli.commands.tracing_cmd import register as register_tracing
 from sevn.cli.commands.tunnel_cmd import register as register_tunnel
 from sevn.cli.commands.turn_bundle_cmd import register as register_turn_bundle
 from sevn.cli.commands.unboard import register as register_unboard
@@ -222,6 +223,7 @@ register_memory(app)
 register_improve(app)
 register_secrets(app)
 register_second_brain(app)
+register_tracing(app)
 register_shell_history(app)
 register_gh(app)
 register_openwiki(app)

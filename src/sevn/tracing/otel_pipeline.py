@@ -89,6 +89,77 @@ def is_otel_export_configured() -> bool:
     return _export_configured
 
 
+def _resolve_logfire_service_name(
+    workspace: WorkspaceConfig,
+    *,
+    default_service_name: str,
+) -> str:
+    """Return ``service.name`` for Logfire from the first ``logfire`` sink ``project``.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace configuration.
+        default_service_name (str): Fallback when ``project`` is omitted.
+
+    Returns:
+        str: Service name passed to :func:`logfire.configure`.
+
+    Examples:
+        >>> from sevn.config.workspace_config import TraceSinkEntry, TracingConfig, WorkspaceConfig
+        >>> ws = WorkspaceConfig.minimal(
+        ...     tracing=TracingConfig(
+        ...         sinks=[TraceSinkEntry.model_validate({"type": "logfire", "project": "home"})],
+        ...     ),
+        ... )
+        >>> _resolve_logfire_service_name(ws, default_service_name="sevn-gateway")
+        'home'
+    """
+    tracing = workspace.tracing
+    if tracing is None or not tracing.sinks:
+        return default_service_name
+    for entry in tracing.sinks:
+        if entry.sink_type.strip().lower() != "logfire":
+            continue
+        project = (entry.project or "").strip()
+        if project:
+            return project
+    return default_service_name
+
+
+def _resolve_logfire_token(
+    workspace: WorkspaceConfig,
+    *,
+    resolved_tokens: dict[int, str] | None,
+) -> str:
+    """Resolve a Logfire bearer token from env and ``tracing.sinks[]`` ``token_ref``.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace configuration.
+        resolved_tokens (dict[int, str] | None): Async-resolved bearer tokens by sink index.
+
+    Returns:
+        str: Non-empty token text or ``""`` when unset.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> _resolve_logfire_token(WorkspaceConfig.minimal(), resolved_tokens=None)
+        ''
+    """
+    token = os.environ.get("LOGFIRE_TOKEN", "").strip()
+    if token:
+        return token
+    tracing = workspace.tracing
+    if tracing is None or not tracing.sinks:
+        return ""
+    token_by_index = resolved_tokens or {}
+    for idx, entry in enumerate(tracing.sinks):
+        if entry.sink_type.strip().lower() not in ("logfire", "otel"):
+            continue
+        resolved = _resolve_token(entry, resolved_token=token_by_index.get(idx)) or ""
+        if resolved.strip():
+            return resolved.strip()
+    return ""
+
+
 def _resolve_token(
     entry: TraceSinkEntry,
     *,
@@ -231,15 +302,11 @@ def configure_gateway_otel(
     targets = resolve_otlp_targets(workspace, resolved_tokens=resolved_tokens)
     processors = _build_processors(targets, exporter_factory=exporter_factory)
 
-    logfire_token = os.environ.get("LOGFIRE_TOKEN", "").strip()
-    if not logfire_token and workspace.tracing and workspace.tracing.sinks:
-        for idx, entry in enumerate(workspace.tracing.sinks):
-            if entry.sink_type.strip().lower() in ("logfire", "otel"):
-                logfire_token = (
-                    _resolve_token(entry, resolved_token=(resolved_tokens or {}).get(idx)) or ""
-                )
-                if logfire_token:
-                    break
+    logfire_token = _resolve_logfire_token(workspace, resolved_tokens=resolved_tokens)
+    service_name = _resolve_logfire_service_name(
+        workspace,
+        default_service_name="sevn-gateway",
+    )
 
     _export_configured = bool(processors) or bool(logfire_token)
 
@@ -247,8 +314,9 @@ def configure_gateway_otel(
         import logfire
 
         logfire.configure(
-            service_name="sevn-gateway",
-            send_to_logfire="if-token-present",
+            service_name=service_name,
+            token=logfire_token or None,
+            send_to_logfire=True if logfire_token else "if-token-present",
             additional_span_processors=processors or None,
         )
         logfire.instrument_pydantic_ai()
@@ -256,14 +324,14 @@ def configure_gateway_otel(
         provider = trace.get_tracer_provider()
         if isinstance(provider, TracerProvider):
             return provider
-        resource = Resource.create({"service.name": "sevn-gateway"})
+        resource = Resource.create({"service.name": service_name})
         fallback = TracerProvider(resource=resource)
         for processor in processors:
             fallback.add_span_processor(processor)
         trace.set_tracer_provider(fallback)
         return fallback
 
-    resource = Resource.create({"service.name": "sevn-gateway"})
+    resource = Resource.create({"service.name": service_name})
     provider = TracerProvider(resource=resource)
     trace.set_tracer_provider(provider)
     _export_configured = False
@@ -298,14 +366,24 @@ def configure_proxy_otel(
         targets = [OtlpExportTarget(endpoint=endpoint, headers={}, service_name="sevn-proxy")]
 
     processors = _build_processors(targets, exporter_factory=exporter_factory)
-    logfire_token = os.environ.get("LOGFIRE_TOKEN", "").strip()
+    logfire_token = ""
+    service_name = "sevn-proxy"
+    if workspace is not None:
+        logfire_token = _resolve_logfire_token(workspace, resolved_tokens=resolved_tokens)
+        service_name = _resolve_logfire_service_name(
+            workspace,
+            default_service_name="sevn-proxy",
+        )
+    else:
+        logfire_token = os.environ.get("LOGFIRE_TOKEN", "").strip()
 
     if logfire_token or targets:
         import logfire
 
         logfire.configure(
-            service_name="sevn-proxy",
-            send_to_logfire="if-token-present",
+            service_name=service_name,
+            token=logfire_token or None,
+            send_to_logfire=True if logfire_token else "if-token-present",
             additional_span_processors=processors or None,
         )
         logfire.instrument_httpx()

@@ -66,6 +66,7 @@ _EXTRA_DOT_PATHS: dict[str, tuple[str, ...]] = {
     "voice": ("channels.telegram.tts_mode",),
     "dashboard": ("channels.telegram.pinned_status",),
     "advanced": ("second_brain.paths.vault",),
+    "logs": ("tracing.sinks",),
 }
 
 

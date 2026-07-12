@@ -47,6 +47,7 @@ FORM_TARGETS: frozenset[str] = frozenset(
         "agent_display_name",
         "logs_grep",
         "logs_span_id",
+        "logs_logfire_token",
         "second_brain_vault_path",
         "second_brain_vault_browse",
     },
@@ -82,6 +83,8 @@ def parse_form_callback(data: str) -> str | None:
         return "logs_grep"
     if raw == "form:logs:span_id":
         return "logs_span_id"
+    if raw == "form:logs:logfire_token":
+        return "logs_logfire_token"
     if raw.startswith("form:sb_browse:"):
         return "second_brain_vault_browse"
     target = raw.removeprefix("form:").strip()
@@ -195,7 +198,11 @@ class MenuFormHandler:
             return
         # ``logs_grep`` / ``logs_span_id`` are owner-only operator diagnostics
         # (`specs/18-channel-telegram.md` §4.7).
-        if target in {"logs_grep", "logs_span_id"} and not self._router._resolve_owner_flag(msg):
+        if target in {
+            "logs_grep",
+            "logs_span_id",
+            "logs_logfire_token",
+        } and not self._router._resolve_owner_flag(msg):
             await self._answer_callback(msg, text="Owner only.")
             return
         if target in {
@@ -219,6 +226,9 @@ class MenuFormHandler:
         elif target == "logs_span_id":
             section = "logs"
             step = "span_id"
+        elif target == "logs_logfire_token":
+            section = "logs"
+            step = "token"
         elif target == "second_brain_vault_path":
             section = "second_brain"
             step = "path"
@@ -258,6 +268,8 @@ class MenuFormHandler:
             prompt = "Send the grep pattern for service logs (gateway+proxy):"
         elif target == "logs_span_id":
             prompt = "Send the trace span id to look up:"
+        elif target == "logs_logfire_token":
+            prompt = "Send your Logfire write token (pylf_v1_… — not shown again):"
         elif target == "second_brain_vault_path":
             prompt = "Send the workspace-relative vault path (e.g. obsidian/alex_AI):"
         elif target == "second_brain_vault_browse":
@@ -314,6 +326,11 @@ class MenuFormHandler:
             return
         if target == "logs_span_id":
             await self._advance_logs_span_id(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "logs_logfire_token":
+            await self._advance_logs_logfire_token(
                 msg, token=token, step=step, text=text, payload=payload
             )
 
@@ -419,6 +436,63 @@ class MenuFormHandler:
             chunks = format_traces_for_telegram([span], redaction=policy)
         await self._send_pre_chunks(msg, chunks)
         await self._refresh_section(msg, section="logs", toast=None)
+
+    async def _advance_logs_logfire_token(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Store a Logfire write token and enable the Logfire trace sink (owner-only).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text (Logfire token).
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_logs_logfire_token)
+            True
+        """
+        from sevn.agent.tracing.logfire_config import (
+            LOGFIRE_SECRET_LOGICAL_KEY,
+            apply_logfire_export_to_sevn_doc,
+        )
+
+        _ = step, payload
+        if not self._router._resolve_owner_flag(msg):
+            self._consume_token(token)
+            await self._send_chat(msg, "Owner only.")
+            return
+        bearer = text.strip()
+        if not bearer:
+            await self._send_chat(msg, "Logfire token cannot be empty.")
+            return
+        chain = secrets_chain_from_workspace(
+            self._content_root,
+            self._workspace.secrets_backend,
+        )
+        try:
+            await chain.set(LOGFIRE_SECRET_LOGICAL_KEY, bearer)
+        except Exception as exc:
+            await self._send_chat(msg, f"Could not store Logfire token: {exc}")
+            return
+        mutate_sevn_json(
+            self._sevn_json,
+            lambda d: apply_logfire_export_to_sevn_doc(d, enabled=True, keep_local_sinks=True),
+        )
+        self._consume_token(token)
+        await self._refresh_section(msg, section="logs", toast=None)
+        await self._send_chat(
+            msg,
+            "✅ Logfire token stored and export enabled. Restart the gateway to apply.",
+        )
 
     async def _advance_shortcut_add(
         self,
