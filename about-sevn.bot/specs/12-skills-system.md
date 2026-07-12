@@ -7,7 +7,7 @@ owner: Alex
 summary: 'Own everything under workspace/skills/: how skills are discovered, validated,
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
-last_updated: '2026-07-07'
+last_updated: '2026-07-12'
 fingerprint: sha256:0d756b7d8ad81c03e0bf5492137beff4c071dd36a853d1355679ad5ac19d68df
 related: []
 sources:
@@ -478,6 +478,7 @@ interfaces:
   symbol: x_search_url
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

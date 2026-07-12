@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Provide a single, testable configuration surface before storage, tracing,
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
-last_updated: '2026-07-07'
-fingerprint: sha256:a774dff8a1dd3d19f184add0dfc44474162e4f1c9254bed2f7681a8b8eb905e7
+last_updated: '2026-07-12'
+fingerprint: sha256:879348883c06d18b8f3666f3686665639185c6f6c08fa6b3297e38f43a483a55
 related: []
 sources:
 - src/sevn/config/**
@@ -110,6 +110,9 @@ interfaces:
 - name: codemode_enabled
   file: src/sevn/config/model_resolution.py
   symbol: codemode_enabled
+- name: codemode_max_retries
+  file: src/sevn/config/model_resolution.py
+  symbol: codemode_max_retries
 - name: codemode_resource_limits
   file: src/sevn/config/model_resolution.py
   symbol: codemode_resource_limits
@@ -437,6 +440,9 @@ interfaces:
 - name: SecondBrainFetchConfig
   file: src/sevn/config/sections/features.py
   symbol: SecondBrainFetchConfig
+- name: SecondBrainPathsConfig
+  file: src/sevn/config/sections/features.py
+  symbol: SecondBrainPathsConfig
 - name: SecondBrainWorkspaceConfig
   file: src/sevn/config/sections/features.py
   symbol: SecondBrainWorkspaceConfig
@@ -670,6 +676,7 @@ interfaces:
   symbol: parse_workspace_config
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

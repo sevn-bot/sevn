@@ -7,7 +7,7 @@ owner: Alex
 summary: 'Deliver the code-orientation stack the coding companion PRD names: five
   orthogonal capabilities (MYCODE, Memgraph CGR, code-review-graph (SQLite MCP), roam-code,
   Graphify) that Triager and executors c'
-last_updated: '2026-07-07'
+last_updated: '2026-07-12'
 fingerprint: sha256:5a97e9841a414ba088717f40956b00e55c59c77add891779e0555da9bb2c9f93
 related: []
 sources:
@@ -265,6 +265,7 @@ interfaces:
   symbol: orientation_block_for_workspace
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

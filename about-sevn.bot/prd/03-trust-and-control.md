@@ -4,15 +4,19 @@ kind: prd
 title: Trust & Control — PRD
 status: ready
 owner: Alex
-summary: Operators delegate real work only when prompt injection, secrets, sandbox, and
-  approvals are bounded—scan hostile input, isolate credentials and egress, and gate risky tools.
-last_updated: '2026-07-08'
-fingerprint: sha256:7779473bb8768c053249ed009d3228c6ffd58f8a216a27a9e2ffc48e109a11bb
+summary: Operators delegate real work only when prompt injection, secrets, sandbox,
+  and approvals are bounded—scan hostile input, isolate credentials and egress, and
+  gate risky tools.
+last_updated: '2026-07-12'
+fingerprint: sha256:2be585f6507b7f341fade5e88ecc982e998afb8ec97666a7b5c4d5757f02ee21
 related: []
 sources:
 - src/sevn/security/**
 - src/sevn/secrets/**
 parent_prd: prd-00-main
+depends_on: []
+build_phase: null
+interfaces: []
 specs:
 - spec-06-secrets
 - spec-07-egress-proxy

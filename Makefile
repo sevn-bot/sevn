@@ -299,7 +299,7 @@ about-docs-schema: ## Export about-docs JSON Schema to about-sevn.bot/_docsys/ab
 	$(UV) run sevn about-docs schema
 
 about-docs-check: ## Validate about-docs (schema, drift, references, index)
-	PYTHONPATH=. $(UV) run sevn about-docs check
+	PYTHONPATH=. $(UV) run sevn about-docs check --repo .
 
 changelog-check: ## Changelog gate: Keep-a-Changelog lint + Unreleased diff gate (SEVN_CI_BASE=<ref>)
 	python3 spec-kit-wave/src/skw/changelog_validate.py --repo . --base $${SEVN_CI_BASE:-origin/main}
@@ -309,18 +309,18 @@ changelog-eval: ## Advisory LLM double-score of Unreleased entries (not in CI; n
 		$(if $(MODEL),--model $(MODEL),) $(if $(BASE),--base $(BASE),)
 
 about-docs-migrate: ## Migrate legacy root prd/specs seed into about-sevn.bot/
-	PYTHONPATH=. $(UV) run sevn about-docs migrate
+	PYTHONPATH=. $(UV) run sevn about-docs migrate --repo .
 
 about-docs-index: ## Render prd/spec README index tables
-	PYTHONPATH=. $(UV) run sevn about-docs index
+	PYTHONPATH=. $(UV) run sevn about-docs index --repo .
 
 about-docs-extract: ## Extract code-owned frontmatter for one doc (DOC_ID=spec-17-gateway)
 	@test -n "$(DOC_ID)" || (echo "usage: make about-docs-extract DOC_ID=spec-17-gateway" && exit 1)
-	PYTHONPATH=. $(UV) run sevn about-docs extract $(DOC_ID)
+	PYTHONPATH=. $(UV) run sevn about-docs extract $(DOC_ID) --repo .
 
 about-docs-generate: ## Generate offline body for one doc (DOC_ID=spec-17-gateway)
 	@test -n "$(DOC_ID)" || (echo "usage: make about-docs-generate DOC_ID=spec-17-gateway" && exit 1)
-	PYTHONPATH=. $(UV) run sevn about-docs generate $(DOC_ID)
+	PYTHONPATH=. $(UV) run sevn about-docs generate $(DOC_ID) --repo .
 
 about-site: ## Regenerate about-sevn.bot user help HTML + assets
 	$(UV) run python scripts/build_about_site.py build

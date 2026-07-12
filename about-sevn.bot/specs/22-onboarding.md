@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the merge + validation + promotion pipeline every setup path shares
   so sevn.json stays the single source of truth (prd-06-setup-and-operations §5.4,
   spec-02-config-and-workspace): shipped pres'
-last_updated: '2026-07-07'
-fingerprint: sha256:bb441db79fbf3ae282909b86bf678880b532a03c5c98676d4a71612bbbaf34a6
+last_updated: '2026-07-12'
+fingerprint: sha256:a64e8fc77699166f4514ab0c9c9196e250b68b4e1f28ac641607a7745c29139e
 related: []
 sources:
 - src/sevn/onboarding/**
@@ -27,9 +27,6 @@ interfaces:
 - name: get_browser_session
   file: src/sevn/onboarding/browser_automation.py
   symbol: get_browser_session
-- name: CDPOnboardingBrowser
-  file: src/sevn/onboarding/cdp_browser.py
-  symbol: CDPOnboardingBrowser
 - name: register_shutdown_hooks
   file: src/sevn/onboarding/browser_automation.py
   symbol: register_shutdown_hooks
@@ -563,6 +560,7 @@ interfaces:
   symbol: sanitize_repo_name
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

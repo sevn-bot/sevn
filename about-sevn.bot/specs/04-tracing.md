@@ -7,7 +7,7 @@ owner: Alex
 summary: Provide durable trace sinks that implement TraceSink without ever throwing
   through emit, so instrumentation stays off the critical path. SQLite layout matches
   Mission Control query patterns (prd-07-mi
-last_updated: '2026-06-19'
+last_updated: '2026-07-12'
 fingerprint: sha256:5507549dd5ddaa246c3504df95f3b8d5aa4eec051d2d9a5233febb695f6c9dce
 related: []
 sources:
@@ -49,6 +49,7 @@ interfaces:
   symbol: resolve_trace_sink_token
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

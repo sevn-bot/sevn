@@ -6,14 +6,17 @@ status: ready
 owner: Alex
 summary: Local-first bots are judged in the first ten minutes—clone, three setup commands,
   and a Telegram reply, or the operator returns to a hosted assistant.
-last_updated: '2026-07-08'
-fingerprint: sha256:771ab8ffe6dbd017cf0ef8ced5afe2fda30291a169e6bf6f670f4d08614a8924
+last_updated: '2026-07-12'
+fingerprint: sha256:4bd287098690ee89d5c4221b1840889d0c25db47e95000d8effdde0985f21479
 related: []
 sources:
 - src/sevn/config/**
 - src/sevn/cli/**
 - src/sevn/onboarding/**
 parent_prd: prd-00-main
+depends_on: []
+build_phase: null
+interfaces: []
 specs:
 - spec-02-config-and-workspace
 - spec-07-egress-proxy

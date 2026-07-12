@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that every
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
-last_updated: '2026-07-07'
-fingerprint: sha256:f09f08eea1ed88aa7a7e8d2158a71d23aaaf96f557d589e657cb47dfa4c4c1df
+last_updated: '2026-07-12'
+fingerprint: sha256:20968c921a9baf975ed298ce2ba17295a943c7ee294df0d0f1300d808d757ec3
 related: []
 sources:
 - src/sevn/tools/**
@@ -484,6 +484,7 @@ interfaces:
   symbol: write_workspace_md
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

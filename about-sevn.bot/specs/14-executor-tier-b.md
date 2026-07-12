@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Tier B is the default “do work” executor for messages the Triager classifies
   as complexity == B (prd-04-getting-things-done §5.2): a single pydantic-ai Agent
   loop over the user’s incoming_text, with t'
-last_updated: '2026-07-07'
-fingerprint: sha256:705db1ed1726a52324f84bc7cbd2fa44232ad9eaecc6cb14a0da3404eb085111
+last_updated: '2026-07-12'
+fingerprint: sha256:c85f7c7ab3ca210d49ad55ee6d1ef0e37b65c39c57eb11cbf11116930e789ffa
 related: []
 sources:
 - src/sevn/agent/**
@@ -532,6 +532,9 @@ interfaces:
 - name: steer_for_dropped_tool_call
   file: src/sevn/agent/grounding.py
   symbol: steer_for_dropped_tool_call
+- name: steer_for_fallback_tool
+  file: src/sevn/agent/grounding.py
+  symbol: steer_for_fallback_tool
 - name: steer_for_false_tool_failure_claim
   file: src/sevn/agent/grounding.py
   symbol: steer_for_false_tool_failure_claim
@@ -1086,6 +1089,7 @@ interfaces:
   symbol: build_tool_index_lines
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

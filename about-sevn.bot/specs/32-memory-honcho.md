@@ -7,7 +7,7 @@ owner: Alex
 summary: Deliver an opt-in inferred profile that accumulates stable operator-facing
   facts (preferences, recurring context the operator states in chat) without requiring
   manual USER.md edits for every drift. Wh
-last_updated: '2026-07-07'
+last_updated: '2026-07-12'
 fingerprint: sha256:3acf237a4bd55e13e11e5460ee9356083af5b7d550de051a2d63cde5681034b4
 related: []
 sources:
@@ -155,6 +155,7 @@ interfaces:
   symbol: personality_bump_allowed
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

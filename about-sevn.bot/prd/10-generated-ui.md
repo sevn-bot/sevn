@@ -4,14 +4,18 @@ kind: prd
 title: Generated UI — PRD
 status: ready
 owner: Alex
-summary: Text-only replies hit a wall fast—budget panels, side-by-side diffs, and model-pick
-  forms are clearer as sanitised HTML primitives than walls of markdown in every channel.
-last_updated: '2026-07-08'
+summary: Text-only replies hit a wall fast—budget panels, side-by-side diffs, and
+  model-pick forms are clearer as sanitised HTML primitives than walls of markdown
+  in every channel.
+last_updated: '2026-07-12'
 fingerprint: sha256:bea823d693563b387c0227a26e81a81491fb872ae79aaa1e5fab82ed888727f7
 related: []
 sources:
 - src/sevn/ui/openui/**
 parent_prd: prd-00-main
+depends_on: []
+build_phase: null
+interfaces: []
 specs:
 - spec-29-openui
 - spec-17-gateway

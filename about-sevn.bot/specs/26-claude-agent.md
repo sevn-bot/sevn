@@ -5,7 +5,7 @@ title: Claude Agent — Spec
 status: rejected
 owner: Alex
 summary: '- N/A: Spec rejected — no implementation rows for v0.0.2.'
-last_updated: '2026-06-19'
+last_updated: '2026-07-12'
 fingerprint: sha256:fa2b6320a8f4d1b4766983f4bdd67707d234f602503b5d953202ac24799c18ba
 related: []
 sources:
@@ -100,6 +100,7 @@ interfaces:
   symbol: match_telegram_binding
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

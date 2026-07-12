@@ -5,15 +5,18 @@ title: Getting Things Done — PRD
 status: ready
 owner: Alex
 summary: A general-purpose AI assistant earns its keep by doing things—answering questions,
-  fetching pages, opening PRs, and acting on the operator's behalf via tools, skills, and
-  tiered executors.
-last_updated: '2026-07-08'
-fingerprint: sha256:bc1fe5933c023b3c10c15a27dfe4a37f256ea040dc1f03d804e710f5b198cd03
+  fetching pages, opening PRs, and acting on the operator's behalf via tools, skills,
+  and tiered executors.
+last_updated: '2026-07-12'
+fingerprint: sha256:84b610b3811875faa170746112d3743fe9101436842dc1e44236a5b5a6762255
 related: []
 sources:
 - src/sevn/agent/**
 - src/sevn/tools/**
 parent_prd: prd-00-main
+depends_on: []
+build_phase: null
+interfaces: []
 specs:
 - spec-10-schema-ontology
 - spec-11-tools-registry

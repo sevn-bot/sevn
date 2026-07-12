@@ -7,7 +7,7 @@ owner: Alex
 summary: 'LCM is the lossless conversation memory for a workspace (prd-02-personality-and-memory
   §5.2–§5.4): every qualifying message is stored; compaction summarises without deleting
   source rows; the assembler'
-last_updated: '2026-07-07'
+last_updated: '2026-07-12'
 fingerprint: sha256:3acf237a4bd55e13e11e5460ee9356083af5b7d550de051a2d63cde5681034b4
 related: []
 sources:
@@ -157,6 +157,7 @@ interfaces:
   symbol: personality_bump_allowed
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

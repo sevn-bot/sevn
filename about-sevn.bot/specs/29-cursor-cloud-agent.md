@@ -7,7 +7,7 @@ owner: Alex
 summary: Let operators and agents launch, poll, and inspect Cursor Cloud Agents against
   any GitHub/GitLab repo when skills.cursor_cloud.enabled is true, returning PR URLs,
   dashboard links (remote desktop), and
-last_updated: '2026-06-19'
+last_updated: '2026-07-12'
 fingerprint: sha256:99a185af444a73436b77fa1c7fb9312a557a45d4c300bb87ddf8d21ddb7e0f6f
 related: []
 sources:
@@ -168,6 +168,7 @@ interfaces:
   symbol: integration_post_sync
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

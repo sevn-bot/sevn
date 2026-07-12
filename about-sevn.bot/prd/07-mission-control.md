@@ -4,13 +4,17 @@ kind: prd
 title: Mission Control — PRD
 status: ready
 owner: Alex
-summary: Operator dashboard for traces, spend, provider health, and in-flight runs—so a capable self-hosted bot stays livable instead of flying blind after each turn.
-last_updated: '2026-07-08'
-fingerprint: sha256:d437a013bcf30936fa7a4877a32a4fab8ce0d79dc71a3a395ded9cd8c9380d19
+summary: Operator dashboard for traces, spend, provider health, and in-flight runs—so
+  a capable self-hosted bot stays livable instead of flying blind after each turn.
+last_updated: '2026-07-12'
+fingerprint: sha256:a479e3d2103171ed6c03ecf8371d519861b2316dae62f3ce66b0a84387473a26
 related: []
 sources:
 - src/sevn/ui/**
 parent_prd: prd-00-main
+depends_on: []
+build_phase: null
+interfaces: []
 specs:
 - spec-04-tracing
 - spec-07-egress-proxy

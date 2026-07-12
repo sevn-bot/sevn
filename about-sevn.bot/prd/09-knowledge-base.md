@@ -6,12 +6,15 @@ status: ready
 owner: Alex
 summary: Without accumulated knowledge, every research thread starts at zero—operators
   need a provenance-backed wiki vault the assistant can search and cite in chat.
-last_updated: '2026-07-08'
-fingerprint: sha256:474701a1501fb3dd2635d7dc51085c655a1445573f95efe8bfd71dde0b804973
+last_updated: '2026-07-12'
+fingerprint: sha256:12c8243b0fcc82e791221e55eb0e0bf9567ac67714950e6a56b301a790a18944
 related: []
 sources:
 - src/sevn/second_brain/**
 parent_prd: prd-00-main
+depends_on: []
+build_phase: null
+interfaces: []
 specs:
 - spec-27-second-brain
 personas:

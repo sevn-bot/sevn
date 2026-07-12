@@ -5,7 +5,7 @@ title: Harness discipline — Spec
 status: done
 owner: Alex
 summary: 45# Harness discipline — Spec
-last_updated: '2026-07-07'
+last_updated: '2026-07-12'
 fingerprint: sha256:ec658899f82afd5f0a138328407204e02b564a13ff3835e5adc9635b28f37023
 related: []
 sources:
@@ -31,6 +31,7 @@ interfaces:
   symbol: operator_path_prefixes
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

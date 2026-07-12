@@ -7,7 +7,7 @@ owner: Alex
 summary: 'Deliver non-interactive dispatch: external events (“something happened”)
   and schedules (“tick”) compile to DispatchRequest, optionally pass through notify_only
   (zero LLM, zero sandbox boot), otherwise'
-last_updated: '2026-06-19'
+last_updated: '2026-07-12'
 fingerprint: sha256:3ba449957038898a3f00cba876819d2398f3dfd4e02ca942fbeb846280cdcd61
 related: []
 sources:
@@ -177,6 +177,7 @@ interfaces:
   symbol: trigger_run_ws_topic
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

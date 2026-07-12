@@ -6,7 +6,7 @@ status: done
 owner: Alex
 summary: 'Own the provider-chain facades for speech-to-text and text-to-speech so
   the gateway can:'
-last_updated: '2026-07-07'
+last_updated: '2026-07-12'
 fingerprint: sha256:4c2908fbd8c41f1682736822897a1fe5b9a7535d1022136beb2e2c407b4e1784
 related: []
 sources:
@@ -140,6 +140,7 @@ interfaces:
   symbol: model_path_for
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

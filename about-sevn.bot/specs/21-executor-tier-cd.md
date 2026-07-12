@@ -7,7 +7,7 @@ owner: Alex
 summary: 'Tier C/D is the planned-work executor for messages the Triager classifies
   as complexity == C or complexity == D (prd-04-getting-things-done §5.3–§5.4): structured
   planning, optional owner approval (Pl'
-last_updated: '2026-06-19'
+last_updated: '2026-07-12'
 fingerprint: sha256:fa2b6320a8f4d1b4766983f4bdd67707d234f602503b5d953202ac24799c18ba
 related: []
 sources:
@@ -107,6 +107,7 @@ interfaces:
   symbol: match_telegram_binding
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

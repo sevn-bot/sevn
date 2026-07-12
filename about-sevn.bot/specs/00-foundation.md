@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the lowest layer every later spec assumes: a src/sevn/ package layout,
   uv-managed Python 3.12+ project (hatchling build backend), a root Makefile as the
   single recurring-command surface, pre-c'
-last_updated: '2026-07-07'
-fingerprint: sha256:5065fb5d5f04314eb1e2b9fa4d0be23e774d7c9f38247def7a276230171e24a2
+last_updated: '2026-07-12'
+fingerprint: sha256:a3b42b5a5f5666810ed56591001059d40981b1fed60dfa92622aa86e31d6f3b1
 related: []
 sources:
 - src/sevn/**
@@ -529,6 +529,9 @@ interfaces:
 - name: steer_for_dropped_tool_call
   file: src/sevn/agent/grounding.py
   symbol: steer_for_dropped_tool_call
+- name: steer_for_fallback_tool
+  file: src/sevn/agent/grounding.py
+  symbol: steer_for_fallback_tool
 - name: steer_for_false_tool_failure_claim
   file: src/sevn/agent/grounding.py
   symbol: steer_for_false_tool_failure_claim
@@ -1909,6 +1912,12 @@ interfaces:
 - name: register
   file: src/sevn/cli/commands/readme_cmd.py
   symbol: register
+- name: register
+  file: src/sevn/cli/commands/second_brain_cmd.py
+  symbol: register
+- name: show_second_brain_config
+  file: src/sevn/cli/commands/second_brain_cmd.py
+  symbol: show_second_brain_config
 - name: execute_secrets_put
   file: src/sevn/cli/commands/secrets_cmd.py
   symbol: execute_secrets_put
@@ -2878,6 +2887,9 @@ interfaces:
 - name: codemode_enabled
   file: src/sevn/config/model_resolution.py
   symbol: codemode_enabled
+- name: codemode_max_retries
+  file: src/sevn/config/model_resolution.py
+  symbol: codemode_max_retries
 - name: codemode_resource_limits
   file: src/sevn/config/model_resolution.py
   symbol: codemode_resource_limits
@@ -3205,6 +3217,9 @@ interfaces:
 - name: SecondBrainFetchConfig
   file: src/sevn/config/sections/features.py
   symbol: SecondBrainFetchConfig
+- name: SecondBrainPathsConfig
+  file: src/sevn/config/sections/features.py
+  symbol: SecondBrainPathsConfig
 - name: SecondBrainWorkspaceConfig
   file: src/sevn/config/sections/features.py
   symbol: SecondBrainWorkspaceConfig
@@ -3763,6 +3778,15 @@ interfaces:
 - name: show_briefing
   file: src/sevn/data/bundled_skills/core/last30days/scripts/briefing.py
   symbol: show_briefing
+- name: build_digest_for_run
+  file: src/sevn/data/bundled_skills/core/last30days/scripts/daily_digest.py
+  symbol: build_digest_for_run
+- name: main
+  file: src/sevn/data/bundled_skills/core/last30days/scripts/daily_digest.py
+  symbol: main
+- name: run_topic
+  file: src/sevn/data/bundled_skills/core/last30days/scripts/daily_digest.py
+  symbol: run_topic
 - name: build_judge_prompt
   file: src/sevn/data/bundled_skills/core/last30days/scripts/evaluate_search_quality.py
   symbol: build_judge_prompt
@@ -3841,6 +3865,15 @@ interfaces:
 - name: write_summary
   file: src/sevn/data/bundled_skills/core/last30days/scripts/evaluate_search_quality.py
   symbol: write_summary
+- name: filter_items
+  file: src/sevn/data/bundled_skills/core/last30days/scripts/filter_raw.py
+  symbol: filter_items
+- name: main
+  file: src/sevn/data/bundled_skills/core/last30days/scripts/filter_raw.py
+  symbol: main
+- name: parse_raw_items
+  file: src/sevn/data/bundled_skills/core/last30days/scripts/filter_raw.py
+  symbol: parse_raw_items
 - name: build_parser
   file: src/sevn/data/bundled_skills/core/last30days/scripts/last30days.py
   symbol: build_parser
@@ -4867,6 +4900,9 @@ interfaces:
 - name: get_daily_cost
   file: src/sevn/data/bundled_skills/core/last30days/scripts/store.py
   symbol: get_daily_cost
+- name: get_findings_new_in_run
+  file: src/sevn/data/bundled_skills/core/last30days/scripts/store.py
+  symbol: get_findings_new_in_run
 - name: get_latest_completed_runs
   file: src/sevn/data/bundled_skills/core/last30days/scripts/store.py
   symbol: get_latest_completed_runs
@@ -5479,9 +5515,15 @@ interfaces:
 - name: load_fingerprints
   file: src/sevn/docs/readme/fingerprint.py
   symbol: load_fingerprints
+- name: path_matches_source_glob
+  file: src/sevn/docs/readme/fingerprint.py
+  symbol: path_matches_source_glob
 - name: save_fingerprints
   file: src/sevn/docs/readme/fingerprint.py
   symbol: save_fingerprints
+- name: slugs_for_changed_paths
+  file: src/sevn/docs/readme/fingerprint.py
+  symbol: slugs_for_changed_paths
 - name: upsert_entry
   file: src/sevn/docs/readme/fingerprint.py
   symbol: upsert_entry
@@ -5509,6 +5551,12 @@ interfaces:
 - name: assemble_template_context
   file: src/sevn/docs/readme/model.py
   symbol: assemble_template_context
+- name: format_module_symbols_for_prompt
+  file: src/sevn/docs/readme/model.py
+  symbol: format_module_symbols_for_prompt
+- name: format_path_list
+  file: src/sevn/docs/readme/model.py
+  symbol: format_path_list
 - name: merge_section
   file: src/sevn/docs/readme/model.py
   symbol: merge_section
@@ -5560,6 +5608,12 @@ interfaces:
 - name: scaffold_readme_tree
   file: src/sevn/docs/readme/scaffold.py
   symbol: scaffold_readme_tree
+- name: extract_module_symbols
+  file: src/sevn/docs/readme/scanner.py
+  symbol: extract_module_symbols
+- name: resolve_spec_path
+  file: src/sevn/docs/readme/scanner.py
+  symbol: resolve_spec_path
 - name: scan_repo_context
   file: src/sevn/docs/readme/scanner.py
   symbol: scan_repo_context
@@ -7138,12 +7192,36 @@ interfaces:
 - name: set_nested
   file: src/sevn/gateway/workspace_config_io.py
   symbol: set_nested
+- name: CloudflareApiError
+  file: src/sevn/infrastructure/cloudflare_tunnel_api.py
+  symbol: CloudflareApiError
+- name: CloudflareTunnelProvisionResult
+  file: src/sevn/infrastructure/cloudflare_tunnel_api.py
+  symbol: CloudflareTunnelProvisionResult
+- name: dns_record_name_for_zone
+  file: src/sevn/infrastructure/cloudflare_tunnel_api.py
+  symbol: dns_record_name_for_zone
+- name: normalize_public_hostname
+  file: src/sevn/infrastructure/cloudflare_tunnel_api.py
+  symbol: normalize_public_hostname
+- name: provision_cloudflare_tunnel
+  file: src/sevn/infrastructure/cloudflare_tunnel_api.py
+  symbol: provision_cloudflare_tunnel
+- name: tunnel_mission_control_url
+  file: src/sevn/infrastructure/cloudflare_tunnel_api.py
+  symbol: tunnel_mission_control_url
 - name: ensure_cloudflared_binary
   file: src/sevn/infrastructure/cloudflared_provision.py
   symbol: ensure_cloudflared_binary
 - name: parse_cloudflared_tunnel_input
   file: src/sevn/infrastructure/cloudflared_provision.py
   symbol: parse_cloudflared_tunnel_input
+- name: extract_quick_tunnel_url
+  file: src/sevn/infrastructure/cloudflared_quick_tunnel.py
+  symbol: extract_quick_tunnel_url
+- name: read_quick_tunnel_url
+  file: src/sevn/infrastructure/cloudflared_quick_tunnel.py
+  symbol: read_quick_tunnel_url
 - name: TunnelModeSpec
   file: src/sevn/infrastructure/tunnel_config.py
   symbol: TunnelModeSpec
@@ -8593,6 +8671,9 @@ interfaces:
 - name: wiki_search_tool
   file: src/sevn/second_brain/__init__.py
   symbol: wiki_search_tool
+- name: ensure_second_brain_scope_layout
+  file: src/sevn/second_brain/bootstrap.py
+  symbol: ensure_second_brain_scope_layout
 - name: SecondBrainError
   file: src/sevn/second_brain/errors.py
   symbol: SecondBrainError
@@ -8608,6 +8689,12 @@ interfaces:
 - name: fetch_url_to_raw
   file: src/sevn/second_brain/fetch.py
   symbol: fetch_url_to_raw
+- name: list_workspace_subdirs
+  file: src/sevn/second_brain/folder_picker.py
+  symbol: list_workspace_subdirs
+- name: normalise_browse_path
+  file: src/sevn/second_brain/folder_picker.py
+  symbol: normalise_browse_path
 - name: compose_page
   file: src/sevn/second_brain/frontmatter.py
   symbol: compose_page
@@ -8635,6 +8722,15 @@ interfaces:
 - name: run_ingest_stub
   file: src/sevn/second_brain/ingest_stub.py
   symbol: run_ingest_stub
+- name: SecondBrainLayoutProbe
+  file: src/sevn/second_brain/layout_probe.py
+  symbol: SecondBrainLayoutProbe
+- name: fix_second_brain_layout
+  file: src/sevn/second_brain/layout_probe.py
+  symbol: fix_second_brain_layout
+- name: probe_second_brain_vault_layout
+  file: src/sevn/second_brain/layout_probe.py
+  symbol: probe_second_brain_vault_layout
 - name: index_line_targets
   file: src/sevn/second_brain/links.py
   symbol: index_line_targets
@@ -8662,9 +8758,15 @@ interfaces:
 - name: assert_wiki_relative_safe
   file: src/sevn/second_brain/paths.py
   symbol: assert_wiki_relative_safe
+- name: display_scope_root_relative
+  file: src/sevn/second_brain/paths.py
+  symbol: display_scope_root_relative
 - name: effective_scope
   file: src/sevn/second_brain/paths.py
   symbol: effective_scope
+- name: legacy_shared_vault_root
+  file: src/sevn/second_brain/paths.py
+  symbol: legacy_shared_vault_root
 - name: outputs_dir_for_scope
   file: src/sevn/second_brain/paths.py
   symbol: outputs_dir_for_scope
@@ -8674,6 +8776,12 @@ interfaces:
 - name: resolve_raw_file
   file: src/sevn/second_brain/paths.py
   symbol: resolve_raw_file
+- name: resolve_scope_root
+  file: src/sevn/second_brain/paths.py
+  symbol: resolve_scope_root
+- name: resolve_vault_base
+  file: src/sevn/second_brain/paths.py
+  symbol: resolve_vault_base
 - name: resolve_wiki_file
   file: src/sevn/second_brain/paths.py
   symbol: resolve_wiki_file
@@ -8734,6 +8842,15 @@ interfaces:
 - name: witchcraft_indexer_available
   file: src/sevn/second_brain/witchcraft_bridge.py
   symbol: witchcraft_indexer_available
+- name: maybe_reindex_workspace_on_startup
+  file: src/sevn/second_brain/witchcraft_reindex.py
+  symbol: maybe_reindex_workspace_on_startup
+- name: reindex_workspace_wiki
+  file: src/sevn/second_brain/witchcraft_reindex.py
+  symbol: reindex_workspace_wiki
+- name: resolve_index_wiki_paths
+  file: src/sevn/second_brain/witchcraft_reindex.py
+  symbol: resolve_index_wiki_paths
 - name: fingerprint_sha256_hex
   file: src/sevn/secrets/fingerprint.py
   symbol: fingerprint_sha256_hex
@@ -11547,6 +11664,7 @@ interfaces:
   symbol: sync_tools_md_for_config
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

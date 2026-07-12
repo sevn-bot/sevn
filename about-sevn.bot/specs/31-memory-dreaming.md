@@ -7,7 +7,7 @@ owner: Alex
 summary: Provide scored consolidation from short-term recall signals into curated
   long-term prose (MEMORY.md) on a daily (configurable) cadence, without mutating
   LCM tables or crossing into Second Brain (wiki/
-last_updated: '2026-07-07'
+last_updated: '2026-07-12'
 fingerprint: sha256:c6e40f612e54a561b469d42b154b5c51b9e337c3b822c757343df49f56c60e75
 related: []
 sources:
@@ -120,6 +120,7 @@ interfaces:
   symbol: load_memory_signals
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

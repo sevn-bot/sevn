@@ -7,7 +7,7 @@ owner: Alex
 summary: Deliver the in-process extension layer that intercepts existing tool and
   terminal I/O paths and registers dispatcher-level commands, without adding new tool
   symbols or transports in-tree.
-last_updated: '2026-06-19'
+last_updated: '2026-07-12'
 fingerprint: sha256:ab4e914f79036515eb4f237c238304c982aa0fc45e281f11d363ab2dd6627349
 related: []
 sources:
@@ -93,6 +93,7 @@ interfaces:
   symbol: as_trigger_surface
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

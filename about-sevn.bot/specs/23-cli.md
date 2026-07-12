@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver the primary operator and automation surface for install, upgrades,
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
-last_updated: '2026-07-07'
-fingerprint: sha256:387f2215c8d1e7d64041b6ff6ea4b8578f1c50870b5d03f662a6b1440f3f5db1
+last_updated: '2026-07-12'
+fingerprint: sha256:b2102d288bddb8664c6ab75d8a0874d0233af0a202b7882baf36ca8bb33e4fed
 related: []
 sources:
 - src/sevn/cli/**
@@ -135,6 +135,12 @@ interfaces:
 - name: register
   file: src/sevn/cli/commands/readme_cmd.py
   symbol: register
+- name: register
+  file: src/sevn/cli/commands/second_brain_cmd.py
+  symbol: register
+- name: show_second_brain_config
+  file: src/sevn/cli/commands/second_brain_cmd.py
+  symbol: show_second_brain_config
 - name: execute_secrets_put
   file: src/sevn/cli/commands/secrets_cmd.py
   symbol: execute_secrets_put
@@ -692,6 +698,7 @@ interfaces:
   symbol: parse_config_set_value
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose
