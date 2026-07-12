@@ -1,0 +1,11 @@
+# Copy to deploy/inventory.toml (gitignored) and edit host entries before deploy.
+# Prerequisites: ssh-copy-id, remote user can run user systemd/launchd units, sevn on PATH.
+
+[hosts.prod-vps]
+host = "203.0.113.10"
+user = "sevn"
+identity_file = "~/.ssh/id_ed25519"
+remote_home = "/home/sevn/.sevn"
+remote_workspace = "workspace"
+gateway_port = 3001
+proxy_port = 8787

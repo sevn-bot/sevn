@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "suppressions": [
+    {
+      "skill_path": ".claude/skills/conventional-commit",
+      "rule_id": "TM1",
+      "reason": "Pre-0 SS0 baseline (HIGH)",
+      "reviewed": "2026-06-14"
+    },
+    {
+      "skill_path": ".claude/skills/improve-waves",
+      "rule_id": "PE3",
+      "reason": "Pre-0 SS0 baseline (HIGH)",
+      "reviewed": "2026-06-14"
+    },
+    {
+      "skill_path": ".claude/skills/improve-waves",
+      "rule_id": "TM1",
+      "reason": "Pre-0 SS0 baseline (HIGH)",
+      "reviewed": "2026-06-14"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/conventional_commit",
+      "rule_id": "TM1",
+      "reason": "Pre-0 SS0 baseline (HIGH)",
+      "reviewed": "2026-06-14"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/graphify",
+      "rule_id": "OH1",
+      "reason": "Pre-0 SS0 baseline (HIGH)",
+      "reviewed": "2026-06-14"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/last30days",
+      "rule_id": "E2",
+      "reason": "Pre-0 SS0 baseline (HIGH)",
+      "reviewed": "2026-06-14"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/last30days",
+      "rule_id": "OH1",
+      "reason": "Pre-0 SS0 baseline (HIGH)",
+      "reviewed": "2026-06-14"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/last30days",
+      "rule_id": "PE3",
+      "reason": "Pre-0 SS0 baseline (HIGH)",
+      "reviewed": "2026-06-14"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/last30days",
+      "rule_id": "YR1",
+      "reason": "Pre-0 SS0 baseline (HIGH)",
+      "reviewed": "2026-06-14"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/last30days",
+      "rule_id": "TM1",
+      "reason": "setup-pass.sh stores operator API keys via pass(1); reviewed operator-only script",
+      "reviewed": "2026-06-18"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/printing-press-library",
+      "rule_id": "OH1",
+      "reason": "Pre-0 SS0 baseline (HIGH)",
+      "reviewed": "2026-06-14"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/sessions_management",
+      "rule_id": "E4",
+      "reason": "Pre-0 SS0 baseline (HIGH)",
+      "reviewed": "2026-06-14"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/sevn-diagnostics",
+      "rule_id": "PE3",
+      "reason": "W4 doctor playbooks cite gateway token / secrets read-only diagnostics",
+      "reviewed": "2026-06-17"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/cua-agent",
+      "rule_id": "OH1",
+      "reason": "run_agent.py relays upstream cua-agent output; opt-in + per-run approval gate (D5)",
+      "reviewed": "2026-06-23"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/lume",
+      "rule_id": "OH1",
+      "reason": "lume _common.py relays lume CLI stdout/stderr; macOS-only opt-in VM lifecycle",
+      "reviewed": "2026-06-23"
+    },
+    {
+      "skill_path": "src/sevn/data/workspace_templates/tools/browser.md",
+      "rule_id": "YR1",
+      "reason": "Tool doc describes operator-controlled browser cookie/CDP access; YR1 info_stealer false positive",
+      "reviewed": "2026-07-02"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/job-ops",
+      "rule_id": "E2",
+      "reason": "Extractors/llm read board + model API keys from env by design (operator-provisioned secrets)",
+      "reviewed": "2026-07-07"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/kokoro-tts",
+      "rule_id": "E2",
+      "reason": "generate.py reads cache/model-dir env knobs; local runtime-quarantined TTS, no exfil path",
+      "reviewed": "2026-07-07"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/openwiki",
+      "rule_id": "E2",
+      "reason": "generate.py reads dry-run flag and forwards os.environ to the openwiki CLI subprocess",
+      "reviewed": "2026-07-07"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/kokoro-tts",
+      "rule_id": "SC4",
+      "reason": "numpy advisories are ancient (<1.22) / disputed; requirements now pin numpy>=1.26",
+      "reviewed": "2026-07-07"
+    },
+    {
+      "skill_path": ".claude/skills/diagnosing-bugs",
+      "rule_id": "P6",
+      "reason": "hitl_loop.py operator HITL diagnostic helper; reviewed false positive",
+      "reviewed": "2026-07-11"
+    },
+    {
+      "skill_path": ".claude/skills/git-pr-review",
+      "rule_id": "OH1",
+      "reason": "post_pending_review.py posts operator-approved draft review comments only",
+      "reviewed": "2026-07-11"
+    }
+  ]
+}

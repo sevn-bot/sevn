@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: MIT
+# Example systemd unit for the egress proxy (`specs/07-egress-proxy.md`, `specs/06-secrets.md`).
+# Copy to /etc/systemd/system/sevn-proxy.service and customize User=, EnvironmentFile=, paths.
+
+[Unit]
+Description=Sevn egress LLM proxy (Starlette / uvicorn)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sevn-proxy
+Group=sevn-proxy
+WorkingDirectory=/opt/sevn
+EnvironmentFile=-/etc/sevn/proxy.env
+ExecStart=/opt/sevn/.venv/bin/uvicorn sevn.proxy.app:app --host 127.0.0.1 --port 8787
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

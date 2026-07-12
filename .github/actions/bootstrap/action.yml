@@ -1,0 +1,30 @@
+# Local composite: install uv (pinned) and run `make setup`.
+#
+# Centralises the checkout-then-uv-then-`make setup` bootstrap that was
+# copy-pasted across ci.yml, ci-cd.yml, and playwright-e2e.yml. Keeping it in
+# one place is what prevents the build-context drift that shipped the
+# sevn.schema.json bug (specs/25-cicd-full.md §2.1).
+#
+# `actions/checkout` MUST stay in the calling job: a local composite can only
+# run after the repo is on disk. This composite owns only the shared
+# uv + `make setup` core; jobs add their own `make ci` / `make e2e` steps.
+name: Bootstrap sevn toolchain
+description: Install uv (pinned) and run make setup.
+
+inputs:
+  uv-version:
+    description: uv version to install (keep in sync across all jobs here).
+    required: false
+    default: "0.6.9"
+
+runs:
+  using: composite
+  steps:
+    - name: Install uv
+      uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+      with:
+        version: ${{ inputs.uv-version }}
+
+    - name: Bootstrap toolchain (make setup)
+      shell: bash
+      run: make setup

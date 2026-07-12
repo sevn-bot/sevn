@@ -1,0 +1,702 @@
+{
+  "_meta": {
+    "title": "sevn workspace config — field long descriptions and collection guide",
+    "description": "No secret values. Use secret_label with unified proxy/keychain resolution (${SECRET:source:key}).",
+    "paired_schema": "infra/sevn.schema.json",
+    "paired_template": "infra/sevn.json.template",
+    "runtime_env": "infra/sevn.schema.json#/x-sevn-env-allowlist"
+  },
+  "paths": {
+    "schema_version": {
+      "long_description": "Integer workspace config schema version. Gateway and CLI refuse unknown versions to prevent half-migrated state.",
+      "how_to_collect": "Start at 1 for a new workspace. After upgrades, run `sevn migrate` (or dashboard) which bumps this and writes `sevn.json.vN` backup. Match the version supported by your installed sevn binary."
+    },
+    "workspace_root": {
+      "long_description": "Directory root for workspace markdown, skills, SQLite paths, and logs. Default `.` means the same folder as `sevn.json` (typical bound install at `{SEVN_HOME}/workspace/`). Use an absolute path with `~` only when content must live outside the config directory; tilde is expanded before path resolution.",
+      "how_to_collect": "Keep `.` for standard CLI installs. Use a subdirectory name (e.g. `app`) relative to the folder containing `sevn.json`, or an absolute path for a dedicated data directory elsewhere."
+    },
+    "timezone": {
+      "long_description": "IANA timezone for cron schedule interpretation; interactive traffic timestamps remain UTC in logs per architecture.",
+      "how_to_collect": "Pick from IANA database (e.g. `timedatectl list-timezones`, or tzdata docs). Use `UTC` if all operators are global and cron should use UTC wall clock."
+    },
+    "gateway.host": {
+      "long_description": "HTTP bind address for the FastAPI gateway.",
+      "how_to_collect": "127.0.0.1 for local-only; 0.0.0.0 only behind firewall or tunnel (Cloudflare/ngrok/Tailscale Funnel)."
+    },
+    "gateway.port": {
+      "long_description": "TCP port for gateway HTTP and WebSocket.",
+      "how_to_collect": "Choose a free port; avoid clashing with proxy.port. Document in systemd unit or docker-compose."
+    },
+    "gateway.token": {
+      "long_description": "Opaque shared secret for authenticating dashboard, CLI, and /api routes (exceptions: Telegram webhook secret_token, webchat JWT per doc 01).",
+      "how_to_collect": "Generate a high-entropy random string (e.g. `openssl rand -hex 32`). Store in OS keychain with label `sevn.gateway.token` and set value to `${SECRET:keychain:sevn.gateway.token}` OR export `SEVN_GATEWAY_TOKEN` for dev scripts O4.",
+      "secret_label": "sevn.gateway.token"
+    },
+    "gateway.proxy_headers": {
+      "long_description": "Whether to trust X-Forwarded-For / Proto when behind reverse proxy or tunnel.",
+      "how_to_collect": "Set true only when uvicorn `--forwarded-allow-ips` (or equivalent) is locked to trusted tunnel IPs"
+    },
+    "gateway.queue_mode": {
+      "long_description": "cancel aborts in-flight work on new user message; steer buffers lines until safe harness injection point.",
+      "how_to_collect": "Read the design docsb. Default cancel for simpler replay; steer for Tier-B-heavy chats accepting complexity."
+    },
+    "gateway.steer.max_pending": {
+      "long_description": "Maximum buffered user lines per session when queue_mode=steer.",
+      "how_to_collect": "Tune from default in doc 01 table; raise carefully — memory and UX trade-off."
+    },
+    "gateway.steer.degrade_to_cancel_after_ms": {
+      "long_description": "If steer cannot inject before this timeout, gateway degrades to cancel+merge for that burst.",
+      "how_to_collect": "Milliseconds; align with longest acceptable user wait before forced supersession."
+    },
+    "gateway.shutdown_timeout_s": {
+      "long_description": "Seconds to wait for in-flight runs during graceful shutdown before force-cancel.",
+      "how_to_collect": "Confirm against the design docs and defaults.py when code exists."
+    },
+    "gateway.voice_trigger_keywords": {
+      "long_description": "Keywords/substrings in assistant or user text that trigger TTS when session is in when_asked mode.",
+      "how_to_collect": "List phrases your operators use to request read-aloud; keep short to avoid accidental TTS."
+    },
+    "proxy.host": {
+      "long_description": "Bind address for unified egress proxy.",
+      "how_to_collect": "Typically 127.0.0.1 with gateway on same host; separate host for split deploy."
+    },
+    "proxy.port": {
+      "long_description": "TCP port for proxy /llm and /integration.",
+      "how_to_collect": "Free port distinct from gateway.port."
+    },
+    "proxy.secret_ttl_seconds": {
+      "long_description": "In-memory decrypted secret cache TTL at proxy for keychain round-trips.",
+      "how_to_collect": "Default 300 in the design docs example; lower for faster rotation propagation, higher for fewer keychain hits."
+    },
+    "secrets_backend": {
+      "long_description": "Which secret service adapter the proxy tries first for ${SECRET:...} resolution.",
+      "how_to_collect": "Choose keychain (macOS/Linux desktop), openbao, proton-pass, or encrypted-file fallback"
+    },
+    "infrastructure.snapshot_interval_minutes": {
+      "long_description": "Cadence for sandbox image/repo snapshot rebuild steps.",
+      "how_to_collect": "Default 30; increase on slow hosts if snapshots are expensive."
+    },
+    "infrastructure.docker_socket": {
+      "long_description": "Path to Docker daemon socket for sandbox and snapshot tooling.",
+      "how_to_collect": "Standard `/var/run/docker.sock` on Linux; Docker Desktop macOS may differ — check `docker context ls`."
+    },
+    "infrastructure.preload_repos": {
+      "long_description": "List of paths (often relative) cloned into sandbox /repos/ reference shelf.",
+      "how_to_collect": "Add main bot repo `./` and any dependency repos operators want grep/read without network."
+    },
+    "infrastructure.backup.target": {
+      "long_description": "Backup destination family; v1 implements local tar only.",
+      "how_to_collect": "Set `local` for v1. Reserve s3|rsync for future; expect warning if unsupported."
+    },
+    "infrastructure.backup.cadence": {
+      "long_description": "How often automated backup runs (e.g. nightly).",
+      "how_to_collect": "Cron string or enum per implementation; align with the design docs"
+    },
+    "infrastructure.backup.retention_days": {
+      "long_description": "How long to keep local backup artifacts.",
+      "how_to_collect": "Match disk budget; default 14 in example."
+    },
+    "infrastructure.backup.s3.bucket": {
+      "long_description": "S3 bucket name (forward-compatible; v1 may warn-only).",
+      "how_to_collect": "When s3 target ships: create bucket in cloud console, IAM policy least-privilege PutObject to prefix."
+    },
+    "infrastructure.backup.s3.key_ref": {
+      "long_description": "Secret reference for AWS credentials (not inline).",
+      "how_to_collect": "Store access key or role token in keychain; reference `${SECRET:...}` per coding standards.",
+      "secret_label": "sevn.infrastructure.backup.s3.credentials"
+    },
+    "infrastructure.backup.rsync.ssh_key_ref": {
+      "long_description": "Reference to SSH private key for rsync backup (forward-compatible).",
+      "how_to_collect": "Generate deploy key; add public key to backup server authorized_keys; store private key in keychain.",
+      "secret_label": "sevn.infrastructure.backup.rsync.ssh_key"
+    },
+    "infrastructure.version_control.enabled": {
+      "long_description": "Lets Mission Control stage and commit changes to files in your workspace using git. When off, sevn never runs git commands on your behalf. When on, sevn can make git commits (with the author you configured) so you can review or roll back agent edits later.",
+      "how_to_collect": "Enable if your workspace is already a git repository (run `git init` first if not) and you want sevn to record its file edits as commits. Disable to keep sevn from touching git state."
+    },
+    "notifications.health_alert": {
+      "long_description": "Telegram/dashboard alert when /health reports degraded.",
+      "how_to_collect": "Toggle per operator preference; requires channel credentials and notification routing wired."
+    },
+    "notifications.provider_fallback_digest": {
+      "long_description": "Daily or periodic digest of model fallback events instead of silent only.",
+      "how_to_collect": "Enable for ops-heavy deployments"
+    },
+    "notifications.provider_fallback_per_turn": {
+      "long_description": "Noisy per-turn user-visible or owner-visible fallback notifications (debug).",
+      "how_to_collect": "Enable temporarily when debugging provider outages."
+    },
+    "notifications.trigger_dead_letter": {
+      "long_description": "Optional Telegram alert when non-interactive dispatch lands in dead letter queue.",
+      "how_to_collect": "the design docs — requires Telegram channel configured."
+    },
+    "channels.*.enabled": {
+      "long_description": "Per adapter: if true, gateway loads that sevn.channels entry point at startup.",
+      "how_to_collect": "Replace * with adapter name (telegram, webchat). Set false to keep package installed but inactive."
+    },
+    "channels.*.mcp_enabled": {
+      "long_description": "Channel-default MCP server id list; session override wins",
+      "how_to_collect": "Subset of keys in mcp_servers; stricter lists for Telegram than webchat per trust model."
+    },
+    "agents": {
+      "long_description": "Placeholder object from early infrastructure example; multi-agent bindings removed from product direction.",
+      "how_to_collect": "Leave {} until x-sevn-todo in infra/sevn.schema.json is resolved; do not rely on keys here."
+    },
+    "providers.default_regime": {
+      "long_description": "Default BudgetRegime string when per-model overlay omits regime.",
+      "how_to_collect": "Align with dominant billing mode: SUBSCRIPTION for OAuth/hosted bundles, PER_TOKEN for metered APIs, FREE_LOCAL for Ollama-only."
+    },
+    "providers.use_main_model_for_all": {
+      "long_description": "When true (default), every LLM slot uses the main triager model id and per-slot overrides in sevn.json are ignored at runtime. When false, each saved slot value is used independently; changing one slot does not change the others. Unchecking unified in onboarding only copies the current main model into empty slot fields (existing slot values are kept).",
+      "how_to_collect": "Leave enabled for single-provider installs (MiniMax, OpenAI-only, Ollama-only). Disable only when you need different models per subsystem."
+    },
+    "providers.tier_default.triager": {
+      "long_description": "Main routing model for incoming work (Triager) and, when use_main_model_for_all is true, the model id used everywhere else in v1.",
+      "how_to_collect": "Use the provider-prefixed catalog id (e.g. minimax/MiniMax-M2.7, openai/gpt-4o-mini). minimax/ models route via Anthropic Messages on the egress proxy."
+    },
+    "providers.tier_default.*": {
+      "long_description": "LiteLLM model id or {primary, vision} object per tier key (triager, B, C, D, C.sub_lm, …). Ignored at runtime when use_main_model_for_all is true except triager.",
+      "how_to_collect": "Pick ids from proxy health / LiteLLM route table; confirm vision variants in the design docs"
+    },
+    "lcm.summary_model": {
+      "long_description": "Model id for LCM session summarisation and compaction.",
+      "how_to_collect": "Usually same as main triager; only set when use_main_model_for_all is false."
+    },
+    "memory.pre_compaction_flush.model": {
+      "long_description": "Model id for pre-compaction memory flush LLM calls.",
+      "how_to_collect": "Defaults to lcm.summary_model when unset; inherits triager when unified."
+    },
+    "memory.dreaming.scoring.llm_ranker.model": {
+      "long_description": "Model id for dreaming candidate re-ranking.",
+      "how_to_collect": "Optional; falls back to LCM summary model when unset."
+    },
+    "memory.user_model.extractor_model": {
+      "long_description": "Model id for Honcho-style user-profile extraction.",
+      "how_to_collect": "Set only when user_model is enabled and you need a dedicated extractor model."
+    },
+    "security.scanner.model": {
+      "long_description": "LLM Guard classify model override. When use_main_model_for_all is true, scanner uses triager instead.",
+      "how_to_collect": "Leave empty when using one provider for the whole install; set only for advanced multi-provider setups."
+    },
+    "providers.fallback_chain.*": {
+      "long_description": "Ordered fallback model ids per base tier when primary unhealthy.",
+      "how_to_collect": "List cheaper/smaller models after primary; ensure at least one entry supports vision if you rely on Triager requires_vision."
+    },
+    "providers.openai.api_key": {
+      "long_description": "OpenAI-compatible API key for routes using OpenAI provider (also CGR subprocess env mapping). Ignored when providers.openai.auth_mode is oauth.",
+      "how_to_collect": "Create key in OpenAI dashboard; store as `${SECRET:keychain:providers.openai.api_key}`; never commit. For ChatGPT Plus/Pro/Team subscription billing, set auth_mode to oauth and use Sign in with ChatGPT instead.",
+      "secret_label": "providers.openai.api_key"
+    },
+    "providers.openai.auth_mode": {
+      "long_description": "OpenAI credential mode (D1): api_key (default) resolves providers.openai.api_key or SEVN_SECRET_OPENAI for chat-completions; oauth resolves oauth.openai (Codex PKCE) and routes to chatgpt.com/backend-api/codex/responses with subscription headers.",
+      "how_to_collect": "Use api_key for pay-as-you-go API keys. Use oauth for ChatGPT subscription access via sevn providers oauth login --provider openai, Mission Control Providers re-auth, or onboarding Sign in with ChatGPT."
+    },
+    "providers.anthropic.api_key": {
+      "long_description": "Anthropic API key for Claude routes.",
+      "how_to_collect": "Anthropic console > API keys; keychain storage.",
+      "secret_label": "providers.anthropic.api_key"
+    },
+    "providers.google.api_key": {
+      "long_description": "Google AI Studio / Gemini API key.",
+      "how_to_collect": "Google AI Studio credentials; restrict key to Generative Language API.",
+      "secret_label": "providers.google.api_key"
+    },
+    "providers.groq.api_key": {
+      "long_description": "Groq API key for OpenAI-compatible Groq host.",
+      "how_to_collect": "Groq console; store in keychain.",
+      "secret_label": "providers.groq.api_key"
+    },
+    "providers.mistral.api_key": {
+      "long_description": "Mistral API key (TTS / models).",
+      "how_to_collect": "Mistral console.",
+      "secret_label": "providers.mistral.api_key"
+    },
+    "providers.ollama": {
+      "long_description": "Usually empty object — local Ollama needs no key; optional base_url in nested keys per code.",
+      "how_to_collect": "If remote Ollama, set endpoint"
+    },
+    "providers.model_budgets": {
+      "long_description": "Per-model_id ModelBudget JSON overrides merged over shipped models.json.",
+      "how_to_collect": "Copy template entries from repo models.json (when shipped); adjust regime/throttle for your subscription."
+    },
+    "executors.tier_cd.lambda_rlm.enabled": {
+      "long_description": "Opt-in gate for λ-RLM C/D executor (default off). When false, harness uses dspy even if rlm.c_d_backend is lambda_rlm.",
+      "how_to_collect": "Set true only after rlm.lambda_tool_allowlist is populated (the design docs)."
+    },
+    "rlm.c_d_backend": {
+      "long_description": "dspy (default) vs lambda_rlm inner C/D executor (honored only when executors.tier_cd.lambda_rlm.enabled is true).",
+      "how_to_collect": "Read the design docsa; lambda_rlm requires lambda_tool_allowlist populated."
+    },
+    "rlm.lambda_tool_allowlist": {
+      "long_description": "Tool names exposed as λ combinator leaves when c_d_backend=lambda_rlm.",
+      "how_to_collect": "Subset of registered @sevn_tool names; intersect with PermissionConfig in harness."
+    },
+    "rlm.lambda_tool_allowlist_C": {
+      "long_description": "Optional tier-C-specific allowlist.",
+      "how_to_collect": "If empty and D-specific set, product may fall back to single list — confirm implementation."
+    },
+    "rlm.lambda_tool_allowlist_D": {
+      "long_description": "Optional tier-D-specific allowlist.",
+      "how_to_collect": "Same as C variant."
+    },
+    "rlm.lambda_max_leaf_llm_calls": {
+      "long_description": "Cap on inner leaf LLM calls for λ path; unset uses RegimeBudget.rlm_for.",
+      "how_to_collect": "Tune during λ eval experiments; see the design docs J0."
+    },
+    "rlm.max_llm_calls": {
+      "long_description": "Override inner DSPy RLM max_llm_calls budget by regime table.",
+      "how_to_collect": "Set only if defaults in RLM doc are wrong for your provider mix."
+    },
+    "rlm.sandbox": {
+      "long_description": "docker vs pyodide_deno interpreter for default DSPy RLM REPL.",
+      "how_to_collect": "Auto-detect per RLM J0; override if Docker unavailable or forbidden."
+    },
+    "plan_approval.enabled": {
+      "long_description": "Surfaces PlanGate for C/D before execute phase when adapter supports normalized Plan.",
+      "how_to_collect": "Enable for high-risk workspaces; read the design docs."
+    },
+    "permissions.profiles": {
+      "long_description": "Map profile name -> PermissionConfig JSON for Triager scope narrowing.",
+      "how_to_collect": "Author with dashboard advanced editor or hand-edit; validate against PermissionConfig schema in code; start with read_only style profiles per RLM Q1."
+    },
+    "permissions.scope_narrowing.enabled": {
+      "long_description": "Feature flag: when false, Triager structured schema omits permission_scope_narrowing field.",
+      "how_to_collect": "Keep false until profiles audited; enable for power users Q1."
+    },
+    "triager.group_scope": {
+      "long_description": "Group triage scope string T2.",
+      "how_to_collect": "Copy allowed literal from gateway implementation when enums are frozen."
+    },
+    "triager.model": {
+      "long_description": "LiteLLM model id for Triager-only call (no tools).",
+      "how_to_collect": "Pick small fast model; same resolve_model path as tier B"
+    },
+    "diagnostics.turn_bundles.enabled": {
+      "long_description": "When true, the gateway writes one JSONL bundle per inbound turn under `<content_root>/.sevn/turns/<safe_turn_id>.jsonl` and upserts `index.json` with `has_error` and `processed` flags. Default false — no post-turn I/O until enabled.",
+      "how_to_collect": "Enable after confirming disk budget; backfill historical turns with `sevn turn-bundle export`; inspect with `sevn turn-bundle view <turn_id>`; batch remediation via `wave-orchestrator/make build-plan-from-errors`."
+    },
+    "tracing.retention_days": {
+      "long_description": "Retention for file/sqlite TraceSink backends.",
+      "how_to_collect": "Match disk budget; external sinks ignore"
+    },
+    "tracing.sinks": {
+      "long_description": "Array of sink configs: type jsonl_file|sqlite|logfire|otel plus type-specific fields.",
+      "how_to_collect": "For otel/logfire sinks, set token_ref to `${ENV:VAR}` or `${SECRET:<source>:<logical_key>}` (e.g. `${SECRET:keychain:logfire.token}`). The gateway resolves the reference at sink construction on boot — not the egress proxy. Store the raw token in the OS keychain or export the env var; never put plaintext API keys in sevn.json. A bare logical key (no `${…}` wrapper) is also accepted and looked up via the workspace secrets chain."
+    },
+    "memory.pre_compaction_flush.enabled": {
+      "long_description": "Silent flush before LCM compaction boundary.",
+      "how_to_collect": "Default true; disable only if debugging compaction."
+    },
+    "memory.dreaming.enabled": {
+      "long_description": "Optional Dreaming memory consolidation jobs.",
+      "how_to_collect": "Read the design docs; mutex with other heavy memory jobs."
+    },
+    "memory_search_max_chars": {
+      "long_description": "Hard cap on merged output size of memory_search tool.",
+      "how_to_collect": "Set from approximate token budget (~4 chars/token rule of thumb); default preserves ~100-line spirit in the design docs."
+    },
+    "mcp_servers.*": {
+      "long_description": "Per server id: command + args to spawn MCP stdio server.",
+      "how_to_collect": "Install MCP package globally or in uv env; test command manually; use id referenced in mcp_enabled."
+    },
+    "mcp_enabled": {
+      "long_description": "Workspace-wide MCP server id allowlist.",
+      "how_to_collect": "Start empty; add ids one-by-one after reviewing each server’s tool surface (trust boundary)."
+    },
+    "stt_providers": {
+      "long_description": "Ordered STT backends for voice messages before Triager.",
+      "how_to_collect": "List provider ids your gateway implements (openai, whisper_cpp, …)"
+    },
+    "voice.stt_confidence_reprompt_threshold": {
+      "long_description": "If STT confidence below this float, gateway asks user to confirm transcript before Triager.",
+      "how_to_collect": "Default 0.7 per RLM S1; raise for noisy environments, lower for aggressive automation (not recommended)."
+    },
+    "logging.pii_mode": {
+      "long_description": "secrets_only vs strict redaction for spans and logs.",
+      "how_to_collect": "Use strict for multi-tenant shared bots; secrets_only for personal debugging per gateway Q&A M6."
+    },
+    "logging.retention_days": {
+      "long_description": "Days to keep rotated gateway-*.log and proxy-*.log files under workspace logs/ before the retention sweeper archives or deletes them.",
+      "how_to_collect": "Default 10. Lower for disk-constrained hosts; 0 applies sweeper immediately on eligible rotated files (test only)."
+    },
+    "logging.archive_mode": {
+      "long_description": "What the retention sweeper does with expired rotated service logs: delete, copy to archive_destination, upload to R2, or upload to GCS.",
+      "how_to_collect": "Use copy for local archive folder; delete when you do not need history; r2/gcs require bucket_ref secrets and are optional in early v1 builds."
+    },
+    "logging.archive_destination": {
+      "long_description": "Local folder (relative to workspace content root) where copy mode moves expired rotated logs before deleting the source file.",
+      "how_to_collect": "Default logs/archive; must exist or be creatable by the gateway process user."
+    },
+    "logging.cloud.r2.bucket_ref": {
+      "long_description": "Secret reference for Cloudflare R2 bucket name when archive_mode is r2.",
+      "how_to_collect": "Store bucket id via sevn secrets put; reference as ${SECRET:...} — never plaintext in sevn.json."
+    },
+    "logging.cloud.gcs.bucket_ref": {
+      "long_description": "Secret reference for GCS bucket when archive_mode is gcs.",
+      "how_to_collect": "Same pattern as R2; credentials via secrets chain"
+    },
+    "providers.minimax.base_url": {
+      "long_description": "OpenAI-compatible HTTPS base URL for MiniMax API calls through the egress proxy.",
+      "how_to_collect": "Leave blank for the shipped Anthropic-compatible default (https://api.minimax.io/anthropic/v1); applies when any minimax/ catalog model is configured. Override for regional endpoints."
+    },
+    "providers.minimax.api_key": {
+      "long_description": "MiniMax API key for minimax/* catalog models; resolved per request at the egress proxy when mixed with other vendors on the same route.",
+      "how_to_collect": "Set providers.minimax.api_key to ${SECRET:SEVN_SECRET_MINIMAX}; store plaintext as SEVN_SECRET_MINIMAX in the workspace secrets chain.",
+      "secret_label": "SEVN_SECRET_MINIMAX"
+    },
+    "providers.*.api_key": {
+      "long_description": "Per-provider API key binding for the provider registry (D2). Provider name is the catalog id prefix before / (e.g. minimax/M2 → minimax). Required when assigned model slots reference that provider.",
+      "how_to_collect": "Set providers.<name>.api_key to a ${SECRET:…} ref; store the plaintext as SEVN_SECRET_{PROVIDER} in the workspace secrets chain. Env escape hatches: OPENAI_API_KEY or ANTHROPIC_API_KEY."
+    },
+    "triggers.paused": {
+      "long_description": "Global kill switch for non-interactive dispatches.",
+      "how_to_collect": "Set true during incidents; webhooks return 503 triggers_paused"
+    },
+    "triggers.webhooks_paused": {
+      "long_description": "Fine-grained pause for webhooks only.",
+      "how_to_collect": "Use for webhook spam without stopping cron/API."
+    },
+    "triggers.cron_paused": {
+      "long_description": "Pause cron ticks only.",
+      "how_to_collect": "Maintenance windows for scheduler DB."
+    },
+    "triggers.api_paused": {
+      "long_description": "Pause outbound API /api/v1/run dispatch only.",
+      "how_to_collect": "When API clients misbehave."
+    },
+    "triggers.max_parallel_runs": {
+      "long_description": "Global concurrent non-interactive runs cap.",
+      "how_to_collect": "Default 4; raise with care for CPU/memory."
+    },
+    "triggers.sources.*.prompt_template": {
+      "long_description": "Jinja-style template overriding default webhook user prompt composition.",
+      "how_to_collect": "Author against each source’s PayloadModel fields; test in staging with sample payloads §3.4."
+    },
+    "triggers.cron.require_approval": {
+      "long_description": "If true, agent-created cron rows start pending_approval until owner confirms.",
+      "how_to_collect": "Set false only for solo trusted bots"
+    },
+    "triggers.cron.run_history_archive_after_days": {
+      "long_description": "Hot retention for sevn_cron_runs before cold archive.",
+      "how_to_collect": "Default 30; tune for SQLite size."
+    },
+    "triggers.api.default_rate_limit.enabled": {
+      "long_description": "Master switch for API rate limiting defaults.",
+      "how_to_collect": "Default false for solo bots"
+    },
+    "triggers.api.callers.*.requests_per_minute": {
+      "long_description": "Per API caller id throttle; null disables for that caller.",
+      "how_to_collect": "Register caller in dashboard; mint subtoken; set integer cap."
+    },
+    "permission_templates": {
+      "long_description": "Owner-defined named PermissionConfig templates for cron/API ceilings.",
+      "how_to_collect": "Copy structure from the design docs static templates as baseline; tighten tool lists per trigger class."
+    },
+    "second_brain.paths": {
+      "long_description": "Optional workspace-relative Obsidian vault folder for Second Brain (e.g. obsidian/alex_AI). When unset, sevn uses second_brain/users/<scope>/.",
+      "how_to_collect": "Choose an existing folder under the workspace content root; sevn creates raw/, wiki/, outputs/, and stub index/log files on bootstrap."
+    },
+    "second_brain.paths.vault": {
+      "long_description": "Workspace-relative directory that acts as the Second Brain vault root for default_scope.",
+      "how_to_collect": "Use CLI (`sevn second-brain setup --vault`), Telegram /config, or onboarding folder picker."
+    },
+    "openui.enabled": {
+      "long_description": "Workspace toggle for OpenUI agent HTML surface.",
+      "how_to_collect": "the design docs — default true for owner webchat deployments when resolved."
+    },
+    "openui.renderer": {
+      "long_description": "Which rendering backend serves OpenUI HTML.",
+      "how_to_collect": "Product-defined enum/string; confirm with OpenUI doc when written."
+    },
+    "doctor.strict": {
+      "long_description": "Stricter sevn doctor / schema validation for CI.",
+      "how_to_collect": "the design docs O8; optional `doctor.strict: true` in CI pipelines (pair with `21-cli.md` §10)."
+    },
+    "subagents.max_concurrent": {
+      "long_description": "Per-session concurrent subagent cap.",
+      "how_to_collect": "Default 5 lower on small hosts."
+    },
+    "max_concurrent_subagents_total": {
+      "long_description": "Workspace-wide total subagent cap across sessions.",
+      "how_to_collect": "Default 20 per RLM H2; reduce if SQLite or CPU bottlenecks."
+    },
+    "add_core_tools_to_all_context": {
+      "long_description": "RLM E2 policy: include core tools in descriptions appendix for all tiers.",
+      "how_to_collect": "Boolean E2."
+    },
+    "use_code_graph_rag": {
+      "long_description": "Master toggle for Memgraph-backed code graph pipeline.",
+      "how_to_collect": "Requires Memgraph + CGR install"
+    },
+    "code_graph_rag": {
+      "long_description": "Nested orchestrator/cypher/memgraph/watch settings merged with code defaults.",
+      "how_to_collect": "Follow the design docs table; API keys only under providers.*."
+    },
+    "witchcraft_enabled": {
+      "long_description": "Witchcraft is sevn's local semantic search. When enabled, the bot can search through your workspace markdown (MEMORY.md, notes, docs) by meaning, not just exact keywords. It indexes locally — nothing leaves your machine.",
+      "how_to_collect": "Enable if you have a lot of markdown notes and want the bot to recall them by topic. Disable on small machines (indexing uses CPU and a few hundred MB of disk for the embedding model)."
+    },
+    "witchcraft.db_path": {
+      "long_description": "SQLite path for Witchcraft index.",
+      "how_to_collect": "Relative to workspace_root; default.sevn/witchcraft.sqlite."
+    },
+    "witchcraft.index_messages": {
+      "long_description": "Whether to index full messages vs summaries only (heavy).",
+      "how_to_collect": "Keep false unless you need per-message semantic index."
+    },
+    "witchcraft.reindex_on_startup": {
+      "long_description": "Force full reindex on each gateway boot (expensive).",
+      "how_to_collect": "Enable only after bulk imports."
+    },
+    "witchcraft.model_backend": {
+      "long_description": "Embedding backend identifier (t5-quantized, t5-openvino, …).",
+      "how_to_collect": "Match installed Witchcraft build capabilities."
+    },
+    "cloudflare_agent_memory_enabled": {
+      "long_description": "Stores long-term memories in Cloudflare's Agent Memory service so the bot can recall context across devices and restarts. Third-party service: requires a Cloudflare account and an API token. There may be costs at higher usage tiers — see https://developers.cloudflare.com/agents/api-reference/store-and-retrieve-state/ for current pricing.",
+      "how_to_collect": "Enable if you want cross-device memory and have a Cloudflare account. Disable to keep all memory local (default). You'll provide the API token separately after enabling."
+    },
+    "cloudflare_agent_memory.api_token_secret": {
+      "long_description": "Secret reference for Cloudflare API token (not inline).",
+      "how_to_collect": "Create token in Cloudflare dashboard with Agent Memory scopes; store in keychain; reference `${SECRET:...}`.",
+      "secret_label": "cloudflare_agent_memory.api_token"
+    },
+    "cloudflare_agent_memory.account_id": {
+      "long_description": "Cloudflare account id string if API requires it.",
+      "how_to_collect": "Copy from Cloudflare dashboard overview URL or API."
+    },
+    "cloudflare_agent_memory.api_base_url": {
+      "long_description": "Override API base for staging/beta endpoints.",
+      "how_to_collect": "Leave empty for vendor default unless Cloudflare docs specify staging host."
+    },
+    "cloudflare_agent_memory.http_timeout_ms": {
+      "long_description": "HTTP client timeout for Agent Memory calls.",
+      "how_to_collect": "Start 8000ms from Cloudflare-Agent-Memory.md §7; increase on slow links."
+    },
+    "cloudflare_agent_memory.max_retries": {
+      "long_description": "Retry count for idempotent read paths.",
+      "how_to_collect": "Small integer 1–3; balance cost vs reliability."
+    },
+    "cloudflare_agent_memory.use_egress_proxy": {
+      "long_description": "Force traffic through unified egress proxy when true.",
+      "how_to_collect": "true in prod so credentials never hit gateway raw; false only in dev sandboxes if documented."
+    },
+    "cloudflare_agent_memory.profile_template": {
+      "long_description": "String template for isolation profile naming.",
+      "how_to_collect": "Use placeholders session_key, channel, user_id"
+    },
+    "cloudflare_agent_memory.shared_profiles": {
+      "long_description": "Named map for team profile overrides (deferred features in doc).",
+      "how_to_collect": "Usually {} in v1 per Cloudflare-Agent-Memory.md §3.6 deferral."
+    },
+    "cloudflare_agent_memory.ingest_on_compaction": {
+      "long_description": "Call ingest after LCM compaction boundary.",
+      "how_to_collect": "true for full feature column; false for ingest-only preset."
+    },
+    "cloudflare_agent_memory.ingest_min_messages": {
+      "long_description": "Minimum messages since last ingest before calling again.",
+      "how_to_collect": "Avoid thrashing on quiet chats."
+    },
+    "cloudflare_agent_memory.ingest_max_messages_per_call": {
+      "long_description": "Payload cap per ingest API call.",
+      "how_to_collect": "Lower if 413 errors; raise carefully for bandwidth."
+    },
+    "cloudflare_agent_memory.ingest_include_assistant": {
+      "long_description": "Whether assistant turns are included in ingest payload.",
+      "how_to_collect": "Usually true for full transcripts; false for privacy experiments only with legal review."
+    },
+    "cloudflare_agent_memory.tools_enabled": {
+      "long_description": "Register remember/recall/list/forget tools when true.",
+      "how_to_collect": "Disable for ingest-only archive mode preset."
+    },
+    "cloudflare_agent_memory.memory_search_merge": {
+      "long_description": "Merge Cloudflare recall into memory_search source=all.",
+      "how_to_collect": "Enable when federated search should cross layers per doc §3.5."
+    },
+    "cloudflare_agent_memory.recall_default_limit": {
+      "long_description": "Cap on recall operations per turn if enforced.",
+      "how_to_collect": "Integer default 1 from proposed table."
+    },
+    "cloudflare_agent_memory.preamble_enabled": {
+      "long_description": "Optional pre-turn recall bundle injection.",
+      "how_to_collect": "Token budget sensitive; read §7.6."
+    },
+    "cloudflare_agent_memory.preamble_queries": {
+      "long_description": "Fixed recall query strings for preamble mode.",
+      "how_to_collect": "Short stable questions; monitor token use."
+    },
+    "cloudflare_agent_memory.preamble_max_tokens": {
+      "long_description": "Hard cap on injected preamble synthesis text.",
+      "how_to_collect": "512 starter from proposed table; lower on small context models."
+    },
+    "cloudflare_agent_memory.redact_patterns": {
+      "long_description": "Regex strings stripped before ingest.",
+      "how_to_collect": "Add email/token patterns; test regexes offline."
+    },
+    "cloudflare_agent_memory.skip_channels": {
+      "long_description": "Channel type strings where Agent Memory disabled.",
+      "how_to_collect": "e.g. demo web channels per doc §7.7."
+    },
+    "telegram.bot_token": {
+      "long_description": "LEGACY top-level Telegram token reference — prefer channels.telegram.",
+      "how_to_collect": "Use `${ENV:SEVN_TELEGRAM_BOT_TOKEN}` or keychain secret migrate to channels.telegram.",
+      "secret_label": "telegram.bot_token"
+    },
+    "telegram.claude_agent_topic_id": {
+      "long_description": "Forum topic id for Claude Agent dedicated path.",
+      "how_to_collect": "Read topic id from Telegram client URL when in forum mode; integer"
+    },
+    "sandbox.mode": {
+      "long_description": "Where sevn executes tool code. Three choices: leave empty to inherit the profile's default (recommended); `docker` runs each tool call in a throwaway container (strongest isolation, requires Docker Desktop / docker daemon, adds ~1–3 s per call); `pyodide_deno` runs Python via Pyodide WASM and JS via Deno permissions (no Docker, fastest startup, but native binaries won't run).",
+      "how_to_collect": "Stick with the preset default unless you have a specific reason to override. Choose `docker` for production-grade safety on a machine that already runs Docker. Choose `pyodide_deno` on a laptop without Docker where tool code is pure-Python or pure-JS."
+    },
+    "skills.computer_use.enabled": {
+      "long_description": "Lets the bot control your computer's screen, keyboard, and mouse (open apps, click, type) through Anthropic's computer-use skill. macOS only for now. When you first enable it, macOS will ask you to grant Accessibility and Screen Recording permissions to the terminal that runs sevn.",
+      "how_to_collect": "Only enable if you actually want sevn to drive your desktop. Disable for chat-only use. You can revoke the macOS permissions at any time in System Settings → Privacy & Security."
+    },
+    "skills.computer_use.target": {
+      "long_description": "Which computer-use backend is active: `host` uses cua-driver MCP on your real macOS desktop (default, highest risk); `docker`, `cloud`, or `lume` route through the `cua` CLI sandbox after `cua do switch <provider>`.",
+      "how_to_collect": "Keep `host` only when you intend to drive the operator desktop. Pick a sandbox provider when you want isolation; ensure the matching CLI/binary is installed before switching targets."
+    },
+    "skills.computer_use.snapshot.annotate": {
+      "long_description": "When true, prefer AI-annotated `cua do snapshot` output (labels UI elements) instead of a raw screenshot. Requires `ANTHROPIC_API_KEY` in the environment or secrets chain.",
+      "how_to_collect": "Leave false unless you need annotated snapshots for agent reasoning. Enable only after the cua CLI is installed and API credentials are configured."
+    },
+    "skills.computer_use.trajectory": {
+      "long_description": "Session trajectory recording via the cua CLI: `enabled` turns capture on; `share` offers a link to the operator at session end; `export_dir` optionally writes HTML exports to a directory you choose.",
+      "how_to_collect": "Defaults record and share trajectories for debugging autonomous runs. Disable `share` on sensitive desktops or set `export_dir` to a workspace-local folder you control."
+    },
+    "skills.cua_agent.enabled": {
+      "long_description": "Opt-in autonomous GUI loop (`cua-agent`) that drives the active computer-use target toward a goal without step-by-step operator prompts. Requires computer-use enabled and explicit per-run approval at the script boundary.",
+      "how_to_collect": "Enable only after computer-use is working (binaries + macOS TCC on host). Keep disabled unless you want goal-driven automation with HITL approval each run."
+    },
+    "skills.cua_agent.approval": {
+      "long_description": "How cua-agent obtains operator consent before an autonomous run. v1 supports `per_run` only: each invocation must pass an explicit approval flag or prompt.",
+      "how_to_collect": "Leave at `per_run` — do not disable approval while the default computer-use target is the host desktop."
+    },
+    "skills.lume.enabled": {
+      "long_description": "Apple-Silicon VM lifecycle via the `lume` CLI (`run`, `stop`, `ls`, `pull`). Also selectable as a computer-use sandbox target through `cua do switch lume`. macOS Apple-Silicon only.",
+      "how_to_collect": "Enable when you run local VMs for isolated computer-use sessions. Install `lume` first; keep disabled on Intel Macs or non-Darwin hosts."
+    },
+    "skills.cursor_cloud.enabled": {
+      "long_description": "Exposes the bundled cursor_cloud skill so the agent can launch Cursor Cloud Agents against GitHub/GitLab repos (code changes, optional PR, dashboard link, artifacts). Requires a Cursor API key on the egress proxy.",
+      "how_to_collect": "Enable when you want sevn to delegate heavy coding tasks to Cursor's cloud VMs. Store integration.cursor.api_key via sevn secrets (Cursor Dashboard → Integrations). Connect GitHub/GitLab to your Cursor account."
+    },
+    "skills.cursor_cloud.default_repo_url": {
+      "long_description": "Default GitHub repository URL when launch scripts omit --repo-url (for example https://github.com/your-org/sevn).",
+      "how_to_collect": "Set to the repo you delegate most often."
+    },
+    "integration.cursor.api_key": {
+      "long_description": "Cursor Cloud Agents API key used by the egress proxy for POST /integration service=cursor.",
+      "how_to_collect": "Generate from https://cursor.com/dashboard/integrations and run: sevn secrets set integration.cursor.api_key",
+      "secret_label": "integration.cursor.api_key"
+    },
+    "integration.openwiki.llm_api_key": {
+      "long_description": "Primary LLM API key for the bundled openwiki skill. Resolved from sevn secrets and forwarded to the provider env var configured under skills.openwiki.provider (for example OPENROUTER_API_KEY when provider is openrouter).",
+      "how_to_collect": "Run: sevn openwiki configure --stdin — paste the API key for your chosen OpenWiki provider. Reference it in sevn.json as skills.openwiki.api_key: ${SECRET:integration.openwiki.llm_api_key}.",
+      "secret_label": "integration.openwiki.llm_api_key"
+    },
+    "skills.openwiki.api_key": {
+      "long_description": "${SECRET:…} reference to the OpenWiki LLM API key. When omitted, sevn auto-maps from the assigned provider's `providers.<name>.api_key` secret (for OpenWiki-compatible providers) or `integration.openwiki.llm_api_key`.",
+      "how_to_collect": "Optional when an assigned provider already has a stored key. Otherwise run `sevn secrets set integration.openwiki.llm_api_key` and set skills.openwiki.api_key to ${SECRET:integration.openwiki.llm_api_key}, or rely on auto-map."
+    },
+    "skills.openwiki.provider": {
+      "long_description": "OpenWiki inference provider id (openrouter, openai, anthropic, fireworks, baseten). Forwarded as OPENWIKI_PROVIDER and selects which env var receives skills.openwiki.api_key.",
+      "how_to_collect": "Match the provider for the API key you stored in integration.openwiki.llm_api_key."
+    },
+    "skills.openwiki.model_id": {
+      "long_description": "Optional OpenWiki model id override forwarded as OPENWIKI_MODEL_ID to the npm CLI.",
+      "how_to_collect": "Use an id supported by your chosen provider (see upstream OpenWiki docs)."
+    },
+    "self_improve.enabled": {
+      "long_description": "Background loop that watches recent conversations and proposes tweaks to sevn's own prompts and skills (writes proposals to logs/, never modifies code without your approval). Costs a small amount of LLM usage in the background.",
+      "how_to_collect": "Leave on if you want sevn to learn from your feedback over time. Turn off on metered API keys where every call counts."
+    },
+    "dashboard.enabled": {
+      "long_description": "Master switch for Mission Control JSON APIs, WebSocket bus, and the /mission/ SPA mount on the gateway.",
+      "how_to_collect": "Set true when operators use Mission Control; false disables routes while leaving sevn.json valid."
+    },
+    "dashboard.local_open": {
+      "long_description": "When effectively true and the HTTP client is loopback, Mission Control skips owner login and uses synthetic owner claims. Defaults to true when gateway.host is loopback-only and infrastructure.tunnel.mode is none; forced false when a tunnel is active.",
+      "how_to_collect": "Leave unset for laptop dev on 127.0.0.1 with no tunnel. Set false to require dashboard.login_password even on loopback. Never rely on local_open when infrastructure.tunnel.mode is not none."
+    },
+    "dashboard.login_password": {
+      "long_description": "Owner password for Mission Control login over tunnel or non-loopback clients. Distinct from gateway.token; never returned by APIs.",
+      "how_to_collect": "Choose a strong password; store via `${SECRET:keychain:sevn.dashboard.password}`; required before exposing Mission Control on the public internet.",
+      "secret_label": "sevn.dashboard.password"
+    },
+    "dashboard.jwt_secret": {
+      "long_description": "HMAC secret for aud=dashboard session JWTs (cookie and Bearer). Rotates on restart when unset.",
+      "how_to_collect": "Generate a long random string; store via `${SECRET:keychain:sevn.dashboard.jwt_secret}`; set explicitly when sessions must survive gateway restarts.",
+      "secret_label": "sevn.dashboard.jwt_secret"
+    },
+    "dashboard.jwt_ttl_seconds": {
+      "long_description": "Lifetime in seconds for dashboard session JWTs after login (default 86400).",
+      "how_to_collect": "Use 86400 for one day; shorten for shared machines or compliance."
+    },
+    "dashboard.page_agent.enabled": {
+      "long_description": "Enables the Page Agent side panel in Mission Control (OpenUI integration).",
+      "how_to_collect": "Set true when operators use Page Agent; requires openui and proxy configuration."
+    },
+    "infrastructure.tunnel.mode": {
+      "long_description": "How sevn exposes the gateway to the outside world. `none` uses Telegram long-polling (no public address needed — best default). Other modes start a vendor-specific tunnel so Telegram or webhooks can reach you over HTTPS.",
+      "how_to_collect": "Pick `none` if unsure — Telegram polls for messages without needing inbound HTTPS. Use `cloudflare-quick` for a no-domain dev URL (`https://*.trycloudflare.com`). Use `cloudflare` with API credentials when you have a domain on Cloudflare."
+    },
+    "infrastructure.tunnel.cloudflare.token": {
+      "long_description": "Cloudflare connector token for cloudflared (legacy dashboard paste).",
+      "how_to_collect": "Legacy path only: Cloudflare Zero Trust → Networks → Tunnels → your tunnel → Connectors. Copy the full Install as service command (for example `sudo cloudflared service install eyJ…`) and paste it here — sevn extracts the token, installs cloudflared if needed, and starts the tunnel. Prefer API setup with --account-id and --api-token-stdin instead.",
+      "secret_label": "infrastructure.tunnel.cloudflare.token"
+    },
+    "infrastructure.tunnel.cloudflare.api_token": {
+      "long_description": "Cloudflare API token with Tunnel Write and DNS Write permissions.",
+      "how_to_collect": "Create at https://dash.cloudflare.com/profile/api-tokens with Cloudflare Tunnel Edit and DNS Edit for your zone. Used by `sevn tunnel setup --mode cloudflare` to create the tunnel, route ingress to the gateway, and publish DNS automatically (https://developers.cloudflare.com/tunnel/setup/).",
+      "secret_label": "infrastructure.tunnel.cloudflare.api_token"
+    },
+    "infrastructure.tunnel.cloudflare.credentials_file": {
+      "long_description": "Path to the Cloudflare tunnel credentials JSON written by `cloudflared tunnel login`. Use this when you already ran cloudflared interactively instead of using a token from the dashboard.",
+      "how_to_collect": "Run `cloudflared tunnel login` in a terminal, then `cloudflared tunnel create sevn` — note the generated `~/.cloudflared/<uuid>.json` path and paste it here."
+    },
+    "infrastructure.tunnel.ngrok.authtoken": {
+      "long_description": "Your personal ngrok authtoken — needed for the free tier.",
+      "how_to_collect": "Copy your authtoken from https://dashboard.ngrok.com/get-started/your-authtoken",
+      "secret_label": "infrastructure.tunnel.ngrok.authtoken"
+    },
+    "infrastructure.tunnel.ngrok_authtoken": {
+      "long_description": "ngrok authtoken reference (ngrok mode). Stamped as a ${SECRET:...} reference by `sevn tunnel setup`; the plaintext lives in the workspace secrets chain under infrastructure.tunnel.ngrok.authtoken.",
+      "how_to_collect": "Run `sevn tunnel setup --mode ngrok --token-stdin` and paste the authtoken; never store the plaintext in sevn.json.",
+      "secret_label": "infrastructure.tunnel.ngrok.authtoken"
+    },
+    "infrastructure.tunnel.local_port": {
+      "long_description": "Local gateway port that ngrok/tailscale forward to. Defaults to gateway.port when unset.",
+      "how_to_collect": "Leave unset to use the gateway port, or pass `--local-port` to `sevn tunnel setup` when the gateway listens on a non-default port."
+    },
+    "infrastructure.tunnel.tailscale.hostname": {
+      "long_description": "Optional hostname under your tailnet to advertise (e.g. `my-mac.tail1234.ts.net`). Only used to surface a friendly URL in handoff messages; leave empty and Tailscale's default will work.",
+      "how_to_collect": "Run `tailscale status` to see your tailnet hostname, or copy it from the Tailscale admin console at https://login.tailscale.com/admin/machines."
+    }
+  },
+  "skills.computer_use.target": {
+    "long_description": "Which computer-use backend is active: `host` uses cua-driver MCP on your real macOS desktop (default, highest risk); `docker`, `cloud`, or `lume` route through the `cua` CLI sandbox after `cua do switch <provider>`.",
+    "how_to_collect": "Keep `host` only when you intend to drive the operator desktop. Pick a sandbox provider when you want isolation; ensure the matching CLI/binary is installed before switching targets."
+  },
+  "skills.computer_use.snapshot.annotate": {
+    "long_description": "When true, prefer AI-annotated `cua do snapshot` output (labels UI elements) instead of a raw screenshot. Requires `ANTHROPIC_API_KEY` in the environment or secrets chain.",
+    "how_to_collect": "Leave false unless you need annotated snapshots for agent reasoning. Enable only after the cua CLI is installed and API credentials are configured."
+  },
+  "skills.computer_use.trajectory": {
+    "long_description": "Session trajectory recording via the cua CLI: `enabled` turns capture on; `share` offers a link to the operator at session end; `export_dir` optionally writes HTML exports to a directory you choose.",
+    "how_to_collect": "Defaults record and share trajectories for debugging autonomous runs. Disable `share` on sensitive desktops or set `export_dir` to a workspace-local folder you control."
+  },
+  "skills.cua_agent.enabled": {
+    "long_description": "Opt-in autonomous GUI loop (`cua-agent`) that drives the active computer-use target toward a goal without step-by-step operator prompts. Requires computer-use enabled and explicit per-run approval at the script boundary.",
+    "how_to_collect": "Enable only after computer-use is working (binaries + macOS TCC on host). Keep disabled unless you want goal-driven automation with HITL approval each run."
+  },
+  "skills.cua_agent.approval": {
+    "long_description": "How cua-agent obtains operator consent before an autonomous run. v1 supports `per_run` only: each invocation must pass an explicit approval flag or prompt.",
+    "how_to_collect": "Leave at `per_run` — do not disable approval while the default computer-use target is the host desktop."
+  },
+  "skills.lume.enabled": {
+    "long_description": "Apple-Silicon VM lifecycle via the `lume` CLI (`run`, `stop`, `ls`, `pull`). Also selectable as a computer-use sandbox target through `cua do switch lume`. macOS Apple-Silicon only.",
+    "how_to_collect": "Enable when you run local VMs for isolated computer-use sessions. Install `lume` first; keep disabled on Intel Macs or non-Darwin hosts."
+  }
+}

@@ -1,0 +1,31 @@
+# Markdownlint for `prd/`, `specs/`, `plan/` (via pre-commit).
+# Hook excludes `plan/archive/` (`.pre-commit-config.yaml`). Permissive rules for ADR/PRD style.
+default: true
+MD007: false # unordered list indent (nested docs use mixed indentation)
+MD013: false # line length
+MD022: false # blanks around headings
+MD024: false # duplicate headings
+MD029: false # ordered list prefix style
+MD032: false # blanks around lists
+MD033: false # inline HTML
+MD036: false # emphasis as heading
+MD040: false # fenced code language (bare ``` used for directory trees / templates)
+MD041: false # first line h1
+MD046: false # code block style
+MD060: false # table column pipe spacing (compact GitHub-style tables)
+MD058: false # blanks around tables
+MD056: false # table column count mismatch
+MD034: false # bare URLs
+MD031: false # blanks around fenced blocks
+MD012: false # consecutive blank lines
+MD009: false # trailing spaces
+MD037: false # spaces inside emphasis markers
+MD038: false # spaces inside code spans
+MD051: false # link fragments (GitHub § anchors differ from slug generators)
+MD049: false # emphasis _ vs *
+MD003: false # heading style (setext used in some ADRs)
+MD026: false # trailing punctuation in heading
+MD025: false # multiple top-level h1 (long migrated docs)
+MD028: false # blank line inside blockquote
+MD055: false # leading/trailing table pipes
+MD010: false # hard tabs (Make snippets in docs)

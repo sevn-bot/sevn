@@ -1,0 +1,142 @@
+# Sync hook revisions with dev tooling (see pyproject.toml optional dev deps).
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.12
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-yaml
+      - id: check-toml
+      - id: end-of-file-fixer
+        exclude: ^about-sevn\.bot/(index|getting-started|mission-control|telegram-menu|tools|skills|config|troubleshooting)\.html$
+      - id: trailing-whitespace
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.48.0
+    hooks:
+      - id: markdownlint
+        args: [--config, .markdownlint.yaml]
+        files: ^(prd|specs|plan)/
+        exclude: ^plan/(archive/|audit-specs-0-16-report\.md|open-questions\.md)
+
+  - repo: local
+    hooks:
+      - id: sevn-docstrings
+        name: ADR docstring / Exports check (src/sevn, scripts)
+        entry: uv run python scripts/check_docstrings.py
+        language: system
+        pass_filenames: true
+        files: ^(src/sevn|scripts)/.*\.py$
+
+      - id: sevn-type-hints
+        name: ADR public type-hint check (src/sevn, scripts)
+        entry: uv run python scripts/check_type_hints.py
+        language: system
+        pass_filenames: true
+        files: ^(src/sevn|scripts)/.*\.py$
+
+      - id: sevn-mypy
+        name: mypy (src/sevn, pyproject.toml)
+        entry: uv run python scripts/mypy_precommit.py
+        language: system
+        pass_filenames: false
+        files: ^(src/sevn/.*\.py|pyproject\.toml)$
+
+      - id: sevn-telegram-menu-docs
+        name: Telegram Menu.html structure sync
+        entry: uv run python scripts/check_telegram_menu_docs.py
+        language: system
+        pass_filenames: false
+        files: ^(src/sevn/gateway/menu(_registry|_readiness)?\.py|about-sevn\.bot/Telegram Menu\.html|scripts/(check_telegram_menu_docs|telegram_menu_catalog|telegram_menu_snapshot)\.py)$
+
+      - id: sevn-mission-control-docs
+        name: Mission Control.html structure sync
+        entry: uv run python scripts/check_mission_control_docs.py
+        language: system
+        pass_filenames: false
+        files: ^(src/sevn/ui/dashboard/tab_registry\.py|about-sevn\.bot/Mission Control\.html|scripts/(check_mission_control_docs|mission_control_catalog|mission_control_snapshot)\.py)$
+
+      - id: sevn-mission-control-schema
+        name: Mission Control dashboard schema drift gate
+        entry: uv run python scripts/check_mission_control_schema.py
+        language: system
+        pass_filenames: false
+        files: ^(src/sevn/ui/dashboard/(dashboard_schema|tab_registry)\.py|src/sevn/ui/spa/dashboard/app\.js|src/sevn/ui/dashboard/api/.*\.py|infra/mission-control\.schema\.(json|meta\.json)|scripts/(check_mission_control_schema|generate_mission_control_schema|mission_control_schema_lib)\.py)$
+
+      - id: sevn-about-site
+        name: about-sevn.bot site sync check
+        entry: uv run python scripts/build_about_site.py --check
+        language: system
+        pass_filenames: false
+        files: ^(about-sevn\.bot/_sources/|about-sevn\.bot/_templates/|about-sevn\.bot/(Telegram Menu|Mission Control)\.html|scripts/build_about_site\.py|scripts/(check_telegram_menu_docs|telegram_menu_catalog|telegram_menu_snapshot|check_mission_control_docs|mission_control_catalog|mission_control_snapshot|agent_context_manifest_lib|generate_agent_context_manifest)\.py|infra/agent-context\.manifest\.json|tests/fixtures/agent_context/|src/sevn/agent/context_manifest\.py|src/sevn/gateway/menu(_registry|_readiness)?\.py|src/sevn/ui/dashboard/tab_registry\.py|src/sevn/tools/registry\.py|src/sevn/data/sevn\.schema\.json|src/sevn/data/bundled_skills/)
+
+      - id: sevn-loguru-only
+        name: loguru-only (no new stdlib logging imports)
+        entry: uv run python scripts/check_loguru_only.py
+        language: system
+        pass_filenames: false
+        files: ^src/sevn/.*\.py$
+
+      - id: sevn-skills-index
+        name: skills/INDEX.md ↔ bundled_skills/core/ parity
+        entry: uv run python scripts/check_skills_index.py
+        language: system
+        pass_filenames: false
+        files: ^(skills/INDEX\.md|src/sevn/data/skills/INDEX\.md|src/sevn/data/bundled_skills/core/|scripts/check_skills_index\.py|src/sevn/data/skills_index\.py)$
+
+      - id: sevn-readme-sync
+        name: README offline sync for touched source_globs
+        entry: uv run python scripts/readme_precommit.py
+        language: system
+        pass_filenames: true
+        files: ^(src/sevn/|pyproject\.toml|CLAUDE\.md|docs/readmes/manifest\.toml|docs/brand/|evolution/ARCHITECTURE\.md|about-sevn\.bot/ARCHITECTURE\.md|infra/sevn\.schema\.json)$
+
+      - id: sevn-no-design-doc-refs
+        name: no plan/ specs/ prd/ refs in published surfaces
+        entry: uv run python scripts/check_no_design_doc_refs.py
+        language: system
+        pass_filenames: true
+        files: ^(README\.md|CHANGELOG\.md|about-sevn\.bot/.*|infra/sevn\.schema\.json|infra/sevn\.json\.template|infra/sevn_config_long_description\.json|src/sevn/data/sevn\.schema\.json)$
+        exclude: ^about-sevn\.bot/_docsys/manifest\.toml$
+
+      - id: sevn-about-docs-refs
+        name: about-docs file-path reference guard
+        entry: uv run python scripts/check_about_docs_refs.py
+        language: system
+        pass_filenames: true
+        files: ^about-sevn\.bot/(prd|specs)/
+
+      - id: changelog-staged-check
+        name: Changelog gate (staged src/scripts require a staged Unreleased entry)
+        entry: python3 spec-kit-wave/src/skw/changelog_validate.py --repo . --staged
+        language: system
+        # commit-msg stage: pre-commit appends the message file path (read for the
+        # `changelog: skip` trailer); the hook inspects the staged index itself, so
+        # no `files` filter — it no-ops when no code is staged.
+        stages: [commit-msg]
+
+      - id: sevn-conventional-commit
+        name: Conventional Commits (commit-msg)
+        entry: uv run python scripts/check_conventional_commit.py
+        language: system
+        stages: [commit-msg]
+
+      - id: sevn-codespell-advisory
+        name: codespell (advisory — manual stage)
+        entry: uv run codespell
+        language: system
+        pass_filenames: true
+        stages: [manual]
+        files: ^(src|tests|scripts)/
+
+      - id: sevn-vulture-advisory
+        name: vulture dead-code (advisory — manual stage)
+        entry: uv run vulture
+        language: system
+        pass_filenames: false
+        stages: [manual]

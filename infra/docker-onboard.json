@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "workspace_root": ".",
+  "agent": {
+    "display_name": "Sevn"
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "bot_token_ref": "${ENV:SEVN_TELEGRAM_BOT_TOKEN}"
+    },
+    "webchat": {
+      "enabled": true
+    }
+  },
+  "gateway": {
+    "host": "0.0.0.0",
+    "port": 3001,
+    "queue_mode": "cancel"
+  },
+  "providers": {
+    "tier_default": {
+      "triager": "minimax/MiniMax-M2.7"
+    },
+    "use_main_model_for_all": true
+  },
+  "sandbox": {
+    "mode": "docker"
+  },
+  "skills": {
+    "browser": {
+      "engine": "brave",
+      "headless": true
+    }
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sevn.bot/schemas/mission-control.schema.meta.json",
+  "title": "Mission Control dashboard schema golden",
+  "type": "object",
+  "required": ["schema_version", "generated_at", "tab_count", "nav", "shell", "tabs", "routes"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "generated_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tab_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "nav": {
+      "type": "object",
+      "required": ["groups", "tabs", "wired_slugs", "post_v1_placeholder_slugs", "tab_count"],
+      "additionalProperties": true
+    },
+    "shell": {
+      "type": "object",
+      "required": ["key_selectors"],
+      "properties": {
+        "key_selectors": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "system_menu_actions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/action" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "tabs": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/tab" }
+    },
+    "routes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["method", "path"],
+        "properties": {
+          "method": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "pattern": "^/api/v1/" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "view": {
+      "type": "object",
+      "required": ["id", "label", "selector"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "selector": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "action": {
+      "type": "object",
+      "required": ["id", "label", "selector", "method", "endpoint"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "selector": { "type": "string" },
+        "method": { "type": "string" },
+        "endpoint": { "type": "string", "pattern": "^/api/v1/" },
+        "destructive": { "type": "boolean" },
+        "needs_seed": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "tab": {
+      "type": "object",
+      "required": ["group", "title", "kind", "views", "actions", "read_endpoints", "key_selectors"],
+      "properties": {
+        "group": { "type": "string" },
+        "title": { "type": "string" },
+        "kind": { "type": "string", "enum": ["wired", "post_v1", "stub"] },
+        "views": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/view" }
+        },
+        "actions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/action" }
+        },
+        "read_endpoints": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^/api/v1/" }
+        },
+        "key_selectors": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

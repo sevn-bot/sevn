@@ -1,0 +1,493 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sevn"
+version = "0.0.1"
+description = "sevn.bot — ownable multi-channel AI assistant"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Alex" }]
+dependencies = [
+    "croniter==6.2.2",
+    "fastapi==0.136.1",
+    "cryptography==48.0.0",
+    "jinja2==3.1.6",
+    "loguru==0.7.3",
+    "httpx==0.28.1",
+    "rich==15.0.0",
+    "typer==0.25.1",
+    "pyyaml==6.0.3",
+    "pydantic==2.13.3",
+    "pydantic-settings==2.14.0",
+    "starlette==1.0.1",
+    "pydantic-ai>=1.106,<2",
+    "textual==8.2.7",
+    "uvicorn[standard]==0.46.0",
+    "weasyprint==69.0",
+    "opentelemetry-sdk==1.39.1",
+    "opentelemetry-exporter-otlp-proto-http==1.39.1",
+    "ddgs==9.14.4",
+    "markdownify==1.2.2",
+    "pexpect==4.9.0",
+    "fpdf2==2.8.3",
+    "pyjwt[crypto]>=2.13.0",
+    "pydantic-evals>=1.99.0",
+    "logfire>=4.32.1",
+    "pydantic-ai-harness[codemode]>=0.3.0",
+]
+
+[project.scripts]
+sevn = "sevn.cli.app:main"
+
+[project.entry-points."sevn.tools"]
+sevn_core_reserved_plugin_table = "sevn.tools.entrypoints:reserved_plugin_row"
+
+[project.entry-points."sevn.skills"]
+sevn_core_reserved_skills_table = "sevn.skills.entrypoints:reserved_skills_plugin_row"
+
+[project.entry-points."sevn.channels"]
+discord = "sevn.channels.discord:DiscordChannelAdapter"
+slack = "sevn.channels.slack:SlackChannelAdapter"
+signal = "sevn.channels.tier_stubs:SignalChannelAdapter"
+whatsapp = "sevn.channels.tier_stubs:WhatsappChannelAdapter"
+matrix = "sevn.channels.tier_stubs:MatrixChannelAdapter"
+teams = "sevn.channels.tier_stubs:TeamsChannelAdapter"
+email = "sevn.channels.tier_stubs:EmailChannelAdapter"
+sms = "sevn.channels.tier_stubs:SmsChannelAdapter"
+dingtalk = "sevn.channels.tier_stubs:DingtalkChannelAdapter"
+feishu = "sevn.channels.tier_stubs:FeishuChannelAdapter"
+wecom = "sevn.channels.tier_stubs:WecomChannelAdapter"
+weixin = "sevn.channels.tier_stubs:WeixinChannelAdapter"
+qq = "sevn.channels.tier_stubs:QqChannelAdapter"
+yuanbao = "sevn.channels.tier_stubs:YuanbaoChannelAdapter"
+line = "sevn.channels.tier_stubs:LineChannelAdapter"
+ntfy = "sevn.channels.tier_stubs:NtfyChannelAdapter"
+bluebubbles = "sevn.channels.tier_stubs:BluebubblesChannelAdapter"
+google_chat = "sevn.channels.tier_stubs:GoogleChatChannelAdapter"
+mattermost = "sevn.channels.tier_stubs:MattermostChannelAdapter"
+homeassistant = "sevn.channels.tier_stubs:HomeassistantChannelAdapter"
+
+[project.optional-dependencies]
+bedrock = ["boto3==1.43.6"]
+code-graph-rag = []
+code-review-graph = ["code-review-graph==2.3.3"]
+graphify = ["graphifyy==0.8.13"]
+pdf = ["pdfplumber==0.11.9", "openparse==0.7.0"]
+browser = ["playwright==1.60.0", "websocket-client==1.9.0"]
+browser-cdp = ["websockets>=12"]
+job-ops = ["python-jobspy>=1.1.80", "selectolax>=0.3.21"]
+skillspector = ["skillspector @ git+https://github.com/NVIDIA/SkillSpector@main"]
+yt-dlp = ["yt-dlp==2026.6.9"]
+web-extract = ["readability-lxml==0.8.4.1"]
+web-fetch = ["brotli>=1.1.0"]
+dev = [
+    "sevn-telegram-tester",
+    "pytest==9.0.3",
+    "pytest-asyncio==1.3.0",
+    "pytest-xdist==3.8.0",
+    "ruff==0.15.12",
+    "mypy==1.20.2",
+    "pre-commit==4.6.0",
+    "bandit[toml]==1.9.4",
+    "pip-audit==2.10.0",
+    "types-PyYAML==6.0.12.20260510",
+    "uvicorn[standard]==0.46.0",
+    "check-jsonschema==0.37.2",
+    "import-linter==2.11",
+    "pyright==1.1.409",
+    "vulture==2.16",
+    "xenon==0.9.3",
+    "codespell==2.4.2",
+    "deptry==0.25.1",
+    "interrogate==1.7.0",
+    "pytest-cov==6.0.0",
+    "diff-cover==9.2.0",
+    "pytest-randomly==3.16.0",
+    "hypothesis==6.122.3",
+    "pytest-split==0.11.0",
+]
+
+[tool.uv.workspace]
+members = ["tools/telegram-tester"]
+
+[tool.uv]
+# python-jobspy (job-ops extra) hard-pins markdownify<0.14.0, but sevn pins
+# markdownify==1.2.2; the markdownify() API is stable across the range, so force
+# sevn's version rather than downgrade the core dependency.
+override-dependencies = ["typer==0.25.1", "joserfc>=1.6.7", "markdownify==1.2.2"]
+
+[tool.uv.sources]
+sevn-telegram-tester = { workspace = true }
+skillspector = { git = "https://github.com/NVIDIA/SkillSpector", branch = "main" }
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sevn"]
+artifacts = [
+    "src/sevn/ui/webapp/*.html",
+    "src/sevn/ui/webapp/*.css",
+    "src/sevn/ui/webapp/*.js",
+    "src/sevn/ui/webapp/viewer/*.html",
+    "src/sevn/ui/webapp/viewer/*.css",
+    "src/sevn/ui/webapp/viewer/*.js",
+    "src/sevn/ui/spa/dashboard/*.html",
+    "src/sevn/ui/spa/dashboard/*.css",
+    "src/sevn/ui/spa/dashboard/*.js",
+    "src/sevn/data/onboarding_profiles/**/*.json",
+    "src/sevn/data/doctor_solutions.json",
+    "src/sevn/data/cli_guides/**/*.md",
+    "src/sevn/data/workspace_templates/**/*.md",
+    "src/sevn/data/sevn_config_long_description.json",
+    "src/sevn/data/LLM_params_config.json",
+    "src/sevn/onboarding/web_wizard/*.html",
+    "src/sevn/onboarding/web_wizard/*.css",
+    "src/sevn/onboarding/web_wizard/*.js",
+    "src/sevn/ui/shared/*.js",
+    "src/sevn/ui/style/**/*.css",
+    "src/sevn/ui/style/**/*.svg",
+    "src/sevn/ui/style/**/*.html",
+    "src/sevn/ui/style/**/*.js",
+    "src/sevn/agent/runtimes/pyodide_runner.ts",
+    "src/sevn/data/bundled_skills/**/*.md",
+    "src/sevn/data/bundled_skills/**/*.py",
+    "src/sevn/data/bundled_skills/**/*.sh",
+    "src/sevn/data/bundled_skills/**/*.js",
+    "src/sevn/data/bundled_skills/**/*.mjs",
+    "src/sevn/data/bundled_skills/**/*.json",
+    "src/sevn/data/bundled_skills/**/LICENSE",
+    "src/sevn/data/bundled_skills/**/UPSTREAM_VERSION",
+    "src/sevn/data/skills/INDEX.md",
+    "src/sevn/data/standards/**/*.md",
+    "src/sevn/data/second_brain/**/*.md",
+    "src/sevn/pdf/assets/*.ttf",
+    "src/sevn/pdf/assets/*.txt",
+    "src/sevn/data/branding/*.png",
+    "src/sevn/docs/readme/templates/**/*.j2",
+    "src/sevn/docs/readme/prompts/**/*.toml",
+]
+
+[tool.hatch.build.targets.wheel.force-include]
+"infra/sevn.schema.json" = "sevn/data/sevn.schema.json"
+
+[tool.hatch.build.targets.sdist]
+include = ["src/sevn", "tests", "README.md", "pyproject.toml", "infra/sevn.schema.json"]
+
+[tool.importlinter]
+root_packages = ["sevn"]
+
+[[tool.importlinter.contracts]]
+name = "Channels must not import tools or skills"
+type = "forbidden"
+source_modules = ["sevn.channels"]
+forbidden_modules = ["sevn.tools", "sevn.skills"]
+
+[[tool.importlinter.contracts]]
+name = "Proxy is a leaf"
+type = "forbidden"
+source_modules = ["sevn.proxy"]
+forbidden_modules = ["sevn.agent", "sevn.gateway", "sevn.channels"]
+
+# W2 (D9): skills/tools independence — blocking (no current violations)
+[[tool.importlinter.contracts]]
+name = "Skills must not import tools"
+type = "forbidden"
+source_modules = ["sevn.skills"]
+forbidden_modules = ["sevn.tools"]
+
+# W2 (D9): tools/skills must not reach channel transports (§2.3) — baselined edges
+[[tool.importlinter.contracts]]
+name = "Tools and skills must not import channels"
+type = "forbidden"
+source_modules = ["sevn.tools", "sevn.skills"]
+forbidden_modules = ["sevn.channels"]
+ignore_imports = [
+    # TODO(ci-quality): burn down — outbound tool reaches channel layer directly and via gateway
+    "sevn.tools.outbound -> sevn.channels.telegram",
+    "sevn.tools.outbound -> sevn.gateway.channel_router",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests", "scripts", "tools/telegram-tester/src", "tools/telegram-tester/tests"]
+extend-exclude = [
+    "src/sevn/data/bundled_skills/core/last30days/scripts/lib",
+    "src/sevn/data/bundled_skills/core/last30days/scripts/last30days.py",
+    "src/sevn/data/bundled_skills/core/last30days/scripts/briefing.py",
+    "src/sevn/data/bundled_skills/core/last30days/scripts/watchlist.py",
+    "src/sevn/data/bundled_skills/core/last30days/scripts/evaluate_search_quality.py",
+    "src/sevn/data/bundled_skills/core/last30days/scripts/store.py",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "W",
+    "F",
+    "I",
+    "UP",
+    "B",
+    "SIM",
+    "RUF",
+    "ASYNC",
+    "PT",
+    "TCH",
+    "PIE",
+    "T20",
+    # W1 (D3): correctness — RET/RSE/DTZ/FLY blocking-ready; SLF/BLE advisory
+    "RET",
+    "BLE",
+    "RSE",
+    "SLF",
+    "DTZ",
+    "FLY",
+    # W1 (D3): pathlib / comprehensions — advisory
+    "PTH",
+    "C4",
+    "PERF",
+    "FURB",
+    # W1 (D3): errors / exceptions — advisory
+    "TRY",
+    "EM",
+    "ARG",
+    # W1 (D3): style / strictness — advisory
+    "N",
+    "PL",
+    "FBT",
+    "ERA",
+    "ISC",
+    "ICN",
+    "C901",
+]
+ignore = [
+    "E501",
+    "B008",
+    # Advisory-only (D3): enforced in `make ruff-extra` / `ci-quality` (W6), not blocking `lint`
+    "SLF",
+    "BLE",
+    "PTH",
+    "C4",
+    "PERF",
+    "FURB",
+    "TRY",
+    "EM",
+    "ARG",
+    "N",
+    "PL",
+    "FBT",
+    "ERA",
+    "ISC",
+    "ICN",
+    "C901",
+]
+
+[tool.ruff.lint.mccabe]
+# Highest observed complexity in current tree (187); C901 advisory via ignore above
+max-complexity = 187
+
+[tool.ruff.lint.isort]
+known-first-party = ["sevn", "sevn_telegram_tester"]
+
+[tool.ruff.lint.per-file-ignores]
+".vulture_whitelist.py" = ["B018", "F821"]  # vulture name-registration baseline (W3)
+"build-plan-from-review/scripts/**" = [
+    "T20",
+    "BLE", "PTH", "C4", "PERF", "FURB", "TRY", "EM", "ARG", "SLF",
+    "N", "PL", "FBT", "ERA", "ISC", "ICN", "C901",
+]
+"build-plan-from-review/tests/**" = [
+    "PT",
+    "TC003", "ASYNC240", "T20",
+    "SLF", "ARG", "PLC0415", "PLR2004", "FBT", "BLE", "DTZ",
+    "PTH", "C4", "PERF", "FURB", "TRY", "EM", "N", "PL", "ERA", "ISC", "ICN", "C901",
+]
+"scripts/**" = [
+    "T20",
+    # W1: advisory families exempt in maintenance scripts (blocking RET/RSE/DTZ/FLY stay enforced)
+    "BLE", "PTH", "C4", "PERF", "FURB", "TRY", "EM", "ARG", "SLF",
+    "N", "PL", "FBT", "ERA", "ISC", "ICN", "C901",
+]
+"tests/**" = [
+    "TC003", "ASYNC240", "T20",
+    # W1: test fixtures/mocks — mirror src exemptions for advisory families
+    "SLF", "ARG", "PLC0415", "PLR2004", "FBT", "BLE", "DTZ",
+    "PTH", "C4", "PERF", "FURB", "TRY", "EM", "N", "PL", "ERA", "ISC", "ICN", "C901",
+]
+"tools/telegram-tester/**" = ["TC003", "T20"]
+"tools/explore_gateway_log.py" = ["T20", "UP035"]
+# CDP browser engine: a transport-facing client where per-call timeout args are the
+# intended API (mirrors httpx/aiohttp); ASYNC109 would force asyncio.timeout ceremony.
+"src/sevn/browser/**" = ["ASYNC109"]
+"src/sevn/logging/**" = ["TC003"]
+"tests/triggers/**" = ["TC001", "TC003", "ASYNC240"]
+"src/sevn/storage/**" = ["TC003"]
+"src/sevn/agent/tracing/**" = ["TC003"]
+"src/sevn/agent/providers/**" = ["TC003"]
+"src/sevn/agent/triager/**" = ["TC001", "TC003"]
+"src/sevn/agent/adapters/tier_b_model.py" = ["TC001", "TC002", "TC003"]
+"src/sevn/agent/adapters/tier_b_tools.py" = ["TC001", "TC002", "TC003"]
+"src/sevn/agent/executors/b_harness.py" = ["TC001", "TC003"]
+"src/sevn/agent/executors/cd_harness.py" = ["TC001", "TC003", "ASYNC240"]
+"src/sevn/agent/executors/cd_types.py" = ["TC001"]
+"src/sevn/agent/executors/lambda_rlm_runtime.py" = ["TC001"]
+"src/sevn/agent/executors/b_types.py" = ["TC001", "TC003"]
+"src/sevn/tools/meta_escalation.py" = ["TC001", "TC002", "TC003"]
+"src/sevn/tools/**/*.py" = ["TC001", "TC003"]
+"src/sevn/skills/**/*.py" = ["TC001", "TC003"]
+"src/sevn/memory/**/*.py" = ["TC001", "TC003"]
+"src/sevn/security/secrets/**" = ["TC001", "TC003"]
+"src/sevn/proxy/**" = ["TC002", "TC003", "TC001"]
+"src/sevn/gateway/**/*.py" = ["TC001", "TC003"]
+"src/sevn/triggers/**/*.py" = ["TC001", "TC003", "RUF006"]
+"src/sevn/ui/dashboard/**/*.py" = ["TC001", "TC003"]
+"src/sevn/second_brain/**/*.py" = ["TC001", "TC003"]
+"src/sevn/onboarding/**/*.py" = ["TC001", "TC003"]
+"src/sevn/cli/**/*.py" = ["TC001", "TC003"]
+"src/sevn/channels/**/*.py" = ["TC001", "TC003"]
+"src/sevn/voice/**/*.py" = ["TC001", "TC003", "ASYNC240"]
+"src/sevn/agent/adapters/dspy_adapter.py" = ["TC001"]
+"src/sevn/code_understanding/tools_register.py" = ["TC001", "TC003", "ASYNC240"]
+"src/sevn/code_understanding/code_review_graph_mcp.py" = ["TC003"]
+"src/sevn/code_understanding/graphify_mcp.py" = ["TC003"]
+"src/sevn/agent/adapters/pydantic_adapter.py" = ["TC001"]
+"src/sevn/docs/readme/**/*.py" = ["TC001", "TC003"]
+"src/sevn/data/bundled_skills/**" = [
+    "T20", "E402", "I001", "SIM105", "SIM108", "SIM112", "F401", "RUF100", "UP047", "TC001", "TC002", "TC003", "ASYNC220",
+    # W1: third-party bundled scripts — exempt all new rule families
+    "RET", "BLE", "RSE", "SLF", "DTZ", "FLY",
+    "PTH", "C4", "PERF", "FURB", "TRY", "EM", "ARG",
+    "N", "PL", "FBT", "ERA", "ISC", "ICN", "C901",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-markers -p no:logfire"
+xfail_strict = true
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "sandbox_docker: optional Docker-backed sandbox contract tests (specs/08-sandbox.md §10.4)",
+    "integration: optional network/proxy-heavy tests excluded from default ``make test`` (specs/13-rlm-triager.md §10.4)",
+    "golden_llm: opt-in live-LLM golden corpus tests (skipped unless SEVN_GOLDEN_LLM=1; replay subset runs tokenless)",
+    "onboard_e2e: optional onboarding Telegram CDP smoke (skipped unless SEVN_ONBOARD_E2E=1)",
+    "no_cloudflare_api_stub: disable autouse Cloudflare API stub in tunnel CLI tests",
+    "xdist_group(name): serialise tests sharing a group on one xdist worker",
+]
+
+[tool.coverage.run]
+source = ["sevn"]
+branch = true
+omit = [
+    "*/bundled_skills/*",
+    "*/data/bundled_skills/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@abstractmethod",
+]
+show_missing = true
+skip_empty = true
+fail_under = 0
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+mypy_path = ["src"]
+packages = ["sevn"]
+exclude = ["src/sevn/data/bundled_skills/"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = [
+    "sevn.config.settings",
+    "sevn.config.sections.triager",
+    "sevn.proxy.settings",
+]
+# TODO(ci-quality): burn down — AliasChoices fields predate warn_required_dynamic_aliases
+disable_error_code = ["pydantic-alias"]
+
+[tool.pydantic-mypy]
+init_forbid_extra = true
+init_typed = true
+warn_required_dynamic_aliases = true
+warn_untyped_fields = true
+
+[tool.vulture]
+min_confidence = 80
+paths = ["src", "scripts", ".vulture_whitelist.py"]
+exclude = [
+    "*/bundled_skills/*",
+    "tests/*",
+]
+# Baseline unreachable-code false positives (unsatisfiable `if False`, post-`try` flow).
+ignore_names = ["if", "try"]
+
+[tool.radon]
+# Xenon ceilings for `make complexity` (D5 baseline). Observed 2026-06-17 on `src/`:
+# max block CC 137 (`b_harness.run_b_turn`); average CC ~4.44.
+xenon_max_absolute = "F"
+xenon_max_modules = "F"
+xenon_max_average = "A"
+xenon_max_average_num = 5
+exclude = ["*/bundled_skills/*"]
+
+[tool.codespell]
+# D6 baseline (W4): domain terms + ratcheted false positives; skip generated/vendor trees.
+skip = "uv.lock,*.log,dist,node_modules,pyclaww,graphify-out,*/bundled_skills/*,*.js,*.ts,*.json"
+ignore-words-list = "sevn,minimax,weasyprint,loguru,unparseable,runns,indx,hel,ist,pre-select,newyorker,nd,wit,ment,te,retriev,integrat"
+
+[tool.deptry]
+# D6 baseline (W4): scan main package + CI scripts; freeze optional/extra/transitive false positives.
+extend_exclude = [".*/bundled_skills/.*"]
+known_first_party = ["scripts"]
+optional_dependencies_dev_groups = ["dev"]
+
+[tool.deptry.package_module_name_map]
+"readability-lxml" = ["readability"]
+"python-jobspy" = ["jobspy"]
+
+[tool.deptry.per_rule_ignores]
+DEP001 = ["secretstorage", "readability"]
+DEP002 = [
+    "rich",
+    "pyjwt",
+    "pydantic-evals",
+    "code-review-graph",
+    "graphifyy",
+    "websocket-client",
+    "skillspector",
+    "yt-dlp",
+    "readability-lxml",
+    "brotli",
+    "python-jobspy",
+    "selectolax",
+]
+DEP003 = ["mcp", "jsonschema", "PIL", "tomli"]
+DEP004 = ["sevn_telegram_tester", "sevn-telegram-tester"]
+
+[tool.interrogate]
+# D6 baseline (W4): coverage % floor observed 2026-06-17 on src+scripts (excl. tests/bundled_skills).
+fail-under = 96.8
+exclude = ["*/bundled_skills/*", "tests/*", "*/graphify-out/*"]
+ignore-init-module = true
+ignore-init-method = true
+ignore-magic = true
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "src/sevn/data/bundled_skills"]
+skips = []
+
+[dependency-groups]
+dev = [
+    "check-jsonschema>=0.37.2",
+    "types-croniter==6.2.2.20260508",
+]

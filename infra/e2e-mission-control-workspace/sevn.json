@@ -1,0 +1,113 @@
+{
+  "channels": {
+    "telegram": {
+      "enabled": false,
+      "owner_scanner_overrides": {
+        "disable_documents": false,
+        "disable_links": false,
+        "disable_text": false
+      },
+      "reply_keyboard": {
+        "enabled": false
+      },
+      "show_routing": false
+    },
+    "webchat": {
+      "allowed_origins": [],
+      "enabled": false,
+      "jwt_ttl_seconds": 3600,
+      "public": false,
+      "tts_inline": true
+    }
+  },
+  "dashboard": {
+    "enabled": true,
+    "jwt_secret": "mc-e2e-dashboard-jwt",
+    "local_open": true,
+    "login_password": "mc-e2e-owner-pw"
+  },
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 13004,
+    "queue_mode": "cancel",
+    "token": "mc-e2e-dev-token"
+  },
+  "my_sevn": {
+    "bugs": {
+      "require_approval": true,
+      "use_spec_kit": false
+    },
+    "issues": {
+      "prefer_github": false
+    }
+  },
+  "permissions": {
+    "mc-e2e-w3b-probe": true
+  },
+  "providers": {
+    "tier_default": {
+      "triager": "minimax/MiniMax-M2.5"
+    },
+    "use_main_model_for_all": true
+  },
+  "schema_version": 1,
+  "secrets_backend": {
+    "chain": [
+      {
+        "key_source": "master_key",
+        "path": ".sevn/secrets/store.enc",
+        "type": "encrypted_file"
+      }
+    ]
+  },
+  "security": {
+    "scanner": {
+      "ban_topics": [],
+      "bypass_owner": true,
+      "heuristic_only": true,
+      "image_ocr": false,
+      "max_inbound_bytes": 524288,
+      "providers": [
+        "local_ollama",
+        "openai"
+      ],
+      "scan_voice": true,
+      "toxicity_threshold": 0.9
+    }
+  },
+  "self_improve": {
+    "enabled": true,
+    "jobs": {
+      "max_concurrent_writers": 32
+    },
+    "preset": "A",
+    "spec_kit": {
+      "enabled": false,
+      "require_hitl_for_plan": false,
+      "require_plan_before_patch": true
+    }
+  },
+  "spec_kit": {
+    "enabled": true,
+    "integration": "copilot",
+    "options": {
+      "dry_run_default": false
+    }
+  },
+  "telemetry": {
+    "enabled": false
+  },
+  "tools": {},
+  "tracing": {
+    "sinks": [
+      {
+        "type": "sqlite"
+      },
+      {
+        "path": ".sevn/traces/",
+        "type": "jsonl_file"
+      }
+    ]
+  },
+  "workspace_root": "."
+}

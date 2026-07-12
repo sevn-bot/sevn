@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sevn.bot/infra/skillspector-baseline.schema.json",
+  "title": "SkillSpector CI baseline suppressions",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "suppressions"],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "suppressions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["skill_path", "rule_id", "reason", "reviewed"],
+        "properties": {
+          "skill_path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Repo-relative skill directory or file path (posix, no trailing slash)."
+          },
+          "rule_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "SkillSpector issue id (e.g. E2, PE3, TM1)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reviewed": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sevn.bot/infra/onboarding_capabilities.schema.json",
+  "title": "sevn onboarding capability manifest",
+  "description": "Machine-readable SSOT for comprehensive onboarding wizard checkboxes and install actions (plan onboarding-comprehensive-setup W0.2; W1 implements onboarding_capabilities.json).",
+  "type": "object",
+  "required": ["schema_version", "groups", "capabilities"],
+  "additionalProperties": false,
+  "$defs": {
+    "install_action_kind": {
+      "type": "string",
+      "enum": ["uv_extra", "subprocess", "make_target", "noop", "secret_required", "second_brain_bootstrap"]
+    },
+    "install_action": {
+      "type": "object",
+      "required": ["id", "kind", "argv", "fatal"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable action id unique within the parent capability."
+        },
+        "kind": { "$ref": "#/$defs/install_action_kind" },
+        "argv": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "uv extra names, subprocess argv, make targets, secret logical keys, or empty for noop."
+        },
+        "fatal": {
+          "type": "boolean",
+          "description": "When true, failure blocks promote; when false, warn-only in live validation."
+        },
+        "note": {
+          "type": "string",
+          "description": "Human-readable note for noop or warn-only actions."
+        },
+        "cwd": {
+          "type": "string",
+          "description": "Optional working directory override for subprocess/make execution."
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Non-secret environment overrides for subprocess execution."
+        },
+        "idempotent_check": {
+          "type": "string",
+          "description": "Optional shell one-liner or import probe; skip action when exit 0."
+        }
+      }
+    },
+    "group_id": {
+      "type": "string",
+      "enum": ["A", "B", "C", "D", "E", "F", "G"]
+    },
+    "control_type": {
+      "type": "string",
+      "enum": ["checkbox", "select", "hidden", "text", "folder_picker"]
+    },
+    "group_entry": {
+      "type": "object",
+      "required": ["id", "label", "sort_order"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/group_id" },
+        "label": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "sort_order": { "type": "integer", "minimum": 1, "maximum": 7 }
+      }
+    },
+    "capability_entry": {
+      "type": "object",
+      "required": [
+        "capability_id",
+        "group",
+        "label",
+        "description",
+        "config_paths",
+        "control",
+        "default",
+        "profile_overridable",
+        "install_actions"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "capability_id": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_.]*$"
+        },
+        "group": { "$ref": "#/$defs/group_id" },
+        "label": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "config_paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "control": { "$ref": "#/$defs/control_type" },
+        "default": {
+          "description": "Wizard default when no profile capabilities_defaults override applies.",
+          "oneOf": [{ "type": "boolean" }, { "type": "string" }]
+        },
+        "profile_overridable": { "type": "boolean" },
+        "install_actions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/install_action" }
+        },
+        "select_options": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "Required when control is select (e.g. gateway.queue_mode)."
+        },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Other capability_id values that must be enabled first."
+        },
+        "wizard_tab": {
+          "type": "string",
+          "description": "Override wizard tab for profile inspector grouping (e.g. My Sevn.bot for group G)."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "control": { "const": "select" } },
+            "required": ["control"]
+          },
+          "then": { "required": ["select_options"] }
+        }
+      ]
+    }
+  },
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "groups": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": { "$ref": "#/$defs/group_entry" },
+      "description": "Groups A–G: Python extras, bundled skills, external CLIs, gateway/memory, channels, code understanding, self-improve."
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/capability_entry" }
+    }
+  }
+}

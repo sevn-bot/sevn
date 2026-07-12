@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: MIT
+# Production overlay for operator compose stacks (use with docker-compose.yml).
+#
+#   docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml --profile browser up -d
+#
+# Keeps CDP (9222), raw VNC (5900), and noVNC (6080) off published host ports.
+# Use gateway `/gui` (authenticated) instead of exposing 6080.
+
+services:
+  sevn-gateway-browser:
+    environment:
+      SEVN_BROWSER_EXTRA_ARGS: "--no-sandbox --disable-dev-shm-usage"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+
+  sevn-gateway-gui:
+    environment:
+      SEVN_BROWSER_EXTRA_ARGS: "--disable-dev-shm-usage"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 3G

@@ -1,0 +1,5 @@
+{
+  "exclude": ["src/sevn/data/bundled_skills"],
+  "reportMissingImports": "warning",
+  "reportMissingModuleSource": "warning"
+}

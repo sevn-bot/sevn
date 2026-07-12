@@ -1,0 +1,7 @@
+# E2E-only overrides for `make telegram-e2e` / `sevn telegram-test run session --target local`.
+# Not used by default `make compose-up` (plan/telegram-e2e-wave-plan.md TE-8).
+services:
+  sevn-gateway:
+    environment:
+      SEVN_E2E_ECHO_TURN: "1"
+      SEVN_E2E_ECHO_DELAY_MS: "3000"

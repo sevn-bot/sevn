@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: MIT
+# Compose stack for Phase 1 CI: mock upstream + egress proxy + gateway (specs/25-cicd-full.md §4.4).
+services:
+  mock-openai:
+    build:
+      context: ../infra/ci-mock-openai
+    expose:
+      - "9090"
+
+  sevn-proxy:
+    image: sevn-proxy:ci
+    # pull_policy:never + a matching local tag lets jobs that pre-build the
+    # image (load:true via build-push-action) run `up --no-build` and reuse it
+    # deterministically. Jobs that still `docker compose build` keep working:
+    # build always rebuilds and tags sevn-proxy:ci, then up reuses it.
+    pull_policy: never
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.proxy
+    environment:
+      OPENAI_API_KEY: ci-mock-key
+      OPENAI_BASE_URL: http://mock-openai:9090/v1
+    ports:
+      - "18787:8787"
+    depends_on:
+      - mock-openai
+
+  sevn-gateway:
+    image: sevn-gateway:ci
+    pull_policy: never
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gateway
+    environment:
+      SEVN_PROXY_URL: http://sevn-proxy:8787
+      SEVN_E2E_ECHO_TURN: "1"
+    volumes:
+      - ../infra/ci-workspace:/workspace
+    working_dir: /workspace
+    ports:
+      - "13001:3001"
+    depends_on:
+      - sevn-proxy

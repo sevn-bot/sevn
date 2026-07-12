@@ -1,0 +1,139 @@
+# SPDX-License-Identifier: MIT
+# Operator local stack: egress proxy + gateway (plan/telegram-e2e-wave-plan.md Wave TE-5).
+# CI uses docker/docker-compose.ci.yml — do not change that file for operator workflows.
+#
+# Run from repo root: docker compose -f docker/docker-compose.yml up -d
+#
+# Persistent layout (volume sevn-state → /operator):
+#   /operator/workspace/sevn.json
+#   /operator/workspace/logs/gateway.log  (resolve_service_log_path / diagnostics)
+#   /operator/workspace/.sevn/traces.db
+#
+# Browser skills (Playwright): optional profile `browser` swaps in Dockerfile.gateway.browser
+# (uv sync --extra browser + Brave + playwright install chromium). Profile `gui` adds noVNC.
+# Profiles `browser` and `gui` are mutually exclusive (each excludes the other).
+# Default `docker compose up` stays slim.
+# Host-first headed browsing: run gateway on macOS with `uv sync --extra browser` instead.
+
+services:
+  sevn-proxy:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.proxy
+    environment:
+      SEVN_HOME: /operator
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - sevn-state:/operator
+    expose:
+      - "8787"
+
+  sevn-gateway:
+    profiles:
+      - "!browser"
+      - "!gui"
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gateway
+    environment:
+      SEVN_HOME: /operator
+      SEVN_PROXY_URL: http://sevn-proxy:8787
+      SEVN_TELEGRAM_BOT_TOKEN: ${SEVN_TELEGRAM_BOT_TOKEN:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - sevn-state:/operator
+      - ../infra/docker-onboard.json:/bootstrap/onboard-compose.json:ro
+    working_dir: /operator/workspace
+    ports:
+      - "${SEVN_GATEWAY_PORT:-3001}:3001"
+    depends_on:
+      - sevn-proxy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3001/ready', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  sevn-gateway-browser:
+    profiles:
+      - browser
+      - "!gui"
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gateway.browser
+    environment:
+      SEVN_HOME: /operator
+      SEVN_PROXY_URL: http://sevn-proxy:8787
+      SEVN_TELEGRAM_BOT_TOKEN: ${SEVN_TELEGRAM_BOT_TOKEN:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SEVN_CHROME_EXECUTABLE: /usr/bin/brave-browser
+      SEVN_BROWSER_ENGINE: brave
+      SEVN_BROWSER_EXTRA_ARGS: "--no-sandbox --disable-dev-shm-usage"
+    volumes:
+      - sevn-state:/operator
+      - ../infra/docker-onboard.json:/bootstrap/onboard-compose.json:ro
+    working_dir: /operator/workspace
+    ports:
+      - "${SEVN_GATEWAY_PORT:-3001}:3001"
+    depends_on:
+      - sevn-proxy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3001/ready', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  sevn-gateway-gui:
+    profiles:
+      - gui
+      - "!browser"
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gateway.gui
+    environment:
+      SEVN_HOME: /operator
+      SEVN_PROXY_URL: http://sevn-proxy:8787
+      SEVN_TELEGRAM_BOT_TOKEN: ${SEVN_TELEGRAM_BOT_TOKEN:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SEVN_CHROME_EXECUTABLE: /usr/bin/brave-browser
+      SEVN_BROWSER_ENGINE: brave
+      SEVN_BROWSER_HEADLESS: "0"
+      DISPLAY: ":99"
+      SEVN_BROWSER_EXTRA_ARGS: "--disable-dev-shm-usage"
+    volumes:
+      - sevn-state:/operator
+      - ../infra/docker-onboard.json:/bootstrap/onboard-compose.json:ro
+    working_dir: /operator/workspace
+    ports:
+      - "${SEVN_GATEWAY_PORT:-3001}:3001"
+    depends_on:
+      - sevn-proxy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3001/ready', timeout=3); urllib.request.urlopen('http://127.0.0.1:6080/vnc.html', timeout=3)",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 120s
+
+volumes:
+  sevn-state:
