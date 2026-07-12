@@ -1,0 +1,109 @@
+/* sevn.bot — OpenUI generated-panel vocabulary.
+ * The agent emits sanitised HTML/CSS panels; these are the classes it can use.
+ * No JS allowed inside generated panels. CSS only.
+ */
+
+.openui {
+  background: var(--sevn-surface-2);
+  border: 1px solid var(--sevn-border);
+  border-top: 2px solid var(--sevn-primary);
+  border-radius: 0 0 var(--sevn-radius-lg) var(--sevn-radius-lg);
+  padding: var(--sevn-space-4) var(--sevn-space-5);
+  font-family: var(--sevn-font-sans);
+  color: var(--sevn-fg);
+}
+
+.openui-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sevn-space-1);
+}
+.openui-stat__label {
+  font-size: var(--sevn-fs-xs);
+  letter-spacing: var(--sevn-tracking-widest);
+  text-transform: uppercase;
+  color: var(--sevn-fg-muted);
+}
+.openui-stat__value {
+  font-size: var(--sevn-fs-3xl);
+  font-weight: var(--sevn-fw-600);
+  color: var(--sevn-fg-strong);
+  letter-spacing: var(--sevn-tracking-tightest);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.openui-kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: var(--sevn-space-4);
+  row-gap: var(--sevn-space-1-5);
+  font-size: var(--sevn-fs-sm);
+}
+.openui-kv dt { color: var(--sevn-fg-muted); }
+.openui-kv dd { color: var(--sevn-fg-strong); font-family: var(--sevn-font-mono); font-variant-numeric: tabular-nums; }
+
+.openui-callout {
+  display: flex;
+  gap: var(--sevn-space-3);
+  padding: var(--sevn-space-3) var(--sevn-space-4);
+  background: var(--sevn-surface-1);
+  border: 1px solid var(--sevn-border);
+  border-left: 2px solid var(--sevn-primary);
+  border-radius: 0 var(--sevn-radius-md) var(--sevn-radius-md) 0;
+  font-size: var(--sevn-fs-sm);
+}
+.openui-callout--info     { border-left-color: var(--sevn-primary); }
+.openui-callout--warn     { border-left-color: var(--sevn-warning); }
+.openui-callout--critical { border-left-color: var(--sevn-accent); background: var(--sevn-surface-accent-tint); }
+
+.openui-timeline {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sevn-space-3);
+  position: relative;
+  padding-left: var(--sevn-space-4);
+}
+.openui-timeline::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: var(--sevn-border);
+}
+.openui-timeline li {
+  position: relative;
+  font-size: var(--sevn-fs-sm);
+  color: var(--sevn-fg);
+}
+.openui-timeline li::before {
+  content: '';
+  position: absolute;
+  left: calc(-1 * var(--sevn-space-4) + 1px);
+  top: 6px;
+  width: 8px; height: 8px;
+  border-radius: var(--sevn-radius-full);
+  background: var(--sevn-primary);
+  box-shadow: 0 0 0 3px var(--sevn-bg);
+}
+
+.openui-diff {
+  font-family: var(--sevn-font-mono);
+  font-size: var(--sevn-fs-xs);
+  background: var(--sevn-base-050);
+  border: 1px solid var(--sevn-border);
+  border-radius: var(--sevn-radius-md);
+  overflow: hidden;
+}
+.openui-diff__row {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr;
+  padding: 1px var(--sevn-space-3);
+}
+.openui-diff__row--add { background: rgba(106,156,120,0.08); color: var(--sevn-success); }
+.openui-diff__row--rem { background: rgba(255,59,59,0.06);  color: var(--sevn-accent-light); }
+.openui-diff__row--ctx { color: var(--sevn-fg-muted); }
+.openui-diff__row .ln { color: var(--sevn-fg-faint); user-select: none; text-align: right; padding-right: var(--sevn-space-2); }

@@ -1,0 +1,60 @@
+/* sevn.bot — dense data tables */
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--sevn-fs-sm);
+  color: var(--sevn-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  text-align: left;
+  font-size: var(--sevn-fs-xs);
+  font-weight: var(--sevn-fw-500);
+  letter-spacing: var(--sevn-tracking-widest);
+  text-transform: uppercase;
+  color: var(--sevn-fg-faint);
+  background: var(--sevn-surface-1);
+  padding: var(--sevn-space-2) var(--sevn-space-3);
+  border-bottom: 1px solid var(--sevn-border);
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.table tbody td {
+  padding: var(--sevn-space-2-5, 0.625rem) var(--sevn-space-3);
+  border-bottom: 1px solid var(--sevn-border-faint);
+  color: var(--sevn-fg);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.table tbody tr {
+  transition: background var(--sevn-duration-fast) var(--sevn-ease-out);
+}
+.table tbody tr:hover { background: var(--sevn-hover-bg); }
+.table tbody tr[aria-selected='true'] {
+  background: var(--sevn-selected-bg);
+}
+.table tbody tr[aria-selected='true'] td {
+  color: var(--sevn-fg-strong);
+}
+
+.table .num   { text-align: right; font-family: var(--sevn-font-mono); }
+.table .mono  { font-family: var(--sevn-font-mono); }
+.table .muted { color: var(--sevn-fg-muted); }
+.table .strong { color: var(--sevn-fg-strong); font-weight: var(--sevn-fw-500); }
+
+/* compact density variant */
+.table--compact tbody td { padding: var(--sevn-space-2) var(--sevn-space-3); }
+
+.table-empty {
+  text-align: center;
+  padding: var(--sevn-space-12) var(--sevn-space-6);
+  color: var(--sevn-fg-muted);
+  font-size: var(--sevn-fs-sm);
+}

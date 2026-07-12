@@ -7,7 +7,7 @@ test_env.env
 secrets_backup_env.env
 *.pem
 *.key
-secrets.*
+/secrets.*
 /deploy/inventory.toml
 infra/cloudflared/config.yml
 !infra/cloudflared/config.example.yml

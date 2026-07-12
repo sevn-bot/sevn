@@ -1,0 +1,870 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sevn.bot — style guide</title>
+<link rel="icon" href="logos/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="index.css">
+<style>
+  /* style-guide-only chrome */
+  .sg-shell { max-width: 1200px; margin: 0 auto; padding: var(--sevn-space-8) var(--sevn-space-6) var(--sevn-space-24); }
+  .sg-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: var(--sevn-space-8);
+    align-items: center;
+    padding: var(--sevn-space-12) 0 var(--sevn-space-10);
+    border-bottom: 1px solid var(--sevn-border);
+  }
+  .sg-eyebrow {
+    font-family: var(--sevn-font-mono);
+    font-size: var(--sevn-fs-xs);
+    color: var(--sevn-fg-muted);
+    letter-spacing: var(--sevn-tracking-widest);
+    text-transform: uppercase;
+    display: inline-flex; align-items: center; gap: var(--sevn-space-2);
+  }
+  .sg-eyebrow::before { content: ''; width: 16px; height: 1px; background: var(--sevn-primary); }
+  .sg-hero h1 {
+    font-size: clamp(2.5rem, 5.5vw, 4.75rem);
+    line-height: 1.02;
+    letter-spacing: var(--sevn-tracking-tightest);
+    color: var(--sevn-fg-strong);
+    margin-top: var(--sevn-space-3);
+  }
+  .sg-hero h1 .accent { color: var(--sevn-primary); }
+  .sg-hero h1 .suffix { font-family: var(--sevn-font-mono); font-weight: 400; color: var(--sevn-fg-muted); }
+  .sg-hero p { color: var(--sevn-fg-muted); font-size: var(--sevn-fs-lg); margin-top: var(--sevn-space-5); max-width: 52ch; }
+  .sg-hero .voice {
+    display: flex; flex-wrap: wrap; gap: var(--sevn-space-2);
+    margin-top: var(--sevn-space-6);
+  }
+  .sg-hero .voice .badge { background: transparent; }
+
+  .sg-mark-stage {
+    display: flex; align-items: center; justify-content: center;
+    aspect-ratio: 1 / 1;
+    max-width: 380px;
+    margin-left: auto;
+    border-radius: var(--sevn-radius-2xl);
+    background:
+      radial-gradient(ellipse at 80% 0%, rgba(95,177,247,0.15) 0%, rgba(0,0,0,0) 55%),
+      radial-gradient(ellipse at 20% 100%, rgba(255,59,59,0.10) 0%, rgba(0,0,0,0) 55%),
+      var(--sevn-surface-1);
+    border: 1px solid var(--sevn-border);
+    position: relative;
+    overflow: hidden;
+  }
+  .sg-mark-stage svg { width: 60%; }
+
+  /* section header */
+  .sg-section { padding: var(--sevn-space-12) 0; border-bottom: 1px solid var(--sevn-border-faint); }
+  .sg-section__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sevn-space-4); margin-bottom: var(--sevn-space-6); }
+  .sg-section__num { font-family: var(--sevn-font-mono); font-size: var(--sevn-fs-xs); color: var(--sevn-fg-faint); letter-spacing: var(--sevn-tracking-widest); }
+  .sg-section h2 { font-size: var(--sevn-fs-2xl); font-weight: 600; letter-spacing: var(--sevn-tracking-tighter); color: var(--sevn-fg-strong); }
+  .sg-section__sub { color: var(--sevn-fg-muted); font-size: var(--sevn-fs-sm); max-width: 60ch; }
+
+  .sg-grid { display: grid; gap: var(--sevn-space-4); }
+  .sg-grid--2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .sg-grid--3 { grid-template-columns: repeat(3, minmax(0,1fr)); }
+  .sg-grid--4 { grid-template-columns: repeat(4, minmax(0,1fr)); }
+  .sg-grid--6 { grid-template-columns: repeat(6, minmax(0,1fr)); }
+  @media (max-width: 880px) { .sg-grid--3, .sg-grid--4, .sg-grid--6 { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
+  /* swatches */
+  .swatch {
+    background: var(--sevn-surface-2);
+    border: 1px solid var(--sevn-border);
+    border-radius: var(--sevn-radius-lg);
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .swatch__chip { aspect-ratio: 16 / 10; }
+  .swatch__meta { padding: var(--sevn-space-3); display: flex; flex-direction: column; gap: 2px; }
+  .swatch__name { font-size: var(--sevn-fs-sm); color: var(--sevn-fg-strong); font-weight: 500; }
+  .swatch__hex  { font-family: var(--sevn-font-mono); font-size: var(--sevn-fs-xs); color: var(--sevn-fg-muted); }
+
+  /* type sample */
+  .type-sample {
+    display: grid; grid-template-columns: 6rem 1fr; gap: var(--sevn-space-4); align-items: baseline;
+    padding: var(--sevn-space-3) 0; border-bottom: 1px solid var(--sevn-border-faint);
+  }
+  .type-sample .meta { font-family: var(--sevn-font-mono); font-size: var(--sevn-fs-xs); color: var(--sevn-fg-faint); }
+  .type-sample .sample { color: var(--sevn-fg-strong); }
+
+  /* component example wrapper */
+  .demo {
+    background: var(--sevn-surface-1);
+    border: 1px solid var(--sevn-border);
+    border-radius: var(--sevn-radius-lg);
+    padding: var(--sevn-space-5);
+    display: flex; flex-wrap: wrap; gap: var(--sevn-space-3); align-items: center;
+  }
+  .demo--col { flex-direction: column; align-items: stretch; }
+
+  /* logo lockup grid */
+  .lockup {
+    aspect-ratio: 16 / 9;
+    border-radius: var(--sevn-radius-lg);
+    border: 1px solid var(--sevn-border);
+    display: flex; align-items: center; justify-content: center;
+    padding: var(--sevn-space-6);
+    overflow: hidden;
+  }
+  .lockup--dark  { background: var(--sevn-base-050); }
+  .lockup--surface { background: var(--sevn-surface-1); }
+  .lockup--brand { background: var(--sevn-gradient-brand); }
+  .lockup--white { background: #fff; }
+  .lockup__caption { position: absolute; }
+
+  .lockup-card { position: relative; }
+  .lockup-card .meta {
+    margin-top: var(--sevn-space-2);
+    display: flex; justify-content: space-between;
+    font-family: var(--sevn-font-mono); font-size: var(--sevn-fs-xs); color: var(--sevn-fg-muted);
+  }
+  .lockup img, .lockup svg { max-width: 80%; height: auto; }
+
+  /* footer */
+  .sg-footer {
+    margin-top: var(--sevn-space-16);
+    padding-top: var(--sevn-space-8);
+    border-top: 1px solid var(--sevn-border);
+    color: var(--sevn-fg-faint);
+    font-size: var(--sevn-fs-xs);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+
+  /* token table */
+  .token-list { display: grid; grid-template-columns: 14rem 1fr auto; row-gap: 2px; column-gap: var(--sevn-space-4); align-items: center; }
+  .token-list .name { font-family: var(--sevn-font-mono); font-size: var(--sevn-fs-xs); color: var(--sevn-fg); }
+  .token-list .preview { color: var(--sevn-fg-muted); font-size: var(--sevn-fs-xs); }
+  .token-list .val { font-family: var(--sevn-font-mono); font-size: var(--sevn-fs-xs); color: var(--sevn-fg-faint); text-align: right; }
+
+  /* spacing visualizer */
+  .sp-bar { height: 14px; background: var(--sevn-primary); opacity: 0.85; border-radius: 2px; }
+
+  /* radius preview */
+  .rad { aspect-ratio: 1 / 1; background: var(--sevn-surface-3); border: 1px solid var(--sevn-border); display: flex; align-items: end; justify-content: center; padding: var(--sevn-space-2); font-family: var(--sevn-font-mono); font-size: var(--sevn-fs-xs); color: var(--sevn-fg-muted); }
+</style>
+</head>
+<body>
+
+<!-- top bar / theme toggle -->
+<nav class="navbar" aria-label="Style guide controls">
+  <div class="navbar__brand">
+    <img class="navbar__mark" src="logos/logo-mark.svg" alt="">
+    <span class="navbar__name">sevn<span class="suffix">.bot</span></span>
+  </div>
+  <button class="navbar__workspace" aria-haspopup="menu">
+    <span class="ws-icon" aria-hidden="true"></span>
+    <span>Style&nbsp;guide</span>
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2.5 4 L5 6.5 L7.5 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <label class="navbar__search" tabindex="0">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><circle cx="6" cy="6" r="4.25" stroke="currentColor" stroke-width="1.4"/><path d="M9.2 9.2 L12 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+    <input type="text" placeholder="Jump to a token, component, or section…" aria-label="Search style guide">
+    <span class="kbd">⌘K</span>
+  </label>
+  <div class="navbar__actions">
+    <div class="theme-picker" role="radiogroup" aria-label="Theme">
+      <button class="theme-picker__btn" data-theme-set="dark"   aria-pressed="true">Dark</button>
+      <button class="theme-picker__btn" data-theme-set="light"  aria-pressed="false">Light</button>
+      <button class="theme-picker__btn" data-theme-set="system" aria-pressed="false">System</button>
+    </div>
+    <button class="btn btn-ghost btn--icon" aria-label="Notifications">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 6.5a4 4 0 1 1 8 0v2l1 2H2l1-2v-2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M5.5 12.5a1.5 1.5 0 0 0 3 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+    </button>
+    <div class="user-menu" role="button" tabindex="0">
+      <span class="user-menu__avatar" aria-hidden="true"></span>
+      <span class="text-xs fg-muted">owner</span>
+    </div>
+  </div>
+</nav>
+
+<main class="sg-shell">
+
+  <!-- Hero -->
+  <header class="sg-hero">
+    <div>
+      <span class="sg-eyebrow">v0.1 · style guide · dark-first</span>
+      <h1>The design system <span class="accent">for sevn</span><span class="suffix">.bot</span></h1>
+      <p>One technical user. One bot. A confident, calm, slightly playful copilot — never corporate, never childish, never twee. This document is the locked compass; everything in <code>/style/</code> compiles against the tokens below.</p>
+      <div class="voice">
+        <span class="badge badge-primary">calm</span>
+        <span class="badge badge-primary">precise</span>
+        <span class="badge badge-primary">technical</span>
+        <span class="badge badge-primary">opinionated</span>
+        <span class="badge badge-primary">warm</span>
+        <span class="badge badge-primary">fast</span>
+        <span class="badge badge-primary">alive — just a little</span>
+      </div>
+    </div>
+    <aside class="sg-mark-stage" aria-hidden="true">
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <path d="M40 60 H160" stroke="#ff3b3b" stroke-width="20" stroke-linecap="round"/>
+        <path d="M148 60 L72 156" stroke="#5fb1f7" stroke-width="20" stroke-linecap="round"/>
+      </svg>
+    </aside>
+  </header>
+
+  <!-- 01 — Brand colors -->
+  <section class="sg-section">
+    <div class="sg-section__head">
+      <div>
+        <div class="sg-section__num">01</div>
+        <h2>Brand pair · Sky &amp; Signal</h2>
+        <p class="sg-section__sub">Clear sky blue carries the product; signal red is reserved for action and critical states. The base is warm slate-black — graphite with a hint of bark, never cool.</p>
+      </div>
+      <span class="badge badge-slate">2 hues · 1 deep neutral</span>
+    </div>
+
+    <div class="sg-grid sg-grid--4" style="margin-bottom: var(--sevn-space-5);">
+      <div class="swatch"><div class="swatch__chip" style="background:#d6ecff"></div><div class="swatch__meta"><span class="swatch__name">primary · pale</span><span class="swatch__hex">#d6ecff</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#9dd0fb"></div><div class="swatch__meta"><span class="swatch__name">primary · light</span><span class="swatch__hex">#9dd0fb</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#5fb1f7"></div><div class="swatch__meta"><span class="swatch__name">primary · base</span><span class="swatch__hex">#5fb1f7</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#2a7fc6"></div><div class="swatch__meta"><span class="swatch__name">primary · dark</span><span class="swatch__hex">#2a7fc6</span></div></div>
+    </div>
+
+    <div class="sg-grid sg-grid--4" style="margin-bottom: var(--sevn-space-5);">
+      <div class="swatch"><div class="swatch__chip" style="background:#ffd6d6"></div><div class="swatch__meta"><span class="swatch__name">accent · pale</span><span class="swatch__hex">#ffd6d6</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#ff7a7a"></div><div class="swatch__meta"><span class="swatch__name">accent · light</span><span class="swatch__hex">#ff7a7a</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#ff3b3b"></div><div class="swatch__meta"><span class="swatch__name">accent · base</span><span class="swatch__hex">#ff3b3b</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#b51e1e"></div><div class="swatch__meta"><span class="swatch__name">accent · dark</span><span class="swatch__hex">#b51e1e</span></div></div>
+    </div>
+
+    <div class="sg-grid sg-grid--6">
+      <div class="swatch"><div class="swatch__chip" style="background:#0c0a09"></div><div class="swatch__meta"><span class="swatch__name">base 050 · page</span><span class="swatch__hex">#0c0a09</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#14110f"></div><div class="swatch__meta"><span class="swatch__name">base 100 · surface 1</span><span class="swatch__hex">#14110f</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#181513"></div><div class="swatch__meta"><span class="swatch__name">base 150 · cards</span><span class="swatch__hex">#181513</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#26211d"></div><div class="swatch__meta"><span class="swatch__name">base 200 · raised</span><span class="swatch__hex">#26211d</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#322c27"></div><div class="swatch__meta"><span class="swatch__name">base 300 · hairlines</span><span class="swatch__hex">#322c27</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#423a33"></div><div class="swatch__meta"><span class="swatch__name">base 400 · dividers</span><span class="swatch__hex">#423a33</span></div></div>
+    </div>
+
+    <h3 class="text-sm fw-500 fg-muted tracking-wide" style="margin-top: var(--sevn-space-8); margin-bottom: var(--sevn-space-3);">GRADIENTS</h3>
+    <div class="sg-grid sg-grid--3">
+      <div class="swatch"><div class="swatch__chip" style="background:linear-gradient(135deg,#5fb1f7 0%,#ff3b3b 100%)"></div><div class="swatch__meta"><span class="swatch__name">brand · 135°</span><span class="swatch__hex">var(--sevn-gradient-brand)</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:linear-gradient(160deg,#181513 0%,#0c0a09 100%)"></div><div class="swatch__meta"><span class="swatch__name">dark · 160°</span><span class="swatch__hex">var(--sevn-gradient-dark)</span></div></div>
+      <div class="swatch"><div class="swatch__chip" style="background:#0c0a09;background-image:radial-gradient(ellipse at center,rgba(95,177,247,0.4) 0%,rgba(95,177,247,0) 65%),radial-gradient(ellipse at 70% 50%,rgba(255,59,59,0.35) 0%,rgba(255,59,59,0) 65%)"></div><div class="swatch__meta"><span class="swatch__name">brand glow</span><span class="swatch__hex">primary + accent</span></div></div>
+    </div>
+  </section>
+
+  <!-- 02 — Typography -->
+  <section class="sg-section">
+    <div class="sg-section__head">
+      <div>
+        <div class="sg-section__num">02</div>
+        <h2>Type · Inter Tight + JetBrains Mono</h2>
+        <p class="sg-section__sub">Inter Tight for UI, both for its tight metrics and disciplined cuts. JetBrains Mono for code, telemetry, IDs — anything where digits should align.</p>
+      </div>
+      <span class="badge badge-slate">300/400/500/600/700/800 · mono 400/500/600/700</span>
+    </div>
+
+    <div>
+      <div class="type-sample"><div class="meta">6xl · 76 / 1.0</div><div class="sample" style="font-size:var(--sevn-fs-6xl);line-height:var(--sevn-lh-6xl);font-weight:600;letter-spacing:var(--sevn-tracking-tightest)">A serious-but-personable copilot</div></div>
+      <div class="type-sample"><div class="meta">4xl · 48 / 1.05</div><div class="sample" style="font-size:var(--sevn-fs-4xl);line-height:var(--sevn-lh-4xl);font-weight:600;letter-spacing:var(--sevn-tracking-tightest)">It opens into a working state.</div></div>
+      <div class="type-sample"><div class="meta">2xl · 28 / 1.25</div><div class="sample" style="font-size:var(--sevn-fs-2xl);line-height:var(--sevn-lh-2xl);font-weight:600;letter-spacing:var(--sevn-tracking-tighter)">Density that breathes.</div></div>
+      <div class="type-sample"><div class="meta">xl · 22 / 1.4</div><div class="sample" style="font-size:var(--sevn-fs-xl);line-height:var(--sevn-lh-xl);font-weight:500">Mission Control — Sessions, traces, plans.</div></div>
+      <div class="type-sample"><div class="meta">md · 16 / 1.65</div><div class="sample" style="font-size:var(--sevn-fs-md);line-height:var(--sevn-lh-md)">Long-form body copy. Comfortable line-height; tracked tight enough that paragraphs feel structured but never cramped. text-wrap: pretty handles widows.</div></div>
+      <div class="type-sample"><div class="meta">sm · 13 / 1.5</div><div class="sample" style="font-size:var(--sevn-fs-sm);line-height:var(--sevn-lh-sm)">UI body — the working size for tables, sidebars, secondary text.</div></div>
+      <div class="type-sample"><div class="meta">mono · 13</div><div class="sample" style="font-family:var(--sevn-font-mono);font-size:var(--sevn-fs-sm);font-variant-numeric:tabular-nums">$ sevn run --tier C 0xabc123 · 4m 12s · $0.0421 · gpt-5-mini</div></div>
+      <div class="type-sample"><div class="meta">xs · 11 · uppercase</div><div class="sample" style="font-size:var(--sevn-fs-xs);font-weight:500;letter-spacing:var(--sevn-tracking-widest);text-transform:uppercase;color:var(--sevn-fg-muted)">Section eyebrow · used sparingly</div></div>
+    </div>
+  </section>
+
+  <!-- 03 — Spacing / radius / shadow -->
+  <section class="sg-section">
+    <div class="sg-section__head">
+      <div>
+        <div class="sg-section__num">03</div>
+        <h2>Spacing · Radius · Shadow</h2>
+        <p class="sg-section__sub">Spacing in rem (1rem = 16px). Radius is gentle — 6–8px is the default working range. Shadows are dark-tuned; light theme overrides with a softer set.</p>
+      </div>
+    </div>
+
+    <div class="sg-grid sg-grid--2 gap-6">
+      <div>
+        <h3 class="text-sm fw-500 fg-muted tracking-wide" style="margin-bottom: var(--sevn-space-3);">SPACING SCALE</h3>
+        <div class="col gap-2">
+          <div class="row gap-3"><div class="font-mono text-xs fg-faint" style="width:3rem">1</div><div class="sp-bar" style="width: var(--sevn-space-1)"></div><div class="text-xs fg-muted font-mono">0.25 · 4px</div></div>
+          <div class="row gap-3"><div class="font-mono text-xs fg-faint" style="width:3rem">2</div><div class="sp-bar" style="width: var(--sevn-space-2)"></div><div class="text-xs fg-muted font-mono">0.5 · 8px</div></div>
+          <div class="row gap-3"><div class="font-mono text-xs fg-faint" style="width:3rem">3</div><div class="sp-bar" style="width: var(--sevn-space-3)"></div><div class="text-xs fg-muted font-mono">0.75 · 12px</div></div>
+          <div class="row gap-3"><div class="font-mono text-xs fg-faint" style="width:3rem">4</div><div class="sp-bar" style="width: var(--sevn-space-4)"></div><div class="text-xs fg-muted font-mono">1 · 16px</div></div>
+          <div class="row gap-3"><div class="font-mono text-xs fg-faint" style="width:3rem">6</div><div class="sp-bar" style="width: var(--sevn-space-6)"></div><div class="text-xs fg-muted font-mono">1.5 · 24px</div></div>
+          <div class="row gap-3"><div class="font-mono text-xs fg-faint" style="width:3rem">8</div><div class="sp-bar" style="width: var(--sevn-space-8)"></div><div class="text-xs fg-muted font-mono">2 · 32px</div></div>
+          <div class="row gap-3"><div class="font-mono text-xs fg-faint" style="width:3rem">12</div><div class="sp-bar" style="width: var(--sevn-space-12)"></div><div class="text-xs fg-muted font-mono">3 · 48px</div></div>
+          <div class="row gap-3"><div class="font-mono text-xs fg-faint" style="width:3rem">16</div><div class="sp-bar" style="width: var(--sevn-space-16)"></div><div class="text-xs fg-muted font-mono">4 · 64px</div></div>
+        </div>
+      </div>
+      <div>
+        <h3 class="text-sm fw-500 fg-muted tracking-wide" style="margin-bottom: var(--sevn-space-3);">RADIUS</h3>
+        <div class="sg-grid sg-grid--4">
+          <div class="rad" style="border-radius:var(--sevn-radius-sm)">sm · 4</div>
+          <div class="rad" style="border-radius:var(--sevn-radius-md)">md · 6</div>
+          <div class="rad" style="border-radius:var(--sevn-radius-lg)">lg · 8</div>
+          <div class="rad" style="border-radius:var(--sevn-radius-xl)">xl · 12</div>
+          <div class="rad" style="border-radius:var(--sevn-radius-2xl)">2xl · 16</div>
+          <div class="rad" style="border-radius:var(--sevn-radius-3xl)">3xl · 24</div>
+          <div class="rad" style="border-radius:var(--sevn-radius-full)">full</div>
+          <div class="rad" style="border-radius:var(--sevn-radius-none)">none</div>
+        </div>
+
+        <h3 class="text-sm fw-500 fg-muted tracking-wide" style="margin: var(--sevn-space-6) 0 var(--sevn-space-3);">SHADOW &amp; GLOW</h3>
+        <div class="sg-grid sg-grid--3">
+          <div class="card" style="box-shadow:var(--sevn-shadow-sm)"><span class="text-xs fg-muted font-mono">sm</span></div>
+          <div class="card" style="box-shadow:var(--sevn-shadow-md)"><span class="text-xs fg-muted font-mono">md</span></div>
+          <div class="card" style="box-shadow:var(--sevn-shadow-lg)"><span class="text-xs fg-muted font-mono">lg</span></div>
+          <div class="card" style="box-shadow:var(--sevn-shadow-glow-primary)"><span class="text-xs fg-primary-light font-mono">glow-primary</span></div>
+          <div class="card" style="box-shadow:var(--sevn-shadow-glow-accent)"><span class="text-xs fg-accent-light font-mono">glow-accent</span></div>
+          <div class="card" style="box-shadow:var(--sevn-shadow-glow-brand)"><span class="text-xs fg-strong font-mono">glow-brand</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 — Buttons -->
+  <section class="sg-section">
+    <div class="sg-section__head">
+      <div>
+        <div class="sg-section__num">04</div>
+        <h2>Buttons</h2>
+        <p class="sg-section__sub">Default is the quiet surface button. Primary for confident actions; accent only for action / critical. Ghost for toolbars and icon-only.</p>
+      </div>
+    </div>
+    <div class="demo">
+      <button class="btn">Cancel</button>
+      <button class="btn btn-primary">Resume run</button>
+      <button class="btn btn-outline">Inspect</button>
+      <button class="btn btn-ghost">Skip</button>
+      <button class="btn btn-accent">Abandon · critical</button>
+      <button class="btn btn-danger">Delete trajectory</button>
+    </div>
+    <div class="demo" style="margin-top: var(--sevn-space-3);">
+      <button class="btn btn--sm">sm</button>
+      <button class="btn">base</button>
+      <button class="btn btn--lg">lg</button>
+      <button class="btn btn--icon" aria-label="More">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="3" cy="7" r="1.2" fill="currentColor"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/><circle cx="11" cy="7" r="1.2" fill="currentColor"/></svg>
+      </button>
+      <button class="btn btn-primary">
+        <svg class="btn__icon" viewBox="0 0 14 14" fill="none"><path d="M3 7 H11 M8 4 L11 7 L8 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Approve plan
+      </button>
+      <button class="btn btn-ghost">
+        Search <span class="kbd">⌘K</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- 05 — Forms -->
+  <section class="sg-section">
+    <div class="sg-section__head">
+      <div>
+        <div class="sg-section__num">05</div>
+        <h2>Forms</h2>
+        <p class="sg-section__sub">Tight, readable, with focus rings on every interactive surface. Required marker is the only place we let red in casually.</p>
+      </div>
+    </div>
+    <div class="demo demo--col" style="max-width: 540px;">
+      <div class="field">
+        <label class="label label--required" for="f-tg">Telegram bot token</label>
+        <input class="input input--mono" id="f-tg" type="password" value="••••••••••••••••" placeholder="0123456789:ABCDEF...">
+        <div class="field__hint">Pasted once, stored locally. Rotates via /token-rotate.</div>
+      </div>
+      <div class="field">
+        <label class="label" for="f-model">Model regime</label>
+        <select class="select" id="f-model">
+          <option>Subscription · Anthropic</option>
+          <option>Per-token · OpenAI</option>
+          <option>Free-local · Ollama</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="label" for="f-prompt">System prompt</label>
+        <textarea class="textarea" id="f-prompt" placeholder="Calm, precise, opinionated. Don't volunteer disclaimers."></textarea>
+      </div>
+      <div class="row gap-4">
+        <label class="row gap-2 text-sm fg"><input class="checkbox" type="checkbox" checked> Enable sandbox</label>
+        <label class="row gap-2 text-sm fg"><input class="radio" type="radio" name="r" checked> 256-color</label>
+        <label class="row gap-2 text-sm fg"><input class="radio" type="radio" name="r"> truecolor</label>
+        <label class="row gap-2 text-sm fg"><input class="switch" type="checkbox" checked> Stream responses</label>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 — Cards & badges & status -->
+  <section class="sg-section">
+    <div class="sg-section__head">
+      <div>
+        <div class="sg-section__num">06</div>
+        <h2>Cards · Badges · Status</h2>
+        <p class="sg-section__sub">Stat cards lead with the number; badges are quiet by default and earn color only when the data does.</p>
+      </div>
+    </div>
+    <div class="sg-grid sg-grid--4">
+      <div class="stat-card">
+        <span class="stat-card__label">This month</span>
+        <span class="stat-card__value">$24.18</span>
+        <span class="stat-card__delta stat-card__delta--up">▲ 12% vs last month</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card__label">Sessions · 7d</span>
+        <span class="stat-card__value">142</span>
+        <span class="stat-card__delta">— flat</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card__label">Cache hit rate</span>
+        <span class="stat-card__value">61%</span>
+        <span class="stat-card__delta stat-card__delta--up">▲ 3pp</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-card__label">Failures · 24h</span>
+        <span class="stat-card__value">3</span>
+        <span class="stat-card__delta stat-card__delta--alert">▼ 1 anomaly</span>
+      </div>
+    </div>
+
+    <div class="demo" style="margin-top: var(--sevn-space-5);">
+      <span class="badge">default</span>
+      <span class="badge badge-primary">primary</span>
+      <span class="badge badge-accent">accent</span>
+      <span class="badge badge-slate">slate</span>
+      <span class="badge badge-success">success</span>
+      <span class="badge badge-warning">warning</span>
+      <span class="badge badge--mono">tier C · 4m</span>
+      <span class="badge-status badge-status--live">live</span>
+      <span class="badge-status badge-status--ok">healthy</span>
+      <span class="badge-status badge-status--warn">budget 78%</span>
+      <span class="badge-status badge-status--error">2 errors</span>
+      <span class="badge-status badge-status--idle">idle</span>
+    </div>
+
+    <div class="sg-grid sg-grid--2" style="margin-top: var(--sevn-space-5);">
+      <div class="feature-card">
+        <span class="card__title">Plan-and-execute</span>
+        <h3 class="card__heading">Long-running jobs survive boots.</h3>
+        <p class="card__sub">Tier C runs are checkpointed and resume on restart. Approve, reject, or steer mid-flight.</p>
+        <div class="row gap-2" style="margin-top: var(--sevn-space-4);">
+          <button class="btn btn-primary">Resume run abc123</button>
+          <button class="btn btn-ghost">Inspect</button>
+        </div>
+      </div>
+      <div class="card">
+        <span class="card__title">Self-improve</span>
+        <h3 class="card__heading">Trajectory diff · pending review</h3>
+        <p class="card__sub">3 trajectories proposed by triager. Accepting writes new policy to <code>skills/router.md</code>.</p>
+        <div class="row gap-2" style="margin-top: var(--sevn-space-4);">
+          <button class="btn btn-outline">Review diff</button>
+          <button class="btn btn-ghost">Snooze</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 07 — Chat surface -->
+  <section class="sg-section">
+    <div class="sg-section__head">
+      <div>
+        <div class="sg-section__num">07</div>
+        <h2>Chat surface</h2>
+        <p class="sg-section__sub">Assistant messages: thin primary left edge on a raised surface. User messages: label-led, no fill, comfortable line length. Streaming uses a brand-glow caret — never a “thinking…” sentence.</p>
+      </div>
+    </div>
+    <div class="demo demo--col" style="background: var(--sevn-bg);">
+      <div class="chat">
+        <article class="msg msg--user">
+          <div class="msg__meta"><span class="who who--user">you</span><time>09:42</time></div>
+          <div class="msg__body">Find the longest job from last week and summarise what it actually shipped.</div>
+        </article>
+
+        <article class="msg msg--assistant">
+          <div class="msg__meta"><span class="who who--assistant">sevn</span><time>09:42</time><span class="badge badge--mono">tier B · 38s · $0.0084</span></div>
+          <div class="msg__body">
+            <p>Longest run: <code>0xabc123</code> — “Refactor the trajectories table to support the new policy column.” Ran 4m 12s across 14 tool calls (mostly <code>shell</code> and <code>file_write</code>). It shipped: a new <code>policy_id</code> column on <code>trajectories</code>, a migration, and three updated queries. Tests pass. Not pinned.</p>
+            <div class="thinking" style="margin-top: var(--sevn-space-2);"><span class="thinking__caret"></span><span>still drafting follow-ups…</span></div>
+          </div>
+          <div class="qab">
+            <button class="qab__btn qab__btn--steer"><span class="glyph">🎯</span><span class="qab__btn--label">Steer</span></button>
+            <button class="qab__btn"><span class="glyph">♻</span><span class="qab__btn--label">Regen</span></button>
+            <button class="qab__btn"><span class="glyph">👍</span></button>
+            <button class="qab__btn"><span class="glyph">👎</span></button>
+            <button class="qab__btn"><span class="glyph">🔗</span><span class="qab__btn--label">Share</span></button>
+            <button class="qab__btn"><span class="glyph">📝</span><span class="qab__btn--label">Feedback</span></button>
+          </div>
+        </article>
+
+        <article class="msg msg--assistant">
+          <div class="msg__meta"><span class="who who--assistant">sevn</span><time>09:43</time></div>
+          <div class="plan-card">
+            <span class="plan-card__title">Plan · approve to run</span>
+            <ol>
+              <li>Read <code>trajectories.sql</code> and the three updated queries.</li>
+              <li>Generate a one-screen summary of the policy_id change.</li>
+              <li>Pin the run if you 👍 the summary.</li>
+            </ol>
+            <div class="plan-card__actions">
+              <button class="btn btn-primary">Approve <span class="kbd">1</span></button>
+              <button class="btn">Edit <span class="kbd">2</span></button>
+              <button class="btn btn-ghost">Reject <span class="kbd">3</span></button>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <div class="composer">
+        <textarea placeholder="Ask sevn anything — or paste a job"></textarea>
+        <div class="composer__bar">
+          <button class="btn btn-ghost btn--icon" aria-label="Attach"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 4 L5 8 a2 2 0 0 0 2.8 2.8 L11 8 a3.2 3.2 0 0 0 -4.5 -4.5 L3 7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="btn btn-ghost btn--icon" aria-label="Voice"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="5.5" y="2" width="3" height="6" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M3 7 a4 4 0 0 0 8 0 M7 11 v1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+          <span class="composer__hint">⏎ to send · ⇧⏎ for newline</span>
+          <button class="btn btn-primary btn--sm">Send</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 08 — Tables -->
+  <section class="sg-section">
+    <div class="sg-section__head">
+      <div>
+        <div class="sg-section__num">08</div>
+        <h2>Tables</h2>
+        <p class="sg-section__sub">Dense, zebra-off, hover row, selected row. Tabular numerics throughout; mono for IDs.</p>
+      </div>
+    </div>
+    <div class="surface" style="overflow:hidden;">
+      <table class="table table--compact">
+        <thead><tr>
+          <th>Run</th><th>Surface</th><th>Triager</th><th>Tier</th><th>Tool calls</th><th class="num">Latency</th><th class="num">Cost</th><th>Status</th>
+        </tr></thead>
+        <tbody>
+          <tr aria-selected="true">
+            <td class="mono strong">0xabc123</td>
+            <td>Telegram</td>
+            <td>fast-router</td>
+            <td><span class="badge badge--mono">C</span></td>
+            <td class="num">14</td>
+            <td class="num">4m 12s</td>
+            <td class="num strong">$0.0421</td>
+            <td><span class="badge-status badge-status--ok">ok</span></td>
+          </tr>
+          <tr>
+            <td class="mono">0xab9f02</td>
+            <td>Web UI</td>
+            <td>fast-router</td>
+            <td><span class="badge badge--mono">B</span></td>
+            <td class="num">7</td>
+            <td class="num">38s</td>
+            <td class="num">$0.0084</td>
+            <td><span class="badge-status badge-status--ok">ok</span></td>
+          </tr>
+          <tr>
+            <td class="mono">0xab8d11</td>
+            <td>Telegram</td>
+            <td>plan-then-execute</td>
+            <td><span class="badge badge--mono">C</span></td>
+            <td class="num">22</td>
+            <td class="num">2m 03s</td>
+            <td class="num">$0.0212</td>
+            <td><span class="badge-status badge-status--warn">budget 78%</span></td>
+          </tr>
+          <tr>
+            <td class="mono">0xab7c00</td>
+            <td>Webhook</td>
+            <td>fast-router</td>
+            <td><span class="badge badge--mono">A</span></td>
+            <td class="num">3</td>
+            <td class="num">1.2s</td>
+            <td class="num">$0.0007</td>
+            <td><span class="badge-status badge-status--error">tool fail</span></td>
+          </tr>
+          <tr>
+            <td class="mono">0xab6e8a</td>
+            <td>Web UI</td>
+            <td>cache-direct</td>
+            <td><span class="badge badge--mono">A</span></td>
+            <td class="num">0</td>
+            <td class="num">0.04s</td>
+            <td class="num muted">cache</td>
+            <td><span class="badge-status badge-status--ok">ok</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 09 — OpenUI vocabulary -->
+  <section class="sg-section">
+    <div class="sg-section__head">
+      <div>
+        <div class="sg-section__num">09</div>
+        <h2>OpenUI vocabulary</h2>
+        <p class="sg-section__sub">The classes the agent emits inside the chat. CSS only (no JS), token-driven, shape-stable across rasterise targets.</p>
+      </div>
+    </div>
+    <div class="sg-grid sg-grid--2">
+      <div class="openui">
+        <div class="openui-stat">
+          <span class="openui-stat__label">Today’s spend</span>
+          <span class="openui-stat__value">$0.84</span>
+        </div>
+      </div>
+      <div class="openui">
+        <dl class="openui-kv">
+          <dt>Run</dt><dd>0xabc123</dd>
+          <dt>Triager</dt><dd>plan-then-execute</dd>
+          <dt>Tier</dt><dd>C</dd>
+          <dt>Latency</dt><dd>4m 12s</dd>
+          <dt>Cost</dt><dd>$0.0421</dd>
+        </dl>
+      </div>
+      <div class="openui">
+        <div class="openui-callout openui-callout--info">
+          <strong style="color:var(--sevn-fg-strong)">Cache hit.</strong> Reused embeddings from 11:42 — no model spend.
+        </div>
+      </div>
+      <div class="openui">
+        <div class="openui-callout openui-callout--critical">
+          <strong style="color:var(--sevn-fg-strong)">Sandbox killed.</strong> Container exceeded 60s wall-clock; rerun with <code>--tier C</code>.
+        </div>
+      </div>
+      <div class="openui">
+        <ol class="openui-timeline">
+          <li><strong style="color:var(--sevn-fg-strong)">Triager</strong> — selected <code>plan-then-execute</code></li>
+          <li><strong style="color:var(--sevn-fg-strong)">Plan</strong> — 3 steps emitted</li>
+          <li><strong style="color:var(--sevn-fg-strong)">Tool</strong> — <code>file_write</code> · trajectories.sql</li>
+          <li><strong style="color:var(--sevn-fg-strong)">Tool</strong> — <code>shell</code> · pytest -k policy_id</li>
+          <li><strong style="color:var(--sevn-fg-strong)">Done</strong> — 14 calls · 4m 12s</li>
+        </ol>
+      </div>
+      <div class="openui">
+        <div class="openui-diff">
+          <div class="openui-diff__row openui-diff__row--ctx"><span class="ln">12</span><span>def triage(msg):</span></div>
+          <div class="openui-diff__row openui-diff__row--rem"><span class="ln">13</span><span>-   return Tier.A if len(msg) &lt; 20 else Tier.B</span></div>
+          <div class="openui-diff__row openui-diff__row--add"><span class="ln">13</span><span>+   return route_via_policy(msg, policy_id=current.policy)</span></div>
+          <div class="openui-diff__row openui-diff__row--ctx"><span class="ln">14</span><span></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 — Code -->
+  <section class="sg-section">
+    <div class="sg-section__head">
+      <div>
+        <div class="sg-section__num">10</div>
+        <h2>Code blocks</h2>
+        <p class="sg-section__sub">Syntax palette is muted; primary marks keywords, accent flags builtins-of-note, warning-amber strings, primary-light numbers.</p>
+      </div>
+    </div>
+    <div class="col gap-3">
+      <div>
+        <div class="code-block__head">
+          <span>routing.py</span>
+          <span class="code-block__lang">python</span>
+        </div>
+<pre class="code-block"><span class="tok-keyword">from</span> sevn <span class="tok-keyword">import</span> triage, run
+<span class="tok-keyword">from</span> sevn.policy <span class="tok-keyword">import</span> Policy
+
+<span class="tok-keyword">def</span> <span class="tok-fn">handle</span>(msg: <span class="tok-builtin">str</span>) -> <span class="tok-builtin">Run</span>:
+    <span class="tok-comment"># tier C runs survive boot — see /policy/tiers.md</span>
+    tier = triage(msg, policy=Policy.<span class="tok-fn">current</span>())
+    <span class="tok-keyword">return</span> run(msg, tier=tier, budget=<span class="tok-number">0.05</span>)</pre>
+      </div>
+      <p class="text-sm fg-muted">Inline: <code>sevn run --tier C 0xabc123</code> · keyboard: <span class="kbd">⌘</span> <span class="kbd">K</span></p>
+    </div>
+  </section>
+
+  <!-- 11 — Toasts -->
+  <section class="sg-section">
+    <div class="sg-section__head">
+      <div>
+        <div class="sg-section__num">11</div>
+        <h2>Notifications</h2>
+        <p class="sg-section__sub">Primary for info; success for success; amber for warnings; accent for critical only. Anchored bottom-right; stack newest-on-top.</p>
+      </div>
+    </div>
+    <div class="sg-grid sg-grid--2">
+      <div class="toast">
+        <svg class="toast__icon" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 4.5 V7.5 M7 9.5 v0.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <div><div class="toast__title">Sandbox image rebuilt</div><div class="toast__body">python:3.12-slim · 312MB · cached layers preserved</div></div>
+        <button class="toast__close">✕</button>
+      </div>
+      <div class="toast toast--success">
+        <svg class="toast__icon" viewBox="0 0 14 14" fill="none"><path d="M3 7.5 L6 10 L11 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div><div class="toast__title">Run pinned</div><div class="toast__body">0xabc123 · saved to Pinned Runs</div></div>
+        <button class="toast__close">✕</button>
+      </div>
+      <div class="toast toast--warning">
+        <svg class="toast__icon" viewBox="0 0 14 14" fill="none"><path d="M7 2 L12.5 12 H1.5 Z M7 6 v3 M7 11 v0.5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/></svg>
+        <div><div class="toast__title">Budget at 78%</div><div class="toast__body">$23.40 of $30 · resets in 4 days</div></div>
+        <button class="toast__close">✕</button>
+      </div>
+      <div class="toast toast--critical">
+        <svg class="toast__icon" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.3"/><path d="M7 4 V8 M7 10 v0.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <div><div class="toast__title">Provider unreachable</div><div class="toast__body">3 retries failed · falling back to cached responses</div></div>
+        <button class="toast__close">✕</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 — Logos -->
+  <section class="sg-section">
+    <div class="sg-section__head">
+      <div>
+        <div class="sg-section__num">12</div>
+        <h2>Logo lockups</h2>
+        <p class="sg-section__sub">The mark is an ASCII-style “7” in signal red and clear-sky blue — two colors only, no gradient. The wordmark pairs <code>sevn</code> in heavy Inter Tight with <code>.bot</code> in JetBrains Mono — a deliberate domain-style suffix.</p>
+      </div>
+    </div>
+
+    <div class="sg-grid sg-grid--2">
+      <div class="lockup-card">
+        <div class="lockup lockup--dark"><img src="logos/logo-mark.svg" alt="sevn.bot mark" style="max-width:40%"></div>
+        <div class="meta"><span>logo-mark.svg</span><span>compact · 80×80</span></div>
+      </div>
+      <div class="lockup-card">
+        <div class="lockup lockup--dark"><img src="logos/logo-primary.svg" alt="sevn.bot — primary lockup"></div>
+        <div class="meta"><span>logo-primary.svg</span><span>on base · 050</span></div>
+      </div>
+      <div class="lockup-card">
+        <div class="lockup lockup--surface"><img src="logos/logo-dark-bg.svg" alt="sevn.bot — dark bg"></div>
+        <div class="meta"><span>logo-dark-bg.svg</span><span>on surface · 1</span></div>
+      </div>
+      <div class="lockup-card">
+        <div class="lockup lockup--brand"><img src="logos/logo-all-white.svg" alt="sevn.bot — all white"></div>
+        <div class="meta"><span>logo-all-white.svg</span><span>on brand gradient</span></div>
+      </div>
+      <div class="lockup-card">
+        <div class="lockup lockup--white"><img src="logos/avatar-github.svg" alt="sevn.bot avatar" style="max-width:50%"></div>
+        <div class="meta"><span>avatar-github.svg</span><span>280×280</span></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: var(--sevn-space-6);">
+      <span class="card__title">Logo usage</span>
+      <ul style="list-style:none; display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: var(--sevn-space-3); margin-top: var(--sevn-space-3);">
+        <li class="text-sm"><span class="fg-success">✓</span> Maintain clear-space equal to the height of the mark.</li>
+        <li class="text-sm"><span class="fg-success">✓</span> Use the all-white version on photographic backgrounds.</li>
+        <li class="text-sm"><span class="fg-success">✓</span> Minimum size: 22px for <code>logo-mark</code>, 96px wide for the full lockup.</li>
+        <li class="text-sm"><span class="fg-success">✓</span> The brand-glow shadow is the only legal drop shadow.</li>
+        <li class="text-sm"><span class="fg-accent-light">✕</span> Don’t swap the bar/diagonal colors — red stays the bar, blue stays the diagonal.</li>
+        <li class="text-sm"><span class="fg-accent-light">✕</span> Don’t apply gradients, glows, or fills to the mark.</li>
+        <li class="text-sm"><span class="fg-accent-light">✕</span> Don’t stretch, skew, or outline the wordmark.</li>
+        <li class="text-sm"><span class="fg-accent-light">✕</span> Don’t typeset “sevn.bot” in any font other than Inter Tight + JetBrains Mono.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- 13 — Motion -->
+  <section class="sg-section">
+    <div class="sg-section__head">
+      <div>
+        <div class="sg-section__num">13</div>
+        <h2>Motion tokens</h2>
+        <p class="sg-section__sub">Five durations, five easings. Restraint by default; spring/bounce earned, never default.</p>
+      </div>
+    </div>
+    <div class="sg-grid sg-grid--3">
+      <div class="card"><div class="card__title">DURATIONS</div>
+        <div class="token-list" style="margin-top: var(--sevn-space-2);">
+          <span class="name">--sevn-duration-instant</span><span class="preview">tap feedback</span><span class="val">80ms</span>
+          <span class="name">--sevn-duration-fast</span><span class="preview">hover, focus</span><span class="val">140ms</span>
+          <span class="name">--sevn-duration-base</span><span class="preview">state change</span><span class="val">200ms</span>
+          <span class="name">--sevn-duration-slow</span><span class="preview">entrance</span><span class="val">320ms</span>
+          <span class="name">--sevn-duration-slower</span><span class="preview">page-level</span><span class="val">500ms</span>
+        </div>
+      </div>
+      <div class="card"><div class="card__title">EASINGS</div>
+        <div class="token-list" style="margin-top: var(--sevn-space-2);">
+          <span class="name">--sevn-ease-out</span><span class="preview">default</span><span class="val">cubic</span>
+          <span class="name">--sevn-ease-in</span><span class="preview">exits</span><span class="val">cubic</span>
+          <span class="name">--sevn-ease-in-out</span><span class="preview">balanced</span><span class="val">cubic</span>
+          <span class="name">--sevn-ease-spring</span><span class="preview">gentle pop</span><span class="val">cubic</span>
+          <span class="name">--sevn-ease-bounce</span><span class="preview">celebration</span><span class="val">cubic</span>
+        </div>
+      </div>
+      <div class="card"><div class="card__title">PRIMITIVES</div>
+        <div class="col gap-3" style="margin-top: var(--sevn-space-2);">
+          <div class="thinking"><span class="thinking__caret"></span><span>streaming caret</span></div>
+          <div class="thinking"><span class="thinking__dots"><span></span><span></span><span></span></span><span>thinking dots</span></div>
+          <div class="row gap-2"><span class="badge-status badge-status--live">pulse</span><span class="text-xs fg-muted font-mono">badge-status live</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="sg-footer">
+    <span>sevn.bot · style-guide.html · v0.1</span>
+    <span>compiled against <code>style/index.css</code></span>
+  </footer>
+
+</main>
+
+<!-- Tweaks panel host -->
+<div id="tweaks-host"></div>
+
+<script>
+  // theme switching
+  const root = document.documentElement;
+  const buttons = document.querySelectorAll('[data-theme-set]');
+  const stored = localStorage.getItem('sevn:theme') || 'dark';
+  function applyTheme(t){
+    if (t === 'system') { root.removeAttribute('data-theme'); }
+    else { root.setAttribute('data-theme', t); }
+    buttons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.themeSet === t)));
+    localStorage.setItem('sevn:theme', t);
+  }
+  applyTheme(stored);
+  buttons.forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.themeSet)));
+</script>
+
+<!-- Tweaks: density, radius, primary hue tuner. Surfaces only when toolbar Tweaks is on. -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel">
+  const STYLE_GUIDE_TWEAKS = /*EDITMODE-BEGIN*/{
+    "primaryHue": 208,
+    "radiusFeel": "gentle",
+    "themeBootstrap": "dark"
+  }/*EDITMODE-END*/;
+
+  function StyleGuideTweaks(){
+    const { tweaks: t, setTweak } = useTweaks(STYLE_GUIDE_TWEAKS);
+    React.useEffect(() => {
+      // primary hue: oklch wheel around the locked clear-blue
+      // base lch ≈ (74% 0.13 235), nudge hue
+      const h = t.primaryHue;
+      const r = h - 235;
+      // simple recolor: shift hue via CSS custom property
+      document.documentElement.style.setProperty('--sevn-primary',       `oklch(74% 0.13 ${h})`);
+      document.documentElement.style.setProperty('--sevn-primary-light', `oklch(82% 0.10 ${h})`);
+      document.documentElement.style.setProperty('--sevn-primary-pale',  `oklch(93% 0.05 ${h})`);
+      document.documentElement.style.setProperty('--sevn-primary-dark',  `oklch(55% 0.14 ${h})`);
+    }, [t.primaryHue]);
+    React.useEffect(() => {
+      const map = { sharp: '4px', gentle: '8px', warm: '12px' };
+      document.documentElement.style.setProperty('--sevn-radius-lg', map[t.radiusFeel] || '8px');
+      document.documentElement.style.setProperty('--sevn-radius-md', map[t.radiusFeel] === '4px' ? '3px' : (map[t.radiusFeel] === '12px' ? '8px' : '6px'));
+    }, [t.radiusFeel]);
+
+    return (
+      <TweaksPanel title="Tweaks">
+        <TweakSection title="Brand">
+          <TweakSlider label="Primary hue" value={t.primaryHue} min={180} max={260} step={1} onChange={(v)=>setTweak('primaryHue', v)} suffix="°"/>
+        </TweakSection>
+        <TweakSection title="Shape">
+          <TweakRadio label="Radius" value={t.radiusFeel} options={[{value:'sharp',label:'Sharp'},{value:'gentle',label:'Gentle'},{value:'warm',label:'Warm'}]} onChange={(v)=>setTweak('radiusFeel', v)}/>
+        </TweakSection>
+      </TweaksPanel>
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('tweaks-host')).render(<StyleGuideTweaks/>);
+</script>
+
+</body>
+</html>

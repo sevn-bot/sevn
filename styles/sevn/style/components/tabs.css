@@ -1,0 +1,73 @@
+/* sevn.bot — tabs (underline + pill) */
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--sevn-space-1);
+  border-bottom: 1px solid var(--sevn-border);
+}
+
+.tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sevn-space-2);
+  height: 2.25rem;
+  padding: 0 var(--sevn-space-3);
+  font-size: var(--sevn-fs-sm);
+  font-weight: var(--sevn-fw-500);
+  color: var(--sevn-fg-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: color var(--sevn-duration-fast) var(--sevn-ease-out);
+}
+.tab:hover { color: var(--sevn-fg); }
+.tab[aria-selected='true'] { color: var(--sevn-fg-strong); }
+.tab[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  left: var(--sevn-space-3);
+  right: var(--sevn-space-3);
+  bottom: -1px;
+  height: 2px;
+  background: var(--sevn-primary);
+  border-radius: var(--sevn-radius-full);
+}
+
+.tab .count {
+  font-family: var(--sevn-font-mono);
+  font-size: var(--sevn-fs-xs);
+  color: var(--sevn-fg-faint);
+  font-variant-numeric: tabular-nums;
+  padding: 1px 6px;
+  background: var(--sevn-surface-3);
+  border-radius: var(--sevn-radius-full);
+}
+
+/* pill tabs — inline, segmented */
+.tabs-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  gap: 2px;
+  background: var(--sevn-surface-1);
+  border: 1px solid var(--sevn-border);
+  border-radius: var(--sevn-radius-md);
+}
+.tab-pill {
+  height: 1.625rem;
+  padding: 0 var(--sevn-space-3);
+  font-size: var(--sevn-fs-xs);
+  font-weight: var(--sevn-fw-500);
+  color: var(--sevn-fg-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--sevn-radius-sm);
+  cursor: pointer;
+}
+.tab-pill[aria-selected='true'] {
+  color: var(--sevn-fg-strong);
+  background: var(--sevn-surface-3);
+  box-shadow: var(--sevn-hairline-top), var(--sevn-shadow-xs);
+}

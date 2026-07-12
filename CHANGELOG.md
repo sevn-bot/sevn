@@ -23,6 +23,8 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- CI failures from `secrets.*` gitignore rule excluding `src/sevn/config/sections/secrets.py` (ModuleNotFoundError and mypy `no-any-return` on CI)
+
 ### Security
 
 ## [0.0.1] - 2026-07-08

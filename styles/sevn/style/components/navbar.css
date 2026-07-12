@@ -1,0 +1,152 @@
+/* sevn.bot — top navbar.
+ * Top bar with logo (compact), workspace switcher, global search slot, theme picker, notifications, user menu.
+ */
+
+.navbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sevn-space-4);
+  height: 3rem;
+  padding: 0 var(--sevn-space-4);
+  background: var(--sevn-surface-glass);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  border-bottom: 1px solid var(--sevn-border);
+  position: sticky;
+  top: 0;
+  z-index: var(--sevn-z-sticky);
+}
+
+.navbar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sevn-space-2);
+  padding-right: var(--sevn-space-3);
+  border-right: 1px solid var(--sevn-border);
+  height: 100%;
+}
+
+.navbar__brand .navbar__mark { width: 22px; height: 22px; }
+.navbar__brand .navbar__name {
+  font-family: var(--sevn-font-sans);
+  font-weight: var(--sevn-fw-700);
+  font-size: var(--sevn-fs-sm);
+  letter-spacing: var(--sevn-tracking-tighter);
+  color: var(--sevn-fg-strong);
+}
+.navbar__brand .navbar__name .suffix {
+  font-family: var(--sevn-font-mono);
+  font-weight: var(--sevn-fw-400);
+  color: var(--sevn-fg-muted);
+}
+
+.navbar__workspace {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sevn-space-2);
+  height: 1.875rem;
+  padding: 0 var(--sevn-space-2-5, 0.625rem) 0 var(--sevn-space-2);
+  font-size: var(--sevn-fs-sm);
+  font-weight: var(--sevn-fw-500);
+  color: var(--sevn-fg);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--sevn-radius-md);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background var(--sevn-duration-fast) var(--sevn-ease-out);
+}
+.navbar__workspace > * { flex-shrink: 0; }
+.navbar__workspace:hover { background: var(--sevn-hover-bg); border-color: var(--sevn-border); }
+.navbar__workspace .ws-icon {
+  width: 18px; height: 18px;
+  border-radius: var(--sevn-radius-sm);
+  background: var(--sevn-primary);
+  display: inline-block;
+}
+
+.navbar__search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--sevn-space-2);
+  height: 1.875rem;
+  padding: 0 var(--sevn-space-3);
+  background: var(--sevn-surface-1);
+  border: 1px solid var(--sevn-border);
+  border-radius: var(--sevn-radius-md);
+  color: var(--sevn-fg-muted);
+  font-size: var(--sevn-fs-sm);
+  cursor: text;
+  max-width: 480px;
+  transition: border-color var(--sevn-duration-fast) var(--sevn-ease-out);
+}
+.navbar__search:hover { border-color: var(--sevn-border-strong); }
+.navbar__search:focus-within { border-color: var(--sevn-primary); box-shadow: 0 0 0 3px rgba(95,177,247,0.18); }
+.navbar__search input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  color: var(--sevn-fg-strong);
+  font-size: inherit;
+  outline: 0;
+}
+.navbar__search input::placeholder { color: var(--sevn-fg-faint); }
+
+.navbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sevn-space-1);
+  margin-left: auto;
+}
+
+/* theme picker (segmented) */
+.theme-picker {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  background: var(--sevn-surface-1);
+  border: 1px solid var(--sevn-border);
+  border-radius: var(--sevn-radius-md);
+}
+.theme-picker__btn {
+  height: 1.5rem;
+  padding: 0 var(--sevn-space-2);
+  font-size: var(--sevn-fs-xs);
+  font-weight: var(--sevn-fw-500);
+  color: var(--sevn-fg-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--sevn-radius-sm);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sevn-space-1);
+}
+.theme-picker__btn[aria-pressed='true'] {
+  color: var(--sevn-fg-strong);
+  background: var(--sevn-surface-3);
+  box-shadow: var(--sevn-hairline-top), var(--sevn-shadow-xs);
+}
+
+/* user menu avatar */
+.user-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sevn-space-2);
+  height: 1.875rem;
+  padding: 0 var(--sevn-space-1);
+  border-radius: var(--sevn-radius-md);
+  cursor: pointer;
+  transition: background var(--sevn-duration-fast) var(--sevn-ease-out);
+}
+.user-menu:hover { background: var(--sevn-hover-bg); }
+.user-menu__avatar {
+  width: 22px; height: 22px;
+  border-radius: var(--sevn-radius-full);
+  background: var(--sevn-primary);
+  border: 1px solid var(--sevn-border-strong);
+  flex-shrink: 0;
+}
+.user-menu > span:not(.user-menu__avatar) { white-space: nowrap; }

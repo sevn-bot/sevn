@@ -1,0 +1,53 @@
+/* sevn.bot — typography tokens
+ * Inter Tight for UI, JetBrains Mono for code. Both Google-hosted.
+ * Type scale: xs..6xl with locked line-heights and tracking per step.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+:root {
+  /* ---------- Families ---------- */
+  --sevn-font-sans: 'Inter Tight', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --sevn-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* ---------- Weights ---------- */
+  --sevn-fw-300: 300;
+  --sevn-fw-400: 400;
+  --sevn-fw-500: 500;
+  --sevn-fw-600: 600;
+  --sevn-fw-700: 700;
+  --sevn-fw-800: 800;
+
+  /* ---------- Sizes (rem) — per-step lh and tracking ---------- */
+  --sevn-fs-xs:    0.6875rem;  /* 11 */
+  --sevn-fs-sm:    0.8125rem;  /* 13 */
+  --sevn-fs-base:  0.9375rem;  /* 15 — UI body default */
+  --sevn-fs-md:    1rem;       /* 16 — long-form */
+  --sevn-fs-lg:    1.125rem;   /* 18 */
+  --sevn-fs-xl:    1.375rem;   /* 22 */
+  --sevn-fs-2xl:   1.75rem;    /* 28 */
+  --sevn-fs-3xl:   2.25rem;    /* 36 */
+  --sevn-fs-4xl:   3rem;       /* 48 */
+  --sevn-fs-5xl:   3.75rem;    /* 60 */
+  --sevn-fs-6xl:   4.75rem;    /* 76 */
+
+  --sevn-lh-xs:    1.45;
+  --sevn-lh-sm:    1.5;
+  --sevn-lh-base:  1.55;
+  --sevn-lh-md:    1.65;
+  --sevn-lh-lg:    1.55;
+  --sevn-lh-xl:    1.4;
+  --sevn-lh-2xl:   1.25;
+  --sevn-lh-3xl:   1.15;
+  --sevn-lh-4xl:   1.05;
+  --sevn-lh-5xl:   1.02;
+  --sevn-lh-6xl:   1.0;
+
+  --sevn-tracking-tightest: -0.04em;
+  --sevn-tracking-tighter:  -0.025em;
+  --sevn-tracking-tight:    -0.015em;
+  --sevn-tracking-normal:    0em;
+  --sevn-tracking-wide:      0.02em;
+  --sevn-tracking-wider:     0.06em;
+  --sevn-tracking-widest:    0.14em;
+}
