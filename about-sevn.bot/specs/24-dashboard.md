@@ -8,7 +8,7 @@ summary: 'Deliver Mission Control: a same-process dashboard (prd-07-mission-cont
   so the owner can inspect traces, costs, provider health, in-flight runs, proxy status,
   and config without opening SQLite from'
 last_updated: '2026-07-12'
-fingerprint: sha256:a479e3d2103171ed6c03ecf8371d519861b2316dae62f3ce66b0a84387473a26
+fingerprint: sha256:b1c1fe2d50940a621305fcb77c9597689d9db04636ed6f3933a3da283a9456d5
 related: []
 sources:
 - src/sevn/ui/**
@@ -327,6 +327,12 @@ interfaces:
 - name: security_put
   file: src/sevn/ui/dashboard/api/ops.py
   symbol: security_put
+- name: tracing_logfire_get
+  file: src/sevn/ui/dashboard/api/ops.py
+  symbol: tracing_logfire_get
+- name: tracing_logfire_put
+  file: src/sevn/ui/dashboard/api/ops.py
+  symbol: tracing_logfire_put
 - name: tunnels_process
   file: src/sevn/ui/dashboard/api/ops.py
   symbol: tunnels_process

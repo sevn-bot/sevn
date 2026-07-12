@@ -8,7 +8,7 @@ summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict de
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
 last_updated: '2026-07-12'
-fingerprint: sha256:41a6bf6e50310d091433935c0d88a8c6a61597e95d918d4f5cb62a719430945e
+fingerprint: sha256:d61acf7cdeb2d35970f55dc0e62788023a75b32aed5fd864f4d09c5e96d75c86
 related: []
 sources:
 - src/sevn/**
@@ -811,6 +811,21 @@ interfaces:
 - name: wrap_trace_sink
   file: src/sevn/agent/tracing/emit.py
   symbol: wrap_trace_sink
+- name: LogfireExportStatus
+  file: src/sevn/agent/tracing/logfire_config.py
+  symbol: LogfireExportStatus
+- name: apply_logfire_export_to_sevn_doc
+  file: src/sevn/agent/tracing/logfire_config.py
+  symbol: apply_logfire_export_to_sevn_doc
+- name: logfire_export_status
+  file: src/sevn/agent/tracing/logfire_config.py
+  symbol: logfire_export_status
+- name: logfire_export_status_from_doc
+  file: src/sevn/agent/tracing/logfire_config.py
+  symbol: logfire_export_status_from_doc
+- name: logfire_sink_entry_for_tests
+  file: src/sevn/agent/tracing/logfire_config.py
+  symbol: logfire_sink_entry_for_tests
 - name: MultiSink
   file: src/sevn/agent/tracing/multi_sink.py
   symbol: MultiSink
@@ -1951,6 +1966,12 @@ interfaces:
 - name: run_traces
   file: src/sevn/cli/commands/traces_cmd.py
   symbol: run_traces
+- name: register
+  file: src/sevn/cli/commands/tracing_cmd.py
+  symbol: register
+- name: show_tracing_config
+  file: src/sevn/cli/commands/tracing_cmd.py
+  symbol: show_tracing_config
 - name: register
   file: src/sevn/cli/commands/tunnel_cmd.py
   symbol: register
@@ -10888,6 +10909,12 @@ interfaces:
 - name: security_put
   file: src/sevn/ui/dashboard/api/ops.py
   symbol: security_put
+- name: tracing_logfire_get
+  file: src/sevn/ui/dashboard/api/ops.py
+  symbol: tracing_logfire_get
+- name: tracing_logfire_put
+  file: src/sevn/ui/dashboard/api/ops.py
+  symbol: tracing_logfire_put
 - name: tunnels_process
   file: src/sevn/ui/dashboard/api/ops.py
   symbol: tunnels_process
