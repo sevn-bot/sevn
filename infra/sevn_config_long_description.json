@@ -37,8 +37,8 @@
       "how_to_collect": "Set true only when uvicorn `--forwarded-allow-ips` (or equivalent) is locked to trusted tunnel IPs"
     },
     "gateway.queue_mode": {
-      "long_description": "cancel aborts in-flight work on new user message; steer buffers lines until safe harness injection point.",
-      "how_to_collect": "Read the design docsb. Default cancel for simpler replay; steer for Tier-B-heavy chats accepting complexity."
+      "long_description": "cancel aborts in-flight work on new user message; steer buffers lines until safe harness injection point; multi runs a bounded triager relatedness classification (related_steer / supersede_cancel / new_task) and, on new_task, spawns a fresh level-1 tier-B sub-agent bound to the same session/channel (about-sevn.bot/sub-agents.html D6).",
+      "how_to_collect": "Read the design docsb. Default cancel for simpler replay; steer for Tier-B-heavy chats accepting complexity; multi when concurrent unrelated asks in one chat are common and subagents.enabled is true."
     },
     "gateway.steer.max_pending": {
       "long_description": "Maximum buffered user lines per session when queue_mode=steer.",
@@ -412,12 +412,40 @@
       "long_description": "Stricter sevn doctor / schema validation for CI.",
       "how_to_collect": "the design docs O8; optional `doctor.strict: true` in CI pipelines (pair with `21-cli.md` §10)."
     },
-    "subagents.max_concurrent": {
-      "long_description": "Per-session concurrent subagent cap.",
-      "how_to_collect": "Default 5 lower on small hosts."
+    "subagents": {
+      "long_description": "Sub-agents (L1/L2) orchestration subtree (about-sevn.bot/sub-agents.html D2). Level-1 sub-agents are tracked, concurrent, killable runs of the existing roles (triager/tier_b/tier_c/tier_d); level-1 runs may spawn level-2 sub-agents, including specialists (hard depth cap at level 2).",
+      "how_to_collect": "Superseded the earlier speculative subagents.max_concurrent placeholder (unimplemented, no Python backing) once the D2 shape landed in W1 of the sub-agents-orchestration plan."
+    },
+    "subagents.enabled": {
+      "long_description": "Master on/off switch for the sub-agent system.",
+      "how_to_collect": "Default true; set false to force the classic single-run-per-role behavior."
+    },
+    "subagents.max_level1_default": {
+      "long_description": "Workspace default max concurrent level-1 sub-agents per role, absent a subagents.agents.<role>.max_level1 override.",
+      "how_to_collect": "Default 5; lower on small hosts or under provider rate limits."
+    },
+    "subagents.max_level2_default": {
+      "long_description": "Workspace default max concurrent level-2 sub-agents per level-1 run, absent a subagents.agents.<role>.max_level2 override.",
+      "how_to_collect": "Default 3."
+    },
+    "subagents.max_override": {
+      "long_description": "When set, a hard ceiling applied over every resolved max_level1/max_level2 (defaults and per-role overrides alike) — D2 precedence: max_override (ceiling) -> agents.<role>.* -> *_default.",
+      "how_to_collect": "Leave null (default) unless you need one global cap regardless of per-role config, e.g. during a provider incident."
+    },
+    "subagents.timeout_s": {
+      "long_description": "Optional per-sub-agent wall-clock timeout in seconds; null falls back to the owning tier's default executor timeout (D11).",
+      "how_to_collect": "Set only when sub-agent tasks need a tighter/looser bound than the tier default."
+    },
+    "subagents.agents": {
+      "long_description": "Per-role max_level1/max_level2 overrides, keyed by level-1 role (triager, tier_b, tier_c, tier_d).",
+      "how_to_collect": "Add an entry only for roles that need a limit different from the *_default values."
+    },
+    "subagents.specialists": {
+      "long_description": "Level-2 specialist executors by name (default empty object — no specialists configured). Documented example (not a shipped default): media_generator -> {\"model\": \"minimax-3\", \"provider\": \"minimax\", \"assigned_to\": [\"tier_b\"], \"requestable_by\": [\"triager\", \"tier_b\"], \"max_concurrent\": 2} (D8), operator-visible label sub_agent_2_media_generator (D16).",
+      "how_to_collect": "Add one entry per specialist you configure; each requires model + provider at minimum. assigned_to statically binds roles that may spawn it; requestable_by additionally allows those roles to grant/request it at runtime."
     },
     "max_concurrent_subagents_total": {
-      "long_description": "Workspace-wide total subagent cap across sessions.",
+      "long_description": "Workspace-wide total subagent cap across sessions. Pre-existing, unimplemented placeholder distinct from subagents.max_override (about-sevn.bot/sub-agents.html D2) — a true workspace-total cap is explicitly out of scope for v1 (sub-agents-orchestration risk #6) and may retire this key later.",
       "how_to_collect": "Default 20 per RLM H2; reduce if SQLite or CPU bottlenecks."
     },
     "add_core_tools_to_all_context": {

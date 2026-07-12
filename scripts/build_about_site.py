@@ -40,6 +40,7 @@ _REPO = Path(__file__).resolve().parents[1]
 if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
 
+from scripts.gen_subagents_chart import write_chart as write_subagents_chart  # noqa: E402
 from scripts.mission_control_catalog import (  # noqa: E402
     DEV_MISSION_HTML,
     match_dev_tab,
@@ -77,6 +78,7 @@ USER_PAGES: tuple[str, ...] = (
     "index.html",
     "getting-started.html",
     "mission-control.html",
+    "sub-agents.html",
     "telegram-menu.html",
     "tools.html",
     "skills.html",
@@ -195,6 +197,7 @@ def _nav_pages() -> tuple[tuple[str, str], ...]:
         "index": "Home",
         "getting-started": "Getting started",
         "mission-control": "Mission Control",
+        "sub-agents": "Sub-agents",
         "telegram-menu": "Telegram settings",
         "tools": "Tools",
         "skills": "Skills",
@@ -708,6 +711,7 @@ def build_site(dest_root: Path | None = None) -> None:
     root = dest_root or ABOUT
     root.mkdir(parents=True, exist_ok=True)
     _copy_assets(root)
+    write_subagents_chart(root / "assets" / "subagents-chart.svg")
     env = _jinja_env()
 
     extras: dict[str, dict[str, Any]] = {
@@ -723,6 +727,7 @@ def build_site(dest_root: Path | None = None) -> None:
         "index",
         "getting-started",
         "mission-control",
+        "sub-agents",
         "telegram-menu",
         "tools",
         "skills",

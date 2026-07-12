@@ -5,6 +5,7 @@ Depends: httpx, sevn.cli.gateway_client, sevn.cli.json_util
 
 Exports:
     dashboard_api_get — ``GET /api/v1/...`` with gateway transport + JSON parse.
+    dashboard_api_post — ``POST /api/v1/...`` with gateway transport + JSON parse.
     dashboard_http_failure — map non-success responses to CLI exit ``4``.
 """
 
@@ -184,4 +185,83 @@ def dashboard_api_get(
     return body
 
 
-__all__ = ["dashboard_api_get", "dashboard_http_failure"]
+def dashboard_api_post(
+    path: str,
+    *,
+    command: str,
+    workspace: WorkspaceConfig,
+    process: ProcessSettings | None = None,
+    json_out: bool = False,
+    transport: httpx.BaseTransport | None = None,
+    require_token: bool = False,
+) -> dict[str, Any]:
+    """Perform one dashboard ``POST`` and return the JSON object body.
+
+    Args:
+        path (str): Path under gateway origin (e.g. ``/api/v1/mission/subagents/x/kill``).
+        command (str): Invoked CLI command for error envelopes.
+        workspace (WorkspaceConfig): Bound workspace config.
+        process (ProcessSettings | None): Optional env overrides.
+        json_out (bool): Emit JSON failure envelopes on error.
+        transport (httpx.BaseTransport | None): Optional httpx transport for tests.
+        require_token (bool): Fail before I/O when gateway token is missing.
+
+    Returns:
+        dict[str, Any]: Parsed JSON response body.
+
+    Raises:
+        typer.Exit: Exit code ``4`` on HTTP or transport errors.
+
+    Examples:
+        >>> from unittest.mock import patch
+        >>> import httpx
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> t = httpx.MockTransport(lambda r: httpx.Response(200, json={"killed": True}, request=r))
+        >>> with patch("sevn.cli.gateway_client.resolve_gateway_token", return_value="tok"):
+        ...     dashboard_api_post(
+        ...         "/api/v1/mission/subagents/a1/kill",
+        ...         command="t",
+        ...         workspace=WorkspaceConfig.minimal(),
+        ...         transport=t,
+        ...     )["killed"]
+        True
+    """
+    api_path = path if path.startswith("/api/v1/") else f"/api/v1/{path.lstrip('/')}"
+    response = gateway_json_request(
+        "POST",
+        api_path,
+        process=process,
+        workspace=workspace,
+        require_token=require_token,
+        transport=transport,
+    )
+    if response.status_code >= 400:
+        dashboard_http_failure(command=command, response=response, json_out=json_out)
+    try:
+        body = response.json()
+    except ValueError as exc:
+        if json_out:
+            emit_json_failure(
+                command=command,
+                error_code="DASHBOARD_API_ERROR",
+                message=f"invalid JSON from {api_path}",
+                exit_code=4,
+            )
+        else:
+            typer.secho(f"invalid JSON from {api_path}", err=True)
+        raise typer.Exit(4) from exc
+    if not isinstance(body, dict):
+        if json_out:
+            emit_json_failure(
+                command=command,
+                error_code="DASHBOARD_API_ERROR",
+                message=f"unexpected JSON type from {api_path}",
+                exit_code=4,
+            )
+        else:
+            typer.secho(f"unexpected JSON type from {api_path}", err=True)
+        raise typer.Exit(4)
+    return body
+
+
+__all__ = ["dashboard_api_get", "dashboard_api_post", "dashboard_http_failure"]

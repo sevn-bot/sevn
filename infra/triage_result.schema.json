@@ -202,6 +202,13 @@
       "title": "Skills",
       "type": "array"
     },
+    "specialist_grants": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Specialist Grants",
+      "type": "array"
+    },
     "tools": {
       "items": {
         "type": "string"

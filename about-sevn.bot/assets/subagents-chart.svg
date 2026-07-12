@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480" width="800" height="480" role="img" aria-label="sevn.bot sub-agents topology">
+<defs>
+<marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+<path d="M0,0 L6,3 L0,6 Z" fill="#8ab4f8"/>
+</marker>
+</defs>
+<rect width="800" height="480" fill="#1a1d21"/>
+<text x="400" y="22" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="16" fill="#e8eaed">sevn.bot sub-agents topology</text>
+<text x="400" y="38" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" fill="#e8eaed">defaults L1=5 L2=3</text>
+<rect x="340" y="18" width="120" height="44" rx="6" fill="#2d3a4f" stroke="#5f7a9a" stroke-width="1.5"/>
+<text x="400" y="44" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" fill="#e8eaed">Gateway / Session</text>
+<rect x="140" y="278" width="120" height="44" rx="6" fill="#3a2d40" stroke="#6a8f6e" stroke-width="1.5"/>
+<text x="200" y="304" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" fill="#e8eaed">L2 worker</text>
+<rect x="580" y="138" width="120" height="44" rx="6" fill="#3a3520" stroke="#6a8f6e" stroke-width="1.5"/>
+<text x="640" y="164" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" fill="#e8eaed">Relatedness classifier</text>
+<rect x="340" y="398" width="120" height="44" rx="6" fill="#243328" stroke="#6a8f6e" stroke-width="1.5"/>
+<text x="400" y="424" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" fill="#e8eaed">SubAgentRegistry</text>
+<rect x="580" y="398" width="120" height="44" rx="6" fill="#243328" stroke="#6a8f6e" stroke-width="1.5"/>
+<text x="640" y="424" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" fill="#e8eaed">SubAgentSupervisor</text>
+<rect x="220" y="138" width="120" height="44" rx="6" fill="#1e3a5f" stroke="#4a90d9" stroke-width="1.5"/>
+<text x="280" y="154" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">L1</text>
+<text x="280" y="168" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" fill="#e8eaed">Tier B</text>
+<rect x="380" y="138" width="120" height="44" rx="6" fill="#1e3a5f" stroke="#4a90d9" stroke-width="1.5"/>
+<text x="440" y="154" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">L1</text>
+<text x="440" y="168" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" fill="#e8eaed">Tier C</text>
+<rect x="540" y="138" width="120" height="44" rx="6" fill="#1e3a5f" stroke="#4a90d9" stroke-width="1.5"/>
+<text x="600" y="154" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">L1</text>
+<text x="600" y="168" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" fill="#e8eaed">Tier D</text>
+<rect x="60" y="138" width="120" height="44" rx="6" fill="#1e3a5f" stroke="#4a90d9" stroke-width="1.5"/>
+<text x="120" y="154" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">L1</text>
+<text x="120" y="168" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" fill="#e8eaed">Triager</text>
+<rect x="380" y="278" width="120" height="44" rx="6" fill="#3a2448" stroke="#b48ad9" stroke-width="1.5"/>
+<text x="440" y="294" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">L2 specialist</text>
+<text x="440" y="308" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" fill="#e8eaed">media_generator</text>
+<rect x="140" y="278" width="120" height="44" rx="6" fill="#2a3540" stroke="#7a8a9a" stroke-width="1.5"/>
+<text x="200" y="294" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">L2</text>
+<text x="200" y="308" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" fill="#e8eaed">generic worker</text>
+<line x1="400" y1="62" x2="280" y2="138" stroke="#8ab4f8" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="400" y1="62" x2="440" y2="138" stroke="#8ab4f8" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="400" y1="62" x2="600" y2="138" stroke="#8ab4f8" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="400" y1="62" x2="120" y2="138" stroke="#8ab4f8" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="400" y1="62" x2="640" y2="138" stroke="#8ab4f8" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="520" y="96" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">queue_mode multi</text>
+<line x1="640" y1="182" x2="280" y2="138" stroke="#8ab4f8" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="460" y="156" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">new_task</text>
+<line x1="400" y1="442" x2="400" y2="18" stroke="#8ab4f8" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="400" y="226" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">counts / kill</text>
+<line x1="640" y1="442" x2="400" y2="398" stroke="#8ab4f8" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="520" y="416" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">persist</text>
+<line x1="280" y1="182" x2="200" y2="278" stroke="#8ab4f8" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="240" y="226" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">spawn_subagent</text>
+<line x1="280" y1="182" x2="440" y2="278" stroke="#8ab4f8" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="360" y="226" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">spawn specialist</text>
+<line x1="120" y1="182" x2="280" y2="138" stroke="#8ab4f8" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="200" y="156" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">specialist_grants</text>
+<text x="640" y="200" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" fill="#e8eaed">multi: new_task / related_steer / supersede_cancel</text>
+<text x="640" y="216" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" fill="#e8eaed">fallback → steer</text>
+<text x="400" y="464" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" fill="#e8eaed">Kill surfaces: sevn subagents, Mission Control, Telegram /config</text>
+</svg>

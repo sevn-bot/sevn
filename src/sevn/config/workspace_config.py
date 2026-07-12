@@ -121,6 +121,17 @@ from sevn.config.sections.self_improve import (
     SelfImproveSpecKitConfig,
     SelfImproveWorkspaceConfig,
 )
+from sevn.config.sections.subagents import (
+    Role as SubAgentRole,
+)
+from sevn.config.sections.subagents import (
+    SpecialistConfig,
+    SubAgentRoleLimits,
+    SubAgentsWorkspaceConfig,
+)
+from sevn.config.sections.subagents import (
+    resolve_limits as resolve_subagent_limits,
+)
 from sevn.config.sections.tracing import TraceRedactionConfig, TraceSinkEntry, TracingConfig
 from sevn.config.sections.triager import TriagerTimeoutConfig, TriagerWorkspaceConfig
 
@@ -236,6 +247,10 @@ __all__ = [
     "SelfImproveWorkspaceConfig",
     "SpecKitOptionsWorkspaceConfig",
     "SpecKitWorkspaceConfig",
+    "SpecialistConfig",
+    "SubAgentRole",
+    "SubAgentRoleLimits",
+    "SubAgentsWorkspaceConfig",
     "TelegramChannelConfig",
     "TelegramInlineConfig",
     "TelegramInlineSourcesConfig",
@@ -265,6 +280,7 @@ __all__ = [
     "complexity_clamp_short_word_limit",
     "effective_encrypted_file_key_source",
     "parse_workspace_config",
+    "resolve_subagent_limits",
     "rlm_json_dict",
     "show_intent_footer",
     "tier_b_answer_mode",

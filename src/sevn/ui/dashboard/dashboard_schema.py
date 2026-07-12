@@ -12,7 +12,7 @@ Exports:
 
 Examples:
     >>> len(DASHBOARD_TAB_DESCRIPTORS)
-    45
+    46
     >>> "overview" in DASHBOARD_TAB_DESCRIPTORS
     True
 """
@@ -324,6 +324,37 @@ DASHBOARD_TAB_DESCRIPTORS: dict[str, TabDescriptor] = {
                 "#channels-config-form",
                 "PUT",
                 "/api/v1/channels/config",
+                needs_seed=True,
+            ),
+        ],
+    ),
+    "sub-agents": _tab(
+        group="observability",
+        title="Sub-agents",
+        read_endpoints=["/api/v1/mission/subagents"],
+        key_selectors={
+            "count_chips": ".subagents-count-chips",
+            "running_table": "#subagents-running-table",
+            "recent_table": "#subagents-recent-table",
+            "limits_panel": "#subagents-limits-panel",
+        },
+        actions=[
+            _action(
+                "kill-run",
+                "Kill sub-agent",
+                ".subagent-kill-btn",
+                "POST",
+                "/api/v1/mission/subagents/{id}/kill",
+                destructive=True,
+                needs_seed=True,
+            ),
+            _action(
+                "kill-all-role",
+                "Kill all for role",
+                ".subagent-kill-all-btn",
+                "POST",
+                "/api/v1/mission/subagents/kill_all",
+                destructive=True,
                 needs_seed=True,
             ),
         ],
@@ -1190,7 +1221,7 @@ def missing_descriptor_slugs() -> list[str]:
 
 
 # Sanity: registry coverage at import time (44 wired + 1 post-v1).
-assert len(DASHBOARD_TAB_DESCRIPTORS) == 45  # nosec B101
+assert len(DASHBOARD_TAB_DESCRIPTORS) == 46  # nosec B101
 assert not missing_descriptor_slugs()  # nosec B101
 assert set(DASHBOARD_TAB_DESCRIPTORS) == WIRED_SLUGS | POST_V1_PLACEHOLDER_SLUGS  # nosec B101
 assert tab_slug("Core") == "core"  # nosec B101

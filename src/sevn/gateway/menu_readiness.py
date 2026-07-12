@@ -117,6 +117,15 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C18.5",
         # CodeMode tier-B toggle (W8 operator surface)
         "C24.1",
+        # Sub-agents (W7)
+        "C25.1",
+        "C25.2",
+        "C25.3",
+        "C25.4",
+        "C25.5",
+        "C25.6",
+        "C25.7",
+        "C25.8",
     },
 )
 
@@ -200,6 +209,12 @@ _CONFIG_SECTION_CATALOG: tuple[tuple[str, str, str, MenuReadiness], ...] = (
         "Second Brain enabled; ingest schedule caption; MC tab.",
         "Ingest schedule not a schema toggle path yet.",
         "WIP",
+    ),
+    (
+        "Sub-agents",
+        "Level-1/level-2 concurrency limits, global override, queue mode (incl. multi), live L1/L2 counts, Running kill submenu.",
+        "Toggle, limit forms, queue cycle, and Running kill buttons are Ready when supervisor is wired; Mission Control panel when web_ui.url is set.",
+        "Ready",
     ),
     (
         "Integrations",

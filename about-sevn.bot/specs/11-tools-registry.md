@@ -8,7 +8,7 @@ summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that eve
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
 last_updated: '2026-07-12'
-fingerprint: sha256:20968c921a9baf975ed298ce2ba17295a943c7ee294df0d0f1300d808d757ec3
+fingerprint: sha256:714669b67f67b606e30dfd3552c2fb8e4c5d1303e2008ce84e86bfdfa89e90b3
 related: []
 sources:
 - src/sevn/tools/**
@@ -419,6 +419,12 @@ interfaces:
 - name: prune_orphan_tool_result_dirs
   file: src/sevn/tools/spill_gc.py
   symbol: prune_orphan_tool_result_dirs
+- name: register_subagent_spawn_tools
+  file: src/sevn/tools/subagent_spawn.py
+  symbol: register_subagent_spawn_tools
+- name: spawn_subagent_tool
+  file: src/sevn/tools/subagent_spawn.py
+  symbol: spawn_subagent_tool
 - name: TerminalSession
   file: src/sevn/tools/terminal.py
   symbol: TerminalSession

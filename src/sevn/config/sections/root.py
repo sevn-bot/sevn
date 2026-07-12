@@ -64,6 +64,7 @@ from sevn.config.sections.security import (
     SecurityWorkspaceConfig,
 )
 from sevn.config.sections.self_improve import SelfImproveWorkspaceConfig
+from sevn.config.sections.subagents import SubAgentsWorkspaceConfig
 from sevn.config.sections.tracing import TracingConfig
 from sevn.config.sections.triager import TriagerWorkspaceConfig
 
@@ -97,6 +98,7 @@ class WorkspaceConfig(BaseModel):
     providers: ProvidersWorkspaceSectionConfig | None = None
     provisioning: ProvisioningWorkspaceConfig | None = None
     triager: TriagerWorkspaceConfig | None = None
+    subagents: SubAgentsWorkspaceConfig | None = None
     memory: MemoryWorkspaceSectionConfig | None = None
     lcm: LcmWorkspaceConfig | None = None
     rlm: RlmWorkspaceConfig | None = None

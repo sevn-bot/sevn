@@ -238,7 +238,7 @@ class GatewayConfig(BaseModel):
     port: int | None = None
     token: str = Field(min_length=1)
     proxy_headers: bool | None = None
-    queue_mode: Literal["cancel", "steer"] | None = None
+    queue_mode: Literal["cancel", "steer", "multi"] | None = None
     steer: GatewaySteerConfig | None = None
     budget: GatewayBudgetConfig | None = None
     restart: GatewayRestartConfig | None = None

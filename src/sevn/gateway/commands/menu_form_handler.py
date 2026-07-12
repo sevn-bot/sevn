@@ -34,7 +34,7 @@ from sevn.gateway.commands.shortcuts_store import (
 from sevn.gateway.dispatcher_state import dispatcher_state_ttl_for_kind, insert_dispatcher_state
 from sevn.gateway.menu import ConfigMenuRefreshContext, ConfigSection, refresh_config_menu_message
 from sevn.gateway.workspace_config_io import mutate_sevn_json
-from sevn.onboarding.web_app import _set_nested
+from sevn.onboarding.web_app import _get_nested, _set_nested
 from sevn.security.secrets.factory import secrets_chain_from_workspace
 
 if TYPE_CHECKING:
@@ -50,6 +50,7 @@ FORM_TARGETS: frozenset[str] = frozenset(
         "logs_logfire_token",
         "second_brain_vault_path",
         "second_brain_vault_browse",
+        "subagents_max_override",
     },
 )
 _SECRET_ALIAS_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
@@ -87,6 +88,8 @@ def parse_form_callback(data: str) -> str | None:
         return "logs_logfire_token"
     if raw.startswith("form:sb_browse:"):
         return "second_brain_vault_browse"
+    if raw.startswith("form:subagents_limits:"):
+        return raw.removeprefix("form:")
     target = raw.removeprefix("form:").strip()
     return target if target in FORM_TARGETS else None
 
@@ -150,6 +153,8 @@ class MenuFormHandler:
         if isinstance(raw_cb, str) and parse_form_callback(raw_cb.strip()):
             return True
         if isinstance(raw_cb, str) and raw_cb.strip().startswith("form:sb_browse:"):
+            return True
+        if isinstance(raw_cb, str) and raw_cb.strip().startswith("form:subagents_limits:"):
             return True
         text = (msg.text or "").strip()
         if not text or text.startswith("/"):
@@ -235,18 +240,27 @@ class MenuFormHandler:
         elif target == "second_brain_vault_browse":
             section = "second_brain"
             step = "browse"
+        elif target == "subagents_max_override":
+            section = "subagents"
+            step = "override"
+        elif target.startswith("subagents_limits:"):
+            section = "subagents"
+            step = "l1"
         else:
             section = "shortcuts"
             step = "name"
         token = f"ds:{secrets.token_hex(8)}"
+        payload_obj: dict[str, Any] = {
+            "v": 1,
+            "target": target,
+            "step": step,
+            "section": section,
+            "user_id": str(msg.user_id),
+        }
+        if target.startswith("subagents_limits:"):
+            payload_obj["role"] = target.removeprefix("subagents_limits:").strip()
         payload = json.dumps(
-            {
-                "v": 1,
-                "target": target,
-                "step": step,
-                "section": section,
-                "user_id": str(msg.user_id),
-            },
+            payload_obj,
             separators=(",", ":"),
         )
         chat_raw, topic_raw = self._chat_context(msg)
@@ -275,6 +289,11 @@ class MenuFormHandler:
         elif target == "second_brain_vault_browse":
             await self._send_second_brain_browse_keyboard(msg, token=token, browse_path=".")
             return
+        elif target == "subagents_max_override":
+            prompt = "Send global max_override (integer, or empty to clear):"
+        elif target.startswith("subagents_limits:"):
+            role = target.removeprefix("subagents_limits:").strip()
+            prompt = f"Send max level-1 count for {role} (integer, empty clears override):"
         else:
             prompt = "Send the shortcut name (e.g. standup):"
         await self._send_chat(msg, prompt)
@@ -333,6 +352,142 @@ class MenuFormHandler:
             await self._advance_logs_logfire_token(
                 msg, token=token, step=step, text=text, payload=payload
             )
+            return
+        if target == "subagents_max_override":
+            await self._advance_subagents_max_override(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target.startswith("subagents_limits:"):
+            await self._advance_subagents_role_limits(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+
+    async def _advance_subagents_max_override(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Persist ``subagents.max_override`` from operator numeric input.
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active dispatcher token.
+            step (str): Wizard step id.
+            text (str): Operator reply.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_subagents_max_override)
+            True
+        """
+        _ = step, payload
+        value: int | None
+        if not text.strip():
+            value = None
+        else:
+            try:
+                value = max(0, int(text.strip()))
+            except ValueError:
+                await self._send_chat(msg, "Send a non-negative integer or empty to clear.")
+                return
+
+        def _apply(doc: dict[str, Any]) -> None:
+            _set_nested(doc, "subagents.max_override", value)
+
+        mutate_sevn_json(self._sevn_json, _apply)
+        mar = self._router._menu_action_router
+        if mar is not None:
+            mar._reload_workspace()
+        self._workspace = self._router._workspace
+        self._consume_token(token)
+        await self._refresh_section(msg, section="subagents", toast="✅ Updated max_override.")
+
+    async def _advance_subagents_role_limits(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Two-step wizard for per-role ``max_level1`` / ``max_level2`` overrides.
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active dispatcher token.
+            step (str): ``l1`` or ``l2``.
+            text (str): Operator reply.
+            payload (dict[str, Any]): Parsed wizard payload including ``role``.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_subagents_role_limits)
+            True
+        """
+        role = str(payload.get("role", "")).strip()
+        if role not in {"triager", "tier_b", "tier_c", "tier_d"}:
+            self._consume_token(token)
+            await self._send_chat(msg, "Wizard expired — open Sub-agents again.")
+            return
+        if step == "l1":
+            if text.strip():
+                try:
+                    payload["max_level1"] = max(0, int(text.strip()))
+                except ValueError:
+                    await self._send_chat(msg, "Send a non-negative integer or empty to clear.")
+                    return
+            else:
+                payload["max_level1"] = None
+            payload["step"] = "l2"
+            self._update_payload(token, payload)
+            await self._send_chat(
+                msg, f"Send max level-2 count for {role} (integer, empty clears):"
+            )
+            return
+        if step == "l2":
+            max_l1 = payload.get("max_level1")
+            max_l2: int | None
+            if text.strip():
+                try:
+                    max_l2 = max(0, int(text.strip()))
+                except ValueError:
+                    await self._send_chat(msg, "Send a non-negative integer or empty to clear.")
+                    return
+            else:
+                max_l2 = None
+
+            def _apply(doc: dict[str, Any]) -> None:
+                agents = _get_nested(doc, f"subagents.agents.{role}")
+                block = dict(agents) if isinstance(agents, dict) else {}
+                if max_l1 is not None:
+                    block["max_level1"] = max_l1
+                elif "max_level1" in block:
+                    block.pop("max_level1", None)
+                if max_l2 is not None:
+                    block["max_level2"] = max_l2
+                elif "max_level2" in block:
+                    block.pop("max_level2", None)
+                if block:
+                    _set_nested(doc, f"subagents.agents.{role}", block)
+                else:
+                    agents_root = _get_nested(doc, "subagents.agents")
+                    if isinstance(agents_root, dict):
+                        agents_root.pop(role, None)
+
+            mutate_sevn_json(self._sevn_json, _apply)
+            mar = self._router._menu_action_router
+            if mar is not None:
+                mar._reload_workspace()
+            self._workspace = self._router._workspace
+            self._consume_token(token)
+            await self._refresh_section(msg, section="subagents", toast="✅ Updated role limits.")
 
     async def _advance_logs_grep(
         self,
@@ -1018,6 +1173,7 @@ class MenuFormHandler:
             content_root=self._content_root,
             user_id=msg.user_id,
             is_owner=self._router._resolve_owner_flag(msg),
+            router=self._router,
         )
         cq_id = md.get("callback_query_id")
         cq_str = cq_id.strip() if isinstance(cq_id, str) else ""

@@ -121,6 +121,7 @@ _CONFIG_PATH_SECTION: dict[str, ConfigSection] = {
     "code_review_graph": "code",
     "self_improve": "self_improve",
     "second_brain": "second_brain",
+    "subagents": "subagents",
     "skills": "skills",
     "tools": "tools",
     "integration": "integrations",
@@ -176,6 +177,8 @@ def infer_config_section_from_callback(data: str) -> ConfigSection:
         path = raw.removeprefix("cfg:toggle:").split(":", 1)[0]
         if path.startswith("agent.codemode"):
             return "codemode"
+        if path.startswith("subagents"):
+            return "subagents"
         if "quick_actions" in path or path.startswith("gateway.queue_mode"):
             return "session"
         if path.startswith("gateway.restart"):
@@ -432,6 +435,10 @@ class MenuActionRouter:
                 return await self._handle_logs_action(msg, raw, target)
             if target.startswith("sevn_bot:"):
                 return await self._handle_sevn_bot_action(msg, raw, target)
+            if target.startswith("subagents:kill:"):
+                return await self._handle_subagents_kill(msg, raw, target)
+            if target == "subagents:kill_all":
+                return await self._handle_subagents_kill_all(msg, raw)
             restart_handled = await self._handle_service_restart_action(
                 msg,
                 raw,
@@ -550,6 +557,7 @@ class MenuActionRouter:
             content_root=self._content_root,
             user_id=msg.user_id,
             is_owner=self._router._resolve_owner_flag(msg),
+            router=self._router,
         )
         cq_id = md.get("callback_query_id")
         cq_str = cq_id.strip() if isinstance(cq_id, str) else ""
@@ -977,6 +985,73 @@ class MenuActionRouter:
         answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
         return None if answered else toast
 
+    async def _handle_subagents_kill(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        target: str,
+    ) -> str | None:
+        """Kill one tracked sub-agent run (owner-only, D13).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed target ``subagents:kill:<id>``.
+
+        Returns:
+            str | None: Toast when non-owner; ``None`` when handled via menu refresh.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_subagents_kill)
+            True
+        """
+        _ = callback_data
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        run_id = target.removeprefix("subagents:kill:").strip()
+        supervisor = getattr(self._router, "_subagent_supervisor", None)
+        if supervisor is None:
+            return "Sub-agent supervisor unavailable."
+        run = await supervisor.registry.get(run_id)
+        if run is None:
+            return f"Unknown sub-agent {run_id!r}."
+        killed = await supervisor.kill(run_id, cascade=True)
+        toast = f"Killed {run_id}." if killed else f"Could not kill {run_id}."
+        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+        return None if answered else toast
+
+    async def _handle_subagents_kill_all(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """Kill all active level-1 sub-agent runs (owner-only, D13).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Toast when non-owner; ``None`` when handled via menu refresh.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_subagents_kill_all)
+            True
+        """
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        supervisor = getattr(self._router, "_subagent_supervisor", None)
+        if supervisor is None:
+            return "Sub-agent supervisor unavailable."
+        count = await supervisor.kill_all(role=None)
+        toast = f"Killed {count} sub-agent run(s)."
+        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+        return None if answered else toast
+
     async def _handle_service_restart_action(
         self,
         msg: IncomingMessage,
@@ -1232,6 +1307,7 @@ class MenuActionRouter:
             content_root=self._content_root,
             user_id=msg.user_id,
             is_owner=self._router._resolve_owner_flag(msg),
+            router=self._router,
         )
         cq_id = md.get("callback_query_id")
         cq_str = cq_id.strip() if isinstance(cq_id, str) else ""

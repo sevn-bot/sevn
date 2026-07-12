@@ -19,9 +19,9 @@ import re
 import secrets
 import time
 import uuid
-from collections.abc import Callable, Coroutine
+from collections.abc import Awaitable, Callable, Coroutine
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from loguru import logger
 
@@ -60,6 +60,11 @@ from sevn.gateway.lcm_ingest import ingest_gateway_message_row
 from sevn.gateway.media_store import MediaStore
 from sevn.gateway.pairing import PairingStore
 from sevn.gateway.platform_runtime import PlatformRuntimeRegistry
+from sevn.gateway.queue_multi import (
+    MultiDispatchHooks,
+    MultiSpawnOutcome,
+    in_flight_task_summary_for_session,
+)
 from sevn.gateway.rate_limit import TokenBucketLimiter
 from sevn.gateway.response_filters import is_intentional_silence_response
 from sevn.gateway.session_manager import SessionManager
@@ -99,6 +104,9 @@ from sevn.voice.factory import (
 from sevn.voice.stt import PLACEHOLDER_LLM_LINE, SpeechToTextPipeline
 from sevn.voice.trace_events import emit_voice_event
 from sevn.voice.tts import TextToSpeechPipeline
+
+if TYPE_CHECKING:
+    from sevn.agent.subagents.supervisor import SubAgentSupervisor
 
 _THINK_RE = re.compile(r"<\s*think\b[^>]*>.*?</\s*think\s*>", re.DOTALL | re.IGNORECASE)
 _OSC_RE = re.compile(r"\x1b\][^\x07]*(?:\x07|\x1b\\)")
@@ -466,6 +474,12 @@ class ChannelRouter:
         )
         self._plugin_hook_chain = plugin_hook_chain
         self._steer_store = steer_store
+        # W3.1/W3.3: process-wide sub-agent supervisor, wired lazily by
+        # ``http_server.create_app`` right after ``run_boot_hooks`` (the boot hook that
+        # constructs it runs *after* ``build_agent_run_turn``). ``None`` when sub-agents
+        # are unwired (most unit tests) — ``agent_turn.py`` reads it via ``getattr`` and
+        # treats ``None`` as "no sub-agent tracking", preserving classic single-turn behavior.
+        self._subagent_supervisor: SubAgentSupervisor | None = None
         self._plan_gate_registry: Any | None = None
         self._plan_gate_callback_handler: Any | None = None
         self._evolution_approval_registry: Any | None = None
@@ -553,7 +567,7 @@ class ChannelRouter:
             channel (str): Adapter name.
 
         Returns:
-            str: ``cancel``, ``queue``, or ``steer``.
+            str: ``cancel``, ``queue``, ``steer``, or ``multi``.
 
         Examples:
             >>> import inspect
@@ -569,6 +583,78 @@ class ChannelRouter:
             self._workspace.channels,
             channel,
             gateway_queue_mode=gateway_mode,
+        )
+
+    def build_multi_dispatch_hooks(
+        self,
+        *,
+        classify_override: Callable[..., Awaitable[object]] | None = None,
+    ) -> MultiDispatchHooks | None:
+        """Build ``multi`` hooks when sub-agents and spawn glue are wired (D6).
+
+        Args:
+            classify_override (Callable | None): Test-only classifier stub.
+
+        Returns:
+            MultiDispatchHooks | None: Hooks when sub-agents are enabled; else ``None``.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.isfunction(ChannelRouter.build_multi_dispatch_hooks)
+            True
+        """
+        supervisor = self._subagent_supervisor
+        spawn_fn = getattr(self, "_spawn_multi_l1_tier_b", None)
+        classify_fn = getattr(self, "_multi_classify_busy", None)
+        if supervisor is None or spawn_fn is None or classify_fn is None:
+            return None
+
+        async def _classify_busy(
+            in_flight_summary: str,
+            queued_summaries: tuple[str, ...],
+            new_message: str,
+        ) -> tuple[str, bool]:
+            if classify_override is not None:
+                raw = await classify_override(in_flight_summary, queued_summaries, new_message)
+                if isinstance(raw, tuple) and len(raw) == 2:
+                    label, fallback = raw
+                    return str(label), bool(fallback)
+                return str(raw), False
+            result = await classify_fn(in_flight_summary, queued_summaries, new_message)
+            return str(result[0]), bool(result[1])
+
+        async def _spawn(session_id: str, correlation_id: str) -> MultiSpawnOutcome:
+            outcome = await spawn_fn(session_id, correlation_id)
+            if isinstance(outcome, MultiSpawnOutcome):
+                return outcome
+            return MultiSpawnOutcome(str(outcome))
+
+        async def _notify(session_id: str, line: str) -> None:
+            from sevn.gateway.session_manager import load_session_row
+
+            sess = load_session_row(self._sessions.connection, session_id)
+            if sess is None or not line.strip():
+                return
+            try:
+                await self.route_outgoing(
+                    OutgoingMessage(
+                        channel=sess.channel,
+                        user_id=sess.user_id,
+                        text=line.strip(),
+                        session_id=session_id,
+                        metadata={},
+                    ),
+                )
+            except Exception:
+                logger.exception(
+                    "queue_multi_operator_notice_failed session_id={}",
+                    session_id,
+                )
+
+        return MultiDispatchHooks(
+            classify_busy=_classify_busy,
+            spawn_new_task=_spawn,
+            notify_operator=_notify,
         )
 
     async def _ensure_session_for_turn(self, msg: IncomingMessage) -> str:
@@ -1858,11 +1944,25 @@ class ChannelRouter:
         )
         await self._sessions.set_unanswered_tail(session_id, user_row_id)
         self._telegram_stream_anchor.pop(session_id, None)
+        queue_mode = self.resolve_queue_mode_for_channel(msg.channel)
+        multi_hooks = None
+        in_flight_summary = ""
+        task_summary = user_text.strip().splitlines()[0][:200] if user_text.strip() else ""
+        if queue_mode == "multi":
+            multi_hooks = self.build_multi_dispatch_hooks()
+            in_flight_summary = await in_flight_task_summary_for_session(
+                self._subagent_supervisor,
+                session_id,
+            )
         await self._sessions.enqueue_dispatch(
             session_id,
             correlation_id=correlation_id,
-            queue_mode=self.resolve_queue_mode_for_channel(msg.channel),
+            queue_mode=queue_mode,
             dispatch=self._run_turn,
+            multi_hooks=multi_hooks,
+            new_message_text=user_text,
+            task_summary=task_summary,
+            in_flight_task_summary=in_flight_summary,
         )
         await self._emit(
             kind="gateway.route_incoming",

@@ -40,7 +40,7 @@ from sevn.config.defaults import (
     DEFAULT_WEBCHAT_TTS_INLINE,
 )
 
-BusyInputMode = Literal["interrupt", "queue", "steer"]
+BusyInputMode = Literal["interrupt", "queue", "steer", "multi"]
 SessionResetPolicyName = Literal["daily", "idle", "both"]
 
 JsonDict = dict[str, Any]
@@ -289,7 +289,8 @@ def resolve_busy_input_mode(
     """Map ``channels.<name>.busy_input_mode`` to router queue mode.
 
     Busy input modes map to sevn queue semantics:
-    ``interrupt`` → ``cancel``, ``queue`` → ``queue``, ``steer`` → ``steer``.
+    ``interrupt`` → ``cancel``, ``queue`` → ``queue``, ``steer`` → ``steer``,
+    ``multi`` → ``multi`` (triager relatedness classification; `specs/36-sub-agents.md` D6).
 
     Args:
         channels (ChannelsWorkspaceSectionConfig | None): Parsed channels section.
@@ -304,6 +305,8 @@ def resolve_busy_input_mode(
         'steer'
         >>> resolve_busy_input_mode(None, "telegram", gateway_queue_mode="cancel")
         'cancel'
+        >>> resolve_busy_input_mode(None, "telegram", gateway_queue_mode="multi")
+        'multi'
     """
     extra = channel_extra_dict(channels, channel)
     raw = extra.get("busy_input_mode")
@@ -311,11 +314,13 @@ def resolve_busy_input_mode(
         normalized = raw.strip().lower()
         if normalized == "interrupt":
             return "cancel"
-        if normalized in ("queue", "steer"):
+        if normalized in ("queue", "steer", "multi"):
             return normalized
     fallback = (gateway_queue_mode or "cancel").strip().lower()
     if fallback == "steer":
         return "steer"
     if fallback == "queue":
         return "queue"
+    if fallback == "multi":
+        return "multi"
     return "cancel"

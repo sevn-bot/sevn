@@ -147,6 +147,11 @@ class TriageResult(BaseModel):
     requires_document: bool
     disregard: bool = False
     replay_provider_history: bool = False
+    specialist_grants: list[str] = Field(default_factory=list)
+    """Specialist names (`subagents.specialists.<name>`) granted to this turn's tier-B
+    dispatch (D8/W3.4). Lets tier B spawn a specialist not in its own
+    ``assigned_to`` when the specialist's ``requestable_by`` includes ``"triager"``.
+    """
 
     @field_validator("first_message")
     @classmethod

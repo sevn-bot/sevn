@@ -17,6 +17,7 @@ are cut into a dated, versioned section at release time.
 - Configurable Second Brain vault path via `second_brain.paths.vault` (CLI setup, Telegram `/config`, onboarding, doctor)
 - Witchcraft semantic reindex for the Second Brain vault via `sevn second-brain setup --reindex` and automatically at gateway boot
 - Logfire trace export: `tracing.sinks[]` logfire sink with secrets-managed token, `sevn tracing` / `sevn config tracing` CLI, Telegram `/config → Logs` toggle and token form, and Mission Control ops endpoints
+- Sub-agents orchestration with level-1 role runs, level-2 workers and specialists, `multi` queue mode, Mission Control and Telegram kill surfaces, and `media_generation` skill via the `media_generator` specialist
 
 ### Changed
 

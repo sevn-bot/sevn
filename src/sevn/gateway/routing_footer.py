@@ -5,6 +5,7 @@ Depends: re, sevn.agent.triager.models, sevn.config.workspace_config
 
 Exports:
     telegram_show_routing_enabled — read ``channels.telegram.show_routing``.
+    format_subagent_tag — short ``⋮id`` attribution prefix (D7).
     format_routing_footer — one-line intent/tier/conf summary.
     append_routing_footer — attach footer to assistant text once per turn.
     strip_model_emitted_footer — remove footer-shaped lines from model output.
@@ -59,6 +60,23 @@ def telegram_show_routing_enabled(workspace: WorkspaceConfig) -> bool:
     if channels is None or channels.telegram is None:
         return False
     return bool(channels.telegram.show_routing)
+
+
+def format_subagent_tag(subagent_id: str) -> str:
+    """Build the short sub-agent attribution prefix for parallel L1 replies (D7).
+
+    Args:
+        subagent_id (str): Registry short id (e.g. ``a1f3``).
+
+    Returns:
+        str: Tag ``⋮<id>`` suitable for prepending to a routing footer.
+
+    Examples:
+        >>> format_subagent_tag("a1f3")
+        '⋮a1f3'
+    """
+    sid = subagent_id.strip()
+    return f"⋮{sid}" if sid else ""
 
 
 def format_routing_footer(
@@ -156,6 +174,7 @@ def append_routing_footer(
     triage: TriageResult,
     *,
     triager_ms: int | None = None,
+    subagent_id: str | None = None,
 ) -> str:
     """Append routing footer to assistant-visible text.
 
@@ -168,6 +187,8 @@ def append_routing_footer(
         triage (TriageResult): Triage decision for the turn.
         triager_ms (int | None): Wall-clock milliseconds spent inside
             ``triage_turn`` for this turn (Wave 4 §A2).
+        subagent_id (str | None): Level-1 sub-agent short id for parallel-reply
+            attribution (D7).
 
     Returns:
         str: ``text`` with footer appended when non-empty.
@@ -187,9 +208,14 @@ def append_routing_footer(
         ... )
         >>> "intent=GREETING" in append_routing_footer("Hello", triage)
         True
+        >>> "⋮a1" in append_routing_footer("Hello", triage, subagent_id="a1")
+        True
     """
     body = strip_model_emitted_footer(text).rstrip()
     footer = format_routing_footer(triage, triager_ms=triager_ms)
+    tag = format_subagent_tag(subagent_id or "")
+    if tag:
+        footer = f"{tag} · {footer}"
     if not body:
         return footer
     return f"{body}\n\n_{footer}_"
@@ -198,6 +224,7 @@ def append_routing_footer(
 __all__ = [
     "append_routing_footer",
     "format_routing_footer",
+    "format_subagent_tag",
     "strip_model_emitted_footer",
     "telegram_show_routing_enabled",
 ]

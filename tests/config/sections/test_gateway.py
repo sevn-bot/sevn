@@ -39,3 +39,31 @@ def test_gateway_intro_max_output_tokens_exceeds_budget_fails() -> None:
                 },
             },
         )
+
+
+def test_gateway_queue_mode_accepts_multi() -> None:
+    """``gateway.queue_mode`` gains ``multi`` (`specs/36-sub-agents.md` D6)."""
+    cfg = parse_workspace_config(
+        {
+            "schema_version": 1,
+            "gateway": {
+                "token": "${SECRET:keychain:sevn.gateway.token}",
+                "queue_mode": "multi",
+            },
+        },
+    )
+    assert cfg.gateway is not None
+    assert cfg.gateway.queue_mode == "multi"
+
+
+def test_gateway_queue_mode_rejects_unknown_literal() -> None:
+    with pytest.raises(ValidationError, match="queue_mode"):
+        parse_workspace_config(
+            {
+                "schema_version": 1,
+                "gateway": {
+                    "token": "${SECRET:keychain:sevn.gateway.token}",
+                    "queue_mode": "bogus",
+                },
+            },
+        )

@@ -200,8 +200,8 @@ def register_channel_boot_hooks() -> None:
     """Register channel adapter boot hook (idempotent module import side-effect).
 
     Examples:
-        >>> register_channel_boot_hooks()
-        >>> isinstance(True, bool)
+        >>> from sevn.gateway import boot_registry as br
+        >>> any(name == "channel_adapters" for _, name, _ in br._BOOT_HOOKS)
         True
     """
     register_boot_hook("channel_adapters", _boot_channel_adapters, priority=25)

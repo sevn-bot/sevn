@@ -18,7 +18,7 @@ PIP_AUDIT ?= $(UV) run pip-audit
 PIP_AUDIT_CACHE ?= $(CURDIR)/.cache/pip-audit
 PRE_COMMIT ?= $(UV) run pre-commit
 
-.PHONY: help setup install install-git-guards check-git-guards snapshot-local install-cli install-cli-browser sync-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover stale-xfail-check doctest security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage coderabbit-install review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-down compose-logs compose-restart log-explore telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve
+.PHONY: help setup install install-git-guards check-git-guards snapshot-local install-cli install-cli-browser sync-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover stale-xfail-check doctest security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage coderabbit-install review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-down compose-logs compose-restart log-explore telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve
 
 
 PROXY_ENV_FILE ?= .env.proxy
@@ -322,7 +322,13 @@ about-docs-generate: ## Generate offline body for one doc (DOC_ID=spec-17-gatewa
 	@test -n "$(DOC_ID)" || (echo "usage: make about-docs-generate DOC_ID=spec-17-gateway" && exit 1)
 	PYTHONPATH=. $(UV) run sevn about-docs generate $(DOC_ID) --repo .
 
-about-site: ## Regenerate about-sevn.bot user help HTML + assets
+subagents-chart: ## Regenerate deterministic sub-agents topology SVG (D14)
+	$(UV) run python scripts/gen_subagents_chart.py
+
+subagents-chart-check: ## Fail when about-sevn.bot/assets/subagents-chart.svg is stale
+	$(UV) run python scripts/gen_subagents_chart.py --check
+
+about-site: subagents-chart ## Regenerate about-sevn.bot user help HTML + assets
 	$(UV) run python scripts/build_about_site.py build
 
 about-site-check: ## Fail when about-sevn.bot HTML is stale or contains forbidden internal refs
@@ -354,7 +360,7 @@ ci-core: lockcheck lint typecheck pyright test doctest security build doctor-sol
 
 ci-infra: config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards agent-context-manifest-check ## Schema / infra drift tier
 
-ci-docs: telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check about-site-check about-docs-check about-docs-schema changelog-check ## Docs / menu HTML tier
+ci-docs: telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema changelog-check ## Docs / menu HTML tier
 
 ci-skills: skills-core-check skillspector-check skills-index-check dreaming-allowlist-check ## Skills inventory tier
 
@@ -366,7 +372,7 @@ ci: ci-core ci-infra ci-docs ci-skills ci-parity ## Full gate (same as CI)
 # Keep in sync with the ci-core/ci-infra/ci-docs/ci-skills/ci-parity tiers above.
 CI_STEPS := lockcheck lint typecheck pyright test doctest security build doctor-solutions-check \
 	config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards agent-context-manifest-check \
-	telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check about-site-check about-docs-check about-docs-schema changelog-check \
+	telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema changelog-check \
 	skills-core-check skillspector-check skills-index-check dreaming-allowlist-check \
 	code-index deploy-remote-report-check code-index-check
 

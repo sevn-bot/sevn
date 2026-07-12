@@ -41,8 +41,8 @@ def register_telemetry_boot_hooks() -> None:
     """Register telemetry boot hooks (idempotent module import side-effect).
 
     Examples:
-        >>> register_telemetry_boot_hooks()
-        >>> isinstance(True, bool)
+        >>> from sevn.gateway import boot_registry as br
+        >>> any(name == "telemetry_channels" for _, name, _ in br._BOOT_HOOKS)
         True
     """
     register_boot_hook("telemetry_channels", _register_enabled_channels, priority=50)

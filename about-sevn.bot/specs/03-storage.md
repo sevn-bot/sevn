@@ -8,7 +8,7 @@ summary: 'Own application persistence: connection setup (WAL, foreign keys), ver
   migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence
   contracts for crash-resume and (w'
 last_updated: '2026-07-12'
-fingerprint: sha256:541a70ad5ce899b7a79642d5fdc594ece6dc9367b3fdfb8c4d68f669ebc6217c
+fingerprint: sha256:c8d8696bb48df26ee44ca00953ab251cbd6b6d6cfc93c2d07da470a38c46aa9c
 related: []
 sources:
 - src/sevn/storage/**

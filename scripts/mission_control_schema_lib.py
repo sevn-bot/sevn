@@ -129,7 +129,7 @@ def build_schema_document(*, generated_at: str | None = None) -> dict[str, Any]:
 
     Examples:
         >>> doc = build_schema_document(generated_at="2026-01-01T00:00:00+00:00")
-        >>> doc["tab_count"] == 45
+        >>> doc["tab_count"] == 46
         True
     """
     nav = build_nav_payload()

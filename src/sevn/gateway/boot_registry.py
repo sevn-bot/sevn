@@ -100,10 +100,21 @@ def register_cron_job(name: str, hook: CronReconcileHook, *, priority: int = 0) 
 def clear_boot_registry() -> None:
     """Clear boot and cron registries (test isolation only).
 
+    Restores prior registrations after the example runs so this module's own
+    doctest stays order-independent under ``pytest-randomly`` alongside sibling
+    modules that register hooks at import time (e.g. ``subagents_boot``'s
+    ``subagents_supervisor`` boot hook) — W3 (`plan/sub-agents-orchestration-
+    wave-plan.md`) hit this exact flake once ``subagents_boot`` joined
+    ``boot_registry``'s bottom import chain.
+
     Examples:
+        >>> from sevn.gateway import boot_registry as br
+        >>> saved_hooks, saved_jobs = list(br._BOOT_HOOKS), list(br._CRON_JOBS)
         >>> clear_boot_registry()
-        >>> (_BOOT_HOOKS, _CRON_JOBS)
+        >>> (br._BOOT_HOOKS, br._CRON_JOBS)
         ([], [])
+        >>> br._BOOT_HOOKS.extend(saved_hooks)
+        >>> br._CRON_JOBS.extend(saved_jobs)
     """
     _BOOT_HOOKS.clear()
     _CRON_JOBS.clear()
@@ -149,10 +160,21 @@ def run_cron_reconciles(conn: sqlite3.Connection, workspace: WorkspaceConfig) ->
 def _register_builtin_cron_jobs() -> None:
     """Register built-in gateway cron reconcile hooks.
 
+    The doctest saves/restores ``_CRON_JOBS`` around its own call so the
+    assertion never depends on whether this ran already at module import, or
+    on execution order relative to other doctests in this module (see
+    :func:`clear_boot_registry`'s docstring for the ``pytest-randomly`` flake
+    this fixes).
+
     Examples:
         >>> from sevn.gateway import boot_registry as br
+        >>> saved = list(br._CRON_JOBS)
+        >>> br._CRON_JOBS.clear()
+        >>> _register_builtin_cron_jobs()
         >>> any(name == 'dreaming' for _, name, _ in br._CRON_JOBS)
         True
+        >>> br._CRON_JOBS.clear()
+        >>> br._CRON_JOBS.extend(saved)
     """
     from sevn.evolution.repo_sync_scheduler import (
         reconcile_my_sevn_issues_sync_cron_job,
@@ -169,6 +191,7 @@ _register_builtin_cron_jobs()
 
 import sevn.gateway.channel_boot  # noqa: E402 — M1 multi-adapter boot
 import sevn.gateway.replay_worker_hooks  # noqa: E402 — Batch D lane #5
+import sevn.gateway.subagents_boot  # noqa: E402 — W3 sub-agent supervisor boot activation
 import sevn.gateway.telemetry_boot  # noqa: E402 — CW-2 lane #1 channel boot hooks
 import sevn.gateway.trajectory_ingest_hooks  # noqa: E402 — Batch C lane #3
 import sevn.gateway.turn_bundle_hooks  # noqa: E402 — turn-bundle W1

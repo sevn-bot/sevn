@@ -18,7 +18,7 @@ from typing import Any
 
 from sevn.config.workspace_config import TraceSinkEntry, WorkspaceConfig
 
-LOGFIRE_SECRET_LOGICAL_KEY = "logfire.token"
+LOGFIRE_SECRET_LOGICAL_KEY = "logfire.token"  # nosec B105 — logical secret id, not a credential
 DEFAULT_LOGFIRE_TOKEN_REF = f"${{SECRET:encrypted_file:{LOGFIRE_SECRET_LOGICAL_KEY}}}"
 DEFAULT_LOGFIRE_PROJECT = "sevn-gateway"
 
@@ -223,7 +223,8 @@ def apply_logfire_export_to_sevn_doc(
     """
     tracing = _ensure_tracing(doc)
     sinks_raw = tracing.get("sinks")
-    assert isinstance(sinks_raw, list)
+    if not isinstance(sinks_raw, list):
+        sinks_raw = []
     retained: list[Any] = []
     for item in sinks_raw:
         if not isinstance(item, dict):

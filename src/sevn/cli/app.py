@@ -55,6 +55,7 @@ from sevn.cli.commands.secrets_cmd import register as register_secrets
 from sevn.cli.commands.sessions import register as register_sessions
 from sevn.cli.commands.shell_history_cmd import register as register_shell_history
 from sevn.cli.commands.skills_cmd import register as register_skills
+from sevn.cli.commands.subagents_cmd import register as register_subagents
 from sevn.cli.commands.sync_cmd import register as register_sync
 from sevn.cli.commands.telegram_test import register as register_telegram_test
 from sevn.cli.commands.tools_cmd import register as register_tools
@@ -228,6 +229,7 @@ register_shell_history(app)
 register_gh(app)
 register_openwiki(app)
 register_skills(app)
+register_subagents(app)
 register_sync(app)
 register_telegram_test(app)
 register_turn_bundle(app)

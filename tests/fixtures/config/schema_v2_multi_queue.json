@@ -1,0 +1,31 @@
+{
+  "schema_version": 2,
+  "workspace_root": ".",
+  "gateway": {
+    "host": "127.0.0.1",
+    "port": 3001,
+    "queue_mode": "multi",
+    "token": "${SECRET:keychain:sevn.gateway.token}"
+  },
+  "subagents": {
+    "enabled": true,
+    "max_level1_default": 5,
+    "max_level2_default": 3
+  },
+  "tracing": {
+    "retention_days": 14,
+    "sinks": [{ "type": "jsonl_file", "path": ".sevn/traces/" }]
+  },
+  "providers": {
+    "default_regime": "subscription",
+    "tier_default": {
+      "A": "gpt-4o-mini",
+      "B": "gpt-4o-mini",
+      "C": "gpt-4o",
+      "D": "gpt-4o"
+    },
+    "fallback_chain": {
+      "openai": ["gpt-4o-mini", "gpt-4o"]
+    }
+  }
+}

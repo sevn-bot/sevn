@@ -19,7 +19,7 @@ Run the long-lived gateway process that accepts channel ingress (Telegram poll/w
 
 ### Components and layout
 
-Implementation lives under `src/sevn/gateway/`. The package contains 110 Python module(s); primary entry points include `src/sevn/gateway/__init__.py`, `src/sevn/gateway/admin_secrets.py`, `src/sevn/gateway/agent_turn.py`, `src/sevn/gateway/auth.py`, and 2 more.
+Implementation lives under `src/sevn/gateway/`. The package contains 114 Python module(s); primary entry points include `src/sevn/gateway/__init__.py`, `src/sevn/gateway/admin_secrets.py`, `src/sevn/gateway/agent_turn.py`, `src/sevn/gateway/auth.py`, and 2 more.
 
 ### Data and control flow
 
@@ -44,7 +44,7 @@ Run the long-lived gateway process that accepts channel ingress (Telegram poll/w
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/gateway/` (110 Python files). Normative design: `specs/17-gateway.md`.
+Primary source tree: `src/sevn/gateway/` (114 Python files). Normative design: `specs/17-gateway.md`.
 
 ### Module inventory
 
@@ -60,7 +60,7 @@ Primary source tree: `src/sevn/gateway/` (110 Python files). Normative design: `
 - `src/sevn/gateway/cascade_budget.py` — """Cumulative wall-clock budget for the tier B → C/D cascade ('specs/17-gateway.md' §3.4).
 - `src/sevn/gateway/channel_boot.py` — """Multi-adapter gateway boot loader.
 - `src/sevn/gateway/channel_router.py` — """Unified inbound/outbound orchestration ('specs/17-gateway.md' §2.2-§2.4, §4.3-§4.4).
-- … and 98 more Python modules
+- … and 102 more Python modules
 
 ### Admin Secrets (`src/sevn/gateway/admin_secrets.py`)
 
@@ -126,7 +126,7 @@ Public entry points:
 
 ### Additional modules
 
-98 more Python files under `src/sevn/gateway/` — including `src/sevn/gateway/channel_types.py`, `src/sevn/gateway/coding_agent_router.py`, `src/sevn/gateway/commands/__init__.py`, `src/sevn/gateway/commands/ask_config.py`.
+102 more Python files under `src/sevn/gateway/` — including `src/sevn/gateway/channel_types.py`, `src/sevn/gateway/coding_agent_router.py`, `src/sevn/gateway/commands/__init__.py`, `src/sevn/gateway/commands/ask_config.py`.
 
 ### Extension and invariants
 

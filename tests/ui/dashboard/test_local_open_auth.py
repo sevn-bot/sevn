@@ -106,7 +106,7 @@ def test_dashboard_nav_without_login_on_loopback(tmp_path: Path) -> None:
     with _client(tmp_path) as client:
         resp = client.get("/api/v1/dashboard/nav")
         assert resp.status_code == 200
-        assert resp.json()["tab_count"] == 45
+        assert resp.json()["tab_count"] == 46
 
 
 def test_remote_client_requires_auth(tmp_path: Path) -> None:

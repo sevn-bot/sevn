@@ -45,6 +45,9 @@ GATEWAY_TRACE_KINDS: Final[frozenset[str]] = frozenset(
 MISSION_TELEMETRY_TRACE_KINDS: Final[frozenset[str]] = frozenset(
     {
         "provider.call",
+        "subagent_spawned",
+        "subagent_finished",
+        "subagent_killed",
     },
 )
 
@@ -79,10 +82,12 @@ def is_mission_telemetry_kind(kind: str) -> bool:
         kind (str): Trace event kind.
 
     Returns:
-        bool: True for ``provider.call`` or channel lifecycle kinds.
+        bool: True for ``provider.call``, sub-agent lifecycle kinds, or channel kinds.
 
     Examples:
         >>> is_mission_telemetry_kind("provider.call")
+        True
+        >>> is_mission_telemetry_kind("subagent_spawned")
         True
         >>> is_mission_telemetry_kind("tool.invoke")
         False
@@ -183,6 +188,10 @@ class SessionMissionStats:
     disregards: int = 0
     last_complexity: str | None = None
     last_activity_at: float = 0.0
+    subagents_running_by_level_role: dict[str, int] = field(default_factory=dict)
+    """Active sub-agent counts keyed by ``"<level>:<role>"`` (W5)."""
+    subagents_total_by_status: dict[str, int] = field(default_factory=dict)
+    """Terminal sub-agent counts keyed by status (``done``/``failed``/``killed``) for this session."""
 
 
 def event_timestamp(event: TraceEvent) -> float:

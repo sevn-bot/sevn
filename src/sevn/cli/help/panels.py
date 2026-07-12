@@ -61,6 +61,7 @@ ROOT_COMMAND_PANELS: dict[str, str] = {
     "sessions": "Core",
     "shell-history": "Ops",
     "skills": "Agent",
+    "subagents": "Agent",
     "sync": "Ops",
     "tools": "Agent",
     "telegram-test": "Surfaces",

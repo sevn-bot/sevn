@@ -1522,6 +1522,12 @@ def create_app(
                 content_root=ly.content_root,
             )
         )
+        # W3.1/W3.3: the subagents boot hook (priority 40) populates
+        # `app.state.subagent_supervisor` above; `agent_turn.py` reads it lazily off
+        # the router (`router._subagent_supervisor`) rather than as a
+        # `build_agent_run_turn` constructor param, since both call sites of that
+        # factory run *before* `run_boot_hooks` above.
+        gateway_router._subagent_supervisor = getattr(app.state, "subagent_supervisor", None)
         yield
         await _emit_gateway_trace(trace, kind="gateway.shutdown", status="ok")
         cursor_sched = getattr(app.state, "cursor_poll_scheduler", None)
@@ -1660,7 +1666,17 @@ def create_app(
         active_sessions = 0
         if session_mgr is not None and hasattr(session_mgr, "active_session_count"):
             active_sessions = int(session_mgr.active_session_count())
-        txt = render_gateway_metrics(active_sessions=active_sessions)
+        subagents_running: dict[tuple[int, str], int] | None = None
+        subagents_total: dict[str, int] | None = None
+        prom = getattr(app.state, "subagent_prometheus", None)
+        if prom is not None:
+            subagents_running = dict(prom.running)
+            subagents_total = dict(prom.total_by_status)
+        txt = render_gateway_metrics(
+            active_sessions=active_sessions,
+            subagents_running=subagents_running,
+            subagents_total=subagents_total,
+        )
         return PlainTextResponse(txt, media_type="text/plain; version=0.0.4")
 
     async def enforce_gateway_auth(request: Request) -> None:

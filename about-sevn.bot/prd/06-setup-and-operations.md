@@ -7,7 +7,7 @@ owner: Alex
 summary: Local-first bots are judged in the first ten minutes—clone, three setup commands,
   and a Telegram reply, or the operator returns to a hosted assistant.
 last_updated: '2026-07-12'
-fingerprint: sha256:76e0d99406f2f8c762ea3c92283da3f42a7240303c7b50c402677dcaf0780d94
+fingerprint: sha256:2f57f1322c6090ff352480a908db98710bd4767b1a0450e5110c51104a40d51a
 related: []
 sources:
 - src/sevn/config/**

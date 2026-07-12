@@ -8,7 +8,7 @@ summary: 'Provide a single, testable configuration surface before storage, traci
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
 last_updated: '2026-07-12'
-fingerprint: sha256:879348883c06d18b8f3666f3686665639185c6f6c08fa6b3297e38f43a483a55
+fingerprint: sha256:0b4418291fc21dcca7d3467c2bc972e24991d1dbd0dd5285ab81a9691c3fe65b
 related: []
 sources:
 - src/sevn/config/**
@@ -632,6 +632,18 @@ interfaces:
 - name: SelfImproveWorkspaceConfig
   file: src/sevn/config/sections/self_improve.py
   symbol: SelfImproveWorkspaceConfig
+- name: SpecialistConfig
+  file: src/sevn/config/sections/subagents.py
+  symbol: SpecialistConfig
+- name: SubAgentRoleLimits
+  file: src/sevn/config/sections/subagents.py
+  symbol: SubAgentRoleLimits
+- name: SubAgentsWorkspaceConfig
+  file: src/sevn/config/sections/subagents.py
+  symbol: SubAgentsWorkspaceConfig
+- name: resolve_limits
+  file: src/sevn/config/sections/subagents.py
+  symbol: resolve_limits
 - name: TraceRedactionConfig
   file: src/sevn/config/sections/tracing.py
   symbol: TraceRedactionConfig

@@ -726,6 +726,26 @@
       ]
     },
     {
+      "capability_id": "skill.media_generation",
+      "group": "B",
+      "label": "media_generation",
+      "description": "Generate images, video, and music via the MiniMax-backed media_generator specialist (spec 36).",
+      "config_paths": [
+        "skills.media_generation.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.media_generation.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
       "capability_id": "skill.lcm",
       "group": "B",
       "label": "lcm",

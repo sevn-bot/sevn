@@ -234,9 +234,9 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         _toggle("gateway.queue_mode"),
         "C",
         "session",
-        "Queue cancel↔steer",
+        "Queue cancel↔steer↔multi",
         implemented=True,
-        notes="JSON; verify /status TMF Wave 1",
+        notes="JSON; cycles cancel/steer/multi (W4/W7)",
     )
 
     # --- C2. Help ---
@@ -685,6 +685,83 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "Browse folders",
         implemented=True,
         notes="Owner folder browser wizard",
+    )
+
+    # --- C25. Sub-agents (Advanced nested) ---
+    add(
+        "C25.1",
+        _toggle("subagents.enabled"),
+        "C",
+        "subagents",
+        "Sub-agents enabled",
+        implemented=True,
+        notes="JSON; W7 operator surface",
+    )
+    add(
+        "C25.2",
+        _exact("cfg:section:subagents_running"),
+        "C",
+        "subagents",
+        "Running L1/L2 counts",
+        implemented=True,
+        notes="Live registry snapshot + Running submenu",
+    )
+    add(
+        "C25.3",
+        r"^form:subagents_max_override$",
+        "C",
+        "subagents",
+        "Global override",
+        implemented=True,
+        notes="Numeric form wizard",
+    )
+    add(
+        "C25.4",
+        r"^form:subagents_limits:(triager|tier_b|tier_c|tier_d)$",
+        "C",
+        "subagents",
+        "Per-role limits",
+        implemented=True,
+        notes="Two-step L1/L2 numeric wizard",
+    )
+    add(
+        "C25.5",
+        r"^act:subagents:kill:[a-z0-9]+$",
+        "C",
+        "subagents_running",
+        "Kill sub-agent",
+        implemented=True,
+        owner_only=True,
+        notes="Owner-only cooperative kill via supervisor (D13)",
+    )
+    add(
+        "C25.6",
+        _exact("act:subagents:kill_all"),
+        "C",
+        "subagents_running",
+        "Kill all L1",
+        implemented=True,
+        owner_only=True,
+        notes="Owner-only kill-all (D13)",
+    )
+    add(
+        "C25.7",
+        r"^https?://.*#subagents$",
+        "C",
+        "subagents",
+        "Open Sub-agents panel",
+        implemented=True,
+        requires_web_ui=True,
+        notes="OMIT when no web_ui.url",
+    )
+    add(
+        "C25.8",
+        _exact("cfg:section:subagents"),
+        "C",
+        "advanced",
+        "Open Sub-agents",
+        implemented=True,
+        notes="Nested section under Advanced (W7)",
     )
 
     # --- C14. Integrations ---
