@@ -156,7 +156,7 @@ Follow `about-sevn.bot/sub-agents.html` for merge gates, error semantics, and co
 ## References
 
 - [about-sevn.bot/sub-agents.html](about-sevn.bot/sub-agents.html)
-- [about-sevn.bot/gateway.html](about-sevn.bot/gateway.html)
+- [docs/readmes/gateway.md](docs/readmes/gateway.md)
 - [about-sevn.bot/mission-control.html](about-sevn.bot/mission-control.html)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white

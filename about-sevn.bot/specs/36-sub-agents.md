@@ -4,10 +4,11 @@ kind: spec
 title: Sub-agents (L1/L2) — Spec
 status: done
 owner: Alex
-summary: 'Level-1 sub-agents (tracked, concurrent, killable role runs) that may spawn
-  level-2 workers (incl. specialists); multi queue mode; limits, tracing, kill
-  surfaces, media_generation skill.'
+summary: Level-1 sub-agents (tracked, concurrent, killable role runs) that may spawn
+  level-2 workers (incl. specialists); multi queue mode; limits, tracing, kill surfaces,
+  media_generation skill.
 last_updated: '2026-07-12'
+fingerprint: sha256:165ae9c98579a2314058cca1d88361ec34623609d5efcf3ecd762b19dd55f54a
 related: []
 sources:
 - src/sevn/agent/subagents/**
@@ -30,9 +31,136 @@ depends_on:
 - spec-23-cli
 - spec-24-dashboard
 build_phase: null
-interfaces: []
+interfaces:
+- name: MiniMaxMediaError
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: MiniMaxMediaError
+- name: generate_image_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_image_bytes
+- name: generate_music_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_music_bytes
+- name: generate_video_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_video_bytes
+- name: MediaTask
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: MediaTask
+- name: execute_media_generator_for_context
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: execute_media_generator_for_context
+- name: execute_media_generator_task
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: execute_media_generator_task
+- name: parse_media_task
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: parse_media_task
+- name: require_media_generator
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: require_media_generator
+- name: resolve_minimax_api_key
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: resolve_minimax_api_key
+- name: SubAgentLimitExceeded
+  file: src/sevn/agent/subagents/models.py
+  symbol: SubAgentLimitExceeded
+- name: SubAgentRun
+  file: src/sevn/agent/subagents/models.py
+  symbol: SubAgentRun
+- name: SubAgentStatus
+  file: src/sevn/agent/subagents/models.py
+  symbol: SubAgentStatus
+- name: generate_short_id
+  file: src/sevn/agent/subagents/models.py
+  symbol: generate_short_id
+- name: RegistrySnapshot
+  file: src/sevn/agent/subagents/registry.py
+  symbol: RegistrySnapshot
+- name: SubAgentRegistry
+  file: src/sevn/agent/subagents/registry.py
+  symbol: SubAgentRegistry
+- name: ResolvedSpecialist
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: ResolvedSpecialist
+- name: merge_specialist_grants
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: merge_specialist_grants
+- name: resolve_specialist
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: resolve_specialist
+- name: resolve_specialist_executor
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: resolve_specialist_executor
+- name: resolve_specialist_transport
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: resolve_specialist_transport
+- name: specialist_spawn_allowed
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: specialist_spawn_allowed
+- name: list_recent_subagent_runs
+  file: src/sevn/agent/subagents/storage.py
+  symbol: list_recent_subagent_runs
+- name: persist_subagent_run
+  file: src/sevn/agent/subagents/storage.py
+  symbol: persist_subagent_run
+- name: prune_subagent_runs
+  file: src/sevn/agent/subagents/storage.py
+  symbol: prune_subagent_runs
+- name: sqlite_persist_hook
+  file: src/sevn/agent/subagents/storage.py
+  symbol: sqlite_persist_hook
+- name: sweep_orphaned_subagent_runs
+  file: src/sevn/agent/subagents/storage.py
+  symbol: sweep_orphaned_subagent_runs
+- name: SubAgentHandle
+  file: src/sevn/agent/subagents/supervisor.py
+  symbol: SubAgentHandle
+- name: SubAgentSpec
+  file: src/sevn/agent/subagents/supervisor.py
+  symbol: SubAgentSpec
+- name: SubAgentSupervisor
+  file: src/sevn/agent/subagents/supervisor.py
+  symbol: SubAgentSupervisor
+- name: register
+  file: src/sevn/cli/commands/subagents_cmd.py
+  symbol: register
+- name: show_subagents_config
+  file: src/sevn/cli/commands/subagents_cmd.py
+  symbol: show_subagents_config
+- name: SpecialistConfig
+  file: src/sevn/config/sections/subagents.py
+  symbol: SpecialistConfig
+- name: SubAgentRoleLimits
+  file: src/sevn/config/sections/subagents.py
+  symbol: SubAgentRoleLimits
+- name: SubAgentsWorkspaceConfig
+  file: src/sevn/config/sections/subagents.py
+  symbol: SubAgentsWorkspaceConfig
+- name: resolve_limits
+  file: src/sevn/config/sections/subagents.py
+  symbol: resolve_limits
+- name: content_root_from_env
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/_common.py
+  symbol: content_root_from_env
+- name: main_guard
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/_common.py
+  symbol: main_guard
+- name: run_media_generation
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/_common.py
+  symbol: run_media_generation
+- name: main
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_image.py
+  symbol: main
+- name: main
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_music.py
+  symbol: main
+- name: main
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_video.py
+  symbol: main
 specs: []
 personas: []
+prd_profile: null
 ---
 
 ## Purpose

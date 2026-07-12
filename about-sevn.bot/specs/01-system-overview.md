@@ -8,7 +8,7 @@ summary: 'Give implementers a single picture of the runtime before feature work:
   boundaries under src/sevn/, allowed import directions, and the shared protocols
   that keep LLM wiring, observability, and '
 last_updated: '2026-07-12'
-fingerprint: sha256:851ed1ebaa8918f06ba31f9ea41a017decb681bbbb1a81a172f42c2fabf822b0
+fingerprint: sha256:a20f46c7b95dbd6206a0573c11a694c2c06eea4b88bfc01becdc92810d0aab76
 related: []
 sources:
 - src/sevn/**
@@ -761,6 +761,96 @@ interfaces:
 - name: build_sandbox_executor_client
   file: src/sevn/agent/runtimes/sandbox_client.py
   symbol: build_sandbox_executor_client
+- name: MiniMaxMediaError
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: MiniMaxMediaError
+- name: generate_image_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_image_bytes
+- name: generate_music_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_music_bytes
+- name: generate_video_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_video_bytes
+- name: MediaTask
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: MediaTask
+- name: execute_media_generator_for_context
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: execute_media_generator_for_context
+- name: execute_media_generator_task
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: execute_media_generator_task
+- name: parse_media_task
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: parse_media_task
+- name: require_media_generator
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: require_media_generator
+- name: resolve_minimax_api_key
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: resolve_minimax_api_key
+- name: SubAgentLimitExceeded
+  file: src/sevn/agent/subagents/models.py
+  symbol: SubAgentLimitExceeded
+- name: SubAgentRun
+  file: src/sevn/agent/subagents/models.py
+  symbol: SubAgentRun
+- name: SubAgentStatus
+  file: src/sevn/agent/subagents/models.py
+  symbol: SubAgentStatus
+- name: generate_short_id
+  file: src/sevn/agent/subagents/models.py
+  symbol: generate_short_id
+- name: RegistrySnapshot
+  file: src/sevn/agent/subagents/registry.py
+  symbol: RegistrySnapshot
+- name: SubAgentRegistry
+  file: src/sevn/agent/subagents/registry.py
+  symbol: SubAgentRegistry
+- name: ResolvedSpecialist
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: ResolvedSpecialist
+- name: merge_specialist_grants
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: merge_specialist_grants
+- name: resolve_specialist
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: resolve_specialist
+- name: resolve_specialist_executor
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: resolve_specialist_executor
+- name: resolve_specialist_transport
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: resolve_specialist_transport
+- name: specialist_spawn_allowed
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: specialist_spawn_allowed
+- name: list_recent_subagent_runs
+  file: src/sevn/agent/subagents/storage.py
+  symbol: list_recent_subagent_runs
+- name: persist_subagent_run
+  file: src/sevn/agent/subagents/storage.py
+  symbol: persist_subagent_run
+- name: prune_subagent_runs
+  file: src/sevn/agent/subagents/storage.py
+  symbol: prune_subagent_runs
+- name: sqlite_persist_hook
+  file: src/sevn/agent/subagents/storage.py
+  symbol: sqlite_persist_hook
+- name: sweep_orphaned_subagent_runs
+  file: src/sevn/agent/subagents/storage.py
+  symbol: sweep_orphaned_subagent_runs
+- name: SubAgentHandle
+  file: src/sevn/agent/subagents/supervisor.py
+  symbol: SubAgentHandle
+- name: SubAgentSpec
+  file: src/sevn/agent/subagents/supervisor.py
+  symbol: SubAgentSpec
+- name: SubAgentSupervisor
+  file: src/sevn/agent/subagents/supervisor.py
+  symbol: SubAgentSupervisor
 - name: TemplateEntry
   file: src/sevn/agent/templates/registry.py
   symbol: TemplateEntry
@@ -893,6 +983,27 @@ interfaces:
 - name: redact_trace_attrs
   file: src/sevn/agent/tracing/sqlite_sink.py
   symbol: redact_trace_attrs
+- name: SubAgentPrometheusCounts
+  file: src/sevn/agent/tracing/subagent_trace.py
+  symbol: SubAgentPrometheusCounts
+- name: SubAgentTraceEmitter
+  file: src/sevn/agent/tracing/subagent_trace.py
+  symbol: SubAgentTraceEmitter
+- name: bind_subagent_turn_context
+  file: src/sevn/agent/tracing/subagent_trace.py
+  symbol: bind_subagent_turn_context
+- name: build_subagent_trace_hook
+  file: src/sevn/agent/tracing/subagent_trace.py
+  symbol: build_subagent_trace_hook
+- name: reset_subagent_trace_for_tests
+  file: src/sevn/agent/tracing/subagent_trace.py
+  symbol: reset_subagent_trace_for_tests
+- name: reset_subagent_turn_context
+  file: src/sevn/agent/tracing/subagent_trace.py
+  symbol: reset_subagent_turn_context
+- name: subagent_trace_scope
+  file: src/sevn/agent/tracing/subagent_trace.py
+  symbol: subagent_trace_scope
 - name: TraceEventOtelBridge
   file: src/sevn/agent/tracing/trace_event_bridge.py
   symbol: TraceEventOtelBridge
@@ -980,6 +1091,18 @@ interfaces:
 - name: concat_prompt_for_stub_llm
   file: src/sevn/agent/triager/prompt.py
   symbol: concat_prompt_for_stub_llm
+- name: RelatednessDecision
+  file: src/sevn/agent/triager/relatedness.py
+  symbol: RelatednessDecision
+- name: RelatednessInput
+  file: src/sevn/agent/triager/relatedness.py
+  symbol: RelatednessInput
+- name: RelatednessResult
+  file: src/sevn/agent/triager/relatedness.py
+  symbol: RelatednessResult
+- name: classify_relatedness
+  file: src/sevn/agent/triager/relatedness.py
+  symbol: classify_relatedness
 - name: apply_routing_policy
   file: src/sevn/agent/triager/routing_policy.py
   symbol: apply_routing_policy
@@ -1950,6 +2073,12 @@ interfaces:
   file: src/sevn/cli/commands/skills_cmd.py
   symbol: register
 - name: register
+  file: src/sevn/cli/commands/subagents_cmd.py
+  symbol: register
+- name: show_subagents_config
+  file: src/sevn/cli/commands/subagents_cmd.py
+  symbol: show_subagents_config
+- name: register
   file: src/sevn/cli/commands/sync_cmd.py
   symbol: register
 - name: register
@@ -2042,6 +2171,9 @@ interfaces:
 - name: dashboard_api_get
   file: src/sevn/cli/dashboard_api_client.py
   symbol: dashboard_api_get
+- name: dashboard_api_post
+  file: src/sevn/cli/dashboard_api_client.py
+  symbol: dashboard_api_post
 - name: dashboard_http_failure
   file: src/sevn/cli/dashboard_api_client.py
   symbol: dashboard_http_failure
@@ -3431,6 +3563,18 @@ interfaces:
 - name: SelfImproveWorkspaceConfig
   file: src/sevn/config/sections/self_improve.py
   symbol: SelfImproveWorkspaceConfig
+- name: SpecialistConfig
+  file: src/sevn/config/sections/subagents.py
+  symbol: SpecialistConfig
+- name: SubAgentRoleLimits
+  file: src/sevn/config/sections/subagents.py
+  symbol: SubAgentRoleLimits
+- name: SubAgentsWorkspaceConfig
+  file: src/sevn/config/sections/subagents.py
+  symbol: SubAgentsWorkspaceConfig
+- name: resolve_limits
+  file: src/sevn/config/sections/subagents.py
+  symbol: resolve_limits
 - name: TraceRedactionConfig
   file: src/sevn/config/sections/tracing.py
   symbol: TraceRedactionConfig
@@ -5072,6 +5216,24 @@ interfaces:
 - name: main
   file: src/sevn/data/bundled_skills/core/lume/scripts/stop.py
   symbol: main
+- name: content_root_from_env
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/_common.py
+  symbol: content_root_from_env
+- name: main_guard
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/_common.py
+  symbol: main_guard
+- name: run_media_generation
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/_common.py
+  symbol: run_media_generation
+- name: main
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_image.py
+  symbol: main
+- name: main
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_music.py
+  symbol: main
+- name: main
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_video.py
+  symbol: main
 - name: main
   file: src/sevn/data/bundled_skills/core/mycode/scripts/scan.py
   symbol: main
@@ -6440,6 +6602,9 @@ interfaces:
 - name: service_restart_confirm_message
   file: src/sevn/gateway/menu.py
   symbol: service_restart_confirm_message
+- name: subagent_menu_snapshot_from_router
+  file: src/sevn/gateway/menu.py
+  symbol: subagent_menu_snapshot_from_router
 - name: sync_telegram_chat_menu_button
   file: src/sevn/gateway/menu.py
   symbol: sync_telegram_chat_menu_button
@@ -6488,6 +6653,15 @@ interfaces:
 - name: create_mission_v1_router
   file: src/sevn/gateway/mission_api.py
   symbol: create_mission_v1_router
+- name: fetch_subagents_mission_payload
+  file: src/sevn/gateway/mission_api.py
+  symbol: fetch_subagents_mission_payload
+- name: kill_all_subagents_mission
+  file: src/sevn/gateway/mission_api.py
+  symbol: kill_all_subagents_mission
+- name: kill_subagent_mission
+  file: src/sevn/gateway/mission_api.py
+  symbol: kill_subagent_mission
 - name: resolve_mission_control_state
   file: src/sevn/gateway/mission_api.py
   symbol: resolve_mission_control_state
@@ -6530,6 +6704,9 @@ interfaces:
 - name: MissionControlSnapshotsMixin
   file: src/sevn/gateway/mission_state_snapshots.py
   symbol: MissionControlSnapshotsMixin
+- name: build_subagents_mission_snapshot
+  file: src/sevn/gateway/mission_subagents_snapshot.py
+  symbol: build_subagents_mission_snapshot
 - name: MissionControlTraceSink
   file: src/sevn/gateway/mission_trace_sink.py
   symbol: MissionControlTraceSink
@@ -6608,6 +6785,18 @@ interfaces:
 - name: render_gateway_metrics
   file: src/sevn/gateway/prometheus_metrics.py
   symbol: render_gateway_metrics
+- name: MultiDispatchHooks
+  file: src/sevn/gateway/queue_multi.py
+  symbol: MultiDispatchHooks
+- name: MultiSpawnOutcome
+  file: src/sevn/gateway/queue_multi.py
+  symbol: MultiSpawnOutcome
+- name: in_flight_task_summary_for_session
+  file: src/sevn/gateway/queue_multi.py
+  symbol: in_flight_task_summary_for_session
+- name: spawn_multi_l1_via_supervisor
+  file: src/sevn/gateway/queue_multi.py
+  symbol: spawn_multi_l1_via_supervisor
 - name: TokenBucketLimiter
   file: src/sevn/gateway/rate_limit.py
   symbol: TokenBucketLimiter
@@ -6650,6 +6839,9 @@ interfaces:
 - name: format_routing_footer
   file: src/sevn/gateway/routing_footer.py
   symbol: format_routing_footer
+- name: format_subagent_tag
+  file: src/sevn/gateway/routing_footer.py
+  symbol: format_subagent_tag
 - name: strip_model_emitted_footer
   file: src/sevn/gateway/routing_footer.py
   symbol: strip_model_emitted_footer
@@ -6782,6 +6974,12 @@ interfaces:
 - name: blocked_inbound_user_message
   file: src/sevn/gateway/strings.py
   symbol: blocked_inbound_user_message
+- name: build_announce_back_hook
+  file: src/sevn/gateway/subagents_announce.py
+  symbol: build_announce_back_hook
+- name: register_subagents_boot_hook
+  file: src/sevn/gateway/subagents_boot.py
+  symbol: register_subagents_boot_hook
 - name: dispatch_telegram_inline_query
   file: src/sevn/gateway/telegram_inline.py
   symbol: dispatch_telegram_inline_query
@@ -10379,6 +10577,12 @@ interfaces:
 - name: prune_orphan_tool_result_dirs
   file: src/sevn/tools/spill_gc.py
   symbol: prune_orphan_tool_result_dirs
+- name: register_subagent_spawn_tools
+  file: src/sevn/tools/subagent_spawn.py
+  symbol: register_subagent_spawn_tools
+- name: spawn_subagent_tool
+  file: src/sevn/tools/subagent_spawn.py
+  symbol: spawn_subagent_tool
 - name: TerminalSession
   file: src/sevn/tools/terminal.py
   symbol: TerminalSession
@@ -10892,6 +11096,15 @@ interfaces:
 - name: cron_jobs_list
   file: src/sevn/ui/dashboard/api/ops.py
   symbol: cron_jobs_list
+- name: mission_subagent_kill
+  file: src/sevn/ui/dashboard/api/ops.py
+  symbol: mission_subagent_kill
+- name: mission_subagents_get
+  file: src/sevn/ui/dashboard/api/ops.py
+  symbol: mission_subagents_get
+- name: mission_subagents_kill_all
+  file: src/sevn/ui/dashboard/api/ops.py
+  symbol: mission_subagents_kill_all
 - name: schema_ontology
   file: src/sevn/ui/dashboard/api/ops.py
   symbol: schema_ontology

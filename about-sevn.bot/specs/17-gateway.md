@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-07-12'
-fingerprint: sha256:a00b1d6bec6df7d1532cb710e0a81f8111f52b0c93e31e6a16d265e4c6f5f6e3
+fingerprint: sha256:9120dff5fd5725197fcec4da8b9ff753c2bd86ded66a4e23bed78530b600a0d2
 related: []
 sources:
 - src/sevn/gateway/**
@@ -546,6 +546,9 @@ interfaces:
 - name: service_restart_confirm_message
   file: src/sevn/gateway/menu.py
   symbol: service_restart_confirm_message
+- name: subagent_menu_snapshot_from_router
+  file: src/sevn/gateway/menu.py
+  symbol: subagent_menu_snapshot_from_router
 - name: sync_telegram_chat_menu_button
   file: src/sevn/gateway/menu.py
   symbol: sync_telegram_chat_menu_button
@@ -594,6 +597,15 @@ interfaces:
 - name: create_mission_v1_router
   file: src/sevn/gateway/mission_api.py
   symbol: create_mission_v1_router
+- name: fetch_subagents_mission_payload
+  file: src/sevn/gateway/mission_api.py
+  symbol: fetch_subagents_mission_payload
+- name: kill_all_subagents_mission
+  file: src/sevn/gateway/mission_api.py
+  symbol: kill_all_subagents_mission
+- name: kill_subagent_mission
+  file: src/sevn/gateway/mission_api.py
+  symbol: kill_subagent_mission
 - name: resolve_mission_control_state
   file: src/sevn/gateway/mission_api.py
   symbol: resolve_mission_control_state
@@ -636,6 +648,9 @@ interfaces:
 - name: MissionControlSnapshotsMixin
   file: src/sevn/gateway/mission_state_snapshots.py
   symbol: MissionControlSnapshotsMixin
+- name: build_subagents_mission_snapshot
+  file: src/sevn/gateway/mission_subagents_snapshot.py
+  symbol: build_subagents_mission_snapshot
 - name: MissionControlTraceSink
   file: src/sevn/gateway/mission_trace_sink.py
   symbol: MissionControlTraceSink
@@ -714,6 +729,18 @@ interfaces:
 - name: render_gateway_metrics
   file: src/sevn/gateway/prometheus_metrics.py
   symbol: render_gateway_metrics
+- name: MultiDispatchHooks
+  file: src/sevn/gateway/queue_multi.py
+  symbol: MultiDispatchHooks
+- name: MultiSpawnOutcome
+  file: src/sevn/gateway/queue_multi.py
+  symbol: MultiSpawnOutcome
+- name: in_flight_task_summary_for_session
+  file: src/sevn/gateway/queue_multi.py
+  symbol: in_flight_task_summary_for_session
+- name: spawn_multi_l1_via_supervisor
+  file: src/sevn/gateway/queue_multi.py
+  symbol: spawn_multi_l1_via_supervisor
 - name: TokenBucketLimiter
   file: src/sevn/gateway/rate_limit.py
   symbol: TokenBucketLimiter
@@ -756,6 +783,9 @@ interfaces:
 - name: format_routing_footer
   file: src/sevn/gateway/routing_footer.py
   symbol: format_routing_footer
+- name: format_subagent_tag
+  file: src/sevn/gateway/routing_footer.py
+  symbol: format_subagent_tag
 - name: strip_model_emitted_footer
   file: src/sevn/gateway/routing_footer.py
   symbol: strip_model_emitted_footer
@@ -888,6 +918,12 @@ interfaces:
 - name: blocked_inbound_user_message
   file: src/sevn/gateway/strings.py
   symbol: blocked_inbound_user_message
+- name: build_announce_back_hook
+  file: src/sevn/gateway/subagents_announce.py
+  symbol: build_announce_back_hook
+- name: register_subagents_boot_hook
+  file: src/sevn/gateway/subagents_boot.py
+  symbol: register_subagents_boot_hook
 - name: dispatch_telegram_inline_query
   file: src/sevn/gateway/telegram_inline.py
   symbol: dispatch_telegram_inline_query

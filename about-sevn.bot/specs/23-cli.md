@@ -8,7 +8,7 @@ summary: Deliver the primary operator and automation surface for install, upgrad
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
 last_updated: '2026-07-12'
-fingerprint: sha256:2f09e11084d712a0380491908dcd201d57eaabdeb29624e89198a1aef9a0b6a4
+fingerprint: sha256:f04490340168a99e538455fd195dc2e3f7f981887a42c3d30b12a945daca9d3f
 related: []
 sources:
 - src/sevn/cli/**
@@ -157,6 +157,12 @@ interfaces:
   file: src/sevn/cli/commands/skills_cmd.py
   symbol: register
 - name: register
+  file: src/sevn/cli/commands/subagents_cmd.py
+  symbol: register
+- name: show_subagents_config
+  file: src/sevn/cli/commands/subagents_cmd.py
+  symbol: show_subagents_config
+- name: register
   file: src/sevn/cli/commands/sync_cmd.py
   symbol: register
 - name: register
@@ -249,6 +255,9 @@ interfaces:
 - name: dashboard_api_get
   file: src/sevn/cli/dashboard_api_client.py
   symbol: dashboard_api_get
+- name: dashboard_api_post
+  file: src/sevn/cli/dashboard_api_client.py
+  symbol: dashboard_api_post
 - name: dashboard_http_failure
   file: src/sevn/cli/dashboard_api_client.py
   symbol: dashboard_http_failure

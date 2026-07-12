@@ -8,7 +8,7 @@ summary: 'Deliver Mission Control: a same-process dashboard (prd-07-mission-cont
   so the owner can inspect traces, costs, provider health, in-flight runs, proxy status,
   and config without opening SQLite from'
 last_updated: '2026-07-12'
-fingerprint: sha256:b1c1fe2d50940a621305fcb77c9597689d9db04636ed6f3933a3da283a9456d5
+fingerprint: sha256:648629cf3d66ca390d23d54a48ad55571bfd47d4c27d741c38e4a0487b97333d
 related: []
 sources:
 - src/sevn/ui/**
@@ -312,6 +312,15 @@ interfaces:
 - name: cron_jobs_list
   file: src/sevn/ui/dashboard/api/ops.py
   symbol: cron_jobs_list
+- name: mission_subagent_kill
+  file: src/sevn/ui/dashboard/api/ops.py
+  symbol: mission_subagent_kill
+- name: mission_subagents_get
+  file: src/sevn/ui/dashboard/api/ops.py
+  symbol: mission_subagents_get
+- name: mission_subagents_kill_all
+  file: src/sevn/ui/dashboard/api/ops.py
+  symbol: mission_subagents_kill_all
 - name: schema_ontology
   file: src/sevn/ui/dashboard/api/ops.py
   symbol: schema_ontology

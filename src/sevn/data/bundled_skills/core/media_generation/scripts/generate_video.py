@@ -37,11 +37,12 @@ def main() -> int:
     parser.add_argument("--duration", type=int, default=6)
     parser.add_argument("--resolution", default="720P")
     args = parser.parse_args()
-    return run_media_generation(
+    exit_code: int = run_media_generation(
         "video",
         args.prompt,
         extra={"duration": args.duration, "resolution": args.resolution},
     )
+    return exit_code
 
 
 if __name__ == "__main__":

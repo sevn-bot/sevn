@@ -8,7 +8,7 @@ summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–�
   a single, tool-less outbound generation step that emits validated TriageResult consumed
   by tier dispatch (A / B / C / D), MCP e'
 last_updated: '2026-07-12'
-fingerprint: sha256:ab9a9e449690f60cbe16951412b625727d35fd0f7ff87441678252d789103443
+fingerprint: sha256:d84825ec55c18dd461c20eeeb340b8345804f552c691e6e6e6721515c2181e3b
 related: []
 sources:
 - src/sevn/agent/**
@@ -761,6 +761,96 @@ interfaces:
 - name: build_sandbox_executor_client
   file: src/sevn/agent/runtimes/sandbox_client.py
   symbol: build_sandbox_executor_client
+- name: MiniMaxMediaError
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: MiniMaxMediaError
+- name: generate_image_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_image_bytes
+- name: generate_music_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_music_bytes
+- name: generate_video_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_video_bytes
+- name: MediaTask
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: MediaTask
+- name: execute_media_generator_for_context
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: execute_media_generator_for_context
+- name: execute_media_generator_task
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: execute_media_generator_task
+- name: parse_media_task
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: parse_media_task
+- name: require_media_generator
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: require_media_generator
+- name: resolve_minimax_api_key
+  file: src/sevn/agent/subagents/media_worker.py
+  symbol: resolve_minimax_api_key
+- name: SubAgentLimitExceeded
+  file: src/sevn/agent/subagents/models.py
+  symbol: SubAgentLimitExceeded
+- name: SubAgentRun
+  file: src/sevn/agent/subagents/models.py
+  symbol: SubAgentRun
+- name: SubAgentStatus
+  file: src/sevn/agent/subagents/models.py
+  symbol: SubAgentStatus
+- name: generate_short_id
+  file: src/sevn/agent/subagents/models.py
+  symbol: generate_short_id
+- name: RegistrySnapshot
+  file: src/sevn/agent/subagents/registry.py
+  symbol: RegistrySnapshot
+- name: SubAgentRegistry
+  file: src/sevn/agent/subagents/registry.py
+  symbol: SubAgentRegistry
+- name: ResolvedSpecialist
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: ResolvedSpecialist
+- name: merge_specialist_grants
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: merge_specialist_grants
+- name: resolve_specialist
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: resolve_specialist
+- name: resolve_specialist_executor
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: resolve_specialist_executor
+- name: resolve_specialist_transport
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: resolve_specialist_transport
+- name: specialist_spawn_allowed
+  file: src/sevn/agent/subagents/specialists.py
+  symbol: specialist_spawn_allowed
+- name: list_recent_subagent_runs
+  file: src/sevn/agent/subagents/storage.py
+  symbol: list_recent_subagent_runs
+- name: persist_subagent_run
+  file: src/sevn/agent/subagents/storage.py
+  symbol: persist_subagent_run
+- name: prune_subagent_runs
+  file: src/sevn/agent/subagents/storage.py
+  symbol: prune_subagent_runs
+- name: sqlite_persist_hook
+  file: src/sevn/agent/subagents/storage.py
+  symbol: sqlite_persist_hook
+- name: sweep_orphaned_subagent_runs
+  file: src/sevn/agent/subagents/storage.py
+  symbol: sweep_orphaned_subagent_runs
+- name: SubAgentHandle
+  file: src/sevn/agent/subagents/supervisor.py
+  symbol: SubAgentHandle
+- name: SubAgentSpec
+  file: src/sevn/agent/subagents/supervisor.py
+  symbol: SubAgentSpec
+- name: SubAgentSupervisor
+  file: src/sevn/agent/subagents/supervisor.py
+  symbol: SubAgentSupervisor
 - name: TemplateEntry
   file: src/sevn/agent/templates/registry.py
   symbol: TemplateEntry
@@ -893,6 +983,27 @@ interfaces:
 - name: redact_trace_attrs
   file: src/sevn/agent/tracing/sqlite_sink.py
   symbol: redact_trace_attrs
+- name: SubAgentPrometheusCounts
+  file: src/sevn/agent/tracing/subagent_trace.py
+  symbol: SubAgentPrometheusCounts
+- name: SubAgentTraceEmitter
+  file: src/sevn/agent/tracing/subagent_trace.py
+  symbol: SubAgentTraceEmitter
+- name: bind_subagent_turn_context
+  file: src/sevn/agent/tracing/subagent_trace.py
+  symbol: bind_subagent_turn_context
+- name: build_subagent_trace_hook
+  file: src/sevn/agent/tracing/subagent_trace.py
+  symbol: build_subagent_trace_hook
+- name: reset_subagent_trace_for_tests
+  file: src/sevn/agent/tracing/subagent_trace.py
+  symbol: reset_subagent_trace_for_tests
+- name: reset_subagent_turn_context
+  file: src/sevn/agent/tracing/subagent_trace.py
+  symbol: reset_subagent_turn_context
+- name: subagent_trace_scope
+  file: src/sevn/agent/tracing/subagent_trace.py
+  symbol: subagent_trace_scope
 - name: TraceEventOtelBridge
   file: src/sevn/agent/tracing/trace_event_bridge.py
   symbol: TraceEventOtelBridge
@@ -980,6 +1091,18 @@ interfaces:
 - name: concat_prompt_for_stub_llm
   file: src/sevn/agent/triager/prompt.py
   symbol: concat_prompt_for_stub_llm
+- name: RelatednessDecision
+  file: src/sevn/agent/triager/relatedness.py
+  symbol: RelatednessDecision
+- name: RelatednessInput
+  file: src/sevn/agent/triager/relatedness.py
+  symbol: RelatednessInput
+- name: RelatednessResult
+  file: src/sevn/agent/triager/relatedness.py
+  symbol: RelatednessResult
+- name: classify_relatedness
+  file: src/sevn/agent/triager/relatedness.py
+  symbol: classify_relatedness
 - name: apply_routing_policy
   file: src/sevn/agent/triager/routing_policy.py
   symbol: apply_routing_policy

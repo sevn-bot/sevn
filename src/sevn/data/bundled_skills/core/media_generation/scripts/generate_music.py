@@ -40,7 +40,8 @@ def main() -> int:
     extra: dict[str, object] = {"is_instrumental": bool(args.instrumental)}
     if args.lyrics:
         extra["lyrics"] = args.lyrics
-    return run_media_generation("music", args.prompt, extra=extra)
+    exit_code: int = run_media_generation("music", args.prompt, extra=extra)
+    return exit_code
 
 
 if __name__ == "__main__":

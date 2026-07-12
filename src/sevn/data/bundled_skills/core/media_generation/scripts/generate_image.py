@@ -36,11 +36,12 @@ def main() -> int:
     parser.add_argument("prompt", help="Text prompt")
     parser.add_argument("--aspect-ratio", default="1:1", dest="aspect_ratio")
     args = parser.parse_args()
-    return run_media_generation(
+    exit_code: int = run_media_generation(
         "image",
         args.prompt,
         extra={"aspect_ratio": args.aspect_ratio},
     )
+    return exit_code
 
 
 if __name__ == "__main__":

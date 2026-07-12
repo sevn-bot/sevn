@@ -7,7 +7,7 @@ owner: Alex
 summary: Operator dashboard for traces, spend, provider health, and in-flight runs—so
   a capable self-hosted bot stays livable instead of flying blind after each turn.
 last_updated: '2026-07-12'
-fingerprint: sha256:b1c1fe2d50940a621305fcb77c9597689d9db04636ed6f3933a3da283a9456d5
+fingerprint: sha256:648629cf3d66ca390d23d54a48ad55571bfd47d4c27d741c38e4a0487b97333d
 related: []
 sources:
 - src/sevn/ui/**

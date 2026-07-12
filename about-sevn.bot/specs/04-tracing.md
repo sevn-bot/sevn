@@ -8,7 +8,7 @@ summary: Provide durable trace sinks that implement TraceSink without ever throw
   through emit, so instrumentation stays off the critical path. SQLite layout matches
   Mission Control query patterns (prd-07-mi
 last_updated: '2026-07-12'
-fingerprint: sha256:414f9c1057e1602763162862e11a195f0df09f7e4eeb7cb7c392c020a28e9ede
+fingerprint: sha256:a33032572047a4fa122a58bf78dbaefaa41dc96dd585ee8da2e39aaa52c630c3
 related: []
 sources:
 - src/sevn/tracing/**
