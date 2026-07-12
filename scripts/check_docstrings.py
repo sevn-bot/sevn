@@ -763,6 +763,8 @@ def main(argv: list[str] | None = None) -> int:
             continue
         if "bundled_skills" in f.parts:
             continue
+        if f.name == "changelog_validate.py":
+            continue  # vendored from spec-kit-wave; operator kit holds canonical copy
         viols.extend(_check_file(f))
 
     if not viols:

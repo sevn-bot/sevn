@@ -157,6 +157,8 @@ def test_replay_requires_csrf_double_submit(tmp_path: Path) -> None:
         login = client.post("/api/v1/auth/login", json={"password": "pw"})
         assert login.status_code == 200
         _seed_replayable_turn(client)
+        # CSRF gate only — do not schedule real replay work (TestClient waits on bg tasks).
+        client.app.state.replay_worker = None
         blocked = client.post(
             "/api/v1/sessions/sess-a/turns/t1/replay",
             json={"confirmed": True},

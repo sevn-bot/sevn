@@ -302,7 +302,7 @@ about-docs-check: ## Validate about-docs (schema, drift, references, index)
 	PYTHONPATH=. $(UV) run sevn about-docs check --repo .
 
 changelog-check: ## Changelog gate: Keep-a-Changelog lint + Unreleased diff gate (SEVN_CI_BASE=<ref>)
-	python3 spec-kit-wave/src/skw/changelog_validate.py --repo . --base $${SEVN_CI_BASE:-origin/main}
+	python3 scripts/changelog_validate.py --repo . --base $${SEVN_CI_BASE:-origin/main}
 
 changelog-eval: ## Advisory LLM double-score of Unreleased entries (not in CI; needs model access — MODEL=, BASE=)
 	PYTHONPATH=spec-kit-wave/src $(UV) run python -m skw.changelog_eval --repo . \
