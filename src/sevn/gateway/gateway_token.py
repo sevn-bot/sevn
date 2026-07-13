@@ -11,7 +11,8 @@ Constants:
 Exports:
     generate_gateway_token — CSPRNG hex token (64 chars).
     validate_gateway_token_plaintext — reject empty/short values.
-    resolve_gateway_token_ref — expand env + ``${SECRET:…}`` refs to bearer text.
+    resolve_config_ref — expand env + ``${SECRET:…}`` refs to plaintext.
+    resolve_gateway_token_ref — resolve ``gateway.token`` (env overrides config ref).
 """
 
 from __future__ import annotations
@@ -134,15 +135,21 @@ async def _resolve_env_ref_from_chain(chain: SecretsChain, ref_raw: str) -> str 
     return text or None
 
 
-async def _resolve_against_chain(chain: SecretsChain, ref_raw: str) -> str | None:
-    """Expand ``ref_raw`` against ``chain`` to bearer plaintext.
+async def _resolve_against_chain(
+    chain: SecretsChain,
+    ref_raw: str,
+    *,
+    unresolved_log_label: str = "config_ref_unresolved",
+) -> str | None:
+    """Expand ``ref_raw`` against ``chain`` to plaintext.
 
     Args:
         chain (SecretsChain): Workspace secrets chain.
-        ref_raw (str): ``gateway.token`` config value (literal or ``${…}`` ref).
+        ref_raw (str): Config value (literal or ``${…}`` ref).
+        unresolved_log_label (str): Log label when expansion leaves bracketed refs.
 
     Returns:
-        str | None: Bearer token when fully resolved.
+        str | None: Plaintext when fully resolved.
 
     Examples:
         >>> import inspect
@@ -170,7 +177,7 @@ async def _resolve_against_chain(chain: SecretsChain, ref_raw: str) -> str | Non
     # ``prefix-${SECRET:X}`` that could not be fully expanded) means the bearer is not
     # available; log which ref failed so the boot ``RuntimeError`` is not silent (M4).
     if "${SECRET:" in expanded or "${ENV:" in expanded:
-        logger.warning("gateway_token_ref_unresolved ref={}", ref_raw)
+        logger.warning("{} ref={}", unresolved_log_label, ref_raw)
         return None
 
     if expanded and "${" not in expanded:
@@ -181,10 +188,96 @@ async def _resolve_against_chain(chain: SecretsChain, ref_raw: str) -> str | Non
     # forwarding obviously-broken placeholder text as the bearer.
     value = await get_secret_resilient(chain, expanded)
     if not value:
-        logger.warning("gateway_token_ref_unresolved ref={}", ref_raw)
+        logger.warning("{} ref={}", unresolved_log_label, ref_raw)
         return None
     text = value.strip()
     return text or None
+
+
+async def resolve_config_ref(
+    workspace: WorkspaceConfig,
+    *,
+    content_root: Path,
+    ref_raw: str | None,
+    process: ProcessSettings | None = None,
+    process_env_override: str | None = None,
+    unresolved_log_label: str = "config_ref_unresolved",
+) -> str | None:
+    """Resolve a config value that may be plaintext or ``${ENV:…}`` / ``${SECRET:…}`` refs.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed ``sevn.json``.
+        content_root (Path): Workspace content root for encrypted-file backends.
+        ref_raw (str | None): Config field value.
+        process (ProcessSettings | None): Process env; default fresh settings.
+        process_env_override (str | None): Optional env override checked before ``ref_raw``.
+        unresolved_log_label (str): Log label when expansion leaves bracketed refs.
+
+    Returns:
+        str | None: Resolved plaintext when available.
+
+    Examples:
+        >>> import asyncio
+        >>> from pathlib import Path
+        >>> from sevn.config.workspace_config import GatewayConfig, WorkspaceConfig
+        >>> ws = WorkspaceConfig(
+        ...     schema_version=1,
+        ...     gateway=GatewayConfig(token="plain-token-value-at-least-32-chars-long"),
+        ... )
+        >>> asyncio.run(
+        ...     resolve_config_ref(ws, content_root=Path("."), ref_raw=ws.gateway.token),
+        ... ) == "plain-token-value-at-least-32-chars-long"
+        True
+    """
+    _ = process  # reserved for future env-backed overrides beyond gateway token
+    env_override = (process_env_override or "").strip()
+    if env_override:
+        return env_override
+
+    if not ref_raw:
+        return None
+
+    text = str(ref_raw).strip()
+    if not text:
+        return None
+
+    if "${" not in text:
+        return text
+
+    chain = secrets_chain_from_workspace(content_root, workspace.secrets_backend)
+    try:
+        return await _resolve_against_chain(chain, text, unresolved_log_label=unresolved_log_label)
+    except SecretsStoreCorruptError as exc:
+        if is_encrypted_store_decrypt_failure(exc):
+            from sevn.config.workspace_config import effective_encrypted_file_key_source
+            from sevn.security.secrets.passphrase_prime import reconcile_unlock_env_with_keychain
+
+            key_source = effective_encrypted_file_key_source(workspace.secrets_backend)
+            if await reconcile_unlock_env_with_keychain(key_source=key_source):
+                logger.warning(
+                    "config_ref_retry_after_unlock_reconcile label={} store={}",
+                    unresolved_log_label,
+                    resolve_primary_encrypted_store_path(content_root, workspace.secrets_backend),
+                )
+                try:
+                    return await _resolve_against_chain(
+                        chain,
+                        text,
+                        unresolved_log_label=unresolved_log_label,
+                    )
+                except SecretsStoreCorruptError:
+                    pass
+            store_path = resolve_primary_encrypted_store_path(
+                content_root, workspace.secrets_backend
+            )
+            logger.error(
+                "config_ref_unresolved_store_decrypt_failed label={} store={} reason={}",
+                unresolved_log_label,
+                store_path,
+                exc,
+            )
+            return None
+        raise
 
 
 async def resolve_gateway_token_ref(
@@ -218,46 +311,17 @@ async def resolve_gateway_token_ref(
     """
     ps = process or ProcessSettings()
     env_token = (ps.gateway_token or "").strip()
-    if env_token:
-        return env_token
-
     ref_raw: str | None = None
     if workspace.gateway is not None and workspace.gateway.token:
         ref_raw = str(workspace.gateway.token).strip()
-    if not ref_raw:
-        return None
-
-    if "${" not in ref_raw:
-        return ref_raw
-
-    chain = secrets_chain_from_workspace(content_root, workspace.secrets_backend)
-    try:
-        return await _resolve_against_chain(chain, ref_raw)
-    except SecretsStoreCorruptError as exc:
-        if is_encrypted_store_decrypt_failure(exc):
-            from sevn.config.workspace_config import effective_encrypted_file_key_source
-            from sevn.security.secrets.passphrase_prime import reconcile_unlock_env_with_keychain
-
-            key_source = effective_encrypted_file_key_source(workspace.secrets_backend)
-            if await reconcile_unlock_env_with_keychain(key_source=key_source):
-                logger.warning(
-                    "gateway_token_retry_after_unlock_reconcile store={}",
-                    resolve_primary_encrypted_store_path(content_root, workspace.secrets_backend),
-                )
-                try:
-                    return await _resolve_against_chain(chain, ref_raw)
-                except SecretsStoreCorruptError:
-                    pass
-            store_path = resolve_primary_encrypted_store_path(
-                content_root, workspace.secrets_backend
-            )
-            logger.error(
-                "gateway_token_unresolved_store_decrypt_failed store={} reason={}",
-                store_path,
-                exc,
-            )
-            return None
-        raise
+    return await resolve_config_ref(
+        workspace,
+        content_root=content_root,
+        ref_raw=ref_raw,
+        process=ps,
+        process_env_override=env_token or None,
+        unresolved_log_label="gateway_token_ref_unresolved",
+    )
 
 
 __all__ = [
@@ -266,6 +330,7 @@ __all__ = [
     "GATEWAY_TOKEN_LOGICAL_KEY",
     "GATEWAY_TOKEN_MIN_CHARS",
     "generate_gateway_token",
+    "resolve_config_ref",
     "resolve_gateway_token_ref",
     "validate_gateway_token_plaintext",
 ]

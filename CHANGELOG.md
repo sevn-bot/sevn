@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- `sevn dashboard set-login-password` stores the Mission Control owner password in the workspace secrets chain and stamps `dashboard.login_password` with a `${SECRET:…}` ref
 - README `curated` manifest flag and `sevn readme fingerprint` command so hand-authored subsystem READMEs are stamped without body rewrites
 - Advisory `make md-links-check` markdown link checker for tracked docs outside `about-sevn.bot/` (`scripts/check_markdown_links.py`; `ci-quality` tier only)
 - Bundled skills, workspace templates, doctor solutions, docs site (`about-sevn.bot/`), readme pipeline (`docs/readmes/`), brand assets, and remaining test suites for the pre-0.0.1 migration import (I5)
@@ -34,7 +35,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
-- README `make readme-scaffold` protects curated bodies: stale slugs get fingerprint-only stamps, never body rewrites or section stubs
+- Mission Control owner login resolves `${SECRET:…}` dashboard and gateway password refs at boot instead of comparing against placeholder strings
 - README `_write_entries` doctest uses non-curated `storage` row after gateway manifest curation
 - Self-improve trajectory ingest circular import: move `ensure_trace_connection` to `agent.tracing.traces_migrate` and rewrite `docs/readmes/self-improve.md` Level 1–2 with preset-C audit
 - CI failures from `secrets.*` gitignore rule excluding `src/sevn/config/sections/secrets.py` (ModuleNotFoundError and mypy `no-any-return` on CI)
