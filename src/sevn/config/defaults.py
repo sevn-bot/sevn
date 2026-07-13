@@ -280,6 +280,14 @@ TIER_B_TOOL_MAX_RETRIES: Final[int] = 3
 # synthesis steer so a wandering model (e.g. re-reading files for dozens of rounds)
 # is forced to answer from gathered evidence instead of burning rounds/tokens.
 TIER_B_TOOL_CALL_BUDGET: Final[int] = 40
+# Per-turn hard cap on how many times a *single* tool may return an error before it is
+# blocked with a terminal synthesis steer. The identical-call escalation
+# (``repeated_wrong_tool_call``) only fires on repeated *same-args* calls, so a model
+# that varies arguments each attempt (e.g. guessing CLI subcommands or rewriting
+# ``run_code`` snippets) could otherwise fail the same tool for dozens of rounds up to
+# ``TIER_B_TOOL_CALL_BUDGET``. Sits above ``RECOVERY_WIDEN_FAILURE_THRESHOLD`` (2) so the
+# diagnostics-widen recovery still gets a chance first.
+TIER_B_TOOL_FAILURE_HARD_CAP: Final[int] = 5
 TIER_B_COUNT_PLANNING: Final[bool] = False
 # Triager retry budget for schema / model failures (`specs/13-rlm-triager.md` §6).
 TRIAGER_MAX_RETRY_ATTEMPTS: Final[int] = 3

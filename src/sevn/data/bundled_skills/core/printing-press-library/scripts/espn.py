@@ -15,6 +15,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import shlex
 import sys
 
 from _pp_cli import run_pp_cli
@@ -48,7 +49,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--query",
         default=None,
-        help="Natural-language query forwarded as positional arg to espn-pp-cli.",
+        help=(
+            "An espn-pp-cli subcommand line (e.g. 'news soccer fifa.world --limit 10' or "
+            "'scoreboard nba'), tokenised on whitespace. NOT free-text: a natural-language "
+            "phrase like 'World Cup news' fails with 'unknown command'. See references/espn.md."
+        ),
     )
     parser.add_argument(
         "args",
@@ -61,7 +66,13 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.args:
         cli_args = [a for a in parsed.args if a != "--"]
     elif parsed.query:
-        cli_args = [parsed.query]
+        # Tokenise the subcommand line so multi-word queries ('news soccer fifa.world')
+        # reach espn-pp-cli as separate argv, not one bogus subcommand token. Fall back to
+        # a naive split if the string has unbalanced quotes.
+        try:
+            cli_args = shlex.split(parsed.query)
+        except ValueError:
+            cli_args = parsed.query.split()
 
     result = run_pp_cli(_SLUG, cli_args)
     if result.get("ok"):

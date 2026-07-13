@@ -34,6 +34,11 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- `list your skills` reply no longer truncates skill descriptions at ~80 chars: `compose_list_skills_reply` now prefers the full manifest description from the skill inventory over the clipped Triager routing-index line
+- `log_query` accepts a `[start, end]` integer pair and a bracketed `"[start, end]"` string as one inclusive range, instead of rejecting them with an "invalid range" error that leaked into replies; unparseable ranges now mark the diagnostic internal so the model corrects the call rather than quoting it to the user
+- Tier-B empty-output retry exhaustion (`Exceeded maximum output retries`) is treated as a deterministic harness failure, skipping the wasteful widened full-index retry that reproduced it and contributed to `executor_timeout_cancel` (the summarize / partial-progress path still runs)
+- Tier-B blocks a single tool after `TIER_B_TOOL_FAILURE_HARD_CAP` (5) errors in one turn with a terminal synthesis steer, stopping loops where the model varies arguments each attempt (e.g. guessing CLI subcommands or rewriting `run_code`) that previously ground to the round/timeout budget
+- Printing Press skill wrappers (`espn`, `flight_goat`, `movie_goat`, `recipe_goat`) tokenise `--query` on whitespace with quotes respected, so multi-word subcommands like `news soccer fifa.world` reach the CLI as separate argv instead of one bogus subcommand token; `--query` help and `references/espn.md` document the `news <sport> <league>` form (e.g. World Cup = `news soccer fifa.world`)
 - README `make readme-scaffold` protects curated bodies: stale slugs get fingerprint-only stamps, never body rewrites or section stubs
 - README `_write_entries` doctest uses non-curated `storage` row after gateway manifest curation
 - Self-improve trajectory ingest circular import: move `ensure_trace_connection` to `agent.tracing.traces_migrate` and rewrite `docs/readmes/self-improve.md` Level 1–2 with preset-C audit

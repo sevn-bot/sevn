@@ -226,6 +226,15 @@ _DETERMINISTIC_HARNESS_FAILURE_MARKERS: tuple[str, ...] = (
     "returned 400",
     "complete_stream produced no final",
     "upstream sse",
+    # Live-session finding (2026-07-13): the model exhausted its empty-output retry
+    # budget (e.g. "Exceeded maximum output retries (3)") — it returned no final text
+    # after tool rounds. The widened full-index retry re-runs the same model on the
+    # same context and reproduces the empty output, so it is pure latency and a
+    # contributor to executor_timeout_cancel. Skip it and let the summarize pass /
+    # graceful partial-progress path surface what the tools already gathered. This
+    # only suppresses the widened retry; the tools-succeeded summarize pass is gated
+    # separately and still runs.
+    "maximum output retries",
 )
 # P9: suppress the "interrupted" terminal when cancel-mode supersession is imminent.
 _CANCEL_INTERRUPT_SUPPRESS_S = 5.0

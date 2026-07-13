@@ -18,6 +18,7 @@ npx -y @mvanhorn/printing-press-library install espn --cli-only
 
 | Command | Purpose |
 |---------|---------|
+| `news <sport> <league> [--limit N]` | Latest news articles for a sport + league (default 25) |
 | `today` | Scores across all major sports in one call |
 | `scoreboard <league>` | Live scoreboard with date filtering |
 | `standings <league>` | Conference/division standings |
@@ -46,7 +47,18 @@ espn-pp-cli summary --event 401671793 --agent
 
 # Cross-league today
 espn-pp-cli today --agent
+
+# Latest news for a sport + league (NOT a free-text query)
+espn-pp-cli news basketball nba --limit 10 --agent
+espn-pp-cli news football nfl --agent
+
+# World Cup / international soccer news
+espn-pp-cli news soccer fifa.world --limit 10 --agent
 ```
+
+> **News takes `<sport> <league>`, not a natural-language phrase.** `news "World Cup
+> news"` fails with `unknown command`. Use `news soccer fifa.world` (World Cup),
+> `news soccer eng.1` (EPL), `news basketball nba`, `news football nfl`, etc.
 
 ## Agent mode
 
@@ -54,4 +66,8 @@ Add `--agent` to any command: `--json --compact --no-input --no-color --yes`.
 
 ## Leagues
 
-`nfl`, `nba`, `mlb`, `nhl`, `ncaaf`, `ncaam`, `mls`, `epl`, `wnba`, `nascar`
+Scoreboard/standings league slugs: `nfl`, `nba`, `mlb`, `nhl`, `ncaaf`, `ncaam`,
+`mls`, `epl`, `wnba`, `nascar`.
+
+`news` uses `<sport> <league>` pairs, e.g. `basketball nba`, `football nfl`,
+`baseball mlb`, `hockey nhl`, `soccer fifa.world` (World Cup), `soccer eng.1` (EPL).

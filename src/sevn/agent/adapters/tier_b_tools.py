@@ -50,7 +50,11 @@ from sevn.agent.grounding import (
     steer_for_playwright_cdp_probe_failure,
 )
 from sevn.agent.tracing.sink import checkpoint_snapshot
-from sevn.config.defaults import TIER_B_TOOL_CALL_BUDGET, TIER_B_TOOL_MAX_RETRIES
+from sevn.config.defaults import (
+    TIER_B_TOOL_CALL_BUDGET,
+    TIER_B_TOOL_FAILURE_HARD_CAP,
+    TIER_B_TOOL_MAX_RETRIES,
+)
 from sevn.logging.structured import debug_event
 from sevn.prompts.fallbacks import TIER_B_REPEATED_WRONG_CALL_TEMPLATE
 from sevn.tools.base import ToolCall, ToolDefinition, ToolExecutor, enveloped_failure
@@ -812,6 +816,28 @@ async def _dispatch_tool(
                     >= RECOVERY_WIDEN_FAILURE_THRESHOLD
                 ):
                     deps.tool_allowlist.widen_diagnostics()
+                failures_for_tool = deps.tool_failure_by_name.get(definition.name, 0)
+                if (
+                    definition.name not in deps.meta_tool_names
+                    and failures_for_tool >= TIER_B_TOOL_FAILURE_HARD_CAP
+                ):
+                    # Same tool has failed too many times this turn (varying args slip past
+                    # the identical-call escalation). Stop the loop with a terminal steer so
+                    # the model answers from evidence or switches approach instead of
+                    # grinding to the round/timeout budget.
+                    debug_event(
+                        "tier_b.tool_failure_cap_reached",
+                        tool=definition.name,
+                        failures=failures_for_tool,
+                        cap=TIER_B_TOOL_FAILURE_HARD_CAP,
+                    )
+                    return enveloped_failure(
+                        f"{definition.name!r} has failed {failures_for_tool} times this turn — "
+                        "stop calling it. Use a different tool or approach, or write your final "
+                        "answer from the evidence already gathered (state plainly if you could "
+                        "not complete the request). Do not retry this tool again.",
+                        code=ToolResultCode.VALIDATION_ERROR,
+                    )
                 code = blob.get("code")
                 if (
                     code == ToolResultCode.SKILL_IS_ACTUALLY_TOOL

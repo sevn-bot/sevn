@@ -87,6 +87,8 @@ def test_is_executor_timeout_cancel_outcome_positive() -> None:
         ("exception", None, False),
         ("exception", "llm_transport_bad_request path=/v1/messages", True),
         ("exception", "promised_but_idle (motion-promise, no tool calls)", False),
+        # Empty-output retry exhaustion reproduces on a widened retry (live-session fix).
+        (None, "Exceeded maximum output retries (3)", True),
     ],
 )
 def test_is_deterministic_harness_failure_reason_outcome_matrix(

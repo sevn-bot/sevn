@@ -247,6 +247,15 @@ def test_parse_log_ranges_accepts_dash_and_colon() -> None:
     assert spans[1].end == 120
 
 
+def test_parse_log_ranges_invalid_form_marks_error_internal() -> None:
+    """An unparseable range flags the diagnostic as internal so it is not quoted to users."""
+    spans, err = parse_log_ranges(["nonsense"])
+    assert spans == []
+    assert err is not None
+    assert "invalid range" in err
+    assert "do not quote this to the user" in err
+
+
 @pytest.fixture
 def numbered_log(workspace: Path) -> Path:
     """``gateway.log`` with ten numbered lines for pagination tests."""
@@ -522,6 +531,35 @@ def test_coerce_log_range_args_accepts_comma_separated_string() -> None:
     string_ranges, _lines, _offset, err = coerce_log_range_args("10-50, 100-120")
     assert err is None
     assert string_ranges == ["10-50", "100-120"]
+
+
+def test_coerce_log_range_args_accepts_two_int_pair() -> None:
+    """Model mistake: ``[start, end]`` as two bare ints means one inclusive range."""
+    string_ranges, tail_lines, tail_offset, err = coerce_log_range_args([2578, 2632])
+    assert err is None
+    assert string_ranges == ["2578-2632"]
+    assert tail_lines is None
+    assert tail_offset is None
+
+
+def test_coerce_log_range_args_accepts_two_int_string_pair() -> None:
+    string_ranges, _lines, _offset, err = coerce_log_range_args(["10", "50"])
+    assert err is None
+    assert string_ranges == ["10-50"]
+
+
+def test_coerce_log_range_args_accepts_bracketed_string() -> None:
+    """A JSON-array-looking string ``'[2578, 2632]'`` collapses to one range."""
+    string_ranges, _lines, _offset, err = coerce_log_range_args("[2578, 2632]")
+    assert err is None
+    assert string_ranges == ["2578-2632"]
+
+
+def test_coerce_log_range_args_two_hyphen_ranges_not_merged() -> None:
+    """A genuine pair of ``'a-b'`` ranges must stay two ranges, not be merged."""
+    string_ranges, _lines, _offset, err = coerce_log_range_args(["10-50", "60-90"])
+    assert err is None
+    assert string_ranges == ["10-50", "60-90"]
 
 
 @pytest.mark.asyncio
