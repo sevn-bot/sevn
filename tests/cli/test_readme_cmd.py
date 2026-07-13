@@ -101,3 +101,170 @@ source_globs = ["src/sevn/demo/**"]
         assert fix.exit_code == 0
         ok = runner.invoke(get_command(app), ["readme", "check", "--repo", str(repo)])
         assert ok.exit_code == 0
+
+
+def _seed_curated_repo(repo: Path, *, curated: bool = True) -> None:
+    """Create a tmp repo with one curated (or generated) manifest entry."""
+    _seed_sevn_repo(repo)
+    manifest_dir = repo / "docs/readmes"
+    manifest_dir.mkdir(parents=True)
+    hand_src = repo / "src/sevn/hand"
+    hand_src.mkdir(parents=True)
+    (hand_src / "mod.py").write_text("v = 1\n", encoding="utf-8")
+    curated_line = "curated = true\n" if curated else ""
+    manifest_dir.joinpath("manifest.toml").write_text(
+        "version = 1\n"
+        "[[readme]]\n"
+        'slug = "hand"\n'
+        'title = "Hand"\n'
+        'summary = "Hand-authored README."\n'
+        'profile = "freeform"\n'
+        'tier_owner = "docs"\n'
+        'output = "docs/readmes/hand.md"\n'
+        'source_globs = ["src/sevn/hand/**"]\n'
+        f"{curated_line}",
+        encoding="utf-8",
+    )
+    readme_path = manifest_dir / "hand.md"
+    readme_path.write_text(
+        "<!-- curated: hand-authored body -->\n> **Summary.** Hand body must stay byte-stable.\n",
+        encoding="utf-8",
+    )
+
+
+@pytest.mark.xfail(reason="green after W2: sevn readme fingerprint subcommand", strict=False)
+def test_readme_fingerprint_stamps_without_body_change(runner: CliRunner) -> None:
+    """D1: ``sevn readme fingerprint <slug>`` updates digest only (body unchanged)."""
+    with tempfile.TemporaryDirectory() as td:
+        repo = Path(td)
+        _seed_curated_repo(repo, curated=True)
+        readme_path = repo / "docs/readmes/hand.md"
+        before_text = readme_path.read_text(encoding="utf-8")
+        before_mtime = readme_path.stat().st_mtime_ns
+        result = runner.invoke(
+            get_command(app),
+            ["readme", "fingerprint", "hand", "--repo", str(repo)],
+        )
+        assert result.exit_code == 0
+        assert "stamped hand" in result.stdout
+        assert readme_path.read_text(encoding="utf-8") == before_text
+        assert readme_path.stat().st_mtime_ns == before_mtime
+
+
+@pytest.mark.xfail(reason="green after W2: curated update guard", strict=False)
+def test_readme_update_curated_exits_without_force(runner: CliRunner) -> None:
+    """D2: ``sevn readme update`` on curated entry exits 2 with hint unless ``--force``."""
+    with tempfile.TemporaryDirectory() as td:
+        repo = Path(td)
+        _seed_curated_repo(repo, curated=True)
+        before = (repo / "docs/readmes/hand.md").read_text(encoding="utf-8")
+        result = runner.invoke(
+            get_command(app),
+            ["readme", "update", "hand", "--offline", "--repo", str(repo)],
+        )
+        assert result.exit_code == 2
+        assert "curated" in result.stderr.lower() or "curated" in result.stdout.lower()
+        assert (repo / "docs/readmes/hand.md").read_text(encoding="utf-8") == before
+
+
+@pytest.mark.xfail(reason="green after W2: curated update --force", strict=False)
+def test_readme_update_curated_force_writes(runner: CliRunner) -> None:
+    """D2: ``sevn readme update --force`` regenerates a curated README body."""
+    with tempfile.TemporaryDirectory() as td:
+        repo = Path(td)
+        _seed_curated_repo(repo, curated=True)
+        result = runner.invoke(
+            get_command(app),
+            ["readme", "update", "hand", "--force", "--offline", "--repo", str(repo)],
+        )
+        assert result.exit_code == 0
+        body = (repo / "docs/readmes/hand.md").read_text(encoding="utf-8")
+        assert "Hand body must stay byte-stable." not in body
+
+
+@pytest.mark.xfail(reason="green after W2: generate --all skips curated bodies", strict=False)
+def test_readme_generate_all_skips_curated_body_but_stamps(runner: CliRunner) -> None:
+    """D2: ``sevn readme generate --all`` stamps curated slugs without rewriting bodies."""
+    with tempfile.TemporaryDirectory() as td:
+        repo = Path(td)
+        _seed_curated_repo(repo, curated=True)
+        gen_src = repo / "src/sevn/gen"
+        gen_src.mkdir(parents=True)
+        (gen_src / "a.py").write_text("x = 1\n", encoding="utf-8")
+        manifest_path = repo / "docs/readmes/manifest.toml"
+        manifest_path.write_text(
+            manifest_path.read_text(encoding="utf-8") + "\n[[readme]]\n"
+            'slug = "gen"\n'
+            'title = "Gen"\n'
+            'summary = "Generated entry."\n'
+            'profile = "freeform"\n'
+            'tier_owner = "docs"\n'
+            'output = "docs/readmes/gen.md"\n'
+            'source_globs = ["src/sevn/gen/**"]\n',
+            encoding="utf-8",
+        )
+        hand_before = (repo / "docs/readmes/hand.md").read_text(encoding="utf-8")
+        result = runner.invoke(
+            get_command(app),
+            ["readme", "generate", "--all", "--offline", "--repo", str(repo)],
+        )
+        assert result.exit_code == 0
+        assert "skipped hand (curated)" in result.stdout
+        assert (repo / "docs/readmes/hand.md").read_text(encoding="utf-8") == hand_before
+        assert (repo / "docs/readmes/gen.md").is_file()
+
+
+@pytest.mark.xfail(reason="green after W2: precommit curated stamp-only", strict=False)
+def test_precommit_main_leaves_curated_body_unchanged(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """D2: ``readme_precommit.main`` stamps curated slugs without ``write_readme`` body churn."""
+    from scripts import readme_precommit
+
+    with tempfile.TemporaryDirectory() as td:
+        repo = Path(td)
+        _seed_curated_repo(repo, curated=True)
+        before = (repo / "docs/readmes/hand.md").read_text(encoding="utf-8")
+        monkeypatch.setattr(readme_precommit, "_resolve_repo_root", lambda _repo: repo)
+        exit_code = readme_precommit.main(["src/sevn/hand/mod.py"])
+        captured = capsys.readouterr()
+        assert exit_code == 0
+        assert "stamped hand (curated)" in captured.out
+        assert (repo / "docs/readmes/hand.md").read_text(encoding="utf-8") == before
+
+
+@pytest.mark.xfail(reason="green after W2: stale-hint differentiates curated", strict=False)
+def test_check_stale_hint_text_for_curated_vs_generated(runner: CliRunner) -> None:
+    """D3: stale errors suggest ``fingerprint`` for curated and ``update`` for generated."""
+    with tempfile.TemporaryDirectory() as td:
+        repo = Path(td)
+        _seed_curated_repo(repo, curated=True)
+        gen_src = repo / "src/sevn/gen"
+        gen_src.mkdir(parents=True)
+        gen_py = gen_src / "a.py"
+        gen_py.write_text("x = 1\n", encoding="utf-8")
+        manifest_path = repo / "docs/readmes/manifest.toml"
+        manifest_path.write_text(
+            manifest_path.read_text(encoding="utf-8") + "\n[[readme]]\n"
+            'slug = "gen"\n'
+            'title = "Gen"\n'
+            'summary = "Generated entry."\n'
+            'profile = "freeform"\n'
+            'tier_owner = "docs"\n'
+            'output = "docs/readmes/gen.md"\n'
+            'source_globs = ["src/sevn/gen/**"]\n',
+            encoding="utf-8",
+        )
+        gen_write = runner.invoke(
+            get_command(app),
+            ["readme", "generate", "--slug", "gen", "--offline", "--repo", str(repo)],
+        )
+        assert gen_write.exit_code == 0
+        (repo / "src/sevn/hand/mod.py").write_text("v = 2\n", encoding="utf-8")
+        gen_py.write_text("x = 2\n", encoding="utf-8")
+        fail = runner.invoke(get_command(app), ["readme", "check", "--repo", str(repo)])
+        assert fail.exit_code == 1
+        output = fail.stdout + fail.stderr
+        assert "sevn readme fingerprint hand" in output
+        assert "sevn readme update gen" in output

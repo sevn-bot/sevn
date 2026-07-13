@@ -125,7 +125,7 @@
     },
     "self-improve": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-12T20:36:35Z",
+      "computed_at": "2026-07-13T10:48:19Z",
       "digest": "b6b6582757fd76c55bfc0be5f46765cebbf119bb8f422676f5e40774240cd753",
       "source_globs": [
         "src/sevn/self_improve/**"

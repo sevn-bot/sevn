@@ -10,6 +10,7 @@ Exports:
     load_fingerprints — read stored fingerprint JSON.
     save_fingerprints — write fingerprint JSON atomically.
     upsert_entry — update one slug row in the fingerprint store.
+    stamp_entry — recompute and persist one slug fingerprint (no README write).
     path_matches_source_glob — whether a repo-relative path matches one manifest glob.
     slugs_for_changed_paths — manifest slugs whose ``source_globs`` cover changed paths.
 
@@ -309,6 +310,37 @@ def save_fingerprints(path: Path, data: dict[str, Any]) -> None:
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def stamp_entry(
+    repo_root: Path,
+    *,
+    slug: str,
+    source_globs: Sequence[str],
+    fingerprints_path: Path,
+) -> None:
+    """Recompute and store one slug fingerprint without touching README bodies.
+
+        Args:
+    repo_root (Path): Repository root.
+    slug (str): Manifest slug key.
+    source_globs (Sequence[str]): Globs used for the digest.
+    fingerprints_path (Path): ``_fingerprints.json`` location.
+
+        Examples:
+            >>> from pathlib import Path as _P
+            >>> import tempfile
+            >>> td = _P(tempfile.mkdtemp())
+            >>> _ = (td / "Makefile").write_text("x\\n", encoding="utf-8")
+            >>> fp = td / "_fingerprints.json"
+            >>> stamp_entry(td, slug="gateway", source_globs=["Makefile"], fingerprints_path=fp)
+            >>> fp.is_file()
+            True
+    """
+    store = load_fingerprints(fingerprints_path)
+    digest = compute_digest(repo_root, source_globs)
+    upsert_entry(store, slug=slug, digest=digest, source_globs=source_globs)
+    save_fingerprints(fingerprints_path, store)
 
 
 def upsert_entry(

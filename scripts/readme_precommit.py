@@ -30,6 +30,7 @@ from sevn.cli.commands.readme_cmd import (  # noqa: E402
 from sevn.docs.readme.fingerprint import (  # noqa: E402
     default_fingerprints_path,
     slugs_for_changed_paths,
+    stamp_entry,
 )
 from sevn.docs.readme.manifest import get_entry, load_manifest  # noqa: E402
 from sevn.docs.readme.render import write_readme  # noqa: E402
@@ -78,6 +79,15 @@ def main(argv: list[str] | None = None) -> int:
 
     for slug in slugs:
         entry = get_entry(manifest, slug)
+        if entry.curated:
+            stamp_entry(
+                repo_root,
+                slug=slug,
+                source_globs=entry.source_globs,
+                fingerprints_path=fingerprints_path,
+            )
+            print(f"readme-precommit: stamped {slug} (curated)")
+            continue
         path = run_sync_coro(
             write_readme(
                 repo_root=repo_root,

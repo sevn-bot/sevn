@@ -236,6 +236,7 @@ tier_owner = "agent"
 output = "docs/readmes/self-improve.md"
 source_globs = ["src/sevn/self_improve/**"]
 specs = ["specs/33-self-improvement.md"]
+curated = true
 
 [[readme]]
 slug = "integrations"
@@ -283,6 +284,7 @@ specs = [
   "specs/13-rlm-triager.md",
   "specs/14-executor-tier-b.md",
 ]
+curated = true
 
 [[readme]]
 slug = "index"

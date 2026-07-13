@@ -1,4 +1,4 @@
-<!-- generated: do not edit by hand; run `sevn readme update subagents` -->
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint subagents` -->
 # Sub-agents — Level-1 role runs, level-2 workers, specialists, multi queue mode, registry, and kill surfaces
 
 [![Spec][spec-badge]][spec-link]

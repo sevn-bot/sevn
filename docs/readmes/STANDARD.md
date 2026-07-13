@@ -37,7 +37,13 @@ docs/brand/
 <!-- generated: do not edit by hand; run `sevn readme update <slug>` -->
 ```
 
-Hand-edits are allowed only when followed by `sevn readme update` to refresh fingerprints, or when the operator explicitly opts out (documented in PR).
+**Curated READMEs** (`curated = true` in `manifest.toml`) are hand-authored at Levels 1–2 and use a different stamp:
+
+```markdown
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint <slug>` -->
+```
+
+The pipeline **never overwrites** curated bodies during `make readme`, `sevn readme generate --all`, or the `sevn-readme-sync` pre-commit hook — those paths only refresh `_fingerprints.json` via `sevn readme fingerprint`. To regenerate a curated body deliberately, run `sevn readme update <slug> --force`. Non-curated READMEs use `sevn readme update <slug>` after source changes.
 
 ---
 
@@ -369,4 +375,5 @@ Operator preview of the root brand header: `docs/readmes/_mock-root-header.md`.
 
 | Date | Wave | Change |
 |------|------|--------|
+| 2026-07-13 | W2 | §A curated flag semantics, fingerprint-only refresh, header stamp split. |
 | 2026-06-13 | W0 | Initial standard from merged references + wave plan §A–F. |

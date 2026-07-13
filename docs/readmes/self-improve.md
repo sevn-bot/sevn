@@ -1,4 +1,4 @@
-<!-- generated: do not edit by hand; run `sevn readme update self-improve` -->
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint self-improve` -->
 # Self-improvement — Self-upgrade harness, eval workers, spec-kit stages, and improve jobs
 
 [![Spec][spec-badge]][spec-link]
@@ -218,7 +218,7 @@ Public entry points:
 
 ### Extension and invariants
 
-Follow [`about-sevn.bot/specs/33-self-improvement.md`](../../about-sevn.bot/specs/33-self-improvement.md) for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/self_improve/`, reconcile Level 1–2 manually when behaviour changes; run `make readme-check` (do not blindly `sevn readme update` over hand-authored L1/L2).
+Follow [`about-sevn.bot/specs/33-self-improvement.md`](../../about-sevn.bot/specs/33-self-improvement.md) for merge gates, error semantics, and compatibility constraints.
 
 ## References
 

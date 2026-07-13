@@ -39,6 +39,7 @@ class ReadmeEntry:
     output: str
     source_globs: tuple[str, ...]
     specs: tuple[str, ...]
+    curated: bool = False
 
 
 @dataclass(frozen=True)
@@ -102,6 +103,8 @@ def load_manifest(path: Path) -> ReadmeManifest:
             msg = f"{path}: readme[{idx}] slug={slug!r} missing source_globs"
             raise ValueError(msg)
 
+        curated = _parse_curated(row.get("curated"), path=path, idx=idx)
+
         entries.append(
             ReadmeEntry(
                 slug=slug,
@@ -112,6 +115,7 @@ def load_manifest(path: Path) -> ReadmeManifest:
                 output=str(row.get("output", f"docs/readmes/{slug}.md")).strip(),
                 source_globs=source_globs,
                 specs=_as_str_tuple(row.get("specs")),
+                curated=curated,
             )
         )
 
@@ -142,6 +146,34 @@ def get_entry(manifest: ReadmeManifest, slug: str) -> ReadmeEntry:
             return entry
     msg = f"manifest entry not found: {slug!r}"
     raise KeyError(msg)
+
+
+def _parse_curated(value: object, *, path: Path, idx: int) -> bool:
+    """Parse optional ``curated`` manifest key (defaults to false).
+
+        Args:
+    value (object): Raw TOML value or ``None`` when omitted.
+    path (Path): Manifest path for error messages.
+    idx (int): Row index for error messages.
+
+        Returns:
+            bool: Parsed curated flag.
+
+        Raises:
+            ValueError: When ``curated`` is present but not a boolean.
+
+        Examples:
+            >>> _parse_curated(None, path=Path("m.toml"), idx=0)
+            False
+            >>> _parse_curated(True, path=Path("m.toml"), idx=0)
+            True
+    """
+    if value is None:
+        return False
+    if not isinstance(value, bool):
+        msg = f"{path}: readme[{idx}] curated must be a boolean"
+        raise ValueError(msg)
+    return value
 
 
 def _as_str_tuple(value: object) -> tuple[str, ...]:

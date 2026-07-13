@@ -112,9 +112,11 @@ def check_readme_tree(
             result.warnings.append(f"{entry.slug}: contains PLACEHOLDER asset label (TODO)")
         status = status_by_slug.get(entry.slug)
         if status == "stale":
-            result.errors.append(
-                f"{entry.slug}: stale source fingerprint — run `sevn readme update {entry.slug}`"
-            )
+            if entry.curated:
+                hint = f"sevn readme fingerprint {entry.slug}"
+            else:
+                hint = f"sevn readme update {entry.slug}"
+            result.errors.append(f"{entry.slug}: stale source fingerprint — run `{hint}`")
 
     return result
 
