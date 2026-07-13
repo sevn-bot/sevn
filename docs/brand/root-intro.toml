@@ -1,6 +1,10 @@
 # Root README intro verse — edit here; regenerate with `sevn readme update root`.
 # Rendered centered under the logo in README.md (replaces legacy title + tagline).
 
+value_prop = """
+**sevn.bot** is a _single AI assistant you own_ that lives in the channels you already use. It remembers you across sessions, runs on whichever LLM provider you can afford or trust, and gets work done by composing tools, skills, and external integrations under your control. The gateway is the control plane — the product is the assistant.
+"""
+
 lines = [
   "I'm Sevn. I'm more than a bot,",
   "or an Assistant, AI or not.",

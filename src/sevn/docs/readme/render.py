@@ -223,6 +223,22 @@ _SUBSYSTEM_SECTION_PROMPTS: tuple[tuple[str, str], ...] = (
     ("level3", "deep-dive"),
 )
 
+_ROOT_SECTION_PROMPTS: tuple[tuple[str, str], ...] = (
+    ("value_prop", "root-valueprop"),
+    ("highlights", "highlights"),
+)
+
+_GUIDE_SECTION_PROMPTS: tuple[tuple[str, str], ...] = (("steps", "guide-steps"),)
+
+_CATALOG_SECTION_PROMPTS: tuple[tuple[str, str], ...] = (("table_intro", "catalog-table"),)
+
+_PROFILE_LLM_PROMPTS: dict[str, tuple[tuple[str, str], ...]] = {
+    "subsystem": _SUBSYSTEM_SECTION_PROMPTS,
+    "root": _ROOT_SECTION_PROMPTS,
+    "guide": _GUIDE_SECTION_PROMPTS,
+    "catalog": _CATALOG_SECTION_PROMPTS,
+}
+
 
 async def render_readme_markdown(
     *,
@@ -465,9 +481,178 @@ async def _build_assembly(
     resolved = _provider_from_config(provider, config)
     if isinstance(resolved, OfflineProvider):
         return assembly
-    if entry.profile == "subsystem":
-        return await _llm_subsystem_assembly(assembly, scan, resolved)
+    prompt_map = _PROFILE_LLM_PROMPTS.get(entry.profile)
+    if prompt_map is None:
+        return assembly
+    return await _llm_profile_assembly(assembly, scan, resolved, prompt_map)
+
+
+async def _llm_profile_assembly(
+    base: ReadmeAssembly,
+    scan: dict[str, Any],
+    provider: SectionProvider,
+    prompt_map: tuple[tuple[str, str], ...],
+) -> ReadmeAssembly:
+    """Polish profile sections via LLM section prompts.
+
+        Args:
+    base (ReadmeAssembly): Offline baseline sections.
+    scan (dict[str, Any]): Scanner context.
+    provider (SectionProvider): LLM provider.
+    prompt_map (tuple[tuple[str, str], ...]): Section key → prompt stem pairs.
+
+        Returns:
+            ReadmeAssembly: Assembly with LLM-polished section bodies.
+
+        Examples:
+            >>> import asyncio
+            >>> from sevn.docs.readme.manifest import ReadmeEntry
+            >>> e = ReadmeEntry("g", "G", "S", "subsystem", "g", "o.md", ("src/**",), ())
+            >>> base = ReadmeAssembly(e, {"summary": "S", "level1": "a"})
+            >>> polished = asyncio.run(
+            ...     _llm_profile_assembly(base, {"title": "G"}, OfflineProvider(), (("summary", "summary"),))
+            ... )
+            >>> polished.sections["summary"] == "S"
+            True
+    """
+    assembly = base
+    variables = _llm_prompt_variables(base, scan)
+    for section_key, prompt_name in prompt_map:
+        content = await provider.render_section(prompt_name, variables)
+        if not content.strip():
+            continue
+        polished = content.strip()
+        if section_key == "highlights":
+            bullets = _parse_markdown_bullets(polished)
+            if bullets:
+                merged = dict(assembly.sections)
+                merged["highlights"] = bullets
+                assembly = ReadmeAssembly(entry=assembly.entry, sections=merged)
+            continue
+        if section_key == "steps":
+            steps = _parse_guide_steps(polished)
+            if steps:
+                merged = dict(assembly.sections)
+                merged["steps"] = steps
+                assembly = ReadmeAssembly(entry=assembly.entry, sections=merged)
+            continue
+        assembly = merge_section(assembly, name=section_key, content=polished)
     return assembly
+
+
+def _llm_prompt_variables(base: ReadmeAssembly, scan: dict[str, Any]) -> dict[str, Any]:
+    """Build shared LLM prompt variables from scan context and offline sections.
+
+        Args:
+    base (ReadmeAssembly): Offline baseline assembly.
+    scan (dict[str, Any]): Scanner context.
+
+        Returns:
+            dict[str, Any]: Variables for section prompt templates.
+
+        Examples:
+            >>> from sevn.docs.readme.manifest import ReadmeEntry
+            >>> e = ReadmeEntry("g", "G", "S", "subsystem", "g", "o.md", ("src/**",), ())
+            >>> vars = _llm_prompt_variables(ReadmeAssembly(e, {"summary": "S"}), {"title": "G"})
+            >>> vars["title"]
+            'G'
+    """
+    context_json = json.dumps(
+        {
+            "source_files": scan.get("source_files", [])[:20],
+            "specs": scan.get("specs", []),
+            "graphify": scan.get("graphify"),
+        },
+        sort_keys=True,
+    )
+    items = base.sections.get("items", [])
+    if not isinstance(items, list):
+        items = []
+    subsystem_entries = scan.get("subsystem_entries", base.sections.get("subsystem_entries", []))
+    subsystem_slugs = [
+        str(row.get("slug", row.get("title", "")))
+        for row in subsystem_entries
+        if isinstance(row, dict)
+    ]
+    intro_lines = scan.get("intro_lines", base.sections.get("intro_lines", []))
+    intro_hint = intro_lines[0] if isinstance(intro_lines, list) and intro_lines else ""
+    architecture_bullets = base.sections.get("architecture_bullets", [])
+    architecture_hint = (
+        architecture_bullets[0]
+        if isinstance(architecture_bullets, list) and architecture_bullets
+        else ""
+    )
+    steps = base.sections.get("steps", [])
+    return {
+        "title": scan.get("title", base.entry.title),
+        "summary": base.sections.get("summary", base.entry.summary),
+        "profile": base.entry.profile,
+        "specs": list(scan.get("specs", base.entry.specs)),
+        "source_globs": scan.get("source_globs", []),
+        "source_excerpt": scan.get("source_excerpt", ""),
+        "spec_excerpt": scan.get("spec_excerpt", ""),
+        "module_symbols": format_module_symbols_for_prompt(scan.get("module_symbols", {})),
+        "modules_hint": format_path_list(list(scan.get("source_py_files", []))[:6]),
+        "context_json": context_json,
+        "value_prop": base.sections.get("value_prop", base.entry.summary),
+        "highlights": base.sections.get("highlights", []),
+        "intro_hint": intro_hint,
+        "architecture_hint": architecture_hint,
+        "subsystem_slugs": ", ".join(subsystem_slugs),
+        "items_json": json.dumps(items[:20], sort_keys=True),
+        "steps_json": json.dumps(steps, sort_keys=True),
+    }
+
+
+def _parse_markdown_bullets(text: str) -> list[str]:
+    """Parse markdown list items into plain bullet strings.
+
+        Args:
+    text (str): Markdown list body.
+
+        Returns:
+            list[str]: Bullet text without list markers.
+
+        Examples:
+            >>> _parse_markdown_bullets("- One\\n- Two")
+            ['One', 'Two']
+    """
+    bullets: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(("- ", "* ")):
+            bullets.append(stripped[2:].strip())
+    return bullets
+
+
+def _parse_guide_steps(text: str) -> list[dict[str, str]]:
+    """Parse ``##`` headings from guide LLM output into step dicts.
+
+        Args:
+    text (str): Markdown with one or more ``##`` sections.
+
+        Returns:
+            list[dict[str, str]]: Step dicts with ``heading`` and ``body`` keys.
+
+        Examples:
+            >>> _parse_guide_steps("## Setup\\nRun make setup.\\n\\n## Verify\\nRun doctor.")
+            [{'heading': 'Setup', 'body': 'Run make setup.'}, {'heading': 'Verify', 'body': 'Run doctor.'}]
+    """
+    steps: list[dict[str, str]] = []
+    current_heading: str | None = None
+    body_lines: list[str] = []
+    for line in text.splitlines():
+        if line.startswith("## "):
+            if current_heading is not None:
+                steps.append({"heading": current_heading, "body": "\n".join(body_lines).strip()})
+            current_heading = line.removeprefix("## ").strip()
+            body_lines = []
+            continue
+        if current_heading is not None:
+            body_lines.append(line)
+    if current_heading is not None:
+        steps.append({"heading": current_heading, "body": "\n".join(body_lines).strip()})
+    return steps
 
 
 async def _llm_subsystem_assembly(
@@ -494,28 +679,4 @@ async def _llm_subsystem_assembly(
             >>> polished.sections["summary"] == "S"
             True
     """
-    assembly = base
-    context_json = json.dumps(
-        {
-            "source_files": scan.get("source_files", [])[:20],
-            "specs": scan.get("specs", []),
-            "graphify": scan.get("graphify"),
-        },
-        sort_keys=True,
-    )
-    variables: dict[str, Any] = {
-        "title": scan.get("title", base.entry.title),
-        "summary": base.sections.get("summary", base.entry.summary),
-        "profile": base.entry.profile,
-        "source_globs": scan.get("source_globs", []),
-        "source_excerpt": scan.get("source_excerpt", ""),
-        "spec_excerpt": scan.get("spec_excerpt", ""),
-        "module_symbols": format_module_symbols_for_prompt(scan.get("module_symbols", {})),
-        "modules_hint": format_path_list(list(scan.get("source_py_files", []))[:6]),
-        "context_json": context_json,
-    }
-    for section_key, prompt_name in _SUBSYSTEM_SECTION_PROMPTS:
-        content = await provider.render_section(prompt_name, variables)
-        if content.strip():
-            assembly = merge_section(assembly, name=section_key, content=content.strip())
-    return assembly
+    return await _llm_profile_assembly(base, scan, provider, _SUBSYSTEM_SECTION_PROMPTS)

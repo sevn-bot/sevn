@@ -237,6 +237,7 @@ def assemble_template_context(
                 items = _catalog_items_with_hrefs(items, entry=entry, repo_root=repo_root)
             base["catalog_kind"] = "modules"
             base["items"] = items
+        base["table_intro"] = sections.get("table_intro", "")
     elif entry.profile == "guide":
         base["steps"] = sections.get("steps", [])
         refs = sections.get("references", list(entry.specs))
@@ -339,7 +340,7 @@ def _offline_root_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str
         "summary": entry.summary,
         "intro_lines": intro_lines,
         "tagline": intro_lines[0] if intro_lines else entry.summary,
-        "value_prop": str(package.get("description", entry.summary)),
+        "value_prop": str(scan.get("value_prop") or package.get("description", entry.summary)),
         "highlights": list(_ROOT_HIGHLIGHTS),
         "architecture_bullets": [
             "Turn spine: channel → gateway → triage → executor → tools/skills → reply",
@@ -728,7 +729,7 @@ def _build_level2_how_it_works(
             True
     """
     source_dir = str(scan.get("source_dir", "src/sevn/"))
-    source_roots = list(scan.get("source_roots", ()))
+    source_roots = [str(root) for root in scan.get("source_roots", ())]
     module_symbols: dict[str, list[str]] = scan.get("module_symbols", {})
     if len(source_roots) > 1:
         layout = (

@@ -53,7 +53,7 @@ Order, with the GitHub-safe idiom for each:
 
 1. `<a name="readme-top"></a>` anchor.
 2. **Centered brand header** — `<div align="center">` with theme-aware logo (`<picture>` + `prefers-color-scheme` → `logo-all-white.svg` dark / `logo-primary.jpg` light from `styles/sevn/style/logos/`), wordmark, one-line tagline, and an **action badge-button row** (Docs · Quick Start · Architecture · Report Bug) using `docs/brand/badges.md`.
-3. **Status badge row** — CI, license (MIT), Python 3.12+, package version, release channel — shields.io `for-the-badge`, reference-style links at EOF.
+3. **Status badge row** — CI (live GitHub Actions badge: `https://github.com/sevn-bot/sevn/actions/workflows/ci.yml/badge.svg` → workflow page), license (MIT), Python 3.12+, package version, release channel — shields.io `for-the-badge` for non-CI badges, reference-style links at EOF.
 4. **Hero** — product screenshot/GIF placeholder (`docs/brand/assets/hero.png` until replaced).
 5. **Value prop** — 2–3 sentences (the “one bot you own” pitch).
 6. **Collapsible TOC** — `<details><summary>`.
@@ -80,7 +80,7 @@ Not every README is a subsystem deep-dive. `manifest.toml` assigns each file a `
 | `guide` | task/operator docs (onboarding, deployment) | Summary · task/step sections (≥1 `##`) · References | no | optional |
 | `freeform` | one-off READMEs | Summary · GitHub-safe (§E) · links resolve | no | no |
 
-**Shared across all profiles:** a `Summary` block at top (see formats below), GitHub-safe allowlist (§E), and resolving relative links/anchors. Placeholders for unbuilt assets → `TODO` warning, not fail.
+**Shared across profiles except `root`:** a `Summary` block at top (see formats below). The root README uses a value-prop paragraph (§B) instead of a Summary block. All profiles must stay GitHub-safe (§E) with resolving relative links/anchors. Placeholders for unbuilt assets → `TODO` warning, not fail.
 
 ### Profile schema objects (checker loads these directly)
 
@@ -259,9 +259,8 @@ Ships in the wheel; unit-tested; invoked by `sevn readme` CLI (W3). The Claude s
 | `model.py` | Section/tier data model + assembly (Summary + L1/L2/L3 per profile). |
 | `fingerprint.py` | Compute/read/write source fingerprints; `_fingerprints.json` I/O. |
 | `providers.py` | LLM abstraction: **offline** (template-only) + **llm** via egress proxy + `Transport`. Generator **never** reads provider API keys. |
-| `render.py` | Section-by-section render → assemble → write; picks template by profile. |
+| `render.py` | Section-by-section render → assemble → write; picks template by profile; GitHub-safe allowlist (§E). |
 | `check.py` | Structure/validity per profile + staleness gate (W4). |
-| `linter.py` | GitHub-safe allowlist (§E). |
 | `templates/` | Jinja2: `root.md.j2`, `subsystem.md.j2`, `index.md.j2`, `catalog.md.j2`, `guide.md.j2`, `freeform.md.j2`. |
 | `prompts/` | One file per section/tier (not hardcoded in Python). |
 
@@ -271,16 +270,16 @@ Mirrors readme-ai’s `prompts.toml` approach — tunable without code changes.
 
 | Prompt file | Used for |
 |-------------|----------|
-| `summary.toml` | Summary block (all profiles). |
+| `summary.toml` | Summary block (`subsystem`, `catalog`, `guide`, `freeform`). |
 | `overview.toml` | Subsystem Level 1. |
 | `how-it-works.toml` | Subsystem Level 2. |
 | `deep-dive.toml` | Subsystem Level 3 (path/symbol citations). |
-| `root-valueprop.toml` | Root value prop paragraph. |
-| `highlights.toml` | Root highlights grid. |
-| `catalog-table.toml` | Catalog profile item tables. |
-| `guide-steps.toml` | Guide profile task sections. |
+| `root-valueprop.toml` | Root value prop paragraph (`profile: root`, LLM mode). |
+| `highlights.toml` | Root highlights grid (`profile: root`, LLM mode). |
+| `catalog-table.toml` | Catalog profile table intro (`profile: catalog`, LLM mode). |
+| `guide-steps.toml` | Guide profile task sections (`profile: guide`, LLM mode). |
 
-Each prompt file: `system`, `user_template`, optional `max_tokens`. Offline mode skips LLM and uses template stubs only.
+`profile: index` stays offline-only (no section prompts). Offline mode skips LLM and uses template stubs only.
 
 ### Transport / egress proxy integration
 
@@ -358,7 +357,7 @@ Explicit operator action for LLM spend: `sevn readme generate --llm`. CI uses `o
 
 `make readme-check` performs:
 
-1. **Structure/validity** — every manifest README exists; profile schema (§C0); GitHub linter (§E); link resolution. Placeholders → `TODO` warning.
+1. **Structure/validity** — every manifest README exists; profile schema (§C0); GitHub-safe checks in `render.py` (§E); link resolution. Placeholders → `TODO` warning.
 2. **Staleness** — fingerprint mismatch → fail with `sevn readme update <slug>`.
 
 Scaffold path: `make readme-scaffold` (parallel to `*-docs-scaffold`).
@@ -375,5 +374,6 @@ Operator preview of the root brand header: `docs/readmes/_mock-root-header.md`.
 
 | Date | Wave | Change |
 |------|------|--------|
+| 2026-07-13 | W6 | §B live CI badge; §C0 root Summary exemption; §F module table (`render.py` owns §E checks); prompt-wiring table matches D15 profile map. |
 | 2026-07-13 | W2 | §A curated flag semantics, fingerprint-only refresh, header stamp split. |
 | 2026-06-13 | W0 | Initial standard from merged references + wave plan §A–F. |

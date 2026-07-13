@@ -28,7 +28,7 @@ from typing import Any
 
 from loguru import logger
 
-from sevn.docs.readme.brand import load_root_intro_lines
+from sevn.docs.readme.brand import load_root_intro_lines, load_root_value_prop
 from sevn.docs.readme.fingerprint import expand_source_globs
 from sevn.docs.readme.manifest import ReadmeEntry
 from sevn.docs.readme.model import _first_sentence, truncate_at_sentence
@@ -87,6 +87,9 @@ def scan_repo_context(repo_root: Path, entry: ReadmeEntry) -> dict[str, Any]:
     }
     if entry.profile == "root":
         context["intro_lines"] = load_root_intro_lines(repo_root)
+        value_prop = load_root_value_prop(repo_root)
+        if value_prop is not None:
+            context["value_prop"] = value_prop
     if entry.catalog == "skills":
         context["bundled_skills"] = _scan_bundled_skills(repo_root)
     return context

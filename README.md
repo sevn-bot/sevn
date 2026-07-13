@@ -43,7 +43,7 @@ Your gateway, your rules — I run where you chose.<br>
 
 ---
 
-sevn.bot — ownable multi-channel AI assistant
+**sevn.bot** is a _single AI assistant you own_ that lives in the channels you already use. It remembers you across sessions, runs on whichever LLM provider you can afford or trust, and gets work done by composing tools, skills, and external integrations under your control. The gateway is the control plane — the product is the assistant.
 
 <details>
 <summary><strong>Table of contents</strong></summary>
@@ -166,8 +166,8 @@ Built on open-source tools documented throughout `docs/readmes/`.
 [arch-link]: about-sevn.bot/ARCHITECTURE.md
 [bug-badge]: https://img.shields.io/badge/Report_Bug-ff3b3b?style=for-the-badge&logo=githubissues&logoColor=white
 [bug-link]: https://github.com/sevn-bot/sevn/issues
-[ci-badge]: https://img.shields.io/badge/CI-6a9c78?style=for-the-badge&logo=githubactions&logoColor=white
-[ci-link]: .github/workflows/ci.yml
+[ci-badge]: https://github.com/sevn-bot/sevn/actions/workflows/ci.yml/badge.svg
+[ci-link]: https://github.com/sevn-bot/sevn/actions/workflows/ci.yml
 [license-badge]: https://img.shields.io/badge/License-MIT-5fb1f7?style=for-the-badge
 [license-link]: LICENSE
 [python-badge]: https://img.shields.io/badge/Python-3.12+-2a7fc6?style=for-the-badge&logo=python&logoColor=white
