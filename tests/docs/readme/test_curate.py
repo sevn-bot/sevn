@@ -9,6 +9,7 @@ from sevn.docs.readme import curate as curate_mod
 from sevn.docs.readme.curate import (
     RunnerKind,
     _glob_to_pathspec,
+    _sanitize_runner_output,
     build_prompt,
     curate_entry,
     diff_for_globs,
@@ -64,6 +65,12 @@ def test_resolve_runner_prefers_available(monkeypatch: pytest.MonkeyPatch) -> No
     runner = resolve_runner("claude")
     assert runner is not None
     assert runner.name == "claude"
+
+
+def test_sanitize_runner_output_redacts_secrets() -> None:
+    assert _sanitize_runner_output("token=abc123") == "<redacted>"
+    assert _sanitize_runner_output("Bearer sk-live-abc123xyz") == "<redacted>"
+    assert _sanitize_runner_output("") == "(no output)"
 
 
 def test_build_prompt_contains_contract_and_diff() -> None:

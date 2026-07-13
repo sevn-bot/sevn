@@ -30,6 +30,7 @@ Examples:
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -44,6 +45,47 @@ _RUNNER_BINS: tuple[tuple[str, str], ...] = (
     ("claude", "claude"),
 )
 _DEFAULT_TIMEOUT_S = 300
+_RUNNER_ENV_KEYS = ("PATH", "HOME", "USER", "LANG", "LC_ALL", "TMPDIR", "TERM")
+_SECRET_RE = re.compile(
+    r"(?i)(api[_-]?key|token|secret|authorization|password)\s*[:=]\s*\S+|"
+    r"sk-[a-zA-Z0-9_-]{8,}|"
+    r"Bearer\s+\S+"
+)
+
+
+def _runner_env() -> dict[str, str]:
+    """Return a minimal env for external agent runners (no inherited secrets).
+
+    Returns:
+        dict[str, str]: Subset of ``os.environ`` safe to pass to ``subprocess.run``.
+
+    Examples:
+        >>> isinstance(_runner_env(), dict)
+        True
+    """
+    return {key: value for key, value in os.environ.items() if key in _RUNNER_ENV_KEYS}
+
+
+def _sanitize_runner_output(raw: str, *, max_len: int = 200) -> str:
+    """Redact likely secrets and truncate runner stderr/stdout for callers.
+
+    Args:
+        raw (str): Raw runner output.
+        max_len (int): Maximum returned length after redaction.
+
+    Returns:
+        str: Safe summary text.
+
+    Examples:
+        >>> _sanitize_runner_output("token=abc123")
+        '<redacted>'
+    """
+    text = _SECRET_RE.sub("<redacted>", raw.strip())
+    if not text:
+        return "(no output)"
+    if len(text) > max_len:
+        return text[:max_len] + "…"
+    return text
 
 
 @dataclass(frozen=True)
@@ -288,6 +330,7 @@ def invoke_runner(
             capture_output=True,
             text=True,
             cwd=str(repo_root),
+            env=_runner_env(),
             timeout=timeout_s,
             check=False,
         )
@@ -296,8 +339,8 @@ def invoke_runner(
     except OSError as exc:
         return False, f"{runner.name} failed to launch: {exc}"
     if proc.returncode != 0:
-        tail = (proc.stderr or proc.stdout or "").strip()[-500:]
-        return False, f"{runner.name} exited {proc.returncode}: {tail}"
+        summary = _sanitize_runner_output(proc.stderr or proc.stdout or "")
+        return False, f"{runner.name} exited {proc.returncode}: {summary}"
     return True, ""
 
 

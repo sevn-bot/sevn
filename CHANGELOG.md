@@ -35,6 +35,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- README curation: strict pre-commit mode no longer stamps fingerprints when agent curation fails; curator runner subprocess uses minimal env and redacts error output
 - README `make readme-scaffold` protects curated bodies: stale slugs get fingerprint-only stamps, never body rewrites or section stubs
 - README `_write_entries` doctest uses non-curated `storage` row after gateway manifest curation
 - Self-improve trajectory ingest circular import: move `ensure_trace_connection` to `agent.tracing.traces_migrate` and rewrite `docs/readmes/self-improve.md` Level 1–2 with preset-C audit

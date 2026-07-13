@@ -162,15 +162,22 @@ def _curate_or_stamp(
         print(f"readme-precommit: curated {entry.slug} ({result.status})")
         return 0
 
-    # error / invalid / skipped — never clobber; stamp so the commit can proceed.
+    # error / invalid / skipped — never clobber curated prose.
     for err in result.template_errors:
         print(f"readme-precommit: {entry.slug} template {err}", file=sys.stderr)
+    if mode == "strict":
+        print(
+            f"readme-precommit: {entry.slug} curate {result.status} ({result.detail}); "
+            "strict mode — commit blocked",
+            file=sys.stderr,
+        )
+        return 1
     print(
         f"readme-precommit: {entry.slug} curate {result.status} ({result.detail}); stamped only",
         file=sys.stderr,
     )
     _stamp(repo_root, entry, fingerprints_path)
-    return 1 if mode == "strict" else 0
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
