@@ -12,7 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
-- README pipeline curated flag and `sevn readme fingerprint` command: hand-authored READMEs are stamp-only in pre-commit and `make readme`, with stale-hint differentiation in `readme-check`
+- Advisory `make md-links-check` markdown link checker for tracked docs outside `about-sevn.bot/` (`scripts/check_markdown_links.py`; `ci-quality` tier only)
 - Bundled skills, workspace templates, doctor solutions, docs site (`about-sevn.bot/`), readme pipeline (`docs/readmes/`), brand assets, and remaining test suites for the pre-0.0.1 migration import (I5)
 - Core runtime packages for the pre-0.0.1 migration import (config, storage, workspace, gateway, agent, security, proxy, and related tests)
 - Configurable Second Brain vault path via `second_brain.paths.vault` (CLI setup, Telegram `/config`, onboarding, doctor)
