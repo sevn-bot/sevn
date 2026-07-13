@@ -1,46 +1,74 @@
-<!-- generated: do not edit by hand; run `sevn readme update security` -->
-# Security scanner — LLM Guard,
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint security` -->
+# Security scanner — LLM Guard, .llmignore, block-and-notify, and channel security copy
 
 [![Spec][spec-badge]][spec-link]
 [![Source][source-badge]][source-link]
 [![Index][index-badge]][index-link]
 
-> **Summary.** LLM Guard, .llmignore, block-and-notify, and channel security copy. Deliver a single scanner subsystem that runs in the gateway process so hostile content is filtered before the Triager or any routing model sees user-visible text, transcripts, or selected tool output.
+> **Summary.** LLM Guard, .llmignore, block-and-notify, and channel security copy.
 
 ## Level 1 — Overview (non-technical)
 
-**Security scanner** is a core part of sevn.bot — the personal AI assistant you run on your own machine. LLM Guard, .llmignore, block-and-notify, and channel security copy.
+**Security scanner** filters hostile or sensitive content **before** any routing model sees it. Inbound Telegram/Web UI text, selected tool output, feedback bodies, and patch diffs can be scanned. When content is blocked, sevn **does not** silently drop it — the operator gets a clear channel message, an audit row under `.llmignore/`, and a non-LLM-visible transcript entry.
 
-In everyday use, security scanner helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
-
-Deliver a single scanner subsystem that runs in the gateway process so hostile content is filtered before the Triager or any routing model sees user-visible text, transcripts, or selected tool output.
+This is defense in depth alongside tool permission gates and sandbox isolation — not a replacement for operator judgment.
 
 ## Level 2 — How it works (technical)
 
-### Components and layout
+Core scanner code lives in `src/sevn/security/`. The gateway wires it at the channel boundary (`channel_router.py`).
 
-Implementation lives under `src/sevn/security/`. The package contains 32 Python module(s); primary entry points include `src/sevn/security/__init__.py`, `src/sevn/security/egress_firewall.py`, `src/sevn/security/llm_guard_scanner.py`, `src/sevn/security/llmignore.py`, `src/sevn/security/oauth/__init__.py`, `src/sevn/security/oauth/authorize.py`, and 26 more.
+### LLM Guard scan points
 
-### Data and control flow
+`LLMGuardScanner` (`llm_guard_scanner.py`) exposes async entrypoints:
 
-Security scanner is a supporting subsystem; see Level 3 for the module-level flow.
+| Method | When |
+| --- | --- |
+| `scan_inbound` | Every gateway inbound message (before triage) |
+| `scan_tool_result` | Selected tool output before re-entering the model |
+| `scan_feedback_body` | Web App / structured feedback payloads |
+| `scan_patch_diff` | Self-improve patch promotion path |
 
-### Configuration
+Verdicts are `ScanVerdict.allow` or `ScanVerdict.block` with `BlockReason` codes and provider metadata. Owner overrides can skip named guard kinds via config.
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/09-security-scanner.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+### Block-and-notify flow
+
+When `scan_inbound` returns block (`channel_router.py`):
+
+1. **`write_blocked_inbound`** — atomic JSON under `.llmignore/blocked/` (`llmignore.py`)
+2. **Session row** — user message stored as `kind="blocked"`, `visible_to_llm=0`
+3. **Trace events** — `gateway.llm_guard_block`, `gateway.route_incoming` with `status="stopped_blocked"`
+4. **Channel notify** — `blocked_inbound_user_message` (`gateway/strings.py`) sent via the channel adapter
+
+Feedback blocks mirror the pattern via `write_blocked_feedback`.
+
+### `.llmignore` layout
+
+`resolve_llmignore_root` + `ensure_llmignore_layout` create:
+
+- `.llmignore/blocked/` — inbound/feedback blocks
+- `.llmignore/quarantine/` — held content with TTL
+- `.llmignore/incidents/` — scanner incident records
+
+`sweep_expired` enforces retention from `security.llmignore.retention` in `sevn.json`. Indexers honor `DEFAULT_INDEX_DENY` so `.llmignore/` never enters LLM-facing corpora. Shadow workspaces must exclude the subtree (`assert_shadow_workspace_excludes_llmignore`).
+
+### Configuration (`sevn.json` → `security`)
+
+Key knobs (full schema: [`infra/sevn.schema.json`](../../infra/sevn.schema.json)):
+
+- `security.scanner.enabled` — master switch
+- `security.scanner.providers` — LLM Guard backend selection
+- `security.llmignore.*` — relative path + retention TTLs
+
+Validate after edits: `sevn config validate`.
 
 ### Key modules
 
-- `src/sevn/security/egress_firewall.py` — `write_macos_pf_ruleset`, `egress_firewall_noop`, `write_linux_iptables_ruleset`, `apply_namespace_egress_firewall`
-- `src/sevn/security/llm_guard_scanner.py` — `LLMGuardScanner.scan_inbound`, `LLMGuardScanner.scan_tool_result`, `LLMGuardScanner.scan_feedback_body`, `scan_patch_diff`
-- `src/sevn/security/llmignore.py` — `resolve_llmignore_root`, `ensure_llmignore_layout`, `is_llmignored`, `sweep_expired`
-- `src/sevn/security/oauth/authorize.py` — `build_authorization_flow`
-- `src/sevn/security/oauth/callback.py` — `OAuthCallbackServer.ready`, `OAuthCallbackServer.wait_for_code`, `OAuthCallbackServer.close`, `parse_pasted_oauth_redirect`
+- `src/sevn/security/llm_guard_scanner.py` — `LLMGuardScanner`
+- `src/sevn/security/llmignore.py` — layout, persistence, TTL sweep
+- `src/sevn/gateway/channel_router.py` — inbound gate + notify path
+- `src/sevn/gateway/strings.py` — `blocked_inbound_user_message`
 
-### Spec context
-
-From about-sevn.bot/specs/09-security-scanner.md:
-Deliver a single scanner subsystem that runs in the gateway process so hostile content is filtered before the Triager or any routing model sees user-visible text, transcripts, or selected tool output.
+Normative spec: [`about-sevn.bot/specs/09-security-scanner.md`](../../about-sevn.bot/specs/09-security-scanner.md).
 
 ## Level 3 — Deep dive (low-level, technical)
 

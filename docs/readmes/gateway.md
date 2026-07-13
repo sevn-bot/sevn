@@ -1,4 +1,4 @@
-<!-- generated: do not edit by hand; run `sevn readme update gateway` -->
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint gateway` -->
 # Gateway — FastAPI control plane: channels, sessions, turn spine, queue/steer, Telegram menus
 
 [![Spec][spec-badge]][spec-link]
@@ -9,31 +9,59 @@
 
 ## Level 1 — Overview (non-technical)
 
-**Gateway** is a core part of sevn.bot — the personal AI assistant you run on your own machine. FastAPI control plane: channels, sessions, turn spine, queue/steer, Telegram menus.
+**Gateway** is the long-running **control plane** you start with `sevn gateway start` (or the installed daemon). Every channel — Telegram, Web UI, voice hooks — connects here. The gateway owns sessions, queues your messages, runs the security scanner, and dispatches work to the agent stack. Provider API keys never load in this process; outbound LLM traffic goes through the paired **egress proxy**.
 
-In everyday use, gateway helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
+In everyday terms: you send a message on Telegram; the gateway receives it, checks it, remembers the conversation, picks the right executor tier, and sends the reply back on the same channel.
 
 ## Level 2 — How it works (technical)
 
-### Components and layout
+The gateway is a **FastAPI** app under `src/sevn/gateway/`. The inbound path is centered on `ChannelRouter` (`channel_router.py`).
 
-Implementation lives under `src/sevn/gateway/`. The package contains 114 Python module(s); primary entry points include `src/sevn/gateway/__init__.py`, `src/sevn/gateway/admin_secrets.py`, `src/sevn/gateway/agent_turn.py`, `src/sevn/gateway/auth.py`, `src/sevn/gateway/boot.py`, `src/sevn/gateway/boot_registry.py`, and 108 more.
+### Turn spine
 
-### Data and control flow
+1. **Inbound** — A channel adapter delivers a normalized message to `ChannelRouter.route_inbound`.
+2. **Scan** — `LLMGuardScanner.scan_inbound` runs before triage (unless owner override skips the guard).
+3. **Session** — Message persisted to SQLite (`sessions` store); blocked content gets a `kind="blocked"` row instead.
+4. **Dispatch** — `build_agent_run_turn` (`agent_turn.py`) returns the production `RunTurnFn`: `triage_turn` → tier **A** (triager-only reply), **B** (`run_b_turn`), or **C/D** (`run_cd_turn`).
+5. **Outbound** — Assistant text streams back through the same channel adapter; trace events land in `.sevn/traces` / `traces.db`.
 
-Gateway sits in the sevn.bot turn spine: a channel delivers a message, the gateway normalises it, triage routes work to the right executor, and the reply returns through the same channel adapter. This subsystem owns the responsibilities described in the manifest summary and defers provider API calls to the paired egress proxy (keys never load in the gateway process).
+### Queue and steer modes
 
-### Configuration
+`gateway.queue_mode` in `sevn.json` controls behavior when a session is already busy:
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/17-gateway.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+| Mode | Behavior |
+| --- | --- |
+| `cancel` (default) | New inbound cancels the in-flight turn |
+| `steer` | Owner `/steer <text>` queues corrections at the next safe LLM boundary (`steer_store.py`) |
+| `multi` | Triager classifies busy input as steer, supersede, or a new level-1 task (`queue_multi.py`) |
+
+Per-channel overrides exist via `channels.*.busy_input_mode`.
+
+### Channels and boot
+
+`channel_boot.py` loads configured adapters (Telegram, Web UI, Discord, Slack, stubs). `run_boot_hooks` (`boot_registry.py`) runs harness discipline sweeps, layout validation, cron reconciles, and subsystem registration at startup.
+
+### Configuration (`sevn.json` → `gateway`)
+
+Key knobs (full schema: [`infra/sevn.schema.json`](../../infra/sevn.schema.json)):
+
+- `queue_mode` — `cancel` \| `steer` \| `multi`
+- `steer.max_pending` — bounded `/steer` queue per session
+- `budget.*` — cascade wall-clock budget for tier B → C/D (`cascade_budget.py`)
+- `first_session_intro`, `session_mirror`, `restart` — UX and lifecycle helpers
+
+Validate after edits: `sevn config validate`; `sevn doctor` for install health.
 
 ### Key modules
 
-- `src/sevn/gateway/admin_secrets.py` — `register_admin_secrets_routes`
-- `src/sevn/gateway/agent_turn.py` — `build_intro_extra_instructions`, `build_agent_run_turn`
-- `src/sevn/gateway/auth.py` — `extract_bearer`, `secrets_compare`, `verify_login_gateway_token`, `login_page_html`
-- `src/sevn/gateway/boot.py` — `run_harness_boot_sweep`, `run_workspace_layout_validation`
-- `src/sevn/gateway/boot_registry.py` — `register_boot_hook`, `register_cron_job`, `clear_boot_registry`, `run_boot_hooks`
+- `src/sevn/gateway/agent_turn.py` — `build_agent_run_turn`, production turn dispatch glue
+- `src/sevn/gateway/channel_router.py` — inbound/outbound orchestration, LLM Guard gate
+- `src/sevn/gateway/channel_boot.py` — multi-adapter boot loader
+- `src/sevn/gateway/steer_store.py` — session-scoped `/steer` buffer
+- `src/sevn/gateway/queue_multi.py` — `multi` queue-mode classification
+- `src/sevn/gateway/boot.py` — harness boot sweep + workspace layout validation
+
+Normative spec: [`about-sevn.bot/specs/17-gateway.md`](../../about-sevn.bot/specs/17-gateway.md).
 
 ## Level 3 — Deep dive (low-level, technical)
 

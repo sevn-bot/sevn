@@ -1,4 +1,4 @@
-<!-- generated: do not edit by hand; run `sevn readme update agent` -->
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint agent` -->
 # Agent runtime — Triager, tier-B/C executors, harness discipline, sandboxes, and turn orchestration
 
 [![Spec][spec-badge]][spec-link]
@@ -9,31 +9,57 @@
 
 ## Level 1 — Overview (non-technical)
 
-**Agent runtime** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Triager, tier-B/C executors, harness discipline, sandboxes, and turn orchestration.
+**Agent runtime** is where your message becomes action. A lightweight **triager** model reads each turn and decides intent (greeting, code question, tool task) and **complexity tier** (A–D). Simple replies stay on tier A; everyday tool use runs on tier B; multi-step planning and delegation use tiers C and D. Executors run inside **harness discipline** rules — bounded tool loops, sandboxed subprocesses, and traces you can inspect in Mission Control.
 
-In everyday use, agent runtime helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
+You do not pick the tier manually; the triager and routing policy choose it per turn.
 
 ## Level 2 — How it works (technical)
 
-### Components and layout
+Implementation lives under `src/sevn/agent/`. The gateway calls into this package through `build_agent_run_turn` (`gateway/agent_turn.py`).
 
-Implementation lives under `src/sevn/agent/`. The package contains 90 Python module(s); primary entry points include `src/sevn/agent/__init__.py`, `src/sevn/agent/adapters/__init__.py`, `src/sevn/agent/adapters/_monty_limits.py`, `src/sevn/agent/adapters/dspy_adapter.py`, `src/sevn/agent/adapters/egress_bridge.py`, `src/sevn/agent/adapters/minimax_wrapper_model.py`, and 84 more.
+### Triage (`src/sevn/agent/triager/`)
 
-### Data and control flow
+`triage_turn` (`triager/run.py`) returns a structured `TriageResult`: `Intent`, `ComplexityTier` (A–D), optional first-message ack, tool/skill shortlists, and confidence. Routing policy modules enforce repo-code detection, orientation blocks, and footer injection.
 
-Agent runtime sits in the sevn.bot turn spine: a channel delivers a message, the gateway normalises it, triage routes work to the right executor, and the reply returns through the same channel adapter. This subsystem owns the responsibilities described in the manifest summary and defers provider API calls to the paired egress proxy (keys never load in the gateway process).
+### Executor tiers
+
+| Tier | Role | Entry point | Typical use |
+| --- | --- | --- | --- |
+| **A** | Triager-only | Handled in `agent_turn` after `triage_turn` | Greetings, simple Q&A with no tools |
+| **B** | Harnessed tool executor | `run_b_turn` (`executors/b_harness.py`) | Default workhorse: skills, CodeMode, web tools |
+| **C** | Planner + outer loop | `run_cd_turn` (`executors/cd_harness.py`) | Multi-step plans, tool orchestration |
+| **D** | Deep delegation | Same `run_cd_turn` path with higher budgets | Long-horizon tasks, λ-RLM-style macros |
+
+Tier B uses pydantic-ai adapters (`adapters/tier_b_*.py`), optional CodeMode (`tier_b_codemode.py`), and routes LLM calls through the egress proxy (`adapters/egress_bridge.py`) — keys stay out of the gateway process.
+
+### Harness discipline and sandbox
+
+[`about-sevn.bot/specs/16-harness-discipline.md`](../../about-sevn.bot/specs/16-harness-discipline.md) governs boot sweeps, tool permissions, and workspace write gates. Risky tool runs may enter a sandbox namespace (`security/sandbox_runtime.py`) with optional egress firewall rules (`security/egress_firewall.py`).
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/13-rlm-triager.md`, `about-sevn.bot/specs/14-executor-tier-b.md`, `about-sevn.bot/specs/21-executor-tier-cd.md`, `about-sevn.bot/specs/16-harness-discipline.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Model slots resolve from `sevn.json` → `providers.tier_default.*` and per-agent overrides. `sevn config validate` checks schema and credential coverage; `load_or_create_llm_params_doc` manages per-agent sampling caps.
+
+### Honest status (selected paths)
+
+| Path | Status | Where |
+| --- | --- | --- |
+| Triager structured output + routing | **live** | `triager/run.py`, `routing_policy.py` |
+| Tier B harness + CodeMode | **live** | `executors/b_harness.py`, `adapters/tier_b_codemode.py` |
+| Tier C/D plan harness | **live** | `executors/cd_harness.py`, `plan_gate_store.py` |
+| λ-RLM combinator execute | **stub** | `executors/lambda_rlm_runtime.py` — name intersection only, no full REPL |
+| Native pydantic-ai models (per-slot flags) | **partial** | `adapters/native_model.py` — gated by config |
+| DSPy adapter scaffolding | **partial** | `adapters/dspy_adapter.py` — not production path |
 
 ### Key modules
 
-- `src/sevn/agent/adapters/_monty_limits.py` — `default_codemode_limits`, `install_monty_resource_limits`
-- `src/sevn/agent/adapters/dspy_adapter.py` — `to_dspy_tools`, `lambda_rlm_filter`
-- `src/sevn/agent/adapters/egress_bridge.py` — `resolve_proxy_shared_secret`, `redact_llm_request_snapshot`, `redact_proxy_transport_request`, `redact_httpx_request_snapshot`
-- `src/sevn/agent/adapters/minimax_wrapper_model.py` — `MiniMaxWrapperModel.request`, `MiniMaxWrapperModel.request_stream`, `MiniMaxWrapperModel.prepare_request`, `wrap_minimax_native_model`
-- `src/sevn/agent/adapters/native_model.py` — `build_native_model_settings`, `resolve_pydantic_model`, `resolve_pydantic_model_for_slot`, `default_native_model_context`
+- `src/sevn/agent/triager/run.py` — `triage_turn`
+- `src/sevn/agent/executors/b_harness.py` — `run_b_turn`
+- `src/sevn/agent/executors/cd_harness.py` — `run_cd_turn`
+- `src/sevn/agent/adapters/egress_bridge.py` — proxy transport for native models
+- `src/sevn/agent/adapters/tier_b_codemode.py` — CodeMode capability for tier B
+
+Normative specs: [`13-rlm-triager`](../../about-sevn.bot/specs/13-rlm-triager.md), [`14-executor-tier-b`](../../about-sevn.bot/specs/14-executor-tier-b.md), [`21-executor-tier-cd`](../../about-sevn.bot/specs/21-executor-tier-cd.md), [`16-harness-discipline`](../../about-sevn.bot/specs/16-harness-discipline.md).
 
 ## Level 3 — Deep dive (low-level, technical)
 

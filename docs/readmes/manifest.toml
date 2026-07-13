@@ -31,6 +31,7 @@ output = "docs/readmes/gateway.md"
 source_globs = ["src/sevn/gateway/**"]
 turn_spine = true
 specs = ["about-sevn.bot/specs/17-gateway.md"]
+curated = true
 
 [[readme]]
 slug = "agent"
@@ -47,6 +48,7 @@ specs = [
   "about-sevn.bot/specs/21-executor-tier-cd.md",
   "about-sevn.bot/specs/16-harness-discipline.md",
 ]
+curated = true
 
 [[readme]]
 slug = "channels"
@@ -109,6 +111,7 @@ tier_owner = "security"
 output = "docs/readmes/security.md"
 source_globs = ["src/sevn/security/**"]
 specs = ["about-sevn.bot/specs/09-security-scanner.md"]
+curated = true
 
 [[readme]]
 slug = "secrets"
@@ -210,6 +213,7 @@ source_globs = [
   "infra/sevn.schema.json",
 ]
 specs = ["about-sevn.bot/specs/02-config-and-workspace.md"]
+curated = true
 
 [[readme]]
 slug = "storage"
@@ -265,6 +269,7 @@ source_globs = [
   "src/sevn/data/onboarding_profiles/**",
 ]
 specs = ["about-sevn.bot/specs/22-onboarding.md", "about-sevn.bot/specs/23-cli.md"]
+curated = true
 
 [[readme]]
 slug = "subagents"

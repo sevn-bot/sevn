@@ -1,5 +1,5 @@
-<!-- generated: do not edit by hand; run `sevn readme update config-workspace` -->
-# Config & workspace — sevn
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint config-workspace` -->
+# Config & workspace — sevn.json schema, workspace layout, defaults, and layout validation
 
 [![Spec][spec-badge]][spec-link]
 [![Source][source-badge]][source-link]
@@ -9,31 +9,59 @@
 
 ## Level 1 — Overview (non-technical)
 
-**Config & workspace** is a core part of sevn.bot — the personal AI assistant you run on your own machine. sevn.json schema, workspace layout, defaults, and layout validation.
+**Config & workspace** is how sevn.bot knows *your* install: where files live, which models and channels are enabled, and what the gateway may touch. Everything operator-facing rolls up to **`sevn.json`** at the workspace root (bound path: `~/.sevn/workspace/sevn.json` when using the default operator home). The workspace directory holds prompts, skills, memory files, and SQLite state under `.sevn/`.
 
-In everyday use, config & workspace helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
+Edit `sevn.json` through Mission Control, Telegram `/config`, the onboarding wizard, or by hand — then validate before restarting the gateway.
 
 ## Level 2 — How it works (technical)
 
-### Components and layout
+Config spans `src/sevn/config/`, workspace layout in `src/sevn/workspace/`, and the JSON Schema at [`infra/sevn.schema.json`](../../infra/sevn.schema.json).
 
-Implementation spans `infra/`, `src/sevn/config/`, `src/sevn/workspace/`. The package contains 44 Python module(s); primary entry points include `src/sevn/config/__init__.py`, `src/sevn/config/defaults.py`, `src/sevn/config/errors.py`, `src/sevn/config/field_help.py`, `src/sevn/config/llm_params.py`, `src/sevn/config/loader.py`, and 38 more.
+### Discover and load
 
-### Data and control flow
+| Step | Function | Behavior |
+| --- | --- | --- |
+| Bound path | `bound_sevn_json_path` | `{SEVN_HOME}/workspace/sevn.json` (default `~/.sevn`) |
+| Walk-up fallback | `find_sevn_json` | First `sevn.json` from cwd to filesystem root |
+| Parse + layout | `load_workspace` (`config/loader.py`) | JSON → `WorkspaceConfig` + `WorkspaceLayout` |
 
-Config & workspace is a supporting subsystem; see Level 3 for the module-level flow.
+`WorkspaceLayout.from_config` resolves `content_root` from `workspace_root` relative to the config file path. Derived paths include `.sevn/` (SQLite, traces), `logs/`, `skills/`, `sessions/`, `memory/`.
 
-### Configuration
+### Subtree model
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/02-config-and-workspace.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+`sevn.json` is a single document validated against [`infra/sevn.schema.json`](../../infra/sevn.schema.json). Domain sections live as Pydantic models under `src/sevn/config/sections/` — e.g. `gateway.py`, `channels.py`, `agent.py`, `security.py`. CLI section helpers (`cli/config_sections.py`) expose stable slugs for `sevn config show <section>`.
+
+### Validation flow
+
+**`sevn config validate`** (`cli/commands/config_cmd.py`):
+
+1. `load_bound_workspace()` — requires operator home + bound `sevn.json`
+2. `validate_workspace_document(bw.raw)` — schema + cross-field rules (`onboarding/validate.py`)
+3. Advisory warnings — unused providers, OpenAI OAuth probe (`onboarding/live_validate.py`)
+
+Gateway boot also runs `validate_workspace_layout` (`workspace/layout_validate.py`) against canonical dirs (`skills/`, `logs/`, `.sevn/`) and seed markdown files (`AGENTS.md`, `SOUL.md`, `USER.md`, …).
+
+**`sevn config set <dotted.path> <value>`** writes a draft and promotes through the same validate → merge path as onboarding.
+
+### Layout vs config
+
+| Path under `content_root` | Purpose |
+| --- | --- |
+| `sevn.json` | Authoritative typed config |
+| `.sevn/` | SQLite (`sevn.db`), traces, improve jobs, turn bundles |
+| `skills/` | Bundled core (read-only) + operator `skills/user/` |
+| `memory/`, `sessions/` | Lazy-created operator dirs |
+| `AGENTS.md`, `USER.md`, … | Workspace persona + operator memory |
 
 ### Key modules
 
-- `src/sevn/config/field_help.py` — `load_config_field_help`, `field_help_for`, `urls_in_help_text`
-- `src/sevn/config/llm_params.py` — `SamplingParams.as_request_kwargs`, `ReasoningParams.as_thinking_request`, `builtin_llm_params_doc`, `validate_llm_params_doc`
-- `src/sevn/config/loader.py` — `find_sevn_json`, `operator_home_dir`, `bound_sevn_json_path`, `resolve_sevn_json_path`
-- `src/sevn/config/model_resolution.py` — `use_main_model_for_all`, `resolve_main_model_id`, `resolve_model_slot`, `is_minimax_catalog_model`
-- `src/sevn/config/my_sevn.py` — `persist_my_sevn_repo_path`, `resolve_my_sevn_repo_path`, `effective_my_sevn_sync`, `effective_my_sevn_executors`
+- `src/sevn/config/loader.py` — `load_workspace`, `find_sevn_json`
+- `src/sevn/config/sections/` — typed `sevn.json` subtrees
+- `src/sevn/workspace/layout.py` — `WorkspaceLayout` path resolver
+- `src/sevn/workspace/layout_validate.py` — boot-time filesystem check
+- `src/sevn/onboarding/promote.py` — merge validated draft → live `sevn.json`
+
+Normative spec: [`about-sevn.bot/specs/02-config-and-workspace.md`](../../about-sevn.bot/specs/02-config-and-workspace.md).
 
 ## Level 3 — Deep dive (low-level, technical)
 
