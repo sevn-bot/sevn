@@ -35,6 +35,10 @@ from sevn.docs.readme.symbol_refs import (
     validate_path_refs,
     validate_symbol_refs,
 )
+from sevn.docs.readme.templates import (
+    resolve_template_path,
+    validate_against_template,
+)
 
 _SUMMARY_MARKERS = ("> **Summary.**", "## Summary")
 _PLACEHOLDER_LABEL = re.compile(r"PLACEHOLDER", re.IGNORECASE)
@@ -109,6 +113,7 @@ def check_readme_tree(
         for err in validate_markdown_links(text, output, repo_root):
             result.errors.append(f"{entry.slug}: {err}")
         _check_path_and_symbol_refs(entry, text, schema, repo_root, result)
+        _check_template(entry, text, repo_root, result)
         if _has_placeholder_warning(text):
             result.warnings.append(f"{entry.slug}: contains PLACEHOLDER asset label (TODO)")
         status = status_by_slug.get(entry.slug)
@@ -235,6 +240,46 @@ def _check_path_and_symbol_refs(
             result.errors.append(f"{entry.slug}: {err}")
         for err in validate_symbol_refs(level3, repo_root):
             result.errors.append(f"{entry.slug}: {err}")
+
+
+def _check_template(
+    entry: ReadmeEntry,
+    text: str,
+    repo_root: Path,
+    result: CheckResult,
+) -> None:
+    """Validate a curated README's outline against its slug template.
+
+    Only curated entries are checked, and only when a template file exists. A
+    missing template for a curated entry is a warning (opt-in adoption), not a
+    hard failure; structural drift against an existing template is an error.
+
+        Args:
+    entry (ReadmeEntry): Manifest row.
+    text (str): README body.
+    repo_root (Path): Repository root.
+    result (CheckResult): Mutable result accumulator.
+
+        Examples:
+            >>> from sevn.docs.readme.manifest import ReadmeEntry
+            >>> r = CheckResult()
+            >>> e = ReadmeEntry("f", "F", "S", "freeform", "f", "o.md", ("a",), ())
+            >>> _check_template(e, "x", Path("."), r)
+            >>> r.errors
+            []
+    """
+    if not entry.curated:
+        return
+    template_path = resolve_template_path(repo_root, entry)
+    if not template_path.is_file():
+        result.warnings.append(
+            f"{entry.slug}: curated but no template at "
+            f"{template_path.relative_to(repo_root).as_posix()}"
+        )
+        return
+    template_text = template_path.read_text(encoding="utf-8")
+    for err in validate_against_template(template_text, text):
+        result.errors.append(f"{entry.slug}: template {err}")
 
 
 def _has_placeholder_warning(text: str) -> bool:

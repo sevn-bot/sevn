@@ -45,6 +45,24 @@ docs/brand/
 
 The pipeline **never overwrites** curated bodies during `make readme`, `make readme-scaffold`, `sevn readme generate --all`, or the `sevn-readme-sync` pre-commit hook — those paths only refresh `_fingerprints.json` via `sevn readme fingerprint`. To regenerate a curated body deliberately, run `sevn readme update <slug> --force`. Non-curated READMEs use `sevn readme update <slug>` after source changes.
 
+### A1. Templates & agent curation (curated entries)
+
+Every curated entry maps to a **template** in [`_templates/`](_templates/) — `_templates/<slug>.md` by convention, or an explicit `template = "…"` manifest key. Templates pin the *outline* (the required heading skeleton) and are validated by `sevn readme check`: the README must contain every template heading, at the same level, in the same order (a subsequence — extra per-module `###` sections are allowed). See [`_templates/README.md`](_templates/README.md) for the markup contract (`<!-- fill: … -->` guidance, `<!-- generated -->` pipeline-owned regions, `# <Title>` wildcards).
+
+Rather than hand-editing curated prose after a code change, drive the **`readme-curator`** agent:
+
+```
+sevn readme curate <slug>            # feeds the source diff + template + README to cursor-agent/claude, then validates
+sevn readme curate <slug> --dry-run  # print the assembled prompt only (no runner)
+make readme-curate SLUG=<slug>       # curate + git add
+```
+
+The runner is pluggable (auto-detects `cursor-agent`/`claude`; override with `--runner` or `SEVN_README_RUNNER`). The `sevn-readme-sync` pre-commit hook, when a curated slug's source is staged, runs the curator **inline** (auto-edit & stage) and re-stamps the fingerprint. Controls:
+
+- `SEVN_README_AGENT=0` — skip the agent, stamp-only (the pre-`curate` behaviour).
+- `SEVN_README_AGENT=strict` — fail the commit on agent error or template drift.
+- When no runner is available (offline / CLI missing) or the agent errors, the hook falls back to a fingerprint-only stamp — curated prose is never clobbered, and the commit proceeds.
+
 ---
 
 ## B. Root README skeleton (`profile: root`)
@@ -260,7 +278,9 @@ Ships in the wheel; unit-tested; invoked by `sevn readme` CLI (W3). The Claude s
 | `fingerprint.py` | Compute/read/write source fingerprints; `_fingerprints.json` I/O. |
 | `providers.py` | LLM abstraction: **offline** (template-only) + **llm** via egress proxy + `Transport`. Generator **never** reads provider API keys. |
 | `render.py` | Section-by-section render → assemble → write; picks template by profile; GitHub-safe allowlist (§E). |
-| `check.py` | Structure/validity per profile + staleness gate (W4). |
+| `check.py` | Structure/validity per profile + staleness gate (W4) + curated template validation (§A1). |
+| `templates.py` | Per-README outline validation against `docs/readmes/_templates/<slug>.md` (§A1). |
+| `curate.py` | Agent-driven curation: source diff → prompt → pluggable runner (`cursor-agent`/`claude`) → validate (§A1). |
 | `templates/` | Jinja2: `root.md.j2`, `subsystem.md.j2`, `index.md.j2`, `catalog.md.j2`, `guide.md.j2`, `freeform.md.j2`. |
 | `prompts/` | One file per section/tier (not hardcoded in Python). |
 
@@ -374,6 +394,7 @@ Operator preview of the root brand header: `docs/readmes/_mock-root-header.md`.
 
 | Date | Wave | Change |
 |------|------|--------|
+| 2026-07-13 | W9 | §A1 curated templates (`_templates/`) + `templates.py` validation in the gate; `sevn readme curate` + `readme-curator` agent; pre-commit auto-edit & stage with `SEVN_README_AGENT` controls. |
 | 2026-07-13 | W6 | §B live CI badge; §C0 root Summary exemption; §F module table (`render.py` owns §E checks); prompt-wiring table matches D15 profile map. |
 | 2026-07-13 | W2 | §A curated flag semantics, fingerprint-only refresh, header stamp split. |
 | 2026-06-13 | W0 | Initial standard from merged references + wave plan §A–F. |

@@ -20,6 +20,7 @@ from sevn.cli.gateway_client import resolve_proxy_base_url
 from sevn.cli.repo_sync import RepoSyncError, resolve_sevn_repo_root
 from sevn.cli.workspace import load_bound_workspace
 from sevn.docs.readme.check import check_readme_tree
+from sevn.docs.readme.curate import curate_entry
 from sevn.docs.readme.fingerprint import (
     default_fingerprints_path,
     stamp_entry,
@@ -138,6 +139,27 @@ def _resolve_slug(manifest: ReadmeManifest, slug_or_path: str) -> str:
             return entry.slug
     typer.secho(f"no manifest entry for path or slug: {slug_or_path!r}", err=True)
     raise typer.Exit(2)
+
+
+def _git_add(repo_root: Path, rel_path: str) -> None:
+    """Stage ``rel_path`` in the repository (best-effort).
+
+    Args:
+        repo_root (Path): Repository root.
+        rel_path (str): Repo-relative path to stage.
+
+    Examples:
+        >>> import tempfile
+        >>> _git_add(Path(tempfile.mkdtemp()), "README.md") is None
+        True
+    """
+    import subprocess  # local import: only needed on the --stage path
+
+    subprocess.run(
+        ["git", "-C", str(repo_root), "add", "--", rel_path],
+        capture_output=True,
+        check=False,
+    )
 
 
 def _generation_order(manifest: ReadmeManifest, slug: str | None) -> list[ReadmeEntry]:
@@ -375,6 +397,87 @@ def register(app: typer.Typer) -> None:
             )
             typer.echo(f"stamped {slug}")
         raise typer.Exit(0)
+
+    @readme_app.command("curate")
+    def curate_cmd(
+        slug_or_path: str = typer.Argument(..., help="Curated manifest slug or README path."),
+        runner: str = typer.Option(
+            "auto",
+            "--runner",
+            help="Agent runner: auto | cursor | claude (or SEVN_README_RUNNER).",
+        ),
+        base: str | None = typer.Option(
+            None,
+            "--base",
+            help="Diff source_globs against this git ref (default: unstaged worktree).",
+        ),
+        staged: bool = typer.Option(
+            False,
+            "--staged",
+            help="Diff the staged index instead of the worktree (pre-commit use).",
+        ),
+        model: str | None = typer.Option(None, "--model", help="Override the runner model."),
+        dry_run: bool = typer.Option(
+            False,
+            "--dry-run",
+            "--print-prompt",
+            help="Print the assembled prompt and exit without invoking a runner.",
+        ),
+        stage: bool = typer.Option(
+            False,
+            "--stage",
+            help="`git add` the README when the agent updates it.",
+        ),
+        no_validate: bool = typer.Option(
+            False,
+            "--no-validate",
+            help="Skip template validation of the curated result.",
+        ),
+        repo: Path | None = typer.Option(
+            None,
+            "--repo",
+            help="sevn.bot checkout root (default: SEVN_REPO_ROOT or walk up from cwd).",
+        ),
+    ) -> None:
+        """Drive an agent to update a curated README from its source diff."""
+        repo_root = _resolve_repo_root(repo)
+        _, settings = _load_workspace_settings(repo_root)
+        if not settings.enabled:
+            typer.echo("docs.readme.enabled is false — skipping curate")
+            raise typer.Exit(0)
+
+        manifest = load_manifest(_manifest_path(repo_root, settings))
+        slug = _resolve_slug(manifest, slug_or_path)
+        entry = get_entry(manifest, slug)
+        if not entry.curated:
+            typer.secho(
+                f"{slug} is not curated — use `sevn readme update {slug}` instead", err=True
+            )
+            raise typer.Exit(2)
+
+        result = curate_entry(
+            repo_root,
+            entry,
+            base=base,
+            staged=staged,
+            runner_preference=runner,
+            model=model,
+            dry_run=dry_run,
+            validate=not no_validate,
+        )
+        if dry_run:
+            typer.echo(result.prompt)
+            raise typer.Exit(0)
+
+        for err in result.template_errors:
+            typer.secho(f"{slug}: template {err}", err=True)
+        typer.echo(f"curate {slug}: {result.status} ({result.detail})")
+
+        if result.status == "updated" and stage:
+            _git_add(repo_root, entry.output)
+            typer.echo(f"staged {entry.output}")
+
+        raise typer.Exit(0 if result.ok else 1)
 
     @readme_app.command("update")
     def update(
