@@ -22,6 +22,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- README offline scaffold quality: turn-spine paragraph gated on `turn_spine`, sentence-boundary truncation, true path-list remainders, docstring-derived module inventory, and narrowed PLACEHOLDER warnings
 - README pipeline emits file-relative links and retargets manifest spec paths to `about-sevn.bot/specs/`; link checker resolves paths from each README directory only
 
 ### Deprecated

@@ -19,11 +19,11 @@ Deliver a single scanner subsystem that runs in the gateway process so hostile c
 
 ### Components and layout
 
-Implementation lives under `src/sevn/security/`. The package contains 32 Python module(s); primary entry points include `src/sevn/security/__init__.py`, `src/sevn/security/egress_firewall.py`, `src/sevn/security/llm_guard_scanner.py`, `src/sevn/security/llmignore.py`, and 2 more.
+Implementation lives under `src/sevn/security/`. The package contains 32 Python module(s); primary entry points include `src/sevn/security/__init__.py`, `src/sevn/security/egress_firewall.py`, `src/sevn/security/llm_guard_scanner.py`, `src/sevn/security/llmignore.py`, `src/sevn/security/oauth/__init__.py`, `src/sevn/security/oauth/authorize.py`, and 26 more.
 
 ### Data and control flow
 
-Security scanner sits in the sevn.bot turn spine: a channel delivers a message, the gateway normalises it, triage routes work to the right executor, and the reply returns through the same channel adapter. This subsystem owns the responsibilities described in the manifest summary and defers provider API calls to the paired egress proxy (keys never load in the gateway process).
+Security scanner is a supporting subsystem; see Level 3 for the module-level flow.
 
 ### Configuration
 
@@ -48,66 +48,90 @@ Primary source tree: `src/sevn/security/` (32 Python files). Normative design: `
 
 ### Module inventory
 
-- `src/sevn/security/__init__.py` — """Security policy and sandboxing (''about-sevn.bot/specs/08-sandbox.md'').
-- `src/sevn/security/egress_firewall.py` — """Egress posture helpers inside sandbox namespaces (''about-sevn.bot/specs/08-sandbox.md'' §4.2, §8.2).
-- `src/sevn/security/llm_guard_scanner.py` — """Async LLM Guard scanner entrypoints (''about-sevn.bot/specs/09-security-scanner.md'' §2.1).
-- `src/sevn/security/llmignore.py` — """''.llmignore/'' layout helpers (''about-sevn.bot/specs/09-security-scanner.md'' §2.2, §4.4).
-- `src/sevn/security/oauth/__init__.py` — """Codex (ChatGPT subscription) OAuth for sevn LLM transports (W0 scaffold).
-- `src/sevn/security/oauth/authorize.py` — """Authorize-URL builder for Codex OAuth (W2).
-- `src/sevn/security/oauth/callback.py` — """Local OAuth callback server for Codex PKCE (W2, D5).
-- `src/sevn/security/oauth/constants.py` — """OpenAI Codex OAuth constants (locked at W0 — ''codex-oauth-subscription'' plan).
-- `src/sevn/security/oauth/credential.py` — """Codex OAuth credential model and secret-alias helpers (W0 scaffold).
-- `src/sevn/security/oauth/design.py` — """Locked Codex OAuth design decisions (W0 gate — ''codex-oauth-subscription'' plan).
-- `src/sevn/security/oauth/login_flow.py` — """Codex OAuth login completion helpers (W4 — CLI + onboarding).
-- `src/sevn/security/oauth/pkce.py` — """PKCE pair generation for Codex OAuth (W2).
+- `src/sevn/security/__init__.py` — Security policy and sandboxing (''about-sevn.bot/specs/08-sandbox.md'').
+- `src/sevn/security/egress_firewall.py` — Egress posture helpers inside sandbox namespaces (''about-sevn.bot/specs/08-sandbox.md'' §4.2, §8.2).
+- `src/sevn/security/llm_guard_scanner.py` — Async LLM Guard scanner entrypoints (''about-sevn.bot/specs/09-security-scanner.md'' §2.1).
+- `src/sevn/security/llmignore.py` — ''.llmignore/'' layout helpers (''about-sevn.bot/specs/09-security-scanner.md'' §2.2, §4.4).
+- `src/sevn/security/oauth/__init__.py` — Codex (ChatGPT subscription) OAuth for sevn LLM transports (W0 scaffold).
+- `src/sevn/security/oauth/authorize.py` — Authorize-URL builder for Codex OAuth (W2).
+- `src/sevn/security/oauth/callback.py` — Local OAuth callback server for Codex PKCE (W2, D5).
+- `src/sevn/security/oauth/constants.py` — OpenAI Codex OAuth constants (locked at W0 — ''codex-oauth-subscription'' plan).
+- `src/sevn/security/oauth/credential.py` — Codex OAuth credential model and secret-alias helpers (W0 scaffold).
+- `src/sevn/security/oauth/design.py` — Locked Codex OAuth design decisions (W0 gate — ''codex-oauth-subscription'' plan).
+- `src/sevn/security/oauth/login_flow.py` — Codex OAuth login completion helpers (W4 — CLI + onboarding).
+- `src/sevn/security/oauth/pkce.py` — PKCE pair generation for Codex OAuth (W2).
 - … and 20 more Python modules
+
+### Package init (`src/sevn/security/__init__.py`)
+
+See `src/sevn/security/__init__.py` for implementation details.
 
 ### Egress Firewall (`src/sevn/security/egress_firewall.py`)
 
 Public entry points:
-- `write_macos_pf_ruleset` — see `src/sevn/security/egress_firewall.py`
-- `egress_firewall_noop` — see `src/sevn/security/egress_firewall.py`
-- `write_linux_iptables_ruleset` — see `src/sevn/security/egress_firewall.py`
-- `apply_namespace_egress_firewall` — see `src/sevn/security/egress_firewall.py`
+- `write_macos_pf_ruleset`
+- `egress_firewall_noop`
+- `write_linux_iptables_ruleset`
+- `apply_namespace_egress_firewall`
 
 ### Llm Guard Scanner (`src/sevn/security/llm_guard_scanner.py`)
 
 Public entry points:
-- `LLMGuardScanner.scan_inbound` — see `src/sevn/security/llm_guard_scanner.py`
-- `LLMGuardScanner.scan_tool_result` — see `src/sevn/security/llm_guard_scanner.py`
-- `LLMGuardScanner.scan_feedback_body` — see `src/sevn/security/llm_guard_scanner.py`
-- `scan_patch_diff` — see `src/sevn/security/llm_guard_scanner.py`
+- `LLMGuardScanner.scan_inbound`
+- `LLMGuardScanner.scan_tool_result`
+- `LLMGuardScanner.scan_feedback_body`
+- `scan_patch_diff`
 
 ### Llmignore (`src/sevn/security/llmignore.py`)
 
 Public entry points:
-- `resolve_llmignore_root` — see `src/sevn/security/llmignore.py`
-- `ensure_llmignore_layout` — see `src/sevn/security/llmignore.py`
-- `is_llmignored` — see `src/sevn/security/llmignore.py`
-- `sweep_expired` — see `src/sevn/security/llmignore.py`
-- `assert_shadow_workspace_excludes_llmignore` — see `src/sevn/security/llmignore.py`
-- `write_blocked_inbound` — see `src/sevn/security/llmignore.py`
-- `write_blocked_feedback` — see `src/sevn/security/llmignore.py`
+- `resolve_llmignore_root`
+- `ensure_llmignore_layout`
+- `is_llmignored`
+- `sweep_expired`
+- `assert_shadow_workspace_excludes_llmignore`
+- `write_blocked_inbound`
+- `write_blocked_feedback`
+
+### Package init (`src/sevn/security/oauth/__init__.py`)
+
+See `src/sevn/security/oauth/__init__.py` for implementation details.
 
 ### Authorize (`src/sevn/security/oauth/authorize.py`)
 
 Public entry points:
-- `build_authorization_flow` — see `src/sevn/security/oauth/authorize.py`
+- `build_authorization_flow`
 
 ### Callback (`src/sevn/security/oauth/callback.py`)
 
 Public entry points:
-- `OAuthCallbackServer.ready` — see `src/sevn/security/oauth/callback.py`
-- `OAuthCallbackServer.wait_for_code` — see `src/sevn/security/oauth/callback.py`
-- `OAuthCallbackServer.close` — see `src/sevn/security/oauth/callback.py`
-- `parse_pasted_oauth_redirect` — see `src/sevn/security/oauth/callback.py`
-- `start_local_callback_server` — see `src/sevn/security/oauth/callback.py`
+- `OAuthCallbackServer.ready`
+- `OAuthCallbackServer.wait_for_code`
+- `OAuthCallbackServer.close`
+- `parse_pasted_oauth_redirect`
+- `start_local_callback_server`
+
+### Constants (`src/sevn/security/oauth/constants.py`)
+
+See `src/sevn/security/oauth/constants.py` for implementation details.
 
 ### Credential (`src/sevn/security/oauth/credential.py`)
 
 Public entry points:
-- `resolution_probe_credential` — see `src/sevn/security/oauth/credential.py`
-- `oauth_openai_secret_alias` — see `src/sevn/security/oauth/credential.py`
+- `resolution_probe_credential`
+- `oauth_openai_secret_alias`
+
+### Design (`src/sevn/security/oauth/design.py`)
+
+See `src/sevn/security/oauth/design.py` for implementation details.
+
+### Login Flow (`src/sevn/security/oauth/login_flow.py`)
+
+See `src/sevn/security/oauth/login_flow.py` for implementation details.
+
+### Pkce (`src/sevn/security/oauth/pkce.py`)
+
+See `src/sevn/security/oauth/pkce.py` for implementation details.
 
 ### Additional modules
 

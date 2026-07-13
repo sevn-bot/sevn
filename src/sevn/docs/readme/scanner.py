@@ -31,6 +31,7 @@ from loguru import logger
 from sevn.docs.readme.brand import load_root_intro_lines
 from sevn.docs.readme.fingerprint import expand_source_globs
 from sevn.docs.readme.manifest import ReadmeEntry
+from sevn.docs.readme.model import _first_sentence, truncate_at_sentence
 
 _SPEC_HEADING = re.compile(r"^#{1,3}\s+", re.MULTILINE)
 
@@ -58,6 +59,7 @@ def scan_repo_context(repo_root: Path, entry: ReadmeEntry) -> dict[str, Any]:
     source_files = [p.relative_to(repo_root).as_posix() for p in source_paths]
     py_files = [rel for rel in source_files if rel.endswith(".py")]
 
+    source_roots = _source_dir_roots(entry.source_globs)
     context: dict[str, Any] = {
         "slug": entry.slug,
         "profile": entry.profile,
@@ -68,6 +70,7 @@ def scan_repo_context(repo_root: Path, entry: ReadmeEntry) -> dict[str, Any]:
         "specs": list(entry.specs),
         "source_globs": list(entry.source_globs),
         "source_dir": _primary_source_dir(entry.source_globs),
+        "source_roots": source_roots,
         "source_files": source_files,
         "source_py_files": py_files,
         "source_excerpt": _build_source_excerpt(repo_root, py_files),
@@ -212,7 +215,10 @@ def _read_spec_excerpt(
             continue
         chunk = f"From {spec_rel}:\n{prose}"
         if len(chunk) > remaining:
-            chunk = chunk[:remaining].rsplit("\n", maxsplit=1)[0]
+            trimmed = truncate_at_sentence(chunk, remaining)
+            if not trimmed:
+                continue
+            chunk = trimmed
         chunks.append(chunk)
         remaining -= len(chunk)
         if remaining <= 0:
@@ -310,6 +316,72 @@ def _first_spec_prose(body: str, *, max_lines: int = 40) -> str:
     return "\n".join(lines).strip()
 
 
+def _glob_dir_prefix(pattern: str) -> str:
+    """Extract a directory prefix from a manifest glob pattern.
+
+        Args:
+    pattern (str): Manifest ``source_globs`` entry.
+
+        Returns:
+            str: Repo-relative directory prefix ending with ``/``.
+
+        Examples:
+            >>> _glob_dir_prefix("src/sevn/gateway/**")
+            'src/sevn/gateway/'
+    """
+    if pattern.endswith("/**"):
+        return pattern[:-3] + "/"
+    prefix = pattern.split("*", maxsplit=1)[0]
+    if prefix.endswith("/"):
+        return prefix
+    if "/" in prefix:
+        return prefix.rsplit("/", maxsplit=1)[0] + "/"
+    return prefix + "/"
+
+
+def _common_path_prefix(paths: list[str]) -> str:
+    """Return the longest shared ``/``-delimited prefix among directory paths.
+
+        Args:
+    paths (list[str]): Directory prefixes.
+
+        Returns:
+            str: Common prefix ending with ``/``, or empty when none.
+
+        Examples:
+            >>> _common_path_prefix(["src/sevn/gateway/", "src/sevn/agent/"])
+            'src/sevn/'
+    """
+    normalized = [p.strip("/") for p in paths if p.strip("/")]
+    if not normalized:
+        return ""
+    split = [p.split("/") for p in normalized]
+    common: list[str] = []
+    for parts in zip(*split, strict=False):
+        if len(set(parts)) == 1:
+            common.append(parts[0])
+        else:
+            break
+    return "/".join(common) + "/" if common else ""
+
+
+def _source_dir_roots(source_globs: tuple[str, ...]) -> list[str]:
+    """List distinct source-tree roots referenced by manifest globs.
+
+        Args:
+    source_globs (tuple[str, ...]): Manifest ``source_globs`` patterns.
+
+        Returns:
+            list[str]: Sorted unique directory prefixes.
+
+        Examples:
+            >>> _source_dir_roots(("src/sevn/gateway/**", "infra/**"))
+            ['infra/', 'src/sevn/gateway/']
+    """
+    roots = {_glob_dir_prefix(pattern) for pattern in source_globs}
+    return sorted(roots)
+
+
 def _primary_source_dir(source_globs: tuple[str, ...]) -> str:
     """Pick a badge/link source directory from manifest globs.
 
@@ -322,24 +394,22 @@ def _primary_source_dir(source_globs: tuple[str, ...]) -> str:
         Examples:
             >>> _primary_source_dir(("src/sevn/gateway/**",))
             'src/sevn/gateway/'
+            >>> _primary_source_dir(("src/sevn/gateway/**", "infra/**"))
+            'src/sevn/'
     """
-    for pattern in source_globs:
-        if pattern.startswith("src/sevn/"):
-            head = pattern.split("/", maxsplit=3)
-            if len(head) >= 3:
-                return f"{head[0]}/{head[1]}/{head[2]}/"
-        if "/" not in pattern:
-            continue
-        prefix = pattern.split("*", maxsplit=1)[0]
-        if prefix.endswith("/"):
-            return prefix
-    if source_globs:
-        first = source_globs[0]
-        if first.endswith("/**"):
-            return first[:-3]
-        if "/" in first:
-            return first.rsplit("/", maxsplit=1)[0] + "/"
-    return "src/sevn/"
+    dirs = _source_dir_roots(source_globs)
+    if not dirs:
+        return "src/sevn/"
+    if len(dirs) == 1:
+        return dirs[0]
+    common = _common_path_prefix(dirs)
+    if common:
+        return common
+    if any(d.startswith("src/sevn/") for d in dirs):
+        return "src/sevn/"
+    if all(d.startswith("src/") for d in dirs):
+        return "src/"
+    return dirs[0]
 
 
 def _read_pyproject(repo_root: Path) -> dict[str, str]:
@@ -496,6 +566,36 @@ def _rewrite_design_doc_refs(text: str) -> str:
     return _PLAN_PRD_REF.sub("the design docs", text)
 
 
+def _first_docstring_sentence(text: str) -> str:
+    """Return the first sentence from a module docstring or leading comment line.
+
+        Args:
+    text (str): Python source text.
+
+        Returns:
+            str: First sentence without raw quote characters.
+
+        Examples:
+            >>> _first_docstring_sentence('\"\"\"First sentence only.\"\"\"\\n')
+            'First sentence only.'
+    """
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        tree = None
+    doc = ast.get_docstring(tree) if tree is not None else None
+    if doc:
+        sentence = _first_sentence(doc)
+        if sentence:
+            if len(sentence) <= 200:
+                return sentence
+            trimmed = truncate_at_sentence(sentence, 200)
+            return trimmed or sentence[:200]
+    first = next((ln.strip() for ln in text.splitlines() if ln.strip()), "")
+    cleaned = first.strip("\"'").replace('"""', "").replace("'''", "")
+    return truncate_at_sentence(cleaned, 200) or cleaned
+
+
 def _build_source_excerpt(repo_root: Path, py_files: list[str], *, max_files: int = 12) -> str:
     """Build a compact excerpt listing key Python modules.
 
@@ -525,9 +625,12 @@ def _build_source_excerpt(repo_root: Path, py_files: list[str], *, max_files: in
         except OSError:
             logger.warning("readme_scanner: unable to read source file at {}", path)
             continue
-        first = next((ln.strip() for ln in text.splitlines() if ln.strip()), "")
-        safe_first = _rewrite_design_doc_refs(first.replace("`", "'")[:120])
-        lines.append(f"- `{rel}` — {safe_first}")
+        summary = _first_docstring_sentence(text)
+        safe_summary = _rewrite_design_doc_refs(summary.replace("`", "'"))
+        if safe_summary:
+            lines.append(f"- `{rel}` — {safe_summary}")
+        else:
+            lines.append(f"- `{rel}`")
     if len(py_files) > max_files:
         lines.append(f"- … and {len(py_files) - max_files} more Python modules")
     return "\n".join(lines)

@@ -13,17 +13,15 @@
 
 In everyday use, storage helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
 
-Own application persistence: connection setup (WAL, foreign keys), versioned migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence contracts for crash-resume and (w
-
 ## Level 2 — How it works (technical)
 
 ### Components and layout
 
-Implementation lives under `src/sevn/storage/`. The package contains 7 Python module(s); primary entry points include `src/sevn/storage/__init__.py`, `src/sevn/storage/d1.py`, `src/sevn/storage/d1_backend.py`, `src/sevn/storage/errors.py`, and 2 more.
+Implementation lives under `src/sevn/storage/`. The package contains 7 Python module(s); primary entry points include `src/sevn/storage/__init__.py`, `src/sevn/storage/d1.py`, `src/sevn/storage/d1_backend.py`, `src/sevn/storage/errors.py`, `src/sevn/storage/migrate.py`, `src/sevn/storage/paths.py`, and 1 more.
 
 ### Data and control flow
 
-Storage sits in the sevn.bot turn spine: a channel delivers a message, the gateway normalises it, triage routes work to the right executor, and the reply returns through the same channel adapter. This subsystem owns the responsibilities described in the manifest summary and defers provider API calls to the paired egress proxy (keys never load in the gateway process).
+Storage is a supporting subsystem; see Level 3 for the module-level flow.
 
 ### Configuration
 
@@ -37,60 +35,63 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 - `src/sevn/storage/paths.py` — `sevn_db_path`, `traces_sqlite_path`, `turn_bundles_dir`, `turn_bundle_day_slug`
 - `src/sevn/storage/sqlite.py` — `connect_sqlite`, `open_sevn_sqlite`
 
-### Spec context
-
-From about-sevn.bot/specs/03-storage.md:
-Own application persistence: connection setup (WAL, foreign keys), versioned migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence contracts for crash-resume and (w
-
 ## Level 3 — Deep dive (low-level, technical)
 
 Primary source tree: `src/sevn/storage/` (7 Python files). Normative design: `about-sevn.bot/specs/03-storage.md`.
 
 ### Module inventory
 
-- `src/sevn/storage/__init__.py` — """Workspace persistence — SQLite paths, connections, migrations.
-- `src/sevn/storage/d1.py` — """Cloudflare D1 backend protocol sketch ('about-sevn.bot/specs/03-storage.md' §3.3).
-- `src/sevn/storage/d1_backend.py` — """Cloudflare D1 optional backend ('about-sevn.bot/specs/03-storage.md' §3.3).
-- `src/sevn/storage/errors.py` — """Storage layer exceptions.
-- `src/sevn/storage/migrate.py` — """Versioned SQLite migrations for ''sevn.db''.
-- `src/sevn/storage/paths.py` — """Canonical paths for workspace SQLite files.
-- `src/sevn/storage/sqlite.py` — """SQLite connection helpers for workspace databases.
+- `src/sevn/storage/__init__.py` — Workspace persistence — SQLite paths, connections, migrations.
+- `src/sevn/storage/d1.py` — Cloudflare D1 backend protocol sketch ('about-sevn.bot/specs/03-storage.md' §3.3).
+- `src/sevn/storage/d1_backend.py` — Cloudflare D1 optional backend ('about-sevn.bot/specs/03-storage.md' §3.3).
+- `src/sevn/storage/errors.py` — Storage layer exceptions.
+- `src/sevn/storage/migrate.py` — Versioned SQLite migrations for ''sevn.db''.
+- `src/sevn/storage/paths.py` — Canonical paths for workspace SQLite files.
+- `src/sevn/storage/sqlite.py` — SQLite connection helpers for workspace databases.
+
+### Package init (`src/sevn/storage/__init__.py`)
+
+See `src/sevn/storage/__init__.py` for implementation details.
 
 ### D1 (`src/sevn/storage/d1.py`)
 
 Public entry points:
-- `D1Backend.apply_migration` — see `src/sevn/storage/d1.py`
-- `D1Backend.query` — see `src/sevn/storage/d1.py`
+- `D1Backend.apply_migration`
+- `D1Backend.query`
 
 ### D1 Backend (`src/sevn/storage/d1_backend.py`)
 
 Public entry points:
-- `D1StorageBackend.ping` — see `src/sevn/storage/d1_backend.py`
-- `D1StorageBackend.apply_migration` — see `src/sevn/storage/d1_backend.py`
-- `D1StorageBackend.query` — see `src/sevn/storage/d1_backend.py`
+- `D1StorageBackend.ping`
+- `D1StorageBackend.apply_migration`
+- `D1StorageBackend.query`
+
+### Errors (`src/sevn/storage/errors.py`)
+
+See `src/sevn/storage/errors.py` for implementation details.
 
 ### Migrate (`src/sevn/storage/migrate.py`)
 
 Public entry points:
-- `apply_migrations` — see `src/sevn/storage/migrate.py`
+- `apply_migrations`
 
 ### Paths (`src/sevn/storage/paths.py`)
 
 Public entry points:
-- `sevn_db_path` — see `src/sevn/storage/paths.py`
-- `traces_sqlite_path` — see `src/sevn/storage/paths.py`
-- `turn_bundles_dir` — see `src/sevn/storage/paths.py`
-- `turn_bundle_day_slug` — see `src/sevn/storage/paths.py`
-- `is_turn_bundle_day_slug` — see `src/sevn/storage/paths.py`
-- `turn_bundle_day_dir` — see `src/sevn/storage/paths.py`
-- `turn_bundle_index_path` — see `src/sevn/storage/paths.py`
-- `turn_bundle_file_path` — see `src/sevn/storage/paths.py`
+- `sevn_db_path`
+- `traces_sqlite_path`
+- `turn_bundles_dir`
+- `turn_bundle_day_slug`
+- `is_turn_bundle_day_slug`
+- `turn_bundle_day_dir`
+- `turn_bundle_index_path`
+- `turn_bundle_file_path`
 
 ### Sqlite (`src/sevn/storage/sqlite.py`)
 
 Public entry points:
-- `connect_sqlite` — see `src/sevn/storage/sqlite.py`
-- `open_sevn_sqlite` — see `src/sevn/storage/sqlite.py`
+- `connect_sqlite`
+- `open_sevn_sqlite`
 
 ### Extension and invariants
 

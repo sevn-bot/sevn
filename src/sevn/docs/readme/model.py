@@ -10,6 +10,7 @@ Exports:
     assemble_template_context — map assembly + scan context to template vars.
     merge_section — copy assembly with one section replaced.
     format_path_list — comma-separated backtick path list for prose.
+    truncate_at_sentence — truncate prose at a sentence boundary within a limit.
     format_module_symbols_for_prompt — JSON symbol map for LLM prompts.
 
 Examples:
@@ -21,12 +22,39 @@ Examples:
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from sevn.docs.readme.links import readme_relative_href
 from sevn.docs.readme.manifest import ReadmeEntry
+
+_SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s")
+_ABBREV_BEFORE_PERIOD = frozenset(
+    {
+        "incl",
+        "eg",
+        "ie",
+        "etc",
+        "vs",
+        "mr",
+        "mrs",
+        "dr",
+        "sr",
+        "jr",
+        "st",
+        "fig",
+        "dept",
+        "approx",
+        "min",
+        "max",
+        "ext",
+        "vol",
+        "ref",
+        "al",
+    }
+)
 
 _ROOT_HIGHLIGHTS: tuple[str, ...] = (
     "Chat on Telegram, in your browser, or by voice — one assistant, many ways to reach it",
@@ -501,15 +529,14 @@ def _build_subsystem_summary(entry: ReadmeEntry, spec_excerpt: str) -> str:
     prose = spec_excerpt.split("\n\n")[0]
     if prose.startswith("From "):
         prose = prose.split(":", maxsplit=1)[-1].strip()
-    first_sentence = prose.split(".", maxsplit=1)[0].strip()
+    elongation = truncate_at_sentence(prose, 400)
     if (
-        first_sentence
-        and len(first_sentence) > 20
-        and first_sentence not in entry.summary
-        and not first_sentence.startswith("Offline scaffold")
-        and prose.rstrip().endswith((".", "!", "?"))
+        elongation
+        and len(elongation) > 20
+        and elongation not in entry.summary
+        and not elongation.startswith("Offline scaffold")
     ):
-        return f"{entry.summary} {first_sentence}."
+        return f"{entry.summary} {elongation}"
     return entry.summary
 
 
@@ -550,8 +577,9 @@ def _build_level1_overview(entry: ReadmeEntry, spec_excerpt: str) -> str:
                 snippet = snippet.split(":", maxsplit=1)[-1].strip()
                 break
         if len(snippet) > 40:
-            trimmed = snippet[:600].rstrip()
-            paragraphs.append(trimmed + ("…" if len(snippet) > 600 else ""))
+            trimmed = truncate_at_sentence(snippet, 600)
+            if trimmed:
+                paragraphs.append(trimmed)
     return "\n\n".join(paragraphs)
 
 
@@ -583,18 +611,39 @@ def _build_level2_how_it_works(
             True
     """
     source_dir = str(scan.get("source_dir", "src/sevn/"))
+    source_roots = list(scan.get("source_roots", ()))
     module_symbols: dict[str, list[str]] = scan.get("module_symbols", {})
+    if len(source_roots) > 1:
+        layout = (
+            f"### Components and layout\n\n"
+            f"Implementation spans {_format_path_list(source_roots, max_items=len(source_roots))}. "
+            f"The package contains {len(py_files)} Python module(s); primary entry points "
+            f"include {_format_path_list(py_files, max_items=6)}."
+        )
+    else:
+        layout = (
+            f"### Components and layout\n\n"
+            f"Implementation lives under `{source_dir}`. "
+            f"The package contains {len(py_files)} Python module(s); primary entry points "
+            f"include {_format_path_list(py_files, max_items=6)}."
+        )
+    if entry.turn_spine:
+        flow = (
+            f"### Data and control flow\n\n"
+            f"{entry.title} sits in the sevn.bot turn spine: a channel delivers a message, "
+            f"the gateway normalises it, triage routes work to the right executor, and the "
+            f"reply returns through the same channel adapter. This subsystem owns the "
+            f"responsibilities described in the manifest summary and defers provider API "
+            f"calls to the paired egress proxy (keys never load in the gateway process)."
+        )
+    else:
+        flow = (
+            f"### Data and control flow\n\n"
+            f"{entry.title} is a supporting subsystem; see Level 3 for the module-level flow."
+        )
     parts = [
-        f"### Components and layout\n\n"
-        f"Implementation lives under `{source_dir}`. "
-        f"The package contains {len(py_files)} Python module(s); primary entry points "
-        f"include {_format_path_list(py_files[:6])}.",
-        f"### Data and control flow\n\n"
-        f"{entry.title} sits in the sevn.bot turn spine: a channel delivers a message, "
-        f"the gateway normalises it, triage routes work to the right executor, and the "
-        f"reply returns through the same channel adapter. This subsystem owns the "
-        f"responsibilities described in the manifest summary and defers provider API "
-        f"calls to the paired egress proxy (keys never load in the gateway process).",
+        layout,
+        flow,
         f"### Configuration\n\n"
         f"Operator settings come from `sevn.json` in the workspace. Related normative "
         f"specs: {_format_path_list(list(entry.specs))}. "
@@ -607,7 +656,9 @@ def _build_level2_how_it_works(
             symbol_lines.append(f"- `{rel}` — {', '.join(f'`{s}`' for s in symbols[:4])}")
         parts.append("### Key modules\n\n" + "\n".join(symbol_lines))
     if spec_excerpt:
-        parts.append(f"### Spec context\n\n{spec_excerpt[:1200]}")
+        spec_context = truncate_at_sentence(spec_excerpt, 1200)
+        if spec_context:
+            parts.append(f"### Spec context\n\n{spec_context}")
     return "\n\n".join(parts)
 
 
@@ -647,13 +698,18 @@ def _build_level3_deep_dive(
     ]
     if scan.get("source_excerpt"):
         sections.append("### Module inventory\n\n" + str(scan["source_excerpt"]))
-    for rel, symbols in list(module_symbols.items())[:12]:
-        heading = rel.rsplit("/", maxsplit=1)[-1].removesuffix(".py").replace("_", " ").title()
-        lines = [f"### {heading} (`{rel}`)", ""]
+    for rel in py_files[:12]:
+        symbols = module_symbols.get(rel, [])
+        filename = rel.rsplit("/", maxsplit=1)[-1]
+        if filename == "__init__.py":
+            heading = f"Package init (`{rel}`)"
+        else:
+            heading = f"{filename.removesuffix('.py').replace('_', ' ').title()} (`{rel}`)"
+        lines = [f"### {heading}", ""]
         if symbols:
             lines.append("Public entry points:")
             for sym in symbols:
-                lines.append(f"- `{sym}` — see `{rel}`")
+                lines.append(f"- `{sym}`")
         else:
             lines.append(f"See `{rel}` for implementation details.")
         sections.append("\n".join(lines))
@@ -661,7 +717,7 @@ def _build_level3_deep_dive(
         sections.append(
             f"### Additional modules\n\n"
             f"{len(py_files) - 12} more Python files under `{source_dir}` — "
-            f"including {_format_path_list(py_files[12:16])}."
+            f"including {_format_path_list(py_files[12:16], max_items=4)}."
         )
     if entry.specs:
         sections.append(
@@ -691,6 +747,129 @@ def format_module_symbols_for_prompt(module_symbols: dict[str, list[str]]) -> st
     return json.dumps(module_symbols, indent=2, sort_keys=True)
 
 
+def _first_sentence(text: str) -> str:
+    """Return the first complete sentence from prose text.
+
+        Args:
+    text (str): Source prose.
+
+        Returns:
+            str: First sentence ending in ``.``, ``!``, or ``?``; empty when none.
+
+        Examples:
+            >>> _first_sentence("Hello world. More text.")
+            'Hello world.'
+    """
+    stripped = text.strip()
+    for match in _SENTENCE_BOUNDARY.finditer(stripped):
+        if not _is_sentence_boundary(stripped, match.start()):
+            continue
+        candidate = stripped[: match.start() + 1].strip()
+        if candidate and candidate[-1] in ".!?":
+            return candidate
+    return ""
+
+
+def truncate_at_sentence(text: str, limit: int) -> str:
+    """Return the longest leading sentence fragment that fits within ``limit``.
+
+        Args:
+    text (str): Source prose.
+    limit (int): Maximum character length for the returned fragment.
+
+        Returns:
+            str: Sentence ending in ``.``, ``!``, or ``?``; empty when none fits.
+
+        Examples:
+            >>> truncate_at_sentence("Hello world. More text.", 15)
+            'Hello world.'
+            >>> truncate_at_sentence("No sentence boundary at all", 12)
+            ''
+    """
+    if limit <= 0 or not text.strip():
+        return ""
+    stripped = text.strip()
+    if len(stripped) <= limit and stripped[-1] in ".!?":
+        return stripped
+    best = ""
+    for match in _SENTENCE_BOUNDARY.finditer(stripped):
+        end = match.start() + 1
+        if end > limit:
+            break
+        if not _is_sentence_boundary(stripped, match.start()):
+            continue
+        candidate = stripped[:end].strip()
+        if candidate and candidate[-1] in ".!?":
+            best = candidate
+    return best
+
+
+def _is_sentence_boundary(text: str, space_pos: int) -> bool:
+    """Return True when ``space_pos`` ends a real sentence (not an abbreviation).
+
+        Args:
+    text (str): Full prose string.
+    space_pos (int): Index of the whitespace after sentence punctuation.
+
+        Returns:
+            bool: True when the boundary is a sentence end.
+
+        Examples:
+            >>> _is_sentence_boundary("Items (incl. foo) and more. Extra", 24)
+            False
+    """
+    if space_pos < 1 or text[space_pos - 1] not in ".!?":
+        return False
+    punct_pos = space_pos - 1
+    word_start = punct_pos
+    while word_start > 0 and (text[word_start - 1].isalnum() or text[word_start - 1] == "."):
+        word_start -= 1
+    word = text[word_start:punct_pos].lower().rstrip(".")
+    return word not in _ABBREV_BEFORE_PERIOD
+
+
+def format_path_list(paths: list[str], *, max_items: int = 4) -> str:
+    """Format path list for inline prose.
+
+        Args:
+    paths (list[str]): Repo-relative paths.
+    max_items (int): Maximum paths to quote before summarizing the remainder.
+
+        Returns:
+            str: Comma-separated backtick paths with a true remainder count.
+
+        Examples:
+            >>> format_path_list(["a.py", "b.py"])
+            '`a.py`, `b.py`'
+            >>> format_path_list([f"m{i}.py" for i in range(114)], max_items=4)
+            '`m0.py`, `m1.py`, `m2.py`, `m3.py`, and 110 more'
+    """
+    if not paths:
+        return "(see source tree)"
+    quoted = [f"`{p}`" for p in paths[:max_items]]
+    remainder = len(paths) - max_items
+    if remainder > 0:
+        return ", ".join(quoted) + f", and {remainder} more"
+    return ", ".join(quoted)
+
+
+def _format_path_list(paths: list[str], *, max_items: int = 4) -> str:
+    """Backward-compatible alias for :func:`format_path_list`.
+
+        Args:
+    paths (list[str]): Repo-relative paths.
+    max_items (int): Maximum paths to quote before summarizing the remainder.
+
+        Returns:
+            str: Comma-separated backtick paths.
+
+        Examples:
+            >>> _format_path_list(["a.py"])
+            '`a.py`'
+    """
+    return format_path_list(paths, max_items=max_items)
+
+
 def _role_from_summary(summary: str) -> str:
     """Use the first sentence of the manifest summary as the role line.
 
@@ -706,40 +885,3 @@ def _role_from_summary(summary: str) -> str:
     """
     first = summary.split(".", maxsplit=1)[0].strip()
     return first or summary
-
-
-def format_path_list(paths: list[str]) -> str:
-    """Format path list for inline prose.
-
-        Args:
-    paths (list[str]): Repo-relative paths.
-
-        Returns:
-            str: Comma-separated backtick paths.
-
-        Examples:
-            >>> format_path_list(["a.py", "b.py"])
-            '`a.py`, `b.py`'
-    """
-    if not paths:
-        return "(see source tree)"
-    quoted = [f"`{p}`" for p in paths[:4]]
-    if len(paths) > 4:
-        return ", ".join(quoted) + f", and {len(paths) - 4} more"
-    return ", ".join(quoted)
-
-
-def _format_path_list(paths: list[str]) -> str:
-    """Backward-compatible alias for :func:`format_path_list`.
-
-        Args:
-    paths (list[str]): Repo-relative paths.
-
-        Returns:
-            str: Comma-separated backtick paths.
-
-        Examples:
-            >>> _format_path_list(["a.py"])
-            '`a.py`'
-    """
-    return format_path_list(paths)

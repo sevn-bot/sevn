@@ -13,17 +13,15 @@
 
 In everyday use, code understanding helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
 
-Deliver the code-orientation stack the coding companion PRD names: five orthogonal capabilities (MYCODE, Memgraph CGR, code-review-graph (SQLite MCP), roam-code, Graphify) that Triager and executors c
-
 ## Level 2 — How it works (technical)
 
 ### Components and layout
 
-Implementation lives under `src/sevn/code_understanding/`. The package contains 19 Python module(s); primary entry points include `src/sevn/code_understanding/__init__.py`, `src/sevn/code_understanding/bootstrap.py`, `src/sevn/code_understanding/cgr_adapter.py`, `src/sevn/code_understanding/cgr_runner.py`, and 2 more.
+Implementation lives under `src/sevn/code_understanding/`. The package contains 19 Python module(s); primary entry points include `src/sevn/code_understanding/__init__.py`, `src/sevn/code_understanding/bootstrap.py`, `src/sevn/code_understanding/cgr_adapter.py`, `src/sevn/code_understanding/cgr_runner.py`, `src/sevn/code_understanding/code_index.py`, `src/sevn/code_understanding/code_review_graph_mcp.py`, and 13 more.
 
 ### Data and control flow
 
-Code understanding sits in the sevn.bot turn spine: a channel delivers a message, the gateway normalises it, triage routes work to the right executor, and the reply returns through the same channel adapter. This subsystem owns the responsibilities described in the manifest summary and defers provider API calls to the paired egress proxy (keys never load in the gateway process).
+Code understanding is a supporting subsystem; see Level 3 for the module-level flow.
 
 ### Configuration
 
@@ -37,106 +35,113 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 - `src/sevn/code_understanding/code_index.py` — `collect_module_symbols`, `iter_python_files`, `audit_docstring_coverage`, `extract_listed_symbols`
 - `src/sevn/code_understanding/code_review_graph_mcp.py` — `code_review_graph_mcp_enabled`, `code_review_graph_mcp_server_id`, `read_only_tool_names`, `resolve_repo_root`
 
-### Spec context
-
-From about-sevn.bot/specs/28-code-understanding.md:
-Deliver the code-orientation stack the coding companion PRD names: five orthogonal capabilities (MYCODE, Memgraph CGR, code-review-graph (SQLite MCP), roam-code, Graphify) that Triager and executors c
-
 ## Level 3 — Deep dive (low-level, technical)
 
 Primary source tree: `src/sevn/code_understanding/` (19 Python files). Normative design: `about-sevn.bot/specs/28-code-understanding.md`.
 
 ### Module inventory
 
-- `src/sevn/code_understanding/__init__.py` — """Code-understanding stack: MYCODE, CGR, roam-code, Graphify ('about-sevn.bot/specs/28-code-understanding.md').
-- `src/sevn/code_understanding/bootstrap.py` — """Operator bootstrap for code orientation (MYCODE scan, Graphify hints).
-- `src/sevn/code_understanding/cgr_adapter.py` — """Allowlisted CGR CLI argv builder + capped export reader.
-- `src/sevn/code_understanding/cgr_runner.py` — """Subprocess runner for allowlisted ''cgr'' CLI ('about-sevn.bot/specs/28-code-understanding.md' §2.2).
-- `src/sevn/code_understanding/code_index.py` — """Generate ''.index/code_index/INDEX.md'' from the sevn source tree.
-- `src/sevn/code_understanding/code_review_graph_mcp.py` — """code-review-graph MCP stdio registration ('about-sevn.bot/specs/28-code-understanding.md' §3.4, §4.5).
-- `src/sevn/code_understanding/effective_settings.py` — """Effective code-understanding settings when a sevn.bot checkout is available.
-- `src/sevn/code_understanding/graphify.py` — """Pure helpers for Graphify profile resolution and Triager prefix text.
-- `src/sevn/code_understanding/graphify_mcp.py` — """Graphify + code-understanding MCP gateway registration ('about-sevn.bot/specs/28-code-understanding.md' §4.4).
-- `src/sevn/code_understanding/graphify_seed.py` — """Deterministic Graphify index seeding for the ''source_code/'' mirror.
-- `src/sevn/code_understanding/models.py` — """Pydantic types for code-understanding settings and digest payloads.
-- `src/sevn/code_understanding/mycode_cache.py` — """MYCODE scan digest cache ('about-sevn.bot/specs/28-code-understanding.md' §11).
+- `src/sevn/code_understanding/__init__.py` — Code-understanding stack: MYCODE, CGR, roam-code, Graphify ('about-sevn.bot/specs/28-code-understanding.md').
+- `src/sevn/code_understanding/bootstrap.py` — Operator bootstrap for code orientation (MYCODE scan, Graphify hints).
+- `src/sevn/code_understanding/cgr_adapter.py` — Allowlisted CGR CLI argv builder + capped export reader.
+- `src/sevn/code_understanding/cgr_runner.py` — Subprocess runner for allowlisted ''cgr'' CLI ('about-sevn.bot/specs/28-code-understanding.md' §2.2).
+- `src/sevn/code_understanding/code_index.py` — Generate ''.index/code_index/INDEX.md'' from the sevn source tree.
+- `src/sevn/code_understanding/code_review_graph_mcp.py` — code-review-graph MCP stdio registration ('about-sevn.bot/specs/28-code-understanding.md' §3.4, §4.5).
+- `src/sevn/code_understanding/effective_settings.py` — Effective code-understanding settings when a sevn.bot checkout is available.
+- `src/sevn/code_understanding/graphify.py` — Pure helpers for Graphify profile resolution and Triager prefix text.
+- `src/sevn/code_understanding/graphify_mcp.py` — Graphify + code-understanding MCP gateway registration ('about-sevn.bot/specs/28-code-understanding.md' §4.4).
+- `src/sevn/code_understanding/graphify_seed.py` — Deterministic Graphify index seeding for the ''source_code/'' mirror.
+- `src/sevn/code_understanding/models.py` — Pydantic types for code-understanding settings and digest payloads.
+- `src/sevn/code_understanding/mycode_cache.py` — MYCODE scan digest cache ('about-sevn.bot/specs/28-code-understanding.md' §11).
 - … and 7 more Python modules
+
+### Package init (`src/sevn/code_understanding/__init__.py`)
+
+See `src/sevn/code_understanding/__init__.py` for implementation details.
 
 ### Bootstrap (`src/sevn/code_understanding/bootstrap.py`)
 
 Public entry points:
-- `code_orientation_doctor_checks` — see `src/sevn/code_understanding/bootstrap.py`
-- `refresh_mycode_scan_cache` — see `src/sevn/code_understanding/bootstrap.py`
-- `mycode_needs_refresh` — see `src/sevn/code_understanding/bootstrap.py`
+- `code_orientation_doctor_checks`
+- `refresh_mycode_scan_cache`
+- `mycode_needs_refresh`
 
 ### Cgr Adapter (`src/sevn/code_understanding/cgr_adapter.py`)
 
 Public entry points:
-- `build_cgr_argv` — see `src/sevn/code_understanding/cgr_adapter.py`
-- `read_export_capped` — see `src/sevn/code_understanding/cgr_adapter.py`
+- `build_cgr_argv`
+- `read_export_capped`
 
 ### Cgr Runner (`src/sevn/code_understanding/cgr_runner.py`)
 
 Public entry points:
-- `run_cgr_subprocess` — see `src/sevn/code_understanding/cgr_runner.py`
-- `read_export_file` — see `src/sevn/code_understanding/cgr_runner.py`
+- `run_cgr_subprocess`
+- `read_export_file`
 
 ### Code Index (`src/sevn/code_understanding/code_index.py`)
 
 Public entry points:
-- `collect_module_symbols` — see `src/sevn/code_understanding/code_index.py`
-- `iter_python_files` — see `src/sevn/code_understanding/code_index.py`
-- `audit_docstring_coverage` — see `src/sevn/code_understanding/code_index.py`
-- `extract_listed_symbols` — see `src/sevn/code_understanding/code_index.py`
-- `render_code_index_markdown` — see `src/sevn/code_understanding/code_index.py`
-- `generate_code_index` — see `src/sevn/code_understanding/code_index.py`
+- `collect_module_symbols`
+- `iter_python_files`
+- `audit_docstring_coverage`
+- `extract_listed_symbols`
+- `render_code_index_markdown`
+- `generate_code_index`
 
 ### Code Review Graph Mcp (`src/sevn/code_understanding/code_review_graph_mcp.py`)
 
 Public entry points:
-- `code_review_graph_mcp_enabled` — see `src/sevn/code_understanding/code_review_graph_mcp.py`
-- `code_review_graph_mcp_server_id` — see `src/sevn/code_understanding/code_review_graph_mcp.py`
-- `read_only_tool_names` — see `src/sevn/code_understanding/code_review_graph_mcp.py`
-- `resolve_repo_root` — see `src/sevn/code_understanding/code_review_graph_mcp.py`
-- `validate_repo_root` — see `src/sevn/code_understanding/code_review_graph_mcp.py`
-- `build_serve_argv` — see `src/sevn/code_understanding/code_review_graph_mcp.py`
-- `resolve_command` — see `src/sevn/code_understanding/code_review_graph_mcp.py`
-- `mcp_stdio_entry` — see `src/sevn/code_understanding/code_review_graph_mcp.py`
+- `code_review_graph_mcp_enabled`
+- `code_review_graph_mcp_server_id`
+- `read_only_tool_names`
+- `resolve_repo_root`
+- `validate_repo_root`
+- `build_serve_argv`
+- `resolve_command`
+- `mcp_stdio_entry`
 
 ### Effective Settings (`src/sevn/code_understanding/effective_settings.py`)
 
 Public entry points:
-- `graphify_enabled_for_checkout` — see `src/sevn/code_understanding/effective_settings.py`
-- `effective_graphify_settings` — see `src/sevn/code_understanding/effective_settings.py`
-- `effective_code_understanding` — see `src/sevn/code_understanding/effective_settings.py`
+- `graphify_enabled_for_checkout`
+- `effective_graphify_settings`
+- `effective_code_understanding`
 
 ### Graphify (`src/sevn/code_understanding/graphify.py`)
 
 Public entry points:
-- `resolve_profiles` — see `src/sevn/code_understanding/graphify.py`
-- `graph_report_path` — see `src/sevn/code_understanding/graphify.py`
-- `graph_json_path` — see `src/sevn/code_understanding/graphify.py`
-- `profile_covers` — see `src/sevn/code_understanding/graphify.py`
-- `search_tool_prefix` — see `src/sevn/code_understanding/graphify.py`
-- `clear_resolve_active_profiles_cache` — see `src/sevn/code_understanding/graphify.py`
-- `resolve_active_profiles_cached` — see `src/sevn/code_understanding/graphify.py`
-- `active_profiles_with_report` — see `src/sevn/code_understanding/graphify.py`
+- `resolve_profiles`
+- `graph_report_path`
+- `graph_json_path`
+- `profile_covers`
+- `search_tool_prefix`
+- `clear_resolve_active_profiles_cache`
+- `resolve_active_profiles_cached`
+- `active_profiles_with_report`
 
 ### Graphify Mcp (`src/sevn/code_understanding/graphify_mcp.py`)
 
 Public entry points:
-- `graphify_mcp_enabled` — see `src/sevn/code_understanding/graphify_mcp.py`
-- `graphify_mcp_server_ids` — see `src/sevn/code_understanding/graphify_mcp.py`
-- `merge_gateway_mcp_servers` — see `src/sevn/code_understanding/graphify_mcp.py`
-- `build_effective_mcp_servers` — see `src/sevn/code_understanding/graphify_mcp.py`
+- `graphify_mcp_enabled`
+- `graphify_mcp_server_ids`
+- `merge_gateway_mcp_servers`
+- `build_effective_mcp_servers`
 
 ### Graphify Seed (`src/sevn/code_understanding/graphify_seed.py`)
 
 Public entry points:
-- `graphify_report_mirror_path` — see `src/sevn/code_understanding/graphify_seed.py`
-- `graphify_needs_refresh` — see `src/sevn/code_understanding/graphify_seed.py`
-- `seed_graphify_mirror` — see `src/sevn/code_understanding/graphify_seed.py`
-- `build_graphify_index` — see `src/sevn/code_understanding/graphify_seed.py`
+- `graphify_report_mirror_path`
+- `graphify_needs_refresh`
+- `seed_graphify_mirror`
+- `build_graphify_index`
+
+### Models (`src/sevn/code_understanding/models.py`)
+
+See `src/sevn/code_understanding/models.py` for implementation details.
+
+### Mycode Cache (`src/sevn/code_understanding/mycode_cache.py`)
+
+See `src/sevn/code_understanding/mycode_cache.py` for implementation details.
 
 ### Additional modules
 
