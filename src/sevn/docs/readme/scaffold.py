@@ -24,7 +24,7 @@ from pathlib import Path
 
 from sevn.docs.readme.catalog import build_catalog_rows
 from sevn.docs.readme.check import _has_heading
-from sevn.docs.readme.fingerprint import default_fingerprints_path
+from sevn.docs.readme.fingerprint import default_fingerprints_path, stamp_entry
 from sevn.docs.readme.manifest import ReadmeEntry, ReadmeManifest
 from sevn.docs.readme.profile_schemas import ProfileSchema, get_profile_schema
 from sevn.docs.readme.providers import ReadmeProviderConfig
@@ -44,6 +44,10 @@ def scaffold_readme_tree(
 ) -> int:
     """Bring README files toward green: regenerate missing/stale, stub missing sections.
 
+    Curated manifest entries (``curated = true``) are never rewritten: when stale,
+    only ``_fingerprints.json`` is refreshed via ``stamp_entry``; section stubs are
+    skipped even when the file exists.
+
         Args:
     repo_root (Path): Repository root.
     manifest (ReadmeManifest): Loaded manifest.
@@ -51,7 +55,7 @@ def scaffold_readme_tree(
     provider_config (ReadmeProviderConfig | None): Offline provider config.
 
         Returns:
-            int: Number of files written or sections stubbed.
+            int: Number of files written, sections stubbed, or curated fingerprints stamped.
 
         Examples:
             >>> from pathlib import Path as _P
@@ -70,6 +74,16 @@ def scaffold_readme_tree(
     for entry in manifest.entries:
         output = repo_root / entry.output
         stale = status_by_slug.get(entry.slug) == "stale"
+        if entry.curated:
+            if stale:
+                stamp_entry(
+                    repo_root,
+                    slug=entry.slug,
+                    source_globs=entry.source_globs,
+                    fingerprints_path=fp_path,
+                )
+                inserted += 1
+            continue
         if not output.is_file() or stale:
             asyncio.run(
                 write_readme(

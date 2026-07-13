@@ -34,6 +34,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- README `make readme-scaffold` protects curated bodies: stale slugs get fingerprint-only stamps, never body rewrites or section stubs
 - README `_write_entries` doctest uses non-curated `storage` row after gateway manifest curation
 - Self-improve trajectory ingest circular import: move `ensure_trace_connection` to `agent.tracing.traces_migrate` and rewrite `docs/readmes/self-improve.md` Level 1–2 with preset-C audit
 - CI failures from `secrets.*` gitignore rule excluding `src/sevn/config/sections/secrets.py` (ModuleNotFoundError and mypy `no-any-return` on CI)

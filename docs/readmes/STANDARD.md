@@ -43,7 +43,7 @@ docs/brand/
 <!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint <slug>` -->
 ```
 
-The pipeline **never overwrites** curated bodies during `make readme`, `sevn readme generate --all`, or the `sevn-readme-sync` pre-commit hook — those paths only refresh `_fingerprints.json` via `sevn readme fingerprint`. To regenerate a curated body deliberately, run `sevn readme update <slug> --force`. Non-curated READMEs use `sevn readme update <slug>` after source changes.
+The pipeline **never overwrites** curated bodies during `make readme`, `make readme-scaffold`, `sevn readme generate --all`, or the `sevn-readme-sync` pre-commit hook — those paths only refresh `_fingerprints.json` via `sevn readme fingerprint`. To regenerate a curated body deliberately, run `sevn readme update <slug> --force`. Non-curated READMEs use `sevn readme update <slug>` after source changes.
 
 ---
 
@@ -358,9 +358,9 @@ Explicit operator action for LLM spend: `sevn readme generate --llm`. CI uses `o
 `make readme-check` performs:
 
 1. **Structure/validity** — every manifest README exists; profile schema (§C0); GitHub-safe checks in `render.py` (§E); link resolution. Placeholders → `TODO` warning.
-2. **Staleness** — fingerprint mismatch → fail with `sevn readme update <slug>`.
+2. **Staleness** — fingerprint mismatch → fail. Curated entries (`curated = true`): run `sevn readme fingerprint <slug>` after reviewing the body. Generated entries: run `sevn readme update <slug>`.
 
-Scaffold path: `make readme-scaffold` (parallel to `*-docs-scaffold`).
+Scaffold path: `make readme-scaffold` (parallel to `*-docs-scaffold`). Curated slugs are fingerprint-only on scaffold; generated slugs are regenerated and stubbed as needed.
 
 ---
 
