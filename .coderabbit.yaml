@@ -21,6 +21,8 @@ reviews:
       - main
       - develop
       - test-pre
+      # Release-staging branches (pre-0.0.1, pre-0.0.x, …). Regex-matched.
+      - pre-.*
   path_filters:
     - "!**/pyclaww/**"
     - "!**/node_modules/**"
