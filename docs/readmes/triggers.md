@@ -27,7 +27,7 @@ Non-interactive triggers sits in the sevn.bot turn spine: a channel delivers a m
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `specs/30-non-interactive-triggers.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/30-non-interactive-triggers.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
 
 ### Key modules
 
@@ -39,27 +39,27 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ### Spec context
 
-From specs/30-non-interactive-triggers.md:
+From about-sevn.bot/specs/30-non-interactive-triggers.md:
 Deliver non-interactive dispatch: external events (“something happened”) and schedules (“tick”) compile to DispatchRequest, optionally pass through notify_only (zero LLM, zero sandbox boot), otherwise
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/triggers/` (19 Python files). Normative design: `specs/30-non-interactive-triggers.md`.
+Primary source tree: `src/sevn/triggers/` (19 Python files). Normative design: `about-sevn.bot/specs/30-non-interactive-triggers.md`.
 
 ### Module inventory
 
-- `src/sevn/triggers/__init__.py` — """Non-interactive triggers ('specs/30-non-interactive-triggers.md').
-- `src/sevn/triggers/api_router.py` — """HTTP API for non-interactive runs ('specs/30-non-interactive-triggers.md' §2.2).
-- `src/sevn/triggers/auth.py` — """Triggers API bearer verification ('specs/30-non-interactive-triggers.md' §2.2, §11).
+- `src/sevn/triggers/__init__.py` — """Non-interactive triggers ('about-sevn.bot/specs/30-non-interactive-triggers.md').
+- `src/sevn/triggers/api_router.py` — """HTTP API for non-interactive runs ('about-sevn.bot/specs/30-non-interactive-triggers.md' §2.2).
+- `src/sevn/triggers/auth.py` — """Triggers API bearer verification ('about-sevn.bot/specs/30-non-interactive-triggers.md' §2.2, §11).
 - `src/sevn/triggers/coding_agent_loop.py` — """Coding agent loop trigger — ALRCA background loop + session-mining hook (CA6.3).
-- `src/sevn/triggers/cron.py` — """SQLite-backed cron job store ('specs/30-non-interactive-triggers.md' §2.4, §3.2).
-- `src/sevn/triggers/dedupe.py` — """Webhook dedupe persistence ('specs/30-non-interactive-triggers.md' §3.2).
-- `src/sevn/triggers/delivery.py` — """Result fan-out for trigger dispatches ('specs/30-non-interactive-triggers.md' §4.6).
-- `src/sevn/triggers/dispatcher.py` — """Core trigger dispatch ('specs/30-non-interactive-triggers.md' §2.1).
-- `src/sevn/triggers/hooks.py` — """See :mod:'sevn.plugins.registry' and :mod:'sevn.plugins.trigger_mux' ('specs/34-plugin-hooks.md')."""
-- `src/sevn/triggers/hooks_protocol.py` — """Minimal hook surface for trigger ingress ('specs/34-plugin-hooks.md' §4.7 stub).
-- `src/sevn/triggers/inbox.py` — """Trigger inbox spill + retention ('specs/30-non-interactive-triggers.md' §3.3).
-- `src/sevn/triggers/request.py` — """Dispatch envelopes for non-interactive runs ('specs/30-non-interactive-triggers.md' §3.1).
+- `src/sevn/triggers/cron.py` — """SQLite-backed cron job store ('about-sevn.bot/specs/30-non-interactive-triggers.md' §2.4, §3.2).
+- `src/sevn/triggers/dedupe.py` — """Webhook dedupe persistence ('about-sevn.bot/specs/30-non-interactive-triggers.md' §3.2).
+- `src/sevn/triggers/delivery.py` — """Result fan-out for trigger dispatches ('about-sevn.bot/specs/30-non-interactive-triggers.md' §4.6).
+- `src/sevn/triggers/dispatcher.py` — """Core trigger dispatch ('about-sevn.bot/specs/30-non-interactive-triggers.md' §2.1).
+- `src/sevn/triggers/hooks.py` — """See :mod:'sevn.plugins.registry' and :mod:'sevn.plugins.trigger_mux' ('about-sevn.bot/specs/34-plugin-hooks.md')."""
+- `src/sevn/triggers/hooks_protocol.py` — """Minimal hook surface for trigger ingress ('about-sevn.bot/specs/34-plugin-hooks.md' §4.7 stub).
+- `src/sevn/triggers/inbox.py` — """Trigger inbox spill + retention ('about-sevn.bot/specs/30-non-interactive-triggers.md' §3.3).
+- `src/sevn/triggers/request.py` — """Dispatch envelopes for non-interactive runs ('about-sevn.bot/specs/30-non-interactive-triggers.md' §3.1).
 - … and 7 more Python modules
 
 ### Api Router (`src/sevn/triggers/api_router.py`)
@@ -126,15 +126,15 @@ Public entry points:
 
 ### Extension and invariants
 
-Follow `specs/30-non-interactive-triggers.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/triggers/`, run `sevn readme update triggers` and `make readme-check`.
+Follow `about-sevn.bot/specs/30-non-interactive-triggers.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/triggers/`, run `sevn readme update triggers` and `make readme-check`.
 
 ## References
 
-- [specs/30-non-interactive-triggers.md](specs/30-non-interactive-triggers.md)
+- [../../about-sevn.bot/specs/30-non-interactive-triggers.md](../../about-sevn.bot/specs/30-non-interactive-triggers.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
-[spec-link]: specs/30-non-interactive-triggers.md
+[spec-link]: ../../about-sevn.bot/specs/30-non-interactive-triggers.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/triggers/
+[source-link]: ../../src/sevn/triggers/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md

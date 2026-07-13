@@ -27,7 +27,7 @@ Mission Control UI sits in the sevn.bot turn spine: a channel delivers a message
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `specs/24-dashboard.md`, `specs/29-openui.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/24-dashboard.md`, `about-sevn.bot/specs/29-openui.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
 
 ### Key modules
 
@@ -39,27 +39,27 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ### Spec context
 
-From specs/24-dashboard.md:
+From about-sevn.bot/specs/24-dashboard.md:
 Deliver Mission Control: a same-process dashboard (prd-07-mission-control) so the owner can inspect traces, costs, provider health, in-flight runs, proxy status, and config without opening SQLite from
 
-From specs/29-openui.md:
+From about-sevn.bot/specs/29-openui.md:
 Deliver OpenUI: explicit openui_render tool calls produce sanitised, CSP-wrapped, size-capped HTML (live or rasterised) and deterministic form callbacks that rejoin the same executor turn for tier B /
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/ui/` (65 Python files). Normative design: `specs/24-dashboard.md`, `specs/29-openui.md`.
+Primary source tree: `src/sevn/ui/` (65 Python files). Normative design: `about-sevn.bot/specs/24-dashboard.md`, `about-sevn.bot/specs/29-openui.md`.
 
 ### Module inventory
 
 - `src/sevn/ui/__init__.py` — """User interface components (scaffold).
-- `src/sevn/ui/dashboard/__init__.py` — """Mission Control dashboard registration facade ('specs/24-dashboard.md' §4.1).
+- `src/sevn/ui/dashboard/__init__.py` — """Mission Control dashboard registration facade ('about-sevn.bot/specs/24-dashboard.md' §4.1).
 - `src/sevn/ui/dashboard/api/__init__.py` — """Mission Control REST API router assembly.
 - `src/sevn/ui/dashboard/api/_config_persist.py` — """Shared helpers for persisting Mission Control config edits to ''sevn.json''.
-- `src/sevn/ui/dashboard/api/agent.py` — """Mission Control Agent group REST router ('specs/24-dashboard.md' MC-7).
+- `src/sevn/ui/dashboard/api/agent.py` — """Mission Control Agent group REST router ('about-sevn.bot/specs/24-dashboard.md' MC-7).
 - `src/sevn/ui/dashboard/api/audit.py` — """Dashboard audit trail and analytics REST router.
 - `src/sevn/ui/dashboard/api/auth.py` — """Dashboard auth REST router.
-- `src/sevn/ui/dashboard/api/canvas.py` — """Dashboard OpenUI Canvas tab REST router ('specs/24-dashboard.md' §4.4).
-- `src/sevn/ui/dashboard/api/channels.py` — """Dashboard channels and alert rollup REST routers ('specs/24-dashboard.md' MC-5).
+- `src/sevn/ui/dashboard/api/canvas.py` — """Dashboard OpenUI Canvas tab REST router ('about-sevn.bot/specs/24-dashboard.md' §4.4).
+- `src/sevn/ui/dashboard/api/channels.py` — """Dashboard channels and alert rollup REST routers ('about-sevn.bot/specs/24-dashboard.md' MC-5).
 - `src/sevn/ui/dashboard/api/chat.py` — """Mission Control in-dashboard webchat console API (MC W6).
 - `src/sevn/ui/dashboard/api/cli_console.py` — """Mission Control sevn CLI console API (MC W1 §2c).
 - `src/sevn/ui/dashboard/api/coding_agents.py` — """Mission Control Coding Agents hub REST router (CA1 + CA6.2 artifacts).
@@ -137,16 +137,16 @@ Public entry points:
 
 ### Extension and invariants
 
-Follow `specs/24-dashboard.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/ui/`, run `sevn readme update ui-mission-control` and `make readme-check`.
+Follow `about-sevn.bot/specs/24-dashboard.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/ui/`, run `sevn readme update ui-mission-control` and `make readme-check`.
 
 ## References
 
-- [specs/24-dashboard.md](specs/24-dashboard.md)
-- [specs/29-openui.md](specs/29-openui.md)
+- [../../about-sevn.bot/specs/24-dashboard.md](../../about-sevn.bot/specs/24-dashboard.md)
+- [../../about-sevn.bot/specs/29-openui.md](../../about-sevn.bot/specs/29-openui.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
-[spec-link]: specs/24-dashboard.md
+[spec-link]: ../../about-sevn.bot/specs/24-dashboard.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/ui/
+[source-link]: ../../src/sevn/ui/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md

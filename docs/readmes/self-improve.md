@@ -133,18 +133,18 @@ Primary source tree: `src/sevn/self_improve/` (36 Python files). Normative desig
 
 ### Module inventory
 
-- `src/sevn/self_improve/__init__.py` — """Closed-loop self-improve subsystem ('specs/33-self-improvement.md').
-- `src/sevn/self_improve/effective.py` — """Resolve effective self-improve enablement ('specs/33-self-improvement.md' §5).
-- `src/sevn/self_improve/eval/__init__.py` — """Docker evaluation launcher ('specs/33-self-improvement.md' §4.3).
-- `src/sevn/self_improve/eval/baseline.py` — """Last-known-good baseline and eval report deltas ('specs/33-self-improvement.md' §4.3).
+- `src/sevn/self_improve/__init__.py` — """Closed-loop self-improve subsystem ('about-sevn.bot/specs/33-self-improvement.md').
+- `src/sevn/self_improve/effective.py` — """Resolve effective self-improve enablement ('about-sevn.bot/specs/33-self-improvement.md' §5).
+- `src/sevn/self_improve/eval/__init__.py` — """Docker evaluation launcher ('about-sevn.bot/specs/33-self-improvement.md' §4.3).
+- `src/sevn/self_improve/eval/baseline.py` — """Last-known-good baseline and eval report deltas ('about-sevn.bot/specs/33-self-improvement.md' §4.3).
 - `src/sevn/self_improve/eval/docker.py` — """Docker compose runner for the improve evaluation graph.
-- `src/sevn/self_improve/eval/launcher.py` — """CLI entry for improve evaluation inside Docker ('specs/33-self-improvement.md' §4.3).
-- `src/sevn/self_improve/eval/replay.py` — """Golden routing and live replay smoke segments ('specs/33-self-improvement.md' §4.3).
-- `src/sevn/self_improve/export.py` — """Trajectory export scaffold under ''.sevn/improve/exports/'' ('specs/33-self-improvement.md' §4.6).
-- `src/sevn/self_improve/facade.py` — """Service façades for gateway and dashboard delegation ('specs/33-self-improvement.md' §2).
-- `src/sevn/self_improve/feedback/__init__.py` — """Explicit feedback inserts ('specs/33-self-improvement.md' §3.4).
-- `src/sevn/self_improve/forge_providers.py` — """Self-improve forge adapters ('specs/33-self-improvement.md' §11).
-- `src/sevn/self_improve/jobs/__init__.py` — """Job queue SQLite helpers ('specs/33-self-improvement.md' §3.3).
+- `src/sevn/self_improve/eval/launcher.py` — """CLI entry for improve evaluation inside Docker ('about-sevn.bot/specs/33-self-improvement.md' §4.3).
+- `src/sevn/self_improve/eval/replay.py` — """Golden routing and live replay smoke segments ('about-sevn.bot/specs/33-self-improvement.md' §4.3).
+- `src/sevn/self_improve/export.py` — """Trajectory export scaffold under ''.sevn/improve/exports/'' ('about-sevn.bot/specs/33-self-improvement.md' §4.6).
+- `src/sevn/self_improve/facade.py` — """Service façades for gateway and dashboard delegation ('about-sevn.bot/specs/33-self-improvement.md' §2).
+- `src/sevn/self_improve/feedback/__init__.py` — """Explicit feedback inserts ('about-sevn.bot/specs/33-self-improvement.md' §3.4).
+- `src/sevn/self_improve/forge_providers.py` — """Self-improve forge adapters ('about-sevn.bot/specs/33-self-improvement.md' §11).
+- `src/sevn/self_improve/jobs/__init__.py` — """Job queue SQLite helpers ('about-sevn.bot/specs/33-self-improvement.md' §3.3).
 - … and 24 more Python modules
 
 ### Effective (`src/sevn/self_improve/effective.py`)
@@ -228,6 +228,6 @@ Follow [`about-sevn.bot/specs/33-self-improvement.md`](../../about-sevn.bot/spec
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
 [spec-link]: ../../about-sevn.bot/specs/33-self-improvement.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/self_improve/
+[source-link]: ../../src/sevn/self_improve/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md

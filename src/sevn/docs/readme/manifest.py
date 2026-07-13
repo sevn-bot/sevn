@@ -40,6 +40,7 @@ class ReadmeEntry:
     source_globs: tuple[str, ...]
     specs: tuple[str, ...]
     curated: bool = False
+    turn_spine: bool = False
 
 
 @dataclass(frozen=True)
@@ -104,6 +105,7 @@ def load_manifest(path: Path) -> ReadmeManifest:
             raise ValueError(msg)
 
         curated = _parse_curated(row.get("curated"), path=path, idx=idx)
+        turn_spine = _parse_turn_spine(row.get("turn_spine"), path=path, idx=idx)
 
         entries.append(
             ReadmeEntry(
@@ -116,6 +118,7 @@ def load_manifest(path: Path) -> ReadmeManifest:
                 source_globs=source_globs,
                 specs=_as_str_tuple(row.get("specs")),
                 curated=curated,
+                turn_spine=turn_spine,
             )
         )
 
@@ -172,6 +175,34 @@ def _parse_curated(value: object, *, path: Path, idx: int) -> bool:
         return False
     if not isinstance(value, bool):
         msg = f"{path}: readme[{idx}] curated must be a boolean"
+        raise ValueError(msg)
+    return value
+
+
+def _parse_turn_spine(value: object, *, path: Path, idx: int) -> bool:
+    """Parse optional ``turn_spine`` manifest key (defaults to false).
+
+        Args:
+    value (object): Raw TOML value or ``None`` when omitted.
+    path (Path): Manifest path for error messages.
+    idx (int): Row index for error messages.
+
+        Returns:
+            bool: Parsed turn-spine flag.
+
+        Raises:
+            ValueError: When ``turn_spine`` is present but not a boolean.
+
+        Examples:
+            >>> _parse_turn_spine(None, path=Path("m.toml"), idx=0)
+            False
+            >>> _parse_turn_spine(True, path=Path("m.toml"), idx=0)
+            True
+    """
+    if value is None:
+        return False
+    if not isinstance(value, bool):
+        msg = f"{path}: readme[{idx}] turn_spine must be a boolean"
         raise ValueError(msg)
     return value
 

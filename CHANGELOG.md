@@ -22,6 +22,8 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- README pipeline emits file-relative links and retargets manifest spec paths to `about-sevn.bot/specs/`; link checker resolves paths from each README directory only
+
 ### Deprecated
 
 ### Removed

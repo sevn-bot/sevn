@@ -2,7 +2,7 @@
 
 > **Status:** Wave 0 contract (2026-06-13). Locked after operator REVIEW GATE approval.
 > **Normative for:** `docs/readmes/*.md`, root `README.md`, generator (`src/sevn/docs/readme/`), CI gate (`make readme-check`).
-> **Inputs:** merged from `plan/readme-system/references/` (GFM/HTML, templates, generators, doc principles, MarkedDown badges).
+> **Inputs:** merged from the readme-system reference pack (GFM/HTML, templates, generators, doc principles, MarkedDown badges).
 
 This document is the **verbatim authoring contract** for the README pipeline. Later waves implement it; they do not relitigate structure, profiles, or brand palette.
 
@@ -239,7 +239,7 @@ Relative image paths must resolve within the repo. External URLs allowed when ho
 Two-stage, section-by-section, provider-agnostic, offline-capable:
 
 ```
-repo scan (pyproject.toml · sevn.json · CLAUDE.md · specs/ index · graphify-out/
+repo scan (pyproject.toml · sevn.json · CLAUDE.md · about-sevn.bot/specs index · graphify-out/
            · subsystem source_globs from manifest.toml)
    → structured context per README
    → per-section render:  offline = Jinja2 template only
@@ -284,7 +284,7 @@ Each prompt file: `system`, `user_template`, optional `max_tokens`. Offline mode
 
 ### Transport / egress proxy integration
 
-LLM mode routes through the **paired egress proxy** (`specs/07-egress-proxy.md`) using existing `Transport` shapes (`specs/05-llm-transports.md`):
+LLM mode routes through the **paired egress proxy** (`about-sevn.bot/specs/07-egress-proxy.md`) using existing `Transport` shapes (`about-sevn.bot/specs/05-llm-transports.md`):
 
 - Config: `sevn.json → docs.readme.transport` (enum: `anthropic`, `openai_chat`, `openai_responses`, `bedrock_converse`).
 - Config: `docs.readme.model` — LiteLLM model id resolved like other gateway agents.

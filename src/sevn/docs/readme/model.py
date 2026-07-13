@@ -22,8 +22,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
+from sevn.docs.readme.links import readme_relative_href
 from sevn.docs.readme.manifest import ReadmeEntry
 
 _ROOT_HIGHLIGHTS: tuple[str, ...] = (
@@ -92,12 +94,15 @@ def offline_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> ReadmeAssembly
 def assemble_template_context(
     assembly: ReadmeAssembly,
     scan: dict[str, Any],
+    *,
+    repo_root: Path | None = None,
 ) -> dict[str, Any]:
     """Merge scan metadata and section bodies into a Jinja2 context dict.
 
         Args:
     assembly (ReadmeAssembly): Rendered section map.
     scan (dict[str, Any]): Scanner context.
+    repo_root (Path | None): Repository root for file-relative link hrefs.
 
         Returns:
             dict[str, Any]: Variables for :func:`sevn.docs.readme.render.render_profile`.
@@ -110,7 +115,7 @@ def assemble_template_context(
             >>> e = get_entry(m, "gateway")
             >>> s = scan_repo_context(_P("."), e)
             >>> asm = offline_sections(e, s)
-            >>> ctx = assemble_template_context(asm, s)
+            >>> ctx = assemble_template_context(asm, s, repo_root=_P("."))
             >>> ctx["slug"] == "gateway"
             True
     """
@@ -124,16 +129,48 @@ def assemble_template_context(
     }
 
     if entry.profile == "subsystem":
-        spec_path = entry.specs[0] if entry.specs else "specs/"
+        spec_target = entry.specs[0] if entry.specs else "about-sevn.bot/specs/"
+        source_target = str(scan.get("source_dir", "src/sevn/"))
+        if repo_root is not None:
+            spec_path = readme_relative_href(
+                readme_output=entry.output,
+                target=spec_target,
+                repo_root=repo_root,
+            )
+            source_dir = readme_relative_href(
+                readme_output=entry.output,
+                target=source_target,
+                repo_root=repo_root,
+                directory=True,
+            )
+            index_link = readme_relative_href(
+                readme_output=entry.output,
+                target="docs/readmes/INDEX.md",
+                repo_root=repo_root,
+            )
+            references = [
+                readme_relative_href(
+                    readme_output=entry.output,
+                    target=spec,
+                    repo_root=repo_root,
+                )
+                for spec in sections.get("references", list(entry.specs))
+            ]
+        else:
+            spec_path = spec_target
+            source_dir = source_target
+            index_link = "docs/readmes/INDEX.md"
+            references = list(sections.get("references", list(entry.specs)))
         base.update(
             {
                 "role": sections.get("role", _role_from_summary(entry.summary)),
                 "spec_path": spec_path,
-                "source_dir": scan.get("source_dir", "src/sevn/"),
+                "source_dir": source_dir,
+                "index_link": index_link,
                 "level1": sections.get("level1", ""),
                 "level2": sections.get("level2", ""),
                 "level3": sections.get("level3", ""),
-                "references": sections.get("references", list(entry.specs)),
+                "references": references,
             }
         )
     elif entry.profile == "root":
@@ -156,10 +193,33 @@ def assemble_template_context(
     elif entry.profile == "index":
         base["entries"] = sections.get("entries", [])
     elif entry.profile == "catalog":
-        base["items"] = sections.get("items", [])
+        items = sections.get("items", [])
+        if repo_root is not None:
+            items = [
+                {
+                    **item,
+                    "path": readme_relative_href(
+                        readme_output=entry.output,
+                        target=str(item["path"]),
+                        repo_root=repo_root,
+                    ),
+                }
+                for item in items
+            ]
+        base["items"] = items
     elif entry.profile == "guide":
         base["steps"] = sections.get("steps", [])
-        base["references"] = sections.get("references", list(entry.specs))
+        refs = sections.get("references", list(entry.specs))
+        if repo_root is not None:
+            refs = [
+                readme_relative_href(
+                    readme_output=entry.output,
+                    target=spec,
+                    repo_root=repo_root,
+                )
+                for spec in refs
+            ]
+        base["references"] = refs
     else:
         base["body"] = sections.get("body", entry.summary)
 

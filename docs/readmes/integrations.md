@@ -27,7 +27,7 @@ Integrations sits in the sevn.bot turn spine: a channel delivers a message, the 
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `specs/34-plugin-hooks.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/34-plugin-hooks.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
 
 ### Key modules
 
@@ -39,17 +39,17 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ### Spec context
 
-From specs/34-plugin-hooks.md:
+From about-sevn.bot/specs/34-plugin-hooks.md:
 Deliver the in-process extension layer that intercepts existing tool and terminal I/O paths and registers dispatcher-level commands, without adding new tool symbols or transports in-tree.
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/integrations/` (16 Python files). Normative design: `specs/34-plugin-hooks.md`.
+Primary source tree: `src/sevn/integrations/` (16 Python files). Normative design: `about-sevn.bot/specs/34-plugin-hooks.md`.
 
 ### Module inventory
 
 - `src/sevn/integrations/__init__.py` — """External system integrations (scaffold).
-- `src/sevn/integrations/code_graph_rag/__init__.py` — """Optional CGR integration package root ('specs/28-code-understanding.md' §4.2).
+- `src/sevn/integrations/code_graph_rag/__init__.py` — """Optional CGR integration package root ('about-sevn.bot/specs/28-code-understanding.md' §4.2).
 - `src/sevn/integrations/cursor_cloud/__init__.py` — """Cursor Cloud Agent integration for bundled ''cursor_cloud'' skill.
 - `src/sevn/integrations/cursor_cloud/client.py` — """Cursor Cloud Agents API client via egress proxy.
 - `src/sevn/integrations/cursor_cloud/config.py` — """Workspace config helpers for ''cursor_cloud'' skill.
@@ -109,15 +109,15 @@ Public entry points:
 
 ### Extension and invariants
 
-Follow `specs/34-plugin-hooks.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/integrations/`, run `sevn readme update integrations` and `make readme-check`.
+Follow `about-sevn.bot/specs/34-plugin-hooks.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/integrations/`, run `sevn readme update integrations` and `make readme-check`.
 
 ## References
 
-- [specs/34-plugin-hooks.md](specs/34-plugin-hooks.md)
+- [../../about-sevn.bot/specs/34-plugin-hooks.md](../../about-sevn.bot/specs/34-plugin-hooks.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
-[spec-link]: specs/34-plugin-hooks.md
+[spec-link]: ../../about-sevn.bot/specs/34-plugin-hooks.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/integrations/
+[source-link]: ../../src/sevn/integrations/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md

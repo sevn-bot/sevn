@@ -473,6 +473,29 @@ def _read_graphify(repo_root: Path) -> dict[str, Any] | None:
     }
 
 
+_SPECS_REF = re.compile(r"(?<![\w./-])specs/")
+_PLAN_PRD_REF = re.compile(r"(?<![\w./-])(?:plan|prd)/[^\s')\"]+")
+
+
+def _rewrite_design_doc_refs(text: str) -> str:
+    """Rewrite gitignored design-doc path cites for published README emission.
+
+        Args:
+    text (str): Docstring or markdown excerpt.
+
+        Returns:
+            str: Text with ``specs/`` retargeted and ``plan/``/``prd/`` cites genericized.
+
+        Examples:
+            >>> _rewrite_design_doc_refs("('specs/17-gateway.md')")
+            "('about-sevn.bot/specs/17-gateway.md')"
+            >>> _rewrite_design_doc_refs("'plan/foo.md'")
+            "'the design docs'"
+    """
+    text = _SPECS_REF.sub("about-sevn.bot/specs/", text)
+    return _PLAN_PRD_REF.sub("the design docs", text)
+
+
 def _build_source_excerpt(repo_root: Path, py_files: list[str], *, max_files: int = 12) -> str:
     """Build a compact excerpt listing key Python modules.
 
@@ -503,7 +526,7 @@ def _build_source_excerpt(repo_root: Path, py_files: list[str], *, max_files: in
             logger.warning("readme_scanner: unable to read source file at {}", path)
             continue
         first = next((ln.strip() for ln in text.splitlines() if ln.strip()), "")
-        safe_first = first.replace("`", "'")[:120]
+        safe_first = _rewrite_design_doc_refs(first.replace("`", "'")[:120])
         lines.append(f"- `{rel}` — {safe_first}")
     if len(py_files) > max_files:
         lines.append(f"- … and {len(py_files) - max_files} more Python modules")

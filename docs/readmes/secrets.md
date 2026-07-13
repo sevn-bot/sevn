@@ -27,7 +27,7 @@ Secrets sits in the sevn.bot turn spine: a channel delivers a message, the gatew
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `specs/06-secrets.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/06-secrets.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
 
 ### Key modules
 
@@ -39,27 +39,27 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ### Spec context
 
-From specs/06-secrets.md:
+From about-sevn.bot/specs/06-secrets.md:
 Deliver a single trust boundary for credentials: backend modules + TTL cache under src/sevn/security/, wired exclusively by the egress proxy (src/sevn/proxy/) so agent-facing processes never see raw k
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/secrets/` (17 Python files). Normative design: `specs/06-secrets.md`.
+Primary source tree: `src/sevn/secrets/` (17 Python files). Normative design: `about-sevn.bot/specs/06-secrets.md`.
 
 ### Module inventory
 
-- `src/sevn/secrets/__init__.py` — """Operator-facing secrets helpers outside ''sevn.security'' ('specs/06-secrets.md').
-- `src/sevn/secrets/fingerprint.py` — """Stable fingerprints for operator CLI confirmation ('specs/06-secrets.md' §2.6).
-- `src/sevn/secrets/migrate.py` — """Legacy plaintext ''.sevn/secrets'' promotion ('specs/06-secrets.md' §10.2).
-- `src/sevn/security/secrets/__init__.py` — """Secrets abstraction for the trust boundary (''specs/06-secrets.md'').
-- `src/sevn/security/secrets/backends/__init__.py` — """Concrete secret backends (''specs/06-secrets.md'' §4.1).
-- `src/sevn/security/secrets/backends/encrypted_file.py` — """Encrypted JSON map on disk with AEAD (''specs/06-secrets.md'' §3.1).
-- `src/sevn/security/secrets/backends/linux_secret_service.py` — """Linux secret service via optional ''secretstorage'' (''specs/06-secrets.md'' §3.2).
-- `src/sevn/security/secrets/backends/macos_keychain.py` — """macOS Keychain via ''security'' CLI (''specs/06-secrets.md'' §3.2).
-- `src/sevn/security/secrets/backends/openbao.py` — """OpenBao / Vault OSS KV v2 read path (''specs/06-secrets.md'' §3.2).
-- `src/sevn/security/secrets/backends/proton_pass.py` — """Proton Pass CLI bridge (''specs/06-secrets.md'' §3.2).
-- `src/sevn/security/secrets/cache.py` — """TTL cache for resolved secret strings (''specs/06-secrets.md'' §2.2).
-- `src/sevn/security/secrets/chain.py` — """Ordered backend chain with read/write policy (''specs/06-secrets.md'' §2.2, §5).
+- `src/sevn/secrets/__init__.py` — """Operator-facing secrets helpers outside ''sevn.security'' ('about-sevn.bot/specs/06-secrets.md').
+- `src/sevn/secrets/fingerprint.py` — """Stable fingerprints for operator CLI confirmation ('about-sevn.bot/specs/06-secrets.md' §2.6).
+- `src/sevn/secrets/migrate.py` — """Legacy plaintext ''.sevn/secrets'' promotion ('about-sevn.bot/specs/06-secrets.md' §10.2).
+- `src/sevn/security/secrets/__init__.py` — """Secrets abstraction for the trust boundary (''about-sevn.bot/specs/06-secrets.md'').
+- `src/sevn/security/secrets/backends/__init__.py` — """Concrete secret backends (''about-sevn.bot/specs/06-secrets.md'' §4.1).
+- `src/sevn/security/secrets/backends/encrypted_file.py` — """Encrypted JSON map on disk with AEAD (''about-sevn.bot/specs/06-secrets.md'' §3.1).
+- `src/sevn/security/secrets/backends/linux_secret_service.py` — """Linux secret service via optional ''secretstorage'' (''about-sevn.bot/specs/06-secrets.md'' §3.2).
+- `src/sevn/security/secrets/backends/macos_keychain.py` — """macOS Keychain via ''security'' CLI (''about-sevn.bot/specs/06-secrets.md'' §3.2).
+- `src/sevn/security/secrets/backends/openbao.py` — """OpenBao / Vault OSS KV v2 read path (''about-sevn.bot/specs/06-secrets.md'' §3.2).
+- `src/sevn/security/secrets/backends/proton_pass.py` — """Proton Pass CLI bridge (''about-sevn.bot/specs/06-secrets.md'' §3.2).
+- `src/sevn/security/secrets/cache.py` — """TTL cache for resolved secret strings (''about-sevn.bot/specs/06-secrets.md'' §2.2).
+- `src/sevn/security/secrets/chain.py` — """Ordered backend chain with read/write policy (''about-sevn.bot/specs/06-secrets.md'' §2.2, §5).
 - … and 5 more Python modules
 
 ### Fingerprint (`src/sevn/secrets/fingerprint.py`)
@@ -122,15 +122,15 @@ Public entry points:
 
 ### Extension and invariants
 
-Follow `specs/06-secrets.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/secrets/`, run `sevn readme update secrets` and `make readme-check`.
+Follow `about-sevn.bot/specs/06-secrets.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/secrets/`, run `sevn readme update secrets` and `make readme-check`.
 
 ## References
 
-- [specs/06-secrets.md](specs/06-secrets.md)
+- [../../about-sevn.bot/specs/06-secrets.md](../../about-sevn.bot/specs/06-secrets.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
-[spec-link]: specs/06-secrets.md
+[spec-link]: ../../about-sevn.bot/specs/06-secrets.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/secrets/
+[source-link]: ../../src/sevn/secrets/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md

@@ -266,7 +266,7 @@ async def render_readme_markdown(
             fingerprints_path=fingerprints_path,
         )
     assembly = await _build_assembly(entry, scan, provider=provider, config=config)
-    context = assemble_template_context(assembly, scan)
+    context = assemble_template_context(assembly, scan, repo_root=repo_root)
     return render_profile(entry.profile, context)
 
 
@@ -404,6 +404,7 @@ def _enrich_scan_for_catalog(
             repo_root,
             manifest,
             fingerprints_path=fingerprints_path,
+            embed_output=entry.output,
         )
     return enriched
 

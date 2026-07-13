@@ -27,7 +27,7 @@ Code understanding sits in the sevn.bot turn spine: a channel delivers a message
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `specs/28-code-understanding.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/28-code-understanding.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
 
 ### Key modules
 
@@ -39,27 +39,27 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ### Spec context
 
-From specs/28-code-understanding.md:
+From about-sevn.bot/specs/28-code-understanding.md:
 Deliver the code-orientation stack the coding companion PRD names: five orthogonal capabilities (MYCODE, Memgraph CGR, code-review-graph (SQLite MCP), roam-code, Graphify) that Triager and executors c
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/code_understanding/` (19 Python files). Normative design: `specs/28-code-understanding.md`.
+Primary source tree: `src/sevn/code_understanding/` (19 Python files). Normative design: `about-sevn.bot/specs/28-code-understanding.md`.
 
 ### Module inventory
 
-- `src/sevn/code_understanding/__init__.py` — """Code-understanding stack: MYCODE, CGR, roam-code, Graphify ('specs/28-code-understanding.md').
+- `src/sevn/code_understanding/__init__.py` — """Code-understanding stack: MYCODE, CGR, roam-code, Graphify ('about-sevn.bot/specs/28-code-understanding.md').
 - `src/sevn/code_understanding/bootstrap.py` — """Operator bootstrap for code orientation (MYCODE scan, Graphify hints).
 - `src/sevn/code_understanding/cgr_adapter.py` — """Allowlisted CGR CLI argv builder + capped export reader.
-- `src/sevn/code_understanding/cgr_runner.py` — """Subprocess runner for allowlisted ''cgr'' CLI ('specs/28-code-understanding.md' §2.2).
+- `src/sevn/code_understanding/cgr_runner.py` — """Subprocess runner for allowlisted ''cgr'' CLI ('about-sevn.bot/specs/28-code-understanding.md' §2.2).
 - `src/sevn/code_understanding/code_index.py` — """Generate ''.index/code_index/INDEX.md'' from the sevn source tree.
-- `src/sevn/code_understanding/code_review_graph_mcp.py` — """code-review-graph MCP stdio registration ('specs/28-code-understanding.md' §3.4, §4.5).
+- `src/sevn/code_understanding/code_review_graph_mcp.py` — """code-review-graph MCP stdio registration ('about-sevn.bot/specs/28-code-understanding.md' §3.4, §4.5).
 - `src/sevn/code_understanding/effective_settings.py` — """Effective code-understanding settings when a sevn.bot checkout is available.
 - `src/sevn/code_understanding/graphify.py` — """Pure helpers for Graphify profile resolution and Triager prefix text.
-- `src/sevn/code_understanding/graphify_mcp.py` — """Graphify + code-understanding MCP gateway registration ('specs/28-code-understanding.md' §4.4).
+- `src/sevn/code_understanding/graphify_mcp.py` — """Graphify + code-understanding MCP gateway registration ('about-sevn.bot/specs/28-code-understanding.md' §4.4).
 - `src/sevn/code_understanding/graphify_seed.py` — """Deterministic Graphify index seeding for the ''source_code/'' mirror.
 - `src/sevn/code_understanding/models.py` — """Pydantic types for code-understanding settings and digest payloads.
-- `src/sevn/code_understanding/mycode_cache.py` — """MYCODE scan digest cache ('specs/28-code-understanding.md' §11).
+- `src/sevn/code_understanding/mycode_cache.py` — """MYCODE scan digest cache ('about-sevn.bot/specs/28-code-understanding.md' §11).
 - … and 7 more Python modules
 
 ### Bootstrap (`src/sevn/code_understanding/bootstrap.py`)
@@ -144,15 +144,15 @@ Public entry points:
 
 ### Extension and invariants
 
-Follow `specs/28-code-understanding.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/code_understanding/`, run `sevn readme update code-understanding` and `make readme-check`.
+Follow `about-sevn.bot/specs/28-code-understanding.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/code_understanding/`, run `sevn readme update code-understanding` and `make readme-check`.
 
 ## References
 
-- [specs/28-code-understanding.md](specs/28-code-understanding.md)
+- [../../about-sevn.bot/specs/28-code-understanding.md](../../about-sevn.bot/specs/28-code-understanding.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
-[spec-link]: specs/28-code-understanding.md
+[spec-link]: ../../about-sevn.bot/specs/28-code-understanding.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/code_understanding/
+[source-link]: ../../src/sevn/code_understanding/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md

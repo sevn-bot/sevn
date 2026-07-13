@@ -27,7 +27,7 @@ Egress proxy sits in the sevn.bot turn spine: a channel delivers a message, the 
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `specs/05-llm-transports.md`, `specs/07-egress-proxy.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/05-llm-transports.md`, `about-sevn.bot/specs/07-egress-proxy.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
 
 ### Key modules
 
@@ -39,30 +39,30 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ### Spec context
 
-From specs/05-llm-transports.md:
+From about-sevn.bot/specs/05-llm-transports.md:
 Normalize provider-shaped JSON over async HTTP to a single egress base URL (SEVN_PROXY_URL / ProcessSettings.proxy_url), so tier executors bind once per turn and never touch raw secrets. LiteLLM may r
 
-From specs/07-egress-proxy.md:
+From about-sevn.bot/specs/07-egress-proxy.md:
 Product pairing (v1). Deployment, paired daemon install, onboarding validation, and Mission Control management of the proxy are specified in prd-06-setup-and-operations and prd-07-mission-control §5.1
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/proxy/` (19 Python files). Normative design: `specs/05-llm-transports.md`, `specs/07-egress-proxy.md`.
+Primary source tree: `src/sevn/proxy/` (19 Python files). Normative design: `about-sevn.bot/specs/05-llm-transports.md`, `about-sevn.bot/specs/07-egress-proxy.md`.
 
 ### Module inventory
 
 - `src/sevn/proxy/__init__.py` — """Egress LLM proxy (ASGI): vendor auth injection for ''/llm/*'' routes.
-- `src/sevn/proxy/anthropic_body.py` — """Anthropic Messages request normalization for the egress proxy ('specs/07-egress-proxy.md' §5).
+- `src/sevn/proxy/anthropic_body.py` — """Anthropic Messages request normalization for the egress proxy ('about-sevn.bot/specs/07-egress-proxy.md' §5).
 - `src/sevn/proxy/app.py` — """Starlette ASGI app for the egress LLM proxy.
 - `src/sevn/proxy/auth.py` — """Shared-secret guard for proxy ''POST /llm/*'' routes.
-- `src/sevn/proxy/bedrock_converse.py` — """AWS Bedrock Converse forwarding for the egress proxy ('specs/07-egress-proxy.md').
+- `src/sevn/proxy/bedrock_converse.py` — """AWS Bedrock Converse forwarding for the egress proxy ('about-sevn.bot/specs/07-egress-proxy.md').
 - `src/sevn/proxy/codex_translation.py` — """Chat-completions ↔ Codex Responses translation (W3.3 — D7).
 - `src/sevn/proxy/codex_transport.py` — """Codex OAuth Responses transport helpers (W3.2 — D1/D7).
 - `src/sevn/proxy/credentials.py` — """Build ''ProxySettings'' from workspace secrets and provider metadata.
 - `src/sevn/proxy/forward.py` — """Httpx forward primitives for the egress proxy (test seam).
 - `src/sevn/proxy/http_client.py` — """Shared ''httpx.AsyncClient'' factory for the egress proxy lifespan.
-- `src/sevn/proxy/integration/__init__.py` — """Egress proxy third-party integration dispatch ('specs/29-cursor-cloud-agent.md').
-- `src/sevn/proxy/integration/cursor.py` — """Cursor Cloud Agents API v1 forwarder ('specs/29-cursor-cloud-agent.md' §2.3).
+- `src/sevn/proxy/integration/__init__.py` — """Egress proxy third-party integration dispatch ('about-sevn.bot/specs/29-cursor-cloud-agent.md').
+- `src/sevn/proxy/integration/cursor.py` — """Cursor Cloud Agents API v1 forwarder ('about-sevn.bot/specs/29-cursor-cloud-agent.md' §2.3).
 - … and 7 more Python modules
 
 ### Anthropic Body (`src/sevn/proxy/anthropic_body.py`)
@@ -129,16 +129,16 @@ Public entry points:
 
 ### Extension and invariants
 
-Follow `specs/05-llm-transports.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/proxy/`, run `sevn readme update proxy-egress` and `make readme-check`.
+Follow `about-sevn.bot/specs/05-llm-transports.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/proxy/`, run `sevn readme update proxy-egress` and `make readme-check`.
 
 ## References
 
-- [specs/05-llm-transports.md](specs/05-llm-transports.md)
-- [specs/07-egress-proxy.md](specs/07-egress-proxy.md)
+- [../../about-sevn.bot/specs/05-llm-transports.md](../../about-sevn.bot/specs/05-llm-transports.md)
+- [../../about-sevn.bot/specs/07-egress-proxy.md](../../about-sevn.bot/specs/07-egress-proxy.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
-[spec-link]: specs/05-llm-transports.md
+[spec-link]: ../../about-sevn.bot/specs/05-llm-transports.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/proxy/
+[source-link]: ../../src/sevn/proxy/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md

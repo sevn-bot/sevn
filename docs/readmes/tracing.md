@@ -27,7 +27,7 @@ Tracing sits in the sevn.bot turn spine: a channel delivers a message, the gatew
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `specs/04-tracing.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/04-tracing.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
 
 ### Key modules
 
@@ -39,27 +39,27 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ### Spec context
 
-From specs/04-tracing.md:
+From about-sevn.bot/specs/04-tracing.md:
 Provide durable trace sinks that implement TraceSink without ever throwing through emit, so instrumentation stays off the critical path. SQLite layout matches Mission Control query patterns (prd-07-mi
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/tracing/` (23 Python files). Normative design: `specs/04-tracing.md`.
+Primary source tree: `src/sevn/tracing/` (23 Python files). Normative design: `about-sevn.bot/specs/04-tracing.md`.
 
 ### Module inventory
 
 - `src/sevn/agent/tracing/__init__.py` — """Tracing and telemetry hooks.
-- `src/sevn/agent/tracing/agent_context.py` — """Structured agent-context snapshots for trace export ('specs/04-tracing.md').
-- `src/sevn/agent/tracing/attrs.py` — """Trace ''attrs'' normalization ('specs/04-tracing.md' §7).
-- `src/sevn/agent/tracing/emit.py` — """In-process trace fan-out before persistence ('specs/04-tracing.md' §2).
-- `src/sevn/agent/tracing/logfire_config.py` — """Logfire trace export helpers for operator toggles ('specs/04-tracing.md').
-- `src/sevn/agent/tracing/multi_sink.py` — """Compose multiple ''TraceSink'' instances ('specs/04-tracing.md' §2).
+- `src/sevn/agent/tracing/agent_context.py` — """Structured agent-context snapshots for trace export ('about-sevn.bot/specs/04-tracing.md').
+- `src/sevn/agent/tracing/attrs.py` — """Trace ''attrs'' normalization ('about-sevn.bot/specs/04-tracing.md' §7).
+- `src/sevn/agent/tracing/emit.py` — """In-process trace fan-out before persistence ('about-sevn.bot/specs/04-tracing.md' §2).
+- `src/sevn/agent/tracing/logfire_config.py` — """Logfire trace export helpers for operator toggles ('about-sevn.bot/specs/04-tracing.md').
+- `src/sevn/agent/tracing/multi_sink.py` — """Compose multiple ''TraceSink'' instances ('about-sevn.bot/specs/04-tracing.md' §2).
 - `src/sevn/agent/tracing/otel_pipeline.py` — """Backward-compatible re-export of ''sevn.tracing.otel_pipeline''.
-- `src/sevn/agent/tracing/otel_sink.py` — """OTLP HTTP trace exporter sink with bounded queue backpressure ('specs/04-tracing.md').
+- `src/sevn/agent/tracing/otel_sink.py` — """OTLP HTTP trace exporter sink with bounded queue backpressure ('about-sevn.bot/specs/04-tracing.md').
 - `src/sevn/agent/tracing/provider_call.py` — """Canonical ''provider.call'' trace emission for dashboard budget and provider stats.
-- `src/sevn/agent/tracing/redacting_sink.py` — """Trace redaction wrapper applied once before sink fan-out ('specs/04-tracing.md' §2.5).
-- `src/sevn/agent/tracing/redaction_config.py` — """Trace redaction JSON helpers for operator toggles ('specs/04-tracing.md' §2.5).
-- `src/sevn/agent/tracing/rotating_jsonl_sink.py` — """Daily UTC JSONL trace sink under ''layout.traces_dir'' ('specs/04-tracing.md' §2).
+- `src/sevn/agent/tracing/redacting_sink.py` — """Trace redaction wrapper applied once before sink fan-out ('about-sevn.bot/specs/04-tracing.md' §2.5).
+- `src/sevn/agent/tracing/redaction_config.py` — """Trace redaction JSON helpers for operator toggles ('about-sevn.bot/specs/04-tracing.md' §2.5).
+- `src/sevn/agent/tracing/rotating_jsonl_sink.py` — """Daily UTC JSONL trace sink under ''layout.traces_dir'' ('about-sevn.bot/specs/04-tracing.md' §2).
 - … and 11 more Python modules
 
 ### Agent Context (`src/sevn/agent/tracing/agent_context.py`)
@@ -130,15 +130,15 @@ Public entry points:
 
 ### Extension and invariants
 
-Follow `specs/04-tracing.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/tracing/`, run `sevn readme update tracing` and `make readme-check`.
+Follow `about-sevn.bot/specs/04-tracing.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/tracing/`, run `sevn readme update tracing` and `make readme-check`.
 
 ## References
 
-- [specs/04-tracing.md](specs/04-tracing.md)
+- [../../about-sevn.bot/specs/04-tracing.md](../../about-sevn.bot/specs/04-tracing.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
-[spec-link]: specs/04-tracing.md
+[spec-link]: ../../about-sevn.bot/specs/04-tracing.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/tracing/
+[source-link]: ../../src/sevn/tracing/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md

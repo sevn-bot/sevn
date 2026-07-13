@@ -27,7 +27,7 @@ Second brain sits in the sevn.bot turn spine: a channel delivers a message, the 
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `specs/27-second-brain.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/27-second-brain.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
 
 ### Key modules
 
@@ -39,27 +39,27 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ### Spec context
 
-From specs/27-second-brain.md:
+From about-sevn.bot/specs/27-second-brain.md:
 Deliver the Second Brain subsystem: filesystem wiki engine + agent surface so operators curate sources in raw/ and maintain a structured wiki/ with index.md, log.md, lint reports, and provenance-beari
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/second_brain/` (18 Python files). Normative design: `specs/27-second-brain.md`.
+Primary source tree: `src/sevn/second_brain/` (18 Python files). Normative design: `about-sevn.bot/specs/27-second-brain.md`.
 
 ### Module inventory
 
-- `src/sevn/second_brain/__init__.py` — """Second Brain wiki engine + tool registration ('specs/27-second-brain.md' section 2.1-2.2).
-- `src/sevn/second_brain/bootstrap.py` — """Idempotent Second Brain scope layout bootstrap ('specs/27-second-brain.md' §3.2).
-- `src/sevn/second_brain/errors.py` — """Second Brain failure types ('specs/27-second-brain.md' §6).
-- `src/sevn/second_brain/fetch.py` — """HTTPS URL → ''raw/'' fetch helper ('specs/27-second-brain.md' §2.4, §5).
+- `src/sevn/second_brain/__init__.py` — """Second Brain wiki engine + tool registration ('about-sevn.bot/specs/27-second-brain.md' section 2.1-2.2).
+- `src/sevn/second_brain/bootstrap.py` — """Idempotent Second Brain scope layout bootstrap ('about-sevn.bot/specs/27-second-brain.md' §3.2).
+- `src/sevn/second_brain/errors.py` — """Second Brain failure types ('about-sevn.bot/specs/27-second-brain.md' §6).
+- `src/sevn/second_brain/fetch.py` — """HTTPS URL → ''raw/'' fetch helper ('about-sevn.bot/specs/27-second-brain.md' §2.4, §5).
 - `src/sevn/second_brain/folder_picker.py` — """Workspace-relative folder browser helpers for Second Brain vault pickers.
-- `src/sevn/second_brain/frontmatter.py` — """YAML frontmatter parse/merge for wiki pages ('specs/27-second-brain.md' §3.3).
-- `src/sevn/second_brain/ingest.py` — """Deterministic raw→wiki ingest pipeline ('specs/27-second-brain.md' §2.2).
-- `src/sevn/second_brain/ingest_stub.py` — """Idempotent stub ingest ('specs/27-second-brain.md' §2.2).
+- `src/sevn/second_brain/frontmatter.py` — """YAML frontmatter parse/merge for wiki pages ('about-sevn.bot/specs/27-second-brain.md' §3.3).
+- `src/sevn/second_brain/ingest.py` — """Deterministic raw→wiki ingest pipeline ('about-sevn.bot/specs/27-second-brain.md' §2.2).
+- `src/sevn/second_brain/ingest_stub.py` — """Idempotent stub ingest ('about-sevn.bot/specs/27-second-brain.md' §2.2).
 - `src/sevn/second_brain/layout_probe.py` — """Second Brain vault layout checks for ''sevn doctor''.
 - `src/sevn/second_brain/links.py` — """Internal wiki link extraction and resolution (OKF + Obsidian wikilinks).
-- `src/sevn/second_brain/lint_local.py` — """Local wiki lint rules ('specs/27-second-brain.md' §2.2).
-- `src/sevn/second_brain/merge.py` — """Optional git merge conflict path ('specs/27-second-brain.md' §4, PRD §5.8).
+- `src/sevn/second_brain/lint_local.py` — """Local wiki lint rules ('about-sevn.bot/specs/27-second-brain.md' §2.2).
+- `src/sevn/second_brain/merge.py` — """Optional git merge conflict path ('about-sevn.bot/specs/27-second-brain.md' §4, PRD §5.8).
 - … and 6 more Python modules
 
 ###   Init   (`src/sevn/second_brain/__init__.py`)
@@ -130,15 +130,15 @@ Public entry points:
 
 ### Extension and invariants
 
-Follow `specs/27-second-brain.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/second_brain/`, run `sevn readme update second-brain` and `make readme-check`.
+Follow `about-sevn.bot/specs/27-second-brain.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/second_brain/`, run `sevn readme update second-brain` and `make readme-check`.
 
 ## References
 
-- [specs/27-second-brain.md](specs/27-second-brain.md)
+- [../../about-sevn.bot/specs/27-second-brain.md](../../about-sevn.bot/specs/27-second-brain.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
-[spec-link]: specs/27-second-brain.md
+[spec-link]: ../../about-sevn.bot/specs/27-second-brain.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/second_brain/
+[source-link]: ../../src/sevn/second_brain/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md

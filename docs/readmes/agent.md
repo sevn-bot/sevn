@@ -27,7 +27,7 @@ Agent runtime sits in the sevn.bot turn spine: a channel delivers a message, the
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `specs/13-rlm-triager.md`, `specs/14-executor-tier-b.md`, `specs/21-executor-tier-cd.md`, `specs/16-harness-discipline.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/13-rlm-triager.md`, `about-sevn.bot/specs/14-executor-tier-b.md`, `about-sevn.bot/specs/21-executor-tier-cd.md`, `about-sevn.bot/specs/16-harness-discipline.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
 
 ### Key modules
 
@@ -39,36 +39,36 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ### Spec context
 
-From specs/13-rlm-triager.md:
+From about-sevn.bot/specs/13-rlm-triager.md:
 The Triager is the routing brain (prd-04-getting-things-done §5.1–§5.2): a single, tool-less outbound generation step that emits validated TriageResult consumed by tier dispatch (A / B / C / D), MCP e
 
-From specs/14-executor-tier-b.md:
+From about-sevn.bot/specs/14-executor-tier-b.md:
 Tier B is the default “do work” executor for messages the Triager classifies as complexity == B (prd-04-getting-things-done §5.2): a single pydantic-ai Agent loop over the user’s incoming_text, with t
 
-From specs/21-executor-tier-cd.md:
+From about-sevn.bot/specs/21-executor-tier-cd.md:
 Tier C/D is the planned-work executor for messages the Triager classifies as complexity == C or complexity == D (prd-04-getting-things-done §5.3–§5.4): structured planning, optional owner approval (Pl
 
-From specs/16-harness-discipline.md:
+From about-sevn.bot/specs/16-harness-discipline.md:
 45# Harness discipline — Spec
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/agent/` (90 Python files). Normative design: `specs/13-rlm-triager.md`, `specs/14-executor-tier-b.md`, `specs/21-executor-tier-cd.md`, `specs/16-harness-discipline.md`.
+Primary source tree: `src/sevn/agent/` (90 Python files). Normative design: `about-sevn.bot/specs/13-rlm-triager.md`, `about-sevn.bot/specs/14-executor-tier-b.md`, `about-sevn.bot/specs/21-executor-tier-cd.md`, `about-sevn.bot/specs/16-harness-discipline.md`.
 
 ### Module inventory
 
 - `src/sevn/agent/__init__.py` — """Agent runtime and orchestration (scaffold).
 - `src/sevn/agent/adapters/__init__.py` — """Framework adapter entrypoints bridging ''ToolSet'' + ''ToolExecutor''.
 - `src/sevn/agent/adapters/_monty_limits.py` — """Inject Monty ''ResourceLimits'' into CodeMode's sandbox REPL.
-- `src/sevn/agent/adapters/dspy_adapter.py` — """DSPy + λ-RLM adapter scaffolding ('specs/11-tools-registry.md' §2.6).
+- `src/sevn/agent/adapters/dspy_adapter.py` — """DSPy + λ-RLM adapter scaffolding ('about-sevn.bot/specs/11-tools-registry.md' §2.6).
 - `src/sevn/agent/adapters/egress_bridge.py` — """httpx egress bridge for native pydantic-ai models via the sevn proxy (W2).
 - `src/sevn/agent/adapters/minimax_wrapper_model.py` — """MiniMax native-model wrappers: Anthropic XML recovery + OpenAI settings hygiene.
 - `src/sevn/agent/adapters/native_model.py` — """Native pydantic-ai model factory behind per-slot flags (W3).
-- `src/sevn/agent/adapters/pydantic_adapter.py` — """Pydantic AI adapter surfaces (tier B scaffolding) ('specs/11-tools-registry.md' §2.6).
+- `src/sevn/agent/adapters/pydantic_adapter.py` — """Pydantic AI adapter surfaces (tier B scaffolding) ('about-sevn.bot/specs/11-tools-registry.md' §2.6).
 - `src/sevn/agent/adapters/tier_b_capabilities.py` — """Provider-adaptive WebSearch/WebFetch + Thinking for tier B (W7).
-- `src/sevn/agent/adapters/tier_b_codemode.py` — """Tier-B CodeMode helpers ('specs/14-executor-tier-b.md' W8; D8/D9).
-- `src/sevn/agent/adapters/tier_b_hooks.py` — """Tier-B pydantic-ai lifecycle hooks ('specs/14-executor-tier-b.md'; W5).
-- `src/sevn/agent/adapters/tier_b_model.py` — """OpenAI Chat Completions bridge for tier-B ''FunctionModel'' ('specs/14-executor-tier-b.md' §2.3).
+- `src/sevn/agent/adapters/tier_b_codemode.py` — """Tier-B CodeMode helpers ('about-sevn.bot/specs/14-executor-tier-b.md' W8; D8/D9).
+- `src/sevn/agent/adapters/tier_b_hooks.py` — """Tier-B pydantic-ai lifecycle hooks ('about-sevn.bot/specs/14-executor-tier-b.md'; W5).
+- `src/sevn/agent/adapters/tier_b_model.py` — """OpenAI Chat Completions bridge for tier-B ''FunctionModel'' ('about-sevn.bot/specs/14-executor-tier-b.md' §2.3).
 - … and 78 more Python modules
 
 ###  Monty Limits (`src/sevn/agent/adapters/_monty_limits.py`)
@@ -144,18 +144,18 @@ Public entry points:
 
 ### Extension and invariants
 
-Follow `specs/13-rlm-triager.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/agent/`, run `sevn readme update agent` and `make readme-check`.
+Follow `about-sevn.bot/specs/13-rlm-triager.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/agent/`, run `sevn readme update agent` and `make readme-check`.
 
 ## References
 
-- [specs/13-rlm-triager.md](specs/13-rlm-triager.md)
-- [specs/14-executor-tier-b.md](specs/14-executor-tier-b.md)
-- [specs/21-executor-tier-cd.md](specs/21-executor-tier-cd.md)
-- [specs/16-harness-discipline.md](specs/16-harness-discipline.md)
+- [../../about-sevn.bot/specs/13-rlm-triager.md](../../about-sevn.bot/specs/13-rlm-triager.md)
+- [../../about-sevn.bot/specs/14-executor-tier-b.md](../../about-sevn.bot/specs/14-executor-tier-b.md)
+- [../../about-sevn.bot/specs/21-executor-tier-cd.md](../../about-sevn.bot/specs/21-executor-tier-cd.md)
+- [../../about-sevn.bot/specs/16-harness-discipline.md](../../about-sevn.bot/specs/16-harness-discipline.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
-[spec-link]: specs/13-rlm-triager.md
+[spec-link]: ../../about-sevn.bot/specs/13-rlm-triager.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/agent/
+[source-link]: ../../src/sevn/agent/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md

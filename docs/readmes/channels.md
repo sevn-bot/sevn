@@ -27,7 +27,7 @@ Channels sits in the sevn.bot turn spine: a channel delivers a message, the gate
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `specs/18-channel-telegram.md`, `specs/19-channel-webui.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/18-channel-telegram.md`, `about-sevn.bot/specs/19-channel-webui.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
 
 ### Key modules
 
@@ -39,27 +39,27 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ### Spec context
 
-From specs/18-channel-telegram.md:
+From about-sevn.bot/specs/18-channel-telegram.md:
 Deliver the primary daily-driver channel for personal messaging: a ChannelAdapter implementation that normalises Telegram Updates into spec-17-gateway IncomingMessage / OutgoingMessage and implements
 
-From specs/19-channel-webui.md:
+From about-sevn.bot/specs/19-channel-webui.md:
 Deliver the browser conversational surface required by prd-01-conversational-experience §5.1: owner-only WebSocket chat, static SPA shell, and session continuity with Telegram via the shared SessionMa
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/channels/` (35 Python files). Normative design: `specs/18-channel-telegram.md`, `specs/19-channel-webui.md`.
+Primary source tree: `src/sevn/channels/` (35 Python files). Normative design: `about-sevn.bot/specs/18-channel-telegram.md`, `about-sevn.bot/specs/19-channel-webui.md`.
 
 ### Module inventory
 
 - `src/sevn/channels/__init__.py` — """Messaging channel adapters.
 - `src/sevn/channels/_common.py` — """Shared helpers for channel adapters.
-- `src/sevn/channels/callback_overflow.py` — """Telegram ''callback_data'' overflow via ''dispatcher_state'' ('specs/18-channel-telegram.md' §3.1, §4.5).
+- `src/sevn/channels/callback_overflow.py` — """Telegram ''callback_data'' overflow via ''dispatcher_state'' ('about-sevn.bot/specs/18-channel-telegram.md' §3.1, §4.5).
 - `src/sevn/channels/discord.py` — """Discord channel adapter — webhook-first slice.
 - `src/sevn/channels/markdown_safe.py` — r"""MarkdownV2 escape pipeline for outbound Telegram text ('PROBLEMS.md' §9).
-- `src/sevn/channels/self_improve_copy.py` — """Owner-facing Telegram copy for improve-job transitions ('specs/33-self-improvement.md' §10.6).
+- `src/sevn/channels/self_improve_copy.py` — """Owner-facing Telegram copy for improve-job transitions ('about-sevn.bot/specs/33-self-improvement.md' §10.6).
 - `src/sevn/channels/slack.py` — """Slack channel adapter — Events API slice.
 - `src/sevn/channels/stub.py` — """Stub channel adapter for Tier 2/3 platforms.
-- `src/sevn/channels/telegram.py` — """Telegram channel adapter facade ('specs/18-channel-telegram.md').
+- `src/sevn/channels/telegram.py` — """Telegram channel adapter facade ('about-sevn.bot/specs/18-channel-telegram.md').
 - `src/sevn/channels/telegram_api.py` — """Bot API HTTP transport for TelegramAdapter.
 - `src/sevn/channels/telegram_capabilities.py` — """Bot API 10.1 rich-message capability probe (R1, D2).
 - `src/sevn/channels/telegram_config.py` — """Telegram adapter configuration, text utilities, and workspace wiring.
@@ -137,16 +137,16 @@ Public entry points:
 
 ### Extension and invariants
 
-Follow `specs/18-channel-telegram.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/channels/`, run `sevn readme update channels` and `make readme-check`.
+Follow `about-sevn.bot/specs/18-channel-telegram.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/channels/`, run `sevn readme update channels` and `make readme-check`.
 
 ## References
 
-- [specs/18-channel-telegram.md](specs/18-channel-telegram.md)
-- [specs/19-channel-webui.md](specs/19-channel-webui.md)
+- [../../about-sevn.bot/specs/18-channel-telegram.md](../../about-sevn.bot/specs/18-channel-telegram.md)
+- [../../about-sevn.bot/specs/19-channel-webui.md](../../about-sevn.bot/specs/19-channel-webui.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
-[spec-link]: specs/18-channel-telegram.md
+[spec-link]: ../../about-sevn.bot/specs/18-channel-telegram.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/channels/
+[source-link]: ../../src/sevn/channels/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md

@@ -27,7 +27,7 @@ Config & workspace sits in the sevn.bot turn spine: a channel delivers a message
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `specs/02-config-and-workspace.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/02-config-and-workspace.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
 
 ### Key modules
 
@@ -39,12 +39,12 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ### Spec context
 
-From specs/02-config-and-workspace.md:
+From about-sevn.bot/specs/02-config-and-workspace.md:
 Provide a single, testable configuration surface before storage, tracing, proxy, and gateway work: locate sevn.json, validate schema_version and structured subtrees needed by early boot, resolve the c
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/config/` (44 Python files). Normative design: `specs/02-config-and-workspace.md`.
+Primary source tree: `src/sevn/config/` (44 Python files). Normative design: `about-sevn.bot/specs/02-config-and-workspace.md`.
 
 ### Module inventory
 
@@ -55,7 +55,7 @@ Primary source tree: `src/sevn/config/` (44 Python files). Normative design: `sp
 - `src/sevn/config/llm_params.py` — """Per-agent LLM call config ('LLM_params_config.json').
 - `src/sevn/config/loader.py` — """Discover and load ''sevn.json'' into typed config + layout.
 - `src/sevn/config/model_resolution.py` — """Resolve model ids per logical slot from workspace config.
-- `src/sevn/config/my_sevn.py` — """''my_sevn'' config helpers ('specs/35-bot-evolution.md').
+- `src/sevn/config/my_sevn.py` — """''my_sevn'' config helpers ('about-sevn.bot/specs/35-bot-evolution.md').
 - `src/sevn/config/provider_credential_validate.py` — """Validate provider credential coverage for assigned model slots (D7).
 - `src/sevn/config/provider_registry.py` — """Resolve provider bindings and credentials from workspace config.
 - `src/sevn/config/provider_secrets.py` — """Canonical provider secret aliases and config binding helpers (D2/D6).
@@ -137,15 +137,15 @@ Public entry points:
 
 ### Extension and invariants
 
-Follow `specs/02-config-and-workspace.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/config/`, run `sevn readme update config-workspace` and `make readme-check`.
+Follow `about-sevn.bot/specs/02-config-and-workspace.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/config/`, run `sevn readme update config-workspace` and `make readme-check`.
 
 ## References
 
-- [specs/02-config-and-workspace.md](specs/02-config-and-workspace.md)
+- [../../about-sevn.bot/specs/02-config-and-workspace.md](../../about-sevn.bot/specs/02-config-and-workspace.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
-[spec-link]: specs/02-config-and-workspace.md
+[spec-link]: ../../about-sevn.bot/specs/02-config-and-workspace.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/config/
+[source-link]: ../../src/sevn/config/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md

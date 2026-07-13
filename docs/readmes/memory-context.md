@@ -27,7 +27,7 @@ Memory & context sits in the sevn.bot turn spine: a channel delivers a message, 
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `specs/15-memory-lcm.md`, `specs/31-memory-dreaming.md`, `specs/32-memory-honcho.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/15-memory-lcm.md`, `about-sevn.bot/specs/31-memory-dreaming.md`, `about-sevn.bot/specs/32-memory-honcho.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
 
 ### Key modules
 
@@ -39,33 +39,33 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ### Spec context
 
-From specs/15-memory-lcm.md:
+From about-sevn.bot/specs/15-memory-lcm.md:
 LCM is the lossless conversation memory for a workspace (prd-02-personality-and-memory §5.2–§5.4): every qualifying message is stored; compaction summarises without deleting source rows; the assembler
 
-From specs/31-memory-dreaming.md:
+From about-sevn.bot/specs/31-memory-dreaming.md:
 Provide scored consolidation from short-term recall signals into curated long-term prose (MEMORY.md) on a daily (configurable) cadence, without mutating LCM tables or crossing into Second Brain (wiki/
 
-From specs/32-memory-honcho.md:
+From about-sevn.bot/specs/32-memory-honcho.md:
 Deliver an opt-in inferred profile that accumulates stable operator-facing facts (preferences, recurring context the operator states in chat) without requiring manual USER.md edits for every drift. Wh
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/memory/` (34 Python files). Normative design: `specs/15-memory-lcm.md`, `specs/31-memory-dreaming.md`, `specs/32-memory-honcho.md`.
+Primary source tree: `src/sevn/memory/` (34 Python files). Normative design: `about-sevn.bot/specs/15-memory-lcm.md`, `about-sevn.bot/specs/31-memory-dreaming.md`, `about-sevn.bot/specs/32-memory-honcho.md`.
 
 ### Module inventory
 
-- `src/sevn/lcm/__init__.py` — """Lossless context management ('specs/15-memory-lcm.md').
-- `src/sevn/lcm/assembler.py` — """Context assembly: fresh tail plus newest-first summaries ('specs/15-memory-lcm.md' §4).
-- `src/sevn/lcm/compaction.py` — """Compaction scheduler — leaf summaries + optional condensation ('specs/15-memory-lcm.md' §2.5, §4).
-- `src/sevn/lcm/engine.py` — """LCM engine façade — ingest, assemble, compaction, search ('specs/15-memory-lcm.md' §2).
+- `src/sevn/lcm/__init__.py` — """Lossless context management ('about-sevn.bot/specs/15-memory-lcm.md').
+- `src/sevn/lcm/assembler.py` — """Context assembly: fresh tail plus newest-first summaries ('about-sevn.bot/specs/15-memory-lcm.md' §4).
+- `src/sevn/lcm/compaction.py` — """Compaction scheduler — leaf summaries + optional condensation ('about-sevn.bot/specs/15-memory-lcm.md' §2.5, §4).
+- `src/sevn/lcm/engine.py` — """LCM engine façade — ingest, assemble, compaction, search ('about-sevn.bot/specs/15-memory-lcm.md' §2).
 - `src/sevn/lcm/flush.py` — """Pre-compaction flush: ''MemoryWrites'' validation and retry-once policy.
-- `src/sevn/lcm/large_files.py` — """Oversized inbound payloads spill into ''lcm_large_files'' ('specs/15-memory-lcm.md' §3).
-- `src/sevn/lcm/query.py` — """Read-only LCM query helpers for bundled skill scripts ('specs/15-memory-lcm.md' §3).
+- `src/sevn/lcm/large_files.py` — """Oversized inbound payloads spill into ''lcm_large_files'' ('about-sevn.bot/specs/15-memory-lcm.md' §3).
+- `src/sevn/lcm/query.py` — """Read-only LCM query helpers for bundled skill scripts ('about-sevn.bot/specs/15-memory-lcm.md' §3).
 - `src/sevn/lcm/script_cli.py` — """Shared CLI helpers for bundled ''lcm'' skill scripts.
 - `src/sevn/lcm/search.py` — """Session-summary keyword search over ''lcm_summaries''.
 - `src/sevn/memory/__init__.py` — """Workspace memory helpers (LCM-adjacent; optional subsystems).
-- `src/sevn/memory/dreaming/__init__.py` — """Optional Dreaming consolidation ('specs/31-memory-dreaming.md')."""
-- `src/sevn/memory/dreaming/ack_policy.py` — """Dreaming ''ack_required'' operator surface ('specs/31-memory-dreaming.md' §2, §11).
+- `src/sevn/memory/dreaming/__init__.py` — """Optional Dreaming consolidation ('about-sevn.bot/specs/31-memory-dreaming.md')."""
+- `src/sevn/memory/dreaming/ack_policy.py` — """Dreaming ''ack_required'' operator surface ('about-sevn.bot/specs/31-memory-dreaming.md' §2, §11).
 - … and 22 more Python modules
 
 ### Assembler (`src/sevn/lcm/assembler.py`)
@@ -132,17 +132,17 @@ Public entry points:
 
 ### Extension and invariants
 
-Follow `specs/15-memory-lcm.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/memory/`, run `sevn readme update memory-context` and `make readme-check`.
+Follow `about-sevn.bot/specs/15-memory-lcm.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/memory/`, run `sevn readme update memory-context` and `make readme-check`.
 
 ## References
 
-- [specs/15-memory-lcm.md](specs/15-memory-lcm.md)
-- [specs/31-memory-dreaming.md](specs/31-memory-dreaming.md)
-- [specs/32-memory-honcho.md](specs/32-memory-honcho.md)
+- [../../about-sevn.bot/specs/15-memory-lcm.md](../../about-sevn.bot/specs/15-memory-lcm.md)
+- [../../about-sevn.bot/specs/31-memory-dreaming.md](../../about-sevn.bot/specs/31-memory-dreaming.md)
+- [../../about-sevn.bot/specs/32-memory-honcho.md](../../about-sevn.bot/specs/32-memory-honcho.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
-[spec-link]: specs/15-memory-lcm.md
+[spec-link]: ../../about-sevn.bot/specs/15-memory-lcm.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/memory/
+[source-link]: ../../src/sevn/memory/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md

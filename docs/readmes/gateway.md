@@ -27,7 +27,7 @@ Gateway sits in the sevn.bot turn spine: a channel delivers a message, the gatew
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `specs/17-gateway.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/17-gateway.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
 
 ### Key modules
 
@@ -39,27 +39,27 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ### Spec context
 
-From specs/17-gateway.md:
+From about-sevn.bot/specs/17-gateway.md:
 Run the long-lived gateway process that accepts channel ingress (Telegram poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner, rate limits), persists session history, an
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/gateway/` (114 Python files). Normative design: `specs/17-gateway.md`.
+Primary source tree: `src/sevn/gateway/` (114 Python files). Normative design: `about-sevn.bot/specs/17-gateway.md`.
 
 ### Module inventory
 
-- `src/sevn/gateway/__init__.py` — """HTTP gateway and session handling ('specs/17-gateway.md').
-- `src/sevn/gateway/admin_secrets.py` — """Gateway-delegated operator secrets API ('specs/23-cli.md' §8, 'specs/06-secrets.md').
-- `src/sevn/gateway/agent_turn.py` — """Production agent dispatch glue ('specs/17-gateway.md' §2.6).
+- `src/sevn/gateway/__init__.py` — """HTTP gateway and session handling ('about-sevn.bot/specs/17-gateway.md').
+- `src/sevn/gateway/admin_secrets.py` — """Gateway-delegated operator secrets API ('about-sevn.bot/specs/23-cli.md' §8, 'about-sevn.bot/specs/06-secrets.md').
+- `src/sevn/gateway/agent_turn.py` — """Production agent dispatch glue ('about-sevn.bot/specs/17-gateway.md' §2.6).
 - `src/sevn/gateway/auth.py` — """Gateway bearer + Telegram secret + Web UI JWT helpers
-- `src/sevn/gateway/boot.py` — """Gateway boot integration for harness discipline ('specs/16-harness-discipline.md' §2.2).
+- `src/sevn/gateway/boot.py` — """Gateway boot integration for harness discipline ('about-sevn.bot/specs/16-harness-discipline.md' §2.2).
 - `src/sevn/gateway/boot_registry.py` — """Gateway boot and cron reconcile hook registry (CW-2).
-- `src/sevn/gateway/bootstrap_capture.py` — """Deterministic USER.md fallback after bootstrap tier-B ('plan/operator-experience-wave-plan.md' Wave 3).
+- `src/sevn/gateway/bootstrap_capture.py` — """Deterministic USER.md fallback after bootstrap tier-B ('the design docs' Wave 3).
 - `src/sevn/gateway/bootstrap_state.py` — """USER.md bootstrap completion helpers without onboarding seed imports.
 - `src/sevn/gateway/browser_lifecycle.py` — """Gateway browser teardown hooks without static ''sevn.skills'' imports.
-- `src/sevn/gateway/cascade_budget.py` — """Cumulative wall-clock budget for the tier B → C/D cascade ('specs/17-gateway.md' §3.4).
+- `src/sevn/gateway/cascade_budget.py` — """Cumulative wall-clock budget for the tier B → C/D cascade ('about-sevn.bot/specs/17-gateway.md' §3.4).
 - `src/sevn/gateway/channel_boot.py` — """Multi-adapter gateway boot loader.
-- `src/sevn/gateway/channel_router.py` — """Unified inbound/outbound orchestration ('specs/17-gateway.md' §2.2-§2.4, §4.3-§4.4).
+- `src/sevn/gateway/channel_router.py` — """Unified inbound/outbound orchestration ('about-sevn.bot/specs/17-gateway.md' §2.2-§2.4, §4.3-§4.4).
 - … and 102 more Python modules
 
 ### Admin Secrets (`src/sevn/gateway/admin_secrets.py`)
@@ -130,15 +130,15 @@ Public entry points:
 
 ### Extension and invariants
 
-Follow `specs/17-gateway.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/gateway/`, run `sevn readme update gateway` and `make readme-check`.
+Follow `about-sevn.bot/specs/17-gateway.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/gateway/`, run `sevn readme update gateway` and `make readme-check`.
 
 ## References
 
-- [specs/17-gateway.md](specs/17-gateway.md)
+- [../../about-sevn.bot/specs/17-gateway.md](../../about-sevn.bot/specs/17-gateway.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
-[spec-link]: specs/17-gateway.md
+[spec-link]: ../../about-sevn.bot/specs/17-gateway.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/gateway/
+[source-link]: ../../src/sevn/gateway/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md

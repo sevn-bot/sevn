@@ -101,7 +101,7 @@ repos:
         entry: uv run python scripts/check_no_design_doc_refs.py
         language: system
         pass_filenames: true
-        files: ^(README\.md|CHANGELOG\.md|about-sevn\.bot/.*|infra/sevn\.schema\.json|infra/sevn\.json\.template|infra/sevn_config_long_description\.json|src/sevn/data/sevn\.schema\.json)$
+        files: ^(README\.md|CHANGELOG\.md|about-sevn\.bot/.*|docs/readmes/.*|infra/ci-workspace/README\.md|infra/sevn\.schema\.json|infra/sevn\.json\.template|infra/sevn_config_long_description\.json|src/sevn/data/sevn\.schema\.json)$
         exclude: ^about-sevn\.bot/_docsys/manifest\.toml$
 
       - id: sevn-about-docs-refs

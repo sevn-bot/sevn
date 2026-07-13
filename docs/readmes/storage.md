@@ -27,7 +27,7 @@ Storage sits in the sevn.bot turn spine: a channel delivers a message, the gatew
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `specs/03-storage.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/03-storage.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
 
 ### Key modules
 
@@ -39,18 +39,18 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ### Spec context
 
-From specs/03-storage.md:
+From about-sevn.bot/specs/03-storage.md:
 Own application persistence: connection setup (WAL, foreign keys), versioned migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence contracts for crash-resume and (w
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/storage/` (7 Python files). Normative design: `specs/03-storage.md`.
+Primary source tree: `src/sevn/storage/` (7 Python files). Normative design: `about-sevn.bot/specs/03-storage.md`.
 
 ### Module inventory
 
 - `src/sevn/storage/__init__.py` — """Workspace persistence — SQLite paths, connections, migrations.
-- `src/sevn/storage/d1.py` — """Cloudflare D1 backend protocol sketch ('specs/03-storage.md' §3.3).
-- `src/sevn/storage/d1_backend.py` — """Cloudflare D1 optional backend ('specs/03-storage.md' §3.3).
+- `src/sevn/storage/d1.py` — """Cloudflare D1 backend protocol sketch ('about-sevn.bot/specs/03-storage.md' §3.3).
+- `src/sevn/storage/d1_backend.py` — """Cloudflare D1 optional backend ('about-sevn.bot/specs/03-storage.md' §3.3).
 - `src/sevn/storage/errors.py` — """Storage layer exceptions.
 - `src/sevn/storage/migrate.py` — """Versioned SQLite migrations for ''sevn.db''.
 - `src/sevn/storage/paths.py` — """Canonical paths for workspace SQLite files.
@@ -94,15 +94,15 @@ Public entry points:
 
 ### Extension and invariants
 
-Follow `specs/03-storage.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/storage/`, run `sevn readme update storage` and `make readme-check`.
+Follow `about-sevn.bot/specs/03-storage.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/storage/`, run `sevn readme update storage` and `make readme-check`.
 
 ## References
 
-- [specs/03-storage.md](specs/03-storage.md)
+- [../../about-sevn.bot/specs/03-storage.md](../../about-sevn.bot/specs/03-storage.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
-[spec-link]: specs/03-storage.md
+[spec-link]: ../../about-sevn.bot/specs/03-storage.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/storage/
+[source-link]: ../../src/sevn/storage/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md

@@ -5,6 +5,7 @@ Depends: pathlib, re
 
 Exports:
     validate_markdown_links — fail when relative links or anchors do not resolve.
+    readme_relative_href — POSIX href from a README output path to a repo target.
 
 Examples:
     >>> from pathlib import Path
@@ -15,6 +16,7 @@ Examples:
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -32,6 +34,53 @@ _HEADING = re.compile(r"^#{1,6}\s+(.+)$", re.MULTILINE)
 # such links are skipped rather than reported broken. They are still validated
 # on operator checkouts where the tree exists.
 _LOCAL_ONLY_TREES = ("specs", "plan", "prd", "examples", "prompts")
+
+
+def readme_relative_href(
+    *,
+    readme_output: str,
+    target: str,
+    repo_root: Path,
+    directory: bool = False,
+) -> str:
+    """Return a POSIX markdown href from a README file to a repo target.
+
+        Args:
+    readme_output (str): Manifest ``output`` path for the emitting README.
+    target (str): Repo-relative path to the link target.
+    repo_root (Path): Repository root.
+    directory (bool): When true, ensure the href ends with ``/``.
+
+        Returns:
+            str: File-relative href suitable for markdown link targets.
+
+        Examples:
+            >>> import tempfile
+            >>> td = Path(tempfile.mkdtemp())
+            >>> readme = td / "docs/readmes/gateway.md"
+            >>> readme.parent.mkdir(parents=True)
+            >>> _ = readme.write_text("# Gateway\\n", encoding="utf-8")
+            >>> spec = td / "about-sevn.bot/specs/17-gateway.md"
+            >>> spec.parent.mkdir(parents=True)
+            >>> _ = spec.write_text("# Spec\\n", encoding="utf-8")
+            >>> readme_relative_href(
+            ...     readme_output="docs/readmes/gateway.md",
+            ...     target="about-sevn.bot/specs/17-gateway.md",
+            ...     repo_root=td,
+            ... )
+            '../../about-sevn.bot/specs/17-gateway.md'
+    """
+    repo_root = repo_root.resolve()
+    readme_dir = (repo_root / readme_output).resolve().parent
+    target_path = (repo_root / target).resolve()
+    if directory and (
+        target_path.is_file() or (not target_path.exists() and not target.endswith("/"))
+    ):
+        target_path = target_path.parent
+    href = Path(os.path.relpath(target_path, readme_dir)).as_posix()
+    if directory and not href.endswith("/"):
+        href += "/"
+    return href
 
 
 def validate_markdown_links(
@@ -111,6 +160,9 @@ def _validate_one_link(raw: str, *, readme_dir: Path, repo_root: Path) -> str | 
     if not path_part:
         return None
 
+    if _skip_local_only_tree_link(path_part, repo_root=repo_root):
+        return None
+
     candidate = _resolve_link_target(path_part, readme_dir=readme_dir, repo_root=repo_root)
     try:
         candidate.relative_to(repo_root)
@@ -136,15 +188,15 @@ def _validate_one_link(raw: str, *, readme_dir: Path, repo_root: Path) -> str | 
 
 
 def _resolve_link_target(path_part: str, *, readme_dir: Path, repo_root: Path) -> Path:
-    """Resolve a relative link against readme dir then repo root.
+    """Resolve a relative link against the README's own directory only.
 
         Args:
     path_part (str): Path portion of a markdown link (no anchor).
     readme_dir (Path): Directory containing the README.
-    repo_root (Path): Repository root.
+    repo_root (Path): Repository root (unused; kept for call-site stability).
 
         Returns:
-            Path: Best-effort resolved target path.
+            Path: Resolved target path.
 
         Examples:
             >>> import tempfile
@@ -152,15 +204,39 @@ def _resolve_link_target(path_part: str, *, readme_dir: Path, repo_root: Path) -
             >>> target = td / "src/a.py"
             >>> target.parent.mkdir(parents=True)
             >>> _ = target.write_text("x\\n", encoding="utf-8")
-            >>> _resolve_link_target("src/a.py", readme_dir=td / "docs", repo_root=td).name
+            >>> resolved = _resolve_link_target(
+            ...     "../../src/a.py",
+            ...     readme_dir=td / "docs/readmes",
+            ...     repo_root=td,
+            ... )
+            >>> resolved.name
             'a.py'
     """
-    from_readme = (readme_dir / path_part).resolve()
-    from_root = (repo_root / path_part).resolve()
-    for candidate in (from_readme, from_root):
-        if candidate.is_file() or candidate.is_dir():
-            return candidate
-    return from_root
+    _ = repo_root
+    return (readme_dir / path_part).resolve()
+
+
+def _skip_local_only_tree_link(path_part: str, *, repo_root: Path) -> bool:
+    """Return True when a repo-root local-only tree link should be skipped.
+
+        Args:
+    path_part (str): Path portion of a markdown link (no anchor).
+    repo_root (Path): Repository root.
+
+        Returns:
+            bool: True when the link targets a gitignored tree absent on this clone.
+
+        Examples:
+            >>> import tempfile
+            >>> td = Path(tempfile.mkdtemp())
+            >>> _skip_local_only_tree_link("specs/17-gateway.md", repo_root=td)
+            True
+    """
+    normalized = path_part.replace("\\", "/").lstrip("./")
+    first = normalized.split("/", maxsplit=1)[0]
+    if first not in _LOCAL_ONLY_TREES:
+        return False
+    return not (repo_root / first).is_dir()
 
 
 def _anchor_exists(text: str, anchor: str) -> bool:

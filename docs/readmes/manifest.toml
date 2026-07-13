@@ -15,12 +15,11 @@ output = "README.md"
 source_globs = [
   "pyproject.toml",
   "CLAUDE.md",
-  "evolution/ARCHITECTURE.md",
   "about-sevn.bot/ARCHITECTURE.md",
   "docs/readmes/manifest.toml",
   "docs/brand/root-intro.toml",
 ]
-specs = ["specs/01-system-overview.md"]
+specs = ["about-sevn.bot/specs/01-system-overview.md"]
 
 [[readme]]
 slug = "gateway"
@@ -30,7 +29,8 @@ profile = "subsystem"
 tier_owner = "gateway"
 output = "docs/readmes/gateway.md"
 source_globs = ["src/sevn/gateway/**"]
-specs = ["specs/17-gateway.md"]
+turn_spine = true
+specs = ["about-sevn.bot/specs/17-gateway.md"]
 
 [[readme]]
 slug = "agent"
@@ -40,11 +40,12 @@ profile = "subsystem"
 tier_owner = "agent"
 output = "docs/readmes/agent.md"
 source_globs = ["src/sevn/agent/**"]
+turn_spine = true
 specs = [
-  "specs/13-rlm-triager.md",
-  "specs/14-executor-tier-b.md",
-  "specs/21-executor-tier-cd.md",
-  "specs/16-harness-discipline.md",
+  "about-sevn.bot/specs/13-rlm-triager.md",
+  "about-sevn.bot/specs/14-executor-tier-b.md",
+  "about-sevn.bot/specs/21-executor-tier-cd.md",
+  "about-sevn.bot/specs/16-harness-discipline.md",
 ]
 
 [[readme]]
@@ -55,9 +56,10 @@ profile = "subsystem"
 tier_owner = "channels"
 output = "docs/readmes/channels.md"
 source_globs = ["src/sevn/channels/**"]
+turn_spine = true
 specs = [
-  "specs/18-channel-telegram.md",
-  "specs/19-channel-webui.md",
+  "about-sevn.bot/specs/18-channel-telegram.md",
+  "about-sevn.bot/specs/19-channel-webui.md",
 ]
 
 [[readme]]
@@ -68,7 +70,7 @@ profile = "catalog"
 tier_owner = "tools"
 output = "docs/readmes/tools.md"
 source_globs = ["src/sevn/tools/**"]
-specs = ["specs/11-tools-registry.md"]
+specs = ["about-sevn.bot/specs/11-tools-registry.md"]
 
 [[readme]]
 slug = "skills"
@@ -82,7 +84,7 @@ source_globs = [
   "src/sevn/data/bundled_skills/**",
   "src/sevn/data/skills_index.py",
 ]
-specs = ["specs/12-skills-system.md"]
+specs = ["about-sevn.bot/specs/12-skills-system.md"]
 
 [[readme]]
 slug = "ui-mission-control"
@@ -93,8 +95,8 @@ tier_owner = "ui"
 output = "docs/readmes/ui-mission-control.md"
 source_globs = ["src/sevn/ui/**"]
 specs = [
-  "specs/24-dashboard.md",
-  "specs/29-openui.md",
+  "about-sevn.bot/specs/24-dashboard.md",
+  "about-sevn.bot/specs/29-openui.md",
 ]
 
 [[readme]]
@@ -105,7 +107,7 @@ profile = "subsystem"
 tier_owner = "security"
 output = "docs/readmes/security.md"
 source_globs = ["src/sevn/security/**"]
-specs = ["specs/09-security-scanner.md"]
+specs = ["about-sevn.bot/specs/09-security-scanner.md"]
 
 [[readme]]
 slug = "secrets"
@@ -118,7 +120,7 @@ source_globs = [
   "src/sevn/secrets/**",
   "src/sevn/security/secrets/**",
 ]
-specs = ["specs/06-secrets.md"]
+specs = ["about-sevn.bot/specs/06-secrets.md"]
 
 [[readme]]
 slug = "proxy-egress"
@@ -129,8 +131,8 @@ tier_owner = "infra"
 output = "docs/readmes/proxy-egress.md"
 source_globs = ["src/sevn/proxy/**"]
 specs = [
-  "specs/05-llm-transports.md",
-  "specs/07-egress-proxy.md",
+  "about-sevn.bot/specs/05-llm-transports.md",
+  "about-sevn.bot/specs/07-egress-proxy.md",
 ]
 
 [[readme]]
@@ -144,7 +146,7 @@ source_globs = [
   "src/sevn/tracing/**",
   "src/sevn/agent/tracing/**",
 ]
-specs = ["specs/04-tracing.md"]
+specs = ["about-sevn.bot/specs/04-tracing.md"]
 
 [[readme]]
 slug = "memory-context"
@@ -158,9 +160,9 @@ source_globs = [
   "src/sevn/lcm/**",
 ]
 specs = [
-  "specs/15-memory-lcm.md",
-  "specs/31-memory-dreaming.md",
-  "specs/32-memory-honcho.md",
+  "about-sevn.bot/specs/15-memory-lcm.md",
+  "about-sevn.bot/specs/31-memory-dreaming.md",
+  "about-sevn.bot/specs/32-memory-honcho.md",
 ]
 
 [[readme]]
@@ -171,7 +173,7 @@ profile = "subsystem"
 tier_owner = "memory"
 output = "docs/readmes/second-brain.md"
 source_globs = ["src/sevn/second_brain/**"]
-specs = ["specs/27-second-brain.md"]
+specs = ["about-sevn.bot/specs/27-second-brain.md"]
 
 [[readme]]
 slug = "voice"
@@ -181,7 +183,8 @@ profile = "subsystem"
 tier_owner = "channels"
 output = "docs/readmes/voice.md"
 source_globs = ["src/sevn/voice/**"]
-specs = ["specs/20-voice.md"]
+turn_spine = true
+specs = ["about-sevn.bot/specs/20-voice.md"]
 
 [[readme]]
 slug = "triggers"
@@ -191,7 +194,7 @@ profile = "subsystem"
 tier_owner = "gateway"
 output = "docs/readmes/triggers.md"
 source_globs = ["src/sevn/triggers/**"]
-specs = ["specs/30-non-interactive-triggers.md"]
+specs = ["about-sevn.bot/specs/30-non-interactive-triggers.md"]
 
 [[readme]]
 slug = "config-workspace"
@@ -205,7 +208,7 @@ source_globs = [
   "src/sevn/workspace/**",
   "infra/sevn.schema.json",
 ]
-specs = ["specs/02-config-and-workspace.md"]
+specs = ["about-sevn.bot/specs/02-config-and-workspace.md"]
 
 [[readme]]
 slug = "storage"
@@ -215,7 +218,7 @@ profile = "subsystem"
 tier_owner = "infra"
 output = "docs/readmes/storage.md"
 source_globs = ["src/sevn/storage/**"]
-specs = ["specs/03-storage.md"]
+specs = ["about-sevn.bot/specs/03-storage.md"]
 
 [[readme]]
 slug = "code-understanding"
@@ -225,7 +228,7 @@ profile = "subsystem"
 tier_owner = "code"
 output = "docs/readmes/code-understanding.md"
 source_globs = ["src/sevn/code_understanding/**"]
-specs = ["specs/28-code-understanding.md"]
+specs = ["about-sevn.bot/specs/28-code-understanding.md"]
 
 [[readme]]
 slug = "self-improve"
@@ -235,7 +238,7 @@ profile = "subsystem"
 tier_owner = "agent"
 output = "docs/readmes/self-improve.md"
 source_globs = ["src/sevn/self_improve/**"]
-specs = ["specs/33-self-improvement.md"]
+specs = ["about-sevn.bot/specs/33-self-improvement.md"]
 curated = true
 
 [[readme]]
@@ -246,7 +249,7 @@ profile = "subsystem"
 tier_owner = "integrations"
 output = "docs/readmes/integrations.md"
 source_globs = ["src/sevn/integrations/**"]
-specs = ["specs/34-plugin-hooks.md"]
+specs = ["about-sevn.bot/specs/34-plugin-hooks.md"]
 
 [[readme]]
 slug = "onboarding"
@@ -260,7 +263,7 @@ source_globs = [
   "src/sevn/cli/commands/onboard.py",
   "src/sevn/data/onboarding_profiles/**",
 ]
-specs = ["specs/22-onboarding.md", "specs/23-cli.md"]
+specs = ["about-sevn.bot/specs/22-onboarding.md", "about-sevn.bot/specs/23-cli.md"]
 
 [[readme]]
 slug = "subagents"
@@ -278,11 +281,12 @@ source_globs = [
   "src/sevn/gateway/mission_subagents_snapshot.py",
   "src/sevn/cli/commands/subagents_cmd.py",
 ]
+turn_spine = true
 specs = [
-  "specs/36-sub-agents.md",
-  "specs/17-gateway.md",
-  "specs/13-rlm-triager.md",
-  "specs/14-executor-tier-b.md",
+  "about-sevn.bot/specs/36-sub-agents.md",
+  "about-sevn.bot/specs/17-gateway.md",
+  "about-sevn.bot/specs/13-rlm-triager.md",
+  "about-sevn.bot/specs/14-executor-tier-b.md",
 ]
 curated = true
 

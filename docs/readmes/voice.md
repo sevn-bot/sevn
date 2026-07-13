@@ -27,7 +27,7 @@ Voice sits in the sevn.bot turn spine: a channel delivers a message, the gateway
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `specs/20-voice.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/20-voice.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
 
 ### Key modules
 
@@ -39,24 +39,24 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ### Spec context
 
-From specs/20-voice.md:
+From about-sevn.bot/specs/20-voice.md:
 Own the provider-chain facades for speech-to-text and text-to-speech so the gateway can:
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/voice/` (10 Python files). Normative design: `specs/20-voice.md`.
+Primary source tree: `src/sevn/voice/` (10 Python files). Normative design: `about-sevn.bot/specs/20-voice.md`.
 
 ### Module inventory
 
 - `src/sevn/voice/__init__.py` — """Voice provider chains (scaffold).
-- `src/sevn/voice/backends.py` — """STT/TTS backend registry ('specs/20-voice.md' §2.4).
-- `src/sevn/voice/egress.py` — """Egress base URL for voice HTTP clients ('specs/20-voice.md' §4.2, §10.3).
-- `src/sevn/voice/factory.py` — """Construct voice pipelines from workspace config ('specs/20-voice.md' §5).
+- `src/sevn/voice/backends.py` — """STT/TTS backend registry ('about-sevn.bot/specs/20-voice.md' §2.4).
+- `src/sevn/voice/egress.py` — """Egress base URL for voice HTTP clients ('about-sevn.bot/specs/20-voice.md' §4.2, §10.3).
+- `src/sevn/voice/factory.py` — """Construct voice pipelines from workspace config ('about-sevn.bot/specs/20-voice.md' §5).
 - `src/sevn/voice/host_deps.py` — """Voice-specific host-dependency provisioning: whisper.cpp binary + ffmpeg.
-- `src/sevn/voice/keywords.py` — """Voice trigger keyword matching ('specs/20-voice.md' §4.1, §11).
-- `src/sevn/voice/stt.py` — """Speech-to-text pipeline ('specs/20-voice.md' §2, §4, §6).
-- `src/sevn/voice/trace_events.py` — """Trace helpers for voice spans ('specs/20-voice.md' §7).
-- `src/sevn/voice/tts.py` — """Text-to-speech pipeline ('specs/20-voice.md' §2, §4, §6).
+- `src/sevn/voice/keywords.py` — """Voice trigger keyword matching ('about-sevn.bot/specs/20-voice.md' §4.1, §11).
+- `src/sevn/voice/stt.py` — """Speech-to-text pipeline ('about-sevn.bot/specs/20-voice.md' §2, §4, §6).
+- `src/sevn/voice/trace_events.py` — """Trace helpers for voice spans ('about-sevn.bot/specs/20-voice.md' §7).
+- `src/sevn/voice/tts.py` — """Text-to-speech pipeline ('about-sevn.bot/specs/20-voice.md' §2, §4, §6).
 - `src/sevn/voice/whisper_model_provisioner.py` — """Local GGML whisper.cpp model provisioning (mirrors pyclaww's voice-transcription skill).
 
 ### Backends (`src/sevn/voice/backends.py`)
@@ -133,15 +133,15 @@ Public entry points:
 
 ### Extension and invariants
 
-Follow `specs/20-voice.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/voice/`, run `sevn readme update voice` and `make readme-check`.
+Follow `about-sevn.bot/specs/20-voice.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/voice/`, run `sevn readme update voice` and `make readme-check`.
 
 ## References
 
-- [specs/20-voice.md](specs/20-voice.md)
+- [../../about-sevn.bot/specs/20-voice.md](../../about-sevn.bot/specs/20-voice.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
-[spec-link]: specs/20-voice.md
+[spec-link]: ../../about-sevn.bot/specs/20-voice.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/voice/
+[source-link]: ../../src/sevn/voice/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md

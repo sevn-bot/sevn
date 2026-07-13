@@ -27,7 +27,7 @@ Security scanner sits in the sevn.bot turn spine: a channel delivers a message, 
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `specs/09-security-scanner.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/09-security-scanner.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
 
 ### Key modules
 
@@ -39,19 +39,19 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ### Spec context
 
-From specs/09-security-scanner.md:
+From about-sevn.bot/specs/09-security-scanner.md:
 Deliver a single scanner subsystem that runs in the gateway process so hostile content is filtered before the Triager or any routing model sees user-visible text, transcripts, or selected tool output.
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/security/` (32 Python files). Normative design: `specs/09-security-scanner.md`.
+Primary source tree: `src/sevn/security/` (32 Python files). Normative design: `about-sevn.bot/specs/09-security-scanner.md`.
 
 ### Module inventory
 
-- `src/sevn/security/__init__.py` — """Security policy and sandboxing (''specs/08-sandbox.md'').
-- `src/sevn/security/egress_firewall.py` — """Egress posture helpers inside sandbox namespaces (''specs/08-sandbox.md'' §4.2, §8.2).
-- `src/sevn/security/llm_guard_scanner.py` — """Async LLM Guard scanner entrypoints (''specs/09-security-scanner.md'' §2.1).
-- `src/sevn/security/llmignore.py` — """''.llmignore/'' layout helpers (''specs/09-security-scanner.md'' §2.2, §4.4).
+- `src/sevn/security/__init__.py` — """Security policy and sandboxing (''about-sevn.bot/specs/08-sandbox.md'').
+- `src/sevn/security/egress_firewall.py` — """Egress posture helpers inside sandbox namespaces (''about-sevn.bot/specs/08-sandbox.md'' §4.2, §8.2).
+- `src/sevn/security/llm_guard_scanner.py` — """Async LLM Guard scanner entrypoints (''about-sevn.bot/specs/09-security-scanner.md'' §2.1).
+- `src/sevn/security/llmignore.py` — """''.llmignore/'' layout helpers (''about-sevn.bot/specs/09-security-scanner.md'' §2.2, §4.4).
 - `src/sevn/security/oauth/__init__.py` — """Codex (ChatGPT subscription) OAuth for sevn LLM transports (W0 scaffold).
 - `src/sevn/security/oauth/authorize.py` — """Authorize-URL builder for Codex OAuth (W2).
 - `src/sevn/security/oauth/callback.py` — """Local OAuth callback server for Codex PKCE (W2, D5).
@@ -115,15 +115,15 @@ Public entry points:
 
 ### Extension and invariants
 
-Follow `specs/09-security-scanner.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/security/`, run `sevn readme update security` and `make readme-check`.
+Follow `about-sevn.bot/specs/09-security-scanner.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/security/`, run `sevn readme update security` and `make readme-check`.
 
 ## References
 
-- [specs/09-security-scanner.md](specs/09-security-scanner.md)
+- [../../about-sevn.bot/specs/09-security-scanner.md](../../about-sevn.bot/specs/09-security-scanner.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
-[spec-link]: specs/09-security-scanner.md
+[spec-link]: ../../about-sevn.bot/specs/09-security-scanner.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/security/
+[source-link]: ../../src/sevn/security/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md
