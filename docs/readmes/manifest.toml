@@ -77,6 +77,7 @@ slug = "skills"
 title = "Skills system"
 summary = "Curated inventory of bundled and workspace skills, loaders, and subprocess runners."
 profile = "catalog"
+catalog = "skills"
 tier_owner = "skills"
 output = "docs/readmes/skills.md"
 source_globs = [

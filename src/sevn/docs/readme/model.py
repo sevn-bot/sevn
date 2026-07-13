@@ -30,6 +30,7 @@ from typing import Any
 from sevn.docs.readme.links import readme_relative_href
 from sevn.docs.readme.manifest import ReadmeEntry
 
+_MODULES_CATALOG_CAP = 200
 _SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s")
 _ABBREV_BEFORE_PERIOD = frozenset(
     {
@@ -221,20 +222,21 @@ def assemble_template_context(
     elif entry.profile == "index":
         base["entries"] = sections.get("entries", [])
     elif entry.profile == "catalog":
-        items = sections.get("items", [])
-        if repo_root is not None:
-            items = [
-                {
-                    **item,
-                    "path": readme_relative_href(
-                        readme_output=entry.output,
-                        target=str(item["path"]),
-                        repo_root=repo_root,
-                    ),
-                }
-                for item in items
-            ]
-        base["items"] = items
+        if entry.catalog == "skills":
+            bundled = sections.get("bundled_items", [])
+            runtime = sections.get("runtime_items", [])
+            if repo_root is not None:
+                bundled = _catalog_items_with_hrefs(bundled, entry=entry, repo_root=repo_root)
+                runtime = _catalog_items_with_hrefs(runtime, entry=entry, repo_root=repo_root)
+            base["catalog_kind"] = "skills"
+            base["bundled_items"] = bundled
+            base["runtime_items"] = runtime
+        else:
+            items = sections.get("items", [])
+            if repo_root is not None:
+                items = _catalog_items_with_hrefs(items, entry=entry, repo_root=repo_root)
+            base["catalog_kind"] = "modules"
+            base["items"] = items
     elif entry.profile == "guide":
         base["steps"] = sections.get("steps", [])
         refs = sections.get("references", list(entry.specs))
@@ -411,24 +413,139 @@ def _offline_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[
         Examples:
             >>> _offline_catalog_sections(
             ...     ReadmeEntry("tools", "T", "S", "catalog", "t", "o.md", ("src/**",), ()),
-            ...     {"source_py_files": ["src/sevn/tools/x.py"]},
+            ...     {"source_py_files": ["src/sevn/tools/x.py"], "module_summaries": {}},
             ... )["items"][0]["name"]
             'x'
     """
+    if entry.catalog == "skills":
+        return _offline_skills_catalog_sections(entry, scan)
+    return _offline_modules_catalog_sections(entry, scan)
+
+
+def _offline_modules_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str, Any]:
+    """Build the modules catalog table with docstring summaries and overflow row.
+
+        Args:
+    entry (ReadmeEntry): Manifest row.
+    scan (dict[str, Any]): Scanner context with ``source_py_files``.
+
+        Returns:
+            dict[str, Any]: Section map with ``summary`` and ``items`` keys.
+
+        Examples:
+            >>> _offline_modules_catalog_sections(
+            ...     ReadmeEntry("tools", "T", "S", "catalog", "t", "o.md", ("src/**",), ()),
+            ...     {"source_py_files": ["src/sevn/tools/x.py"], "module_summaries": {"src/sevn/tools/x.py": "Tool x."}},
+            ... )["items"][0]["summary"]
+            'Tool x.'
+    """
     items: list[dict[str, str]] = []
+    py_files = list(scan.get("source_py_files", []))
+    module_summaries: dict[str, str] = scan.get("module_summaries", {})
     module_symbols: dict[str, list[str]] = scan.get("module_symbols", {})
-    for rel in scan.get("source_py_files", [])[:40]:
+    for rel in py_files[:_MODULES_CATALOG_CAP]:
         name = rel.rsplit("/", maxsplit=1)[-1].removesuffix(".py")
-        symbols = module_symbols.get(rel, [])
-        sym_hint = f" Entry points: {', '.join(f'`{s}`' for s in symbols[:3])}." if symbols else ""
-        items.append(
+        summary = module_summaries.get(rel, "")
+        if not summary:
+            symbols = module_symbols.get(rel, [])
+            sym_hint = (
+                f" Entry points: {', '.join(f'`{s}`' for s in symbols[:3])}." if symbols else ""
+            )
+            summary = f"Module `{rel}`.{sym_hint}"
+        items.append({"name": name, "path": rel, "summary": summary})
+    remainder = len(py_files) - _MODULES_CATALOG_CAP
+    if remainder > 0:
+        items.append({"name": "…", "path": "", "summary": f"+{remainder} more modules"})
+    return {"summary": entry.summary, "items": items}
+
+
+def _offline_skills_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str, Any]:
+    """Build bundled-skill and runtime-loader tables for the skills catalog.
+
+        Args:
+    entry (ReadmeEntry): Manifest row.
+    scan (dict[str, Any]): Scanner context with ``bundled_skills`` and ``source_py_files``.
+
+        Returns:
+            dict[str, Any]: Section map with bundled and runtime item lists.
+
+        Examples:
+            >>> _offline_skills_catalog_sections(
+            ...     ReadmeEntry("skills", "S", "Sum", "catalog", "s", "o.md", ("a",), (), catalog="skills"),
+            ...     {"bundled_skills": [{"name": "demo", "path": "p/SKILL.md", "summary": "Demo."}], "source_py_files": []},
+            ... )["bundled_items"][0]["name"]
+            'demo'
+    """
+    bundled_items = [
+        {"name": row["name"], "path": row["path"], "summary": row["summary"]}
+        for row in scan.get("bundled_skills", [])
+    ]
+    runtime_items: list[dict[str, str]] = []
+    module_summaries: dict[str, str] = scan.get("module_summaries", {})
+    module_symbols: dict[str, list[str]] = scan.get("module_symbols", {})
+    runtime_prefix = "src/sevn/skills/"
+    for rel in scan.get("source_py_files", []):
+        if not rel.startswith(runtime_prefix):
+            continue
+        name = rel.rsplit("/", maxsplit=1)[-1].removesuffix(".py")
+        summary = module_summaries.get(rel, "")
+        if not summary:
+            symbols = module_symbols.get(rel, [])
+            sym_hint = (
+                f" Entry points: {', '.join(f'`{s}`' for s in symbols[:3])}." if symbols else ""
+            )
+            summary = f"Module `{rel}`.{sym_hint}"
+        runtime_items.append({"name": name, "path": rel, "summary": summary})
+    return {
+        "summary": entry.summary,
+        "bundled_items": bundled_items,
+        "runtime_items": runtime_items,
+    }
+
+
+def _catalog_items_with_hrefs(
+    items: list[dict[str, str]],
+    *,
+    entry: ReadmeEntry,
+    repo_root: Path,
+) -> list[dict[str, str]]:
+    """Attach file-relative hrefs to catalog row paths.
+
+        Args:
+    items (list[dict[str, str]]): Catalog rows with repo-root ``path`` values.
+    entry (ReadmeEntry): Manifest row for output-relative link resolution.
+    repo_root (Path): Repository root.
+
+        Returns:
+            list[dict[str, str]]: Rows with ``path`` rewritten to README-relative hrefs.
+
+        Examples:
+            >>> from pathlib import Path as _P
+            >>> rows = _catalog_items_with_hrefs(
+            ...     [{"name": "x", "path": "src/a.py", "summary": "A."}],
+            ...     entry=ReadmeEntry("t", "T", "S", "catalog", "t", "docs/readmes/t.md", ("src/**",), ()),
+            ...     repo_root=_P("."),
+            ... )
+            >>> rows[0]["path"].endswith("src/a.py")
+            True
+    """
+    out: list[dict[str, str]] = []
+    for item in items:
+        path = str(item.get("path", ""))
+        if not path:
+            out.append(dict(item))
+            continue
+        out.append(
             {
-                "name": name,
-                "path": rel,
-                "summary": f"Module `{rel}`.{sym_hint}",
+                **item,
+                "path": readme_relative_href(
+                    readme_output=entry.output,
+                    target=path,
+                    repo_root=repo_root,
+                ),
             }
         )
-    return {"summary": entry.summary, "items": items}
+    return out
 
 
 def _offline_guide_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str, Any]:

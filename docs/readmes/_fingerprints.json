@@ -44,8 +44,8 @@
     },
     "index": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-13T11:04:05Z",
-      "digest": "8a30b45d878ddf9ef6f1ec961fe3c8f80c4ca25d06584f0cb7d13894c8e03156",
+      "computed_at": "2026-07-13T11:10:24Z",
+      "digest": "43f2d12f83a073a8cdddd73816b1dd64d2e05a8541ceb104786706b84a66bd48",
       "source_globs": [
         "docs/readmes/manifest.toml"
       ]
@@ -87,8 +87,8 @@
     },
     "root": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-13T11:03:59Z",
-      "digest": "07f45fe504107e17803b621dbb1f4960fb628dc8e0e548f3edb24cda1332b92a",
+      "computed_at": "2026-07-13T11:10:20Z",
+      "digest": "01ca2f0feda7afefee4c7b76005bdb817169bcfdf49548ab6affff63685390d9",
       "source_globs": [
         "pyproject.toml",
         "CLAUDE.md",
@@ -132,7 +132,7 @@
     },
     "skills": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-13T11:04:01Z",
+      "computed_at": "2026-07-13T11:12:29Z",
       "digest": "404c591de06742a55ec591d0e444994226fc3c49f935dfab6c85d0e58d2302f3",
       "source_globs": [
         "src/sevn/skills/**",
@@ -164,7 +164,7 @@
     },
     "tools": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-13T11:04:00Z",
+      "computed_at": "2026-07-13T11:09:55Z",
       "digest": "714669b67f67b606e30dfd3552c2fb8e4c5d1303e2008ce84e86bfdfa89e90b3",
       "source_globs": [
         "src/sevn/tools/**"

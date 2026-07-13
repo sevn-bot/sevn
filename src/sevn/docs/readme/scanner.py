@@ -60,6 +60,7 @@ def scan_repo_context(repo_root: Path, entry: ReadmeEntry) -> dict[str, Any]:
     py_files = [rel for rel in source_files if rel.endswith(".py")]
 
     source_roots = _source_dir_roots(entry.source_globs)
+    module_summaries = _build_module_summaries(repo_root, py_files)
     context: dict[str, Any] = {
         "slug": entry.slug,
         "profile": entry.profile,
@@ -73,6 +74,7 @@ def scan_repo_context(repo_root: Path, entry: ReadmeEntry) -> dict[str, Any]:
         "source_roots": source_roots,
         "source_files": source_files,
         "source_py_files": py_files,
+        "module_summaries": module_summaries,
         "source_excerpt": _build_source_excerpt(repo_root, py_files),
         "spec_excerpt": _read_spec_excerpt(repo_root, list(entry.specs)),
         "module_symbols": extract_module_symbols(repo_root, py_files),
@@ -85,6 +87,8 @@ def scan_repo_context(repo_root: Path, entry: ReadmeEntry) -> dict[str, Any]:
     }
     if entry.profile == "root":
         context["intro_lines"] = load_root_intro_lines(repo_root)
+    if entry.catalog == "skills":
+        context["bundled_skills"] = _scan_bundled_skills(repo_root)
     return context
 
 
@@ -594,6 +598,128 @@ def _first_docstring_sentence(text: str) -> str:
     first = next((ln.strip() for ln in text.splitlines() if ln.strip()), "")
     cleaned = first.strip("\"'").replace('"""', "").replace("'''", "")
     return truncate_at_sentence(cleaned, 200) or cleaned
+
+
+def _build_module_summaries(repo_root: Path, py_files: list[str]) -> dict[str, str]:
+    """Map repo-relative Python paths to module docstring first sentences.
+
+        Args:
+    repo_root (Path): Repository root.
+    py_files (list[str]): Repo-relative Python paths.
+
+        Returns:
+            dict[str, str]: ``src/...py`` → summary text.
+
+        Examples:
+            >>> import tempfile
+            >>> from pathlib import Path as _P
+            >>> td = _P(tempfile.mkdtemp())
+            >>> p = td / "src/a.py"
+            >>> p.parent.mkdir(parents=True)
+            >>> _ = p.write_text('\"\"\"Hello module.\"\"\"\\n', encoding="utf-8")
+            >>> _build_module_summaries(td, ["src/a.py"])["src/a.py"]
+            'Hello module.'
+    """
+    repo_root = repo_root.resolve()
+    out: dict[str, str] = {}
+    for rel in py_files:
+        path = repo_root / rel
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            logger.warning("readme_scanner: unable to read source file at {}", path)
+            continue
+        summary = _first_docstring_sentence(text)
+        if summary:
+            out[rel] = _rewrite_design_doc_refs(summary.replace("`", "'"))
+    return out
+
+
+def _scan_bundled_skills(repo_root: Path) -> list[dict[str, str]]:
+    """Collect bundled skill rows from ``core/*/SKILL.md`` frontmatter.
+
+        Args:
+    repo_root (Path): Repository root.
+
+        Returns:
+            list[dict[str, str]]: Rows with ``name``, ``path``, and ``summary`` keys.
+
+        Examples:
+            >>> rows = _scan_bundled_skills(Path("."))
+            >>> isinstance(rows, list)
+            True
+    """
+    repo_root = repo_root.resolve()
+    core = repo_root / "src/sevn/data/bundled_skills/core"
+    if not core.is_dir():
+        return []
+    rows: list[dict[str, str]] = []
+    for skill_dir in sorted(core.iterdir()):
+        if not skill_dir.is_dir():
+            continue
+        skill_md = skill_dir / "SKILL.md"
+        if not skill_md.is_file():
+            continue
+        rel = skill_md.relative_to(repo_root).as_posix()
+        try:
+            text = skill_md.read_text(encoding="utf-8")
+        except OSError:
+            logger.warning("readme_scanner: unable to read bundled skill at {}", skill_md)
+            continue
+        name, description = _skill_frontmatter_fields(text)
+        if not name:
+            name = skill_dir.name
+        summary = _first_sentence(description)
+        if not summary:
+            stripped = description.strip()
+            if stripped and stripped[-1] in ".!?":
+                summary = stripped
+            else:
+                summary = truncate_at_sentence(description, 200) or stripped[:200]
+        summary = _rewrite_design_doc_refs(summary.replace("`", "'"))
+        rows.append({"name": name, "path": rel, "summary": summary})
+    return rows
+
+
+def _skill_frontmatter_fields(text: str) -> tuple[str, str]:
+    """Extract ``name`` and ``description`` from a ``SKILL.md`` frontmatter block.
+
+        Args:
+    text (str): Full ``SKILL.md`` contents.
+
+        Returns:
+            tuple[str, str]: Skill name and description text.
+
+        Examples:
+            >>> _skill_frontmatter_fields("---\\nname: demo\\ndescription: Do things.\\n---\\n")
+            ('demo', 'Do things.')
+    """
+    if not text.lstrip("\ufeff").startswith("---"):
+        return ("", "")
+    end = text.find("\n---", 3)
+    if end < 0:
+        return ("", "")
+    block = text[3:end]
+    name = ""
+    description_lines: list[str] = []
+    in_description = False
+    for line in block.splitlines():
+        if line.startswith("name:"):
+            name = line.split(":", maxsplit=1)[1].strip().strip("'\"")
+            in_description = False
+            continue
+        if line.startswith("description:"):
+            rest = line.split(":", maxsplit=1)[1].strip()
+            if rest:
+                description_lines.append(rest.strip("'\""))
+            in_description = True
+            continue
+        if in_description:
+            if line.startswith((" ", "\t")):
+                description_lines.append(line.strip().strip("'\""))
+                continue
+            in_description = False
+    return (name, " ".join(description_lines).strip())
 
 
 def _build_source_excerpt(repo_root: Path, py_files: list[str], *, max_files: int = 12) -> str:

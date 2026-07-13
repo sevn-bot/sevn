@@ -25,6 +25,7 @@ from pathlib import Path
 from sevn.docs.readme.profiles import PROFILE_TEMPLATES
 
 _VALID_PROFILES = frozenset(PROFILE_TEMPLATES)
+_VALID_CATALOG_KINDS = frozenset({"modules", "skills"})
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,7 @@ class ReadmeEntry:
     specs: tuple[str, ...]
     curated: bool = False
     turn_spine: bool = False
+    catalog: str = "modules"
 
 
 @dataclass(frozen=True)
@@ -106,6 +108,7 @@ def load_manifest(path: Path) -> ReadmeManifest:
 
         curated = _parse_curated(row.get("curated"), path=path, idx=idx)
         turn_spine = _parse_turn_spine(row.get("turn_spine"), path=path, idx=idx)
+        catalog = _parse_catalog(row.get("catalog"), path=path, idx=idx)
 
         entries.append(
             ReadmeEntry(
@@ -119,6 +122,7 @@ def load_manifest(path: Path) -> ReadmeManifest:
                 specs=_as_str_tuple(row.get("specs")),
                 curated=curated,
                 turn_spine=turn_spine,
+                catalog=catalog,
             )
         )
 
@@ -205,6 +209,39 @@ def _parse_turn_spine(value: object, *, path: Path, idx: int) -> bool:
         msg = f"{path}: readme[{idx}] turn_spine must be a boolean"
         raise ValueError(msg)
     return value
+
+
+def _parse_catalog(value: object, *, path: Path, idx: int) -> str:
+    """Parse optional ``catalog`` manifest key (defaults to ``modules``).
+
+        Args:
+    value (object): Raw TOML value or ``None`` when omitted.
+    path (Path): Manifest path for error messages.
+    idx (int): Row index for error messages.
+
+        Returns:
+            str: Parsed catalog kind.
+
+        Raises:
+            ValueError: When ``catalog`` is present but not a valid enum member.
+
+        Examples:
+            >>> _parse_catalog(None, path=Path("m.toml"), idx=0)
+            'modules'
+            >>> _parse_catalog("skills", path=Path("m.toml"), idx=0)
+            'skills'
+    """
+    if value is None:
+        return "modules"
+    if not isinstance(value, str):
+        msg = f"{path}: readme[{idx}] catalog must be a string"
+        raise ValueError(msg)
+    kind = value.strip()
+    if kind not in _VALID_CATALOG_KINDS:
+        known = ", ".join(sorted(_VALID_CATALOG_KINDS))
+        msg = f"{path}: readme[{idx}] catalog={kind!r}; expected one of: {known}"
+        raise ValueError(msg)
+    return kind
 
 
 def _as_str_tuple(value: object) -> tuple[str, ...]:
