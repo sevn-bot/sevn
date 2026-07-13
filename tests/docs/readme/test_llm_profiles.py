@@ -84,7 +84,6 @@ def _index_entry() -> ReadmeEntry:
     )
 
 
-@pytest.mark.xfail(reason="green after W6: LLM guide-steps prompt", strict=False)
 @pytest.mark.asyncio
 async def test_llm_guide_calls_guide_steps_prompt(tmp_path: Path) -> None:
     """D15: ``guide`` profile with LLM calls ``guide-steps`` section provider."""
@@ -101,7 +100,6 @@ async def test_llm_guide_calls_guide_steps_prompt(tmp_path: Path) -> None:
     assert "guide-steps" in prompt_names
 
 
-@pytest.mark.xfail(reason="green after W6: LLM root prompts", strict=False)
 @pytest.mark.asyncio
 async def test_llm_root_calls_valueprop_and_highlights(tmp_path: Path) -> None:
     """D15: ``root`` profile with LLM calls ``root-valueprop`` and ``highlights``."""
@@ -124,7 +122,6 @@ async def test_llm_root_calls_valueprop_and_highlights(tmp_path: Path) -> None:
     assert "highlights" in prompt_names
 
 
-@pytest.mark.xfail(reason="green after W6: LLM catalog-table prompt", strict=False)
 @pytest.mark.asyncio
 async def test_llm_catalog_calls_catalog_table_prompt(tmp_path: Path) -> None:
     """D15: ``catalog`` profile with LLM calls ``catalog-table`` section provider."""
@@ -160,7 +157,6 @@ async def test_llm_index_never_calls_section_provider(tmp_path: Path) -> None:
     assert provider.calls == []
 
 
-@pytest.mark.xfail(reason="green after W6: value_prop from root-intro.toml", strict=False)
 def test_root_scan_includes_value_prop_from_brand_toml(tmp_path: Path) -> None:
     """D16: root scan context loads ``value_prop`` from ``docs/brand/root-intro.toml``."""
     brand_dir = tmp_path / "docs/brand"
@@ -177,7 +173,6 @@ def test_root_scan_includes_value_prop_from_brand_toml(tmp_path: Path) -> None:
     assert scan.get("value_prop") == "Custom value proposition for tests."
 
 
-@pytest.mark.xfail(reason="green after W6: live CI badge URL", strict=False)
 @pytest.mark.asyncio
 async def test_root_render_contains_live_ci_badge(tmp_path: Path) -> None:
     """D16: rendered root README uses the live GitHub Actions badge URL."""

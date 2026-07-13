@@ -121,7 +121,7 @@ def test_catalog_without_tiers_passes() -> None:
         (repo / "src/sevn/tools/a.py").write_text("x = 1\n", encoding="utf-8")
         manifest_dir.joinpath("tools.md").write_text(
             "> **Summary.** ok\n\n| Name | Path | Summary |\n|------|------|---------|\n"
-            "| `a` | [`src/sevn/tools/a.py`](src/sevn/tools/a.py) | tool |\n",
+            "| `a` | [`a.py`](../../src/sevn/tools/a.py) | tool |\n",
             encoding="utf-8",
         )
         fp_path = manifest_dir / "_fingerprints.json"

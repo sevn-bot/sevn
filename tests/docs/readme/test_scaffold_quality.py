@@ -53,7 +53,6 @@ def _subsystem_manifest(
     )
 
 
-@pytest.mark.xfail(reason="green after W4: turn_spine gate", strict=False)
 @pytest.mark.asyncio
 async def test_non_turn_spine_entry_omits_turn_spine_paragraph(tmp_path: Path) -> None:
     """D10: non-``turn_spine`` subsystems get the neutral one-liner, not turn-spine prose."""
@@ -71,7 +70,6 @@ async def test_non_turn_spine_entry_omits_turn_spine_paragraph(tmp_path: Path) -
     assert "supporting subsystem" in markdown.lower()
 
 
-@pytest.mark.xfail(reason="green after W4: turn_spine paragraph present", strict=False)
 @pytest.mark.asyncio
 async def test_turn_spine_entry_includes_turn_spine_paragraph(tmp_path: Path) -> None:
     """D10: ``turn_spine = true`` retains the turn-spine paragraph."""
@@ -90,7 +88,6 @@ async def test_turn_spine_entry_includes_turn_spine_paragraph(tmp_path: Path) ->
     assert _TURN_SPINE_SNIPPET in markdown
 
 
-@pytest.mark.xfail(reason="green after W4: truncate_at_sentence helper", strict=False)
 @pytest.mark.parametrize(
     ("text", "limit", "expected"),
     [
@@ -109,7 +106,6 @@ def test_truncate_at_sentence(text: str, limit: int, expected: str) -> None:
     assert truncate_at_sentence(text, limit) == expected
 
 
-@pytest.mark.xfail(reason="green after W4: format_path_list true remainder", strict=False)
 def test_format_path_list_true_remainder_for_114_paths() -> None:
     """D12: ``format_path_list`` reports ``and 110 more`` for 114 paths at cap 4."""
     paths = [f"src/sevn/gateway/m{i}.py" for i in range(114)]
@@ -117,14 +113,12 @@ def test_format_path_list_true_remainder_for_114_paths() -> None:
     assert "and 110 more" in rendered
 
 
-@pytest.mark.xfail(reason="green after W4: multi-root primary source dir", strict=False)
 def test_primary_source_dir_multi_root_deepest_common() -> None:
     """D12: multi-root globs derive deepest common directory across all roots."""
     result = _primary_source_dir(("src/sevn/gateway/**", "infra/**"))
     assert result in {"src/sevn/", "src/"}
 
 
-@pytest.mark.xfail(reason="green after W4: docstring inventory without quotes", strict=False)
 @pytest.mark.asyncio
 async def test_inventory_lines_exclude_raw_docstring_quotes(tmp_path: Path) -> None:
     """D12: module inventory uses docstring first sentence without raw ``\"\"\"``."""
@@ -143,7 +137,6 @@ async def test_inventory_lines_exclude_raw_docstring_quotes(tmp_path: Path) -> N
     assert "First sentence only." in markdown
 
 
-@pytest.mark.xfail(reason="green after W4: Package init heading", strict=False)
 @pytest.mark.asyncio
 async def test_init_module_heading_renders_package_init(tmp_path: Path) -> None:
     """D12: ``__init__.py`` sections render as ``Package init``."""
@@ -162,7 +155,6 @@ async def test_init_module_heading_renders_package_init(tmp_path: Path) -> None:
     assert "__init__.py" in markdown
 
 
-@pytest.mark.xfail(reason="green after W4: PLACEHOLDER narrowed for symbols", strict=False)
 def test_check_no_placeholder_warning_for_transcribe_symbol() -> None:
     """D13: symbol names like ``transcribe_placeholder`` must not trigger PLACEHOLDER warnings."""
     with tempfile.TemporaryDirectory() as td:

@@ -25,7 +25,6 @@ def _load_check_markdown_links_main():
     return module.main
 
 
-@pytest.mark.xfail(reason="green after W8: check_markdown_links script", strict=False)
 def test_main_reports_good_and_broken_links(capsys: pytest.CaptureFixture[str]) -> None:
     """D18: ``check_markdown_links.main`` reports broken links and exits non-zero."""
     main = _load_check_markdown_links_main()

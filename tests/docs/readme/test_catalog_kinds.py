@@ -78,7 +78,6 @@ def _write_skills_catalog_repo(repo: Path) -> Path:
     return manifest_path
 
 
-@pytest.mark.xfail(reason="green after W5: modules catalog overflow row", strict=False)
 @pytest.mark.asyncio
 async def test_modules_catalog_lists_overflow_with_true_remainder() -> None:
     """D14: modules kind over cap emits ``+N more modules`` with the true remainder."""
@@ -94,7 +93,6 @@ async def test_modules_catalog_lists_overflow_with_true_remainder() -> None:
         assert "+5 more modules" in markdown
 
 
-@pytest.mark.xfail(reason="green after W5: docstring-derived catalog summaries", strict=False)
 @pytest.mark.asyncio
 async def test_modules_catalog_uses_docstring_first_sentence() -> None:
     """D14: catalog row summaries prefer module docstring first sentence."""
@@ -111,7 +109,6 @@ async def test_modules_catalog_uses_docstring_first_sentence() -> None:
         assert "Module `src/sevn/tools/tool_000.py`." not in markdown
 
 
-@pytest.mark.xfail(reason="green after W5: skills catalog two-table layout", strict=False)
 @pytest.mark.asyncio
 async def test_skills_catalog_renders_frontmatter_and_runtime_tables() -> None:
     """D14: skills kind renders bundled SKILL.md table plus ``src/sevn/skills/**`` modules."""

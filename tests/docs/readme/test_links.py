@@ -41,7 +41,6 @@ def test_external_links_skipped() -> None:
         assert not errors
 
 
-@pytest.mark.xfail(reason="green after W3: repo-root fallback removed", strict=False)
 def test_root_relative_link_from_nested_readme_fails() -> None:
     """D7: links resolvable only from repo root fail when emitted from nested READMEs."""
     with tempfile.TemporaryDirectory() as td:
@@ -75,7 +74,6 @@ def test_local_only_tree_skip_when_absent() -> None:
         assert not errors
 
 
-@pytest.mark.xfail(reason="green after W3: about-sevn.bot spec paths validate", strict=False)
 @pytest.mark.asyncio
 async def test_manifest_about_sevn_bot_spec_path_validates(tmp_path: Path) -> None:
     """D8: rendered subsystem README with ``about-sevn.bot/specs/…`` passes check."""
@@ -105,5 +103,6 @@ async def test_manifest_about_sevn_bot_spec_path_validates(tmp_path: Path) -> No
     )
     manifest = load_manifest(manifest_dir / "manifest.toml")
     await write_readme(repo_root=tmp_path, entry=get_entry(manifest, "demo"), manifest=manifest)
+    manifest_dir.joinpath("INDEX.md").write_text("# README catalog\n", encoding="utf-8")
     result = check_readme_tree(tmp_path, manifest)
     assert result.ok, result.errors

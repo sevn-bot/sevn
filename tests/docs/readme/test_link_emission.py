@@ -60,7 +60,6 @@ def _seed_link_repo(repo: Path) -> Path:
     return manifest_path
 
 
-@pytest.mark.xfail(reason="green after W3: INDEX gateway row link", strict=False)
 @pytest.mark.asyncio
 async def test_index_gateway_row_links_gateway_md() -> None:
     """D6: INDEX row for ``gateway`` uses ``gateway.md`` (same directory)."""
@@ -82,7 +81,6 @@ async def test_index_gateway_row_links_gateway_md() -> None:
         assert "docs/readmes/gateway.md" not in index_md
 
 
-@pytest.mark.xfail(reason="green after W3: INDEX root row link", strict=False)
 @pytest.mark.asyncio
 async def test_index_root_row_links_repo_readme() -> None:
     """D6: INDEX row for ``root`` uses ``../../README.md`` from ``docs/readmes/``."""
@@ -103,7 +101,6 @@ async def test_index_root_row_links_repo_readme() -> None:
         assert "[root](../../README.md)" in index_md or "[sevn.bot](../../README.md)" in index_md
 
 
-@pytest.mark.xfail(reason="green after W3: subsystem index badge link", strict=False)
 @pytest.mark.asyncio
 async def test_subsystem_index_badge_links_index_md() -> None:
     """D6: subsystem INDEX badge href is ``INDEX.md`` (not ``docs/readmes/INDEX.md``)."""
@@ -120,7 +117,6 @@ async def test_subsystem_index_badge_links_index_md() -> None:
         assert "docs/readmes/INDEX.md" not in gateway_md
 
 
-@pytest.mark.xfail(reason="green after W3: subsystem source badge link", strict=False)
 @pytest.mark.asyncio
 async def test_subsystem_source_badge_links_relative_src() -> None:
     """D6: subsystem source badge href is file-relative under ``src/sevn/``."""
@@ -136,7 +132,6 @@ async def test_subsystem_source_badge_links_relative_src() -> None:
         assert "[source-link]: ../../src/sevn/gateway/" in gateway_md
 
 
-@pytest.mark.xfail(reason="green after W3: References spec links", strict=False)
 @pytest.mark.asyncio
 async def test_subsystem_references_use_about_specs_relative() -> None:
     """D8: References list links ``../../about-sevn.bot/specs/…`` from subsystem output dir."""

@@ -30,7 +30,6 @@ def _manifest_with_curated(tmp_path: Path, *, curated: bool | None) -> Path:
     return manifest_path
 
 
-@pytest.mark.xfail(reason="green after W2: curated manifest key", strict=False)
 def test_manifest_parses_curated_true(tmp_path: Path) -> None:
     """D2: ``curated = true`` maps to ``ReadmeEntry.curated``."""
     manifest_path = _manifest_with_curated(tmp_path, curated=True)
@@ -38,7 +37,6 @@ def test_manifest_parses_curated_true(tmp_path: Path) -> None:
     assert entry.curated is True
 
 
-@pytest.mark.xfail(reason="green after W2: curated default false", strict=False)
 def test_manifest_curated_defaults_false(tmp_path: Path) -> None:
     """D2: omitted ``curated`` defaults to false."""
     manifest_path = _manifest_with_curated(tmp_path, curated=None)
@@ -46,7 +44,6 @@ def test_manifest_curated_defaults_false(tmp_path: Path) -> None:
     assert entry.curated is False
 
 
-@pytest.mark.xfail(reason="green after W2: reject non-bool curated", strict=False)
 def test_manifest_rejects_non_bool_curated(tmp_path: Path) -> None:
     """D2: non-boolean ``curated`` values fail manifest validation."""
     manifest_path = tmp_path / "manifest.toml"

@@ -132,7 +132,6 @@ def _seed_curated_repo(repo: Path, *, curated: bool = True) -> None:
     )
 
 
-@pytest.mark.xfail(reason="green after W2: sevn readme fingerprint subcommand", strict=False)
 def test_readme_fingerprint_stamps_without_body_change(runner: CliRunner) -> None:
     """D1: ``sevn readme fingerprint <slug>`` updates digest only (body unchanged)."""
     with tempfile.TemporaryDirectory() as td:
@@ -151,7 +150,6 @@ def test_readme_fingerprint_stamps_without_body_change(runner: CliRunner) -> Non
         assert readme_path.stat().st_mtime_ns == before_mtime
 
 
-@pytest.mark.xfail(reason="green after W2: curated update guard", strict=False)
 def test_readme_update_curated_exits_without_force(runner: CliRunner) -> None:
     """D2: ``sevn readme update`` on curated entry exits 2 with hint unless ``--force``."""
     with tempfile.TemporaryDirectory() as td:
@@ -167,7 +165,6 @@ def test_readme_update_curated_exits_without_force(runner: CliRunner) -> None:
         assert (repo / "docs/readmes/hand.md").read_text(encoding="utf-8") == before
 
 
-@pytest.mark.xfail(reason="green after W2: curated update --force", strict=False)
 def test_readme_update_curated_force_writes(runner: CliRunner) -> None:
     """D2: ``sevn readme update --force`` regenerates a curated README body."""
     with tempfile.TemporaryDirectory() as td:
@@ -182,7 +179,6 @@ def test_readme_update_curated_force_writes(runner: CliRunner) -> None:
         assert "Hand body must stay byte-stable." not in body
 
 
-@pytest.mark.xfail(reason="green after W2: generate --all skips curated bodies", strict=False)
 def test_readme_generate_all_skips_curated_body_but_stamps(runner: CliRunner) -> None:
     """D2: ``sevn readme generate --all`` stamps curated slugs without rewriting bodies."""
     with tempfile.TemporaryDirectory() as td:
@@ -214,7 +210,6 @@ def test_readme_generate_all_skips_curated_body_but_stamps(runner: CliRunner) ->
         assert (repo / "docs/readmes/gen.md").is_file()
 
 
-@pytest.mark.xfail(reason="green after W2: precommit curated stamp-only", strict=False)
 def test_precommit_main_leaves_curated_body_unchanged(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -234,7 +229,6 @@ def test_precommit_main_leaves_curated_body_unchanged(
         assert (repo / "docs/readmes/hand.md").read_text(encoding="utf-8") == before
 
 
-@pytest.mark.xfail(reason="green after W2: stale-hint differentiates curated", strict=False)
 def test_check_stale_hint_text_for_curated_vs_generated(runner: CliRunner) -> None:
     """D3: stale errors suggest ``fingerprint`` for curated and ``update`` for generated."""
     with tempfile.TemporaryDirectory() as td:
