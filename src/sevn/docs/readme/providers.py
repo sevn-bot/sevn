@@ -103,6 +103,12 @@ class OfflineProvider:
             highlights = variables.get("highlights")
             if isinstance(highlights, list):
                 return "\n".join(f"- {item}" for item in highlights)
+        if prompt_name == "guide-steps":
+            steps_json = str(variables.get("steps_json", "[]"))
+            return f"Offline scaffold for guide steps ({steps_json[:120]})."
+        if prompt_name == "catalog-table":
+            items_json = str(variables.get("items_json", "[]"))
+            return f"Offline catalog intro ({items_json[:120]})."
         return summary or title
 
     async def render_section(self, prompt_name: str, variables: dict[str, Any]) -> str:

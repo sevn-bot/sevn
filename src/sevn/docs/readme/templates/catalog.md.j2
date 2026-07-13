@@ -3,8 +3,30 @@
 
 > **Summary.** {{ summary }}
 
+{% if table_intro -%}
+{{ table_intro }}
+
+{% endif -%}
+{% if catalog_kind == "skills" -%}
+## Bundled skills
+
+| Name | Path | Summary |
+|------|------|---------|
+{% for item in bundled_items -%}
+| `{{ item.name }}` | [`{{ item.path }}`]({{ item.path }}) | {{ item.summary }} |
+{% endfor %}
+
+## Runtime loaders
+
+| Name | Path | Summary |
+|------|------|---------|
+{% for item in runtime_items -%}
+| `{{ item.name }}` | [`{{ item.path }}`]({{ item.path }}) | {{ item.summary }} |
+{% endfor %}
+{% else -%}
 | Name | Path | Summary |
 |------|------|---------|
 {% for item in items -%}
-| `{{ item.name }}` | [`{{ item.path }}`]({{ item.path }}) | {{ item.summary }} |
+| `{{ item.name }}` | {% if item.path %}[`{{ item.path }}`]({{ item.path }}){% else %}—{% endif %} | {{ item.summary }} |
 {% endfor %}
+{% endif %}

@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Give implementers a single picture of the runtime before feature work: package
   boundaries under src/sevn/, allowed import directions, and the shared protocols
   that keep LLM wiring, observability, and '
-last_updated: '2026-07-12'
-fingerprint: sha256:ba4a1e6ab9997c28e29203ece7b1117bb69681d89f23cc908f87933c282024a9
+last_updated: '2026-07-13'
+fingerprint: sha256:80fc7b860bcff952695896461dbb6fc48a237660bf2cf68d9eaf0a45bc460e91
 related: []
 sources:
 - src/sevn/**
@@ -5672,6 +5672,9 @@ interfaces:
 - name: load_root_intro_lines
   file: src/sevn/docs/readme/brand.py
   symbol: load_root_intro_lines
+- name: load_root_value_prop
+  file: src/sevn/docs/readme/brand.py
+  symbol: load_root_value_prop
 - name: CatalogRow
   file: src/sevn/docs/readme/catalog.py
   symbol: CatalogRow
@@ -5711,9 +5714,15 @@ interfaces:
 - name: slugs_for_changed_paths
   file: src/sevn/docs/readme/fingerprint.py
   symbol: slugs_for_changed_paths
+- name: stamp_entry
+  file: src/sevn/docs/readme/fingerprint.py
+  symbol: stamp_entry
 - name: upsert_entry
   file: src/sevn/docs/readme/fingerprint.py
   symbol: upsert_entry
+- name: readme_relative_href
+  file: src/sevn/docs/readme/links.py
+  symbol: readme_relative_href
 - name: validate_markdown_links
   file: src/sevn/docs/readme/links.py
   symbol: validate_markdown_links
@@ -5750,6 +5759,9 @@ interfaces:
 - name: offline_sections
   file: src/sevn/docs/readme/model.py
   symbol: offline_sections
+- name: truncate_at_sentence
+  file: src/sevn/docs/readme/model.py
+  symbol: truncate_at_sentence
 - name: ProfileSchema
   file: src/sevn/docs/readme/profile_schemas.py
   symbol: ProfileSchema

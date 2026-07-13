@@ -38,6 +38,7 @@ from sevn.docs.readme.symbol_refs import (
 
 _SUMMARY_MARKERS = ("> **Summary.**", "## Summary")
 _PLACEHOLDER_LABEL = re.compile(r"PLACEHOLDER", re.IGNORECASE)
+_PLACEHOLDER_LINE_MARKERS = ("![", "<img", "srcset=", "docs/brand/assets/")
 _HEADING = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 _TABLE_ROW = re.compile(r"^\|.+\|.+\|", re.MULTILINE)
 
@@ -108,13 +109,15 @@ def check_readme_tree(
         for err in validate_markdown_links(text, output, repo_root):
             result.errors.append(f"{entry.slug}: {err}")
         _check_path_and_symbol_refs(entry, text, schema, repo_root, result)
-        if _PLACEHOLDER_LABEL.search(text):
+        if _has_placeholder_warning(text):
             result.warnings.append(f"{entry.slug}: contains PLACEHOLDER asset label (TODO)")
         status = status_by_slug.get(entry.slug)
         if status == "stale":
-            result.errors.append(
-                f"{entry.slug}: stale source fingerprint — run `sevn readme update {entry.slug}`"
-            )
+            if entry.curated:
+                hint = f"sevn readme fingerprint {entry.slug}"
+            else:
+                hint = f"sevn readme update {entry.slug}"
+            result.errors.append(f"{entry.slug}: stale source fingerprint — run `{hint}`")
 
     return result
 
@@ -232,6 +235,29 @@ def _check_path_and_symbol_refs(
             result.errors.append(f"{entry.slug}: {err}")
         for err in validate_symbol_refs(level3, repo_root):
             result.errors.append(f"{entry.slug}: {err}")
+
+
+def _has_placeholder_warning(text: str) -> bool:
+    """Return True when PLACEHOLDER appears on an image or brand-asset line.
+
+        Args:
+    text (str): README body.
+
+        Returns:
+            bool: True when a placeholder asset label should warn.
+
+        Examples:
+            >>> _has_placeholder_warning("![hero PLACEHOLDER](docs/brand/assets/x.png)")
+            True
+            >>> _has_placeholder_warning("- `transcribe_placeholder`")
+            False
+    """
+    for line in text.splitlines():
+        if not _PLACEHOLDER_LABEL.search(line):
+            continue
+        if any(marker in line for marker in _PLACEHOLDER_LINE_MARKERS):
+            return True
+    return False
 
 
 def _strip_leading_html_comments(text: str) -> str:

@@ -5,6 +5,7 @@ Depends: pathlib, tomllib
 
 Exports:
     load_root_intro_lines — read intro verse lines for the root README.
+    load_root_value_prop — read value proposition paragraph for the root README.
 
 Examples:
     >>> from pathlib import Path
@@ -58,3 +59,29 @@ def load_root_intro_lines(repo_root: Path, *, path: Path | None = None) -> list[
     raw = data.get("lines", ())
     lines = [str(line).strip() for line in raw if str(line).strip()]
     return lines or list(_DEFAULT_ROOT_INTRO_LINES)
+
+
+def load_root_value_prop(repo_root: Path, *, path: Path | None = None) -> str | None:
+    """Load root README value proposition from ``docs/brand/root-intro.toml``.
+
+        Args:
+    repo_root (Path): Repository root.
+    path (Path | None): Override intro TOML path (relative to ``repo_root``).
+
+        Returns:
+            str | None: Value prop text when set; otherwise ``None``.
+
+        Examples:
+            >>> from pathlib import Path as _P
+            >>> load_root_value_prop(_P(".")) is None or isinstance(load_root_value_prop(_P(".")), str)
+            True
+    """
+    intro_path = repo_root.resolve() / (path or ROOT_INTRO_PATH)
+    if not intro_path.is_file():
+        return None
+    data = tomllib.loads(intro_path.read_text(encoding="utf-8"))
+    raw = data.get("value_prop")
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    return text or None

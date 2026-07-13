@@ -20,7 +20,10 @@ from sevn.cli.gateway_client import resolve_proxy_base_url
 from sevn.cli.repo_sync import RepoSyncError, resolve_sevn_repo_root
 from sevn.cli.workspace import load_bound_workspace
 from sevn.docs.readme.check import check_readme_tree
-from sevn.docs.readme.fingerprint import default_fingerprints_path
+from sevn.docs.readme.fingerprint import (
+    default_fingerprints_path,
+    stamp_entry,
+)
 from sevn.docs.readme.manifest import ReadmeEntry, ReadmeManifest, get_entry, load_manifest
 from sevn.docs.readme.providers import ReadmeProviderConfig
 from sevn.docs.readme.render import write_readme
@@ -187,10 +190,10 @@ async def _write_entries(
         >>> from pathlib import Path as _P
         >>> from sevn.docs.readme.settings import provider_config_from_settings, resolve_readme_settings
         >>> td = _P(tempfile.mkdtemp())
-        >>> (td / "src/sevn/x").mkdir(parents=True)
-        >>> _ = (td / "src/sevn/x/a.py").write_text("x=1\\n", encoding="utf-8")
+        >>> (td / "src/sevn/storage").mkdir(parents=True)
+        >>> _ = (td / "src/sevn/storage/a.py").write_text("x=1\\n", encoding="utf-8")
         >>> m = load_manifest(_P("docs/readmes/manifest.toml"))
-        >>> e = get_entry(m, "gateway")
+        >>> e = get_entry(m, "storage")
         >>> cfg = provider_config_from_settings(resolve_readme_settings(None), offline=True)
         >>> paths = asyncio.run(
         ...     _write_entries(
@@ -206,6 +209,15 @@ async def _write_entries(
     """
     written: list[Path] = []
     for entry in entries:
+        if entry.curated:
+            stamp_entry(
+                repo_root,
+                slug=entry.slug,
+                source_globs=entry.source_globs,
+                fingerprints_path=fingerprints_path,
+            )
+            typer.echo(f"skipped {entry.slug} (curated)")
+            continue
         path = await write_readme(
             repo_root=repo_root,
             entry=entry,
@@ -311,9 +323,67 @@ def register(app: typer.Typer) -> None:
             typer.echo(f"written {rel.as_posix()}")
         raise typer.Exit(0)
 
+    @readme_app.command("fingerprint")
+    def fingerprint_cmd(
+        slug_or_path: str | None = typer.Argument(
+            None,
+            help="Manifest slug or README output path.",
+        ),
+        all_entries: bool = typer.Option(
+            False,
+            "--all",
+            help="Stamp fingerprints for every manifest slug.",
+        ),
+        repo: Path | None = typer.Option(
+            None,
+            "--repo",
+            help="sevn.bot checkout root (default: SEVN_REPO_ROOT or walk up from cwd).",
+        ),
+    ) -> None:
+        """Recompute source fingerprints without rewriting README bodies."""
+        if all_entries and slug_or_path:
+            typer.secho("pass only one of slug argument or --all", err=True)
+            raise typer.Exit(2)
+        if not all_entries and not slug_or_path:
+            typer.secho("pass a slug or --all", err=True)
+            raise typer.Exit(2)
+
+        repo_root = _resolve_repo_root(repo)
+        _, settings = _load_workspace_settings(repo_root)
+        if not settings.enabled:
+            typer.echo("docs.readme.enabled is false — skipping fingerprint")
+            raise typer.Exit(0)
+
+        manifest_path = _manifest_path(repo_root, settings)
+        manifest = load_manifest(manifest_path)
+        fingerprints_path = default_fingerprints_path(repo_root)
+
+        if all_entries:
+            slugs = [entry.slug for entry in manifest.entries]
+        elif slug_or_path is not None:
+            slugs = [_resolve_slug(manifest, slug_or_path)]
+        else:
+            raise typer.Exit(2)
+
+        for slug in slugs:
+            entry = get_entry(manifest, slug)
+            stamp_entry(
+                repo_root,
+                slug=slug,
+                source_globs=entry.source_globs,
+                fingerprints_path=fingerprints_path,
+            )
+            typer.echo(f"stamped {slug}")
+        raise typer.Exit(0)
+
     @readme_app.command("update")
     def update(
         slug_or_path: str = typer.Argument(..., help="Manifest slug or README output path."),
+        force: bool = typer.Option(
+            False,
+            "--force",
+            help="Allow regenerating curated README bodies.",
+        ),
         offline: bool = typer.Option(
             False,
             "--offline",
@@ -350,6 +420,14 @@ def register(app: typer.Typer) -> None:
         manifest = load_manifest(manifest_path)
         slug = _resolve_slug(manifest, slug_or_path)
         entry = get_entry(manifest, slug)
+        if entry.curated and not force:
+            typer.secho(
+                f"{slug} is curated — hand-authored body is protected. "
+                f"Review the README, then run `sevn readme fingerprint {slug}` "
+                f"to refresh the fingerprint, or pass --force to regenerate the body.",
+                err=True,
+            )
+            raise typer.Exit(2)
         fingerprints_path = default_fingerprints_path(repo_root)
 
         use_offline = offline or (not llm and default_offline_mode(settings))

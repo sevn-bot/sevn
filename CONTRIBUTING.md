@@ -69,7 +69,7 @@ one of `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`).
   `*.md` changes are exempt.
 - To bypass a change that genuinely needs no entry, add a `changelog: skip` trailer to
   the commit message (or set `SEVN_CHANGELOG_SKIP=1` for the local hook).
-- Use the `changelog-author` skill to draft entries, and `make changelog-eval` for the
+- Use the `changelog` skill (`.claude/skills/changelog/SKILL.md`) to draft entries, and `make changelog-eval` for the
   (advisory, non-CI) LLM quality score.
 
 ## License

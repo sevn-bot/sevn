@@ -27,6 +27,7 @@ from sevn.docs.readme.fingerprint import (
     default_fingerprints_path,
     load_fingerprints,
 )
+from sevn.docs.readme.links import readme_relative_href
 from sevn.docs.readme.manifest import ReadmeEntry, ReadmeManifest
 
 
@@ -122,6 +123,7 @@ def build_index_rows(
     manifest: ReadmeManifest,
     *,
     fingerprints_path: Path | None = None,
+    embed_output: str = "docs/readmes/INDEX.md",
 ) -> list[dict[str, str]]:
     """Build INDEX.md table rows (all READMEs except ``index`` itself).
 
@@ -129,6 +131,7 @@ def build_index_rows(
     repo_root (Path): Repository root.
     manifest (ReadmeManifest): Loaded manifest.
     fingerprints_path (Path | None): Override fingerprint store path.
+    embed_output (str): Output path of the INDEX README emitting row links.
 
         Returns:
             list[dict[str, str]]: Template variables for ``index.md.j2``.
@@ -147,7 +150,11 @@ def build_index_rows(
             "title": row.title,
             "profile": row.profile,
             "summary": row.summary,
-            "path": row.path,
+            "path": readme_relative_href(
+                readme_output=embed_output,
+                target=row.path,
+                repo_root=repo_root,
+            ),
             "status": row.status,
         }
         for row in build_catalog_rows(repo_root, manifest, fingerprints_path=fingerprints_path)

@@ -56,3 +56,39 @@ def test_scaffold_fixes_stale_fingerprint() -> None:
         assert not check_readme_tree(repo, manifest).ok
         scaffold_readme_tree(repo, manifest)
         assert check_readme_tree(repo, manifest).ok
+
+
+def _curated_manifest() -> ReadmeManifest:
+    entry = ReadmeEntry(
+        slug="hand",
+        title="Hand",
+        summary="Hand-authored README.",
+        profile="freeform",
+        tier_owner="docs",
+        output="docs/readmes/hand.md",
+        source_globs=("src/sevn/hand/**",),
+        specs=(),
+        curated=True,
+    )
+    return ReadmeManifest(version=1, entries=(entry,))
+
+
+def test_scaffold_curated_stamps_stale_without_body_change() -> None:
+    """Curated slugs: scaffold stamps fingerprint when stale; body stays byte-identical."""
+    with tempfile.TemporaryDirectory() as td:
+        repo = Path(td)
+        manifest = _curated_manifest()
+        hand_src = repo / "src/sevn/hand"
+        hand_src.mkdir(parents=True)
+        hand_py = hand_src / "mod.py"
+        hand_py.write_text("v = 1\n", encoding="utf-8")
+        readme_path = repo / "docs/readmes/hand.md"
+        readme_path.parent.mkdir(parents=True)
+        body = "<!-- curated: hand-authored body -->\n> **Summary.** Hand body must stay byte-stable.\n"
+        readme_path.write_text(body, encoding="utf-8")
+        hand_py.write_text("v = 2\n", encoding="utf-8")
+        assert not check_readme_tree(repo, manifest).ok
+        count = scaffold_readme_tree(repo, manifest)
+        assert count == 1
+        assert readme_path.read_text(encoding="utf-8") == body
+        assert check_readme_tree(repo, manifest).ok

@@ -1,12 +1,12 @@
 # about-sevn.bot — architecture index
 
-Canonical evolution orientation for agents. Deep folder contract and read order also live at [`evolution/ARCHITECTURE.md`](../evolution/ARCHITECTURE.md).
+Canonical evolution orientation for agents. Deep folder contract and read order also live at [`evolution/ARCHITECTURE.md`](../evolution/ARCHITECTURE.md) (local checkouts only — when present).
 
 ## Agent read order
 
-1. This file (or `evolution/ARCHITECTURE.md` when only that path exists).
+1. This file (or `evolution/ARCHITECTURE.md` when only that path exists — local checkouts only).
 2. [`specs-index.md`](specs-index.md) — compact map of the design specs.
-3. [`graphify-out/GRAPH_REPORT.md`](../graphify-out/GRAPH_REPORT.md) when Graphify is enabled.
+3. [`graphify-out/GRAPH_REPORT.md`](../graphify-out/GRAPH_REPORT.md) when Graphify is enabled (local checkouts only — when present).
 4. `<checkout>/.sevn/MYCODE.md` when present.
 5. Package source via tier-B tools: `source_code/<relative>` (read-only).
 6. Code writes only under `workspace/.sevn/code-worktrees/<issue-id>/`.

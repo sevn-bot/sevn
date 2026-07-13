@@ -2,7 +2,7 @@
 
 > **Status:** Wave 0 contract (2026-06-13). Locked after operator REVIEW GATE approval.
 > **Normative for:** `docs/readmes/*.md`, root `README.md`, generator (`src/sevn/docs/readme/`), CI gate (`make readme-check`).
-> **Inputs:** merged from `plan/readme-system/references/` (GFM/HTML, templates, generators, doc principles, MarkedDown badges).
+> **Inputs:** merged from the readme-system reference pack (GFM/HTML, templates, generators, doc principles, MarkedDown badges).
 
 This document is the **verbatim authoring contract** for the README pipeline. Later waves implement it; they do not relitigate structure, profiles, or brand palette.
 
@@ -37,7 +37,13 @@ docs/brand/
 <!-- generated: do not edit by hand; run `sevn readme update <slug>` -->
 ```
 
-Hand-edits are allowed only when followed by `sevn readme update` to refresh fingerprints, or when the operator explicitly opts out (documented in PR).
+**Curated READMEs** (`curated = true` in `manifest.toml`) are hand-authored at Levels 1–2 and use a different stamp:
+
+```markdown
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint <slug>` -->
+```
+
+The pipeline **never overwrites** curated bodies during `make readme`, `make readme-scaffold`, `sevn readme generate --all`, or the `sevn-readme-sync` pre-commit hook — those paths only refresh `_fingerprints.json` via `sevn readme fingerprint`. To regenerate a curated body deliberately, run `sevn readme update <slug> --force`. Non-curated READMEs use `sevn readme update <slug>` after source changes.
 
 ---
 
@@ -47,7 +53,7 @@ Order, with the GitHub-safe idiom for each:
 
 1. `<a name="readme-top"></a>` anchor.
 2. **Centered brand header** — `<div align="center">` with theme-aware logo (`<picture>` + `prefers-color-scheme` → `logo-all-white.svg` dark / `logo-primary.jpg` light from `styles/sevn/style/logos/`), wordmark, one-line tagline, and an **action badge-button row** (Docs · Quick Start · Architecture · Report Bug) using `docs/brand/badges.md`.
-3. **Status badge row** — CI, license (MIT), Python 3.12+, package version, release channel — shields.io `for-the-badge`, reference-style links at EOF.
+3. **Status badge row** — CI (live GitHub Actions badge: `https://github.com/sevn-bot/sevn/actions/workflows/ci.yml/badge.svg` → workflow page), license (MIT), Python 3.12+, package version, release channel — shields.io `for-the-badge` for non-CI badges, reference-style links at EOF.
 4. **Hero** — product screenshot/GIF placeholder (`docs/brand/assets/hero.png` until replaced).
 5. **Value prop** — 2–3 sentences (the “one bot you own” pitch).
 6. **Collapsible TOC** — `<details><summary>`.
@@ -74,7 +80,7 @@ Not every README is a subsystem deep-dive. `manifest.toml` assigns each file a `
 | `guide` | task/operator docs (onboarding, deployment) | Summary · task/step sections (≥1 `##`) · References | no | optional |
 | `freeform` | one-off READMEs | Summary · GitHub-safe (§E) · links resolve | no | no |
 
-**Shared across all profiles:** a `Summary` block at top (see formats below), GitHub-safe allowlist (§E), and resolving relative links/anchors. Placeholders for unbuilt assets → `TODO` warning, not fail.
+**Shared across profiles except `root`:** a `Summary` block at top (see formats below). The root README uses a value-prop paragraph (§B) instead of a Summary block. All profiles must stay GitHub-safe (§E) with resolving relative links/anchors. Placeholders for unbuilt assets → `TODO` warning, not fail.
 
 ### Profile schema objects (checker loads these directly)
 
@@ -233,7 +239,7 @@ Relative image paths must resolve within the repo. External URLs allowed when ho
 Two-stage, section-by-section, provider-agnostic, offline-capable:
 
 ```
-repo scan (pyproject.toml · sevn.json · CLAUDE.md · specs/ index · graphify-out/
+repo scan (pyproject.toml · sevn.json · CLAUDE.md · about-sevn.bot/specs index · graphify-out/
            · subsystem source_globs from manifest.toml)
    → structured context per README
    → per-section render:  offline = Jinja2 template only
@@ -253,9 +259,8 @@ Ships in the wheel; unit-tested; invoked by `sevn readme` CLI (W3). The Claude s
 | `model.py` | Section/tier data model + assembly (Summary + L1/L2/L3 per profile). |
 | `fingerprint.py` | Compute/read/write source fingerprints; `_fingerprints.json` I/O. |
 | `providers.py` | LLM abstraction: **offline** (template-only) + **llm** via egress proxy + `Transport`. Generator **never** reads provider API keys. |
-| `render.py` | Section-by-section render → assemble → write; picks template by profile. |
+| `render.py` | Section-by-section render → assemble → write; picks template by profile; GitHub-safe allowlist (§E). |
 | `check.py` | Structure/validity per profile + staleness gate (W4). |
-| `linter.py` | GitHub-safe allowlist (§E). |
 | `templates/` | Jinja2: `root.md.j2`, `subsystem.md.j2`, `index.md.j2`, `catalog.md.j2`, `guide.md.j2`, `freeform.md.j2`. |
 | `prompts/` | One file per section/tier (not hardcoded in Python). |
 
@@ -265,20 +270,20 @@ Mirrors readme-ai’s `prompts.toml` approach — tunable without code changes.
 
 | Prompt file | Used for |
 |-------------|----------|
-| `summary.toml` | Summary block (all profiles). |
+| `summary.toml` | Summary block (`subsystem`, `catalog`, `guide`, `freeform`). |
 | `overview.toml` | Subsystem Level 1. |
 | `how-it-works.toml` | Subsystem Level 2. |
 | `deep-dive.toml` | Subsystem Level 3 (path/symbol citations). |
-| `root-valueprop.toml` | Root value prop paragraph. |
-| `highlights.toml` | Root highlights grid. |
-| `catalog-table.toml` | Catalog profile item tables. |
-| `guide-steps.toml` | Guide profile task sections. |
+| `root-valueprop.toml` | Root value prop paragraph (`profile: root`, LLM mode). |
+| `highlights.toml` | Root highlights grid (`profile: root`, LLM mode). |
+| `catalog-table.toml` | Catalog profile table intro (`profile: catalog`, LLM mode). |
+| `guide-steps.toml` | Guide profile task sections (`profile: guide`, LLM mode). |
 
-Each prompt file: `system`, `user_template`, optional `max_tokens`. Offline mode skips LLM and uses template stubs only.
+`profile: index` stays offline-only (no section prompts). Offline mode skips LLM and uses template stubs only.
 
 ### Transport / egress proxy integration
 
-LLM mode routes through the **paired egress proxy** (`specs/07-egress-proxy.md`) using existing `Transport` shapes (`specs/05-llm-transports.md`):
+LLM mode routes through the **paired egress proxy** (`about-sevn.bot/specs/07-egress-proxy.md`) using existing `Transport` shapes (`about-sevn.bot/specs/05-llm-transports.md`):
 
 - Config: `sevn.json → docs.readme.transport` (enum: `anthropic`, `openai_chat`, `openai_responses`, `bedrock_converse`).
 - Config: `docs.readme.model` — LiteLLM model id resolved like other gateway agents.
@@ -352,10 +357,10 @@ Explicit operator action for LLM spend: `sevn readme generate --llm`. CI uses `o
 
 `make readme-check` performs:
 
-1. **Structure/validity** — every manifest README exists; profile schema (§C0); GitHub linter (§E); link resolution. Placeholders → `TODO` warning.
-2. **Staleness** — fingerprint mismatch → fail with `sevn readme update <slug>`.
+1. **Structure/validity** — every manifest README exists; profile schema (§C0); GitHub-safe checks in `render.py` (§E); link resolution. Placeholders → `TODO` warning.
+2. **Staleness** — fingerprint mismatch → fail. Curated entries (`curated = true`): run `sevn readme fingerprint <slug>` after reviewing the body. Generated entries: run `sevn readme update <slug>`.
 
-Scaffold path: `make readme-scaffold` (parallel to `*-docs-scaffold`).
+Scaffold path: `make readme-scaffold` (parallel to `*-docs-scaffold`). Curated slugs are fingerprint-only on scaffold; generated slugs are regenerated and stubbed as needed.
 
 ---
 
@@ -369,4 +374,6 @@ Operator preview of the root brand header: `docs/readmes/_mock-root-header.md`.
 
 | Date | Wave | Change |
 |------|------|--------|
+| 2026-07-13 | W6 | §B live CI badge; §C0 root Summary exemption; §F module table (`render.py` owns §E checks); prompt-wiring table matches D15 profile map. |
+| 2026-07-13 | W2 | §A curated flag semantics, fingerprint-only refresh, header stamp split. |
 | 2026-06-13 | W0 | Initial standard from merged references + wave plan §A–F. |

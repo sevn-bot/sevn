@@ -2,11 +2,9 @@
 
 Host-side Playwright harness for Telegram Web K E2E against a sevn.bot gateway.
 
-**Start here for day-to-day development:**
-[`docs/telegram-e2e-developer-guide.md`](../../docs/telegram-e2e-developer-guide.md)
-(setup, dev loop, Cursor + Claude skills, troubleshooting).
-
-Shorter operator runbook: [`docs/runbooks/telegram-e2e.md`](../../docs/runbooks/telegram-e2e.md).
+**Start here for day-to-day development:** run `make telegram-e2e` (see [CI](#ci) below).
+For Cursor, load `.cursor/skills/telegram_test/SKILL.md` when present in your checkout.
+For Claude Code / sevn.bot, use `src/sevn/data/bundled_skills/core/telegram_test/SKILL.md`.
 
 **Not** shipped inside the gateway Docker image.
 

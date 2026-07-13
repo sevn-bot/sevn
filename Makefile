@@ -18,7 +18,7 @@ PIP_AUDIT ?= $(UV) run pip-audit
 PIP_AUDIT_CACHE ?= $(CURDIR)/.cache/pip-audit
 PRE_COMMIT ?= $(UV) run pre-commit
 
-.PHONY: help setup install install-git-guards check-git-guards snapshot-local install-cli install-cli-browser sync-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover stale-xfail-check doctest security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage coderabbit-install review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-down compose-logs compose-restart log-explore telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve
+.PHONY: help setup install install-git-guards check-git-guards snapshot-local install-cli install-cli-browser sync-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover stale-xfail-check md-links-check doctest security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage coderabbit-install review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-down compose-logs compose-restart log-explore telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve
 
 
 PROXY_ENV_FILE ?= .env.proxy
@@ -148,6 +148,9 @@ diff-cover: ## Fail when changed lines fall below DIFF_COVER_MIN (default 80%; c
 
 stale-xfail-check: ## Fail on strict=False or wave-scaffolding xfail markers (ci-quality)
 	$(UV) run python scripts/quality/check_stale_xfail.py
+
+md-links-check: ## Advisory markdown link check outside about-sevn.bot (D18; ci-quality)
+	$(UV) run python scripts/check_markdown_links.py
 
 golden-llm-ci: styles-build ## Tokenless golden_llm pydantic-evals gate (W12)
 	$(PYTEST) tests/fixtures/golden_llm/runner/test_golden_llm_eval.py -v --tb=short --strict-markers
@@ -395,7 +398,7 @@ ci-affected: ## Path-aware partial gate (Python + mapped make targets); set SEVN
 
 partial-ci: ci-affected ## Alias for ci-affected (per-wave local gate)
 
-ci-quality: ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage stale-xfail-check ## Advisory quality tier (baseline + ratchet; not in `ci`)
+ci-quality: ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage stale-xfail-check md-links-check ## Advisory quality tier (baseline + ratchet; not in `ci`)
 
 ci-quality-coverage: coverage diff-cover ## Advisory coverage + diff-cover (run after code changes)
 ruff-extra: ## Ruff advisory families ratchet (D3; `scripts/quality/ruff_advisory_gate.py`)

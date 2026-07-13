@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict delivery
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
-last_updated: '2026-07-12'
-fingerprint: sha256:afcc19f2cf0dca1832b10a230d4153cacf342ee8044fe8107f8d41b39b5bb855
+last_updated: '2026-07-13'
+fingerprint: sha256:6180d0f54bf699058df7411343f416a58b7ff82a84fbe0febf49f6dc70e5fe87
 related: []
 sources:
 - src/sevn/**
@@ -5674,6 +5674,9 @@ interfaces:
 - name: load_root_intro_lines
   file: src/sevn/docs/readme/brand.py
   symbol: load_root_intro_lines
+- name: load_root_value_prop
+  file: src/sevn/docs/readme/brand.py
+  symbol: load_root_value_prop
 - name: CatalogRow
   file: src/sevn/docs/readme/catalog.py
   symbol: CatalogRow
@@ -5713,9 +5716,15 @@ interfaces:
 - name: slugs_for_changed_paths
   file: src/sevn/docs/readme/fingerprint.py
   symbol: slugs_for_changed_paths
+- name: stamp_entry
+  file: src/sevn/docs/readme/fingerprint.py
+  symbol: stamp_entry
 - name: upsert_entry
   file: src/sevn/docs/readme/fingerprint.py
   symbol: upsert_entry
+- name: readme_relative_href
+  file: src/sevn/docs/readme/links.py
+  symbol: readme_relative_href
 - name: validate_markdown_links
   file: src/sevn/docs/readme/links.py
   symbol: validate_markdown_links
@@ -5752,6 +5761,9 @@ interfaces:
 - name: offline_sections
   file: src/sevn/docs/readme/model.py
   symbol: offline_sections
+- name: truncate_at_sentence
+  file: src/sevn/docs/readme/model.py
+  symbol: truncate_at_sentence
 - name: ProfileSchema
   file: src/sevn/docs/readme/profile_schemas.py
   symbol: ProfileSchema

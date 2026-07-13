@@ -1,4 +1,4 @@
-<!-- generated: do not edit by hand; run `sevn readme update subagents` -->
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint subagents` -->
 # Sub-agents — Level-1 role runs, level-2 workers, specialists, multi queue mode, registry, and kill surfaces
 
 [![Spec][spec-badge]][spec-link]
@@ -155,13 +155,13 @@ Follow `about-sevn.bot/sub-agents.html` for merge gates, error semantics, and co
 
 ## References
 
-- [about-sevn.bot/sub-agents.html](about-sevn.bot/sub-agents.html)
-- [docs/readmes/gateway.md](docs/readmes/gateway.md)
-- [about-sevn.bot/mission-control.html](about-sevn.bot/mission-control.html)
+- [about-sevn.bot/sub-agents.html](../../about-sevn.bot/sub-agents.html)
+- [gateway](gateway.md)
+- [about-sevn.bot/mission-control.html](../../about-sevn.bot/mission-control.html)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
-[spec-link]: about-sevn.bot/sub-agents.html
+[spec-link]: ../../about-sevn.bot/sub-agents.html
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: src/sevn/agent/
+[source-link]: ../../src/sevn/agent/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
-[index-link]: docs/readmes/INDEX.md
+[index-link]: INDEX.md

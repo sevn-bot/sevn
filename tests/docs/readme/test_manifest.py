@@ -19,7 +19,7 @@ def test_load_manifest_has_gateway_subsystem() -> None:
     gateway = get_entry(manifest, "gateway")
     assert gateway.profile == "subsystem"
     assert gateway.source_globs == ("src/sevn/gateway/**",)
-    assert "specs/17-gateway.md" in gateway.specs
+    assert "about-sevn.bot/specs/17-gateway.md" in gateway.specs
 
 
 def test_manifest_rejects_unknown_profile(tmp_path: Path) -> None:

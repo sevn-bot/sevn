@@ -1,7 +1,7 @@
 # CI compose workspace
 
 Seeded `sevn.json` bind-mounted into the gateway container by `docker-compose.ci.yml`
-(`specs/25-cicd-full.md` §10.4). Runtime SQLite and artefacts live under `.sevn/` inside
+(`about-sevn.bot/specs/25-cicd-full.md` §10.4). Runtime SQLite and artefacts live under `.sevn/` inside
 this directory.
 
 **Wave 10 seeded state** (consumes Wave 9 onboarding/CLI outputs):
