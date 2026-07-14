@@ -164,7 +164,7 @@ def _summary_from_tree(tree: ast.Module | None, text: str) -> str:
 
     Examples:
         >>> _summary_from_tree(None, "class X: pass\\n")
-        ''
+        'class X: pass'
     """
     doc = ast.get_docstring(tree) if tree is not None else None
     if doc:

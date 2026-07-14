@@ -194,7 +194,9 @@ def offline_root_sections(entry: ReadmeEntry, scan: ScanContext | dict[str, Any]
     }
 
 
-def offline_index_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str, Any]:
+def offline_index_sections(
+    entry: ReadmeEntry, scan: ScanContext | dict[str, Any]
+) -> dict[str, Any]:
     """Offline index catalog section bodies.
 
         Args:
@@ -211,6 +213,7 @@ def offline_index_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str
             ... )["entries"]
             []
     """
+    scan = _scan_dict(scan)
     entries = scan.get("index_entries", [])
     return {
         "summary": entry.summary,
@@ -218,7 +221,9 @@ def offline_index_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str
     }
 
 
-def offline_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str, Any]:
+def offline_catalog_sections(
+    entry: ReadmeEntry, scan: ScanContext | dict[str, Any]
+) -> dict[str, Any]:
     """Offline catalog item table scaffold.
 
         Args:
@@ -235,12 +240,15 @@ def offline_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[s
             ... )["items"][0]["name"]
             'x'
     """
+    scan = _scan_dict(scan)
     if entry.catalog == "skills":
         return offline_skills_catalog_sections(entry, scan)
     return offline_modules_catalog_sections(entry, scan)
 
 
-def offline_modules_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str, Any]:
+def offline_modules_catalog_sections(
+    entry: ReadmeEntry, scan: ScanContext | dict[str, Any]
+) -> dict[str, Any]:
     """Build the modules catalog table with docstring summaries and overflow row.
 
         Args:
@@ -257,6 +265,7 @@ def offline_modules_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) -
             ... )["items"][0]["summary"]
             'Tool x.'
     """
+    scan = _scan_dict(scan)
     items: list[dict[str, str]] = []
     py_files = list(scan.get("source_py_files", []))
     module_summaries: dict[str, str] = scan.get("module_summaries", {})
@@ -271,7 +280,9 @@ def offline_modules_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) -
     return {"summary": entry.summary, "items": items}
 
 
-def offline_skills_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str, Any]:
+def offline_skills_catalog_sections(
+    entry: ReadmeEntry, scan: ScanContext | dict[str, Any]
+) -> dict[str, Any]:
     """Build bundled-skill and runtime-loader tables for the skills catalog.
 
         Args:
@@ -288,6 +299,7 @@ def offline_skills_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) ->
             ... )["bundled_items"][0]["name"]
             'demo'
     """
+    scan = _scan_dict(scan)
     bundled_items = [
         {"name": row["name"], "path": row["path"], "summary": row["summary"]}
         for row in scan.get("bundled_skills", [])
@@ -327,7 +339,7 @@ def catalog_items_with_hrefs(
 
         Examples:
             >>> from pathlib import Path as _P
-            >>> catalog_items_with_hrefs(
+            >>> rows = catalog_items_with_hrefs(
             ...     [{"name": "x", "path": "src/a.py", "summary": "A."}],
             ...     entry=ReadmeEntry("t", "T", "S", "catalog", "t", "docs/readmes/t.md", ("src/**",), ()),
             ...     repo_root=_P("."),
@@ -354,7 +366,9 @@ def catalog_items_with_hrefs(
     return out
 
 
-def offline_guide_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str, Any]:
+def offline_guide_sections(
+    entry: ReadmeEntry, scan: ScanContext | dict[str, Any]
+) -> dict[str, Any]:
     """Offline guide step scaffold.
 
         Args:
@@ -365,13 +379,14 @@ def offline_guide_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str
             dict[str, str]: Section key → value.
 
         Examples:
-            >>> steps = _offline_guide_sections(
+            >>> steps = offline_guide_sections(
             ...     ReadmeEntry("onboarding", "O", "S", "guide", "o", "o.md", ("a",), ("specs/x.md",)),
             ...     {"spec_excerpt": "Setup wizard."},
             ... )["steps"]
             >>> steps[0]["heading"]
             'Overview'
     """
+    scan = _scan_dict(scan)
     spec_excerpt = str(scan.get("spec_excerpt", "")).strip()
     overview_body = (
         f"{entry.summary}\n\n"
@@ -406,7 +421,9 @@ def offline_guide_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str
     }
 
 
-def offline_freeform_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str, Any]:
+def offline_freeform_sections(
+    entry: ReadmeEntry, scan: ScanContext | dict[str, Any]
+) -> dict[str, Any]:
     """Offline freeform body scaffold.
 
         Args:
@@ -473,7 +490,7 @@ def build_level1_overview(entry: ReadmeEntry, spec_excerpt: str) -> str:
             str: Non-technical overview paragraphs.
 
         Examples:
-            >>> text = _build_level1_overview(
+            >>> text = build_level1_overview(
             ...     ReadmeEntry("g", "Gateway", "Control plane.", "subsystem", "g", "o.md", ("a",), ()),
             ...     "Accepts messages from channels.",
             ... )

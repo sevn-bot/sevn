@@ -298,6 +298,31 @@ def _read_spec_excerpt(
     return "\n\n".join(chunks).strip()
 
 
+def _frontmatter_data(text: str) -> dict[str, Any]:
+    """Parse YAML frontmatter from a markdown file when present.
+
+        Args:
+    text (str): Full markdown file contents.
+
+        Returns:
+            dict[str, Any]: Parsed frontmatter mapping, or empty dict.
+
+        Examples:
+            >>> _frontmatter_data("---\\nsummary: Hello\\n---\\n")
+            {'summary': 'Hello'}
+    """
+    if not text.lstrip("\ufeff").startswith("---"):
+        return {}
+    end = text.find("\n---", 3)
+    if end < 0:
+        return {}
+    try:
+        data = yaml.safe_load(text[3:end])
+    except yaml.YAMLError:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 def _spec_frontmatter_summary(text: str) -> str:
     """Extract the ``summary`` field from YAML frontmatter when present.
 
@@ -311,27 +336,10 @@ def _spec_frontmatter_summary(text: str) -> str:
             >>> _spec_frontmatter_summary("---\\nsummary: Hello world\\n---\\n")
             'Hello world'
     """
-    if not text.startswith("---"):
-        return ""
-    end = text.find("\n---", 3)
-    if end < 0:
-        return ""
-    block = text[3:end]
-    lines: list[str] = []
-    in_summary = False
-    for line in block.splitlines():
-        if line.startswith("summary:"):
-            rest = line.split(":", maxsplit=1)[1].strip()
-            if rest:
-                lines.append(rest.strip("'\""))
-            in_summary = True
-            continue
-        if in_summary:
-            if line.startswith((" ", "\t")):
-                lines.append(line.strip().strip("'\""))
-                continue
-            break
-    return " ".join(lines).strip()
+    summary = _frontmatter_data(text).get("summary", "")
+    if isinstance(summary, list):
+        return " ".join(str(part).strip() for part in summary if str(part).strip())
+    return str(summary).strip()
 
 
 def _spec_body_without_frontmatter(text: str) -> str:
@@ -671,18 +679,7 @@ def _skill_frontmatter_fields(text: str) -> tuple[str, str]:
             ... )
             ('fold', 'Line one. Line two.')
     """
-    if not text.lstrip("\ufeff").startswith("---"):
-        return ("", "")
-    end = text.find("\n---", 3)
-    if end < 0:
-        return ("", "")
-    block = text[3:end]
-    try:
-        data = yaml.safe_load(block)
-    except yaml.YAMLError:
-        return ("", "")
-    if not isinstance(data, dict):
-        return ("", "")
+    data = _frontmatter_data(text)
     name = str(data.get("name", "")).strip()
     description = data.get("description", "")
     if isinstance(description, list):
