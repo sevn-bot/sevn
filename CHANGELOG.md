@@ -12,6 +12,8 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- [2026-07-14] `skw spec_validate` and `make spec-check` validate the committed 7-section about-sevn.bot spec format with deterministic 0–100 validity scores (`make docs-score`, folder rollup)
+- [2026-07-14] `docs-folder-author` agent (`.cursor/agents/` + `spec-kit-wave/agents/`) validates and updates whole `about-sevn.bot/specs/` or `about-sevn.bot/prd/` folders against code and template rules
 - [2026-07-14] Unreleased changelog bullets require a leading `[YYYY-MM-DD]` datestamp enforced by `make changelog-check`
 - [2026-07-14] Changelog templates, standards, and author skills under `spec-kit-wave/` document the datestamp contract
 
@@ -29,6 +31,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- [2026-07-14] The about-docs generator no longer writes `interfaces`, `depends_on`, or `build_phase` into `kind: prd` frontmatter (spec-only keys; aligns with `skw prd-validate`)
 - [2026-07-14] `make about-docs-check` chains `make spec-check` and `make prd-check` so CI catches doc regressions; about-docs check rejects specs with `status: done` over scaffold placeholder bodies
 - [2026-07-14] Changelog validator canonical implementation lives in `spec-kit-wave/src/skw/changelog_validate.py`; `scripts/changelog_validate.py` is a shim
 
@@ -55,6 +58,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-14] Bundled skill seeding skips `__pycache__` when copying packaged skills, avoiding parallel-test flakes on transient `.pyc` files
 - [2026-07-14] Onboarding web and TUI wizards expose `gateway.queue_mode=multi` in capabilities (matches runtime and spec-36)
 - [2026-07-14] README pre-commit stages `_fingerprints.json` when source digests change but rendered markdown is unchanged
 - [2026-07-14] Curated Level 1–2 symbol validation flags bare `` `function_name` `` cites absent from cited Python files (line-scoped, snake_case only)

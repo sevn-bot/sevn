@@ -506,7 +506,11 @@ def seed_bundled_skills(
         dest_pkg = dest_root / skill_id
         if dest_pkg.exists():
             continue
-        shutil.copytree(src_pkg, dest_pkg)
+        shutil.copytree(
+            src_pkg,
+            dest_pkg,
+            ignore=lambda _dir, names: {name for name in names if name == "__pycache__"},
+        )
         skill_md = dest_pkg / "SKILL.md"
         if skill_md.is_file():
             written.append(skill_md)
@@ -1005,7 +1009,11 @@ def refresh_bundled_core_skills(content_root: Path) -> list[str]:
         dest_pkg = dest_root / skill_id
         if dest_pkg.exists():
             shutil.rmtree(dest_pkg)
-        shutil.copytree(src_pkg, dest_pkg)
+        shutil.copytree(
+            src_pkg,
+            dest_pkg,
+            ignore=lambda _dir, names: {name for name in names if name == "__pycache__"},
+        )
         refreshed.append(skill_id)
     ensure_workspace_index(content_root)
     return refreshed

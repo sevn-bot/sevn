@@ -650,7 +650,11 @@ def install_bundled_skill(
     if dst.exists():
         msg = f"user skill already exists: {name}"
         raise SkillExecutionError(msg, code="SKILL_VALIDATION")
-    shutil.copytree(src, dst)
+    shutil.copytree(
+        src,
+        dst,
+        ignore=lambda _dir, names: {name for name in names if name == "__pycache__"},
+    )
     manager = SkillsManager.shared(layout.content_root, layout=layout, config=workspace)
     manager.reload()
     return {
