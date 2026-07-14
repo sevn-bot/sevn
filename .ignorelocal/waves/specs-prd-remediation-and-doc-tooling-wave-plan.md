@@ -1,6 +1,6 @@
 # Specs & PRD remediation + doc-folder tooling — wave plan
 
-**Status:** W0–W10 + Thermos complete; **W11–W13 pre-merge fixes pending**; Final re-opened for re-run after W13
+**Status:** W0–W11 + Thermos complete; **W12 in progress** (uncommitted WIP @ `5f89fa9`); W13 + Final pending
 **Date:** 2026-07-14
 **Owner agents:** `.cursor/agents/wave-plan-executor.md` (W0, W2–W13, Final, Thermos gate) · `.cursor/agents/test-creator.md` (W1 `role: test-author` + per-wave xfail reconciliation) · **new** `.cursor/agents/docs-folder-author.md` (invoked *by the executor* to author/update/validate the `about-sevn.bot/specs` and `about-sevn.bot/prd` folders in W7–W9 — the sanctioned folder-authoring path this plan creates)
 **Source:** `.ignorelocal/PRD-SPECS-QUALITY-ANALYSIS-2026-07-14.md` (repo-root artefact, gitignored — the deep quality analysis of `about-sevn.bot/{prd,specs}` on `pre-0.0.1`). Findings are cited by that file's section numbers: **§1** (TL;DR), **§2** (stubs vs developed), **§3** (code-fidelity), **§4** (external / gitignore refs), **§5** (defects), **§6** (bottom line + recommended follow-ups). This plan is the sequencing artefact; the analysis is the requirement rationale; `spec-kit-wave/{PRD-STANDARDS.md,SPEC-KIT-STANDARDS.md,CHANGELOG-STANDARDS.md}` + the `*-rules.toml` files are the normative contracts.
@@ -526,6 +526,8 @@ Target: `docs/readmes/gateway.md` on branch `wave/specs-prd-remediation`. Refere
 
 ## Wave W12 — Gateway package reorganization (refactor-only)
 
+> **Progress (2026-07-14):** In progress — uncommitted WIP on `wave/specs-prd-remediation` @ `5f89fa9`. `scripts/gateway_reorg_w12.py` created; ~104 modules moved into 30 subpackages (`access/`, `api/`, `telegram/`, `turn/`, …); 10 core modules remain at gateway root. ~283 tracked files changed (85 staged renames + import updates). `17-gateway.md` / `gateway.md` touched but W12.3–W12.5 not verified. No commit `ed5fbb7` (prior agent session unfinished). Gates (`make lint`, `make typecheck`, `make ci-affected`) not run on WIP tree.
+
 Goal: reduce the flat **114** Python files at `src/sevn/gateway/` — keep **core** modules at the gateway root; move the rest into new subpackages under `src/sevn/gateway/` (e.g. `commands/`, `telegram/`, `diagnostics/` — derive from actual inventory). **No behavior change** — import-path refactor only.
 
 - [ ] **W12.1** [US8] Inventory all 114 `*.py` files under `src/sevn/gateway/`; classify each as **core** (stays at root) vs **relocatable** (moves to subpackage). Document the classification table below (fill during execution).
@@ -594,3 +596,7 @@ _Verified 2026-07-14 in worktree `../sevn-specs-prd` (branch `wave/specs-prd-rem
 - **`sevn about-docs schema` status enum (all kinds):** `draft`, `scaffold`, `ready`, `done`, `rejected` (`about-sevn.bot/_docsys/about-docs.schema.json` + `src/sevn/docs/about/model.py`)
 - **`ready` for `kind: spec`:** schema allows it today; **plan locks `spec-rules.toml` to exclude `ready`** for specs (D3)
 - **§-numbered external source:** none found → **`about-sevn.bot/specs/*.md` is SSOT** (D11)
+
+## Plan maintenance
+
+> After each wave: flip checkboxes in the **worktree** copy (`../sevn-specs-prd/.ignorelocal/waves/…`), `cp` to the **primary checkout** copy (`sevn/.ignorelocal/waves/…`), and commit+push plan updates with wave commits or immediately after.
