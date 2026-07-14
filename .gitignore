@@ -24,7 +24,6 @@ docs/*
 
 # --- Operator wave kits (private checkout only) ---
 /build-plan-from-review/
-/spec-kit-wave/
 /wave-orchestrator/
 
 # --- Verification evidence (verifier-setup / verify skill output) ---
