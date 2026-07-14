@@ -2,7 +2,7 @@
 id: spec-04-tracing
 kind: spec
 title: Tracing — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: Provide durable trace sinks that implement TraceSink without ever throwing
   through emit, so instrumentation stays off the critical path. SQLite layout matches

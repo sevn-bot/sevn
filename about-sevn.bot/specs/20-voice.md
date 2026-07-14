@@ -2,7 +2,7 @@
 id: spec-20-voice
 kind: spec
 title: Voice (STT / TTS) — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Own the provider-chain facades for speech-to-text and text-to-speech so
   the gateway can:'

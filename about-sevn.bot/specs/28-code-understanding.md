@@ -2,7 +2,7 @@
 id: spec-28-code-understanding
 kind: spec
 title: Code understanding — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Deliver the code-orientation stack the coding companion PRD names: five
   orthogonal capabilities (MYCODE, Memgraph CGR, code-review-graph (SQLite MCP), roam-code,

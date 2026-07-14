@@ -2,7 +2,7 @@
 id: spec-23-cli
 kind: spec
 title: CLI — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: Deliver the primary operator and automation surface for install, upgrades,
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI

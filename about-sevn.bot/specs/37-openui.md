@@ -2,7 +2,7 @@
 id: spec-37-openui
 kind: spec
 title: OpenUI — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Deliver OpenUI: explicit openui_render tool calls produce sanitised, CSP-wrapped,
   size-capped HTML (live or rasterised) and deterministic form callbacks that rejoin

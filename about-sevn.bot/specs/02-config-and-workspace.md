@@ -2,7 +2,7 @@
 id: spec-02-config-and-workspace
 kind: spec
 title: Config and workspace — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Provide a single, testable configuration surface before storage, tracing,
   proxy, and gateway work: locate sevn.json, validate schema_version and structured

@@ -2,7 +2,7 @@
 id: spec-22-onboarding
 kind: spec
 title: Onboarding — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Deliver the merge + validation + promotion pipeline every setup path shares
   so sevn.json stays the single source of truth (prd-06-setup-and-operations §5.4,

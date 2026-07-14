@@ -2,7 +2,7 @@
 id: spec-12-skills-system
 kind: spec
 title: Skills system — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Own everything under workspace/skills/: how skills are discovered, validated,
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only

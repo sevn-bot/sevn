@@ -2,7 +2,7 @@
 id: spec-29-cursor-cloud-agent
 kind: spec
 title: Cursor Cloud Agent — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: Let operators and agents launch, poll, and inspect Cursor Cloud Agents against
   any GitHub/GitLab repo when skills.cursor_cloud.enabled is true, returning PR URLs,

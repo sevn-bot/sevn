@@ -2,7 +2,7 @@
 id: spec-13-rlm-triager
 kind: spec
 title: RLM Triager — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–§5.2):
   a single, tool-less outbound generation step that emits validated TriageResult consumed

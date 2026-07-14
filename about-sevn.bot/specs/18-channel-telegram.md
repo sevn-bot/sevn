@@ -2,7 +2,7 @@
 id: spec-18-channel-telegram
 kind: spec
 title: Channel — Telegram — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Deliver the primary daily-driver channel for personal messaging: a ChannelAdapter
   implementation that normalises Telegram Updates into spec-17-gateway IncomingMessage

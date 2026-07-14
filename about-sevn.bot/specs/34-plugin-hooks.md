@@ -2,7 +2,7 @@
 id: spec-34-plugin-hooks
 kind: spec
 title: Plugin hooks & channel plugins — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: Deliver the in-process extension layer that intercepts existing tool and
   terminal I/O paths and registers dispatcher-level commands, without adding new tool

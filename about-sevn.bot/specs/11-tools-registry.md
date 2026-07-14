@@ -2,7 +2,7 @@
 id: spec-11-tools-registry
 kind: spec
 title: Tools registry — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that every
   executor tier uses: one implementation per tool name, registered in a session-scoped

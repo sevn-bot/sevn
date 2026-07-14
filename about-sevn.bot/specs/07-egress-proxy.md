@@ -2,7 +2,7 @@
 id: spec-07-egress-proxy
 kind: spec
 title: Egress proxy — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: Product pairing (v1). Deployment, paired daemon install, onboarding validation,
   and Mission Control management of the proxy are specified in prd-06-setup-and-operations

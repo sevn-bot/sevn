@@ -2,7 +2,7 @@
 id: spec-16-harness-discipline
 kind: spec
 title: Harness discipline — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Harness discipline: background task logging, operator PATH augmentation,
   and gateway/agent harness hooks under agent/harness/.'

@@ -2,7 +2,7 @@
 id: spec-24-dashboard
 kind: spec
 title: Mission Control (dashboard) — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Deliver Mission Control: a same-process dashboard (prd-07-mission-control)
   so the owner can inspect traces, costs, provider health, in-flight runs, proxy status,

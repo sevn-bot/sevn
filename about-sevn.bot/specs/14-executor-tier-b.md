@@ -2,7 +2,7 @@
 id: spec-14-executor-tier-b
 kind: spec
 title: Executor tier B — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Tier B is the default “do work” executor for messages the Triager classifies
   as complexity == B (prd-04-getting-things-done §5.2): a single pydantic-ai Agent

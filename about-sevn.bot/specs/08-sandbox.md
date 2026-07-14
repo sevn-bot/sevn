@@ -2,7 +2,7 @@
 id: spec-08-sandbox
 kind: spec
 title: Sandbox — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / safebash
   (when routed through the execution sandbox), process when configured for sandbox

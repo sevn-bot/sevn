@@ -2,7 +2,7 @@
 id: spec-09-security-scanner
 kind: spec
 title: Security scanner — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: Deliver a single scanner subsystem that runs in the gateway process so hostile
   content is filtered before the Triager or any routing model sees user-visible text,

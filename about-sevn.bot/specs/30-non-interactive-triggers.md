@@ -2,7 +2,7 @@
 id: spec-30-non-interactive-triggers
 kind: spec
 title: Non-interactive triggers — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Deliver non-interactive dispatch: external events (“something happened”)
   and schedules (“tick”) compile to DispatchRequest, optionally pass through notify_only

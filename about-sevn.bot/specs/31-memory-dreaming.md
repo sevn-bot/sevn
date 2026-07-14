@@ -2,7 +2,7 @@
 id: spec-31-memory-dreaming
 kind: spec
 title: Memory — Dreaming — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: Provide scored consolidation from short-term recall signals into curated
   long-term prose (MEMORY.md) on a daily (configurable) cadence, without mutating

@@ -2,7 +2,7 @@
 id: spec-03-storage
 kind: spec
 title: Storage — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Own application persistence: connection setup (WAL, foreign keys), versioned
   migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence

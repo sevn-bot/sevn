@@ -185,17 +185,17 @@ place (queue semantics, tracing spans, storage migration, dashboard panel,
 Telegram menu, CLI surface, skills binding).
 
 Full authoring (architecture, registry lifecycle state machine, `multi` flow,
-specialist contract) lands in wave W9 of
-`.ignorelocal/design/plan/sub-agents-orchestration-wave-plan.md`; this file is
-the W0 scaffold — locked decisions below are load-bearing now for waves
-W1–W9.
+specialist contract) is recorded in this spec's prose and §10 build checklist;
+the original orchestration wave plan was operator-local design history (not
+shipped in-repo). Locked decisions below are load-bearing for implementation
+waves W1–W9.
 
 ## Locked decisions (D1–D16)
 
-Copied verbatim from the wave plan
-(`.ignorelocal/design/plan/sub-agents-orchestration-wave-plan.md`, "Decisions
+Copied from the operator-local sub-agents orchestration wave plan ("Decisions
 baked into this plan" table) as of 2026-07-11 — operator-approved, do not
-re-derive during later waves.
+re-derive during later waves. (Design history, local-only — not available on a
+clean clone.)
 
 | # | Topic | Decision |
 |---|-------|----------|

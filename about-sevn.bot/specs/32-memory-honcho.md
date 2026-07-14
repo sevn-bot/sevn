@@ -2,7 +2,7 @@
 id: spec-32-memory-honcho
 kind: spec
 title: Memory — Honcho-style user model — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: Deliver an opt-in inferred profile that accumulates stable operator-facing
   facts (preferences, recurring context the operator states in chat) without requiring

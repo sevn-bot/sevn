@@ -2,7 +2,7 @@
 id: spec-05-llm-transports
 kind: spec
 title: LLM transports — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: Normalize provider-shaped JSON over async HTTP to a single egress base URL
   (SEVN_PROXY_URL / ProcessSettings.proxy_url), so tier executors bind once per turn

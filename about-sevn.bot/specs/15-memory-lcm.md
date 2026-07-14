@@ -2,7 +2,7 @@
 id: spec-15-memory-lcm
 kind: spec
 title: Memory — LCM (Lossless Context Management) — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'LCM is the lossless conversation memory for a workspace (prd-02-personality-and-memory
   §5.2–§5.4): every qualifying message is stored; compaction summarises without deleting

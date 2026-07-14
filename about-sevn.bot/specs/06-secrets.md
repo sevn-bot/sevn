@@ -2,7 +2,7 @@
 id: spec-06-secrets
 kind: spec
 title: Secrets — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Deliver a single trust boundary for credentials: backend modules + TTL cache
   under src/sevn/security/, wired exclusively by the egress proxy (src/sevn/proxy/)

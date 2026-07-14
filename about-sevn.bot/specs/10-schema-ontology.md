@@ -2,7 +2,7 @@
 id: spec-10-schema-ontology
 kind: spec
 title: Schema & ontology — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Define the runtime ontology for Triager output and related labels across
   the agent core: canonical field names, closed enums, typing conventions, and how

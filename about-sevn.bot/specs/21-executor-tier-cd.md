@@ -2,7 +2,7 @@
 id: spec-21-executor-tier-cd
 kind: spec
 title: Executor tier C/D — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Tier C/D is the planned-work executor for messages the Triager classifies
   as complexity == C or complexity == D (prd-04-getting-things-done §5.3–§5.4): structured

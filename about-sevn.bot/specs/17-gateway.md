@@ -2,7 +2,7 @@
 id: spec-17-gateway
 kind: spec
 title: Gateway — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,

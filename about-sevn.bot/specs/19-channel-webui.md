@@ -2,7 +2,7 @@
 id: spec-19-channel-webui
 kind: spec
 title: Channel — Web UI — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Deliver the browser conversational surface required by prd-01-conversational-experience
   §5.1: owner-only WebSocket chat, static SPA shell, and session continuity with Telegram

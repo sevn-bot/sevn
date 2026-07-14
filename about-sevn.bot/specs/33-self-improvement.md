@@ -2,7 +2,7 @@
 id: spec-33-self-improvement
 kind: spec
 title: Self-improvement — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Deliver src/sevn/self_improve/: ingest traces + session artefacts + explicit
   user feedback into trajectory_fact rows, deterministically shortlist turns for review
