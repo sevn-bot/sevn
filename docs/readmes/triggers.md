@@ -21,7 +21,7 @@ Implementation lives under `src/sevn/triggers/`. The package contains 19 Python 
 
 ### Data and control flow
 
-Non-interactive triggers is a supporting subsystem; see Level 3 for the module-level flow.
+Non-interactive triggers is organized around `  init  `, `api router`, `auth`, `coding agent loop`, and 2 more under `src/sevn/triggers/` with 19 Python module(s) in the scanned tree. Primary entry points include api_router.py (build_api_router), auth.py (triggers_api_auth_required), coding_agent_loop.py (mine_session_trajectories), cron.py (format_next_fire_at_iso).
 
 ### Configuration
 
@@ -37,105 +37,74 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/triggers/` (19 Python files). Normative design: `about-sevn.bot/specs/30-non-interactive-triggers.md`.
+Primary source tree: [`src/sevn/triggers`](../../src/sevn/triggers/) (19 Python files). Normative design: `about-sevn.bot/specs/30-non-interactive-triggers.md`.
 
 ### Module inventory
 
-- `src/sevn/triggers/__init__.py` — Non-interactive triggers ('about-sevn.bot/specs/30-non-interactive-triggers.md').
-- `src/sevn/triggers/api_router.py` — HTTP API for non-interactive runs ('about-sevn.bot/specs/30-non-interactive-triggers.md' §2.2).
-- `src/sevn/triggers/auth.py` — Triggers API bearer verification ('about-sevn.bot/specs/30-non-interactive-triggers.md' §2.2, §11).
-- `src/sevn/triggers/coding_agent_loop.py` — Coding agent loop trigger — ALRCA background loop + session-mining hook (CA6.3).
-- `src/sevn/triggers/cron.py` — SQLite-backed cron job store ('about-sevn.bot/specs/30-non-interactive-triggers.md' §2.4, §3.2).
-- `src/sevn/triggers/dedupe.py` — Webhook dedupe persistence ('about-sevn.bot/specs/30-non-interactive-triggers.md' §3.2).
-- `src/sevn/triggers/delivery.py` — Result fan-out for trigger dispatches ('about-sevn.bot/specs/30-non-interactive-triggers.md' §4.6).
-- `src/sevn/triggers/dispatcher.py` — Core trigger dispatch ('about-sevn.bot/specs/30-non-interactive-triggers.md' §2.1).
-- `src/sevn/triggers/hooks.py` — See :mod:'sevn.plugins.registry' and :mod:'sevn.plugins.trigger_mux' ('about-sevn.bot/specs/34-plugin-hooks.md').
-- `src/sevn/triggers/hooks_protocol.py` — Minimal hook surface for trigger ingress ('about-sevn.bot/specs/34-plugin-hooks.md' §4.7 stub).
-- `src/sevn/triggers/inbox.py` — Trigger inbox spill + retention ('about-sevn.bot/specs/30-non-interactive-triggers.md' §3.3).
-- `src/sevn/triggers/request.py` — Dispatch envelopes for non-interactive runs ('about-sevn.bot/specs/30-non-interactive-triggers.md' §3.1).
-- … and 7 more Python modules
+Non-interactive triggers (about-sevn.bot/specs/30-non-interactive-triggers.md).
 
-### Package init (`src/sevn/triggers/__init__.py`)
+Public entrypoints are mounted from :mod:sevn.gateway.http_server.
 
-See `src/sevn/triggers/__init__.py` for implementation details.
+Working with [`__init__.py`](../../src/sevn/triggers/__init__.py): inspect the public entry points below.
 
-### Api Router (`src/sevn/triggers/api_router.py`)
+HTTP API for non-interactive runs (about-sevn.bot/specs/30-non-interactive-triggers.md §2.2).
 
-Public entry points:
-- `build_api_router`
+Working with [`api_router.py`](../../src/sevn/triggers/api_router.py): inspect the public entry points below.
+Start with [`build_api_router`](../../src/sevn/triggers/api_router.py#L112).
 
-### Auth (`src/sevn/triggers/auth.py`)
+Triggers API bearer verification (about-sevn.bot/specs/30-non-interactive-triggers.md §2.2, §11).
 
-Public entry points:
-- `triggers_api_auth_required`
-- `verify_triggers_api_bearer`
+Working with [`auth.py`](../../src/sevn/triggers/auth.py): inspect the public entry points below.
+Start with [`triggers_api_auth_required`](../../src/sevn/triggers/auth.py#L19), then [`verify_triggers_api_bearer`](../../src/sevn/triggers/auth.py#L42).
 
-### Coding Agent Loop (`src/sevn/triggers/coding_agent_loop.py`)
+Coding agent loop trigger — ALRCA background loop + session-mining hook (CA6.3).
 
-Public entry points:
-- `mine_session_trajectories`
-- `coding_agent_loop_trigger`
+Working with [`coding_agent_loop.py`](../../src/sevn/triggers/coding_agent_loop.py): inspect the public entry points below.
+Start with [`mine_session_trajectories`](../../src/sevn/triggers/coding_agent_loop.py#L31), then [`coding_agent_loop_trigger`](../../src/sevn/triggers/coding_agent_loop.py#L62).
 
-### Cron (`src/sevn/triggers/cron.py`)
+SQLite-backed cron job store (about-sevn.bot/specs/30-non-interactive-triggers.md §2.4, §3.2).
 
-Public entry points:
-- `format_next_fire_at_iso`
-- `cron_job_to_dict`
-- `cron_job_to_list_dict`
-- `SqliteCronStore.list_due`
-- `SqliteCronStore.update_schedule`
-- `SqliteCronStore.list_jobs`
-- `SqliteCronStore (+4 methods)`
-- `list_cron_jobs`
+Working with [`cron.py`](../../src/sevn/triggers/cron.py): inspect the public entry points below.
+Start with [`format_next_fire_at_iso`](../../src/sevn/triggers/cron.py#L231), then [`cron_job_to_dict`](../../src/sevn/triggers/cron.py#L252), [`cron_job_to_list_dict`](../../src/sevn/triggers/cron.py#L293), [`SqliteCronStore.list_due`](../../src/sevn/triggers/cron.py#L339).
 
-### Dedupe (`src/sevn/triggers/dedupe.py`)
+Webhook dedupe persistence (about-sevn.bot/specs/30-non-interactive-triggers.md §3.2).
 
-Public entry points:
-- `try_insert_webhook_dedupe`
-- `prune_webhook_dedupe_expired`
+Working with [`dedupe.py`](../../src/sevn/triggers/dedupe.py): inspect the public entry points below.
+Start with [`try_insert_webhook_dedupe`](../../src/sevn/triggers/dedupe.py#L25), then [`prune_webhook_dedupe_expired`](../../src/sevn/triggers/dedupe.py#L73).
 
-### Delivery (`src/sevn/triggers/delivery.py`)
+Result fan-out for trigger dispatches (about-sevn.bot/specs/30-non-interactive-triggers.md §4.6).
 
-Public entry points:
-- `trigger_runs_dir`
-- `write_log_result`
+Working with [`delivery.py`](../../src/sevn/triggers/delivery.py): inspect the public entry points below.
+Start with [`trigger_runs_dir`](../../src/sevn/triggers/delivery.py#L25), then [`write_log_result`](../../src/sevn/triggers/delivery.py#L43).
 
-### Dispatcher (`src/sevn/triggers/dispatcher.py`)
+Core trigger dispatch (about-sevn.bot/specs/30-non-interactive-triggers.md §2.1).
 
-Public entry points:
-- `agent_dispatch_kwargs`
-- `TriggerDispatchGate.limit`
-- `TriggerDispatchGate.acquire_api_slot`
-- `TriggerDispatchGate.release_api_slot`
-- `TriggerDispatchGate (+3 methods)`
-- `dispatch_notify_only`
-- `dispatch_run`
+Working with [`dispatcher.py`](../../src/sevn/triggers/dispatcher.py): inspect the public entry points below.
+Start with [`agent_dispatch_kwargs`](../../src/sevn/triggers/dispatcher.py#L40), then [`TriggerDispatchGate.limit`](../../src/sevn/triggers/dispatcher.py#L85), [`TriggerDispatchGate.acquire_api_slot`](../../src/sevn/triggers/dispatcher.py#L98), [`TriggerDispatchGate.release_api_slot`](../../src/sevn/triggers/dispatcher.py#L119).
 
-### Hooks (`src/sevn/triggers/hooks.py`)
+See :mod:sevn.plugins.registry and :mod:sevn.plugins.trigger_mux (about-sevn.bot/specs/34-plugin-hooks.md).
 
-See `src/sevn/triggers/hooks.py` for implementation details.
+Working with [`hooks.py`](../../src/sevn/triggers/hooks.py): inspect the public entry points below.
 
-### Hooks Protocol (`src/sevn/triggers/hooks_protocol.py`)
+Minimal hook surface for trigger ingress (about-sevn.bot/specs/34-plugin-hooks.md §4.7 stub).
 
-Public entry points:
-- `TriggerPluginHookSurface.trigger_before_receive`
-- `TriggerPluginHookSurface.trigger_after_dispatch`
+Working with [`hooks_protocol.py`](../../src/sevn/triggers/hooks_protocol.py): inspect the public entry points below.
+Start with [`TriggerPluginHookSurface.trigger_before_receive`](../../src/sevn/triggers/hooks_protocol.py#L24), then [`TriggerPluginHookSurface.trigger_after_dispatch`](../../src/sevn/triggers/hooks_protocol.py#L45).
 
-### Inbox (`src/sevn/triggers/inbox.py`)
+Trigger inbox spill + retention (about-sevn.bot/specs/30-non-interactive-triggers.md §3.3).
 
-See `src/sevn/triggers/inbox.py` for implementation details.
+Working with [`inbox.py`](../../src/sevn/triggers/inbox.py): inspect the public entry points below.
+Start with [`inbox_dir`](../../src/sevn/triggers/inbox.py#L25), then [`maybe_spill_prompt_to_inbox`](../../src/sevn/triggers/inbox.py#L40), [`prune_inbox_spill`](../../src/sevn/triggers/inbox.py#L80).
 
-### Request (`src/sevn/triggers/request.py`)
+Dispatch envelopes for non-interactive runs (about-sevn.bot/specs/30-non-interactive-triggers.md §3.1).
 
-See `src/sevn/triggers/request.py` for implementation details.
+Working with [`request.py`](../../src/sevn/triggers/request.py): inspect the public entry points below.
 
-### Additional modules
-
-7 more Python files under `src/sevn/triggers/` — including `src/sevn/triggers/settings.py`, `src/sevn/triggers/sources/__init__.py`, `src/sevn/triggers/sources/github.py`, `src/sevn/triggers/trace_util.py`.
+7 more Python files under [`src/sevn/triggers`](../../src/sevn/triggers/) — including `src/sevn/triggers/settings.py`, `src/sevn/triggers/sources/__init__.py`, `src/sevn/triggers/sources/github.py`, `src/sevn/triggers/trace_util.py`.
 
 ### Extension and invariants
 
-Follow `about-sevn.bot/specs/30-non-interactive-triggers.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/triggers/`, run `sevn readme update triggers` and `make readme-check`.
+Follow [`30-non-interactive-triggers.md`](../../about-sevn.bot/specs/30-non-interactive-triggers.md) for merge gates, error semantics, and compatibility constraints. After code changes under [`src/sevn/triggers`](../../src/sevn/triggers/), run `sevn readme update triggers` and `make readme-check`.
 
 ## References
 

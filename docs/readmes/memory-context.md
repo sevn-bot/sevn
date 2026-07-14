@@ -21,7 +21,7 @@ Implementation spans `src/sevn/lcm/`, `src/sevn/memory/`. The package contains 3
 
 ### Data and control flow
 
-Memory & context is a supporting subsystem; see Level 3 for the module-level flow.
+Memory & context is organized around `  init  `, `assembler`, `compaction`, `engine`, and 2 more under `src/sevn/memory/`; implementation spans `src/sevn/lcm/`, `src/sevn/memory/`. Primary entry points include assembler.py (LcmAssembler.assemble), compaction.py (completion_text), engine.py (LcmEngine.ingest), flush.py (is_allowlisted_relative_path).
 
 ### Configuration
 
@@ -48,105 +48,76 @@ Deliver an opt-in inferred profile that accumulates stable operator-facing facts
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/` (34 Python files). Normative design: `about-sevn.bot/specs/15-memory-lcm.md`, `about-sevn.bot/specs/31-memory-dreaming.md`, `about-sevn.bot/specs/32-memory-honcho.md`.
+Primary source tree: [`src/sevn/memory`](../../src/sevn/memory/) (34 Python files). Normative design: `about-sevn.bot/specs/15-memory-lcm.md`, `about-sevn.bot/specs/31-memory-dreaming.md`, `about-sevn.bot/specs/32-memory-honcho.md`.
 
 ### Module inventory
 
-- `src/sevn/lcm/__init__.py` — Lossless context management ('about-sevn.bot/specs/15-memory-lcm.md').
-- `src/sevn/lcm/assembler.py` — Context assembly: fresh tail plus newest-first summaries ('about-sevn.bot/specs/15-memory-lcm.md' §4).
-- `src/sevn/lcm/compaction.py` — Compaction scheduler — leaf summaries + optional condensation ('about-sevn.bot/specs/15-memory-lcm.md' §2.5, §4).
-- `src/sevn/lcm/engine.py` — LCM engine façade — ingest, assemble, compaction, search ('about-sevn.bot/specs/15-memory-lcm.md' §2).
-- `src/sevn/lcm/flush.py` — Pre-compaction flush: ''MemoryWrites'' validation and retry-once policy.
-- `src/sevn/lcm/large_files.py` — Oversized inbound payloads spill into ''lcm_large_files'' ('about-sevn.bot/specs/15-memory-lcm.md' §3).
-- `src/sevn/lcm/query.py` — Read-only LCM query helpers for bundled skill scripts ('about-sevn.bot/specs/15-memory-lcm.md' §3).
-- `src/sevn/lcm/script_cli.py` — Shared CLI helpers for bundled ''lcm'' skill scripts.
-- `src/sevn/lcm/search.py` — Session-summary keyword search over ''lcm_summaries''.
-- `src/sevn/memory/__init__.py` — Workspace memory helpers (LCM-adjacent; optional subsystems).
-- `src/sevn/memory/dreaming/__init__.py` — Optional Dreaming consolidation ('about-sevn.bot/specs/31-memory-dreaming.md').
-- `src/sevn/memory/dreaming/ack_policy.py` — Dreaming ''ack_required'' operator surface ('about-sevn.bot/specs/31-memory-dreaming.md' §2, §11).
-- … and 22 more Python modules
+Lossless context management (about-sevn.bot/specs/15-memory-lcm.md).
 
-### Package init (`src/sevn/lcm/__init__.py`)
+Working with [`__init__.py`](../../src/sevn/lcm/__init__.py): inspect the public entry points below.
 
-See `src/sevn/lcm/__init__.py` for implementation details.
+Context assembly: fresh tail plus newest-first summaries (about-sevn.bot/specs/15-memory-lcm.md §4).
 
-### Assembler (`src/sevn/lcm/assembler.py`)
+Working with [`assembler.py`](../../src/sevn/lcm/assembler.py): inspect the public entry points below.
+Start with [`LcmAssembler.assemble`](../../src/sevn/lcm/assembler.py#L69).
 
-Public entry points:
-- `LcmAssembler.assemble`
+Compaction scheduler — leaf summaries + optional condensation (about-sevn.bot/specs/15-memory-lcm.md §2.5, §4).
 
-### Compaction (`src/sevn/lcm/compaction.py`)
+Working with [`compaction.py`](../../src/sevn/lcm/compaction.py): inspect the public entry points below.
+Start with [`completion_text`](../../src/sevn/lcm/compaction.py#L37), then [`CompactionScheduler.run_incremental`](../../src/sevn/lcm/compaction.py#L100).
 
-Public entry points:
-- `completion_text`
-- `CompactionScheduler.run_incremental`
+LCM engine façade — ingest, assemble, compaction, search (about-sevn.bot/specs/15-memory-lcm.md §2).
 
-### Engine (`src/sevn/lcm/engine.py`)
+Working with [`engine.py`](../../src/sevn/lcm/engine.py): inspect the public entry points below.
+Start with [`LcmEngine.ingest`](../../src/sevn/lcm/engine.py#L242), then [`LcmEngine.assemble`](../../src/sevn/lcm/engine.py#L402), [`LcmEngine.after_turn`](../../src/sevn/lcm/engine.py#L446).
 
-Public entry points:
-- `LcmEngine.ingest`
-- `LcmEngine.assemble`
-- `LcmEngine.after_turn`
-- `LcmEngine (+4 methods)`
+Pre-compaction flush: MemoryWrites validation and retry-once policy.
 
-### Flush (`src/sevn/lcm/flush.py`)
+Working with [`flush.py`](../../src/sevn/lcm/flush.py): inspect the public entry points below.
+Start with [`is_allowlisted_relative_path`](../../src/sevn/lcm/flush.py#L78), then [`validate_memory_writes`](../../src/sevn/lcm/flush.py#L108), [`run_flush_decode_with_retry_once`](../../src/sevn/lcm/flush.py#L137).
 
-Public entry points:
-- `is_allowlisted_relative_path`
-- `validate_memory_writes`
-- `run_flush_decode_with_retry_once`
+Oversized inbound payloads spill into lcm_large_files (about-sevn.bot/specs/15-memory-lcm.md §3).
 
-### Large Files (`src/sevn/lcm/large_files.py`)
+v1 stores **full text in SQLite** on the content column and leaves storage_path null
+until a future slice optionally relocates bytes under workspace-relative paths (never under
+.llmignore/). byte_size records UTF-8 length for operator dashboards.
 
-Public entry points:
-- `maybe_spill_large_payload`
+Working with [`large_files.py`](../../src/sevn/lcm/large_files.py): inspect the public entry points below.
+Start with [`maybe_spill_large_payload`](../../src/sevn/lcm/large_files.py#L41).
 
-### Query (`src/sevn/lcm/query.py`)
+Read-only LCM query helpers for bundled skill scripts (about-sevn.bot/specs/15-memory-lcm.md §3).
 
-Public entry points:
-- `resolve_conversation_id`
-- `conversation_ids_for_scope`
-- `grep_messages`
-- `describe_item`
-- `fetch_message`
-- `fetch_recent_messages`
-- `expand_summary`
-- `expand_query`
+Working with [`query.py`](../../src/sevn/lcm/query.py): inspect the public entry points below.
+Start with [`resolve_conversation_id`](../../src/sevn/lcm/query.py#L79), then [`conversation_ids_for_scope`](../../src/sevn/lcm/query.py#L104), [`grep_messages`](../../src/sevn/lcm/query.py#L166), [`describe_item`](../../src/sevn/lcm/query.py#L278).
 
-### Script Cli (`src/sevn/lcm/script_cli.py`)
+Shared CLI helpers for bundled lcm skill scripts.
 
-Public entry points:
-- `cap_script_row_limit`
-- `workspace_from_env`
-- `open_workspace_db`
-- `session_key_from`
-- `write_ok`
-- `write_error`
+Working with [`script_cli.py`](../../src/sevn/lcm/script_cli.py): inspect the public entry points below.
+Start with [`cap_script_row_limit`](../../src/sevn/lcm/script_cli.py#L41), then [`workspace_from_env`](../../src/sevn/lcm/script_cli.py#L59), [`open_workspace_db`](../../src/sevn/lcm/script_cli.py#L72), [`session_key_from`](../../src/sevn/lcm/script_cli.py#L96).
 
-### Search (`src/sevn/lcm/search.py`)
+Session-summary keyword search over lcm_summaries.
 
-Public entry points:
-- `search_session_summaries`
+Working with [`search.py`](../../src/sevn/lcm/search.py): inspect the public entry points below.
+Start with [`search_session_summaries`](../../src/sevn/lcm/search.py#L44).
 
-### Package init (`src/sevn/memory/__init__.py`)
+Workspace memory helpers (LCM-adjacent; optional subsystems).
 
-See `src/sevn/memory/__init__.py` for implementation details.
+Working with [`__init__.py`](../../src/sevn/memory/__init__.py): inspect the public entry points below.
 
-### Package init (`src/sevn/memory/dreaming/__init__.py`)
+Optional Dreaming consolidation (about-sevn.bot/specs/31-memory-dreaming.md).
 
-See `src/sevn/memory/dreaming/__init__.py` for implementation details.
+Working with [`__init__.py`](../../src/sevn/memory/dreaming/__init__.py): inspect the public entry points below.
 
-### Ack Policy (`src/sevn/memory/dreaming/ack_policy.py`)
+Dreaming ack_required operator surface (about-sevn.bot/specs/31-memory-dreaming.md §2, §11).
 
-See `src/sevn/memory/dreaming/ack_policy.py` for implementation details.
+Working with [`ack_policy.py`](../../src/sevn/memory/dreaming/ack_policy.py): inspect the public entry points below.
+Start with [`format_ack_required_trace_attrs`](../../src/sevn/memory/dreaming/ack_policy.py#L23).
 
-### Additional modules
-
-22 more Python files under `src/sevn/` — including `src/sevn/memory/dreaming/backfill.py`, `src/sevn/memory/dreaming/defaults.py`, `src/sevn/memory/dreaming/engine.py`, `src/sevn/memory/dreaming/filters.py`.
+22 more Python files under [`src/sevn/memory`](../../src/sevn/memory/) — including `src/sevn/memory/dreaming/backfill.py`, `src/sevn/memory/dreaming/defaults.py`, `src/sevn/memory/dreaming/engine.py`, `src/sevn/memory/dreaming/filters.py`.
 
 ### Extension and invariants
 
-Follow `about-sevn.bot/specs/15-memory-lcm.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/`, run `sevn readme update memory-context` and `make readme-check`.
+Follow [`15-memory-lcm.md`](../../about-sevn.bot/specs/15-memory-lcm.md) for merge gates, error semantics, and compatibility constraints. After code changes under [`src/sevn/memory`](../../src/sevn/memory/), run `sevn readme update memory-context` and `make readme-check`.
 
 ## References
 
@@ -157,6 +128,6 @@ Follow `about-sevn.bot/specs/15-memory-lcm.md` for merge gates, error semantics,
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
 [spec-link]: ../../about-sevn.bot/specs/15-memory-lcm.md
 [source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
-[source-link]: ../../src/sevn/
+[source-link]: ../../src/sevn/memory/
 [index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
 [index-link]: INDEX.md

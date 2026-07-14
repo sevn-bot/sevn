@@ -12,6 +12,7 @@ Exports:
     format_path_list — comma-separated backtick path list for prose.
     truncate_at_sentence — truncate prose at a sentence boundary within a limit.
     format_module_symbols_for_prompt — JSON symbol map for LLM prompts.
+    strip_inline_code — remove inline-code backticks without doubling quotes.
 
 Examples:
     >>> from sevn.docs.readme.model import SectionContent
@@ -21,6 +22,7 @@ Examples:
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 from dataclasses import dataclass
@@ -31,6 +33,8 @@ from sevn.docs.readme.links import readme_relative_href
 from sevn.docs.readme.manifest import ReadmeEntry
 
 _MODULES_CATALOG_CAP = 200
+README_MAX_SYMBOL_FILES = 12
+_INLINE_CODE = re.compile(r"``([^`]+)``|`([^`]+)`")
 _SENTENCE_BOUNDARY = re.compile(r"(?<=[.!?])\s")
 _ABBREV_BEFORE_PERIOD = frozenset(
     {
@@ -82,6 +86,29 @@ class ReadmeAssembly:
 
     entry: ReadmeEntry
     sections: dict[str, Any]
+
+
+def strip_inline_code(text: str) -> str:
+    """Strip markdown inline-code backticks without doubling quote characters.
+
+        Args:
+    text (str): Source prose that may contain `` `x` `` or `` ``x`` `` spans.
+
+        Returns:
+            str: Prose with inline code delimiters removed.
+
+        Examples:
+            >>> strip_inline_code("Use `foo` here.")
+            'Use foo here.'
+            >>> strip_inline_code("Already ''doubled'' quotes.")
+            'Already doubled quotes.'
+    """
+
+    def _replace(match: re.Match[str]) -> str:
+        return match.group(1) or match.group(2) or ""
+
+    cleaned = _INLINE_CODE.sub(_replace, text)
+    return cleaned.replace("''", "")
 
 
 def offline_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> ReadmeAssembly:
@@ -305,7 +332,7 @@ def _offline_subsystem_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dic
     py_files = list(scan.get("source_py_files", []))
     source_dir = str(scan.get("source_dir", "src/sevn/"))
     spec_excerpt = str(scan.get("spec_excerpt", "")).strip()
-    module_symbols: dict[str, list[str]] = scan.get("module_symbols", {})
+    module_symbols: dict[str, list[dict[str, int | str]]] = scan.get("module_symbols", {})
     return {
         "summary": _build_subsystem_summary(entry, spec_excerpt),
         "role": _role_from_summary(entry.summary),
@@ -443,12 +470,12 @@ def _offline_modules_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) 
     items: list[dict[str, str]] = []
     py_files = list(scan.get("source_py_files", []))
     module_summaries: dict[str, str] = scan.get("module_summaries", {})
-    module_symbols: dict[str, list[str]] = scan.get("module_symbols", {})
+    module_symbols: dict[str, list[dict[str, int | str]]] = scan.get("module_symbols", {})
     for rel in py_files[:_MODULES_CATALOG_CAP]:
         name = rel.rsplit("/", maxsplit=1)[-1].removesuffix(".py")
         summary = module_summaries.get(rel, "")
         if not summary:
-            symbols = module_symbols.get(rel, [])
+            symbols = _symbol_names(module_symbols.get(rel, []))
             sym_hint = (
                 f" Entry points: {', '.join(f'`{s}`' for s in symbols[:3])}." if symbols else ""
             )
@@ -483,7 +510,7 @@ def _offline_skills_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) -
     ]
     runtime_items: list[dict[str, str]] = []
     module_summaries: dict[str, str] = scan.get("module_summaries", {})
-    module_symbols: dict[str, list[str]] = scan.get("module_symbols", {})
+    module_symbols: dict[str, list[dict[str, int | str]]] = scan.get("module_symbols", {})
     runtime_prefix = "src/sevn/skills/"
     for rel in scan.get("source_py_files", []):
         if not rel.startswith(runtime_prefix):
@@ -491,7 +518,7 @@ def _offline_skills_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) -
         name = rel.rsplit("/", maxsplit=1)[-1].removesuffix(".py")
         summary = module_summaries.get(rel, "")
         if not summary:
-            symbols = module_symbols.get(rel, [])
+            symbols = _symbol_names(module_symbols.get(rel, []))
             sym_hint = (
                 f" Entry points: {', '.join(f'`{s}`' for s in symbols[:3])}." if symbols else ""
             )
@@ -730,7 +757,47 @@ def _build_level2_how_it_works(
     """
     source_dir = str(scan.get("source_dir", "src/sevn/"))
     source_roots = [str(root) for root in scan.get("source_roots", ())]
-    module_symbols: dict[str, list[str]] = scan.get("module_symbols", {})
+    module_symbols: dict[str, list[dict[str, int | str]]] = scan.get("module_symbols", {})
+    if entry.turn_spine:
+        flow = (
+            f"### Data and control flow\n\n"
+            f"{entry.title} sits in the sevn.bot turn spine: a channel delivers a message, "
+            f"the gateway normalises it, triage routes work to the right executor, and the "
+            f"reply returns through the same channel adapter. This subsystem owns the "
+            f"responsibilities described in the manifest summary."
+        )
+        if entry.provider_keys_via_proxy:
+            flow += " Provider API calls are brokered by the egress proxy."
+    else:
+        module_names = [
+            rel.rsplit("/", maxsplit=1)[-1].removesuffix(".py").replace("_", " ")
+            for rel in py_files[:6]
+        ]
+        if module_names:
+            modules_phrase = ", ".join(f"`{name}`" for name in module_names[:4])
+            if len(module_names) > 4:
+                modules_phrase += f", and {len(module_names) - 4} more"
+            graph = (
+                f"{entry.title} is organized around {modules_phrase} under "
+                f"{_format_path_list([source_dir], max_items=1)}"
+            )
+        else:
+            graph = f"{entry.title} implements supporting services under `{source_dir}`"
+        if len(source_roots) > 1:
+            graph += (
+                f"; implementation spans "
+                f"{_format_path_list(source_roots, max_items=len(source_roots))}."
+            )
+        else:
+            graph += f" with {len(py_files)} Python module(s) in the scanned tree."
+        entry_points: list[str] = []
+        for rel, symbols in list(module_symbols.items())[:4]:
+            names = _symbol_names(symbols)
+            if names:
+                entry_points.append(f"{rel.rsplit('/', 1)[-1]} ({names[0]})")
+        if entry_points:
+            graph += f" Primary entry points include {', '.join(entry_points)}."
+        flow = f"### Data and control flow\n\n{graph}"
     if len(source_roots) > 1:
         layout = (
             f"### Components and layout\n\n"
@@ -745,20 +812,6 @@ def _build_level2_how_it_works(
             f"The package contains {len(py_files)} Python module(s); primary entry points "
             f"include {_format_path_list(py_files, max_items=6)}."
         )
-    if entry.turn_spine:
-        flow = (
-            f"### Data and control flow\n\n"
-            f"{entry.title} sits in the sevn.bot turn spine: a channel delivers a message, "
-            f"the gateway normalises it, triage routes work to the right executor, and the "
-            f"reply returns through the same channel adapter. This subsystem owns the "
-            f"responsibilities described in the manifest summary and defers provider API "
-            f"calls to the paired egress proxy (keys never load in the gateway process)."
-        )
-    else:
-        flow = (
-            f"### Data and control flow\n\n"
-            f"{entry.title} is a supporting subsystem; see Level 3 for the module-level flow."
-        )
     parts = [
         layout,
         flow,
@@ -771,7 +824,8 @@ def _build_level2_how_it_works(
     if module_symbols:
         symbol_lines = []
         for rel, symbols in list(module_symbols.items())[:5]:
-            symbol_lines.append(f"- `{rel}` — {', '.join(f'`{s}`' for s in symbols[:4])}")
+            names = _symbol_names(symbols)
+            symbol_lines.append(f"- `{rel}` — {', '.join(f'`{s}`' for s in names[:4])}")
         parts.append("### Key modules\n\n" + "\n".join(symbol_lines))
     if spec_excerpt:
         spec_context = truncate_at_sentence(spec_excerpt, 1200)
@@ -784,16 +838,16 @@ def _build_level3_deep_dive(
     entry: ReadmeEntry,
     source_dir: str,
     py_files: list[str],
-    module_symbols: dict[str, list[str]],
+    module_symbols: dict[str, list[dict[str, int | str]]],
     scan: dict[str, Any],
 ) -> str:
-    """Very detailed Level 3 with verified paths and symbols.
+    """Very detailed Level 3 with verified paths, symbols, and instructional prose.
 
         Args:
     entry (ReadmeEntry): Manifest row.
     source_dir (str): Primary source directory.
     py_files (list[str]): Python module paths.
-    module_symbols (dict[str, list[str]]): AST symbol inventory.
+    module_symbols (dict[str, list[dict[str, int | str]]]): AST symbol inventory.
     scan (dict[str, Any]): Scanner context.
 
         Returns:
@@ -804,65 +858,318 @@ def _build_level3_deep_dive(
             ...     ReadmeEntry("g", "G", "S.", "subsystem", "g", "o.md", ("src/**",), ("specs/x.md",)),
             ...     "src/sevn/gateway/",
             ...     ["src/sevn/gateway/a.py"],
-            ...     {"src/sevn/gateway/a.py": ["Foo.bar"]},
-            ...     {"source_excerpt": "- `src/sevn/gateway/a.py`"},
+            ...     {"src/sevn/gateway/a.py": [{"name": "Foo.bar", "lineno": 4}]},
+            ...     {"repo_root": Path("."), "module_summaries": {}},
             ... )
             >>> "src/sevn/gateway/a.py" in body
             True
     """
+    repo_root = scan.get("repo_root")
+    repo_path = repo_root if isinstance(repo_root, Path) else None
+    if repo_path is not None:
+        source_link = _file_markdown_link(
+            entry,
+            repo_path,
+            source_dir if source_dir.endswith("/") else f"{source_dir}/",
+            directory=True,
+            label=source_dir,
+        )
+    else:
+        source_link = f"`{source_dir}`"
     sections: list[str] = [
-        f"Primary source tree: `{source_dir}` ({len(py_files)} Python files). "
+        f"Primary source tree: {source_link} ({len(py_files)} Python files). "
         f"Normative design: {_format_path_list(list(entry.specs))}."
     ]
-    if scan.get("source_excerpt"):
-        sections.append("### Module inventory\n\n" + str(scan["source_excerpt"]))
-    for rel in py_files[:12]:
-        symbols = module_symbols.get(rel, [])
-        filename = rel.rsplit("/", maxsplit=1)[-1]
-        if filename == "__init__.py":
-            heading = f"Package init (`{rel}`)"
-        else:
-            heading = f"{filename.removesuffix('.py').replace('_', ' ').title()} (`{rel}`)"
-        lines = [f"### {heading}", ""]
-        if symbols:
-            lines.append("Public entry points:")
-            for sym in symbols:
-                lines.append(f"- `{sym}`")
-        else:
-            lines.append(f"See `{rel}` for implementation details.")
-        sections.append("\n".join(lines))
-    if len(py_files) > 12:
-        sections.append(
-            f"### Additional modules\n\n"
-            f"{len(py_files) - 12} more Python files under `{source_dir}` — "
-            f"including {_format_path_list(py_files[12:16], max_items=4)}."
+    inventory_lines: list[str] = []
+    for rel in py_files[:README_MAX_SYMBOL_FILES]:
+        inventory_lines.append(_build_module_inventory_block(entry, repo_path, rel, scan))
+    if len(py_files) > README_MAX_SYMBOL_FILES:
+        inventory_lines.append(
+            f"{len(py_files) - README_MAX_SYMBOL_FILES} more Python files under "
+            f"{source_link} — including "
+            f"{_format_path_list(py_files[README_MAX_SYMBOL_FILES : README_MAX_SYMBOL_FILES + 4], max_items=4)}."
         )
+    sections.append("### Module inventory\n\n" + "\n\n".join(inventory_lines))
     if entry.specs:
+        spec_link = (
+            _file_markdown_link(entry, repo_path, entry.specs[0])
+            if repo_path is not None
+            else f"`{entry.specs[0]}`"
+        )
+        source_tree = (
+            _file_markdown_link(
+                entry,
+                repo_path,
+                source_dir if source_dir.endswith("/") else f"{source_dir}/",
+                directory=True,
+                label=source_dir,
+            )
+            if repo_path is not None
+            else f"`{source_dir}`"
+        )
         sections.append(
             f"### Extension and invariants\n\n"
-            f"Follow `{entry.specs[0]}` for merge gates, error semantics, and "
-            f"compatibility constraints. After code changes under `{source_dir}`, "
+            f"Follow {spec_link} for merge gates, error semantics, and "
+            f"compatibility constraints. After code changes under {source_tree}, "
             f"run `sevn readme update {entry.slug}` and `make readme-check`."
         )
     return "\n\n".join(sections)
 
 
-def format_module_symbols_for_prompt(module_symbols: dict[str, list[str]]) -> str:
+def _build_module_inventory_block(
+    entry: ReadmeEntry,
+    repo_root: Path | None,
+    rel: str,
+    scan: dict[str, Any],
+) -> str:
+    """Render one module's deep-dive prose block with D21 links.
+
+        Args:
+    entry (ReadmeEntry): Manifest row.
+    repo_root (Path | None): Repository root for href emission.
+    rel (str): Repo-relative Python module path.
+    scan (dict[str, Any]): Scanner context.
+
+        Returns:
+            str: Markdown prose for one module.
+
+        Examples:
+            >>> block = _build_module_inventory_block(
+            ...     ReadmeEntry("g", "G", "S.", "subsystem", "g", "o.md", ("src/**",), ()),
+            ...     None,
+            ...     "src/sevn/demo/a.py",
+            ...     {"module_symbols": {}, "module_summaries": {"src/sevn/demo/a.py": "Demo."}},
+            ... )
+            >>> "Working with" in block
+            True
+    """
+    module_symbols: dict[str, list[dict[str, int | str]]] = scan.get("module_symbols", {})
+    module_summaries: dict[str, str] = scan.get("module_summaries", {})
+    symbols = module_symbols.get(rel, [])
+    file_link = _file_markdown_link(entry, repo_root, rel) if repo_root is not None else f"`{rel}`"
+    docstring = _module_docstring_prose(
+        _full_module_docstring(repo_root, rel)
+    ) or module_summaries.get(rel, "")
+    if docstring:
+        docstring = strip_inline_code(docstring)
+    if not docstring:
+        docstring = f"This module implements part of the {entry.title} package."
+    lines = [docstring, "", f"Working with {file_link}: inspect the public entry points below."]
+    linked_symbols = _linked_symbol_list(entry, repo_root, rel, symbols)
+    if linked_symbols:
+        tail = linked_symbols[0]
+        if len(linked_symbols) > 1:
+            tail = f"{tail}, then {', '.join(linked_symbols[1:4])}"
+        lines.append(f"Start with {tail}.")
+    return "\n".join(lines)
+
+
+def _full_module_docstring(repo_root: Path | None, rel: str) -> str:
+    """Return the full module docstring for ``rel``.
+
+        Args:
+    repo_root (Path | None): Repository root.
+    rel (str): Repo-relative Python path.
+
+        Returns:
+            str: Docstring text or empty string.
+
+        Examples:
+            >>> _full_module_docstring(None, "missing.py")
+            ''
+    """
+    if repo_root is None:
+        return ""
+    path = repo_root / rel
+    if not path.is_file():
+        return ""
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except SyntaxError:
+        return ""
+    doc = ast.get_docstring(tree)
+    return doc.strip() if doc else ""
+
+
+def _module_docstring_prose(docstring: str) -> str:
+    """Return narrative docstring prose without structured export inventories.
+
+        Args:
+    docstring (str): Full module docstring text.
+
+        Returns:
+            str: Leading prose paragraphs before ``Module:`` / ``Exports:`` blocks.
+
+        Examples:
+            >>> _module_docstring_prose("Summary.\\n\\nModule: sevn.demo\\nExports:\\n    run")
+            'Summary.'
+    """
+    if not docstring.strip():
+        return ""
+    lines: list[str] = []
+    for line in docstring.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(("Module:", "Depends:", "Exports:", "Examples:")):
+            break
+        lines.append(line)
+    return _sanitize_design_doc_paths("\n".join(lines).strip())
+
+
+_FORBIDDEN_DESIGN_DOC = re.compile(r"(?<![\w./-])(?P<tree>plan|specs|prd)/")
+
+
+def _sanitize_design_doc_paths(text: str) -> str:
+    """Rewrite gitignored design-doc path prefixes for published README prose.
+
+        Args:
+    text (str): Docstring or spec excerpt destined for docs/readmes.
+
+        Returns:
+            str: Text with ``plan/``, ``specs/``, and ``prd/`` paths prefixed by ``about-sevn.bot/``.
+
+        Examples:
+            >>> _sanitize_design_doc_paths("(specs/17-gateway.md)")
+            '(about-sevn.bot/specs/17-gateway.md)'
+    """
+    if not text:
+        return text
+    return _FORBIDDEN_DESIGN_DOC.sub(r"about-sevn.bot/\g<tree>/", text)
+
+
+def _file_markdown_link(
+    entry: ReadmeEntry,
+    repo_root: Path | None,
+    target: str,
+    *,
+    directory: bool = False,
+    label: str | None = None,
+) -> str:
+    """Build a markdown file link for generated README prose.
+
+        Args:
+    entry (ReadmeEntry): Manifest row.
+    repo_root (Path | None): Repository root.
+    target (str): Repo-relative target path.
+    directory (bool): When true, link to a directory prefix.
+    label (str | None): Optional link label; defaults to basename.
+
+        Returns:
+            str: Markdown link or backtick fallback when ``repo_root`` is absent.
+
+        Examples:
+            >>> _file_markdown_link(
+            ...     ReadmeEntry("g", "G", "S.", "subsystem", "g", "docs/readmes/g.md", ("src/**",), ()),
+            ...     Path("."),
+            ...     "src/sevn/gateway/a.py",
+            ... )
+            '[`a.py`](../../src/sevn/gateway/a.py)'
+    """
+    if repo_root is None:
+        return f"`{label or target}`"
+    href = readme_relative_href(
+        readme_output=entry.output,
+        target=target,
+        repo_root=repo_root,
+        directory=directory,
+    )
+    text = label or target.rsplit("/", maxsplit=1)[-1]
+    if directory and text.endswith("/"):
+        text = text.rstrip("/")
+    return f"[`{text}`]({href})"
+
+
+def _linked_symbol_list(
+    entry: ReadmeEntry,
+    repo_root: Path | None,
+    rel: str,
+    symbols: list[dict[str, int | str]],
+) -> list[str]:
+    """Format symbol records as definition-site markdown links.
+
+        Args:
+    entry (ReadmeEntry): Manifest row.
+    repo_root (Path | None): Repository root.
+    rel (str): Repo-relative Python module path.
+    symbols (list[dict[str, int | str]]): Symbol records from the scanner.
+
+        Returns:
+            list[str]: Markdown link fragments for each symbol.
+
+        Examples:
+            >>> _linked_symbol_list(
+            ...     ReadmeEntry("g", "G", "S.", "subsystem", "g", "o.md", ("src/**",), ()),
+            ...     None,
+            ...     "src/a.py",
+            ...     [{"name": "Foo.bar", "lineno": 4}],
+            ... )
+            ['`Foo.bar`']
+    """
+    links: list[str] = []
+    for record in symbols:
+        if not isinstance(record, dict):
+            continue
+        name = str(record.get("name", "")).strip()
+        if not name or "(+" in name:
+            continue
+        line = record.get("lineno")
+        if repo_root is None or line is None:
+            links.append(f"`{name}`")
+            continue
+        href = readme_relative_href(
+            readme_output=entry.output,
+            target=rel,
+            repo_root=repo_root,
+            line=int(line),
+        )
+        links.append(f"[`{name}`]({href})")
+    return links
+
+
+def _symbol_names(entries: list[dict[str, int | str]] | list[object]) -> list[str]:
+    """Normalize symbol records to bare names for inline prose.
+
+        Args:
+    entries (list[dict[str, int | str]] | list[object]): Symbol records or legacy strings.
+
+        Returns:
+            list[str]: Symbol names in scan order.
+
+        Examples:
+            >>> _symbol_names([{"name": "Foo.bar", "lineno": 3}])
+            ['Foo.bar']
+    """
+    names: list[str] = []
+    for entry_item in entries:
+        if isinstance(entry_item, dict):
+            name = str(entry_item.get("name", "")).strip()
+            if name:
+                names.append(name)
+        elif isinstance(entry_item, str) and entry_item:
+            names.append(entry_item)
+    return names
+
+
+def format_module_symbols_for_prompt(module_symbols: dict[str, list[object]]) -> str:
     """Format module symbol map for LLM prompt variables.
 
         Args:
-    module_symbols (dict[str, list[str]]): Path → symbol names.
+    module_symbols (dict[str, list[object]]): Path → symbol records or legacy names.
 
         Returns:
             str: JSON-ish bullet list.
 
         Examples:
-            >>> "Foo.bar" in format_module_symbols_for_prompt({"src/a.py": ["Foo.bar"]})
+            >>> "Foo.bar" in format_module_symbols_for_prompt(
+            ...     {"src/a.py": [{"name": "Foo.bar", "lineno": 4}]}
+            ... )
             True
     """
     if not module_symbols:
         return "(no symbols extracted)"
-    return json.dumps(module_symbols, indent=2, sort_keys=True)
+    normalized = {
+        rel: _symbol_names(entries) if entries else [] for rel, entries in module_symbols.items()
+    }
+    return json.dumps(normalized, indent=2, sort_keys=True)
 
 
 def _first_sentence(text: str) -> str:

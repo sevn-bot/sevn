@@ -1,15 +1,15 @@
 <!-- generated: do not edit by hand; run `sevn readme update second-brain` -->
-# Second brain — Wiki, Obsidian sync, ingest paths, and provenance for operator knowledge
+# Second brain — Wiki vault layout, ingest paths, and wikilink-compatible provenance for operator knowledge
 
 [![Spec][spec-badge]][spec-link]
 [![Source][source-badge]][source-link]
 [![Index][index-badge]][index-link]
 
-> **Summary.** Wiki, Obsidian sync, ingest paths, and provenance for operator knowledge.
+> **Summary.** Wiki vault layout, ingest paths, and wikilink-compatible provenance for operator knowledge.
 
 ## Level 1 — Overview (non-technical)
 
-**Second brain** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Wiki, Obsidian sync, ingest paths, and provenance for operator knowledge.
+**Second brain** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Wiki vault layout, ingest paths, and wikilink-compatible provenance for operator knowledge.
 
 In everyday use, second brain helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
 
@@ -21,7 +21,7 @@ Implementation lives under `src/sevn/second_brain/`. The package contains 18 Pyt
 
 ### Data and control flow
 
-Second brain is a supporting subsystem; see Level 3 for the module-level flow.
+Second brain is organized around `  init  `, `bootstrap`, `errors`, `fetch`, and 2 more under `src/sevn/second_brain/` with 18 Python module(s) in the scanned tree. Primary entry points include __init__.py (wiki_search_tool), bootstrap.py (ensure_second_brain_scope_layout), fetch.py (fetch_url_to_raw), folder_picker.py (normalise_browse_path).
 
 ### Configuration
 
@@ -37,105 +37,77 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/second_brain/` (18 Python files). Normative design: `about-sevn.bot/specs/27-second-brain.md`.
+Primary source tree: [`src/sevn/second_brain`](../../src/sevn/second_brain/) (18 Python files). Normative design: `about-sevn.bot/specs/27-second-brain.md`.
 
 ### Module inventory
 
-- `src/sevn/second_brain/__init__.py` — Second Brain wiki engine + tool registration ('about-sevn.bot/specs/27-second-brain.md' section 2.1-2.2).
-- `src/sevn/second_brain/bootstrap.py` — Idempotent Second Brain scope layout bootstrap ('about-sevn.bot/specs/27-second-brain.md' §3.2).
-- `src/sevn/second_brain/errors.py` — Second Brain failure types ('about-sevn.bot/specs/27-second-brain.md' §6).
-- `src/sevn/second_brain/fetch.py` — HTTPS URL → ''raw/'' fetch helper ('about-sevn.bot/specs/27-second-brain.md' §2.4, §5).
-- `src/sevn/second_brain/folder_picker.py` — Workspace-relative folder browser helpers for Second Brain vault pickers.
-- `src/sevn/second_brain/frontmatter.py` — YAML frontmatter parse/merge for wiki pages ('about-sevn.bot/specs/27-second-brain.md' §3.3).
-- `src/sevn/second_brain/ingest.py` — Deterministic raw→wiki ingest pipeline ('about-sevn.bot/specs/27-second-brain.md' §2.2).
-- `src/sevn/second_brain/ingest_stub.py` — Idempotent stub ingest ('about-sevn.bot/specs/27-second-brain.md' §2.2).
-- `src/sevn/second_brain/layout_probe.py` — Second Brain vault layout checks for ''sevn doctor''.
-- `src/sevn/second_brain/links.py` — Internal wiki link extraction and resolution (OKF + Obsidian wikilinks).
-- `src/sevn/second_brain/lint_local.py` — Local wiki lint rules ('about-sevn.bot/specs/27-second-brain.md' §2.2).
-- `src/sevn/second_brain/merge.py` — Optional git merge conflict path ('about-sevn.bot/specs/27-second-brain.md' §4, PRD §5.8).
-- … and 6 more Python modules
+Second Brain wiki engine + tool registration (about-sevn.bot/specs/27-second-brain.md section 2.1-2.2).
 
-### Package init (`src/sevn/second_brain/__init__.py`)
+Working with [`__init__.py`](../../src/sevn/second_brain/__init__.py): inspect the public entry points below.
+Start with [`wiki_search_tool`](../../src/sevn/second_brain/__init__.py#L151), then [`wiki_get_tool`](../../src/sevn/second_brain/__init__.py#L210), [`wiki_apply_tool`](../../src/sevn/second_brain/__init__.py#L264), [`wiki_lint_tool`](../../src/sevn/second_brain/__init__.py#L349).
 
-Public entry points:
-- `wiki_search_tool`
-- `wiki_get_tool`
-- `wiki_apply_tool`
-- `wiki_lint_tool`
-- `second_brain_query_tool`
-- `second_brain_ingest_stub_tool`
-- `legacy_native_second_brain_ingest_stub_enabled`
-- `register_second_brain_tools`
+Idempotent Second Brain scope layout bootstrap (about-sevn.bot/specs/27-second-brain.md §3.2).
 
-### Bootstrap (`src/sevn/second_brain/bootstrap.py`)
+Working with [`bootstrap.py`](../../src/sevn/second_brain/bootstrap.py): inspect the public entry points below.
+Start with [`ensure_second_brain_scope_layout`](../../src/sevn/second_brain/bootstrap.py#L49).
 
-Public entry points:
-- `ensure_second_brain_scope_layout`
+Second Brain failure types (about-sevn.bot/specs/27-second-brain.md §6).
 
-### Errors (`src/sevn/second_brain/errors.py`)
+Working with [`errors.py`](../../src/sevn/second_brain/errors.py): inspect the public entry points below.
 
-See `src/sevn/second_brain/errors.py` for implementation details.
+HTTPS URL → raw/ fetch helper (about-sevn.bot/specs/27-second-brain.md §2.4, §5).
 
-### Fetch (`src/sevn/second_brain/fetch.py`)
+Invoked from the gateway with httpx; enforces allowlist, size, MIME, timeout. No partial
+writes on rejection (about-sevn.bot/specs/27-second-brain.md §6).
 
-Public entry points:
-- `fetch_url_to_raw`
+Working with [`fetch.py`](../../src/sevn/second_brain/fetch.py): inspect the public entry points below.
+Start with [`fetch_url_to_raw`](../../src/sevn/second_brain/fetch.py#L100).
 
-### Folder Picker (`src/sevn/second_brain/folder_picker.py`)
+Workspace-relative folder browser helpers for Second Brain vault pickers.
 
-Public entry points:
-- `normalise_browse_path`
-- `list_workspace_subdirs`
+Working with [`folder_picker.py`](../../src/sevn/second_brain/folder_picker.py): inspect the public entry points below.
+Start with [`normalise_browse_path`](../../src/sevn/second_brain/folder_picker.py#L28), then [`list_workspace_subdirs`](../../src/sevn/second_brain/folder_picker.py#L56).
 
-### Frontmatter (`src/sevn/second_brain/frontmatter.py`)
+YAML frontmatter parse/merge for wiki pages (about-sevn.bot/specs/27-second-brain.md §3.3).
 
-Public entry points:
-- `split_frontmatter`
-- `dumps_frontmatter`
-- `normalise_agent_keys`
-- `okf_type_required`
-- `missing_okf_type`
-- `compose_page`
+Working with [`frontmatter.py`](../../src/sevn/second_brain/frontmatter.py): inspect the public entry points below.
+Start with [`split_frontmatter`](../../src/sevn/second_brain/frontmatter.py#L31), then [`dumps_frontmatter`](../../src/sevn/second_brain/frontmatter.py#L62), [`normalise_agent_keys`](../../src/sevn/second_brain/frontmatter.py#L87), [`okf_type_required`](../../src/sevn/second_brain/frontmatter.py#L117).
 
-### Ingest (`src/sevn/second_brain/ingest.py`)
+Deterministic raw→wiki ingest pipeline (about-sevn.bot/specs/27-second-brain.md §2.2).
 
-Public entry points:
-- `raw_content_hash`
-- `run_ingest`
+Working with [`ingest.py`](../../src/sevn/second_brain/ingest.py): inspect the public entry points below.
+Start with [`raw_content_hash`](../../src/sevn/second_brain/ingest.py#L20), then [`run_ingest`](../../src/sevn/second_brain/ingest.py#L145).
 
-### Ingest Stub (`src/sevn/second_brain/ingest_stub.py`)
+Idempotent stub ingest (about-sevn.bot/specs/27-second-brain.md §2.2).
 
-Public entry points:
-- `run_ingest_stub`
+Working with [`ingest_stub.py`](../../src/sevn/second_brain/ingest_stub.py): inspect the public entry points below.
+Start with [`run_ingest_stub`](../../src/sevn/second_brain/ingest_stub.py#L72).
 
-### Layout Probe (`src/sevn/second_brain/layout_probe.py`)
+Second Brain vault layout checks for sevn doctor.
 
-Public entry points:
-- `probe_second_brain_vault_layout`
-- `fix_second_brain_layout`
+Working with [`layout_probe.py`](../../src/sevn/second_brain/layout_probe.py): inspect the public entry points below.
+Start with [`probe_second_brain_vault_layout`](../../src/sevn/second_brain/layout_probe.py#L71), then [`fix_second_brain_layout`](../../src/sevn/second_brain/layout_probe.py#L138).
 
-### Links (`src/sevn/second_brain/links.py`)
+Internal wiki link extraction and resolution (OKF + Obsidian wikilinks).
 
-Public entry points:
-- `iter_internal_link_targets`
-- `resolve_wiki_target`
-- `index_line_targets`
+Working with [`links.py`](../../src/sevn/second_brain/links.py): inspect the public entry points below.
+Start with [`iter_internal_link_targets`](../../src/sevn/second_brain/links.py#L72), then [`resolve_wiki_target`](../../src/sevn/second_brain/links.py#L98), [`index_line_targets`](../../src/sevn/second_brain/links.py#L131).
 
-### Lint Local (`src/sevn/second_brain/lint_local.py`)
+Local wiki lint rules (about-sevn.bot/specs/27-second-brain.md §2.2).
 
-See `src/sevn/second_brain/lint_local.py` for implementation details.
+Working with [`lint_local.py`](../../src/sevn/second_brain/lint_local.py): inspect the public entry points below.
+Start with [`lint_wiki_tree`](../../src/sevn/second_brain/lint_local.py#L54), then [`issues_to_json`](../../src/sevn/second_brain/lint_local.py#L148).
 
-### Merge (`src/sevn/second_brain/merge.py`)
+Optional git merge conflict path (about-sevn.bot/specs/27-second-brain.md §4, PRD §5.8).
 
-See `src/sevn/second_brain/merge.py` for implementation details.
+Working with [`merge.py`](../../src/sevn/second_brain/merge.py): inspect the public entry points below.
+Start with [`try_git_merge`](../../src/sevn/second_brain/merge.py#L18).
 
-### Additional modules
-
-6 more Python files under `src/sevn/second_brain/` — including `src/sevn/second_brain/paths.py`, `src/sevn/second_brain/query.py`, `src/sevn/second_brain/search.py`, `src/sevn/second_brain/wiki_io.py`.
+6 more Python files under [`src/sevn/second_brain`](../../src/sevn/second_brain/) — including `src/sevn/second_brain/paths.py`, `src/sevn/second_brain/query.py`, `src/sevn/second_brain/search.py`, `src/sevn/second_brain/wiki_io.py`.
 
 ### Extension and invariants
 
-Follow `about-sevn.bot/specs/27-second-brain.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/second_brain/`, run `sevn readme update second-brain` and `make readme-check`.
+Follow [`27-second-brain.md`](../../about-sevn.bot/specs/27-second-brain.md) for merge gates, error semantics, and compatibility constraints. After code changes under [`src/sevn/second_brain`](../../src/sevn/second_brain/), run `sevn readme update second-brain` and `make readme-check`.
 
 ## References
 

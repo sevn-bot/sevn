@@ -1,15 +1,15 @@
 <!-- generated: do not edit by hand; run `sevn readme update proxy-egress` -->
-# Egress proxy — Paired proxy daemon, /llm/* routes, Transport wire shapes, and session tokens
+# Egress proxy — Shared-secret-guarded /llm/* egress proxy, transport wire shapes, and paired daemon
 
 [![Spec][spec-badge]][spec-link]
 [![Source][source-badge]][source-link]
 [![Index][index-badge]][index-link]
 
-> **Summary.** Paired proxy daemon, /llm/* routes, Transport wire shapes, and session tokens. Normalize provider-shaped JSON over async HTTP to a single egress base URL (SEVN_PROXY_URL / ProcessSettings.proxy_url), so tier executors bind once per turn and never touch raw secrets.
+> **Summary.** Shared-secret-guarded /llm/* egress proxy, transport wire shapes, and paired daemon. Normalize provider-shaped JSON over async HTTP to a single egress base URL (SEVN_PROXY_URL / ProcessSettings.proxy_url), so tier executors bind once per turn and never touch raw secrets.
 
 ## Level 1 — Overview (non-technical)
 
-**Egress proxy** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Paired proxy daemon, /llm/* routes, Transport wire shapes, and session tokens.
+**Egress proxy** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Shared-secret-guarded /llm/* egress proxy, transport wire shapes, and paired daemon.
 
 In everyday use, egress proxy helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
 
@@ -23,7 +23,7 @@ Implementation lives under `src/sevn/proxy/`. The package contains 19 Python mod
 
 ### Data and control flow
 
-Egress proxy is a supporting subsystem; see Level 3 for the module-level flow.
+Egress proxy is organized around `  init  `, `anthropic body`, `app`, `auth`, and 2 more under `src/sevn/proxy/` with 19 Python module(s) in the scanned tree. Primary entry points include anthropic_body.py (normalize_anthropic_request_body), app.py (create_app), auth.py (llm_post_auth_failure), bedrock_converse.py (converse_via_bedrock).
 
 ### Configuration
 
@@ -47,101 +47,73 @@ Product pairing (v1).
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/proxy/` (19 Python files). Normative design: `about-sevn.bot/specs/05-llm-transports.md`, `about-sevn.bot/specs/07-egress-proxy.md`.
+Primary source tree: [`src/sevn/proxy`](../../src/sevn/proxy/) (19 Python files). Normative design: `about-sevn.bot/specs/05-llm-transports.md`, `about-sevn.bot/specs/07-egress-proxy.md`.
 
 ### Module inventory
 
-- `src/sevn/proxy/__init__.py` — Egress LLM proxy (ASGI): vendor auth injection for ''/llm/*'' routes.
-- `src/sevn/proxy/anthropic_body.py` — Anthropic Messages request normalization for the egress proxy ('about-sevn.bot/specs/07-egress-proxy.md' §5).
-- `src/sevn/proxy/app.py` — Starlette ASGI app for the egress LLM proxy.
-- `src/sevn/proxy/auth.py` — Shared-secret guard for proxy ''POST /llm/*'' routes.
-- `src/sevn/proxy/bedrock_converse.py` — AWS Bedrock Converse forwarding for the egress proxy ('about-sevn.bot/specs/07-egress-proxy.md').
-- `src/sevn/proxy/codex_translation.py` — Chat-completions ↔ Codex Responses translation (W3.3 — D7).
-- `src/sevn/proxy/codex_transport.py` — Codex OAuth Responses transport helpers (W3.2 — D1/D7).
-- `src/sevn/proxy/credentials.py` — Build ''ProxySettings'' from workspace secrets and provider metadata.
-- `src/sevn/proxy/forward.py` — Httpx forward primitives for the egress proxy (test seam).
-- `src/sevn/proxy/http_client.py` — Shared ''httpx.AsyncClient'' factory for the egress proxy lifespan.
-- `src/sevn/proxy/integration/__init__.py` — Egress proxy third-party integration dispatch ('about-sevn.bot/specs/29-cursor-cloud-agent.md').
-- `src/sevn/proxy/integration/cursor.py` — Cursor Cloud Agents API v1 forwarder ('about-sevn.bot/specs/29-cursor-cloud-agent.md' §2.3).
-- … and 7 more Python modules
+Egress LLM proxy (ASGI): vendor auth injection for /llm/* routes.
 
-### Package init (`src/sevn/proxy/__init__.py`)
+Working with [`__init__.py`](../../src/sevn/proxy/__init__.py): inspect the public entry points below.
 
-See `src/sevn/proxy/__init__.py` for implementation details.
+Anthropic Messages request normalization for the egress proxy (about-sevn.bot/specs/07-egress-proxy.md §5).
 
-### Anthropic Body (`src/sevn/proxy/anthropic_body.py`)
+Working with [`anthropic_body.py`](../../src/sevn/proxy/anthropic_body.py): inspect the public entry points below.
+Start with [`normalize_anthropic_request_body`](../../src/sevn/proxy/anthropic_body.py#L60).
 
-Public entry points:
-- `normalize_anthropic_request_body`
+Starlette ASGI app for the egress LLM proxy.
 
-### App (`src/sevn/proxy/app.py`)
+Working with [`app.py`](../../src/sevn/proxy/app.py): inspect the public entry points below.
+Start with [`create_app`](../../src/sevn/proxy/app.py#L92).
 
-Public entry points:
-- `create_app`
+Shared-secret guard for proxy POST /llm/* routes.
 
-### Auth (`src/sevn/proxy/auth.py`)
+Working with [`auth.py`](../../src/sevn/proxy/auth.py): inspect the public entry points below.
+Start with [`llm_post_auth_failure`](../../src/sevn/proxy/auth.py#L26).
 
-Public entry points:
-- `llm_post_auth_failure`
+AWS Bedrock Converse forwarding for the egress proxy (about-sevn.bot/specs/07-egress-proxy.md).
 
-### Bedrock Converse (`src/sevn/proxy/bedrock_converse.py`)
+Working with [`bedrock_converse.py`](../../src/sevn/proxy/bedrock_converse.py): inspect the public entry points below.
+Start with [`converse_via_bedrock`](../../src/sevn/proxy/bedrock_converse.py#L14).
 
-Public entry points:
-- `converse_via_bedrock`
+Chat-completions ↔ Codex Responses translation (W3.3 — D7).
 
-### Codex Translation (`src/sevn/proxy/codex_translation.py`)
+Working with [`codex_translation.py`](../../src/sevn/proxy/codex_translation.py): inspect the public entry points below.
+Start with [`translate_chat_to_responses_request`](../../src/sevn/proxy/codex_translation.py#L308), then [`translate_responses_to_chat_completion`](../../src/sevn/proxy/codex_translation.py#L462), [`translate_responses_sse_to_chat_stream`](../../src/sevn/proxy/codex_translation.py#L563), [`aggregate_responses_sse`](../../src/sevn/proxy/codex_translation.py#L836).
 
-Public entry points:
-- `translate_chat_to_responses_request`
-- `translate_responses_to_chat_completion`
-- `translate_responses_sse_to_chat_stream`
-- `aggregate_responses_sse`
+Codex OAuth Responses transport helpers (W3.2 — D1/D7).
 
-### Codex Transport (`src/sevn/proxy/codex_transport.py`)
+Working with [`codex_transport.py`](../../src/sevn/proxy/codex_transport.py): inspect the public entry points below.
+Start with [`codex_responses_url`](../../src/sevn/proxy/codex_transport.py#L49), then [`build_codex_request_headers`](../../src/sevn/proxy/codex_transport.py#L62).
 
-Public entry points:
-- `codex_responses_url`
-- `build_codex_request_headers`
+Build ProxySettings from workspace secrets and provider metadata.
 
-### Credentials (`src/sevn/proxy/credentials.py`)
+Working with [`credentials.py`](../../src/sevn/proxy/credentials.py): inspect the public entry points below.
+Start with [`credential_unresolved_detail`](../../src/sevn/proxy/credentials.py#L107), then [`resolve_request_credential`](../../src/sevn/proxy/credentials.py#L343), [`resolve_oauth_request_credential`](../../src/sevn/proxy/credentials.py#L457), [`resolve_oauth_request_credential_async`](../../src/sevn/proxy/credentials.py#L494).
 
-Public entry points:
-- `credential_unresolved_detail`
-- `resolve_request_credential`
-- `resolve_oauth_request_credential`
-- `resolve_oauth_request_credential_async`
-- `build_proxy_settings`
-- `build_proxy_settings_sync`
+Httpx forward primitives for the egress proxy (test seam).
 
-### Forward (`src/sevn/proxy/forward.py`)
+Working with [`forward.py`](../../src/sevn/proxy/forward.py): inspect the public entry points below.
+Start with [`redact_headers`](../../src/sevn/proxy/forward.py#L70), then [`summarize_request_body`](../../src/sevn/proxy/forward.py#L139), [`post_json`](../../src/sevn/proxy/forward.py#L273), [`post_sse_stream`](../../src/sevn/proxy/forward.py#L334).
 
-Public entry points:
-- `redact_headers`
-- `summarize_request_body`
-- `post_json`
-- `post_sse_stream`
+Shared httpx.AsyncClient factory for the egress proxy lifespan.
 
-### Http Client (`src/sevn/proxy/http_client.py`)
+Working with [`http_client.py`](../../src/sevn/proxy/http_client.py): inspect the public entry points below.
+Start with [`build_proxy_upstream_timeout`](../../src/sevn/proxy/http_client.py#L35), then [`create_proxy_http_client`](../../src/sevn/proxy/http_client.py#L63).
 
-Public entry points:
-- `build_proxy_upstream_timeout`
-- `create_proxy_http_client`
+Egress proxy third-party integration dispatch (about-sevn.bot/specs/29-cursor-cloud-agent.md).
 
-### Package init (`src/sevn/proxy/integration/__init__.py`)
+Working with [`__init__.py`](../../src/sevn/proxy/integration/__init__.py): inspect the public entry points below.
 
-See `src/sevn/proxy/integration/__init__.py` for implementation details.
+Cursor Cloud Agents API v1 forwarder (about-sevn.bot/specs/29-cursor-cloud-agent.md §2.3).
 
-### Cursor (`src/sevn/proxy/integration/cursor.py`)
+Working with [`cursor.py`](../../src/sevn/proxy/integration/cursor.py): inspect the public entry points below.
+Start with [`dispatch_cursor`](../../src/sevn/proxy/integration/cursor.py#L130).
 
-See `src/sevn/proxy/integration/cursor.py` for implementation details.
-
-### Additional modules
-
-7 more Python files under `src/sevn/proxy/` — including `src/sevn/proxy/integration/github.py`, `src/sevn/proxy/integration/mcp_expand.py`, `src/sevn/proxy/integration/router.py`, `src/sevn/proxy/oauth_lifecycle.py`.
+7 more Python files under [`src/sevn/proxy`](../../src/sevn/proxy/) — including `src/sevn/proxy/integration/github.py`, `src/sevn/proxy/integration/mcp_expand.py`, `src/sevn/proxy/integration/router.py`, `src/sevn/proxy/oauth_lifecycle.py`.
 
 ### Extension and invariants
 
-Follow `about-sevn.bot/specs/05-llm-transports.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/proxy/`, run `sevn readme update proxy-egress` and `make readme-check`.
+Follow [`05-llm-transports.md`](../../about-sevn.bot/specs/05-llm-transports.md) for merge gates, error semantics, and compatibility constraints. After code changes under [`src/sevn/proxy`](../../src/sevn/proxy/), run `sevn readme update proxy-egress` and `make readme-check`.
 
 ## References
 

@@ -42,6 +42,7 @@ class ReadmeEntry:
     specs: tuple[str, ...]
     curated: bool = False
     turn_spine: bool = False
+    provider_keys_via_proxy: bool = False
     catalog: str = "modules"
     template: str = ""
 
@@ -109,6 +110,9 @@ def load_manifest(path: Path) -> ReadmeManifest:
 
         curated = _parse_curated(row.get("curated"), path=path, idx=idx)
         turn_spine = _parse_turn_spine(row.get("turn_spine"), path=path, idx=idx)
+        provider_keys_via_proxy = _parse_provider_keys_via_proxy(
+            row.get("provider_keys_via_proxy"), path=path, idx=idx
+        )
         catalog = _parse_catalog(row.get("catalog"), path=path, idx=idx)
         template = _parse_template(row.get("template"), path=path, idx=idx)
 
@@ -124,6 +128,7 @@ def load_manifest(path: Path) -> ReadmeManifest:
                 specs=_as_str_tuple(row.get("specs")),
                 curated=curated,
                 turn_spine=turn_spine,
+                provider_keys_via_proxy=provider_keys_via_proxy,
                 catalog=catalog,
                 template=template,
             )
@@ -210,6 +215,32 @@ def _parse_turn_spine(value: object, *, path: Path, idx: int) -> bool:
         return False
     if not isinstance(value, bool):
         msg = f"{path}: readme[{idx}] turn_spine must be a boolean"
+        raise ValueError(msg)
+    return value
+
+
+def _parse_provider_keys_via_proxy(value: object, *, path: Path, idx: int) -> bool:
+    """Parse optional ``provider_keys_via_proxy`` manifest key (defaults to false).
+
+        Args:
+    value (object): Raw TOML value or ``None`` when omitted.
+    path (Path): Manifest path for error messages.
+    idx (int): Row index for error messages.
+
+        Returns:
+            bool: Parsed provider-key proxy flag.
+
+        Raises:
+            ValueError: When the key is present but not a boolean.
+
+        Examples:
+            >>> _parse_provider_keys_via_proxy(None, path=Path("m.toml"), idx=0)
+            False
+    """
+    if value is None:
+        return False
+    if not isinstance(value, bool):
+        msg = f"{path}: readme[{idx}] provider_keys_via_proxy must be a boolean"
         raise ValueError(msg)
     return value
 

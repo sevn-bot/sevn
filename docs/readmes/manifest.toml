@@ -30,6 +30,7 @@ tier_owner = "gateway"
 output = "docs/readmes/gateway.md"
 source_globs = ["src/sevn/gateway/**"]
 turn_spine = true
+provider_keys_via_proxy = true
 specs = ["about-sevn.bot/specs/17-gateway.md"]
 curated = true
 template = "docs/readmes/_templates/gateway.md"
@@ -43,6 +44,7 @@ tier_owner = "agent"
 output = "docs/readmes/agent.md"
 source_globs = ["src/sevn/agent/**"]
 turn_spine = true
+provider_keys_via_proxy = true
 specs = [
   "about-sevn.bot/specs/13-rlm-triager.md",
   "about-sevn.bot/specs/14-executor-tier-b.md",
@@ -191,6 +193,7 @@ tier_owner = "channels"
 output = "docs/readmes/voice.md"
 source_globs = ["src/sevn/voice/**"]
 turn_spine = true
+provider_keys_via_proxy = true
 specs = ["about-sevn.bot/specs/20-voice.md"]
 
 [[readme]]

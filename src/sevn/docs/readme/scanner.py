@@ -7,6 +7,7 @@ Exports:
     scan_repo_context — structured context dict for one README entry.
     resolve_spec_path — locate a manifest spec path under the repo.
     extract_module_symbols — AST inventory of public classes/functions per module.
+    symbol_lineno_for_module — lookup a symbol definition line in scan output.
 
 Examples:
     >>> from pathlib import Path
@@ -31,7 +32,14 @@ from loguru import logger
 from sevn.docs.readme.brand import load_root_intro_lines, load_root_value_prop
 from sevn.docs.readme.fingerprint import expand_source_globs
 from sevn.docs.readme.manifest import ReadmeEntry
-from sevn.docs.readme.model import _first_sentence, truncate_at_sentence
+from sevn.docs.readme.model import (
+    README_MAX_SYMBOL_FILES,
+    _first_sentence,
+    strip_inline_code,
+    truncate_at_sentence,
+)
+
+DEFAULT_MAX_SYMBOL_FILES = README_MAX_SYMBOL_FILES
 
 _SPEC_HEADING = re.compile(r"^#{1,3}\s+", re.MULTILINE)
 
@@ -61,6 +69,7 @@ def scan_repo_context(repo_root: Path, entry: ReadmeEntry) -> dict[str, Any]:
 
     source_roots = _source_dir_roots(entry.source_globs)
     module_summaries = _build_module_summaries(repo_root, py_files)
+    module_symbols = extract_module_symbols(repo_root, py_files)
     context: dict[str, Any] = {
         "slug": entry.slug,
         "profile": entry.profile,
@@ -77,7 +86,9 @@ def scan_repo_context(repo_root: Path, entry: ReadmeEntry) -> dict[str, Any]:
         "module_summaries": module_summaries,
         "source_excerpt": _build_source_excerpt(repo_root, py_files),
         "spec_excerpt": _read_spec_excerpt(repo_root, list(entry.specs)),
-        "module_symbols": extract_module_symbols(repo_root, py_files),
+        "module_symbols": module_symbols,
+        "symbol_lineno": _build_symbol_lineno_map(module_symbols),
+        "repo_root": repo_root,
         "package": _read_pyproject(repo_root),
         "sevn_config": _read_sevn_json(repo_root),
         "claude_md_excerpt": _read_claude_excerpt(repo_root),
@@ -128,9 +139,9 @@ def extract_module_symbols(
     repo_root: Path,
     py_files: list[str],
     *,
-    max_files: int = 10,
+    max_files: int = DEFAULT_MAX_SYMBOL_FILES,
     max_symbols_per_file: int = 8,
-) -> dict[str, list[str]]:
+) -> dict[str, list[dict[str, int | str]]]:
     """Build a map of Python module paths to public class/function symbols.
 
         Args:
@@ -140,7 +151,8 @@ def extract_module_symbols(
     max_symbols_per_file (int): Cap symbols listed per module.
 
         Returns:
-            dict[str, list[str]]: ``src/...py`` → ``Class.method`` / ``function`` names.
+            dict[str, list[dict[str, int | str]]]: ``src/...py`` → symbol records
+            with ``name`` and definition-site ``lineno``.
 
         Examples:
             >>> import tempfile
@@ -149,11 +161,11 @@ def extract_module_symbols(
             >>> p.parent.mkdir(parents=True)
             >>> _ = p.write_text("class Foo:\\n    def bar(self): pass\\n", encoding="utf-8")
             >>> syms = extract_module_symbols(td, ["src/sevn/demo/a.py"])
-            >>> "Foo.bar" in syms["src/sevn/demo/a.py"]
-            True
+            >>> syms["src/sevn/demo/a.py"][0]["name"]
+            'Foo.bar'
     """
     repo_root = repo_root.resolve()
-    out: dict[str, list[str]] = {}
+    out: dict[str, list[dict[str, int | str]]] = {}
     for rel in py_files[:max_files]:
         path = repo_root / rel
         if not path.is_file():
@@ -163,24 +175,118 @@ def extract_module_symbols(
         except SyntaxError:
             logger.debug("readme_scanner: syntax error in {}", rel)
             continue
-        symbols: list[str] = []
+        symbols: list[dict[str, int | str]] = []
         for node in tree.body:
             if isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
                 methods = [
-                    f"{node.name}.{child.name}"
+                    (f"{node.name}.{child.name}", int(child.lineno))
                     for child in node.body
                     if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef))
                     and not child.name.startswith("_")
                 ]
-                symbols.extend(methods[:3])
+                for name, lineno in methods[:3]:
+                    symbols.append({"name": name, "lineno": lineno})
                 if len(methods) > 3:
-                    symbols.append(f"{node.name} (+{len(methods) - 3} methods)")
+                    symbols.append(
+                        {
+                            "name": f"{node.name} (+{len(methods) - 3} methods)",
+                            "lineno": int(node.lineno),
+                        }
+                    )
             elif isinstance(
                 node, (ast.FunctionDef, ast.AsyncFunctionDef)
             ) and not node.name.startswith("_"):
-                symbols.append(node.name)
+                symbols.append({"name": node.name, "lineno": int(node.lineno)})
         if symbols:
             out[rel] = symbols[:max_symbols_per_file]
+    return out
+
+
+def symbol_lineno_for_module(
+    symbols: dict[str, list[object]],
+    rel_path: str,
+    symbol: str,
+) -> int | None:
+    """Return the definition line for ``symbol`` inside ``rel_path``.
+
+        Args:
+    symbols (dict[str, list[object]]): Output of :func:`extract_module_symbols`.
+    rel_path (str): Repo-relative Python module path.
+    symbol (str): Function or ``Class.method`` name.
+
+        Returns:
+            int | None: 1-based AST line number when found.
+
+        Examples:
+            >>> symbol_lineno_for_module(
+            ...     {"src/a.py": [{"name": "run", "lineno": 4}]},
+            ...     "src/a.py",
+            ...     "run",
+            ... )
+            4
+    """
+    for entry in symbols.get(rel_path, []):
+        if isinstance(entry, dict):
+            name = str(entry.get("name", ""))
+            if name == symbol or name.endswith(f".{symbol}"):
+                line = entry.get("lineno")
+                return int(line) if line is not None else None
+        elif isinstance(entry, str) and entry == symbol:
+            return None
+    return None
+
+
+def _symbol_names(entries: list[dict[str, int | str]] | list[object]) -> list[str]:
+    """Normalize symbol records to bare names (scanner-local alias).
+
+        Args:
+    entries (list[dict[str, int | str]] | list[object]): Symbol records.
+
+        Returns:
+            list[str]: Symbol names.
+
+        Examples:
+            >>> _symbol_names([{"name": "run", "lineno": 2}])
+            ['run']
+    """
+    names: list[str] = []
+    for entry in entries:
+        if isinstance(entry, dict):
+            name = str(entry.get("name", "")).strip()
+            if name:
+                names.append(name)
+        elif isinstance(entry, str) and entry:
+            names.append(entry)
+    return names
+
+
+def _build_symbol_lineno_map(
+    module_symbols: dict[str, list[dict[str, int | str]]],
+) -> dict[str, dict[str, int]]:
+    """Build a nested path → symbol → line map for link emission.
+
+        Args:
+    module_symbols (dict[str, list[dict[str, int | str]]]): Scanner symbol inventory.
+
+        Returns:
+            dict[str, dict[str, int]]: Repo-relative path to symbol line numbers.
+
+        Examples:
+            >>> _build_symbol_lineno_map({"src/a.py": [{"name": "run", "lineno": 2}]})
+            {'src/a.py': {'run': 2}}
+    """
+    out: dict[str, dict[str, int]] = {}
+    for rel, entries in module_symbols.items():
+        mapping: dict[str, int] = {}
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            name = str(entry.get("name", "")).strip()
+            line = entry.get("lineno")
+            if name and line is not None and "(+" not in name:
+                mapping[name] = int(line)
+        if mapping:
+            out[rel] = mapping
     return out
 
 
@@ -401,21 +507,20 @@ def _primary_source_dir(source_globs: tuple[str, ...]) -> str:
         Examples:
             >>> _primary_source_dir(("src/sevn/gateway/**",))
             'src/sevn/gateway/'
-            >>> _primary_source_dir(("src/sevn/gateway/**", "infra/**"))
-            'src/sevn/'
+            >>> _primary_source_dir(("src/sevn/secrets/**", "src/sevn/security/secrets/**"))
+            'src/sevn/secrets/'
     """
-    dirs = _source_dir_roots(source_globs)
+    dirs: list[str] = []
+    seen: set[str] = set()
+    for pattern in source_globs:
+        root = _glob_dir_prefix(pattern)
+        if root not in seen:
+            dirs.append(root)
+            seen.add(root)
     if not dirs:
         return "src/sevn/"
     if len(dirs) == 1:
         return dirs[0]
-    common = _common_path_prefix(dirs)
-    if common:
-        return common
-    if any(d.startswith("src/sevn/") for d in dirs):
-        return "src/sevn/"
-    if all(d.startswith("src/") for d in dirs):
-        return "src/"
     return dirs[0]
 
 
@@ -634,7 +739,7 @@ def _build_module_summaries(repo_root: Path, py_files: list[str]) -> dict[str, s
             continue
         summary = _first_docstring_sentence(text)
         if summary:
-            out[rel] = _rewrite_design_doc_refs(summary.replace("`", "'"))
+            out[rel] = _rewrite_design_doc_refs(strip_inline_code(summary))
     return out
 
 
@@ -672,14 +777,12 @@ def _scan_bundled_skills(repo_root: Path) -> list[dict[str, str]]:
         name, description = _skill_frontmatter_fields(text)
         if not name:
             name = skill_dir.name
-        summary = _first_sentence(description)
+        summary = description.strip()
+        if len(summary) > 300:
+            summary = truncate_at_sentence(summary, 300) or summary[:300]
         if not summary:
-            stripped = description.strip()
-            if stripped and stripped[-1] in ".!?":
-                summary = stripped
-            else:
-                summary = truncate_at_sentence(description, 200) or stripped[:200]
-        summary = _rewrite_design_doc_refs(summary.replace("`", "'"))
+            summary = name
+        summary = _rewrite_design_doc_refs(strip_inline_code(summary))
         rows.append({"name": name, "path": rel, "summary": summary})
     return rows
 
@@ -696,6 +799,10 @@ def _skill_frontmatter_fields(text: str) -> tuple[str, str]:
         Examples:
             >>> _skill_frontmatter_fields("---\\nname: demo\\ndescription: Do things.\\n---\\n")
             ('demo', 'Do things.')
+            >>> _skill_frontmatter_fields(
+            ...     "---\\nname: fold\\ndescription: >-\\n  Line one.\\n  Line two.\\n---\\n"
+            ... )
+            ('fold', 'Line one. Line two.')
     """
     if not text.lstrip("\ufeff").startswith("---"):
         return ("", "")
@@ -704,28 +811,50 @@ def _skill_frontmatter_fields(text: str) -> tuple[str, str]:
         return ("", "")
     block = text[3:end]
     name = ""
-    description_lines: list[str] = []
-    in_description = False
-    for line in block.splitlines():
+    description = ""
+    lines = block.splitlines()
+    idx = 0
+    while idx < len(lines):
+        line = lines[idx]
         if line.startswith("name:"):
             name = line.split(":", maxsplit=1)[1].strip().strip("'\"")
-            in_description = False
+            idx += 1
             continue
         if line.startswith("description:"):
             rest = line.split(":", maxsplit=1)[1].strip()
-            if rest:
-                description_lines.append(rest.strip("'\""))
-            in_description = True
-            continue
-        if in_description:
-            if line.startswith((" ", "\t")):
-                description_lines.append(line.strip().strip("'\""))
+            if rest.startswith(">"):
+                collected: list[str] = []
+                idx += 1
+                while idx < len(lines) and lines[idx].startswith((" ", "\t")):
+                    collected.append(lines[idx].strip().strip("'\""))
+                    idx += 1
+                description = " ".join(collected).strip()
                 continue
-            in_description = False
-    return (name, " ".join(description_lines).strip())
+            if rest.startswith("|"):
+                collected = []
+                idx += 1
+                while idx < len(lines) and lines[idx].startswith((" ", "\t")):
+                    collected.append(lines[idx].strip().strip("'\""))
+                    idx += 1
+                description = "\n".join(collected).strip()
+                continue
+            collected = [rest.strip("'\"")] if rest else []
+            idx += 1
+            while idx < len(lines) and lines[idx].startswith((" ", "\t")):
+                collected.append(lines[idx].strip().strip("'\""))
+                idx += 1
+            description = " ".join(collected).strip()
+            continue
+        idx += 1
+    return (name, description)
 
 
-def _build_source_excerpt(repo_root: Path, py_files: list[str], *, max_files: int = 12) -> str:
+def _build_source_excerpt(
+    repo_root: Path,
+    py_files: list[str],
+    *,
+    max_files: int = DEFAULT_MAX_SYMBOL_FILES,
+) -> str:
     """Build a compact excerpt listing key Python modules.
 
         Args:
@@ -755,7 +884,7 @@ def _build_source_excerpt(repo_root: Path, py_files: list[str], *, max_files: in
             logger.warning("readme_scanner: unable to read source file at {}", path)
             continue
         summary = _first_docstring_sentence(text)
-        safe_summary = _rewrite_design_doc_refs(summary.replace("`", "'"))
+        safe_summary = _rewrite_design_doc_refs(strip_inline_code(summary))
         if safe_summary:
             lines.append(f"- `{rel}` — {safe_summary}")
         else:

@@ -15,31 +15,33 @@ Edit `sevn.json` through Mission Control, Telegram `/config`, the onboarding wiz
 
 ## Level 2 — How it works (technical)
 
-Config spans `src/sevn/config/`, workspace layout in `src/sevn/workspace/`, and the JSON Schema at [`infra/sevn.schema.json`](../../infra/sevn.schema.json).
+Config spans [`src/sevn/config/`](../../src/sevn/config/), workspace layout in [`src/sevn/workspace/`](../../src/sevn/workspace/), and the JSON Schema at [`infra/sevn.schema.json`](../../infra/sevn.schema.json).
 
 ### Discover and load
 
 | Step | Function | Behavior |
 | --- | --- | --- |
-| Bound path | `bound_sevn_json_path` | `{SEVN_HOME}/workspace/sevn.json` (default `~/.sevn`) |
-| Walk-up fallback | `find_sevn_json` | First `sevn.json` from cwd to filesystem root |
-| Parse + layout | `load_workspace` (`config/loader.py`) | JSON → `WorkspaceConfig` + `WorkspaceLayout` |
+| Bound path | [`bound_sevn_json_path`](../../src/sevn/config/loader.py#L89) | `{SEVN_HOME}/workspace/sevn.json` (default `~/.sevn`) |
+| Walk-up fallback | [`find_sevn_json`](../../src/sevn/config/loader.py) | First `sevn.json` from cwd to filesystem root |
+| Parse + layout | [`load_workspace`](../../src/sevn/config/loader.py#L161) ([`config/loader.py`](../../src/sevn/config/loader.py)) | JSON → `WorkspaceConfig` + [`WorkspaceLayout`](../../src/sevn/workspace/layout.py#L31) |
 
-`WorkspaceLayout.from_config` resolves `content_root` from `workspace_root` relative to the config file path. Derived paths include `.sevn/` (SQLite, traces), `logs/`, `skills/`, `sessions/`, `memory/`.
+[`WorkspaceLayout.from_config`](../../src/sevn/workspace/layout.py#L38) resolves `content_root` from `workspace_root` relative to the config file path. Derived paths include `.sevn/` (SQLite, traces), `logs/`, `skills/`, `sessions/`, `memory/`.
 
 ### Subtree model
 
-`sevn.json` is a single document validated against [`infra/sevn.schema.json`](../../infra/sevn.schema.json). Domain sections live as Pydantic models under `src/sevn/config/sections/` — e.g. `gateway.py`, `channels.py`, `agent.py`, `security.py`. CLI section helpers (`cli/config_sections.py`) expose stable slugs for `sevn config show <section>`.
+`sevn.json` is a single document validated against [`infra/sevn.schema.json`](../../infra/sevn.schema.json). Domain sections live as Pydantic models under [`src/sevn/config/sections/`](../../src/sevn/config/sections/) — e.g. [`gateway.py`](../../src/sevn/config/sections/gateway.py), [`channels.py`](../../src/sevn/config/sections/channels.py), [`agent.py`](../../src/sevn/config/sections/agent.py), [`security.py`](../../src/sevn/config/sections/security.py). CLI section helpers live in the [`cli/config_sections/`](../../src/sevn/cli/config_sections/) package ([`config_sections/__init__.py`](../../src/sevn/cli/config_sections/__init__.py)) and expose stable slugs for **`sevn config <slug>`** (for example `sevn config gateway`).
+
+**Schema vs Pydantic gaps:** typed models may include subtrees not yet reflected in [`infra/sevn.schema.json`](../../infra/sevn.schema.json). Notably [`provisioning`](../../src/sevn/config/sections/provisioning.py) (host-dependency auto-install allowlist) and [`coding_agents`](../../src/sevn/config/sections/coding_agents.py) (Coding Agents hub) parse from raw JSON via Pydantic but have **no** top-level schema entries today — validate with `sevn config validate` for schema-covered keys and read the section modules for the full contract.
 
 ### Validation flow
 
-**`sevn config validate`** (`cli/commands/config_cmd.py`):
+**`sevn config validate`** ([`cli/commands/config_cmd.py`](../../src/sevn/cli/commands/config_cmd.py)):
 
-1. `load_bound_workspace()` — requires operator home + bound `sevn.json`
-2. `validate_workspace_document(bw.raw)` — schema + cross-field rules (`onboarding/validate.py`)
-3. Advisory warnings — unused providers, OpenAI OAuth probe (`onboarding/live_validate.py`)
+1. [`load_bound_workspace`](../../src/sevn/cli/workspace.py) — requires operator home + bound `sevn.json`
+2. [`validate_workspace_document`](../../src/sevn/onboarding/validate.py) — schema + cross-field rules
+3. Advisory warnings — unused providers, OpenAI OAuth probe ([`onboarding/live_validate.py`](../../src/sevn/onboarding/live_validate.py))
 
-Gateway boot also runs `validate_workspace_layout` (`workspace/layout_validate.py`) against canonical dirs (`skills/`, `logs/`, `.sevn/`) and seed markdown files (`AGENTS.md`, `SOUL.md`, `USER.md`, …).
+Gateway boot also runs [`validate_workspace_layout`](../../src/sevn/workspace/layout_validate.py) against canonical dirs (`skills/`, `logs/`, `.sevn/`) and seed markdown files (`AGENTS.md`, `SOUL.md`, `USER.md`, …).
 
 **`sevn config set <dotted.path> <value>`** writes a draft and promotes through the same validate → merge path as onboarding.
 
@@ -55,11 +57,11 @@ Gateway boot also runs `validate_workspace_layout` (`workspace/layout_validate.p
 
 ### Key modules
 
-- `src/sevn/config/loader.py` — `load_workspace`, `find_sevn_json`
-- `src/sevn/config/sections/` — typed `sevn.json` subtrees
-- `src/sevn/workspace/layout.py` — `WorkspaceLayout` path resolver
-- `src/sevn/workspace/layout_validate.py` — boot-time filesystem check
-- `src/sevn/onboarding/promote.py` — merge validated draft → live `sevn.json`
+- [`loader.py`](../../src/sevn/config/loader.py) — [`load_workspace`](../../src/sevn/config/loader.py#L161), [`find_sevn_json`](../../src/sevn/config/loader.py)
+- [`sections/`](../../src/sevn/config/sections/) — typed `sevn.json` subtrees
+- [`layout.py`](../../src/sevn/workspace/layout.py) — [`WorkspaceLayout`](../../src/sevn/workspace/layout.py#L31) path resolver
+- [`layout_validate.py`](../../src/sevn/workspace/layout_validate.py) — boot-time filesystem check
+- [`promote.py`](../../src/sevn/onboarding/promote.py) — merge validated draft → live `sevn.json`
 
 Normative spec: [`about-sevn.bot/specs/02-config-and-workspace.md`](../../about-sevn.bot/specs/02-config-and-workspace.md).
 

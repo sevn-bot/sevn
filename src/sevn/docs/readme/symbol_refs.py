@@ -5,6 +5,7 @@ Depends: ast, pathlib, re
 
 Exports:
     extract_level3_section — slice markdown between L3 and References headings.
+    extract_curated_prose_section — slice curated Level 1-2 prose before L3.
     validate_path_refs — verify backtick ``src/...`` paths exist.
     validate_symbol_refs — verify ``Class.method`` symbols in cited Python files.
 
@@ -22,10 +23,17 @@ import ast
 import re
 from pathlib import Path
 
+_LEVEL1_START = re.compile(r"^##\s+Level 1 — Overview", re.MULTILINE)
 _LEVEL3_START = re.compile(r"^##\s+Level 3 — Deep dive", re.MULTILINE)
 _REFERENCES_START = re.compile(r"^##\s+References\b", re.MULTILINE)
-_PY_PATH = re.compile(r"`(src/[^`\s]+\.py)`")
-_SYMBOL = re.compile(r"`([A-Z][A-Za-z0-9_]*(?:\.[a-z_][A-Za-z0-9_]*)+)`")
+_PY_PATH = re.compile(r"`(src/[^`\s]+\.py)`|\[[^\]]*\]\(([^)#\s]+\.py)(?:#L\d+)?\)")
+_SYMBOL = re.compile(
+    r"`([A-Z][A-Za-z0-9_]*(?:\.[a-z_][A-Za-z0-9_]*)+)`|"
+    r"\[`([A-Z][A-Za-z0-9_]*(?:\.[a-z_][A-Za-z0-9_]*)+)`\]\([^)]+\.py#L\d+\)"
+)
+_SYMBOL_LINK = re.compile(
+    r"\[`([A-Z][A-Za-z0-9_]*(?:\.[a-z_][A-Za-z0-9_]*)+)`\]\(([^)]+\.py)(?:#L\d+)?\)"
+)
 _FILE_EXT_SUFFIXES = frozenset(
     {
         "css",
@@ -69,6 +77,33 @@ def extract_level3_section(markdown: str) -> str:
     return after
 
 
+def extract_curated_prose_section(markdown: str) -> str:
+    """Return curated Level 1-2 prose before the Level 3 heading.
+
+        Args:
+    markdown (str): Full README body.
+
+        Returns:
+            str: Level 1-2 section text (may be empty when headings are absent).
+
+        Examples:
+            >>> body = "## Level 1 — Overview\\n\\nL1\\n\\n## Level 2 — How it works\\n\\nL2\\n\\n## Level 3 — Deep dive\\n"
+            >>> "L2" in extract_curated_prose_section(body)
+            True
+            >>> "Deep dive" not in extract_curated_prose_section(body)
+            True
+    """
+    start = _LEVEL1_START.search(markdown)
+    if start is None:
+        l3 = _LEVEL3_START.search(markdown)
+        return markdown[: l3.start()] if l3 else markdown
+    section = markdown[start.start() :]
+    l3 = _LEVEL3_START.search(section)
+    if l3:
+        return section[: l3.start()]
+    return section
+
+
 def validate_path_refs(text: str, repo_root: Path) -> list[str]:
     """Verify backtick-quoted ``src/...py`` paths exist under ``repo_root``.
 
@@ -92,14 +127,38 @@ def validate_path_refs(text: str, repo_root: Path) -> list[str]:
     errors: list[str] = []
     seen: set[str] = set()
     for match in _PY_PATH.finditer(text):
-        rel = match.group(1).strip()
-        if rel in seen:
+        rel = (match.group(1) or match.group(2) or "").strip()
+        rel = _normalize_repo_py_path(rel)
+        if not rel or rel in seen:
             continue
         seen.add(rel)
         candidate = repo_root / rel
         if not candidate.is_file():
             errors.append(f"missing cited path: {rel}")
     return errors
+
+
+def _normalize_repo_py_path(raw: str) -> str:
+    """Normalize a markdown href or backtick path to a repo-relative ``src/...py`` path.
+
+        Args:
+    raw (str): Raw path from a README cite.
+
+        Returns:
+            str: Normalized repo-relative path, or empty when not derivable.
+
+        Examples:
+            >>> _normalize_repo_py_path("../../src/sevn/demo/a.py")
+            'src/sevn/demo/a.py'
+    """
+    normalized = raw.replace("\\", "/").split("#", maxsplit=1)[0]
+    if normalized.startswith("src/"):
+        return normalized
+    marker = "src/"
+    idx = normalized.find(marker)
+    if idx >= 0:
+        return normalized[idx:]
+    return normalized
 
 
 def validate_symbol_refs(text: str, repo_root: Path) -> list[str]:
@@ -123,17 +182,25 @@ def validate_symbol_refs(text: str, repo_root: Path) -> list[str]:
     """
     repo_root = repo_root.resolve()
     errors: list[str] = []
-    py_paths = [match.group(1) for match in _PY_PATH.finditer(text)]
+    py_paths = [
+        _normalize_repo_py_path(match.group(1) or match.group(2) or "")
+        for match in _PY_PATH.finditer(text)
+    ]
+    py_paths = [path for path in py_paths if path]
     default_py = py_paths[0] if len(py_paths) == 1 else None
 
     for match in _SYMBOL.finditer(text):
-        symbol = match.group(1)
-        if "." not in symbol:
+        symbol = match.group(1) or match.group(2) or ""
+        if not symbol or "." not in symbol:
             continue
         suffix = symbol.rsplit(".", maxsplit=1)[-1].lower()
         if suffix in _FILE_EXT_SUFFIXES:
             continue
         py_rel = _nearest_py_path(text, match.start(), py_paths, default_py)
+        if py_rel is None:
+            link = _SYMBOL_LINK.search(text, match.start(), match.end() + 120)
+            if link:
+                py_rel = _normalize_repo_py_path(link.group(2))
         if py_rel is None:
             errors.append(f"symbol {symbol!r} has no associated .py path")
             continue
@@ -171,9 +238,10 @@ def _nearest_py_path(
         return default_py
     best: tuple[int, str] | None = None
     for rel in py_paths:
-        idx = text.rfind(f"`{rel}`", 0, symbol_pos)
-        if idx >= 0 and (best is None or idx > best[0]):
-            best = (idx, rel)
+        for needle in (f"`{rel}`", f"]({rel}", f"](../../{rel}", rel):
+            idx = text.rfind(needle, 0, symbol_pos)
+            if idx >= 0 and (best is None or idx > best[0]):
+                best = (idx, rel)
     return best[1] if best else None
 
 

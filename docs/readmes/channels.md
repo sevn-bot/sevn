@@ -1,15 +1,15 @@
 <!-- generated: do not edit by hand; run `sevn readme update channels` -->
-# Channels — Telegram, Web UI bridge, voice hooks, and channel adapter patterns
+# Channels — Telegram, Web UI bridge, Discord/Slack adapters, and channel boot patterns
 
 [![Spec][spec-badge]][spec-link]
 [![Source][source-badge]][source-link]
 [![Index][index-badge]][index-link]
 
-> **Summary.** Telegram, Web UI bridge, voice hooks, and channel adapter patterns.
+> **Summary.** Telegram, Web UI bridge, Discord/Slack adapters, and channel boot patterns.
 
 ## Level 1 — Overview (non-technical)
 
-**Channels** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Telegram, Web UI bridge, voice hooks, and channel adapter patterns.
+**Channels** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Telegram, Web UI bridge, Discord/Slack adapters, and channel boot patterns.
 
 In everyday use, channels helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
 
@@ -21,7 +21,7 @@ Implementation lives under `src/sevn/channels/`. The package contains 35 Python 
 
 ### Data and control flow
 
-Channels sits in the sevn.bot turn spine: a channel delivers a message, the gateway normalises it, triage routes work to the right executor, and the reply returns through the same channel adapter. This subsystem owns the responsibilities described in the manifest summary and defers provider API calls to the paired egress proxy (keys never load in the gateway process).
+Channels sits in the sevn.bot turn spine: a channel delivers a message, the gateway normalises it, triage routes work to the right executor, and the reply returns through the same channel adapter. This subsystem owns the responsibilities described in the manifest summary.
 
 ### Configuration
 
@@ -37,109 +37,74 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/channels/` (35 Python files). Normative design: `about-sevn.bot/specs/18-channel-telegram.md`, `about-sevn.bot/specs/19-channel-webui.md`.
+Primary source tree: [`src/sevn/channels`](../../src/sevn/channels/) (35 Python files). Normative design: `about-sevn.bot/specs/18-channel-telegram.md`, `about-sevn.bot/specs/19-channel-webui.md`.
 
 ### Module inventory
 
-- `src/sevn/channels/__init__.py` — Messaging channel adapters.
-- `src/sevn/channels/_common.py` — Shared helpers for channel adapters.
-- `src/sevn/channels/callback_overflow.py` — Telegram ''callback_data'' overflow via ''dispatcher_state'' ('about-sevn.bot/specs/18-channel-telegram.md' §3.1, §4.5).
-- `src/sevn/channels/discord.py` — Discord channel adapter — webhook-first slice.
-- `src/sevn/channels/markdown_safe.py` — MarkdownV2 escape pipeline for outbound Telegram text ('PROBLEMS.md' §9).
-- `src/sevn/channels/self_improve_copy.py` — Owner-facing Telegram copy for improve-job transitions ('about-sevn.bot/specs/33-self-improvement.md' §10.6).
-- `src/sevn/channels/slack.py` — Slack channel adapter — Events API slice.
-- `src/sevn/channels/stub.py` — Stub channel adapter for Tier 2/3 platforms.
-- `src/sevn/channels/telegram.py` — Telegram channel adapter facade ('about-sevn.bot/specs/18-channel-telegram.md').
-- `src/sevn/channels/telegram_api.py` — Bot API HTTP transport for TelegramAdapter.
-- `src/sevn/channels/telegram_capabilities.py` — Bot API 10.1 rich-message capability probe (R1, D2).
-- `src/sevn/channels/telegram_config.py` — Telegram adapter configuration, text utilities, and workspace wiring.
-- … and 23 more Python modules
+Messaging channel adapters.
 
-### Package init (`src/sevn/channels/__init__.py`)
+Working with [`__init__.py`](../../src/sevn/channels/__init__.py): inspect the public entry points below.
 
-See `src/sevn/channels/__init__.py` for implementation details.
+Shared helpers for channel adapters.
 
-###  Common (`src/sevn/channels/_common.py`)
+Working with [`_common.py`](../../src/sevn/channels/_common.py): inspect the public entry points below.
+Start with [`platform_config_from_workspace`](../../src/sevn/channels/_common.py#L42), then [`busy_input_mode_for_channel`](../../src/sevn/channels/_common.py#L72), [`session_reset_policy_for_channel`](../../src/sevn/channels/_common.py#L93), [`dm_policy_for_channel`](../../src/sevn/channels/_common.py#L117).
 
-Public entry points:
-- `platform_config_from_workspace`
-- `busy_input_mode_for_channel`
-- `session_reset_policy_for_channel`
-- `dm_policy_for_channel`
-- `channel_blob`
+Telegram callback_data overflow via dispatcher_state (about-sevn.bot/specs/18-channel-telegram.md §3.1, §4.5).
 
-### Callback Overflow (`src/sevn/channels/callback_overflow.py`)
+Working with [`callback_overflow.py`](../../src/sevn/channels/callback_overflow.py): inspect the public entry points below.
+Start with [`telegram_callback_data_utf8_len`](../../src/sevn/channels/callback_overflow.py#L33), then [`tokenize_inline_keyboard_callback_data`](../../src/sevn/channels/callback_overflow.py#L46), [`resolve_dispatcher_overflow_callback_data`](../../src/sevn/channels/callback_overflow.py#L127).
 
-Public entry points:
-- `telegram_callback_data_utf8_len`
-- `tokenize_inline_keyboard_callback_data`
-- `resolve_dispatcher_overflow_callback_data`
+Discord channel adapter — webhook-first slice.
 
-### Discord (`src/sevn/channels/discord.py`)
+Working with [`discord.py`](../../src/sevn/channels/discord.py): inspect the public entry points below.
+Start with [`DiscordChannelAdapter.from_gateway_boot`](../../src/sevn/channels/discord.py#L59), then [`DiscordChannelAdapter.name`](../../src/sevn/channels/discord.py#L76), [`DiscordChannelAdapter.config`](../../src/sevn/channels/discord.py#L89).
 
-Public entry points:
-- `DiscordChannelAdapter.from_gateway_boot`
-- `DiscordChannelAdapter.name`
-- `DiscordChannelAdapter.config`
-- `DiscordChannelAdapter (+2 methods)`
+MarkdownV2 escape pipeline for outbound Telegram text (PROBLEMS.md §9).
 
-### Markdown Safe (`src/sevn/channels/markdown_safe.py`)
+Working with [`markdown_safe.py`](../../src/sevn/channels/markdown_safe.py): inspect the public entry points below.
+Start with [`escape_markdown_v2`](../../src/sevn/channels/markdown_safe.py#L65), then [`escape_intent_footer`](../../src/sevn/channels/markdown_safe.py#L117).
 
-Public entry points:
-- `escape_markdown_v2`
-- `escape_intent_footer`
+Owner-facing Telegram copy for improve-job transitions (about-sevn.bot/specs/33-self-improvement.md §10.6).
 
-### Self Improve Copy (`src/sevn/channels/self_improve_copy.py`)
+Working with [`self_improve_copy.py`](../../src/sevn/channels/self_improve_copy.py): inspect the public entry points below.
+Start with [`format_self_improve_job_telegram`](../../src/sevn/channels/self_improve_copy.py#L55).
 
-Public entry points:
-- `format_self_improve_job_telegram`
+Slack channel adapter — Events API slice.
 
-### Slack (`src/sevn/channels/slack.py`)
+Working with [`slack.py`](../../src/sevn/channels/slack.py): inspect the public entry points below.
+Start with [`SlackChannelAdapter.from_gateway_boot`](../../src/sevn/channels/slack.py#L60), then [`SlackChannelAdapter.name`](../../src/sevn/channels/slack.py#L77), [`SlackChannelAdapter.config`](../../src/sevn/channels/slack.py#L90).
 
-Public entry points:
-- `SlackChannelAdapter.from_gateway_boot`
-- `SlackChannelAdapter.name`
-- `SlackChannelAdapter.config`
-- `SlackChannelAdapter (+2 methods)`
+Stub channel adapter for Tier 2/3 platforms.
 
-### Stub (`src/sevn/channels/stub.py`)
+Working with [`stub.py`](../../src/sevn/channels/stub.py): inspect the public entry points below.
+Start with [`StubChannelAdapter.name`](../../src/sevn/channels/stub.py#L52), then [`StubChannelAdapter.configured`](../../src/sevn/channels/stub.py#L65), [`StubChannelAdapter.config`](../../src/sevn/channels/stub.py#L78), [`make_stub_adapter_class`](../../src/sevn/channels/stub.py#L127).
 
-Public entry points:
-- `StubChannelAdapter.name`
-- `StubChannelAdapter.configured`
-- `StubChannelAdapter.config`
-- `StubChannelAdapter (+2 methods)`
-- `make_stub_adapter_class`
+Telegram channel adapter facade (about-sevn.bot/specs/18-channel-telegram.md).
 
-### Telegram (`src/sevn/channels/telegram.py`)
+Working with [`telegram.py`](../../src/sevn/channels/telegram.py): inspect the public entry points below.
+Start with [`TelegramAdapter.rich_capability`](../../src/sevn/channels/telegram.py#L187), then [`TelegramAdapter.connected`](../../src/sevn/channels/telegram.py#L234), [`TelegramAdapter.name`](../../src/sevn/channels/telegram.py#L247).
 
-Public entry points:
-- `TelegramAdapter.rich_capability`
-- `TelegramAdapter.connected`
-- `TelegramAdapter.name`
-- `TelegramAdapter (+1 methods)`
+Bot API HTTP transport for TelegramAdapter.
 
-### Telegram Api (`src/sevn/channels/telegram_api.py`)
+Working with [`telegram_api.py`](../../src/sevn/channels/telegram_api.py): inspect the public entry points below.
+Start with [`TelegramApiMixin.answer_callback`](../../src/sevn/channels/telegram_api.py#L116), then [`TelegramApiMixin.send_chat_action`](../../src/sevn/channels/telegram_api.py#L135).
 
-Public entry points:
-- `TelegramApiMixin.answer_callback`
-- `TelegramApiMixin.send_chat_action`
+Bot API 10.1 rich-message capability probe (R1, D2).
 
-### Telegram Capabilities (`src/sevn/channels/telegram_capabilities.py`)
+Working with [`telegram_capabilities.py`](../../src/sevn/channels/telegram_capabilities.py): inspect the public entry points below.
+Start with [`bot_api_error_description`](../../src/sevn/channels/telegram_capabilities.py#L46), then [`is_method_not_found_response`](../../src/sevn/channels/telegram_capabilities.py#L70), [`is_rich_payload_rejected`](../../src/sevn/channels/telegram_capabilities.py#L93), [`detect_rich_support`](../../src/sevn/channels/telegram_capabilities.py#L145).
 
-See `src/sevn/channels/telegram_capabilities.py` for implementation details.
+Telegram adapter configuration, text utilities, and workspace wiring.
 
-### Telegram Config (`src/sevn/channels/telegram_config.py`)
+Working with [`telegram_config.py`](../../src/sevn/channels/telegram_config.py): inspect the public entry points below.
+Start with [`build_reply_keyboard_markup`](../../src/sevn/channels/telegram_config.py#L95), then [`telegram_utf16_len`](../../src/sevn/channels/telegram_config.py#L145), [`chunk_text`](../../src/sevn/channels/telegram_config.py#L165), [`format_reply_quote`](../../src/sevn/channels/telegram_config.py#L296).
 
-See `src/sevn/channels/telegram_config.py` for implementation details.
-
-### Additional modules
-
-23 more Python files under `src/sevn/channels/` — including `src/sevn/channels/telegram_file_links.py`, `src/sevn/channels/telegram_format.py`, `src/sevn/channels/telegram_inbound.py`, `src/sevn/channels/telegram_inline_send.py`.
+23 more Python files under [`src/sevn/channels`](../../src/sevn/channels/) — including `src/sevn/channels/telegram_file_links.py`, `src/sevn/channels/telegram_format.py`, `src/sevn/channels/telegram_inbound.py`, `src/sevn/channels/telegram_inline_send.py`.
 
 ### Extension and invariants
 
-Follow `about-sevn.bot/specs/18-channel-telegram.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/channels/`, run `sevn readme update channels` and `make readme-check`.
+Follow [`18-channel-telegram.md`](../../about-sevn.bot/specs/18-channel-telegram.md) for merge gates, error semantics, and compatibility constraints. After code changes under [`src/sevn/channels`](../../src/sevn/channels/), run `sevn readme update channels` and `make readme-check`.
 
 ## References
 

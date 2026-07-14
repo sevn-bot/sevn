@@ -15,22 +15,26 @@ You do not pick the tier manually; the triager and routing policy choose it per 
 
 ## Level 2 — How it works (technical)
 
-Implementation lives under `src/sevn/agent/`. The gateway calls into this package through `build_agent_run_turn` (`gateway/agent_turn.py`).
+Implementation lives under [`src/sevn/agent/`](../../src/sevn/agent/). The gateway calls into this package through [`build_agent_run_turn`](../../src/sevn/gateway/agent_turn.py#L702) ([`gateway/agent_turn.py`](../../src/sevn/gateway/agent_turn.py)).
 
-### Triage (`src/sevn/agent/triager/`)
+### Triage ([`src/sevn/agent/triager/`](../../src/sevn/agent/triager/))
 
-`triage_turn` (`triager/run.py`) returns a structured `TriageResult`: `Intent`, `ComplexityTier` (A–D), optional first-message ack, tool/skill shortlists, and confidence. Routing policy modules enforce repo-code detection, orientation blocks, and footer injection.
+[`triage_turn`](../../src/sevn/agent/triager/run.py#L1171) ([`triager/run.py`](../../src/sevn/agent/triager/run.py)) returns a structured `TriageResult`: `Intent`, `ComplexityTier` (A–D), optional first-message ack, tool/skill shortlists, and confidence. Routing policy modules enforce repo-code detection, orientation blocks, and footer injection.
 
 ### Executor tiers
 
 | Tier | Role | Entry point | Typical use |
 | --- | --- | --- | --- |
-| **A** | Triager-only | Handled in `agent_turn` after `triage_turn` | Greetings, simple Q&A with no tools |
-| **B** | Harnessed tool executor | `run_b_turn` (`executors/b_harness.py`) | Default workhorse: skills, CodeMode, web tools |
-| **C** | Planner + outer loop | `run_cd_turn` (`executors/cd_harness.py`) | Multi-step plans, tool orchestration |
-| **D** | Deep delegation | Same `run_cd_turn` path with higher budgets | Long-horizon tasks, λ-RLM-style macros |
+| **A** | Triager-only | Handled in [`agent_turn`](../../src/sevn/gateway/agent_turn.py) after [`triage_turn`](../../src/sevn/agent/triager/run.py#L1171) | Greetings, simple Q&A with no tools |
+| **B** | Harnessed tool executor | [`run_b_turn`](../../src/sevn/agent/executors/b_harness.py#L924) ([`executors/b_harness.py`](../../src/sevn/agent/executors/b_harness.py)) | Default workhorse: skills, CodeMode, web tools |
+| **C** | Planner + outer loop | [`run_cd_turn`](../../src/sevn/agent/executors/cd_harness.py#L888) ([`executors/cd_harness.py`](../../src/sevn/agent/executors/cd_harness.py)) | Multi-step plans, tool orchestration |
+| **D** | Deep delegation | Same [`run_cd_turn`](../../src/sevn/agent/executors/cd_harness.py#L888) path with higher budgets | Long-horizon tasks, λ-RLM-style macros |
 
-Tier B uses pydantic-ai adapters (`adapters/tier_b_*.py`), optional CodeMode (`tier_b_codemode.py`), and routes LLM calls through the egress proxy (`adapters/egress_bridge.py`) — keys stay out of the gateway process.
+Tier B uses pydantic-ai adapters ([`adapters/tier_b_*.py`](../../src/sevn/agent/adapters/)), optional CodeMode ([`tier_b_codemode.py`](../../src/sevn/agent/adapters/tier_b_codemode.py)), and routes LLM calls through the egress proxy ([`adapters/egress_bridge.py`](../../src/sevn/agent/adapters/egress_bridge.py)) — keys stay out of the gateway process.
+
+### Sub-agents
+
+Level-1/level-2 sub-agent orchestration lives under [`src/sevn/agent/subagents/`](../../src/sevn/agent/subagents/) (registry, supervisor, specialists, media workers). See the [Sub-agents README](subagents.md) and [`about-sevn.bot/specs/36-sub-agents.md`](../../about-sevn.bot/specs/36-sub-agents.md) for spawn limits, `multi` queue mode, and kill surfaces.
 
 ### Harness discipline and sandbox
 
@@ -53,11 +57,11 @@ Model slots resolve from `sevn.json` → `providers.tier_default.*` and per-agen
 
 ### Key modules
 
-- `src/sevn/agent/triager/run.py` — `triage_turn`
-- `src/sevn/agent/executors/b_harness.py` — `run_b_turn`
-- `src/sevn/agent/executors/cd_harness.py` — `run_cd_turn`
-- `src/sevn/agent/adapters/egress_bridge.py` — proxy transport for native models
-- `src/sevn/agent/adapters/tier_b_codemode.py` — CodeMode capability for tier B
+- [`triager/run.py`](../../src/sevn/agent/triager/run.py) — [`triage_turn`](../../src/sevn/agent/triager/run.py#L1171)
+- [`executors/b_harness.py`](../../src/sevn/agent/executors/b_harness.py) — [`run_b_turn`](../../src/sevn/agent/executors/b_harness.py#L924)
+- [`executors/cd_harness.py`](../../src/sevn/agent/executors/cd_harness.py) — [`run_cd_turn`](../../src/sevn/agent/executors/cd_harness.py#L888)
+- [`adapters/egress_bridge.py`](../../src/sevn/agent/adapters/egress_bridge.py) — proxy transport for native models
+- [`adapters/tier_b_codemode.py`](../../src/sevn/agent/adapters/tier_b_codemode.py) — CodeMode capability for tier B
 
 Normative specs: [`13-rlm-triager`](../../about-sevn.bot/specs/13-rlm-triager.md), [`14-executor-tier-b`](../../about-sevn.bot/specs/14-executor-tier-b.md), [`21-executor-tier-cd`](../../about-sevn.bot/specs/21-executor-tier-cd.md), [`16-harness-discipline`](../../about-sevn.bot/specs/16-harness-discipline.md).
 
