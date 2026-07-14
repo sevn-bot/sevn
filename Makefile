@@ -345,6 +345,9 @@ prd-sync: ## Refresh PRD frontmatter in about-sevn.bot/prd (skw docs sync)
 prd-check: ## Validate+score every PRD in about-sevn.bot/prd (skw docs validate)
 	$(MAKE) -C spec-kit-wave prd-check
 
+spec-kit-wave-test: ## Run spec-kit-wave pytest suite (skw validators + sync contracts)
+	$(MAKE) -C spec-kit-wave test
+
 subagents-chart: ## Regenerate deterministic sub-agents topology SVG (D14)
 	$(UV) run python scripts/gen_subagents_chart.py
 
@@ -383,7 +386,7 @@ ci-core: lockcheck lint typecheck pyright test doctest security build doctor-sol
 
 ci-infra: config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards agent-context-manifest-check ## Schema / infra drift tier
 
-ci-docs: telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema changelog-check ## Docs / menu HTML tier
+ci-docs: telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema spec-kit-wave-test changelog-check ## Docs / menu HTML tier
 
 ci-skills: skills-core-check skillspector-check skills-index-check dreaming-allowlist-check ## Skills inventory tier
 
@@ -395,7 +398,7 @@ ci: ci-core ci-infra ci-docs ci-skills ci-parity ## Full gate (same as CI)
 # Keep in sync with the ci-core/ci-infra/ci-docs/ci-skills/ci-parity tiers above.
 CI_STEPS := lockcheck lint typecheck pyright test doctest security build doctor-solutions-check \
 	config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards agent-context-manifest-check \
-	telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema changelog-check \
+	telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema spec-kit-wave-test changelog-check \
 	skills-core-check skillspector-check skills-index-check dreaming-allowlist-check \
 	code-index deploy-remote-report-check code-index-check
 

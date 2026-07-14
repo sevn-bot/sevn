@@ -26,7 +26,7 @@ Every user message follows the same five-step path — the **turn spine** — re
 1. **Inbound** — A channel adapter (Telegram, Web UI, voice, etc.) delivers a normalised message to [`ChannelRouter.route_incoming`](../../src/sevn/gateway/channel_router.py#L1348). Adapters hide platform quirks; the router sees a uniform event.
 2. **Scan** — In [`llm_guard_scanner.py`](../../src/sevn/security/llm_guard_scanner.py), [`LLMGuardScanner.scan_inbound`](../../src/sevn/security/llm_guard_scanner.py#L564) inspects content before triage. Blocked input is stored as a `kind="blocked"` session row instead of reaching the agent stack (owner override can skip the guard when configured).
 3. **Session** — The message is persisted to SQLite via the sessions store so history, diagnostics, and Mission Control views stay consistent across restarts.
-4. **Dispatch** — [`build_agent_run_turn`](../../src/sevn/gateway/agent_turn.py#L702) returns the production `RunTurnFn` closure. It calls [`triage_turn`](../../src/sevn/agent/triager/run.py#L1171) and then routes to tier **A** (triager-only reply), **B** ([`run_b_turn`](../../src/sevn/agent/executors/b_harness.py#L924) — everyday tool use), or **C/D** ([`run_cd_turn`](../../src/sevn/agent/executors/cd_harness.py#L888) — multi-step planning).
+4. **Dispatch** — [`build_agent_run_turn`](../../src/sevn/gateway/agent_turn.py#L706) returns the production `RunTurnFn` closure. It calls [`triage_turn`](../../src/sevn/agent/triager/run.py#L1171) and then routes to tier **A** (triager-only reply), **B** ([`run_b_turn`](../../src/sevn/agent/executors/b_harness.py#L924) — everyday tool use), or **C/D** ([`run_cd_turn`](../../src/sevn/agent/executors/cd_harness.py#L888) — multi-step planning).
 5. **Outbound** — Assistant text streams back through the same channel adapter. Trace events land under `.sevn/traces` and in `traces.db` for inspection in Mission Control.
 
 Provider API calls are brokered by the egress proxy — keys never load in the gateway process.
@@ -66,7 +66,7 @@ Validate after edits: `sevn config validate`; `sevn doctor` for install health.
 
 ### Key modules
 
-- [`agent_turn.py`](../../src/sevn/gateway/agent_turn.py) — [`build_agent_run_turn`](../../src/sevn/gateway/agent_turn.py#L702): production turn dispatch glue from triage through tier B/C/D
+- [`agent_turn.py`](../../src/sevn/gateway/agent_turn.py) — [`build_agent_run_turn`](../../src/sevn/gateway/agent_turn.py#L706): production turn dispatch glue from triage through tier B/C/D
 - [`channel_router.py`](../../src/sevn/gateway/channel_router.py) — [`route_incoming`](../../src/sevn/gateway/channel_router.py#L1348): inbound/outbound orchestration, LLM Guard gate, session enqueue
 - [`channel_boot.py`](../../src/sevn/gateway/channel_boot.py) — multi-adapter boot loader and webhook registration
 - [`session_manager.py`](../../src/sevn/gateway/session_manager.py) — SQLite session persistence, turn queue, and busy-session detection
@@ -79,7 +79,7 @@ Normative spec: [`about-sevn.bot/specs/17-gateway.md`](../../about-sevn.bot/spec
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: [`src/sevn/gateway`](../../src/sevn/gateway/) (114 Python files). Normative design: [`17-gateway.md`](../../about-sevn.bot/specs/17-gateway.md).
+Primary source tree: [`src/sevn/gateway`](../../src/sevn/gateway/) (143 Python files). Normative design: [`17-gateway.md`](../../about-sevn.bot/specs/17-gateway.md).
 
 ### Module inventory
 
@@ -99,7 +99,7 @@ Start with [`register_admin_secrets_routes`](../../src/sevn/gateway/admin/admin_
 Production agent dispatch glue (about-sevn.bot/specs/17-gateway.md §2.6).
 
 Working with [`agent_turn.py`](../../src/sevn/gateway/agent_turn.py): inspect the public entry points below.
-Start with [`build_intro_extra_instructions`](../../src/sevn/gateway/agent_turn.py#L607), then [`build_agent_run_turn`](../../src/sevn/gateway/agent_turn.py#L702).
+Start with [`build_intro_extra_instructions`](../../src/sevn/gateway/agent_turn.py#L607), then [`build_agent_run_turn`](../../src/sevn/gateway/agent_turn.py#L706).
 
 Gateway bearer + Telegram secret + Web UI JWT helpers
 (about-sevn.bot/specs/17-gateway.md §2.1, §6; about-sevn.bot/specs/19-channel-webui.md §2.3-§2.5).

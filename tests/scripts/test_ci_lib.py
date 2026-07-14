@@ -39,6 +39,17 @@ def test_match_path_rules_telegram_menu() -> None:
     assert "telegram-menu-docs-check" in targets
 
 
+def test_match_path_rules_about_docs_check() -> None:
+    targets = match_path_rules(["about-sevn.bot/specs/17-gateway.md"])
+    assert "about-docs-check" in targets
+    assert "about-site-check" in targets
+
+
+def test_match_path_rules_spec_kit_wave() -> None:
+    targets = match_path_rules(["spec-kit-wave/src/skw/spec_validate.py"])
+    assert targets == ["about-docs-check"]
+
+
 def test_discover_related_tests_includes_paired_file() -> None:
     src = REPO_ROOT / "src/sevn/gateway/bootstrap/bootstrap_capture.py"
     tests = discover_related_tests([src])

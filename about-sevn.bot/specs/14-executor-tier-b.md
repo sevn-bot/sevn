@@ -1309,3 +1309,10 @@ double narrow failure (gateway may spawn full-index retry then tier C).
 | `tests/fixtures/golden_llm/runner/test_golden_llm_tier_b.py` | Golden LLM |
 | `tests/gateway/test_agent_turn_tier_b.py` | Gateway integration |
 | `tests/config/test_tier_b_answer_mode.py` | Answer mode config |
+
+## Amendments (spec-36-sub-agents)
+
+Tier B runs register as **level-1** sub-agents. Exposes `spawn_subagent` tool
+(fire-and-forget + optional `wait:true`) for **level-2** workers and specialists
+(`src/sevn/tools/subagent_spawn.py`). L2 spawns draw the parent `CascadeBudget` (D11).
+See spec-36 (`about-sevn.bot/specs/36-sub-agents.md`) for the full orchestration contract.

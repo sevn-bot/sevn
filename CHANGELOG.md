@@ -16,6 +16,8 @@ are cut into a dated, versioned section at release time.
 - [2026-07-14] `docs-folder-author` agent (`.cursor/agents/` + `spec-kit-wave/agents/`) validates and updates whole `about-sevn.bot/specs/` or `about-sevn.bot/prd/` folders against code and template rules
 - [2026-07-14] Unreleased changelog bullets require a leading `[YYYY-MM-DD]` datestamp enforced by `make changelog-check`
 - [2026-07-14] Changelog templates, standards, and author skills under `spec-kit-wave/` document the datestamp contract
+- [2026-07-15] `make spec-kit-wave-test` runs the skw pytest suite in `ci-docs` so validator regressions cannot slip through partial iteration
+- [2026-07-15] `make ci-affected` triggers `about-docs-check` when `about-sevn.bot/specs/`, `about-sevn.bot/prd/`, or `spec-kit-wave/` paths change
 - [2026-07-15] Gateway README Level 3 module inventory lists every gateway subpackage module with docstring prose and symbol anchors for operator and LLM readers
 
 - [2026-07-14] `skw docs sync` refreshes about-doc frontmatter and scaffolds missing PRD/spec files via `make spec-sync` and `make prd-sync`
@@ -63,7 +65,9 @@ are cut into a dated, versioned section at release time.
 ### Fixed
 
 - [2026-07-14] Bundled skill seeding skips `__pycache__` when copying packaged skills, avoiding parallel-test flakes on transient `.pyc` files
-- [2026-07-15] About-docs interface fingerprints refreshed for 20 PRD/spec files whose `sources` globs changed during the gateway subpackage reorg
+- [2026-07-15] Restored spec-36 sub-agent amendment cross-reference in `14-executor-tier-b.md` after W9 body rewrite
+- [2026-07-15] `scripts/changelog_validate.py` shim re-exports `load_changelog_rules`, `validate_changelog`, and `check_staged_gate` for backward compatibility
+- [2026-07-15] Gateway README module count and `build_agent_run_turn` line anchors updated after W12 subpackage reorg
 - [2026-07-14] Gateway telegram printing-press inline loader resolves bundled `_pp_cli.py` from the `sevn` package root after W12 subpackage moves; `ci-affected` doctest skips bundled skill script paths
 - [2026-07-14] `ci-affected` runs `make doctest` when more than 100 `src/sevn` files change, avoiding doctest context pollution from huge per-file pytest invocations on long-lived wave branches
 - [2026-07-14] Onboarding web and TUI wizards expose `gateway.queue_mode=multi` in capabilities (matches runtime and spec-36)

@@ -424,7 +424,7 @@ Docs tooling in scope: `src/sevn/docs/about/check.py` (`check_about_docs`),
 
 ## Data Model
 
-### `CI_STEPS` (31 ordered steps)
+### `CI_STEPS` (32 ordered steps)
 
 Defined in root `Makefile` — consumed by `make ci-resume` via `scripts/ci_resume.sh`.
 First infra step includes `make config-schema` against `infra/sevn.schema.json` goldens.
@@ -485,5 +485,5 @@ Wave agents: mid-wave **`make ci-affected`** only; wave boundary **`make ci`** o
 | `make ci` | Entire pipeline (~12–15 min) |
 | `make ci-resume` | Iterative final-wave fix loop |
 | `tests/docs/about/` | About-docs contracts |
-| `spec-kit-wave/tests/` | skw validators (`spec-check` / `prd-check` wired via `about-docs-check`) |
+| `spec-kit-wave/tests/` | skw validators + sync contracts (`make spec-kit-wave-test` in `ci-docs`; `spec-check` / `prd-check` wired via `about-docs-check`) |
 | `.github/workflows/*.yml` | CI orchestration smoke on every push |
