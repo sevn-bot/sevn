@@ -1,4 +1,4 @@
-"""Catalog coverage resolution (D19; green after W10)."""
+"""Catalog coverage resolution (D19)."""
 
 from __future__ import annotations
 
@@ -28,7 +28,6 @@ def _standard_text() -> str:
 
 
 @pytest.mark.parametrize("package", _LOAD_BEARING_PACKAGES)
-@pytest.mark.xfail(reason="green after W10: D19 catalog coverage decision", strict=False)
 def test_load_bearing_package_is_catalogued_or_documented_out_of_catalog(
     package: str,
 ) -> None:
