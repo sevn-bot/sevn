@@ -43,6 +43,7 @@ class ReadmeEntry:
     curated: bool = False
     turn_spine: bool = False
     catalog: str = "modules"
+    template: str = ""
 
 
 @dataclass(frozen=True)
@@ -109,6 +110,7 @@ def load_manifest(path: Path) -> ReadmeManifest:
         curated = _parse_curated(row.get("curated"), path=path, idx=idx)
         turn_spine = _parse_turn_spine(row.get("turn_spine"), path=path, idx=idx)
         catalog = _parse_catalog(row.get("catalog"), path=path, idx=idx)
+        template = _parse_template(row.get("template"), path=path, idx=idx)
 
         entries.append(
             ReadmeEntry(
@@ -123,6 +125,7 @@ def load_manifest(path: Path) -> ReadmeManifest:
                 curated=curated,
                 turn_spine=turn_spine,
                 catalog=catalog,
+                template=template,
             )
         )
 
@@ -242,6 +245,34 @@ def _parse_catalog(value: object, *, path: Path, idx: int) -> str:
         msg = f"{path}: readme[{idx}] catalog={kind!r}; expected one of: {known}"
         raise ValueError(msg)
     return kind
+
+
+def _parse_template(value: object, *, path: Path, idx: int) -> str:
+    """Parse optional ``template`` manifest key (repo-relative path, defaults to empty).
+
+        Args:
+    value (object): Raw TOML value or ``None`` when omitted.
+    path (Path): Manifest path for error messages.
+    idx (int): Row index for error messages.
+
+        Returns:
+            str: Repo-relative template path, or ``""`` to use the slug convention.
+
+        Raises:
+            ValueError: When ``template`` is present but not a string.
+
+        Examples:
+            >>> _parse_template(None, path=Path("m.toml"), idx=0)
+            ''
+            >>> _parse_template("docs/readmes/_templates/gateway.md", path=Path("m.toml"), idx=0)
+            'docs/readmes/_templates/gateway.md'
+    """
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        msg = f"{path}: readme[{idx}] template must be a string"
+        raise ValueError(msg)
+    return value.strip()
 
 
 def _as_str_tuple(value: object) -> tuple[str, ...]:

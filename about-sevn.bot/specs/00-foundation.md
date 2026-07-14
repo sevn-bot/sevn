@@ -8,7 +8,7 @@ summary: 'Deliver the lowest layer every later spec assumes: a src/sevn/ package
   uv-managed Python 3.12+ project (hatchling build backend), a root Makefile as the
   single recurring-command surface, pre-c'
 last_updated: '2026-07-13'
-fingerprint: sha256:80fc7b860bcff952695896461dbb6fc48a237660bf2cf68d9eaf0a45bc460e91
+fingerprint: sha256:826020741e93b626825430396223034f4abb43a673ff51fe84a14321a2e8872d
 related: []
 sources:
 - src/sevn/**
@@ -5692,6 +5692,27 @@ interfaces:
 - name: check_readme_tree
   file: src/sevn/docs/readme/check.py
   symbol: check_readme_tree
+- name: CurateResult
+  file: src/sevn/docs/readme/curate.py
+  symbol: CurateResult
+- name: RunnerKind
+  file: src/sevn/docs/readme/curate.py
+  symbol: RunnerKind
+- name: build_prompt
+  file: src/sevn/docs/readme/curate.py
+  symbol: build_prompt
+- name: curate_entry
+  file: src/sevn/docs/readme/curate.py
+  symbol: curate_entry
+- name: diff_for_globs
+  file: src/sevn/docs/readme/curate.py
+  symbol: diff_for_globs
+- name: invoke_runner
+  file: src/sevn/docs/readme/curate.py
+  symbol: invoke_runner
+- name: resolve_runner
+  file: src/sevn/docs/readme/curate.py
+  symbol: resolve_runner
 - name: compute_digest
   file: src/sevn/docs/readme/fingerprint.py
   symbol: compute_digest
@@ -5836,6 +5857,21 @@ interfaces:
 - name: validate_symbol_refs
   file: src/sevn/docs/readme/symbol_refs.py
   symbol: validate_symbol_refs
+- name: Heading
+  file: src/sevn/docs/readme/templates.py
+  symbol: Heading
+- name: TemplateError
+  file: src/sevn/docs/readme/templates.py
+  symbol: TemplateError
+- name: load_template_headings
+  file: src/sevn/docs/readme/templates.py
+  symbol: load_template_headings
+- name: resolve_template_path
+  file: src/sevn/docs/readme/templates.py
+  symbol: resolve_template_path
+- name: validate_against_template
+  file: src/sevn/docs/readme/templates.py
+  symbol: validate_against_template
 - name: EvolutionApproval
   file: src/sevn/evolution/approvals.py
   symbol: EvolutionApproval

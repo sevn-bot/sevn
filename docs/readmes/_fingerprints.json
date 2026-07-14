@@ -44,8 +44,8 @@
     },
     "index": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-13T11:59:07Z",
-      "digest": "4ceeb61007de7a926670f0e56191359c9770c03f69ec527c765e06b70c007f05",
+      "computed_at": "2026-07-13T15:26:44Z",
+      "digest": "8397ca3c476c7b0b06c4bc1ac11877622321799424361e1d98c7cd5eac0a73c9",
       "source_globs": [
         "docs/readmes/manifest.toml"
       ]
@@ -87,8 +87,8 @@
     },
     "root": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-13T11:59:04Z",
-      "digest": "50a570469e96518325e5a4c6574548f0e67430b4a34edbd4d1f5c057cc123880",
+      "computed_at": "2026-07-13T15:26:41Z",
+      "digest": "ae8269a4e50a9318a554f7da96807344f7ec44dffda3c7f3d660ae49abbe132d",
       "source_globs": [
         "pyproject.toml",
         "CLAUDE.md",
