@@ -55,14 +55,17 @@ async def _write_logical_key(
 
     Examples:
         >>> import asyncio
-        >>> from unittest.mock import AsyncMock
+        >>> from unittest.mock import AsyncMock, patch
         >>> from sevn.cli.gateway_token_store import GatewayTokenBootstrap
         >>> from pathlib import Path
         >>> boot = GatewayTokenBootstrap(Path("s.json"), Path("."), None)
-        >>> boot.chain = lambda: AsyncMock(get=AsyncMock(return_value=None), set=AsyncMock())  # type: ignore[method-assign]
-        >>> asyncio.run(
-        ...     _write_logical_key(boot, plaintext="owner-password-12", confirm_fingerprint=None),
-        ... )
+        >>> mock_chain = AsyncMock(get=AsyncMock(return_value=None), set=AsyncMock())
+        >>> with patch.object(GatewayTokenBootstrap, "chain", lambda self: mock_chain):
+        ...     asyncio.run(
+        ...         _write_logical_key(
+        ...             boot, plaintext="owner-password-12", confirm_fingerprint=None,
+        ...         ),
+        ...     )
         False
     """
     chain = bootstrap.chain()
@@ -111,16 +114,6 @@ def store_dashboard_login_password_local(
     """
     password = validate_dashboard_login_password_plaintext(plaintext)
 
-    def _stamp_login_password(doc: dict[str, object]) -> None:
-        dash = doc.setdefault("dashboard", {})
-        if not isinstance(dash, dict):
-            msg = "dashboard section must be an object"
-            raise ValueError(msg)
-        dash.setdefault("enabled", True)
-        set_nested(doc, "dashboard.login_password", DASHBOARD_LOGIN_PASSWORD_CONFIG_REF)
-
-    mutate_sevn_json(bootstrap.sevn_json_path, _stamp_login_password)
-
     from sevn.cli.asyncio_util import run_sync_coro
     from sevn.config.workspace_config import effective_encrypted_file_key_source
     from sevn.security.secrets.passphrase_prime import reconcile_unlock_env_with_keychain
@@ -135,6 +128,16 @@ def store_dashboard_login_password_local(
             confirm_fingerprint=confirm_fingerprint,
         ),
     )
+
+    def _stamp_login_password(doc: dict[str, object]) -> None:
+        dash = doc.setdefault("dashboard", {})
+        if not isinstance(dash, dict):
+            msg = "dashboard section must be an object"
+            raise ValueError(msg)
+        dash.setdefault("enabled", True)
+        set_nested(doc, "dashboard.login_password", DASHBOARD_LOGIN_PASSWORD_CONFIG_REF)
+
+    mutate_sevn_json(bootstrap.sevn_json_path, _stamp_login_password)
     fp = fingerprint_sha256_hex(password)
     return DashboardLoginPasswordStoreResult(
         fingerprint_sha256_hex=fp,

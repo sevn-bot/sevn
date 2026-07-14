@@ -83,7 +83,14 @@ def register_set_login_password(dash: typer.Typer) -> None:
             help="JSON envelope with fingerprint and ref only (never plaintext).",
         ),
     ) -> None:
-        """Bootstrap or rotate ``dashboard.login_password`` without a running gateway."""
+        """Bootstrap or rotate ``dashboard.login_password`` without a running gateway.
+
+        Args:
+            set_value (str | None): Operator-supplied password (visible in argv/ps).
+            stdin (bool): Read one line from standard input instead of generating.
+            confirm_fingerprint (str | None): Required SHA-256 hex when overwriting.
+            json_out (bool): Emit JSON envelope (no plaintext) instead of human output.
+        """
         command = "sevn dashboard set-login-password"
         if set_value is not None and stdin:
             msg = "pass at most one of --set-value or --stdin"

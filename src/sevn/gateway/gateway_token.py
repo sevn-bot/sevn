@@ -260,8 +260,11 @@ async def resolve_config_ref(
                     resolve_primary_encrypted_store_path(content_root, workspace.secrets_backend),
                 )
                 try:
+                    retry_chain = secrets_chain_from_workspace(
+                        content_root, workspace.secrets_backend
+                    )
                     return await _resolve_against_chain(
-                        chain,
+                        retry_chain,
                         text,
                         unresolved_log_label=unresolved_log_label,
                     )

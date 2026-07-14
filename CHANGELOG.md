@@ -36,6 +36,7 @@ are cut into a dated, versioned section at release time.
 ### Fixed
 
 - Mission Control owner login resolves `${SECRET:…}` dashboard and gateway password refs at boot instead of comparing against placeholder strings
+- `sevn dashboard set-login-password` stamps `sevn.json` only after the secrets write succeeds; doctest mocks frozen `GatewayTokenBootstrap.chain` correctly
 - README `_write_entries` doctest uses non-curated `storage` row after gateway manifest curation
 - Self-improve trajectory ingest circular import: move `ensure_trace_connection` to `agent.tracing.traces_migrate` and rewrite `docs/readmes/self-improve.md` Level 1–2 with preset-C audit
 - CI failures from `secrets.*` gitignore rule excluding `src/sevn/config/sections/secrets.py` (ModuleNotFoundError and mypy `no-any-return` on CI)
