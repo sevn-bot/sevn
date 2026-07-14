@@ -2,7 +2,7 @@
 id: spec-25-cicd-full
 kind: spec
 title: CI/CD (mature pipeline) — Spec
-status: scaffold
+status: done
 owner: Alex
 summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict delivery
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
@@ -12,7 +12,6 @@ fingerprint: sha256:4046eea79e99f21fdef5bd3ee60f2384aa6fecc4400df1e94da1766386c0
 related: []
 sources:
 - .github/workflows/**
-- wave-orchestrator/**
 - src/sevn/docs/**
 parent_prd: prd-06-setup-and-operations
 depends_on:
@@ -398,70 +397,94 @@ interfaces:
 
 ## Purpose
 
-Grow spec-00-foundation’s minimal verify loop into a phase-strict delivery pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox (and any ASGI image built for spec-07-egr
+Document the **mature delivery pipeline** grown from spec-00-foundation: GitHub Actions
+workflows, composable Makefile CI tiers, resumable full gates, path-aware partial gates,
+and docs/skills/infra checks that block regressions before merge.
 
-Implementation spans [`src/sevn`](src/sevn/__init__.py), `wave-orchestrator/` (gitignored local operator tree when present), and [`.github/workflows/ci.yml`](.github/workflows/ci.yml). The frontmatter `interfaces:` block is code-owned (refresh with `make about-docs-extract DOC_ID=spec-25-cicd-full`).
-
-<!-- HUMAN-INPUT[owner=operator]: Author the full normative contract for this mega-spec — do not hand-expand the whole-tree interfaces dump. -->
 ## Public Interface
 
-Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
+| Target | Role |
+|--------|------|
+| `make ci` | Full pre-merge gate (all tiers) |
+| `make ci-resume` / `make ci-reset` | Resumable / reset CI checkpoint |
+| `make ci-core` | lockcheck, lint, typecheck, pyright, test, doctest, security, build, doctor |
+| `make ci-infra` | config-schema, onboarding schemas, git guards, manifests |
+| `make ci-docs` | about-site, readme, changelog, telegram menu docs |
+| `make ci-skills` | skillspector + skill inventory checks |
+| `make ci-parity` | code-index, deploy report parity |
+| `make ci-affected` / `make ci-changed` | Path-aware partial gates |
+| `make ci-quality` | Advisory (ruff ratchet, vulture, codespell — not in `make ci`) |
+| `.github/workflows/ci.yml` | Primary CI workflow |
+| `.github/workflows/ci-cd.yml` | Release / CD workflow |
+| `scripts/ci_resume.sh` | Ordered `CI_STEPS` driver |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+Docs tooling in scope: `src/sevn/docs/about/check.py` (`check_about_docs`),
+`make about-docs-check`, `make changelog-check`.
 
-- [`default_codemode_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`install_monty_resource_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`lambda_rlm_filter`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`to_dspy_tools`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`EgressBridgeContext`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_anthropic_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_httpx_event_hooks`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_openai_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_httpx_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_llm_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_proxy_transport_request`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`resolve_proxy_shared_secret`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- _…and 3973 more in frontmatter `interfaces:`._
 ## Data Model
 
-Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
+### `CI_STEPS` (39 ordered steps)
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+Defined in root `Makefile` — consumed by `make ci-resume` via `scripts/ci_resume.sh`.
+First infra step includes `make config-schema` against `infra/sevn.schema.json` goldens.
 
-- [`default_codemode_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`install_monty_resource_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`lambda_rlm_filter`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`to_dspy_tools`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`EgressBridgeContext`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_anthropic_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_httpx_event_hooks`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_openai_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_httpx_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_llm_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_proxy_transport_request`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`resolve_proxy_shared_secret`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- _…and 3973 more in frontmatter `interfaces:`._
+### Workflow matrix (`.github/workflows/`)
+
+| Workflow | Purpose |
+|----------|---------|
+| `ci.yml` | Main CI (invokes make targets) |
+| `ci-supplementary.yml` | Supplementary checks |
+| `ci-cd.yml` | CD / release |
+| `docker.yml` | Container build validation |
+| `style-guide-pages.yml` | Style guide site |
+
+### Partial gate inputs
+
+`SEVN_CI_BASE` (default `origin/main`), `SEVN_PYTEST_JOBS` for xdist control.
+
 ## Internal Architecture
 
-See **Implemented by** and [`src/sevn`](src/sevn/__init__.py), `wave-orchestrator/`, [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+```text
+PR / push → GitHub Actions → make ci (or subset)
+    → ci-core (Python quality + test + build)
+    → ci-infra (schemas, guards)
+    → ci-docs (about/readme/changelog/menu)
+    → ci-skills
+    → ci-parity
+Local iteration → make ci-affected / ci-changed → subset only
+Final wave loop → make ci-resume until all steps pass
+```
+
+Wave agents: mid-wave **`make ci-affected`** only; wave boundary **`make ci`** or **`make ci-resume`**.
+
 ## Behavior
 
-Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
+1. **`make lockcheck`** — `uv lock --check` first in CI core.
+2. **`make lint`** / **`make typecheck`** — mandatory on Python changes.
+3. **`make test`** — full pytest; parallel via xdist unless `SEVN_PYTEST_JOBS=0`.
+4. **`make config-schema`** — JSON Schema vs fixture configs.
+5. **`make about-docs-check`** — about-sevn.bot doc integrity + frontmatter.
+6. **`make changelog-check`** — Keep a Changelog + datestamp rules (spec-kit-wave).
+7. **`make ci-resume`** — stops at first failure; reruns skip passed steps (checkpoint not re-verifying earlier steps — finish with clean `make ci` before merge).
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
-
-Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn`](src/sevn/__init__.py), `wave-orchestrator/`, and [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 ## Failure Modes
 
-Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
+| Failure | Signal |
+|---------|--------|
+| Any CI step non-zero | `make ci` / Actions job red |
+| Checkpoint stale after early-step regression | Operator runs `make ci-reset` then full gate |
+| Schema drift | `make config-schema` fails |
+| Doc regression | `make about-docs-check` or `make readme-check` fails |
+| Git guard missing | `make check-git-guards` fails (blocks destructive clean) |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
-
-Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+| Gate | Validates |
+|------|-----------|
+| `make ci` | Entire pipeline (~12–15 min) |
+| `make ci-resume` | Iterative final-wave fix loop |
+| `tests/docs/about/` | About-docs contracts |
+| `spec-kit-wave/tests/` | skw validators (W10 wires into ci-docs) |
+| `.github/workflows/*.yml` | CI orchestration smoke on every push |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
-
-Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+Document new gates in this spec when W10 lands skw `spec-check` in `make about-docs-check`.

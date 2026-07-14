@@ -338,3 +338,9 @@ Unit tests under `tests/second_brain/` cover path resolution, bootstrap idempote
 - [x] CLI `sevn second-brain setup` + `sevn config second-brain` (2026-07-11 ✅: `cli/commands/second_brain_cmd.py`)
 - [x] Telegram `/config` vault path + browse forms (2026-07-11 ✅: `menu.py`, `menu_form_handler.py`)
 - [x] Onboarding text + folder_picker controls (2026-07-11 ✅: `onboarding_capabilities.json`, web wizard)
+
+## Human-input needed
+
+Prose body not yet authored (W9 scope). Normative contract requires operator or
+follow-up wave authoring against verified code (`sevn about-docs extract` + graphify).
+Do not mark `status: done` until `make -C spec-kit-wave spec-check` scores ≥ 80.

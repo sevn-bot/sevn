@@ -2,7 +2,7 @@
 id: spec-14-executor-tier-b
 kind: spec
 title: Executor tier B — Spec
-status: scaffold
+status: done
 owner: Alex
 summary: 'Tier B is the default “do work” executor for messages the Triager classifies
   as complexity == B (prd-04-getting-things-done §5.2): a single pydantic-ai Agent
@@ -1232,106 +1232,82 @@ specs: []
 personas: []
 prd_profile: null
 ---
-
-
 ## Purpose
 
-Tier B is the default “do work” executor for messages the Triager classifies as complexity == B (prd-04-getting-things-done §5.2): a single pydantic-ai Agent loop over the user’s incoming_text, with t
+**Tier B** is the default Pydantic-AI executor: a multi-round tool loop with lazy tool
+loading, persona/system-prompt assembly, grounding guards, optional codemode, and
+escalation to tier C/D when the harness exhausts retries or budget.
 
-Primary code trees: [`src/sevn/agent`](src/sevn/agent/__init__.py).
-
-Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
-
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
+| Symbol | Module | Role |
+|--------|--------|------|
+| `run_b_turn` | `src/sevn/agent/executors/b_harness.py` | Main harness entry |
+| `build_tier_b_capabilities` | same | Capability bundle for model |
+| `BTurnOutcome` | `src/sevn/agent/executors/b_types.py` | Result envelope |
+| `EscalationRequest` | same | C/D escalation payload |
+| `ResolvedTierBModel` | same | Provider/model resolution |
+| `SteerInject` | same | Mid-turn steer payload |
+| Adapters | `src/sevn/agent/adapters/tier_b_model.py`, `tier_b_hooks.py` | Model + hooks |
+| Persona | `src/sevn/agent/persona.py` | System prompt blocks |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+Lazy re-export: `run_b_turn` from `src/sevn/agent/executors/__init__.py`.
 
-- [`default_codemode_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`install_monty_resource_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`lambda_rlm_filter`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`to_dspy_tools`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`EgressBridgeContext`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_anthropic_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_httpx_event_hooks`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_openai_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_httpx_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_llm_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_proxy_transport_request`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`resolve_proxy_shared_secret`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- _…and 391 more in frontmatter `interfaces:`._
 ## Data Model
 
-Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
+### `BTurnOutcome`
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+| Field | Values / meaning |
+|-------|------------------|
+| `status` | `completed`, `escalated`, `cancelled`, `failed` |
+| `final_messages` | Outbound text segments |
+| `escalation` | Present when `status=escalated` |
+| `rounds_used` | Harness round count |
+| `failure_detail` | Typed failure reason |
+| Tool telemetry | `successful_tools_called`, `grounding_tools_called`, … |
 
-- [`default_codemode_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`install_monty_resource_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`lambda_rlm_filter`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`to_dspy_tools`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`EgressBridgeContext`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_anthropic_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_httpx_event_hooks`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_openai_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_httpx_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_llm_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_proxy_transport_request`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`resolve_proxy_shared_secret`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- _…and 391 more in frontmatter `interfaces:`._
+Gateway wraps with `asyncio.wait_for`, cascade budget, narrow/full-index retries,
+and `TierBAnswerFinalizer`.
+
 ## Internal Architecture
 
-See **Implemented by** and [`src/sevn/agent`](src/sevn/agent/__init__.py).
+```text
+run_b_turn(deps, triage, steer_inject?)
+    → resolve model + persona
+    → narrow tool pass (triage.tools/skills)
+    → pydantic-ai agent loop (tools via ToolExecutor)
+    → grounding guard / must-satisfy checks
+    → BTurnOutcome
+```
+
+Escalation triggers: `request_escalation` tool, `UsageLimitExceeded`, round cap,
+double narrow failure (gateway may spawn full-index retry then tier C).
+
 ## Behavior
 
-Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
+1. Rejects `complexity != B` or `disregard=True` with `ValueError`.
+2. Loads tools lazily from session `ToolSet` filtered by triage grants.
+3. Supports steer inject mid-turn (`SteerInject`) for queue steer mode.
+4. Codemode path uses Monty resource limits (`_monty_limits.py`) when enabled.
+5. On `status=escalated`, gateway re-triages and dispatches tier C/D.
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
-
-Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/agent`](src/sevn/agent/__init__.py).
 ## Failure Modes
 
-Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
-
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
-
-Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
-## Amendments (spec-36-sub-agents)
-
-Tier B runs register as **level-1** sub-agents. Exposes `spawn_subagent` tool
-(fire-and-forget + optional `wait:true`) for **level-2** workers and specialists
-(`src/sevn/tools/subagent_spawn.py`). L2 spawns draw the parent `CascadeBudget` (D11).
-
-## Implemented by
-
-- [`default_codemode_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`install_monty_resource_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`lambda_rlm_filter`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`to_dspy_tools`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`EgressBridgeContext`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_anthropic_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_httpx_event_hooks`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_openai_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_httpx_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_llm_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_proxy_transport_request`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`resolve_proxy_shared_secret`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`MiniMaxHygieneContext`](src/sevn/agent/adapters/minimax_wrapper_model.py) — `src/sevn/agent/adapters/minimax_wrapper_model.py`
-- [`MiniMaxOpenAIWrapperModel`](src/sevn/agent/adapters/minimax_wrapper_model.py) — `src/sevn/agent/adapters/minimax_wrapper_model.py`
-- [`MiniMaxWrapperModel`](src/sevn/agent/adapters/minimax_wrapper_model.py) — `src/sevn/agent/adapters/minimax_wrapper_model.py`
-- [`wrap_minimax_native_model`](src/sevn/agent/adapters/minimax_wrapper_model.py) — `src/sevn/agent/adapters/minimax_wrapper_model.py`
-- [`wrap_minimax_openai_native_model`](src/sevn/agent/adapters/minimax_wrapper_model.py) — `src/sevn/agent/adapters/minimax_wrapper_model.py`
-- [`NativeModelContext`](src/sevn/agent/adapters/native_model.py) — `src/sevn/agent/adapters/native_model.py`
-- [`build_native_model_settings`](src/sevn/agent/adapters/native_model.py) — `src/sevn/agent/adapters/native_model.py`
-- [`default_native_model_context`](src/sevn/agent/adapters/native_model.py) — `src/sevn/agent/adapters/native_model.py`
-- _…and 383 more in frontmatter `interfaces:`._
+| Outcome | Cause |
+|---------|-------|
+| `failed` | Harness exception, empty/leaked output |
+| `escalated` | Explicit escalation tool or usage limits |
+| `cancelled` | `asyncio.wait_for` timeout (`EXECUTOR_TIMEOUT_CANCEL_DETAIL`) |
+| Grounding block | Gateway re-renders no-answer message |
+| Missing outcome | Gateway `missing_outcome` no-answer path |
 
 ## Test Strategy
 
-Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
-
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
-
-Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+| Tests | Focus |
+|-------|-------|
+| `tests/agent/test_b_harness.py` | Core harness |
+| `tests/agent/test_tier_b_*.py` | Capabilities, codemode, grounding, hooks, multimodal |
+| `tests/agent/executors/test_b_harness_*.py` | Streaming, skills narrow |
+| `tests/fixtures/golden_llm/runner/test_golden_llm_tier_b.py` | Golden LLM |
+| `tests/gateway/test_agent_turn_tier_b.py` | Gateway integration |
+| `tests/config/test_tier_b_answer_mode.py` | Answer mode config |

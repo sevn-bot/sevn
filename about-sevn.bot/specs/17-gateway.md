@@ -2,7 +2,7 @@
 id: spec-17-gateway
 kind: spec
 title: Gateway — Spec
-status: scaffold
+status: done
 owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
@@ -1363,107 +1363,100 @@ specs: []
 personas: []
 prd_profile: null
 ---
-
-
 ## Purpose
 
-Run the long-lived gateway process that accepts channel ingress (Telegram poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner, rate limits), persists session history, an
+Run the long-lived **gateway** process: accept channel ingress (Telegram poll/webhook,
+webchat WebSocket), normalize messages, enforce trust boundaries, persist session
+history, dispatch the agent turn spine (triager → tier executors), and deliver outbound
+replies. This spec is the normative home for session queue semantics, turn finalization,
+and channel routing.
 
-Primary code trees: [`src/sevn/gateway`](src/sevn/gateway/__init__.py).
-
-Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
-
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
+| Symbol | Module | Role |
+|--------|--------|------|
+| `build_agent_run_turn` | `src/sevn/gateway/agent_turn.py` | Turn factory → `RunTurnFn` |
+| `SessionManager` | `src/sevn/gateway/session_manager.py` | Per-session queue + worker |
+| `ChannelRouter` | `src/sevn/gateway/channel_router.py` | Ingress/egress routing |
+| `IncomingMessage` / `OutgoingMessage` | `src/sevn/gateway/channel_types.py` | Channel envelopes |
+| `triage_context_from_session` | `src/sevn/gateway/triage_context.py` | Triager inputs |
+| `CascadeBudget` | `src/sevn/gateway/cascade_budget.py` | Tier-B retry budget |
+| `TurnFinalizer` | `src/sevn/gateway/turn_finalizer.py` | Placeholder/edit dance |
+| HTTP lifespan | `src/sevn/gateway/http_server.py` | ASGI server boot |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+Amendments from spec-36: `queue_mode`/`busy_input_mode` `"multi"`, relatedness classify,
+routing footers for parallel L1 replies — see **Behavior**.
 
-- [`SecretDeleteBody`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`SecretDeleteResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`SecretEntryOut`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`SecretPutBody`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`SecretPutResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`SecretsListResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`register_admin_secrets_routes`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`build_agent_run_turn`](src/sevn/gateway/agent_turn.py) — `src/sevn/gateway/agent_turn.py`
-- [`build_intro_extra_instructions`](src/sevn/gateway/agent_turn.py) — `src/sevn/gateway/agent_turn.py`
-- [`JWTClaims`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
-- [`extract_bearer`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
-- [`login_page_html`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
-- _…and 434 more in frontmatter `interfaces:`._
 ## Data Model
 
-Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
+### Session queue
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+Per-session: message queue, active dispatch task, regen/replay targets, cancel
+supersede timestamps, multi-queue summaries, global turn semaphore.
 
-- [`SecretDeleteBody`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`SecretDeleteResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`SecretEntryOut`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`SecretPutBody`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`SecretPutResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`SecretsListResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`register_admin_secrets_routes`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`build_agent_run_turn`](src/sevn/gateway/agent_turn.py) — `src/sevn/gateway/agent_turn.py`
-- [`build_intro_extra_instructions`](src/sevn/gateway/agent_turn.py) — `src/sevn/gateway/agent_turn.py`
-- [`JWTClaims`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
-- [`extract_bearer`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
-- [`login_page_html`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
-- _…and 434 more in frontmatter `interfaces:`._
+### Queue modes (`enqueue_dispatch`)
+
+| Mode | Behavior |
+|------|----------|
+| `cancel` | Supersede in-flight turn |
+| `steer` | Inject into running tier-B turn |
+| `queue` | FIFO wait |
+| `multi` | Classify busy input → steer / supersede / spawn new L1 tier-B |
+
+### Turn states
+
+Persisted in storage + JSONL session mirror; spans under `gateway.turn.*` and
+`gateway.triage.completed`.
+
 ## Internal Architecture
 
-See **Implemented by** and [`src/sevn/gateway`](src/sevn/gateway/__init__.py).
+```text
+Channel adapter → ChannelRouter.route_incoming
+    → SessionManager.enqueue_dispatch → _session_worker
+    → build_agent_run_turn._run_guarded → _run
+        → triage_turn | passthrough
+        → tier A | run_b_turn | run_cd_turn
+    → ChannelRouter outbound (+ TurnFinalizer)
+```
+
+Sub-agent L1 registration/finalize hooks in `_run_guarded` (spec-36).
+
 ## Behavior
 
-Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
+1. **`_run`** loads session, resolves user text (replay/regen/backref/burst merge).
+2. Triager when enabled; early exit on `disregard`, identity/list-tools shortcuts.
+3. Emit `first_message` — tier A final; B/C/D persist opener (+ optional routing footer).
+4. Tier B cascade: narrow → summarize retry → full-index retry → escalate to C.
+5. Grounding guard + `TierBAnswerFinalizer`; no-answer fallback on failures.
+6. **`multi` mode:** `classify_busy_relatedness` with timeout fallback to steer.
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
-
-Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/gateway`](src/sevn/gateway/__init__.py).
 ## Failure Modes
 
-Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
+| Condition | Handling |
+|-----------|----------|
+| Missing session / empty user text | Log + return |
+| `TriagerUnavailable` | User fallback message |
+| Cancel supersession | `cancelled_by_new_message` no-answer (unless replacement queued) |
+| Unhandled exception | `_run_guarded` catch-all fallback |
+| Tier B timeout / budget exhausted | `_emit_no_answer_fallback` |
+| CD dispatch failure | No-answer + optional re-triage |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
-
-Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Amendments (spec-36-sub-agents)
 
 `gateway.queue_mode` and per-channel `busy_input_mode` gain `"multi"`.
 `session_manager.enqueue_dispatch` classifies busy input via relatedness labels
 and may spawn concurrent L1 tier-B runs (`src/sevn/gateway/queue_multi.py`).
-`routing_footer.py` tags parallel L1 replies with short sub-agent ids (D7).
-
-## Implemented by
-
-- [`SecretDeleteBody`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`SecretDeleteResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`SecretEntryOut`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`SecretPutBody`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`SecretPutResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`SecretsListResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`register_admin_secrets_routes`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
-- [`build_agent_run_turn`](src/sevn/gateway/agent_turn.py) — `src/sevn/gateway/agent_turn.py`
-- [`build_intro_extra_instructions`](src/sevn/gateway/agent_turn.py) — `src/sevn/gateway/agent_turn.py`
-- [`JWTClaims`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
-- [`extract_bearer`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
-- [`login_page_html`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
-- [`mint_webchat_jwt`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
-- [`refresh_webchat_access_token`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
-- [`secrets_compare`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
-- [`verify_gateway_bearer`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
-- [`verify_login_gateway_token`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
-- [`verify_telegram_init_data`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
-- [`verify_telegram_secret`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
-- [`verify_webchat_jwt`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
-- _…and 426 more in frontmatter `interfaces:`._
+`routing_footer.py` tags parallel L1 replies with short sub-agent ids.
 
 ## Test Strategy
 
-Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
-
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
-
-Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+| Tests | Focus |
+|-------|-------|
+| `tests/gateway/test_agent_turn_mvp.py` | Core turn |
+| `tests/gateway/test_agent_turn_tier_b.py` | Tier B wiring |
+| `tests/gateway/test_agent_turn_escalation.py` | Escalation |
+| `tests/gateway/test_session_manager.py` | Queue semantics |
+| `tests/gateway/test_queue_steer.py`, `test_queue_multi.py` | Queue modes |
+| `tests/gateway/test_cascade_budget.py` | Retry budget |
+| `tests/gateway/test_no_answer_messages.py` | Fallback copy |
+| `make telegram-e2e` | Host Telegram smoke |

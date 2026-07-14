@@ -2,7 +2,7 @@
 id: spec-00-foundation
 kind: spec
 title: Foundation — Spec
-status: scaffold
+status: done
 owner: Alex
 summary: 'Deliver the lowest layer every later spec assumes: a src/sevn/ package layout,
   uv-managed Python 3.12+ project (hatchling build backend), a root Makefile as the
@@ -15,73 +15,87 @@ sources:
 parent_prd: prd-00-main
 build_phase: null
 ---
-
 ## Purpose
 
-Deliver the lowest layer every later spec assumes: a src/sevn/ package layout, uv-managed Python 3.12+ project (hatchling build backend), a root Makefile as the single recurring-command surface, pre-c
+Deliver the lowest layer every later spec assumes: a `src/sevn/` package layout,
+**Python 3.12+** project managed by **uv**, **hatchling** build backend, and a
+root **Makefile** as the single recurring-command surface for lint, typecheck, test,
+and CI tiers. Agents and contributors must not invoke `ruff`, `mypy`, or `pytest`
+directly in recurring flows — those tools run only through Make targets (ADR 17).
 
-Implementation spans [`src/sevn`](src/sevn/__init__.py). The frontmatter `interfaces:` block is code-owned (refresh with `make about-docs-extract DOC_ID=spec-00-foundation`).
+This spec is normative for project bootstrap (`make setup`), lockfile discipline
+(`make lockcheck`), and the composable CI entry points (`make ci`, `make ci-resume`,
+`make ci-affected`, `make ci-changed`). Feature specs depend on it via
+`depends_on: [spec-00-foundation]`.
 
-<!-- HUMAN-INPUT[owner=operator]: Author the full normative contract for this mega-spec — do not hand-expand the whole-tree interfaces dump. -->
 ## Public Interface
 
-Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
+| Symbol / target | Location | Role |
+|-----------------|----------|------|
+| `requires-python >= 3.12` | `pyproject.toml` | Minimum runtime |
+| hatchling wheel | `pyproject.toml` `[build-system]` | Package build |
+| `sevn` CLI entry | `pyproject.toml` → `sevn.cli.app:main` | Operator CLI |
+| `make help` | `Makefile` | Canonical command index |
+| `make setup` | `Makefile` | `uv sync`, pre-commit, git guards, CLI install |
+| `make lint` | `Makefile` | ruff check/format, docstring + import policy |
+| `make typecheck` | `Makefile` | mypy + type-hint gate |
+| `make ci` | `Makefile` | Full pre-merge gate (core + infra + docs + skills + parity) |
+| `make ci-resume` | `Makefile` | Resumable full CI loop |
+| `make ci-affected` / `ci-changed` | `Makefile` | Path-aware partial gates for wave iteration |
+| `make lint-imports` | `Makefile` | import-linter contracts (see spec-01) |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+Plugin entry-point groups (`sevn.tools`, `sevn.skills`, `sevn.channels`) are declared
+in `pyproject.toml` for optional extensions.
 
-- [`default_codemode_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`install_monty_resource_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`lambda_rlm_filter`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`to_dspy_tools`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`EgressBridgeContext`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_anthropic_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_httpx_event_hooks`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_openai_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_httpx_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_llm_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_proxy_transport_request`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`resolve_proxy_shared_secret`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- _…and 3973 more in frontmatter `interfaces:`._
 ## Data Model
 
-Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
+| Artifact | Contract |
+|----------|----------|
+| `pyproject.toml` | Project metadata, optional extras, tool config (ruff, mypy, import-linter) |
+| `uv.lock` | Pinned dependency graph; `make lockcheck` fails on drift |
+| `src/sevn/py.typed` | PEP 561 typed-package marker |
+| `Makefile` | `CI_STEPS` ordered list for `ci-resume`; tier targets `ci-core`, `ci-infra`, `ci-docs`, `ci-skills`, `ci-parity` |
+| `bin/git` | Git guard wrapper blocking `git clean -x`/`-X` |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+The root package `src/sevn/__init__.py` is intentionally minimal; subsystems live in
+top-level subpackages (`agent`, `gateway`, `config`, `tools`, …).
 
-- [`default_codemode_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`install_monty_resource_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`lambda_rlm_filter`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`to_dspy_tools`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`EgressBridgeContext`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_anthropic_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_httpx_event_hooks`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_openai_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_httpx_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_llm_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_proxy_transport_request`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`resolve_proxy_shared_secret`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- _…and 3973 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-See **Implemented by** and [`src/sevn`](src/sevn/__init__.py).
+```text
+Developer / CI → make <target> → uv run … / scripts/*
+Release → hatchling / uv build → wheel
+Operator → sevn CLI (editable install via make setup)
+```
+
+**CI composition (`make ci`):** `ci-core` + `ci-infra` + `ci-docs` + `ci-skills` +
+`ci-parity`. Advisory: `make ci-quality` (not in `make ci`).
+
 ## Behavior
 
-Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
+1. **`make setup`** syncs dev extras, pre-commit, git guards, and the `sevn` CLI.
+2. **`make lint`** runs ruff, docstring policy, CLI-help spec-ref ban, loguru-only check, import-linter.
+3. **`make typecheck`** runs mypy on `src/sevn` plus the type-hint completeness script.
+4. **`make ci`** runs the full ordered step list; mid-wave agents prefer `make ci-affected` or `make ci-changed`.
+5. **`uv build`** produces the hatchling wheel from `src/sevn`.
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
-
-Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn`](src/sevn/__init__.py).
 ## Failure Modes
 
-Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
+| Failure | Observable behavior |
+|---------|---------------------|
+| Lock drift | `make lockcheck` exits non-zero |
+| Lint / format | `make lint` fails on ruff or import-linter violations |
+| Type errors | `make typecheck` / `make pyright` fail |
+| Destructive git clean | `bin/git` blocks `-x`/`-X` |
+| CI step failure | `make ci-resume` stops at first failing step |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
-
-Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+| Gate | Coverage |
+|------|----------|
+| `make test` | Full pytest suite under `tests/` |
+| `make doctest` | Doctests in `src/sevn` |
+| `make ci-core` | lint, typecheck, pyright, test, doctest, security, build |
+| Wave iteration | `make ci-changed` / `make ci-affected` |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
-
-Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+Validate commit subjects with `make commit-msg-check MSG='…'` before commit.

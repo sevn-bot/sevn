@@ -2,7 +2,7 @@
 id: spec-11-tools-registry
 kind: spec
 title: Tools registry — Spec
-status: scaffold
+status: done
 owner: Alex
 summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that every
   executor tier uses: one implementation per tool name, registered in a session-scoped
@@ -492,76 +492,84 @@ specs: []
 personas: []
 prd_profile: null
 ---
-
-
 ## Purpose
 
-Own the Layer-3 tool callables and Layer-2 framework adapters that every executor tier uses: one implementation per tool name, registered in a session-scoped ToolSet, exposed to LLM frameworks without
+Own the **session tool registry**: native Python tools, MCP overlays, skill script
+descriptions, plugin entry-points, and the `ToolExecutor` dispatch surface tier B/C/D
+harnesses call. Each turn gets a frozen `ToolSet` snapshot for triager grants and
+executor lazy loading.
 
-Primary code trees: [`src/sevn/tools`](src/sevn/tools/__init__.py).
-
-Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
-
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
+| Symbol | Module | Role |
+|--------|--------|------|
+| `ToolDefinition` / `ToolCall` / `Tool` | `src/sevn/tools/base.py` | Core types + ABC |
+| `ToolExecutor` | `src/sevn/tools/base.py` | Dispatch + schema validation |
+| `build_session_registry` | `src/sevn/tools/registry.py` | Session factory → `(ToolExecutor, ToolSet)` |
+| `ToolSet` | `src/sevn/tools/registry.py` | Frozen snapshot (native, mcp, skills) |
+| `snapshot_tool_set` | same | Freeze executor state |
+| `combine_registry_version` | same | Merge tools + skills scan generation |
+| `load_plugin_tools` | same | `sevn.tools` entry-points |
+| `register_feature_stubs` | same | Integration/sandbox stubs via bindings |
+| `TracingToolExecutor` | same | OTel `tool.<name>` spans |
+| `enveloped_success` / `enveloped_failure` | `src/sevn/tools/base.py` | Standard tool result envelopes |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+Package surface: `src/sevn/tools/__init__.py` re-exports registry + runtime dispatch types.
 
-- [`BoundToolCallable`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`FunctionTool`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`Tool`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`ToolCall`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`ToolDefinition`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`ToolExecutor`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`enveloped_failure`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`enveloped_success`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`maybe_spill_large_payload`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`browser_tool`](src/sevn/tools/browser.py) — `src/sevn/tools/browser.py`
-- [`register_browser_tool`](src/sevn/tools/browser.py) — `src/sevn/tools/browser.py`
-- [`set_eval_allowed`](src/sevn/tools/browser.py) — `src/sevn/tools/browser.py`
-- _…and 143 more in frontmatter `interfaces:`._
 ## Data Model
 
-Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
+### `ToolSet`
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+| Field | Content |
+|-------|---------|
+| `registry_version` | Bumps on plugin/skill scan changes |
+| `native` | Registered Python tools (file ops, web, memory, …) |
+| `mcp` | MCP server tool overlay |
+| `skill_descriptions` | Skill script metadata for triager |
+| `skill_inventory` | Runnable skill summaries |
 
-- [`BoundToolCallable`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`FunctionTool`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`Tool`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`ToolCall`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`ToolDefinition`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`ToolExecutor`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`enveloped_failure`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`enveloped_success`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`maybe_spill_large_payload`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
-- [`browser_tool`](src/sevn/tools/browser.py) — `src/sevn/tools/browser.py`
-- [`register_browser_tool`](src/sevn/tools/browser.py) — `src/sevn/tools/browser.py`
-- [`set_eval_allowed`](src/sevn/tools/browser.py) — `src/sevn/tools/browser.py`
-- _…and 143 more in frontmatter `interfaces:`._
+Constants: `INITIAL_REGISTRY_VERSION` in `src/sevn/config/defaults.py`.
+
+### Plugin toggles
+
+`plugin_entrypoint_allowed(ep_name, toggles)` honors `tools.<plugin>.enabled` in config.
+
 ## Internal Architecture
 
-See **Implemented by** and [`src/sevn/tools`](src/sevn/tools/__init__.py).
+```text
+build_session_registry(config, bindings, skills_manager, …)
+    → register native tools + file_ops + web + meta loaders
+    → load_plugin_tools (importlib.metadata group sevn.tools)
+    → merge skill manifests
+    → ToolExecutor + ToolSet snapshot for triager / harness
+```
+
+Tier B accesses tools lazily via adapter (`to_dspy_tools`, pydantic-ai tool wiring).
+Path resolution for file tools: `src/sevn/tools/paths.py` (`source_code/` prefix).
+
 ## Behavior
 
-Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
+1. Gateway builds registry once per turn (or refreshes on version bump).
+2. Triager names tools/skills in `TriageResult`; tier B narrow pass filters registry.
+3. `ToolExecutor.dispatch` validates args (JSON Schema subset), runs tool, returns envelope.
+4. MCP unavailable → `McpUnavailableTool` fallback stub.
+5. Outbound tools (`send_file`, `message`) route via `src/sevn/tools/outbound.py`.
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
-
-Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/tools`](src/sevn/tools/__init__.py).
 ## Failure Modes
 
-Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
+| Failure | Behavior |
+|---------|----------|
+| Unknown tool name | Executor returns failure envelope |
+| Schema validation error | `enveloped_failure` with typed code |
+| MCP server down | Stub tool explains unavailability |
+| Plugin disabled | Entry-point filtered by toggle |
+| Path escape | File ops reject paths outside allowed roots |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
-
-Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
-
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
-
-Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+| Tests | Focus |
+|-------|-------|
+| `tests/tools/` | Registry, dispatch, file ops, outbound |
+| `tests/agent/test_tier_b_*` | Harness + tool narrow pass |
+| `tests/gateway/test_triage_registry_wiring.py` | Gateway registry snapshot |
+| `make skillspector-check` | Bundled skill inventory (CI skills tier) |

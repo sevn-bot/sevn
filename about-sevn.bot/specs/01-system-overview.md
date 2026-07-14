@@ -2,7 +2,7 @@
 id: spec-01-system-overview
 kind: spec
 title: System overview — Spec
-status: scaffold
+status: done
 owner: Alex
 summary: 'Give implementers a single picture of the runtime before feature work: package
   boundaries under src/sevn/, allowed import directions, and the shared protocols
@@ -138,73 +138,85 @@ interfaces:
   file: src/sevn/ui/style/__init__.py
   symbol: serve_style_asset
 ---
-
 ## Purpose
 
-Give implementers a single picture of the runtime before feature work: package boundaries under src/sevn/, allowed import directions, and the shared protocols that keep LLM wiring, observability, and
+Give implementers a single picture of the runtime before feature work: package
+boundaries under `src/sevn/`, allowed import directions, and the shared turn spine
+(gateway → triager → tier executors). This spec complements spec-00-foundation
+(build/CI) with **architectural layering** enforced by import-linter and indexed
+in `about-sevn.bot/ARCHITECTURE.md`.
 
-Implementation spans [`src/sevn`](src/sevn/__init__.py). The frontmatter `interfaces:` block is code-owned (refresh with `make about-docs-extract DOC_ID=spec-01-system-overview`).
-
-<!-- HUMAN-INPUT[owner=operator]: Author the full normative contract for this mega-spec — do not hand-expand the whole-tree interfaces dump. -->
 ## Public Interface
 
-Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
+| Layer | Primary modules | Responsibility |
+|-------|-----------------|----------------|
+| Gateway | `src/sevn/gateway/` | HTTP server, session queue, turn dispatch, channel routing |
+| Triager | `src/sevn/agent/triager/` | Tier-A routing brain (`TriageResult`) |
+| Tier B | `src/sevn/agent/executors/b_harness.py` | Pydantic-AI tool loop |
+| Tier C/D | `src/sevn/agent/executors/cd_harness.py` | Lambda-RLM / planner backend |
+| Channels | `src/sevn/channels/` | Telegram, webchat adapters |
+| Tools / skills | `src/sevn/tools/`, `src/sevn/skills/` | Registry, file ops, bundled skills |
+| Config | `src/sevn/config/` | `sevn.json` load + `WorkspaceConfig` |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+Import contracts: `make lint-imports` (see **Data Model**).
 
-- [`default_codemode_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`install_monty_resource_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`lambda_rlm_filter`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`to_dspy_tools`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`EgressBridgeContext`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_anthropic_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_httpx_event_hooks`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_openai_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_httpx_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_llm_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_proxy_transport_request`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`resolve_proxy_shared_secret`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- _…and 3973 more in frontmatter `interfaces:`._
 ## Data Model
 
-Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
+### Import-layer contracts (`pyproject.toml` `[tool.importlinter]`)
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+| Contract | Rule |
+|----------|------|
+| Channels isolation | `sevn.channels` must not import `sevn.tools` or `sevn.skills` |
+| Proxy leaf | `sevn.proxy` must not import `sevn.agent`, `sevn.gateway`, `sevn.channels` |
+| Skills/tools independence | `sevn.skills` must not import `sevn.tools` |
+| Tools/skills ↔ channels | `sevn.tools` / `sevn.skills` must not import `sevn.channels` (baselined outbound exceptions) |
 
-- [`default_codemode_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`install_monty_resource_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`lambda_rlm_filter`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`to_dspy_tools`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`EgressBridgeContext`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_anthropic_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_httpx_event_hooks`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_openai_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_httpx_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_llm_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_proxy_transport_request`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`resolve_proxy_shared_secret`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- _…and 3973 more in frontmatter `interfaces:`._
+### Turn-spine flow
+
+```text
+IncomingMessage → ChannelRouter → SessionManager.enqueue_dispatch
+    → build_agent_run_turn → triage_turn (or passthrough)
+    → tier A | tier B run_b_turn | tier C/D run_cd_turn → OutgoingMessage
+```
+
+Shared types: `TriageResult` (spec-10), `BTurnOutcome`, `SessionRow`, `ToolSet`.
+
 ## Internal Architecture
 
-See **Implemented by** and [`src/sevn`](src/sevn/__init__.py).
+Forty top-level packages under `src/sevn/`. CLI entry: `sevn.cli.app:main`.
+Long-lived runtime: gateway process (spec-17).
+
+Agent read order (`about-sevn.bot/ARCHITECTURE.md`):
+
+1. Architecture index → specs index → graphify (when present)
+2. Source via tier-B tools under workspace `source_code/` mirror
+3. Writes only under `workspace/.sevn/code-worktrees/<issue-id>/`
+
 ## Behavior
 
-Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
+1. **Boot** — gateway loads config, storage, channels; wires `build_agent_run_turn`.
+2. **Ingress** — adapters normalize to `IncomingMessage`; scanner/rate limits pre-enqueue.
+3. **Dispatch** — one active turn per session; queue modes: cancel, steer, queue, multi.
+4. **Egress** — `ChannelRouter` delivers outbound with streaming and routing footers.
+5. **Cross-cutting** — OTel spans; section-specific config reload (spec-02).
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
-
-Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn`](src/sevn/__init__.py).
 ## Failure Modes
 
-Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
+| Failure | Effect |
+|---------|--------|
+| Import-layer violation | `make lint-imports` fails CI |
+| Missing session / empty text | Turn aborts early in `agent_turn` |
+| Triager unavailable | Routing-unavailable user message (spec-13) |
+| Unhandled turn exception | Catch-all fallback in `_run_guarded` (spec-17) |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
-
-Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+| Area | Tests |
+|------|-------|
+| Gateway | `tests/gateway/test_agent_turn_*.py`, `test_session_manager.py` |
+| Triager | `tests/agent/test_triager_*.py` |
+| Tier B | `tests/agent/test_b_harness*.py`, `test_tier_b_*.py` |
+| Import contracts | `make lint-imports` |
+| Docs gates | `make about-docs-check`, `make agent-context-manifest-check` |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
-
-Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+Host E2E: `make telegram-e2e` (not in Docker gateway).

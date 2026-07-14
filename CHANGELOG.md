@@ -31,7 +31,7 @@ are cut into a dated, versioned section at release time.
 
 - [2026-07-14] Changelog validator canonical implementation lives in `spec-kit-wave/src/skw/changelog_validate.py`; `scripts/changelog_validate.py` is a shim
 
-- [2026-07-14] About-docs omits spec-only frontmatter keys (`interfaces`, `depends_on`, `build_phase`) when serialising PRD files
+- [2026-07-14] Authored code-true 7-section bodies for nine high-traffic specs (`00-foundation`, `01-system-overview`, `02-config-and-workspace`, `10-schema-ontology`, `11-tools-registry`, `13-rlm-triager`, `14-executor-tier-b`, `17-gateway`, `25-cicd-full`); remaining specs stay honestly `scaffold` with `## Human-input needed`
 - [2026-07-14] README L3 primary source tree lists every manifest ``source_globs`` root when multiple trees apply
 - [2026-07-14] README fingerprints skip timestamp-only rewrites when source digests are unchanged
 - [2026-07-14] README pipeline refactor splits offline sections, L2 policy, text utils, module index, and scan context; scanner uses single-pass module indexes

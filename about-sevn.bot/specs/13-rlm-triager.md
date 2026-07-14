@@ -2,7 +2,7 @@
 id: spec-13-rlm-triager
 kind: spec
 title: RLM Triager — Spec
-status: scaffold
+status: done
 owner: Alex
 summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–§5.2):
   a single, tool-less outbound generation step that emits validated TriageResult consumed
@@ -1230,106 +1230,75 @@ specs: []
 personas: []
 prd_profile: null
 ---
-
-
 ## Purpose
 
-The Triager is the routing brain (prd-04-getting-things-done §5.1–§5.2): a single, tool-less outbound generation step that emits validated TriageResult consumed by tier dispatch (A / B / C / D), MCP e
+The **Triager** is the routing brain: a single structured-generation step that emits
+`TriageResult` consumed by tier dispatch (A/B/C/D), MCP overlays, and sub-agent specialist
+grants. It is tool-less at generation time — tool/skill **names** are selected, not executed.
 
-Primary code trees: [`src/sevn/agent`](src/sevn/agent/__init__.py).
-
-Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
-
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
+| Symbol | Module | Role |
+|--------|--------|------|
+| `triage_turn` | `src/sevn/agent/triager/run.py` | Main entry |
+| `finalize_triage_result` | same | Post-process LLM output |
+| `structured_output_call` | same | Provider structured JSON call |
+| `TriagePromptContext` | `src/sevn/agent/triager/context.py` | Prompt assembly inputs |
+| `apply_routing_policy` | `src/sevn/agent/triager/routing_policy.py` | Deterministic policy layer |
+| `try_fast_greeting_triage` | same | LLM bypass for greetings |
+| `try_fast_continuation_triage` | same | LLM bypass for continuations |
+| `TriagerUnavailable` | `src/sevn/agent/triager/errors.py` | Fatal routing-unavailable |
+| `TriagerUnknownToolAbort` | same | Abort on unknown named tool |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+Gateway wiring: `triage_context_from_session`, `is_triager_enabled`, `passthrough_triage_result`
+in `src/sevn/gateway/triage_context.py`.
 
-- [`default_codemode_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`install_monty_resource_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`lambda_rlm_filter`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`to_dspy_tools`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`EgressBridgeContext`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_anthropic_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_httpx_event_hooks`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_openai_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_httpx_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_llm_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_proxy_transport_request`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`resolve_proxy_shared_secret`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- _…and 391 more in frontmatter `interfaces:`._
 ## Data Model
 
-Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
+Inputs: `ApprovedUserTurn`, `SessionView`, `RegistrySnapshot` (tool/skill names + caps).
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+Output: `TriageResult` (spec-10 ontology).
 
-- [`default_codemode_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`install_monty_resource_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`lambda_rlm_filter`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`to_dspy_tools`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`EgressBridgeContext`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_anthropic_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_httpx_event_hooks`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_openai_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_httpx_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_llm_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_proxy_transport_request`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`resolve_proxy_shared_secret`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- _…and 391 more in frontmatter `interfaces:`._
+Config: `triager` section in `WorkspaceConfig` — model, provider, caps, personality blocks.
+
 ## Internal Architecture
 
-See **Implemented by** and [`src/sevn/agent`](src/sevn/agent/__init__.py).
+```text
+triage_context_from_session → triage_turn
+    → fast paths (greeting / continuation)?
+    → build prompt (prompt.py + context.py)
+    → structured_output_call → finalize_triage_result
+    → apply_routing_policy → TriageResult
+```
+
+Relatedness classifier for `multi` queue mode: `classify_busy_relatedness` in
+`src/sevn/agent/triager/relatedness.py` (spec-36 amendment).
+
 ## Behavior
 
-Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
+1. If triager disabled → `passthrough_triage_result` (tier B default).
+2. Fast paths avoid LLM for obvious greetings/continuations when policy allows.
+3. Prompt includes registry snapshot, session summary, channel constraints, persona blocks.
+4. Policy clamps complexity, handles `disregard`, validates tool/skill ids against registry.
+5. Gateway persists decision span `gateway.triage.completed`; tier A emits `first_message` as final.
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
-
-Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/agent`](src/sevn/agent/__init__.py).
 ## Failure Modes
 
-Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
-
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
-
-Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
-## Amendments (spec-36-sub-agents)
-
-Triager runs register as **level-1** sub-agents. `TriageResult.specialist_grants[]`
-attaches named specialists to tier-B dispatch. `classify_busy_relatedness` drives
-`gateway.queue_mode: multi` when a session is busy (D6). See spec-36-sub-agents.
-
-## Implemented by
-
-- [`default_codemode_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`install_monty_resource_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
-- [`lambda_rlm_filter`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`to_dspy_tools`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
-- [`EgressBridgeContext`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_anthropic_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_httpx_event_hooks`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`build_sevn_openai_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_httpx_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_llm_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`redact_proxy_transport_request`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`resolve_proxy_shared_secret`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
-- [`MiniMaxHygieneContext`](src/sevn/agent/adapters/minimax_wrapper_model.py) — `src/sevn/agent/adapters/minimax_wrapper_model.py`
-- [`MiniMaxOpenAIWrapperModel`](src/sevn/agent/adapters/minimax_wrapper_model.py) — `src/sevn/agent/adapters/minimax_wrapper_model.py`
-- [`MiniMaxWrapperModel`](src/sevn/agent/adapters/minimax_wrapper_model.py) — `src/sevn/agent/adapters/minimax_wrapper_model.py`
-- [`wrap_minimax_native_model`](src/sevn/agent/adapters/minimax_wrapper_model.py) — `src/sevn/agent/adapters/minimax_wrapper_model.py`
-- [`wrap_minimax_openai_native_model`](src/sevn/agent/adapters/minimax_wrapper_model.py) — `src/sevn/agent/adapters/minimax_wrapper_model.py`
-- [`NativeModelContext`](src/sevn/agent/adapters/native_model.py) — `src/sevn/agent/adapters/native_model.py`
-- [`build_native_model_settings`](src/sevn/agent/adapters/native_model.py) — `src/sevn/agent/adapters/native_model.py`
-- [`default_native_model_context`](src/sevn/agent/adapters/native_model.py) — `src/sevn/agent/adapters/native_model.py`
-- _…and 383 more in frontmatter `interfaces:`._
+| Condition | User-visible / log |
+|-----------|-------------------|
+| `TriagerUnavailable` | "Sorry — message routing is unavailable right now." |
+| `TriagerUnknownToolAbort` | Turn abort (strict unknown-tool policy) |
+| Provider timeout / empty fixture | Unavailable path |
+| `disregard=True` | Silent return (no outbound) |
+| Classifier timeout (`multi`) | Fall back to steer (spec-17) |
 
 ## Test Strategy
 
-Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
-
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
-
-Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+| Tests | Focus |
+|-------|-------|
+| `tests/agent/test_triager_run.py` | Core triage |
+| `tests/agent/test_triager_routing_policy.py` | Policy |
+| `tests/agent/test_triager_integration.py` | Provider integration |
+| `tests/agent/test_triager_tracing.py` | OTel spans |
+| `tests/gateway/test_triage_context.py` | Gateway integration |
+| `tests/code_understanding/test_triager_orientation.py` | Orientation hints |
