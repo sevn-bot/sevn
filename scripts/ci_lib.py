@@ -571,8 +571,10 @@ def build_python_gate_steps(changed: list[Path]) -> list[tuple[str, list[str]]]:
         xdist_args = ["-n", xdist] if xdist and xdist != "0" else []
         steps.append(("pytest", [*uv, "pytest", *test_rel, *xdist_args, "-q"]))
     if src_sevn:
-        src_rel = [str(p.relative_to(REPO_ROOT)) for p in src_sevn]
-        steps.append(("doctest", [*uv, "pytest", "--doctest-modules", *src_rel, "-q"]))
+        bundled = REPO_ROOT / "src" / "sevn" / "data" / "bundled_skills"
+        src_rel = [str(p.relative_to(REPO_ROOT)) for p in src_sevn if not _is_under(p, bundled)]
+        if src_rel:
+            steps.append(("doctest", [*uv, "pytest", "--doctest-modules", *src_rel, "-q"]))
     return steps
 
 

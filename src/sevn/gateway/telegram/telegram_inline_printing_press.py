@@ -63,7 +63,7 @@ def _default_printing_press_runner() -> PrintingPressRunnerFn:
         True
     """
     path = (
-        Path(__file__).resolve().parents[1]
+        Path(__file__).resolve().parents[2]
         / "data/bundled_skills/core/printing-press-library/scripts/_pp_cli.py"
     )
     spec = importlib.util.spec_from_file_location("sevn_inline_pp_cli", path)
