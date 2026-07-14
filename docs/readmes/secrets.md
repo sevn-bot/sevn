@@ -1,4 +1,4 @@
-<!-- generated: do not edit by hand; run `sevn readme update secrets` -->
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint secrets` -->
 # Secrets — Secrets backends, logical-key chain, TTL, and fingerprint confirmation
 
 [![Spec][spec-badge]][spec-link]
@@ -9,31 +9,65 @@
 
 ## Level 1 — Overview (non-technical)
 
-**Secrets** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Secrets backends, logical-key chain, TTL, and fingerprint confirmation.
+**Secrets** is how sevn.bot stores and resolves credentials without scattering plaintext across config files. Operator-facing values — Telegram tokens, the gateway bearer token, Mission Control login, webhook secrets — live in an ordered **backend chain** (macOS Keychain, Linux Secret Service, encrypted file, optional OpenBao/Proton Pass). Provider API keys for LLM vendors are resolved in the **egress proxy**, not in the gateway turn spine.
 
-In everyday use, secrets helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
+When you confirm a secret on the CLI, sevn shows a **fingerprint** (SHA-256 hex) so you can verify you typed the right value without echoing it. Mission Control lets the **owner** reveal `${SECRET:…}` aliases and store entries for audit — every reveal is logged.
 
 ## Level 2 — How it works (technical)
 
-### Components and layout
+Implementation spans [`src/sevn/secrets/`](../../src/sevn/secrets/) (operator helpers) and [`src/sevn/security/secrets/`](../../src/sevn/security/secrets/) (backends, chain, factory).
 
-Implementation spans `src/sevn/secrets/`, `src/sevn/security/secrets/`. The package contains 17 Python module(s); primary entry points include `src/sevn/secrets/__init__.py`, `src/sevn/secrets/fingerprint.py`, `src/sevn/secrets/migrate.py`, `src/sevn/security/secrets/__init__.py`, `src/sevn/security/secrets/backends/__init__.py`, `src/sevn/security/secrets/backends/encrypted_file.py`, and 11 more.
+### Gateway vs egress proxy
 
-### Data and control flow
+| Secret class | Resolved where | Typical keys |
+| --- | --- | --- |
+| Channel + gateway auth | **Gateway** via [`secrets_chain_from_workspace`](../../src/sevn/security/secrets/factory.py#L283) | Telegram bot token, `gateway.token`, dashboard login password refs |
+| Provider API keys | **Egress proxy** ([`credentials.py`](../../src/sevn/proxy/credentials.py)) | Anthropic/OpenAI/Bedrock keys injected on `/llm/*` |
+| Trace export tokens | Gateway boot async path | `tracing.sinks[].token_ref` for OTLP/Logfire |
 
-Secrets is organized around `  init  `, `fingerprint`, `migrate`, `  init  `, and 2 more under `src/sevn/secrets/`; implementation spans `src/sevn/secrets/`, `src/sevn/security/secrets/`. Primary entry points include fingerprint.py (fingerprint_sha256_hex), migrate.py (secrets_dir_under_content_root), encrypted_file.py (default_encrypted_store_path), linux_secret_service.py (LinuxSecretServiceBackend.get).
+The gateway **does** call [`secrets_chain_from_workspace`](../../src/sevn/security/secrets/factory.py#L283) for channel tokens, webhook secrets, and Mission Control login resolution ([`DashboardAuthService`](../../src/sevn/ui/dashboard/services/auth.py) resolves `${SECRET:…}` login passwords and gateway tokens at boot). Provider keys stay on the proxy side of the trust boundary.
 
-### Configuration
+### Backend chain and TTL
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/06-secrets.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+[`secrets_chain_from_workspace`](../../src/sevn/security/secrets/factory.py#L283) builds a [`SecretsChain`](../../src/sevn/security/secrets/chain.py) from `sevn.json` → `secrets_backend.chain` (or platform defaults via [`default_chain_entries`](../../src/sevn/security/secrets/factory.py#L64)). Reads walk the chain in order; writes honour `write_targets`. [`ResolvedSecretsCache`](../../src/sevn/security/secrets/cache.py) adds a TTL cache so hot paths do not hammer OS keychains.
+
+Legacy plaintext `.sevn/secrets/` promotion: [`migrate.py`](../../src/sevn/secrets/migrate.py) in the operator package.
+
+### Mission Control reveal API
+
+Owner-only, CSRF-guarded endpoints:
+
+| Route | Handler | Purpose |
+| --- | --- | --- |
+| `GET /api/v1/secrets/aliases/{logical_key}/reveal` | [`secrets_alias_reveal`](../../src/sevn/ui/dashboard/api/ops.py#L1094) | Resolve `${SECRET:…}` config alias plaintext |
+| `GET /api/v1/secrets/store/entries/{alias}` | [`secrets_store_entry_reveal`](../../src/sevn/ui/dashboard/api/secrets_store.py#L163) | Reveal one logical store entry |
+
+Both emit audited `mission.secrets.read` events via [`emit_mission_audit`](../../src/sevn/ui/dashboard/services/mission_audit.py).
+
+### Fingerprint confirmation
+
+[`fingerprint_sha256_hex`](../../src/sevn/secrets/fingerprint.py#L15) returns a stable 64-char hex digest for CLI confirmation (`sevn gateway set-token`, dashboard password setup) without logging plaintext.
+
+### Configuration (`sevn.json` → `secrets_backend`)
+
+Key knobs (full schema: [`infra/sevn.schema.json`](../../infra/sevn.schema.json)):
+
+- `chain[]` — ordered backend entries (encrypted file, keychain, OpenBao, …)
+- `write_targets` — which backend labels accept writes
+- `encrypted_file.path`, `master_key_source` — encrypted-file backend
+- Env: `SEVN_SECRETS_MASTER_KEY` (64 hex chars) parsed by [`parse_optional_master_key_hex`](../../src/sevn/security/secrets/factory.py#L82)
+
+Validate after edits: `sevn config validate`; `sevn doctor` probes the chain.
 
 ### Key modules
 
-- `src/sevn/secrets/fingerprint.py` — `fingerprint_sha256_hex`
-- `src/sevn/secrets/migrate.py` — `secrets_dir_under_content_root`, `legacy_plaintext_entries`, `remove_legacy_plaintext_artifacts`, `encrypted_file_backend_for_workspace`
-- `src/sevn/security/secrets/backends/encrypted_file.py` — `default_encrypted_store_path`, `EncryptedFileBackend.get`, `EncryptedFileBackend.load_decrypted_map`, `EncryptedFileBackend.set`
-- `src/sevn/security/secrets/backends/linux_secret_service.py` — `LinuxSecretServiceBackend.get`, `LinuxSecretServiceBackend.set`, `LinuxSecretServiceBackend.delete`
-- `src/sevn/security/secrets/backends/macos_keychain.py` — `MacOSKeychainBackend.get`, `MacOSKeychainBackend.set`, `MacOSKeychainBackend.delete`
+- [`factory.py`](../../src/sevn/security/secrets/factory.py) — [`secrets_chain_from_workspace`](../../src/sevn/security/secrets/factory.py#L283), backend construction
+- [`chain.py`](../../src/sevn/security/secrets/chain.py) — ordered read/write policy
+- [`fingerprint.py`](../../src/sevn/secrets/fingerprint.py) — [`fingerprint_sha256_hex`](../../src/sevn/secrets/fingerprint.py#L15)
+- [`secrets_store.py`](../../src/sevn/ui/dashboard/api/secrets_store.py) — Mission Control store CRUD + reveal
+- [`ops.py`](../../src/sevn/ui/dashboard/api/ops.py) — config alias reveal
+
+Normative spec: [`about-sevn.bot/specs/06-secrets.md`](../../about-sevn.bot/specs/06-secrets.md).
 
 ## Level 3 — Deep dive (low-level, technical)
 

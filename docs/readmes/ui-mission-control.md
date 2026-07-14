@@ -1,4 +1,4 @@
-<!-- generated: do not edit by hand; run `sevn readme update ui-mission-control` -->
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint ui-mission-control` -->
 # Mission Control UI — Dashboard SPA, tab registry, traces, ops surfaces, and OpenUI delivery
 
 [![Spec][spec-badge]][spec-link]
@@ -9,31 +9,63 @@
 
 ## Level 1 — Overview (non-technical)
 
-**Mission Control UI** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Dashboard SPA, tab registry, traces, ops surfaces, and OpenUI delivery.
+**Mission Control** is the browser dashboard at `/mission/*` on the gateway. It gives you traces, sessions, config editors, secrets reveal, self-improve jobs, evolution pipelines, and more — **46 tabs** grouped into **8 sidebar sections**. The UI is a vanilla JS SPA under `src/sevn/ui/spa/dashboard/`; Python registers REST + WebSocket routes on the same FastAPI app as Telegram/Web UI.
 
-In everyday use, mission control ui helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
+**OpenUI** (Canvas tab) lets agents publish sanitized HTML/PNG/PDF surfaces via the `openui_render` tool — delivery modes include live URL, rasterized PNG, and PDF.
 
 ## Level 2 — How it works (technical)
 
-### Components and layout
+### SPA shell
 
-Implementation lives under `src/sevn/ui/`. The package contains 66 Python module(s); primary entry points include `src/sevn/ui/__init__.py`, `src/sevn/ui/dashboard/__init__.py`, `src/sevn/ui/dashboard/api/__init__.py`, `src/sevn/ui/dashboard/api/_config_persist.py`, `src/sevn/ui/dashboard/api/agent.py`, `src/sevn/ui/dashboard/api/audit.py`, and 60 more.
+Static assets: [`src/sevn/ui/spa/dashboard/`](../../src/sevn/ui/spa/dashboard/) (`app.js`, tab panels). Mounted by the gateway HTTP server at `/mission/{slug}`. Shared design tokens at `/style/*`.
 
-### Data and control flow
+### Tab registry
 
-Mission Control UI is organized around `  init  `, `  init  `, `  init  `, ` config persist`, and 2 more under `src/sevn/ui/` with 66 Python module(s) in the scanned tree. Primary entry points include __init__.py (register_dashboard_routes), __init__.py (create_dashboard_api_router), _config_persist.py (config_error), agent.py (tools_health_list).
+[`tab_registry.py`](../../src/sevn/ui/dashboard/tab_registry.py) is the SSOT for sidebar structure:
 
-### Configuration
+- [`DASHBOARD_GROUPS`](../../src/sevn/ui/dashboard/tab_registry.py#L17) — 8 groups × 46 tab labels
+- [`WIRED_SLUGS`](../../src/sevn/ui/dashboard/tab_registry.py#L156) — tabs with live REST backing (vs stub/post-v1 placeholders)
+- [`build_nav_payload`](../../src/sevn/ui/dashboard/tab_registry.py#L210) — JSON for `GET /api/v1/dashboard/nav` ([`nav.py`](../../src/sevn/ui/dashboard/api/nav.py))
+- [`registry_tab_slug`](../../src/sevn/ui/dashboard/tab_registry.py#L117) — canonical `/mission/{slug}` paths (e.g. `canvas-openui`, `rlm-training`)
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/24-dashboard.md`, `about-sevn.bot/specs/29-openui.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Sample wired slugs: `overview`, `chat`, `canvas-openui`, `traces`, `secrets`, `egress-proxy`, `jobs`, `spec-kit`.
+
+### Route wiring
+
+[`register_dashboard_routes`](../../src/sevn/ui/dashboard/__init__.py#L24) on the gateway FastAPI app:
+
+1. Installs [`create_dashboard_api_router`](../../src/sevn/ui/dashboard/api/__init__.py#L43) at `/api/v1`
+2. WebSocket hubs: `/ws/dashboard`, terminal WS
+3. Auth service on `app.state.dashboard_auth`
+
+Individual tab routers live under [`src/sevn/ui/dashboard/api/`](../../src/sevn/ui/dashboard/api/) (ops, traces, secrets, evolution, …).
+
+### OpenUI delivery matrix
+
+| Surface | Module | Delivery |
+| --- | --- | --- |
+| Agent tool | [`openui_render`](../../src/sevn/ui/openui/tools_register.py#L63) via [`register_openui_tools`](../../src/sevn/ui/openui/tools_register.py) | Live URL / PNG / PDF metadata in tool result |
+| Bridge | [`OpenUIBridge`](../../src/sevn/ui/openui/bridge.py) | Sanitize + publish HTML |
+| MC Canvas tab | [`dashboard_canvas`](../../src/sevn/ui/dashboard/api/canvas.py) | Owner view of published surfaces |
+| Store | [`OpenUIStore`](../../src/sevn/ui/openui/store.py) | Token + artifact persistence (`openui_tokens` table) |
+
+Spec: [`29-openui.md`](../../about-sevn.bot/specs/29-openui.md).
+
+### Configuration (`sevn.json` → `dashboard`)
+
+- `login_password`, `jwt_secret` — owner auth ([`DashboardAuthService`](../../src/sevn/ui/dashboard/services/auth.py)); `${SECRET:…}` refs resolved at boot
+- `enabled`, bind/port via gateway HTTP server
+
+Validate: `sevn config validate`.
 
 ### Key modules
 
-- `src/sevn/ui/dashboard/__init__.py` — `register_dashboard_routes`
-- `src/sevn/ui/dashboard/api/__init__.py` — `create_dashboard_api_router`
-- `src/sevn/ui/dashboard/api/_config_persist.py` — `config_error`, `config_validation_error`, `read_config_body`, `load_workspace_document`
-- `src/sevn/ui/dashboard/api/agent.py` — `tools_health_list`, `skills_inventory`, `skills_promote`, `skills_bundled_list`
-- `src/sevn/ui/dashboard/api/audit.py` — `audit_timeline`, `analytics_tool_frequency`, `analytics_daily_volume`, `analytics_approvals`
+- [`tab_registry.py`](../../src/sevn/ui/dashboard/tab_registry.py) — nav SSOT, [`build_nav_payload`](../../src/sevn/ui/dashboard/tab_registry.py#L210)
+- [`__init__.py`](../../src/sevn/ui/dashboard/__init__.py) — [`register_dashboard_routes`](../../src/sevn/ui/dashboard/__init__.py#L24)
+- [`api/__init__.py`](../../src/sevn/ui/dashboard/api/__init__.py) — [`create_dashboard_api_router`](../../src/sevn/ui/dashboard/api/__init__.py#L43)
+- [`openui/tools_register.py`](../../src/sevn/ui/openui/tools_register.py) — agent-facing OpenUI tool
+
+Normative specs: [`24-dashboard.md`](../../about-sevn.bot/specs/24-dashboard.md), [`29-openui.md`](../../about-sevn.bot/specs/29-openui.md).
 
 ## Level 3 — Deep dive (low-level, technical)
 

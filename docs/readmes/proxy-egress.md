@@ -1,49 +1,64 @@
-<!-- generated: do not edit by hand; run `sevn readme update proxy-egress` -->
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint proxy-egress` -->
 # Egress proxy — Shared-secret-guarded `/llm/*` egress proxy, Transport wire shapes, and route handlers
 
 [![Spec][spec-badge]][spec-link]
 [![Source][source-badge]][source-link]
 [![Index][index-badge]][index-link]
 
-> **Summary.** Shared-secret-guarded `/llm/*` egress proxy, Transport wire shapes, and route handlers. Normalize provider-shaped JSON over async HTTP to a single egress base URL (SEVN_PROXY_URL / ProcessSettings.proxy_url), so tier executors bind once per turn and never touch raw secrets.
+> **Summary.** Shared-secret-guarded `/llm/*` egress proxy, Transport wire shapes, and route handlers.
 
 ## Level 1 — Overview (non-technical)
 
-**Egress proxy** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Shared-secret-guarded `/llm/*` egress proxy, Transport wire shapes, and route handlers.
+The **egress proxy** is a small ASGI service that holds **provider API keys** and forwards outbound HTTP on sevn's behalf. Tier B/C/D executors talk to one base URL (`SEVN_PROXY_URL`) with normalized JSON shapes — they never see raw Anthropic/OpenAI/Bedrock credentials.
 
-In everyday use, egress proxy helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
-
-Normalize provider-shaped JSON over async HTTP to a single egress base URL (SEVN_PROXY_URL / ProcessSettings.proxy_url), so tier executors bind once per turn and never touch raw secrets.
+When configured, a **shared secret** (`SEVN_PROXY_SHARED_SECRET`) gates every `POST` to `/llm/*`, `/web/*`, and `/integration` via the `X-Sevn-Proxy-Token` header. The gateway and proxy run as a paired install; provider keys resolve here, channel tokens resolve in the gateway.
 
 ## Level 2 — How it works (technical)
 
-### Components and layout
+Implementation lives under [`src/sevn/proxy/`](../../src/sevn/proxy/). [`create_app`](../../src/sevn/proxy/app.py#L92) builds the Starlette ASGI app; tier executors reach it through [`_ProxyTransport`](../../src/sevn/agent/providers/transport.py#L442) in [`transport.py`](../../src/sevn/agent/providers/transport.py).
 
-Implementation lives under `src/sevn/proxy/`. The package contains 19 Python module(s); primary entry points include `src/sevn/proxy/__init__.py`, `src/sevn/proxy/anthropic_body.py`, `src/sevn/proxy/app.py`, `src/sevn/proxy/auth.py`, `src/sevn/proxy/bedrock_converse.py`, `src/sevn/proxy/codex_translation.py`, and 13 more.
+### Route table
 
-### Data and control flow
+Registered in [`app.py`](../../src/sevn/proxy/app.py) (see routes list ~L436):
 
-Egress proxy is organized around `  init  `, `anthropic body`, `app`, `auth`, and 2 more under `src/sevn/proxy/` with 19 Python module(s) in the scanned tree. Primary entry points include anthropic_body.py (normalize_anthropic_request_body), app.py (create_app), auth.py (llm_post_auth_failure), bedrock_converse.py (converse_via_bedrock).
+| Prefix | Method | Handler | Purpose |
+| --- | --- | --- | --- |
+| `/llm/anthropic/messages` | POST | `anthropic_messages` | Anthropic Messages API |
+| `/llm/openai/chat/completions` | POST | `openai_chat_completions` | OpenAI-compatible chat (incl. MiniMax routing) |
+| `/llm/openai/responses` | POST | `openai_responses` | OpenAI Responses / Codex OAuth path |
+| `/llm/bedrock/converse` | POST | `bedrock_converse` | AWS Bedrock Converse |
+| `/web/fetch` | POST | `web_fetch` | Page fetch for tools |
+| `/web/brave/search` | POST | `web_brave_search` | Brave web search |
+| `/integration` | POST | [`integration_post`](../../src/sevn/proxy/integration/__init__.py) | Cursor Cloud / GitHub dispatch |
+| `/healthz` | GET | `healthz` | Liveness |
+
+### Shared-secret auth
+
+[`llm_post_auth_failure`](../../src/sevn/proxy/auth.py#L26) checks `X-Sevn-Proxy-Token` against `proxy_shared_secret` from [`ProxySettings`](../../src/sevn/proxy/settings.py) (env alias `SEVN_PROXY_SHARED_SECRET`). Empty/unset secret skips the guard (dev-only). Guarded prefixes: `/llm/`, `/web/`, `/integration/`.
+
+### Credential injection
+
+[`resolve_request_credential`](../../src/sevn/proxy/credentials.py#L343) maps `(route, model_id)` to the workspace provider registry and injects vendor auth headers per request. OAuth Codex paths use [`resolve_oauth_request_credential_async`](../../src/sevn/proxy/credentials.py#L494).
+
+### Client transport wire shapes
+
+Gateway/agent code binds [`Transport`](../../src/sevn/agent/providers/transport.py#L327) implementations once per turn — [`AnthropicMessagesTransport`](../../src/sevn/agent/providers/transport.py#L678), [`ChatCompletionsTransport`](../../src/sevn/agent/providers/transport.py#L700), [`BedrockTransport`](../../src/sevn/agent/providers/transport.py#L750) all POST to the proxy base URL with provider-shaped JSON; the proxy normalizes and forwards upstream.
 
 ### Configuration
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/05-llm-transports.md`, `about-sevn.bot/specs/07-egress-proxy.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+- Process: `SEVN_PROXY_URL`, `SEVN_PROXY_SHARED_SECRET` ([`ProcessSettings`](../../src/sevn/config/settings.py))
+- Workspace pairing: `sevn.json` provider entries + secrets chain wired at proxy boot
+- Validate: `sevn doctor`; proxy factory reads `{SEVN_HOME}/workspace/sevn.json` when started via uvicorn `--factory`
 
 ### Key modules
 
-- `src/sevn/proxy/anthropic_body.py` — `normalize_anthropic_request_body`
-- `src/sevn/proxy/app.py` — `create_app`
-- `src/sevn/proxy/auth.py` — `llm_post_auth_failure`
-- `src/sevn/proxy/bedrock_converse.py` — `converse_via_bedrock`
-- `src/sevn/proxy/codex_translation.py` — `translate_chat_to_responses_request`, `translate_responses_to_chat_completion`, `translate_responses_sse_to_chat_stream`, `aggregate_responses_sse`
+- [`app.py`](../../src/sevn/proxy/app.py) — [`create_app`](../../src/sevn/proxy/app.py#L92), route table, auth middleware
+- [`auth.py`](../../src/sevn/proxy/auth.py) — [`llm_post_auth_failure`](../../src/sevn/proxy/auth.py#L26)
+- [`credentials.py`](../../src/sevn/proxy/credentials.py) — per-route key resolution
+- [`forward.py`](../../src/sevn/proxy/forward.py) — httpx POST/SSE primitives
+- [`integration/router.py`](../../src/sevn/proxy/integration/router.py) — `/integration` dispatcher
 
-### Spec context
-
-From about-sevn.bot/specs/05-llm-transports.md:
-Normalize provider-shaped JSON over async HTTP to a single egress base URL (SEVN_PROXY_URL / ProcessSettings.proxy_url), so tier executors bind once per turn and never touch raw secrets. LiteLLM may r
-
-From about-sevn.bot/specs/07-egress-proxy.md:
-Product pairing (v1).
+Normative specs: [`05-llm-transports.md`](../../about-sevn.bot/specs/05-llm-transports.md), [`07-egress-proxy.md`](../../about-sevn.bot/specs/07-egress-proxy.md).
 
 ## Level 3 — Deep dive (low-level, technical)
 

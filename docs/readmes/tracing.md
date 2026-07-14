@@ -1,46 +1,62 @@
-<!-- generated: do not edit by hand; run `sevn readme update tracing` -->
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint tracing` -->
 # Tracing — TraceSink JSONL/SQLite sinks, OTLP export bridge, and trace maintenance
 
 [![Spec][spec-badge]][spec-link]
 [![Source][source-badge]][source-link]
 [![Index][index-badge]][index-link]
 
-> **Summary.** TraceSink JSONL/SQLite sinks, OTLP export bridge, and trace maintenance. Provide durable trace sinks that implement TraceSink without ever throwing through emit, so instrumentation stays off the critical path.
+> **Summary.** TraceSink JSONL/SQLite sinks, OTLP export bridge, and trace maintenance.
 
 ## Level 1 — Overview (non-technical)
 
-**Tracing** is a core part of sevn.bot — the personal AI assistant you run on your own machine. TraceSink JSONL/SQLite sinks, OTLP export bridge, and trace maintenance.
+**Tracing** records what sevn did on each turn — triage decisions, tool calls, provider latency, voice events — so you can debug in Mission Control or on disk. Events land in **JSONL files** and/or a **SQLite** `traces.db` under `.sevn/traces/`. Optional **OTLP export** sends spans to Logfire or any OpenTelemetry collector.
 
-In everyday use, tracing helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
-
-Provide durable trace sinks that implement TraceSink without ever throwing through emit, so instrumentation stays off the critical path.
+Instrumentation follows an **emit-never-throws** rule: a broken sink must never crash a live chat turn. Redaction strips sensitive keys before persistence when enabled.
 
 ## Level 2 — How it works (technical)
 
-### Components and layout
+Implementation spans [`src/sevn/agent/tracing/`](../../src/sevn/agent/tracing/) (runtime sinks, factory) and [`src/sevn/tracing/`](../../src/sevn/tracing/) (OTLP pipeline helpers).
 
-Implementation spans `src/sevn/agent/tracing/`, `src/sevn/tracing/`. The package contains 23 Python module(s); primary entry points include `src/sevn/agent/tracing/__init__.py`, `src/sevn/agent/tracing/agent_context.py`, `src/sevn/agent/tracing/attrs.py`, `src/sevn/agent/tracing/emit.py`, `src/sevn/agent/tracing/logfire_config.py`, `src/sevn/agent/tracing/multi_sink.py`, and 17 more.
+### Sink fan-out
 
-### Data and control flow
+[`build_gateway_trace_sink`](../../src/sevn/agent/tracing/sink_factory.py) reads `sevn.json` → `tracing.sinks[]` and builds a composite sink:
 
-Tracing is organized around `  init  `, `agent context`, `attrs`, `emit`, and 2 more under `src/sevn/tracing/`; implementation spans `src/sevn/agent/tracing/`, `src/sevn/tracing/`. Primary entry points include agent_context.py (trace_text_field), attrs.py (json_safe_trace_value), emit.py (register_trace_subscriber), logfire_config.py (logfire_export_status_from_doc).
+| `sink_type` | Built by `_sink_from_entry` | Notes |
+| --- | --- | --- |
+| `jsonl_file` | [`JSONLFileSink`](../../src/sevn/agent/tracing/sink.py) / [`RotatingJSONLFileSink`](../../src/sevn/agent/tracing/rotating_jsonl_sink.py) | Real persistence |
+| `sqlite` | [`SQLiteSink`](../../src/sevn/agent/tracing/sqlite_sink.py) | `traces.db` queries in MC |
+| `logfire` | **`None`** (skipped as leaf) | Token resolved async; export via OTLP bridge |
+| `otel` | **`None`** (skipped as leaf) | Same — not a factory peer sink |
 
-### Configuration
+Multiple local sinks compose via [`MultiSink`](../../src/sevn/agent/tracing/multi_sink.py); see [`_sink_from_entry`](../../src/sevn/agent/tracing/sink_factory.py#L223) lines 261–263 for the logfire/otel skip.
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/04-tracing.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+### OTLP bridge (Logfire / OpenTelemetry)
+
+[`configure_gateway_otel`](../../src/sevn/tracing/otel_pipeline.py#L277) installs a global `TracerProvider` at gateway boot (sync + async [`configure_gateway_otel_async`](../../src/sevn/tracing/otel_pipeline.py#L400) with secret-resolved bearer tokens). [`TraceEventOtelBridge`](../../src/sevn/agent/tracing/trace_event_bridge.py) translates in-process `TraceEvent` rows into OTel spans — it always participates in the composite even when logfire/otel sink entries return `None` from the factory.
+
+Logfire operator toggles: [`logfire_config.py`](../../src/sevn/agent/tracing/logfire_config.py) (`apply_logfire_export_to_sevn_doc`, etc.).
+
+### Emit never throws
+
+In [`sink.py`](../../src/sevn/agent/tracing/sink.py), [`TraceSink.emit`](../../src/sevn/agent/tracing/sink.py#L135) implementations swallow I/O errors; [`redacting_sink.py`](../../src/sevn/agent/tracing/redacting_sink.py) [`RedactingSink`](../../src/sevn/agent/tracing/redacting_sink.py) wraps the composite once via [`_wrap_with_redaction`](../../src/sevn/agent/tracing/sink_factory.py#L78) in [`sink_factory.py`](../../src/sevn/agent/tracing/sink_factory.py). Subscribers hook through [`emit.py`](../../src/sevn/agent/tracing/emit.py) [`register_trace_subscriber`](../../src/sevn/agent/tracing/emit.py#L27).
+
+### Configuration (`sevn.json` → `tracing`)
+
+- `sinks[]` — `{ sink_type, path?, token_ref? }` entries
+- `redaction.enabled`, `deny_keys`, `deny_value_patterns`
+- Maintenance CLI: `sevn traces …` (see spec)
+
+Validate: `sevn config validate`.
 
 ### Key modules
 
-- `src/sevn/agent/tracing/agent_context.py` — `trace_text_field`, `serialize_message_history_for_trace`, `serialize_user_prompt_for_trace`, `build_triager_context_attrs`
-- `src/sevn/agent/tracing/attrs.py` — `json_safe_trace_value`, `json_safe_trace_attrs`, `trace_tool_result_value`
-- `src/sevn/agent/tracing/emit.py` — `register_trace_subscriber`, `unregister_trace_subscriber`, `wrap_trace_sink`, `reset_trace_subscribers_for_tests`
-- `src/sevn/agent/tracing/logfire_config.py` — `logfire_export_status_from_doc`, `logfire_export_status`, `apply_logfire_export_to_sevn_doc`, `logfire_sink_entry_for_tests`
-- `src/sevn/agent/tracing/multi_sink.py` — `MultiSink.emit`, `MultiSink.flush`, `MultiSink.close`
+- [`sink_factory.py`](../../src/sevn/agent/tracing/sink_factory.py) — [`build_gateway_trace_sink`](../../src/sevn/agent/tracing/sink_factory.py), [`configure_gateway_otel`](../../src/sevn/tracing/otel_pipeline.py#L277) call site
+- [`otel_pipeline.py`](../../src/sevn/tracing/otel_pipeline.py) — [`configure_gateway_otel`](../../src/sevn/tracing/otel_pipeline.py#L277)
+- [`sink.py`](../../src/sevn/agent/tracing/sink.py) — `TraceSink` protocol, `NullTraceSink`
+- [`sqlite_sink.py`](../../src/sevn/agent/tracing/sqlite_sink.py) — MC trace queries
+- [`redacting_sink.py`](../../src/sevn/agent/tracing/redacting_sink.py) — deny-key policy
 
-### Spec context
-
-From about-sevn.bot/specs/04-tracing.md:
-Provide durable trace sinks that implement TraceSink without ever throwing through emit, so instrumentation stays off the critical path.
+Normative spec: [`about-sevn.bot/specs/04-tracing.md`](../../about-sevn.bot/specs/04-tracing.md).
 
 ## Level 3 — Deep dive (low-level, technical)
 

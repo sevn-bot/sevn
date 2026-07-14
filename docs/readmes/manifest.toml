@@ -105,6 +105,8 @@ specs = [
   "about-sevn.bot/specs/24-dashboard.md",
   "about-sevn.bot/specs/29-openui.md",
 ]
+curated = true
+template = "docs/readmes/_templates/ui-mission-control.md"
 
 [[readme]]
 slug = "security"
@@ -130,6 +132,8 @@ source_globs = [
   "src/sevn/security/secrets/**",
 ]
 specs = ["about-sevn.bot/specs/06-secrets.md"]
+curated = true
+template = "docs/readmes/_templates/secrets.md"
 
 [[readme]]
 slug = "proxy-egress"
@@ -143,6 +147,8 @@ specs = [
   "about-sevn.bot/specs/05-llm-transports.md",
   "about-sevn.bot/specs/07-egress-proxy.md",
 ]
+curated = true
+template = "docs/readmes/_templates/proxy-egress.md"
 
 [[readme]]
 slug = "tracing"
@@ -156,6 +162,8 @@ source_globs = [
   "src/sevn/agent/tracing/**",
 ]
 specs = ["about-sevn.bot/specs/04-tracing.md"]
+curated = true
+template = "docs/readmes/_templates/tracing.md"
 
 [[readme]]
 slug = "memory-context"
@@ -231,6 +239,8 @@ tier_owner = "infra"
 output = "docs/readmes/storage.md"
 source_globs = ["src/sevn/storage/**"]
 specs = ["about-sevn.bot/specs/03-storage.md"]
+curated = true
+template = "docs/readmes/_templates/storage.md"
 
 [[readme]]
 slug = "code-understanding"
