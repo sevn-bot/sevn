@@ -86,7 +86,6 @@ def test_w6_curated_slug_contract(contract: CuratedContract) -> None:
 
 
 @pytest.mark.parametrize("contract", W7_CONTRACTS, ids=lambda c: c.slug)
-@pytest.mark.xfail(reason="green after W7: D13/D14 curated enrich pt.2", strict=False)
 def test_w7_curated_slug_contract(contract: CuratedContract) -> None:
     """D13/D14: W7 newly-curated slugs expose required anchor tokens and outlines."""
     manifest = load_manifest(MANIFEST_PATH)
