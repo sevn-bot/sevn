@@ -212,10 +212,10 @@ async def _write_entries(
         >>> from pathlib import Path as _P
         >>> from sevn.docs.readme.settings import provider_config_from_settings, resolve_readme_settings
         >>> td = _P(tempfile.mkdtemp())
-        >>> (td / "src/sevn/storage").mkdir(parents=True)
-        >>> _ = (td / "src/sevn/storage/a.py").write_text("x=1\\n", encoding="utf-8")
+        >>> (td / "src/sevn/integrations").mkdir(parents=True)
+        >>> _ = (td / "src/sevn/integrations/a.py").write_text("x=1\\n", encoding="utf-8")
         >>> m = load_manifest(_P("docs/readmes/manifest.toml"))
-        >>> e = get_entry(m, "storage")
+        >>> e = get_entry(m, "integrations")
         >>> cfg = provider_config_from_settings(resolve_readme_settings(None), offline=True)
         >>> paths = asyncio.run(
         ...     _write_entries(

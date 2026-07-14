@@ -158,7 +158,7 @@ def _format_source_tree_links(
         ...     None,
         ...     ["src/sevn/gateway/"],
         ... )
-        '`src/sevn/gateway/`'
+        '`src/sevn/gateway`'
     """
     normalized = [root if root.endswith("/") else f"{root}/" for root in source_roots]
     if repo_path is None:
