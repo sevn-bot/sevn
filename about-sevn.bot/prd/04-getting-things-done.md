@@ -7,8 +7,8 @@ owner: Alex
 summary: A general-purpose AI assistant earns its keep by doing things—answering questions,
   fetching pages, opening PRs, and acting on the operator's behalf via tools, skills,
   and tiered executors.
-last_updated: '2026-07-12'
-fingerprint: sha256:280d2c84a1efa462502ef63fd99fff240234a153b456dd9042733bb7965afcf6
+last_updated: '2026-07-14'
+fingerprint: sha256:9c2398424b10b0d0ac0fd5771ed945f3318bc5294556091119b1aa1153720faf
 related: []
 sources:
 - src/sevn/agent/**

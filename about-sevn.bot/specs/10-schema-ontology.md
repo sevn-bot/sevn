@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Define the runtime ontology for Triager output and related labels across
   the agent core: canonical field names, closed enums, typing conventions, and how
   they compose with executor dispatch described '
-last_updated: '2026-07-12'
-fingerprint: sha256:0b4418291fc21dcca7d3467c2bc972e24991d1dbd0dd5285ab81a9691c3fe65b
+last_updated: '2026-07-14'
+fingerprint: sha256:5974dac305546f994730735acb3807d00aff5d24e1ad06c19cbab944953f0f67
 related: []
 sources:
 - src/sevn/config/**

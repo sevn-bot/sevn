@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the lowest layer every later spec assumes: a src/sevn/ package layout,
   uv-managed Python 3.12+ project (hatchling build backend), a root Makefile as the
   single recurring-command surface, pre-c'
-last_updated: '2026-07-13'
-fingerprint: sha256:80fc7b860bcff952695896461dbb6fc48a237660bf2cf68d9eaf0a45bc460e91
+last_updated: '2026-07-14'
+fingerprint: sha256:35b7a872a6c253011ae977d080c2e8eefc1af46171ed018377bc6d4e88ace45e
 related: []
 sources:
 - src/sevn/**
