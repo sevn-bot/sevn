@@ -117,7 +117,9 @@ def parse_module_index(
         logger.debug("readme_scanner: syntax error in {}", rel)
         summary = rewrite_design_doc_refs(strip_inline_code(_summary_from_tree(None, text)))
         return ModuleIndex(summary=summary, docstring_prose="", symbols=[])
-    assert isinstance(tree, ast.Module)
+    if not isinstance(tree, ast.Module):
+        summary = rewrite_design_doc_refs(strip_inline_code(_summary_from_tree(tree, text)))
+        return ModuleIndex(summary=summary, docstring_prose="", symbols=[])
     doc = ast.get_docstring(tree)
     if doc:
         prose = module_docstring_prose(doc.strip())
