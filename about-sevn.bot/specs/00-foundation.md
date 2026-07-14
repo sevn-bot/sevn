@@ -8,7 +8,7 @@ summary: 'Deliver the lowest layer every later spec assumes: a src/sevn/ package
   uv-managed Python 3.12+ project (hatchling build backend), a root Makefile as the
   single recurring-command surface, pre-c'
 last_updated: '2026-07-14'
-fingerprint: sha256:70f4ba913c37ff6419c3931aee9bd1a2a533035092626797787739d70f9cf319
+fingerprint: sha256:9e13b6fefba8c3db378874a014919674631edc707d55cfcc05f3e41a25e45926
 related: []
 sources:
 - src/sevn/**
@@ -5749,6 +5749,21 @@ interfaces:
 - name: upsert_entry
   file: src/sevn/docs/readme/fingerprint.py
   symbol: upsert_entry
+- name: glob_dir_prefix
+  file: src/sevn/docs/readme/glob_paths.py
+  symbol: glob_dir_prefix
+- name: glob_to_pathspec
+  file: src/sevn/docs/readme/glob_paths.py
+  symbol: glob_to_pathspec
+- name: L2ProsePolicy
+  file: src/sevn/docs/readme/l2_prose.py
+  symbol: L2ProsePolicy
+- name: build_level2_how_it_works
+  file: src/sevn/docs/readme/l2_prose.py
+  symbol: build_level2_how_it_works
+- name: build_level3_deep_dive
+  file: src/sevn/docs/readme/l3_prose.py
+  symbol: build_level3_deep_dive
 - name: readme_relative_href
   file: src/sevn/docs/readme/links.py
   symbol: readme_relative_href
@@ -5779,27 +5794,69 @@ interfaces:
 - name: format_module_symbols_for_prompt
   file: src/sevn/docs/readme/model.py
   symbol: format_module_symbols_for_prompt
-- name: format_path_list
-  file: src/sevn/docs/readme/model.py
-  symbol: format_path_list
 - name: merge_section
   file: src/sevn/docs/readme/model.py
   symbol: merge_section
 - name: offline_sections
   file: src/sevn/docs/readme/model.py
   symbol: offline_sections
-- name: strip_inline_code
-  file: src/sevn/docs/readme/model.py
-  symbol: strip_inline_code
-- name: truncate_at_sentence
-  file: src/sevn/docs/readme/model.py
-  symbol: truncate_at_sentence
+- name: ModuleIndex
+  file: src/sevn/docs/readme/module_index.py
+  symbol: ModuleIndex
+- name: build_module_indexes
+  file: src/sevn/docs/readme/module_index.py
+  symbol: build_module_indexes
+- name: parse_module_index
+  file: src/sevn/docs/readme/module_index.py
+  symbol: parse_module_index
+- name: build_level1_overview
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: build_level1_overview
+- name: build_subsystem_summary
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: build_subsystem_summary
+- name: catalog_items_with_hrefs
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: catalog_items_with_hrefs
+- name: offline_catalog_sections
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: offline_catalog_sections
+- name: offline_freeform_sections
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: offline_freeform_sections
+- name: offline_guide_sections
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: offline_guide_sections
+- name: offline_index_sections
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: offline_index_sections
+- name: offline_modules_catalog_sections
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: offline_modules_catalog_sections
+- name: offline_root_sections
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: offline_root_sections
+- name: offline_skills_catalog_sections
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: offline_skills_catalog_sections
+- name: offline_subsystem_sections
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: offline_subsystem_sections
 - name: ProfileSchema
   file: src/sevn/docs/readme/profile_schemas.py
   symbol: ProfileSchema
 - name: get_profile_schema
   file: src/sevn/docs/readme/profile_schemas.py
   symbol: get_profile_schema
+- name: module_docstring_prose
+  file: src/sevn/docs/readme/prose.py
+  symbol: module_docstring_prose
+- name: rewrite_design_doc_refs
+  file: src/sevn/docs/readme/prose.py
+  symbol: rewrite_design_doc_refs
+- name: strip_inline_code
+  file: src/sevn/docs/readme/prose.py
+  symbol: strip_inline_code
 - name: LlmProvider
   file: src/sevn/docs/readme/providers.py
   symbol: LlmProvider
@@ -5839,6 +5896,9 @@ interfaces:
 - name: scaffold_readme_tree
   file: src/sevn/docs/readme/scaffold.py
   symbol: scaffold_readme_tree
+- name: ScanContext
+  file: src/sevn/docs/readme/scan_context.py
+  symbol: ScanContext
 - name: extract_module_symbols
   file: src/sevn/docs/readme/scanner.py
   symbol: extract_module_symbols
@@ -5863,18 +5923,33 @@ interfaces:
 - name: resolve_readme_settings
   file: src/sevn/docs/readme/settings.py
   symbol: resolve_readme_settings
+- name: callable_name_in_file
+  file: src/sevn/docs/readme/symbol_refs.py
+  symbol: callable_name_in_file
 - name: extract_curated_prose_section
   file: src/sevn/docs/readme/symbol_refs.py
   symbol: extract_curated_prose_section
 - name: extract_level3_section
   file: src/sevn/docs/readme/symbol_refs.py
   symbol: extract_level3_section
+- name: function_defined_in_file
+  file: src/sevn/docs/readme/symbol_refs.py
+  symbol: function_defined_in_file
+- name: symbol_defined_in_file
+  file: src/sevn/docs/readme/symbol_refs.py
+  symbol: symbol_defined_in_file
 - name: validate_path_refs
   file: src/sevn/docs/readme/symbol_refs.py
   symbol: validate_path_refs
 - name: validate_symbol_refs
   file: src/sevn/docs/readme/symbol_refs.py
   symbol: validate_symbol_refs
+- name: SymbolRecord
+  file: src/sevn/docs/readme/symbols.py
+  symbol: SymbolRecord
+- name: symbol_names
+  file: src/sevn/docs/readme/symbols.py
+  symbol: symbol_names
 - name: Heading
   file: src/sevn/docs/readme/templates.py
   symbol: Heading
@@ -5890,6 +5965,18 @@ interfaces:
 - name: validate_against_template
   file: src/sevn/docs/readme/templates.py
   symbol: validate_against_template
+- name: first_sentence
+  file: src/sevn/docs/readme/text_utils.py
+  symbol: first_sentence
+- name: format_path_list
+  file: src/sevn/docs/readme/text_utils.py
+  symbol: format_path_list
+- name: role_from_summary
+  file: src/sevn/docs/readme/text_utils.py
+  symbol: role_from_summary
+- name: truncate_at_sentence
+  file: src/sevn/docs/readme/text_utils.py
+  symbol: truncate_at_sentence
 - name: SummaryLintFinding
   file: src/sevn/docs/readme/verify.py
   symbol: SummaryLintFinding

@@ -38,12 +38,11 @@ from sevn.docs.readme.text_utils import first_sentence, truncate_at_sentence
 
 @dataclass(frozen=True)
 class ModuleIndex:
-    """Parsed module summary, prose, symbols, and raw source text."""
+    """Parsed module summary, prose, and symbols."""
 
     summary: str
     docstring_prose: str
     symbols: list[dict[str, int | str]]
-    raw_text: str
 
 
 def build_module_indexes(
@@ -109,22 +108,22 @@ def parse_module_index(
     except OSError:
         logger.warning("readme_scanner: unable to read source file at {}", path)
         return None
-    summary = _first_docstring_sentence(text)
-    summary = rewrite_design_doc_refs(strip_inline_code(summary)) if summary else ""
+    summary = ""
     docstring_prose = ""
     symbols: list[dict[str, int | str]] = []
     try:
         tree = ast.parse(text)
     except SyntaxError:
         logger.debug("readme_scanner: syntax error in {}", rel)
-        return ModuleIndex(summary=summary, docstring_prose="", symbols=[], raw_text=text)
+        summary = rewrite_design_doc_refs(strip_inline_code(_summary_from_tree(None, text)))
+        return ModuleIndex(summary=summary, docstring_prose="", symbols=[])
+    assert isinstance(tree, ast.Module)
     doc = ast.get_docstring(tree)
     if doc:
         prose = module_docstring_prose(doc.strip())
         if prose:
             docstring_prose = rewrite_design_doc_refs(strip_inline_code(prose))
-        if not summary:
-            summary = rewrite_design_doc_refs(strip_inline_code(_first_docstring_sentence(text)))
+    summary = rewrite_design_doc_refs(strip_inline_code(_summary_from_tree(tree, text)))
     for node in tree.body:
         if isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
             methods = [
@@ -150,27 +149,23 @@ def parse_module_index(
         summary=summary,
         docstring_prose=docstring_prose,
         symbols=symbols[:max_symbols_per_file],
-        raw_text=text,
     )
 
 
-def _first_docstring_sentence(text: str) -> str:
-    """Return the first docstring sentence or leading code comment line.
+def _summary_from_tree(tree: ast.Module | None, text: str) -> str:
+    """Return first-sentence summary from an already-parsed module tree.
 
     Args:
+        tree (ast.AST | None): Parsed module tree, or None on syntax error.
         text (str): Full module source text.
 
-        Returns:
-            str: Summary sentence capped at 200 characters.
+    Returns:
+        str: Summary sentence capped at 200 characters.
 
-        Examples:
-            >>> _first_docstring_sentence("class X: pass\\n")
-            ''
+    Examples:
+        >>> _summary_from_tree(None, "class X: pass\\n")
+        ''
     """
-    try:
-        tree = ast.parse(text)
-    except SyntaxError:
-        tree = None
     doc = ast.get_docstring(tree) if tree is not None else None
     if doc:
         sentence = first_sentence(doc)

@@ -37,6 +37,7 @@ from sevn.docs.readme.l2_prose import build_level2_how_it_works
 from sevn.docs.readme.l3_prose import build_level3_deep_dive
 from sevn.docs.readme.links import readme_relative_href
 from sevn.docs.readme.manifest import ReadmeEntry
+from sevn.docs.readme.scan_context import ScanContext
 from sevn.docs.readme.symbols import symbol_names
 from sevn.docs.readme.text_utils import format_path_list, role_from_summary, truncate_at_sentence
 
@@ -53,7 +54,54 @@ _ROOT_HIGHLIGHTS: tuple[str, ...] = (
 )
 
 
-def offline_subsystem_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str, Any]:
+def _scan_dict(scan: ScanContext | dict[str, Any]) -> dict[str, Any]:
+    """Normalize scanner output for section builders.
+
+    Args:
+        scan (ScanContext | dict[str, Any]): Scanner context.
+
+    Returns:
+        dict[str, Any]: Plain mapping for template assembly.
+
+    Examples:
+        >>> _scan_dict({"slug": "gateway"})["slug"]
+        'gateway'
+    """
+    if isinstance(scan, ScanContext):
+        return scan.to_dict()
+    return scan
+
+
+def _catalog_row_summary(
+    rel: str,
+    module_summaries: dict[str, str],
+    module_symbols: dict[str, list[dict[str, int | str]]],
+) -> str:
+    """Build one catalog row summary with optional symbol hints.
+
+    Args:
+        rel (str): Repo-relative Python module path.
+        module_summaries (dict[str, str]): Module summary map.
+        module_symbols (dict): Symbol inventory.
+
+    Returns:
+        str: Catalog summary cell text.
+
+    Examples:
+        >>> _catalog_row_summary("src/a.py", {}, {})
+        'Module `src/a.py`.'
+    """
+    summary = module_summaries.get(rel, "")
+    if summary:
+        return summary
+    symbols = symbol_names(module_symbols.get(rel, []))
+    sym_hint = f" Entry points: {', '.join(f'`{s}`' for s in symbols[:3])}." if symbols else ""
+    return f"Module `{rel}`.{sym_hint}"
+
+
+def offline_subsystem_sections(
+    entry: ReadmeEntry, scan: ScanContext | dict[str, Any]
+) -> dict[str, Any]:
     """Offline subsystem tier bodies from scan context.
 
         Args:
@@ -64,12 +112,13 @@ def offline_subsystem_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict
             dict[str, str]: Section key → markdown body.
 
         Examples:
-            >>> _offline_subsystem_sections(
+            >>> offline_subsystem_sections(
             ...     ReadmeEntry("g", "Gateway", "S.", "subsystem", "g", "o.md", ("src/**",), ("specs/x.md",)),
             ...     {"source_py_files": ["src/a.py"], "source_dir": "src/sevn/gateway/", "source_excerpt": ""},
             ... )["summary"]
             'S.'
     """
+    scan = _scan_dict(scan)
     py_files = list(scan.get("source_py_files", []))
     source_dir = str(scan.get("source_dir", "src/sevn/"))
     spec_excerpt = str(scan.get("spec_excerpt", "")).strip()
@@ -84,7 +133,7 @@ def offline_subsystem_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict
     }
 
 
-def offline_root_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str, Any]:
+def offline_root_sections(entry: ReadmeEntry, scan: ScanContext | dict[str, Any]) -> dict[str, Any]:
     """Offline root README section bodies.
 
         Args:
@@ -95,13 +144,14 @@ def offline_root_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str,
             dict[str, str]: Section key → value (strings or lists).
 
         Examples:
-            >>> out = _offline_root_sections(
+            >>> out = offline_root_sections(
             ...     ReadmeEntry("root", "R", "S", "root", "d", "README.md", ("a",), ()),
             ...     {"package": {"name": "sevn", "description": "d"}},
             ... )
             >>> "value_prop" in out
             True
     """
+    scan = _scan_dict(scan)
     package = scan.get("package", {})
     intro_lines = list(scan.get("intro_lines", ()))
     return {
@@ -155,7 +205,7 @@ def offline_index_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[str
             dict[str, str]: Section key → value.
 
         Examples:
-            >>> _offline_index_sections(
+            >>> offline_index_sections(
             ...     ReadmeEntry("index", "I", "S", "index", "d", "INDEX.md", ("a",), ()),
             ...     {},
             ... )["entries"]
@@ -179,7 +229,7 @@ def offline_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[s
             dict[str, str]: Section key → value.
 
         Examples:
-            >>> _offline_catalog_sections(
+            >>> offline_catalog_sections(
             ...     ReadmeEntry("tools", "T", "S", "catalog", "t", "o.md", ("src/**",), ()),
             ...     {"source_py_files": ["src/sevn/tools/x.py"], "module_summaries": {}},
             ... )["items"][0]["name"]
@@ -201,7 +251,7 @@ def offline_modules_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) -
             dict[str, Any]: Section map with ``summary`` and ``items`` keys.
 
         Examples:
-            >>> _offline_modules_catalog_sections(
+            >>> offline_modules_catalog_sections(
             ...     ReadmeEntry("tools", "T", "S", "catalog", "t", "o.md", ("src/**",), ()),
             ...     {"source_py_files": ["src/sevn/tools/x.py"], "module_summaries": {"src/sevn/tools/x.py": "Tool x."}},
             ... )["items"][0]["summary"]
@@ -213,13 +263,7 @@ def offline_modules_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) -
     module_symbols: dict[str, list[dict[str, int | str]]] = scan.get("module_symbols", {})
     for rel in py_files[:_MODULES_CATALOG_CAP]:
         name = rel.rsplit("/", maxsplit=1)[-1].removesuffix(".py")
-        summary = module_summaries.get(rel, "")
-        if not summary:
-            symbols = symbol_names(module_symbols.get(rel, []))
-            sym_hint = (
-                f" Entry points: {', '.join(f'`{s}`' for s in symbols[:3])}." if symbols else ""
-            )
-            summary = f"Module `{rel}`.{sym_hint}"
+        summary = _catalog_row_summary(rel, module_summaries, module_symbols)
         items.append({"name": name, "path": rel, "summary": summary})
     remainder = len(py_files) - _MODULES_CATALOG_CAP
     if remainder > 0:
@@ -238,7 +282,7 @@ def offline_skills_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) ->
             dict[str, Any]: Section map with bundled and runtime item lists.
 
         Examples:
-            >>> _offline_skills_catalog_sections(
+            >>> offline_skills_catalog_sections(
             ...     ReadmeEntry("skills", "S", "Sum", "catalog", "s", "o.md", ("a",), (), catalog="skills"),
             ...     {"bundled_skills": [{"name": "demo", "path": "p/SKILL.md", "summary": "Demo."}], "source_py_files": []},
             ... )["bundled_items"][0]["name"]
@@ -256,13 +300,7 @@ def offline_skills_catalog_sections(entry: ReadmeEntry, scan: dict[str, Any]) ->
         if not rel.startswith(runtime_prefix):
             continue
         name = rel.rsplit("/", maxsplit=1)[-1].removesuffix(".py")
-        summary = module_summaries.get(rel, "")
-        if not summary:
-            symbols = symbol_names(module_symbols.get(rel, []))
-            sym_hint = (
-                f" Entry points: {', '.join(f'`{s}`' for s in symbols[:3])}." if symbols else ""
-            )
-            summary = f"Module `{rel}`.{sym_hint}"
+        summary = _catalog_row_summary(rel, module_summaries, module_symbols)
         runtime_items.append({"name": name, "path": rel, "summary": summary})
     return {
         "summary": entry.summary,
@@ -289,7 +327,7 @@ def catalog_items_with_hrefs(
 
         Examples:
             >>> from pathlib import Path as _P
-            >>> rows = _catalog_items_with_hrefs(
+            >>> catalog_items_with_hrefs(
             ...     [{"name": "x", "path": "src/a.py", "summary": "A."}],
             ...     entry=ReadmeEntry("t", "T", "S", "catalog", "t", "docs/readmes/t.md", ("src/**",), ()),
             ...     repo_root=_P("."),
@@ -379,7 +417,7 @@ def offline_freeform_sections(entry: ReadmeEntry, scan: dict[str, Any]) -> dict[
             dict[str, str]: Summary and body text.
 
         Examples:
-            >>> _offline_freeform_sections(
+            >>> offline_freeform_sections(
             ...     ReadmeEntry("x", "X", "Body", "freeform", "d", "o.md", ("a",), ()),
             ...     {},
             ... )["body"]
@@ -402,7 +440,7 @@ def build_subsystem_summary(entry: ReadmeEntry, spec_excerpt: str) -> str:
             str: Summary paragraph(s).
 
         Examples:
-            >>> _build_subsystem_summary(
+            >>> build_subsystem_summary(
             ...     ReadmeEntry("g", "G", "FastAPI control plane.", "subsystem", "g", "o.md", ("a",), ()),
             ...     "",
             ... )

@@ -47,7 +47,7 @@ are cut into a dated, versioned section at release time.
 
 - Onboarding web and TUI wizards expose `gateway.queue_mode=multi` in capabilities (matches runtime and spec-36)
 - README pre-commit stages `_fingerprints.json` when source digests change but rendered markdown is unchanged
-- Curated Level 1–2 symbol validation flags bare `` `function_name` `` cites absent from cited Python files
+- Curated Level 1–2 symbol validation flags bare `` `function_name` `` cites absent from cited Python files (line-scoped, snake_case only)
 - Skills catalog README no longer leaks YAML folded-scalar `>-` markers from bundled SKILL.md frontmatter
 - `list your skills` reply no longer truncates skill descriptions at ~80 chars: `compose_list_skills_reply` now prefers the full manifest description from the skill inventory over the clipped Triager routing-index line
 - `log_query` accepts a `[start, end]` integer pair and a bracketed `"[start, end]"` string as one inclusive range, instead of rejecting them with an "invalid range" error that leaked into replies; unparseable ranges now mark the diagnostic internal so the model corrects the call rather than quoting it to the user

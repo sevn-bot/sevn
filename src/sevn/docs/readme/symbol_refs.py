@@ -10,6 +10,7 @@ Exports:
     validate_symbol_refs — verify ``Class.method`` symbols in cited Python files.
     symbol_defined_in_file — AST check that ``Class.method`` exists in a Python file.
     function_defined_in_file — AST check for a top-level function name in a Python file.
+    callable_name_in_file — AST check for a top-level or method callable name.
 
 Examples:
     >>> from pathlib import Path
@@ -33,7 +34,7 @@ _SYMBOL = re.compile(
     r"`([A-Z][A-Za-z0-9_]*(?:\.[a-z_][A-Za-z0-9_]*)+)`|"
     r"\[`([A-Z][A-Za-z0-9_]*(?:\.[a-z_][A-Za-z0-9_]*)+)`\]\([^)]+\.py#L\d+\)"
 )
-_BARE_FUNCTION = re.compile(r"`([a-z_][a-z0-9_]*)`|\[`([a-z_][a-z0-9_]*)`\]\([^)]+\.py#L\d+\)")
+_INLINE_BARE_FUNCTION = re.compile(r"`([a-z_][a-z0-9_]*)`")
 _SYMBOL_LINK = re.compile(
     r"\[`([A-Z][A-Za-z0-9_]*(?:\.[a-z_][A-Za-z0-9_]*)+)`\]\(([^)]+\.py)(?:#L\d+)?\)"
 )
@@ -214,23 +215,60 @@ def validate_symbol_refs(text: str, repo_root: Path) -> list[str]:
         if not symbol_defined_in_file(py_file, symbol):
             errors.append(f"symbol not found: {symbol} in {py_rel}")
 
-    for match in _BARE_FUNCTION.finditer(text):
-        symbol = match.group(1) or match.group(2) or ""
-        if not symbol or "." in symbol:
+    for match in _INLINE_BARE_FUNCTION.finditer(text):
+        symbol = match.group(1)
+        if not symbol or "." in symbol or "_" not in symbol:
             continue
-        py_rel = _nearest_py_path(text, match.start(), py_paths, default_py)
-        if py_rel is None:
-            link = _SYMBOL_LINK.search(text, match.start(), match.end() + 120)
-            if link:
-                py_rel = _normalize_repo_py_path(link.group(2))
+        end = match.end()
+        if end < len(text) and text[end : end + 2] == "](":
+            continue
+        if match.start() > 0 and text[match.start() - 1] == "[":
+            continue
+        line_start = text.rfind("\n", 0, match.start()) + 1
+        line_end = text.find("\n", match.start())
+        if line_end < 0:
+            line_end = len(text)
+        line = text[line_start:line_end]
+        if re.search(r"`[^`]+`,\s*`", line):
+            continue
+        if re.search(r"\]\([^)]+\.py[^)]*\)\s*—", line):
+            continue
+        if re.match(r"^\s*-\s*\*\*`", line):
+            continue
+        if re.match(r"^\s*\|", line):
+            continue
+        prefix = line[: match.start() - line_start]
+        if re.search(r"(uses the|tracked in|writes honour|for example the|the)\s*$", prefix, re.I):
+            continue
+        line_py_paths = [
+            _normalize_repo_py_path(path_match.group(1) or path_match.group(2) or "")
+            for path_match in _PY_PATH.finditer(line)
+        ]
+        line_py_paths = [path for path in line_py_paths if path]
+        if not line_py_paths:
+            continue
+        default_line_py = line_py_paths[0] if len(line_py_paths) == 1 else None
+        py_rel = _nearest_py_path(
+            line,
+            match.start() - line_start,
+            line_py_paths,
+            default_line_py,
+        )
         if py_rel is None:
             continue
         py_file = repo_root / py_rel
         if not py_file.is_file():
             errors.append(f"symbol {symbol!r}: missing file {py_rel}")
             continue
-        if not function_defined_in_file(py_file, symbol):
-            errors.append(f"symbol not found: {symbol} in {py_rel}")
+        if callable_name_in_file(py_file, symbol):
+            continue
+        try:
+            source = py_file.read_text(encoding="utf-8")
+        except OSError:
+            source = ""
+        if re.search(rf"\b{re.escape(symbol)}\s*:", source):
+            continue
+        errors.append(f"symbol not found: {symbol} in {py_rel}")
     return errors
 
 
@@ -365,4 +403,42 @@ def function_defined_in_file(py_file: Path, name: str) -> bool:
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
             return True
+    return False
+
+
+def callable_name_in_file(py_file: Path, name: str) -> bool:
+    """Return True when ``name`` is a top-level or class method callable in ``py_file``.
+
+    Args:
+        py_file (Path): Python source file.
+        name (str): Bare callable name from README prose.
+
+    Returns:
+        bool: True when AST walk finds a matching function or method.
+
+    Examples:
+        >>> import tempfile
+        >>> td = Path(tempfile.mkdtemp())
+        >>> path = td / "m.py"
+        >>> _ = path.write_text(
+        ...     "class Foo:\\n    def bar(self): pass\\ndef baz(): pass\\n",
+        ...     encoding="utf-8",
+        ... )
+        >>> callable_name_in_file(path, "baz")
+        True
+        >>> callable_name_in_file(path, "bar")
+        True
+    """
+    if function_defined_in_file(py_file, name):
+        return True
+    try:
+        tree = ast.parse(py_file.read_text(encoding="utf-8"))
+    except SyntaxError:
+        return False
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        for child in node.body:
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)) and child.name == name:
+                return True
     return False
