@@ -1,7 +1,8 @@
 """Manifest summary verification against entry ``source_globs`` (D7 / C2).
 
 Module: sevn.docs.readme.verify
-Depends: dataclasses, pathlib, re, sevn.docs.readme.fingerprint, sevn.docs.readme.manifest
+Depends: dataclasses, pathlib, re, sevn.docs.readme.fingerprint, sevn.docs.readme.manifest,
+    sevn.docs.readme.symbol_refs
 
 Exports:
     SummaryLintFinding — structured summary-lint row.

@@ -8,5 +8,5 @@
 | Slug | Title | Profile | Summary | Status |
 |------|-------|---------|---------|--------|
 {% for entry in entries -%}
-| [{{ entry.slug }}]({{ entry.path }}) | {{ entry.title }} | `{{ entry.profile }}` | {{ entry.summary }} | {{ entry.status }} |
+| [{{ entry.slug }}]({{ entry.path }}) | {{ entry.title }} | `{{ entry.profile }}` | {{ entry.summary | replace('|', '\\|') }} | {{ entry.status }} |
 {% endfor %}

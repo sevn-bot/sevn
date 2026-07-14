@@ -32,6 +32,7 @@ from sevn.docs.readme.links import readme_relative_href
 from sevn.docs.readme.manifest import ReadmeEntry
 from sevn.docs.readme.prose import strip_inline_code
 from sevn.docs.readme.symbols import README_MAX_SYMBOL_FILES, SymbolRecord
+from sevn.docs.readme.text_utils import format_path_list
 
 
 def build_level3_deep_dive(
@@ -65,8 +66,6 @@ def build_level3_deep_dive(
             >>> "src/sevn/gateway/a.py" in body
             True
     """
-    from sevn.docs.readme.model import format_path_list
-
     repo_root = scan.get("repo_root")
     repo_path = repo_root if isinstance(repo_root, Path) else None
     if repo_path is not None:
@@ -79,9 +78,10 @@ def build_level3_deep_dive(
         )
     else:
         source_link = f"`{source_dir}`"
+    spec_links = _spec_markdown_links(entry, repo_path, list(entry.specs))
     sections: list[str] = [
         f"Primary source tree: {source_link} ({len(py_files)} Python files). "
-        f"Normative design: {format_path_list(list(entry.specs))}."
+        f"Normative design: {spec_links or format_path_list(list(entry.specs))}."
     ]
     inventory_lines: list[str] = []
     for rel in py_files[:README_MAX_SYMBOL_FILES]:
@@ -99,24 +99,48 @@ def build_level3_deep_dive(
             if repo_path is not None
             else f"`{entry.specs[0]}`"
         )
-        source_tree = (
-            _file_markdown_link(
-                entry,
-                repo_path,
-                source_dir if source_dir.endswith("/") else f"{source_dir}/",
-                directory=True,
-                label=source_dir,
-            )
-            if repo_path is not None
-            else f"`{source_dir}`"
-        )
         sections.append(
             f"### Extension and invariants\n\n"
             f"Follow {spec_link} for merge gates, error semantics, and "
-            f"compatibility constraints. After code changes under {source_tree}, "
+            f"compatibility constraints. After code changes under {source_link}, "
             f"run `sevn readme update {entry.slug}` and `make readme-check`."
         )
     return "\n\n".join(sections)
+
+
+def _spec_markdown_links(
+    entry: ReadmeEntry,
+    repo_path: Path | None,
+    specs: list[str],
+) -> str:
+    """Format spec paths as D21 markdown links when ``repo_path`` is set.
+
+    Args:
+        entry (ReadmeEntry): Manifest row.
+        repo_path (Path | None): Repository root.
+        specs (list[str]): Normative spec paths.
+
+        Returns:
+            str: Comma-separated markdown links or backtick paths.
+
+        Examples:
+            >>> from sevn.docs.readme.manifest import ReadmeEntry
+            >>> _spec_markdown_links(
+            ...     ReadmeEntry("g", "G", "S", "subsystem", "g", "o.md", ("a",), ("specs/x.md",)),
+            ...     None,
+            ...     ["specs/x.md"],
+            ... )
+            '`specs/x.md`'
+    """
+    if not specs:
+        return ""
+    if repo_path is None:
+        return format_path_list(specs)
+    links = [_file_markdown_link(entry, repo_path, spec) for spec in specs[:4]]
+    remainder = len(specs) - 4
+    if remainder > 0:
+        return ", ".join(links) + f", and {remainder} more"
+    return ", ".join(links)
 
 
 def _build_module_inventory_block(

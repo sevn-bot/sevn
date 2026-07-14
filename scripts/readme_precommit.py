@@ -230,6 +230,9 @@ def main(argv: list[str] | None = None) -> int:
             continue
         output_path = repo_root / entry.output
         prior = output_path.read_text(encoding="utf-8") if output_path.is_file() else None
+        prior_fp = (
+            fingerprints_path.read_text(encoding="utf-8") if fingerprints_path.is_file() else None
+        )
         path = run_sync_coro(
             write_readme(
                 repo_root=repo_root,
@@ -241,11 +244,16 @@ def main(argv: list[str] | None = None) -> int:
         )
         rel = path.relative_to(repo_root)
         current = path.read_text(encoding="utf-8")
+        current_fp = (
+            fingerprints_path.read_text(encoding="utf-8") if fingerprints_path.is_file() else None
+        )
         if prior != current:
             _git_add(repo_root, rel.as_posix())
             print(f"readme-precommit: updated {rel.as_posix()}")
         else:
             print(f"readme-precommit: unchanged {rel.as_posix()}")
+        if current_fp is not None and current_fp != prior_fp:
+            _git_add(repo_root, str(fingerprints_path.relative_to(repo_root)))
     return exit_code
 
 

@@ -237,8 +237,22 @@ def _check_path_and_symbol_refs(
             []
     """
     if schema.verify_path_refs:
-        for err in validate_path_refs(text, repo_root):
-            result.errors.append(f"{entry.slug}: {err}")
+        path_sections: list[str]
+        if entry.profile == "subsystem" and entry.curated:
+            path_sections = []
+            curated = extract_curated_prose_section(text)
+            if curated.strip():
+                path_sections.append(curated)
+            level3 = extract_level3_section(text)
+            if level3.strip():
+                path_sections.append(level3)
+            if not path_sections:
+                path_sections = [text]
+        else:
+            path_sections = [text]
+        for section in path_sections:
+            for err in validate_path_refs(section, repo_root):
+                result.errors.append(f"{entry.slug}: {err}")
     if schema.verify_symbol_refs:
         symbol_sections: list[str] = []
         if entry.curated:

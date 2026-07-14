@@ -16,8 +16,7 @@ _SUPPORTING_SUBSYSTEM = "supporting subsystem"
 
 
 def _strip_inline_code(text: str) -> str:
-    module = importlib.import_module("sevn.docs.readme.scanner")
-    fn = getattr(module, "strip_inline_code", None)
+    fn = getattr(importlib.import_module("sevn.docs.readme.prose"), "strip_inline_code", None)
     assert fn is not None, "strip_inline_code not implemented (green after W2)"
     return fn(text)
 

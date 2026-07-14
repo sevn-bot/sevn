@@ -14,8 +14,9 @@ from sevn.docs.readme.fingerprint import (
 )
 from sevn.docs.readme.manifest import ReadmeEntry, ReadmeManifest
 from sevn.docs.readme.symbol_refs import (
-    _symbol_defined_in_file,
     extract_level3_section,
+    function_defined_in_file,
+    symbol_defined_in_file,
     validate_path_refs,
     validate_symbol_refs,
 )
@@ -58,8 +59,30 @@ def test_symbol_defined_in_file_nested_class_method() -> None:
             "class Foo:\n    class Bar:\n        def baz(self): pass\n",
             encoding="utf-8",
         )
-        assert _symbol_defined_in_file(path, "Foo.Bar.baz")
-        assert not _symbol_defined_in_file(path, "Foo.Bar.missing")
+        assert symbol_defined_in_file(path, "Foo.Bar.baz")
+        assert not symbol_defined_in_file(path, "Foo.Bar.missing")
+
+
+def test_validate_symbol_refs_flags_bare_function_drift() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        repo = Path(td)
+        py = repo / "src/sevn/gateway/channel_router.py"
+        py.parent.mkdir(parents=True)
+        py.write_text(
+            "class ChannelRouter:\n    async def route_incoming(self) -> None: pass\n",
+            encoding="utf-8",
+        )
+        l2 = "In `src/sevn/gateway/channel_router.py`, inbound messages reach `route_inbound`.\n"
+        errors = validate_symbol_refs(l2, repo)
+        assert any("route_inbound" in err for err in errors)
+
+
+def test_function_defined_in_file_top_level() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        path = Path(td) / "m.py"
+        path.write_text("def run(): pass\n", encoding="utf-8")
+        assert function_defined_in_file(path, "run")
+        assert not function_defined_in_file(path, "missing")
 
 
 def test_validate_symbol_refs_ignores_file_like_backticks() -> None:

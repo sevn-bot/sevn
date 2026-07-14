@@ -19,8 +19,9 @@ from __future__ import annotations
 import re
 
 _INLINE_CODE = re.compile(r"``([^`]+)``|`([^`]+)`")
+_RST_ROLE = re.compile(r":\w+:`([^`]+)`")
 _SPECS_REF = re.compile(r"(?<![\w./-])specs/")
-_PLAN_PRD_REF = re.compile(r"(?<![\w./-])(?:plan|prd)/[^\s')\"]+")
+_PLAN_PRD_REF = re.compile(r"(?<![\w./-])`?(?:plan|prd)/[^\s'`\"`,)]+`?")
 
 
 def strip_inline_code(text: str) -> str:
@@ -42,7 +43,8 @@ def strip_inline_code(text: str) -> str:
     def _replace(match: re.Match[str]) -> str:
         return match.group(1) or match.group(2) or ""
 
-    cleaned = _INLINE_CODE.sub(_replace, text)
+    cleaned = _RST_ROLE.sub(r"\1", text)
+    cleaned = _INLINE_CODE.sub(_replace, cleaned)
     return cleaned.replace("''", "")
 
 
@@ -60,6 +62,10 @@ def rewrite_design_doc_refs(text: str) -> str:
             "('about-sevn.bot/specs/17-gateway.md')"
             >>> rewrite_design_doc_refs("'plan/foo.md'")
             "'the design docs'"
+            >>> rewrite_design_doc_refs(
+            ...     "(`plan/dev_eval_14062026/evolution-auto-run-import-wave-plan.md` AR-1)."
+            ... )
+            '(the design docs AR-1).'
     """
     if not text:
         return text

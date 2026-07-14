@@ -1320,7 +1320,7 @@
       "capability_id": "gateway.queue_mode",
       "group": "D",
       "label": "Gateway queue mode",
-      "description": "cancel aborts in-flight work on new user text; steer buffers until safe injection.",
+      "description": "cancel aborts in-flight work on new user text; steer buffers until safe injection; multi allows parallel queue lanes.",
       "config_paths": [
         "gateway.queue_mode"
       ],
@@ -1328,7 +1328,8 @@
       "default": "cancel",
       "select_options": [
         "cancel",
-        "steer"
+        "steer",
+        "multi"
       ],
       "profile_overridable": true,
       "install_actions": [

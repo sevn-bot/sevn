@@ -25,7 +25,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
-- README generator refactors L3 prose into `l3_prose.py` with shared `prose`/`symbols` helpers; `lint_summaries` classifies backtick config keys and paths correctly; manifest `l2_flow_suffix` carries optional turn-spine flow suffix text
+- README pipeline refactor splits offline sections, L2 policy, text utils, module index, and scan context; scanner uses single-pass module indexes
 - README regeneration skips rewriting files when rendered markdown is unchanged, keeping pre-commit manifest sync idempotent
 - README `make readme-check` runs manifest `lint_summaries` and validates curated Level 1–2 symbol cites; INDEX status column shows `fresh`/`stale` with a freshness ≠ accuracy note
 - README generator drops the hardcoded gateway key-load clause unless `provider_keys_via_proxy` is set on the manifest row; non–turn-spine L2 uses module-graph prose instead of a generic stub
@@ -35,7 +35,7 @@ are cut into a dated, versioned section at release time.
 - README pipeline emits file-relative links and retargets manifest spec paths to `about-sevn.bot/specs/`; link checker resolves paths from each README directory only
 - README catalog kinds: manifest `catalog = "modules" | "skills"` with modules cap 200 (+N overflow row) and skills two-table layout (bundled SKILL.md frontmatter + runtime loaders)
 - CLI getting-started and config guides drop stale M1/M2 milestone framing; the `sevn config` interactive menu is documented as shipped
-- Subsystem README catalog adds `evolution` and `plugins` manifest rows with generated subsystem docs; `browser/` remains documented as out-of-catalog in STANDARD
+- Subsystem README catalog adds `evolution` and `plugins` manifest rows with generated subsystem docs; `tools` migrated from catalog to curated subsystem profile; `browser/` remains documented as out-of-catalog in STANDARD
 
 ### Deprecated
 
@@ -45,7 +45,9 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
-- Onboarding web wizard accepts `gateway.queue_mode=multi` (matches runtime and spec-36)
+- Onboarding web and TUI wizards expose `gateway.queue_mode=multi` in capabilities (matches runtime and spec-36)
+- README pre-commit stages `_fingerprints.json` when source digests change but rendered markdown is unchanged
+- Curated Level 1–2 symbol validation flags bare `` `function_name` `` cites absent from cited Python files
 - Skills catalog README no longer leaks YAML folded-scalar `>-` markers from bundled SKILL.md frontmatter
 - `list your skills` reply no longer truncates skill descriptions at ~80 chars: `compose_list_skills_reply` now prefers the full manifest description from the skill inventory over the clipped Triager routing-index line
 - `log_query` accepts a `[start, end]` integer pair and a bracketed `"[start, end]"` string as one inclusive range, instead of rejecting them with an "invalid range" error that leaked into replies; unparseable ranges now mark the diagnostic internal so the model corrects the call rather than quoting it to the user
@@ -65,6 +67,7 @@ are cut into a dated, versioned section at release time.
 ### Security
 
 - Bump setuptools to 83.0.0 to clear PYSEC-2026-3447 from pip-audit
+
 ## [0.0.1] - 2026-07-08
 
 First public release on [github.com/sevn-bot/sevn](https://github.com/sevn-bot/sevn).

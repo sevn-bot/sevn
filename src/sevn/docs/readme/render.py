@@ -654,30 +654,3 @@ def _parse_guide_steps(text: str) -> list[dict[str, str]]:
     if current_heading is not None:
         steps.append({"heading": current_heading, "body": "\n".join(body_lines).strip()})
     return steps
-
-
-async def _llm_subsystem_assembly(
-    base: ReadmeAssembly,
-    scan: dict[str, Any],
-    provider: SectionProvider,
-) -> ReadmeAssembly:
-    """Polish subsystem tiers via LLM section prompts.
-
-        Args:
-    base (ReadmeAssembly): Offline baseline sections.
-    scan (dict[str, Any]): Scanner context.
-    provider (SectionProvider): LLM provider.
-
-        Returns:
-            ReadmeAssembly: Assembly with LLM-polished tier bodies.
-
-        Examples:
-            >>> import asyncio
-            >>> from sevn.docs.readme.manifest import ReadmeEntry
-            >>> e = ReadmeEntry("g", "G", "S", "subsystem", "g", "o.md", ("src/**",), ())
-            >>> base = ReadmeAssembly(e, {"summary": "S", "level1": "a"})
-            >>> polished = asyncio.run(_llm_subsystem_assembly(base, {"title": "G"}, OfflineProvider()))
-            >>> polished.sections["summary"] == "S"
-            True
-    """
-    return await _llm_profile_assembly(base, scan, provider, _SUBSYSTEM_SECTION_PROMPTS)

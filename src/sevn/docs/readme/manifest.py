@@ -166,6 +166,41 @@ def get_entry(manifest: ReadmeManifest, slug: str) -> ReadmeEntry:
     raise KeyError(msg)
 
 
+def _parse_bool(
+    value: object,
+    *,
+    field: str,
+    path: Path,
+    idx: int,
+    default: bool = False,
+) -> bool:
+    """Parse optional boolean manifest keys.
+
+    Args:
+        value (object): Raw TOML value or ``None`` when omitted.
+        field (str): Manifest field name for error messages.
+        path (Path): Manifest path for error messages.
+        idx (int): Row index for error messages.
+        default (bool): Value when the key is omitted.
+
+    Returns:
+        bool: Parsed boolean flag.
+
+        Raises:
+            ValueError: When the key is present but not a boolean.
+
+        Examples:
+            >>> _parse_bool(None, field="curated", path=Path("m.toml"), idx=0)
+            False
+    """
+    if value is None:
+        return default
+    if not isinstance(value, bool):
+        msg = f"{path}: readme[{idx}] {field} must be a boolean"
+        raise ValueError(msg)
+    return value
+
+
 def _parse_curated(value: object, *, path: Path, idx: int) -> bool:
     """Parse optional ``curated`` manifest key (defaults to false).
 
@@ -186,12 +221,7 @@ def _parse_curated(value: object, *, path: Path, idx: int) -> bool:
             >>> _parse_curated(True, path=Path("m.toml"), idx=0)
             True
     """
-    if value is None:
-        return False
-    if not isinstance(value, bool):
-        msg = f"{path}: readme[{idx}] curated must be a boolean"
-        raise ValueError(msg)
-    return value
+    return _parse_bool(value, field="curated", path=path, idx=idx, default=False)
 
 
 def _parse_turn_spine(value: object, *, path: Path, idx: int) -> bool:
@@ -214,12 +244,7 @@ def _parse_turn_spine(value: object, *, path: Path, idx: int) -> bool:
             >>> _parse_turn_spine(True, path=Path("m.toml"), idx=0)
             True
     """
-    if value is None:
-        return False
-    if not isinstance(value, bool):
-        msg = f"{path}: readme[{idx}] turn_spine must be a boolean"
-        raise ValueError(msg)
-    return value
+    return _parse_bool(value, field="turn_spine", path=path, idx=idx, default=False)
 
 
 def _parse_provider_keys_via_proxy(value: object, *, path: Path, idx: int) -> bool:
@@ -240,12 +265,7 @@ def _parse_provider_keys_via_proxy(value: object, *, path: Path, idx: int) -> bo
             >>> _parse_provider_keys_via_proxy(None, path=Path("m.toml"), idx=0)
             False
     """
-    if value is None:
-        return False
-    if not isinstance(value, bool):
-        msg = f"{path}: readme[{idx}] provider_keys_via_proxy must be a boolean"
-        raise ValueError(msg)
-    return value
+    return _parse_bool(value, field="provider_keys_via_proxy", path=path, idx=idx, default=False)
 
 
 def _parse_l2_flow_suffix(value: object, *, path: Path, idx: int) -> str:
