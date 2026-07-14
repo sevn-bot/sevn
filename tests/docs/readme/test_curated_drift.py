@@ -57,7 +57,6 @@ def _readme_body(slug: str) -> str:
 
 
 @pytest.mark.parametrize("contract", W5_CONTRACTS, ids=lambda c: c.slug)
-@pytest.mark.xfail(reason="green after W5: D15 curated drift fixes", strict=False)
 def test_w5_curated_slug_contract(contract: CuratedContract) -> None:
     """D15: W5 curated slugs carry the D5 stamp, template outline, and drift anchor."""
     manifest = load_manifest(MANIFEST_PATH)
