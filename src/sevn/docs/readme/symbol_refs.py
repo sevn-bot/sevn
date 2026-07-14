@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import ast
 import re
+from collections.abc import Iterator
 from pathlib import Path
 
 _LEVEL1_START = re.compile(r"^##\s+Level 1 — Overview", re.MULTILINE)
@@ -215,31 +216,41 @@ def validate_symbol_refs(text: str, repo_root: Path) -> list[str]:
         if not symbol_defined_in_file(py_file, symbol):
             errors.append(f"symbol not found: {symbol} in {py_rel}")
 
-    for match in _INLINE_BARE_FUNCTION.finditer(text):
-        symbol = match.group(1)
-        if not symbol or "." in symbol or "_" not in symbol:
+    for symbol, py_rel in _iter_line_scoped_bare_functions(text):
+        py_file = repo_root / py_rel
+        if not py_file.is_file():
+            errors.append(f"symbol {symbol!r}: missing file {py_rel}")
             continue
-        end = match.end()
-        if end < len(text) and text[end : end + 2] == "](":
-            continue
-        if match.start() > 0 and text[match.start() - 1] == "[":
-            continue
-        line_start = text.rfind("\n", 0, match.start()) + 1
-        line_end = text.find("\n", match.start())
-        if line_end < 0:
-            line_end = len(text)
-        line = text[line_start:line_end]
-        if re.search(r"`[^`]+`,\s*`", line):
-            continue
-        if re.search(r"\]\([^)]+\.py[^)]*\)\s*—", line):
-            continue
-        if re.match(r"^\s*-\s*\*\*`", line):
-            continue
-        if re.match(r"^\s*\|", line):
-            continue
-        prefix = line[: match.start() - line_start]
-        if re.search(r"(uses the|tracked in|writes honour|for example the|the)\s*$", prefix, re.I):
-            continue
+        if not callable_name_in_file(py_file, symbol):
+            try:
+                source = py_file.read_text(encoding="utf-8")
+            except OSError:
+                source = ""
+            if re.search(rf"\b{re.escape(symbol)}\s*:", source):
+                continue
+            errors.append(f"symbol not found: {symbol} in {py_rel}")
+    return errors
+
+
+def _iter_line_scoped_bare_functions(text: str) -> Iterator[tuple[str, str]]:
+    """Yield bare ``snake_case`` symbols only on lines that cite a ``.py`` path.
+
+    Args:
+        text (str): Markdown body to scan.
+
+    Yields:
+        tuple[str, str]: ``(symbol, repo_relative_py_path)`` pairs.
+
+    Returns:
+        Iterator[tuple[str, str]]: Line-scoped bare-function cite pairs.
+
+    Examples:
+        >>> list(_iter_line_scoped_bare_functions(
+        ...     "In `src/a.py`, call `run_boot_hooks`."
+        ... ))
+        [('run_boot_hooks', 'src/a.py')]
+    """
+    for line in text.splitlines():
         line_py_paths = [
             _normalize_repo_py_path(path_match.group(1) or path_match.group(2) or "")
             for path_match in _PY_PATH.finditer(line)
@@ -248,28 +259,34 @@ def validate_symbol_refs(text: str, repo_root: Path) -> list[str]:
         if not line_py_paths:
             continue
         default_line_py = line_py_paths[0] if len(line_py_paths) == 1 else None
-        py_rel = _nearest_py_path(
-            line,
-            match.start() - line_start,
-            line_py_paths,
-            default_line_py,
-        )
-        if py_rel is None:
-            continue
-        py_file = repo_root / py_rel
-        if not py_file.is_file():
-            errors.append(f"symbol {symbol!r}: missing file {py_rel}")
-            continue
-        if callable_name_in_file(py_file, symbol):
-            continue
-        try:
-            source = py_file.read_text(encoding="utf-8")
-        except OSError:
-            source = ""
-        if re.search(rf"\b{re.escape(symbol)}\s*:", source):
-            continue
-        errors.append(f"symbol not found: {symbol} in {py_rel}")
-    return errors
+        for match in _INLINE_BARE_FUNCTION.finditer(line):
+            symbol = match.group(1)
+            if not symbol or "." in symbol or "_" not in symbol:
+                continue
+            end = match.end()
+            if end < len(line) and line[end : end + 2] == "](":
+                continue
+            if match.start() > 0 and line[match.start() - 1] == "[":
+                continue
+            if re.search(r"`[^`]+`,\s*`", line):
+                continue
+            if re.search(r"\]\([^)]+\.py[^)]*\)\s*—", line):
+                continue
+            if re.match(r"^\s*-\s*\*\*`", line):
+                continue
+            if re.search(rf"\*\*`{re.escape(symbol)}`\*\*", line):
+                continue
+            if re.match(r"^\s*\|", line):
+                continue
+            prefix = line[: match.start()]
+            if re.search(
+                r"(uses the|tracked in|writes honour|for example the|the)\s*$", prefix, re.I
+            ):
+                continue
+            py_rel = _nearest_py_path(line, match.start(), line_py_paths, default_line_py)
+            if py_rel is None:
+                continue
+            yield symbol, py_rel
 
 
 def _nearest_py_path(

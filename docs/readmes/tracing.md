@@ -60,7 +60,7 @@ Normative spec: [`about-sevn.bot/specs/04-tracing.md`](../../about-sevn.bot/spec
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: [`src/sevn/tracing`](../../src/sevn/tracing/) (23 Python files). Normative design: `about-sevn.bot/specs/04-tracing.md`.
+Primary source tree: [`src/sevn/tracing`](../../src/sevn/tracing/) and [`src/sevn/agent/tracing`](../../src/sevn/agent/tracing/) (23 Python files). Normative design: `about-sevn.bot/specs/04-tracing.md`.
 
 ### Module inventory
 

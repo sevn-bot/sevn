@@ -41,7 +41,6 @@ class ScanContext:
     source_excerpt: str = ""
     spec_excerpt: str = ""
     module_symbols: dict[str, list[dict[str, int | str]]] = field(default_factory=dict)
-    symbol_lineno: dict[str, dict[str, int]] = field(default_factory=dict)
     repo_root: Path | None = None
     package: dict[str, str] = field(default_factory=dict)
     sevn_config: dict[str, Any] | None = None

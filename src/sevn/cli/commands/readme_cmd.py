@@ -215,7 +215,7 @@ async def _write_entries(
         >>> (td / "src/sevn/storage").mkdir(parents=True)
         >>> _ = (td / "src/sevn/storage/a.py").write_text("x=1\\n", encoding="utf-8")
         >>> m = load_manifest(_P("docs/readmes/manifest.toml"))
-        >>> e = get_entry(m, "skills")
+        >>> e = get_entry(m, "storage")
         >>> cfg = provider_config_from_settings(resolve_readme_settings(None), offline=True)
         >>> paths = asyncio.run(
         ...     _write_entries(

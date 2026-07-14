@@ -337,8 +337,15 @@ async def write_readme(
     fp_path = fingerprints_path or default_fingerprints_path(repo_root)
     store = load_fingerprints(fp_path)
     digest = compute_digest(repo_root, entry.source_globs)
-    upsert_entry(store, slug=entry.slug, digest=digest, source_globs=entry.source_globs)
-    save_fingerprints(fp_path, store)
+    entries = store.get("entries", {})
+    prior_digest: str | None = None
+    if isinstance(entries, dict):
+        prior = entries.get(entry.slug, {})
+        if isinstance(prior, dict):
+            prior_digest = str(prior.get("digest", "")) or None
+    if prior_digest != digest:
+        upsert_entry(store, slug=entry.slug, digest=digest, source_globs=entry.source_globs)
+        save_fingerprints(fp_path, store)
     return output_path
 
 

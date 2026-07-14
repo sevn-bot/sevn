@@ -45,7 +45,7 @@ Normative specs: [`15-memory-lcm.md`](../../about-sevn.bot/specs/15-memory-lcm.m
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: [`src/sevn/memory`](../../src/sevn/memory/) (34 Python files). Normative design: `about-sevn.bot/specs/15-memory-lcm.md`, `about-sevn.bot/specs/31-memory-dreaming.md`, `about-sevn.bot/specs/32-memory-honcho.md`.
+Primary source tree: [`src/sevn/memory`](../../src/sevn/memory/) and [`src/sevn/lcm`](../../src/sevn/lcm/) (34 Python files). Normative design: `about-sevn.bot/specs/15-memory-lcm.md`, `about-sevn.bot/specs/31-memory-dreaming.md`, `about-sevn.bot/specs/32-memory-honcho.md`.
 
 ### Module inventory
 

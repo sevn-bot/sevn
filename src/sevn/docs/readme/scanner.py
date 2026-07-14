@@ -98,7 +98,6 @@ def scan_repo_context(repo_root: Path, entry: ReadmeEntry) -> dict[str, Any]:
         source_excerpt=_build_source_excerpt(module_indexes, py_files),
         spec_excerpt=_read_spec_excerpt(repo_root, list(entry.specs)),
         module_symbols=module_symbols,
-        symbol_lineno=_build_symbol_lineno_map(module_symbols),
         repo_root=repo_root,
         package=_read_pyproject(repo_root),
         sevn_config=_read_sevn_json(repo_root),
@@ -217,36 +216,6 @@ def symbol_lineno_for_module(
         elif isinstance(entry, str) and entry == symbol:
             return None
     return None
-
-
-def _build_symbol_lineno_map(
-    module_symbols: dict[str, list[dict[str, int | str]]],
-) -> dict[str, dict[str, int]]:
-    """Build a nested path → symbol → line map for link emission.
-
-        Args:
-    module_symbols (dict[str, list[dict[str, int | str]]]): Scanner symbol inventory.
-
-        Returns:
-            dict[str, dict[str, int]]: Repo-relative path to symbol line numbers.
-
-        Examples:
-            >>> _build_symbol_lineno_map({"src/a.py": [{"name": "run", "lineno": 2}]})
-            {'src/a.py': {'run': 2}}
-    """
-    out: dict[str, dict[str, int]] = {}
-    for rel, entries in module_symbols.items():
-        mapping: dict[str, int] = {}
-        for entry in entries:
-            if not isinstance(entry, dict):
-                continue
-            name = str(entry.get("name", "")).strip()
-            line = entry.get("lineno")
-            if name and line is not None and "(+" not in name:
-                mapping[name] = int(line)
-        if mapping:
-            out[rel] = mapping
-    return out
 
 
 def _read_spec_excerpt(

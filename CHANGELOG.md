@@ -25,7 +25,8 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
-- README offline section builders accept `ScanContext` uniformly; spec and skill frontmatter share one YAML parser
+- README L3 primary source tree lists every manifest ``source_globs`` root when multiple trees apply
+- README fingerprints skip timestamp-only rewrites when source digests are unchanged
 - README pipeline refactor splits offline sections, L2 policy, text utils, module index, and scan context; scanner uses single-pass module indexes
 - README regeneration skips rewriting files when rendered markdown is unchanged, keeping pre-commit manifest sync idempotent
 - README `make readme-check` runs manifest `lint_summaries` and validates curated Level 1–2 symbol cites; INDEX status column shows `fresh`/`stale` with a freshness ≠ accuracy note

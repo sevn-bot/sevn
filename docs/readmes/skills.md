@@ -8,7 +8,7 @@
 | Name | Path | Summary |
 |------|------|---------|
 | `browser-harness` | [`../../src/sevn/data/bundled_skills/core/browser-harness/SKILL.md`](../../src/sevn/data/bundled_skills/core/browser-harness/SKILL.md) | Thin CDP harness with extendable helpers.py for open-ended browser control. |
-| `canvas` | [`../../src/sevn/data/bundled_skills/core/canvas/SKILL.md`](../../src/sevn/data/bundled_skills/core/canvas/SKILL.md) | Cursor Canvas and rich analytical layouts via OpenUI compose helpers (about-sevn.bot/specs/11-tools-registry.md §3.4, about-sevn.bot/specs/29-openui.md). |
+| `canvas` | [`../../src/sevn/data/bundled_skills/core/canvas/SKILL.md`](../../src/sevn/data/bundled_skills/core/canvas/SKILL.md) | Cursor Canvas and rich analytical layouts via OpenUI compose helpers (about-sevn.bot/specs/11-tools-registry.md §3.4, about-sevn.bot/specs/37-openui.md). |
 | `code_graph_rag` | [`../../src/sevn/data/bundled_skills/core/code_graph_rag/SKILL.md`](../../src/sevn/data/bundled_skills/core/code_graph_rag/SKILL.md) | CGR export reader + allowlisted cgr CLI (about-sevn.bot/specs/28-code-understanding.md §2.2). |
 | `computer-use` | [`../../src/sevn/data/bundled_skills/core/computer-use/SKILL.md`](../../src/sevn/data/bundled_skills/core/computer-use/SKILL.md) | Drive a computer via trycua/cua — host cua-driver MCP passthrough plus sandbox providers (docker/cloud/lume) through the cua CLI; opt-in; macOS-only |
 | `conventional_commit` | [`../../src/sevn/data/bundled_skills/core/conventional_commit/SKILL.md`](../../src/sevn/data/bundled_skills/core/conventional_commit/SKILL.md) | Draft git commit messages using Conventional Commits 1.0.0. Use when the operator asks to commit, record changes in git, or before running git commit after editing code (including the sevn.bot checkout). |
@@ -47,25 +47,25 @@
 
 | Name | Path | Summary |
 |------|------|---------|
-| `__init__` | [`../../src/sevn/skills/__init__.py`](../../src/sevn/skills/__init__.py) | Workspace skills subsystem (about-sevn.bot/specs/12-skills-system.md). |
-| `browser_gc` | [`../../src/sevn/skills/browser_gc.py`](../../src/sevn/skills/browser_gc.py) | Best-effort cleanup for session-scoped browser profiles and registries. |
-| `browser_session` | [`../../src/sevn/skills/browser_session.py`](../../src/sevn/skills/browser_session.py) | Session-scoped browser lifecycle — profile, CDP, registry, spawn/attach/close. |
-| `capabilities` | [`../../src/sevn/skills/capabilities.py`](../../src/sevn/skills/capabilities.py) | capabilities[] rows for load_skill payloads (about-sevn.bot/specs/12-skills-system.md §2.3). |
-| `computer_use` | [`../../src/sevn/skills/computer_use.py`](../../src/sevn/skills/computer_use.py) | Computer-use skill gates and Cua Driver MCP passthrough (the design docs §17). |
-| `cua_agent` | [`../../src/sevn/skills/cua_agent.py`](../../src/sevn/skills/cua_agent.py) | Cua Agent skill gates and per-run approval (the design docs §17a). |
-| `cua_doctor_check` | [`../../src/sevn/skills/cua_doctor_check.py`](../../src/sevn/skills/cua_doctor_check.py) | Cua computer-use skill doctor probes (the design docs W0.5 / W6). |
-| `cursor_cloud` | [`../../src/sevn/skills/cursor_cloud.py`](../../src/sevn/skills/cursor_cloud.py) | Opt-in gate for bundled cursor_cloud core skill (about-sevn.bot/specs/29-cursor-cloud-agent.md). |
-| `email_management` | [`../../src/sevn/skills/email_management.py`](../../src/sevn/skills/email_management.py) | Multi-account IMAP/API helpers for the bundled email-management skill. |
-| `entrypoints` | [`../../src/sevn/skills/entrypoints.py`](../../src/sevn/skills/entrypoints.py) | Reserved setuptools entry-point row for sevn.skills (about-sevn.bot/specs/12-skills-system.md §2.1). |
-| `errors` | [`../../src/sevn/skills/errors.py`](../../src/sevn/skills/errors.py) | Skill execution failures -> tool envelope codes (about-sevn.bot/specs/11-tools-registry.md §3.1). |
-| `index` | [`../../src/sevn/skills/index.py`](../../src/sevn/skills/index.py) | Executor / Triager index lines for skills (about-sevn.bot/specs/12-skills-system.md §2.3 narrative). |
-| `lume` | [`../../src/sevn/skills/lume.py`](../../src/sevn/skills/lume.py) | Lume VM lifecycle skill gates (the design docs §17b). |
-| `manager` | [`../../src/sevn/skills/manager.py`](../../src/sevn/skills/manager.py) | Skills registry: scan, validate, load_skill payloads, subprocess runners (about-sevn.bot/specs/12). |
-| `manifest` | [`../../src/sevn/skills/manifest.py`](../../src/sevn/skills/manifest.py) | Parse SKILL.md YAML frontmatter + runnable fence metadata (specs 12 §3.1-§3.3). |
-| `models` | [`../../src/sevn/skills/models.py`](../../src/sevn/skills/models.py) | On-disk skill records (manifest + filesystem provenance). |
-| `openwiki` | [`../../src/sevn/skills/openwiki.py`](../../src/sevn/skills/openwiki.py) | Opt-in gate for bundled openwiki core skill. |
-| `openwiki_doctor_check` | [`../../src/sevn/skills/openwiki_doctor_check.py`](../../src/sevn/skills/openwiki_doctor_check.py) | OpenWiki skill doctor probes when skills.openwiki.enabled is true. |
-| `openwiki_install` | [`../../src/sevn/skills/openwiki_install.py`](../../src/sevn/skills/openwiki_install.py) | Install helpers for the LangChain OpenWiki npm CLI. |
-| `openwiki_secrets` | [`../../src/sevn/skills/openwiki_secrets.py`](../../src/sevn/skills/openwiki_secrets.py) | Resolve skills.openwiki credential refs into subprocess env vars. |
-| `security_scan` | [`../../src/sevn/skills/security_scan.py`](../../src/sevn/skills/security_scan.py) | SkillSpector wrapper for workspace skill security scans (about-sevn.bot/specs/09-security-scanner.md). |
-| `social_browser` | [`../../src/sevn/skills/social_browser.py`](../../src/sevn/skills/social_browser.py) | Session-bound logged-in browser helpers for x-use and facebook-use skills. |
+| `__init__` | [`../../src/sevn/skills/__init__.py`](../../src/sevn/skills/__init__.py) | Module `src/sevn/skills/__init__.py`. |
+| `browser_gc` | [`../../src/sevn/skills/browser_gc.py`](../../src/sevn/skills/browser_gc.py) | Module `src/sevn/skills/browser_gc.py`. |
+| `browser_session` | [`../../src/sevn/skills/browser_session.py`](../../src/sevn/skills/browser_session.py) | Module `src/sevn/skills/browser_session.py`. |
+| `capabilities` | [`../../src/sevn/skills/capabilities.py`](../../src/sevn/skills/capabilities.py) | Module `src/sevn/skills/capabilities.py`. |
+| `computer_use` | [`../../src/sevn/skills/computer_use.py`](../../src/sevn/skills/computer_use.py) | Module `src/sevn/skills/computer_use.py`. |
+| `cua_agent` | [`../../src/sevn/skills/cua_agent.py`](../../src/sevn/skills/cua_agent.py) | Module `src/sevn/skills/cua_agent.py`. |
+| `cua_doctor_check` | [`../../src/sevn/skills/cua_doctor_check.py`](../../src/sevn/skills/cua_doctor_check.py) | Module `src/sevn/skills/cua_doctor_check.py`. |
+| `cursor_cloud` | [`../../src/sevn/skills/cursor_cloud.py`](../../src/sevn/skills/cursor_cloud.py) | Module `src/sevn/skills/cursor_cloud.py`. |
+| `email_management` | [`../../src/sevn/skills/email_management.py`](../../src/sevn/skills/email_management.py) | Module `src/sevn/skills/email_management.py`. |
+| `entrypoints` | [`../../src/sevn/skills/entrypoints.py`](../../src/sevn/skills/entrypoints.py) | Module `src/sevn/skills/entrypoints.py`. |
+| `errors` | [`../../src/sevn/skills/errors.py`](../../src/sevn/skills/errors.py) | Module `src/sevn/skills/errors.py`. |
+| `index` | [`../../src/sevn/skills/index.py`](../../src/sevn/skills/index.py) | Module `src/sevn/skills/index.py`. |
+| `lume` | [`../../src/sevn/skills/lume.py`](../../src/sevn/skills/lume.py) | Module `src/sevn/skills/lume.py`. |
+| `manager` | [`../../src/sevn/skills/manager.py`](../../src/sevn/skills/manager.py) | Module `src/sevn/skills/manager.py`. |
+| `manifest` | [`../../src/sevn/skills/manifest.py`](../../src/sevn/skills/manifest.py) | Module `src/sevn/skills/manifest.py`. |
+| `models` | [`../../src/sevn/skills/models.py`](../../src/sevn/skills/models.py) | Module `src/sevn/skills/models.py`. |
+| `openwiki` | [`../../src/sevn/skills/openwiki.py`](../../src/sevn/skills/openwiki.py) | Module `src/sevn/skills/openwiki.py`. |
+| `openwiki_doctor_check` | [`../../src/sevn/skills/openwiki_doctor_check.py`](../../src/sevn/skills/openwiki_doctor_check.py) | Module `src/sevn/skills/openwiki_doctor_check.py`. |
+| `openwiki_install` | [`../../src/sevn/skills/openwiki_install.py`](../../src/sevn/skills/openwiki_install.py) | Module `src/sevn/skills/openwiki_install.py`. |
+| `openwiki_secrets` | [`../../src/sevn/skills/openwiki_secrets.py`](../../src/sevn/skills/openwiki_secrets.py) | Module `src/sevn/skills/openwiki_secrets.py`. |
+| `security_scan` | [`../../src/sevn/skills/security_scan.py`](../../src/sevn/skills/security_scan.py) | Module `src/sevn/skills/security_scan.py`. |
+| `social_browser` | [`../../src/sevn/skills/social_browser.py`](../../src/sevn/skills/social_browser.py) | Module `src/sevn/skills/social_browser.py`. |

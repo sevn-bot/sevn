@@ -186,6 +186,6 @@ def test_scan_repo_context_includes_symbol_line_numbers(tmp_path: Path) -> None:
     mod.write_text("def alpha() -> None:\n    pass\n", encoding="utf-8")
     manifest = load_manifest(manifest_path)
     ctx = scan_repo_context(tmp_path, get_entry(manifest, "demo"))
-    lineno_map = ctx.get("symbol_lineno") or ctx.get("module_symbol_lines")
-    assert isinstance(lineno_map, dict)
-    assert lineno_map
+    symbols = ctx.get("module_symbols", {})
+    assert isinstance(symbols, dict)
+    assert symbols

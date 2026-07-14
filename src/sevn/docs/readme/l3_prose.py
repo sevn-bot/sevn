@@ -68,16 +68,10 @@ def build_level3_deep_dive(
     """
     repo_root = scan.get("repo_root")
     repo_path = repo_root if isinstance(repo_root, Path) else None
-    if repo_path is not None:
-        source_link = _file_markdown_link(
-            entry,
-            repo_path,
-            source_dir if source_dir.endswith("/") else f"{source_dir}/",
-            directory=True,
-            label=source_dir,
-        )
-    else:
-        source_link = f"`{source_dir}`"
+    source_roots = [str(root) for root in scan.get("source_roots", ()) if root]
+    if not source_roots:
+        source_roots = [source_dir if source_dir.endswith("/") else f"{source_dir}/"]
+    source_link = _format_source_tree_links(entry, repo_path, source_roots)
     spec_links = _spec_markdown_links(entry, repo_path, list(entry.specs))
     sections: list[str] = [
         f"Primary source tree: {source_link} ({len(py_files)} Python files). "
@@ -141,6 +135,49 @@ def _spec_markdown_links(
     if remainder > 0:
         return ", ".join(links) + f", and {remainder} more"
     return ", ".join(links)
+
+
+def _format_source_tree_links(
+    entry: ReadmeEntry,
+    repo_path: Path | None,
+    source_roots: list[str],
+) -> str:
+    """Format one or more source roots as markdown directory links.
+
+    Args:
+        entry (ReadmeEntry): Manifest row.
+        repo_path (Path | None): Repository root for href emission.
+        source_roots (list[str]): Repo-relative directory prefixes.
+
+    Returns:
+        str: Linked or backtick-quoted source tree label(s).
+
+    Examples:
+        >>> _format_source_tree_links(
+        ...     ReadmeEntry("g", "G", "S.", "subsystem", "g", "o.md", ("src/**",), ()),
+        ...     None,
+        ...     ["src/sevn/gateway/"],
+        ... )
+        '`src/sevn/gateway/`'
+    """
+    normalized = [root if root.endswith("/") else f"{root}/" for root in source_roots]
+    if repo_path is None:
+        return format_path_list(
+            [root.rstrip("/") for root in normalized], max_items=len(normalized)
+        )
+    links = [
+        _file_markdown_link(
+            entry,
+            repo_path,
+            root,
+            directory=True,
+            label=root.rstrip("/"),
+        )
+        for root in normalized
+    ]
+    if len(links) == 1:
+        return links[0]
+    return format_path_list(links, max_items=len(links))
 
 
 def _build_module_inventory_block(

@@ -71,7 +71,7 @@ Normative spec: [`about-sevn.bot/specs/06-secrets.md`](../../about-sevn.bot/spec
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: [`src/sevn/secrets`](../../src/sevn/secrets/) (17 Python files). Normative design: `about-sevn.bot/specs/06-secrets.md`.
+Primary source tree: [`src/sevn/secrets`](../../src/sevn/secrets/) and [`src/sevn/security/secrets`](../../src/sevn/security/secrets/) (17 Python files). Normative design: `about-sevn.bot/specs/06-secrets.md`.
 
 ### Module inventory
 

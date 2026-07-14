@@ -148,8 +148,8 @@
     },
     "skills": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T16:07:33Z",
-      "digest": "0412e8746278db2394734365e3dfccb3f4851012331950ffd507a8b01660f0aa",
+      "computed_at": "2026-07-14T17:06:19Z",
+      "digest": "f22d7cc04d807cf0dac738824d5b0a955ccae21d53b2eb760fd9554b13881325",
       "source_globs": [
         "src/sevn/skills/**",
         "src/sevn/data/bundled_skills/**",

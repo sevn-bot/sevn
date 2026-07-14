@@ -18,7 +18,7 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | name | description |
 |------|-------------|
 | browser-harness | Thin CDP harness with extendable helpers.py for open-ended browser control. |
-| canvas | Cursor Canvas and rich analytical layouts via OpenUI compose helpers (`specs/11-tools-registry.md` §3.4, `specs/29-openui.md`). |
+| canvas | Cursor Canvas and rich analytical layouts via OpenUI compose helpers (`specs/11-tools-registry.md` §3.4, `specs/37-openui.md`). |
 | code_graph_rag | CGR export reader + allowlisted cgr CLI (`specs/28-code-understanding.md` §2.2). |
 | computer-use | Drive a computer via trycua/cua — host cua-driver MCP passthrough plus sandbox providers (docker/cloud/lume) through the cua CLI; opt-in; macOS-only |
 | conventional_commit | Draft git commit messages using Conventional Commits 1.0.0. Use when the operator asks to commit, record changes in git, or before running git commit after editing code (including the sevn.bot c... |
