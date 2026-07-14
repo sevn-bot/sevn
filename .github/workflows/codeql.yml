@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: MIT
+#
+# CodeQL semantic code scanning for Python. Complements the bandit + pip-audit
+# tier with GitHub's code scanning; results surface in the repo Security tab.
+name: CodeQL
+
+on:
+  push:
+    branches: [main, develop, test-pre, pre-0.0.1]
+  pull_request:
+    branches: [main, develop, test-pre, pre-0.0.1]
+  schedule:
+    - cron: "23 4 * * 1"  # Mondays 04:23 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@f58f0d11ebf5dedd870fab2f999275f7602cfa46 # codeql-bundle-v2.26.0
+        with:
+          languages: python
+          build-mode: none
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@f58f0d11ebf5dedd870fab2f999275f7602cfa46 # codeql-bundle-v2.26.0
+        with:
+          category: "/language:python"

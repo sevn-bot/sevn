@@ -4,9 +4,11 @@
 # Normative spec: specs/25-cicd-full.md §4.1 (workflow files) and §4.2.
 #
 # Scheduled / supply-chain jobs kept OFF the PR verify gate (ci.yml):
-#   - security (daily): bandit + pip-audit. pip-audit's OSV.dev call is
-#     network-flaky and dependency CVEs rarely land in a single PR, so it runs
-#     daily here and post-merge via `make ci` in ci-cd.yml — not per PR.
+#   - security (daily): bandit + pip-audit. This tier now also runs per-PR in
+#     ci.yml; the daily run here remains to catch newly-disclosed CVEs on
+#     already-merged code (pip-audit's OSV.dev call is network-flaky and new
+#     dependency CVEs rarely land in a single PR). It also runs post-merge via
+#     `make ci` in ci-cd.yml.
 #   - cache-bust-rebuild (weekly): no-cache image rebuild drift canary.
 #   - macos-keychain-smoke (weekly): macOS Keychain backend probe (macOS
 #     runners bill at 10× — a rarely-changing code path does not belong on the

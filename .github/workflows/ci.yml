@@ -8,21 +8,25 @@
 #   - static       → `make ci-static` (lockcheck, lint, typecheck, pyright,
 #                    doctest, build, doctor-solutions)
 #   - drift-gates  → `make ci-infra ci-docs ci-skills ci-parity`
+#   - security     → `make security` (bandit + pip-audit / OSV.dev)
 #
-# Together these equal `make ci` MINUS `security` (bandit + pip-audit), which
-# is a network-flaky, rarely-regressing tier moved to the weekly
-# ci-supplementary.yml run and the post-merge `make ci` in ci-cd.yml. Container
-# image builds + compose/sandbox integration live in docker.yml (path-filtered).
+# Together these equal the full `make ci`. The `security` tier (bandit +
+# pip-audit) now runs here on PRs too; it ALSO runs daily in
+# ci-supplementary.yml (to catch newly-disclosed CVEs on already-merged code)
+# and post-merge via `make ci` in ci-cd.yml. Container image builds +
+# compose/sandbox integration live in docker.yml (path-filtered).
 #
 # Gated branches: main / develop / test-pre / pre-0.0.1. Fork PRs run without secrets by
 # GitHub default — the gate must stay green on mocks/offline fixtures only.
 #
 # Branch protection: require "Verify (static + build)", "Verify (drift gates)",
-# and the four "Verify (tests …)" shard checks.
+# "Verify (security audit)", and the four "Verify (tests …)" shard checks.
 #
 # Tier ownership: `ci-static` + sharded `test` + `ci-infra ci-docs ci-skills
-# ci-parity` together equal `make ci` minus `security` (run daily, see
-# ci-supplementary.yml). Keep these jobs in lockstep with the Makefile targets.
+# ci-parity` + `security` together equal the full `make ci`. The `security`
+# tier also runs daily (see ci-supplementary.yml) to catch newly-disclosed
+# CVEs on already-merged code. Keep these jobs in lockstep with the Makefile
+# targets.
 #
 # hashFiles() in job-level `if` is evaluated before checkout and is always empty;
 # path gates belong on steps after actions/checkout.
@@ -103,3 +107,15 @@ jobs:
       - name: Infra + docs + skills + parity tiers
         if: hashFiles('about-sevn.bot/**') != ''
         run: make ci-infra ci-docs ci-skills ci-parity
+
+  security:
+    name: Verify (security audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: ./.github/actions/bootstrap
+
+      - name: bandit + pip-audit (OSV.dev)
+        if: hashFiles('src/sevn/**') != ''
+        run: make security

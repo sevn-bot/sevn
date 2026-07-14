@@ -1,0 +1,7 @@
+# Example FUNDING configuration for GitHub's "Sponsor" button.
+# Uncomment and fill in the relevant keys once sponsorship is set up.
+# See: https://docs.github.com/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
+#
+# github: your-github-username        # or [user1, user2]
+# ko_fi: your-ko-fi-username
+# custom: ["https://example.com/donate"]

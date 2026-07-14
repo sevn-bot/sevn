@@ -52,10 +52,11 @@ Do not bypass hooks with `--no-verify`.
 ## Pull requests
 
 - Branch off `main` and open a PR against `main`.
-- PRs are **squash-merged**; keep the PR title Conventional-Commit-shaped (it becomes
-  the squash commit subject).
+- Squash-merge, merge-commit, and rebase are all allowed merge methods. If
+  squash-merging, keep the PR title Conventional-Commit-shaped (it becomes the
+  squash commit subject).
 - Every PR requires review from a code owner and must have its conversations resolved
-  before merge. `main` is protected (linear history, no force-push).
+  before merge. `main` is protected (no force-push, no branch deletion).
 - CI must pass. For PRs opened from a fork, a maintainer must approve the workflow run
   before CI executes.
 
