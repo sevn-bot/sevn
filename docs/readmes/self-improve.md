@@ -55,7 +55,7 @@ Terminal states include `merged` (promotion complete) and `aborted` (operator or
 | `self_improve.enabled: false` (default) | Subsystem off |
 | `SEVN_DISABLE_SELF_IMPROVE=1` | Forces off regardless of `sevn.json` (`effective_self_improve_enabled`) |
 | `SEVN_DISABLE_AUTO_MERGE` | Documented in schema; **not yet wired** in runtime (see audit) |
-| [`abort_improve_job`](../../src/sevn/self_improve/facade.py#L547) / dashboard abort | Facade + store transition exist; **no** live Mission Control, Telegram, or CLI caller wires it today (Telegram only renders `si:abort:` copy in [`self_improve_copy.py`](../../src/sevn/channels/self_improve_copy.py)) |
+| [`abort_improve_job`](../../src/sevn/self_improve/facade.py#L547) / dashboard abort | Facade + store transition exist; there is no live MC/Telegram/CLI caller wired today (Telegram only renders `si:abort:` copy in [`self_improve_copy.py`](../../src/sevn/channels/self_improve_copy.py)) |
 
 ### Configuration (`sevn.json` → `self_improve`)
 
