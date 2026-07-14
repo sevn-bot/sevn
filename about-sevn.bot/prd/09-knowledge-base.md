@@ -8,7 +8,11 @@ summary: Without accumulated knowledge, every research thread starts at zero—o
   need a provenance-backed wiki vault the assistant can search and cite in chat.
 last_updated: '2026-07-14'
 fingerprint: sha256:12c8243b0fcc82e791221e55eb0e0bf9567ac67714950e6a56b301a790a18944
-related: []
+related:
+- prd-02-personality-and-memory
+- prd-03-trust-and-control
+- prd-07-mission-control
+- prd-08-coding-companion
 sources:
 - src/sevn/second_brain/**
 parent_prd: prd-00-main

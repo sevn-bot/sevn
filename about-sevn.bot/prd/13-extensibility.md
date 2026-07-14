@@ -8,7 +8,9 @@ summary: Built-in capabilities cover common paths; deployments need org glue—t
   LDAP, formatters, policy hooks—via plugins, skills, and hooks without forking core.
 last_updated: '2026-07-14'
 fingerprint: sha256:8566b2cb9a239bcc766edfaa5cf97a3d7600603ca427639e3ee360e2505fa656
-related: []
+related:
+- prd-03-trust-and-control
+- prd-07-mission-control
 sources:
 - src/sevn/plugins/**
 - src/sevn/skills/**

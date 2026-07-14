@@ -8,7 +8,9 @@ summary: Events and schedules—not chat—start work via webhooks, cron, dedupe
   notify-only paths so operators automate digests, alerts, and agent runs safely.
 last_updated: '2026-07-14'
 fingerprint: sha256:3ba449957038898a3f00cba876819d2398f3dfd4e02ca942fbeb846280cdcd61
-related: []
+related:
+- prd-07-mission-control
+- prd-13-extensibility
 sources:
 - src/sevn/triggers/**
 parent_prd: prd-00-main

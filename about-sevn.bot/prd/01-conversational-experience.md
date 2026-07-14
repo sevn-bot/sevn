@@ -8,7 +8,9 @@ summary: The operator talks to sevn where they already chat—Telegram on phone,
   Control on laptop—with shared sessions, voice, and one gateway turn spine.
 last_updated: '2026-07-14'
 fingerprint: sha256:00bef0835f1ed7d309771d330bd274cc7f44eb4c5d7e3199dd515b3523398503
-related: []
+related:
+- prd-07-mission-control
+- prd-10-generated-ui
 sources:
 - src/sevn/gateway/**
 - src/sevn/channels/**

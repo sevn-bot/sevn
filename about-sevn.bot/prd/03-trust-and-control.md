@@ -9,7 +9,8 @@ summary: Operators delegate real work only when prompt injection, secrets, sandb
   gate risky tools.
 last_updated: '2026-07-14'
 fingerprint: sha256:2be585f6507b7f341fade5e88ecc982e998afb8ec97666a7b5c4d5757f02ee21
-related: []
+related:
+- prd-07-mission-control
 sources:
 - src/sevn/security/**
 - src/sevn/secrets/**

@@ -8,7 +8,8 @@ summary: Operator dashboard for traces, spend, provider health, and in-flight ru
   a capable self-hosted bot stays livable instead of flying blind after each turn.
 last_updated: '2026-07-14'
 fingerprint: sha256:815d492a6dafcae6ef81d25d5d9227cb50f23bf32018c77e5c9b4fe07c46c1d1
-related: []
+related:
+- prd-05-cost-and-providers
 sources:
 - src/sevn/ui/**
 parent_prd: prd-00-main

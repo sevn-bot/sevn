@@ -8,7 +8,8 @@ summary: Operators need a bot that remembers who they are, keeps a stable voice 
   sessions, and surfaces controls when memory drifts or recalls wrong facts.
 last_updated: '2026-07-14'
 fingerprint: sha256:210a42748c1bfeebeabbfdf106fe758bf396797d2dabef09e51886ca62ec9c06
-related: []
+related:
+- prd-09-knowledge-base
 sources:
 - src/sevn/memory/**
 - src/sevn/lcm/**

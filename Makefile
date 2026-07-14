@@ -337,6 +337,9 @@ spec-sync: ## Refresh spec frontmatter in about-sevn.bot/specs (skw docs sync)
 prd-sync: ## Refresh PRD frontmatter in about-sevn.bot/prd (skw docs sync)
 	$(MAKE) -C spec-kit-wave prd-sync
 
+prd-check: ## Validate+score every PRD in about-sevn.bot/prd (skw docs validate)
+	$(MAKE) -C spec-kit-wave prd-check
+
 subagents-chart: ## Regenerate deterministic sub-agents topology SVG (D14)
 	$(UV) run python scripts/gen_subagents_chart.py
 

@@ -8,7 +8,8 @@ summary: Local-first bots are judged in the first ten minutes—clone, three set
   and a Telegram reply, or the operator returns to a hosted assistant.
 last_updated: '2026-07-14'
 fingerprint: sha256:4e23de257f6e8db9f315187684ee7a21f665ecb71f35414ea00b19279ccfa2da
-related: []
+related:
+- prd-07-mission-control
 sources:
 - src/sevn/config/**
 - src/sevn/cli/**

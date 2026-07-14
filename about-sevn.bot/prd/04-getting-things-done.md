@@ -9,7 +9,11 @@ summary: A general-purpose AI assistant earns its keep by doing things—answeri
   and tiered executors.
 last_updated: '2026-07-14'
 fingerprint: sha256:9c2398424b10b0d0ac0fd5771ed945f3318bc5294556091119b1aa1153720faf
-related: []
+related:
+- prd-03-trust-and-control
+- prd-08-coding-companion
+- prd-11-automation-and-triggers
+- prd-13-extensibility
 sources:
 - src/sevn/agent/**
 - src/sevn/tools/**
@@ -27,6 +31,7 @@ specs:
 - spec-19-channel-webui
 - spec-20-voice
 - spec-37-openui
+- spec-36-sub-agents
 personas:
 - operator
 prd_profile: standard
