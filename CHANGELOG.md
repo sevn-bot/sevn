@@ -32,6 +32,8 @@ are cut into a dated, versioned section at release time.
 
 ### Removed
 
+- `about-sevn.bot/DOC-VS-CODE-ANALYSIS.md` — operator audit belongs in `.ignorelocal/`; its presence broke `about-site-check` for PRs merging `pre-0.0.1`
+
 ### Fixed
 
 - README `make readme-scaffold` protects curated bodies: stale slugs get fingerprint-only stamps, never body rewrites or section stubs
