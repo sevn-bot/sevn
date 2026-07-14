@@ -221,11 +221,14 @@ def test_precommit_main_leaves_curated_body_unchanged(
         repo = Path(td)
         _seed_curated_repo(repo, curated=True)
         before = (repo / "docs/readmes/hand.md").read_text(encoding="utf-8")
+        # Force agent-off so the stamp-only path is deterministic regardless of
+        # whether a curator runner (cursor-agent/claude) is installed on the host.
+        monkeypatch.setenv("SEVN_README_AGENT", "0")
         monkeypatch.setattr(readme_precommit, "_resolve_repo_root", lambda _repo: repo)
         exit_code = readme_precommit.main(["src/sevn/hand/mod.py"])
         captured = capsys.readouterr()
         assert exit_code == 0
-        assert "stamped hand (curated)" in captured.out
+        assert "stamped hand (curated, agent off)" in captured.out
         assert (repo / "docs/readmes/hand.md").read_text(encoding="utf-8") == before
 
 

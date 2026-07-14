@@ -8,7 +8,7 @@ summary: 'Give implementers a single picture of the runtime before feature work:
   boundaries under src/sevn/, allowed import directions, and the shared protocols
   that keep LLM wiring, observability, and '
 last_updated: '2026-07-14'
-fingerprint: sha256:6da0794c53ee8daabee24740df37cd3abcea4ec6d3af6f5487e6c789a3e2031f
+fingerprint: sha256:a309215f3cc785f1bf7fe3cd1a3e683fb22d85be15577fbd45c8edfcff5391a1
 related: []
 sources:
 - src/sevn/**
@@ -5702,6 +5702,27 @@ interfaces:
 - name: check_readme_tree
   file: src/sevn/docs/readme/check.py
   symbol: check_readme_tree
+- name: CurateResult
+  file: src/sevn/docs/readme/curate.py
+  symbol: CurateResult
+- name: RunnerKind
+  file: src/sevn/docs/readme/curate.py
+  symbol: RunnerKind
+- name: build_prompt
+  file: src/sevn/docs/readme/curate.py
+  symbol: build_prompt
+- name: curate_entry
+  file: src/sevn/docs/readme/curate.py
+  symbol: curate_entry
+- name: diff_for_globs
+  file: src/sevn/docs/readme/curate.py
+  symbol: diff_for_globs
+- name: invoke_runner
+  file: src/sevn/docs/readme/curate.py
+  symbol: invoke_runner
+- name: resolve_runner
+  file: src/sevn/docs/readme/curate.py
+  symbol: resolve_runner
 - name: compute_digest
   file: src/sevn/docs/readme/fingerprint.py
   symbol: compute_digest
@@ -5846,6 +5867,21 @@ interfaces:
 - name: validate_symbol_refs
   file: src/sevn/docs/readme/symbol_refs.py
   symbol: validate_symbol_refs
+- name: Heading
+  file: src/sevn/docs/readme/templates.py
+  symbol: Heading
+- name: TemplateError
+  file: src/sevn/docs/readme/templates.py
+  symbol: TemplateError
+- name: load_template_headings
+  file: src/sevn/docs/readme/templates.py
+  symbol: load_template_headings
+- name: resolve_template_path
+  file: src/sevn/docs/readme/templates.py
+  symbol: resolve_template_path
+- name: validate_against_template
+  file: src/sevn/docs/readme/templates.py
+  symbol: validate_against_template
 - name: EvolutionApproval
   file: src/sevn/evolution/approvals.py
   symbol: EvolutionApproval

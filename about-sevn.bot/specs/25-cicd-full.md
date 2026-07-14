@@ -8,7 +8,7 @@ summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict de
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
 last_updated: '2026-07-14'
-fingerprint: sha256:8db0b84f83eb6b4acda3f7a129f04b0f2059903245d7056abd0c3fa96823b5e7
+fingerprint: sha256:e1e8e9d0e1ca21531c8e4f8d04bc6ea3097a89ede63b384f136ccbbe65441cde
 related: []
 sources:
 - src/sevn/**
@@ -5704,6 +5704,27 @@ interfaces:
 - name: check_readme_tree
   file: src/sevn/docs/readme/check.py
   symbol: check_readme_tree
+- name: CurateResult
+  file: src/sevn/docs/readme/curate.py
+  symbol: CurateResult
+- name: RunnerKind
+  file: src/sevn/docs/readme/curate.py
+  symbol: RunnerKind
+- name: build_prompt
+  file: src/sevn/docs/readme/curate.py
+  symbol: build_prompt
+- name: curate_entry
+  file: src/sevn/docs/readme/curate.py
+  symbol: curate_entry
+- name: diff_for_globs
+  file: src/sevn/docs/readme/curate.py
+  symbol: diff_for_globs
+- name: invoke_runner
+  file: src/sevn/docs/readme/curate.py
+  symbol: invoke_runner
+- name: resolve_runner
+  file: src/sevn/docs/readme/curate.py
+  symbol: resolve_runner
 - name: compute_digest
   file: src/sevn/docs/readme/fingerprint.py
   symbol: compute_digest
@@ -5848,6 +5869,21 @@ interfaces:
 - name: validate_symbol_refs
   file: src/sevn/docs/readme/symbol_refs.py
   symbol: validate_symbol_refs
+- name: Heading
+  file: src/sevn/docs/readme/templates.py
+  symbol: Heading
+- name: TemplateError
+  file: src/sevn/docs/readme/templates.py
+  symbol: TemplateError
+- name: load_template_headings
+  file: src/sevn/docs/readme/templates.py
+  symbol: load_template_headings
+- name: resolve_template_path
+  file: src/sevn/docs/readme/templates.py
+  symbol: resolve_template_path
+- name: validate_against_template
+  file: src/sevn/docs/readme/templates.py
+  symbol: validate_against_template
 - name: EvolutionApproval
   file: src/sevn/evolution/approvals.py
   symbol: EvolutionApproval
