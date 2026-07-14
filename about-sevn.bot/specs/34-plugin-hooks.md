@@ -101,7 +101,7 @@ prd_profile: null
 
 Deliver the in-process extension layer that intercepts existing tool and terminal I/O paths and registers dispatcher-level commands, without adding new tool symbols or transports in-tree.
 
-Primary code trees: [`src/sevn/plugins`](src/sevn/plugins/__init__.py).
+Primary code trees: `src/sevn/plugins/`.
 
 Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
 

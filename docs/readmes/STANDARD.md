@@ -396,6 +396,27 @@ Explicit operator action for LLM spend: `sevn readme generate --llm`. CI uses `o
 
 Scaffold path: `make readme-scaffold` (parallel to `*-docs-scaffold`). Curated slugs are fingerprint-only on scaffold; generated slugs are regenerated and stubbed as needed.
 
+### Out-of-catalog packages (D19)
+
+Some load-bearing trees intentionally have **no** manifest row. They are documented elsewhere rather than duplicated in the README pipeline:
+
+| Package | Rationale | Where to read |
+|---------|-----------|---------------|
+| `src/sevn/browser/` | Optional **`browser`** / **`browser-cdp`** extras; Playwright/CDP skills and recipes ship under bundled skills — not a core subsystem catalog entry. | `CLAUDE.md` optional extras; bundled skills (`playwright-browser`, `x-use`, …); `about-sevn.bot/specs/12-skills-system.md` |
+
+Adding a manifest row for an out-of-catalog package requires an operator decision at a catalog-coverage gate — default is the table above.
+
+### Operator clarity (§9.4)
+
+Cross-cutting topics that confuse readers if only implied by generated prose:
+
+| Topic | Meaning | Authoritative README |
+|-------|---------|---------------------|
+| Secrets gateway vs egress proxy | Channel/gateway/MC credentials resolve in the **gateway**; LLM provider keys resolve on the **egress proxy**. | [`secrets.md`](secrets.md) Level 2 — *Gateway vs egress proxy* |
+| Channel stub vs production | Telegram/WebChat are production paths; Discord/Slack are narrower stubs until specs mature. | [`channels.md`](channels.md) Level 2 — *Stub vs production adapters* |
+| INDEX `fresh` status | Fingerprint match only — **not** semantic accuracy. Run `make readme-check` for summary lint + symbol validation. | This file §C0 INDEX note; [`INDEX.md`](INDEX.md) Summary |
+| Schema vs Pydantic | `infra/sevn.schema.json` may lag typed section models (`provisioning`, `coding_agents`, …). | [`config-workspace.md`](config-workspace.md) Level 2 — *Schema vs Pydantic gaps* |
+
 ---
 
 ## REVIEW GATE artefact
@@ -408,6 +429,7 @@ Operator preview of the root brand header: `docs/readmes/_mock-root-header.md`.
 
 | Date | Wave | Change |
 |------|------|--------|
+| 2026-07-14 | W10 | D19 catalog coverage: ``evolution`` + ``plugins`` subsystem rows; ``browser/`` out-of-catalog table; §9.4 operator-clarity pointers. |
 | 2026-07-14 | W4 | Manifest summary sweep (D10): seven wrong `summary` rows rewritten; `integrations.specs` → `29-cursor-cloud-agent`; §F public-export list + §C0 profile-schema block reconciled to live code. |
 | 2026-07-14 | W3 | INDEX status column uses ``fresh`` (not ``ok``); Summary documents freshness ≠ semantic accuracy; ``lint_summaries`` gate (D7). |
 | 2026-07-13 | W9 | §A1 curated templates (`_templates/`) + `templates.py` validation in the gate; `sevn readme curate` + `readme-curator` agent; pre-commit auto-edit & stage with `SEVN_README_AGENT` controls. |

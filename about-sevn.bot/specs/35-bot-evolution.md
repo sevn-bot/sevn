@@ -287,7 +287,7 @@ prd_profile: null
 
 Deliver src/sevn/evolution/ and the operator-facing Evolution surface so sevn.bot can evolve its own codebase as a first-class product pillar — not an optional add-on — spanning understand → file work
 
-Primary code trees: [`src/sevn/evolution`](src/sevn/evolution/__init__.py).
+Primary code trees: `src/sevn/evolution/`.
 
 Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
 

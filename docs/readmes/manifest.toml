@@ -331,6 +331,26 @@ curated = true
 template = "docs/readmes/_templates/subagents.md"
 
 [[readme]]
+slug = "evolution"
+title = "Bot evolution"
+summary = "Issue pipelines, spec-kit stages, approvals, and Mission Control evolution APIs."
+profile = "subsystem"
+tier_owner = "agent"
+output = "docs/readmes/evolution.md"
+source_globs = ["src/sevn/evolution/**"]
+specs = ["about-sevn.bot/specs/35-bot-evolution.md"]
+
+[[readme]]
+slug = "plugins"
+title = "Plugin hooks"
+summary = "In-process hook chains, channel plugin registry, slash bindings, and trigger mux."
+profile = "subsystem"
+tier_owner = "tools"
+output = "docs/readmes/plugins.md"
+source_globs = ["src/sevn/plugins/**"]
+specs = ["about-sevn.bot/specs/34-plugin-hooks.md"]
+
+[[readme]]
 slug = "index"
 title = "README catalog"
 summary = "Generated index: every subsystem README with profile, summary, and fingerprint freshness status."

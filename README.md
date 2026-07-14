@@ -106,6 +106,8 @@ See [README catalog](docs/readmes/INDEX.md) and [Architecture](about-sevn.bot/AR
 | [Integrations](docs/readmes/integrations.md) | `subsystem` | Cursor Cloud, GitHub skill clients, and external integration call paths. |
 | [Onboarding](docs/readmes/onboarding.md) | `guide` | Operator setup: CLI, web wizard, Telegram flows, daemon install, and profiles. |
 | [Sub-agents](docs/readmes/subagents.md) | `subsystem` | Level-1 role runs, level-2 workers, specialists, multi queue mode, registry, and kill surfaces. |
+| [Bot evolution](docs/readmes/evolution.md) | `subsystem` | Issue pipelines, spec-kit stages, approvals, and Mission Control evolution APIs. |
+| [Plugin hooks](docs/readmes/plugins.md) | `subsystem` | In-process hook chains, channel plugin registry, slash bindings, and trigger mux. |
 
 <a id="quick-start-tldr"></a>
 

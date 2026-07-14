@@ -176,7 +176,7 @@ prd_profile: null
 
 Let operators and agents launch, poll, and inspect Cursor Cloud Agents against any GitHub/GitLab repo when skills.cursor_cloud.enabled is true, returning PR URLs, dashboard links (remote desktop), and
 
-Primary code trees: [`src/sevn/integrations`](src/sevn/integrations/__init__.py).
+Primary code trees: `src/sevn/integrations/`.
 
 Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
 

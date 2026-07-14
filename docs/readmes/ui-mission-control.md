@@ -49,7 +49,7 @@ Individual tab routers live under [`src/sevn/ui/dashboard/api/`](../../src/sevn/
 | MC Canvas tab | [`dashboard_canvas`](../../src/sevn/ui/dashboard/api/canvas.py) | Owner view of published surfaces |
 | Store | [`OpenUIStore`](../../src/sevn/ui/openui/store.py) | Token + artifact persistence (`openui_tokens` table) |
 
-Spec: [`29-openui.md`](../../about-sevn.bot/specs/29-openui.md).
+Spec: [`37-openui.md`](../../about-sevn.bot/specs/37-openui.md).
 
 ### Configuration (`sevn.json` → `dashboard`)
 
@@ -65,11 +65,11 @@ Validate: `sevn config validate`.
 - [`api/__init__.py`](../../src/sevn/ui/dashboard/api/__init__.py) — [`create_dashboard_api_router`](../../src/sevn/ui/dashboard/api/__init__.py#L43)
 - [`openui/tools_register.py`](../../src/sevn/ui/openui/tools_register.py) — agent-facing OpenUI tool
 
-Normative specs: [`24-dashboard.md`](../../about-sevn.bot/specs/24-dashboard.md), [`29-openui.md`](../../about-sevn.bot/specs/29-openui.md).
+Normative specs: [`24-dashboard.md`](../../about-sevn.bot/specs/24-dashboard.md), [`37-openui.md`](../../about-sevn.bot/specs/37-openui.md).
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: [`src/sevn/ui`](../../src/sevn/ui/) (66 Python files). Normative design: `about-sevn.bot/specs/24-dashboard.md`, `about-sevn.bot/specs/29-openui.md`.
+Primary source tree: [`src/sevn/ui`](../../src/sevn/ui/) (66 Python files). Normative design: `about-sevn.bot/specs/24-dashboard.md`, `about-sevn.bot/specs/37-openui.md`.
 
 ### Module inventory
 
@@ -141,7 +141,7 @@ Follow [`24-dashboard.md`](../../about-sevn.bot/specs/24-dashboard.md) for merge
 ## References
 
 - [../../about-sevn.bot/specs/24-dashboard.md](../../about-sevn.bot/specs/24-dashboard.md)
-- [../../about-sevn.bot/specs/29-openui.md](../../about-sevn.bot/specs/29-openui.md)
+- [../../about-sevn.bot/specs/37-openui.md](../../about-sevn.bot/specs/37-openui.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
 [spec-link]: ../../about-sevn.bot/specs/24-dashboard.md
