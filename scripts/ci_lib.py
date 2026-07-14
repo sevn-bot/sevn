@@ -419,7 +419,12 @@ def _paired_test(src: Path) -> Path | None:
     except ValueError:
         return None
     candidate = REPO_ROOT / "tests" / rel.parent / f"test_{rel.stem}.py"
-    return candidate if candidate.is_file() else None
+    if candidate.is_file():
+        return candidate
+    if rel.parts[0] == "gateway" and len(rel.parts) >= 2:
+        flat = REPO_ROOT / "tests" / "gateway" / f"test_{rel.stem}.py"
+        return flat if flat.is_file() else None
+    return None
 
 
 def discover_related_tests(src_sevn: list[Path]) -> list[Path]:
