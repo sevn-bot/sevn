@@ -32,6 +32,7 @@ source_globs = ["src/sevn/gateway/**"]
 turn_spine = true
 specs = ["about-sevn.bot/specs/17-gateway.md"]
 curated = true
+template = "docs/readmes/_templates/gateway.md"
 
 [[readme]]
 slug = "agent"
@@ -49,6 +50,7 @@ specs = [
   "about-sevn.bot/specs/16-harness-discipline.md",
 ]
 curated = true
+template = "docs/readmes/_templates/agent.md"
 
 [[readme]]
 slug = "channels"
@@ -112,6 +114,7 @@ output = "docs/readmes/security.md"
 source_globs = ["src/sevn/security/**"]
 specs = ["about-sevn.bot/specs/09-security-scanner.md"]
 curated = true
+template = "docs/readmes/_templates/security.md"
 
 [[readme]]
 slug = "secrets"
@@ -214,6 +217,7 @@ source_globs = [
 ]
 specs = ["about-sevn.bot/specs/02-config-and-workspace.md"]
 curated = true
+template = "docs/readmes/_templates/config-workspace.md"
 
 [[readme]]
 slug = "storage"
@@ -245,6 +249,7 @@ output = "docs/readmes/self-improve.md"
 source_globs = ["src/sevn/self_improve/**"]
 specs = ["about-sevn.bot/specs/33-self-improvement.md"]
 curated = true
+template = "docs/readmes/_templates/self-improve.md"
 
 [[readme]]
 slug = "integrations"
@@ -270,6 +275,7 @@ source_globs = [
 ]
 specs = ["about-sevn.bot/specs/22-onboarding.md", "about-sevn.bot/specs/23-cli.md"]
 curated = true
+template = "docs/readmes/_templates/onboarding.md"
 
 [[readme]]
 slug = "subagents"
@@ -295,6 +301,7 @@ specs = [
   "about-sevn.bot/specs/14-executor-tier-b.md",
 ]
 curated = true
+template = "docs/readmes/_templates/subagents.md"
 
 [[readme]]
 slug = "index"

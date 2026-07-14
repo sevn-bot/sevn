@@ -373,6 +373,8 @@ class DashboardAuthService:
         workspace: WorkspaceConfig | None,
         process_settings: ProcessSettings,
         jwt_secret: str | None = None,
+        resolved_login_password: str | None = None,
+        resolved_gateway_token: str | None = None,
     ) -> None:
         """Create the auth service.
 
@@ -380,6 +382,8 @@ class DashboardAuthService:
             workspace (WorkspaceConfig | None): Parsed workspace config when available.
             process_settings (ProcessSettings): Env-derived gateway settings.
             jwt_secret (str | None): Optional explicit signing secret for tests.
+            resolved_login_password (str | None): Boot-resolved ``dashboard.login_password``.
+            resolved_gateway_token (str | None): Boot-resolved ``gateway.token`` fallback.
 
         Examples:
             >>> svc = DashboardAuthService(
@@ -394,6 +398,8 @@ class DashboardAuthService:
         self._workspace = workspace
         self._process = process_settings
         self._secret = jwt_secret or self._configured_secret(workspace) or secrets.token_urlsafe(32)
+        self._resolved_login_password = (resolved_login_password or "").strip() or None
+        self._resolved_gateway_token = (resolved_gateway_token or "").strip() or None
 
     @property
     def cookie_name(self) -> str:
@@ -680,13 +686,15 @@ class DashboardAuthService:
 
         section = _dashboard_section(workspace) if workspace is not None else None
         raw = getattr(section, "login_password", None) if section is not None else None
-        if isinstance(raw, str) and raw.strip():
+        if isinstance(raw, str) and raw.strip() and "${" not in raw.strip():
             return raw.strip()
+        if self._resolved_login_password:
+            return self._resolved_login_password
         token = self._process.gateway_token
         if token and token.strip():
             return token.strip()
-        if workspace is not None and workspace.gateway and workspace.gateway.token:
-            return workspace.gateway.token.strip()
+        if self._resolved_gateway_token:
+            return self._resolved_gateway_token
         return None
 
     def _ttl_seconds(self, workspace: WorkspaceConfig | None) -> int:

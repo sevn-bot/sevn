@@ -1043,6 +1043,16 @@ def create_app(
                     "run `sevn gateway set-gateway-token` or set SEVN_GATEWAY_TOKEN"
                 )
             raise RuntimeError(msg)
+        from sevn.ui.dashboard.dashboard_password import resolve_dashboard_login_password_ref
+
+        resolved_dashboard_login_password = await resolve_dashboard_login_password_ref(
+            ws,
+            content_root=ly.content_root,
+            process=effective_process,
+        )
+        resolved_dashboard_login_password = (
+            resolved_dashboard_login_password or ""
+        ).strip() or None
         maybe_boot_service_logging("gateway", ly.logs_dir)
         trace = await build_gateway_trace_sink_async(ws, ly, content_root=ly.content_root)
         trace_is_null = isinstance(trace, NullTraceSink)
@@ -1283,6 +1293,8 @@ def create_app(
         app.state.dashboard_auth_service = DashboardAuthService(
             workspace=ws,
             process_settings=effective_process,
+            resolved_login_password=resolved_dashboard_login_password,
+            resolved_gateway_token=resolved_gateway_token,
         )
         app.state.trigger_dispatch_gate = TriggerDispatchGate(effective_max_concurrent(ws))
         app.state.trigger_run_status = {}

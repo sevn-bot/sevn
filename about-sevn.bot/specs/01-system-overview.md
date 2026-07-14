@@ -8,7 +8,7 @@ summary: 'Give implementers a single picture of the runtime before feature work:
   boundaries under src/sevn/, allowed import directions, and the shared protocols
   that keep LLM wiring, observability, and '
 last_updated: '2026-07-14'
-fingerprint: sha256:35b7a872a6c253011ae977d080c2e8eefc1af46171ed018377bc6d4e88ace45e
+fingerprint: sha256:9faced107902c5c61b5b1d2d31122823f4c01815d70a93df6a144d28161a6278
 related: []
 sources:
 - src/sevn/**
@@ -1982,6 +1982,9 @@ interfaces:
 - name: register
   file: src/sevn/cli/commands/dashboard_cmd.py
   symbol: register
+- name: register_set_login_password
+  file: src/sevn/cli/commands/dashboard_set_login_password.py
+  symbol: register_set_login_password
 - name: register
   file: src/sevn/cli/commands/deploy_cmd.py
   symbol: register
@@ -2180,6 +2183,12 @@ interfaces:
 - name: dashboard_http_failure
   file: src/sevn/cli/dashboard_api_client.py
   symbol: dashboard_http_failure
+- name: DashboardLoginPasswordStoreResult
+  file: src/sevn/cli/dashboard_login_password_store.py
+  symbol: DashboardLoginPasswordStoreResult
+- name: store_dashboard_login_password_local
+  file: src/sevn/cli/dashboard_login_password_store.py
+  symbol: store_dashboard_login_password_local
 - name: AgentRunReport
   file: src/sevn/cli/doctor/agent.py
   symbol: AgentRunReport
@@ -5693,6 +5702,27 @@ interfaces:
 - name: check_readme_tree
   file: src/sevn/docs/readme/check.py
   symbol: check_readme_tree
+- name: CurateResult
+  file: src/sevn/docs/readme/curate.py
+  symbol: CurateResult
+- name: RunnerKind
+  file: src/sevn/docs/readme/curate.py
+  symbol: RunnerKind
+- name: build_prompt
+  file: src/sevn/docs/readme/curate.py
+  symbol: build_prompt
+- name: curate_entry
+  file: src/sevn/docs/readme/curate.py
+  symbol: curate_entry
+- name: diff_for_globs
+  file: src/sevn/docs/readme/curate.py
+  symbol: diff_for_globs
+- name: invoke_runner
+  file: src/sevn/docs/readme/curate.py
+  symbol: invoke_runner
+- name: resolve_runner
+  file: src/sevn/docs/readme/curate.py
+  symbol: resolve_runner
 - name: compute_digest
   file: src/sevn/docs/readme/fingerprint.py
   symbol: compute_digest
@@ -5837,6 +5867,21 @@ interfaces:
 - name: validate_symbol_refs
   file: src/sevn/docs/readme/symbol_refs.py
   symbol: validate_symbol_refs
+- name: Heading
+  file: src/sevn/docs/readme/templates.py
+  symbol: Heading
+- name: TemplateError
+  file: src/sevn/docs/readme/templates.py
+  symbol: TemplateError
+- name: load_template_headings
+  file: src/sevn/docs/readme/templates.py
+  symbol: load_template_headings
+- name: resolve_template_path
+  file: src/sevn/docs/readme/templates.py
+  symbol: resolve_template_path
+- name: validate_against_template
+  file: src/sevn/docs/readme/templates.py
+  symbol: validate_against_template
 - name: EvolutionApproval
   file: src/sevn/evolution/approvals.py
   symbol: EvolutionApproval
@@ -6515,6 +6560,9 @@ interfaces:
 - name: generate_gateway_token
   file: src/sevn/gateway/gateway_token.py
   symbol: generate_gateway_token
+- name: resolve_config_ref
+  file: src/sevn/gateway/gateway_token.py
+  symbol: resolve_config_ref
 - name: resolve_gateway_token_ref
   file: src/sevn/gateway/gateway_token.py
   symbol: resolve_gateway_token_ref
@@ -11384,6 +11432,15 @@ interfaces:
 - name: traces_query
   file: src/sevn/ui/dashboard/api/traces.py
   symbol: traces_query
+- name: generate_dashboard_login_password
+  file: src/sevn/ui/dashboard/dashboard_password.py
+  symbol: generate_dashboard_login_password
+- name: resolve_dashboard_login_password_ref
+  file: src/sevn/ui/dashboard/dashboard_password.py
+  symbol: resolve_dashboard_login_password_ref
+- name: validate_dashboard_login_password_plaintext
+  file: src/sevn/ui/dashboard/dashboard_password.py
+  symbol: validate_dashboard_login_password_plaintext
 - name: ActionDescriptor
   file: src/sevn/ui/dashboard/dashboard_schema.py
   symbol: ActionDescriptor

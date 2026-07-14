@@ -12,6 +12,8 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- `sevn dashboard set-login-password` stores the Mission Control owner password in the workspace secrets chain and stamps `dashboard.login_password` with a `${SECRET:…}` ref
+- README curated templates (`docs/readmes/_templates/<slug>.md`) with outline validation in `sevn readme check`, plus `sevn readme curate <slug>` and a `readme-curator` agent (`.claude`/`.cursor`) that edits a curated README from its source diff via a pluggable runner (`cursor-agent`/`claude`); the `sevn-readme-sync` pre-commit hook auto-curates and stages curated slugs (`SEVN_README_AGENT=0`/`strict` controls, `make readme-curate`)
 - README `curated` manifest flag and `sevn readme fingerprint` command so hand-authored subsystem READMEs are stamped without body rewrites
 - Advisory `make md-links-check` markdown link checker for tracked docs outside `about-sevn.bot/` (`scripts/check_markdown_links.py`; `ci-quality` tier only)
 - Bundled skills, workspace templates, doctor solutions, docs site (`about-sevn.bot/`), readme pipeline (`docs/readmes/`), brand assets, and remaining test suites for the pre-0.0.1 migration import (I5)
@@ -32,6 +34,8 @@ are cut into a dated, versioned section at release time.
 
 ### Removed
 
+- `about-sevn.bot/DOC-VS-CODE-ANALYSIS.md` — operator audit belongs in `.ignorelocal/`; its presence broke `about-site-check` for PRs merging `pre-0.0.1`
+
 ### Fixed
 
 - `list your skills` reply no longer truncates skill descriptions at ~80 chars: `compose_list_skills_reply` now prefers the full manifest description from the skill inventory over the clipped Triager routing-index line
@@ -39,6 +43,9 @@ are cut into a dated, versioned section at release time.
 - Tier-B empty-output retry exhaustion (`Exceeded maximum output retries`) is treated as a deterministic harness failure, skipping the wasteful widened full-index retry that reproduced it and contributed to `executor_timeout_cancel` (the summarize / partial-progress path still runs)
 - Tier-B blocks a single tool after `TIER_B_TOOL_FAILURE_HARD_CAP` (5) errors in one turn with a terminal synthesis steer, stopping loops where the model varies arguments each attempt (e.g. guessing CLI subcommands or rewriting `run_code`) that previously ground to the round/timeout budget
 - Printing Press skill wrappers (`espn`, `flight_goat`, `movie_goat`, `recipe_goat`) tokenise `--query` on whitespace with quotes respected, so multi-word subcommands like `news soccer fifa.world` reach the CLI as separate argv instead of one bogus subcommand token; `--query` help and `references/espn.md` document the `news <sport> <league>` form (e.g. World Cup = `news soccer fifa.world`)
+- Mission Control owner login resolves `${SECRET:…}` dashboard and gateway password refs at boot instead of comparing against placeholder strings
+- `sevn dashboard set-login-password` stamps `sevn.json` only after the secrets write succeeds; doctest mocks frozen `GatewayTokenBootstrap.chain` correctly
+- README curation: strict pre-commit mode no longer stamps fingerprints when agent curation fails; curator runner subprocess uses minimal env and redacts error output
 - README `make readme-scaffold` protects curated bodies: stale slugs get fingerprint-only stamps, never body rewrites or section stubs
 - README `_write_entries` doctest uses non-curated `storage` row after gateway manifest curation
 - Self-improve trajectory ingest circular import: move `ensure_trace_connection` to `agent.tracing.traces_migrate` and rewrite `docs/readmes/self-improve.md` Level 1–2 with preset-C audit

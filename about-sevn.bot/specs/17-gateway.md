@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-07-14'
-fingerprint: sha256:0ed687906f40ad83ab6da708f484d6aac5f4914dca351a2343ad2fa3b199b384
+fingerprint: sha256:61f04460627e6eb54c155043e455e5938ccba6abc2515cc62458d124d76314eb
 related: []
 sources:
 - src/sevn/gateway/**
@@ -444,6 +444,9 @@ interfaces:
 - name: generate_gateway_token
   file: src/sevn/gateway/gateway_token.py
   symbol: generate_gateway_token
+- name: resolve_config_ref
+  file: src/sevn/gateway/gateway_token.py
+  symbol: resolve_config_ref
 - name: resolve_gateway_token_ref
   file: src/sevn/gateway/gateway_token.py
   symbol: resolve_gateway_token_ref

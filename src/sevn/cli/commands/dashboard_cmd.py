@@ -58,7 +58,10 @@ def _dashboard_login_password_configured(workspace: WorkspaceConfig) -> bool:
         ...     WorkspaceConfig,
         ... )
         >>> ws = WorkspaceConfig.minimal(
-        ...     dashboard=DashboardWorkspaceConfig(enabled=True, login_password="x"),
+        ...     dashboard=DashboardWorkspaceConfig(
+        ...         enabled=True,
+        ...         login_password="${SECRET:keychain:sevn.dashboard.password}",
+        ...     ),
         ... )
         >>> _dashboard_login_password_configured(ws)
         True
@@ -85,6 +88,10 @@ def register(app: typer.Typer) -> None:
         invoke_without_command=True,
     )
     app.add_typer(dash, name="dashboard")
+
+    from sevn.cli.commands.dashboard_set_login_password import register_set_login_password
+
+    register_set_login_password(dash)
 
     @dash.callback()
     def dashboard_root(
@@ -180,7 +187,7 @@ def register(app: typer.Typer) -> None:
             )
         elif tunnel:
             typer.echo(
-                "Tunnel is active: set dashboard.login_password in sevn.json before "
+                "Tunnel is active: run `sevn dashboard set-login-password` before "
                 "exposing Mission Control on the public internet."
             )
         else:
