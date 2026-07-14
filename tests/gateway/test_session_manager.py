@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from sevn.gateway.session_manager import SessionManager, _utc_now_iso
-from sevn.gateway.timestamps import to_user_tz
+from sevn.gateway.util.timestamps import to_user_tz
 from sevn.storage.migrate import apply_migrations
 from sevn.storage.sqlite import connect_sqlite
 

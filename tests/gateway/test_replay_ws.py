@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from sevn.gateway.replay_job_events import ReplayJobEventFanout, replay_ws_topic
+from sevn.gateway.replay.replay_job_events import ReplayJobEventFanout, replay_ws_topic
 
 
 class _RecordingHub:

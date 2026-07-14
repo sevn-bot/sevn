@@ -2,7 +2,7 @@
 
 Module: sevn.gateway.commands.core_commands
 Depends: sevn.config.model_resolution, sevn.gateway.commands.ask_config,
-    sevn.gateway.commands.shortcuts_store, sevn.gateway.workspace_config_io
+    sevn.gateway.commands.shortcuts_store, sevn.gateway.config_io.workspace_config_io
 
 Exports:
     CoreCommandHandler — ``/start`` … ``/model`` + deep-link handoffs.
@@ -21,7 +21,7 @@ from sevn.config.model_resolution import ModelSlot, resolve_model_slot
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.gateway.commands.ask_config import format_ask_config_reply, parse_ask_config_query
 from sevn.gateway.commands.shortcuts_store import find_shortcut
-from sevn.gateway.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
+from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
 from sevn.onboarding.web_app import _get_nested, _set_nested
 from sevn.voice.factory import resolve_effective_tts_mode
 

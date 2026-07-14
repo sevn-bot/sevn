@@ -2,7 +2,7 @@
 
 Module: sevn.gateway.commands.menu_command_invoke
 Depends: sevn.gateway.channel_router, sevn.gateway.commands.core_commands,
-    sevn.gateway.menu
+    sevn.gateway.menu.menu
 
 Exports:
     MenuCommandInvoker — dispatch ``cfg:help:cmd:*`` / ``menu:cmd:*`` to slash handlers.
@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, cast
 if TYPE_CHECKING:
     from sevn.gateway.channel_router import ChannelRouter, IncomingMessage
     from sevn.gateway.commands.core_commands import CoreCommandHandler
-    from sevn.gateway.menu import ConfigMenuHandler, MenuCallbackHandler
+    from sevn.gateway.menu.menu import ConfigMenuHandler, MenuCallbackHandler
 
 from sevn.gateway.channel_router import IncomingMessage, OutgoingMessage, _telegram_reply_metadata
 

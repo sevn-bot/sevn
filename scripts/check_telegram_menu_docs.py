@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Gate: ``Telegram Menu.html`` structure matches live ``/config`` keyboards.
 
-Compares rendered keyboards from :mod:`sevn.gateway.menu` to the developer
+Compares rendered keyboards from :mod:`sevn.gateway.menu.menu` to the developer
 catalog in ``about-sevn.bot/Telegram Menu.html``. With ``--scaffold``, inserts
 WIP/TODO ``btn(...)`` and section stubs for missing rows (never overwrites prose).
 
@@ -87,7 +87,7 @@ def _registry_notes(callback_data: str) -> str | None:
         >>> _registry_notes("cfg:nav:home") is None or isinstance(_registry_notes("cfg:nav:home"), str)
         True
     """
-    from sevn.gateway.menu_registry import match_menu_button_spec
+    from sevn.gateway.menu.menu_registry import match_menu_button_spec
 
     spec = match_menu_button_spec(callback_data)
     if spec is None or not spec.notes:

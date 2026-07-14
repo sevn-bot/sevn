@@ -6,7 +6,7 @@ import asyncio
 
 import pytest
 
-from sevn.gateway.dashboard_pin import DashboardPinPublisher, default_pin_keyboard
+from sevn.gateway.dashboard.dashboard_pin import DashboardPinPublisher, default_pin_keyboard
 
 
 @pytest.mark.asyncio

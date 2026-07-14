@@ -21,9 +21,9 @@ from sevn.config.workspace_config import (
 )
 from sevn.gateway.channel_router import ChannelRouter, IncomingMessage
 from sevn.gateway.commands.dispatcher import CommandDispatcher
-from sevn.gateway.media_store import MediaStore
-from sevn.gateway.queue_multi import MultiDispatchHooks, MultiSpawnOutcome
-from sevn.gateway.rate_limit import TokenBucketLimiter
+from sevn.gateway.media.media_store import MediaStore
+from sevn.gateway.queue.queue_multi import MultiDispatchHooks, MultiSpawnOutcome
+from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
 from sevn.gateway.session_manager import SessionManager, unanswered_tail_message_id
 from sevn.onboarding.validate import validate_workspace_document
 from sevn.security.llm_guard_scanner import LLMGuardScanner, ScanResult, ScanVerdict
@@ -367,7 +367,7 @@ async def test_multi_new_task_spawns_without_queueing(
 
 def test_routing_footer_includes_distinct_subagent_tags() -> None:
     from sevn.agent.triager.models import ComplexityTier, Intent, TriageResult
-    from sevn.gateway.routing_footer import append_routing_footer
+    from sevn.gateway.routing.routing_footer import append_routing_footer
 
     triage = TriageResult(
         intent=Intent.NEW_REQUEST,

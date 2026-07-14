@@ -19,7 +19,7 @@ from sevn.cli.errors import CliPreconditionError
 from sevn.cli.workspace import load_bound_workspace
 from sevn.config.sections.features import _normalise_vault_path
 from sevn.config.workspace_config import WorkspaceConfig
-from sevn.gateway.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
+from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
 from sevn.onboarding.web_app import _set_nested
 from sevn.second_brain.bootstrap import ensure_second_brain_scope_layout
 from sevn.second_brain.paths import display_scope_root_relative, effective_scope, resolve_scope_root

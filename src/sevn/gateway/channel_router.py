@@ -46,6 +46,11 @@ from sevn.channels.telegram_rich import should_use_rich
 from sevn.config.defaults import DEFAULT_GATEWAY_QUEUE_MODE, VOICE_INBOUND_TRANSCRIPT_PREFIX
 from sevn.config.sections.channels import resolve_busy_input_mode
 from sevn.config.workspace_config import WorkspaceConfig
+from sevn.gateway.access.slash_access import (
+    canonical_slash_command,
+    policy_for_message,
+    slash_allowed_for_actor,
+)
 from sevn.gateway.channel_types import (
     ChannelAdapter as ChannelAdapter,
 )
@@ -56,39 +61,34 @@ from sevn.gateway.channel_types import (
     OutgoingMessage as OutgoingMessage,
 )
 from sevn.gateway.commands.dispatcher import CommandDispatcher
-from sevn.gateway.lcm_ingest import ingest_gateway_message_row
-from sevn.gateway.media_store import MediaStore
-from sevn.gateway.pairing import PairingStore
-from sevn.gateway.platform_runtime import PlatformRuntimeRegistry
-from sevn.gateway.queue_multi import (
+from sevn.gateway.lcm.lcm_ingest import ingest_gateway_message_row
+from sevn.gateway.media.media_store import MediaStore
+from sevn.gateway.onboarding.pairing import PairingStore
+from sevn.gateway.queue.queue_multi import (
     MultiDispatchHooks,
     MultiSpawnOutcome,
     in_flight_task_summary_for_session,
 )
-from sevn.gateway.rate_limit import TokenBucketLimiter
-from sevn.gateway.response_filters import is_intentional_silence_response
+from sevn.gateway.routing.response_filters import is_intentional_silence_response
+from sevn.gateway.runtime.platform_runtime import PlatformRuntimeRegistry
+from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
+from sevn.gateway.session.session_reset import resolve_session_reset_policy, session_should_reset
 from sevn.gateway.session_manager import SessionManager
-from sevn.gateway.session_reset import resolve_session_reset_policy, session_should_reset
-from sevn.gateway.slash_access import (
-    canonical_slash_command,
-    policy_for_message,
-    slash_allowed_for_actor,
-)
-from sevn.gateway.strings import (
-    VOICE_DISABLED_USER_MESSAGE,
-    VOICE_INBOUND_REJECTED_TOO_LARGE,
-    VOICE_INBOUND_REJECTED_TOO_LONG,
-    blocked_inbound_user_message,
-)
-from sevn.gateway.telegram_inline import try_route_telegram_inline
-from sevn.gateway.telegram_quick_actions import (
+from sevn.gateway.telegram.telegram_inline import try_route_telegram_inline
+from sevn.gateway.telegram.telegram_quick_actions import (
     GATEWAY_OUTBOUND_PHASE_KEY,
     build_quick_action_inline_keyboard,
     is_telegram_fast_callback_ack,
     record_assistant_platform_message,
     telegram_fast_callback_ack_text,
 )
-from sevn.gateway.turn_media import build_turn_media_summaries
+from sevn.gateway.turn.turn_media import build_turn_media_summaries
+from sevn.gateway.util.strings import (
+    VOICE_DISABLED_USER_MESSAGE,
+    VOICE_INBOUND_REJECTED_TOO_LARGE,
+    VOICE_INBOUND_REJECTED_TOO_LONG,
+    blocked_inbound_user_message,
+)
 from sevn.logging.context import set_message_id as _set_log_message_id
 from sevn.plugins.hook import HookContext
 from sevn.prompts.fallbacks import ASSISTANT_NO_OUTPUT_PLACEHOLDER, TURN_EMPTY_FALLBACK_TEXT
@@ -140,7 +140,7 @@ _FENCED_CODE_RE = re.compile(r"(```.*?```|`[^`\n]+`)", re.DOTALL)
 def _reply_keyboard_enabled(workspace: WorkspaceConfig) -> bool:
     """Return effective ``channels.telegram.reply_keyboard.enabled`` (defaults ``True``).
 
-    Mirrors ``sevn.gateway.menu._telegram_reply_keyboard_enabled``; inlined
+    Mirrors ``sevn.gateway.menu.menu._telegram_reply_keyboard_enabled``; inlined
     here so :meth:`ChannelRouter.apply_workspace` can refresh adapter flags
     without importing the menu module (forbidden by import-linter contracts).
 
@@ -166,7 +166,7 @@ def _reply_keyboard_enabled(workspace: WorkspaceConfig) -> bool:
 def _dm_policy_label(workspace: WorkspaceConfig) -> str:
     """Return configured Telegram DM policy string (defaults to ``open``).
 
-    Mirrors ``sevn.gateway.menu._telegram_dm_policy``; inlined here so
+    Mirrors ``sevn.gateway.menu.menu._telegram_dm_policy``; inlined here so
     :meth:`ChannelRouter.apply_workspace` can refresh adapter flags without
     importing the menu module (forbidden by import-linter contracts).
 
@@ -439,7 +439,7 @@ class ChannelRouter:
             tts_pipeline (TextToSpeechPipeline | None): Optional TTS chain for tests.
             plugin_hook_chain (Any | None): Optional terminal transform chain
                 (`specs/34-plugin-hooks.md` §4.4) for outbound assistant text.
-            steer_store (Any | None): Optional :class:`~sevn.gateway.steer_store.SessionSteerStore`.
+            steer_store (Any | None): Optional :class:`~sevn.gateway.queue.steer_store.SessionSteerStore`.
         Examples:
             >>> import inspect
             >>> "workspace" in inspect.signature(ChannelRouter).parameters
@@ -509,7 +509,7 @@ class ChannelRouter:
         # (`specs/16-harness-discipline.md`; transcript-review item #9).
         self._last_turn_summary: dict[str, dict[str, Any]] = {}
         # Populated by ``http_server.create_app`` via
-        # :func:`sevn.gateway.deployment_id.load_or_create_deployment_id`
+        # :func:`sevn.gateway.runtime.deployment_id.load_or_create_deployment_id`
         # (`specs/17-gateway.md` §10.14 TE-1).
         self._deployment_id: str | None = None
         self._telegram_typing_tasks: dict[str, asyncio.Task[None]] = {}
@@ -743,7 +743,7 @@ class ChannelRouter:
 
     @property
     def media_store(self) -> MediaStore:
-        """Underlying :class:`~sevn.gateway.media_store.MediaStore` for HTTP handlers.
+        """Underlying :class:`~sevn.gateway.media.media_store.MediaStore` for HTTP handlers.
         Returns:
             MediaStore: The router's attachment store.
         Examples:
@@ -765,7 +765,7 @@ class ChannelRouter:
             turn_id (str): Turn / correlation id.
 
         Returns:
-            tuple: :class:`~sevn.gateway.turn_media.TurnMediaItem` rows with bytes
+            tuple: :class:`~sevn.gateway.turn.turn_media.TurnMediaItem` rows with bytes
             when materialised under ``channel_files/``.
 
         Examples:
@@ -773,7 +773,7 @@ class ChannelRouter:
             >>> inspect.isfunction(ChannelRouter.load_turn_media)
             True
         """
-        from sevn.gateway.turn_media import hydrate_turn_media, load_turn_media_summaries
+        from sevn.gateway.turn.turn_media import hydrate_turn_media, load_turn_media_summaries
 
         summaries = load_turn_media_summaries(
             self._sessions.connection,
@@ -788,7 +788,7 @@ class ChannelRouter:
         Single hook invoked by :meth:`MenuActionRouter._reload_workspace` and
         :meth:`CoreCommandHandler._reload_workspace`. Recomputes ``_queue_mode``
         from ``ws.gateway.queue_mode`` (defaults to ``cancel`` — same logic as
-        ``sevn.gateway.menu._gateway_queue_mode``, inlined here to keep
+        ``sevn.gateway.menu.menu._gateway_queue_mode``, inlined here to keep
         :mod:`sevn.gateway.channel_router` independent of the menu module per
         import-linter contracts), rebuilds the LLM Guard scanner + voice
         runtime, refreshes the Telegram adapter's reply keyboard / DM policy
@@ -1174,7 +1174,7 @@ class ChannelRouter:
         """Run STT on persisted ``voice`` / ``audio`` rows (`specs/20-voice.md` §2.3).
         Args:
             msg (IncomingMessage): Parsed inbound envelope (attachments updated in place).
-            session_id (str): Gateway session id under :class:`~sevn.gateway.media_store.MediaStore`.
+            session_id (str): Gateway session id under :class:`~sevn.gateway.media.media_store.MediaStore`.
             correlation_id (str): Correlation id for traces.
         Returns:
             tuple[str, str | None]: ``(user_text_for_scanner, cap_reject)`` where
@@ -1421,7 +1421,7 @@ class ChannelRouter:
                 attrs={"channel": msg.channel, "user_id": msg.user_id},
             )
             return
-        from sevn.gateway.coding_agent_router import CodingAgentRouter
+        from sevn.gateway.routing.coding_agent_router import CodingAgentRouter
 
         coding_router = CodingAgentRouter(workspace=self._workspace, trace=self._trace)
         bound_agent_id = coding_router.match_binding(msg)
@@ -2067,7 +2067,7 @@ class ChannelRouter:
         # next turn. The footer (when enabled) is still rendered on the outbound
         # ``filtered`` value below — but ``persisted_content`` is what
         # ``add_message`` writes, and it's authoritative for LLM read-back.
-        from sevn.gateway.routing_footer import strip_model_emitted_footer
+        from sevn.gateway.routing.routing_footer import strip_model_emitted_footer
 
         persisted_content = strip_model_emitted_footer(filtered).rstrip()
         if persisted_content.strip() == ASSISTANT_NO_OUTPUT_PLACEHOLDER:

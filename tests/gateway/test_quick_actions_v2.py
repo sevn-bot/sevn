@@ -14,7 +14,7 @@ from sevn.config.workspace_config import (
     WorkspaceConfig,
 )
 from sevn.gateway.channel_router import IncomingMessage
-from sevn.gateway.telegram_quick_actions import (
+from sevn.gateway.telegram.telegram_quick_actions import (
     QuickActionCallbackHandler,
     build_quick_action_inline_keyboard,
 )

@@ -102,7 +102,7 @@ def run_doctor_probes(
     )
 
     from sevn.cli.gateway_client import resolve_gateway_token
-    from sevn.gateway.gateway_token import GATEWAY_TOKEN_LOGICAL_KEY
+    from sevn.gateway.runtime.gateway_token import GATEWAY_TOKEN_LOGICAL_KEY
     from sevn.secrets.fingerprint import fingerprint_sha256_hex
 
     def _raw_gateway_token_ref(raw_doc: dict[str, Any]) -> str:

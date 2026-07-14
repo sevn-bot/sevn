@@ -2,7 +2,7 @@
 
 Module: sevn.evolution.spec_kit
 Depends: os, pathlib, subprocess, sevn.config.workspace_config, sevn.evolution.spec_kit_runs,
-    sevn.gateway.workspace_config_io
+    sevn.gateway.config_io.workspace_config_io
 
 Exports:
     ConstitutionPayload — constitution body + persistence metadata.
@@ -32,7 +32,7 @@ from sevn.config.workspace_config import (
     WorkspaceConfig,
 )
 from sevn.evolution import spec_kit_runs
-from sevn.gateway.workspace_config_io import mutate_sevn_json
+from sevn.gateway.config_io.workspace_config_io import mutate_sevn_json
 
 if TYPE_CHECKING:
     from sevn.workspace.layout import WorkspaceLayout

@@ -1,7 +1,7 @@
 """Tier-B multimodal user prompt construction (W10).
 
 Module: sevn.agent.adapters.tier_b_multimodal
-Depends: pydantic_ai.messages, sevn.gateway.turn_media
+Depends: pydantic_ai.messages, sevn.gateway.turn.turn_media
 
 Exports:
     TierBModalitySupport — provider capability flags for vision/document input.
@@ -24,7 +24,11 @@ from urllib.parse import urlparse
 
 from pydantic_ai.messages import BinaryContent, DocumentUrl, ImageUrl
 
-from sevn.gateway.turn_media import TurnMediaItem, hydrate_turn_media, load_turn_media_summaries
+from sevn.gateway.turn.turn_media import (
+    TurnMediaItem,
+    hydrate_turn_media,
+    load_turn_media_summaries,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -106,7 +110,7 @@ def _is_image_item(item: TurnMediaItem) -> bool:
         bool: ``True`` when the row is a photo/image MIME type.
 
     Examples:
-        >>> from sevn.gateway.turn_media import TurnMediaItem
+        >>> from sevn.gateway.turn.turn_media import TurnMediaItem
         >>> _is_image_item(
         ...     TurnMediaItem(
         ...         kind="photo",
@@ -132,7 +136,7 @@ def _is_pdf_item(item: TurnMediaItem) -> bool:
         bool: ``True`` for PDF documents.
 
     Examples:
-        >>> from sevn.gateway.turn_media import TurnMediaItem
+        >>> from sevn.gateway.turn.turn_media import TurnMediaItem
         >>> _is_pdf_item(
         ...     TurnMediaItem(
         ...         kind="document",
@@ -161,7 +165,7 @@ def _channel_file_ref(session_id: str, item: TurnMediaItem) -> str:
         str: Relative ``channel_files/…`` path.
 
     Examples:
-        >>> from sevn.gateway.turn_media import TurnMediaItem
+        >>> from sevn.gateway.turn.turn_media import TurnMediaItem
         >>> _channel_file_ref(
         ...     "s",
         ...     TurnMediaItem(
@@ -214,7 +218,7 @@ def _append_image_part(
         bool: ``True`` when an image part was appended.
 
     Examples:
-        >>> from sevn.gateway.turn_media import TurnMediaItem
+        >>> from sevn.gateway.turn.turn_media import TurnMediaItem
         >>> out: list[Any] = []
         >>> _append_image_part(
         ...     out,
@@ -253,7 +257,7 @@ def _append_document_part(
         bool: ``True`` when a document part was appended.
 
     Examples:
-        >>> from sevn.gateway.turn_media import TurnMediaItem
+        >>> from sevn.gateway.turn.turn_media import TurnMediaItem
         >>> out: list[Any] = []
         >>> _append_document_part(
         ...     out,

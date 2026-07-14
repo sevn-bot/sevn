@@ -20,7 +20,7 @@ from sevn.config.workspace_config import (
     WorkspaceConfig,
 )
 from sevn.gateway.http_server import MISSION_CONTROL_SPA_ROOT, create_app
-from sevn.gateway.webapp_qa import insert_structured_feedback
+from sevn.gateway.webapp.webapp_qa import insert_structured_feedback
 from sevn.self_improve.feedback import insert_feedback_event
 from sevn.self_improve.jobs.store import enqueue_job_row, update_job_state
 from sevn.self_improve.trajectories.ingest import ingest_trajectory_facts_from_traces

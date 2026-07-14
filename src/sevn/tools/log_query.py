@@ -41,8 +41,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, Literal
 
 from sevn.cli.log_redact import redact_log_line
-from sevn.gateway.sessions_query import session_operator_timezone
-from sevn.gateway.timestamps import resolve_time_range
+from sevn.gateway.session.sessions_query import session_operator_timezone
+from sevn.gateway.util.timestamps import resolve_time_range
 from sevn.storage import open_sevn_sqlite
 from sevn.tools.base import enveloped_failure, enveloped_success
 from sevn.tools.codes import ToolResultCode

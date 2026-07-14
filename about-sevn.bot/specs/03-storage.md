@@ -2,13 +2,13 @@
 id: spec-03-storage
 kind: spec
 title: Storage — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Own application persistence: connection setup (WAL, foreign keys), versioned
   migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence
   contracts for crash-resume and (w'
-last_updated: '2026-07-12'
-fingerprint: sha256:c8d8696bb48df26ee44ca00953ab251cbd6b6d6cfc93c2d07da470a38c46aa9c
+last_updated: '2026-07-14'
+fingerprint: sha256:34f61cb771058582360586333ab36dec8cf45a50d4f4a78442ac694de0d9f9e4
 related: []
 sources:
 - src/sevn/storage/**
@@ -67,11 +67,7 @@ interfaces:
 - name: open_sevn_sqlite
   file: src/sevn/storage/sqlite.py
   symbol: open_sevn_sqlite
-specs: []
-personas: []
-prd_profile: null
 ---
-
 
 ## Purpose
 
@@ -169,3 +165,9 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Human-input needed
+
+Prose body not yet authored (W9 scope). Normative contract requires operator or
+follow-up wave authoring against verified code (`sevn about-docs extract` + graphify).
+Do not mark `status: done` until `make -C spec-kit-wave spec-check` scores ≥ 80.

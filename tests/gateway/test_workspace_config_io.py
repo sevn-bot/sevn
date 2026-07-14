@@ -1,4 +1,4 @@
-"""Regression tests for :mod:`sevn.gateway.workspace_config_io`.
+"""Regression tests for :mod:`sevn.gateway.config_io.workspace_config_io`.
 
 Covers the gateway ``/config`` menu-toggle write path: an in-place runtime
 mutation must validate the document structurally yet tolerate a pre-existing,
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from sevn.gateway.workspace_config_io import mutate_sevn_json, set_nested
+from sevn.gateway.config_io.workspace_config_io import mutate_sevn_json, set_nested
 
 
 def _doc_with_uncredentialed_minimax_triager() -> dict[str, object]:

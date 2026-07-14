@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from sevn.config.workspace_config import WorkspaceConfig
-from sevn.gateway.telegram_resolve import resolve_telegram_bot_token
+from sevn.gateway.telegram.telegram_resolve import resolve_telegram_bot_token
 from sevn.security.secrets.backends.encrypted_file import EncryptedFileBackend
 from sevn.security.secrets.chain import SecretsChain
 

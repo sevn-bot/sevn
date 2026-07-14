@@ -33,7 +33,7 @@ from sevn.channels.markdown_safe import escape_markdown_v2
 from sevn.config.defaults import TELEGRAM_MAX_TEXT_LENGTH
 from sevn.config.sections.channels import TelegramInlineConfig, TelegramRichConfig
 from sevn.config.workspace_config import WorkspaceConfig
-from sevn.gateway.telegram_quick_actions import GATEWAY_OUTBOUND_PHASE_KEY
+from sevn.gateway.telegram.telegram_quick_actions import GATEWAY_OUTBOUND_PHASE_KEY
 
 
 class TelegramSendError(Exception):

@@ -57,7 +57,7 @@ from sevn.config.workspace_config import (
     TriggersWorkspaceConfig,
     WorkspaceConfig,
 )
-from sevn.gateway.mission_api import (
+from sevn.gateway.mission.mission_api import (
     fetch_subagents_mission_payload,
     kill_all_subagents_mission,
     kill_subagent_mission,

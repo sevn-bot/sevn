@@ -156,7 +156,7 @@ def resolve_gateway_token(
             return None
         from sevn.cli.asyncio_util import run_sync_coro
         from sevn.config.workspace_config import effective_encrypted_file_key_source
-        from sevn.gateway.gateway_token import resolve_gateway_token_ref
+        from sevn.gateway.runtime.gateway_token import resolve_gateway_token_ref
         from sevn.security.secrets.passphrase_prime import reconcile_unlock_env_with_keychain
 
         key_source = effective_encrypted_file_key_source(workspace.secrets_backend)

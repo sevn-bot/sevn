@@ -71,7 +71,7 @@ def _client(
 
     with (
         patch(
-            "sevn.gateway.gateway_token.resolve_gateway_token_ref",
+            "sevn.gateway.runtime.gateway_token.resolve_gateway_token_ref",
             return_value=_RESOLVED_GATEWAY_TOKEN,
         ),
         patch(

@@ -32,9 +32,9 @@ from loguru import logger
 
 from sevn.config.defaults import DEFAULT_GATEWAY_SESSION_MESSAGE_CAP_DM
 from sevn.config.workspace_config import LcmWorkspaceConfig, WorkspaceConfig
-from sevn.gateway.browser_lifecycle import close_browser_for_rotate
-from sevn.gateway.queue_multi import MultiDispatchHooks, MultiSpawnOutcome
-from sevn.gateway.session_mirror import mark_session_superseded, mirror_gateway_message
+from sevn.gateway.browser.browser_lifecycle import close_browser_for_rotate
+from sevn.gateway.queue.queue_multi import MultiDispatchHooks, MultiSpawnOutcome
+from sevn.gateway.session.session_mirror import mark_session_superseded, mirror_gateway_message
 
 DispatchFn = Callable[[str, str], Coroutine[Any, Any, None]]
 
@@ -53,7 +53,7 @@ def _utc_now_iso() -> str:
     message ``ts`` values line up with the service logs, which default to
     host-local time (``SEVN_LOG_TZ=local``; see
     :func:`sevn.logging.setup.resolve_service_log_timezone`). The offset is
-    always explicit, so downstream renderers (:func:`sevn.gateway.timestamps.
+    always explicit, so downstream renderers (:func:`sevn.gateway.util.timestamps.
     to_user_tz`) still convert into the user's zone without ambiguity, and
     pre-existing UTC (``+00:00``) rows continue to parse unchanged.
 
@@ -539,7 +539,7 @@ class SessionManager:
                 (new_sid, scope_key, channel, user_id, now, now),
             )
             if mirror_root is not None:
-                from sevn.gateway.bootstrap_state import bootstrap_completion_state
+                from sevn.gateway.bootstrap.bootstrap_state import bootstrap_completion_state
 
                 if bootstrap_completion_state(mirror_root, agent_name="Sevn") != "complete":
                     scope_rows = self._conn.execute(

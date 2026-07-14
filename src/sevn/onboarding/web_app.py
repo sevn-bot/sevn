@@ -2,7 +2,7 @@
 Module: sevn.onboarding.web_app
 Depends: fastapi, pathlib, pydantic, time, typing, sevn.onboarding.*
 **Routing:** ``sevn onboard --web`` starts this app on loopback; the gateway also
-mounts it at ``/onboarding`` via ``sevn.gateway.onboarding_mount`` (``specs/17-gateway.md``).
+mounts it at ``/onboarding`` via ``sevn.gateway.onboarding.onboarding_mount`` (``specs/17-gateway.md``).
 **Auth:** every request carries ``onboard_token`` via query string, ``X-Onboard-Token``
 header, or the ``sevn_onboard_session`` cookie. On the first authenticated hit the cookie
 is set automatically so that a plain browser refresh of ``/`` (where the query string is
@@ -285,7 +285,7 @@ def _expand_and_test_file(path_str: str) -> tuple[bool, str]:
 def _set_nested(doc: dict[str, Any], dotted: str, value: Any) -> None:
     """Assign ``value`` at a dot-separated path, creating intermediate dicts.
 
-    Thin wrapper over :func:`sevn.gateway.workspace_config_io.set_nested` (shared util).
+    Thin wrapper over :func:`sevn.gateway.config_io.workspace_config_io.set_nested` (shared util).
 
     Args:
         doc (dict[str, Any]): Target document (mutated in place).
@@ -297,7 +297,7 @@ def _set_nested(doc: dict[str, Any], dotted: str, value: Any) -> None:
         >>> d["gateway"]["port"]
         3001
     """
-    from sevn.gateway.workspace_config_io import set_nested
+    from sevn.gateway.config_io.workspace_config_io import set_nested
 
     set_nested(doc, dotted, value)
 
@@ -758,11 +758,14 @@ def _wizard_gateway_token_plaintext(fields: dict[str, Any]) -> str:
         str: Validated gateway bearer token (min 32 chars).
 
     Examples:
-        >>> from sevn.gateway.gateway_token import GATEWAY_TOKEN_MIN_CHARS
+        >>> from sevn.gateway.runtime.gateway_token import GATEWAY_TOKEN_MIN_CHARS
         >>> len(_wizard_gateway_token_plaintext({})) >= GATEWAY_TOKEN_MIN_CHARS
         True
     """
-    from sevn.gateway.gateway_token import generate_gateway_token, validate_gateway_token_plaintext
+    from sevn.gateway.runtime.gateway_token import (
+        generate_gateway_token,
+        validate_gateway_token_plaintext,
+    )
 
     raw = fields.get("wizard.gateway_token")
     if isinstance(raw, str) and raw.strip():
@@ -879,7 +882,7 @@ def _merge_wizard_payload(
     wc["enabled"] = True
     gw = merged.setdefault("gateway", {})
     if isinstance(gw, dict):
-        from sevn.gateway.gateway_token import GATEWAY_TOKEN_CONFIG_REF
+        from sevn.gateway.runtime.gateway_token import GATEWAY_TOKEN_CONFIG_REF
 
         gw.setdefault("token", GATEWAY_TOKEN_CONFIG_REF)
     return merged
@@ -976,7 +979,7 @@ async def _validate_field(
             return False, _redact_detail(str(exc))
         return True, "ok"
     if field_id == "wizard.gateway_token":
-        from sevn.gateway.gateway_token import validate_gateway_token_plaintext
+        from sevn.gateway.runtime.gateway_token import validate_gateway_token_plaintext
 
         try:
             validate_gateway_token_plaintext(str(value))

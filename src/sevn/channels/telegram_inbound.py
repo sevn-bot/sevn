@@ -32,7 +32,7 @@ from sevn.channels.telegram_config import (
 from sevn.channels.telegram_send_host import TelegramSendHost
 from sevn.config.defaults import TELEGRAM_UPDATE_DEDUP_CAP, TELEGRAM_UPDATE_DEDUP_TRIM_TO
 from sevn.gateway.channel_types import IncomingMessage
-from sevn.gateway.telegram_inline import resolve_inline_config
+from sevn.gateway.telegram.telegram_inline import resolve_inline_config
 
 
 class TelegramInboundMixin(TelegramSendHost):
@@ -542,7 +542,7 @@ class TelegramInboundMixin(TelegramSendHost):
         """Normalise an ``inline_query`` update into an :class:`IncomingMessage`.
 
         Inline queries have no chat context; per-source auth is applied in
-        :mod:`sevn.gateway.telegram_inline` (D8). Returns ``None`` when the
+        :mod:`sevn.gateway.telegram.telegram_inline` (D8). Returns ``None`` when the
         payload is malformed.
 
         Args:

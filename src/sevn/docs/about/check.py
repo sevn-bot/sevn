@@ -30,6 +30,14 @@ if TYPE_CHECKING:
 
     from sevn.docs.about.model import AboutDoc
 
+# Scaffold phrases that cannot coexist with ``status: done`` (D3/D5; mirrors spec-rules.toml).
+_SPEC_SCAFFOLD_PHRASES = (
+    "Offline scaffold for",
+    "Initial draft for",
+    "[NEEDS CLARIFICATION:",
+    "TBD",
+)
+
 
 def _iter_doc_paths(repo_root: Path) -> list[Path]:
     """Return markdown doc paths under ``about-sevn.bot/{prd,specs}/``.
@@ -182,6 +190,42 @@ def _check_fingerprint(repo_root: Path, doc: AboutDoc) -> list[str]:
     return []
 
 
+def _check_status_honesty(doc: AboutDoc, body: str) -> list[str]:
+    """Fail when a spec claims ``status: done`` over scaffold placeholder prose.
+
+    Args:
+        doc (AboutDoc): Loaded frontmatter.
+        body (str): Markdown body after frontmatter.
+
+    Returns:
+        list[str]: Status-honesty issue strings.
+
+    Examples:
+        >>> from datetime import date
+        >>> from sevn.docs.about.model import AboutDoc
+        >>> d = AboutDoc(
+        ...     id="spec-17-gateway",
+        ...     kind="spec",
+        ...     title="Gateway",
+        ...     status="done",
+        ...     owner="Alex",
+        ...     summary="Turn spine.",
+        ...     last_updated=date(2026, 6, 19),
+        ...     parent_prd="prd-01-main",
+        ...     sources=["src/sevn/gateway/**"],
+        ... )
+        >>> any("status honesty" in issue for issue in _check_status_honesty(d, "Offline scaffold for x"))
+        True
+    """
+    if doc.kind != "spec" or doc.status != "done":
+        return []
+    issues: list[str] = []
+    for phrase in _SPEC_SCAFFOLD_PHRASES:
+        if phrase in body:
+            issues.append(f"{doc.id}: status honesty: done status with scaffold phrase {phrase!r}")
+    return issues
+
+
 def _check_index_files(repo_root: Path, loaded: dict[str, AboutDoc]) -> list[str]:
     """Verify generated index README files match :func:`render_index` output.
 
@@ -243,7 +287,7 @@ def check_about_docs(repo_root: Path) -> list[str]:
 
     for path in _iter_doc_paths(repo_root):
         try:
-            doc, _body = load_doc(path)
+            doc, body = load_doc(path)
         except (OSError, ValueError, ValidationError) as exc:
             rel = path.relative_to(repo_root).as_posix()
             issues.append(f"{rel}: {exc}")
@@ -252,6 +296,7 @@ def check_about_docs(repo_root: Path) -> list[str]:
         if allowlist:
             issues.extend(_check_sources_and_interfaces(repo_root, doc, allowlist))
         issues.extend(_check_fingerprint(repo_root, doc))
+        issues.extend(_check_status_honesty(doc, body))
 
     known_ids = set(loaded)
     for doc_id, doc in loaded.items():

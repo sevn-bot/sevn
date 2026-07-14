@@ -220,6 +220,41 @@ class AboutDoc(BaseModel):
                 raise ValueError(msg)
         return self
 
+    def to_frontmatter_dict(self) -> dict[str, Any]:
+        """Return kind-filtered frontmatter for serialisation (D7).
+
+        PRD docs omit ``interfaces``, ``depends_on``, and ``build_phase``; spec
+        docs omit PRD-only keys. Empty optional lists are dropped except where the
+        schema requires explicit null (``parent_prd``).
+
+        Returns:
+            dict[str, Any]: YAML-ready frontmatter mapping.
+
+        Examples:
+            >>> from datetime import date
+            >>> AboutDoc(
+            ...     id="prd-00-main",
+            ...     kind="prd",
+            ...     title="Main",
+            ...     status="ready",
+            ...     owner="Alex",
+            ...     summary="Umbrella.",
+            ...     last_updated=date(2026, 6, 19),
+            ... ).to_frontmatter_dict().get("interfaces") is None
+            True
+        """
+        payload = self.model_dump(mode="json")
+        if self.kind == "prd":
+            for key in ("interfaces", "depends_on", "build_phase"):
+                payload.pop(key, None)
+        else:
+            for key in ("specs", "personas", "prd_profile"):
+                payload.pop(key, None)
+        for key, value in list(payload.items()):
+            if value == [] and key not in {"sources", "related"}:
+                payload.pop(key, None)
+        return payload
+
 
 def _default_schema_path() -> Path:
     """Return the checked-in about-docs JSON Schema path under the repo root.

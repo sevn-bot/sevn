@@ -23,10 +23,10 @@ from sevn.gateway.channel_router import (
     OutgoingMessage,
 )
 from sevn.gateway.commands.dispatcher import CommandDispatcher
-from sevn.gateway.media_store import MediaStore
-from sevn.gateway.rate_limit import TokenBucketLimiter
+from sevn.gateway.media.media_store import MediaStore
+from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
 from sevn.gateway.session_manager import SessionManager
-from sevn.gateway.telegram_quick_actions import (
+from sevn.gateway.telegram.telegram_quick_actions import (
     GATEWAY_OUTBOUND_PHASE_KEY,
     build_quick_action_inline_keyboard,
     lookup_assistant_row_by_platform_message,

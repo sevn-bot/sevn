@@ -10,9 +10,9 @@ import pytest
 
 from sevn.agent.harness.snapshots import ReplayTurnNotReplayableError, queue_dashboard_turn_replay
 from sevn.agent.tracing.traces_migrate import apply_traces_migrations
-from sevn.gateway.post_turn_hooks import PostTurnContext
-from sevn.gateway.replay_worker import TurnReplayWorker
-from sevn.gateway.replay_worker_hooks import _post_turn_replay_terminal
+from sevn.gateway.hooks.post_turn_hooks import PostTurnContext
+from sevn.gateway.replay.replay_worker import TurnReplayWorker
+from sevn.gateway.replay.replay_worker_hooks import _post_turn_replay_terminal
 from sevn.gateway.session_manager import SessionManager
 from sevn.storage.migrate import apply_migrations
 

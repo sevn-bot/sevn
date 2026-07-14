@@ -20,6 +20,7 @@ from sevn.config.workspace_config import (
     WebChatChannelConfig,
     WorkspaceConfig,
 )
+from sevn.gateway.api.web_transport import WebChannelTransport
 from sevn.gateway.auth import (
     JWTClaims,
     mint_webchat_jwt,
@@ -27,7 +28,6 @@ from sevn.gateway.auth import (
     verify_webchat_jwt,
 )
 from sevn.gateway.channel_router import IncomingMessage, OutgoingMessage
-from sevn.gateway.web_transport import WebChannelTransport
 
 
 class _CaptureWS:

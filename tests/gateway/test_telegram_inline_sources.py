@@ -11,8 +11,8 @@ import pytest
 
 from sevn.coding_agents.artifacts.vault import write_artifact
 from sevn.config.sections.channels import TelegramInlineConfig, TelegramInlineSourcesConfig
-from sevn.gateway.telegram_inline import build_inline_dispatch_context
-from sevn.gateway.telegram_inline_sources import (
+from sevn.gateway.telegram.telegram_inline import build_inline_dispatch_context
+from sevn.gateway.telegram.telegram_inline_sources import (
     InlineBuildContext,
     InlineSourceResult,
     build_agent_inline_results,
@@ -174,7 +174,7 @@ def test_artifacts_vault_read_error_isolated(tmp_path: Path) -> None:
         msg = "vault unavailable"
         raise OSError(msg)
 
-    import sevn.gateway.telegram_inline_sources as mod
+    import sevn.gateway.telegram.telegram_inline_sources as mod
 
     original = mod.list_all_runs
     mod.list_all_runs = _boom  # type: ignore[assignment]

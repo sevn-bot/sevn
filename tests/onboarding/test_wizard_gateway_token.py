@@ -10,7 +10,7 @@ from sevn.config.workspace_config import (
     SecretsBackendSectionConfig,
     parse_workspace_config,
 )
-from sevn.gateway.gateway_token import GATEWAY_TOKEN_CONFIG_REF, GATEWAY_TOKEN_LOGICAL_KEY
+from sevn.gateway.runtime.gateway_token import GATEWAY_TOKEN_CONFIG_REF, GATEWAY_TOKEN_LOGICAL_KEY
 from sevn.onboarding.validate import validate_workspace_document
 from sevn.onboarding.web_app import _merge_wizard_payload, _wizard_gateway_token_plaintext
 from sevn.onboarding.wizard_credentials import credentials_status, store_wizard_credentials

@@ -19,10 +19,10 @@ from loguru import logger
 from sevn.channels.telegram import TelegramAdapter, telegram_config_from_workspace
 from sevn.channels.webchat import WebChatAdapter, webchat_config_from_workspace
 from sevn.config.sections.channels import channel_is_enabled
+from sevn.gateway.api.web_transport import WebChannelTransport
 from sevn.gateway.boot_registry import BootContext, register_boot_hook
 from sevn.gateway.channel_router import ChannelAdapter, ChannelRouter
-from sevn.gateway.telegram_resolve import resolve_telegram_bot_token
-from sevn.gateway.web_transport import WebChannelTransport
+from sevn.gateway.telegram.telegram_resolve import resolve_telegram_bot_token
 from sevn.plugins.registry import load_channel_plugin_classes
 
 
@@ -123,7 +123,9 @@ async def register_enabled_channel_adapters(
         if not tg_secret.strip() and channels is not None and channels.telegram:
             mode_raw = (channels.telegram.mode or "poll").strip().lower()
             if mode_raw == "webhook":
-                from sevn.gateway.telegram_webhook_secret import ensure_webhook_secret_token
+                from sevn.gateway.telegram.telegram_webhook_secret import (
+                    ensure_webhook_secret_token,
+                )
 
                 tg_secret = ensure_webhook_secret_token(ws, ctx.layout.sevn_json_path)
         tg_cfg = telegram_config_from_workspace(

@@ -2,7 +2,7 @@
 id: spec-15-memory-lcm
 kind: spec
 title: Memory — LCM (Lossless Context Management) — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'LCM is the lossless conversation memory for a workspace (prd-02-personality-and-memory
   §5.2–§5.4): every qualifying message is stored; compaction summarises without deleting
@@ -232,3 +232,9 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Human-input needed
+
+Prose body not yet authored (W9 scope). Normative contract requires operator or
+follow-up wave authoring against verified code (`sevn about-docs extract` + graphify).
+Do not mark `status: done` until `make -C spec-kit-wave spec-check` scores ≥ 80.

@@ -6,15 +6,11 @@ status: ready
 owner: Alex
 summary: Self-hosted personal AI gateway—multi-channel, memory-rich, operator-owned—with
   tools, transparency, and control instead of vendor lock-in.
-last_updated: '2026-07-12'
+last_updated: '2026-07-14'
 fingerprint: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 related: []
 sources: []
 parent_prd: null
-depends_on: []
-build_phase: null
-interfaces: []
-specs: []
 personas:
 - operator
 prd_profile: standard

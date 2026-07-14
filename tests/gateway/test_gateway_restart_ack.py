@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from sevn.gateway.gateway_restart_ack import (
+from sevn.gateway.runtime.gateway_restart_ack import (
     _filter_snapshot_lines,
     _message_content_is_menu_noise,
     clear_pending_gateway_restarts,

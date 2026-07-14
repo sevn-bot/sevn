@@ -45,8 +45,8 @@ workspace-relative file tools (e.g. `read` with path
 - Turn dispatcher: `source_code/src/sevn/gateway/agent_turn.py`
 - HTTP server + lifespan: `source_code/src/sevn/gateway/http_server.py`
 - Channel router (outbound spine): `source_code/src/sevn/gateway/channel_router.py`
-- Session manager + JSONL mirror: `source_code/src/sevn/gateway/session_manager.py`, `source_code/src/sevn/gateway/session_mirror.py`
-- Turn finalizer (placeholder/edit dance): `source_code/src/sevn/gateway/turn_finalizer.py`
+- Session manager + JSONL mirror: `source_code/src/sevn/gateway/session_manager.py`, `source_code/src/sevn/gateway/session/session_mirror.py`
+- Turn finalizer (placeholder/edit dance): `source_code/src/sevn/gateway/turn/turn_finalizer.py`
 - Menus + callbacks: `source_code/src/sevn/gateway/commands/menu_action_router.py`,
   `source_code/src/sevn/gateway/commands/menu_form_handler.py`,
   `source_code/src/sevn/gateway/commands/file_link_callback_handler.py`
@@ -79,7 +79,7 @@ workspace-relative file tools (e.g. `read` with path
 - SQLite memory store: `source_code/src/sevn/tools/memory_tools.py`
 - Daily memory logs + dreaming: `source_code/src/sevn/memory/`
 - LCM (long-term context manager): `source_code/src/sevn/lcm/`
-- Workspace personality (SOUL/IDENTITY/USER/MEMORY load): `source_code/src/sevn/gateway/triage_context.py`
+- Workspace personality (SOUL/IDENTITY/USER/MEMORY load): `source_code/src/sevn/gateway/triage/triage_context.py`
 
 ### Code understanding
 
@@ -129,7 +129,7 @@ workspace-relative file tools (e.g. `read` with path
 
 - Operator docs: [`sub-agents.html`](sub-agents.html) (architecture chart and limits reference)
 - Registry + supervisor: `source_code/src/sevn/agent/subagents/registry.py`, `source_code/src/sevn/agent/subagents/supervisor.py`
-- Gateway wiring: `source_code/src/sevn/gateway/agent_turn.py`, `source_code/src/sevn/gateway/queue_multi.py`
+- Gateway wiring: `source_code/src/sevn/gateway/agent_turn.py`, `source_code/src/sevn/gateway/queue/queue_multi.py`
 - Spawn tool: `source_code/src/sevn/tools/subagent_spawn.py`
 - Config subtree: `source_code/src/sevn/config/sections/subagents.py`
 - Deterministic topology chart: `about-sevn.bot/_sources/subagents-topology.json` → `make subagents-chart`

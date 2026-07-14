@@ -7,7 +7,7 @@ import re
 import socket
 from pathlib import Path
 
-from sevn.gateway.deployment_id import load_or_create_deployment_id
+from sevn.gateway.runtime.deployment_id import load_or_create_deployment_id
 
 _DEPLOYMENT_ID_RE = re.compile(r"^[A-Za-z0-9._-]+-\d{14}-[0-9a-f]{6}$")
 

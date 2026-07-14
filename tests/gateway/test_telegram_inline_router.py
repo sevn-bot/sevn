@@ -15,10 +15,10 @@ from sevn.config.sections.channels import TelegramInlineConfig
 from sevn.config.workspace_config import parse_workspace_config
 from sevn.gateway.channel_router import ChannelRouter, IncomingMessage
 from sevn.gateway.commands.dispatcher import CommandDispatcher
-from sevn.gateway.media_store import MediaStore
-from sevn.gateway.rate_limit import TokenBucketLimiter
+from sevn.gateway.media.media_store import MediaStore
+from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
 from sevn.gateway.session_manager import SessionManager
-from sevn.gateway.telegram_inline import (
+from sevn.gateway.telegram.telegram_inline import (
     build_inline_dispatch_context,
     inline_user_may_use_agent_source,
     telegram_allowed_updates,
@@ -274,10 +274,10 @@ async def test_route_incoming_inline_does_not_persist_turn(tmp_path: Path) -> No
     )
     adapter.answer_inline_query = AsyncMock(return_value={"ok": True})  # type: ignore[method-assign]
 
-    import sevn.gateway.telegram_inline as inline_mod
+    import sevn.gateway.telegram.telegram_inline as inline_mod
 
     async def _empty_sources(ctx: Any, **kwargs: Any) -> tuple[Any, ...]:
-        from sevn.gateway.telegram_inline_sources import InlineSourceResult
+        from sevn.gateway.telegram.telegram_inline_sources import InlineSourceResult
 
         return tuple(
             InlineSourceResult(source=src, cache_time=300, results=())  # type: ignore[arg-type]
@@ -304,4 +304,4 @@ def test_smoke_post_split_telegram_inline_types_import() -> None:
     """W6: shared inline types module importable after router split."""
     import importlib
 
-    importlib.import_module("sevn.gateway.telegram_inline_types")
+    importlib.import_module("sevn.gateway.telegram.telegram_inline_types")

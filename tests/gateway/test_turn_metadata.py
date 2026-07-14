@@ -1,4 +1,4 @@
-"""Tests for ``sevn.gateway.turn_metadata`` (`PROBLEMS.md` §7 / Step §7)."""
+"""Tests for ``sevn.gateway.turn.turn_metadata`` (`PROBLEMS.md` §7 / Step §7)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import sqlite3
 
 import pytest
 
-from sevn.gateway.turn_metadata import (
+from sevn.gateway.turn.turn_metadata import (
     format_intent_footer_from_metadata,
     load_turn_metadata,
     record_turn_finished,

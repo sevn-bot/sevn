@@ -9,7 +9,7 @@ import time
 import pytest
 
 from sevn.config.defaults import DEFAULT_DISPATCHER_STATE_TTL_SECONDS
-from sevn.gateway.dispatcher_state import (
+from sevn.gateway.dispatcher.dispatcher_state import (
     dispatcher_state_ttl_for_kind,
     insert_dispatcher_state,
     sweep_expired_dispatcher_state,

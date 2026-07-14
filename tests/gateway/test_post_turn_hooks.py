@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from sevn.gateway.post_turn_hooks import (
+from sevn.gateway.hooks.post_turn_hooks import (
     PostTurnContext,
     clear_post_turn_hooks,
     register_post_turn_hook,
@@ -42,7 +42,7 @@ async def test_run_post_turn_hooks_core_cleanup() -> None:
     ctx = _ctx()
     with (
         patch("sevn.gateway.agent_turn._emit_gateway_span", new_callable=AsyncMock) as emit,
-        patch("sevn.gateway.post_turn_hooks.record_turn_finished") as record,
+        patch("sevn.gateway.hooks.post_turn_hooks.record_turn_finished") as record,
     ):
         await run_post_turn_hooks(ctx)
     ctx.router.cancel_telegram_typing.assert_called_once_with("sess-1")
@@ -66,7 +66,7 @@ async def test_registered_hooks_run_in_priority_order() -> None:
 
     with (
         patch("sevn.gateway.agent_turn._emit_gateway_span", new_callable=AsyncMock),
-        patch("sevn.gateway.post_turn_hooks.record_turn_finished"),
+        patch("sevn.gateway.hooks.post_turn_hooks.record_turn_finished"),
     ):
         await run_post_turn_hooks(_ctx())
 
@@ -89,7 +89,7 @@ async def test_hook_failure_is_isolated() -> None:
 
     with (
         patch("sevn.gateway.agent_turn._emit_gateway_span", new_callable=AsyncMock),
-        patch("sevn.gateway.post_turn_hooks.record_turn_finished"),
+        patch("sevn.gateway.hooks.post_turn_hooks.record_turn_finished"),
     ):
         await run_post_turn_hooks(_ctx())
 

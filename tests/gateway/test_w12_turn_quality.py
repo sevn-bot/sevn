@@ -10,8 +10,8 @@ import pytest
 from sevn.channels.telegram import TelegramAdapter, TelegramConfig
 from sevn.gateway.agent_turn import _deliverable_assistant_text, _strip_preamble_echo
 from sevn.gateway.channel_router import OutgoingMessage
-from sevn.gateway.telegram_quick_actions import build_quick_action_inline_keyboard
-from sevn.gateway.turn_finalizer import TierBAnswerFinalizer
+from sevn.gateway.telegram.telegram_quick_actions import build_quick_action_inline_keyboard
+from sevn.gateway.turn.turn_finalizer import TierBAnswerFinalizer
 from sevn.prompts.fallbacks import ASSISTANT_NO_OUTPUT_PLACEHOLDER
 
 

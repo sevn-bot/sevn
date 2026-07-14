@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver src/sevn/evolution/ and the operator-facing Evolution surface so
   sevn.bot can evolve its own codebase as a first-class product pillar — not an optional
   add-on — spanning understand → file work
-last_updated: '2026-07-12'
-fingerprint: sha256:9b3c337dbc7b272dfeeed4530df44d6f79fb344bec56c314fff513a5a80b8bd5
+last_updated: '2026-07-14'
+fingerprint: sha256:061ec4922dc42c711e2ccc36dd3bd6a8c49c083b52c572ba282a7b91b8c9204c
 related: []
 sources:
 - src/sevn/evolution/**
@@ -277,11 +277,7 @@ interfaces:
 - name: run_ci_smoke
   file: src/sevn/evolution/worktree.py
   symbol: run_ci_smoke
-specs: []
-personas: []
-prd_profile: null
 ---
-
 
 ## Purpose
 
@@ -354,3 +350,9 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Human-input needed
+
+Prose body not yet authored (W9 scope). Normative contract requires operator or
+follow-up wave authoring against verified code (`sevn about-docs extract` + graphify).
+Do not mark `status: done` until `make -C spec-kit-wave spec-check` scores ≥ 80.

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from sevn.agent.context_refs import expand_context_refs
-from sevn.gateway.openai_compat_api import build_openai_compat_router
+from sevn.gateway.api.openai_compat_api import build_openai_compat_router
 
 
 def test_expand_context_refs_injects_file(tmp_path) -> None:

@@ -1,7 +1,7 @@
 """Shared Mission Control runtime accessors for dashboard routes.
 
 Module: sevn.ui.dashboard.services.mission_runtime
-Depends: fastapi, sevn.gateway.mission_trace_sink
+Depends: fastapi, sevn.gateway.mission.mission_trace_sink
 
 Exports:
     mission_runtime_channels — channel health map from gateway mission state.
@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from sevn.gateway.mission_trace_sink import resolve_mission_control_state
+from sevn.gateway.mission.mission_trace_sink import resolve_mission_control_state
 
 if TYPE_CHECKING:
     from fastapi import Request

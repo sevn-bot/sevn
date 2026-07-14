@@ -2,7 +2,7 @@
 
 Module: sevn.cli.commands.tracing_cmd
 Depends: asyncio, typer, sevn.agent.tracing.logfire_config, sevn.cli.workspace,
-    sevn.gateway.workspace_config_io, sevn.security.secrets.factory
+    sevn.gateway.config_io.workspace_config_io, sevn.security.secrets.factory
 
 Exports:
     register — attach ``tracing`` Typer subapp to the root CLI.
@@ -27,7 +27,7 @@ from sevn.cli.errors import CliPreconditionError
 from sevn.cli.json_util import emit_json_success
 from sevn.cli.workspace import load_bound_workspace
 from sevn.config.workspace_config import WorkspaceConfig
-from sevn.gateway.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
+from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
 from sevn.security.secrets.factory import secrets_chain_from_workspace
 
 

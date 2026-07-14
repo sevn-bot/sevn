@@ -11,7 +11,7 @@ import pytest
 from sevn.code_understanding.graphify_mcp import build_effective_mcp_servers
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.data.bundled_skills import BUNDLED_SKILLS_ROOT
-from sevn.gateway.menu import _skill_enabled
+from sevn.gateway.menu.menu import _skill_enabled
 from sevn.skills.computer_use import (
     COMPUTER_USE_SKILL_ID,
     CUA_DRIVER_MCP_SERVER_ID,

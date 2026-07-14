@@ -27,10 +27,10 @@ from sevn.gateway.channel_router import (
     OutgoingMessage,
 )
 from sevn.gateway.commands.dispatcher import CommandDispatcher
-from sevn.gateway.media_store import MediaStore
-from sevn.gateway.rate_limit import TokenBucketLimiter
+from sevn.gateway.media.media_store import MediaStore
+from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
 from sevn.gateway.session_manager import SessionManager
-from sevn.gateway.turn_metadata import load_turn_metadata, record_turn_start
+from sevn.gateway.turn.turn_metadata import load_turn_metadata, record_turn_start
 from sevn.security.llm_guard_scanner import LLMGuardScanner
 from sevn.storage.migrate import apply_migrations
 
@@ -137,7 +137,7 @@ async def test_full_gateway_footer_with_triager_s_is_stripped_from_persistence(
     ON and the outbound copy still shows the footer.
     """
     from sevn.agent.triager.models import ComplexityTier, Intent, TriageResult
-    from sevn.gateway.routing_footer import append_routing_footer
+    from sevn.gateway.routing.routing_footer import append_routing_footer
 
     conn = sqlite3.connect(":memory:", check_same_thread=False)
     conn.execute("PRAGMA journal_mode=WAL")

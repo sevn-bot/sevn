@@ -20,9 +20,9 @@ from sevn.config.workspace_config import (
     WorkspaceConfig,
 )
 from sevn.gateway.http_server import create_app
-from sevn.gateway.menu import build_chat_menu_webapp_request
-from sevn.gateway.telegram_quick_actions import build_quick_action_inline_keyboard
-from sevn.gateway.webapp_viewer import (
+from sevn.gateway.menu.menu import build_chat_menu_webapp_request
+from sevn.gateway.telegram.telegram_quick_actions import build_quick_action_inline_keyboard
+from sevn.gateway.webapp.webapp_viewer import (
     attach_inline_viewer_launch_buttons,
     build_viewer_web_app_button,
     infer_viewer_payload_from_markdown,

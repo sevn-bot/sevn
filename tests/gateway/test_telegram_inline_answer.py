@@ -16,10 +16,10 @@ from sevn.config.sections.channels import TelegramInlineConfig
 from sevn.config.workspace_config import parse_workspace_config
 from sevn.gateway.channel_router import ChannelRouter, IncomingMessage
 from sevn.gateway.commands.dispatcher import CommandDispatcher
-from sevn.gateway.media_store import MediaStore
-from sevn.gateway.rate_limit import TokenBucketLimiter
+from sevn.gateway.media.media_store import MediaStore
+from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
 from sevn.gateway.session_manager import SessionManager
-from sevn.gateway.telegram_inline import (
+from sevn.gateway.telegram.telegram_inline import (
     INLINE_BOTFATHER_SETUP_NOTE,
     build_answer_inline_query_payload,
     build_inline_dispatch_context,
@@ -35,7 +35,7 @@ from sevn.gateway.telegram_inline import (
     try_route_telegram_inline,
     upgrade_inline_results_for_capability,
 )
-from sevn.gateway.telegram_inline_sources import inline_article_result
+from sevn.gateway.telegram.telegram_inline_sources import inline_article_result
 from sevn.security.llm_guard_scanner import LLMGuardScanner
 from sevn.storage.migrate import apply_migrations
 
@@ -237,7 +237,7 @@ async def test_dispatch_inline_query_answers_with_rich_content(tmp_path: Path) -
     adapter.answer_inline_query = AsyncMock(return_value={"ok": True})
 
     async def _fake_build_all(ctx: Any, **kwargs: Any) -> tuple[Any, ...]:
-        from sevn.gateway.telegram_inline_sources import InlineSourceResult
+        from sevn.gateway.telegram.telegram_inline_sources import InlineSourceResult
 
         row = inline_article_result(
             result_id="agent:0:abc",
@@ -272,7 +272,7 @@ async def test_dispatch_inline_query_answers_with_rich_content(tmp_path: Path) -
         allowed_users=[],
     )
 
-    import sevn.gateway.telegram_inline as inline_mod
+    import sevn.gateway.telegram.telegram_inline as inline_mod
 
     original = inline_mod.build_all_inline_source_results
     inline_mod.build_all_inline_source_results = _fake_build_all  # type: ignore[assignment]
@@ -316,10 +316,10 @@ async def test_try_route_inline_query_calls_answer(tmp_path: Path) -> None:
     )
     adapter.answer_inline_query = AsyncMock(return_value={"ok": True})  # type: ignore[method-assign]
 
-    import sevn.gateway.telegram_inline as inline_mod
+    import sevn.gateway.telegram.telegram_inline as inline_mod
 
     async def _empty_sources(ctx: Any, **kwargs: Any) -> tuple[Any, ...]:
-        from sevn.gateway.telegram_inline_sources import InlineSourceResult
+        from sevn.gateway.telegram.telegram_inline_sources import InlineSourceResult
 
         return tuple(
             InlineSourceResult(source=src, cache_time=300, results=())  # type: ignore[arg-type]
@@ -355,4 +355,4 @@ def test_smoke_post_split_telegram_inline_dispatch_import() -> None:
     """W6: inline dispatch submodule importable after router split."""
     import importlib
 
-    importlib.import_module("sevn.gateway.telegram_inline_dispatch")
+    importlib.import_module("sevn.gateway.telegram.telegram_inline_dispatch")

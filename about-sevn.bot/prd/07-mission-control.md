@@ -7,14 +7,12 @@ owner: Alex
 summary: Operator dashboard for traces, spend, provider health, and in-flight runs—so
   a capable self-hosted bot stays livable instead of flying blind after each turn.
 last_updated: '2026-07-14'
-fingerprint: sha256:815d492a6dafcae6ef81d25d5d9227cb50f23bf32018c77e5c9b4fe07c46c1d1
-related: []
+fingerprint: sha256:cc076a1312f6b814834bd2e8d7ae7a3c264f2cdaa204b73c134e0abc4dc9cb36
+related:
+- prd-05-cost-and-providers
 sources:
 - src/sevn/ui/**
 parent_prd: prd-00-main
-depends_on: []
-build_phase: null
-interfaces: []
 specs:
 - spec-04-tracing
 - spec-07-egress-proxy

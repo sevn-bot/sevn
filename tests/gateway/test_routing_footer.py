@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from sevn.agent.triager.models import ComplexityTier, Intent, TriageResult
 from sevn.config.workspace_config import WorkspaceConfig
-from sevn.gateway.routing_footer import (
+from sevn.gateway.routing.routing_footer import (
     append_routing_footer,
     format_routing_footer,
     strip_model_emitted_footer,

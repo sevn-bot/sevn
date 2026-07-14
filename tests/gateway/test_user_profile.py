@@ -1,4 +1,4 @@
-"""Tests for ``sevn.gateway.user_profile`` (`PROBLEMS.md` §4 / Step §4)."""
+"""Tests for ``sevn.gateway.user.user_profile`` (`PROBLEMS.md` §4 / Step §4)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import sqlite3
 
 import pytest
 
-from sevn.gateway.user_profile import (
+from sevn.gateway.user.user_profile import (
     UserProfile,
     get_user_profile,
     set_user_language_code,

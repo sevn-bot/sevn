@@ -50,9 +50,7 @@ PATH_RULES: tuple[PathRule, ...] = (
     PathRule(("pyproject.toml",), "security"),
     PathRule(
         (
-            "src/sevn/gateway/menu*.py",
-            "src/sevn/gateway/menu_registry.py",
-            "src/sevn/gateway/menu_readiness.py",
+            "src/sevn/gateway/menu/**",
             "about-sevn.bot/Telegram Menu.html",
             "about-sevn.bot/Telegram*",
             "scripts/check_telegram_menu*.py",
@@ -62,7 +60,7 @@ PATH_RULES: tuple[PathRule, ...] = (
     ),
     PathRule(
         (
-            "src/sevn/gateway/menu*.py",
+            "src/sevn/gateway/menu/**",
             "about-sevn.bot/Telegram Menu.html",
             "about-sevn.bot/Telegram*",
             "scripts/check_telegram_menu_docs.py",
@@ -173,6 +171,15 @@ PATH_RULES: tuple[PathRule, ...] = (
     ),
     PathRule(
         (
+            "about-sevn.bot/specs/**",
+            "about-sevn.bot/prd/**",
+            "spec-kit-wave/**",
+            "src/sevn/docs/about/**",
+        ),
+        "about-docs-check",
+    ),
+    PathRule(
+        (
             "about-sevn.bot/**",
             "scripts/build_about_site.py",
             "scripts/check_telegram_menu_docs.py",
@@ -214,6 +221,7 @@ TARGET_ORDER: tuple[str, ...] = (
     "tools-skills-inventory-check",
     "dreaming-allowlist-check",
     "readme-check",
+    "about-docs-check",
     "about-site-check",
     "code-index-check",
     "deploy-remote-report-check",
@@ -300,7 +308,7 @@ def _pattern_matches(rel_path: str, pattern: str) -> bool:
         bool: True on match.
 
     Examples:
-        >>> _pattern_matches("src/sevn/gateway/menu_registry.py", "src/sevn/gateway/menu*.py")
+        >>> _pattern_matches("src/sevn/gateway/menu/menu_registry.py", "src/sevn/gateway/menu/**")
         True
     """
     if fnmatch.fnmatch(rel_path, pattern):
@@ -365,9 +373,9 @@ def _module_dotted_name(src_path: Path) -> str | None:
         str | None: Dotted module name or ``None``.
 
     Examples:
-        >>> p = REPO_ROOT / "src/sevn/gateway/turn_bundle.py"
+        >>> p = REPO_ROOT / "src/sevn/gateway/turn/turn_bundle.py"
         >>> _module_dotted_name(p)
-        'sevn.gateway.turn_bundle'
+        'sevn.gateway.turn.turn_bundle'
     """
     try:
         rel = src_path.relative_to(REPO_ROOT / "src")
@@ -386,7 +394,7 @@ def _import_needles(modules: set[str]) -> set[str]:
         set[str]: Import-line substrings to search for.
 
     Examples:
-        >>> "from sevn.gateway" in _import_needles({"sevn.gateway.turn_bundle"})
+        >>> "from sevn.gateway" in _import_needles({"sevn.gateway.turn.turn_bundle"})
         True
     """
     needles: set[str] = set()
@@ -412,7 +420,7 @@ def _paired_test(src: Path) -> Path | None:
         Path | None: Matching test module or ``None``.
 
     Examples:
-        >>> p = REPO_ROOT / "src/sevn/gateway/bootstrap_capture.py"
+        >>> p = REPO_ROOT / "src/sevn/gateway/bootstrap/bootstrap_capture.py"
         >>> _paired_test(p) == REPO_ROOT / "tests/gateway/test_bootstrap_capture.py"
         True
     """
@@ -421,7 +429,12 @@ def _paired_test(src: Path) -> Path | None:
     except ValueError:
         return None
     candidate = REPO_ROOT / "tests" / rel.parent / f"test_{rel.stem}.py"
-    return candidate if candidate.is_file() else None
+    if candidate.is_file():
+        return candidate
+    if rel.parts[0] == "gateway" and len(rel.parts) >= 2:
+        flat = REPO_ROOT / "tests" / "gateway" / f"test_{rel.stem}.py"
+        return flat if flat.is_file() else None
+    return None
 
 
 def discover_related_tests(src_sevn: list[Path]) -> list[Path]:
@@ -568,8 +581,13 @@ def build_python_gate_steps(changed: list[Path]) -> list[tuple[str, list[str]]]:
         xdist_args = ["-n", xdist] if xdist and xdist != "0" else []
         steps.append(("pytest", [*uv, "pytest", *test_rel, *xdist_args, "-q"]))
     if src_sevn:
-        src_rel = [str(p.relative_to(REPO_ROOT)) for p in src_sevn]
-        steps.append(("doctest", [*uv, "pytest", "--doctest-modules", *src_rel, "-q"]))
+        if len(src_sevn) > 100:
+            steps.append(("doctest", ["make", "doctest"]))
+        else:
+            bundled = REPO_ROOT / "src" / "sevn" / "data" / "bundled_skills"
+            src_rel = [str(p.relative_to(REPO_ROOT)) for p in src_sevn if not _is_under(p, bundled)]
+            if src_rel:
+                steps.append(("doctest", [*uv, "pytest", "--doctest-modules", *src_rel, "-q"]))
     return steps
 
 

@@ -19,6 +19,9 @@ forbid_trailing_period = true
 require_sentence_case = true
 # Any issue/PR reference must match this pattern (advisory warning otherwise).
 ref_pattern = "#\\d+"
+# Unreleased bullets must start with a leading datestamp (D10).
+require_datestamp = true
+datestamp_pattern = "^\\[\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}Z)?\\]"
 
 [diff_gate]
 # Default base ref; override with $SEVN_CI_BASE. A leading `origin/` is tried both ways.

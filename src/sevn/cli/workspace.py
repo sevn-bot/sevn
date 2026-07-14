@@ -213,7 +213,7 @@ def load_doctor_workspace() -> BoundWorkspace:
         ) from exc
     if not isinstance(raw, dict):
         raise CliPreconditionError("sevn.json must be a JSON object", exit_code=4)
-    from sevn.gateway.gateway_token import GATEWAY_TOKEN_CONFIG_REF
+    from sevn.gateway.runtime.gateway_token import GATEWAY_TOKEN_CONFIG_REF
 
     parse_doc: dict[str, Any] = dict(raw)
     gateway_section = parse_doc.get("gateway")

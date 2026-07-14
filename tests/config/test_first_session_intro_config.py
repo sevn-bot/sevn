@@ -16,7 +16,7 @@ from sevn.config.workspace_config import (
     WorkspaceConfig,
     parse_workspace_config,
 )
-from sevn.gateway.first_session import first_session_intro_max_output_tokens
+from sevn.gateway.onboarding.first_session import first_session_intro_max_output_tokens
 
 _SCHEMA = Path(__file__).resolve().parents[2] / "infra" / "sevn.schema.json"
 

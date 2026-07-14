@@ -1215,7 +1215,7 @@ async def triage_turn(
     session_id = session.session_id
     operator_name = None
     if content_root is not None:
-        from sevn.gateway.bootstrap_state import operator_name_from_user_md
+        from sevn.gateway.bootstrap.bootstrap_state import operator_name_from_user_md
 
         operator_name = operator_name_from_user_md(content_root)
     try:

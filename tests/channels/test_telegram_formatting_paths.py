@@ -31,7 +31,7 @@ import pytest
 from sevn.channels.telegram import TelegramConfig
 from sevn.channels.telegram_format import to_telegram
 from sevn.gateway.channel_router import OutgoingMessage
-from sevn.gateway.turn_finalizer import TierBAnswerFinalizer
+from sevn.gateway.turn.turn_finalizer import TierBAnswerFinalizer
 from tests.channels.test_markdown_safe import _MockTelegramAdapter
 
 _PARSE_MODE = "HTML"

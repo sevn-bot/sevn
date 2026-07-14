@@ -1,7 +1,7 @@
 """``sevn turn-bundle`` — offline bundle export and explorer (`specs/23-cli.md`).
 
 Module: sevn.cli.commands.turn_bundle_cmd
-Depends: json, sqlite3, typer, sevn.config.loader, sevn.gateway.turn_bundle, sevn.storage
+Depends: json, sqlite3, typer, sevn.config.loader, sevn.gateway.turn.turn_bundle, sevn.storage
 
 Exports:
     register — attach ``turn-bundle`` Typer subtree.
@@ -17,7 +17,7 @@ import typer
 
 from sevn.config.loader import find_sevn_json
 from sevn.config.workspace_config import parse_workspace_config
-from sevn.gateway.turn_bundle import (
+from sevn.gateway.turn.turn_bundle import (
     TurnBundleViewSection,
     TurnBundleViewStream,
     export_turn_bundles,

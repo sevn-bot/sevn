@@ -18,16 +18,16 @@ from sevn.gateway.agent_turn import _apply_routing_footer_once, build_agent_run_
 from sevn.gateway.channel_router import ChannelRouter, IncomingMessage, OutgoingMessage
 from sevn.gateway.commands.dispatcher import CommandDispatcher
 from sevn.gateway.commands.shortcuts_store import add_shortcut, find_shortcut
-from sevn.gateway.media_store import MediaStore
-from sevn.gateway.menu import (
+from sevn.gateway.media.media_store import MediaStore
+from sevn.gateway.menu.menu import (
     build_config_menu_keyboard,
     build_menu_keyboard,
     config_menu_message_text,
 )
-from sevn.gateway.rate_limit import TokenBucketLimiter
-from sevn.gateway.routing_footer import telegram_show_routing_enabled
+from sevn.gateway.routing.routing_footer import telegram_show_routing_enabled
+from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
 from sevn.gateway.session_manager import SessionManager
-from sevn.gateway.telegram_quick_actions import GATEWAY_OUTBOUND_PHASE_KEY
+from sevn.gateway.telegram.telegram_quick_actions import GATEWAY_OUTBOUND_PHASE_KEY
 from sevn.security.llm_guard_scanner import LLMGuardScanner
 from sevn.security.secrets.factory import secrets_chain_from_workspace
 from sevn.tools.registry import ToolSet
@@ -329,7 +329,7 @@ def _menu_callback(
 
 def test_help_keyboard_includes_status_and_stop() -> None:
     """Help section catalog documents ``/status`` and ``/stop`` slash commands."""
-    from sevn.gateway.menu_readiness import config_menu_help_catalog_text
+    from sevn.gateway.menu.menu_readiness import config_menu_help_catalog_text
 
     catalog = config_menu_help_catalog_text()
     assert "/status" in catalog
@@ -627,7 +627,7 @@ async def test_form_shortcut_add_not_toast_only(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_dashboard_create_pin_sends_registers_and_pins(tmp_path: Path) -> None:
     """C15.3 create pin sends dashboard body, registers id, and calls pinChatMessage."""
-    from sevn.gateway.dashboard_pin import lookup_dashboard_pin_message_id
+    from sevn.gateway.dashboard.dashboard_pin import lookup_dashboard_pin_message_id
 
     router, cap, _root = _build_router(tmp_path)
     await router.route_incoming(
@@ -690,7 +690,7 @@ async def test_dashboard_refresh_pin_requires_registry_entry(tmp_path: Path) -> 
 @pytest.mark.asyncio
 async def test_dashboard_unpin_removes_registry_and_unpins_chat(tmp_path: Path) -> None:
     """C15.4 unpin drops registry entry and calls unpinChatMessage."""
-    from sevn.gateway.dashboard_pin import lookup_dashboard_pin_message_id
+    from sevn.gateway.dashboard.dashboard_pin import lookup_dashboard_pin_message_id
 
     router, cap, _root = _build_router(tmp_path)
     router._telegram_dashboard_pins = {"42:0": 1001}
@@ -807,7 +807,7 @@ async def test_models_picker_page_navigation(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_models_pick_persists_to_sevn_json(tmp_path: Path) -> None:
     """Selecting a catalog row writes the slot in ``sevn.json`` and refreshes caption."""
-    from sevn.gateway.workspace_config_io import load_raw_sevn_json
+    from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json
     from sevn.onboarding.web_app import _get_nested
 
     router, cap, root = _build_models_router(tmp_path)
@@ -823,7 +823,7 @@ async def test_models_pick_persists_to_sevn_json(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_models_swap_last_model(tmp_path: Path) -> None:
     """C4.5 swap mirrors ``/model toggle`` using ``providers.last_used_model``."""
-    from sevn.gateway.workspace_config_io import load_raw_sevn_json
+    from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json
     from sevn.onboarding.web_app import _get_nested
 
     router, cap, root = _build_models_router(tmp_path)
@@ -897,7 +897,7 @@ def _my_sevn_bot_callbacks(*, is_owner: bool) -> list[str]:
 
 def test_my_sevn_bot_restart_buttons_ready() -> None:
     """C18.4/C18.5 are pressable (not gated) on owner keyboards."""
-    from sevn.gateway.menu_readiness import readiness_for_callback
+    from sevn.gateway.menu.menu_readiness import readiness_for_callback
 
     assert readiness_for_callback("act:gateway:restart") == "Ready"
     assert readiness_for_callback("act:proxy:restart") == "Ready"
@@ -1088,7 +1088,7 @@ async def test_dm_policy_cycle_mutates_and_refreshes(tmp_path: Path) -> None:
     await router.route_incoming(
         _config_callback(cycle_btn["callback_data"], callback_query_id="cq-dm"),
     )
-    from sevn.gateway.workspace_config_io import load_raw_sevn_json
+    from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json
     from sevn.onboarding.web_app import _get_nested
 
     doc = load_raw_sevn_json(sevn_json)
@@ -1141,8 +1141,8 @@ async def test_notify_policy_cycle_runtime_path(tmp_path: Path) -> None:
     root = tmp_path / "w"
     sevn_json = root / "sevn.json"
     router, cap, ws = _build_router(tmp_path)
-    from sevn.gateway.menu import _telegram_notify_policy
-    from sevn.gateway.workspace_config_io import load_raw_sevn_json
+    from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json
+    from sevn.gateway.menu.menu import _telegram_notify_policy
     from sevn.onboarding.web_app import _get_nested
 
     assert _telegram_notify_policy(router._workspace) == "all"
@@ -1240,7 +1240,7 @@ async def test_skill_toggle_mutates_sevn_json(
 ) -> None:
     """C7.2 skill enabled toggle writes ``skills.lcm.enabled`` when schema allows."""
     from sevn.config.loader import load_workspace
-    from sevn.gateway.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
+    from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
     from sevn.onboarding.web_app import _get_nested, _set_nested
 
     stub_surface = ToolSet(
@@ -1250,7 +1250,7 @@ async def test_skill_toggle_mutates_sevn_json(
         skill_descriptions={"lcm": "lcm — memory summaries"},
     )
     monkeypatch.setattr(
-        "sevn.gateway.menu._config_menu_tool_surface",
+        "sevn.gateway.menu.menu._config_menu_tool_surface",
         lambda _ws, _cr: stub_surface,
     )
 
@@ -1288,7 +1288,7 @@ async def test_openwiki_skill_toggle_mutates_sevn_json(
 ) -> None:
     """OpenWiki skill toggle writes ``skills.openwiki.enabled`` when schema allows."""
     from sevn.config.loader import load_workspace
-    from sevn.gateway.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
+    from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
     from sevn.onboarding.web_app import _get_nested, _set_nested
     from sevn.tools.registry import ToolSet
 
@@ -1299,7 +1299,7 @@ async def test_openwiki_skill_toggle_mutates_sevn_json(
         skill_descriptions={"openwiki": "LLM-generated agent wiki"},
     )
     monkeypatch.setattr(
-        "sevn.gateway.menu._config_menu_tool_surface",
+        "sevn.gateway.menu.menu._config_menu_tool_surface",
         lambda _ws, _cr: stub_surface,
     )
 
@@ -1334,7 +1334,7 @@ async def test_openwiki_skill_toggle_mutates_sevn_json(
 async def test_agent_display_name_form_updates_config(tmp_path: Path) -> None:
     """C19.2 display name wizard persists ``agent.display_name`` and refreshes caption."""
     from sevn.gateway.channel_router import IncomingMessage
-    from sevn.gateway.workspace_config_io import load_raw_sevn_json
+    from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json
     from sevn.onboarding.web_app import _get_nested
 
     router, cap, root = _build_owner_router(tmp_path)
@@ -1370,8 +1370,8 @@ async def test_rlm_backend_cycle_runtime(tmp_path: Path) -> None:
     """C9.2 C/D backend cycle persists and reloads on ``router._workspace``."""
     from sevn.agent.executors.cd_harness import _cd_backend
     from sevn.config.loader import load_workspace
-    from sevn.gateway.menu import _rlm_c_d_backend
-    from sevn.gateway.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
+    from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
+    from sevn.gateway.menu.menu import _rlm_c_d_backend
     from sevn.onboarding.web_app import _get_nested, _set_nested
 
     router, cap, _ws = _build_router(tmp_path)
@@ -1414,7 +1414,7 @@ async def test_rlm_backend_cycle_runtime(tmp_path: Path) -> None:
 async def test_lambda_rlm_toggle_updates_executor_gate(tmp_path: Path) -> None:
     """C9.1 λ-RLM opt-in toggle reloads harness gate on ``router._workspace``."""
     from sevn.agent.executors.cd_harness import _lambda_rlm_enabled
-    from sevn.gateway.workspace_config_io import load_raw_sevn_json
+    from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json
     from sevn.onboarding.web_app import _get_nested
 
     router, cap, ws = _build_router(tmp_path)
@@ -1445,7 +1445,7 @@ async def test_lambda_rlm_toggle_updates_executor_gate(tmp_path: Path) -> None:
 async def test_security_heuristic_toggle_reloads_scanner(tmp_path: Path) -> None:
     """C11.1 heuristic-only toggle reloads ``router._scanner`` config."""
     from sevn.config.workspace_config import SecurityWorkspaceConfig
-    from sevn.gateway.workspace_config_io import load_raw_sevn_json
+    from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json
     from sevn.onboarding.web_app import _get_nested
 
     router, cap, ws = _build_router(tmp_path)
@@ -1477,8 +1477,8 @@ async def test_security_heuristic_toggle_reloads_scanner(tmp_path: Path) -> None
 @pytest.mark.asyncio
 async def test_mycode_toggle_updates_runtime_flag(tmp_path: Path) -> None:
     """C10.1 MYCODE toggle reloads ``code_understanding.mycode.enabled``."""
-    from sevn.gateway.menu import _mycode_enabled
-    from sevn.gateway.workspace_config_io import load_raw_sevn_json
+    from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json
+    from sevn.gateway.menu.menu import _mycode_enabled
     from sevn.onboarding.web_app import _get_nested
 
     router, cap, ws = _build_router(tmp_path)
@@ -1508,7 +1508,7 @@ async def test_mycode_toggle_updates_runtime_flag(tmp_path: Path) -> None:
 async def test_code_review_graph_toggle_updates_mcp_gate(tmp_path: Path) -> None:
     """C10.2 review graph toggle reloads ``code_review_graph_mcp_enabled``."""
     from sevn.code_understanding.code_review_graph_mcp import code_review_graph_mcp_enabled
-    from sevn.gateway.workspace_config_io import load_raw_sevn_json
+    from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json
     from sevn.onboarding.web_app import _get_nested
 
     router, cap, ws = _build_router(tmp_path)
@@ -1539,7 +1539,7 @@ async def test_code_review_graph_toggle_updates_mcp_gate(tmp_path: Path) -> None
 async def test_self_improve_toggle_updates_effective_enabled(tmp_path: Path) -> None:
     """C12.1 self-improve toggle reloads ``effective_self_improve_enabled``."""
     from sevn.config.loader import load_workspace
-    from sevn.gateway.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
+    from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
     from sevn.onboarding.web_app import _get_nested, _set_nested
     from sevn.self_improve.effective import effective_self_improve_enabled
 
@@ -1606,7 +1606,7 @@ def test_wave9_sections_omit_urls_without_web_ui() -> None:
 @pytest.mark.asyncio
 async def test_queue_mode_reload_after_toggle(tmp_path: Path) -> None:
     """TE-2: toggling ``gateway.queue_mode`` updates ``router._queue_mode`` without restart."""
-    from sevn.gateway.menu import _gateway_queue_mode
+    from sevn.gateway.menu.menu import _gateway_queue_mode
 
     router, cap, _ws = _build_router(tmp_path)
     assert router._queue_mode == "cancel"

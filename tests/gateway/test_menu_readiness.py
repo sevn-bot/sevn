@@ -10,13 +10,13 @@ import pytest
 from sevn.cli.repo_sync import RepoSyncError
 from sevn.cli.workspace_schema import load_workspace_json_schema
 from sevn.config.workspace_config import WorkspaceConfig
-from sevn.gateway.menu import (
+from sevn.gateway.menu.menu import (
     _apply_operator_readiness_gate,
     _workspace_json_schema,
     build_config_menu_keyboard,
     config_menu_message_text,
 )
-from sevn.gateway.menu_readiness import (
+from sevn.gateway.menu.menu_readiness import (
     config_menu_help_catalog_text,
     gate_config_keyboard_rows,
     readiness_for_callback,

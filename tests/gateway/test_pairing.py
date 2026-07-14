@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sevn.gateway.pairing import PairingStore
+from sevn.gateway.onboarding.pairing import PairingStore
 
 
 def test_pairing_generate_and_approve(tmp_path: Path) -> None:

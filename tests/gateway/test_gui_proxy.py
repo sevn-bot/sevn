@@ -1,4 +1,4 @@
-"""Tests for ``sevn.gateway.gui_proxy``."""
+"""Tests for ``sevn.gateway.api.gui_proxy``."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
-from sevn.gateway.gui_proxy import (
+from sevn.gateway.api.gui_proxy import (
     GUI_SESSION_COOKIE,
     _upstream_ws_url,
     mount_gui_proxy,
@@ -55,7 +55,7 @@ def test_gui_proxy_forwards_query_string(gui_client: TestClient) -> None:
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("sevn.gateway.gui_proxy.httpx.AsyncClient", return_value=mock_client):
+    with patch("sevn.gateway.api.gui_proxy.httpx.AsyncClient", return_value=mock_client):
         response = gui_client.get("/gui/vnc.html?autoconnect=1&resize=scale")
 
     assert response.status_code == 200
@@ -83,7 +83,7 @@ def test_gui_accepts_token_query_param(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("sevn.gateway.gui_proxy.httpx.AsyncClient", return_value=mock_client):
+    with patch("sevn.gateway.api.gui_proxy.httpx.AsyncClient", return_value=mock_client):
         allowed = client.get(f"/gui/vnc.html?token={_GATEWAY_TOKEN}")
     assert allowed.status_code == 200
 
@@ -119,7 +119,7 @@ def test_gui_accepts_valid_cookie_when_query_token_is_wrong(
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("sevn.gateway.gui_proxy.httpx.AsyncClient", return_value=mock_client):
+    with patch("sevn.gateway.api.gui_proxy.httpx.AsyncClient", return_value=mock_client):
         response = client.get("/gui/vnc.html?token=wrong-token-at-least-32-characters-long")
     assert response.status_code == 200
 
@@ -146,7 +146,7 @@ def test_gui_renews_stale_session_cookie_on_new_token(monkeypatch: pytest.Monkey
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
 
-    with patch("sevn.gateway.gui_proxy.httpx.AsyncClient", return_value=mock_client):
+    with patch("sevn.gateway.api.gui_proxy.httpx.AsyncClient", return_value=mock_client):
         follow_up = client.get("/gui/vnc.html")
     assert follow_up.status_code == 200
 
@@ -173,7 +173,7 @@ def test_gui_ws_accepts_token_query_param(monkeypatch: pytest.MonkeyPatch) -> No
     app = FastAPI()
     mount_gui_proxy(app, resolve_gateway_token=lambda _request: _GATEWAY_TOKEN)
 
-    with patch("sevn.gateway.gui_proxy._relay_gui_websocket", new=AsyncMock(return_value=None)):
+    with patch("sevn.gateway.api.gui_proxy._relay_gui_websocket", new=AsyncMock(return_value=None)):
         client = TestClient(app)
         with client.websocket_connect(f"/gui/websockify?token={_GATEWAY_TOKEN}"):
             pass

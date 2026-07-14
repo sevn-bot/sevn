@@ -20,8 +20,9 @@ from sevn.gateway.agent_turn import build_agent_run_turn
 from sevn.gateway.channel_router import ChannelRouter, IncomingMessage
 from sevn.gateway.commands.dispatcher import CommandDispatcher
 from sevn.gateway.commands.menu_action_router import MenuActionRouter, parse_action_callback
-from sevn.gateway.media_store import MediaStore
-from sevn.gateway.menu import (
+from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
+from sevn.gateway.media.media_store import MediaStore
+from sevn.gateway.menu.menu import (
     MenuCallbackHandler,
     _apply_operator_readiness_gate,
     build_config_menu_keyboard,
@@ -29,9 +30,8 @@ from sevn.gateway.menu import (
     menu_message_text,
     parse_menu_callback_data,
 )
-from sevn.gateway.rate_limit import TokenBucketLimiter
+from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
 from sevn.gateway.session_manager import SessionManager
-from sevn.gateway.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
 from sevn.onboarding.web_app import _get_nested
 from sevn.security.llm_guard_scanner import LLMGuardScanner
 from sevn.storage.migrate import apply_migrations

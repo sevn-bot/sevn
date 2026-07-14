@@ -1,4 +1,4 @@
-"""Tests for the sub-agents boot-construction hook (`sevn.gateway.subagents_boot`)."""
+"""Tests for the sub-agents boot-construction hook (`sevn.gateway.subagents.subagents_boot`)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import sqlite3
 from types import SimpleNamespace
 
 from sevn.agent.subagents import SubAgentRegistry, SubAgentSupervisor
-from sevn.gateway.subagents_boot import _construct_subagent_supervisor
+from sevn.gateway.subagents.subagents_boot import _construct_subagent_supervisor
 from sevn.storage.migrate import apply_migrations
 
 

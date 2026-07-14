@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from sevn.config.workspace_config import WorkspaceConfig
-from sevn.gateway.menu import _second_brain_vault_display, config_menu_message_text
+from sevn.gateway.menu.menu import _second_brain_vault_display, config_menu_message_text
 
 
 def test_second_brain_caption_shows_vault_path(tmp_path: Path) -> None:

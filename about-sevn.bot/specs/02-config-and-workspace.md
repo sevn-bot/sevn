@@ -2,7 +2,7 @@
 id: spec-02-config-and-workspace
 kind: spec
 title: Config and workspace — Spec
-status: draft
+status: done
 owner: Alex
 summary: 'Provide a single, testable configuration surface before storage, tracing,
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
@@ -690,107 +690,89 @@ specs: []
 personas: []
 prd_profile: null
 ---
-
-
 ## Purpose
 
-Provide a single, testable configuration surface before storage, tracing, proxy, and gateway work: locate sevn.json, validate schema_version and structured subtrees needed by early boot, resolve the c
+Provide a single, testable configuration surface before storage, tracing, proxy, and
+gateway work: locate `sevn.json`, validate `schema_version` and structured subtrees,
+resolve the workspace content root, and expose typed section models consumed by boot,
+CLI, and Telegram `/config` menus.
 
-Primary code trees: [`src/sevn/config`](src/sevn/config/__init__.py).
-
-Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
-
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
+| Symbol | Module | Role |
+|--------|--------|------|
+| `find_sevn_json` / `resolve_sevn_json_path` | `src/sevn/config/loader.py` | Discovery (walk-up + bound path) |
+| `load_workspace` | `src/sevn/config/loader.py` | Full load → parse → layout |
+| `WorkspaceConfig` | `src/sevn/config/sections/root.py` | Root Pydantic model |
+| `parse_workspace_config` | `src/sevn/config/workspace_config.py` | JSON → typed config |
+| `ensure_schema_supported` | `src/sevn/config/loader.py` | `schema_version` gate |
+| `WorkspaceLayout` | `src/sevn/workspace/layout.py` | Content root resolution |
+| `ProcessSettings` | `src/sevn/config/settings.py` | Env-only process settings |
+| `validate_workspace_document` | `src/sevn/onboarding/validate.py` | CLI/doctor validation |
+| `SevnConfigError` family | `src/sevn/config/errors.py` | Typed config failures |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+CLI: `sevn config validate`, `sevn doctor`; dot-path helpers in `src/sevn/cli/workspace_schema.py`.
 
-- [`SevnConfigError`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
-- [`SevnJsonNotFoundError`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
-- [`TriagerUnavailable`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
-- [`UnsupportedSchemaVersionError`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
-- [`field_help_for`](src/sevn/config/field_help.py) — `src/sevn/config/field_help.py`
-- [`load_config_field_help`](src/sevn/config/field_help.py) — `src/sevn/config/field_help.py`
-- [`urls_in_help_text`](src/sevn/config/field_help.py) — `src/sevn/config/field_help.py`
-- [`ReasoningParams`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`SamplingParams`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`builtin_llm_params_doc`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`load_or_create_llm_params_doc`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`resolve_effective_max_output_tokens`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- _…and 211 more in frontmatter `interfaces:`._
 ## Data Model
 
-Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
+### Discovery order
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+1. Bound path: `{SEVN_HOME}/workspace/sevn.json` via `bound_sevn_json_path()`
+2. Else walk-up from CWD for `sevn.json`
 
-- [`SevnConfigError`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
-- [`SevnJsonNotFoundError`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
-- [`TriagerUnavailable`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
-- [`UnsupportedSchemaVersionError`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
-- [`field_help_for`](src/sevn/config/field_help.py) — `src/sevn/config/field_help.py`
-- [`load_config_field_help`](src/sevn/config/field_help.py) — `src/sevn/config/field_help.py`
-- [`urls_in_help_text`](src/sevn/config/field_help.py) — `src/sevn/config/field_help.py`
-- [`ReasoningParams`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`SamplingParams`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`builtin_llm_params_doc`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`load_or_create_llm_params_doc`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`resolve_effective_max_output_tokens`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- _…and 211 more in frontmatter `interfaces:`._
+### Schema version
+
+`SUPPORTED_SCHEMA_VERSIONS = frozenset({1, 2})` in `src/sevn/config/defaults.py`.
+Unsupported version → `UnsupportedSchemaVersionError`.
+
+### `WorkspaceConfig` sections (sample)
+
+`schema_version`, `workspace_root`, `gateway`, `providers`, `channels`, `triager`,
+`executors`, `secrets_backend`, `tracing`, `sandbox`, `security`, `skills`, `tools`,
+`agent`, `subagents`, … — see `src/sevn/config/sections/*.py`.
+
+Root model uses `extra="allow"` for forward-compatible keys in `model_extra`.
+
+### JSON Schema (CI)
+
+Authoritative: `infra/sevn.schema.json` (Draft 2020-12). Runtime primary validation
+is Pydantic; `make config-schema` validates fixture goldens via `check-jsonschema`.
+
 ## Internal Architecture
 
-See **Implemented by** and [`src/sevn/config`](src/sevn/config/__init__.py).
+```text
+sevn.json → load_workspace → parse_workspace_config → ensure_schema_supported
+         → WorkspaceLayout.from_config → consumers (gateway, CLI, menus)
+```
+
+Process env vars (`ProcessSettings`) are separate from `sevn.json` and documented
+via `x-sevn-process-settings-env` in the JSON Schema.
+
 ## Behavior
 
-Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
+1. **Load** — `load_workspace` reads JSON, parses, checks schema version, builds layout.
+2. **Validate** — `validate_workspace_document` enforces gateway token, provider rules,
+   optional credential checks for onboarding/doctor.
+3. **Field help** — `field_help_for` / `load_config_field_help` power Telegram config UX.
+4. **LLM params** — `resolve_llm_params`, reasoning/sampling helpers in `llm_params.py`.
+5. **Reload** — hot paths re-read specific sections; full reload on gateway restart or explicit CLI.
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
-
-Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/config`](src/sevn/config/__init__.py).
 ## Failure Modes
 
-Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
-
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
-
-Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
-## Amendments (spec-36-sub-agents)
-
-Normative home: **spec-36-sub-agents**. Adds top-level `subagents` subtree to
-`sevn.json` (`SubAgentsWorkspaceConfig`, `resolve_limits`, per-role limits,
-`specialists.*`). See `src/sevn/config/sections/subagents.py` and
-`infra/sevn.schema.json`.
-
-## Implemented by
-
-- [`SevnConfigError`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
-- [`SevnJsonNotFoundError`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
-- [`TriagerUnavailable`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
-- [`UnsupportedSchemaVersionError`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
-- [`field_help_for`](src/sevn/config/field_help.py) — `src/sevn/config/field_help.py`
-- [`load_config_field_help`](src/sevn/config/field_help.py) — `src/sevn/config/field_help.py`
-- [`urls_in_help_text`](src/sevn/config/field_help.py) — `src/sevn/config/field_help.py`
-- [`ReasoningParams`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`SamplingParams`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`builtin_llm_params_doc`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`load_or_create_llm_params_doc`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`resolve_effective_max_output_tokens`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`resolve_llm_params`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`resolve_llm_params_max_output_tokens`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`resolve_llm_request_params`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`resolve_minimax_thinking_request`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`resolve_reasoning_params`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`resolve_reasoning_request`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`set_agent_model_max_output_tokens`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- [`transport_for`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
-- _…and 203 more in frontmatter `interfaces:`._
+| Error | When |
+|-------|------|
+| `SevnJsonNotFoundError` | No discoverable `sevn.json` |
+| `UnsupportedSchemaVersionError` | `schema_version` not in supported set |
+| `SevnConfigError` | Pydantic validation failure |
+| `TriagerUnavailable` | Triager config incomplete at routing time |
+| JSON Schema drift | `make config-schema` fails in CI |
 
 ## Test Strategy
 
-Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
-
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
-
-Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+| Tests | Focus |
+|-------|-------|
+| `tests/config/` | Loader, sections, LLM params, tier defaults |
+| `tests/fixtures/config/schema_v*_min.json` | Schema goldens for `make config-schema` |
+| `tests/onboarding/` | `validate_workspace_document` |
+| `make about-docs-check` | Frontmatter ↔ code fingerprint |
+| `sevn config validate` | Operator smoke |

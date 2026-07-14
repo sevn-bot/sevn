@@ -2,7 +2,7 @@
 id: spec-34-plugin-hooks
 kind: spec
 title: Plugin hooks & channel plugins — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: Deliver the in-process extension layer that intercepts existing tool and
   terminal I/O paths and registers dispatcher-level commands, without adding new tool
@@ -168,3 +168,9 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Human-input needed
+
+Prose body not yet authored (W9 scope). Normative contract requires operator or
+follow-up wave authoring against verified code (`sevn about-docs extract` + graphify).
+Do not mark `status: done` until `make -C spec-kit-wave spec-check` scores ≥ 80.

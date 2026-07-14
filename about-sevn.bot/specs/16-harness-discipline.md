@@ -2,12 +2,12 @@
 id: spec-16-harness-discipline
 kind: spec
 title: Harness discipline — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Harness discipline: background task logging, operator PATH augmentation,
   and gateway/agent harness hooks under agent/harness/.'
 last_updated: '2026-07-14'
-fingerprint: sha256:cb73370725e0153c05d3c39e02fdb473d27befafb76f4d6d040d15b10c99c39a
+fingerprint: sha256:3d1bd9050c4ccabc3c76b79dd616114e44c5ef0033271a6d372eb9a5b0741101
 related: []
 sources:
 - src/sevn/agent/harness/**
@@ -97,9 +97,6 @@ interfaces:
 - name: operator_path_prefixes
   file: src/sevn/runtime/operator_path.py
   symbol: operator_path_prefixes
-specs: []
-personas: []
-prd_profile: null
 ---
 
 ## Purpose
@@ -161,3 +158,9 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Human-input needed
+
+Prose body not yet authored (W9 scope). Normative contract requires operator or
+follow-up wave authoring against verified code (`sevn about-docs extract` + graphify).
+Do not mark `status: done` until `make -C spec-kit-wave spec-check` scores ≥ 80.

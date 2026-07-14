@@ -2,7 +2,7 @@
 id: spec-30-non-interactive-triggers
 kind: spec
 title: Non-interactive triggers — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Deliver non-interactive dispatch: external events (“something happened”)
   and schedules (“tick”) compile to DispatchRequest, optionally pass through notify_only
@@ -252,3 +252,9 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Human-input needed
+
+Prose body not yet authored (W9 scope). Normative contract requires operator or
+follow-up wave authoring against verified code (`sevn about-docs extract` + graphify).
+Do not mark `status: done` until `make -C spec-kit-wave spec-check` scores ≥ 80.

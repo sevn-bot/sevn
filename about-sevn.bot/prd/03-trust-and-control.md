@@ -7,16 +7,14 @@ owner: Alex
 summary: Operators delegate real work only when prompt injection, secrets, sandbox,
   and approvals are bounded—scan hostile input, isolate credentials and egress, and
   gate risky tools.
-last_updated: '2026-07-12'
+last_updated: '2026-07-14'
 fingerprint: sha256:2be585f6507b7f341fade5e88ecc982e998afb8ec97666a7b5c4d5757f02ee21
-related: []
+related:
+- prd-07-mission-control
 sources:
 - src/sevn/security/**
 - src/sevn/secrets/**
 parent_prd: prd-00-main
-depends_on: []
-build_phase: null
-interfaces: []
 specs:
 - spec-06-secrets
 - spec-07-egress-proxy

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from sevn.gateway.first_session import (
+from sevn.gateway.onboarding.first_session import (
     clear_bootstrap_markdown_cache,
     load_bootstrap_markdown,
     load_bootstrap_markdown_cached,
@@ -30,7 +30,7 @@ def test_bootstrap_cache_reuses_body_without_touch(
         return real_load(content_root)
 
     monkeypatch.setattr(
-        "sevn.gateway.first_session.load_bootstrap_markdown",
+        "sevn.gateway.onboarding.first_session.load_bootstrap_markdown",
         _counting_load,
     )
     (tmp_path / "BOOTSTRAP.md").write_text("first body", encoding="utf-8")

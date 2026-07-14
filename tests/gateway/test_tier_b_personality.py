@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from sevn.agent.triager.routing_policy import is_identity_or_capability_message
-from sevn.gateway.triage_context import (
+from sevn.gateway.triage.triage_context import (
     load_workspace_personality,
     tier_b_personality_instructions,
 )

@@ -2,13 +2,13 @@
 id: spec-24-dashboard
 kind: spec
 title: Mission Control (dashboard) — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Deliver Mission Control: a same-process dashboard (prd-07-mission-control)
   so the owner can inspect traces, costs, provider health, in-flight runs, proxy status,
   and config without opening SQLite from'
 last_updated: '2026-07-14'
-fingerprint: sha256:815d492a6dafcae6ef81d25d5d9227cb50f23bf32018c77e5c9b4fe07c46c1d1
+fingerprint: sha256:cc076a1312f6b814834bd2e8d7ae7a3c264f2cdaa204b73c134e0abc4dc9cb36
 related: []
 sources:
 - src/sevn/ui/**
@@ -951,11 +951,7 @@ interfaces:
 - name: style_warning
   file: src/sevn/ui/terminal_theme.py
   symbol: style_warning
-specs: []
-personas: []
-prd_profile: null
 ---
-
 
 ## Purpose
 
@@ -1058,3 +1054,9 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Human-input needed
+
+Prose body not yet authored (W9 scope). Normative contract requires operator or
+follow-up wave authoring against verified code (`sevn about-docs extract` + graphify).
+Do not mark `status: done` until `make -C spec-kit-wave spec-check` scores ≥ 80.

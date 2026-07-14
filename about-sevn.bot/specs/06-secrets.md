@@ -2,7 +2,7 @@
 id: spec-06-secrets
 kind: spec
 title: Secrets — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Deliver a single trust boundary for credentials: backend modules + TTL cache
   under src/sevn/security/, wired exclusively by the egress proxy (src/sevn/proxy/)
@@ -181,3 +181,9 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Human-input needed
+
+Prose body not yet authored (W9 scope). Normative contract requires operator or
+follow-up wave authoring against verified code (`sevn about-docs extract` + graphify).
+Do not mark `status: done` until `make -C spec-kit-wave spec-check` scores ≥ 80.

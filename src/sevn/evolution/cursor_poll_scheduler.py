@@ -3,7 +3,7 @@
 Every 60 s the scheduler scans issues where ``state=implementing``,
 ``executor=cursor_cloud``, and ``cursor_job_id`` is set, calls
 :func:`~sevn.evolution.router.poll_cursor_cloud_for_issue` for each, then fans
-the result to :class:`~sevn.gateway.evolution_issue_events.EvolutionIssueEventFanout`.
+the result to :class:`~sevn.gateway.evolution.evolution_issue_events.EvolutionIssueEventFanout`.
 
 The scheduler runs only when ``my_sevn.executors.cursor_poll_mode`` is
 ``"background"`` (default); in ``"inline"`` or ``"manual"`` modes it is a no-op.

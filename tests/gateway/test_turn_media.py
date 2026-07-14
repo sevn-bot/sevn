@@ -22,7 +22,7 @@ from sevn.agent.triager.prompt import build_triager_prompt_segments, concat_prom
 from sevn.agent.triager.run import _apply_attachment_modality_flags, triage_turn
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.gateway.channel_router import ChannelRouter, IncomingMessage
-from sevn.gateway.turn_media import (
+from sevn.gateway.turn.turn_media import (
     attachment_hints_for_triager,
     build_turn_media_summaries,
     hydrate_turn_media,

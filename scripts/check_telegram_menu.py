@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Static gate: Telegram menu completeness + TMF registry sync.
 
-Builds keyboards from :mod:`sevn.gateway.menu`, :mod:`sevn.gateway.dashboard_pin`,
-:mod:`sevn.channels.telegram`, and :mod:`sevn.gateway.telegram_quick_actions`, then asserts:
+Builds keyboards from :mod:`sevn.gateway.menu.menu`, :mod:`sevn.gateway.dashboard.dashboard_pin`,
+:mod:`sevn.channels.telegram`, and :mod:`sevn.gateway.telegram.telegram_quick_actions`, then asserts:
 
 * No ``Coming soon`` stubs; every inline button has ``callback_data`` or ``url``.
 * Config/menu action callbacks parse via existing parsers.
-* Rendered ``callback_data`` rows match :mod:`sevn.gateway.menu_registry` and only
+* Rendered ``callback_data`` rows match :mod:`sevn.gateway.menu.menu_registry` and only
   ``implemented=True`` specs appear (nav chrome and section tiles exempt).
 * Forbidden NOOP patterns: section self-loops, ``cfg:shortcuts``, unparsed shortcuts.
 
@@ -39,8 +39,8 @@ from typing import Any, Literal, get_args
 from sevn.channels.telegram import build_reply_keyboard_markup
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.gateway.commands.menu_action_router import parse_action_callback
-from sevn.gateway.dashboard_pin import default_pin_keyboard
-from sevn.gateway.menu import (
+from sevn.gateway.dashboard.dashboard_pin import default_pin_keyboard
+from sevn.gateway.menu.menu import (
     _EMPTY_TOOL_SURFACE,
     ConfigSection,
     MenuSection,
@@ -51,13 +51,13 @@ from sevn.gateway.menu import (
     parse_menu_callback_data,
     parse_models_callback_data,
 )
-from sevn.gateway.menu_registry import (
+from sevn.gateway.menu.menu_registry import (
     is_nav_chrome_callback,
     is_section_tile_callback,
     match_menu_button_spec,
     registry_implementation_counts,
 )
-from sevn.gateway.telegram_quick_actions import (
+from sevn.gateway.telegram.telegram_quick_actions import (
     build_quick_action_inline_keyboard,
     parse_qa_callback_data,
 )

@@ -558,7 +558,7 @@ def test_publish_transition_includes_pr_url() -> None:
 
 def test_format_evolution_telegram_pr_url_message() -> None:
     """``_format_evolution_telegram`` must return a PR-ready message when pr_url is set."""
-    from sevn.gateway.evolution_issue_events import _format_evolution_telegram
+    from sevn.gateway.evolution.evolution_issue_events import _format_evolution_telegram
 
     text, _ = _format_evolution_telegram(
         {
@@ -574,7 +574,7 @@ def test_format_evolution_telegram_pr_url_message() -> None:
 
 def test_format_evolution_telegram_no_pr_url_unchanged() -> None:
     """Without ``pr_url``, the standard state/stage message is returned."""
-    from sevn.gateway.evolution_issue_events import _format_evolution_telegram
+    from sevn.gateway.evolution.evolution_issue_events import _format_evolution_telegram
 
     text, _ = _format_evolution_telegram(
         {

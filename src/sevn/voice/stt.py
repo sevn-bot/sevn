@@ -127,7 +127,7 @@ class SpeechToTextPipeline:
     ) -> tuple[str, dict[str, Any]]:
         """Return LLM-visible text plus attachment metadata updates.
         Args:
-            audio_path (Path): On-disk audio from :class:`~sevn.gateway.media_store.MediaStore`.
+            audio_path (Path): On-disk audio from :class:`~sevn.gateway.media.media_store.MediaStore`.
             mime_type (str | None): MIME hint from the adapter.
             duration_s (float | None): Known duration in seconds, if any.
             session_id (str): Gateway session id for traces.

@@ -26,11 +26,11 @@ from sevn.gateway import agent_turn as agent_turn_mod
 from sevn.gateway.agent_turn import build_agent_run_turn
 from sevn.gateway.channel_router import ChannelRouter, IncomingMessage
 from sevn.gateway.commands.dispatcher import CommandDispatcher
-from sevn.gateway.media_store import MediaStore
-from sevn.gateway.rate_limit import TokenBucketLimiter
+from sevn.gateway.media.media_store import MediaStore
+from sevn.gateway.queue.steer_store import SessionSteerStore
+from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
 from sevn.gateway.session_manager import SessionManager
-from sevn.gateway.steer_store import SessionSteerStore
-from sevn.gateway.strings import (
+from sevn.gateway.util.strings import (
     STEER_ACK_V1,
     STEER_BUFFER_FULL_V1,
     STEER_NOT_AVAILABLE_V1,

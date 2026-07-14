@@ -8,15 +8,16 @@ summary: A general-purpose AI assistant earns its keep by doing things—answeri
   fetching pages, opening PRs, and acting on the operator's behalf via tools, skills,
   and tiered executors.
 last_updated: '2026-07-14'
-fingerprint: sha256:9c2398424b10b0d0ac0fd5771ed945f3318bc5294556091119b1aa1153720faf
-related: []
+fingerprint: sha256:90c034d7ea3e4c3df0ee5396c2e0001cfed708867844c0960f2ff6889df679cd
+related:
+- prd-03-trust-and-control
+- prd-08-coding-companion
+- prd-11-automation-and-triggers
+- prd-13-extensibility
 sources:
 - src/sevn/agent/**
 - src/sevn/tools/**
 parent_prd: prd-00-main
-depends_on: []
-build_phase: null
-interfaces: []
 specs:
 - spec-10-schema-ontology
 - spec-11-tools-registry
@@ -30,6 +31,7 @@ specs:
 - spec-19-channel-webui
 - spec-20-voice
 - spec-37-openui
+- spec-36-sub-agents
 personas:
 - operator
 prd_profile: standard

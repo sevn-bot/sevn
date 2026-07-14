@@ -2,7 +2,7 @@
 id: spec-04-tracing
 kind: spec
 title: Tracing — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: Provide durable trace sinks that implement TraceSink without ever throwing
   through emit, so instrumentation stays off the critical path. SQLite layout matches
@@ -278,3 +278,9 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Human-input needed
+
+Prose body not yet authored (W9 scope). Normative contract requires operator or
+follow-up wave authoring against verified code (`sevn about-docs extract` + graphify).
+Do not mark `status: done` until `make -C spec-kit-wave spec-check` scores ≥ 80.

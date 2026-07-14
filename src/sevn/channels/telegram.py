@@ -96,7 +96,7 @@ from sevn.channels.telegram_rich_send import (
 from sevn.channels.telegram_rich_send import TelegramRichSendMixin
 from sevn.channels.telegram_send_edit import TelegramTextSendMixin
 from sevn.gateway.channel_types import ChannelAdapter
-from sevn.gateway.telegram_inline import resolve_inline_config, telegram_allowed_updates
+from sevn.gateway.telegram.telegram_inline import resolve_inline_config, telegram_allowed_updates
 from sevn.ui.openui.models import RasteriseCaps
 
 if TYPE_CHECKING:

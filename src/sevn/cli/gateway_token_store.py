@@ -2,7 +2,7 @@
 
 Module: sevn.cli.gateway_token_store
 Depends: asyncio, json, pathlib, sevn.cli.workspace, sevn.config.workspace_config,
-    sevn.gateway.gateway_token, sevn.gateway.workspace_config_io
+    sevn.gateway.runtime.gateway_token, sevn.gateway.config_io.workspace_config_io
 
 Exports:
     GatewayTokenBootstrap — raw-JSON view of the bound workspace for bootstrap.
@@ -23,12 +23,12 @@ from pydantic import ValidationError
 from sevn.cli.errors import CliPreconditionError
 from sevn.cli.workspace import bound_sevn_json_path
 from sevn.config.workspace_config import SecretsBackendSectionConfig
-from sevn.gateway.gateway_token import (
+from sevn.gateway.config_io.workspace_config_io import mutate_sevn_json, set_nested
+from sevn.gateway.runtime.gateway_token import (
     GATEWAY_TOKEN_CONFIG_REF,
     GATEWAY_TOKEN_LOGICAL_KEY,
     validate_gateway_token_plaintext,
 )
-from sevn.gateway.workspace_config_io import mutate_sevn_json, set_nested
 from sevn.secrets.fingerprint import fingerprint_sha256_hex
 from sevn.security.secrets.factory import secrets_chain_from_workspace
 

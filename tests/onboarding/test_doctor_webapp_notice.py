@@ -8,7 +8,10 @@ from sevn.config.workspace_config import WorkspaceConfig
 
 if TYPE_CHECKING:
     import pytest
-from sevn.gateway.webapp_qa import maybe_log_qa_bar_webapp_disabled, webapp_https_disabled_notice
+from sevn.gateway.webapp.webapp_qa import (
+    maybe_log_qa_bar_webapp_disabled,
+    webapp_https_disabled_notice,
+)
 from sevn.onboarding.live_validate import probe_webapp_https
 
 
@@ -42,7 +45,7 @@ def test_maybe_log_qa_bar_webapp_disabled_emits_once(
     from loguru import logger as loguru_logger
 
     monkeypatch.setattr(
-        "sevn.gateway.webapp_qa._QA_BAR_WEBAPP_DISABLED_BASES_SEEN",
+        "sevn.gateway.webapp.webapp_qa._QA_BAR_WEBAPP_DISABLED_BASES_SEEN",
         set(),
     )
     ws = WorkspaceConfig(

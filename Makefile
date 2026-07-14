@@ -18,7 +18,7 @@ PIP_AUDIT ?= $(UV) run pip-audit
 PIP_AUDIT_CACHE ?= $(CURDIR)/.cache/pip-audit
 PRE_COMMIT ?= $(UV) run pre-commit
 
-.PHONY: help setup install install-git-guards check-git-guards snapshot-local install-cli install-cli-browser sync-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover stale-xfail-check md-links-check doctest security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage coderabbit-install review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-down compose-logs compose-restart log-explore telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-curate readme-curate-prompt readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve
+.PHONY: help setup install install-git-guards check-git-guards snapshot-local install-cli install-cli-browser sync-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover stale-xfail-check md-links-check doctest security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage coderabbit-install review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-down compose-logs compose-restart log-explore telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-curate readme-curate-prompt readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate spec-check prd-check spec-sync prd-sync logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve
 
 
 PROXY_ENV_FILE ?= .env.proxy
@@ -307,8 +307,13 @@ readme-preview: readme-render-fixtures ## Render README template previews to /tm
 about-docs-schema: ## Export about-docs JSON Schema to about-sevn.bot/_docsys/about-docs.schema.json
 	$(UV) run sevn about-docs schema
 
-about-docs-check: ## Validate about-docs (schema, drift, references, index)
+about-docs-check: ## Validate about-docs + skw spec/prd folder gates
 	PYTHONPATH=. $(UV) run sevn about-docs check --repo .
+	$(MAKE) spec-check
+	$(MAKE) prd-check
+
+spec-check: ## Validate+score every spec in about-sevn.bot/specs (skw docs validate)
+	$(MAKE) -C spec-kit-wave spec-check
 
 changelog-check: ## Changelog gate: Keep-a-Changelog lint + Unreleased diff gate (SEVN_CI_BASE=<ref>)
 	python3 scripts/changelog_validate.py --repo . --base $${SEVN_CI_BASE:-origin/main}
@@ -330,6 +335,18 @@ about-docs-extract: ## Extract code-owned frontmatter for one doc (DOC_ID=spec-1
 about-docs-generate: ## Generate offline body for one doc (DOC_ID=spec-17-gateway)
 	@test -n "$(DOC_ID)" || (echo "usage: make about-docs-generate DOC_ID=spec-17-gateway" && exit 1)
 	PYTHONPATH=. $(UV) run sevn about-docs generate $(DOC_ID) --repo .
+
+spec-sync: ## Refresh spec frontmatter in about-sevn.bot/specs (skw docs sync)
+	$(MAKE) -C spec-kit-wave spec-sync
+
+prd-sync: ## Refresh PRD frontmatter in about-sevn.bot/prd (skw docs sync)
+	$(MAKE) -C spec-kit-wave prd-sync
+
+prd-check: ## Validate+score every PRD in about-sevn.bot/prd (skw docs validate)
+	$(MAKE) -C spec-kit-wave prd-check
+
+spec-kit-wave-test: ## Run spec-kit-wave pytest suite (skw validators + sync contracts)
+	$(MAKE) -C spec-kit-wave test
 
 subagents-chart: ## Regenerate deterministic sub-agents topology SVG (D14)
 	$(UV) run python scripts/gen_subagents_chart.py
@@ -369,7 +386,7 @@ ci-core: lockcheck lint typecheck pyright test doctest security build doctor-sol
 
 ci-infra: config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards agent-context-manifest-check ## Schema / infra drift tier
 
-ci-docs: telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema changelog-check ## Docs / menu HTML tier
+ci-docs: telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema spec-kit-wave-test changelog-check ## Docs / menu HTML tier
 
 ci-skills: skills-core-check skillspector-check skills-index-check dreaming-allowlist-check ## Skills inventory tier
 
@@ -381,7 +398,7 @@ ci: ci-core ci-infra ci-docs ci-skills ci-parity ## Full gate (same as CI)
 # Keep in sync with the ci-core/ci-infra/ci-docs/ci-skills/ci-parity tiers above.
 CI_STEPS := lockcheck lint typecheck pyright test doctest security build doctor-solutions-check \
 	config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards agent-context-manifest-check \
-	telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema changelog-check \
+	telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema spec-kit-wave-test changelog-check \
 	skills-core-check skillspector-check skills-index-check dreaming-allowlist-check \
 	code-index deploy-remote-report-check code-index-check
 

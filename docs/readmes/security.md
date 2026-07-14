@@ -37,7 +37,7 @@ When [`scan_inbound`](../../src/sevn/security/llm_guard_scanner.py#L564) returns
 1. **[`write_blocked_inbound`](../../src/sevn/security/llmignore.py#L337)** — atomic JSON under `.llmignore/blocked/` ([`llmignore.py`](../../src/sevn/security/llmignore.py))
 2. **Session row** — user message stored as `kind="blocked"`, `visible_to_llm=0`
 3. **Trace events** — `gateway.llm_guard_block`, [`gateway.route_incoming`](../../src/sevn/gateway/channel_router.py#L1348) with `status="stopped_blocked"`
-4. **Channel notify** — [`blocked_inbound_user_message`](../../src/sevn/gateway/strings.py#L47) ([`gateway/strings.py`](../../src/sevn/gateway/strings.py)) sent via the channel adapter
+4. **Channel notify** — [`blocked_inbound_user_message`](../../src/sevn/gateway/util/strings.py#L47) ([`gateway/strings.py`](../../src/sevn/gateway/util/strings.py)) sent via the channel adapter
 
 Feedback blocks mirror the pattern via [`write_blocked_feedback`](../../src/sevn/security/llmignore.py#L398).
 
@@ -67,7 +67,7 @@ Validate after edits: `sevn config validate`.
 - [`llm_guard_scanner.py`](../../src/sevn/security/llm_guard_scanner.py) — [`LLMGuardScanner`](../../src/sevn/security/llm_guard_scanner.py#L543), [`scan_patch_diff`](../../src/sevn/security/llm_guard_scanner.py#L1080)
 - [`llmignore.py`](../../src/sevn/security/llmignore.py) — layout, persistence, [`sweep_expired`](../../src/sevn/security/llmignore.py#L164)
 - [`channel_router.py`](../../src/sevn/gateway/channel_router.py) — inbound gate + notify path
-- [`strings.py`](../../src/sevn/gateway/strings.py) — [`blocked_inbound_user_message`](../../src/sevn/gateway/strings.py#L47)
+- [`strings.py`](../../src/sevn/gateway/util/strings.py) — [`blocked_inbound_user_message`](../../src/sevn/gateway/util/strings.py#L47)
 
 Normative spec: [`about-sevn.bot/specs/09-security-scanner.md`](../../about-sevn.bot/specs/09-security-scanner.md).
 

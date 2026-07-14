@@ -2,13 +2,13 @@
 id: spec-23-cli
 kind: spec
 title: CLI — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: Deliver the primary operator and automation surface for install, upgrades,
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
 last_updated: '2026-07-14'
-fingerprint: sha256:aaf95003fc67239faa3f14ef1e9ecbde9b5461933f7f5425a5bde4702c0cd98d
+fingerprint: sha256:e1c8529f3b70212dd97020c50976859d2f133922086d693853386b64d59ec132
 related: []
 sources:
 - src/sevn/cli/**
@@ -720,9 +720,6 @@ interfaces:
 - name: parse_config_set_value
   file: src/sevn/cli/workspace_schema.py
   symbol: parse_config_set_value
-specs: []
-personas: []
-prd_profile: null
 ---
 
 ## Purpose
@@ -826,3 +823,9 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Human-input needed
+
+Prose body not yet authored (W9 scope). Normative contract requires operator or
+follow-up wave authoring against verified code (`sevn about-docs extract` + graphify).
+Do not mark `status: done` until `make -C spec-kit-wave spec-check` scores ≥ 80.

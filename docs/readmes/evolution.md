@@ -50,7 +50,7 @@ Initial draft for **Purpose** — grounded in extracted interfaces; confirm norm
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: [`src/sevn/evolution`](../../src/sevn/evolution/) (21 Python files). Normative design: `about-sevn.bot/specs/35-bot-evolution.md`.
+Primary source tree: [`src/sevn/evolution`](../../src/sevn/evolution/) (21 Python files). Normative design: [`35-bot-evolution.md`](../../about-sevn.bot/specs/35-bot-evolution.md).
 
 ### Module inventory
 
@@ -72,8 +72,8 @@ Background 60-second poller for Cursor Cloud evolution issues (about-sevn.bot/sp
 
 Every 60 s the scheduler scans issues where state=implementing,
 executor=cursor_cloud, and cursor_job_id is set, calls
-:func:~sevn.evolution.router.poll_cursor_cloud_for_issue for each, then fans
-the result to :class:~sevn.gateway.evolution_issue_events.EvolutionIssueEventFanout.
+~sevn.evolution.router.poll_cursor_cloud_for_issue for each, then fans
+the result to ~sevn.gateway.evolution.evolution_issue_events.EvolutionIssueEventFanout.
 
 The scheduler runs only when my_sevn.executors.cursor_poll_mode is
 "background" (default); in "inline" or "manual" modes it is a no-op.
@@ -118,11 +118,11 @@ Start with [`EvolutionIssue.to_dict`](../../src/sevn/evolution/issues.py#L61), t
 Auto-start evolution pipeline on issue import (the design docs AR-1).
 
 When my_sevn.issues.auto_run_on_import is true and a GitHub issue is **newly**
-imported (created=True), this module schedules :func:run_pipeline in the background
-via :func:spawn_logged.  Dry-run flags are left None so they resolve from
+imported (created=True), this module schedules run_pipeline in the background
+via spawn_logged.  Dry-run flags are left None so they resolve from
 my_sevn.pipelines config defaults — D3 decision in the wave plan.
 
-PipelineBlockedError` is swallowed: feature issues that require approval stop at the
+PipelineBlockedError is swallowed: feature issues that require approval stop at the
 HITL gate and that is the expected operator experience (D5).
 
 Working with [`pipeline_autostart.py`](../../src/sevn/evolution/pipeline_autostart.py): inspect the public entry points below.

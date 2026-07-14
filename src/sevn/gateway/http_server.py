@@ -82,8 +82,12 @@ from sevn.evolution.repo_sync_scheduler import (
     run_scheduled_repo_sync,
 )
 from sevn.evolution.stats import record_last_sync
-from sevn.gateway.admin_secrets import register_admin_secrets_routes
+from sevn.gateway.admin.admin_secrets import register_admin_secrets_routes
 from sevn.gateway.agent_turn import build_agent_run_turn
+from sevn.gateway.api.e2e_echo import build_echo_run_turn
+from sevn.gateway.api.gui_proxy import mount_gui_proxy
+from sevn.gateway.api.openai_compat_api import register_openai_compat_routes
+from sevn.gateway.api.web_transport import WebChannelTransport
 from sevn.gateway.auth import (
     JWTClaims,
     login_page_html,
@@ -100,42 +104,41 @@ from sevn.gateway.boot_registry import BootContext, run_boot_hooks, run_cron_rec
 from sevn.gateway.channel_boot import register_enabled_channel_adapters
 from sevn.gateway.channel_router import ChannelRouter, IncomingMessage
 from sevn.gateway.commands.dispatcher import CommandDispatcher
-from sevn.gateway.deployment_id import load_or_create_deployment_id
-from sevn.gateway.dispatcher_callbacks import prune_dispatcher_callbacks
-from sevn.gateway.dispatcher_state import sweep_expired_dispatcher_state
-from sevn.gateway.e2e_echo import build_echo_run_turn
-from sevn.gateway.evolution_issue_events import EvolutionIssueEventFanout
-from sevn.gateway.first_session import maybe_reseed_bootstrap_at_boot
-from sevn.gateway.gateway_restart_ack import deliver_pending_gateway_restart_acks
-from sevn.gateway.gui_proxy import mount_gui_proxy
-from sevn.gateway.media_store import MediaStore
-from sevn.gateway.mission_api import create_mission_v1_router
-from sevn.gateway.mission_state import (
+from sevn.gateway.dispatcher.dispatcher_callbacks import prune_dispatcher_callbacks
+from sevn.gateway.dispatcher.dispatcher_state import sweep_expired_dispatcher_state
+from sevn.gateway.evolution.evolution_issue_events import EvolutionIssueEventFanout
+from sevn.gateway.media.media_store import MediaStore
+from sevn.gateway.mission.mission_api import create_mission_v1_router
+from sevn.gateway.mission.mission_state import (
     MissionControlState,
     create_mission_trace_sink,
     detach_mission_trace_sink,
 )
-from sevn.gateway.onboarding_mount import mount_gateway_onboarding, resolve_gateway_onboarding_token
-from sevn.gateway.openai_compat_api import register_openai_compat_routes
-from sevn.gateway.outbound_sweep import sweep_outbound_retries
-from sevn.gateway.rate_limit import TokenBucketLimiter
-from sevn.gateway.self_improve_job_events import (
+from sevn.gateway.onboarding.first_session import maybe_reseed_bootstrap_at_boot
+from sevn.gateway.onboarding.onboarding_mount import (
+    mount_gateway_onboarding,
+    resolve_gateway_onboarding_token,
+)
+from sevn.gateway.queue.steer_store import SessionSteerStore, owner_user_ids_from_workspace
+from sevn.gateway.routing.outbound_sweep import sweep_outbound_retries
+from sevn.gateway.runtime.deployment_id import load_or_create_deployment_id
+from sevn.gateway.runtime.gateway_restart_ack import deliver_pending_gateway_restart_acks
+from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
+from sevn.gateway.runtime.shutdown_cleanup import release_leaked_multiprocessing_semaphores
+from sevn.gateway.self_improve.self_improve_job_events import (
     SelfImproveJobEventFanout,
     resolve_owner_telegram_user_id,
 )
 from sevn.gateway.session_manager import SessionManager
-from sevn.gateway.shutdown_cleanup import release_leaked_multiprocessing_semaphores
-from sevn.gateway.steer_store import SessionSteerStore, owner_user_ids_from_workspace
-from sevn.gateway.telegram_resolve import resolve_telegram_bot_token
-from sevn.gateway.web_transport import WebChannelTransport
-from sevn.gateway.webapp_qa import (
+from sevn.gateway.telegram.telegram_resolve import resolve_telegram_bot_token
+from sevn.gateway.webapp.webapp_qa import (
     consume_webapp_dispatcher_token,
     insert_structured_feedback,
     load_webapp_dispatcher_payload,
     resolve_thumbs_polarity,
     resolve_thumbs_transition,
 )
-from sevn.gateway.webapp_viewer import (
+from sevn.gateway.webapp.webapp_viewer import (
     load_webapp_viewer_payload,
     viewer_stream_snapshot,
     webapp_share_to_story_enabled,
@@ -1022,7 +1025,7 @@ def create_app(
         await _prime_unlock_env_and_warn(ws, content_root=ly.content_root)
         apply_tunnel_local_open_policy(ws)
         effective_process = _effective_process_settings(ws, resolved_process)
-        from sevn.gateway.gateway_token import resolve_gateway_token_ref
+        from sevn.gateway.runtime.gateway_token import resolve_gateway_token_ref
 
         resolved_gateway_token = await resolve_gateway_token_ref(
             ws,
@@ -1672,7 +1675,7 @@ def create_app(
 
     @app.get("/metrics")
     async def metrics() -> PlainTextResponse:
-        from sevn.gateway.prometheus_metrics import render_gateway_metrics
+        from sevn.gateway.runtime.prometheus_metrics import render_gateway_metrics
 
         session_mgr = getattr(app.state, "session_manager", None)
         active_sessions = 0
@@ -1915,7 +1918,7 @@ def create_app(
                         # .timeZone``. Persist when the profile is still on
                         # the UTC default so explicit ``/config`` choices
                         # from another channel aren't clobbered.
-                        from sevn.gateway.user_profile import (
+                        from sevn.gateway.user.user_profile import (
                             get_user_profile,
                             set_user_timezone,
                         )

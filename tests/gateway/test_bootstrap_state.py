@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sevn.gateway.bootstrap_state import operator_name_from_user_md
+from sevn.gateway.bootstrap.bootstrap_state import operator_name_from_user_md
 
 
 def test_operator_name_from_user_md_returns_name(tmp_path: Path) -> None:

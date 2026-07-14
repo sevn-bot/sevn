@@ -34,8 +34,8 @@ If unsure which layout applies, run `glob` with `source_code/**/gateway/agent_tu
 
 1. **`source_code/src/sevn/gateway/agent_turn.py`** — user message → triage → tier-B/C execution loop
 2. **`source_code/src/sevn/gateway/channel_router.py`** — channels, sessions, outbound routing
-3. **`source_code/src/sevn/gateway/menu.py`** — Telegram `/config` menus and workspace mutations
-4. **`source_code/src/sevn/gateway/triage_context.py`** — what the Triager sees from the workspace
+3. **`source_code/src/sevn/gateway/menu/menu.py`** — Telegram `/config` menus and workspace mutations
+4. **`source_code/src/sevn/gateway/triage/triage_context.py`** — what the Triager sees from the workspace
 
 (On an installed package, drop `src/` — e.g. `source_code/sevn/gateway/agent_turn.py`.)
 

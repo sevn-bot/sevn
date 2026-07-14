@@ -2,7 +2,7 @@
 """Bundled ``sessions_management`` skill — record session yield.
 
 Module: sevn.data.bundled_skills.core.sessions_management.scripts.yield
-Depends: argparse, json, sevn.gateway.sessions_query, sevn.lcm.script_cli
+Depends: argparse, json, sevn.gateway.session.sessions_query, sevn.lcm.script_cli
 
 Exports:
     main — CLI entry; JSON envelope on stdout.
@@ -14,7 +14,7 @@ import argparse
 import json
 import os
 
-from sevn.gateway.sessions_query import record_yield
+from sevn.gateway.session.sessions_query import record_yield
 from sevn.lcm.script_cli import open_workspace_db, write_error, write_ok
 
 

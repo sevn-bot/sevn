@@ -6,15 +6,13 @@ status: ready
 owner: Alex
 summary: A daily-driver AI must help you code—from repo Q&A and orientation through
   tier B quick fixes to tier C/D plans, workspace mirror, and PR workflows.
-last_updated: '2026-07-12'
+last_updated: '2026-07-14'
 fingerprint: sha256:5a97e9841a414ba088717f40956b00e55c59c77add891779e0555da9bb2c9f93
-related: []
+related:
+- prd-01-conversational-experience
 sources:
 - src/sevn/code_understanding/**
 parent_prd: prd-00-main
-depends_on: []
-build_phase: null
-interfaces: []
 specs:
 - spec-21-executor-tier-cd
 - spec-26-claude-agent

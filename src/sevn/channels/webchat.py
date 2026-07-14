@@ -1,6 +1,6 @@
 """Web UI WebSocket adapter (`specs/19-channel-webui.md`).
 Module: sevn.channels.webchat
-Depends: sevn.gateway.channel_types, sevn.gateway.web_transport
+Depends: sevn.gateway.channel_types, sevn.gateway.api.web_transport
 Exports:
     WebChatConfig — workspace-resolved adapter settings (`specs/19-channel-webui.md` §5).
     WebChatAdapter — translate WS frames ↔ :class:`IncomingMessage` / :class:`OutgoingMessage`.
@@ -25,8 +25,8 @@ from sevn.gateway.channel_types import ChannelAdapter, IncomingMessage, Outgoing
 
 if TYPE_CHECKING:
     from sevn.agent.tracing.sink import TraceSink
+    from sevn.gateway.api.web_transport import WebChannelTransport
     from sevn.gateway.auth import JWTClaims
-    from sevn.gateway.web_transport import WebChannelTransport
 VALID_CLIENT_FRAME_TYPES: frozenset[str] = frozenset(
     {"auth", "message", "callback", "file", "ping"},
 )
@@ -85,7 +85,7 @@ class WebChatAdapter(ChannelAdapter):
     directly. Inbound WS frames pass through :meth:`ingest_ws_frame` which
     returns an :class:`IncomingMessage` for the router pipeline; outbound
     deliveries are fanned-out by :meth:`send` through the gateway-owned
-    :class:`~sevn.gateway.web_transport.WebChannelTransport` registry.
+    :class:`~sevn.gateway.api.web_transport.WebChannelTransport` registry.
     The HTTP webhook contract is intentionally unused — :meth:`parse_webhook`
     always returns ``None``.
     Examples:
@@ -112,7 +112,7 @@ class WebChatAdapter(ChannelAdapter):
         Returns:
             None: Constructor.
         Examples:
-            >>> from sevn.gateway.web_transport import WebChannelTransport
+            >>> from sevn.gateway.api.web_transport import WebChannelTransport
             >>> WebChatAdapter(transport=WebChannelTransport()).name
             'webchat'
         """
@@ -235,7 +235,7 @@ class WebChatAdapter(ChannelAdapter):
           contract (`specs/18-channel-telegram.md`).
         - ``file`` → :class:`IncomingMessage` carrying an ``upload_id``-only
           attachment descriptor; the gateway resolves bytes via
-          :class:`~sevn.gateway.media_store.MediaStore`.
+          :class:`~sevn.gateway.media.media_store.MediaStore`.
         ``auth`` and ``ping`` are control frames consumed by the gateway WS
         handler and never produce an :class:`IncomingMessage`.
         Routing uses a stable per-subscriber scope key ``webchat:{claims.sub}``

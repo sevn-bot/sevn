@@ -190,12 +190,12 @@ def _register_builtin_cron_jobs() -> None:
 _register_builtin_cron_jobs()
 
 import sevn.gateway.channel_boot  # noqa: E402 — M1 multi-adapter boot
-import sevn.gateway.replay_worker_hooks  # noqa: E402 — Batch D lane #5
-import sevn.gateway.subagents_boot  # noqa: E402 — W3 sub-agent supervisor boot activation
-import sevn.gateway.telemetry_boot  # noqa: E402 — CW-2 lane #1 channel boot hooks
-import sevn.gateway.trajectory_ingest_hooks  # noqa: E402 — Batch C lane #3
-import sevn.gateway.turn_bundle_hooks  # noqa: E402 — turn-bundle W1
-import sevn.gateway.user_model_hooks  # noqa: E402, F401 — Batch D lane #6
+import sevn.gateway.hooks.trajectory_ingest_hooks  # noqa: E402 — Batch C lane #3
+import sevn.gateway.replay.replay_worker_hooks  # noqa: E402 — Batch D lane #5
+import sevn.gateway.runtime.telemetry_boot  # noqa: E402 — CW-2 lane #1 channel boot hooks
+import sevn.gateway.subagents.subagents_boot  # noqa: E402 — W3 sub-agent supervisor boot activation
+import sevn.gateway.turn.turn_bundle_hooks  # noqa: E402 — turn-bundle W1
+import sevn.gateway.user.user_model_hooks  # noqa: E402, F401 — Batch D lane #6
 
 __all__ = [
     "BootContext",

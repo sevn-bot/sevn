@@ -2,13 +2,13 @@
 id: spec-22-onboarding
 kind: spec
 title: Onboarding — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Deliver the merge + validation + promotion pipeline every setup path shares
   so sevn.json stays the single source of truth (prd-06-setup-and-operations §5.4,
   spec-02-config-and-workspace): shipped pres'
 last_updated: '2026-07-14'
-fingerprint: sha256:8c1707baf254d04a7d4b4bc933c1fc054358a5b2185b1bddf6ae400bf01c24d3
+fingerprint: sha256:e77d4a42b2523761591b6b1ed37c19908c7e86675373732bc5376d6628edd8ea
 related: []
 sources:
 - src/sevn/onboarding/**
@@ -558,9 +558,6 @@ interfaces:
 - name: sanitize_repo_name
   file: src/sevn/onboarding/workspace_backup.py
   symbol: sanitize_repo_name
-specs: []
-personas: []
-prd_profile: null
 ---
 
 ## Purpose
@@ -634,3 +631,9 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Human-input needed
+
+Prose body not yet authored (W9 scope). Normative contract requires operator or
+follow-up wave authoring against verified code (`sevn about-docs extract` + graphify).
+Do not mark `status: done` until `make -C spec-kit-wave spec-check` scores ≥ 80.

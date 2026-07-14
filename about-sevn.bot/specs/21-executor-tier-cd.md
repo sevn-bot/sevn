@@ -2,7 +2,7 @@
 id: spec-21-executor-tier-cd
 kind: spec
 title: Executor tier C/D — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Tier C/D is the planned-work executor for messages the Triager classifies
   as complexity == C or complexity == D (prd-04-getting-things-done §5.3–§5.4): structured
@@ -212,3 +212,9 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Human-input needed
+
+Prose body not yet authored (W9 scope). Normative contract requires operator or
+follow-up wave authoring against verified code (`sevn about-docs extract` + graphify).
+Do not mark `status: done` until `make -C spec-kit-wave spec-check` scores ≥ 80.

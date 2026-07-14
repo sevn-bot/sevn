@@ -19,8 +19,8 @@ from sevn.config.workspace_config import (
 )
 from sevn.gateway.channel_router import ChannelRouter, IncomingMessage
 from sevn.gateway.commands.dispatcher import CommandDispatcher
-from sevn.gateway.media_store import MediaStore
-from sevn.gateway.rate_limit import TokenBucketLimiter
+from sevn.gateway.media.media_store import MediaStore
+from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
 from sevn.gateway.session_manager import SessionManager
 from sevn.security.llm_guard_scanner import LLMGuardScanner, ScanResult, ScanVerdict
 from sevn.storage.migrate import apply_migrations

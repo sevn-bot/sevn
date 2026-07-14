@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from sevn.gateway.bootstrap_state import bootstrap_completion_state
+from sevn.gateway.bootstrap.bootstrap_state import bootstrap_completion_state
 from sevn.onboarding.seed import (
     load_personality_presets,
     seed_narrative_templates,

@@ -265,8 +265,8 @@ def _collect_telegram_menu() -> dict[str, Any]:
         >>> "sections" in data and len(data["sections"]) >= 10
         True
     """
-    from sevn.gateway.menu import _CONFIG_ROOT_TILES
-    from sevn.gateway.menu_readiness import readiness_for_callback, readiness_user_label
+    from sevn.gateway.menu.menu import _CONFIG_ROOT_TILES
+    from sevn.gateway.menu.menu_readiness import readiness_for_callback, readiness_user_label
 
     dev_catalog = parse_dev_telegram_menu_catalog(DEV_TELEGRAM_HTML)
     ws = default_docs_workspace()

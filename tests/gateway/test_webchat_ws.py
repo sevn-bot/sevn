@@ -241,7 +241,7 @@ def test_ws_client_meta_persists_browser_timezone(client: TestClient) -> None:
     ``Intl.DateTimeFormat().resolvedOptions().timeZone`` on connect; the
     server persists it when the row is still on the UTC default.
     """
-    from sevn.gateway.user_profile import get_user_profile
+    from sevn.gateway.user.user_profile import get_user_profile
 
     token, _ = mint_webchat_jwt(secret=_JWT_SECRET, sub="owner", ttl_seconds=60)
     with client.websocket_connect("/ws/webchat") as ws:
@@ -264,7 +264,7 @@ def test_ws_client_meta_persists_browser_timezone(client: TestClient) -> None:
 
 def test_ws_client_meta_rejects_bad_timezone_silently(client: TestClient) -> None:
     """Unknown IANA name from the SPA never crashes the WS handler."""
-    from sevn.gateway.user_profile import get_user_profile
+    from sevn.gateway.user.user_profile import get_user_profile
 
     token, _ = mint_webchat_jwt(secret=_JWT_SECRET, sub="owner", ttl_seconds=60)
     with client.websocket_connect("/ws/webchat") as ws:

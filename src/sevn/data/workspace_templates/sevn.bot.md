@@ -47,7 +47,7 @@ When only the running package is available (no git tree), paths look like `sourc
 
 - `source_code/src/sevn/gateway/agent_turn.py` — message → triage → tier B/C
 - `source_code/src/sevn/gateway/channel_router.py` — inbound/outbound per channel
-- `source_code/src/sevn/gateway/menu.py` — `/config` Telegram UI
+- `source_code/src/sevn/gateway/menu/menu.py` — `/config` Telegram UI
 
 (Use `source_code/sevn/gateway/...` instead when `src/sevn` is absent.)
 

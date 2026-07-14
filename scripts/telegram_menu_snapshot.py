@@ -1,7 +1,7 @@
 """Live ``/config`` keyboard snapshot for docs gates and the about-site build.
 
 Module: scripts.telegram_menu_snapshot
-Depends: dataclasses, sevn.config.workspace_config, sevn.gateway.menu
+Depends: dataclasses, sevn.config.workspace_config, sevn.gateway.menu.menu
 
 Exports:
     LiveButton — one inline button from a rendered keyboard.
@@ -94,7 +94,7 @@ def collect_live_config_menu(
         ()
     """
     _ = content_root
-    from sevn.gateway.menu import _CONFIG_ROOT_TILES, build_config_menu_keyboard
+    from sevn.gateway.menu.menu import _CONFIG_ROOT_TILES, build_config_menu_keyboard
 
     ws = workspace if workspace is not None else default_docs_workspace()
     out: dict[str, LiveSection] = {}

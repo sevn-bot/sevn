@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from pydantic_ai.capabilities.hooks import Hooks
     from pydantic_ai.toolsets import AbstractToolset
 
-    from sevn.gateway.turn_media import TurnMediaItem
+    from sevn.gateway.turn.turn_media import TurnMediaItem
 
 from loguru import logger
 from pydantic_ai import Agent

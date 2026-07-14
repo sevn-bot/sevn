@@ -1,7 +1,7 @@
 """Local tunnel setup writes (no running gateway required).
 
 Module: sevn.cli.tunnel_setup_store
-Depends: dataclasses, typing, sevn.cli.gateway_token_store, sevn.gateway.workspace_config_io,
+Depends: dataclasses, typing, sevn.cli.gateway_token_store, sevn.gateway.config_io.workspace_config_io,
     sevn.secrets.fingerprint, sevn.security.secrets.*
 
 Exports:
@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from sevn.cli.gateway_token_store import GatewayTokenBootstrap
-from sevn.gateway.workspace_config_io import del_nested, mutate_sevn_json, set_nested
+from sevn.gateway.config_io.workspace_config_io import del_nested, mutate_sevn_json, set_nested
 from sevn.secrets.fingerprint import fingerprint_sha256_hex
 
 if TYPE_CHECKING:

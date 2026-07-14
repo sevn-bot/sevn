@@ -12,13 +12,13 @@ import pytest
 
 from sevn.agent.tracing.traces_migrate import apply_traces_migrations
 from sevn.config.workspace_config import WorkspaceConfig
-from sevn.gateway.post_turn_hooks import (
+from sevn.gateway.hooks.post_turn_hooks import (
     PostTurnContext,
     clear_post_turn_hooks,
     register_post_turn_hook,
     run_post_turn_hooks,
 )
-from sevn.gateway.trajectory_ingest_hooks import _post_turn_trajectory_ingest
+from sevn.gateway.hooks.trajectory_ingest_hooks import _post_turn_trajectory_ingest
 from sevn.storage.migrate import apply_migrations
 from sevn.storage.paths import traces_sqlite_path
 from sevn.workspace.layout import WorkspaceLayout
@@ -88,7 +88,7 @@ async def test_post_turn_hook_ingests_trajectory_fact(tmp_path: Path) -> None:
     )
     with (
         patch("sevn.gateway.agent_turn._emit_gateway_span", new_callable=AsyncMock),
-        patch("sevn.gateway.post_turn_hooks.record_turn_finished"),
+        patch("sevn.gateway.hooks.post_turn_hooks.record_turn_finished"),
     ):
         await run_post_turn_hooks(ctx)
         await asyncio.sleep(0.6)

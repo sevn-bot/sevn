@@ -2,13 +2,13 @@
 id: spec-19-channel-webui
 kind: spec
 title: Channel — Web UI — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Deliver the browser conversational surface required by prd-01-conversational-experience
   §5.1: owner-only WebSocket chat, static SPA shell, and session continuity with Telegram
   via the shared SessionMa'
-last_updated: '2026-07-12'
-fingerprint: sha256:374cf638eff859b6e68373302bb3734271c26da2b07567d8787c6a87db8fe59b
+last_updated: '2026-07-14'
+fingerprint: sha256:36de57ba2907253aeb41e68515b98b476428d4bc8c75d84bbb40262edd17ddb9
 related: []
 sources:
 - src/sevn/channels/**
@@ -422,11 +422,7 @@ interfaces:
 - name: webchat_config_from_workspace
   file: src/sevn/channels/webchat.py
   symbol: webchat_config_from_workspace
-specs: []
-personas: []
-prd_profile: null
 ---
-
 
 ## Purpose
 
@@ -499,3 +495,9 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Human-input needed
+
+Prose body not yet authored (W9 scope). Normative contract requires operator or
+follow-up wave authoring against verified code (`sevn about-docs extract` + graphify).
+Do not mark `status: done` until `make -C spec-kit-wave spec-check` scores ≥ 80.

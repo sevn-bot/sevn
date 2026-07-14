@@ -6,7 +6,7 @@ import asyncio
 from typing import TYPE_CHECKING, Any
 
 from sevn.config.workspace_config import WorkspaceConfig
-from sevn.gateway.self_improve_job_events import SelfImproveJobEventFanout
+from sevn.gateway.self_improve.self_improve_job_events import SelfImproveJobEventFanout
 
 if TYPE_CHECKING:
     from sevn.gateway.channel_router import OutgoingMessage
