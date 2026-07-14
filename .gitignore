@@ -27,6 +27,9 @@ docs/*
 /spec-kit-wave/
 /wave-orchestrator/
 
+# --- Verification evidence (verifier-setup / verify skill output) ---
+/evidence/
+
 # --- Accidental operator workspace at repo root ---
 /AGENTS.md
 /BOOTSTRAP.md

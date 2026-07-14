@@ -12,5 +12,8 @@ cannot cite ADRs into the public site. Do not add either — see
 [`0001-adopt-mattpocock-skills-into-spec-kit-wave.md`](0001-adopt-mattpocock-skills-into-spec-kit-wave.md)
 (decision D3) and `docs/mattpocock-skills-integration.md` §5.5.3 for why.
 
+[`0002-adopt-verifier-setup-into-spec-kit-wave.md`](0002-adopt-verifier-setup-into-spec-kit-wave.md)
+records adoption of AI-Builder-Club **verifier-setup** / per-task **verify** scaffolding.
+
 Paths are resolved by `spec-kit-wave/scripts/context_paths.py` and
 `skw.toml [context].decisions_dir` — never hardcoded in a skill.
