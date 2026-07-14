@@ -32,7 +32,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
-import subprocess
+import subprocess  # nosec B404 — fixed-argv git/runner invocations; no shell
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -227,7 +227,7 @@ def diff_for_globs(
         argv.append("--cached")
     argv += ["--", *pathspecs]
     try:
-        proc = subprocess.run(argv, capture_output=True, text=True, timeout=30, check=False)
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=30, check=False)  # nosec B603
     except (OSError, subprocess.SubprocessError):
         return ""
     diff = proc.stdout
@@ -324,7 +324,7 @@ def invoke_runner(
     """
     argv = runner.command(model=model)
     try:
-        proc = subprocess.run(
+        proc = subprocess.run(  # nosec B603 — operator-configured runner argv; no shell
             argv,
             input=prompt,
             capture_output=True,

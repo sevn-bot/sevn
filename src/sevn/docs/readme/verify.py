@@ -89,7 +89,7 @@ class SummaryLintFinding:
 
         Examples:
             >>> SummaryLintFinding("tools", "@sevn_tool", "decorator").format_error()
-            'tools: summary cites decorator @sevn_tool not found in source_globs'
+            "tools: summary cites decorator '@sevn_tool' not found in source_globs"
         """
         return f"{self.slug}: summary cites {self.kind} {self.token!r} not found in source_globs"
 
@@ -145,7 +145,7 @@ def _load_corpus(repo_root: Path, entry: ReadmeEntry) -> _Corpus:
 
         Examples:
             >>> from sevn.docs.readme.manifest import ReadmeEntry
-            >>> c = _load_corpus(Path("."), ReadmeEntry("g", "G", "S", "subsystem", "g", "g.md", ("Makefile",), ()))
+            >>> c = _load_corpus(Path(".").resolve(), ReadmeEntry("g", "G", "S", "subsystem", "g", "g.md", ("Makefile",), ()))
             >>> isinstance(c.text, str)
             True
     """

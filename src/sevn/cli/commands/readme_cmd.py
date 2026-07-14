@@ -153,9 +153,9 @@ def _git_add(repo_root: Path, rel_path: str) -> None:
         >>> _git_add(Path(tempfile.mkdtemp()), "README.md") is None
         True
     """
-    import subprocess  # local import: only needed on the --stage path
+    import subprocess  # nosec B404 — fixed git argv only; no shell
 
-    subprocess.run(
+    subprocess.run(  # nosec B603 B607 — git -C add; fixed argv, no shell
         ["git", "-C", str(repo_root), "add", "--", rel_path],
         capture_output=True,
         check=False,
@@ -215,7 +215,7 @@ async def _write_entries(
         >>> (td / "src/sevn/storage").mkdir(parents=True)
         >>> _ = (td / "src/sevn/storage/a.py").write_text("x=1\\n", encoding="utf-8")
         >>> m = load_manifest(_P("docs/readmes/manifest.toml"))
-        >>> e = get_entry(m, "storage")
+        >>> e = get_entry(m, "skills")
         >>> cfg = provider_config_from_settings(resolve_readme_settings(None), offline=True)
         >>> paths = asyncio.run(
         ...     _write_entries(

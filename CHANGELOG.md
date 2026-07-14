@@ -33,6 +33,8 @@ are cut into a dated, versioned section at release time.
 - README offline scaffold quality: turn-spine paragraph gated on `turn_spine`, sentence-boundary truncation, true path-list remainders, docstring-derived module inventory, and narrowed PLACEHOLDER warnings
 - README pipeline emits file-relative links and retargets manifest spec paths to `about-sevn.bot/specs/`; link checker resolves paths from each README directory only
 - README catalog kinds: manifest `catalog = "modules" | "skills"` with modules cap 200 (+N overflow row) and skills two-table layout (bundled SKILL.md frontmatter + runtime loaders)
+- CLI getting-started and config guides drop stale M1/M2 milestone framing; the `sevn config` interactive menu is documented as shipped
+- Subsystem README catalog adds `evolution` and `plugins` manifest rows with generated subsystem docs; `browser/` remains documented as out-of-catalog in STANDARD
 
 ### Deprecated
 
@@ -43,6 +45,7 @@ are cut into a dated, versioned section at release time.
 ### Fixed
 
 - Onboarding web wizard accepts `gateway.queue_mode=multi` (matches runtime and spec-36)
+- Skills catalog README no longer leaks YAML folded-scalar `>-` markers from bundled SKILL.md frontmatter
 - `list your skills` reply no longer truncates skill descriptions at ~80 chars: `compose_list_skills_reply` now prefers the full manifest description from the skill inventory over the clipped Triager routing-index line
 - `log_query` accepts a `[start, end]` integer pair and a bracketed `"[start, end]"` string as one inclusive range, instead of rejecting them with an "invalid range" error that leaked into replies; unparseable ranges now mark the diagnostic internal so the model corrects the call rather than quoting it to the user
 - Tier-B empty-output retry exhaustion (`Exceeded maximum output retries`) is treated as a deterministic harness failure, skipping the wasteful widened full-index retry that reproduced it and contributed to `executor_timeout_cancel` (the summarize / partial-progress path still runs)
@@ -60,6 +63,7 @@ are cut into a dated, versioned section at release time.
 
 ### Security
 
+- Bump setuptools to 83.0.0 to clear PYSEC-2026-3447 from pip-audit
 ## [0.0.1] - 2026-07-08
 
 First public release on [github.com/sevn-bot/sevn](https://github.com/sevn-bot/sevn).
