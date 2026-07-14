@@ -1,15 +1,15 @@
 <!-- generated: do not edit by hand; run `sevn readme update proxy-egress` -->
-# Egress proxy — Shared-secret-guarded /llm/* egress proxy, transport wire shapes, and paired daemon
+# Egress proxy — Shared-secret-guarded `/llm/*` egress proxy, Transport wire shapes, and route handlers
 
 [![Spec][spec-badge]][spec-link]
 [![Source][source-badge]][source-link]
 [![Index][index-badge]][index-link]
 
-> **Summary.** Shared-secret-guarded /llm/* egress proxy, transport wire shapes, and paired daemon. Normalize provider-shaped JSON over async HTTP to a single egress base URL (SEVN_PROXY_URL / ProcessSettings.proxy_url), so tier executors bind once per turn and never touch raw secrets.
+> **Summary.** Shared-secret-guarded `/llm/*` egress proxy, Transport wire shapes, and route handlers. Normalize provider-shaped JSON over async HTTP to a single egress base URL (SEVN_PROXY_URL / ProcessSettings.proxy_url), so tier executors bind once per turn and never touch raw secrets.
 
 ## Level 1 — Overview (non-technical)
 
-**Egress proxy** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Shared-secret-guarded /llm/* egress proxy, transport wire shapes, and paired daemon.
+**Egress proxy** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Shared-secret-guarded `/llm/*` egress proxy, Transport wire shapes, and route handlers.
 
 In everyday use, egress proxy helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
 

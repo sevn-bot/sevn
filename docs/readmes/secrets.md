@@ -1,15 +1,15 @@
 <!-- generated: do not edit by hand; run `sevn readme update secrets` -->
-# Secrets — Secrets backends, logical keys, fingerprint confirmation, and gateway-vs-proxy split
+# Secrets — Secrets backends, logical-key chain, TTL, and fingerprint confirmation
 
 [![Spec][spec-badge]][spec-link]
 [![Source][source-badge]][source-link]
 [![Index][index-badge]][index-link]
 
-> **Summary.** Secrets backends, logical keys, fingerprint confirmation, and gateway-vs-proxy split.
+> **Summary.** Secrets backends, logical-key chain, TTL, and fingerprint confirmation.
 
 ## Level 1 — Overview (non-technical)
 
-**Secrets** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Secrets backends, logical keys, fingerprint confirmation, and gateway-vs-proxy split.
+**Secrets** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Secrets backends, logical-key chain, TTL, and fingerprint confirmation.
 
 In everyday use, secrets helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
 

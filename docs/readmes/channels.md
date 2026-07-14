@@ -1,15 +1,15 @@
 <!-- generated: do not edit by hand; run `sevn readme update channels` -->
-# Channels — Telegram, Web UI bridge, Discord/Slack adapters, and channel boot patterns
+# Channels — Telegram, Web UI bridge, and channel adapter patterns
 
 [![Spec][spec-badge]][spec-link]
 [![Source][source-badge]][source-link]
 [![Index][index-badge]][index-link]
 
-> **Summary.** Telegram, Web UI bridge, Discord/Slack adapters, and channel boot patterns.
+> **Summary.** Telegram, Web UI bridge, and channel adapter patterns.
 
 ## Level 1 — Overview (non-technical)
 
-**Channels** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Telegram, Web UI bridge, Discord/Slack adapters, and channel boot patterns.
+**Channels** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Telegram, Web UI bridge, and channel adapter patterns.
 
 In everyday use, channels helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
 
