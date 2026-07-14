@@ -2,8 +2,8 @@
   "entries": {
     "agent": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-13T11:59:04Z",
-      "digest": "366b2924f59ea8525676910651b8aee806866e0cedd5138959564e767cb4acec",
+      "computed_at": "2026-07-14T12:21:28Z",
+      "digest": "996bc2caf5c6634b5fa79d512c6f5064b4f4daa7213ad266590b8ae099108443",
       "source_globs": [
         "src/sevn/agent/**"
       ]
@@ -26,8 +26,8 @@
     },
     "config-workspace": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-13T11:59:06Z",
-      "digest": "ec295917ecd8d8f821df1a7ce60789008f6a41c2a637c6ce750cba9d8a91916c",
+      "computed_at": "2026-07-14T10:26:38Z",
+      "digest": "cbc74868abf04cd79096490542939b44e4df329c325fc09bbe242e718ab12f5a",
       "source_globs": [
         "src/sevn/config/**",
         "src/sevn/workspace/**",
@@ -36,8 +36,8 @@
     },
     "gateway": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T10:26:32Z",
-      "digest": "90008e81ad332a80d672072354f276b7523d0a32a15583f5f2987ae32435e96a",
+      "computed_at": "2026-07-14T12:21:26Z",
+      "digest": "61f04460627e6eb54c155043e455e5938ccba6abc2515cc62458d124d76314eb",
       "source_globs": [
         "src/sevn/gateway/**"
       ]
@@ -132,8 +132,8 @@
     },
     "skills": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-13T11:59:05Z",
-      "digest": "404c591de06742a55ec591d0e444994226fc3c49f935dfab6c85d0e58d2302f3",
+      "computed_at": "2026-07-14T12:21:32Z",
+      "digest": "0412e8746278db2394734365e3dfccb3f4851012331950ffd507a8b01660f0aa",
       "source_globs": [
         "src/sevn/skills/**",
         "src/sevn/data/bundled_skills/**",
@@ -164,8 +164,8 @@
     },
     "tools": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-13T11:59:04Z",
-      "digest": "714669b67f67b606e30dfd3552c2fb8e4c5d1303e2008ce84e86bfdfa89e90b3",
+      "computed_at": "2026-07-14T12:21:30Z",
+      "digest": "207556c8650740a8335885e8fa26f8946cef7f269b331f4957fbb74207414f2c",
       "source_globs": [
         "src/sevn/tools/**"
       ]

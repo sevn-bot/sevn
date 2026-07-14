@@ -36,6 +36,28 @@ def test_compose_list_skills_reply_includes_inventory_counts() -> None:
     assert "load_skill" in body
 
 
+def test_compose_list_skills_reply_prefers_full_inventory_summary() -> None:
+    # skill_descriptions carries the ~80-char clipped Triager index line; the reply
+    # must surface the untruncated manifest description from the inventory summary.
+    clipped = "browser-harness — Thin CDP harness with extendable helpers.py for open-ended br…"
+    full = "Thin CDP harness with extendable helpers.py for open-ended browser automation flows."
+    body = compose_list_skills_reply(
+        {"browser-harness": clipped},
+        skill_inventory={
+            "browser-harness": {"summary": full, "scripts": ["a.py"], "runnables": []},
+        },
+    )
+    assert full in body
+    assert "…" not in body
+    assert "1 script" in body
+
+
+def test_compose_list_skills_reply_falls_back_when_no_inventory_summary() -> None:
+    # Without an inventory summary (e.g. mgr is None), keep the description as given.
+    body = compose_list_skills_reply({"pdf": "Render PDFs"})
+    assert "Render PDFs" in body
+
+
 def test_howto_messages_do_not_match_tier_a_regex() -> None:
     assert not is_list_skills_message("how does listregistry work?")
     assert not is_list_tools_message("how does list_registry work?")

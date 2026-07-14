@@ -15,6 +15,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import shlex
 import sys
 
 from _pp_cli import run_pp_cli
@@ -47,7 +48,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--query",
         default=None,
-        help="Natural-language query forwarded to movie-goat-pp-cli.",
+        help=(
+            "A movie-goat-pp-cli subcommand line (e.g. 'career \"Tom Hanks\"' or "
+            "'tonight'), tokenised on whitespace with quotes respected. Not free-text — "
+            "see references/movie_goat.md."
+        ),
     )
     parser.add_argument(
         "args",
@@ -60,7 +65,12 @@ def main(argv: list[str] | None = None) -> int:
     if parsed.args:
         cli_args = [a for a in parsed.args if a != "--"]
     elif parsed.query:
-        cli_args = [parsed.query]
+        # Tokenise the subcommand line (quotes respected) so multi-word queries reach the
+        # CLI as separate argv, not one bogus subcommand token.
+        try:
+            cli_args = shlex.split(parsed.query)
+        except ValueError:
+            cli_args = parsed.query.split()
 
     result = run_pp_cli(_SLUG, cli_args)
     if result.get("ok"):

@@ -338,6 +338,14 @@ def _coerce_bool_arg(value: Any, *, field: str) -> tuple[bool | None, str | None
     return None, f"log_query: '{field}' must be a boolean true/false (got {value!r})"
 
 
+# Appended to arg-shape validation errors so a model relays the fix silently and
+# corrects its call, rather than quoting the raw diagnostic into the user's reply
+# (observed 2026-07-13: "log_query failed: invalid range '[2578, 2632]'…" leaked to chat).
+_RANGE_ERR_INTERNAL_HINT = (
+    " (internal diagnostic — correct the call and retry; do not quote this to the user)"
+)
+
+
 def parse_log_ranges(ranges: Sequence[str]) -> tuple[list[LogLineSpan], str | None]:
     """Parse ``ranges`` entries like ``10-50`` or ``10:50`` (1-based inclusive).
 
@@ -365,7 +373,7 @@ def parse_log_ranges(ranges: Sequence[str]) -> tuple[list[LogLineSpan], str | No
         if match is None:
             return [], (
                 f"log_query: invalid range {spec!r}; use inclusive 1-based form 'start-end' "
-                "or 'start:end' (e.g. '10-50')"
+                "or 'start:end' (e.g. '10-50')" + _RANGE_ERR_INTERNAL_HINT
             )
         start = int(match.group(1))
         end = int(match.group(2))
@@ -375,6 +383,42 @@ def parse_log_ranges(ranges: Sequence[str]) -> tuple[list[LogLineSpan], str | No
             return [], f"log_query: range end must be >= start (got {spec!r})"
         parsed.append(LogLineSpan(start=start, end=end))
     return parsed, None
+
+
+def _both_plain_ints(items: Sequence[Any]) -> bool:
+    """Return True when every entry is a bare non-negative integer (int or digit string).
+
+    Used to detect a ``[start, end]`` pair passed as two bare integers. Booleans,
+    dicts, signed/tail markers, and already-hyphenated range strings are excluded so
+    tail-mode and canonical ``'start-end'`` inputs are never reinterpreted.
+
+    Args:
+        items (Sequence[Any]): Candidate range entries.
+
+    Returns:
+        bool: ``True`` when every entry is a bare non-negative integer.
+
+    Examples:
+        >>> _both_plain_ints([2578, 2632])
+        True
+        >>> _both_plain_ints(["10", "50"])
+        True
+        >>> _both_plain_ints(["10-50", "60"])
+        False
+        >>> _both_plain_ints([-100, 200])
+        False
+    """
+    for item in items:
+        if isinstance(item, bool):
+            return False
+        if isinstance(item, int):
+            if item < 0:
+                return False
+            continue
+        if isinstance(item, str) and item.strip().isdigit():
+            continue
+        return False
+    return True
 
 
 def coerce_log_range_args(
@@ -408,7 +452,14 @@ def coerce_log_range_args(
     if isinstance(ranges, str):
         # Model passed a bare string instead of a list; split on commas/whitespace so a
         # single ``'10-50'`` or ``'10-50, 100-120'`` is accepted rather than iterated as chars.
-        ranges = [seg for seg in re.split(r"[,\s]+", ranges.strip()) if seg]
+        # Also tolerate a JSON-array-looking string such as ``'[2578, 2632]'`` by stripping the
+        # surrounding brackets first (a frequent model mistake surfaced in live-session logs).
+        ranges = [seg for seg in re.split(r"[,\s]+", ranges.strip().strip("[](){}")) if seg]
+    if isinstance(ranges, (list, tuple)) and len(ranges) == 2 and _both_plain_ints(ranges):
+        # Model passed ``[start, end]`` as two bare integers meaning one inclusive range
+        # (e.g. ``[2578, 2632]`` → ``'2578-2632'``). Without this each number parses as an
+        # invalid standalone range. Only when neither is a dict/separator string.
+        ranges = [f"{int(str(ranges[0]).strip())}-{int(str(ranges[1]).strip())}"]
     if len(ranges) == 0:
         return (
             [],

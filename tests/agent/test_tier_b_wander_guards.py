@@ -9,7 +9,7 @@ import pytest
 
 from sevn.agent.adapters.tier_b_tools import _dispatch_tool
 from sevn.agent.executors.b_types import BTierDeps
-from sevn.config.defaults import TIER_B_TOOL_CALL_BUDGET
+from sevn.config.defaults import TIER_B_TOOL_CALL_BUDGET, TIER_B_TOOL_FAILURE_HARD_CAP
 from sevn.tools.base import ToolDefinition, ToolExecutor, enveloped_failure
 from sevn.tools.codes import ToolResultCode
 from sevn.tools.context import ToolContext
@@ -92,3 +92,30 @@ async def test_tool_call_budget_blocks_after_cap() -> None:
 
     assert f"Tool-call budget ({TIER_B_TOOL_CALL_BUDGET})" in result
     assert deps.tool_executor.dispatch.call_count == 0
+
+
+@pytest.mark.asyncio
+async def test_tool_failure_hard_cap_stops_varying_args_loop() -> None:
+    """A tool failing with *different* args each time is blocked at the failure cap.
+
+    The identical-call escalation keys on repeated same-args calls, so varying the
+    payload keeps ``repeat_n == 1``; the per-tool failure hard cap is what stops the
+    loop (mirrors the live ESPN / run_code failures that varied args each attempt).
+    """
+    deps = _deps()
+    definition = _read_def()
+    deps.tool_executor.dispatch = AsyncMock(  # type: ignore[method-assign]
+        return_value=enveloped_failure("boom", code=ToolResultCode.VALIDATION_ERROR),
+    )
+
+    results = [
+        await _dispatch_tool(_run_ctx(deps), definition, {"path": f"f{i}.py"})
+        for i in range(TIER_B_TOOL_FAILURE_HARD_CAP)
+    ]
+
+    # All attempts reached the executor (varying args are never deduped)...
+    assert deps.tool_executor.dispatch.call_count == TIER_B_TOOL_FAILURE_HARD_CAP
+    # ...but the final one is replaced with the terminal "stop calling it" steer.
+    assert "stop calling it" in results[-1]
+    assert f"failed {TIER_B_TOOL_FAILURE_HARD_CAP} times" in results[-1]
+    assert "boom" in results[0]

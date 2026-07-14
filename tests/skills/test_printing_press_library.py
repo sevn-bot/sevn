@@ -223,19 +223,38 @@ class TestWrapperScripts:
         assert envelope["ok"] is True
         assert envelope["data"] == payload
 
-    def test_query_shorthand_forwarded(
+    def test_query_shorthand_tokenised(
         self, script: str, slug: str, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """``--query`` value is passed as argv to the CLI binary."""
+        """``--query`` is tokenised on whitespace so multi-word subcommands reach the CLI."""
         mod = _load_module(script)
         proc = self._make_proc("{}")
         with (
             patch("shutil.which", return_value=f"/usr/bin/{slug}-pp-cli"),
             patch("subprocess.run", return_value=proc) as mock_run,
         ):
-            mod.main(["--query", "test query"])
+            mod.main(["--query", "news soccer fifa.world"])
         call_args = mock_run.call_args[0][0]
-        assert "test query" in call_args
+        # Separate argv tokens, not one bogus "news soccer fifa.world" subcommand.
+        assert "news" in call_args
+        assert "soccer" in call_args
+        assert "fifa.world" in call_args
+        assert "news soccer fifa.world" not in call_args
+
+    def test_query_shorthand_preserves_quoted_arg(
+        self, script: str, slug: str, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Quoted multi-word args (e.g. ``career "Tom Hanks"``) survive tokenisation as one arg."""
+        mod = _load_module(script)
+        proc = self._make_proc("{}")
+        with (
+            patch("shutil.which", return_value=f"/usr/bin/{slug}-pp-cli"),
+            patch("subprocess.run", return_value=proc) as mock_run,
+        ):
+            mod.main(["--query", 'career "Tom Hanks"'])
+        call_args = mock_run.call_args[0][0]
+        assert "career" in call_args
+        assert "Tom Hanks" in call_args
 
 
 # ---------------------------------------------------------------------------

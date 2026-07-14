@@ -116,6 +116,13 @@ def compose_list_skills_reply(
         suffix = ""
         row = inventory.get(name)
         if isinstance(row, Mapping):
+            # Prefer the inventory ``summary`` (full manifest description) over
+            # ``skill_descriptions``, whose rows are the Triager routing index
+            # lines clipped to ~80 chars (``SkillsIndex._clip``). The operator
+            # asked for the catalog, so surface the untruncated text here.
+            full = row.get("summary")
+            if isinstance(full, str) and full.strip():
+                desc = full.strip().replace("\n", " ")
             scripts = row.get("scripts", [])
             runnables = row.get("runnables", [])
             script_n = len(scripts) if isinstance(scripts, list) else 0
