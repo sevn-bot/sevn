@@ -172,7 +172,7 @@ Locked at W0. Operator-approved; do not re-derive in later waves.
 - [x] **W9** Spec body authoring for high-traffic specs (review gate) (2026-07-14 ✅: 9 specs authored score=100; 28 remain scaffold + Human-input needed; spec-check + about-docs-check green)
 - [x] **W10** Wire folder validators + changelog datestamp into CI (2026-07-14 ✅: about-docs-check chains spec-check+prd-check; status honesty in check.py; ci-docs green)
 - [x] **Thermos** thermo-nuclear branch review gate (2026-07-14 ✅: thermo review PASS; D8 fixes in 17-gateway + 25-cicd; gates green; operator sign-off pending — **optional re-run after Final**)
-- [ ] **W11** README `gateway.md` quality (human/LLM prose) — D13 scope extension
+- [x] **W11** README `gateway.md` quality (human/LLM prose) — D13 scope extension (2026-07-14 ✅: L1 plain-language rewrite; L2 FastAPI link + expanded prose; L3 full 114-module inventory with links; make readme-check green)
 - [ ] **W12** Gateway package reorganization (refactor-only)
 - [ ] **W13** Docstrings + `<Examples:` compliance (`skw` + tests)
 - [ ] **Final** Reconcile, gate, hand back — **re-run after W11–W13 complete** (prior run 2026-07-14 ✅: make ci-resume 31/31 green @ b0f85a5)
@@ -516,13 +516,13 @@ Author real, code-true 7-section bodies (D8/D9/D11) for the specs CLAUDE.md lean
 
 Target: `docs/readmes/gateway.md` on branch `wave/specs-prd-remediation`. Reference baseline: [gateway.md on branch](https://github.com/sevn-bot/sevn/blob/wave/specs-prd-remediation/docs/readmes/gateway.md). **Not** the full readme audit plan — gateway slug only (D13).
 
-- [ ] **W11.1** [US7] **Level 1** — Rewrite overview and operator-facing sections for a regular non-technical operator: plain language, no jargon (e.g. avoid "control plane", FastAPI internals, module-path dumps without explanation).
-- [ ] **W11.2** [US7] **Level 2** — On first "FastAPI" mention, add a markdown link to [FastAPI on GitHub](https://github.com/tiangolo/fastapi); expand prose with explanatory context (human/LLM quality pass on all Level 2 sections).
-- [ ] **W11.3** [US7] **Level 3 — major upgrade:**
+- [x] **W11.1** [US7] **Level 1** — Rewrite overview and operator-facing sections for a regular non-technical operator: plain language, no jargon (e.g. avoid "control plane", FastAPI internals, module-path dumps without explanation). (2026-07-14 ✅: front-desk metaphor; no control-plane/FastAPI in L1)
+- [x] **W11.2** [US7] **Level 2** — On first "FastAPI" mention, add a markdown link to [FastAPI on GitHub](https://github.com/tiangolo/fastapi); expand prose with explanatory context (human/LLM quality pass on all Level 2 sections). (2026-07-14 ✅: FastAPI linked; turn spine, queue/steer, channels/boot, Telegram menus, config expanded)
+- [x] **W11.3** [US7] **Level 3 — major upgrade:** (2026-07-14 ✅: 114-module inventory with docstring prose + symbol links; removed See-X stubs; Extension and invariants updated)
   - Module inventory: each listed module gets LLM-written explanation (not one-liner stubs).
   - All Level 3 sections: proper markdown links to source files **and** public functions (use line anchors where the readme generator supports them), not bare text paths.
   - Every subsection needs substantially more descriptive prose.
-- [ ] **W11.4** Verify: `make readme-check`, `sevn readme fingerprint gateway`. Flip boxes.
+- [x] **W11.4** Verify: `make readme-check`, `sevn readme fingerprint gateway`. Flip boxes. (2026-07-14 ✅: both green)
 
 ## Wave W12 — Gateway package reorganization (refactor-only)
 
