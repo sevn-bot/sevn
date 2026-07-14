@@ -43,6 +43,7 @@ class ReadmeEntry:
     curated: bool = False
     turn_spine: bool = False
     provider_keys_via_proxy: bool = False
+    l2_flow_suffix: str = ""
     catalog: str = "modules"
     template: str = ""
 
@@ -113,6 +114,7 @@ def load_manifest(path: Path) -> ReadmeManifest:
         provider_keys_via_proxy = _parse_provider_keys_via_proxy(
             row.get("provider_keys_via_proxy"), path=path, idx=idx
         )
+        l2_flow_suffix = _parse_l2_flow_suffix(row.get("l2_flow_suffix"), path=path, idx=idx)
         catalog = _parse_catalog(row.get("catalog"), path=path, idx=idx)
         template = _parse_template(row.get("template"), path=path, idx=idx)
 
@@ -129,6 +131,7 @@ def load_manifest(path: Path) -> ReadmeManifest:
                 curated=curated,
                 turn_spine=turn_spine,
                 provider_keys_via_proxy=provider_keys_via_proxy,
+                l2_flow_suffix=l2_flow_suffix,
                 catalog=catalog,
                 template=template,
             )
@@ -243,6 +246,32 @@ def _parse_provider_keys_via_proxy(value: object, *, path: Path, idx: int) -> bo
         msg = f"{path}: readme[{idx}] provider_keys_via_proxy must be a boolean"
         raise ValueError(msg)
     return value
+
+
+def _parse_l2_flow_suffix(value: object, *, path: Path, idx: int) -> str:
+    """Parse optional ``l2_flow_suffix`` manifest key (defaults to empty).
+
+        Args:
+    value (object): Raw TOML value or ``None`` when omitted.
+    path (Path): Manifest path for error messages.
+    idx (int): Row index for error messages.
+
+        Returns:
+            str: Optional Level-2 flow suffix prose.
+
+        Raises:
+            ValueError: When the key is present but not a string.
+
+        Examples:
+            >>> _parse_l2_flow_suffix(None, path=Path("m.toml"), idx=0)
+            ''
+    """
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        msg = f"{path}: readme[{idx}] l2_flow_suffix must be a string"
+        raise ValueError(msg)
+    return value.strip()
 
 
 def _parse_catalog(value: object, *, path: Path, idx: int) -> str:

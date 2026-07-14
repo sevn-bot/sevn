@@ -115,14 +115,14 @@ Evolution issue registry — local JSON (about-sevn.bot/specs/35-bot-evolution.m
 Working with [`issues.py`](../../src/sevn/evolution/issues.py): inspect the public entry points below.
 Start with [`EvolutionIssue.to_dict`](../../src/sevn/evolution/issues.py#L61), then [`EvolutionIssue.from_dict`](../../src/sevn/evolution/issues.py#L83), [`utc_now_iso`](../../src/sevn/evolution/issues.py#L135), [`issues_dir`](../../src/sevn/evolution/issues.py#L148).
 
-Auto-start evolution pipeline on issue import (about-sevn.bot/plan/dev_eval_14062026/evolution-auto-run-import-wave-plan.md AR-1).
+Auto-start evolution pipeline on issue import (the design docs AR-1).
 
 When my_sevn.issues.auto_run_on_import is true and a GitHub issue is **newly**
 imported (created=True), this module schedules :func:run_pipeline in the background
 via :func:spawn_logged.  Dry-run flags are left None so they resolve from
 my_sevn.pipelines config defaults — D3 decision in the wave plan.
 
-PipelineBlockedError is swallowed: feature issues that require approval stop at the
+PipelineBlockedError` is swallowed: feature issues that require approval stop at the
 HITL gate and that is the expected operator experience (D5).
 
 Working with [`pipeline_autostart.py`](../../src/sevn/evolution/pipeline_autostart.py): inspect the public entry points below.

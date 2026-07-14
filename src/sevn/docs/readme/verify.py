@@ -29,7 +29,7 @@ from pathlib import Path
 
 from sevn.docs.readme.fingerprint import expand_source_globs
 from sevn.docs.readme.manifest import ReadmeEntry, ReadmeManifest
-from sevn.docs.readme.symbol_refs import _symbol_defined_in_file
+from sevn.docs.readme.symbol_refs import symbol_defined_in_file
 
 _BACKTICK = re.compile(r"`([^`]+)`")
 _CONFIG_KEY = re.compile(r"\b[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+\b")
@@ -37,6 +37,7 @@ _PASCAL = re.compile(r"\b[A-Z][A-Za-z0-9_]+(?:\.[A-Za-z_][A-Za-z0-9_]*)*\b")
 _AT_SYMBOL = re.compile(r"@[A-Za-z_][A-Za-z0-9_]*")
 _AT_PHRASE = re.compile(r"(@[A-Za-z_][A-Za-z0-9_]*)\s+([a-z][a-z0-9_]{2,})")
 _SLASH_COMPOUND = re.compile(r"\b([A-Za-z0-9]+(?:/[A-Za-z0-9]+)+)\b")
+_PY_PATH = re.compile(r"^src/[\w./-]+\.py$")
 _SKIP_PASCAL = frozenset(
     {
         "Curated",
@@ -60,17 +61,28 @@ _SKIP_PASCAL = frozenset(
         "Paired",
     }
 )
-_AUDIT_PHRASES: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"voice\s+hooks", re.IGNORECASE), "voice hooks"),
-    (
-        re.compile(r"keys\s+never(?:\s+in\s+the\s+gateway\s+process)?", re.IGNORECASE),
+# Regression guards for doc-vs-code audit D10 banned manifest phrases.
+_BANNED_SUMMARY_PHRASES: frozenset[str] = frozenset(
+    {
+        "voice hooks",
         "keys never in the gateway process",
-    ),
-    (re.compile(r"session\s+tokens", re.IGNORECASE), "session tokens"),
-    (re.compile(r"logfire/?otel", re.IGNORECASE), "Logfire/OTel"),
-    (re.compile(r"\bActiveRunSnapshot\b"), "ActiveRunSnapshot"),
-    (re.compile(r"obsidian\s+sync", re.IGNORECASE), "Obsidian sync"),
+        "session tokens",
+        "logfire/otel",
+        "activerunsnapshot",
+        "obsidian sync",
+    }
 )
+
+
+@dataclass
+class _Corpus:
+    """Expanded ``source_globs`` text and Python paths for summary grounding."""
+
+    text: str
+    py_files: list[Path]
+
+
+_CORPUS_CACHE: dict[tuple[str, ...], _Corpus] = {}
 
 
 @dataclass(frozen=True)
@@ -112,6 +124,7 @@ def lint_summaries(manifest: ReadmeManifest, repo_root: Path) -> list[str]:
             True
     """
     repo_root = repo_root.resolve()
+    _CORPUS_CACHE.clear()
     errors: list[str] = []
     for entry in manifest.entries:
         if entry.slug in {"index", "root"}:
@@ -123,14 +136,6 @@ def lint_summaries(manifest: ReadmeManifest, repo_root: Path) -> list[str]:
                     SummaryLintFinding(slug=entry.slug, token=token, kind=kind).format_error()
                 )
     return errors
-
-
-@dataclass
-class _Corpus:
-    """Expanded ``source_globs`` text and Python paths for summary grounding."""
-
-    text: str
-    py_files: list[Path]
 
 
 def _load_corpus(repo_root: Path, entry: ReadmeEntry) -> _Corpus:
@@ -149,6 +154,10 @@ def _load_corpus(repo_root: Path, entry: ReadmeEntry) -> _Corpus:
             >>> isinstance(c.text, str)
             True
     """
+    key = entry.source_globs
+    cached = _CORPUS_CACHE.get(key)
+    if cached is not None:
+        return cached
     parts: list[str] = []
     py_files: list[Path] = []
     for path in expand_source_globs(repo_root, entry.source_globs, tracked_only=False):
@@ -161,7 +170,30 @@ def _load_corpus(repo_root: Path, entry: ReadmeEntry) -> _Corpus:
         parts.append(text)
         if path.suffix == ".py":
             py_files.append(path)
-    return _Corpus(text="\n".join(parts), py_files=py_files)
+    corpus = _Corpus(text="\n".join(parts), py_files=py_files)
+    _CORPUS_CACHE[key] = corpus
+    return corpus
+
+
+def _classify_backtick(token: str) -> tuple[str, str]:
+    """Classify a backtick span as path, config key, or AST symbol.
+
+        Args:
+    token (str): Backtick span from a manifest summary.
+
+        Returns:
+            tuple[str, str]: ``(token, kind)`` for summary grounding.
+
+        Examples:
+            >>> _classify_backtick("gateway.queue_mode")
+            ('gateway.queue_mode', 'config key')
+    """
+    cleaned = token.strip()
+    if _PY_PATH.fullmatch(cleaned):
+        return (cleaned, "path")
+    if _CONFIG_KEY.fullmatch(cleaned):
+        return (cleaned, "config key")
+    return (cleaned, "symbol")
 
 
 def _extract_summary_tokens(summary: str) -> list[tuple[str, str]]:
@@ -188,7 +220,7 @@ def _extract_summary_tokens(summary: str) -> list[tuple[str, str]]:
         found.append((cleaned, kind))
 
     for match in _BACKTICK.finditer(summary):
-        add(match.group(1), "symbol")
+        add(*_classify_backtick(match.group(1)))
 
     for match in _AT_SYMBOL.finditer(summary):
         add(match.group(0), "decorator")
@@ -210,9 +242,10 @@ def _extract_summary_tokens(summary: str) -> list[tuple[str, str]]:
             if part and part[0].isupper():
                 add(part, "symbol")
 
-    for pattern, label in _AUDIT_PHRASES:
-        if pattern.search(summary):
-            add(label, "phrase")
+    lowered = summary.lower()
+    for phrase in _BANNED_SUMMARY_PHRASES:
+        if phrase in lowered:
+            add(phrase, "phrase")
 
     return found
 
@@ -222,7 +255,7 @@ def _token_present(token: str, kind: str, corpus: _Corpus) -> bool:
 
         Args:
     token (str): Cited summary token.
-    kind (str): Token class (``symbol``, ``config key``, ``phrase``, ``decorator``).
+    kind (str): Token class (``symbol``, ``config key``, ``phrase``, ``decorator``, ``path``).
     corpus (_Corpus): Expanded ``source_globs`` text and Python paths.
 
         Returns:
@@ -240,6 +273,9 @@ def _token_present(token: str, kind: str, corpus: _Corpus) -> bool:
         return token in corpus.text
 
     if kind == "config key":
+        return token in corpus.text
+
+    if kind == "path":
         return token in corpus.text
 
     if "." in token:
@@ -265,4 +301,4 @@ def _dotted_symbol_present(symbol: str, py_files: list[Path]) -> bool:
             >>> _dotted_symbol_present("Real.exists", [])
             False
     """
-    return any(_symbol_defined_in_file(py_file, symbol) for py_file in py_files)
+    return any(symbol_defined_in_file(py_file, symbol) for py_file in py_files)

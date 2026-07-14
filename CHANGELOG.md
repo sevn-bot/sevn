@@ -25,6 +25,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- README generator refactors L3 prose into `l3_prose.py` with shared `prose`/`symbols` helpers; `lint_summaries` classifies backtick config keys and paths correctly; manifest `l2_flow_suffix` carries optional turn-spine flow suffix text
 - README regeneration skips rewriting files when rendered markdown is unchanged, keeping pre-commit manifest sync idempotent
 - README `make readme-check` runs manifest `lint_summaries` and validates curated Level 1–2 symbol cites; INDEX status column shows `fresh`/`stale` with a freshness ≠ accuracy note
 - README generator drops the hardcoded gateway key-load clause unless `provider_keys_via_proxy` is set on the manifest row; non–turn-spine L2 uses module-graph prose instead of a generic stub

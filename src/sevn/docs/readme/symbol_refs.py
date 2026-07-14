@@ -8,6 +8,7 @@ Exports:
     extract_curated_prose_section — slice curated Level 1-2 prose before L3.
     validate_path_refs — verify backtick ``src/...`` paths exist.
     validate_symbol_refs — verify ``Class.method`` symbols in cited Python files.
+    symbol_defined_in_file — AST check that ``Class.method`` exists in a Python file.
 
 Examples:
     >>> from pathlib import Path
@@ -208,7 +209,7 @@ def validate_symbol_refs(text: str, repo_root: Path) -> list[str]:
         if not py_file.is_file():
             errors.append(f"symbol {symbol!r}: missing file {py_rel}")
             continue
-        if not _symbol_defined_in_file(py_file, symbol):
+        if not symbol_defined_in_file(py_file, symbol):
             errors.append(f"symbol not found: {symbol} in {py_rel}")
     return errors
 
@@ -245,7 +246,7 @@ def _nearest_py_path(
     return best[1] if best else None
 
 
-def _symbol_defined_in_file(py_file: Path, symbol: str) -> bool:
+def symbol_defined_in_file(py_file: Path, symbol: str) -> bool:
     """Return True when ``Class.method`` exists in ``py_file``.
 
         Args:
@@ -260,7 +261,7 @@ def _symbol_defined_in_file(py_file: Path, symbol: str) -> bool:
             >>> td = Path(tempfile.mkdtemp())
             >>> path = td / "m.py"
             >>> _ = path.write_text("class Foo:\\n    def bar(self): pass\\n", encoding="utf-8")
-            >>> _symbol_defined_in_file(path, "Foo.bar")
+            >>> symbol_defined_in_file(path, "Foo.bar")
             True
     """
     parts = symbol.split(".")
@@ -317,3 +318,6 @@ def _symbol_defined_in_file(py_file: Path, symbol: str) -> bool:
                     return True
             return False
     return False
+
+
+_symbol_defined_in_file = symbol_defined_in_file

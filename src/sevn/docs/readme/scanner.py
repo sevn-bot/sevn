@@ -27,17 +27,19 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+import yaml
 from loguru import logger
 
 from sevn.docs.readme.brand import load_root_intro_lines, load_root_value_prop
 from sevn.docs.readme.fingerprint import expand_source_globs
 from sevn.docs.readme.manifest import ReadmeEntry
-from sevn.docs.readme.model import (
-    README_MAX_SYMBOL_FILES,
-    _first_sentence,
+from sevn.docs.readme.model import _first_sentence, truncate_at_sentence
+from sevn.docs.readme.prose import (
+    module_docstring_prose,
+    rewrite_design_doc_refs,
     strip_inline_code,
-    truncate_at_sentence,
 )
+from sevn.docs.readme.symbols import README_MAX_SYMBOL_FILES
 
 DEFAULT_MAX_SYMBOL_FILES = README_MAX_SYMBOL_FILES
 
@@ -68,7 +70,7 @@ def scan_repo_context(repo_root: Path, entry: ReadmeEntry) -> dict[str, Any]:
     py_files = [rel for rel in source_files if rel.endswith(".py")]
 
     source_roots = _source_dir_roots(entry.source_globs)
-    module_summaries = _build_module_summaries(repo_root, py_files)
+    module_summaries, module_docstring_prose = _build_module_text_maps(repo_root, py_files)
     module_symbols = extract_module_symbols(repo_root, py_files)
     context: dict[str, Any] = {
         "slug": entry.slug,
@@ -84,6 +86,7 @@ def scan_repo_context(repo_root: Path, entry: ReadmeEntry) -> dict[str, Any]:
         "source_files": source_files,
         "source_py_files": py_files,
         "module_summaries": module_summaries,
+        "module_docstring_prose": module_docstring_prose,
         "source_excerpt": _build_source_excerpt(repo_root, py_files),
         "spec_excerpt": _read_spec_excerpt(repo_root, list(entry.specs)),
         "module_symbols": module_symbols,
@@ -234,30 +237,6 @@ def symbol_lineno_for_module(
         elif isinstance(entry, str) and entry == symbol:
             return None
     return None
-
-
-def _symbol_names(entries: list[dict[str, int | str]] | list[object]) -> list[str]:
-    """Normalize symbol records to bare names (scanner-local alias).
-
-        Args:
-    entries (list[dict[str, int | str]] | list[object]): Symbol records.
-
-        Returns:
-            list[str]: Symbol names.
-
-        Examples:
-            >>> _symbol_names([{"name": "run", "lineno": 2}])
-            ['run']
-    """
-    names: list[str] = []
-    for entry in entries:
-        if isinstance(entry, dict):
-            name = str(entry.get("name", "")).strip()
-            if name:
-                names.append(name)
-        elif isinstance(entry, str) and entry:
-            names.append(entry)
-    return names
 
 
 def _build_symbol_lineno_map(
@@ -655,29 +634,6 @@ def _read_graphify(repo_root: Path) -> dict[str, Any] | None:
     }
 
 
-_SPECS_REF = re.compile(r"(?<![\w./-])specs/")
-_PLAN_PRD_REF = re.compile(r"(?<![\w./-])(?:plan|prd)/[^\s')\"]+")
-
-
-def _rewrite_design_doc_refs(text: str) -> str:
-    """Rewrite gitignored design-doc path cites for published README emission.
-
-        Args:
-    text (str): Docstring or markdown excerpt.
-
-        Returns:
-            str: Text with ``specs/`` retargeted and ``plan/``/``prd/`` cites genericized.
-
-        Examples:
-            >>> _rewrite_design_doc_refs("('specs/17-gateway.md')")
-            "('about-sevn.bot/specs/17-gateway.md')"
-            >>> _rewrite_design_doc_refs("'plan/foo.md'")
-            "'the design docs'"
-    """
-    text = _SPECS_REF.sub("about-sevn.bot/specs/", text)
-    return _PLAN_PRD_REF.sub("the design docs", text)
-
-
 def _first_docstring_sentence(text: str) -> str:
     """Return the first sentence from a module docstring or leading comment line.
 
@@ -708,28 +664,26 @@ def _first_docstring_sentence(text: str) -> str:
     return truncate_at_sentence(cleaned, 200) or cleaned
 
 
-def _build_module_summaries(repo_root: Path, py_files: list[str]) -> dict[str, str]:
-    """Map repo-relative Python paths to module docstring first sentences.
+def _build_module_text_maps(
+    repo_root: Path, py_files: list[str]
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Map repo-relative Python paths to summary and deep-dive docstring prose.
 
         Args:
     repo_root (Path): Repository root.
     py_files (list[str]): Repo-relative Python paths.
 
         Returns:
-            dict[str, str]: ``src/...py`` → summary text.
+            tuple[dict[str, str], dict[str, str]]: First-sentence summaries and full prose maps.
 
         Examples:
-            >>> import tempfile
-            >>> from pathlib import Path as _P
-            >>> td = _P(tempfile.mkdtemp())
-            >>> p = td / "src/a.py"
-            >>> p.parent.mkdir(parents=True)
-            >>> _ = p.write_text('\"\"\"Hello module.\"\"\"\\n', encoding="utf-8")
-            >>> _build_module_summaries(td, ["src/a.py"])["src/a.py"]
-            'Hello module.'
+            >>> summaries, prose = _build_module_text_maps(Path(".").resolve(), [])
+            >>> isinstance(summaries, dict) and isinstance(prose, dict)
+            True
     """
     repo_root = repo_root.resolve()
-    out: dict[str, str] = {}
+    summaries: dict[str, str] = {}
+    docstring_prose: dict[str, str] = {}
     for rel in py_files:
         path = repo_root / rel
         try:
@@ -737,10 +691,24 @@ def _build_module_summaries(repo_root: Path, py_files: list[str]) -> dict[str, s
         except OSError:
             logger.warning("readme_scanner: unable to read source file at {}", path)
             continue
+        try:
+            tree = ast.parse(text)
+        except SyntaxError:
+            logger.debug("readme_scanner: syntax error in {}", rel)
+            summary = _first_docstring_sentence(text)
+            if summary:
+                summaries[rel] = rewrite_design_doc_refs(strip_inline_code(summary))
+            continue
+        doc = ast.get_docstring(tree)
+        if not doc:
+            continue
         summary = _first_docstring_sentence(text)
         if summary:
-            out[rel] = _rewrite_design_doc_refs(strip_inline_code(summary))
-    return out
+            summaries[rel] = rewrite_design_doc_refs(strip_inline_code(summary))
+        prose = module_docstring_prose(doc.strip())
+        if prose:
+            docstring_prose[rel] = rewrite_design_doc_refs(strip_inline_code(prose))
+    return summaries, docstring_prose
 
 
 def _scan_bundled_skills(repo_root: Path) -> list[dict[str, str]]:
@@ -782,7 +750,7 @@ def _scan_bundled_skills(repo_root: Path) -> list[dict[str, str]]:
             summary = truncate_at_sentence(summary, 300) or summary[:300]
         if not summary:
             summary = name
-        summary = _rewrite_design_doc_refs(strip_inline_code(summary))
+        summary = rewrite_design_doc_refs(strip_inline_code(summary))
         rows.append({"name": name, "path": rel, "summary": summary})
     return rows
 
@@ -810,42 +778,18 @@ def _skill_frontmatter_fields(text: str) -> tuple[str, str]:
     if end < 0:
         return ("", "")
     block = text[3:end]
-    name = ""
-    description = ""
-    lines = block.splitlines()
-    idx = 0
-    while idx < len(lines):
-        line = lines[idx]
-        if line.startswith("name:"):
-            name = line.split(":", maxsplit=1)[1].strip().strip("'\"")
-            idx += 1
-            continue
-        if line.startswith("description:"):
-            rest = line.split(":", maxsplit=1)[1].strip()
-            if rest.startswith(">"):
-                collected: list[str] = []
-                idx += 1
-                while idx < len(lines) and lines[idx].startswith((" ", "\t")):
-                    collected.append(lines[idx].strip().strip("'\""))
-                    idx += 1
-                description = " ".join(collected).strip()
-                continue
-            if rest.startswith("|"):
-                collected = []
-                idx += 1
-                while idx < len(lines) and lines[idx].startswith((" ", "\t")):
-                    collected.append(lines[idx].strip().strip("'\""))
-                    idx += 1
-                description = "\n".join(collected).strip()
-                continue
-            collected = [rest.strip("'\"")] if rest else []
-            idx += 1
-            while idx < len(lines) and lines[idx].startswith((" ", "\t")):
-                collected.append(lines[idx].strip().strip("'\""))
-                idx += 1
-            description = " ".join(collected).strip()
-            continue
-        idx += 1
+    try:
+        data = yaml.safe_load(block)
+    except yaml.YAMLError:
+        return ("", "")
+    if not isinstance(data, dict):
+        return ("", "")
+    name = str(data.get("name", "")).strip()
+    description = data.get("description", "")
+    if isinstance(description, list):
+        description = " ".join(str(part).strip() for part in description if str(part).strip())
+    else:
+        description = str(description).strip()
     return (name, description)
 
 
@@ -884,7 +828,7 @@ def _build_source_excerpt(
             logger.warning("readme_scanner: unable to read source file at {}", path)
             continue
         summary = _first_docstring_sentence(text)
-        safe_summary = _rewrite_design_doc_refs(strip_inline_code(summary))
+        safe_summary = rewrite_design_doc_refs(strip_inline_code(summary))
         if safe_summary:
             lines.append(f"- `{rel}` — {safe_summary}")
         else:
