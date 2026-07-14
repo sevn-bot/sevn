@@ -30,7 +30,7 @@ workspace-relative file tools (e.g. `read` with path
   - Routing policy + fast greeting path: `source_code/src/sevn/agent/triager/routing_policy.py`
   - Per-turn context builder: `source_code/src/sevn/agent/triager/context.py`
 - **Tier A** — triager-only short replies (greetings, thanks, bye). No executor.
-  - Canned reply pool: `source_code/src/sevn/agent/triager/routing_policy.py` (`_TIER_A_REPLIES`).
+  - Canned reply pool: `source_code/src/sevn/agent/triager/tier_a_replies.py`
 - **Tier B** — Pydantic-AI executor with lazy tool loading.
   - Harness: `source_code/src/sevn/agent/executors/b_harness.py`
   - Model adapter: `source_code/src/sevn/agent/adapters/tier_b_model.py`
@@ -88,6 +88,36 @@ workspace-relative file tools (e.g. `read` with path
 - Code index (this folder's `CODE_INDEX.md`): `source_code/src/sevn/code_understanding/code_index.py`
 - Source mirror at boot: `source_code/src/sevn/workspace/source_copy.py`
 - Graphify CLI integration: `source_code/src/sevn/code_understanding/graphify.py`
+
+### Harness discipline
+
+- Agent harness (snapshots, steer, restart): `source_code/src/sevn/agent/harness/`
+- Gateway harness hooks: `source_code/src/sevn/gateway/harness/`
+
+### Secrets (security tree)
+
+- Secret backends + chain: `source_code/src/sevn/security/secrets/`
+- Legacy shim modules: `source_code/src/sevn/secrets/`
+
+### Bot evolution
+
+- Issue pipelines, approvals, spec-kit runs: `source_code/src/sevn/evolution/`
+
+### Second Brain
+
+- Vault/wiki engine: `source_code/src/sevn/second_brain/`
+
+### Self-improvement
+
+- Trajectory ingest + patch pipeline: `source_code/src/sevn/self_improve/`
+
+### Plugin hooks
+
+- In-process extension layer: `source_code/src/sevn/plugins/`
+
+### OpenUI (generated UI)
+
+- Sanitised HTML bridge + delivery: `source_code/src/sevn/ui/openui/`
 
 ### Observability
 

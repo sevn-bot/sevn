@@ -331,13 +331,21 @@ async def write_readme(
     )
     output_path = repo_root / entry.output
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(markdown, encoding="utf-8")
+    if not (output_path.is_file() and output_path.read_text(encoding="utf-8") == markdown):
+        output_path.write_text(markdown, encoding="utf-8")
 
     fp_path = fingerprints_path or default_fingerprints_path(repo_root)
     store = load_fingerprints(fp_path)
     digest = compute_digest(repo_root, entry.source_globs)
-    upsert_entry(store, slug=entry.slug, digest=digest, source_globs=entry.source_globs)
-    save_fingerprints(fp_path, store)
+    entries = store.get("entries", {})
+    prior_digest: str | None = None
+    if isinstance(entries, dict):
+        prior = entries.get(entry.slug, {})
+        if isinstance(prior, dict):
+            prior_digest = str(prior.get("digest", "")) or None
+    if prior_digest != digest:
+        upsert_entry(store, slug=entry.slug, digest=digest, source_globs=entry.source_globs)
+        save_fingerprints(fp_path, store)
     return output_path
 
 
@@ -653,30 +661,3 @@ def _parse_guide_steps(text: str) -> list[dict[str, str]]:
     if current_heading is not None:
         steps.append({"heading": current_heading, "body": "\n".join(body_lines).strip()})
     return steps
-
-
-async def _llm_subsystem_assembly(
-    base: ReadmeAssembly,
-    scan: dict[str, Any],
-    provider: SectionProvider,
-) -> ReadmeAssembly:
-    """Polish subsystem tiers via LLM section prompts.
-
-        Args:
-    base (ReadmeAssembly): Offline baseline sections.
-    scan (dict[str, Any]): Scanner context.
-    provider (SectionProvider): LLM provider.
-
-        Returns:
-            ReadmeAssembly: Assembly with LLM-polished tier bodies.
-
-        Examples:
-            >>> import asyncio
-            >>> from sevn.docs.readme.manifest import ReadmeEntry
-            >>> e = ReadmeEntry("g", "G", "S", "subsystem", "g", "o.md", ("src/**",), ())
-            >>> base = ReadmeAssembly(e, {"summary": "S", "level1": "a"})
-            >>> polished = asyncio.run(_llm_subsystem_assembly(base, {"title": "G"}, OfflineProvider()))
-            >>> polished.sections["summary"] == "S"
-            True
-    """
-    return await _llm_profile_assembly(base, scan, provider, _SUBSYSTEM_SECTION_PROMPTS)

@@ -25,11 +25,29 @@ specs:
 - spec-19-channel-webui
 - spec-20-voice
 - spec-21-executor-tier-cd
-- spec-29-openui
+- spec-37-openui
 personas:
 - operator
 prd_profile: ai-native
 ---
+
+## Spec implementation status (W9 seed)
+
+This PRD is `ready` while linked specs below are not normatively complete (`draft` / `scaffold` / `rejected`). Code may run ahead of spec prose.
+
+| Spec | Status |
+| --- | --- |
+| spec-15-memory-lcm | draft |
+| spec-31-memory-dreaming | draft |
+| spec-32-memory-honcho | draft |
+| spec-17-gateway | draft |
+| spec-18-channel-telegram | draft |
+| spec-19-channel-webui | draft |
+| spec-20-voice | draft |
+| spec-21-executor-tier-cd | draft |
+| spec-37-openui | draft |
+
+<!-- HUMAN-INPUT[owner=operator]: Reconcile PRD `ready` vs implementing spec maturity — downgrade PRD, or keep ready and finish normative spec bodies. -->
 
 ## Problem & Motivation
 
@@ -147,7 +165,7 @@ context windows fill up.
 | spec-19-channel-webui | Web chat session binding and persona parity |
 | spec-20-voice | Voice turn persona injection and session linkage |
 | spec-21-executor-tier-cd | Tier C/D executor context assembly from shared memory |
-| spec-29-openui | Generated UI panels that respect workspace persona context |
+| spec-37-openui | Generated UI panels that respect workspace persona context |
 
 Downstream: **PRD → specify → plan → tasks** in spec-kit-wave for net-new memory features.
 

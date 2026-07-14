@@ -1,4 +1,4 @@
-<!-- generated: do not edit by hand; run `sevn readme update voice` -->
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint voice` -->
 # Voice — Gateway-level STT/TTS chains, trigger keywords, and voice trace events
 
 [![Spec][spec-badge]][spec-link]
@@ -9,128 +9,98 @@
 
 ## Level 1 — Overview (non-technical)
 
-**Voice** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Gateway-level STT/TTS chains, trigger keywords, and voice trace events.
+**Voice** lets Telegram (and other channels) send voice notes and receive spoken replies. The gateway runs STT (speech-to-text) and TTS (text-to-speech) provider chains configured in `sevn.json`, with optional keyword gating so voice processing only fires when you say a trigger phrase.
 
-In everyday use, voice helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
+Local **whisper.cpp** can run on-host for STT; cloud providers route through the egress proxy. Provider API calls are brokered by the egress proxy.
 
 ## Level 2 — How it works (technical)
 
-### Components and layout
+Implementation under [`src/sevn/voice/`](../../src/sevn/voice/). [`voice_enabled`](../../src/sevn/voice/factory.py#L63) gates the subsystem; [`build_stt_pipeline`](../../src/sevn/voice/factory.py#L189) and TTS pipelines assemble tagged backend chains from workspace config.
 
-Implementation lives under `src/sevn/voice/`. The package contains 10 Python module(s); primary entry points include `src/sevn/voice/__init__.py`, `src/sevn/voice/backends.py`, `src/sevn/voice/egress.py`, `src/sevn/voice/factory.py`, `src/sevn/voice/host_deps.py`, `src/sevn/voice/keywords.py`, and 4 more.
+### STT/TTS provider chains
 
-### Data and control flow
+| Stage | Factory helpers | Backend registry |
+| --- | --- | --- |
+| STT | [`build_stt_pipeline`](../../src/sevn/voice/factory.py#L189) | [`SpeechToTextBackend`](../../src/sevn/voice/backends.py) tags in [`backends.py`](../../src/sevn/voice/backends.py) |
+| TTS | [`resolve_effective_tts_mode`](../../src/sevn/voice/factory.py#L85) | [`TextToSpeechBackend`](../../src/sevn/voice/backends.py) + [`TextToSpeechPipeline`](../../src/sevn/voice/tts.py) |
+| Local whisper | [`provision_voice_deps`](../../src/sevn/voice/host_deps.py#L162) | [`whisper_model_provisioner.py`](../../src/sevn/voice/whisper_model_provisioner.py) |
+| Cloud HTTP | [`voice_http_base_url`](../../src/sevn/voice/egress.py#L11) | Brokered via egress proxy |
 
-Voice sits in the sevn.bot turn spine: a channel delivers a message, the gateway normalises it, triage routes work to the right executor, and the reply returns through the same channel adapter. This subsystem owns the responsibilities described in the manifest summary and defers provider API calls to the paired egress proxy (keys never load in the gateway process).
+**`tts_mode`** (config) is normalised by [`resolve_effective_tts_mode`](../../src/sevn/voice/factory.py#L85) — controls whether replies are synthesized, skipped, or keyword-gated.
 
-### Configuration
+**Keyword gating:** [`user_text_matches_voice_trigger`](../../src/sevn/voice/keywords.py#L37) + [`compile_voice_trigger_patterns`](../../src/sevn/voice/keywords.py#L81) match operator-configured trigger words before STT/TTS runs.
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/20-voice.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Voice spans emit through [`emit_voice_event`](../../src/sevn/voice/trace_events.py#L20).
 
 ### Key modules
 
-- `src/sevn/voice/backends.py` — `validate_voice_backend_tags`, `SpeechToTextBackend.transcribe`, `SpeechToTextBackend.is_available`, `TextToSpeechBackend.synthesize`
-- `src/sevn/voice/egress.py` — `voice_http_base_url`
-- `src/sevn/voice/factory.py` — `voice_enabled`, `resolve_effective_tts_mode`, `voice_runtime_settings`, `build_stt_pipeline`
-- `src/sevn/voice/host_deps.py` — `voice_host_dep_ids`, `maybe_resolve_whisper_model_env`, `provision_voice_deps`
-- `src/sevn/voice/keywords.py` — `user_text_matches_voice_trigger`, `compile_voice_trigger_patterns`
+- [`factory.py`](../../src/sevn/voice/factory.py) — pipeline construction, [`resolve_effective_tts_mode`](../../src/sevn/voice/factory.py#L85)
+- [`backends.py`](../../src/sevn/voice/backends.py) — STT/TTS backend tag validation
+- [`keywords.py`](../../src/sevn/voice/keywords.py) — trigger keyword matching
+- [`stt.py`](../../src/sevn/voice/stt.py) / [`tts.py`](../../src/sevn/voice/tts.py) — runtime pipelines
+- [`host_deps.py`](../../src/sevn/voice/host_deps.py) — whisper.cpp + ffmpeg provisioning
+
+Normative spec: [`20-voice.md`](../../about-sevn.bot/specs/20-voice.md).
+
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/voice/` (10 Python files). Normative design: `about-sevn.bot/specs/20-voice.md`.
+Primary source tree: [`src/sevn/voice`](../../src/sevn/voice/) (10 Python files). Normative design: `about-sevn.bot/specs/20-voice.md`.
 
 ### Module inventory
 
-- `src/sevn/voice/__init__.py` — Voice provider chains (scaffold).
-- `src/sevn/voice/backends.py` — STT/TTS backend registry ('about-sevn.bot/specs/20-voice.md' §2.4).
-- `src/sevn/voice/egress.py` — Egress base URL for voice HTTP clients ('about-sevn.bot/specs/20-voice.md' §4.2, §10.3).
-- `src/sevn/voice/factory.py` — Construct voice pipelines from workspace config ('about-sevn.bot/specs/20-voice.md' §5).
-- `src/sevn/voice/host_deps.py` — Voice-specific host-dependency provisioning: whisper.cpp binary + ffmpeg.
-- `src/sevn/voice/keywords.py` — Voice trigger keyword matching ('about-sevn.bot/specs/20-voice.md' §4.1, §11).
-- `src/sevn/voice/stt.py` — Speech-to-text pipeline ('about-sevn.bot/specs/20-voice.md' §2, §4, §6).
-- `src/sevn/voice/trace_events.py` — Trace helpers for voice spans ('about-sevn.bot/specs/20-voice.md' §7).
-- `src/sevn/voice/tts.py` — Text-to-speech pipeline ('about-sevn.bot/specs/20-voice.md' §2, §4, §6).
-- `src/sevn/voice/whisper_model_provisioner.py` — Local GGML whisper.cpp model provisioning (mirrors pyclaww's voice-transcription skill).
+Voice provider chains (scaffold).
 
-### Package init (`src/sevn/voice/__init__.py`)
+Working with [`__init__.py`](../../src/sevn/voice/__init__.py): inspect the public entry points below.
 
-See `src/sevn/voice/__init__.py` for implementation details.
+STT/TTS backend registry (about-sevn.bot/specs/20-voice.md §2.4).
 
-### Backends (`src/sevn/voice/backends.py`)
+Working with [`backends.py`](../../src/sevn/voice/backends.py): inspect the public entry points below.
+Start with [`validate_voice_backend_tags`](../../src/sevn/voice/backends.py#L58), then [`SpeechToTextBackend.transcribe`](../../src/sevn/voice/backends.py#L108), [`SpeechToTextBackend.is_available`](../../src/sevn/voice/backends.py#L143), [`TextToSpeechBackend.synthesize`](../../src/sevn/voice/backends.py#L179).
 
-Public entry points:
-- `validate_voice_backend_tags`
-- `SpeechToTextBackend.transcribe`
-- `SpeechToTextBackend.is_available`
-- `TextToSpeechBackend.synthesize`
-- `TextToSpeechBackend.is_available`
-- `whisper_cpp_missing_prereqs`
-- `WhisperCppBackend.is_available`
-- `WhisperCppBackend.transcribe`
+Egress base URL for voice HTTP clients (about-sevn.bot/specs/20-voice.md §4.2, §10.3).
 
-### Egress (`src/sevn/voice/egress.py`)
+Working with [`egress.py`](../../src/sevn/voice/egress.py): inspect the public entry points below.
+Start with [`voice_http_base_url`](../../src/sevn/voice/egress.py#L11).
 
-Public entry points:
-- `voice_http_base_url`
+Construct voice pipelines from workspace config (about-sevn.bot/specs/20-voice.md §5).
 
-### Factory (`src/sevn/voice/factory.py`)
+Working with [`factory.py`](../../src/sevn/voice/factory.py): inspect the public entry points below.
+Start with [`voice_enabled`](../../src/sevn/voice/factory.py#L63), then [`resolve_effective_tts_mode`](../../src/sevn/voice/factory.py#L85), [`voice_runtime_settings`](../../src/sevn/voice/factory.py#L113), [`build_stt_pipeline`](../../src/sevn/voice/factory.py#L189).
 
-Public entry points:
-- `voice_enabled`
-- `resolve_effective_tts_mode`
-- `voice_runtime_settings`
-- `build_stt_pipeline`
-- `build_tts_pipeline`
-- `prune_stale_tts_files`
-- `maybe_preload_local_tts`
-- `probe_voice_backends`
+Voice-specific host-dependency provisioning: whisper.cpp binary + ffmpeg.
 
-### Host Deps (`src/sevn/voice/host_deps.py`)
+Working with [`host_deps.py`](../../src/sevn/voice/host_deps.py): inspect the public entry points below.
+Start with [`voice_host_dep_ids`](../../src/sevn/voice/host_deps.py#L100), then [`maybe_resolve_whisper_model_env`](../../src/sevn/voice/host_deps.py#L113), [`provision_voice_deps`](../../src/sevn/voice/host_deps.py#L162).
 
-Public entry points:
-- `voice_host_dep_ids`
-- `maybe_resolve_whisper_model_env`
-- `provision_voice_deps`
+Voice trigger keyword matching (about-sevn.bot/specs/20-voice.md §4.1, §11).
 
-### Keywords (`src/sevn/voice/keywords.py`)
+Working with [`keywords.py`](../../src/sevn/voice/keywords.py): inspect the public entry points below.
+Start with [`user_text_matches_voice_trigger`](../../src/sevn/voice/keywords.py#L37), then [`compile_voice_trigger_patterns`](../../src/sevn/voice/keywords.py#L81).
 
-Public entry points:
-- `user_text_matches_voice_trigger`
-- `compile_voice_trigger_patterns`
+Speech-to-text pipeline (about-sevn.bot/specs/20-voice.md §2, §4, §6).
 
-### Stt (`src/sevn/voice/stt.py`)
+Working with [`stt.py`](../../src/sevn/voice/stt.py): inspect the public entry points below.
+Start with [`SpeechToTextBackend.transcribe`](../../src/sevn/voice/stt.py#L37), then [`SpeechToTextBackend.is_available`](../../src/sevn/voice/stt.py#L69), [`SpeechToTextPipeline.transcribe_or_placeholder`](../../src/sevn/voice/stt.py#L118), [`transcribe_placeholder`](../../src/sevn/voice/stt.py#L261).
 
-Public entry points:
-- `SpeechToTextBackend.transcribe`
-- `SpeechToTextBackend.is_available`
-- `SpeechToTextPipeline.transcribe_or_placeholder`
-- `transcribe_placeholder`
+Trace helpers for voice spans (about-sevn.bot/specs/20-voice.md §7).
 
-### Trace Events (`src/sevn/voice/trace_events.py`)
+Working with [`trace_events.py`](../../src/sevn/voice/trace_events.py): inspect the public entry points below.
+Start with [`emit_voice_event`](../../src/sevn/voice/trace_events.py#L20).
 
-Public entry points:
-- `emit_voice_event`
+Text-to-speech pipeline (about-sevn.bot/specs/20-voice.md §2, §4, §6).
 
-### Tts (`src/sevn/voice/tts.py`)
+Working with [`tts.py`](../../src/sevn/voice/tts.py): inspect the public entry points below.
+Start with [`TextToSpeechBackend.synthesize`](../../src/sevn/voice/tts.py#L101), then [`TextToSpeechBackend.is_available`](../../src/sevn/voice/tts.py#L128), [`TextToSpeechPipeline.should_synthesize`](../../src/sevn/voice/tts.py#L187), [`TextToSpeechPipeline.synthesize_or_skip`](../../src/sevn/voice/tts.py#L226).
 
-Public entry points:
-- `TextToSpeechBackend.synthesize`
-- `TextToSpeechBackend.is_available`
-- `TextToSpeechPipeline.should_synthesize`
-- `TextToSpeechPipeline.synthesize_or_skip`
-- `speak_placeholder`
+Local GGML whisper.cpp model provisioning (mirrors pyclaww's voice-transcription skill).
 
-### Whisper Model Provisioner (`src/sevn/voice/whisper_model_provisioner.py`)
-
-Public entry points:
-- `default_whisper_model_cache_dir`
-- `model_path_for`
-- `is_whisper_model_cached`
-- `ensure_whisper_model`
+Working with [`whisper_model_provisioner.py`](../../src/sevn/voice/whisper_model_provisioner.py): inspect the public entry points below.
+Start with [`default_whisper_model_cache_dir`](../../src/sevn/voice/whisper_model_provisioner.py#L87), then [`model_path_for`](../../src/sevn/voice/whisper_model_provisioner.py#L103), [`is_whisper_model_cached`](../../src/sevn/voice/whisper_model_provisioner.py#L128), [`ensure_whisper_model`](../../src/sevn/voice/whisper_model_provisioner.py#L179).
 
 ### Extension and invariants
 
-Follow `about-sevn.bot/specs/20-voice.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/voice/`, run `sevn readme update voice` and `make readme-check`.
+Follow [`20-voice.md`](../../about-sevn.bot/specs/20-voice.md) for merge gates, error semantics, and compatibility constraints. After code changes under [`src/sevn/voice`](../../src/sevn/voice/), run `sevn readme update voice` and `make readme-check`.
 
 ## References
 

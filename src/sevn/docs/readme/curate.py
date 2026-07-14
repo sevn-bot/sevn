@@ -32,10 +32,11 @@ from __future__ import annotations
 import os
 import re
 import shutil
-import subprocess
+import subprocess  # nosec B404 — fixed-argv git/runner invocations; no shell
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from sevn.docs.readme.glob_paths import glob_to_pathspec
 from sevn.docs.readme.manifest import ReadmeEntry
 from sevn.docs.readme.templates import resolve_template_path, validate_against_template
 
@@ -168,29 +169,6 @@ def resolve_runner(preference: str | None = None) -> RunnerKind | None:
     return None
 
 
-def _glob_to_pathspec(glob: str) -> str:
-    """Reduce a source glob to a git pathspec prefix (strip wildcard tail).
-
-        Args:
-    glob (str): A manifest source glob (e.g. ``src/sevn/gateway/**``).
-
-        Returns:
-            str: Pathspec usable with ``git diff -- <spec>``.
-
-        Examples:
-            >>> _glob_to_pathspec("src/sevn/gateway/**")
-            'src/sevn/gateway'
-            >>> _glob_to_pathspec("src/sevn/config/sections/subagents.py")
-            'src/sevn/config/sections/subagents.py'
-    """
-    out: list[str] = []
-    for part in glob.split("/"):
-        if any(ch in part for ch in "*?[]"):
-            break
-        out.append(part)
-    return "/".join(out) or glob
-
-
 def diff_for_globs(
     repo_root: Path,
     source_globs: tuple[str, ...],
@@ -219,7 +197,7 @@ def diff_for_globs(
             >>> isinstance(diff_for_globs(Path("."), ("pyproject.toml",)), str)
             True
     """
-    pathspecs = sorted({_glob_to_pathspec(g) for g in source_globs})
+    pathspecs = sorted({glob_to_pathspec(g) for g in source_globs})
     argv = ["git", "-C", str(repo_root), "diff"]
     if base:
         argv.append(base)
@@ -227,7 +205,7 @@ def diff_for_globs(
         argv.append("--cached")
     argv += ["--", *pathspecs]
     try:
-        proc = subprocess.run(argv, capture_output=True, text=True, timeout=30, check=False)
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=30, check=False)  # nosec B603
     except (OSError, subprocess.SubprocessError):
         return ""
     diff = proc.stdout
@@ -324,7 +302,7 @@ def invoke_runner(
     """
     argv = runner.command(model=model)
     try:
-        proc = subprocess.run(
+        proc = subprocess.run(  # nosec B603 — operator-configured runner argv; no shell
             argv,
             input=prompt,
             capture_output=True,

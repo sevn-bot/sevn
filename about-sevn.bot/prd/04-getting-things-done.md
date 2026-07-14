@@ -29,11 +29,32 @@ specs:
 - spec-18-channel-telegram
 - spec-19-channel-webui
 - spec-20-voice
-- spec-29-openui
+- spec-37-openui
 personas:
 - operator
 prd_profile: standard
 ---
+
+## Spec implementation status (W9 seed)
+
+This PRD is `ready` while linked specs below are not normatively complete (`draft` / `scaffold` / `rejected`). Code may run ahead of spec prose.
+
+| Spec | Status |
+| --- | --- |
+| spec-10-schema-ontology | draft |
+| spec-11-tools-registry | draft |
+| spec-12-skills-system | draft |
+| spec-13-rlm-triager | draft |
+| spec-14-executor-tier-b | draft |
+| spec-16-harness-discipline | draft |
+| spec-21-executor-tier-cd | draft |
+| spec-17-gateway | draft |
+| spec-18-channel-telegram | draft |
+| spec-19-channel-webui | draft |
+| spec-20-voice | draft |
+| spec-37-openui | draft |
+
+<!-- HUMAN-INPUT[owner=operator]: Reconcile PRD `ready` vs implementing spec maturity — downgrade PRD, or keep ready and finish normative spec bodies. -->
 
 ## Problem & Motivation
 
@@ -163,7 +184,7 @@ becoming the integration layer.
 | spec-18-channel-telegram | Inbound/outbound Telegram delivery, plan approval inline keyboards |
 | spec-19-channel-webui | WebSocket chat and session continuity for task outcomes |
 | spec-20-voice | Voice ingress/egress hooks for spoken task requests and replies |
-| spec-29-openui | Structured HTML panels when a text reply is not enough for the outcome |
+| spec-37-openui | Structured HTML panels when a text reply is not enough for the outcome |
 | spec-36-sub-agents | Level-1/level-2 sub-agents, `multi` queue, specialists, kill surfaces |
 
 Downstream: **PRD → specify → plan → tasks** in spec-kit-wave for net-new executor or tool

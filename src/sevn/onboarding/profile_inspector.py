@@ -328,7 +328,7 @@ def build_profile_inspector_payload(
         >>> payload["profile_id"] == "good_value_osx"
         True
         >>> cap_rows = [r for r in payload["rows"] if r["field_id"] == "gateway.queue_mode"]
-        >>> len(cap_rows) == 1 and cap_rows[0]["value"] in ("cancel", "steer")
+        >>> len(cap_rows) == 1 and cap_rows[0]["value"] in ("cancel", "steer", "multi")
         True
     """
     pid = profile_id.strip()

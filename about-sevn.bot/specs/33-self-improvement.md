@@ -2,7 +2,7 @@
 id: spec-33-self-improvement
 kind: spec
 title: Self-improvement — Spec
-status: done
+status: draft
 owner: Alex
 summary: 'Deliver src/sevn/self_improve/: ingest traces + session artefacts + explicit
   user feedback into trajectory_fact rows, deterministically shortlist turns for review
@@ -324,30 +324,75 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Self-improvement — Spec (spec-33-self-improvement) — Purpose.
+Deliver src/sevn/self_improve/: ingest traces + session artefacts + explicit user feedback into trajectory_fact rows, deterministically shortlist turns for review or patching, optionally run an in-pro
 
+Primary code trees: [`src/sevn/self_improve`](src/sevn/self_improve/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Self-improvement — Spec (spec-33-self-improvement) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`effective_self_improve_enabled`](src/sevn/self_improve/effective.py) — `src/sevn/self_improve/effective.py`
+- [`ImproveJobResult`](src/sevn/self_improve/eval/__init__.py) — `src/sevn/self_improve/eval/__init__.py`
+- [`eval_docker_required`](src/sevn/self_improve/eval/__init__.py) — `src/sevn/self_improve/eval/__init__.py`
+- [`eval_in_process_override`](src/sevn/self_improve/eval/__init__.py) — `src/sevn/self_improve/eval/__init__.py`
+- [`eval_report_passed`](src/sevn/self_improve/eval/__init__.py) — `src/sevn/self_improve/eval/__init__.py`
+- [`golden_routing_fixture_path`](src/sevn/self_improve/eval/__init__.py) — `src/sevn/self_improve/eval/__init__.py`
+- [`resolve_repo_root`](src/sevn/self_improve/eval/__init__.py) — `src/sevn/self_improve/eval/__init__.py`
+- [`run_docker_eval_graph`](src/sevn/self_improve/eval/__init__.py) — `src/sevn/self_improve/eval/__init__.py`
+- [`run_eval_graph`](src/sevn/self_improve/eval/__init__.py) — `src/sevn/self_improve/eval/__init__.py`
+- [`LastKnownGoodRecord`](src/sevn/self_improve/eval/baseline.py) — `src/sevn/self_improve/eval/baseline.py`
+- [`baseline_path_for_job_bundle`](src/sevn/self_improve/eval/baseline.py) — `src/sevn/self_improve/eval/baseline.py`
+- [`baseline_section_for_report`](src/sevn/self_improve/eval/baseline.py) — `src/sevn/self_improve/eval/baseline.py`
+- _…and 89 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Self-improvement — Spec (spec-33-self-improvement) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`effective_self_improve_enabled`](src/sevn/self_improve/effective.py) — `src/sevn/self_improve/effective.py`
+- [`ImproveJobResult`](src/sevn/self_improve/eval/__init__.py) — `src/sevn/self_improve/eval/__init__.py`
+- [`eval_docker_required`](src/sevn/self_improve/eval/__init__.py) — `src/sevn/self_improve/eval/__init__.py`
+- [`eval_in_process_override`](src/sevn/self_improve/eval/__init__.py) — `src/sevn/self_improve/eval/__init__.py`
+- [`eval_report_passed`](src/sevn/self_improve/eval/__init__.py) — `src/sevn/self_improve/eval/__init__.py`
+- [`golden_routing_fixture_path`](src/sevn/self_improve/eval/__init__.py) — `src/sevn/self_improve/eval/__init__.py`
+- [`resolve_repo_root`](src/sevn/self_improve/eval/__init__.py) — `src/sevn/self_improve/eval/__init__.py`
+- [`run_docker_eval_graph`](src/sevn/self_improve/eval/__init__.py) — `src/sevn/self_improve/eval/__init__.py`
+- [`run_eval_graph`](src/sevn/self_improve/eval/__init__.py) — `src/sevn/self_improve/eval/__init__.py`
+- [`LastKnownGoodRecord`](src/sevn/self_improve/eval/baseline.py) — `src/sevn/self_improve/eval/baseline.py`
+- [`baseline_path_for_job_bundle`](src/sevn/self_improve/eval/baseline.py) — `src/sevn/self_improve/eval/baseline.py`
+- [`baseline_section_for_report`](src/sevn/self_improve/eval/baseline.py) — `src/sevn/self_improve/eval/baseline.py`
+- _…and 89 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Self-improvement — Spec (spec-33-self-improvement) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/self_improve`](src/sevn/self_improve/__init__.py).
 ## Behavior
 
-Offline scaffold for Self-improvement — Spec (spec-33-self-improvement) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/self_improve`](src/sevn/self_improve/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Self-improvement — Spec (spec-33-self-improvement) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Offline scaffold for Self-improvement — Spec (spec-33-self-improvement) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

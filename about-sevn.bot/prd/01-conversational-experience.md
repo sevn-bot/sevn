@@ -21,11 +21,25 @@ specs:
 - spec-18-channel-telegram
 - spec-19-channel-webui
 - spec-20-voice
-- spec-29-openui
+- spec-37-openui
 personas:
 - operator
 prd_profile: standard
 ---
+
+## Spec implementation status (W9 seed)
+
+This PRD is `ready` while linked specs below are not normatively complete (`draft` / `scaffold` / `rejected`). Code may run ahead of spec prose.
+
+| Spec | Status |
+| --- | --- |
+| spec-17-gateway | draft |
+| spec-18-channel-telegram | draft |
+| spec-19-channel-webui | draft |
+| spec-20-voice | draft |
+| spec-37-openui | draft |
+
+<!-- HUMAN-INPUT[owner=operator]: Reconcile PRD `ready` vs implementing spec maturity — downgrade PRD, or keep ready and finish normative spec bodies. -->
 
 ## Problem & Motivation
 
@@ -137,7 +151,7 @@ to a self-hosted gateway fails when the bot is not where your thumb already is.
 | spec-18-channel-telegram | Telegram adapter—poll/webhook, formatting, menus, voice, inline callbacks |
 | spec-19-channel-webui | Owner webchat SPA, WebSocket protocol, Mission Control Chat integration |
 | spec-20-voice | STT/TTS pipelines, trigger keywords, provider chains shared by channels |
-| spec-29-openui | Sanitised HTML and form callbacks delivered on Telegram and webchat |
+| spec-37-openui | Sanitised HTML and form callbacks delivered on Telegram and webchat |
 
 Downstream: **PRD → specify → plan → tasks** in spec-kit-wave for net-new channel features.
 

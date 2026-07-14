@@ -2,7 +2,7 @@
 id: spec-11-tools-registry
 kind: spec
 title: Tools registry — Spec
-status: done
+status: draft
 owner: Alex
 summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that every
   executor tier uses: one implementation per tool name, registered in a session-scoped
@@ -493,30 +493,75 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Tools registry — Spec (spec-11-tools-registry) — Purpose.
+Own the Layer-3 tool callables and Layer-2 framework adapters that every executor tier uses: one implementation per tool name, registered in a session-scoped ToolSet, exposed to LLM frameworks without
 
+Primary code trees: [`src/sevn/tools`](src/sevn/tools/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Tools registry — Spec (spec-11-tools-registry) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`BoundToolCallable`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`FunctionTool`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`Tool`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`ToolCall`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`ToolDefinition`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`ToolExecutor`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`enveloped_failure`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`enveloped_success`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`maybe_spill_large_payload`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`browser_tool`](src/sevn/tools/browser.py) — `src/sevn/tools/browser.py`
+- [`register_browser_tool`](src/sevn/tools/browser.py) — `src/sevn/tools/browser.py`
+- [`set_eval_allowed`](src/sevn/tools/browser.py) — `src/sevn/tools/browser.py`
+- _…and 143 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Tools registry — Spec (spec-11-tools-registry) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`BoundToolCallable`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`FunctionTool`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`Tool`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`ToolCall`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`ToolDefinition`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`ToolExecutor`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`enveloped_failure`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`enveloped_success`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`maybe_spill_large_payload`](src/sevn/tools/base.py) — `src/sevn/tools/base.py`
+- [`browser_tool`](src/sevn/tools/browser.py) — `src/sevn/tools/browser.py`
+- [`register_browser_tool`](src/sevn/tools/browser.py) — `src/sevn/tools/browser.py`
+- [`set_eval_allowed`](src/sevn/tools/browser.py) — `src/sevn/tools/browser.py`
+- _…and 143 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Tools registry — Spec (spec-11-tools-registry) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/tools`](src/sevn/tools/__init__.py).
 ## Behavior
 
-Offline scaffold for Tools registry — Spec (spec-11-tools-registry) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/tools`](src/sevn/tools/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Tools registry — Spec (spec-11-tools-registry) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Offline scaffold for Tools registry — Spec (spec-11-tools-registry) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

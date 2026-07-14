@@ -42,6 +42,7 @@ def readme_relative_href(
     target: str,
     repo_root: Path,
     directory: bool = False,
+    line: int | None = None,
 ) -> str:
     """Return a POSIX markdown href from a README file to a repo target.
 
@@ -50,6 +51,7 @@ def readme_relative_href(
     target (str): Repo-relative path to the link target.
     repo_root (Path): Repository root.
     directory (bool): When true, ensure the href ends with ``/``.
+    line (int | None): Optional 1-based source line for ``#L<line>`` fragments.
 
         Returns:
             str: File-relative href suitable for markdown link targets.
@@ -80,6 +82,8 @@ def readme_relative_href(
     href = Path(os.path.relpath(target_path, readme_dir)).as_posix()
     if directory and not href.endswith("/"):
         href += "/"
+    if line is not None:
+        href = f"{href}#L{int(line)}"
     return href
 
 
@@ -181,6 +185,7 @@ def _validate_one_link(raw: str, *, readme_dir: Path, repo_root: Path) -> str | 
     if (
         anchor
         and candidate.is_file()
+        and not (re.fullmatch(r"L\d+", anchor) and candidate.suffix == ".py")
         and not _anchor_exists(candidate.read_text(encoding="utf-8"), anchor)
     ):
         return f"broken anchor: {raw!r}"

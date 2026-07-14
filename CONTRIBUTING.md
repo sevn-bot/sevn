@@ -25,10 +25,15 @@ list of targets.
 
 - **Format / lint** touched Python: `make lint`
 - **Type-check** touched Python: `make typecheck`
-- **Full pre-merge gate** (what CI runs): `make ci`
+- **Full pre-merge gate** (local): `make ci`
+- **PR CI** (GitHub Actions): the same step set as `make ci` **minus** `security`
+  (bandit + pip-audit). Those run daily in
+  [`.github/workflows/ci-supplementary.yml`](.github/workflows/ci-supplementary.yml)
+  and post-merge in `ci-cd.yml`, not on every PR.
 
-Run `make ci` on a clean tree before opening or updating a PR — it runs the same
-lint, type-check, test, docs, and security steps CI enforces.
+Run `make ci` on a clean tree before opening or updating a PR. Locally that includes
+the `security` tier; the PR workflow runs lint, type-check, tests, and docs drift
+gates only.
 
 ## Commits
 
@@ -39,11 +44,8 @@ enforced by a `commit-msg` hook. Validate a subject before committing:
 make commit-msg-check MSG='feat: add proxy egress allowlist'
 ```
 
-Commits must be **signed off** (Developer Certificate of Origin):
-
-```bash
-git commit -s -m "feat: ..."
-```
+Commits may include a **Developer Certificate of Origin** sign-off (`git commit -s`);
+there is no in-tree hook enforcing DCO today.
 
 Do not bypass hooks with `--no-verify`.
 
@@ -69,7 +71,10 @@ one of `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`).
   `*.md` changes are exempt.
 - To bypass a change that genuinely needs no entry, add a `changelog: skip` trailer to
   the commit message (or set `SEVN_CHANGELOG_SKIP=1` for the local hook).
-- Use the `changelog` skill (`.claude/skills/changelog/SKILL.md`) to draft entries, and `make changelog-eval` for the
+- Commit subject rules and changelog expectations live in
+  [`src/sevn/data/standards/README.md`](src/sevn/data/standards/README.md).
+  A local-only `changelog` agent skill may exist under `.claude/skills/` on your
+  machine but is not shipped in the public clone. Use `make changelog-eval` for the
   (advisory, non-CI) LLM quality score.
 
 ## License

@@ -8,13 +8,13 @@ from typing import TYPE_CHECKING
 from sevn.docs.readme import curate as curate_mod
 from sevn.docs.readme.curate import (
     RunnerKind,
-    _glob_to_pathspec,
     _sanitize_runner_output,
     build_prompt,
     curate_entry,
     diff_for_globs,
     resolve_runner,
 )
+from sevn.docs.readme.glob_paths import glob_to_pathspec
 from sevn.docs.readme.manifest import ReadmeEntry
 
 if TYPE_CHECKING:
@@ -39,8 +39,8 @@ def _curated_entry(output: str, template: str) -> ReadmeEntry:
 
 
 def test_glob_to_pathspec_strips_wildcards() -> None:
-    assert _glob_to_pathspec("src/sevn/gateway/**") == "src/sevn/gateway"
-    assert _glob_to_pathspec("src/sevn/config/sections/x.py") == "src/sevn/config/sections/x.py"
+    assert glob_to_pathspec("src/sevn/gateway/**") == "src/sevn/gateway"
+    assert glob_to_pathspec("src/sevn/config/sections/x.py") == "src/sevn/config/sections/x.py"
 
 
 def test_runner_command_shapes() -> None:

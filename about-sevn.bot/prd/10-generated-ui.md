@@ -17,7 +17,7 @@ depends_on: []
 build_phase: null
 interfaces: []
 specs:
-- spec-29-openui
+- spec-37-openui
 - spec-17-gateway
 - spec-18-channel-telegram
 - spec-19-channel-webui
@@ -27,6 +27,21 @@ personas:
 - operator
 prd_profile: standard
 ---
+
+## Spec implementation status (W9 seed)
+
+This PRD is `ready` while linked specs below are not normatively complete (`draft` / `scaffold` / `rejected`). Code may run ahead of spec prose.
+
+| Spec | Status |
+| --- | --- |
+| spec-37-openui | draft |
+| spec-17-gateway | draft |
+| spec-18-channel-telegram | draft |
+| spec-19-channel-webui | draft |
+| spec-20-voice | draft |
+| spec-21-executor-tier-cd | draft |
+
+<!-- HUMAN-INPUT[owner=operator]: Reconcile PRD `ready` vs implementing spec maturity — downgrade PRD, or keep ready and finish normative spec bodies. -->
 
 ## Problem & Motivation
 
@@ -144,7 +159,7 @@ panel instead.
 
 | Spec id | Scope |
 | --- | --- |
-| spec-29-openui | OpenUI tool, bridge, sanitiser, CSP, tokens, store, rasteriser, delivery metadata |
+| spec-37-openui | OpenUI tool, bridge, sanitiser, CSP, tokens, store, rasteriser, delivery metadata |
 | spec-17-gateway | Turn spine, public URL/tunnel deps, callback dispatch into executor |
 | spec-18-channel-telegram | Cover messages, inline keyboard, WebApp deep links |
 | spec-19-channel-webui | Live HTML embed in WebSocket chat |

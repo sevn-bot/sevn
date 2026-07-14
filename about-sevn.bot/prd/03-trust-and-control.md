@@ -26,11 +26,29 @@ specs:
 - spec-18-channel-telegram
 - spec-19-channel-webui
 - spec-20-voice
-- spec-29-openui
+- spec-37-openui
 personas:
 - operator
 prd_profile: standard
 ---
+
+## Spec implementation status (W9 seed)
+
+This PRD is `ready` while linked specs below are not normatively complete (`draft` / `scaffold` / `rejected`). Code may run ahead of spec prose.
+
+| Spec | Status |
+| --- | --- |
+| spec-06-secrets | draft |
+| spec-07-egress-proxy | draft |
+| spec-08-sandbox | draft |
+| spec-09-security-scanner | draft |
+| spec-17-gateway | draft |
+| spec-18-channel-telegram | draft |
+| spec-19-channel-webui | draft |
+| spec-20-voice | draft |
+| spec-37-openui | draft |
+
+<!-- HUMAN-INPUT[owner=operator]: Reconcile PRD `ready` vs implementing spec maturity — downgrade PRD, or keep ready and finish normative spec bodies. -->
 
 ## Problem & Motivation
 
@@ -155,7 +173,7 @@ a black-box "safe mode."
 | spec-18-channel-telegram | Owner commands, approval buttons, scanner kill-switch UX on Telegram |
 | spec-19-channel-webui | Webchat approval and security copy for blocked content |
 | spec-20-voice | Voice path inherits scan and credential boundaries |
-| spec-29-openui | Generated UI delivery respects same trust surfaces as web channel |
+| spec-37-openui | Generated UI delivery respects same trust surfaces as web channel |
 
 Downstream: **PRD → specify → plan → tasks** in spec-kit-wave; normative acceptance criteria
 live in implementing specs, not here.

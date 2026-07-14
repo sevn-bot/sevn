@@ -1,4 +1,4 @@
-<!-- generated: do not edit by hand; run `sevn readme update ui-mission-control` -->
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint ui-mission-control` -->
 # Mission Control UI — Dashboard SPA, tab registry, traces, ops surfaces, and OpenUI delivery
 
 [![Spec][spec-badge]][spec-link]
@@ -9,142 +9,139 @@
 
 ## Level 1 — Overview (non-technical)
 
-**Mission Control UI** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Dashboard SPA, tab registry, traces, ops surfaces, and OpenUI delivery.
+**Mission Control** is the browser dashboard at `/mission/*` on the gateway. It gives you traces, sessions, config editors, secrets reveal, self-improve jobs, evolution pipelines, and more — **46 tabs** grouped into **8 sidebar sections**. The UI is a vanilla JS SPA under `src/sevn/ui/spa/dashboard/`; Python registers REST + WebSocket routes on the same FastAPI app as Telegram/Web UI.
 
-In everyday use, mission control ui helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
+**OpenUI** (Canvas tab) lets agents publish sanitized HTML/PNG/PDF surfaces via the `openui_render` tool — delivery modes include live URL, rasterized PNG, and PDF.
 
 ## Level 2 — How it works (technical)
 
-### Components and layout
+### SPA shell
 
-Implementation lives under `src/sevn/ui/`. The package contains 65 Python module(s); primary entry points include `src/sevn/ui/__init__.py`, `src/sevn/ui/dashboard/__init__.py`, `src/sevn/ui/dashboard/api/__init__.py`, `src/sevn/ui/dashboard/api/_config_persist.py`, `src/sevn/ui/dashboard/api/agent.py`, `src/sevn/ui/dashboard/api/audit.py`, and 59 more.
+Static assets: [`src/sevn/ui/spa/dashboard/`](../../src/sevn/ui/spa/dashboard/) (`app.js`, tab panels). Mounted by the gateway HTTP server at `/mission/{slug}`. Shared design tokens at `/style/*`.
 
-### Data and control flow
+### Tab registry
 
-Mission Control UI is a supporting subsystem; see Level 3 for the module-level flow.
+[`tab_registry.py`](../../src/sevn/ui/dashboard/tab_registry.py) is the SSOT for sidebar structure:
 
-### Configuration
+- [`DASHBOARD_GROUPS`](../../src/sevn/ui/dashboard/tab_registry.py#L17) — 8 groups × 46 tab labels
+- [`WIRED_SLUGS`](../../src/sevn/ui/dashboard/tab_registry.py#L156) — tabs with live REST backing (vs stub/post-v1 placeholders)
+- [`build_nav_payload`](../../src/sevn/ui/dashboard/tab_registry.py#L210) — JSON for `GET /api/v1/dashboard/nav` ([`nav.py`](../../src/sevn/ui/dashboard/api/nav.py))
+- [`registry_tab_slug`](../../src/sevn/ui/dashboard/tab_registry.py#L117) — canonical `/mission/{slug}` paths (e.g. `canvas-openui`, `rlm-training`)
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/24-dashboard.md`, `about-sevn.bot/specs/29-openui.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Sample wired slugs: `overview`, `chat`, `canvas-openui`, `traces`, `secrets`, `egress-proxy`, `jobs`, `spec-kit`.
+
+### Route wiring
+
+[`register_dashboard_routes`](../../src/sevn/ui/dashboard/__init__.py#L24) on the gateway FastAPI app:
+
+1. Installs [`create_dashboard_api_router`](../../src/sevn/ui/dashboard/api/__init__.py#L43) at `/api/v1`
+2. WebSocket hubs: `/ws/dashboard`, terminal WS
+3. Auth service on `app.state.dashboard_auth`
+
+Individual tab routers live under [`src/sevn/ui/dashboard/api/`](../../src/sevn/ui/dashboard/api/) (ops, traces, secrets, evolution, …).
+
+### OpenUI delivery matrix
+
+| Surface | Module | Delivery |
+| --- | --- | --- |
+| Agent tool | [`openui_render`](../../src/sevn/ui/openui/tools_register.py#L63) via [`register_openui_tools`](../../src/sevn/ui/openui/tools_register.py) | Live URL / PNG / PDF metadata in tool result |
+| Bridge | [`OpenUIBridge`](../../src/sevn/ui/openui/bridge.py) | Sanitize + publish HTML |
+| MC Canvas tab | [`dashboard_canvas`](../../src/sevn/ui/dashboard/api/canvas.py) | Owner view of published surfaces |
+| Store | [`OpenUIStore`](../../src/sevn/ui/openui/store.py) | Token + artifact persistence (`openui_tokens` table) |
+
+Spec: [`37-openui.md`](../../about-sevn.bot/specs/37-openui.md).
+
+### Configuration (`sevn.json` → `dashboard`)
+
+- `login_password`, `jwt_secret` — owner auth ([`DashboardAuthService`](../../src/sevn/ui/dashboard/services/auth.py)); `${SECRET:…}` refs resolved at boot
+- `enabled`, bind/port via gateway HTTP server
+
+Validate: `sevn config validate`.
 
 ### Key modules
 
-- `src/sevn/ui/dashboard/__init__.py` — `register_dashboard_routes`
-- `src/sevn/ui/dashboard/api/__init__.py` — `create_dashboard_api_router`
-- `src/sevn/ui/dashboard/api/_config_persist.py` — `config_error`, `config_validation_error`, `read_config_body`, `load_workspace_document`
-- `src/sevn/ui/dashboard/api/agent.py` — `tools_health_list`, `skills_inventory`, `skills_promote`, `skills_bundled_list`
-- `src/sevn/ui/dashboard/api/audit.py` — `audit_timeline`, `analytics_tool_frequency`, `analytics_daily_volume`, `analytics_approvals`
+- [`tab_registry.py`](../../src/sevn/ui/dashboard/tab_registry.py) — nav SSOT, [`build_nav_payload`](../../src/sevn/ui/dashboard/tab_registry.py#L210)
+- [`__init__.py`](../../src/sevn/ui/dashboard/__init__.py) — [`register_dashboard_routes`](../../src/sevn/ui/dashboard/__init__.py#L24)
+- [`api/__init__.py`](../../src/sevn/ui/dashboard/api/__init__.py) — [`create_dashboard_api_router`](../../src/sevn/ui/dashboard/api/__init__.py#L43)
+- [`openui/tools_register.py`](../../src/sevn/ui/openui/tools_register.py) — agent-facing OpenUI tool
+
+Normative specs: [`24-dashboard.md`](../../about-sevn.bot/specs/24-dashboard.md), [`37-openui.md`](../../about-sevn.bot/specs/37-openui.md).
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: `src/sevn/ui/` (65 Python files). Normative design: `about-sevn.bot/specs/24-dashboard.md`, `about-sevn.bot/specs/29-openui.md`.
+Primary source tree: [`src/sevn/ui`](../../src/sevn/ui/) (66 Python files). Normative design: `about-sevn.bot/specs/24-dashboard.md`, `about-sevn.bot/specs/37-openui.md`.
 
 ### Module inventory
 
-- `src/sevn/ui/__init__.py` — User interface components (scaffold).
-- `src/sevn/ui/dashboard/__init__.py` — Mission Control dashboard registration facade ('about-sevn.bot/specs/24-dashboard.md' §4.1).
-- `src/sevn/ui/dashboard/api/__init__.py` — Mission Control REST API router assembly.
-- `src/sevn/ui/dashboard/api/_config_persist.py` — Shared helpers for persisting Mission Control config edits to ''sevn.json''.
-- `src/sevn/ui/dashboard/api/agent.py` — Mission Control Agent group REST router ('about-sevn.bot/specs/24-dashboard.md' MC-7).
-- `src/sevn/ui/dashboard/api/audit.py` — Dashboard audit trail and analytics REST router.
-- `src/sevn/ui/dashboard/api/auth.py` — Dashboard auth REST router.
-- `src/sevn/ui/dashboard/api/canvas.py` — Dashboard OpenUI Canvas tab REST router ('about-sevn.bot/specs/24-dashboard.md' §4.4).
-- `src/sevn/ui/dashboard/api/channels.py` — Dashboard channels and alert rollup REST routers ('about-sevn.bot/specs/24-dashboard.md' MC-5).
-- `src/sevn/ui/dashboard/api/chat.py` — Mission Control in-dashboard webchat console API (MC W6).
-- `src/sevn/ui/dashboard/api/cli_console.py` — Mission Control sevn CLI console API (MC W1 §2c).
-- `src/sevn/ui/dashboard/api/coding_agents.py` — Mission Control Coding Agents hub REST router (CA1 + CA6.2 artifacts).
-- … and 53 more Python modules
+User interface components (scaffold).
 
-### Package init (`src/sevn/ui/__init__.py`)
+Working with [`__init__.py`](../../src/sevn/ui/__init__.py): inspect the public entry points below.
 
-See `src/sevn/ui/__init__.py` for implementation details.
+Mission Control dashboard registration facade (about-sevn.bot/specs/24-dashboard.md §4.1).
 
-### Package init (`src/sevn/ui/dashboard/__init__.py`)
+Working with [`__init__.py`](../../src/sevn/ui/dashboard/__init__.py): inspect the public entry points below.
+Start with [`register_dashboard_routes`](../../src/sevn/ui/dashboard/__init__.py#L24).
 
-Public entry points:
-- `register_dashboard_routes`
+Mission Control REST API router assembly.
 
-### Package init (`src/sevn/ui/dashboard/api/__init__.py`)
+Working with [`__init__.py`](../../src/sevn/ui/dashboard/api/__init__.py): inspect the public entry points below.
+Start with [`create_dashboard_api_router`](../../src/sevn/ui/dashboard/api/__init__.py#L43).
 
-Public entry points:
-- `create_dashboard_api_router`
+Shared helpers for persisting Mission Control config edits to sevn.json.
 
-###  Config Persist (`src/sevn/ui/dashboard/api/_config_persist.py`)
+Working with [`_config_persist.py`](../../src/sevn/ui/dashboard/api/_config_persist.py): inspect the public entry points below.
+Start with [`config_error`](../../src/sevn/ui/dashboard/api/_config_persist.py#L33), then [`config_validation_error`](../../src/sevn/ui/dashboard/api/_config_persist.py#L55), [`read_config_body`](../../src/sevn/ui/dashboard/api/_config_persist.py#L76), [`load_workspace_document`](../../src/sevn/ui/dashboard/api/_config_persist.py#L98).
 
-Public entry points:
-- `config_error`
-- `config_validation_error`
-- `read_config_body`
-- `load_workspace_document`
-- `persist_workspace_document`
-- `deep_merge`
+Mission Control Agent group REST router (about-sevn.bot/specs/24-dashboard.md MC-7).
 
-### Agent (`src/sevn/ui/dashboard/api/agent.py`)
+Working with [`agent.py`](../../src/sevn/ui/dashboard/api/agent.py): inspect the public entry points below.
+Start with [`tools_health_list`](../../src/sevn/ui/dashboard/api/agent.py#L305), then [`skills_inventory`](../../src/sevn/ui/dashboard/api/agent.py#L341), [`skills_promote`](../../src/sevn/ui/dashboard/api/agent.py#L377), [`skills_bundled_list`](../../src/sevn/ui/dashboard/api/agent.py#L435).
 
-Public entry points:
-- `tools_health_list`
-- `skills_inventory`
-- `skills_promote`
-- `skills_bundled_list`
-- `skills_install`
-- `skills_uninstall`
-- `skills_toggle`
-- `mcp_servers_registry`
+Dashboard audit trail and analytics REST router.
 
-### Audit (`src/sevn/ui/dashboard/api/audit.py`)
+Working with [`audit.py`](../../src/sevn/ui/dashboard/api/audit.py): inspect the public entry points below.
+Start with [`audit_timeline`](../../src/sevn/ui/dashboard/api/audit.py#L57), then [`analytics_tool_frequency`](../../src/sevn/ui/dashboard/api/audit.py#L108), [`analytics_daily_volume`](../../src/sevn/ui/dashboard/api/audit.py#L138), [`analytics_approvals`](../../src/sevn/ui/dashboard/api/audit.py#L168).
 
-Public entry points:
-- `audit_timeline`
-- `analytics_tool_frequency`
-- `analytics_daily_volume`
-- `analytics_approvals`
+Dashboard auth REST router.
 
-### Auth (`src/sevn/ui/dashboard/api/auth.py`)
+Working with [`auth.py`](../../src/sevn/ui/dashboard/api/auth.py): inspect the public entry points below.
+Start with [`auth_status`](../../src/sevn/ui/dashboard/api/auth.py#L33), then [`login`](../../src/sevn/ui/dashboard/api/auth.py#L70), [`logout`](../../src/sevn/ui/dashboard/api/auth.py#L126).
 
-Public entry points:
-- `auth_status`
-- `login`
-- `logout`
+Dashboard OpenUI Canvas tab REST router (about-sevn.bot/specs/24-dashboard.md §4.4).
 
-### Canvas (`src/sevn/ui/dashboard/api/canvas.py`)
+Working with [`canvas.py`](../../src/sevn/ui/dashboard/api/canvas.py): inspect the public entry points below.
+Start with [`dashboard_canvas`](../../src/sevn/ui/dashboard/api/canvas.py#L81).
 
-Public entry points:
-- `dashboard_canvas`
+Dashboard channels and alert rollup REST routers (about-sevn.bot/specs/24-dashboard.md MC-5).
 
-### Channels (`src/sevn/ui/dashboard/api/channels.py`)
+Working with [`channels.py`](../../src/sevn/ui/dashboard/api/channels.py): inspect the public entry points below.
+Start with [`channels_status`](../../src/sevn/ui/dashboard/api/channels.py#L159), then [`alerts_rollup`](../../src/sevn/ui/dashboard/api/channels.py#L188), [`channels_config_get`](../../src/sevn/ui/dashboard/api/channels.py#L273), [`channels_config_put`](../../src/sevn/ui/dashboard/api/channels.py#L297).
 
-Public entry points:
-- `channels_status`
-- `alerts_rollup`
-- `channels_config_get`
-- `channels_config_put`
+Mission Control in-dashboard webchat console API (MC W6).
 
-### Chat (`src/sevn/ui/dashboard/api/chat.py`)
+Working with [`chat.py`](../../src/sevn/ui/dashboard/api/chat.py): inspect the public entry points below.
+Start with [`chat_token`](../../src/sevn/ui/dashboard/api/chat.py#L106), then [`chat_fork`](../../src/sevn/ui/dashboard/api/chat.py#L160).
 
-Public entry points:
-- `chat_token`
-- `chat_fork`
+Mission Control sevn CLI console API (MC W1 §2c).
 
-### Cli Console (`src/sevn/ui/dashboard/api/cli_console.py`)
+Working with [`cli_console.py`](../../src/sevn/ui/dashboard/api/cli_console.py): inspect the public entry points below.
+Start with [`cli_shortcuts`](../../src/sevn/ui/dashboard/api/cli_console.py#L169), then [`cli_run`](../../src/sevn/ui/dashboard/api/cli_console.py#L199).
 
-See `src/sevn/ui/dashboard/api/cli_console.py` for implementation details.
+Mission Control Coding Agents hub REST router (CA1 + CA6.2 artifacts).
 
-### Coding Agents (`src/sevn/ui/dashboard/api/coding_agents.py`)
+Working with [`coding_agents.py`](../../src/sevn/ui/dashboard/api/coding_agents.py): inspect the public entry points below.
+Start with [`coding_agents_list_payload`](../../src/sevn/ui/dashboard/api/coding_agents.py#L62), then [`coding_agents_list`](../../src/sevn/ui/dashboard/api/coding_agents.py#L84), [`coding_agents_put`](../../src/sevn/ui/dashboard/api/coding_agents.py#L107), [`coding_agents_artifacts_list`](../../src/sevn/ui/dashboard/api/coding_agents.py#L150).
 
-See `src/sevn/ui/dashboard/api/coding_agents.py` for implementation details.
-
-### Additional modules
-
-53 more Python files under `src/sevn/ui/` — including `src/sevn/ui/dashboard/api/deps.py`, `src/sevn/ui/dashboard/api/evolution.py`, `src/sevn/ui/dashboard/api/files.py`, `src/sevn/ui/dashboard/api/knowledge.py`.
+54 more Python files under [`src/sevn/ui`](../../src/sevn/ui/) — including `src/sevn/ui/dashboard/api/deps.py`, `src/sevn/ui/dashboard/api/evolution.py`, `src/sevn/ui/dashboard/api/files.py`, `src/sevn/ui/dashboard/api/knowledge.py`.
 
 ### Extension and invariants
 
-Follow `about-sevn.bot/specs/24-dashboard.md` for merge gates, error semantics, and compatibility constraints. After code changes under `src/sevn/ui/`, run `sevn readme update ui-mission-control` and `make readme-check`.
+Follow [`24-dashboard.md`](../../about-sevn.bot/specs/24-dashboard.md) for merge gates, error semantics, and compatibility constraints. After code changes under [`src/sevn/ui`](../../src/sevn/ui/), run `sevn readme update ui-mission-control` and `make readme-check`.
 
 ## References
 
 - [../../about-sevn.bot/specs/24-dashboard.md](../../about-sevn.bot/specs/24-dashboard.md)
-- [../../about-sevn.bot/specs/29-openui.md](../../about-sevn.bot/specs/29-openui.md)
+- [../../about-sevn.bot/specs/37-openui.md](../../about-sevn.bot/specs/37-openui.md)
 
 [spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
 [spec-link]: ../../about-sevn.bot/specs/24-dashboard.md

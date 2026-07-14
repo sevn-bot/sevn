@@ -2,7 +2,7 @@
 id: spec-12-skills-system
 kind: spec
 title: Skills system — Spec
-status: done
+status: draft
 owner: Alex
 summary: 'Own everything under workspace/skills/: how skills are discovered, validated,
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
@@ -481,30 +481,71 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Skills system — Spec (spec-12-skills-system) — Purpose.
+Own everything under workspace/skills/: how skills are discovered, validated, indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only — descriptions come from this subsystem)
 
+Primary code trees: [`src/sevn/skills`](src/sevn/skills/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Skills system — Spec (spec-12-skills-system) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`prune_orphan_browser_profiles`](src/sevn/skills/browser_gc.py) — `src/sevn/skills/browser_gc.py`
+- [`BrowserReadiness`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`BrowserSessionRegistry`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`CloseBrowserResult`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`TabOperationError`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`TabSessionView`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`activate_tab`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`browser_autoclose_enabled`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`browser_page`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`browser_readiness_snapshot`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`cdp_list_page_targets`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`cdp_port_from_url`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- _…and 138 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Skills system — Spec (spec-12-skills-system) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`prune_orphan_browser_profiles`](src/sevn/skills/browser_gc.py) — `src/sevn/skills/browser_gc.py`
+- [`BrowserReadiness`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`BrowserSessionRegistry`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`CloseBrowserResult`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`TabOperationError`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`TabSessionView`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`activate_tab`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`browser_autoclose_enabled`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`browser_page`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`browser_readiness_snapshot`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`cdp_list_page_targets`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`cdp_port_from_url`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- _…and 138 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Skills system — Spec (spec-12-skills-system) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/skills`](src/sevn/skills/__init__.py).
 ## Behavior
 
-Offline scaffold for Skills system — Spec (spec-12-skills-system) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/skills`](src/sevn/skills/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Skills system — Spec (spec-12-skills-system) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Amendments (spec-36-sub-agents)
 
 Bundled `media_generation` skill binds to the `media_generator` specialist via
@@ -512,6 +553,34 @@ Bundled `media_generation` skill binds to the `media_generator` specialist via
 Skills may declare `requires_specialist` in SKILL front matter; triager/tier B route
 media asks through the specialist grant path (D8/D16).
 
+## Implemented by
+
+- [`prune_orphan_browser_profiles`](src/sevn/skills/browser_gc.py) — `src/sevn/skills/browser_gc.py`
+- [`BrowserReadiness`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`BrowserSessionRegistry`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`CloseBrowserResult`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`TabOperationError`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`TabSessionView`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`activate_tab`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`browser_autoclose_enabled`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`browser_page`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`browser_readiness_snapshot`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`cdp_list_page_targets`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`cdp_port_from_url`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`cdp_port_seed`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`cdp_reachable`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`clear_registry`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`close_all_gateway_browsers`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`close_browser_session`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`close_idle_browser_sessions`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`close_tab`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- [`connected_tab_session`](src/sevn/skills/browser_session.py) — `src/sevn/skills/browser_session.py`
+- _…and 130 more in frontmatter `interfaces:`._
+
 ## Test Strategy
 
-Offline scaffold for Skills system — Spec (spec-12-skills-system) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

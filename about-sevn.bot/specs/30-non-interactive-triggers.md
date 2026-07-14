@@ -2,7 +2,7 @@
 id: spec-30-non-interactive-triggers
 kind: spec
 title: Non-interactive triggers — Spec
-status: done
+status: draft
 owner: Alex
 summary: 'Deliver non-interactive dispatch: external events (“something happened”)
   and schedules (“tick”) compile to DispatchRequest, optionally pass through notify_only
@@ -180,30 +180,75 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Non-interactive triggers — Spec (spec-30-non-interactive-triggers) — Purpose.
+Deliver non-interactive dispatch: external events (“something happened”) and schedules (“tick”) compile to DispatchRequest, optionally pass through notify_only (zero LLM, zero sandbox boot), otherwise
 
+Primary code trees: [`src/sevn/triggers`](src/sevn/triggers/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Non-interactive triggers — Spec (spec-30-non-interactive-triggers) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`RunCreateBody`](src/sevn/triggers/api_router.py) — `src/sevn/triggers/api_router.py`
+- [`build_api_router`](src/sevn/triggers/api_router.py) — `src/sevn/triggers/api_router.py`
+- [`triggers_api_auth_required`](src/sevn/triggers/auth.py) — `src/sevn/triggers/auth.py`
+- [`verify_triggers_api_bearer`](src/sevn/triggers/auth.py) — `src/sevn/triggers/auth.py`
+- [`coding_agent_loop_trigger`](src/sevn/triggers/coding_agent_loop.py) — `src/sevn/triggers/coding_agent_loop.py`
+- [`mine_session_trajectories`](src/sevn/triggers/coding_agent_loop.py) — `src/sevn/triggers/coding_agent_loop.py`
+- [`CronJobDetail`](src/sevn/triggers/cron.py) — `src/sevn/triggers/cron.py`
+- [`CronJobRow`](src/sevn/triggers/cron.py) — `src/sevn/triggers/cron.py`
+- [`SqliteCronStore`](src/sevn/triggers/cron.py) — `src/sevn/triggers/cron.py`
+- [`add_cron_job`](src/sevn/triggers/cron.py) — `src/sevn/triggers/cron.py`
+- [`add_reminder`](src/sevn/triggers/cron.py) — `src/sevn/triggers/cron.py`
+- [`compute_next_fire_ns`](src/sevn/triggers/cron.py) — `src/sevn/triggers/cron.py`
+- _…and 33 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Non-interactive triggers — Spec (spec-30-non-interactive-triggers) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`RunCreateBody`](src/sevn/triggers/api_router.py) — `src/sevn/triggers/api_router.py`
+- [`build_api_router`](src/sevn/triggers/api_router.py) — `src/sevn/triggers/api_router.py`
+- [`triggers_api_auth_required`](src/sevn/triggers/auth.py) — `src/sevn/triggers/auth.py`
+- [`verify_triggers_api_bearer`](src/sevn/triggers/auth.py) — `src/sevn/triggers/auth.py`
+- [`coding_agent_loop_trigger`](src/sevn/triggers/coding_agent_loop.py) — `src/sevn/triggers/coding_agent_loop.py`
+- [`mine_session_trajectories`](src/sevn/triggers/coding_agent_loop.py) — `src/sevn/triggers/coding_agent_loop.py`
+- [`CronJobDetail`](src/sevn/triggers/cron.py) — `src/sevn/triggers/cron.py`
+- [`CronJobRow`](src/sevn/triggers/cron.py) — `src/sevn/triggers/cron.py`
+- [`SqliteCronStore`](src/sevn/triggers/cron.py) — `src/sevn/triggers/cron.py`
+- [`add_cron_job`](src/sevn/triggers/cron.py) — `src/sevn/triggers/cron.py`
+- [`add_reminder`](src/sevn/triggers/cron.py) — `src/sevn/triggers/cron.py`
+- [`compute_next_fire_ns`](src/sevn/triggers/cron.py) — `src/sevn/triggers/cron.py`
+- _…and 33 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Non-interactive triggers — Spec (spec-30-non-interactive-triggers) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/triggers`](src/sevn/triggers/__init__.py).
 ## Behavior
 
-Offline scaffold for Non-interactive triggers — Spec (spec-30-non-interactive-triggers) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/triggers`](src/sevn/triggers/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Non-interactive triggers — Spec (spec-30-non-interactive-triggers) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Offline scaffold for Non-interactive triggers — Spec (spec-30-non-interactive-triggers) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

@@ -1,10 +1,12 @@
 <!-- generated: do not edit by hand; run `sevn readme update {{ slug }}` -->
 # {{ title }}
 
-> **Summary.** Generated catalog of every subsystem README with profile, one-line summary, and staleness status.
+> **Summary.** Generated catalog of every subsystem README with profile, one-line summary, and fingerprint freshness status. **Freshness ≠ semantic accuracy** — a `fresh` row only means source fingerprints match; run `make readme-check` for full validation.
+
+**Operator clarity** — see [`STANDARD.md`](STANDARD.md) §9.4 for cross-cutting topics (secrets gateway vs proxy, channel stub vs production, schema vs Pydantic gaps). Load-bearing packages outside this catalog (e.g. `src/sevn/browser/`) are listed in STANDARD § out-of-catalog.
 
 | Slug | Title | Profile | Summary | Status |
 |------|-------|---------|---------|--------|
 {% for entry in entries -%}
-| [{{ entry.slug }}]({{ entry.path }}) | {{ entry.title }} | `{{ entry.profile }}` | {{ entry.summary }} | {{ entry.status }} |
+| [{{ entry.slug }}]({{ entry.path }}) | {{ entry.title }} | `{{ entry.profile }}` | {{ entry.summary | replace('|', '\\|') }} | {{ entry.status }} |
 {% endfor %}

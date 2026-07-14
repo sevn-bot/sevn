@@ -87,25 +87,27 @@ See [README catalog](docs/readmes/INDEX.md) and [Architecture](about-sevn.bot/AR
 |-----------|---------|---------|
 | [Gateway](docs/readmes/gateway.md) | `subsystem` | FastAPI control plane: channels, sessions, turn spine, queue/steer, Telegram menus. |
 | [Agent runtime](docs/readmes/agent.md) | `subsystem` | Triager, tier-B/C executors, harness discipline, sandboxes, and turn orchestration. |
-| [Channels](docs/readmes/channels.md) | `subsystem` | Telegram, Web UI bridge, voice hooks, and channel adapter patterns. |
-| [Tools registry](docs/readmes/tools.md) | `catalog` | Curated inventory of @sevn_tool plugins, adapters, and permission gates. |
+| [Channels](docs/readmes/channels.md) | `subsystem` | Telegram, Web UI bridge, and channel adapter patterns. |
+| [Tools registry](docs/readmes/tools.md) | `subsystem` | Module inventory for the tools registry, adapters, and permission gates. |
 | [Skills system](docs/readmes/skills.md) | `catalog` | Curated inventory of bundled and workspace skills, loaders, and subprocess runners. |
 | [Mission Control UI](docs/readmes/ui-mission-control.md) | `subsystem` | Dashboard SPA, tab registry, traces, ops surfaces, and OpenUI delivery. |
 | [Security scanner](docs/readmes/security.md) | `subsystem` | LLM Guard, .llmignore, block-and-notify, and channel security copy. |
-| [Secrets](docs/readmes/secrets.md) | `subsystem` | Secrets backends, logical keys, fingerprint confirmation — keys never in the gateway process. |
-| [Egress proxy](docs/readmes/proxy-egress.md) | `subsystem` | Paired proxy daemon, /llm/* routes, Transport wire shapes, and session tokens. |
-| [Tracing](docs/readmes/tracing.md) | `subsystem` | TraceSink, JSONL/SQLite/Logfire/OTel pipelines, and trace maintenance. |
+| [Secrets](docs/readmes/secrets.md) | `subsystem` | Secrets backends, logical-key chain, TTL, and fingerprint confirmation. |
+| [Egress proxy](docs/readmes/proxy-egress.md) | `subsystem` | Shared-secret-guarded `/llm/*` egress proxy, Transport wire shapes, and route handlers. |
+| [Tracing](docs/readmes/tracing.md) | `subsystem` | TraceSink JSONL/SQLite sinks, OTLP export bridge, and trace maintenance. |
 | [Memory & context](docs/readmes/memory-context.md) | `subsystem` | LCM store, compaction, user model, dreaming, and Honcho opt-ins. |
-| [Second brain](docs/readmes/second-brain.md) | `subsystem` | Wiki, Obsidian sync, ingest paths, and provenance for operator knowledge. |
+| [Second brain](docs/readmes/second-brain.md) | `subsystem` | Wiki vault layout, ingest paths, and wikilink-compatible provenance for operator knowledge. |
 | [Voice](docs/readmes/voice.md) | `subsystem` | Gateway-level STT/TTS chains, trigger keywords, and voice trace events. |
 | [Non-interactive triggers](docs/readmes/triggers.md) | `subsystem` | Webhooks, cron, dedupe, dispatcher, and notify-only automation. |
 | [Config & workspace](docs/readmes/config-workspace.md) | `subsystem` | sevn.json schema, workspace layout, defaults, and layout validation. |
-| [Storage](docs/readmes/storage.md) | `subsystem` | SQLite schema, migrations, D1 paths, and ActiveRunSnapshot persistence. |
+| [Storage](docs/readmes/storage.md) | `subsystem` | SQLite paths, connections, schema migrations, and D1 layout. |
 | [Code understanding](docs/readmes/code-understanding.md) | `subsystem` | MYCODE, Graphify, code-review-graph, and CGR integration for repo orientation. |
 | [Self-improvement](docs/readmes/self-improve.md) | `subsystem` | Self-upgrade harness, eval workers, spec-kit stages, and improve jobs. |
 | [Integrations](docs/readmes/integrations.md) | `subsystem` | Cursor Cloud, GitHub skill clients, and external integration call paths. |
 | [Onboarding](docs/readmes/onboarding.md) | `guide` | Operator setup: CLI, web wizard, Telegram flows, daemon install, and profiles. |
 | [Sub-agents](docs/readmes/subagents.md) | `subsystem` | Level-1 role runs, level-2 workers, specialists, multi queue mode, registry, and kill surfaces. |
+| [Bot evolution](docs/readmes/evolution.md) | `subsystem` | Issue pipelines, spec-kit stages, approvals, and Mission Control evolution APIs. |
+| [Plugin hooks](docs/readmes/plugins.md) | `subsystem` | In-process hook chains, channel plugin registry, slash bindings, and trigger mux. |
 
 <a id="quick-start-tldr"></a>
 

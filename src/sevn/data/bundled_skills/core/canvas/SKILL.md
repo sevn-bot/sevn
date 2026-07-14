@@ -1,6 +1,6 @@
 ---
 name: canvas
-description: Cursor Canvas and rich analytical layouts via OpenUI compose helpers (`specs/11-tools-registry.md` §3.4, `specs/29-openui.md`).
+description: Cursor Canvas and rich analytical layouts via OpenUI compose helpers (`specs/11-tools-registry.md` §3.4, `specs/37-openui.md`).
 version: "1.0.0"
 see_also:
   - openui_render

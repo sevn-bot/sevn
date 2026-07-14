@@ -2,7 +2,7 @@
 id: spec-35-bot-evolution
 kind: spec
 title: Bot evolution — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: Deliver src/sevn/evolution/ and the operator-facing Evolution surface so
   sevn.bot can evolve its own codebase as a first-class product pillar — not an optional
@@ -282,30 +282,75 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Bot evolution — Spec (spec-35-bot-evolution) — Purpose.
+Deliver src/sevn/evolution/ and the operator-facing Evolution surface so sevn.bot can evolve its own codebase as a first-class product pillar — not an optional add-on — spanning understand → file work
 
+Primary code trees: `src/sevn/evolution/`.
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Bot evolution — Spec (spec-35-bot-evolution) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`EvolutionApproval`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`approval_to_api_dict`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`approvals_dir`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`create_approval`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`ensure_issue_approval`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`get_approval`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`list_approvals`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`resolve_approval`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`save_approval`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`run_bug_pipeline`](src/sevn/evolution/bug_pipeline.py) — `src/sevn/evolution/bug_pipeline.py`
+- [`CursorPollScheduler`](src/sevn/evolution/cursor_poll_scheduler.py) — `src/sevn/evolution/cursor_poll_scheduler.py`
+- [`EvolutionIssueEventFanoutFn`](src/sevn/evolution/events.py) — `src/sevn/evolution/events.py`
+- _…and 73 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Bot evolution — Spec (spec-35-bot-evolution) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`EvolutionApproval`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`approval_to_api_dict`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`approvals_dir`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`create_approval`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`ensure_issue_approval`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`get_approval`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`list_approvals`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`resolve_approval`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`save_approval`](src/sevn/evolution/approvals.py) — `src/sevn/evolution/approvals.py`
+- [`run_bug_pipeline`](src/sevn/evolution/bug_pipeline.py) — `src/sevn/evolution/bug_pipeline.py`
+- [`CursorPollScheduler`](src/sevn/evolution/cursor_poll_scheduler.py) — `src/sevn/evolution/cursor_poll_scheduler.py`
+- [`EvolutionIssueEventFanoutFn`](src/sevn/evolution/events.py) — `src/sevn/evolution/events.py`
+- _…and 73 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Bot evolution — Spec (spec-35-bot-evolution) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/evolution`](src/sevn/evolution/__init__.py).
 ## Behavior
 
-Offline scaffold for Bot evolution — Spec (spec-35-bot-evolution) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/evolution`](src/sevn/evolution/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Bot evolution — Spec (spec-35-bot-evolution) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Offline scaffold for Bot evolution — Spec (spec-35-bot-evolution) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

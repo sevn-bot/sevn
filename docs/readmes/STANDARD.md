@@ -14,7 +14,7 @@ This document is the **verbatim authoring contract** for the README pipeline. La
 README.md                      ← root: brand + value prop + highlights + map (high-level only)
 docs/readmes/
   STANDARD.md                  ← this standard (authoring contract) incl. profile schemas (§C0)
-  INDEX.md                     ← generated catalog: every README + 1-line summary + profile + status
+  INDEX.md                     ← generated catalog: every README + 1-line summary + profile + freshness status (`fresh` / `stale`)
   manifest.toml                ← README ⇄ profile ⇄ source-globs ⇄ spec links ⇄ owner tier
   _fingerprints.json           ← stored source fingerprints (staleness gate)
   _mock-root-header.md         ← REVIEW GATE mock header snippet (operator preview; not shipped in W5)
@@ -89,14 +89,14 @@ Root README stays **high-level + links**. Deep detail lives in subsystem READMEs
 
 Not every README is a subsystem deep-dive. `manifest.toml` assigns each file a `profile`; the checker (W4) loads the matching schema below.
 
-| Profile | Used for | Required sections | Tiers? | Symbol-ref check |
-|---------|----------|-------------------|--------|------------------|
-| `root` | root `README.md` | brand header · status badges · TOC · highlights · subsystem map · install · license (§B order) | no | no |
-| `subsystem` | code subsystem (gateway, agent, security, …) | Summary · `## Level 1 — Overview` · `## Level 2 — How it works` · `## Level 3 — Deep dive` · References (§C) | **yes** | **yes** (L3) |
-| `index` | `docs/readmes/INDEX.md` | title · generated entry table | no | no |
-| `catalog` | inventories (tools, skills, runbooks index) | Summary · generated item table · optional per-item subsections | no | paths only |
-| `guide` | task/operator docs (onboarding, deployment) | Summary · task/step sections (≥1 `##`) · References | no | optional |
-| `freeform` | one-off READMEs | Summary · GitHub-safe (§E) · links resolve | no | no |
+| Profile | Used for | Required sections | Tiers? | Symbol-ref check | Other checker fields |
+|---------|----------|-------------------|--------|------------------|----------------------|
+| `root` | root `README.md` | brand header · status badges · TOC · highlights · subsystem map · install · license (§B order) | no | no | no Summary required |
+| `subsystem` | code subsystem (gateway, agent, security, …) | Summary · `## Level 1 — Overview` · `## Level 2 — How it works` · `## Level 3 — Deep dive` · References (§C) | **yes** | **yes** (L3) | — |
+| `index` | `docs/readmes/INDEX.md` | title · generated entry table · freshness note | no | no | `requires_table` |
+| `catalog` | inventories (tools, skills, runbooks index) | Summary · generated item table · optional per-item subsections | no | paths only | `requires_table`, `verify_path_refs` |
+| `guide` | task/operator docs (onboarding, deployment) | Summary · task/step sections (≥1 `##`) · References | no | optional | `requires_step_sections` |
+| `freeform` | one-off READMEs | Summary · GitHub-safe (§E) · links resolve | no | no | — |
 
 **Shared across profiles except `root`:** a `Summary` block at top (see formats below). The root README uses a value-prop paragraph (§B) instead of a Summary block. All profiles must stay GitHub-safe (§E) with resolving relative links/anchors. Placeholders for unbuilt assets → `TODO` warning, not fail.
 
@@ -110,6 +110,10 @@ Each profile is a schema object with these fields:
 | `needs_tiers` | `bool` | When true, enforce L1/L2/L3 tier headings (`subsystem` only). |
 | `verify_symbol_refs` | `bool` | When true, parse Level 3 for `src/...` paths and optional `Class.method()` symbols; fail if missing. |
 | `allow_extra_headings` | `bool` | When true, extra `##` sections beyond `required_headings` are allowed (default true for `subsystem`, `guide`, `freeform`). |
+| `requires_summary` | `bool` | When false, skip Summary block requirement (`root` only). |
+| `requires_table` | `bool` | When true, require a markdown table (`index`, `catalog`). |
+| `requires_step_sections` | `bool` | When true, require at least one task `##` section (`guide`). |
+| `verify_path_refs` | `bool` | When true, validate cited `src/...py` paths (`catalog`). |
 
 ```yaml
 # Canonical profile registry — copy into checker config or load from this section.
@@ -125,6 +129,7 @@ profiles:
     needs_tiers: false
     verify_symbol_refs: false
     allow_extra_headings: true
+    requires_summary: false
 
   subsystem:
     required_headings:
@@ -141,18 +146,27 @@ profiles:
     needs_tiers: false
     verify_symbol_refs: false
     allow_extra_headings: true
+    requires_table: true
+
+  # INDEX status column: ``fresh`` means the stored source fingerprint matches the
+  # current ``source_globs`` digest; ``stale`` means regenerate or fingerprint.
+  # Freshness ≠ semantic accuracy — a ``fresh`` row can still carry a wrong
+  # manifest ``summary`` until ``lint_summaries`` (``make readme-check``) passes.
 
   catalog:
     required_headings: []
     needs_tiers: false
     verify_symbol_refs: false
     allow_extra_headings: true
+    requires_table: true
+    verify_path_refs: true
 
   guide:
     required_headings: []
     needs_tiers: false
     verify_symbol_refs: false
     allow_extra_headings: true
+    requires_step_sections: true
 
   freeform:
     required_headings: []
@@ -271,7 +285,7 @@ Ships in the wheel; unit-tested; invoked by `sevn readme` CLI (W3). The Claude s
 
 | Module / path | Responsibility |
 |---------------|----------------|
-| `__init__.py` | Public exports: `render`, `check`, `generate_index`. |
+| `__init__.py` | Public exports: `PROFILE_TEMPLATES`, `render_profile`, `render_all_fixtures`, `templates_dir`, `prompts_dir`. |
 | `manifest.py` | Parse `manifest.toml`; validate profile names against §C0 registry. |
 | `scanner.py` | Repo/metadata scan: `pyproject.toml`, `sevn.json`, `CLAUDE.md`, specs index, optional `graphify-out/graph.json`, manifest `source_globs` → structured context dict. |
 | `model.py` | Section/tier data model + assembly (Summary + L1/L2/L3 per profile). |
@@ -382,6 +396,27 @@ Explicit operator action for LLM spend: `sevn readme generate --llm`. CI uses `o
 
 Scaffold path: `make readme-scaffold` (parallel to `*-docs-scaffold`). Curated slugs are fingerprint-only on scaffold; generated slugs are regenerated and stubbed as needed.
 
+### Out-of-catalog packages (D19)
+
+Some load-bearing trees intentionally have **no** manifest row. They are documented elsewhere rather than duplicated in the README pipeline:
+
+| Package | Rationale | Where to read |
+|---------|-----------|---------------|
+| `src/sevn/browser/` | Optional **`browser`** / **`browser-cdp`** extras; Playwright/CDP skills and recipes ship under bundled skills — not a core subsystem catalog entry. | `CLAUDE.md` optional extras; bundled skills (`playwright-browser`, `x-use`, …); `about-sevn.bot/specs/12-skills-system.md` |
+
+Adding a manifest row for an out-of-catalog package requires an operator decision at a catalog-coverage gate — default is the table above.
+
+### Operator clarity (§9.4)
+
+Cross-cutting topics that confuse readers if only implied by generated prose:
+
+| Topic | Meaning | Authoritative README |
+|-------|---------|---------------------|
+| Secrets gateway vs egress proxy | Channel/gateway/MC credentials resolve in the **gateway**; LLM provider keys resolve on the **egress proxy**. | [`secrets.md`](secrets.md) Level 2 — *Gateway vs egress proxy* |
+| Channel stub vs production | Telegram/WebChat are production paths; Discord/Slack are narrower stubs until specs mature. | [`channels.md`](channels.md) Level 2 — *Stub vs production adapters* |
+| INDEX `fresh` status | Fingerprint match only — **not** semantic accuracy. Run `make readme-check` for summary lint + symbol validation. | This file §C0 INDEX note; [`INDEX.md`](INDEX.md) Summary |
+| Schema vs Pydantic | `infra/sevn.schema.json` may lag typed section models (`provisioning`, `coding_agents`, …). | [`config-workspace.md`](config-workspace.md) Level 2 — *Schema vs Pydantic gaps* |
+
 ---
 
 ## REVIEW GATE artefact
@@ -394,6 +429,9 @@ Operator preview of the root brand header: `docs/readmes/_mock-root-header.md`.
 
 | Date | Wave | Change |
 |------|------|--------|
+| 2026-07-14 | W10 | D19 catalog coverage: ``evolution`` + ``plugins`` subsystem rows; ``browser/`` out-of-catalog table; §9.4 operator-clarity pointers. |
+| 2026-07-14 | W4 | Manifest summary sweep (D10): seven wrong `summary` rows rewritten; `integrations.specs` → `29-cursor-cloud-agent`; §F public-export list + §C0 profile-schema block reconciled to live code. |
+| 2026-07-14 | W3 | INDEX status column uses ``fresh`` (not ``ok``); Summary documents freshness ≠ semantic accuracy; ``lint_summaries`` gate (D7). |
 | 2026-07-13 | W9 | §A1 curated templates (`_templates/`) + `templates.py` validation in the gate; `sevn readme curate` + `readme-curator` agent; pre-commit auto-edit & stage with `SEVN_README_AGENT` controls. |
 | 2026-07-13 | W6 | §B live CI badge; §C0 root Summary exemption; §F module table (`render.py` owns §E checks); prompt-wiring table matches D15 profile map. |
 | 2026-07-13 | W2 | §A curated flag semantics, fingerprint-only refresh, header stamp split. |

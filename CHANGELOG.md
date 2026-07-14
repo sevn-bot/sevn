@@ -19,16 +19,25 @@ are cut into a dated, versioned section at release time.
 - Bundled skills, workspace templates, doctor solutions, docs site (`about-sevn.bot/`), readme pipeline (`docs/readmes/`), brand assets, and remaining test suites for the pre-0.0.1 migration import (I5)
 - Core runtime packages for the pre-0.0.1 migration import (config, storage, workspace, gateway, agent, security, proxy, and related tests)
 - Configurable Second Brain vault path via `second_brain.paths.vault` (CLI setup, Telegram `/config`, onboarding, doctor)
-- Witchcraft semantic reindex for the Second Brain vault via `sevn second-brain setup --reindex` and automatically at gateway boot
+- Witchcraft semantic reindex for the Second Brain vault via `sevn second-brain setup --reindex` and opt-in `witchcraft.reindex_on_startup` (default false)
 - Logfire trace export: `tracing.sinks[]` logfire sink with secrets-managed token, `sevn tracing` / `sevn config tracing` CLI, Telegram `/config → Logs` toggle and token form, and Mission Control ops endpoints
 - Sub-agents orchestration with level-1 role runs, level-2 workers and specialists, `multi` queue mode, Mission Control and Telegram kill surfaces, and `media_generation` skill via the `media_generator` specialist
 
 ### Changed
 
+- README L3 primary source tree lists every manifest ``source_globs`` root when multiple trees apply
+- README fingerprints skip timestamp-only rewrites when source digests are unchanged
+- README pipeline refactor splits offline sections, L2 policy, text utils, module index, and scan context; scanner uses single-pass module indexes
+- README regeneration skips rewriting files when rendered markdown is unchanged, keeping pre-commit manifest sync idempotent
+- README `make readme-check` runs manifest `lint_summaries` and validates curated Level 1–2 symbol cites; INDEX status column shows `fresh`/`stale` with a freshness ≠ accuracy note
+- README generator drops the hardcoded gateway key-load clause unless `provider_keys_via_proxy` is set on the manifest row; non–turn-spine L2 uses module-graph prose instead of a generic stub
+- README L3 deep dives lead with full module docstrings, definition-site markdown links (`#L` anchors), and a unified 12-file symbol window aligned with `extract_module_symbols`
 - README LLM profile wiring (root value prop + highlights, guide steps, catalog intro) with offline default unchanged; root README loads `value_prop` from brand TOML and uses live GitHub Actions CI badge
 - README offline scaffold quality: turn-spine paragraph gated on `turn_spine`, sentence-boundary truncation, true path-list remainders, docstring-derived module inventory, and narrowed PLACEHOLDER warnings
 - README pipeline emits file-relative links and retargets manifest spec paths to `about-sevn.bot/specs/`; link checker resolves paths from each README directory only
 - README catalog kinds: manifest `catalog = "modules" | "skills"` with modules cap 200 (+N overflow row) and skills two-table layout (bundled SKILL.md frontmatter + runtime loaders)
+- CLI getting-started and config guides drop stale M1/M2 milestone framing; the `sevn config` interactive menu is documented as shipped
+- Subsystem README catalog adds `evolution` and `plugins` manifest rows with generated subsystem docs; `tools` migrated from catalog to curated subsystem profile; `browser/` remains documented as out-of-catalog in STANDARD
 
 ### Deprecated
 
@@ -38,6 +47,10 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- Onboarding web and TUI wizards expose `gateway.queue_mode=multi` in capabilities (matches runtime and spec-36)
+- README pre-commit stages `_fingerprints.json` when source digests change but rendered markdown is unchanged
+- Curated Level 1–2 symbol validation flags bare `` `function_name` `` cites absent from cited Python files (line-scoped, snake_case only)
+- Skills catalog README no longer leaks YAML folded-scalar `>-` markers from bundled SKILL.md frontmatter
 - `list your skills` reply no longer truncates skill descriptions at ~80 chars: `compose_list_skills_reply` now prefers the full manifest description from the skill inventory over the clipped Triager routing-index line
 - `log_query` accepts a `[start, end]` integer pair and a bracketed `"[start, end]"` string as one inclusive range, instead of rejecting them with an "invalid range" error that leaked into replies; unparseable ranges now mark the diagnostic internal so the model corrects the call rather than quoting it to the user
 - Tier-B empty-output retry exhaustion (`Exceeded maximum output retries`) is treated as a deterministic harness failure, skipping the wasteful widened full-index retry that reproduced it and contributed to `executor_timeout_cancel` (the summarize / partial-progress path still runs)
@@ -55,13 +68,15 @@ are cut into a dated, versioned section at release time.
 
 ### Security
 
+- Bump setuptools to 83.0.0 to clear PYSEC-2026-3447 from pip-audit
+
 ## [0.0.1] - 2026-07-08
 
 First public release on [github.com/sevn-bot/sevn](https://github.com/sevn-bot/sevn).
 
 ### Added
 
-- Multi-channel AI gateway (Telegram, Web UI, voice hooks) with tiered agent runtime
+- Multi-channel AI gateway (Telegram, Web UI) with tiered agent runtime
 - Paired egress proxy, secrets backends, Mission Control dashboard, and workspace memory
 - Onboarding wizard (`sevn onboard`), CLI, and `make setup` developer bootstrap
 - Full Python package under `src/sevn/` with CI via `make ci`

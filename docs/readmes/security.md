@@ -15,58 +15,59 @@ This is defense in depth alongside tool permission gates and sandbox isolation �
 
 ## Level 2 — How it works (technical)
 
-Core scanner code lives in `src/sevn/security/`. The gateway wires it at the channel boundary (`channel_router.py`).
+Core scanner code lives in [`src/sevn/security/`](../../src/sevn/security/). The gateway wires it at the channel boundary ([`channel_router.py`](../../src/sevn/gateway/channel_router.py)).
 
 ### LLM Guard scan points
 
-`LLMGuardScanner` (`llm_guard_scanner.py`) exposes async entrypoints:
+[`LLMGuardScanner`](../../src/sevn/security/llm_guard_scanner.py#L543) ([`llm_guard_scanner.py`](../../src/sevn/security/llm_guard_scanner.py)) exposes async instance methods plus one module helper:
 
-| Method | When |
+| Entry point | When |
 | --- | --- |
-| `scan_inbound` | Every gateway inbound message (before triage) |
-| `scan_tool_result` | Selected tool output before re-entering the model |
-| `scan_feedback_body` | Web App / structured feedback payloads |
-| `scan_patch_diff` | Self-improve patch promotion path |
+| [`scan_inbound`](../../src/sevn/security/llm_guard_scanner.py#L564) | Every gateway inbound message (before triage) |
+| [`scan_tool_result`](../../src/sevn/security/llm_guard_scanner.py#L603) | Selected tool output before re-entering the model |
+| [`scan_feedback_body`](../../src/sevn/security/llm_guard_scanner.py#L670) | Web App / structured feedback payloads |
+| [`scan_patch_diff`](../../src/sevn/security/llm_guard_scanner.py#L1080) (module helper) | Self-improve patch promotion path |
 
-Verdicts are `ScanVerdict.allow` or `ScanVerdict.block` with `BlockReason` codes and provider metadata. Owner overrides can skip named guard kinds via config.
+Verdicts are [`ScanVerdict`](../../src/sevn/security/llm_guard_scanner.py#L123) **allow** or **block** with [`BlockReason`](../../src/sevn/security/llm_guard_scanner.py#L130) codes and provider metadata. Owner overrides can skip named guard kinds via config. There is **no** `security.scanner.enabled` field — scanner behaviour is always active when wired; tune providers, thresholds, and `heuristic_only` instead.
 
 ### Block-and-notify flow
 
-When `scan_inbound` returns block (`channel_router.py`):
+When [`scan_inbound`](../../src/sevn/security/llm_guard_scanner.py#L564) returns block ([`channel_router.py`](../../src/sevn/gateway/channel_router.py)):
 
-1. **`write_blocked_inbound`** — atomic JSON under `.llmignore/blocked/` (`llmignore.py`)
+1. **[`write_blocked_inbound`](../../src/sevn/security/llmignore.py#L337)** — atomic JSON under `.llmignore/blocked/` ([`llmignore.py`](../../src/sevn/security/llmignore.py))
 2. **Session row** — user message stored as `kind="blocked"`, `visible_to_llm=0`
-3. **Trace events** — `gateway.llm_guard_block`, `gateway.route_incoming` with `status="stopped_blocked"`
-4. **Channel notify** — `blocked_inbound_user_message` (`gateway/strings.py`) sent via the channel adapter
+3. **Trace events** — `gateway.llm_guard_block`, [`gateway.route_incoming`](../../src/sevn/gateway/channel_router.py#L1348) with `status="stopped_blocked"`
+4. **Channel notify** — [`blocked_inbound_user_message`](../../src/sevn/gateway/strings.py#L47) ([`gateway/strings.py`](../../src/sevn/gateway/strings.py)) sent via the channel adapter
 
-Feedback blocks mirror the pattern via `write_blocked_feedback`.
+Feedback blocks mirror the pattern via [`write_blocked_feedback`](../../src/sevn/security/llmignore.py#L398).
 
 ### `.llmignore` layout
 
-`resolve_llmignore_root` + `ensure_llmignore_layout` create:
+[`resolve_llmignore_root`](../../src/sevn/security/llmignore.py#L61) + [`ensure_llmignore_layout`](../../src/sevn/security/llmignore.py#L92) create:
 
 - `.llmignore/blocked/` — inbound/feedback blocks
 - `.llmignore/quarantine/` — held content with TTL
 - `.llmignore/incidents/` — scanner incident records
 
-`sweep_expired` enforces retention from `security.llmignore.retention` in `sevn.json`. Indexers honor `DEFAULT_INDEX_DENY` so `.llmignore/` never enters LLM-facing corpora. Shadow workspaces must exclude the subtree (`assert_shadow_workspace_excludes_llmignore`).
+[`sweep_expired`](../../src/sevn/security/llmignore.py#L164) enforces TTLs from `security.llmignore.retention_days` (`blocked`, `quarantine`, `incidents` day counts) in `sevn.json`. Indexers honor `DEFAULT_INDEX_DENY` so `.llmignore/` never enters LLM-facing corpora. Shadow workspaces must exclude the subtree ([`assert_shadow_workspace_excludes_llmignore`](../../src/sevn/security/llmignore.py#L208)).
 
 ### Configuration (`sevn.json` → `security`)
 
 Key knobs (full schema: [`infra/sevn.schema.json`](../../infra/sevn.schema.json)):
 
-- `security.scanner.enabled` — master switch
-- `security.scanner.providers` — LLM Guard backend selection
-- `security.llmignore.*` — relative path + retention TTLs
+- `security.scanner.providers`, `heuristic_only`, `bypass_owner`, `model`, `max_inbound_bytes` — LLM Guard backend and thresholds ([`SecurityScannerSubConfig`](../../src/sevn/config/sections/security.py#L79))
+- `security.llmignore.retention_days.*` — per-subtree TTLs (`blocked`, `quarantine`, `incidents`)
+
+**Schema reflection gaps:** some Pydantic-only subtrees (for example nested scanner fields) may not appear verbatim in [`infra/sevn.schema.json`](../../infra/sevn.schema.json); treat [`src/sevn/config/sections/security.py`](../../src/sevn/config/sections/security.py) as authoritative when the schema lags.
 
 Validate after edits: `sevn config validate`.
 
 ### Key modules
 
-- `src/sevn/security/llm_guard_scanner.py` — `LLMGuardScanner`
-- `src/sevn/security/llmignore.py` — layout, persistence, TTL sweep
-- `src/sevn/gateway/channel_router.py` — inbound gate + notify path
-- `src/sevn/gateway/strings.py` — `blocked_inbound_user_message`
+- [`llm_guard_scanner.py`](../../src/sevn/security/llm_guard_scanner.py) — [`LLMGuardScanner`](../../src/sevn/security/llm_guard_scanner.py#L543), [`scan_patch_diff`](../../src/sevn/security/llm_guard_scanner.py#L1080)
+- [`llmignore.py`](../../src/sevn/security/llmignore.py) — layout, persistence, [`sweep_expired`](../../src/sevn/security/llmignore.py#L164)
+- [`channel_router.py`](../../src/sevn/gateway/channel_router.py) — inbound gate + notify path
+- [`strings.py`](../../src/sevn/gateway/strings.py) — [`blocked_inbound_user_message`](../../src/sevn/gateway/strings.py#L47)
 
 Normative spec: [`about-sevn.bot/specs/09-security-scanner.md`](../../about-sevn.bot/specs/09-security-scanner.md).
 

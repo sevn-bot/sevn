@@ -2,7 +2,7 @@
 id: spec-20-voice
 kind: spec
 title: Voice (STT / TTS) — Spec
-status: done
+status: draft
 owner: Alex
 summary: 'Own the provider-chain facades for speech-to-text and text-to-speech so
   the gateway can:'
@@ -143,30 +143,75 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Voice (STT / TTS) — Spec (spec-20-voice) — Purpose.
+Own the provider-chain facades for speech-to-text and text-to-speech so the gateway can:
 
+Primary code trees: [`src/sevn/voice`](src/sevn/voice/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Voice (STT / TTS) — Spec (spec-20-voice) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`EdgeTtsBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`KokoroBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`SpeechToTextBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`SynthesisResult`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`TextToSpeechBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`TranscriptionResult`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`WhisperCppBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`build_stt_backend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`build_tts_backend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`validate_voice_backend_tags`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`whisper_cpp_missing_prereqs`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`voice_http_base_url`](src/sevn/voice/egress.py) — `src/sevn/voice/egress.py`
+- _…and 27 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Voice (STT / TTS) — Spec (spec-20-voice) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`EdgeTtsBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`KokoroBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`SpeechToTextBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`SynthesisResult`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`TextToSpeechBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`TranscriptionResult`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`WhisperCppBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`build_stt_backend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`build_tts_backend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`validate_voice_backend_tags`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`whisper_cpp_missing_prereqs`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`voice_http_base_url`](src/sevn/voice/egress.py) — `src/sevn/voice/egress.py`
+- _…and 27 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Voice (STT / TTS) — Spec (spec-20-voice) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/voice`](src/sevn/voice/__init__.py).
 ## Behavior
 
-Offline scaffold for Voice (STT / TTS) — Spec (spec-20-voice) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/voice`](src/sevn/voice/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Voice (STT / TTS) — Spec (spec-20-voice) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Offline scaffold for Voice (STT / TTS) — Spec (spec-20-voice) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

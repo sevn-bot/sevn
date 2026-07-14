@@ -2,7 +2,7 @@
 id: spec-31-memory-dreaming
 kind: spec
 title: Memory — Dreaming — Spec
-status: done
+status: draft
 owner: Alex
 summary: Provide scored consolidation from short-term recall signals into curated
   long-term prose (MEMORY.md) on a daily (configurable) cadence, without mutating
@@ -123,30 +123,75 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Memory — Dreaming — Spec (spec-31-memory-dreaming) — Purpose.
+Provide scored consolidation from short-term recall signals into curated long-term prose (MEMORY.md) on a daily (configurable) cadence, without mutating LCM tables or crossing into Second Brain (wiki/
 
+Primary code trees: [`src/sevn/memory/dreaming`](src/sevn/memory/dreaming/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Memory — Dreaming — Spec (spec-31-memory-dreaming) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`format_ack_required_trace_attrs`](src/sevn/memory/dreaming/ack_policy.py) — `src/sevn/memory/dreaming/ack_policy.py`
+- [`iter_backfill_dates`](src/sevn/memory/dreaming/backfill.py) — `src/sevn/memory/dreaming/backfill.py`
+- [`DreamingEngine`](src/sevn/memory/dreaming/engine.py) — `src/sevn/memory/dreaming/engine.py`
+- [`content_has_llmignore_provenance`](src/sevn/memory/dreaming/filters.py) — `src/sevn/memory/dreaming/filters.py`
+- [`lcm_channel_allows_dreaming`](src/sevn/memory/dreaming/filters.py) — `src/sevn/memory/dreaming/filters.py`
+- [`session_allows_dreaming`](src/sevn/memory/dreaming/filters.py) — `src/sevn/memory/dreaming/filters.py`
+- [`DreamingCandidate`](src/sevn/memory/dreaming/models.py) — `src/sevn/memory/dreaming/models.py`
+- [`DreamingRunResult`](src/sevn/memory/dreaming/models.py) — `src/sevn/memory/dreaming/models.py`
+- [`MemoryMdAnchor`](src/sevn/memory/dreaming/models.py) — `src/sevn/memory/dreaming/models.py`
+- [`PromotedBatchManifest`](src/sevn/memory/dreaming/models.py) — `src/sevn/memory/dreaming/models.py`
+- [`PromotedManifestRow`](src/sevn/memory/dreaming/models.py) — `src/sevn/memory/dreaming/models.py`
+- [`append_dreams_diary`](src/sevn/memory/dreaming/promoter.py) — `src/sevn/memory/dreaming/promoter.py`
+- _…and 19 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Memory — Dreaming — Spec (spec-31-memory-dreaming) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`format_ack_required_trace_attrs`](src/sevn/memory/dreaming/ack_policy.py) — `src/sevn/memory/dreaming/ack_policy.py`
+- [`iter_backfill_dates`](src/sevn/memory/dreaming/backfill.py) — `src/sevn/memory/dreaming/backfill.py`
+- [`DreamingEngine`](src/sevn/memory/dreaming/engine.py) — `src/sevn/memory/dreaming/engine.py`
+- [`content_has_llmignore_provenance`](src/sevn/memory/dreaming/filters.py) — `src/sevn/memory/dreaming/filters.py`
+- [`lcm_channel_allows_dreaming`](src/sevn/memory/dreaming/filters.py) — `src/sevn/memory/dreaming/filters.py`
+- [`session_allows_dreaming`](src/sevn/memory/dreaming/filters.py) — `src/sevn/memory/dreaming/filters.py`
+- [`DreamingCandidate`](src/sevn/memory/dreaming/models.py) — `src/sevn/memory/dreaming/models.py`
+- [`DreamingRunResult`](src/sevn/memory/dreaming/models.py) — `src/sevn/memory/dreaming/models.py`
+- [`MemoryMdAnchor`](src/sevn/memory/dreaming/models.py) — `src/sevn/memory/dreaming/models.py`
+- [`PromotedBatchManifest`](src/sevn/memory/dreaming/models.py) — `src/sevn/memory/dreaming/models.py`
+- [`PromotedManifestRow`](src/sevn/memory/dreaming/models.py) — `src/sevn/memory/dreaming/models.py`
+- [`append_dreams_diary`](src/sevn/memory/dreaming/promoter.py) — `src/sevn/memory/dreaming/promoter.py`
+- _…and 19 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Memory — Dreaming — Spec (spec-31-memory-dreaming) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/memory/dreaming`](src/sevn/memory/dreaming/__init__.py).
 ## Behavior
 
-Offline scaffold for Memory — Dreaming — Spec (spec-31-memory-dreaming) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/memory/dreaming`](src/sevn/memory/dreaming/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Memory — Dreaming — Spec (spec-31-memory-dreaming) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Offline scaffold for Memory — Dreaming — Spec (spec-31-memory-dreaming) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

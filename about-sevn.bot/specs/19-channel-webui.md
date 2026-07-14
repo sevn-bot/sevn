@@ -2,7 +2,7 @@
 id: spec-19-channel-webui
 kind: spec
 title: Channel — Web UI — Spec
-status: done
+status: draft
 owner: Alex
 summary: 'Deliver the browser conversational surface required by prd-01-conversational-experience
   §5.1: owner-only WebSocket chat, static SPA shell, and session continuity with Telegram
@@ -427,30 +427,75 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Channel — Web UI — Spec (spec-19-channel-webui) — Purpose.
+Deliver the browser conversational surface required by prd-01-conversational-experience §5.1: owner-only WebSocket chat, static SPA shell, and session continuity with Telegram via the shared SessionMa
 
+Primary code trees: [`src/sevn/channels`](src/sevn/channels/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Channel — Web UI — Spec (spec-19-channel-webui) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`PlatformChannelConfig`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`busy_input_mode_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`channel_blob`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`dm_policy_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`platform_config_from_workspace`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`session_reset_policy_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`resolve_dispatcher_overflow_callback_data`](src/sevn/channels/callback_overflow.py) — `src/sevn/channels/callback_overflow.py`
+- [`telegram_callback_data_utf8_len`](src/sevn/channels/callback_overflow.py) — `src/sevn/channels/callback_overflow.py`
+- [`tokenize_inline_keyboard_callback_data`](src/sevn/channels/callback_overflow.py) — `src/sevn/channels/callback_overflow.py`
+- [`DiscordChannelAdapter`](src/sevn/channels/discord.py) — `src/sevn/channels/discord.py`
+- [`escape_intent_footer`](src/sevn/channels/markdown_safe.py) — `src/sevn/channels/markdown_safe.py`
+- [`escape_markdown_v2`](src/sevn/channels/markdown_safe.py) — `src/sevn/channels/markdown_safe.py`
+- _…and 123 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Channel — Web UI — Spec (spec-19-channel-webui) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`PlatformChannelConfig`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`busy_input_mode_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`channel_blob`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`dm_policy_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`platform_config_from_workspace`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`session_reset_policy_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`resolve_dispatcher_overflow_callback_data`](src/sevn/channels/callback_overflow.py) — `src/sevn/channels/callback_overflow.py`
+- [`telegram_callback_data_utf8_len`](src/sevn/channels/callback_overflow.py) — `src/sevn/channels/callback_overflow.py`
+- [`tokenize_inline_keyboard_callback_data`](src/sevn/channels/callback_overflow.py) — `src/sevn/channels/callback_overflow.py`
+- [`DiscordChannelAdapter`](src/sevn/channels/discord.py) — `src/sevn/channels/discord.py`
+- [`escape_intent_footer`](src/sevn/channels/markdown_safe.py) — `src/sevn/channels/markdown_safe.py`
+- [`escape_markdown_v2`](src/sevn/channels/markdown_safe.py) — `src/sevn/channels/markdown_safe.py`
+- _…and 123 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Channel — Web UI — Spec (spec-19-channel-webui) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/channels`](src/sevn/channels/__init__.py).
 ## Behavior
 
-Offline scaffold for Channel — Web UI — Spec (spec-19-channel-webui) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/channels`](src/sevn/channels/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Channel — Web UI — Spec (spec-19-channel-webui) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Offline scaffold for Channel — Web UI — Spec (spec-19-channel-webui) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

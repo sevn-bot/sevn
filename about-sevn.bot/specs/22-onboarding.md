@@ -2,13 +2,13 @@
 id: spec-22-onboarding
 kind: spec
 title: Onboarding — Spec
-status: done
+status: draft
 owner: Alex
 summary: 'Deliver the merge + validation + promotion pipeline every setup path shares
   so sevn.json stays the single source of truth (prd-06-setup-and-operations §5.4,
   spec-02-config-and-workspace): shipped pres'
-last_updated: '2026-07-12'
-fingerprint: sha256:a64e8fc77699166f4514ab0c9c9196e250b68b4e1f28ac641607a7745c29139e
+last_updated: '2026-07-14'
+fingerprint: sha256:8c1707baf254d04a7d4b4bc933c1fc054358a5b2185b1bddf6ae400bf01c24d3
 related: []
 sources:
 - src/sevn/onboarding/**
@@ -565,28 +565,72 @@ prd_profile: null
 
 ## Purpose
 
-Offline scaffold for Onboarding — Spec (spec-22-onboarding) — Purpose.
+Deliver the merge + validation + promotion pipeline every setup path shares so sevn.json stays the single source of truth (prd-06-setup-and-operations §5.4, spec-02-config-and-workspace): shipped pres
 
+Primary code trees: [`src/sevn/onboarding`](src/sevn/onboarding/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Onboarding — Spec (spec-22-onboarding) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`BrowserSession`](src/sevn/onboarding/browser_automation.py) — `src/sevn/onboarding/browser_automation.py`
+- [`BrowserStartRequest`](src/sevn/onboarding/browser_automation.py) — `src/sevn/onboarding/browser_automation.py`
+- [`get_browser_session`](src/sevn/onboarding/browser_automation.py) — `src/sevn/onboarding/browser_automation.py`
+- [`register_shutdown_hooks`](src/sevn/onboarding/browser_automation.py) — `src/sevn/onboarding/browser_automation.py`
+- [`reset_browser_session_for_tests`](src/sevn/onboarding/browser_automation.py) — `src/sevn/onboarding/browser_automation.py`
+- [`resolve_start_request`](src/sevn/onboarding/browser_automation.py) — `src/sevn/onboarding/browser_automation.py`
+- [`stop_browser_on_shutdown`](src/sevn/onboarding/browser_automation.py) — `src/sevn/onboarding/browser_automation.py`
+- [`CapabilityEntry`](src/sevn/onboarding/capabilities_manifest.py) — `src/sevn/onboarding/capabilities_manifest.py`
+- [`CapabilityGroup`](src/sevn/onboarding/capabilities_manifest.py) — `src/sevn/onboarding/capabilities_manifest.py`
+- [`CapabilityManifest`](src/sevn/onboarding/capabilities_manifest.py) — `src/sevn/onboarding/capabilities_manifest.py`
+- [`GroupWithCapabilities`](src/sevn/onboarding/capabilities_manifest.py) — `src/sevn/onboarding/capabilities_manifest.py`
+- [`InstallAction`](src/sevn/onboarding/capabilities_manifest.py) — `src/sevn/onboarding/capabilities_manifest.py`
+- _…and 168 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Onboarding — Spec (spec-22-onboarding) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`BrowserSession`](src/sevn/onboarding/browser_automation.py) — `src/sevn/onboarding/browser_automation.py`
+- [`BrowserStartRequest`](src/sevn/onboarding/browser_automation.py) — `src/sevn/onboarding/browser_automation.py`
+- [`get_browser_session`](src/sevn/onboarding/browser_automation.py) — `src/sevn/onboarding/browser_automation.py`
+- [`register_shutdown_hooks`](src/sevn/onboarding/browser_automation.py) — `src/sevn/onboarding/browser_automation.py`
+- [`reset_browser_session_for_tests`](src/sevn/onboarding/browser_automation.py) — `src/sevn/onboarding/browser_automation.py`
+- [`resolve_start_request`](src/sevn/onboarding/browser_automation.py) — `src/sevn/onboarding/browser_automation.py`
+- [`stop_browser_on_shutdown`](src/sevn/onboarding/browser_automation.py) — `src/sevn/onboarding/browser_automation.py`
+- [`CapabilityEntry`](src/sevn/onboarding/capabilities_manifest.py) — `src/sevn/onboarding/capabilities_manifest.py`
+- [`CapabilityGroup`](src/sevn/onboarding/capabilities_manifest.py) — `src/sevn/onboarding/capabilities_manifest.py`
+- [`CapabilityManifest`](src/sevn/onboarding/capabilities_manifest.py) — `src/sevn/onboarding/capabilities_manifest.py`
+- [`GroupWithCapabilities`](src/sevn/onboarding/capabilities_manifest.py) — `src/sevn/onboarding/capabilities_manifest.py`
+- [`InstallAction`](src/sevn/onboarding/capabilities_manifest.py) — `src/sevn/onboarding/capabilities_manifest.py`
+- _…and 168 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Onboarding — Spec (spec-22-onboarding) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/onboarding`](src/sevn/onboarding/__init__.py).
 ## Behavior
 
-Offline scaffold for Onboarding — Spec (spec-22-onboarding) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/onboarding`](src/sevn/onboarding/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Onboarding — Spec (spec-22-onboarding) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Offline scaffold for Onboarding — Spec (spec-22-onboarding) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

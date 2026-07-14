@@ -2,7 +2,7 @@
 id: spec-21-executor-tier-cd
 kind: spec
 title: Executor tier C/D — Spec
-status: done
+status: draft
 owner: Alex
 summary: 'Tier C/D is the planned-work executor for messages the Triager classifies
   as complexity == C or complexity == D (prd-04-getting-things-done §5.3–§5.4): structured
@@ -110,36 +110,105 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Executor tier C/D — Spec (spec-21-executor-tier-cd) — Purpose.
+Tier C/D is the planned-work executor for messages the Triager classifies as complexity == C or complexity == D (prd-04-getting-things-done §5.3–§5.4): structured planning, optional owner approval (Pl
 
+Primary code trees: [`src/sevn/coding_agents`](src/sevn/coding_agents/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Executor tier C/D — Spec (spec-21-executor-tier-cd) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`EvaluatorResult`](src/sevn/coding_agents/alrca/evaluator.py) — `src/sevn/coding_agents/alrca/evaluator.py`
+- [`NullEvaluator`](src/sevn/coding_agents/alrca/evaluator.py) — `src/sevn/coding_agents/alrca/evaluator.py`
+- [`evaluate_turn`](src/sevn/coding_agents/alrca/evaluator.py) — `src/sevn/coding_agents/alrca/evaluator.py`
+- [`GoalContract`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`GoalStatus`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`list_goals`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`load_goal`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`new_goal`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`save_goal`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`ALRCALoopWorker`](src/sevn/coding_agents/alrca/loop_worker.py) — `src/sevn/coding_agents/alrca/loop_worker.py`
+- [`LoopResult`](src/sevn/coding_agents/alrca/loop_worker.py) — `src/sevn/coding_agents/alrca/loop_worker.py`
+- [`run_alrca_loop`](src/sevn/coding_agents/alrca/loop_worker.py) — `src/sevn/coding_agents/alrca/loop_worker.py`
+- _…and 16 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Executor tier C/D — Spec (spec-21-executor-tier-cd) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`EvaluatorResult`](src/sevn/coding_agents/alrca/evaluator.py) — `src/sevn/coding_agents/alrca/evaluator.py`
+- [`NullEvaluator`](src/sevn/coding_agents/alrca/evaluator.py) — `src/sevn/coding_agents/alrca/evaluator.py`
+- [`evaluate_turn`](src/sevn/coding_agents/alrca/evaluator.py) — `src/sevn/coding_agents/alrca/evaluator.py`
+- [`GoalContract`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`GoalStatus`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`list_goals`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`load_goal`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`new_goal`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`save_goal`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`ALRCALoopWorker`](src/sevn/coding_agents/alrca/loop_worker.py) — `src/sevn/coding_agents/alrca/loop_worker.py`
+- [`LoopResult`](src/sevn/coding_agents/alrca/loop_worker.py) — `src/sevn/coding_agents/alrca/loop_worker.py`
+- [`run_alrca_loop`](src/sevn/coding_agents/alrca/loop_worker.py) — `src/sevn/coding_agents/alrca/loop_worker.py`
+- _…and 16 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Executor tier C/D — Spec (spec-21-executor-tier-cd) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/coding_agents`](src/sevn/coding_agents/__init__.py).
 ## Behavior
 
-Offline scaffold for Executor tier C/D — Spec (spec-21-executor-tier-cd) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/coding_agents`](src/sevn/coding_agents/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Executor tier C/D — Spec (spec-21-executor-tier-cd) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Amendments (spec-36-sub-agents)
 
 Tier C/D executor runs register as **level-1** sub-agents where the turn spine wraps
 them (`src/sevn/gateway/agent_turn.py`). `spawn_subagent` is available where the
 tier tool registry allows (D1/D9).
 
+## Implemented by
+
+- [`EvaluatorResult`](src/sevn/coding_agents/alrca/evaluator.py) — `src/sevn/coding_agents/alrca/evaluator.py`
+- [`NullEvaluator`](src/sevn/coding_agents/alrca/evaluator.py) — `src/sevn/coding_agents/alrca/evaluator.py`
+- [`evaluate_turn`](src/sevn/coding_agents/alrca/evaluator.py) — `src/sevn/coding_agents/alrca/evaluator.py`
+- [`GoalContract`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`GoalStatus`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`list_goals`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`load_goal`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`new_goal`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`save_goal`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`ALRCALoopWorker`](src/sevn/coding_agents/alrca/loop_worker.py) — `src/sevn/coding_agents/alrca/loop_worker.py`
+- [`LoopResult`](src/sevn/coding_agents/alrca/loop_worker.py) — `src/sevn/coding_agents/alrca/loop_worker.py`
+- [`run_alrca_loop`](src/sevn/coding_agents/alrca/loop_worker.py) — `src/sevn/coding_agents/alrca/loop_worker.py`
+- [`BuiltinVerifierKind`](src/sevn/coding_agents/alrca/verifiers/base.py) — `src/sevn/coding_agents/alrca/verifiers/base.py`
+- [`VerifierResult`](src/sevn/coding_agents/alrca/verifiers/base.py) — `src/sevn/coding_agents/alrca/verifiers/base.py`
+- [`build_verifier`](src/sevn/coding_agents/alrca/verifiers/base.py) — `src/sevn/coding_agents/alrca/verifiers/base.py`
+- [`run_verifier_spec`](src/sevn/coding_agents/alrca/verifiers/base.py) — `src/sevn/coding_agents/alrca/verifiers/base.py`
+- [`list_all_runs`](src/sevn/coding_agents/artifacts/vault.py) — `src/sevn/coding_agents/artifacts/vault.py`
+- [`list_run_artifacts`](src/sevn/coding_agents/artifacts/vault.py) — `src/sevn/coding_agents/artifacts/vault.py`
+- [`read_artifact`](src/sevn/coding_agents/artifacts/vault.py) — `src/sevn/coding_agents/artifacts/vault.py`
+- [`write_artifact`](src/sevn/coding_agents/artifacts/vault.py) — `src/sevn/coding_agents/artifacts/vault.py`
+- _…and 8 more in frontmatter `interfaces:`._
+
 ## Test Strategy
 
-Offline scaffold for Executor tier C/D — Spec (spec-21-executor-tier-cd) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

@@ -2,13 +2,13 @@
 id: spec-25-cicd-full
 kind: spec
 title: CI/CD (mature pipeline) — Spec
-status: done
+status: draft
 owner: Alex
 summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict delivery
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
 last_updated: '2026-07-14'
-fingerprint: sha256:14321ed66ec142cbdbe3e6b1997b1f5602ef37ba9f11981c04b64afc8125255f
+fingerprint: sha256:e2330af09eea07c3e08e55506b1cedf6c1b75f79d5a3a0a216b3c3d766491518
 related: []
 sources:
 - src/sevn/**
@@ -5752,6 +5752,21 @@ interfaces:
 - name: upsert_entry
   file: src/sevn/docs/readme/fingerprint.py
   symbol: upsert_entry
+- name: glob_dir_prefix
+  file: src/sevn/docs/readme/glob_paths.py
+  symbol: glob_dir_prefix
+- name: glob_to_pathspec
+  file: src/sevn/docs/readme/glob_paths.py
+  symbol: glob_to_pathspec
+- name: L2ProsePolicy
+  file: src/sevn/docs/readme/l2_prose.py
+  symbol: L2ProsePolicy
+- name: build_level2_how_it_works
+  file: src/sevn/docs/readme/l2_prose.py
+  symbol: build_level2_how_it_works
+- name: build_level3_deep_dive
+  file: src/sevn/docs/readme/l3_prose.py
+  symbol: build_level3_deep_dive
 - name: readme_relative_href
   file: src/sevn/docs/readme/links.py
   symbol: readme_relative_href
@@ -5782,24 +5797,69 @@ interfaces:
 - name: format_module_symbols_for_prompt
   file: src/sevn/docs/readme/model.py
   symbol: format_module_symbols_for_prompt
-- name: format_path_list
-  file: src/sevn/docs/readme/model.py
-  symbol: format_path_list
 - name: merge_section
   file: src/sevn/docs/readme/model.py
   symbol: merge_section
 - name: offline_sections
   file: src/sevn/docs/readme/model.py
   symbol: offline_sections
-- name: truncate_at_sentence
-  file: src/sevn/docs/readme/model.py
-  symbol: truncate_at_sentence
+- name: ModuleIndex
+  file: src/sevn/docs/readme/module_index.py
+  symbol: ModuleIndex
+- name: build_module_indexes
+  file: src/sevn/docs/readme/module_index.py
+  symbol: build_module_indexes
+- name: parse_module_index
+  file: src/sevn/docs/readme/module_index.py
+  symbol: parse_module_index
+- name: build_level1_overview
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: build_level1_overview
+- name: build_subsystem_summary
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: build_subsystem_summary
+- name: catalog_items_with_hrefs
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: catalog_items_with_hrefs
+- name: offline_catalog_sections
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: offline_catalog_sections
+- name: offline_freeform_sections
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: offline_freeform_sections
+- name: offline_guide_sections
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: offline_guide_sections
+- name: offline_index_sections
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: offline_index_sections
+- name: offline_modules_catalog_sections
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: offline_modules_catalog_sections
+- name: offline_root_sections
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: offline_root_sections
+- name: offline_skills_catalog_sections
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: offline_skills_catalog_sections
+- name: offline_subsystem_sections
+  file: src/sevn/docs/readme/offline_sections.py
+  symbol: offline_subsystem_sections
 - name: ProfileSchema
   file: src/sevn/docs/readme/profile_schemas.py
   symbol: ProfileSchema
 - name: get_profile_schema
   file: src/sevn/docs/readme/profile_schemas.py
   symbol: get_profile_schema
+- name: module_docstring_prose
+  file: src/sevn/docs/readme/prose.py
+  symbol: module_docstring_prose
+- name: rewrite_design_doc_refs
+  file: src/sevn/docs/readme/prose.py
+  symbol: rewrite_design_doc_refs
+- name: strip_inline_code
+  file: src/sevn/docs/readme/prose.py
+  symbol: strip_inline_code
 - name: LlmProvider
   file: src/sevn/docs/readme/providers.py
   symbol: LlmProvider
@@ -5839,6 +5899,9 @@ interfaces:
 - name: scaffold_readme_tree
   file: src/sevn/docs/readme/scaffold.py
   symbol: scaffold_readme_tree
+- name: ScanContext
+  file: src/sevn/docs/readme/scan_context.py
+  symbol: ScanContext
 - name: extract_module_symbols
   file: src/sevn/docs/readme/scanner.py
   symbol: extract_module_symbols
@@ -5848,6 +5911,9 @@ interfaces:
 - name: scan_repo_context
   file: src/sevn/docs/readme/scanner.py
   symbol: scan_repo_context
+- name: symbol_lineno_for_module
+  file: src/sevn/docs/readme/scanner.py
+  symbol: symbol_lineno_for_module
 - name: ReadmePipelineSettings
   file: src/sevn/docs/readme/settings.py
   symbol: ReadmePipelineSettings
@@ -5860,15 +5926,33 @@ interfaces:
 - name: resolve_readme_settings
   file: src/sevn/docs/readme/settings.py
   symbol: resolve_readme_settings
+- name: callable_name_in_file
+  file: src/sevn/docs/readme/symbol_refs.py
+  symbol: callable_name_in_file
+- name: extract_curated_prose_section
+  file: src/sevn/docs/readme/symbol_refs.py
+  symbol: extract_curated_prose_section
 - name: extract_level3_section
   file: src/sevn/docs/readme/symbol_refs.py
   symbol: extract_level3_section
+- name: function_defined_in_file
+  file: src/sevn/docs/readme/symbol_refs.py
+  symbol: function_defined_in_file
+- name: symbol_defined_in_file
+  file: src/sevn/docs/readme/symbol_refs.py
+  symbol: symbol_defined_in_file
 - name: validate_path_refs
   file: src/sevn/docs/readme/symbol_refs.py
   symbol: validate_path_refs
 - name: validate_symbol_refs
   file: src/sevn/docs/readme/symbol_refs.py
   symbol: validate_symbol_refs
+- name: SymbolRecord
+  file: src/sevn/docs/readme/symbols.py
+  symbol: SymbolRecord
+- name: symbol_names
+  file: src/sevn/docs/readme/symbols.py
+  symbol: symbol_names
 - name: Heading
   file: src/sevn/docs/readme/templates.py
   symbol: Heading
@@ -5884,6 +5968,24 @@ interfaces:
 - name: validate_against_template
   file: src/sevn/docs/readme/templates.py
   symbol: validate_against_template
+- name: first_sentence
+  file: src/sevn/docs/readme/text_utils.py
+  symbol: first_sentence
+- name: format_path_list
+  file: src/sevn/docs/readme/text_utils.py
+  symbol: format_path_list
+- name: role_from_summary
+  file: src/sevn/docs/readme/text_utils.py
+  symbol: role_from_summary
+- name: truncate_at_sentence
+  file: src/sevn/docs/readme/text_utils.py
+  symbol: truncate_at_sentence
+- name: SummaryLintFinding
+  file: src/sevn/docs/readme/verify.py
+  symbol: SummaryLintFinding
+- name: lint_summaries
+  file: src/sevn/docs/readme/verify.py
+  symbol: lint_summaries
 - name: EvolutionApproval
   file: src/sevn/evolution/approvals.py
   symbol: EvolutionApproval
@@ -11981,28 +12083,70 @@ prd_profile: null
 
 ## Purpose
 
-Offline scaffold for CI/CD (mature pipeline) — Spec (spec-25-cicd-full) — Purpose.
+Grow spec-00-foundation’s minimal verify loop into a phase-strict delivery pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox (and any ASGI image built for spec-07-egr
 
+Implementation spans [`src/sevn`](src/sevn/__init__.py), `wave-orchestrator/` (gitignored local operator tree when present), and [`.github/workflows/ci.yml`](.github/workflows/ci.yml). The frontmatter `interfaces:` block is code-owned (refresh with `make about-docs-extract DOC_ID=spec-25-cicd-full`).
+
+<!-- HUMAN-INPUT[owner=operator]: Author the full normative contract for this mega-spec — do not hand-expand the whole-tree interfaces dump. -->
 ## Public Interface
 
-Offline scaffold for CI/CD (mature pipeline) — Spec (spec-25-cicd-full) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`default_codemode_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
+- [`install_monty_resource_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
+- [`lambda_rlm_filter`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
+- [`to_dspy_tools`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
+- [`EgressBridgeContext`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`build_sevn_anthropic_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`build_sevn_httpx_event_hooks`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`build_sevn_openai_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`redact_httpx_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`redact_llm_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`redact_proxy_transport_request`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`resolve_proxy_shared_secret`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- _…and 3973 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for CI/CD (mature pipeline) — Spec (spec-25-cicd-full) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`default_codemode_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
+- [`install_monty_resource_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
+- [`lambda_rlm_filter`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
+- [`to_dspy_tools`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
+- [`EgressBridgeContext`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`build_sevn_anthropic_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`build_sevn_httpx_event_hooks`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`build_sevn_openai_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`redact_httpx_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`redact_llm_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`redact_proxy_transport_request`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`resolve_proxy_shared_secret`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- _…and 3973 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for CI/CD (mature pipeline) — Spec (spec-25-cicd-full) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn`](src/sevn/__init__.py), `wave-orchestrator/`, [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 ## Behavior
 
-Offline scaffold for CI/CD (mature pipeline) — Spec (spec-25-cicd-full) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn`](src/sevn/__init__.py), `wave-orchestrator/`, and [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 ## Failure Modes
 
-Offline scaffold for CI/CD (mature pipeline) — Spec (spec-25-cicd-full) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Offline scaffold for CI/CD (mature pipeline) — Spec (spec-25-cicd-full) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

@@ -2,7 +2,7 @@
 id: spec-03-storage
 kind: spec
 title: Storage — Spec
-status: done
+status: draft
 owner: Alex
 summary: 'Own application persistence: connection setup (WAL, foreign keys), versioned
   migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence
@@ -72,36 +72,100 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Storage — Spec (spec-03-storage) — Purpose.
+Own application persistence: connection setup (WAL, foreign keys), versioned migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence contracts for crash-resume and (w
 
+Primary code trees: [`src/sevn/storage`](src/sevn/storage/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Storage — Spec (spec-03-storage) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`D1Backend`](src/sevn/storage/d1.py) — `src/sevn/storage/d1.py`
+- [`D1BackendConfig`](src/sevn/storage/d1_backend.py) — `src/sevn/storage/d1_backend.py`
+- [`D1StorageBackend`](src/sevn/storage/d1_backend.py) — `src/sevn/storage/d1_backend.py`
+- [`MigrationError`](src/sevn/storage/errors.py) — `src/sevn/storage/errors.py`
+- [`StorageError`](src/sevn/storage/errors.py) — `src/sevn/storage/errors.py`
+- [`apply_migrations`](src/sevn/storage/migrate.py) — `src/sevn/storage/migrate.py`
+- [`is_turn_bundle_day_slug`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`sevn_db_path`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`traces_sqlite_path`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`turn_bundle_day_dir`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`turn_bundle_day_slug`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`turn_bundle_file_path`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- _…and 4 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Storage — Spec (spec-03-storage) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`D1Backend`](src/sevn/storage/d1.py) — `src/sevn/storage/d1.py`
+- [`D1BackendConfig`](src/sevn/storage/d1_backend.py) — `src/sevn/storage/d1_backend.py`
+- [`D1StorageBackend`](src/sevn/storage/d1_backend.py) — `src/sevn/storage/d1_backend.py`
+- [`MigrationError`](src/sevn/storage/errors.py) — `src/sevn/storage/errors.py`
+- [`StorageError`](src/sevn/storage/errors.py) — `src/sevn/storage/errors.py`
+- [`apply_migrations`](src/sevn/storage/migrate.py) — `src/sevn/storage/migrate.py`
+- [`is_turn_bundle_day_slug`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`sevn_db_path`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`traces_sqlite_path`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`turn_bundle_day_dir`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`turn_bundle_day_slug`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`turn_bundle_file_path`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- _…and 4 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Storage — Spec (spec-03-storage) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/storage`](src/sevn/storage/__init__.py).
 ## Behavior
 
-Offline scaffold for Storage — Spec (spec-03-storage) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/storage`](src/sevn/storage/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Storage — Spec (spec-03-storage) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Amendments (spec-36-sub-agents)
 
 Adds `subagent_runs` table (migration 23) mirroring the in-memory registry for
 restart reconciliation, Mission Control recent history, and
 `sevn subagents list --all`. Boot orphan sweep marks stale `running` → `orphaned`.
 
+## Implemented by
+
+- [`D1Backend`](src/sevn/storage/d1.py) — `src/sevn/storage/d1.py`
+- [`D1BackendConfig`](src/sevn/storage/d1_backend.py) — `src/sevn/storage/d1_backend.py`
+- [`D1StorageBackend`](src/sevn/storage/d1_backend.py) — `src/sevn/storage/d1_backend.py`
+- [`MigrationError`](src/sevn/storage/errors.py) — `src/sevn/storage/errors.py`
+- [`StorageError`](src/sevn/storage/errors.py) — `src/sevn/storage/errors.py`
+- [`apply_migrations`](src/sevn/storage/migrate.py) — `src/sevn/storage/migrate.py`
+- [`is_turn_bundle_day_slug`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`sevn_db_path`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`traces_sqlite_path`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`turn_bundle_day_dir`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`turn_bundle_day_slug`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`turn_bundle_file_path`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`turn_bundle_index_path`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`turn_bundles_dir`](src/sevn/storage/paths.py) — `src/sevn/storage/paths.py`
+- [`connect_sqlite`](src/sevn/storage/sqlite.py) — `src/sevn/storage/sqlite.py`
+- [`open_sevn_sqlite`](src/sevn/storage/sqlite.py) — `src/sevn/storage/sqlite.py`
+
 ## Test Strategy
 
-Offline scaffold for Storage — Spec (spec-03-storage) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

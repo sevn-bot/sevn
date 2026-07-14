@@ -41,14 +41,15 @@ Telegram setup is part of the wizard/TUI credential step (`wizard_credentials.py
 
 After promote, finish linking in Telegram per [`18-channel-telegram`](../../about-sevn.bot/specs/18-channel-telegram.md) (owner `/start`, menu surfaces).
 
-### Profiles (`src/sevn/data/onboarding_profiles/`)
+### Profiles ([`src/sevn/data/onboarding_profiles/`](../../src/sevn/data/onboarding_profiles/))
 
-Presets ship as JSON fragments merged by `load_profile_fragment`:
+Presets ship as JSON fragments merged by [`load_profile_fragment`](../../src/sevn/onboarding/profiles.py#L146) ([`onboarding/profiles.py`](../../src/sevn/onboarding/profiles.py)):
 
 | Profile id | Intent |
 | --- | --- |
 | `full_free` | Balanced defaults for demos |
-| `good_value_osx` / `good_value_docker` | MiniMax M2.7 daily driver |
+| `openai_family` | LiteLLM routes biased to OpenAI-shaped models |
+| `good_value_osx` / `good_value_docker` / `good_value_docker_gui` | MiniMax M2.7 daily driver (headless Docker vs GUI/noVNC image) |
 | `best_agent` | Quality-first caps + browser/graphify |
 | `fastest` | Latency trim (LCM off) |
 | `ollama_local` | Local triager via Ollama |
@@ -74,7 +75,7 @@ By default **`--install-daemon`** installs gateway + proxy launchd/systemd units
 
 - **`sevn gateway start`** / daemon — run the control plane
 - **`sevn config validate`** — after manual `sevn.json` edits
-- **`sevn config show <section>`** — inspect a subtree
+- **`sevn config <slug>`** — inspect one config section (same slugs as Telegram `/config`; e.g. `sevn config gateway`)
 - **`sevn export-secrets`** / **`sevn onboard fast`** — bundle migration path
 
 ## References

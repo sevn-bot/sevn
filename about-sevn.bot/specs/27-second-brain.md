@@ -2,7 +2,7 @@
 id: spec-27-second-brain
 kind: spec
 title: Second Brain — Spec
-status: draft
+status: scaffold
 owner: Alex
 summary: 'Deliver the Second Brain subsystem: filesystem wiki engine + agent surface
   so operators curate sources in raw/ and maintain a structured wiki/ with index.md,
@@ -238,14 +238,35 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Second Brain — Spec (spec-27-second-brain) — Purpose.
+Deliver the Second Brain subsystem: filesystem wiki engine + agent surface so operators curate sources in raw/ and maintain a structured wiki/ with index.md, log.md, lint reports, and provenance-beari
 
+Primary code trees: [`src/sevn/second_brain`](src/sevn/second_brain/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Second Brain — Spec (spec-27-second-brain) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`legacy_native_second_brain_ingest_stub_enabled`](src/sevn/second_brain/__init__.py) — `src/sevn/second_brain/__init__.py`
+- [`register_second_brain_tools`](src/sevn/second_brain/__init__.py) — `src/sevn/second_brain/__init__.py`
+- [`second_brain_ingest_stub_tool`](src/sevn/second_brain/__init__.py) — `src/sevn/second_brain/__init__.py`
+- [`second_brain_query_tool`](src/sevn/second_brain/__init__.py) — `src/sevn/second_brain/__init__.py`
+- [`wiki_apply_tool`](src/sevn/second_brain/__init__.py) — `src/sevn/second_brain/__init__.py`
+- [`wiki_get_tool`](src/sevn/second_brain/__init__.py) — `src/sevn/second_brain/__init__.py`
+- [`wiki_lint_tool`](src/sevn/second_brain/__init__.py) — `src/sevn/second_brain/__init__.py`
+- [`wiki_search_tool`](src/sevn/second_brain/__init__.py) — `src/sevn/second_brain/__init__.py`
+- [`ensure_second_brain_scope_layout`](src/sevn/second_brain/bootstrap.py) — `src/sevn/second_brain/bootstrap.py`
+- [`SecondBrainError`](src/sevn/second_brain/errors.py) — `src/sevn/second_brain/errors.py`
+- [`SecondBrainMergeNeededError`](src/sevn/second_brain/errors.py) — `src/sevn/second_brain/errors.py`
+- [`SecondBrainPathError`](src/sevn/second_brain/errors.py) — `src/sevn/second_brain/errors.py`
+- _…and 56 more in frontmatter `interfaces:`._
 ## Data Model
 
 ### §5 Configuration
@@ -255,6 +276,30 @@ Offline scaffold for Second Brain — Spec (spec-27-second-brain) — Public Int
 | `second_brain.enabled` | Master toggle |
 | `second_brain.paths.vault` | Workspace-relative Obsidian vault folder (e.g. `obsidian/alex_AI`); unset → legacy layout |
 | `second_brain.paths.wiki` | **Read alias only** for `vault`; doctor warns; writes normalize to `vault` |
+
+## Implemented by
+
+- [`legacy_native_second_brain_ingest_stub_enabled`](src/sevn/second_brain/__init__.py) — `src/sevn/second_brain/__init__.py`
+- [`register_second_brain_tools`](src/sevn/second_brain/__init__.py) — `src/sevn/second_brain/__init__.py`
+- [`second_brain_ingest_stub_tool`](src/sevn/second_brain/__init__.py) — `src/sevn/second_brain/__init__.py`
+- [`second_brain_query_tool`](src/sevn/second_brain/__init__.py) — `src/sevn/second_brain/__init__.py`
+- [`wiki_apply_tool`](src/sevn/second_brain/__init__.py) — `src/sevn/second_brain/__init__.py`
+- [`wiki_get_tool`](src/sevn/second_brain/__init__.py) — `src/sevn/second_brain/__init__.py`
+- [`wiki_lint_tool`](src/sevn/second_brain/__init__.py) — `src/sevn/second_brain/__init__.py`
+- [`wiki_search_tool`](src/sevn/second_brain/__init__.py) — `src/sevn/second_brain/__init__.py`
+- [`ensure_second_brain_scope_layout`](src/sevn/second_brain/bootstrap.py) — `src/sevn/second_brain/bootstrap.py`
+- [`SecondBrainError`](src/sevn/second_brain/errors.py) — `src/sevn/second_brain/errors.py`
+- [`SecondBrainMergeNeededError`](src/sevn/second_brain/errors.py) — `src/sevn/second_brain/errors.py`
+- [`SecondBrainPathError`](src/sevn/second_brain/errors.py) — `src/sevn/second_brain/errors.py`
+- [`SecondBrainFetchError`](src/sevn/second_brain/fetch.py) — `src/sevn/second_brain/fetch.py`
+- [`fetch_url_to_raw`](src/sevn/second_brain/fetch.py) — `src/sevn/second_brain/fetch.py`
+- [`list_workspace_subdirs`](src/sevn/second_brain/folder_picker.py) — `src/sevn/second_brain/folder_picker.py`
+- [`normalise_browse_path`](src/sevn/second_brain/folder_picker.py) — `src/sevn/second_brain/folder_picker.py`
+- [`compose_page`](src/sevn/second_brain/frontmatter.py) — `src/sevn/second_brain/frontmatter.py`
+- [`dumps_frontmatter`](src/sevn/second_brain/frontmatter.py) — `src/sevn/second_brain/frontmatter.py`
+- [`missing_okf_type`](src/sevn/second_brain/frontmatter.py) — `src/sevn/second_brain/frontmatter.py`
+- [`normalise_agent_keys`](src/sevn/second_brain/frontmatter.py) — `src/sevn/second_brain/frontmatter.py`
+- _…and 48 more in frontmatter `interfaces:`._
 
 ## Internal Architecture
 
@@ -266,12 +311,18 @@ Bootstrap (`ensure_second_brain_scope_layout`) idempotently creates `raw/`, `wik
 
 ## Behavior
 
-Offline scaffold for Second Brain — Spec (spec-27-second-brain) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/second_brain`](src/sevn/second_brain/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Second Brain — Spec (spec-27-second-brain) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
 Unit tests under `tests/second_brain/` cover path resolution, bootstrap idempotency, config validation, CLI setup, Telegram menu captions, and onboarding capability manifest rows.
