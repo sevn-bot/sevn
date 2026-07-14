@@ -1,0 +1,66 @@
+# spec-kit-wave — per-project defaults (read by validate.py, render.py, Makefile)
+
+base = "test-pre"
+max_turns = 3
+
+[agent]
+bin = "cursor-agent"
+model = "auto"          # global default when no per-agent override matches
+# max_tokens = 8192     # optional; also accepts max_token_out
+# temperature = 0.2     # optional; surfaced in pipeline HTML (pass via extra_args if CLI lacks flag)
+# thinking = "medium"     # maps to claude --effort or cursor-agent model[effort=…]
+perms = "--force"
+plugin_dir = ""
+# extra_args = ["--some-flag", "value"]
+
+# Per-agent overrides (optional). Omit a table to inherit [agent] defaults.
+[agent.models.wave-runner]
+model = "auto"
+
+[agent.models.test-creator]
+model = "auto"
+
+[agent.models.reviewer]
+model = "auto"
+thinking = "high"
+
+[agent.models.post-review-wave-generator]
+model = "auto"
+
+[agent.models.wave-generator]
+model = "auto"
+
+[verify]
+make_only = true
+
+# Per-wave git policy: the LangGraph commit_wave node (D9) stages/commits/pushes
+# after each wave's agent state AND verify pass — not an agent prompt step.
+[git]
+commit_per_wave = true
+push_per_wave = true
+remote = "origin"
+
+[tracing]
+enabled = false
+
+[logging]
+enabled = false
+
+# Portable config seam for vendored skills (mattpocock/skills adoption, Wave 0).
+# Read by `skw render` (agents/prompts, via {context.*}) and by
+# scripts/context_paths.py (skills loaded raw by an IDE). Paths are never
+# hardcoded in a skill so the kit stays portable across host repos.
+[context]
+glossary      = "about-sevn.bot/GLOSSARY.md"      # domain / ubiquitous language; repo-root relative
+decisions_dir = "about-sevn.bot/decisions"        # ADRs, NNNN-*.md (non-published); repo-root relative
+
+[wayfinder]
+maps_dir      = "spec/{slug}/wayfinder"           # MAP.md + tickets/NNNN-<slug>.md; kit-relative
+
+# GitHub issue triage defaults (github-issue-triage skill; read via context_paths.py).
+[github]
+default_repo   = ""                               # empty = detect via `gh repo view`
+triage_policy  = "spec-kit-wave/skills/github-issue-triage/references/triage-policy.md"
+wave_plans_dir = ".ignorelocal/waves"
+contributing   = "CONTRIBUTING.md"
+security       = "SECURITY.md"
