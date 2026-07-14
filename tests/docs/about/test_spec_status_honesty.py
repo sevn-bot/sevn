@@ -87,7 +87,6 @@ def _write_repo_spec(tmp_path: Path, *, status: str, body: str) -> Path:
 
 
 @pytest.mark.parametrize("phrase", SCAFFOLD_PHRASES)
-@pytest.mark.xfail(reason="green after W8/W10: spec status honesty gate", strict=False)
 def test_done_status_with_scaffold_body_fails_check(tmp_path: Path, phrase: str) -> None:
     """D3/D5: ``status: done`` cannot coexist with scaffold placeholder prose."""
     _write_repo_spec(tmp_path, status="done", body=_scaffold_body(phrase))

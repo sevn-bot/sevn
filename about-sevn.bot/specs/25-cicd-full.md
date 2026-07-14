@@ -8,7 +8,7 @@ summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict de
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
 last_updated: '2026-07-14'
-fingerprint: sha256:4046eea79e99f21fdef5bd3ee60f2384aa6fecc4400df1e94da1766386c002b8
+fingerprint: sha256:7787ae99f21f4b6eb251be329d4a8aefc104abe3569f37a1ad6a8f97c0b237b2
 related: []
 sources:
 - .github/workflows/**
@@ -409,7 +409,7 @@ and docs/skills/infra checks that block regressions before merge.
 | `make ci-resume` / `make ci-reset` | Resumable / reset CI checkpoint |
 | `make ci-core` | lockcheck, lint, typecheck, pyright, test, doctest, security, build, doctor |
 | `make ci-infra` | config-schema, onboarding schemas, git guards, manifests |
-| `make ci-docs` | about-site, readme, changelog, telegram menu docs |
+| `make ci-docs` | about-site, readme, changelog, skw spec/prd gates, telegram menu docs |
 | `make ci-skills` | skillspector + skill inventory checks |
 | `make ci-parity` | code-index, deploy report parity |
 | `make ci-affected` / `make ci-changed` | Path-aware partial gates |
@@ -419,7 +419,8 @@ and docs/skills/infra checks that block regressions before merge.
 | `scripts/ci_resume.sh` | Ordered `CI_STEPS` driver |
 
 Docs tooling in scope: `src/sevn/docs/about/check.py` (`check_about_docs`),
-`make about-docs-check`, `make changelog-check`.
+`make about-docs-check` (chains `make spec-check` + `make prd-check`),
+`make changelog-check` (Keep a Changelog + Unreleased datestamp via `skw.changelog_validate`).
 
 ## Data Model
 
@@ -463,8 +464,8 @@ Wave agents: mid-wave **`make ci-affected`** only; wave boundary **`make ci`** o
 2. **`make lint`** / **`make typecheck`** — mandatory on Python changes.
 3. **`make test`** — full pytest; parallel via xdist unless `SEVN_PYTEST_JOBS=0`.
 4. **`make config-schema`** — JSON Schema vs fixture configs.
-5. **`make about-docs-check`** — about-sevn.bot doc integrity + frontmatter.
-6. **`make changelog-check`** — Keep a Changelog + datestamp rules (spec-kit-wave).
+5. **`make about-docs-check`** — about-sevn.bot doc integrity, status honesty, and skw folder gates (`spec-check`, `prd-check`).
+6. **`make changelog-check`** — Keep a Changelog + Unreleased datestamp rules (`skw.changelog_validate`).
 7. **`make ci-resume`** — stops at first failure; reruns skip passed steps (checkpoint not re-verifying earlier steps — finish with clean `make ci` before merge).
 
 ## Failure Modes
@@ -474,7 +475,7 @@ Wave agents: mid-wave **`make ci-affected`** only; wave boundary **`make ci`** o
 | Any CI step non-zero | `make ci` / Actions job red |
 | Checkpoint stale after early-step regression | Operator runs `make ci-reset` then full gate |
 | Schema drift | `make config-schema` fails |
-| Doc regression | `make about-docs-check` or `make readme-check` fails |
+| Doc regression | `make about-docs-check`, `make spec-check`, `make prd-check`, or `make readme-check` fails |
 | Git guard missing | `make check-git-guards` fails (blocks destructive clean) |
 
 ## Test Strategy
@@ -484,7 +485,5 @@ Wave agents: mid-wave **`make ci-affected`** only; wave boundary **`make ci`** o
 | `make ci` | Entire pipeline (~12–15 min) |
 | `make ci-resume` | Iterative final-wave fix loop |
 | `tests/docs/about/` | About-docs contracts |
-| `spec-kit-wave/tests/` | skw validators (W10 wires into ci-docs) |
+| `spec-kit-wave/tests/` | skw validators (`spec-check` / `prd-check` wired via `about-docs-check`) |
 | `.github/workflows/*.yml` | CI orchestration smoke on every push |
-
-Document new gates in this spec when W10 lands skw `spec-check` in `make about-docs-check`.

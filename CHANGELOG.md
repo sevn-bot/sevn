@@ -29,6 +29,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- [2026-07-14] `make about-docs-check` chains `make spec-check` and `make prd-check` so CI catches doc regressions; about-docs check rejects specs with `status: done` over scaffold placeholder bodies
 - [2026-07-14] Changelog validator canonical implementation lives in `spec-kit-wave/src/skw/changelog_validate.py`; `scripts/changelog_validate.py` is a shim
 
 - [2026-07-14] Authored code-true 7-section bodies for nine high-traffic specs (`00-foundation`, `01-system-overview`, `02-config-and-workspace`, `10-schema-ontology`, `11-tools-registry`, `13-rlm-triager`, `14-executor-tier-b`, `17-gateway`, `25-cicd-full`); remaining specs stay honestly `scaffold` with `## Human-input needed`
