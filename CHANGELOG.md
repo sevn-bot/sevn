@@ -16,6 +16,7 @@ are cut into a dated, versioned section at release time.
 - [2026-07-14] `docs-folder-author` agent (`.cursor/agents/` + `spec-kit-wave/agents/`) validates and updates whole `about-sevn.bot/specs/` or `about-sevn.bot/prd/` folders against code and template rules
 - [2026-07-14] Unreleased changelog bullets require a leading `[YYYY-MM-DD]` datestamp enforced by `make changelog-check`
 - [2026-07-14] Changelog templates, standards, and author skills under `spec-kit-wave/` document the datestamp contract
+- [2026-07-15] Gateway README Level 3 module inventory lists every gateway subpackage module with docstring prose and symbol anchors for operator and LLM readers
 
 - [2026-07-14] `skw docs sync` refreshes about-doc frontmatter and scaffolds missing PRD/spec files via `make spec-sync` and `make prd-sync`
 - [2026-07-13] `sevn dashboard set-login-password` stores the Mission Control owner password in the workspace secrets chain and stamps `dashboard.login_password` with a `${SECRET:…}` ref
@@ -34,6 +35,9 @@ are cut into a dated, versioned section at release time.
 - [2026-07-14] The about-docs generator no longer writes `interfaces`, `depends_on`, or `build_phase` into `kind: prd` frontmatter (spec-only keys; aligns with `skw prd-validate`)
 - [2026-07-14] `make about-docs-check` chains `make spec-check` and `make prd-check` so CI catches doc regressions; about-docs check rejects specs with `status: done` over scaffold placeholder bodies
 - [2026-07-14] Changelog validator canonical implementation lives in `spec-kit-wave/src/skw/changelog_validate.py`; `scripts/changelog_validate.py` is a shim
+- [2026-07-15] Gateway README Level 1–2 rewrite uses plain-language operator prose and links FastAPI on first mention for non-technical readers
+- [2026-07-15] Gateway package reorganized into 29 domain subpackages (85 modules moved, 10 core modules remain at `src/sevn/gateway/` root); import paths only with no runtime behavior change
+- [2026-07-15] `spec-kit-wave` modules and tests carry the full docstring schema with `<Examples:` sections required by `make doctest`
 
 - [2026-07-14] Authored code-true 7-section bodies for nine high-traffic specs (`00-foundation`, `01-system-overview`, `02-config-and-workspace`, `10-schema-ontology`, `11-tools-registry`, `13-rlm-triager`, `14-executor-tier-b`, `17-gateway`, `25-cicd-full`); remaining specs stay honestly `scaffold` with `## Human-input needed`
 - [2026-07-14] README L3 primary source tree lists every manifest ``source_globs`` root when multiple trees apply
@@ -59,6 +63,7 @@ are cut into a dated, versioned section at release time.
 ### Fixed
 
 - [2026-07-14] Bundled skill seeding skips `__pycache__` when copying packaged skills, avoiding parallel-test flakes on transient `.pyc` files
+- [2026-07-15] About-docs interface fingerprints refreshed for 20 PRD/spec files whose `sources` globs changed during the gateway subpackage reorg
 - [2026-07-14] Gateway telegram printing-press inline loader resolves bundled `_pp_cli.py` from the `sevn` package root after W12 subpackage moves; `ci-affected` doctest skips bundled skill script paths
 - [2026-07-14] `ci-affected` runs `make doctest` when more than 100 `src/sevn` files change, avoiding doctest context pollution from huge per-file pytest invocations on long-lived wave branches
 - [2026-07-14] Onboarding web and TUI wizards expose `gateway.queue_mode=multi` in capabilities (matches runtime and spec-36)
