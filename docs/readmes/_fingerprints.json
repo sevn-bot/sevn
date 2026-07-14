@@ -77,8 +77,8 @@
     },
     "onboarding": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T16:30:00Z",
-      "digest": "841d163cd4ae8845fd83583b159df6e81c1b84b5b57859ab4211dab6bf80b49d",
+      "computed_at": "2026-07-14T19:20:06Z",
+      "digest": "05f61f26d17b12827630cd9d29928f82730db86aaa1faadac52bd81118535263",
       "source_globs": [
         "src/sevn/onboarding/**",
         "src/sevn/cli/commands/onboard.py",
@@ -205,8 +205,8 @@
     },
     "ui-mission-control": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T16:07:33Z",
-      "digest": "815d492a6dafcae6ef81d25d5d9227cb50f23bf32018c77e5c9b4fe07c46c1d1",
+      "computed_at": "2026-07-14T19:20:06Z",
+      "digest": "45f0cff97e30021ca84fef55991c11869ead019793df02c81dabbfbf88c51c5c",
       "source_globs": [
         "src/sevn/ui/**"
       ]
