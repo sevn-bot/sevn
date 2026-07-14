@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Give implementers a single picture of the runtime before feature work: package
   boundaries under src/sevn/, allowed import directions, and the shared protocols
   that keep LLM wiring, observability, and '
-last_updated: '2026-07-13'
-fingerprint: sha256:826020741e93b626825430396223034f4abb43a673ff51fe84a14321a2e8872d
+last_updated: '2026-07-14'
+fingerprint: sha256:a309215f3cc785f1bf7fe3cd1a3e683fb22d85be15577fbd45c8edfcff5391a1
 related: []
 sources:
 - src/sevn/**
@@ -1982,6 +1982,9 @@ interfaces:
 - name: register
   file: src/sevn/cli/commands/dashboard_cmd.py
   symbol: register
+- name: register_set_login_password
+  file: src/sevn/cli/commands/dashboard_set_login_password.py
+  symbol: register_set_login_password
 - name: register
   file: src/sevn/cli/commands/deploy_cmd.py
   symbol: register
@@ -2180,6 +2183,12 @@ interfaces:
 - name: dashboard_http_failure
   file: src/sevn/cli/dashboard_api_client.py
   symbol: dashboard_http_failure
+- name: DashboardLoginPasswordStoreResult
+  file: src/sevn/cli/dashboard_login_password_store.py
+  symbol: DashboardLoginPasswordStoreResult
+- name: store_dashboard_login_password_local
+  file: src/sevn/cli/dashboard_login_password_store.py
+  symbol: store_dashboard_login_password_local
 - name: AgentRunReport
   file: src/sevn/cli/doctor/agent.py
   symbol: AgentRunReport
@@ -6551,6 +6560,9 @@ interfaces:
 - name: generate_gateway_token
   file: src/sevn/gateway/gateway_token.py
   symbol: generate_gateway_token
+- name: resolve_config_ref
+  file: src/sevn/gateway/gateway_token.py
+  symbol: resolve_config_ref
 - name: resolve_gateway_token_ref
   file: src/sevn/gateway/gateway_token.py
   symbol: resolve_gateway_token_ref
@@ -11420,6 +11432,15 @@ interfaces:
 - name: traces_query
   file: src/sevn/ui/dashboard/api/traces.py
   symbol: traces_query
+- name: generate_dashboard_login_password
+  file: src/sevn/ui/dashboard/dashboard_password.py
+  symbol: generate_dashboard_login_password
+- name: resolve_dashboard_login_password_ref
+  file: src/sevn/ui/dashboard/dashboard_password.py
+  symbol: resolve_dashboard_login_password_ref
+- name: validate_dashboard_login_password_plaintext
+  file: src/sevn/ui/dashboard/dashboard_password.py
+  symbol: validate_dashboard_login_password_plaintext
 - name: ActionDescriptor
   file: src/sevn/ui/dashboard/dashboard_schema.py
   symbol: ActionDescriptor

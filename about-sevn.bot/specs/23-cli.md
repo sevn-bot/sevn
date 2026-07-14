@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver the primary operator and automation surface for install, upgrades,
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
-last_updated: '2026-07-13'
-fingerprint: sha256:165529ae189c411c17c438e27ce2aef0e9b1b4f16367106317d3ac4c00124d79
+last_updated: '2026-07-14'
+fingerprint: sha256:7e32287435638b46610a9b6c987b35b3502c0039fe14c19351f17d55c40c1730
 related: []
 sources:
 - src/sevn/cli/**
@@ -63,6 +63,9 @@ interfaces:
 - name: register
   file: src/sevn/cli/commands/dashboard_cmd.py
   symbol: register
+- name: register_set_login_password
+  file: src/sevn/cli/commands/dashboard_set_login_password.py
+  symbol: register_set_login_password
 - name: register
   file: src/sevn/cli/commands/deploy_cmd.py
   symbol: register
@@ -261,6 +264,12 @@ interfaces:
 - name: dashboard_http_failure
   file: src/sevn/cli/dashboard_api_client.py
   symbol: dashboard_http_failure
+- name: DashboardLoginPasswordStoreResult
+  file: src/sevn/cli/dashboard_login_password_store.py
+  symbol: DashboardLoginPasswordStoreResult
+- name: store_dashboard_login_password_local
+  file: src/sevn/cli/dashboard_login_password_store.py
+  symbol: store_dashboard_login_password_local
 - name: AgentRunReport
   file: src/sevn/cli/doctor/agent.py
   symbol: AgentRunReport
