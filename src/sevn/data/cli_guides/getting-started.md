@@ -29,5 +29,6 @@ sevn guide doctor
 
 ## See also
 
-- `sevn guide config` — interactive config parity (coming in M2)
+- `sevn config` — interactive Textual section picker mirroring Telegram `/config` (`config_menu.py`)
+- `sevn guide config` — config guide (this doc's companion)
 - `specs/23-cli.md` — normative CLI contract

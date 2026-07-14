@@ -19,7 +19,7 @@ are cut into a dated, versioned section at release time.
 - Bundled skills, workspace templates, doctor solutions, docs site (`about-sevn.bot/`), readme pipeline (`docs/readmes/`), brand assets, and remaining test suites for the pre-0.0.1 migration import (I5)
 - Core runtime packages for the pre-0.0.1 migration import (config, storage, workspace, gateway, agent, security, proxy, and related tests)
 - Configurable Second Brain vault path via `second_brain.paths.vault` (CLI setup, Telegram `/config`, onboarding, doctor)
-- Witchcraft semantic reindex for the Second Brain vault via `sevn second-brain setup --reindex` and automatically at gateway boot
+- Witchcraft semantic reindex for the Second Brain vault via `sevn second-brain setup --reindex` and opt-in `witchcraft.reindex_on_startup` (default false)
 - Logfire trace export: `tracing.sinks[]` logfire sink with secrets-managed token, `sevn tracing` / `sevn config tracing` CLI, Telegram `/config → Logs` toggle and token form, and Mission Control ops endpoints
 - Sub-agents orchestration with level-1 role runs, level-2 workers and specialists, `multi` queue mode, Mission Control and Telegram kill surfaces, and `media_generation` skill via the `media_generator` specialist
 
@@ -65,7 +65,7 @@ First public release on [github.com/sevn-bot/sevn](https://github.com/sevn-bot/s
 
 ### Added
 
-- Multi-channel AI gateway (Telegram, Web UI, voice hooks) with tiered agent runtime
+- Multi-channel AI gateway (Telegram, Web UI) with tiered agent runtime
 - Paired egress proxy, secrets backends, Mission Control dashboard, and workspace memory
 - Onboarding wizard (`sevn onboard`), CLI, and `make setup` developer bootstrap
 - Full Python package under `src/sevn/` with CI via `make ci`
