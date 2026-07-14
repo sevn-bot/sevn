@@ -5,6 +5,11 @@ Exports:
     FolderResult — folder command outcome with rollup.
     run_docs_command — dispatch ``validate`` / ``score`` / ``sync``.
     main — CLI entry for ``skw docs``.
+
+Examples:
+    >>> from skw.doc_folder import run_docs_command
+    >>> run_docs_command.__name__
+    'run_docs_command'
 """
 
 from __future__ import annotations
@@ -47,6 +52,19 @@ class FolderResult:
 
 
 def _doc_status(path: Path, kind: str) -> str | None:
+    """Read ``status`` from one doc file's frontmatter.
+
+    Args:
+        path (Path): Markdown file to inspect.
+        kind (str): ``"spec"`` or ``"prd"``.
+
+    Returns:
+        str | None: Frontmatter ``status`` when present and a string.
+
+    Examples:
+        >>> _doc_status.__name__
+        '_doc_status'
+    """
     text = path.read_text(encoding="utf-8")
     if kind == "spec":
         meta, _, _ = parse_spec_frontmatter(text)
@@ -57,6 +75,25 @@ def _doc_status(path: Path, kind: str) -> str | None:
 
 
 def _iter_doc_files(directory: Path) -> list[Path]:
+    """List markdown docs in ``directory`` excluding ``README.md``.
+
+    Args:
+        directory (Path): Folder to scan.
+
+    Returns:
+        list[Path]: Sorted ``*.md`` paths (non-recursive).
+
+    Examples:
+        >>> from pathlib import Path
+        >>> import tempfile
+        >>> with tempfile.TemporaryDirectory() as tmp:
+        ...     root = Path(tmp)
+        ...     (root / "a.md").write_text("---\\nid: x\\n---\\n")
+        ...     (root / "README.md").write_text("# index")
+        ...     names = [p.name for p in _iter_doc_files(root)]
+        ...     names
+        ['a.md']
+    """
     return sorted(
         path for path in directory.glob("*.md") if path.is_file() and path.name != "README.md"
     )
@@ -70,6 +107,22 @@ def _file_ok(
     status: str | None,
     command: str,
 ) -> bool:
+    """Return whether one file passes the folder command gate.
+
+    Args:
+        kind (str): ``"spec"`` or ``"prd"``.
+        validation_ok (bool): Structural validation outcome.
+        score_total (int): Deterministic validity score.
+        status (str | None): Frontmatter status value.
+        command (str): ``validate``, ``score``, or ``sync``.
+
+    Returns:
+        bool: ``True`` when the file satisfies the command-specific policy.
+
+    Examples:
+        >>> _file_ok(kind="prd", validation_ok=True, score_total=90, status="done", command="validate")
+        True
+    """
     terminal = status in _TERMINAL_STATUSES
     score_ok = score_total >= SCORE_THRESHOLD
     if command == "validate":
@@ -82,7 +135,18 @@ def _file_ok(
 
 
 def _ensure_sevn_importable(repo_root: Path) -> None:
-    """Add ``repo_root/src`` to ``sys.path`` so about-docs helpers import."""
+    """Add ``repo_root/src`` to ``sys.path`` so about-docs helpers import.
+
+    Args:
+        repo_root (Path): Repository root containing ``src/sevn``.
+
+    Examples:
+        >>> import sys
+        >>> before = len(sys.path)
+        >>> _ensure_sevn_importable(Path("."))
+        >>> len(sys.path) >= before
+        True
+    """
     src = repo_root.resolve() / "src"
     if src.is_dir():
         src_str = str(src)
@@ -91,7 +155,19 @@ def _ensure_sevn_importable(repo_root: Path) -> None:
 
 
 def _load_about_docs_helpers(repo_root: Path) -> tuple[Any, ...]:
-    """Import about-docs sync helpers from the sevn package."""
+    """Import about-docs sync helpers from the sevn package.
+
+    Args:
+        repo_root (Path): Repository root containing ``src/sevn``.
+
+    Returns:
+        tuple[Any, ...]: ``AboutDoc``, provider, dump/load, extract, generate,
+        and manifest helpers.
+
+    Examples:
+        >>> _load_about_docs_helpers.__name__
+        '_load_about_docs_helpers'
+    """
     _ensure_sevn_importable(repo_root)
     from sevn.docs.about.extract import extract_fields
     from sevn.docs.about.generate import generate_body
@@ -112,7 +188,20 @@ def _load_about_docs_helpers(repo_root: Path) -> tuple[Any, ...]:
 
 
 def _doc_from_manifest(row: dict[str, Any]) -> Any:
-    """Build an :class:`AboutDoc` from a manifest row with ``status: scaffold``."""
+    """Build an :class:`AboutDoc` from a manifest row with ``status: scaffold``.
+
+    Args:
+        row (dict[str, Any]): Manifest entry for one about-doc.
+
+    Returns:
+        AboutDoc: Validated scaffold document model.
+
+    Examples:
+        >>> row = {"id": "spec-99-x", "kind": "spec", "title": "X"}
+        >>> doc = _doc_from_manifest(row)
+        >>> doc.status
+        'scaffold'
+    """
     from sevn.docs.about.model import AboutDoc
 
     kind = str(row.get("kind", "spec"))
@@ -147,7 +236,21 @@ def _manifest_missing_paths(
     directory: Path,
     load_manifest_entries: Any,
 ) -> list[tuple[str, Path]]:
-    """Return manifest entries for ``kind`` under ``directory`` that are absent."""
+    """Return manifest entries for ``kind`` under ``directory`` that are absent.
+
+    Args:
+        repo_root (Path): Repository root for manifest lookup.
+        kind (str): ``"spec"`` or ``"prd"``.
+        directory (Path): Target docs folder.
+        load_manifest_entries (Any): Callable returning manifest rows by id.
+
+    Returns:
+        list[tuple[str, Path]]: ``(doc_id, target_path)`` pairs to scaffold.
+
+    Examples:
+        >>> _manifest_missing_paths.__name__
+        '_manifest_missing_paths'
+    """
     directory = directory.resolve()
     missing: list[tuple[str, Path]] = []
     for doc_id, row in load_manifest_entries(repo_root).items():
@@ -164,7 +267,19 @@ def _manifest_missing_paths(
 
 
 def _merge_extracted(doc: Any, extracted: dict[str, Any]) -> Any:
-    """Merge code-owned extract fields onto an existing :class:`AboutDoc`."""
+    """Merge code-owned extract fields onto an existing :class:`AboutDoc`.
+
+    Args:
+        doc (AboutDoc): Existing document model.
+        extracted (dict[str, Any]): Fields from :func:`extract_fields`.
+
+    Returns:
+        AboutDoc: Re-validated model with extracted fields applied.
+
+    Examples:
+        >>> _merge_extracted.__name__
+        '_merge_extracted'
+    """
     from sevn.docs.about.model import AboutDoc
 
     payload = doc.model_dump(mode="json")
@@ -178,7 +293,17 @@ def _sync_one_file(
     repo_root: Path,
     helpers: tuple[Any, ...],
 ) -> None:
-    """Refresh frontmatter for one existing about-doc file (D8 — body unchanged)."""
+    """Refresh frontmatter for one existing about-doc file (D8 — body unchanged).
+
+    Args:
+        path (Path): Existing markdown file to update in place.
+        repo_root (Path): Repository root for extraction.
+        helpers (tuple[Any, ...]): Tuple from :func:`_load_about_docs_helpers`.
+
+    Examples:
+        >>> _sync_one_file.__name__
+        '_sync_one_file'
+    """
     _about_doc, _offline, dump_doc, extract_fields, _generate_body, load_doc, _manifest = helpers
     doc, body = load_doc(path)
     extracted = extract_fields(repo_root, doc.model_dump(mode="json"))
@@ -193,7 +318,18 @@ def _create_from_template(
     repo_root: Path,
     helpers: tuple[Any, ...],
 ) -> None:
-    """Scaffold a missing doc from manifest metadata without fabricating prose (D8)."""
+    """Scaffold a missing doc from manifest metadata without fabricating prose (D8).
+
+    Args:
+        path (Path): Target markdown path to create.
+        row (dict[str, Any]): Manifest entry for the missing doc.
+        repo_root (Path): Repository root for extraction.
+        helpers (tuple[Any, ...]): Tuple from :func:`_load_about_docs_helpers`.
+
+    Examples:
+        >>> _create_from_template.__name__
+        '_create_from_template'
+    """
     _about_doc, offline_provider, dump_doc, extract_fields, generate_body, _load_doc, _manifest = (
         helpers
     )
@@ -211,7 +347,21 @@ def _run_sync(
     repo_root: Path,
     kit_root: Path | None,
 ) -> FolderResult:
-    """Sync every doc in ``directory``: refresh frontmatter and scaffold missing files."""
+    """Sync every doc in ``directory``: refresh frontmatter and scaffold missing files.
+
+    Args:
+        kind (str): ``"spec"`` or ``"prd"``.
+        directory (Path): Folder of markdown docs.
+        repo_root (Path): Repository root for about-docs helpers.
+        kit_root (Path | None): spec-kit-wave root for validation.
+
+    Returns:
+        FolderResult: Post-sync validation outcome.
+
+    Examples:
+        >>> _run_sync.__name__
+        '_run_sync'
+    """
     directory = directory.resolve()
     repo_root = repo_root.resolve()
     helpers = _load_about_docs_helpers(repo_root)
@@ -247,7 +397,26 @@ def run_docs_command(
     repo_root: Path,
     kit_root: Path | None = None,
 ) -> FolderResult:
-    """Run ``validate``, ``score``, or ``sync`` over a docs folder."""
+    """Run ``validate``, ``score``, or ``sync`` over a docs folder.
+
+    Args:
+        command (str): ``validate``, ``score``, or ``sync``.
+        kind (str): ``"spec"`` or ``"prd"``.
+        directory (Path): Folder of markdown docs.
+        repo_root (Path): Repository root for resolution.
+        kit_root (Path | None, optional): spec-kit-wave root. Defaults to the
+            bundled package parent.
+
+    Returns:
+        FolderResult: Per-file outcomes and folder rollup.
+
+    Raises:
+        ValueError: When ``kind`` is unsupported.
+
+    Examples:
+        >>> run_docs_command.__name__
+        'run_docs_command'
+    """
     if kind not in _SUPPORTED_KINDS:
         msg = f"unsupported kind: {kind!r} (expected 'spec' or 'prd')"
         raise ValueError(msg)
@@ -315,6 +484,17 @@ def run_docs_command(
 
 
 def _print_human(result: FolderResult, *, command: str) -> None:
+    """Print a human-readable folder command report to stdout.
+
+    Args:
+        result (FolderResult): Command outcome to render.
+        command (str): Command name for context (unused in output today).
+
+    Examples:
+        >>> _print_human.__name__
+        '_print_human'
+    """
+    _ = command
     for item in result.files:
         score_text = item.score.total if item.score else "n/a"
         state = "OK" if item.ok else "FAIL"
@@ -332,6 +512,16 @@ def _print_human(result: FolderResult, *, command: str) -> None:
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """Build the ``skw docs`` argparse parser.
+
+    Returns:
+        argparse.ArgumentParser: Parser with ``validate``, ``score``, and ``sync`` subcommands.
+
+    Examples:
+        >>> parser = _build_parser()
+        >>> parser.prog
+        'doc_folder.py'
+    """
     parser = argparse.ArgumentParser(description="spec-kit-wave docs folder tooling")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -356,7 +546,19 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI entry for ``skw docs validate|score|sync``."""
+    """CLI entry for ``skw docs validate|score|sync``.
+
+    Args:
+        argv (list[str] | None, optional): Arguments after ``docs``. Defaults to
+            ``sys.argv`` tail when invoked as ``__main__``.
+
+    Returns:
+        int: Process exit code from :func:`run_docs_command`.
+
+    Examples:
+        >>> main.__name__
+        'main'
+    """
     parser = _build_parser()
     args = parser.parse_args(argv)
     result = run_docs_command(

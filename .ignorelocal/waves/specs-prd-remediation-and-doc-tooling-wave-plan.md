@@ -1,6 +1,6 @@
 # Specs & PRD remediation + doc-folder tooling — wave plan
 
-**Status:** W0–W12 + Thermos complete (uncommitted WIP @ `5f89fa9`); W13 + Final pending
+**Status:** W0–W13 + Thermos complete @ pending push; **Final next**
 **Date:** 2026-07-14
 **Owner agents:** `.cursor/agents/wave-plan-executor.md` (W0, W2–W13, Final, Thermos gate) · `.cursor/agents/test-creator.md` (W1 `role: test-author` + per-wave xfail reconciliation) · **new** `.cursor/agents/docs-folder-author.md` (invoked *by the executor* to author/update/validate the `about-sevn.bot/specs` and `about-sevn.bot/prd` folders in W7–W9 — the sanctioned folder-authoring path this plan creates)
 **Source:** `.ignorelocal/PRD-SPECS-QUALITY-ANALYSIS-2026-07-14.md` (repo-root artefact, gitignored — the deep quality analysis of `about-sevn.bot/{prd,specs}` on `pre-0.0.1`). Findings are cited by that file's section numbers: **§1** (TL;DR), **§2** (stubs vs developed), **§3** (code-fidelity), **§4** (external / gitignore refs), **§5** (defects), **§6** (bottom line + recommended follow-ups). This plan is the sequencing artefact; the analysis is the requirement rationale; `spec-kit-wave/{PRD-STANDARDS.md,SPEC-KIT-STANDARDS.md,CHANGELOG-STANDARDS.md}` + the `*-rules.toml` files are the normative contracts.
@@ -174,7 +174,7 @@ Locked at W0. Operator-approved; do not re-derive in later waves.
 - [x] **Thermos** thermo-nuclear branch review gate (2026-07-14 ✅: thermo review PASS; D8 fixes in 17-gateway + 25-cicd; gates green; operator sign-off pending — **optional re-run after Final**)
 - [x] **W11** README `gateway.md` quality (human/LLM prose) — D13 scope extension (2026-07-14 ✅: L1 plain-language rewrite; L2 FastAPI link + expanded prose; L3 full 114-module inventory with links; make readme-check green)
 - [x] **W12** Gateway package reorganization (refactor-only) (2026-07-14 ✅)
-- [ ] **W13** Docstrings + `<Examples:` compliance (`skw` + tests)
+- [x] **W13** Docstrings + `<Examples:` compliance (`skw` + tests) (2026-07-14 ✅: doc_score/doc_folder/spec_validate/changelog_validate/cli/doc_validate + spec-kit-wave/tests + tests/docs/about touched files; make -C spec-kit-wave lint + make lint + make typecheck + make doctest green; 32/32 spec-kit-wave tests)
 - [ ] **Final** Reconcile, gate, hand back — **re-run after W11–W13 complete** (prior run 2026-07-14 ✅: make ci-resume 31/31 green @ b0f85a5)
 
 ## Execution order & parallelism
@@ -664,10 +664,10 @@ Known gaps (reviewer callouts on this branch):
 - Audit other new `skw` modules from this branch: `doc_folder.py`, `spec_validate.py`, `changelog_validate.py`, `cli.py`.
 - Audit `spec-kit-wave/tests/**` and any touched `tests/docs/about/**` test functions for the same gap.
 
-- [ ] **W13.1** [US9] Fix `doc_score.py` module + private helper docstrings and `<Examples:` sections.
-- [ ] **W13.2** [US9] Audit and fix remaining `spec-kit-wave/src/skw/{doc_folder,spec_validate,changelog_validate,cli}.py` modules.
-- [ ] **W13.3** [US9] Fix test function docstrings in `spec-kit-wave/tests/` and touched `tests/docs/about/` files.
-- [ ] **W13.4** Verify: `make lint`, `make typecheck`, `make doctest`. Flip boxes.
+- [x] **W13.1** [US9] Fix `doc_score.py` module + private helper docstrings and `<Examples:` sections. (2026-07-14 ✅)
+- [x] **W13.2** [US9] Audit and fix remaining `spec-kit-wave/src/skw/{doc_folder,spec_validate,changelog_validate,cli}.py` modules. (2026-07-14 ✅: + doc_validate.py)
+- [x] **W13.3** [US9] Fix test function docstrings in `spec-kit-wave/tests/` and touched `tests/docs/about/` files. (2026-07-14 ✅)
+- [x] **W13.4** Verify: `make lint`, `make typecheck`, `make doctest`. Flip boxes. (2026-07-14 ✅: + make -C spec-kit-wave lint)
 
 ## Recent baseline / drift
 

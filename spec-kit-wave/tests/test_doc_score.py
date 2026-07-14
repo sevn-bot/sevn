@@ -1,4 +1,17 @@
-"""RED contract tests for ``skw.doc_score`` (D5). Green after W3."""
+"""RED contract tests for ``skw.doc_score`` (D5). Green after W3.
+
+Exports:
+    test_score_weights_sum_to_one_hundred — component weights sum to 100.
+    test_scaffold_body_scores_below_threshold — scaffold prose scores below 80.
+    test_authored_spec_scores_at_or_above_threshold — authored spec scores at or above 80.
+    test_status_honesty_component_penalizes_done_with_scaffold — status honesty penalizes done+scaffold.
+    test_score_result_exposes_breakdown_and_rollup — score breakdown and rollup shape.
+
+Examples:
+    >>> from _helpers import SCORE_THRESHOLD
+    >>> SCORE_THRESHOLD
+    80
+"""
 
 from __future__ import annotations
 
@@ -15,11 +28,39 @@ from _helpers import (
 
 
 def _score_weights(kind: str) -> dict[str, int]:
+    """Load score weights for ``kind`` via the implementation module.
+
+    Args:
+        kind (str): ``"spec"`` or ``"prd"``.
+
+    Returns:
+        dict[str, int]: Component weights.
+
+    Examples:
+        >>> weights = _score_weights("spec")
+        >>> sum(weights.values())
+        100
+    """
     doc_score = require_module("skw.doc_score")
     return doc_score.load_score_weights(kind)
 
 
 def _score_doc(path: Path, *, kind: str, repo_root: Path, siblings: list[Path] | None = None):
+    """Score one markdown doc via the implementation module.
+
+    Args:
+        path (Path): Markdown file to score.
+        kind (str): ``"spec"`` or ``"prd"``.
+        repo_root (Path): Repository root for resolution.
+        siblings (list[Path] | None, optional): Sibling docs for id checks.
+
+    Returns:
+        ScoreResult: Weighted score breakdown.
+
+    Examples:
+        >>> _score_doc.__name__
+        '_score_doc'
+    """
     doc_score = require_module("skw.doc_score")
     return doc_score.score_doc(path, kind, repo_root=repo_root, siblings=siblings)
 
@@ -33,6 +74,33 @@ def _write_doc(
     sources: list[str],
     interfaces: list[dict[str, str]] | None = None,
 ) -> Path:
+    """Write a synthetic spec or PRD markdown file for scoring tests.
+
+    Args:
+        directory (Path): Output directory.
+        kind (str): ``"spec"`` or ``"prd"``.
+        status (str): Frontmatter status value.
+        body (str): Markdown body after frontmatter.
+        sources (list[str]): Frontmatter ``sources`` globs.
+        interfaces (list[dict[str, str]] | None, optional): Spec interface rows.
+
+    Returns:
+        Path: Written markdown file path.
+
+    Examples:
+        >>> from pathlib import Path
+        >>> import tempfile
+        >>> with tempfile.TemporaryDirectory() as tmp:
+        ...     path = _write_doc(
+        ...         Path(tmp),
+        ...         kind="prd",
+        ...         status="draft",
+        ...         body="## Problem\\n",
+        ...         sources=["Makefile"],
+        ...     )
+        ...     path.suffix
+        '.md'
+    """
     directory.mkdir(parents=True, exist_ok=True)
     if kind == "spec":
         doc_id = "spec-17-gateway"
@@ -83,14 +151,31 @@ depends_on: []
 
 @pytest.mark.parametrize("kind", ["spec", "prd"])
 def test_score_weights_sum_to_one_hundred(kind: str) -> None:
-    """D5: component weights in ``*-rules.toml [score]`` sum to 100."""
+    """D5: component weights in ``*-rules.toml [score]`` sum to 100.
+
+    Args:
+        kind (str): ``"spec"`` or ``"prd"``.
+
+    Examples:
+        >>> len(SCORE_COMPONENTS)
+        6
+    """
     weights = _score_weights(kind)
     assert set(weights) == set(SCORE_COMPONENTS)
     assert sum(weights.values()) == 100
 
 
 def test_scaffold_body_scores_below_threshold(repo_root: Path, tmp_path: Path) -> None:
-    """D5: scaffold placeholder prose must score below the 80 threshold."""
+    """D5: scaffold placeholder prose must score below the 80 threshold.
+
+    Args:
+        repo_root (Path): Minimal repo fixture with gateway module.
+        tmp_path (Path): Temporary directory for test docs.
+
+    Examples:
+        >>> SCORE_THRESHOLD
+        80
+    """
     docs_dir = tmp_path / "specs"
     body = "\n\n".join(
         f"## {heading}\n\nOffline scaffold for gateway." for heading in SPEC_REQUIRED_SECTIONS
@@ -110,7 +195,16 @@ def test_scaffold_body_scores_below_threshold(repo_root: Path, tmp_path: Path) -
 
 
 def test_authored_spec_scores_at_or_above_threshold(repo_root: Path, tmp_path: Path) -> None:
-    """D5: fully authored, resolving spec scores >= 80."""
+    """D5: fully authored, resolving spec scores >= 80.
+
+    Args:
+        repo_root (Path): Minimal repo fixture with gateway module.
+        tmp_path (Path): Temporary directory for test docs.
+
+    Examples:
+        >>> SCORE_THRESHOLD >= 80
+        True
+    """
     docs_dir = tmp_path / "specs"
     body = "\n\n".join(
         f"## {heading}\n\nAuthored prose for {heading.lower()}."
@@ -132,7 +226,16 @@ def test_authored_spec_scores_at_or_above_threshold(repo_root: Path, tmp_path: P
 def test_status_honesty_component_penalizes_done_with_scaffold(
     repo_root: Path, tmp_path: Path
 ) -> None:
-    """D5: ``status_honesty`` component fails when ``done`` overlays scaffold prose."""
+    """D5: ``status_honesty`` component fails when ``done`` overlays scaffold prose.
+
+    Args:
+        repo_root (Path): Minimal repo fixture with gateway module.
+        tmp_path (Path): Temporary directory for test docs.
+
+    Examples:
+        >>> "status_honesty" in SCORE_COMPONENTS
+        True
+    """
     docs_dir = tmp_path / "specs"
     body = "\n\n".join(
         f"## {heading}\n\nInitial draft for gateway." for heading in SPEC_REQUIRED_SECTIONS
@@ -152,7 +255,16 @@ def test_status_honesty_component_penalizes_done_with_scaffold(
 
 
 def test_score_result_exposes_breakdown_and_rollup(repo_root: Path, tmp_path: Path) -> None:
-    """D5: scorer returns per-component breakdown and folder rollup helper."""
+    """D5: scorer returns per-component breakdown and folder rollup helper.
+
+    Args:
+        repo_root (Path): Minimal repo fixture with gateway module.
+        tmp_path (Path): Temporary directory for test docs.
+
+    Examples:
+        >>> len(SCORE_COMPONENTS)
+        6
+    """
     doc_score = require_module("skw.doc_score")
     docs_dir = tmp_path / "specs"
     body = "\n\n".join(f"## {heading}\n\nAuthored prose." for heading in SPEC_REQUIRED_SECTIONS)

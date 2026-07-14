@@ -18,6 +18,14 @@ setup: ## Install uv-managed dev deps
 
 lint: ## Ruff check on src/ and tests/
 	@$(UV) run ruff check src tests
+	@cd $(REPO_ROOT) && $(UV) run python scripts/check_docstrings.py \
+		spec-kit-wave/src/skw/doc_score.py \
+		spec-kit-wave/src/skw/doc_folder.py \
+		spec-kit-wave/src/skw/spec_validate.py \
+		spec-kit-wave/src/skw/changelog_validate.py \
+		spec-kit-wave/src/skw/cli.py \
+		spec-kit-wave/src/skw/doc_validate.py \
+		spec-kit-wave/tests
 
 test: ## Run pytest suite (uses parent repo uv env for about-docs sync imports)
 	@cd $(REPO_ROOT) && $(UV) run pytest -q spec-kit-wave/tests

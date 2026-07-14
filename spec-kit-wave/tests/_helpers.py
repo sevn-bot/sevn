@@ -1,4 +1,13 @@
-"""Shared contract constants and import helpers for spec-kit-wave tests."""
+"""Shared contract constants and import helpers for spec-kit-wave tests.
+
+Exports:
+    require_module — import helper that fails tests when implementation is pending.
+
+Examples:
+    >>> from _helpers import SCORE_THRESHOLD
+    >>> SCORE_THRESHOLD
+    80
+"""
 
 from __future__ import annotations
 
@@ -32,7 +41,19 @@ SCORE_THRESHOLD = 80
 
 
 def require_module(name: str) -> Any:
-    """Import ``name`` or fail the running test when implementation is pending."""
+    """Import ``name`` or fail the running test when implementation is pending.
+
+    Args:
+        name (str): Dotted module name (for example ``"skw.doc_score"``).
+
+    Returns:
+        Any: Imported module object.
+
+    Examples:
+        >>> mod = require_module("skw.doc_score")
+        >>> mod.SCORE_THRESHOLD
+        80
+    """
     try:
         return importlib.import_module(name)
     except ImportError as exc:

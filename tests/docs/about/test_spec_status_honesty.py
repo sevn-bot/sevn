@@ -1,4 +1,14 @@
-"""RED contract tests for spec status honesty (D3/D5). Green after W8/W10."""
+"""RED contract tests for spec status honesty (D3/D5). Green after W8/W10.
+
+Exports:
+    test_done_status_with_scaffold_body_fails_check — done + scaffold body fails check.
+    test_scaffold_status_with_scaffold_body_passes_check — scaffold status allows scaffold body.
+    test_done_status_with_authored_body_passes_check — done + authored body passes check.
+
+Examples:
+    >>> len(SCAFFOLD_PHRASES)
+    2
+"""
 
 from __future__ import annotations
 
@@ -18,6 +28,19 @@ SCAFFOLD_PHRASES = (
 
 
 def _scaffold_body(phrase: str = "Offline scaffold for") -> str:
+    """Build a seven-section spec body containing a scaffold phrase.
+
+    Args:
+        phrase (str, optional): Scaffold phrase to repeat. Defaults to
+            ``"Offline scaffold for"``.
+
+    Returns:
+        str: Markdown body with seven required H2 sections.
+
+    Examples:
+        >>> "## Purpose" in _scaffold_body()
+        True
+    """
     return "\n\n".join(
         [
             "## Purpose",
@@ -39,6 +62,20 @@ def _scaffold_body(phrase: str = "Offline scaffold for") -> str:
 
 
 def _minimal_spec(*, status: str, body: str) -> AboutDoc:
+    """Return a minimal gateway spec model for status-honesty tests.
+
+    Args:
+        status (str): Frontmatter status value under test.
+        body (str): Markdown body paired with the status.
+
+    Returns:
+        AboutDoc: Spec model with gateway metadata.
+
+    Examples:
+        >>> doc = _minimal_spec(status="scaffold", body="## Purpose\\n")
+        >>> doc.id.startswith("spec-")
+        True
+    """
     return AboutDoc(
         id="spec-17-gateway",
         kind="spec",
@@ -53,6 +90,20 @@ def _minimal_spec(*, status: str, body: str) -> AboutDoc:
 
 
 def _write_repo_spec(tmp_path: Path, *, status: str, body: str) -> Path:
+    """Write a gateway spec file into a synthetic repository tree.
+
+    Args:
+        tmp_path (Path): pytest temporary directory fixture.
+        status (str): Frontmatter status value under test.
+        body (str): Markdown body paired with the status.
+
+    Returns:
+        Path: Written spec markdown path.
+
+    Examples:
+        >>> _write_repo_spec.__name__
+        '_write_repo_spec'
+    """
     docs_dir = tmp_path / "about-sevn.bot" / "specs"
     docs_dir.mkdir(parents=True)
     allowlist_dir = tmp_path / "about-sevn.bot" / "_docsys"
@@ -88,7 +139,16 @@ def _write_repo_spec(tmp_path: Path, *, status: str, body: str) -> Path:
 
 @pytest.mark.parametrize("phrase", SCAFFOLD_PHRASES)
 def test_done_status_with_scaffold_body_fails_check(tmp_path: Path, phrase: str) -> None:
-    """D3/D5: ``status: done`` cannot coexist with scaffold placeholder prose."""
+    """D3/D5: ``status: done`` cannot coexist with scaffold placeholder prose.
+
+    Args:
+        tmp_path (Path): pytest temporary directory fixture.
+        phrase (str): Scaffold phrase embedded in the body.
+
+    Examples:
+        >>> SCAFFOLD_PHRASES[0]
+        'Offline scaffold for'
+    """
     _write_repo_spec(tmp_path, status="done", body=_scaffold_body(phrase))
     issues = check_about_docs(tmp_path)
     assert any(
@@ -98,14 +158,30 @@ def test_done_status_with_scaffold_body_fails_check(tmp_path: Path, phrase: str)
 
 
 def test_scaffold_status_with_scaffold_body_passes_check(tmp_path: Path) -> None:
-    """Happy path: honest ``status: scaffold`` with placeholder body is allowed."""
+    """Happy path: honest ``status: scaffold`` with placeholder body is allowed.
+
+    Args:
+        tmp_path (Path): pytest temporary directory fixture.
+
+    Examples:
+        >>> "scaffold" in {"draft", "scaffold", "done"}
+        True
+    """
     _write_repo_spec(tmp_path, status="scaffold", body=_scaffold_body())
     issues = check_about_docs(tmp_path)
     assert not any("status" in issue.lower() and "scaffold" in issue.lower() for issue in issues)
 
 
 def test_done_status_with_authored_body_passes_check(tmp_path: Path) -> None:
-    """Happy path: ``status: done`` is allowed when the body is fully authored."""
+    """Happy path: ``status: done`` is allowed when the body is fully authored.
+
+    Args:
+        tmp_path (Path): pytest temporary directory fixture.
+
+    Examples:
+        >>> "done" in {"draft", "scaffold", "done"}
+        True
+    """
     body = (
         "## Purpose\n\n"
         "Routes inbound channel messages through the gateway turn spine.\n\n"

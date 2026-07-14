@@ -6,6 +6,11 @@ Exports:
     validate_spec_file — return ``ok``/``errors``/``warnings`` for one spec markdown file.
     validate_spec_file_json — JSON-serialisable report for one spec file.
     main — CLI entry (``--json`` mode for CI).
+
+Examples:
+    >>> from skw.spec_validate import load_spec_rules
+    >>> "frontmatter" in load_spec_rules()
+    True
 """
 
 from __future__ import annotations
@@ -75,11 +80,33 @@ _DEFAULT_RULES: dict[str, Any] = {
 
 
 def _default_kit_root() -> Path:
+    """Return the bundled spec-kit-wave root directory.
+
+    Returns:
+        Path: Parent of ``src/`` inside the installed package tree.
+
+    Examples:
+        >>> _default_kit_root().name
+        'spec-kit-wave'
+    """
     return Path(__file__).resolve().parent.parent.parent
 
 
 def load_spec_rules(kit_root: Path | None = None) -> dict[str, Any]:
-    """Load ``spec-templates/spec-rules.toml`` merged with built-in defaults."""
+    """Load ``spec-templates/spec-rules.toml`` merged with built-in defaults.
+
+    Args:
+        kit_root (Path | None, optional): spec-kit-wave root. Defaults to the
+            bundled package parent.
+
+    Returns:
+        dict[str, Any]: Merged rules mapping.
+
+    Examples:
+        >>> rules = load_spec_rules()
+        >>> "sections" in rules
+        True
+    """
     root = kit_root or _default_kit_root()
     path = root / "spec-templates" / "spec-rules.toml"
     if not path.is_file():
@@ -90,6 +117,21 @@ def load_spec_rules(kit_root: Path | None = None) -> dict[str, Any]:
 
 
 def _parse_nested_list_of_dicts(raw_yaml: str, key: str) -> list[dict[str, str]]:
+    """Parse a YAML list-of-mappings block for ``key`` without a full YAML loader.
+
+    Args:
+        raw_yaml (str): Frontmatter YAML text.
+        key (str): Top-level key (for example ``interfaces``).
+
+    Returns:
+        list[dict[str, str]]: Parsed mapping rows.
+
+    Examples:
+        >>> raw = "interfaces:\\n  - name: run_turn\\n    file: a.py\\n    symbol: run_turn"
+        >>> rows = _parse_nested_list_of_dicts(raw, "interfaces")
+        >>> rows[0]["name"]
+        'run_turn'
+    """
     items: list[dict[str, str]] = []
     lines = raw_yaml.splitlines()
     index = 0
@@ -127,6 +169,19 @@ def _parse_nested_list_of_dicts(raw_yaml: str, key: str) -> list[dict[str, str]]
 
 
 def _strip_yaml_block(raw_yaml: str, key: str) -> str:
+    """Replace a nested YAML block with an empty list placeholder for scalar parsing.
+
+    Args:
+        raw_yaml (str): Frontmatter YAML text.
+        key (str): Top-level key to strip.
+
+    Returns:
+        str: YAML text safe for the lightweight scalar parser.
+
+    Examples:
+        >>> _strip_yaml_block("interfaces:\\n  - name: x\\nid: spec-01-x", "interfaces")
+        'interfaces: []\\nid: spec-01-x'
+    """
     lines = raw_yaml.splitlines()
     kept: list[str] = []
     index = 0
@@ -147,7 +202,20 @@ def _strip_yaml_block(raw_yaml: str, key: str) -> str:
 
 
 def parse_spec_frontmatter(text: str) -> tuple[dict[str, Any], str, str | None]:
-    """Parse YAML frontmatter including nested ``interfaces`` entries."""
+    """Parse YAML frontmatter including nested ``interfaces`` entries.
+
+    Args:
+        text (str): Full markdown file contents.
+
+    Returns:
+        tuple[dict[str, Any], str, str | None]: ``(meta, body, error)``.
+
+    Examples:
+        >>> text = "---\\nid: spec-01-x\\nkind: spec\\n---\\n\\n## Purpose\\n"
+        >>> meta, body, err = parse_spec_frontmatter(text)
+        >>> err is None and meta["id"] == "spec-01-x"
+        True
+    """
     match = _FRONTMATTER_RE.match(text)
     if not match:
         return {}, text, "missing YAML frontmatter (expected opening --- fence)"
@@ -168,10 +236,34 @@ def parse_spec_frontmatter(text: str) -> tuple[dict[str, Any], str, str | None]:
 
 
 def _h2_order(body: str) -> list[str]:
+    """Extract level-2 heading titles in document order.
+
+    Args:
+        body (str): Markdown body after frontmatter.
+
+    Returns:
+        list[str]: Heading titles in appearance order.
+
+    Examples:
+        >>> _h2_order("## Purpose\\n\\n## Behavior\\n")
+        ['Purpose', 'Behavior']
+    """
     return [match.group(1).strip() for match in H2_HEADING_RE.finditer(body)]
 
 
 def _numeric_spec_id(doc_id: str) -> str | None:
+    """Return the two-digit numeric segment from a spec id.
+
+    Args:
+        doc_id (str): Frontmatter ``id`` value.
+
+    Returns:
+        str | None: Numeric segment (for example ``"17"``) or ``None``.
+
+    Examples:
+        >>> _numeric_spec_id("spec-17-gateway")
+        '17'
+    """
     match = re.fullmatch(r"spec-(\d{2})-[a-z0-9-]+", doc_id)
     return match.group(1) if match else None
 
@@ -183,6 +275,21 @@ def _validate_frontmatter(
     path: Path,
     siblings: list[Path] | None,
 ) -> tuple[list[str], list[str]]:
+    """Validate spec frontmatter against kit rules.
+
+    Args:
+        meta (dict[str, Any]): Parsed frontmatter mapping.
+        rules (dict[str, Any]): Merged kit rules.
+        path (Path): File being validated.
+        siblings (list[Path] | None): Other specs in the same folder.
+
+    Returns:
+        tuple[list[str], list[str]]: ``(errors, warnings)``.
+
+    Examples:
+        >>> _validate_frontmatter.__name__
+        '_validate_frontmatter'
+    """
     errors: list[str] = []
     warnings: list[str] = []
     fm = rules["frontmatter"]
@@ -259,6 +366,19 @@ def _validate_frontmatter(
 
 
 def _validate_section_order(body: str, required: list[str]) -> list[str]:
+    """Validate required H2 sections appear in order.
+
+    Args:
+        body (str): Markdown body after frontmatter.
+        required (list[str]): Required section titles.
+
+    Returns:
+        list[str]: Validation errors (empty when OK).
+
+    Examples:
+        >>> _validate_section_order("## Purpose\\n\\n## Behavior\\n", ["Purpose", "Behavior"])
+        []
+    """
     errors: list[str] = []
     found = _h2_order(body)
     if not found:
@@ -281,6 +401,20 @@ def _validate_section_order(body: str, required: list[str]) -> list[str]:
 
 
 def _validate_scaffold(body: str, meta: dict[str, Any], rules: dict[str, Any]) -> list[str]:
+    """Reject scaffold phrases when ``status`` is ``done``.
+
+    Args:
+        body (str): Markdown body after frontmatter.
+        meta (dict[str, Any]): Parsed frontmatter mapping.
+        rules (dict[str, Any]): Merged kit rules.
+
+    Returns:
+        list[str]: Validation errors (empty when OK).
+
+    Examples:
+        >>> _validate_scaffold("real prose", {"status": "draft"}, {"scaffold": {"forbidden_when_ready": ["TBD"]}})
+        []
+    """
     errors: list[str] = []
     if meta.get("status") != "done":
         return errors
@@ -291,6 +425,24 @@ def _validate_scaffold(body: str, meta: dict[str, Any], rules: dict[str, Any]) -
 
 
 def _symbol_exists(file_path: Path, symbol: str) -> bool:
+    """Return whether ``symbol`` names a top-level class or function in ``file_path``.
+
+    Args:
+        file_path (Path): Python source file.
+        symbol (str): Symbol name to locate.
+
+    Returns:
+        bool: ``True`` when the symbol exists at module scope.
+
+    Examples:
+        >>> from pathlib import Path
+        >>> import tempfile
+        >>> with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as handle:
+        ...     _ = handle.write("def run_turn(): pass")
+        ...     path = Path(handle.name)
+        >>> _symbol_exists(path, "run_turn")
+        True
+    """
     tree = ast.parse(file_path.read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if (
@@ -305,6 +457,19 @@ def _validate_interfaces(
     meta: dict[str, Any],
     repo_root: Path,
 ) -> list[str]:
+    """Validate ``interfaces`` rows resolve to real files and symbols.
+
+    Args:
+        meta (dict[str, Any]): Parsed frontmatter mapping.
+        repo_root (Path): Repository root for path resolution.
+
+    Returns:
+        list[str]: Validation errors (empty when OK).
+
+    Examples:
+        >>> _validate_interfaces({"interfaces": []}, Path("."))
+        []
+    """
     errors: list[str] = []
     interfaces = meta.get("interfaces")
     if interfaces in (None, []):
@@ -343,6 +508,22 @@ def _validate_spec_content(
     rules: dict[str, Any] | None = None,
     kit_root: Path | None = None,
 ) -> tuple[list[str], list[str]]:
+    """Validate one spec file's frontmatter, sections, and interface references.
+
+    Args:
+        path (Path): Spec markdown file.
+        repo_root (Path): Repository root for interface resolution.
+        siblings (list[Path] | None): Other specs in the same folder.
+        rules (dict[str, Any] | None): Pre-loaded rules or ``None`` to load defaults.
+        kit_root (Path | None): spec-kit-wave root when loading rules.
+
+    Returns:
+        tuple[list[str], list[str]]: ``(errors, warnings)``.
+
+    Examples:
+        >>> _validate_spec_content.__name__
+        '_validate_spec_content'
+    """
     if rules is None:
         rules = load_spec_rules(kit_root)
     text = path.read_text(encoding="utf-8")
@@ -375,7 +556,22 @@ def validate_spec_file(
     kit_root: Path | None = None,
     rules: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Validate one spec markdown file against kit rules."""
+    """Validate one spec markdown file against kit rules.
+
+    Args:
+        path (Path): Spec markdown file.
+        repo_root (Path): Repository root for interface resolution.
+        siblings (list[Path] | None, optional): Other specs in the same folder.
+        kit_root (Path | None, optional): spec-kit-wave root.
+        rules (dict[str, Any] | None, optional): Pre-loaded rules.
+
+    Returns:
+        dict[str, Any]: Report with ``ok``, ``errors``, ``warnings``, and ``score``.
+
+    Examples:
+        >>> validate_spec_file.__name__
+        'validate_spec_file'
+    """
     errors, warnings = _validate_spec_content(
         path,
         repo_root=repo_root,
@@ -413,7 +609,22 @@ def validate_spec_file_json(
     kit_root: Path | None = None,
     rules: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Return a JSON-serialisable validation report for one spec file."""
+    """Return a JSON-serialisable validation report for one spec file.
+
+    Args:
+        path (Path): Spec markdown file.
+        repo_root (Path): Repository root for interface resolution.
+        siblings (list[Path] | None, optional): Other specs in the same folder.
+        kit_root (Path | None, optional): spec-kit-wave root.
+        rules (dict[str, Any] | None, optional): Pre-loaded rules.
+
+    Returns:
+        dict[str, Any]: Same shape as :func:`validate_spec_file`.
+
+    Examples:
+        >>> validate_spec_file_json.__name__
+        'validate_spec_file_json'
+    """
     return validate_spec_file(
         path,
         repo_root=repo_root,
@@ -424,7 +635,18 @@ def validate_spec_file_json(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI entry for spec validation."""
+    """CLI entry for spec validation.
+
+    Args:
+        argv (list[str] | None, optional): CLI arguments. Defaults to ``sys.argv``.
+
+    Returns:
+        int: Process exit code (``0`` when all files pass).
+
+    Examples:
+        >>> main.__name__
+        'main'
+    """
     parser = argparse.ArgumentParser(description="Validate sevn.bot spec markdown files")
     parser.add_argument("paths", nargs="+", help="One or more spec .md files")
     parser.add_argument(

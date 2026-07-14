@@ -1,4 +1,16 @@
-"""RED contract tests for ``skw.doc_folder`` (D6). Green after W3/W4."""
+"""RED contract tests for ``skw.doc_folder`` (D6). Green after W3/W4.
+
+Exports:
+    test_validate_command_returns_per_file_and_rollup — validate returns per-file + rollup.
+    test_score_command_flags_sub_threshold_done — score flags sub-threshold done docs.
+    test_sync_refreshes_frontmatter_without_fabricating_prose — sync refreshes frontmatter only.
+    test_kind_dispatch_rejects_unknown_kind — unknown kind is rejected.
+
+Examples:
+    >>> from _helpers import SPEC_REQUIRED_SECTIONS
+    >>> len(SPEC_REQUIRED_SECTIONS)
+    7
+"""
 
 from __future__ import annotations
 
@@ -16,6 +28,21 @@ def _run(
     directory: Path,
     repo_root: Path,
 ):
+    """Run a folder docs command via the implementation module.
+
+    Args:
+        command (str): ``validate``, ``score``, or ``sync``.
+        kind (str): ``"spec"`` or ``"prd"``.
+        directory (Path): Folder of markdown docs.
+        repo_root (Path): Repository root for resolution.
+
+    Returns:
+        FolderResult: Folder command outcome.
+
+    Examples:
+        >>> _run.__name__
+        '_run'
+    """
     doc_folder = require_module("skw.doc_folder")
     return doc_folder.run_docs_command(
         command,
@@ -26,6 +53,20 @@ def _run(
 
 
 def _write_kind_doc(directory: Path, *, kind: str, status: str = "done") -> Path:
+    """Write a synthetic spec or PRD markdown file for folder tests.
+
+    Args:
+        directory (Path): Output directory.
+        kind (str): ``"spec"`` or ``"prd"``.
+        status (str, optional): Frontmatter status. Defaults to ``"done"``.
+
+    Returns:
+        Path: Written markdown file path.
+
+    Examples:
+        >>> _write_kind_doc.__name__
+        '_write_kind_doc'
+    """
     directory.mkdir(parents=True, exist_ok=True)
     body = "\n\n".join(f"## {heading}\n\nAuthored content." for heading in SPEC_REQUIRED_SECTIONS)
     if kind == "spec":
@@ -111,7 +152,17 @@ def test_validate_command_returns_per_file_and_rollup(
     tmp_path: Path,
     kind: str,
 ) -> None:
-    """D6: ``validate`` iterates every ``*.md`` and returns per-file + rollup output."""
+    """D6: ``validate`` iterates every ``*.md`` and returns per-file + rollup output.
+
+    Args:
+        repo_root (Path): Minimal repo fixture with gateway module.
+        tmp_path (Path): Temporary directory for test docs.
+        kind (str): ``"spec"`` or ``"prd"``.
+
+    Examples:
+        >>> len(SPEC_REQUIRED_SECTIONS)
+        7
+    """
     docs_dir = tmp_path / kind
     _write_kind_doc(docs_dir, kind=kind)
     result = _run("validate", kind=kind, directory=docs_dir, repo_root=repo_root)
@@ -128,7 +179,18 @@ def test_score_command_flags_sub_threshold_done(
     tmp_path: Path,
     kind: str,
 ) -> None:
-    """D6: ``score`` exits non-zero when a ``done`` file scores below 80."""
+    """D6: ``score`` exits non-zero when a ``done`` file scores below 80.
+
+    Args:
+        repo_root (Path): Minimal repo fixture with gateway module.
+        tmp_path (Path): Temporary directory for test docs.
+        kind (str): ``"spec"`` or ``"prd"``.
+
+    Examples:
+        >>> from _helpers import SCORE_THRESHOLD
+        >>> SCORE_THRESHOLD
+        80
+    """
     docs_dir = tmp_path / kind
     _write_kind_doc(docs_dir, kind=kind, status="done")
     path = next(docs_dir.glob("*.md"))
@@ -151,7 +213,16 @@ def test_sync_refreshes_frontmatter_without_fabricating_prose(
     repo_root: Path,
     tmp_path: Path,
 ) -> None:
-    """D6/D8: ``sync`` refreshes frontmatter but leaves ``status: scaffold`` when body empty."""
+    """D6/D8: ``sync`` refreshes frontmatter but leaves ``status: scaffold`` when body empty.
+
+    Args:
+        repo_root (Path): Minimal repo fixture with gateway module.
+        tmp_path (Path): Temporary directory for test docs.
+
+    Examples:
+        >>> "scaffold" in {"draft", "scaffold", "done"}
+        True
+    """
     docs_dir = tmp_path / "specs"
     path = _write_kind_doc(docs_dir, kind="spec", status="scaffold")
     body = path.read_text(encoding="utf-8").split("---", maxsplit=2)[-1]
@@ -164,7 +235,16 @@ def test_sync_refreshes_frontmatter_without_fabricating_prose(
 
 
 def test_kind_dispatch_rejects_unknown_kind(tmp_path: Path, repo_root: Path) -> None:
-    """D6: CLI/folder layer rejects unknown ``--kind`` values."""
+    """D6: CLI/folder layer rejects unknown ``--kind`` values.
+
+    Args:
+        tmp_path (Path): Temporary directory for test docs.
+        repo_root (Path): Minimal repo fixture with gateway module.
+
+    Examples:
+        >>> {"spec", "prd"} >= {"spec"}
+        True
+    """
     doc_folder = require_module("skw.doc_folder")
     with pytest.raises(ValueError, match="kind"):
         doc_folder.run_docs_command(

@@ -1,4 +1,17 @@
-"""RED contract tests for about-docs PRD frontmatter reconciliation (D7). Green after W4."""
+"""RED contract tests for about-docs PRD frontmatter reconciliation (D7). Green after W4.
+
+Exports:
+    test_extract_fields_omits_spec_only_keys_for_prd — PRD extract omits spec-only keys.
+    test_extract_fields_still_emits_interfaces_for_spec — spec extract keeps interfaces.
+    test_dump_prd_frontmatter_omits_forbidden_keys — PRD dump omits forbidden keys.
+    test_dump_spec_frontmatter_retains_interfaces — spec dump retains interfaces.
+    test_extract_merge_dump_prd_pipeline_omits_forbidden_keys — PRD pipeline omits forbidden keys.
+    test_about_docs_check_passes_clean_prd_without_forbidden_keys — check passes clean PRD.
+
+Examples:
+    >>> len(FORBIDDEN_PRD_KEYS)
+    3
+"""
 
 from __future__ import annotations
 
@@ -15,6 +28,16 @@ FORBIDDEN_PRD_KEYS = ("interfaces", "depends_on", "build_phase")
 
 
 def _minimal_prd() -> AboutDoc:
+    """Return a minimal valid PRD :class:`AboutDoc` for tests.
+
+    Returns:
+        AboutDoc: PRD model with required fields populated.
+
+    Examples:
+        >>> doc = _minimal_prd()
+        >>> doc.kind
+        'prd'
+    """
     return AboutDoc(
         id="prd-01-conversational-experience",
         kind="prd",
@@ -29,6 +52,16 @@ def _minimal_prd() -> AboutDoc:
 
 
 def _minimal_spec() -> AboutDoc:
+    """Return a minimal valid spec :class:`AboutDoc` for tests.
+
+    Returns:
+        AboutDoc: Spec model with required fields populated.
+
+    Examples:
+        >>> doc = _minimal_spec()
+        >>> doc.kind
+        'spec'
+    """
     return AboutDoc(
         id="spec-17-gateway",
         kind="spec",
@@ -43,7 +76,15 @@ def _minimal_spec() -> AboutDoc:
 
 
 def test_extract_fields_omits_spec_only_keys_for_prd(tmp_path: Path) -> None:
-    """D7: ``extract_fields`` must not emit spec-only keys for ``kind: prd``."""
+    """D7: ``extract_fields`` must not emit spec-only keys for ``kind: prd``.
+
+    Args:
+        tmp_path (Path): pytest temporary directory fixture.
+
+    Examples:
+        >>> "interfaces" in FORBIDDEN_PRD_KEYS
+        True
+    """
     (tmp_path / "Makefile").write_text("ci:\n\ttrue\n", encoding="utf-8")
     fields = extract_fields(tmp_path, {"kind": "prd", "sources": ["Makefile"]})
     for key in FORBIDDEN_PRD_KEYS:
@@ -52,7 +93,15 @@ def test_extract_fields_omits_spec_only_keys_for_prd(tmp_path: Path) -> None:
 
 
 def test_extract_fields_still_emits_interfaces_for_spec(tmp_path: Path) -> None:
-    """D7: spec extraction keeps ``interfaces`` for ``kind: spec``."""
+    """D7: spec extraction keeps ``interfaces`` for ``kind: spec``.
+
+    Args:
+        tmp_path (Path): pytest temporary directory fixture.
+
+    Examples:
+        >>> "interfaces" not in FORBIDDEN_PRD_KEYS
+        True
+    """
     module_dir = tmp_path / "src" / "sevn" / "gateway"
     module_dir.mkdir(parents=True)
     (module_dir / "agent_turn.py").write_text(
@@ -67,7 +116,12 @@ def test_extract_fields_still_emits_interfaces_for_spec(tmp_path: Path) -> None:
 
 
 def test_dump_prd_frontmatter_omits_forbidden_keys() -> None:
-    """D7: serialised PRD frontmatter must not contain forbidden keys at all."""
+    """D7: serialised PRD frontmatter must not contain forbidden keys at all.
+
+    Examples:
+        >>> FORBIDDEN_PRD_KEYS[0]
+        'interfaces'
+    """
     text = dump_doc(_minimal_prd(), "## Problem & Motivation\n\nBody.\n")
     frontmatter = text.split("---", maxsplit=2)[1]
     for key in FORBIDDEN_PRD_KEYS:
@@ -75,7 +129,12 @@ def test_dump_prd_frontmatter_omits_forbidden_keys() -> None:
 
 
 def test_dump_spec_frontmatter_retains_interfaces() -> None:
-    """D7: spec serialisation keeps ``interfaces`` / ``depends_on`` where applicable."""
+    """D7: spec serialisation keeps ``interfaces`` / ``depends_on`` where applicable.
+
+    Examples:
+        >>> "depends_on" in FORBIDDEN_PRD_KEYS
+        True
+    """
     doc = _minimal_spec().model_copy(
         update={
             "interfaces": [
@@ -95,7 +154,15 @@ def test_dump_spec_frontmatter_retains_interfaces() -> None:
 
 
 def test_extract_merge_dump_prd_pipeline_omits_forbidden_keys(tmp_path: Path) -> None:
-    """Integration: extract → merge → dump for PRD never reintroduces forbidden keys."""
+    """Integration: extract → merge → dump for PRD never reintroduces forbidden keys.
+
+    Args:
+        tmp_path (Path): pytest temporary directory fixture.
+
+    Examples:
+        >>> len(FORBIDDEN_PRD_KEYS)
+        3
+    """
     (tmp_path / "Makefile").write_text("ci:\n\ttrue\n", encoding="utf-8")
     merged = _minimal_prd().model_copy(
         update=extract_fields(tmp_path, _minimal_prd().model_dump(mode="json"))
@@ -109,7 +176,15 @@ def test_extract_merge_dump_prd_pipeline_omits_forbidden_keys(tmp_path: Path) ->
 def test_about_docs_check_passes_clean_prd_without_forbidden_keys(
     tmp_path: Path,
 ) -> None:
-    """D7: ``check_about_docs`` stays green once PRD files omit forbidden keys."""
+    """D7: ``check_about_docs`` stays green once PRD files omit forbidden keys.
+
+    Args:
+        tmp_path (Path): pytest temporary directory fixture.
+
+    Examples:
+        >>> "build_phase" in FORBIDDEN_PRD_KEYS
+        True
+    """
     docs_dir = tmp_path / "about-sevn.bot" / "prd"
     docs_dir.mkdir(parents=True)
     allowlist_dir = tmp_path / "about-sevn.bot" / "_docsys"

@@ -1,11 +1,17 @@
 """Deterministic per-file validity scoring for spec-kit-wave docs (D5).
 
 Exports:
-    SCORE_THRESHOLD — minimum total score for ``done``/``ready`` docs.
     ScoreResult — per-file score breakdown.
     load_score_weights — read ``[score]`` weights from ``*-rules.toml``.
     score_doc — compute weighted 0-100 score for one markdown file.
     rollup_scores — aggregate scores across a folder.
+
+Examples:
+    >>> from skw.doc_score import SCORE_COMPONENTS, SCORE_THRESHOLD
+    >>> len(SCORE_COMPONENTS)
+    6
+    >>> SCORE_THRESHOLD
+    80
 """
 
 from __future__ import annotations
@@ -41,6 +47,16 @@ _TERMINAL_STATUSES = frozenset({"done", "ready"})
 
 
 def _default_kit_root() -> Path:
+    """Return the bundled spec-kit-wave root directory.
+
+    Returns:
+        Path: Parent of ``src/`` inside the installed package tree.
+
+    Examples:
+        >>> root = _default_kit_root()
+        >>> root.name
+        'spec-kit-wave'
+    """
     return Path(__file__).resolve().parent.parent.parent
 
 
@@ -54,7 +70,24 @@ class ScoreResult:
 
 
 def load_score_weights(kind: str, *, kit_root: Path | None = None) -> dict[str, int]:
-    """Load ``[score]`` component weights for ``kind`` (``spec`` or ``prd``)."""
+    """Load ``[score]`` component weights for ``kind`` (``spec`` or ``prd``).
+
+    Args:
+        kind (str): ``"spec"`` or ``"prd"``.
+        kit_root (Path | None, optional): spec-kit-wave root. Defaults to the
+            bundled package parent.
+
+    Returns:
+        dict[str, int]: Component name to weight (always sums to 100).
+
+    Raises:
+        ValueError: When ``kind`` is unsupported.
+
+    Examples:
+        >>> weights = load_score_weights("spec")
+        >>> sum(weights.values())
+        100
+    """
     root = kit_root or _default_kit_root()
     if kind == "spec":
         from skw.spec_validate import load_spec_rules
@@ -71,10 +104,42 @@ def load_score_weights(kind: str, *, kit_root: Path | None = None) -> dict[str, 
 
 
 def _h2_order(body: str) -> list[str]:
+    """Extract level-2 heading titles in document order.
+
+    Args:
+        body (str): Markdown body after frontmatter.
+
+    Returns:
+        list[str]: Heading titles in appearance order.
+
+    Examples:
+        >>> _h2_order("## Purpose\\n\\n## Behavior\\n")
+        ['Purpose', 'Behavior']
+    """
     return [match.group(1).strip() for match in H2_HEADING_RE.finditer(body)]
 
 
 def _parse_doc(path: Path, kind: str) -> tuple[dict[str, Any], str, str | None]:
+    """Parse frontmatter and body for one doc file.
+
+    Args:
+        path (Path): Markdown file to read.
+        kind (str): ``"spec"`` or ``"prd"``.
+
+    Returns:
+        tuple[dict[str, Any], str, str | None]: ``(meta, body, error)`` where
+        ``error`` is set when frontmatter parsing fails.
+
+    Examples:
+        >>> from pathlib import Path
+        >>> import tempfile
+        >>> with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as handle:
+        ...     _ = handle.write("no frontmatter")
+        ...     path = Path(handle.name)
+        >>> meta, body, err = _parse_doc(path, "prd")
+        >>> err is not None
+        True
+    """
     text = path.read_text(encoding="utf-8")
     if kind == "spec":
         from skw.spec_validate import parse_spec_frontmatter
@@ -86,6 +151,21 @@ def _parse_doc(path: Path, kind: str) -> tuple[dict[str, Any], str, str | None]:
 def _score_frontmatter_completeness(
     meta: dict[str, Any], rules: dict[str, Any], weight: int
 ) -> int:
+    """Score frontmatter required-key presence.
+
+    Args:
+        meta (dict[str, Any]): Parsed frontmatter mapping.
+        rules (dict[str, Any]): Merged kit rules for the doc kind.
+        weight (int): Maximum points for this component.
+
+    Returns:
+        int: ``weight`` when complete, else ``0``.
+
+    Examples:
+        >>> rules = {"frontmatter": {"required": ["id"], "kind": "prd"}}
+        >>> _score_frontmatter_completeness({"id": "prd-01-x"}, rules, 20)
+        20
+    """
     required = rules["frontmatter"]["required"]
     for key in required:
         if key not in meta:
@@ -99,6 +179,22 @@ def _score_frontmatter_completeness(
 
 
 def _score_required_sections(body: str, rules: dict[str, Any], weight: int) -> int:
+    """Score presence of required H2 sections in order.
+
+    Args:
+        body (str): Markdown body after frontmatter.
+        rules (dict[str, Any]): Merged kit rules for the doc kind.
+        weight (int): Maximum points for this component.
+
+    Returns:
+        int: ``weight`` when all required sections appear in order, else ``0``.
+
+    Examples:
+        >>> rules = {"sections": {"required": ["Purpose", "Behavior"]}}
+        >>> body = "## Purpose\\n\\n## Behavior\\n"
+        >>> _score_required_sections(body, rules, 15)
+        15
+    """
     required: list[str] = rules["sections"]["required"]
     found = _h2_order(body)
     if not found:
@@ -113,6 +209,21 @@ def _score_required_sections(body: str, rules: dict[str, Any], weight: int) -> i
 
 
 def _score_no_scaffold_phrase(body: str, rules: dict[str, Any], weight: int) -> int:
+    """Penalize forbidden scaffold phrases anywhere in the body.
+
+    Args:
+        body (str): Markdown body after frontmatter.
+        rules (dict[str, Any]): Merged kit rules for the doc kind.
+        weight (int): Maximum points for this component.
+
+    Returns:
+        int: ``0`` when a forbidden phrase is present, else ``weight``.
+
+    Examples:
+        >>> rules = {"scaffold": {"forbidden_when_ready": ["TBD"]}}
+        >>> _score_no_scaffold_phrase("## Purpose\\n\\nReal prose.", rules, 25)
+        25
+    """
     forbidden = rules["scaffold"]["forbidden_when_ready"]
     for phrase in forbidden:
         if phrase in body:
@@ -123,6 +234,22 @@ def _score_no_scaffold_phrase(body: str, rules: dict[str, Any], weight: int) -> 
 def _score_status_honesty(
     body: str, meta: dict[str, Any], rules: dict[str, Any], weight: int
 ) -> int:
+    """Penalize terminal status paired with scaffold placeholder prose.
+
+    Args:
+        body (str): Markdown body after frontmatter.
+        meta (dict[str, Any]): Parsed frontmatter mapping.
+        rules (dict[str, Any]): Merged kit rules for the doc kind.
+        weight (int): Maximum points for this component.
+
+    Returns:
+        int: ``0`` when ``done``/``ready`` overlays scaffold phrases, else ``weight``.
+
+    Examples:
+        >>> rules = {"scaffold": {"forbidden_when_ready": ["TBD"]}}
+        >>> _score_status_honesty("TBD", {"status": "draft"}, rules, 15)
+        15
+    """
     status = meta.get("status")
     if status not in _TERMINAL_STATUSES:
         return weight
@@ -134,6 +261,24 @@ def _score_status_honesty(
 
 
 def _glob_matches_repo(repo_root: Path, pattern: str) -> bool:
+    """Return whether ``pattern`` resolves under ``repo_root``.
+
+    Args:
+        repo_root (Path): Repository root for glob expansion.
+        pattern (str): Git-style glob (``**`` supported).
+
+    Returns:
+        bool: ``True`` when at least one path matches.
+
+    Examples:
+        >>> from pathlib import Path
+        >>> import tempfile
+        >>> with tempfile.TemporaryDirectory() as tmp:
+        ...     root = Path(tmp)
+        ...     (root / "Makefile").write_text("ci:")
+        ...     _glob_matches_repo(root, "Makefile")
+        True
+    """
     if pattern.endswith("/**"):
         base = pattern[:-3]
         target = repo_root / base
@@ -150,6 +295,32 @@ def _score_interfaces_sources_resolve(
     rules: dict[str, Any],
     weight: int,
 ) -> int:
+    """Score whether ``sources`` and ``interfaces`` resolve to real code.
+
+    Args:
+        meta (dict[str, Any]): Parsed frontmatter mapping.
+        kind (str): ``"spec"`` or ``"prd"``.
+        repo_root (Path): Repository root for resolution.
+        rules (dict[str, Any]): Merged kit rules for the doc kind.
+        weight (int): Maximum points for this component.
+
+    Returns:
+        int: ``weight`` when all references resolve, else ``0``.
+
+    Examples:
+        >>> meta = {"sources": ["Makefile"]}
+        >>> rules = {"frontmatter": {"forbidden_whole_repo_sources": []}}
+        >>> from pathlib import Path
+        >>> import tempfile
+        >>> with tempfile.TemporaryDirectory() as tmp:
+        ...     root = Path(tmp)
+        ...     (root / "Makefile").write_text("ci:")
+        ...     score = _score_interfaces_sources_resolve(
+        ...         meta, kind="prd", repo_root=root, rules=rules, weight=15
+        ...     )
+        ...     score
+        15
+    """
     if kind == "spec":
         from skw.spec_validate import _symbol_exists
 
@@ -200,6 +371,28 @@ def _score_link_id_hygiene(
     kind: str,
     weight: int,
 ) -> int:
+    """Score ``id`` pattern validity and numeric-id uniqueness within a folder.
+
+    Args:
+        meta (dict[str, Any]): Parsed frontmatter mapping.
+        path (Path): File being scored.
+        siblings (list[Path] | None): Other docs in the same folder.
+        rules (dict[str, Any]): Merged kit rules for the doc kind.
+        kind (str): ``"spec"`` or ``"prd"``.
+        weight (int): Maximum points for this component.
+
+    Returns:
+        int: ``weight`` when id hygiene passes, else ``0``.
+
+    Examples:
+        >>> rules = {"frontmatter": {"id_pattern": r"^spec-\\d{2}-[a-z0-9-]+$"}}
+        >>> meta = {"id": "spec-17-gateway"}
+        >>> from pathlib import Path
+        >>> _score_link_id_hygiene(
+        ...     meta, path=Path("17-gateway.md"), siblings=None, rules=rules, kind="spec", weight=10
+        ... )
+        10
+    """
     fm = rules["frontmatter"]
     doc_id = meta.get("id")
     if not isinstance(doc_id, str) or not re.fullmatch(fm["id_pattern"], doc_id):
@@ -229,7 +422,26 @@ def score_doc(
     siblings: list[Path] | None = None,
     kit_root: Path | None = None,
 ) -> ScoreResult:
-    """Compute a deterministic 0-100 validity score for one doc file."""
+    """Compute a deterministic 0-100 validity score for one doc file.
+
+    Args:
+        path (Path): Markdown file to score.
+        kind (str): ``"spec"`` or ``"prd"``.
+        repo_root (Path): Repository root for interface/source resolution.
+        siblings (list[Path] | None, optional): Sibling docs for id uniqueness.
+        kit_root (Path | None, optional): spec-kit-wave root. Defaults to the
+            bundled package parent.
+
+    Returns:
+        ScoreResult: Weighted total and per-component breakdown.
+
+    Raises:
+        ValueError: When ``kind`` is unsupported.
+
+    Examples:
+        >>> score_doc.__name__
+        'score_doc'
+    """
     root = kit_root or _default_kit_root()
     if kind == "spec":
         from skw.spec_validate import load_spec_rules
@@ -274,7 +486,18 @@ def score_doc(
 
 
 def rollup_scores(results: list[ScoreResult]) -> dict[str, Any]:
-    """Aggregate per-file scores into folder-level rollup statistics."""
+    """Aggregate per-file scores into folder-level rollup statistics.
+
+    Args:
+        results (list[ScoreResult]): Per-file score results.
+
+    Returns:
+        dict[str, Any]: ``file_count``, ``average_total``, and ``below_threshold``.
+
+    Examples:
+        >>> rollup_scores([])
+        {'file_count': 0, 'average_total': 0, 'below_threshold': []}
+    """
     if not results:
         return {"file_count": 0, "average_total": 0, "below_threshold": []}
     below = [result.path for result in results if result.total < SCORE_THRESHOLD]
