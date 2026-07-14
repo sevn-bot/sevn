@@ -57,7 +57,7 @@ def build_catalog_rows(
     fingerprints_path (Path | None): Override fingerprint store path.
 
         Returns:
-            list[CatalogRow]: Rows with ``ok`` or ``stale`` status.
+            list[CatalogRow]: Rows with ``fresh`` or ``stale`` status.
 
         Examples:
             >>> from pathlib import Path as _P
@@ -175,7 +175,7 @@ def _row_for_entry(
     stored_entries (dict[str, object]): Fingerprint store ``entries`` object.
 
         Returns:
-            CatalogRow: Row with ``ok`` or ``stale`` status.
+            CatalogRow: Row with ``fresh`` or ``stale`` status.
 
         Examples:
             >>> from sevn.docs.readme.manifest import ReadmeEntry
@@ -192,7 +192,7 @@ def _row_for_entry(
     stored_digest = ""
     if isinstance(stored_row, dict):
         stored_digest = str(stored_row.get("digest", ""))
-    status = "ok" if stored_digest == current else "stale"
+    status = "fresh" if stored_digest == current else "stale"
     return CatalogRow(
         slug=entry.slug,
         title=entry.title,

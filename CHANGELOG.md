@@ -25,6 +25,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- README `make readme-check` runs manifest `lint_summaries` and validates curated Level 1–2 symbol cites; INDEX status column shows `fresh`/`stale` with a freshness ≠ accuracy note
 - README generator drops the hardcoded gateway key-load clause unless `provider_keys_via_proxy` is set on the manifest row; non–turn-spine L2 uses module-graph prose instead of a generic stub
 - README L3 deep dives lead with full module docstrings, definition-site markdown links (`#L` anchors), and a unified 12-file symbol window aligned with `extract_module_symbols`
 - README LLM profile wiring (root value prop + highlights, guide steps, catalog intro) with offline default unchanged; root README loads `value_prop` from brand TOML and uses live GitHub Actions CI badge

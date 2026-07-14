@@ -23,6 +23,13 @@ BANNED_SUMMARY_PHRASES: tuple[tuple[str, str], ...] = (
 )
 
 
+def _title_and_summary_blockquote(markdown: str) -> str:
+    """Return rendered ``#`` title + ``> **Summary.**`` blockquote only (D10 scope)."""
+    return "\n".join(
+        line for line in markdown.splitlines() if line.startswith(("# ", "> "))
+    ).lower()
+
+
 @pytest.mark.asyncio
 async def test_offline_gateway_generation_is_standard_compliant() -> None:
     """Offline gateway README includes Summary and three tiers."""
@@ -96,4 +103,4 @@ async def test_rendered_readme_title_blockquote_omit_banned_summary_phrase(
         manifest_path=MANIFEST_PATH,
         slug=slug,
     )
-    assert phrase not in markdown.lower()
+    assert phrase not in _title_and_summary_blockquote(markdown)

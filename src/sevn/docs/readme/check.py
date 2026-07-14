@@ -3,7 +3,7 @@
 Module: sevn.docs.readme.check
 Depends: pathlib, re, sevn.docs.readme.catalog, sevn.docs.readme.fingerprint,
     sevn.docs.readme.links, sevn.docs.readme.manifest, sevn.docs.readme.profile_schemas,
-    sevn.docs.readme.render, sevn.docs.readme.symbol_refs
+    sevn.docs.readme.render, sevn.docs.readme.symbol_refs, sevn.docs.readme.verify
 
 Exports:
     CheckResult — aggregated errors and warnings from a check run.
@@ -31,6 +31,7 @@ from sevn.docs.readme.manifest import ReadmeEntry, ReadmeManifest
 from sevn.docs.readme.profile_schemas import ProfileSchema, get_profile_schema
 from sevn.docs.readme.render import validate_rendered_markdown
 from sevn.docs.readme.symbol_refs import (
+    extract_curated_prose_section,
     extract_level3_section,
     validate_path_refs,
     validate_symbol_refs,
@@ -39,6 +40,7 @@ from sevn.docs.readme.templates import (
     resolve_template_path,
     validate_against_template,
 )
+from sevn.docs.readme.verify import lint_summaries
 
 _SUMMARY_MARKERS = ("> **Summary.**", "## Summary")
 _PLACEHOLDER_LABEL = re.compile(r"PLACEHOLDER", re.IGNORECASE)
@@ -99,6 +101,9 @@ def check_readme_tree(
 
     catalog = build_catalog_rows(repo_root, manifest, fingerprints_path=fp_path)
     status_by_slug = {row.slug: row.status for row in catalog}
+
+    for err in lint_summaries(manifest, repo_root):
+        result.errors.append(err)
 
     for entry in manifest.entries:
         output = repo_root / entry.output
@@ -235,11 +240,19 @@ def _check_path_and_symbol_refs(
         for err in validate_path_refs(text, repo_root):
             result.errors.append(f"{entry.slug}: {err}")
     if schema.verify_symbol_refs:
+        symbol_sections: list[str] = []
+        if entry.curated:
+            curated = extract_curated_prose_section(text)
+            if curated.strip():
+                symbol_sections.append(curated)
         level3 = extract_level3_section(text)
-        for err in validate_path_refs(level3, repo_root):
-            result.errors.append(f"{entry.slug}: {err}")
-        for err in validate_symbol_refs(level3, repo_root):
-            result.errors.append(f"{entry.slug}: {err}")
+        if level3.strip():
+            symbol_sections.append(level3)
+        for section in symbol_sections:
+            for err in validate_path_refs(section, repo_root):
+                result.errors.append(f"{entry.slug}: {err}")
+            for err in validate_symbol_refs(section, repo_root):
+                result.errors.append(f"{entry.slug}: {err}")
 
 
 def _check_template(
