@@ -60,6 +60,7 @@ are cut into a dated, versioned section at release time.
 
 - [2026-07-14] Bundled skill seeding skips `__pycache__` when copying packaged skills, avoiding parallel-test flakes on transient `.pyc` files
 - [2026-07-14] Gateway telegram printing-press inline loader resolves bundled `_pp_cli.py` from the `sevn` package root after W12 subpackage moves; `ci-affected` doctest skips bundled skill script paths
+- [2026-07-14] `ci-affected` runs `make doctest` when more than 100 `src/sevn` files change, avoiding doctest context pollution from huge per-file pytest invocations on long-lived wave branches
 - [2026-07-14] Onboarding web and TUI wizards expose `gateway.queue_mode=multi` in capabilities (matches runtime and spec-36)
 - [2026-07-14] README pre-commit stages `_fingerprints.json` when source digests change but rendered markdown is unchanged
 - [2026-07-14] Curated Level 1–2 symbol validation flags bare `` `function_name` `` cites absent from cited Python files (line-scoped, snake_case only)
