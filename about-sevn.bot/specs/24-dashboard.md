@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver Mission Control: a same-process dashboard (prd-07-mission-control)
   so the owner can inspect traces, costs, provider health, in-flight runs, proxy status,
   and config without opening SQLite from'
-last_updated: '2026-07-12'
-fingerprint: sha256:4614069da5c2e6e4f697b84098973623cfde5154a5745367fd1e223ffe7bb3e6
+last_updated: '2026-07-14'
+fingerprint: sha256:815d492a6dafcae6ef81d25d5d9227cb50f23bf32018c77e5c9b4fe07c46c1d1
 related: []
 sources:
 - src/sevn/ui/**
@@ -585,6 +585,15 @@ interfaces:
 - name: traces_query
   file: src/sevn/ui/dashboard/api/traces.py
   symbol: traces_query
+- name: generate_dashboard_login_password
+  file: src/sevn/ui/dashboard/dashboard_password.py
+  symbol: generate_dashboard_login_password
+- name: resolve_dashboard_login_password_ref
+  file: src/sevn/ui/dashboard/dashboard_password.py
+  symbol: resolve_dashboard_login_password_ref
+- name: validate_dashboard_login_password_plaintext
+  file: src/sevn/ui/dashboard/dashboard_password.py
+  symbol: validate_dashboard_login_password_plaintext
 - name: ActionDescriptor
   file: src/sevn/ui/dashboard/dashboard_schema.py
   symbol: ActionDescriptor
