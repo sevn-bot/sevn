@@ -194,9 +194,9 @@ async def test_knowledge_memory_user_model_after_turn_hook(tmp_path: Path) -> No
     import json
     from unittest.mock import patch
 
-    from sevn.gateway.post_turn_hooks import PostTurnContext
-    from sevn.gateway.turn_metadata import record_turn_start
-    from sevn.gateway.user_model_turn import maybe_schedule_user_model_extraction_after_turn
+    from sevn.gateway.hooks.post_turn_hooks import PostTurnContext
+    from sevn.gateway.turn.turn_metadata import record_turn_start
+    from sevn.gateway.user.user_model_turn import maybe_schedule_user_model_extraction_after_turn
 
     sevn_json = tmp_path / "sevn.json"
     sevn_json.write_text(
@@ -313,7 +313,7 @@ async def test_knowledge_memory_user_model_after_turn_hook(tmp_path: Path) -> No
                 return list(prompt_segments)
 
         with patch(
-            "sevn.gateway.user_model_turn.resolve_model",
+            "sevn.gateway.user.user_model_turn.resolve_model",
             return_value=("openai/gpt-4o-mini", _FakeTransport()),
         ):
             await maybe_schedule_user_model_extraction_after_turn(ctx)

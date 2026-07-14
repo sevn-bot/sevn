@@ -123,7 +123,7 @@ async def test_openui_render_telegram_tunnel_down_raster_fallback(
 @pytest.mark.asyncio
 async def test_webchat_adapter_emits_openui_frame_from_delivery_metadata() -> None:
     from sevn.channels.webchat import WebChatAdapter
-    from sevn.gateway.web_transport import WebChannelTransport
+    from sevn.gateway.api.web_transport import WebChannelTransport
 
     class _WS:
         def __init__(self) -> None:

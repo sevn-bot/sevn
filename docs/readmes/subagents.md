@@ -17,7 +17,7 @@ When `gateway.queue_mode` is **`multi`**, a message that arrives while a session
 
 ### Components and layout
 
-Implementation spans [`src/sevn/agent/subagents/`](../../src/sevn/agent/subagents/) (registry, supervisor, storage, specialists, media workers), [`queue_multi.py`](../../src/sevn/gateway/queue_multi.py), [`subagent_spawn.py`](../../src/sevn/tools/subagent_spawn.py), and [`subagents_cmd.py`](../../src/sevn/cli/commands/subagents_cmd.py).
+Implementation spans [`src/sevn/agent/subagents/`](../../src/sevn/agent/subagents/) (registry, supervisor, storage, specialists, media workers), [`queue_multi.py`](../../src/sevn/gateway/queue/queue_multi.py), [`subagent_spawn.py`](../../src/sevn/tools/subagent_spawn.py), and [`subagents_cmd.py`](../../src/sevn/cli/commands/subagents_cmd.py).
 
 ### Level-1 and level-2 runs
 
@@ -25,7 +25,7 @@ In [`supervisor.py`](../../src/sevn/agent/subagents/supervisor.py), [`SubAgentSu
 
 ### Multi queue mode
 
-When the gateway is in `multi` mode, [`queue_multi.py`](../../src/sevn/gateway/queue_multi.py) classifies busy-session input (steer vs supersede vs spawn a fresh level-1 tier-B run on the same session/channel). Announcements and Mission Control snapshots flow through [`subagents_announce.py`](../../src/sevn/gateway/subagents_announce.py) and [`mission_subagents_snapshot.py`](../../src/sevn/gateway/mission_subagents_snapshot.py).
+When the gateway is in `multi` mode, [`queue_multi.py`](../../src/sevn/gateway/queue/queue_multi.py) classifies busy-session input (steer vs supersede vs spawn a fresh level-1 tier-B run on the same session/channel). Announcements and Mission Control snapshots flow through [`subagents_announce.py`](../../src/sevn/gateway/subagents/subagents_announce.py) and [`mission_subagents_snapshot.py`](../../src/sevn/gateway/mission/mission_subagents_snapshot.py).
 
 ### Configuration (`sevn.json` → `subagents`)
 
@@ -62,8 +62,8 @@ Primary source tree: `src/sevn/agent/` (14 Python files). Operator design: `abou
 - `src/sevn/agent/subagents/supervisor.py` — """Spawn, kill, and complete tracked sub-agent runs against the registry (D4/D5/D9/D11).
 - `src/sevn/cli/commands/subagents_cmd.py` — """''sevn subagents'' — list, kill, and limit controls (D13).
 - `src/sevn/config/sections/subagents.py` — """Sub-agents (L1/L2) subtree models for ''sevn.json''.
-- `src/sevn/gateway/mission_subagents_snapshot.py` — """Mission Control sub-agent snapshot assembly (registry + telemetry + storage).
-- `src/sevn/gateway/queue_multi.py` — """''multi'' queue-mode orchestration helpers (D6, 'about-sevn.bot/sub-agents.html').
+- `src/sevn/gateway/mission/mission_subagents_snapshot.py` — """Mission Control sub-agent snapshot assembly (registry + telemetry + storage).
+- `src/sevn/gateway/queue/queue_multi.py` — """''multi'' queue-mode orchestration helpers (D6, 'about-sevn.bot/sub-agents.html').
 - … and 2 more Python modules
 
 ### Media Minimax (`src/sevn/agent/subagents/media_minimax.py`)
@@ -137,7 +137,7 @@ Public entry points:
 
 ### Additional modules
 
-2 more Python files under `src/sevn/agent/` — including `src/sevn/gateway/subagents_announce.py`, `src/sevn/tools/subagent_spawn.py`.
+2 more Python files under `src/sevn/agent/` — including `src/sevn/gateway/subagents/subagents_announce.py`, `src/sevn/tools/subagent_spawn.py`.
 
 ### Extension and invariants
 

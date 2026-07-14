@@ -1,7 +1,7 @@
 """Mission Control owner login password constants and secret-ref resolution.
 
 Module: sevn.ui.dashboard.dashboard_password
-Depends: sevn.gateway.gateway_token, sevn.config.settings, sevn.security.secrets.*
+Depends: sevn.gateway.runtime.gateway_token, sevn.config.settings, sevn.security.secrets.*
 
 Constants:
     DASHBOARD_LOGIN_PASSWORD_LOGICAL_KEY — secrets chain logical id.
@@ -20,7 +20,7 @@ import secrets
 from typing import TYPE_CHECKING
 
 from sevn.config.settings import ProcessSettings
-from sevn.gateway.gateway_token import resolve_config_ref
+from sevn.gateway.runtime.gateway_token import resolve_config_ref
 
 if TYPE_CHECKING:
     from pathlib import Path

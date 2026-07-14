@@ -13,11 +13,11 @@ from sevn.gateway.agent_turn import build_agent_run_turn
 from sevn.gateway.channel_router import ChannelRouter, IncomingMessage
 from sevn.gateway.commands.dispatcher import CommandDispatcher
 from sevn.gateway.commands.menu_action_router import parse_action_callback
-from sevn.gateway.media_store import MediaStore
-from sevn.gateway.menu import build_config_menu_keyboard
-from sevn.gateway.rate_limit import TokenBucketLimiter
+from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json
+from sevn.gateway.media.media_store import MediaStore
+from sevn.gateway.menu.menu import build_config_menu_keyboard
+from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
 from sevn.gateway.session_manager import SessionManager
-from sevn.gateway.workspace_config_io import load_raw_sevn_json
 from sevn.onboarding.web_app import _get_nested
 from sevn.security.llm_guard_scanner import LLMGuardScanner
 from sevn.workspace.layout import WorkspaceLayout
@@ -272,7 +272,7 @@ async def test_security_toggle_updates_caption_in_place(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_help_section_navigation(tmp_path: Path) -> None:
-    from sevn.gateway.menu_readiness import config_menu_help_catalog_text
+    from sevn.gateway.menu.menu_readiness import config_menu_help_catalog_text
 
     router, cap, _ws = _build_router(tmp_path)
     await router.route_incoming(_config_callback("cfg:section:help"))
@@ -419,7 +419,7 @@ async def test_shortcut_delete_round_trip(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_dashboard_section_navigation(tmp_path: Path) -> None:
     from sevn.config.loader import load_workspace
-    from sevn.gateway.workspace_config_io import mutate_sevn_json
+    from sevn.gateway.config_io.workspace_config_io import mutate_sevn_json
     from sevn.onboarding.web_app import _set_nested
 
     router, cap, _ws = _build_router(tmp_path)
@@ -655,7 +655,7 @@ async def test_notifications_policy_cycle_mutates_and_refreshes(tmp_path: Path) 
 @pytest.mark.asyncio
 async def test_advanced_section_navigation(tmp_path: Path) -> None:
     from sevn.config.loader import load_workspace
-    from sevn.gateway.workspace_config_io import mutate_sevn_json
+    from sevn.gateway.config_io.workspace_config_io import mutate_sevn_json
     from sevn.onboarding.web_app import _set_nested
 
     router, cap, _ws = _build_router(tmp_path)
@@ -796,8 +796,8 @@ async def test_second_brain_toggle_updates_caption_in_place(tmp_path: Path) -> N
 @pytest.mark.asyncio
 async def test_integrations_section_lists_ids_and_dashboard_link(tmp_path: Path) -> None:
     from sevn.config.loader import load_workspace
-    from sevn.gateway.menu import _mission_control_url
-    from sevn.gateway.workspace_config_io import mutate_sevn_json
+    from sevn.gateway.config_io.workspace_config_io import mutate_sevn_json
+    from sevn.gateway.menu.menu import _mission_control_url
     from sevn.onboarding.web_app import _set_nested
 
     router, cap, _ws = _build_router(tmp_path)

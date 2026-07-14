@@ -24,8 +24,8 @@ from sevn.config.workspace_config import (
     WorkspaceConfig,
 )
 from sevn.gateway.http_server import create_app
-from sevn.gateway.webapp_qa import resolve_webapp_public_base
-from sevn.gateway.webapp_viewer import (
+from sevn.gateway.webapp.webapp_qa import resolve_webapp_public_base
+from sevn.gateway.webapp.webapp_viewer import (
     append_viewer_stream_chunk,
     mark_viewer_stream_done,
     mint_webapp_viewer_token,

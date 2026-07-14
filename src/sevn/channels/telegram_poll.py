@@ -1,7 +1,7 @@
 """Long-poll lifecycle and command-menu sync for TelegramAdapter.
 
 Module: sevn.channels.telegram_poll
-Depends: asyncio, secrets, socket, sevn.gateway.telegram_inline
+Depends: asyncio, secrets, socket, sevn.gateway.telegram.telegram_inline
 
 Exports:
     TelegramPollMixin — ``start`` / ``stop`` / poll loop mixed into the adapter.
@@ -236,7 +236,7 @@ class TelegramPollMixin(TelegramSendHost):
         if router is not None:
             workspace = getattr(router, "_workspace", None)
             if workspace is not None:
-                from sevn.gateway.webapp_viewer import sync_telegram_chat_menu_button
+                from sevn.gateway.webapp.webapp_viewer import sync_telegram_chat_menu_button
 
                 await sync_telegram_chat_menu_button(self._api, workspace)
 

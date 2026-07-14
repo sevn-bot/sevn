@@ -13,13 +13,13 @@ import json
 import sqlite3
 from pathlib import Path
 
-from sevn.gateway.bootstrap_capture import (
+from sevn.gateway.bootstrap.bootstrap_capture import (
     _parse_labeled_bootstrap_fields,
     _replace_field_line,
     extract_bootstrap_name,
     try_bootstrap_user_md_fallback,
 )
-from sevn.gateway.first_session import bootstrap_completion_state
+from sevn.gateway.onboarding.first_session import bootstrap_completion_state
 from sevn.onboarding.seed import seed_narrative_templates
 from sevn.storage.migrate import apply_migrations
 from sevn.tools.workspace_files import write_workspace_md

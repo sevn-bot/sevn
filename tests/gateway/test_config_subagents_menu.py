@@ -13,7 +13,7 @@ from sevn.config.sections.subagents import SubAgentsWorkspaceConfig
 from sevn.config.workspace_config import GatewayConfig, WorkspaceConfig
 from sevn.gateway.commands.menu_action_router import MenuActionRouter, parse_action_callback
 from sevn.gateway.commands.menu_form_handler import parse_form_callback
-from sevn.gateway.menu import (
+from sevn.gateway.menu.menu import (
     _build_subagents_keyboard_rows,
     _build_subagents_running_keyboard_rows,
     build_config_menu_keyboard,

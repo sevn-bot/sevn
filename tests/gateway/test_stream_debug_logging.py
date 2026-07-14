@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 from sevn.channels.telegram import TelegramAdapter, TelegramConfig
-from sevn.gateway.turn_finalizer import TierBAnswerFinalizer
+from sevn.gateway.turn.turn_finalizer import TierBAnswerFinalizer
 
 
 class _StubAdapter:

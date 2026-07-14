@@ -2,7 +2,7 @@
 
 Module: sevn.agent.subagents.media_worker
 Depends: json, pathlib, sqlite3, sevn.agent.subagents.media_minimax,
-    sevn.agent.subagents.specialists, sevn.config.loader, sevn.gateway.media_store
+    sevn.agent.subagents.specialists, sevn.config.loader, sevn.gateway.media.media_store
 
 Exports:
     MediaTask — parsed generation request.
@@ -37,7 +37,7 @@ from sevn.agent.subagents.specialists import resolve_specialist
 from sevn.config.loader import load_workspace
 from sevn.config.provider_secrets import provider_secret_alias
 from sevn.config.sections.providers import providers_section_dict
-from sevn.gateway.media_store import MediaStore
+from sevn.gateway.media.media_store import MediaStore
 from sevn.security.secrets.cache import ResolvedSecretsCache
 from sevn.security.secrets.chain import SecretsChain, get_secret_resilient
 from sevn.security.secrets.factory import secrets_chain_from_workspace

@@ -37,7 +37,7 @@ from textual.widgets import (
 
 from sevn.cli.operator_lock import operator_lock
 from sevn.cli.workspace import bound_sevn_json_path, bound_workspace_dir, sevn_home_dir
-from sevn.gateway.gateway_token import generate_gateway_token
+from sevn.gateway.runtime.gateway_token import generate_gateway_token
 from sevn.onboarding.capabilities_manifest import (
     list_groups,
     load_manifest,

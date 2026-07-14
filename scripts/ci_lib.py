@@ -50,9 +50,7 @@ PATH_RULES: tuple[PathRule, ...] = (
     PathRule(("pyproject.toml",), "security"),
     PathRule(
         (
-            "src/sevn/gateway/menu*.py",
-            "src/sevn/gateway/menu_registry.py",
-            "src/sevn/gateway/menu_readiness.py",
+            "src/sevn/gateway/menu/**",
             "about-sevn.bot/Telegram Menu.html",
             "about-sevn.bot/Telegram*",
             "scripts/check_telegram_menu*.py",
@@ -62,7 +60,7 @@ PATH_RULES: tuple[PathRule, ...] = (
     ),
     PathRule(
         (
-            "src/sevn/gateway/menu*.py",
+            "src/sevn/gateway/menu/**",
             "about-sevn.bot/Telegram Menu.html",
             "about-sevn.bot/Telegram*",
             "scripts/check_telegram_menu_docs.py",
@@ -300,7 +298,7 @@ def _pattern_matches(rel_path: str, pattern: str) -> bool:
         bool: True on match.
 
     Examples:
-        >>> _pattern_matches("src/sevn/gateway/menu_registry.py", "src/sevn/gateway/menu*.py")
+        >>> _pattern_matches("src/sevn/gateway/menu/menu_registry.py", "src/sevn/gateway/menu/**")
         True
     """
     if fnmatch.fnmatch(rel_path, pattern):
@@ -365,9 +363,9 @@ def _module_dotted_name(src_path: Path) -> str | None:
         str | None: Dotted module name or ``None``.
 
     Examples:
-        >>> p = REPO_ROOT / "src/sevn/gateway/turn_bundle.py"
+        >>> p = REPO_ROOT / "src/sevn/gateway/turn/turn_bundle.py"
         >>> _module_dotted_name(p)
-        'sevn.gateway.turn_bundle'
+        'sevn.gateway.turn.turn_bundle'
     """
     try:
         rel = src_path.relative_to(REPO_ROOT / "src")
@@ -386,7 +384,7 @@ def _import_needles(modules: set[str]) -> set[str]:
         set[str]: Import-line substrings to search for.
 
     Examples:
-        >>> "from sevn.gateway" in _import_needles({"sevn.gateway.turn_bundle"})
+        >>> "from sevn.gateway" in _import_needles({"sevn.gateway.turn.turn_bundle"})
         True
     """
     needles: set[str] = set()
@@ -412,7 +410,7 @@ def _paired_test(src: Path) -> Path | None:
         Path | None: Matching test module or ``None``.
 
     Examples:
-        >>> p = REPO_ROOT / "src/sevn/gateway/bootstrap_capture.py"
+        >>> p = REPO_ROOT / "src/sevn/gateway/bootstrap/bootstrap_capture.py"
         >>> _paired_test(p) == REPO_ROOT / "tests/gateway/test_bootstrap_capture.py"
         True
     """

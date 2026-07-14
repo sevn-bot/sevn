@@ -14,7 +14,7 @@ from typing import Literal
 import pytest
 
 from sevn.channels import telegram_rich as rich_mod
-from sevn.gateway import webapp_viewer as viewer_mod
+from sevn.gateway.webapp import webapp_viewer as viewer_mod
 
 RegionKind = Literal["slideshow", "collage", "table", "image_line"]
 

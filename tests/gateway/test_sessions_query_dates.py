@@ -3,7 +3,7 @@
 Guards the timezone-correct comparison: gateway_messages store local-offset ISO
 (``…+02:00``) while gateway_sessions store naive-UTC (space-separated), so the
 queries normalise both sides with SQLite ``datetime()`` before comparing against
-naive-UTC bounds from :func:`sevn.gateway.timestamps.resolve_time_range`.
+naive-UTC bounds from :func:`sevn.gateway.util.timestamps.resolve_time_range`.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import sqlite3
 
 import pytest
 
-from sevn.gateway.sessions_query import (
+from sevn.gateway.session.sessions_query import (
     fetch_session_history,
     list_sessions,
     list_sessions_active_between,

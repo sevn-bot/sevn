@@ -12,15 +12,15 @@ import pytest
 
 from sevn.agent.tracing.sink import NullTraceSink
 from sevn.config.workspace_config import WorkspaceConfig
-from sevn.gateway.channel_router import ChannelRouter, IncomingMessage
-from sevn.gateway.commands.dispatcher import CommandDispatcher
-from sevn.gateway.e2e_echo import (
+from sevn.gateway.api.e2e_echo import (
     SEVN_E2E_ECHO_DELAY_ENV,
     _echo_delay_seconds,
     build_echo_run_turn,
 )
-from sevn.gateway.media_store import MediaStore
-from sevn.gateway.rate_limit import TokenBucketLimiter
+from sevn.gateway.channel_router import ChannelRouter, IncomingMessage
+from sevn.gateway.commands.dispatcher import CommandDispatcher
+from sevn.gateway.media.media_store import MediaStore
+from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
 from sevn.gateway.session_manager import SessionManager
 from sevn.security.llm_guard_scanner import LLMGuardScanner, ScanResult, ScanVerdict
 from sevn.storage.migrate import apply_migrations
@@ -135,7 +135,7 @@ async def test_echo_run_turn_awaits_sleep_when_env_set(
         sleep_calls.append(delay)
         await original_sleep(0)
 
-    monkeypatch.setattr("sevn.gateway.e2e_echo.asyncio.sleep", _spy_sleep)
+    monkeypatch.setattr("sevn.gateway.api.e2e_echo.asyncio.sleep", _spy_sleep)
     try:
         session_id = await router.session_manager.ensure_session(
             scope_key="webchat:alice",
@@ -188,7 +188,7 @@ async def test_echo_run_turn_skips_sleep_when_env_unset(
     async def _spy_sleep(delay: float) -> None:
         sleep_calls.append(delay)
 
-    monkeypatch.setattr("sevn.gateway.e2e_echo.asyncio.sleep", _spy_sleep)
+    monkeypatch.setattr("sevn.gateway.api.e2e_echo.asyncio.sleep", _spy_sleep)
     try:
         session_id = await router.session_manager.ensure_session(
             scope_key="webchat:bob",

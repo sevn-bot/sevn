@@ -19,10 +19,10 @@ from sevn.channels.telegram_capabilities import RichCapability
 from sevn.config.workspace_config import parse_workspace_config
 from sevn.gateway.channel_router import ChannelRouter, OutgoingMessage
 from sevn.gateway.commands.dispatcher import CommandDispatcher
-from sevn.gateway.media_store import MediaStore
-from sevn.gateway.rate_limit import TokenBucketLimiter
+from sevn.gateway.media.media_store import MediaStore
+from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
 from sevn.gateway.session_manager import SessionManager
-from sevn.gateway.telegram_quick_actions import GATEWAY_OUTBOUND_PHASE_KEY
+from sevn.gateway.telegram.telegram_quick_actions import GATEWAY_OUTBOUND_PHASE_KEY
 from sevn.security.llm_guard_scanner import LLMGuardScanner
 from sevn.storage.migrate import apply_migrations
 

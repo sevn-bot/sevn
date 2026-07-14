@@ -1,7 +1,7 @@
 """Owner-only ``/logs`` and ``/traces`` slash commands (`specs/17-gateway.md` §2.9, §10.14 TE-3).
 
 Module: sevn.gateway.commands.diagnostic_commands
-Depends: sevn.agent.tracing.sink_factory, sevn.gateway.diagnostics
+Depends: sevn.agent.tracing.sink_factory, sevn.gateway.diagnostics.diagnostics
 
 Exports:
     DiagnosticCommandHandler — owner-gated `/logs` / `/traces` slash dispatcher.
@@ -17,7 +17,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from sevn.agent.tracing.sink_factory import trace_redaction_policy_for
-from sevn.gateway.diagnostics import (
+from sevn.gateway.diagnostics.diagnostics import (
     format_for_telegram,
     format_traces_for_telegram,
     get_span,

@@ -2,7 +2,7 @@
 """Bundled ``sessions_management`` skill — spawn subagent session.
 
 Module: sevn.data.bundled_skills.core.sessions_management.scripts.spawn
-Depends: argparse, sevn.gateway.sessions_query, sevn.lcm.script_cli
+Depends: argparse, sevn.gateway.session.sessions_query, sevn.lcm.script_cli
 
 Exports:
     main — CLI entry; JSON envelope on stdout.
@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 import os
 
-from sevn.gateway.sessions_query import spawn_subagent
+from sevn.gateway.session.sessions_query import spawn_subagent
 from sevn.lcm.script_cli import open_workspace_db, write_error, write_ok
 
 

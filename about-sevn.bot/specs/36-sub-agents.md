@@ -377,43 +377,43 @@ Docs gate: `make subagents-chart-check` (deterministic SVG); `make ci-docs`.
 
 - [x] `SubAgentRun` / `SubAgentRegistry` / `SubAgentSupervisor` (D3/D4) (2026-07-12 ✅: `src/sevn/agent/subagents/`)
 - [x] `subagent_runs` migration + orphan sweep (D10) (2026-07-12 ✅: `src/sevn/storage/migrate.py`, `tests/fixtures/storage/golden/migration_23.sql`)
-- [x] Gateway boot supervisor (2026-07-12 ✅: `src/sevn/gateway/subagents_boot.py`)
+- [x] Gateway boot supervisor (2026-07-12 ✅: `src/sevn/gateway/subagents/subagents_boot.py`)
 
 ### 10.3 Wave W3 — Runtime wiring — append-only
 
 - [x] L1 registration in `agent_turn.py` (triager + tier B/C/D register → run → finalize) (2026-07-12 ✅: `src/sevn/gateway/agent_turn.py`, `tests/gateway/test_agent_turn_subagents.py`)
 - [x] `specialists.py` resolver + `assigned_to`/`requestable_by` gating (D8) (2026-07-12 ✅: `src/sevn/agent/subagents/specialists.py`, `tests/agent/subagents/test_specialists.py`)
-- [x] `spawn_subagent` tool (fire-and-forget + `wait:true` + announce-back) (2026-07-12 ✅: `src/sevn/tools/subagent_spawn.py`, `src/sevn/gateway/subagents_announce.py`)
+- [x] `spawn_subagent` tool (fire-and-forget + `wait:true` + announce-back) (2026-07-12 ✅: `src/sevn/tools/subagent_spawn.py`, `src/sevn/gateway/subagents/subagents_announce.py`)
 - [x] Triager `specialist_grants` → tier-B tool context (W3.4) (2026-07-12 ✅: `src/sevn/agent/triager/models.py`, `tests/gateway/test_agent_turn_subagents.py`)
 - [x] L2 spawns draw parent `CascadeBudget` (D11) (2026-07-12 ✅: `ToolContext.subagent_remaining_budget_s`, `spawn_subagent_tool` wait path)
 - [x] Harness tests (no LLM round-trips) (2026-07-12 ✅: `tests/agent/subagents/test_spawn_subagent_tool.py`, `tests/gateway/test_agent_turn_subagents.py`)
 
 ### 10.4 Wave W4 — Queue mode `multi` — append-only
 
-- [x] `enqueue_dispatch` `multi` branch (related_steer / supersede_cancel / new_task) (2026-07-12 ✅: `src/sevn/gateway/session_manager.py`, `src/sevn/gateway/queue_multi.py`)
+- [x] `enqueue_dispatch` `multi` branch (related_steer / supersede_cancel / new_task) (2026-07-12 ✅: `src/sevn/gateway/session_manager.py`, `src/sevn/gateway/queue/queue_multi.py`)
 - [x] Relatedness classifier with timeout → steer fallback (D6) (2026-07-12 ✅: `src/sevn/agent/triager/relatedness.py`)
 - [x] L1 tier-B spawn on `new_task` with fresh cascade budget (D11) (2026-07-12 ✅: `src/sevn/gateway/agent_turn.py::_spawn_multi_l1_tier_b`)
-- [x] Routing-footer sub-agent tags (D7) (2026-07-12 ✅: `src/sevn/gateway/routing_footer.py`)
+- [x] Routing-footer sub-agent tags (D7) (2026-07-12 ✅: `src/sevn/gateway/routing/routing_footer.py`)
 - [x] Limit-exceeded / classifier-timeout steer fallback with operator notice (D5) (2026-07-12 ✅: `tests/gateway/test_queue_multi.py`)
 - [x] Harness tests (no LLM round-trips) (2026-07-12 ✅: `tests/gateway/test_queue_multi.py`)
 
 ### 10.5 Wave W5 — Tracing, telemetry, Prometheus — append-only
 
 - [x] OTel `sevn.subagent` span per run with parent linkage (D12) (2026-07-12 ✅: `src/sevn/agent/tracing/subagent_trace.py`, `tests/agent/tracing/test_subagent_trace.py::test_two_level_run_emits_parented_subagent_spans`)
-- [x] Mission telemetry kinds `subagent_spawned` / `subagent_finished` / `subagent_killed` (2026-07-12 ✅: `src/sevn/gateway/mission_state_models.py`, `src/sevn/gateway/mission_state.py`)
-- [x] Prometheus `sevn_subagents_running{level,role}` + `sevn_subagents_total{status}` (2026-07-12 ✅: `src/sevn/gateway/prometheus_metrics.py`, `tests/gateway/test_metrics.py`)
+- [x] Mission telemetry kinds `subagent_spawned` / `subagent_finished` / `subagent_killed` (2026-07-12 ✅: `src/sevn/gateway/mission/mission_state_models.py`, `src/sevn/gateway/mission/mission_state.py`)
+- [x] Prometheus `sevn_subagents_running{level,role}` + `sevn_subagents_total{status}` (2026-07-12 ✅: `src/sevn/gateway/runtime/prometheus_metrics.py`, `tests/gateway/test_metrics.py`)
 - [x] Tests — OTel parentage, mission-sink counts, metrics scrape (2026-07-12 ✅: `tests/agent/tracing/test_subagent_trace.py`, `tests/gateway/test_metrics.py`)
 
 ### 10.6 Wave W6 — Mission Control panel — append-only
 
-- [x] Snapshot — running sub-agent counts by level/role, rows with id/role/specialist/task/status/age (2026-07-12 ✅: `src/sevn/gateway/mission_subagents_snapshot.py`)
-- [x] `mission_api.py` + `ops.py` — `GET /mission/subagents`, `POST /mission/subagents/{id}/kill`, `POST /mission/subagents/kill_all?role=` (owner+CSRF) (2026-07-12 ✅: `src/sevn/gateway/mission_api.py`, `src/sevn/ui/dashboard/api/ops.py`)
+- [x] Snapshot — running sub-agent counts by level/role, rows with id/role/specialist/task/status/age (2026-07-12 ✅: `src/sevn/gateway/mission/mission_subagents_snapshot.py`)
+- [x] `mission_api.py` + `ops.py` — `GET /mission/subagents`, `POST /mission/subagents/{id}/kill`, `POST /mission/subagents/kill_all?role=` (owner+CSRF) (2026-07-12 ✅: `src/sevn/gateway/mission/mission_api.py`, `src/sevn/ui/dashboard/api/ops.py`)
 - [x] Dashboard UI — Sub-agents panel: L1/L2 chips, running table + kill, recent history, read-only limits + config link (2026-07-12 ✅: `src/sevn/ui/spa/dashboard/app.js`, `tab_registry.py`)
 - [x] Tests — `tests/gateway/test_mission_subagents.py` API shapes, kill round-trip, auth-required (2026-07-12 ✅: `tests/gateway/test_mission_subagents.py`)
 
 ### 10.7 Wave W7 — Telegram `/config` + CLI — append-only
 
-- [x] Telegram Sub-agents section — enabled, limits, max_override, live L1/L2 counts, queue mode incl. `multi`, Running kill submenu (2026-07-12 ✅: `src/sevn/gateway/menu.py`, `menu_registry.py`, `menu_form_handler.py`, `menu_action_router.py`, `menu_readiness.py`)
+- [x] Telegram Sub-agents section — enabled, limits, max_override, live L1/L2 counts, queue mode incl. `multi`, Running kill submenu (2026-07-12 ✅: `src/sevn/gateway/menu/menu.py`, `menu_registry.py`, `menu_form_handler.py`, `menu_action_router.py`, `menu_readiness.py`)
 - [x] `sevn subagents list|kill|limits` + `sevn config subagents` + doctor `subagents_registry` probe (2026-07-12 ✅: `src/sevn/cli/commands/subagents_cmd.py`, `dashboard_api_client.py`, `cli/doctor/probes.py`, `src/sevn/data/doctor_solutions.json`, `src/sevn/cli/help/panels.py`)
 - [x] Tests — `tests/gateway/test_config_subagents_menu.py`, `tests/cli/test_subagents_cmd.py`, doctor golden ids (2026-07-12 ✅)
 - [x] Telegram menu docs — `about-sevn.bot/Telegram Menu.html` + `make about-site` (2026-07-12 ✅)

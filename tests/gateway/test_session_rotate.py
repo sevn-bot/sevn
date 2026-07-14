@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from sevn.config.workspace_config import WorkspaceConfig
-from sevn.gateway.first_session import intro_state_for_scope, mark_intro_state
+from sevn.gateway.onboarding.first_session import intro_state_for_scope, mark_intro_state
 from sevn.gateway.session_manager import SessionManager, format_lcm_status_lines, load_session_row
 from sevn.skills.browser_session import CloseBrowserResult
 from sevn.storage.migrate import apply_migrations
@@ -51,7 +51,7 @@ def test_ensure_session_after_rotate_returns_new_id() -> None:
 
 
 def test_session_mirror_separate_jsonl_per_session(tmp_path: Path) -> None:
-    from sevn.gateway.session_mirror import mirror_gateway_message
+    from sevn.gateway.session.session_mirror import mirror_gateway_message
 
     conn = sqlite3.connect(":memory:")
     apply_migrations(conn)

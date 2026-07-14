@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     import pytest
 
 from sevn.cli.app import app
-from sevn.gateway.gateway_token import (
+from sevn.gateway.runtime.gateway_token import (
     GATEWAY_TOKEN_CONFIG_REF,
     GATEWAY_TOKEN_LOGICAL_KEY,
     generate_gateway_token,

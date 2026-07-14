@@ -48,7 +48,7 @@ from sevn.security.secrets.factory import (
     secrets_chain_from_workspace,
 )
 
-# Keep in sync with ``sevn.gateway.gateway_token.GATEWAY_TOKEN_LOGICAL_KEY``.
+# Keep in sync with ``sevn.gateway.runtime.gateway_token.GATEWAY_TOKEN_LOGICAL_KEY``.
 _GATEWAY_TOKEN_LOGICAL_KEY = "sevn.gateway.token"  # nosec B105
 _GITHUB_TOKEN_LOGICAL_KEY = "integration.github.token"  # nosec B105
 

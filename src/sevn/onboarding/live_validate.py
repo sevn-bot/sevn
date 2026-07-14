@@ -890,7 +890,7 @@ def probe_webapp_https(*, merged_preview: dict[str, Any]) -> ValidationCheck:
         >>> chk.check_id == "webapp_https"
         True
     """
-    from sevn.gateway.webapp_qa import (
+    from sevn.gateway.webapp.webapp_qa import (
         resolve_webapp_public_base,
         webapp_https_disabled_notice,
     )

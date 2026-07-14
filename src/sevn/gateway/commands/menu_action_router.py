@@ -1,11 +1,11 @@
 """Polymorphic ``cfg:*`` / shortcut action dispatch (`plan/telegram-commands-design.md` §4.5).
 
 Module: sevn.gateway.commands.menu_action_router
-Depends: json, sqlite3, sevn.gateway.dispatcher_state, sevn.gateway.commands.dispatcher_kinds,
-    sevn.gateway.commands.shortcuts_store, sevn.gateway.workspace_config_io
+Depends: json, sqlite3, sevn.gateway.dispatcher.dispatcher_state, sevn.gateway.commands.dispatcher_kinds,
+    sevn.gateway.commands.shortcuts_store, sevn.gateway.config_io.workspace_config_io
 
 Exports:
-    MenuActionRouter — sibling to :class:`sevn.gateway.menu.MenuCallbackHandler` nav.
+    MenuActionRouter — sibling to :class:`sevn.gateway.menu.menu.MenuCallbackHandler` nav.
     infer_config_section_from_callback — map action callbacks to ``/config`` sections.
     parse_action_callback — parse action callback namespaces.
 Examples:
@@ -55,8 +55,12 @@ from sevn.gateway.commands.shortcuts_store import (
     find_shortcut,
     republish_set_my_commands,
 )
-from sevn.gateway.dispatcher_state import dispatcher_state_ttl_for_kind, insert_dispatcher_state
-from sevn.gateway.menu import (
+from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
+from sevn.gateway.dispatcher.dispatcher_state import (
+    dispatcher_state_ttl_for_kind,
+    insert_dispatcher_state,
+)
+from sevn.gateway.menu.menu import (
     ConfigMenuNavFrame,
     ConfigMenuRefreshContext,
     ConfigSection,
@@ -72,7 +76,6 @@ from sevn.gateway.menu import (
     refresh_config_menu_message,
     service_restart_confirm_message,
 )
-from sevn.gateway.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
 from sevn.onboarding.web_app import _get_nested, _set_nested
 
 if TYPE_CHECKING:
@@ -619,7 +622,7 @@ class MenuActionRouter:
         if ctx is None:
             return "Missing chat context."
         chat_raw, topic_id = ctx
-        from sevn.gateway.dashboard_pin import (
+        from sevn.gateway.dashboard.dashboard_pin import (
             DashboardPinPublisher,
             default_pin_keyboard,
             default_pin_text,
@@ -698,7 +701,7 @@ class MenuActionRouter:
         if adapter is None:
             return "Channel unavailable."
         from sevn.gateway.channel_router import OutgoingMessage, _telegram_reply_metadata
-        from sevn.gateway.dashboard_pin import (
+        from sevn.gateway.dashboard.dashboard_pin import (
             default_pin_keyboard,
             default_pin_text,
             lookup_dashboard_pin_message_id,
@@ -791,7 +794,7 @@ class MenuActionRouter:
         if ctx is None:
             return "Missing chat context."
         chat_raw, topic_id = ctx
-        from sevn.gateway.dashboard_pin import unregister_dashboard_pin
+        from sevn.gateway.dashboard.dashboard_pin import unregister_dashboard_pin
 
         pin_message_id = unregister_dashboard_pin(
             self._router,
@@ -1178,7 +1181,7 @@ class MenuActionRouter:
                 callback_query_id=cq_str,
                 text=f"Restarting {restart_label}…",
             )
-        from sevn.gateway.gateway_restart_ack import (
+        from sevn.gateway.runtime.gateway_restart_ack import (
             conversation_snapshot_for_session,
             has_pending_gateway_restart,
             recent_restart_ack_delivered,
@@ -1568,7 +1571,7 @@ class MenuActionRouter:
             True
         """
         from sevn.agent.tracing.sink_factory import trace_redaction_policy_for
-        from sevn.gateway.diagnostics import format_for_telegram, tail_service_log
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram, tail_service_log
         from sevn.workspace.layout import WorkspaceLayout
 
         parts = suffix.split(":")
@@ -1622,7 +1625,7 @@ class MenuActionRouter:
             True
         """
         from sevn.agent.tracing.sink_factory import trace_redaction_policy_for
-        from sevn.gateway.diagnostics import format_traces_for_telegram, recent_traces
+        from sevn.gateway.diagnostics.diagnostics import format_traces_for_telegram, recent_traces
         from sevn.workspace.layout import WorkspaceLayout
 
         parts = suffix.split(":")

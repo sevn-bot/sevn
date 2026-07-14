@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from sevn.config.workspace_config import WorkspaceConfig
-from sevn.gateway.triage_context import registry_snapshot_from_tool_set
+from sevn.gateway.triage.triage_context import registry_snapshot_from_tool_set
 from sevn.tools.registry import build_session_registry
 
 

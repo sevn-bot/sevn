@@ -163,7 +163,7 @@ def turn_bundle_file_path(bundles_dir: Path, safe_turn_id: str) -> Path:
 
         Args:
     bundles_dir (Path): Day folder or legacy flat ``turns/`` root.
-    safe_turn_id (str): Filesystem-safe slug from :func:`sevn.gateway.turn_bundle.safe_turn_id`.
+    safe_turn_id (str): Filesystem-safe slug from :func:`sevn.gateway.turn.turn_bundle.safe_turn_id`.
 
         Returns:
     Path: ``<bundles_dir>/<safe_turn_id>.jsonl``.

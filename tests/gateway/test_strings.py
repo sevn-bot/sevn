@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import sevn.gateway.strings as strings
+import sevn.gateway.util.strings as strings
 
 
 def test_gateway_string_constants_non_empty() -> None:
@@ -27,12 +27,12 @@ def test_gateway_string_constants_non_empty() -> None:
 def test_stable_module_attribute_names() -> None:
     """Identifiers remain importable for dispatcher and router wiring."""
 
-    again = __import__("sevn.gateway.strings", fromlist=["*"])
+    again = __import__("sevn.gateway.util.strings", fromlist=["*"])
     assert again.BLOCKED_INBOUND_USER_MESSAGE is strings.BLOCKED_INBOUND_USER_MESSAGE
 
 
 def test_blocked_inbound_user_message_scanner_unavailable() -> None:
-    from sevn.gateway.strings import (
+    from sevn.gateway.util.strings import (
         SCANNER_UNAVAILABLE_USER_MESSAGE,
         blocked_inbound_user_message,
     )

@@ -2,7 +2,7 @@
 
 Module: sevn.gateway.agent_turn
 Depends: sevn.agent.triager, sevn.agent.executors.b_harness, sevn.gateway.channel_router,
-    sevn.gateway.triage_context
+    sevn.gateway.triage.triage_context
 
 Exports:
     build_agent_run_turn — factory returning ``RunTurnFn`` for Triager + tier A/B/C/D.
@@ -94,7 +94,6 @@ from sevn.config.workspace_config import (
     tier_cd_executor_timeout_s,
     tool_debug_result_max_chars,
 )
-from sevn.gateway.cascade_budget import CascadeBudget
 from sevn.gateway.channel_router import (
     ChannelRouter,
     IncomingMessage,
@@ -112,12 +111,14 @@ from sevn.gateway.commands.menu_command_invoke import MenuCommandInvoker
 from sevn.gateway.commands.menu_form_handler import MenuFormHandler
 from sevn.gateway.commands.platform_commands import PlatformCommandHandler
 from sevn.gateway.commands.self_improve_commands import SelfImproveCommandHandler
-from sevn.gateway.dashboard_pin import DashboardPinPublisher
-from sevn.gateway.evolution_approval_gate import (
+from sevn.gateway.dashboard.dashboard_pin import DashboardPinPublisher
+from sevn.gateway.evolution.evolution_approval_gate import (
     EvolutionApprovalCallbackHandler,
     EvolutionApprovalWaitRegistry,
 )
-from sevn.gateway.first_session import (
+from sevn.gateway.hooks.post_turn_hooks import PostTurnContext, run_post_turn_hooks
+from sevn.gateway.menu.menu import ConfigMenuHandler, MenuCallbackHandler
+from sevn.gateway.onboarding.first_session import (
     bootstrap_capture_active,
     bootstrap_capture_instructions,
     first_session_intro_max_output_tokens,
@@ -126,17 +127,20 @@ from sevn.gateway.first_session import (
     maybe_mark_intro_done_if_bootstrap_complete,
     tier_b_intro_instructions,
 )
-from sevn.gateway.menu import ConfigMenuHandler, MenuCallbackHandler
-from sevn.gateway.plan_gate import PlanGateCallbackHandler, PlanGateWaitRegistry, SqlitePlanGate
-from sevn.gateway.post_turn_hooks import PostTurnContext, run_post_turn_hooks
-from sevn.gateway.queue_multi import MultiSpawnOutcome
+from sevn.gateway.queue.cascade_budget import CascadeBudget
+from sevn.gateway.queue.queue_multi import MultiSpawnOutcome
+from sevn.gateway.routing.plan_gate import (
+    PlanGateCallbackHandler,
+    PlanGateWaitRegistry,
+    SqlitePlanGate,
+)
 from sevn.gateway.session_manager import latest_messages, load_session_row
-from sevn.gateway.telegram_quick_actions import (
+from sevn.gateway.telegram.telegram_quick_actions import (
     GATEWAY_OUTBOUND_PHASE_KEY,
     QuickActionCallbackHandler,
 )
-from sevn.gateway.triage_audit import persist_triage_decision
-from sevn.gateway.triage_context import (
+from sevn.gateway.triage.triage_audit import persist_triage_decision
+from sevn.gateway.triage.triage_context import (
     is_triager_enabled,
     passthrough_triage_result,
     registry_snapshot_from_tool_set,
@@ -144,9 +148,9 @@ from sevn.gateway.triage_context import (
     triage_context_from_session,
     window_transcript,
 )
-from sevn.gateway.turn_finalizer import TierBAnswerFinalizer
-from sevn.gateway.turn_media import attachment_hints_for_triager, load_turn_media_summaries
-from sevn.gateway.turn_metadata import record_turn_finished, record_turn_start
+from sevn.gateway.turn.turn_finalizer import TierBAnswerFinalizer
+from sevn.gateway.turn.turn_media import attachment_hints_for_triager, load_turn_media_summaries
+from sevn.gateway.turn.turn_metadata import record_turn_finished, record_turn_start
 from sevn.prompts.fallbacks import (  # re-exported for backward compatibility
     ASSISTANT_NO_OUTPUT_PLACEHOLDER,
     ESCALATION_UNAVAILABLE_USER_MESSAGE,
@@ -1315,7 +1319,7 @@ def build_agent_run_turn(
         routing_footer_sent = False
         show_routing = sess.channel == "telegram"
         if show_routing:
-            from sevn.gateway.routing_footer import telegram_show_routing_enabled
+            from sevn.gateway.routing.routing_footer import telegram_show_routing_enabled
 
             show_routing = telegram_show_routing_enabled(router._workspace)
         session_view = session_view_from_session(
@@ -2615,7 +2619,7 @@ def build_agent_run_turn(
             if getattr(part, "text", None) and str(part.text).strip()
         ]
         reply = "\n\n".join(texts) if texts else "Done."
-        from sevn.gateway.routing_footer import telegram_show_routing_enabled
+        from sevn.gateway.routing.routing_footer import telegram_show_routing_enabled
 
         show_routing = sess.channel == "telegram" and telegram_show_routing_enabled(workspace_local)
         if show_routing:
@@ -3923,7 +3927,7 @@ async def _bootstrap_capture_after_turn(
     if not bootstrap_active:
         return False
     if write:
-        from sevn.gateway.bootstrap_capture import try_bootstrap_user_md_fallback
+        from sevn.gateway.bootstrap.bootstrap_capture import try_bootstrap_user_md_fallback
 
         await asyncio.to_thread(
             try_bootstrap_user_md_fallback,
@@ -4176,7 +4180,7 @@ def _apply_routing_footer_once(
     """
     if not enabled or sent or not text.strip():
         return text, False
-    from sevn.gateway.routing_footer import append_routing_footer
+    from sevn.gateway.routing.routing_footer import append_routing_footer
 
     return append_routing_footer(
         text,

@@ -20,7 +20,7 @@ from sevn.config.workspace_config import (
     WorkspaceConfig,
 )
 from sevn.gateway.channel_router import OutgoingMessage
-from sevn.gateway.telegram_quick_actions import GATEWAY_OUTBOUND_PHASE_KEY
+from sevn.gateway.telegram.telegram_quick_actions import GATEWAY_OUTBOUND_PHASE_KEY
 
 
 def _json_response(data: dict[str, Any]) -> httpx.Response:

@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from sevn.cli.gateway_token_store import GatewayTokenBootstrap, load_bootstrap_workspace
-from sevn.gateway.workspace_config_io import mutate_sevn_json, set_nested
+from sevn.gateway.config_io.workspace_config_io import mutate_sevn_json, set_nested
 from sevn.secrets.fingerprint import fingerprint_sha256_hex
 from sevn.ui.dashboard.dashboard_password import (
     DASHBOARD_LOGIN_PASSWORD_CONFIG_REF,

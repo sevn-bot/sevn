@@ -1,7 +1,7 @@
 """``sevn message`` — post messages to gateway sessions (`specs/23-cli.md` §2.4).
 
 Module: sevn.cli.commands.message_cmd
-Depends: typer, sevn.cli.json_util, sevn.gateway.sessions_query, sevn.storage
+Depends: typer, sevn.cli.json_util, sevn.gateway.session.sessions_query, sevn.storage
 
 Exports:
     register — attach ``message`` command group to the root Typer app.
@@ -15,7 +15,7 @@ import typer
 
 from sevn.cli.commands.sessions import _resolve_db
 from sevn.cli.json_util import emit_json_failure, emit_json_success
-from sevn.gateway.sessions_query import send_to_session
+from sevn.gateway.session.sessions_query import send_to_session
 
 
 def register(app: typer.Typer) -> None:

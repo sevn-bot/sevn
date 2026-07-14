@@ -8,7 +8,7 @@ from starlette.testclient import TestClient
 
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.gateway.http_server import create_app
-from sevn.gateway.prometheus_metrics import render_gateway_metrics
+from sevn.gateway.runtime.prometheus_metrics import render_gateway_metrics
 from sevn.workspace.layout import WorkspaceLayout
 
 

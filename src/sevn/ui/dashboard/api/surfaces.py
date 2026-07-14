@@ -1,7 +1,7 @@
 """Mission Control Surfaces group REST router (`specs/24-dashboard.md` MC-11).
 
 Module: sevn.ui.dashboard.api.surfaces
-Depends: pathlib, fastapi, sevn.config.workspace_config, sevn.gateway.menu, sevn.gateway.webapp_qa,
+Depends: pathlib, fastapi, sevn.config.workspace_config, sevn.gateway.menu.menu, sevn.gateway.webapp.webapp_qa,
     sevn.onboarding.draft_store, sevn.ui.dashboard.api.deps
 
 Exports:
@@ -25,12 +25,12 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from sevn.config.workspace_config import ChannelsWorkspaceSectionConfig, WorkspaceConfig
-from sevn.gateway.menu import (
+from sevn.gateway.menu.menu import (
     _CONFIG_ROOT_TILES,
     build_config_menu_keyboard,
     web_ui_url_from_workspace,
 )
-from sevn.gateway.webapp_qa import resolve_webapp_public_base, webapp_inline_buttons_allowed
+from sevn.gateway.webapp.webapp_qa import resolve_webapp_public_base, webapp_inline_buttons_allowed
 from sevn.onboarding.draft_store import draft_path, read_draft
 from sevn.ui.dashboard.api._config_persist import (
     config_error,

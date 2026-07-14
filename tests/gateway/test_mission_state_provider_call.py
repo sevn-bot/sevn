@@ -7,7 +7,7 @@ from time import time_ns
 import pytest
 
 from sevn.agent.tracing.sink import TraceEvent
-from sevn.gateway.mission_state import MissionControlState
+from sevn.gateway.mission.mission_state import MissionControlState
 
 
 def _telemetry_event(

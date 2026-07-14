@@ -11,13 +11,13 @@ import pytest
 
 from sevn.agent.tracing.traces_migrate import apply_traces_migrations
 from sevn.config.workspace_config import WorkspaceConfig
-from sevn.gateway.post_turn_hooks import (
+from sevn.gateway.hooks.post_turn_hooks import (
     PostTurnContext,
     clear_post_turn_hooks,
     register_post_turn_hook,
     run_post_turn_hooks,
 )
-from sevn.gateway.turn_bundle import (
+from sevn.gateway.turn.turn_bundle import (
     bundle_paths,
     collect_turn_bundle_records,
     compute_has_error,
@@ -26,7 +26,7 @@ from sevn.gateway.turn_bundle import (
     upsert_turn_bundle_index_entry,
     write_turn_bundle,
 )
-from sevn.gateway.turn_bundle_hooks import _post_turn_turn_bundle
+from sevn.gateway.turn.turn_bundle_hooks import _post_turn_turn_bundle
 from sevn.storage.migrate import apply_migrations
 from sevn.storage.paths import traces_sqlite_path
 from sevn.workspace.layout import WorkspaceLayout
@@ -310,7 +310,7 @@ async def test_post_turn_hook_writes_bundle_when_enabled(tmp_path: Path) -> None
     )
     with (
         patch("sevn.gateway.agent_turn._emit_gateway_span", new_callable=AsyncMock),
-        patch("sevn.gateway.post_turn_hooks.record_turn_finished"),
+        patch("sevn.gateway.hooks.post_turn_hooks.record_turn_finished"),
     ):
         await run_post_turn_hooks(ctx)
     paths = layout.turn_bundles_dir
@@ -339,7 +339,7 @@ async def test_post_turn_hook_noop_when_disabled(tmp_path: Path) -> None:
     )
     with (
         patch("sevn.gateway.agent_turn._emit_gateway_span", new_callable=AsyncMock),
-        patch("sevn.gateway.post_turn_hooks.record_turn_finished"),
+        patch("sevn.gateway.hooks.post_turn_hooks.record_turn_finished"),
     ):
         await run_post_turn_hooks(ctx)
     assert not layout.turn_bundles_dir.exists()

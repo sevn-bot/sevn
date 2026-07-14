@@ -1,4 +1,4 @@
-"""Tests for ``sevn.gateway.timestamps`` (`PROBLEMS.md` §4 / Step §4)."""
+"""Tests for ``sevn.gateway.util.timestamps`` (`PROBLEMS.md` §4 / Step §4)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from sevn.gateway.timestamps import resolve_time_range, to_user_tz
+from sevn.gateway.util.timestamps import resolve_time_range, to_user_tz
 
 
 def test_utc_with_offset_renders_in_utc() -> None:

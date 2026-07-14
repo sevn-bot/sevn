@@ -15,8 +15,8 @@ from sevn.config.workspace_config import (
     WorkspaceConfig,
 )
 from sevn.gateway.http_server import MISSION_CONTROL_SPA_ROOT, create_app
-from sevn.gateway.menu import _mission_control_url
-from sevn.gateway.onboarding_mount import mount_gateway_onboarding
+from sevn.gateway.menu.menu import _mission_control_url
+from sevn.gateway.onboarding.onboarding_mount import mount_gateway_onboarding
 from sevn.storage.migrate import apply_migrations
 from sevn.ui.dashboard.services.auth import DASHBOARD_CSRF_COOKIE_NAME, DASHBOARD_CSRF_HEADER
 from sevn.ui.dashboard.tab_registry import WIRED_SLUGS

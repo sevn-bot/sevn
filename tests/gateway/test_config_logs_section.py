@@ -21,19 +21,19 @@ from sevn.gateway.commands.menu_action_router import (
     parse_action_callback,
 )
 from sevn.gateway.commands.menu_form_handler import parse_form_callback
-from sevn.gateway.media_store import MediaStore
-from sevn.gateway.menu import (
+from sevn.gateway.media.media_store import MediaStore
+from sevn.gateway.menu.menu import (
     _CONFIG_ROOT_TILES,
     _build_logs_keyboard_rows,
     build_config_menu_keyboard,
     config_menu_message_text,
 )
-from sevn.gateway.menu_readiness import (
+from sevn.gateway.menu.menu_readiness import (
     _READY_SPEC_IDS,
     readiness_for_callback,
 )
-from sevn.gateway.menu_registry import match_menu_button_spec
-from sevn.gateway.rate_limit import TokenBucketLimiter
+from sevn.gateway.menu.menu_registry import match_menu_button_spec
+from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
 from sevn.gateway.session_manager import SessionManager
 from sevn.security.llm_guard_scanner import LLMGuardScanner
 from sevn.workspace.layout import WorkspaceLayout
@@ -128,7 +128,7 @@ def test_logs_section_keyboard_exposes_action_callbacks() -> None:
     """The gated section keyboard keeps concrete ``cfg:logs:*`` callbacks pressable."""
     ws = _workspace()
     kb = build_config_menu_keyboard(ws, section="logs")
-    from sevn.gateway.menu_readiness import gate_config_keyboard_rows
+    from sevn.gateway.menu.menu_readiness import gate_config_keyboard_rows
 
     rows = kb["inline_keyboard"]
     chrome = rows[-1:]
@@ -315,7 +315,7 @@ async def test_logs_section_non_owner_blocked(tmp_path: Path) -> None:
 async def test_logs_toggle_redaction_syncs_deny_keys_both_directions(tmp_path: Path) -> None:
     """Logs redaction toggle writes enabled flag and deny lists together."""
     from sevn.config.defaults import DEFAULT_TRACE_REDACTION_DENY_KEYS
-    from sevn.gateway.workspace_config_io import load_raw_sevn_json
+    from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json
 
     router, cap, root = _build_owner_router(tmp_path)
     sevn_json = root / "sevn.json"

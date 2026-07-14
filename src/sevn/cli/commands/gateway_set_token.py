@@ -1,7 +1,7 @@
 """``sevn gateway set-gateway-token`` — local bootstrap and rotation.
 
 Module: sevn.cli.commands.gateway_set_token
-Depends: sys, typer, sevn.cli.gateway_token_store, sevn.gateway.gateway_token
+Depends: sys, typer, sevn.cli.gateway_token_store, sevn.gateway.runtime.gateway_token
 
 Exports:
     register_set_gateway_token — attach command to the gateway Typer group.
@@ -19,7 +19,7 @@ from sevn.cli.gateway_token_store import (
     store_gateway_token_local,
 )
 from sevn.cli.json_util import emit_json_failure, emit_json_success
-from sevn.gateway.gateway_token import (
+from sevn.gateway.runtime.gateway_token import (
     GATEWAY_TOKEN_CONFIG_REF,
     GATEWAY_TOKEN_LOGICAL_KEY,
     generate_gateway_token,

@@ -16,7 +16,7 @@ from sevn.agent.adapters.tier_b_multimodal import (
     resolve_tier_b_modality_support,
     resolve_turn_media_items,
 )
-from sevn.gateway.turn_media import TurnMediaItem, build_turn_media_summaries
+from sevn.gateway.turn.turn_media import TurnMediaItem, build_turn_media_summaries
 from sevn.storage.migrate import apply_migrations
 
 

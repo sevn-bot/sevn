@@ -15,9 +15,9 @@ from pathlib import Path
 import pytest
 
 from sevn.gateway.commands.menu_action_router import parse_action_callback
-from sevn.gateway.menu_readiness import gate_config_keyboard_rows, readiness_for_callback
-from sevn.gateway.menu_registry import match_menu_button_spec
-from sevn.gateway.workspace_config_io import load_raw_sevn_json
+from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json
+from sevn.gateway.menu.menu_readiness import gate_config_keyboard_rows, readiness_for_callback
+from sevn.gateway.menu.menu_registry import match_menu_button_spec
 from sevn.onboarding.web_app import _get_nested
 from tests.gateway.test_config_menu_actions import _build_router, _config_callback
 

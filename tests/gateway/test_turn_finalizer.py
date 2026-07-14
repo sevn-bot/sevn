@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from sevn.gateway.turn_finalizer import TierBAnswerFinalizer
+from sevn.gateway.turn.turn_finalizer import TierBAnswerFinalizer
 
 
 class _StubAdapter:

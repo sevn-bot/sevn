@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from sevn.gateway.cascade_budget import CascadeBudget
+from sevn.gateway.queue.cascade_budget import CascadeBudget
 
 
 @pytest.fixture

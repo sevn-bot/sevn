@@ -22,9 +22,12 @@ from sevn.agent.tracing.subagent_trace import (
     reset_subagent_trace_for_tests,
 )
 from sevn.agent.tracing.trace_event_bridge import TraceEventOtelBridge, set_trace_event_bridge
-from sevn.gateway.mission_state import MissionControlState
-from sevn.gateway.mission_trace_sink import create_mission_trace_sink, detach_mission_trace_sink
-from sevn.gateway.prometheus_metrics import render_gateway_metrics
+from sevn.gateway.mission.mission_state import MissionControlState
+from sevn.gateway.mission.mission_trace_sink import (
+    create_mission_trace_sink,
+    detach_mission_trace_sink,
+)
+from sevn.gateway.runtime.prometheus_metrics import render_gateway_metrics
 
 
 class _RecordingSpanExporter:

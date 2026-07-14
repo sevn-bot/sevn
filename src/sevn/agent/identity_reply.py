@@ -1,7 +1,7 @@
 """Resolved ``IDENTITY.md`` replies for identity turns (live-session W8).
 
 Module: sevn.agent.identity_reply
-Depends: re, sevn.agent.triager.routing_policy, sevn.gateway.first_session, sevn.prompts.tier_b
+Depends: re, sevn.agent.triager.routing_policy, sevn.gateway.onboarding.first_session, sevn.prompts.tier_b
 
 Exports:
     is_pure_identity_message — ``who are you`` / name questions without capability asks.
@@ -16,7 +16,7 @@ import re
 from typing import TYPE_CHECKING, Final
 
 from sevn.agent.triager.routing_policy import is_identity_or_capability_message
-from sevn.gateway.first_session import missing_user_md_bootstrap_fields
+from sevn.gateway.onboarding.first_session import missing_user_md_bootstrap_fields
 from sevn.prompts.tier_b import (
     _extract_identity_name,
     _extract_identity_role,

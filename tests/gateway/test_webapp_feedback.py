@@ -23,7 +23,7 @@ from sevn.config.workspace_config import (
 )
 from sevn.gateway.auth import mint_webchat_jwt
 from sevn.gateway.http_server import create_app
-from sevn.gateway.webapp_qa import mint_webapp_dispatcher_token
+from sevn.gateway.webapp.webapp_qa import mint_webapp_dispatcher_token
 from sevn.storage.migrate import apply_migrations
 from sevn.workspace.layout import WorkspaceLayout
 

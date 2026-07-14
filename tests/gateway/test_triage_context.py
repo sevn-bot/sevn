@@ -13,8 +13,8 @@ from sevn.agent.triager.models import ComplexityTier, Intent, TriageResult
 from sevn.agent.triager.prompt import GROUP_TRIAGE_INSTRUCTION_V1, build_triager_prompt_segments
 from sevn.config.defaults import INITIAL_REGISTRY_VERSION
 from sevn.config.workspace_config import parse_workspace_config
-from sevn.gateway.triage_audit import persist_triage_decision
-from sevn.gateway.triage_context import (
+from sevn.gateway.triage.triage_audit import persist_triage_decision
+from sevn.gateway.triage.triage_context import (
     group_triage_block_would_inject,
     is_triager_enabled,
     latest_prior_triage_result,
@@ -355,8 +355,8 @@ async def test_agent_turn_triager_disabled_passthrough_to_tier_b(
     from sevn.gateway.agent_turn import build_agent_run_turn
     from sevn.gateway.channel_router import ChannelRouter
     from sevn.gateway.commands.dispatcher import CommandDispatcher
-    from sevn.gateway.media_store import MediaStore
-    from sevn.gateway.rate_limit import TokenBucketLimiter
+    from sevn.gateway.media.media_store import MediaStore
+    from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
     from sevn.gateway.session_manager import SessionManager
     from sevn.security.llm_guard_scanner import LLMGuardScanner
     from sevn.workspace.layout import WorkspaceLayout

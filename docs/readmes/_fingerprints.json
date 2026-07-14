@@ -172,9 +172,9 @@
         "src/sevn/agent/subagents/**",
         "src/sevn/config/sections/subagents.py",
         "src/sevn/tools/subagent_spawn.py",
-        "src/sevn/gateway/queue_multi.py",
-        "src/sevn/gateway/subagents_announce.py",
-        "src/sevn/gateway/mission_subagents_snapshot.py",
+        "src/sevn/gateway/queue/queue_multi.py",
+        "src/sevn/gateway/subagents/subagents_announce.py",
+        "src/sevn/gateway/mission/mission_subagents_snapshot.py",
         "src/sevn/cli/commands/subagents_cmd.py"
       ]
     },

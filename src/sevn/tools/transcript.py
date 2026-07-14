@@ -8,7 +8,7 @@ without re-walking the registry.
 
 Module: sevn.tools.transcript
 Depends: sevn.tools.base, sevn.tools.context, sevn.tools.decorator,
-    sevn.gateway.sessions_query, sevn.storage
+    sevn.gateway.session.sessions_query, sevn.storage
 
 Exports:
     history_tool — ``@sevn_tool`` gateway session history (inline bounded rows).
@@ -28,7 +28,7 @@ from sevn.agent.provider_history_keys import (
     PROVIDER_TURN_MESSAGES_KEY,
     SUCCESSFUL_TOOLS_KEY,
 )
-from sevn.gateway.sessions_query import (
+from sevn.gateway.session.sessions_query import (
     MAX_HISTORY_LIMIT,
     cap_history_limit,
     fetch_session_history,
@@ -36,7 +36,7 @@ from sevn.gateway.sessions_query import (
     search_messages,
     session_operator_timezone,
 )
-from sevn.gateway.timestamps import resolve_time_range
+from sevn.gateway.util.timestamps import resolve_time_range
 from sevn.storage import open_sevn_sqlite
 from sevn.tools.base import enveloped_failure, enveloped_success
 from sevn.tools.codes import ToolResultCode

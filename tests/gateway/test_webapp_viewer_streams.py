@@ -7,8 +7,8 @@ from typing import Any
 
 import pytest
 
-from sevn.gateway import webapp_viewer as viewer_mod
-from sevn.gateway.webapp_viewer import (
+from sevn.gateway.webapp import webapp_viewer as viewer_mod
+from sevn.gateway.webapp.webapp_viewer import (
     append_viewer_stream_chunk,
     mark_viewer_stream_done,
     register_viewer_stream,

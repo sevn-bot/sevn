@@ -8,7 +8,7 @@ from sevn.gateway.agent_turn import (
     _collect_partial_progress,
     _render_no_answer_message,
 )
-from sevn.gateway.turn_finalizer import TierBAnswerFinalizer
+from sevn.gateway.turn.turn_finalizer import TierBAnswerFinalizer
 from sevn.prompts.fallbacks import format_cascade_budget_exhausted_message
 
 

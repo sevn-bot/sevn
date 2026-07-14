@@ -22,8 +22,8 @@ from sevn.cli.errors import CliPreconditionError
 from sevn.cli.json_util import emit_json_failure, emit_json_success
 from sevn.cli.workspace import load_bound_workspace
 from sevn.config.sections.subagents import Role, SubAgentsWorkspaceConfig
-from sevn.gateway.mission_subagents_snapshot import _build_limits_payload
-from sevn.gateway.workspace_config_io import mutate_sevn_json
+from sevn.gateway.config_io.workspace_config_io import mutate_sevn_json
+from sevn.gateway.mission.mission_subagents_snapshot import _build_limits_payload
 from sevn.onboarding.web_app import _get_nested, _set_nested
 from sevn.storage.migrate import apply_migrations
 

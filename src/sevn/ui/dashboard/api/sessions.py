@@ -20,7 +20,7 @@ import time
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-import sevn.gateway.replay_worker_hooks  # noqa: F401 — Batch D lane #5 boot + post-turn hooks
+import sevn.gateway.replay.replay_worker_hooks  # noqa: F401 — Batch D lane #5 boot + post-turn hooks
 from sevn.agent.harness.snapshots import (
     ReplayTurnNotFoundError,
     ReplayTurnNotReplayableError,

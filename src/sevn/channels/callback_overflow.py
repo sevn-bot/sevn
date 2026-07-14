@@ -24,7 +24,7 @@ from sevn.config.defaults import (
     DISPATCHER_STATE_CALLBACK_OVERFLOW_TTL_S,
     TELEGRAM_CALLBACK_DATA_MAX_BYTES,
 )
-from sevn.gateway.dispatcher_state import insert_dispatcher_state
+from sevn.gateway.dispatcher.dispatcher_state import insert_dispatcher_state
 
 _CALLBACK_OVERFLOW_PREFIX = "ds:"
 _CALLBACK_OVERFLOW_HEX_BYTES = 16

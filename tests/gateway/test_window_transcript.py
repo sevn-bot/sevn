@@ -9,7 +9,7 @@ first pass full.
 from __future__ import annotations
 
 from sevn.agent.transcript_replay import TranscriptRow
-from sevn.gateway.triage_context import window_transcript
+from sevn.gateway.triage.triage_context import window_transcript
 
 
 def _turns(n: int) -> list[str]:

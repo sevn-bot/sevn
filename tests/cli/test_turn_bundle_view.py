@@ -9,7 +9,7 @@ import pytest
 from typer.testing import CliRunner
 
 from sevn.cli.app import app
-from sevn.gateway.turn_bundle import (
+from sevn.gateway.turn.turn_bundle import (
     TurnBundleIndexEntry,
     TurnBundleLogRecord,
     TurnBundleMessageRecord,

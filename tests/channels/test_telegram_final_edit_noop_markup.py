@@ -16,7 +16,7 @@ import pytest
 
 from sevn.channels.telegram import TelegramAdapter, TelegramConfig
 from sevn.gateway.channel_router import OutgoingMessage
-from sevn.gateway.telegram_quick_actions import build_quick_action_inline_keyboard
+from sevn.gateway.telegram.telegram_quick_actions import build_quick_action_inline_keyboard
 
 
 def _json_response(data: dict[str, Any]) -> httpx.Response:

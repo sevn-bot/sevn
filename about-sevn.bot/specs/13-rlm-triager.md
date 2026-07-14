@@ -1251,7 +1251,7 @@ grants. It is tool-less at generation time — tool/skill **names** are selected
 | `TriagerUnknownToolAbort` | same | Abort on unknown named tool |
 
 Gateway wiring: `triage_context_from_session`, `is_triager_enabled`, `passthrough_triage_result`
-in `src/sevn/gateway/triage_context.py`.
+in `src/sevn/gateway/triage/triage_context.py`.
 
 ## Data Model
 

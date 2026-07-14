@@ -309,7 +309,7 @@ def tier_b_repo_access_prompt(
     else:
         agent_turn = "source_code/src/sevn/gateway/agent_turn.py"
         channel_router = "source_code/src/sevn/gateway/channel_router.py"
-        menu = "source_code/src/sevn/gateway/menu.py"
+        menu = "source_code/src/sevn/gateway/menu/menu.py"
         glob_hint = "source_code/src/sevn/**/*.py"
     return (
         "## sevn.bot source access (use for any code or gateway question)\n"

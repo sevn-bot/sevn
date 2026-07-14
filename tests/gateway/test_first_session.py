@@ -7,7 +7,7 @@ import sqlite3
 from pathlib import Path
 
 from sevn.config.workspace_config import WorkspaceConfig
-from sevn.gateway.first_session import (
+from sevn.gateway.onboarding.first_session import (
     bootstrap_capture_active,
     count_user_messages,
     first_session_intro_max_output_tokens,

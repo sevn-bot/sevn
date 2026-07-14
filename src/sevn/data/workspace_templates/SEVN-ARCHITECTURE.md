@@ -50,7 +50,7 @@ fabrications to avoid.
    which owns the per-turn spine.
 3. Triage runs via `triage_turn` in `src/sevn/agent/triager/run.py`, producing a
    `TriageResult` (intent, complexity, selected tools/skills). The decision is persisted
-   through `src/sevn/gateway/triage_audit.py`.
+   through `src/sevn/gateway/triage/triage_audit.py`.
 4. On `ComplexityTier.B`, `agent_turn.py` resolves a tier-B transport bundle
    (`ResolvedTierBModel`) and calls `run_b_turn`.
 5. On `ComplexityTier.C` / `ComplexityTier.D`, it calls `run_cd_turn`.

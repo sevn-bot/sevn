@@ -13,9 +13,9 @@ import pytest
 from sevn.agent.tracing.sink import NullTraceSink
 from sevn.config.sections.memory import MemoryWorkspaceSectionConfig, UserModelWorkspaceConfig
 from sevn.config.workspace_config import WorkspaceConfig
-from sevn.gateway.post_turn_hooks import PostTurnContext
-from sevn.gateway.turn_metadata import record_turn_start
-from sevn.gateway.user_model_turn import (
+from sevn.gateway.hooks.post_turn_hooks import PostTurnContext
+from sevn.gateway.turn.turn_metadata import record_turn_start
+from sevn.gateway.user.user_model_turn import (
     lookup_user_text_for_turn,
     maybe_schedule_user_model_extraction_after_turn,
 )
@@ -142,7 +142,7 @@ async def test_extraction_populates_user_model_json(tmp_path: Path) -> None:
     ws = _workspace(enabled=True)
     ctx = _ctx(conn, ws, tmp_path)
     with patch(
-        "sevn.gateway.user_model_turn.resolve_model",
+        "sevn.gateway.user.user_model_turn.resolve_model",
         return_value=("openai/gpt-4o-mini", _FakeTransport()),
     ):
         await maybe_schedule_user_model_extraction_after_turn(ctx)
@@ -201,7 +201,7 @@ async def test_tier_a_skips_extraction(tmp_path: Path) -> None:
     conn.commit()
     ctx = _ctx(conn, _workspace(enabled=True), tmp_path)
     with patch(
-        "sevn.gateway.user_model_turn.resolve_model",
+        "sevn.gateway.user.user_model_turn.resolve_model",
         return_value=("openai/gpt-4o-mini", _FakeTransport()),
     ):
         await maybe_schedule_user_model_extraction_after_turn(ctx)
@@ -272,7 +272,7 @@ async def test_extraction_emits_user_model_spans(tmp_path: Path) -> None:
         turn_wall_ns=base.turn_wall_ns,
     )
     with patch(
-        "sevn.gateway.user_model_turn.resolve_model",
+        "sevn.gateway.user.user_model_turn.resolve_model",
         return_value=("openai/gpt-4o-mini", _FakeTransport()),
     ):
         await maybe_schedule_user_model_extraction_after_turn(ctx)

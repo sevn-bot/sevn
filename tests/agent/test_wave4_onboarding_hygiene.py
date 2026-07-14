@@ -18,7 +18,7 @@ from sevn.agent.triager.run import (
     _synthetic_schema_fallback,
 )
 from sevn.config.defaults import TRIAGER_PYDANTIC_OUTPUT_RETRIES
-from sevn.gateway.first_session import _is_user_md_placeholder_value
+from sevn.gateway.onboarding.first_session import _is_user_md_placeholder_value
 from sevn.gateway.session_manager import SessionManager
 from sevn.tools.base import ToolCall
 from sevn.tools.context import ToolContext

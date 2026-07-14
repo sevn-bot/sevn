@@ -13,7 +13,7 @@ from sevn.cli.config_paths import (
     section_by_slug,
     section_callback,
 )
-from sevn.gateway.menu_registry import MENU_BUTTON_SPECS
+from sevn.gateway.menu.menu_registry import MENU_BUTTON_SPECS
 
 
 def test_menu_registry_root_slugs_count() -> None:

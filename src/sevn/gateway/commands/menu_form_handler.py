@@ -1,7 +1,7 @@
 """Multi-step Telegram form flows for shortcuts and secrets (TMF Wave 3).
 
 Module: sevn.gateway.commands.menu_form_handler
-Depends: json, re, secrets, sqlite3, sevn.gateway.dispatcher_state,
+Depends: json, re, secrets, sqlite3, sevn.gateway.dispatcher.dispatcher_state,
     sevn.gateway.commands.shortcuts_store, sevn.security.secrets.factory
 
 Exports:
@@ -31,9 +31,16 @@ from sevn.gateway.commands.shortcuts_store import (
     republish_set_my_commands,
     validate_shortcut_name,
 )
-from sevn.gateway.dispatcher_state import dispatcher_state_ttl_for_kind, insert_dispatcher_state
-from sevn.gateway.menu import ConfigMenuRefreshContext, ConfigSection, refresh_config_menu_message
-from sevn.gateway.workspace_config_io import mutate_sevn_json
+from sevn.gateway.config_io.workspace_config_io import mutate_sevn_json
+from sevn.gateway.dispatcher.dispatcher_state import (
+    dispatcher_state_ttl_for_kind,
+    insert_dispatcher_state,
+)
+from sevn.gateway.menu.menu import (
+    ConfigMenuRefreshContext,
+    ConfigSection,
+    refresh_config_menu_message,
+)
 from sevn.onboarding.web_app import _get_nested, _set_nested
 from sevn.security.secrets.factory import secrets_chain_from_workspace
 
@@ -518,7 +525,7 @@ class MenuFormHandler:
         import re
 
         from sevn.agent.tracing.sink_factory import trace_redaction_policy_for
-        from sevn.gateway.diagnostics import format_for_telegram
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
         from sevn.tools.log_query import tail_log_lines
         from sevn.workspace.layout import WorkspaceLayout
 
@@ -573,7 +580,7 @@ class MenuFormHandler:
             True
         """
         from sevn.agent.tracing.sink_factory import trace_redaction_policy_for
-        from sevn.gateway.diagnostics import format_traces_for_telegram, get_span
+        from sevn.gateway.diagnostics.diagnostics import format_traces_for_telegram, get_span
         from sevn.workspace.layout import WorkspaceLayout
 
         _ = step, payload

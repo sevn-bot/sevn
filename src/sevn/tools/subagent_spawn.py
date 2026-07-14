@@ -1,7 +1,7 @@
 """``spawn_subagent`` — level-1 → level-2 sub-agent spawn tool (D9, `specs/36-sub-agents.md`).
 
 Default fire-and-forget: returns the run id immediately; the supervisor's
-``AnnounceBackHook`` (wired at gateway boot — ``sevn.gateway.subagents_announce``)
+``AnnounceBackHook`` (wired at gateway boot — ``sevn.gateway.subagents.subagents_announce``)
 delivers the result once the level-2 run finishes. ``wait=True`` blocks the
 caller instead, bounded by the parent turn's remaining ``CascadeBudget`` (D11).
 

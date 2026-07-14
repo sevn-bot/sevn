@@ -15,7 +15,7 @@ import sqlite3
 
 from sevn.config.workspace_config import parse_workspace_config
 from sevn.gateway.agent_turn import _latest_user_message_text, _pending_user_messages_text
-from sevn.gateway.triage_context import triage_context_from_session
+from sevn.gateway.triage.triage_context import triage_context_from_session
 from sevn.storage.migrate import apply_migrations
 
 _BURST = (

@@ -1,6 +1,6 @@
 # Specs & PRD remediation + doc-folder tooling — wave plan
 
-**Status:** W0–W11 + Thermos complete; **W12 in progress** (uncommitted WIP @ `5f89fa9`); W13 + Final pending
+**Status:** W0–W12 + Thermos complete (uncommitted WIP @ `5f89fa9`); W13 + Final pending
 **Date:** 2026-07-14
 **Owner agents:** `.cursor/agents/wave-plan-executor.md` (W0, W2–W13, Final, Thermos gate) · `.cursor/agents/test-creator.md` (W1 `role: test-author` + per-wave xfail reconciliation) · **new** `.cursor/agents/docs-folder-author.md` (invoked *by the executor* to author/update/validate the `about-sevn.bot/specs` and `about-sevn.bot/prd` folders in W7–W9 — the sanctioned folder-authoring path this plan creates)
 **Source:** `.ignorelocal/PRD-SPECS-QUALITY-ANALYSIS-2026-07-14.md` (repo-root artefact, gitignored — the deep quality analysis of `about-sevn.bot/{prd,specs}` on `pre-0.0.1`). Findings are cited by that file's section numbers: **§1** (TL;DR), **§2** (stubs vs developed), **§3** (code-fidelity), **§4** (external / gitignore refs), **§5** (defects), **§6** (bottom line + recommended follow-ups). This plan is the sequencing artefact; the analysis is the requirement rationale; `spec-kit-wave/{PRD-STANDARDS.md,SPEC-KIT-STANDARDS.md,CHANGELOG-STANDARDS.md}` + the `*-rules.toml` files are the normative contracts.
@@ -173,7 +173,7 @@ Locked at W0. Operator-approved; do not re-derive in later waves.
 - [x] **W10** Wire folder validators + changelog datestamp into CI (2026-07-14 ✅: about-docs-check chains spec-check+prd-check; status honesty in check.py; ci-docs green)
 - [x] **Thermos** thermo-nuclear branch review gate (2026-07-14 ✅: thermo review PASS; D8 fixes in 17-gateway + 25-cicd; gates green; operator sign-off pending — **optional re-run after Final**)
 - [x] **W11** README `gateway.md` quality (human/LLM prose) — D13 scope extension (2026-07-14 ✅: L1 plain-language rewrite; L2 FastAPI link + expanded prose; L3 full 114-module inventory with links; make readme-check green)
-- [ ] **W12** Gateway package reorganization (refactor-only)
+- [x] **W12** Gateway package reorganization (refactor-only) (2026-07-14 ✅)
 - [ ] **W13** Docstrings + `<Examples:` compliance (`skw` + tests)
 - [ ] **Final** Reconcile, gate, hand back — **re-run after W11–W13 complete** (prior run 2026-07-14 ✅: make ci-resume 31/31 green @ b0f85a5)
 
@@ -526,22 +526,133 @@ Target: `docs/readmes/gateway.md` on branch `wave/specs-prd-remediation`. Refere
 
 ## Wave W12 — Gateway package reorganization (refactor-only)
 
-> **Progress (2026-07-14):** In progress — uncommitted WIP on `wave/specs-prd-remediation` @ `5f89fa9`. `scripts/gateway_reorg_w12.py` created; ~104 modules moved into 30 subpackages (`access/`, `api/`, `telegram/`, `turn/`, …); 10 core modules remain at gateway root. ~283 tracked files changed (85 staged renames + import updates). `17-gateway.md` / `gateway.md` touched but W12.3–W12.5 not verified. No commit `ed5fbb7` (prior agent session unfinished). Gates (`make lint`, `make typecheck`, `make ci-affected`) not run on WIP tree.
+> **Done (2026-07-14):** @ `wave/specs-prd-remediation` — `scripts/gateway_reorg_w12.py`; 85 modules git-renamed into 29 new subpackages (+ pre-existing `commands/`); 10 core modules at gateway root (113 `.py` modules total incl. `__init__` files). Import graph updated (~233 files). `17-gateway.md` + `docs/readmes/gateway.md` Level 3 paths updated. Gates: `make lint` ✅ · `make typecheck` ✅ · `make ci-affected` ✅.
 
 Goal: reduce the flat **114** Python files at `src/sevn/gateway/` — keep **core** modules at the gateway root; move the rest into new subpackages under `src/sevn/gateway/` (e.g. `commands/`, `telegram/`, `diagnostics/` — derive from actual inventory). **No behavior change** — import-path refactor only.
 
-- [ ] **W12.1** [US8] Inventory all 114 `*.py` files under `src/sevn/gateway/`; classify each as **core** (stays at root) vs **relocatable** (moves to subpackage). Document the classification table below (fill during execution).
-- [ ] **W12.2** [US8] Create subfolders; move modules; update import graph across the repo (`rg` / graphify for callers). Run `make lint`, `make typecheck` iteratively.
-- [ ] **W12.3** [US8] Update `about-sevn.bot/specs/17-gateway.md` Public Interface paths if module locations change.
-- [ ] **W12.4** [US8] Update `docs/readmes/gateway.md` Level 3 module inventory if W12 paths diverge from W11 (W11 lands first).
-- [ ] **W12.5** Verify: `make lint`, `make typecheck`, `make ci-affected` (gateway paths). Flip boxes.
+- [x] **W12.1** [US8] Inventory all 114 `*.py` files under `src/sevn/gateway/`; classify each as **core** (stays at root) vs **relocatable** (moves to subpackage). Document the classification table below (fill during execution). (2026-07-14 ✅: 113 modules classified — 10 core + 103 relocatable)
+- [x] **W12.2** [US8] Create subfolders; move modules; update import graph across the repo (`rg` / graphify for callers). Run `make lint`, `make typecheck` iteratively. (2026-07-14 ✅: 85 git-renames + import updates; lint/typecheck green)
+- [x] **W12.3** [US8] Update `about-sevn.bot/specs/17-gateway.md` Public Interface paths if module locations change. (2026-07-14 ✅: subpackage paths in Public Interface)
+- [x] **W12.4** [US8] Update `docs/readmes/gateway.md` Level 3 module inventory if W12 paths diverge from W11 (W11 lands first). (2026-07-14 ✅: Level 3 inventory uses subpackage paths)
+- [x] **W12.5** Verify: `make lint`, `make typecheck`, `make ci-affected` (gateway paths). Flip boxes. (2026-07-14 ✅: all three green after `git add -A` rename staging)
 
 ### W12 gateway classification table (fill during execution)
 
 | Module | Classification | Target subpackage | Notes |
 |--------|----------------|-------------------|-------|
 | `agent_turn.py` | core | _(root)_ | Turn spine entry |
-| _(remaining 113 → fill)_ | | | |
+| `auth.py` | core | _(root)_ | Bearer / JWT / webhook auth |
+| `boot.py` | core | _(root)_ | Harness boot sweep |
+| `boot_registry.py` | core | _(root)_ | Boot hook registry |
+| `channel_boot.py` | core | _(root)_ | Multi-adapter boot loader |
+| `channel_router.py` | core | _(root)_ | Ingress/egress routing |
+| `channel_types.py` | core | _(root)_ | IncomingMessage / OutgoingMessage |
+| `http_server.py` | core | _(root)_ | ASGI server assembly |
+| `session_manager.py` | core | _(root)_ | Per-session queue + worker |
+| `__init__.py` | core | _(root)_ | Package init |
+| `ask_config.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `core_commands.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `diagnostic_commands.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `dispatcher.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `dispatcher_kinds.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `evolution_chat_bridge.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `evolution_commands.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `evolution_issue_commands.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `file_link_callback_handler.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `menu_action_router.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `menu_command_invoke.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `menu_form_handler.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `platform_commands.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `registry.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `rollback.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `self_improve_commands.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `shortcuts_store.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `voice_match.py` | relocatable | `commands/` | Pre-W12 subpackage |
+| `slash_access.py` | relocatable | `access/` | |
+| `admin_secrets.py` | relocatable | `admin/` | |
+| `e2e_echo.py` | relocatable | `api/` | |
+| `gui_proxy.py` | relocatable | `api/` | |
+| `openai_compat_api.py` | relocatable | `api/` | |
+| `web_transport.py` | relocatable | `api/` | |
+| `bootstrap_capture.py` | relocatable | `bootstrap/` | |
+| `bootstrap_state.py` | relocatable | `bootstrap/` | |
+| `browser_lifecycle.py` | relocatable | `browser/` | |
+| `workspace_config_io.py` | relocatable | `config_io/` | |
+| `dashboard_pin.py` | relocatable | `dashboard/` | |
+| `diagnostics.py` | relocatable | `diagnostics/` | |
+| `dispatcher_callbacks.py` | relocatable | `dispatcher/` | |
+| `dispatcher_state.py` | relocatable | `dispatcher/` | |
+| `evolution_approval_gate.py` | relocatable | `evolution/` | |
+| `evolution_issue_events.py` | relocatable | `evolution/` | |
+| `event_hooks.py` | relocatable | `hooks/` | |
+| `post_turn_hooks.py` | relocatable | `hooks/` | |
+| `trajectory_ingest_hooks.py` | relocatable | `hooks/` | |
+| `lcm_ingest.py` | relocatable | `lcm/` | |
+| `media_store.py` | relocatable | `media/` | |
+| `menu.py` | relocatable | `menu/` | |
+| `menu_branding.py` | relocatable | `menu/` | |
+| `menu_readiness.py` | relocatable | `menu/` | |
+| `menu_registry.py` | relocatable | `menu/` | |
+| `mission_api.py` | relocatable | `mission/` | |
+| `mission_state.py` | relocatable | `mission/` | |
+| `mission_state_models.py` | relocatable | `mission/` | |
+| `mission_state_snapshots.py` | relocatable | `mission/` | |
+| `mission_subagents_snapshot.py` | relocatable | `mission/` | |
+| `mission_trace_sink.py` | relocatable | `mission/` | |
+| `first_session.py` | relocatable | `onboarding/` | |
+| `onboarding_mount.py` | relocatable | `onboarding/` | |
+| `pairing.py` | relocatable | `onboarding/` | |
+| `cascade_budget.py` | relocatable | `queue/` | |
+| `queue_multi.py` | relocatable | `queue/` | |
+| `steer_store.py` | relocatable | `queue/` | |
+| `replay_job_events.py` | relocatable | `replay/` | |
+| `replay_turn_lookup.py` | relocatable | `replay/` | |
+| `replay_worker.py` | relocatable | `replay/` | |
+| `replay_worker_hooks.py` | relocatable | `replay/` | |
+| `coding_agent_router.py` | relocatable | `routing/` | |
+| `outbound_sweep.py` | relocatable | `routing/` | |
+| `plan_gate.py` | relocatable | `routing/` | |
+| `response_filters.py` | relocatable | `routing/` | |
+| `routing_footer.py` | relocatable | `routing/` | |
+| `deployment_id.py` | relocatable | `runtime/` | |
+| `gateway_restart_ack.py` | relocatable | `runtime/` | |
+| `gateway_token.py` | relocatable | `runtime/` | |
+| `platform_runtime.py` | relocatable | `runtime/` | |
+| `prometheus_metrics.py` | relocatable | `runtime/` | |
+| `rate_limit.py` | relocatable | `runtime/` | |
+| `shutdown_cleanup.py` | relocatable | `runtime/` | |
+| `telemetry_boot.py` | relocatable | `runtime/` | |
+| `self_improve_job_events.py` | relocatable | `self_improve/` | |
+| `session_mirror.py` | relocatable | `session/` | |
+| `session_reset.py` | relocatable | `session/` | |
+| `sessions_query.py` | relocatable | `session/` | |
+| `subagents_announce.py` | relocatable | `subagents/` | |
+| `subagents_boot.py` | relocatable | `subagents/` | |
+| `telegram_inline.py` | relocatable | `telegram/` | |
+| `telegram_inline_agent.py` | relocatable | `telegram/` | |
+| `telegram_inline_base.py` | relocatable | `telegram/` | |
+| `telegram_inline_dispatch.py` | relocatable | `telegram/` | |
+| `telegram_inline_printing_press.py` | relocatable | `telegram/` | |
+| `telegram_inline_sources.py` | relocatable | `telegram/` | |
+| `telegram_inline_types.py` | relocatable | `telegram/` | |
+| `telegram_quick_actions.py` | relocatable | `telegram/` | |
+| `telegram_resolve.py` | relocatable | `telegram/` | |
+| `telegram_webhook_secret.py` | relocatable | `telegram/` | |
+| `triage_audit.py` | relocatable | `triage/` | |
+| `triage_context.py` | relocatable | `triage/` | |
+| `turn_bundle.py` | relocatable | `turn/` | |
+| `turn_bundle_hooks.py` | relocatable | `turn/` | |
+| `turn_finalizer.py` | relocatable | `turn/` | |
+| `turn_media.py` | relocatable | `turn/` | |
+| `turn_metadata.py` | relocatable | `turn/` | |
+| `user_model_hooks.py` | relocatable | `user/` | |
+| `user_model_turn.py` | relocatable | `user/` | |
+| `user_profile.py` | relocatable | `user/` | |
+| `redact.py` | relocatable | `util/` | |
+| `strings.py` | relocatable | `util/` | |
+| `timestamps.py` | relocatable | `util/` | |
+| `webapp_qa.py` | relocatable | `webapp/` | |
+| `webapp_viewer.py` | relocatable | `webapp/` | |
 
 ## Wave W13 — Docstrings + `<Examples:` compliance
 

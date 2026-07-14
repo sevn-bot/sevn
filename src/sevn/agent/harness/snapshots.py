@@ -659,7 +659,7 @@ def queue_dashboard_turn_replay(
     if not turn_has_replay_trace(traces_conn, session_id=session_id, turn_id=turn_id):
         msg = f"no trace history for session={session_id!r} turn={turn_id!r}"
         raise ReplayTurnNotFoundError(msg)
-    from sevn.gateway.replay_turn_lookup import lookup_user_text_for_turn
+    from sevn.gateway.replay.replay_turn_lookup import lookup_user_text_for_turn
 
     if lookup_user_text_for_turn(conn, session_id, turn_id) is None:
         msg = f"turn is not replayable session={session_id!r} turn={turn_id!r}"

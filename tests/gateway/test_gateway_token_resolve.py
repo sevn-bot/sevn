@@ -1,4 +1,4 @@
-"""Tests for ``sevn.gateway.gateway_token`` resolution."""
+"""Tests for ``sevn.gateway.runtime.gateway_token`` resolution."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import pytest
 
 from sevn.config.settings import ProcessSettings
 from sevn.config.workspace_config import GatewayConfig, WorkspaceConfig
-from sevn.gateway.gateway_token import (
+from sevn.gateway.runtime.gateway_token import (
     GATEWAY_TOKEN_CONFIG_REF,
     GATEWAY_TOKEN_LOGICAL_KEY,
     generate_gateway_token,

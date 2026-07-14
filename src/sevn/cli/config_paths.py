@@ -1,7 +1,7 @@
 """Telegram ``/config`` section → ``sevn.json`` dot-path SSOT (D14).
 
 Module: sevn.cli.config_paths
-Depends: dataclasses, re, sevn.gateway.menu_registry
+Depends: dataclasses, re, sevn.gateway.menu.menu_registry
 
 Exports:
     ConfigSection — one ``/config`` root section and its schema dot-paths.
@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from sevn.gateway.menu_registry import MENU_BUTTON_SPECS
+from sevn.gateway.menu.menu_registry import MENU_BUTTON_SPECS
 
 _SECTION_CALLBACK_RE = re.compile(r"^\^cfg:section:([^\\$]+)\$$")
 

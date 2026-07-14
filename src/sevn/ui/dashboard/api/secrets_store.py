@@ -1,7 +1,7 @@
 """Mission Control encrypted secrets store CRUD (MC W1 §2b).
 
 Module: sevn.ui.dashboard.api.secrets_store
-Depends: fastapi, pydantic, sevn.gateway.admin_secrets, sevn.secrets.migrate,
+Depends: fastapi, pydantic, sevn.gateway.admin.admin_secrets, sevn.secrets.migrate,
     sevn.ui.dashboard.api.deps, sevn.ui.dashboard.services.mission_audit
 
 Exports:
@@ -20,7 +20,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from sevn.gateway.admin_secrets import (
+from sevn.gateway.admin.admin_secrets import (
     SecretDeleteBody,
     SecretDeleteResponse,
     SecretEntryOut,

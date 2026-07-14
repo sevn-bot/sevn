@@ -26,7 +26,10 @@ from sevn.agent.adapters.tier_b_tools import _ALWAYS_INVOKABLE_FILE_OPS
 from sevn.agent.persona import build_tier_b_intro_prompt_parts
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.gateway.agent_turn import build_intro_extra_instructions
-from sevn.gateway.first_session import bootstrap_capture_instructions, tier_b_intro_instructions
+from sevn.gateway.onboarding.first_session import (
+    bootstrap_capture_instructions,
+    tier_b_intro_instructions,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers

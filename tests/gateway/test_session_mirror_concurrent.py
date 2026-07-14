@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 from sevn.config.workspace_config import WorkspaceConfig
-from sevn.gateway.session_mirror import mirror_gateway_message
+from sevn.gateway.session.session_mirror import mirror_gateway_message
 
 
 @pytest.mark.asyncio

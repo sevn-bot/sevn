@@ -10,7 +10,7 @@ import pytest
 from typer.testing import CliRunner
 
 from sevn.cli.app import app
-from sevn.gateway.gateway_token import GATEWAY_TOKEN_CONFIG_REF
+from sevn.gateway.runtime.gateway_token import GATEWAY_TOKEN_CONFIG_REF
 from sevn.infrastructure.tunnel_config import (
     CF_TOKEN_CONFIG_REF,
     CF_TOKEN_LOGICAL_KEY,

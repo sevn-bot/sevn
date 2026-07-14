@@ -1,7 +1,7 @@
 """``sevn pairing`` CLI for DM pairing approval.
 
 Module: sevn.cli.commands.pairing_cmd
-Depends: typer, sevn.gateway.pairing, sevn.cli.workspace
+Depends: typer, sevn.gateway.onboarding.pairing, sevn.cli.workspace
 
 Exports:
     register — attach ``pairing`` subtree to root Typer app.
@@ -13,7 +13,7 @@ import typer
 
 from sevn.cli.errors import CliPreconditionError
 from sevn.cli.workspace import load_bound_workspace
-from sevn.gateway.pairing import PairingStore
+from sevn.gateway.onboarding.pairing import PairingStore
 
 
 def register(app: typer.Typer) -> None:

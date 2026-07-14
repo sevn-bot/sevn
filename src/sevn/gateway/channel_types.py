@@ -168,7 +168,7 @@ class ChannelAdapter(ABC):
         """Replace the text of a previously delivered message (``PROBLEMS.md`` Priority 2).
 
         Default implementation returns ``False`` to mean "edit not supported on
-        this adapter"; callers (see :class:`sevn.gateway.turn_finalizer.TierBAnswerFinalizer`)
+        this adapter"; callers (see :class:`sevn.gateway.turn.turn_finalizer.TierBAnswerFinalizer`)
         fall back to sending a new message in that case. Adapters that support
         in-place edits (Telegram via ``editMessageText``, future WebChat WS
         update broadcasts) override this method.

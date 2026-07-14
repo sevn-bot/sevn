@@ -25,7 +25,7 @@ from sevn.gateway.agent_turn import (
     _looks_unfinished_assistant_reply,
     _resolve_retry_back_reference,
 )
-from sevn.gateway.turn_finalizer import TierBAnswerFinalizer
+from sevn.gateway.turn.turn_finalizer import TierBAnswerFinalizer
 from sevn.storage.migrate import apply_migrations
 
 # ---------------------------------------------------------------------------

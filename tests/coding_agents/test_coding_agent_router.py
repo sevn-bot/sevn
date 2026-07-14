@@ -7,7 +7,7 @@ import pytest
 from sevn.agent.tracing.sink import NullTraceSink
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.gateway.channel_router import IncomingMessage
-from sevn.gateway.coding_agent_router import CodingAgentRouter
+from sevn.gateway.routing.coding_agent_router import CodingAgentRouter
 
 
 def _router() -> CodingAgentRouter:

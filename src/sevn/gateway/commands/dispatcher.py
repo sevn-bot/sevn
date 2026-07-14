@@ -1,6 +1,6 @@
 """Gateway command / callback short-circuit (`specs/17-gateway.md` §2.4).
 Module: sevn.gateway.commands.dispatcher
-Depends: sevn.gateway.channel_router, sevn.gateway.commands.registry, sevn.gateway.strings
+Depends: sevn.gateway.channel_router, sevn.gateway.commands.registry, sevn.gateway.util.strings
 Exports:
     CommandDispatcher — ``try_dispatch`` registry-driven bypass and optional bypass toasts.
 """
@@ -17,8 +17,8 @@ from loguru import logger
 
 from sevn.agent.tracing.sink import TraceEvent, TraceSink
 from sevn.gateway.commands.registry import DEFAULT_COMMAND_SPECS, CommandSpec
-from sevn.gateway.steer_store import SessionSteerStore, parse_steer_command_text
-from sevn.gateway.strings import (
+from sevn.gateway.queue.steer_store import SessionSteerStore, parse_steer_command_text
+from sevn.gateway.util.strings import (
     CALLBACK_AUTH_BLOCKED_TOAST,
     STEER_ACK_V1,
     STEER_BUFFER_FULL_V1,
@@ -62,7 +62,7 @@ class CommandDispatcher:
     def callback_auth_blocked_user_toast(self) -> str:
         """Return copy for callback authorization denials (`specs/17-gateway.md` §8).
         Returns:
-            str: Stable English v1 string from :mod:`sevn.gateway.strings`.
+            str: Stable English v1 string from :mod:`sevn.gateway.util.strings`.
         Examples:
             >>> CommandDispatcher().callback_auth_blocked_user_toast()
             'You are not allowed to use this action.'
@@ -120,7 +120,7 @@ class CommandDispatcher:
         Returns:
             str: Ack, usage, or rejection copy.
         Examples:
-            >>> from sevn.gateway.steer_store import SessionSteerStore
+            >>> from sevn.gateway.queue.steer_store import SessionSteerStore
             >>> store = SessionSteerStore()
             >>> CommandDispatcher(steer_store=store)._steer_bypass_reply(
             ...     "/steer", session_id="s", is_owner=True,

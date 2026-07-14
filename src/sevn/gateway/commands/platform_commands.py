@@ -1,7 +1,7 @@
 """``/platform`` slash command handler.
 
 Module: sevn.gateway.commands.platform_commands
-Depends: sevn.gateway.channel_router, sevn.gateway.platform_runtime
+Depends: sevn.gateway.channel_router, sevn.gateway.runtime.platform_runtime
 
 Exports:
     PlatformCommandHandler — ``/platform list|pause|resume`` for owners.

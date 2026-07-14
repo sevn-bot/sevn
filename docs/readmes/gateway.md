@@ -38,8 +38,8 @@ When a session is already processing a turn, `gateway.queue_mode` in `sevn.json`
 | Mode | Behavior |
 | --- | --- |
 | `cancel` (default) | A new inbound message cancels the in-flight turn so the latest message wins |
-| `steer` | Owner `/steer <text>` queues corrections in [`steer_store.py`](../../src/sevn/gateway/steer_store.py); they apply at the next safe LLM boundary without aborting the whole turn |
-| `multi` | The triager classifies busy input as steer, supersede, or a new level-1 task via [`queue_multi.py`](../../src/sevn/gateway/queue_multi.py) — useful when sub-agents run in parallel |
+| `steer` | Owner `/steer <text>` queues corrections in [`steer_store.py`](../../src/sevn/gateway/queue/steer_store.py); they apply at the next safe LLM boundary without aborting the whole turn |
+| `multi` | The triager classifies busy input as steer, supersede, or a new level-1 task via [`queue_multi.py`](../../src/sevn/gateway/queue/queue_multi.py) — useful when sub-agents run in parallel |
 
 Per-channel overrides are available through `channels.*.busy_input_mode` when Telegram and Web UI need different behaviour.
 
@@ -51,7 +51,7 @@ The HTTP server itself is assembled in [`http_server.py`](../../src/sevn/gateway
 
 ### Telegram menus and slash commands
 
-Telegram `/config` menus, inline keyboards, and slash commands are gateway-owned. [`menu.py`](../../src/sevn/gateway/menu.py) and [`menu_registry.py`](../../src/sevn/gateway/menu_registry.py) build the operator menu tree; the [`commands/`](../../src/sevn/gateway/commands/) subpackage dispatches `/steer`, diagnostics, evolution, self-improve, and config actions through [`commands/dispatcher.py`](../../src/sevn/gateway/commands/dispatcher.py). After menu changes, run `make telegram-menu-docs-check`.
+Telegram `/config` menus, inline keyboards, and slash commands are gateway-owned. [`menu.py`](../../src/sevn/gateway/menu/menu.py) and [`menu_registry.py`](../../src/sevn/gateway/menu/menu_registry.py) build the operator menu tree; the [`commands/`](../../src/sevn/gateway/commands/) subpackage dispatches `/steer`, diagnostics, evolution, self-improve, and config actions through [`commands/dispatcher.py`](../../src/sevn/gateway/commands/dispatcher.py). After menu changes, run `make telegram-menu-docs-check`.
 
 ### Configuration (`sevn.json` → `gateway`)
 
@@ -59,7 +59,7 @@ Key knobs (full schema: [`infra/sevn.schema.json`](../../infra/sevn.schema.json)
 
 - `queue_mode` — `cancel` \| `steer` \| `multi`
 - `steer.max_pending` — bounded `/steer` queue depth per session
-- `budget.*` — per-turn executor ceilings via [`gateway.py`](../../src/sevn/config/sections/gateway.py) ([`GatewayBudgetConfig`](../../src/sevn/config/sections/gateway.py#L155)): `tier_b_rounds`, `tier_b_rounds_expanded`, `count_planning`, per-slot `*_max_output_tokens` (triager, tier B/C/D, guard, LCM, dreaming, user model), `tier_b_executor_timeout_s`, `tier_cd_executor_timeout_s`, and cumulative `cascade_budget_s` enforced by [`cascade_budget.py`](../../src/sevn/gateway/cascade_budget.py)
+- `budget.*` — per-turn executor ceilings via [`gateway.py`](../../src/sevn/config/sections/gateway.py) ([`GatewayBudgetConfig`](../../src/sevn/config/sections/gateway.py#L155)): `tier_b_rounds`, `tier_b_rounds_expanded`, `count_planning`, per-slot `*_max_output_tokens` (triager, tier B/C/D, guard, LCM, dreaming, user model), `tier_b_executor_timeout_s`, `tier_cd_executor_timeout_s`, and cumulative `cascade_budget_s` enforced by [`cascade_budget.py`](../../src/sevn/gateway/queue/cascade_budget.py)
 - `first_session_intro`, `session_mirror`, `restart` — first-chat UX, cross-channel session mirroring, and graceful restart acknowledgement
 
 Validate after edits: `sevn config validate`; `sevn doctor` for install health.
@@ -70,10 +70,10 @@ Validate after edits: `sevn config validate`; `sevn doctor` for install health.
 - [`channel_router.py`](../../src/sevn/gateway/channel_router.py) — [`route_incoming`](../../src/sevn/gateway/channel_router.py#L1348): inbound/outbound orchestration, LLM Guard gate, session enqueue
 - [`channel_boot.py`](../../src/sevn/gateway/channel_boot.py) — multi-adapter boot loader and webhook registration
 - [`session_manager.py`](../../src/sevn/gateway/session_manager.py) — SQLite session persistence, turn queue, and busy-session detection
-- [`steer_store.py`](../../src/sevn/gateway/steer_store.py) — session-scoped `/steer` buffer for `steer` queue mode
-- [`queue_multi.py`](../../src/sevn/gateway/queue_multi.py) — `multi` queue-mode triager classification
+- [`steer_store.py`](../../src/sevn/gateway/queue/steer_store.py) — session-scoped `/steer` buffer for `steer` queue mode
+- [`queue_multi.py`](../../src/sevn/gateway/queue/queue_multi.py) — `multi` queue-mode triager classification
 - [`boot.py`](../../src/sevn/gateway/boot.py) — harness boot sweep + workspace layout validation
-- [`mission_api.py`](../../src/sevn/gateway/mission_api.py) — Mission Control REST/WebSocket surfaces
+- [`mission_api.py`](../../src/sevn/gateway/mission/mission_api.py) — Mission Control REST/WebSocket surfaces
 
 Normative spec: [`about-sevn.bot/specs/17-gateway.md`](../../about-sevn.bot/specs/17-gateway.md). Related: [Channels README](channels.md), [Agent runtime README](agent.md), [Security README](security.md).
 
@@ -93,8 +93,8 @@ CLI sevn secrets calls these routes with SEVN_GATEWAY_TOKEN; the gateway
 mutates the workspace encrypted store — not a direct proxy admin path
 (about-sevn.bot/specs/07-egress-proxy.md).
 
-Working with [`admin_secrets.py`](../../src/sevn/gateway/admin_secrets.py): inspect the public entry points below.
-Start with [`register_admin_secrets_routes`](../../src/sevn/gateway/admin_secrets.py#L121).
+Working with [`admin_secrets.py`](../../src/sevn/gateway/admin/admin_secrets.py): inspect the public entry points below.
+Start with [`register_admin_secrets_routes`](../../src/sevn/gateway/admin/admin_secrets.py#L121).
 
 Production agent dispatch glue (about-sevn.bot/specs/17-gateway.md §2.6).
 
@@ -119,13 +119,13 @@ Start with [`register_boot_hook`](../../src/sevn/gateway/boot_registry.py#L52), 
 
 Deterministic USER.md fallback after bootstrap tier-B (the design docs Wave 3).
 
-Working with [`bootstrap_capture.py`](../../src/sevn/gateway/bootstrap_capture.py): inspect the public entry points below.
-Start with [`extract_bootstrap_name`](../../src/sevn/gateway/bootstrap_capture.py#L274), then [`try_bootstrap_user_md_fallback`](../../src/sevn/gateway/bootstrap_capture.py#L434).
+Working with [`bootstrap_capture.py`](../../src/sevn/gateway/bootstrap/bootstrap_capture.py): inspect the public entry points below.
+Start with [`extract_bootstrap_name`](../../src/sevn/gateway/bootstrap/bootstrap_capture.py#L274), then [`try_bootstrap_user_md_fallback`](../../src/sevn/gateway/bootstrap/bootstrap_capture.py#L434).
 
 USER.md bootstrap completion helpers without onboarding seed imports.
 
-Working with [`bootstrap_state.py`](../../src/sevn/gateway/bootstrap_state.py): inspect the public entry points below.
-Start with [`operator_name_from_user_md`](../../src/sevn/gateway/bootstrap_state.py#L66), then [`bootstrap_completion_state`](../../src/sevn/gateway/bootstrap_state.py#L101).
+Working with [`bootstrap_state.py`](../../src/sevn/gateway/bootstrap/bootstrap_state.py): inspect the public entry points below.
+Start with [`operator_name_from_user_md`](../../src/sevn/gateway/bootstrap/bootstrap_state.py#L66), then [`bootstrap_completion_state`](../../src/sevn/gateway/bootstrap/bootstrap_state.py#L101).
 
 Gateway browser teardown hooks without static sevn.skills imports.
 
@@ -133,13 +133,13 @@ session_manager is reachable from sevn.channels; import-linter forbids a
 transitive channels → skills chain. Browser close helpers therefore load
 sevn.skills.browser_session via importlib.import_module at call time.
 
-Working with [`browser_lifecycle.py`](../../src/sevn/gateway/browser_lifecycle.py): inspect the public entry points below.
-Start with [`close_browser_for_rotate`](../../src/sevn/gateway/browser_lifecycle.py#L25).
+Working with [`browser_lifecycle.py`](../../src/sevn/gateway/browser/browser_lifecycle.py): inspect the public entry points below.
+Start with [`close_browser_for_rotate`](../../src/sevn/gateway/browser/browser_lifecycle.py#L25).
 
 Cumulative wall-clock budget for the tier B → C/D cascade (about-sevn.bot/specs/17-gateway.md §3.4).
 
-Working with [`cascade_budget.py`](../../src/sevn/gateway/cascade_budget.py): inspect the public entry points below.
-Start with [`CascadeBudget.remaining_s`](../../src/sevn/gateway/cascade_budget.py#L68), then [`CascadeBudget.exhausted`](../../src/sevn/gateway/cascade_budget.py#L87), [`CascadeBudget.clamp`](../../src/sevn/gateway/cascade_budget.py#L104).
+Working with [`cascade_budget.py`](../../src/sevn/gateway/queue/cascade_budget.py): inspect the public entry points below.
+Start with [`CascadeBudget.remaining_s`](../../src/sevn/gateway/queue/cascade_budget.py#L68), then [`CascadeBudget.exhausted`](../../src/sevn/gateway/queue/cascade_budget.py#L87), [`CascadeBudget.clamp`](../../src/sevn/gateway/queue/cascade_budget.py#L104).
 
 Multi-adapter gateway boot loader.
 
@@ -158,8 +158,8 @@ Start with [`ChannelAdapter.name`](../../src/sevn/gateway/channel_types.py#L92),
 
 Dedicated Telegram routing for bound Coding Agents (bypass Triager).
 
-Working with [`coding_agent_router.py`](../../src/sevn/gateway/coding_agent_router.py): inspect the public entry points below.
-Start with [`CodingAgentRouter.match_binding`](../../src/sevn/gateway/coding_agent_router.py#L104), then [`CodingAgentRouter.handle_operator_message`](../../src/sevn/gateway/coding_agent_router.py#L267).
+Working with [`coding_agent_router.py`](../../src/sevn/gateway/routing/coding_agent_router.py): inspect the public entry points below.
+Start with [`CodingAgentRouter.match_binding`](../../src/sevn/gateway/routing/coding_agent_router.py#L104), then [`CodingAgentRouter.handle_operator_message`](../../src/sevn/gateway/routing/coding_agent_router.py#L267).
 
 Gateway-owned slash commands and callback dispatch scaffold.
 
@@ -280,63 +280,63 @@ Start with [`voice_shortcut_enabled`](../../src/sevn/gateway/commands/voice_matc
 
 Pinned dashboard message publisher (the design docs §8.1).
 
-Working with [`dashboard_pin.py`](../../src/sevn/gateway/dashboard_pin.py): inspect the public entry points below.
-Start with [`dashboard_pin_topic_key`](../../src/sevn/gateway/dashboard_pin.py#L35), then [`register_dashboard_pin`](../../src/sevn/gateway/dashboard_pin.py#L55), [`lookup_dashboard_pin_message_id`](../../src/sevn/gateway/dashboard_pin.py#L85), [`unregister_dashboard_pin`](../../src/sevn/gateway/dashboard_pin.py#L115).
+Working with [`dashboard_pin.py`](../../src/sevn/gateway/dashboard/dashboard_pin.py): inspect the public entry points below.
+Start with [`dashboard_pin_topic_key`](../../src/sevn/gateway/dashboard/dashboard_pin.py#L35), then [`register_dashboard_pin`](../../src/sevn/gateway/dashboard/dashboard_pin.py#L55), [`lookup_dashboard_pin_message_id`](../../src/sevn/gateway/dashboard/dashboard_pin.py#L85), [`unregister_dashboard_pin`](../../src/sevn/gateway/dashboard/dashboard_pin.py#L115).
 
 Persistent gateway deployment identifier (about-sevn.bot/specs/17-gateway.md §10.14 TE-1).
 
-Working with [`deployment_id.py`](../../src/sevn/gateway/deployment_id.py): inspect the public entry points below.
-Start with [`load_or_create_deployment_id`](../../src/sevn/gateway/deployment_id.py#L77).
+Working with [`deployment_id.py`](../../src/sevn/gateway/runtime/deployment_id.py): inspect the public entry points below.
+Start with [`load_or_create_deployment_id`](../../src/sevn/gateway/runtime/deployment_id.py#L77).
 
 Backend wrappers for /logs and /traces operator diagnostics.
 
-Working with [`diagnostics.py`](../../src/sevn/gateway/diagnostics.py): inspect the public entry points below.
-Start with [`tail_service_log`](../../src/sevn/gateway/diagnostics.py#L73), then [`recent_traces`](../../src/sevn/gateway/diagnostics.py#L104), [`get_span`](../../src/sevn/gateway/diagnostics.py#L148), [`format_for_telegram`](../../src/sevn/gateway/diagnostics.py#L208).
+Working with [`diagnostics.py`](../../src/sevn/gateway/diagnostics/diagnostics.py): inspect the public entry points below.
+Start with [`tail_service_log`](../../src/sevn/gateway/diagnostics/diagnostics.py#L73), then [`recent_traces`](../../src/sevn/gateway/diagnostics/diagnostics.py#L104), [`get_span`](../../src/sevn/gateway/diagnostics/diagnostics.py#L148), [`format_for_telegram`](../../src/sevn/gateway/diagnostics/diagnostics.py#L208).
 
 dispatcher_callbacks table maintenance (about-sevn.bot/specs/17-gateway.md §3.4).
 
-Working with [`dispatcher_callbacks.py`](../../src/sevn/gateway/dispatcher_callbacks.py): inspect the public entry points below.
-Start with [`prune_dispatcher_callbacks`](../../src/sevn/gateway/dispatcher_callbacks.py#L16).
+Working with [`dispatcher_callbacks.py`](../../src/sevn/gateway/dispatcher/dispatcher_callbacks.py): inspect the public entry points below.
+Start with [`prune_dispatcher_callbacks`](../../src/sevn/gateway/dispatcher/dispatcher_callbacks.py#L16).
 
 dispatcher_state insert + expiry sweeper (about-sevn.bot/specs/17-gateway.md §3.4).
 
-Working with [`dispatcher_state.py`](../../src/sevn/gateway/dispatcher_state.py): inspect the public entry points below.
-Start with [`dispatcher_state_ttl_for_kind`](../../src/sevn/gateway/dispatcher_state.py#L26), then [`insert_dispatcher_state`](../../src/sevn/gateway/dispatcher_state.py#L47), [`sweep_expired_dispatcher_state`](../../src/sevn/gateway/dispatcher_state.py#L110).
+Working with [`dispatcher_state.py`](../../src/sevn/gateway/dispatcher/dispatcher_state.py): inspect the public entry points below.
+Start with [`dispatcher_state_ttl_for_kind`](../../src/sevn/gateway/dispatcher/dispatcher_state.py#L26), then [`insert_dispatcher_state`](../../src/sevn/gateway/dispatcher/dispatcher_state.py#L47), [`sweep_expired_dispatcher_state`](../../src/sevn/gateway/dispatcher/dispatcher_state.py#L110).
 
 E2E-only echo dispatch for Playwright (the design docs Wave 6).
 
-Working with [`e2e_echo.py`](../../src/sevn/gateway/e2e_echo.py): inspect the public entry points below.
-Start with [`build_echo_run_turn`](../../src/sevn/gateway/e2e_echo.py#L65).
+Working with [`e2e_echo.py`](../../src/sevn/gateway/api/e2e_echo.py): inspect the public entry points below.
+Start with [`build_echo_run_turn`](../../src/sevn/gateway/api/e2e_echo.py#L65).
 
 Gateway lifecycle event hooks.
 
-Working with [`event_hooks.py`](../../src/sevn/gateway/event_hooks.py): inspect the public entry points below.
-Start with [`register_gateway_event_hook`](../../src/sevn/gateway/event_hooks.py#L45), then [`clear_gateway_event_hooks`](../../src/sevn/gateway/event_hooks.py#L71), [`emit_gateway_event`](../../src/sevn/gateway/event_hooks.py#L82).
+Working with [`event_hooks.py`](../../src/sevn/gateway/hooks/event_hooks.py): inspect the public entry points below.
+Start with [`register_gateway_event_hook`](../../src/sevn/gateway/hooks/event_hooks.py#L45), then [`clear_gateway_event_hooks`](../../src/sevn/gateway/hooks/event_hooks.py#L71), [`emit_gateway_event`](../../src/sevn/gateway/hooks/event_hooks.py#L82).
 
 Gateway evolution approval Telegram callbacks (about-sevn.bot/specs/35-bot-evolution.md §2.8).
 
-Working with [`evolution_approval_gate.py`](../../src/sevn/gateway/evolution_approval_gate.py): inspect the public entry points below.
-Start with [`EvolutionApprovalWaitRegistry.resolve`](../../src/sevn/gateway/evolution_approval_gate.py#L55), then [`build_evolution_approval_inline_keyboard`](../../src/sevn/gateway/evolution_approval_gate.py#L78), [`parse_evolution_callback_data`](../../src/sevn/gateway/evolution_approval_gate.py#L103), [`EvolutionApprovalCallbackHandler.matches`](../../src/sevn/gateway/evolution_approval_gate.py#L169).
+Working with [`evolution_approval_gate.py`](../../src/sevn/gateway/evolution/evolution_approval_gate.py): inspect the public entry points below.
+Start with [`EvolutionApprovalWaitRegistry.resolve`](../../src/sevn/gateway/evolution/evolution_approval_gate.py#L55), then [`build_evolution_approval_inline_keyboard`](../../src/sevn/gateway/evolution/evolution_approval_gate.py#L78), [`parse_evolution_callback_data`](../../src/sevn/gateway/evolution/evolution_approval_gate.py#L103), [`EvolutionApprovalCallbackHandler.matches`](../../src/sevn/gateway/evolution/evolution_approval_gate.py#L169).
 
 Fan evolution issue transitions to Mission Control WS + Telegram (about-sevn.bot/specs/35-bot-evolution.md §2.8).
 
-Working with [`evolution_issue_events.py`](../../src/sevn/gateway/evolution_issue_events.py): inspect the public entry points below.
-Start with [`EvolutionIssueEventFanout.publish`](../../src/sevn/gateway/evolution_issue_events.py#L137).
+Working with [`evolution_issue_events.py`](../../src/sevn/gateway/evolution/evolution_issue_events.py): inspect the public entry points below.
+Start with [`EvolutionIssueEventFanout.publish`](../../src/sevn/gateway/evolution/evolution_issue_events.py#L137).
 
 First-session BOOTSTRAP intro state (about-sevn.bot/specs/17-gateway.md §2.6).
 
-Working with [`first_session.py`](../../src/sevn/gateway/first_session.py): inspect the public entry points below.
-Start with [`first_session_intro_enabled`](../../src/sevn/gateway/first_session.py#L77), then [`first_session_intro_max_output_tokens`](../../src/sevn/gateway/first_session.py#L94), [`intro_state_for_scope`](../../src/sevn/gateway/first_session.py#L189), [`intro_state_for_session`](../../src/sevn/gateway/first_session.py#L233).
+Working with [`first_session.py`](../../src/sevn/gateway/onboarding/first_session.py): inspect the public entry points below.
+Start with [`first_session_intro_enabled`](../../src/sevn/gateway/onboarding/first_session.py#L77), then [`first_session_intro_max_output_tokens`](../../src/sevn/gateway/onboarding/first_session.py#L94), [`intro_state_for_scope`](../../src/sevn/gateway/onboarding/first_session.py#L189), [`intro_state_for_session`](../../src/sevn/gateway/onboarding/first_session.py#L233).
 
 Persist Telegram context across owner-initiated gateway/proxy restarts.
 
-Working with [`gateway_restart_ack.py`](../../src/sevn/gateway/gateway_restart_ack.py): inspect the public entry points below.
-Start with [`pending_restart_store_path`](../../src/sevn/gateway/gateway_restart_ack.py#L64), then [`restart_ack_delivered_path`](../../src/sevn/gateway/gateway_restart_ack.py#L80), [`conversation_snapshot_for_session`](../../src/sevn/gateway/gateway_restart_ack.py#L152), [`record_pending_gateway_restart`](../../src/sevn/gateway/gateway_restart_ack.py#L188).
+Working with [`gateway_restart_ack.py`](../../src/sevn/gateway/runtime/gateway_restart_ack.py): inspect the public entry points below.
+Start with [`pending_restart_store_path`](../../src/sevn/gateway/runtime/gateway_restart_ack.py#L64), then [`restart_ack_delivered_path`](../../src/sevn/gateway/runtime/gateway_restart_ack.py#L80), [`conversation_snapshot_for_session`](../../src/sevn/gateway/runtime/gateway_restart_ack.py#L152), [`record_pending_gateway_restart`](../../src/sevn/gateway/runtime/gateway_restart_ack.py#L188).
 
 Gateway bearer token constants, generation, and secret-ref resolution.
 
-Working with [`gateway_token.py`](../../src/sevn/gateway/gateway_token.py): inspect the public entry points below.
-Start with [`generate_gateway_token`](../../src/sevn/gateway/gateway_token.py#L57), then [`validate_gateway_token_plaintext`](../../src/sevn/gateway/gateway_token.py#L73), [`resolve_config_ref`](../../src/sevn/gateway/gateway_token.py#L197), [`resolve_gateway_token_ref`](../../src/sevn/gateway/gateway_token.py#L286).
+Working with [`gateway_token.py`](../../src/sevn/gateway/runtime/gateway_token.py): inspect the public entry points below.
+Start with [`generate_gateway_token`](../../src/sevn/gateway/runtime/gateway_token.py#L57), then [`validate_gateway_token_plaintext`](../../src/sevn/gateway/runtime/gateway_token.py#L73), [`resolve_config_ref`](../../src/sevn/gateway/runtime/gateway_token.py#L197), [`resolve_gateway_token_ref`](../../src/sevn/gateway/runtime/gateway_token.py#L286).
 
 Reverse-proxy noVNC behind the gateway when SEVN_NOVNC_UPSTREAM is set.
 
@@ -345,8 +345,8 @@ is proxied at /gui/websockify. Browsers authenticate via ?token= (or a
 session cookie minted from it); API clients may use Authorization: Bearer.
 Port 6080 stays container-internal.
 
-Working with [`gui_proxy.py`](../../src/sevn/gateway/gui_proxy.py): inspect the public entry points below.
-Start with [`mount_gui_proxy`](../../src/sevn/gateway/gui_proxy.py#L319).
+Working with [`gui_proxy.py`](../../src/sevn/gateway/api/gui_proxy.py): inspect the public entry points below.
+Start with [`mount_gui_proxy`](../../src/sevn/gateway/api/gui_proxy.py#L319).
 
 FastAPI gateway surface (about-sevn.bot/specs/17-gateway.md §2.1, §4.2).
 
@@ -355,108 +355,108 @@ Start with [`deferred_json`](../../src/sevn/gateway/http_server.py#L955), then [
 
 Gateway → LCM ingest glue (about-sevn.bot/specs/17-gateway.md §2.6 Wave 8).
 
-Working with [`lcm_ingest.py`](../../src/sevn/gateway/lcm_ingest.py): inspect the public entry points below.
-Start with [`ingest_gateway_message_row`](../../src/sevn/gateway/lcm_ingest.py#L25).
+Working with [`lcm_ingest.py`](../../src/sevn/gateway/lcm/lcm_ingest.py): inspect the public entry points below.
+Start with [`ingest_gateway_message_row`](../../src/sevn/gateway/lcm/lcm_ingest.py#L25).
 
 Signed media paths + DB index (about-sevn.bot/specs/17-gateway.md §3.3).
 
-Working with [`media_store.py`](../../src/sevn/gateway/media_store.py): inspect the public entry points below.
-Start with [`MediaStore.channel_files_dir`](../../src/sevn/gateway/media_store.py#L42), then [`MediaStore.persist_attachment_descriptors`](../../src/sevn/gateway/media_store.py#L59), [`MediaStore.register_token`](../../src/sevn/gateway/media_store.py#L109).
+Working with [`media_store.py`](../../src/sevn/gateway/media/media_store.py): inspect the public entry points below.
+Start with [`MediaStore.channel_files_dir`](../../src/sevn/gateway/media/media_store.py#L42), then [`MediaStore.persist_attachment_descriptors`](../../src/sevn/gateway/media/media_store.py#L59), [`MediaStore.register_token`](../../src/sevn/gateway/media/media_store.py#L109).
 
 Telegram /menu inline keyboard builder (about-sevn.bot/specs/18-channel-telegram.md §4).
 
-Working with [`menu.py`](../../src/sevn/gateway/menu.py): inspect the public entry points below.
-Start with [`config_menu_nav_key`](../../src/sevn/gateway/menu.py#L195), then [`get_config_menu_nav`](../../src/sevn/gateway/menu.py#L212), [`config_menu_nav_go`](../../src/sevn/gateway/menu.py#L240), [`config_menu_nav_push_current`](../../src/sevn/gateway/menu.py#L272).
+Working with [`menu.py`](../../src/sevn/gateway/menu/menu.py): inspect the public entry points below.
+Start with [`config_menu_nav_key`](../../src/sevn/gateway/menu/menu.py#L195), then [`get_config_menu_nav`](../../src/sevn/gateway/menu/menu.py#L212), [`config_menu_nav_go`](../../src/sevn/gateway/menu/menu.py#L240), [`config_menu_nav_push_current`](../../src/sevn/gateway/menu/menu.py#L272).
 
 Branding helpers for Telegram /config tiles (styles/sevn/style/logos).
 
-Working with [`menu_branding.py`](../../src/sevn/gateway/menu_branding.py): inspect the public entry points below.
-Start with [`config_sevn_bot_section_title`](../../src/sevn/gateway/menu_branding.py#L25).
+Working with [`menu_branding.py`](../../src/sevn/gateway/menu/menu_branding.py): inspect the public entry points below.
+Start with [`config_sevn_bot_section_title`](../../src/sevn/gateway/menu/menu_branding.py#L25).
 
 Operator readiness gating for Telegram /config buttons.
 
-Working with [`menu_readiness.py`](../../src/sevn/gateway/menu_readiness.py): inspect the public entry points below.
-Start with [`readiness_for_callback`](../../src/sevn/gateway/menu_readiness.py#L282), then [`gate_config_keyboard_rows`](../../src/sevn/gateway/menu_readiness.py#L346), [`config_section_catalog`](../../src/sevn/gateway/menu_readiness.py#L379), [`readiness_user_label`](../../src/sevn/gateway/menu_readiness.py#L401).
+Working with [`menu_readiness.py`](../../src/sevn/gateway/menu/menu_readiness.py): inspect the public entry points below.
+Start with [`readiness_for_callback`](../../src/sevn/gateway/menu/menu_readiness.py#L282), then [`gate_config_keyboard_rows`](../../src/sevn/gateway/menu/menu_readiness.py#L346), [`config_section_catalog`](../../src/sevn/gateway/menu/menu_readiness.py#L379), [`readiness_user_label`](../../src/sevn/gateway/menu/menu_readiness.py#L401).
 
 Declarative Telegram control-surface button inventory (the design docs).
 
-Working with [`menu_registry.py`](../../src/sevn/gateway/menu_registry.py): inspect the public entry points below.
-Start with [`match_menu_button_spec`](../../src/sevn/gateway/menu_registry.py#L1281), then [`is_nav_chrome_callback`](../../src/sevn/gateway/menu_registry.py#L1303), [`is_section_tile_callback`](../../src/sevn/gateway/menu_registry.py#L1321), [`registry_implementation_counts`](../../src/sevn/gateway/menu_registry.py#L1340).
+Working with [`menu_registry.py`](../../src/sevn/gateway/menu/menu_registry.py): inspect the public entry points below.
+Start with [`match_menu_button_spec`](../../src/sevn/gateway/menu/menu_registry.py#L1281), then [`is_nav_chrome_callback`](../../src/sevn/gateway/menu/menu_registry.py#L1303), [`is_section_tile_callback`](../../src/sevn/gateway/menu/menu_registry.py#L1321), [`registry_implementation_counts`](../../src/sevn/gateway/menu/menu_registry.py#L1340).
 
 Deprecated Mission Control recovery API under /api/v1/mission/* (MC-14).
 
-Working with [`mission_api.py`](../../src/sevn/gateway/mission_api.py): inspect the public entry points below.
-Start with [`fetch_subagents_mission_payload`](../../src/sevn/gateway/mission_api.py#L55), then [`kill_subagent_mission`](../../src/sevn/gateway/mission_api.py#L95), [`kill_all_subagents_mission`](../../src/sevn/gateway/mission_api.py#L128), [`EmptyMissionControlState.get_activity_feed`](../../src/sevn/gateway/mission_api.py#L167).
+Working with [`mission_api.py`](../../src/sevn/gateway/mission/mission_api.py): inspect the public entry points below.
+Start with [`fetch_subagents_mission_payload`](../../src/sevn/gateway/mission/mission_api.py#L55), then [`kill_subagent_mission`](../../src/sevn/gateway/mission/mission_api.py#L95), [`kill_all_subagents_mission`](../../src/sevn/gateway/mission/mission_api.py#L128), [`EmptyMissionControlState.get_activity_feed`](../../src/sevn/gateway/mission/mission_api.py#L167).
 
 Mission Control in-process state fed by gateway trace events (about-sevn.bot/specs/24-dashboard.md).
 
-Working with [`mission_state.py`](../../src/sevn/gateway/mission_state.py): inspect the public entry points below.
-Start with [`MissionControlState.apply_trace_event`](../../src/sevn/gateway/mission_state.py#L126), then [`MissionControlState.apply_telemetry_trace_event`](../../src/sevn/gateway/mission_state.py#L247), [`MissionControlState.register_provider`](../../src/sevn/gateway/mission_state.py#L416).
+Working with [`mission_state.py`](../../src/sevn/gateway/mission/mission_state.py): inspect the public entry points below.
+Start with [`MissionControlState.apply_trace_event`](../../src/sevn/gateway/mission/mission_state.py#L126), then [`MissionControlState.apply_telemetry_trace_event`](../../src/sevn/gateway/mission/mission_state.py#L247), [`MissionControlState.register_provider`](../../src/sevn/gateway/mission/mission_state.py#L416).
 
 Mission Control dataclasses and trace-normalization helpers.
 
-Working with [`mission_state_models.py`](../../src/sevn/gateway/mission_state_models.py): inspect the public entry points below.
-Start with [`is_channel_trace_kind`](../../src/sevn/gateway/mission_state_models.py#L60), then [`is_mission_telemetry_kind`](../../src/sevn/gateway/mission_state_models.py#L78), [`event_timestamp`](../../src/sevn/gateway/mission_state_models.py#L197), [`normalize_complexity`](../../src/sevn/gateway/mission_state_models.py#L224).
+Working with [`mission_state_models.py`](../../src/sevn/gateway/mission/mission_state_models.py): inspect the public entry points below.
+Start with [`is_channel_trace_kind`](../../src/sevn/gateway/mission/mission_state_models.py#L60), then [`is_mission_telemetry_kind`](../../src/sevn/gateway/mission/mission_state_models.py#L78), [`event_timestamp`](../../src/sevn/gateway/mission/mission_state_models.py#L197), [`normalize_complexity`](../../src/sevn/gateway/mission/mission_state_models.py#L224).
 
 REST snapshot assembly for ~sevn.gateway.mission_state.MissionControlState.
 
-Working with [`mission_state_snapshots.py`](../../src/sevn/gateway/mission_state_snapshots.py): inspect the public entry points below.
-Start with [`MissionControlSnapshotsMixin.get_gateway_metrics`](../../src/sevn/gateway/mission_state_snapshots.py#L55), then [`MissionControlSnapshotsMixin.get_channel_status`](../../src/sevn/gateway/mission_state_snapshots.py#L95), [`MissionControlSnapshotsMixin.get_percentile_latency`](../../src/sevn/gateway/mission_state_snapshots.py#L124).
+Working with [`mission_state_snapshots.py`](../../src/sevn/gateway/mission/mission_state_snapshots.py): inspect the public entry points below.
+Start with [`MissionControlSnapshotsMixin.get_gateway_metrics`](../../src/sevn/gateway/mission/mission_state_snapshots.py#L55), then [`MissionControlSnapshotsMixin.get_channel_status`](../../src/sevn/gateway/mission/mission_state_snapshots.py#L95), [`MissionControlSnapshotsMixin.get_percentile_latency`](../../src/sevn/gateway/mission/mission_state_snapshots.py#L124).
 
 Mission Control sub-agent snapshot assembly (registry + telemetry + storage).
 
-Working with [`mission_subagents_snapshot.py`](../../src/sevn/gateway/mission_subagents_snapshot.py): inspect the public entry points below.
-Start with [`build_subagents_mission_snapshot`](../../src/sevn/gateway/mission_subagents_snapshot.py#L122).
+Working with [`mission_subagents_snapshot.py`](../../src/sevn/gateway/mission/mission_subagents_snapshot.py): inspect the public entry points below.
+Start with [`build_subagents_mission_snapshot`](../../src/sevn/gateway/mission/mission_subagents_snapshot.py#L122).
 
 Gateway trace subscriber that feeds ~sevn.gateway.mission_state.MissionControlState.
 
-Working with [`mission_trace_sink.py`](../../src/sevn/gateway/mission_trace_sink.py): inspect the public entry points below.
-Start with [`MissionControlTraceSink.emit`](../../src/sevn/gateway/mission_trace_sink.py#L49), then [`MissionControlTraceSink.flush`](../../src/sevn/gateway/mission_trace_sink.py#L64), [`MissionControlTraceSink.close`](../../src/sevn/gateway/mission_trace_sink.py#L73), [`create_mission_trace_sink`](../../src/sevn/gateway/mission_trace_sink.py#L83).
+Working with [`mission_trace_sink.py`](../../src/sevn/gateway/mission/mission_trace_sink.py): inspect the public entry points below.
+Start with [`MissionControlTraceSink.emit`](../../src/sevn/gateway/mission/mission_trace_sink.py#L49), then [`MissionControlTraceSink.flush`](../../src/sevn/gateway/mission/mission_trace_sink.py#L64), [`MissionControlTraceSink.close`](../../src/sevn/gateway/mission/mission_trace_sink.py#L73), [`create_mission_trace_sink`](../../src/sevn/gateway/mission/mission_trace_sink.py#L83).
 
 Mount onboarding wizard on the gateway (about-sevn.bot/specs/17-gateway.md, about-sevn.bot/specs/22-onboarding.md).
 
-Working with [`onboarding_mount.py`](../../src/sevn/gateway/onboarding_mount.py): inspect the public entry points below.
-Start with [`resolve_gateway_onboarding_token`](../../src/sevn/gateway/onboarding_mount.py#L18), then [`mount_gateway_onboarding`](../../src/sevn/gateway/onboarding_mount.py#L35).
+Working with [`onboarding_mount.py`](../../src/sevn/gateway/onboarding/onboarding_mount.py): inspect the public entry points below.
+Start with [`resolve_gateway_onboarding_token`](../../src/sevn/gateway/onboarding/onboarding_mount.py#L18), then [`mount_gateway_onboarding`](../../src/sevn/gateway/onboarding/onboarding_mount.py#L35).
 
 OpenAI-compatible HTTP API mount on the sevn gateway.
 
-Working with [`openai_compat_api.py`](../../src/sevn/gateway/openai_compat_api.py): inspect the public entry points below.
-Start with [`build_openai_compat_router`](../../src/sevn/gateway/openai_compat_api.py#L94), then [`register_openai_compat_routes`](../../src/sevn/gateway/openai_compat_api.py#L221).
+Working with [`openai_compat_api.py`](../../src/sevn/gateway/api/openai_compat_api.py): inspect the public entry points below.
+Start with [`build_openai_compat_router`](../../src/sevn/gateway/api/openai_compat_api.py#L94), then [`register_openai_compat_routes`](../../src/sevn/gateway/api/openai_compat_api.py#L221).
 
 Boot-time retry for stuck assistant deliveries (about-sevn.bot/specs/17-gateway.md §4.4).
 
-Working with [`outbound_sweep.py`](../../src/sevn/gateway/outbound_sweep.py): inspect the public entry points below.
-Start with [`sweep_outbound_retries`](../../src/sevn/gateway/outbound_sweep.py#L25).
+Working with [`outbound_sweep.py`](../../src/sevn/gateway/routing/outbound_sweep.py): inspect the public entry points below.
+Start with [`sweep_outbound_retries`](../../src/sevn/gateway/routing/outbound_sweep.py#L25).
 
 DM pairing store for channel access.
 
-Working with [`pairing.py`](../../src/sevn/gateway/pairing.py): inspect the public entry points below.
-Start with [`pairing_dir_for_content_root`](../../src/sevn/gateway/pairing.py#L35), then [`PairingStore.storage_dir`](../../src/sevn/gateway/pairing.py#L99), [`PairingStore.is_approved`](../../src/sevn/gateway/pairing.py#L206), [`PairingStore.list_approved`](../../src/sevn/gateway/pairing.py#L225).
+Working with [`pairing.py`](../../src/sevn/gateway/onboarding/pairing.py): inspect the public entry points below.
+Start with [`pairing_dir_for_content_root`](../../src/sevn/gateway/onboarding/pairing.py#L35), then [`PairingStore.storage_dir`](../../src/sevn/gateway/onboarding/pairing.py#L99), [`PairingStore.is_approved`](../../src/sevn/gateway/onboarding/pairing.py#L206), [`PairingStore.list_approved`](../../src/sevn/gateway/onboarding/pairing.py#L225).
 
 Gateway PlanGate adapter + Telegram callback resume (about-sevn.bot/specs/17-gateway.md §2.6 Wave 6).
 
-Working with [`plan_gate.py`](../../src/sevn/gateway/plan_gate.py): inspect the public entry points below.
-Start with [`PlanGateWaitRegistry.register`](../../src/sevn/gateway/plan_gate.py#L55), then [`PlanGateWaitRegistry.resolve`](../../src/sevn/gateway/plan_gate.py#L74), [`PlanGateWaitRegistry.supersede_all`](../../src/sevn/gateway/plan_gate.py#L99), [`build_plan_inline_keyboard`](../../src/sevn/gateway/plan_gate.py#L116).
+Working with [`plan_gate.py`](../../src/sevn/gateway/routing/plan_gate.py): inspect the public entry points below.
+Start with [`PlanGateWaitRegistry.register`](../../src/sevn/gateway/routing/plan_gate.py#L55), then [`PlanGateWaitRegistry.resolve`](../../src/sevn/gateway/routing/plan_gate.py#L74), [`PlanGateWaitRegistry.supersede_all`](../../src/sevn/gateway/routing/plan_gate.py#L99), [`build_plan_inline_keyboard`](../../src/sevn/gateway/routing/plan_gate.py#L116).
 
 Per-channel runtime status, pause/resume, and circuit breaker.
 
-Working with [`platform_runtime.py`](../../src/sevn/gateway/platform_runtime.py): inspect the public entry points below.
-Start with [`PlatformRuntimeState.connection_state`](../../src/sevn/gateway/platform_runtime.py#L34), then [`PlatformRuntimeRegistry.register`](../../src/sevn/gateway/platform_runtime.py#L61), [`PlatformRuntimeRegistry.mark_connected`](../../src/sevn/gateway/platform_runtime.py#L84), [`PlatformRuntimeRegistry.pause`](../../src/sevn/gateway/platform_runtime.py#L101).
+Working with [`platform_runtime.py`](../../src/sevn/gateway/runtime/platform_runtime.py): inspect the public entry points below.
+Start with [`PlatformRuntimeState.connection_state`](../../src/sevn/gateway/runtime/platform_runtime.py#L34), then [`PlatformRuntimeRegistry.register`](../../src/sevn/gateway/runtime/platform_runtime.py#L61), [`PlatformRuntimeRegistry.mark_connected`](../../src/sevn/gateway/runtime/platform_runtime.py#L84), [`PlatformRuntimeRegistry.pause`](../../src/sevn/gateway/runtime/platform_runtime.py#L101).
 
 Ordered post-turn hook registry for gateway agent turns.
 
-Working with [`post_turn_hooks.py`](../../src/sevn/gateway/post_turn_hooks.py): inspect the public entry points below.
-Start with [`register_post_turn_hook`](../../src/sevn/gateway/post_turn_hooks.py#L44), then [`clear_post_turn_hooks`](../../src/sevn/gateway/post_turn_hooks.py#L68), [`run_post_turn_hooks`](../../src/sevn/gateway/post_turn_hooks.py#L79).
+Working with [`post_turn_hooks.py`](../../src/sevn/gateway/hooks/post_turn_hooks.py): inspect the public entry points below.
+Start with [`register_post_turn_hook`](../../src/sevn/gateway/hooks/post_turn_hooks.py#L44), then [`clear_post_turn_hooks`](../../src/sevn/gateway/hooks/post_turn_hooks.py#L68), [`run_post_turn_hooks`](../../src/sevn/gateway/hooks/post_turn_hooks.py#L79).
 
 Prometheus text exposition for the gateway (about-sevn.bot/specs/17-gateway.md, about-sevn.bot/specs/24-dashboard.md).
 
-Working with [`prometheus_metrics.py`](../../src/sevn/gateway/prometheus_metrics.py): inspect the public entry points below.
-Start with [`render_gateway_metrics`](../../src/sevn/gateway/prometheus_metrics.py#L26).
+Working with [`prometheus_metrics.py`](../../src/sevn/gateway/runtime/prometheus_metrics.py): inspect the public entry points below.
+Start with [`render_gateway_metrics`](../../src/sevn/gateway/runtime/prometheus_metrics.py#L26).
 
 multi queue-mode orchestration helpers (D6, about-sevn.bot/specs/36-sub-agents.md).
 
-Working with [`queue_multi.py`](../../src/sevn/gateway/queue_multi.py): inspect the public entry points below.
-Start with [`in_flight_task_summary_for_session`](../../src/sevn/gateway/queue_multi.py#L52), then [`spawn_multi_l1_via_supervisor`](../../src/sevn/gateway/queue_multi.py#L82).
+Working with [`queue_multi.py`](../../src/sevn/gateway/queue/queue_multi.py): inspect the public entry points below.
+Start with [`in_flight_task_summary_for_session`](../../src/sevn/gateway/queue/queue_multi.py#L52), then [`spawn_multi_l1_via_supervisor`](../../src/sevn/gateway/queue/queue_multi.py#L82).
 
 Per-scope token bucket limiter (about-sevn.bot/specs/17-gateway.md §4.3 step 3).
 
@@ -466,48 +466,48 @@ consumes one token per scope via TokenBucketLimiter.allow — the
 same path as classic single-turn sends, so interleaved multi-agent footers
 do not bypass rate limiting.
 
-Working with [`rate_limit.py`](../../src/sevn/gateway/rate_limit.py): inspect the public entry points below.
-Start with [`TokenBucketLimiter.allow`](../../src/sevn/gateway/rate_limit.py#L42).
+Working with [`rate_limit.py`](../../src/sevn/gateway/runtime/rate_limit.py): inspect the public entry points below.
+Start with [`TokenBucketLimiter.allow`](../../src/sevn/gateway/runtime/rate_limit.py#L42).
 
 Log-safe redaction helper (about-sevn.bot/specs/17-gateway.md §8).
 
-Working with [`redact.py`](../../src/sevn/gateway/redact.py): inspect the public entry points below.
-Start with [`redact_inline`](../../src/sevn/gateway/redact.py#L13).
+Working with [`redact.py`](../../src/sevn/gateway/util/redact.py): inspect the public entry points below.
+Start with [`redact_inline`](../../src/sevn/gateway/util/redact.py#L13).
 
 Fan dashboard turn-replay job transitions to Mission Control WS.
 
-Working with [`replay_job_events.py`](../../src/sevn/gateway/replay_job_events.py): inspect the public entry points below.
-Start with [`replay_ws_topic`](../../src/sevn/gateway/replay_job_events.py#L62), then [`ReplayJobEventFanout.publish`](../../src/sevn/gateway/replay_job_events.py#L94).
+Working with [`replay_job_events.py`](../../src/sevn/gateway/replay/replay_job_events.py): inspect the public entry points below.
+Start with [`replay_ws_topic`](../../src/sevn/gateway/replay/replay_job_events.py#L62), then [`ReplayJobEventFanout.publish`](../../src/sevn/gateway/replay/replay_job_events.py#L94).
 
 Lookup replayable user text for dashboard turn replay.
 
-Working with [`replay_turn_lookup.py`](../../src/sevn/gateway/replay_turn_lookup.py): inspect the public entry points below.
-Start with [`lookup_user_text_for_turn`](../../src/sevn/gateway/replay_turn_lookup.py#L15).
+Working with [`replay_turn_lookup.py`](../../src/sevn/gateway/replay/replay_turn_lookup.py): inspect the public entry points below.
+Start with [`lookup_user_text_for_turn`](../../src/sevn/gateway/replay/replay_turn_lookup.py#L15).
 
 Async dashboard turn-replay worker (about-sevn.bot/specs/16-harness-discipline.md §4.4).
 
-Working with [`replay_worker.py`](../../src/sevn/gateway/replay_worker.py): inspect the public entry points below.
-Start with [`TurnReplayWorker.schedule`](../../src/sevn/gateway/replay_worker.py#L73), then [`TurnReplayWorker.start`](../../src/sevn/gateway/replay_worker.py#L104), [`TurnReplayWorker.stop`](../../src/sevn/gateway/replay_worker.py#L119).
+Working with [`replay_worker.py`](../../src/sevn/gateway/replay/replay_worker.py): inspect the public entry points below.
+Start with [`TurnReplayWorker.schedule`](../../src/sevn/gateway/replay/replay_worker.py#L73), then [`TurnReplayWorker.start`](../../src/sevn/gateway/replay/replay_worker.py#L104), [`TurnReplayWorker.stop`](../../src/sevn/gateway/replay/replay_worker.py#L119).
 
 Gateway hook registration for dashboard turn replay (Batch D lane #5).
 
-Working with [`replay_worker_hooks.py`](../../src/sevn/gateway/replay_worker_hooks.py): inspect the public entry points below.
-Start with [`register_replay_worker_hooks`](../../src/sevn/gateway/replay_worker_hooks.py#L82).
+Working with [`replay_worker_hooks.py`](../../src/sevn/gateway/replay/replay_worker_hooks.py): inspect the public entry points below.
+Start with [`register_replay_worker_hooks`](../../src/sevn/gateway/replay/replay_worker_hooks.py#L82).
 
 Gateway response filtering helpers.
 
-Working with [`response_filters.py`](../../src/sevn/gateway/response_filters.py): inspect the public entry points below.
-Start with [`is_intentional_silence_response`](../../src/sevn/gateway/response_filters.py#L47), then [`is_intentional_silence_agent_result`](../../src/sevn/gateway/response_filters.py#L76).
+Working with [`response_filters.py`](../../src/sevn/gateway/routing/response_filters.py): inspect the public entry points below.
+Start with [`is_intentional_silence_response`](../../src/sevn/gateway/routing/response_filters.py#L47), then [`is_intentional_silence_agent_result`](../../src/sevn/gateway/routing/response_filters.py#L76).
 
 Telegram routing footer on first outbound bubble (the design docs Wave 6).
 
-Working with [`routing_footer.py`](../../src/sevn/gateway/routing_footer.py): inspect the public entry points below.
-Start with [`telegram_show_routing_enabled`](../../src/sevn/gateway/routing_footer.py#L45), then [`format_subagent_tag`](../../src/sevn/gateway/routing_footer.py#L65), [`format_routing_footer`](../../src/sevn/gateway/routing_footer.py#L82), [`strip_model_emitted_footer`](../../src/sevn/gateway/routing_footer.py#L142).
+Working with [`routing_footer.py`](../../src/sevn/gateway/routing/routing_footer.py): inspect the public entry points below.
+Start with [`telegram_show_routing_enabled`](../../src/sevn/gateway/routing/routing_footer.py#L45), then [`format_subagent_tag`](../../src/sevn/gateway/routing/routing_footer.py#L65), [`format_routing_footer`](../../src/sevn/gateway/routing/routing_footer.py#L82), [`strip_model_emitted_footer`](../../src/sevn/gateway/routing/routing_footer.py#L142).
 
 Fan improve-job transitions to Mission Control WS + Telegram (about-sevn.bot/specs/24-dashboard.md §2.3).
 
-Working with [`self_improve_job_events.py`](../../src/sevn/gateway/self_improve_job_events.py): inspect the public entry points below.
-Start with [`resolve_owner_telegram_user_id`](../../src/sevn/gateway/self_improve_job_events.py#L57), then [`SelfImproveJobEventFanout.publish`](../../src/sevn/gateway/self_improve_job_events.py#L111).
+Working with [`self_improve_job_events.py`](../../src/sevn/gateway/self_improve/self_improve_job_events.py): inspect the public entry points below.
+Start with [`resolve_owner_telegram_user_id`](../../src/sevn/gateway/self_improve/self_improve_job_events.py#L57), then [`SelfImproveJobEventFanout.publish`](../../src/sevn/gateway/self_improve/self_improve_job_events.py#L111).
 
 Durable gateway sessions + message rows (about-sevn.bot/specs/17-gateway.md §2.5, §3.1).
 
@@ -516,38 +516,38 @@ Start with [`SessionManager.connection`](../../src/sevn/gateway/session_manager.
 
 Append-only workspace session mirror (about-sevn.bot/specs/17-gateway.md §3.x).
 
-Working with [`session_mirror.py`](../../src/sevn/gateway/session_mirror.py): inspect the public entry points below.
-Start with [`session_mirror_enabled`](../../src/sevn/gateway/session_mirror.py#L99), then [`mark_session_superseded`](../../src/sevn/gateway/session_mirror.py#L244), [`mirror_gateway_message`](../../src/sevn/gateway/session_mirror.py#L302).
+Working with [`session_mirror.py`](../../src/sevn/gateway/session/session_mirror.py): inspect the public entry points below.
+Start with [`session_mirror_enabled`](../../src/sevn/gateway/session/session_mirror.py#L99), then [`mark_session_superseded`](../../src/sevn/gateway/session/session_mirror.py#L244), [`mirror_gateway_message`](../../src/sevn/gateway/session/session_mirror.py#L302).
 
 Per-channel session reset policies.
 
-Working with [`session_reset.py`](../../src/sevn/gateway/session_reset.py): inspect the public entry points below.
-Start with [`SessionResetPolicy.enabled`](../../src/sevn/gateway/session_reset.py#L31), then [`resolve_session_reset_policy`](../../src/sevn/gateway/session_reset.py#L46), [`session_should_reset`](../../src/sevn/gateway/session_reset.py#L110).
+Working with [`session_reset.py`](../../src/sevn/gateway/session/session_reset.py): inspect the public entry points below.
+Start with [`SessionResetPolicy.enabled`](../../src/sevn/gateway/session/session_reset.py#L31), then [`resolve_session_reset_policy`](../../src/sevn/gateway/session/session_reset.py#L46), [`session_should_reset`](../../src/sevn/gateway/session/session_reset.py#L110).
 
 Read/write gateway session helpers for bundled skill scripts (about-sevn.bot/specs/17-gateway.md).
 
-Working with [`sessions_query.py`](../../src/sevn/gateway/sessions_query.py): inspect the public entry points below.
-Start with [`parse_session_metadata`](../../src/sevn/gateway/sessions_query.py#L58), then [`can_access_session`](../../src/sevn/gateway/sessions_query.py#L143), [`list_sessions`](../../src/sevn/gateway/sessions_query.py#L235), [`list_sessions_active_between`](../../src/sevn/gateway/sessions_query.py#L298).
+Working with [`sessions_query.py`](../../src/sevn/gateway/session/sessions_query.py): inspect the public entry points below.
+Start with [`parse_session_metadata`](../../src/sevn/gateway/session/sessions_query.py#L58), then [`can_access_session`](../../src/sevn/gateway/session/sessions_query.py#L143), [`list_sessions`](../../src/sevn/gateway/session/sessions_query.py#L235), [`list_sessions_active_between`](../../src/sevn/gateway/session/sessions_query.py#L298).
 
 Gateway shutdown helpers for third-party resource-tracker gaps.
 
-Working with [`shutdown_cleanup.py`](../../src/sevn/gateway/shutdown_cleanup.py): inspect the public entry points below.
-Start with [`release_leaked_multiprocessing_semaphores`](../../src/sevn/gateway/shutdown_cleanup.py#L72).
+Working with [`shutdown_cleanup.py`](../../src/sevn/gateway/runtime/shutdown_cleanup.py): inspect the public entry points below.
+Start with [`release_leaked_multiprocessing_semaphores`](../../src/sevn/gateway/runtime/shutdown_cleanup.py#L72).
 
 Per-platform slash command access control.
 
-Working with [`slash_access.py`](../../src/sevn/gateway/slash_access.py): inspect the public entry points below.
-Start with [`SlashAccessPolicy.is_admin`](../../src/sevn/gateway/slash_access.py#L56), then [`SlashAccessPolicy.can_run`](../../src/sevn/gateway/slash_access.py#L76), [`is_admin_slash_command`](../../src/sevn/gateway/slash_access.py#L102), [`canonical_slash_command`](../../src/sevn/gateway/slash_access.py#L124).
+Working with [`slash_access.py`](../../src/sevn/gateway/access/slash_access.py): inspect the public entry points below.
+Start with [`SlashAccessPolicy.is_admin`](../../src/sevn/gateway/access/slash_access.py#L56), then [`SlashAccessPolicy.can_run`](../../src/sevn/gateway/access/slash_access.py#L76), [`is_admin_slash_command`](../../src/sevn/gateway/access/slash_access.py#L102), [`canonical_slash_command`](../../src/sevn/gateway/access/slash_access.py#L124).
 
 Session-scoped /steer buffer for gateway agent glue (about-sevn.bot/specs/17-gateway.md Wave 7).
 
-Working with [`steer_store.py`](../../src/sevn/gateway/steer_store.py): inspect the public entry points below.
-Start with [`SessionBoundSteerInject.pop_pending`](../../src/sevn/gateway/steer_store.py#L50), then [`SessionBoundSteerInject.inject_pending`](../../src/sevn/gateway/steer_store.py#L66), [`SessionSteerStore.from_workspace`](../../src/sevn/gateway/steer_store.py#L99), [`SessionSteerStore.enqueue`](../../src/sevn/gateway/steer_store.py#L115).
+Working with [`steer_store.py`](../../src/sevn/gateway/queue/steer_store.py): inspect the public entry points below.
+Start with [`SessionBoundSteerInject.pop_pending`](../../src/sevn/gateway/queue/steer_store.py#L50), then [`SessionBoundSteerInject.inject_pending`](../../src/sevn/gateway/queue/steer_store.py#L66), [`SessionSteerStore.from_workspace`](../../src/sevn/gateway/queue/steer_store.py#L99), [`SessionSteerStore.enqueue`](../../src/sevn/gateway/queue/steer_store.py#L115).
 
 English-only gateway user-visible copy (about-sevn.bot/specs/17-gateway.md §10.6, PRD 01).
 
-Working with [`strings.py`](../../src/sevn/gateway/strings.py): inspect the public entry points below.
-Start with [`blocked_inbound_user_message`](../../src/sevn/gateway/strings.py#L47).
+Working with [`strings.py`](../../src/sevn/gateway/util/strings.py): inspect the public entry points below.
+Start with [`blocked_inbound_user_message`](../../src/sevn/gateway/util/strings.py#L47).
 
 Level-2 sub-agent completion announce-back (D9, about-sevn.bot/specs/36-sub-agents.md).
 
@@ -556,148 +556,148 @@ returns a run id immediately, and this module's hook delivers the result once
 the level-2 run finishes — steer-injected into the parent session when a turn
 is still in flight there, otherwise sent outbound with a short sub-agent tag.
 
-Working with [`subagents_announce.py`](../../src/sevn/gateway/subagents_announce.py): inspect the public entry points below.
-Start with [`build_announce_back_hook`](../../src/sevn/gateway/subagents_announce.py#L68).
+Working with [`subagents_announce.py`](../../src/sevn/gateway/subagents/subagents_announce.py): inspect the public entry points below.
+Start with [`build_announce_back_hook`](../../src/sevn/gateway/subagents/subagents_announce.py#L68).
 
 Gateway boot hook: construct the process-wide sub-agent supervisor (D3/D4/D10).
 
-Working with [`subagents_boot.py`](../../src/sevn/gateway/subagents_boot.py): inspect the public entry points below.
-Start with [`register_subagents_boot_hook`](../../src/sevn/gateway/subagents_boot.py#L74).
+Working with [`subagents_boot.py`](../../src/sevn/gateway/subagents/subagents_boot.py): inspect the public entry points below.
+Start with [`register_subagents_boot_hook`](../../src/sevn/gateway/subagents/subagents_boot.py#L74).
 
 Telegram inline-query router (I1 plumbing; I2 sources; I3 answer assembly).
 
-Working with [`telegram_inline.py`](../../src/sevn/gateway/telegram_inline.py): inspect the public entry points below.
-Start with [`maybe_emit_botfather_inline_warning`](../../src/sevn/gateway/telegram_inline.py#L81), then [`handle_chosen_inline_result_feedback`](../../src/sevn/gateway/telegram_inline.py#L114), [`dispatch_telegram_inline_query`](../../src/sevn/gateway/telegram_inline.py#L149), [`try_route_telegram_inline`](../../src/sevn/gateway/telegram_inline.py#L311).
+Working with [`telegram_inline.py`](../../src/sevn/gateway/telegram/telegram_inline.py): inspect the public entry points below.
+Start with [`maybe_emit_botfather_inline_warning`](../../src/sevn/gateway/telegram/telegram_inline.py#L81), then [`handle_chosen_inline_result_feedback`](../../src/sevn/gateway/telegram/telegram_inline.py#L114), [`dispatch_telegram_inline_query`](../../src/sevn/gateway/telegram/telegram_inline.py#L149), [`try_route_telegram_inline`](../../src/sevn/gateway/telegram/telegram_inline.py#L311).
 
 Inline source (a): agent-answer rows + run_turn outbound capture (I2.1).
 
-Working with [`telegram_inline_agent.py`](../../src/sevn/gateway/telegram_inline_agent.py): inspect the public entry points below.
-Start with [`build_agent_inline_results`](../../src/sevn/gateway/telegram_inline_agent.py#L68), then [`capture_router_outbound_text`](../../src/sevn/gateway/telegram_inline_agent.py#L158), [`make_run_turn_agent_answer_fn`](../../src/sevn/gateway/telegram_inline_agent.py#L209).
+Working with [`telegram_inline_agent.py`](../../src/sevn/gateway/telegram/telegram_inline_agent.py): inspect the public entry points below.
+Start with [`build_agent_inline_results`](../../src/sevn/gateway/telegram/telegram_inline_agent.py#L68), then [`capture_router_outbound_text`](../../src/sevn/gateway/telegram/telegram_inline_agent.py#L158), [`make_run_turn_agent_answer_fn`](../../src/sevn/gateway/telegram/telegram_inline_agent.py#L209).
 
 Shared inline-source primitives, payload types, and result containers (I2).
 
-Working with [`telegram_inline_base.py`](../../src/sevn/gateway/telegram_inline_base.py): inspect the public entry points below.
-Start with [`inline_article_result`](../../src/sevn/gateway/telegram_inline_base.py#L118).
+Working with [`telegram_inline_base.py`](../../src/sevn/gateway/telegram/telegram_inline_base.py): inspect the public entry points below.
+Start with [`inline_article_result`](../../src/sevn/gateway/telegram/telegram_inline_base.py#L118).
 
 Inline answer-assembly helpers: offset, dedupe, paginate, content (I3.1-I3.2).
 
-Working with [`telegram_inline_dispatch.py`](../../src/sevn/gateway/telegram_inline_dispatch.py): inspect the public entry points below.
-Start with [`parse_inline_result_offset`](../../src/sevn/gateway/telegram_inline_dispatch.py#L43), then [`dedupe_inline_results`](../../src/sevn/gateway/telegram_inline_dispatch.py#L69), [`compute_inline_answer_cache_time`](../../src/sevn/gateway/telegram_inline_dispatch.py#L104), [`build_inline_input_message_content`](../../src/sevn/gateway/telegram_inline_dispatch.py#L170).
+Working with [`telegram_inline_dispatch.py`](../../src/sevn/gateway/telegram/telegram_inline_dispatch.py): inspect the public entry points below.
+Start with [`parse_inline_result_offset`](../../src/sevn/gateway/telegram/telegram_inline_dispatch.py#L43), then [`dedupe_inline_results`](../../src/sevn/gateway/telegram/telegram_inline_dispatch.py#L69), [`compute_inline_answer_cache_time`](../../src/sevn/gateway/telegram/telegram_inline_dispatch.py#L104), [`build_inline_input_message_content`](../../src/sevn/gateway/telegram/telegram_inline_dispatch.py#L170).
 
 Inline source (c): printing-press CLI cards (I2; D9).
 
-Working with [`telegram_inline_printing_press.py`](../../src/sevn/gateway/telegram_inline_printing_press.py): inspect the public entry points below.
-Start with [`build_printing_press_inline_results`](../../src/sevn/gateway/telegram_inline_printing_press.py#L151).
+Working with [`telegram_inline_printing_press.py`](../../src/sevn/gateway/telegram/telegram_inline_printing_press.py): inspect the public entry points below.
+Start with [`build_printing_press_inline_results`](../../src/sevn/gateway/telegram/telegram_inline_printing_press.py#L151).
 
 Inline-query content-source aggregator (I2; I3 assembles answerInlineQuery).
 
-Working with [`telegram_inline_sources.py`](../../src/sevn/gateway/telegram_inline_sources.py): inspect the public entry points below.
-Start with [`inline_sources_module_ready`](../../src/sevn/gateway/telegram_inline_sources.py#L75), then [`build_second_brain_inline_results`](../../src/sevn/gateway/telegram_inline_sources.py#L88), [`build_artifacts_inline_results`](../../src/sevn/gateway/telegram_inline_sources.py#L177), [`build_all_inline_source_results`](../../src/sevn/gateway/telegram_inline_sources.py#L279).
+Working with [`telegram_inline_sources.py`](../../src/sevn/gateway/telegram/telegram_inline_sources.py): inspect the public entry points below.
+Start with [`inline_sources_module_ready`](../../src/sevn/gateway/telegram/telegram_inline_sources.py#L75), then [`build_second_brain_inline_results`](../../src/sevn/gateway/telegram/telegram_inline_sources.py#L88), [`build_artifacts_inline_results`](../../src/sevn/gateway/telegram/telegram_inline_sources.py#L177), [`build_all_inline_source_results`](../../src/sevn/gateway/telegram/telegram_inline_sources.py#L279).
 
 Shared inline-query types, config, and auth helpers (I1; W6 boundary).
 
-Working with [`telegram_inline_types.py`](../../src/sevn/gateway/telegram_inline_types.py): inspect the public entry points below.
-Start with [`resolve_inline_config`](../../src/sevn/gateway/telegram_inline_types.py#L90), then [`telegram_allowed_updates`](../../src/sevn/gateway/telegram_inline_types.py#L113), [`inline_user_may_use_agent_source`](../../src/sevn/gateway/telegram_inline_types.py#L139), [`inline_source_cache_time`](../../src/sevn/gateway/telegram_inline_types.py#L175).
+Working with [`telegram_inline_types.py`](../../src/sevn/gateway/telegram/telegram_inline_types.py): inspect the public entry points below.
+Start with [`resolve_inline_config`](../../src/sevn/gateway/telegram/telegram_inline_types.py#L90), then [`telegram_allowed_updates`](../../src/sevn/gateway/telegram/telegram_inline_types.py#L113), [`inline_user_may_use_agent_source`](../../src/sevn/gateway/telegram/telegram_inline_types.py#L139), [`inline_source_cache_time`](../../src/sevn/gateway/telegram/telegram_inline_types.py#L175).
 
 Telegram streaming edits + quick-action callbacks (about-sevn.bot/specs/18-channel-telegram.md §4.4-4.5).
 
-Working with [`telegram_quick_actions.py`](../../src/sevn/gateway/telegram_quick_actions.py): inspect the public entry points below.
-Start with [`build_quick_action_inline_keyboard`](../../src/sevn/gateway/telegram_quick_actions.py#L60), then [`parse_qa_callback_data`](../../src/sevn/gateway/telegram_quick_actions.py#L177), [`is_telegram_fast_callback_ack`](../../src/sevn/gateway/telegram_quick_actions.py#L233), [`telegram_fast_callback_ack_text`](../../src/sevn/gateway/telegram_quick_actions.py#L272).
+Working with [`telegram_quick_actions.py`](../../src/sevn/gateway/telegram/telegram_quick_actions.py): inspect the public entry points below.
+Start with [`build_quick_action_inline_keyboard`](../../src/sevn/gateway/telegram/telegram_quick_actions.py#L60), then [`parse_qa_callback_data`](../../src/sevn/gateway/telegram/telegram_quick_actions.py#L177), [`is_telegram_fast_callback_ack`](../../src/sevn/gateway/telegram/telegram_quick_actions.py#L233), [`telegram_fast_callback_ack_text`](../../src/sevn/gateway/telegram/telegram_quick_actions.py#L272).
 
 Resolve Telegram bot token via env + secrets chain (about-sevn.bot/specs/06-secrets.md §2.5, §4).
 
-Working with [`telegram_resolve.py`](../../src/sevn/gateway/telegram_resolve.py): inspect the public entry points below.
-Start with [`resolve_telegram_bot_token`](../../src/sevn/gateway/telegram_resolve.py#L80).
+Working with [`telegram_resolve.py`](../../src/sevn/gateway/telegram/telegram_resolve.py): inspect the public entry points below.
+Start with [`resolve_telegram_bot_token`](../../src/sevn/gateway/telegram/telegram_resolve.py#L80).
 
 Auto-mint Telegram webhook secret on first setup (about-sevn.bot/specs/18-channel-telegram.md).
 
-Working with [`telegram_webhook_secret.py`](../../src/sevn/gateway/telegram_webhook_secret.py): inspect the public entry points below.
-Start with [`ensure_webhook_secret_token`](../../src/sevn/gateway/telegram_webhook_secret.py#L43).
+Working with [`telegram_webhook_secret.py`](../../src/sevn/gateway/telegram/telegram_webhook_secret.py): inspect the public entry points below.
+Start with [`ensure_webhook_secret_token`](../../src/sevn/gateway/telegram/telegram_webhook_secret.py#L43).
 
 Gateway boot hooks for provider/channel telemetry registration (lane #1 W2.4).
 
-Working with [`telemetry_boot.py`](../../src/sevn/gateway/telemetry_boot.py): inspect the public entry points below.
-Start with [`register_telemetry_boot_hooks`](../../src/sevn/gateway/telemetry_boot.py#L40).
+Working with [`telemetry_boot.py`](../../src/sevn/gateway/runtime/telemetry_boot.py): inspect the public entry points below.
+Start with [`register_telemetry_boot_hooks`](../../src/sevn/gateway/runtime/telemetry_boot.py#L40).
 
 Render-time timezone conversion for outbound payloads (PROBLEMS.md §4).
 
-Working with [`timestamps.py`](../../src/sevn/gateway/timestamps.py): inspect the public entry points below.
-Start with [`to_user_tz`](../../src/sevn/gateway/timestamps.py#L31), then [`operator_local_date_iso`](../../src/sevn/gateway/timestamps.py#L83), [`resolve_time_range`](../../src/sevn/gateway/timestamps.py#L230).
+Working with [`timestamps.py`](../../src/sevn/gateway/util/timestamps.py): inspect the public entry points below.
+Start with [`to_user_tz`](../../src/sevn/gateway/util/timestamps.py#L31), then [`operator_local_date_iso`](../../src/sevn/gateway/util/timestamps.py#L83), [`resolve_time_range`](../../src/sevn/gateway/util/timestamps.py#L230).
 
 Gateway hook registration for trajectory ingest (Batch C lane #3).
 
-Working with [`trajectory_ingest_hooks.py`](../../src/sevn/gateway/trajectory_ingest_hooks.py): inspect the public entry points below.
-Start with [`register_trajectory_ingest_hooks`](../../src/sevn/gateway/trajectory_ingest_hooks.py#L102).
+Working with [`trajectory_ingest_hooks.py`](../../src/sevn/gateway/hooks/trajectory_ingest_hooks.py): inspect the public entry points below.
+Start with [`register_trajectory_ingest_hooks`](../../src/sevn/gateway/hooks/trajectory_ingest_hooks.py#L102).
 
 Gateway-owned Triager audit rows (about-sevn.bot/specs/13-rlm-triager.md §10.2, about-sevn.bot/specs/17-gateway.md §3).
 
-Working with [`triage_audit.py`](../../src/sevn/gateway/triage_audit.py): inspect the public entry points below.
-Start with [`persist_triage_decision`](../../src/sevn/gateway/triage_audit.py#L57).
+Working with [`triage_audit.py`](../../src/sevn/gateway/triage/triage_audit.py): inspect the public entry points below.
+Start with [`persist_triage_decision`](../../src/sevn/gateway/triage/triage_audit.py#L57).
 
 Gateway builders for Triager inputs (about-sevn.bot/specs/17-gateway.md §2.6 Wave 2-8).
 
-Working with [`triage_context.py`](../../src/sevn/gateway/triage_context.py): inspect the public entry points below.
-Start with [`is_triager_enabled`](../../src/sevn/gateway/triage_context.py#L69), then [`passthrough_triage_result`](../../src/sevn/gateway/triage_context.py#L92), [`registry_snapshot_from_tool_set`](../../src/sevn/gateway/triage_context.py#L123), [`session_view_from_session`](../../src/sevn/gateway/triage_context.py#L215).
+Working with [`triage_context.py`](../../src/sevn/gateway/triage/triage_context.py): inspect the public entry points below.
+Start with [`is_triager_enabled`](../../src/sevn/gateway/triage/triage_context.py#L69), then [`passthrough_triage_result`](../../src/sevn/gateway/triage/triage_context.py#L92), [`registry_snapshot_from_tool_set`](../../src/sevn/gateway/triage/triage_context.py#L123), [`session_view_from_session`](../../src/sevn/gateway/triage/triage_context.py#L215).
 
 Turn-bundle diagnostics — schemas, collector, and index writer (W0 + W1).
 
-Working with [`turn_bundle.py`](../../src/sevn/gateway/turn_bundle.py): inspect the public entry points below.
-Start with [`safe_turn_id`](../../src/sevn/gateway/turn_bundle.py#L186), then [`parse_channel_from_turn_id`](../../src/sevn/gateway/turn_bundle.py#L206), [`turn_msg_hex_suffix`](../../src/sevn/gateway/turn_bundle.py#L223), [`turn_log_grep_needles`](../../src/sevn/gateway/turn_bundle.py#L244).
+Working with [`turn_bundle.py`](../../src/sevn/gateway/turn/turn_bundle.py): inspect the public entry points below.
+Start with [`safe_turn_id`](../../src/sevn/gateway/turn/turn_bundle.py#L186), then [`parse_channel_from_turn_id`](../../src/sevn/gateway/turn/turn_bundle.py#L206), [`turn_msg_hex_suffix`](../../src/sevn/gateway/turn/turn_bundle.py#L223), [`turn_log_grep_needles`](../../src/sevn/gateway/turn/turn_bundle.py#L244).
 
 Gateway hook registration for per-turn diagnostic bundles (W1).
 
-Working with [`turn_bundle_hooks.py`](../../src/sevn/gateway/turn_bundle_hooks.py): inspect the public entry points below.
-Start with [`register_turn_bundle_hooks`](../../src/sevn/gateway/turn_bundle_hooks.py#L76).
+Working with [`turn_bundle_hooks.py`](../../src/sevn/gateway/turn/turn_bundle_hooks.py): inspect the public entry points below.
+Start with [`register_turn_bundle_hooks`](../../src/sevn/gateway/turn/turn_bundle_hooks.py#L76).
 
 Tier-B answer placeholder + finalizer for Priority 2 (PROBLEMS.md).
 
-Working with [`turn_finalizer.py`](../../src/sevn/gateway/turn_finalizer.py): inspect the public entry points below.
-Start with [`TierBAnswerFinalizer.placeholder_message_id`](../../src/sevn/gateway/turn_finalizer.py#L87), then [`TierBAnswerFinalizer.partial_progress_text`](../../src/sevn/gateway/turn_finalizer.py#L101), [`TierBAnswerFinalizer.is_finalized`](../../src/sevn/gateway/turn_finalizer.py#L118).
+Working with [`turn_finalizer.py`](../../src/sevn/gateway/turn/turn_finalizer.py): inspect the public entry points below.
+Start with [`TierBAnswerFinalizer.placeholder_message_id`](../../src/sevn/gateway/turn/turn_finalizer.py#L87), then [`TierBAnswerFinalizer.partial_progress_text`](../../src/sevn/gateway/turn/turn_finalizer.py#L101), [`TierBAnswerFinalizer.is_finalized`](../../src/sevn/gateway/turn/turn_finalizer.py#L118).
 
 Turn-bound channel media for multimodal input (about-sevn.bot/specs/17-gateway.md §3.3).
 
-Working with [`turn_media.py`](../../src/sevn/gateway/turn_media.py): inspect the public entry points below.
-Start with [`build_turn_media_summaries`](../../src/sevn/gateway/turn_media.py#L78), then [`load_turn_media_summaries`](../../src/sevn/gateway/turn_media.py#L133), [`hydrate_turn_media`](../../src/sevn/gateway/turn_media.py#L198), [`attachment_hints_for_triager`](../../src/sevn/gateway/turn_media.py#L243).
+Working with [`turn_media.py`](../../src/sevn/gateway/turn/turn_media.py): inspect the public entry points below.
+Start with [`build_turn_media_summaries`](../../src/sevn/gateway/turn/turn_media.py#L78), then [`load_turn_media_summaries`](../../src/sevn/gateway/turn/turn_media.py#L133), [`hydrate_turn_media`](../../src/sevn/gateway/turn/turn_media.py#L198), [`attachment_hints_for_triager`](../../src/sevn/gateway/turn/turn_media.py#L243).
 
 Repo layer for gateway_turn_metadata (PROBLEMS.md §7 / Step §7).
 
-Working with [`turn_metadata.py`](../../src/sevn/gateway/turn_metadata.py): inspect the public entry points below.
-Start with [`record_turn_start`](../../src/sevn/gateway/turn_metadata.py#L89), then [`record_turn_finished`](../../src/sevn/gateway/turn_metadata.py#L165), [`load_turn_metadata`](../../src/sevn/gateway/turn_metadata.py#L193), [`format_intent_footer_from_metadata`](../../src/sevn/gateway/turn_metadata.py#L236).
+Working with [`turn_metadata.py`](../../src/sevn/gateway/turn/turn_metadata.py): inspect the public entry points below.
+Start with [`record_turn_start`](../../src/sevn/gateway/turn/turn_metadata.py#L89), then [`record_turn_finished`](../../src/sevn/gateway/turn/turn_metadata.py#L165), [`load_turn_metadata`](../../src/sevn/gateway/turn/turn_metadata.py#L193), [`format_intent_footer_from_metadata`](../../src/sevn/gateway/turn/turn_metadata.py#L236).
 
 Gateway hook registration for user-model extraction (Batch D lane #6).
 
-Working with [`user_model_hooks.py`](../../src/sevn/gateway/user_model_hooks.py): inspect the public entry points below.
-Start with [`register_user_model_hooks`](../../src/sevn/gateway/user_model_hooks.py#L16).
+Working with [`user_model_hooks.py`](../../src/sevn/gateway/user/user_model_hooks.py): inspect the public entry points below.
+Start with [`register_user_model_hooks`](../../src/sevn/gateway/user/user_model_hooks.py#L16).
 
 Post-turn user-model extraction orchestration (Batch D lane #6).
 
-Working with [`user_model_turn.py`](../../src/sevn/gateway/user_model_turn.py): inspect the public entry points below.
-Start with [`lookup_user_text_for_turn`](../../src/sevn/gateway/user_model_turn.py#L45), then [`maybe_schedule_user_model_extraction_after_turn`](../../src/sevn/gateway/user_model_turn.py#L319).
+Working with [`user_model_turn.py`](../../src/sevn/gateway/user/user_model_turn.py): inspect the public entry points below.
+Start with [`lookup_user_text_for_turn`](../../src/sevn/gateway/user/user_model_turn.py#L45), then [`maybe_schedule_user_model_extraction_after_turn`](../../src/sevn/gateway/user/user_model_turn.py#L319).
 
 Repo layer for gateway_user_profile (PROBLEMS.md §4 / Step §4).
 
-Working with [`user_profile.py`](../../src/sevn/gateway/user_profile.py): inspect the public entry points below.
-Start with [`get_user_profile`](../../src/sevn/gateway/user_profile.py#L102), then [`set_user_timezone`](../../src/sevn/gateway/user_profile.py#L216), [`set_user_language_code`](../../src/sevn/gateway/user_profile.py#L248).
+Working with [`user_profile.py`](../../src/sevn/gateway/user/user_profile.py): inspect the public entry points below.
+Start with [`get_user_profile`](../../src/sevn/gateway/user/user_profile.py#L102), then [`set_user_timezone`](../../src/sevn/gateway/user/user_profile.py#L216), [`set_user_language_code`](../../src/sevn/gateway/user/user_profile.py#L248).
 
 Web UI WebSocket connection registry (about-sevn.bot/specs/19-channel-webui.md §3.2, §4.3).
 
-Working with [`web_transport.py`](../../src/sevn/gateway/web_transport.py): inspect the public entry points below.
-Start with [`WebSocketLike.send_text`](../../src/sevn/gateway/web_transport.py#L23), then [`WebChannelTransport.register`](../../src/sevn/gateway/web_transport.py#L69), [`WebChannelTransport.unregister`](../../src/sevn/gateway/web_transport.py#L98), [`WebChannelTransport.session_count`](../../src/sevn/gateway/web_transport.py#L123).
+Working with [`web_transport.py`](../../src/sevn/gateway/api/web_transport.py): inspect the public entry points below.
+Start with [`WebSocketLike.send_text`](../../src/sevn/gateway/api/web_transport.py#L23), then [`WebChannelTransport.register`](../../src/sevn/gateway/api/web_transport.py#L69), [`WebChannelTransport.unregister`](../../src/sevn/gateway/api/web_transport.py#L98), [`WebChannelTransport.session_count`](../../src/sevn/gateway/api/web_transport.py#L123).
 
 Telegram/Web App quick-action helpers (share + structured feedback).
 
-Working with [`webapp_qa.py`](../../src/sevn/gateway/webapp_qa.py): inspect the public entry points below.
-Start with [`resolve_webapp_public_base`](../../src/sevn/gateway/webapp_qa.py#L54), then [`webapp_inline_buttons_allowed`](../../src/sevn/gateway/webapp_qa.py#L90), [`webapp_https_disabled_notice`](../../src/sevn/gateway/webapp_qa.py#L114), [`maybe_log_qa_bar_webapp_disabled`](../../src/sevn/gateway/webapp_qa.py#L137).
+Working with [`webapp_qa.py`](../../src/sevn/gateway/webapp/webapp_qa.py): inspect the public entry points below.
+Start with [`resolve_webapp_public_base`](../../src/sevn/gateway/webapp/webapp_qa.py#L54), then [`webapp_inline_buttons_allowed`](../../src/sevn/gateway/webapp/webapp_qa.py#L90), [`webapp_https_disabled_notice`](../../src/sevn/gateway/webapp/webapp_qa.py#L114), [`maybe_log_qa_bar_webapp_disabled`](../../src/sevn/gateway/webapp/webapp_qa.py#L137).
 
 Telegram Mini App rich artifact viewer helpers (about-sevn.bot/specs/19-channel-webui.md §2.5).
 
-Working with [`webapp_viewer.py`](../../src/sevn/gateway/webapp_viewer.py): inspect the public entry points below.
-Start with [`webapp_viewer_launch_allowed`](../../src/sevn/gateway/webapp_viewer.py#L120), then [`webapp_share_to_story_enabled`](../../src/sevn/gateway/webapp_viewer.py#L142), [`build_viewer_webapp_url`](../../src/sevn/gateway/webapp_viewer.py#L179), [`infer_viewer_payload_from_markdown`](../../src/sevn/gateway/webapp_viewer.py#L217).
+Working with [`webapp_viewer.py`](../../src/sevn/gateway/webapp/webapp_viewer.py): inspect the public entry points below.
+Start with [`webapp_viewer_launch_allowed`](../../src/sevn/gateway/webapp/webapp_viewer.py#L120), then [`webapp_share_to_story_enabled`](../../src/sevn/gateway/webapp/webapp_viewer.py#L142), [`build_viewer_webapp_url`](../../src/sevn/gateway/webapp/webapp_viewer.py#L179), [`infer_viewer_payload_from_markdown`](../../src/sevn/gateway/webapp/webapp_viewer.py#L217).
 
 Atomic sevn.json read/write for gateway menu toggles.
 
-Working with [`workspace_config_io.py`](../../src/sevn/gateway/workspace_config_io.py): inspect the public entry points below.
-Start with [`set_nested`](../../src/sevn/gateway/workspace_config_io.py#L31), then [`del_nested`](../../src/sevn/gateway/workspace_config_io.py#L58), [`load_raw_sevn_json`](../../src/sevn/gateway/workspace_config_io.py#L83), [`mutate_sevn_json`](../../src/sevn/gateway/workspace_config_io.py#L113).
+Working with [`workspace_config_io.py`](../../src/sevn/gateway/config_io/workspace_config_io.py): inspect the public entry points below.
+Start with [`set_nested`](../../src/sevn/gateway/config_io/workspace_config_io.py#L31), then [`del_nested`](../../src/sevn/gateway/config_io/workspace_config_io.py#L58), [`load_raw_sevn_json`](../../src/sevn/gateway/config_io/workspace_config_io.py#L83), [`mutate_sevn_json`](../../src/sevn/gateway/config_io/workspace_config_io.py#L113).
 
 ### Extension and invariants
 

@@ -10,8 +10,8 @@ import pytest
 from sevn.agent.triager.context import RegistrySnapshot
 from sevn.agent.triager.prompt import build_triager_prompt_segments
 from sevn.config.workspace_config import parse_workspace_config
-from sevn.gateway.lcm_ingest import ingest_gateway_message_row
-from sevn.gateway.triage_context import (
+from sevn.gateway.lcm.lcm_ingest import ingest_gateway_message_row
+from sevn.gateway.triage.triage_context import (
     load_workspace_personality,
     triage_context_from_session,
 )

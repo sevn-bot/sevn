@@ -12,7 +12,7 @@ from sevn.agent.tracing.emit import (
     wrap_trace_sink,
 )
 from sevn.agent.tracing.sink import NullTraceSink, TraceEvent
-from sevn.gateway.mission_state import (
+from sevn.gateway.mission.mission_state import (
     GATEWAY_TRACE_KINDS,
     MissionControlState,
     MissionControlTraceSink,
