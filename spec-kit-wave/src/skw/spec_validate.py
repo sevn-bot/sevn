@@ -133,12 +133,12 @@ def _strip_yaml_block(raw_yaml: str, key: str) -> str:
     while index < len(lines):
         if lines[index].strip() == f"{key}:":
             index += 1
-        while index < len(lines):
-            line = lines[index]
-            stripped = line.strip()
-            if stripped and not line.startswith((" ", "\t")) and not stripped.startswith("- "):
-                break
-            index += 1
+            while index < len(lines):
+                line = lines[index]
+                stripped = line.strip()
+                if stripped and not line.startswith((" ", "\t")) and not stripped.startswith("- "):
+                    break
+                index += 1
             kept.append(f"{key}: []")
             continue
         kept.append(lines[index])
