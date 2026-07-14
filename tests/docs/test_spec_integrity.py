@@ -1,4 +1,4 @@
-"""Spec corpus integrity contracts (D17; green after W9)."""
+"""Spec corpus integrity contracts (D17)."""
 
 from __future__ import annotations
 
@@ -36,13 +36,11 @@ def _sources_list(frontmatter: str) -> list[str]:
     ]
 
 
-@pytest.mark.xfail(reason="green after W9: D17 specs-index exists", strict=False)
 def test_specs_index_exists() -> None:
     """D17: ``about-sevn.bot/specs-index.md`` exists for architecture links."""
     assert SPECS_INDEX.is_file()
 
 
-@pytest.mark.xfail(reason="green after W9: D17 hollow done scaffolds relabeled", strict=False)
 def test_no_done_status_with_offline_scaffold_body() -> None:
     """D17: no spec combines ``status: done`` with an Offline scaffold body."""
     offenders: list[str] = []
@@ -56,7 +54,6 @@ def test_no_done_status_with_offline_scaffold_body() -> None:
     assert offenders == []
 
 
-@pytest.mark.xfail(reason="green after W9: D17 glossary terms seeded", strict=False)
 def test_glossary_has_at_least_one_term_row() -> None:
     """D17: ``GLOSSARY.md`` ``## Terms`` contains at least one table/data row."""
     text = GLOSSARY.read_text(encoding="utf-8")
@@ -69,7 +66,6 @@ def test_glossary_has_at_least_one_term_row() -> None:
     assert len(rows) >= 1
 
 
-@pytest.mark.xfail(reason="green after W9: D17 duplicate numeric spec id resolved", strict=False)
 def test_no_duplicate_numeric_spec_id_prefix() -> None:
     """D17: spec filenames do not reuse the same numeric id prefix."""
     ids: dict[str, list[str]] = {}
@@ -91,7 +87,6 @@ def test_no_duplicate_numeric_spec_id_prefix() -> None:
         ("04-tracing.md", "agent/tracing"),
     ],
 )
-@pytest.mark.xfail(reason="green after W9: D17 spec sources frontmatter", strict=False)
 def test_spec_sources_frontmatter_points_at_real_trees(
     filename: str,
     expected_source: str,
