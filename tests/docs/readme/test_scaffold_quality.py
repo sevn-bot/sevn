@@ -113,10 +113,11 @@ def test_format_path_list_true_remainder_for_114_paths() -> None:
     assert "and 110 more" in rendered
 
 
-def test_primary_source_dir_multi_root_deepest_common() -> None:
-    """D12: multi-root globs derive deepest common directory across all roots."""
+def test_primary_source_dir_multi_root_uses_first_concrete_root() -> None:
+    """D6: multi-root globs badge the first concrete package root, not a common prefix."""
     result = _primary_source_dir(("src/sevn/gateway/**", "infra/**"))
-    assert result in {"src/sevn/", "src/"}
+    assert result == "src/sevn/gateway/"
+    assert result not in {"src/sevn/", "src/"}
 
 
 @pytest.mark.asyncio
@@ -138,8 +139,8 @@ async def test_inventory_lines_exclude_raw_docstring_quotes(tmp_path: Path) -> N
 
 
 @pytest.mark.asyncio
-async def test_init_module_heading_renders_package_init(tmp_path: Path) -> None:
-    """D12: ``__init__.py`` sections render as ``Package init``."""
+async def test_init_module_renders_docstring_prose_and_working_with_link(tmp_path: Path) -> None:
+    """D22: ``__init__.py`` L3 renders docstring prose plus a ``Working with`` link."""
     manifest_path = tmp_path / "manifest.toml"
     manifest_path.write_text(_subsystem_manifest(), encoding="utf-8")
     pkg = tmp_path / "src/sevn/demo"
@@ -151,8 +152,10 @@ async def test_init_module_heading_renders_package_init(tmp_path: Path) -> None:
         entry=get_entry(manifest, "storage"),
         manifest=manifest,
     )
-    assert "Package init" in markdown
+    assert "Package docstring sentence." in markdown
+    assert "Working with" in markdown
     assert "__init__.py" in markdown
+    assert "Package init" not in markdown
 
 
 def test_check_no_placeholder_warning_for_transcribe_symbol() -> None:

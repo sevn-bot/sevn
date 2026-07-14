@@ -12,6 +12,16 @@ from sevn.docs.readme.render import render_manifest_slug, validate_rendered_mark
 REPO_ROOT = Path(__file__).resolve().parents[3]
 MANIFEST_PATH = REPO_ROOT / "docs/readmes/manifest.toml"
 
+BANNED_SUMMARY_PHRASES: tuple[tuple[str, str], ...] = (
+    ("secrets", "keys never in the gateway"),
+    ("tools", "@sevn_tool"),
+    ("proxy-egress", "session tokens"),
+    ("tracing", "logfire/otel"),
+    ("storage", "activerunsnapshot"),
+    ("channels", "voice hooks"),
+    ("second-brain", "obsidian sync"),
+)
+
 
 @pytest.mark.asyncio
 async def test_offline_gateway_generation_is_standard_compliant() -> None:
@@ -60,3 +70,30 @@ async def test_write_readme_updates_fingerprints(tmp_path: Path) -> None:
     data = fp_path.read_text(encoding="utf-8")
     assert '"demo"' in data
     assert "sha256_glob_aggregate" in data
+
+
+@pytest.mark.asyncio
+async def test_integrations_render_uses_cursor_cloud_agent_spec() -> None:
+    """D11: rendered ``integrations`` Spec-context cites ``29-cursor-cloud-agent``."""
+    markdown = await render_manifest_slug(
+        repo_root=REPO_ROOT,
+        manifest_path=MANIFEST_PATH,
+        slug="integrations",
+    )
+    assert "29-cursor-cloud-agent" in markdown.lower()
+    assert "34-plugin-hooks" not in markdown.lower()
+
+
+@pytest.mark.parametrize(("slug", "phrase"), BANNED_SUMMARY_PHRASES)
+@pytest.mark.asyncio
+async def test_rendered_readme_title_blockquote_omit_banned_summary_phrase(
+    slug: str,
+    phrase: str,
+) -> None:
+    """D10: fixed manifest summaries flow into rendered title + blockquote."""
+    markdown = await render_manifest_slug(
+        repo_root=REPO_ROOT,
+        manifest_path=MANIFEST_PATH,
+        slug=slug,
+    )
+    assert phrase not in markdown.lower()
