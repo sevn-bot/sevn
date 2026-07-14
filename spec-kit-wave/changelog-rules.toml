@@ -1,4 +1,4 @@
-# Changelog enforcement rules for sevn.bot.
+# Changelog enforcement rules for sevn.bot (spec-kit-wave SSOT).
 #
 # Consumed by `skw.changelog_validate` (deterministic gate) and `skw.changelog_eval`
 # (LLM double-score). Keep a Changelog format with a rolling `## [Unreleased]` section.

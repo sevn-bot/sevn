@@ -2,13 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-
 from _helpers import require_module
-
-pytestmark = pytest.mark.xfail(
-    reason="green after W6: skw.changelog_validate datestamp", strict=False
-)
 
 UNRELEASED_HEADING = "Unreleased"
 DATESTAMP = "[2026-07-14]"
