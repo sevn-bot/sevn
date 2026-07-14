@@ -152,7 +152,6 @@ def test_sync_refreshes_frontmatter_without_fabricating_prose(
     tmp_path: Path,
 ) -> None:
     """D6/D8: ``sync`` refreshes frontmatter but leaves ``status: scaffold`` when body empty."""
-    pytest.xfail("green after W4: skw.doc_folder sync")
     docs_dir = tmp_path / "specs"
     path = _write_kind_doc(docs_dir, kind="spec", status="scaffold")
     body = path.read_text(encoding="utf-8").split("---", maxsplit=2)[-1]

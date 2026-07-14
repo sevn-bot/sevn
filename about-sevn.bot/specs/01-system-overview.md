@@ -8,7 +8,7 @@ summary: 'Give implementers a single picture of the runtime before feature work:
   boundaries under src/sevn/, allowed import directions, and the shared protocols
   that keep LLM wiring, observability, and '
 last_updated: '2026-07-14'
-fingerprint: sha256:a09935bda4bac11599ec2718eca3744bdeed0967cdbb5f2aef4e06679c54563c
+fingerprint: sha256:08f67763821af340a525d75e52b00066073d97b1d03fdf5da0e994bd8e40694e
 related: []
 sources:
 - src/sevn/**
@@ -12074,9 +12074,6 @@ interfaces:
 - name: sync_tools_md_for_config
   file: src/sevn/workspace/tools_md.py
   symbol: sync_tools_md_for_config
-specs: []
-personas: []
-prd_profile: null
 ---
 
 ## Purpose

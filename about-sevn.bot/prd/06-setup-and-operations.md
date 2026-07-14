@@ -14,9 +14,6 @@ sources:
 - src/sevn/cli/**
 - src/sevn/onboarding/**
 parent_prd: prd-00-main
-depends_on: []
-build_phase: null
-interfaces: []
 specs:
 - spec-02-config-and-workspace
 - spec-07-egress-proxy

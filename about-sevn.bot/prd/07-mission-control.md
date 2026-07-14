@@ -12,9 +12,6 @@ related: []
 sources:
 - src/sevn/ui/**
 parent_prd: prd-00-main
-depends_on: []
-build_phase: null
-interfaces: []
 specs:
 - spec-04-tracing
 - spec-07-egress-proxy

@@ -331,6 +331,12 @@ about-docs-generate: ## Generate offline body for one doc (DOC_ID=spec-17-gatewa
 	@test -n "$(DOC_ID)" || (echo "usage: make about-docs-generate DOC_ID=spec-17-gateway" && exit 1)
 	PYTHONPATH=. $(UV) run sevn about-docs generate $(DOC_ID) --repo .
 
+spec-sync: ## Refresh spec frontmatter in about-sevn.bot/specs (skw docs sync)
+	$(MAKE) -C spec-kit-wave spec-sync
+
+prd-sync: ## Refresh PRD frontmatter in about-sevn.bot/prd (skw docs sync)
+	$(MAKE) -C spec-kit-wave prd-sync
+
 subagents-chart: ## Regenerate deterministic sub-agents topology SVG (D14)
 	$(UV) run python scripts/gen_subagents_chart.py
 

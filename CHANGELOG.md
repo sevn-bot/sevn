@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- `skw docs sync` refreshes about-doc frontmatter and scaffolds missing PRD/spec files via `make spec-sync` and `make prd-sync`
 - `sevn dashboard set-login-password` stores the Mission Control owner password in the workspace secrets chain and stamps `dashboard.login_password` with a `${SECRET:…}` ref
 - README curated templates (`docs/readmes/_templates/<slug>.md`) with outline validation in `sevn readme check`, plus `sevn readme curate <slug>` and a `readme-curator` agent (`.claude`/`.cursor`) that edits a curated README from its source diff via a pluggable runner (`cursor-agent`/`claude`); the `sevn-readme-sync` pre-commit hook auto-curates and stages curated slugs (`SEVN_README_AGENT=0`/`strict` controls, `make readme-curate`)
 - README `curated` manifest flag and `sevn readme fingerprint` command so hand-authored subsystem READMEs are stamped without body rewrites
@@ -25,6 +26,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- About-docs omits spec-only frontmatter keys (`interfaces`, `depends_on`, `build_phase`) when serialising PRD files
 - README L3 primary source tree lists every manifest ``source_globs`` root when multiple trees apply
 - README fingerprints skip timestamp-only rewrites when source digests are unchanged
 - README pipeline refactor splits offline sections, L2 policy, text utils, module index, and scan context; scanner uses single-pass module indexes

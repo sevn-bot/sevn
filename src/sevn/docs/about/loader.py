@@ -130,7 +130,7 @@ def dump_doc(doc: AboutDoc, body: str) -> str:
         >>> dump_doc(doc, "## Body\\n").startswith("---\\n")
         True
     """
-    payload = doc.model_dump(mode="json")
+    payload = doc.to_frontmatter_dict()
     yaml_block = yaml.safe_dump(
         payload,
         default_flow_style=False,

@@ -13,9 +13,6 @@ sources:
 - src/sevn/gateway/**
 - src/sevn/channels/**
 parent_prd: prd-00-main
-depends_on: []
-build_phase: null
-interfaces: []
 specs:
 - spec-17-gateway
 - spec-18-channel-telegram

@@ -6,14 +6,11 @@ status: draft
 owner: Alex
 summary: Catalog of real operator-session failures—grounding loops, PDF degradation,
   tool/skill routing—and the product fixes that stop silent hangs and fabricated answers.
-last_updated: '2026-07-12'
+last_updated: '2026-07-14'
 fingerprint: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 related: []
 sources: []
 parent_prd: prd-00-main
-depends_on: []
-build_phase: null
-interfaces: []
 specs:
 - spec-11-tools-registry
 - spec-12-skills-system

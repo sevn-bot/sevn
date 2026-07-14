@@ -6,16 +6,13 @@ status: ready
 owner: Alex
 summary: Operators need a bot that remembers who they are, keeps a stable voice across
   sessions, and surfaces controls when memory drifts or recalls wrong facts.
-last_updated: '2026-07-12'
+last_updated: '2026-07-14'
 fingerprint: sha256:210a42748c1bfeebeabbfdf106fe758bf396797d2dabef09e51886ca62ec9c06
 related: []
 sources:
 - src/sevn/memory/**
 - src/sevn/lcm/**
 parent_prd: prd-00-main
-depends_on: []
-build_phase: null
-interfaces: []
 specs:
 - spec-15-memory-lcm
 - spec-31-memory-dreaming

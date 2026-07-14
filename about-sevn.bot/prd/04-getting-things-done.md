@@ -14,9 +14,6 @@ sources:
 - src/sevn/agent/**
 - src/sevn/tools/**
 parent_prd: prd-00-main
-depends_on: []
-build_phase: null
-interfaces: []
 specs:
 - spec-10-schema-ontology
 - spec-11-tools-registry

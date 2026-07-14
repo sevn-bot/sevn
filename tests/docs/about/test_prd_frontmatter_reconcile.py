@@ -5,8 +5,6 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-import pytest
-
 from sevn.docs.about.check import check_about_docs
 from sevn.docs.about.extract import extract_fields
 from sevn.docs.about.index import index_path, render_index
@@ -68,7 +66,6 @@ def test_extract_fields_still_emits_interfaces_for_spec(tmp_path: Path) -> None:
     assert fields["interfaces"]
 
 
-@pytest.mark.xfail(reason="green after W4: PRD dump omits forbidden keys", strict=False)
 def test_dump_prd_frontmatter_omits_forbidden_keys() -> None:
     """D7: serialised PRD frontmatter must not contain forbidden keys at all."""
     text = dump_doc(_minimal_prd(), "## Problem & Motivation\n\nBody.\n")
@@ -97,7 +94,6 @@ def test_dump_spec_frontmatter_retains_interfaces() -> None:
     assert "depends_on:" in frontmatter
 
 
-@pytest.mark.xfail(reason="green after W4: PRD merge pipeline omits forbidden keys", strict=False)
 def test_extract_merge_dump_prd_pipeline_omits_forbidden_keys(tmp_path: Path) -> None:
     """Integration: extract → merge → dump for PRD never reintroduces forbidden keys."""
     (tmp_path / "Makefile").write_text("ci:\n\ttrue\n", encoding="utf-8")
@@ -110,7 +106,6 @@ def test_extract_merge_dump_prd_pipeline_omits_forbidden_keys(tmp_path: Path) ->
         assert f"{key}:" not in frontmatter
 
 
-@pytest.mark.xfail(reason="green after W4: about-docs-check green for reconciled PRD", strict=False)
 def test_about_docs_check_passes_clean_prd_without_forbidden_keys(
     tmp_path: Path,
 ) -> None:

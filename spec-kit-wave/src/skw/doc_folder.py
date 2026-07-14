@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -79,6 +81,164 @@ def _file_ok(
     return not terminal or score_ok
 
 
+def _ensure_sevn_importable(repo_root: Path) -> None:
+    """Add ``repo_root/src`` to ``sys.path`` so about-docs helpers import."""
+    src = repo_root.resolve() / "src"
+    if src.is_dir():
+        src_str = str(src)
+        if src_str not in sys.path:
+            sys.path.insert(0, src_str)
+
+
+def _load_about_docs_helpers(repo_root: Path) -> tuple[Any, ...]:
+    """Import about-docs sync helpers from the sevn package."""
+    _ensure_sevn_importable(repo_root)
+    from sevn.docs.about.extract import extract_fields
+    from sevn.docs.about.generate import generate_body
+    from sevn.docs.about.loader import dump_doc, load_doc
+    from sevn.docs.about.model import AboutDoc
+    from sevn.docs.about.registry import load_manifest_entries
+    from sevn.docs.readme.providers import OfflineProvider
+
+    return (
+        AboutDoc,
+        OfflineProvider,
+        dump_doc,
+        extract_fields,
+        generate_body,
+        load_doc,
+        load_manifest_entries,
+    )
+
+
+def _doc_from_manifest(row: dict[str, Any]) -> Any:
+    """Build an :class:`AboutDoc` from a manifest row with ``status: scaffold``."""
+    from sevn.docs.about.model import AboutDoc
+
+    kind = str(row.get("kind", "spec"))
+    payload: dict[str, Any] = {
+        "id": str(row["id"]),
+        "kind": kind,
+        "title": str(row.get("title", row["id"])),
+        "status": "scaffold",
+        "owner": str(row.get("owner", "Alex")),
+        "summary": str(row.get("summary", f"Scaffold for {row.get('title', row['id'])}."))[:200],
+        "last_updated": date.today(),
+        "sources": list(row.get("sources") or []),
+        "related": list(row.get("related") or []),
+    }
+    if kind == "spec":
+        payload["parent_prd"] = row.get("parent_prd")
+        payload["depends_on"] = list(row.get("depends_on") or [])
+        payload["build_phase"] = row.get("build_phase")
+    else:
+        payload["parent_prd"] = row.get("parent_prd")
+        payload["specs"] = list(row.get("specs") or [])
+        payload["personas"] = list(row.get("personas") or [])
+        profile = row.get("prd_profile")
+        payload["prd_profile"] = profile if profile in {"standard", "ai-native"} else "standard"
+    return AboutDoc.model_validate(payload)
+
+
+def _manifest_missing_paths(
+    repo_root: Path,
+    *,
+    kind: str,
+    directory: Path,
+    load_manifest_entries: Any,
+) -> list[tuple[str, Path]]:
+    """Return manifest entries for ``kind`` under ``directory`` that are absent."""
+    directory = directory.resolve()
+    missing: list[tuple[str, Path]] = []
+    for doc_id, row in load_manifest_entries(repo_root).items():
+        if str(row.get("kind", "")) != kind:
+            continue
+        new_path = str(row.get("new_path", "")).strip()
+        if not new_path:
+            continue
+        path = (repo_root / new_path).resolve()
+        if path.parent != directory or path.is_file():
+            continue
+        missing.append((doc_id, path))
+    return sorted(missing, key=lambda item: item[1].name)
+
+
+def _merge_extracted(doc: Any, extracted: dict[str, Any]) -> Any:
+    """Merge code-owned extract fields onto an existing :class:`AboutDoc`."""
+    from sevn.docs.about.model import AboutDoc
+
+    payload = doc.model_dump(mode="json")
+    payload.update(extracted)
+    return AboutDoc.model_validate(payload)
+
+
+def _sync_one_file(
+    path: Path,
+    *,
+    repo_root: Path,
+    helpers: tuple[Any, ...],
+) -> None:
+    """Refresh frontmatter for one existing about-doc file (D8 — body unchanged)."""
+    _about_doc, _offline, dump_doc, extract_fields, _generate_body, load_doc, _manifest = helpers
+    doc, body = load_doc(path)
+    extracted = extract_fields(repo_root, doc.model_dump(mode="json"))
+    updated = _merge_extracted(doc, extracted)
+    path.write_text(dump_doc(updated, body), encoding="utf-8")
+
+
+def _create_from_template(
+    path: Path,
+    row: dict[str, Any],
+    *,
+    repo_root: Path,
+    helpers: tuple[Any, ...],
+) -> None:
+    """Scaffold a missing doc from manifest metadata without fabricating prose (D8)."""
+    _about_doc, offline_provider, dump_doc, extract_fields, generate_body, _load_doc, _manifest = (
+        helpers
+    )
+    doc = _doc_from_manifest(row)
+    body = generate_body(doc, offline_provider())
+    merged = _merge_extracted(doc, extract_fields(repo_root, doc.model_dump(mode="json")))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(dump_doc(merged, body), encoding="utf-8")
+
+
+def _run_sync(
+    *,
+    kind: str,
+    directory: Path,
+    repo_root: Path,
+    kit_root: Path | None,
+) -> FolderResult:
+    """Sync every doc in ``directory``: refresh frontmatter and scaffold missing files."""
+    directory = directory.resolve()
+    repo_root = repo_root.resolve()
+    helpers = _load_about_docs_helpers(repo_root)
+    _about_doc, _offline, _dump, _extract, _generate, _load, load_manifest_entries = helpers
+
+    for path in _iter_doc_files(directory):
+        _sync_one_file(path, repo_root=repo_root, helpers=helpers)
+
+    for doc_id, path in _manifest_missing_paths(
+        repo_root,
+        kind=kind,
+        directory=directory,
+        load_manifest_entries=load_manifest_entries,
+    ):
+        row = load_manifest_entries(repo_root)[doc_id]
+        _create_from_template(path, row, repo_root=repo_root, helpers=helpers)
+        _ = doc_id
+
+    return run_docs_command(
+        "validate",
+        kind=kind,
+        directory=directory,
+        repo_root=repo_root,
+        kit_root=kit_root,
+    )
+
+
 def run_docs_command(
     command: str,
     *,
@@ -92,8 +252,12 @@ def run_docs_command(
         msg = f"unsupported kind: {kind!r} (expected 'spec' or 'prd')"
         raise ValueError(msg)
     if command == "sync":
-        msg = "sync is not implemented until W4"
-        raise NotImplementedError(msg)
+        return _run_sync(
+            kind=kind,
+            directory=directory,
+            repo_root=repo_root,
+            kit_root=kit_root,
+        )
 
     directory = directory.resolve()
     repo_root = repo_root.resolve()

@@ -8,7 +8,7 @@ summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict de
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
 last_updated: '2026-07-14'
-fingerprint: sha256:e2330af09eea07c3e08e55506b1cedf6c1b75f79d5a3a0a216b3c3d766491518
+fingerprint: sha256:5d1f505aa51a7863a6b1884c55a115c1ea797d2c8993eeba42e6e73c6e05fdda
 related: []
 sources:
 - src/sevn/**
@@ -12076,9 +12076,6 @@ interfaces:
 - name: sync_tools_md_for_config
   file: src/sevn/workspace/tools_md.py
   symbol: sync_tools_md_for_config
-specs: []
-personas: []
-prd_profile: null
 ---
 
 ## Purpose

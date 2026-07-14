@@ -6,15 +6,12 @@ status: ready
 owner: Alex
 summary: Operators turn traces and feedback into bounded, eval-gated patch proposals—with
   explicit approval before merge—so prompts and skills improve without silent drift.
-last_updated: '2026-07-12'
+last_updated: '2026-07-14'
 fingerprint: sha256:b6b6582757fd76c55bfc0be5f46765cebbf119bb8f422676f5e40774240cd753
 related: []
 sources:
 - src/sevn/self_improve/**
 parent_prd: prd-00-main
-depends_on: []
-build_phase: null
-interfaces: []
 specs:
 - spec-33-self-improvement
 - spec-17-gateway
