@@ -8,7 +8,7 @@ summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that eve
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
 last_updated: '2026-07-14'
-fingerprint: sha256:207556c8650740a8335885e8fa26f8946cef7f269b331f4957fbb74207414f2c
+fingerprint: sha256:6a6f78395399232925316b0ed98588975c005a59e61174879b5d0cac787f3a3a
 related: []
 sources:
 - src/sevn/tools/**
@@ -488,10 +488,8 @@ interfaces:
 - name: write_workspace_md
   file: src/sevn/tools/workspace_files.py
   symbol: write_workspace_md
-specs: []
-personas: []
-prd_profile: null
 ---
+
 ## Purpose
 
 Own the **session tool registry**: native Python tools, MCP overlays, skill script

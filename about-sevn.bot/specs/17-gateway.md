@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-07-14'
-fingerprint: sha256:61f04460627e6eb54c155043e455e5938ccba6abc2515cc62458d124d76314eb
+fingerprint: sha256:3347abb42f8cf3fec3b41af080dea85b5d442e762f8f05a60e49420cf13ba15b
 related: []
 sources:
 - src/sevn/gateway/**
@@ -21,6 +21,24 @@ depends_on:
 - spec-16-harness-discipline
 build_phase: null
 interfaces:
+- name: SlashAccessPolicy
+  file: src/sevn/gateway/access/slash_access.py
+  symbol: SlashAccessPolicy
+- name: canonical_slash_command
+  file: src/sevn/gateway/access/slash_access.py
+  symbol: canonical_slash_command
+- name: is_admin_slash_command
+  file: src/sevn/gateway/access/slash_access.py
+  symbol: is_admin_slash_command
+- name: policy_for_message
+  file: src/sevn/gateway/access/slash_access.py
+  symbol: policy_for_message
+- name: policy_from_channel_extra
+  file: src/sevn/gateway/access/slash_access.py
+  symbol: policy_from_channel_extra
+- name: slash_allowed_for_actor
+  file: src/sevn/gateway/access/slash_access.py
+  symbol: slash_allowed_for_actor
 - name: SecretDeleteBody
   file: src/sevn/gateway/admin/admin_secrets.py
   symbol: SecretDeleteBody
@@ -48,6 +66,30 @@ interfaces:
 - name: build_intro_extra_instructions
   file: src/sevn/gateway/agent_turn.py
   symbol: build_intro_extra_instructions
+- name: build_echo_run_turn
+  file: src/sevn/gateway/api/e2e_echo.py
+  symbol: build_echo_run_turn
+- name: mount_gui_proxy
+  file: src/sevn/gateway/api/gui_proxy.py
+  symbol: mount_gui_proxy
+- name: ChatCompletionRequest
+  file: src/sevn/gateway/api/openai_compat_api.py
+  symbol: ChatCompletionRequest
+- name: ChatMessage
+  file: src/sevn/gateway/api/openai_compat_api.py
+  symbol: ChatMessage
+- name: build_openai_compat_router
+  file: src/sevn/gateway/api/openai_compat_api.py
+  symbol: build_openai_compat_router
+- name: register_openai_compat_routes
+  file: src/sevn/gateway/api/openai_compat_api.py
+  symbol: register_openai_compat_routes
+- name: WebChannelTransport
+  file: src/sevn/gateway/api/web_transport.py
+  symbol: WebChannelTransport
+- name: WebSocketLike
+  file: src/sevn/gateway/api/web_transport.py
+  symbol: WebSocketLike
 - name: JWTClaims
   file: src/sevn/gateway/auth.py
   symbol: JWTClaims
@@ -120,9 +162,6 @@ interfaces:
 - name: close_browser_for_rotate
   file: src/sevn/gateway/browser/browser_lifecycle.py
   symbol: close_browser_for_rotate
-- name: CascadeBudget
-  file: src/sevn/gateway/queue/cascade_budget.py
-  symbol: CascadeBudget
 - name: ChannelBootArtifacts
   file: src/sevn/gateway/channel_boot.py
   symbol: ChannelBootArtifacts
@@ -147,9 +186,6 @@ interfaces:
 - name: OutgoingMessage
   file: src/sevn/gateway/channel_types.py
   symbol: OutgoingMessage
-- name: CodingAgentRouter
-  file: src/sevn/gateway/routing/coding_agent_router.py
-  symbol: CodingAgentRouter
 - name: build_ask_config_vocab
   file: src/sevn/gateway/commands/ask_config.py
   symbol: build_ask_config_vocab
@@ -258,6 +294,18 @@ interfaces:
 - name: voice_shortcut_enabled
   file: src/sevn/gateway/commands/voice_match.py
   symbol: voice_shortcut_enabled
+- name: del_nested
+  file: src/sevn/gateway/config_io/workspace_config_io.py
+  symbol: del_nested
+- name: load_raw_sevn_json
+  file: src/sevn/gateway/config_io/workspace_config_io.py
+  symbol: load_raw_sevn_json
+- name: mutate_sevn_json
+  file: src/sevn/gateway/config_io/workspace_config_io.py
+  symbol: mutate_sevn_json
+- name: set_nested
+  file: src/sevn/gateway/config_io/workspace_config_io.py
+  symbol: set_nested
 - name: DashboardPinPublisher
   file: src/sevn/gateway/dashboard/dashboard_pin.py
   symbol: DashboardPinPublisher
@@ -282,9 +330,6 @@ interfaces:
 - name: unregister_dashboard_pin
   file: src/sevn/gateway/dashboard/dashboard_pin.py
   symbol: unregister_dashboard_pin
-- name: load_or_create_deployment_id
-  file: src/sevn/gateway/runtime/deployment_id.py
-  symbol: load_or_create_deployment_id
 - name: format_for_telegram
   file: src/sevn/gateway/diagnostics/diagnostics.py
   symbol: format_for_telegram
@@ -312,24 +357,6 @@ interfaces:
 - name: sweep_expired_dispatcher_state
   file: src/sevn/gateway/dispatcher/dispatcher_state.py
   symbol: sweep_expired_dispatcher_state
-- name: build_echo_run_turn
-  file: src/sevn/gateway/api/e2e_echo.py
-  symbol: build_echo_run_turn
-- name: GatewayEvent
-  file: src/sevn/gateway/hooks/event_hooks.py
-  symbol: GatewayEvent
-- name: GatewayEventPayload
-  file: src/sevn/gateway/hooks/event_hooks.py
-  symbol: GatewayEventPayload
-- name: clear_gateway_event_hooks
-  file: src/sevn/gateway/hooks/event_hooks.py
-  symbol: clear_gateway_event_hooks
-- name: emit_gateway_event
-  file: src/sevn/gateway/hooks/event_hooks.py
-  symbol: emit_gateway_event
-- name: register_gateway_event_hook
-  file: src/sevn/gateway/hooks/event_hooks.py
-  symbol: register_gateway_event_hook
 - name: EvolutionApprovalCallbackHandler
   file: src/sevn/gateway/evolution/evolution_approval_gate.py
   symbol: EvolutionApprovalCallbackHandler
@@ -345,117 +372,36 @@ interfaces:
 - name: EvolutionIssueEventFanout
   file: src/sevn/gateway/evolution/evolution_issue_events.py
   symbol: EvolutionIssueEventFanout
-- name: bootstrap_capture_active
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: bootstrap_capture_active
-- name: bootstrap_capture_instructions
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: bootstrap_capture_instructions
-- name: bootstrap_completion_state
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: bootstrap_completion_state
-- name: clear_bootstrap_markdown_cache
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: clear_bootstrap_markdown_cache
-- name: clear_intro_state_cache
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: clear_intro_state_cache
-- name: count_user_messages
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: count_user_messages
-- name: count_user_messages_in_session
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: count_user_messages_in_session
-- name: first_session_intro_enabled
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: first_session_intro_enabled
-- name: first_session_intro_max_output_tokens
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: first_session_intro_max_output_tokens
-- name: intro_state_for_scope
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: intro_state_for_scope
-- name: intro_state_for_session
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: intro_state_for_session
-- name: is_first_session_turn
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: is_first_session_turn
-- name: load_bootstrap_markdown
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: load_bootstrap_markdown
-- name: load_bootstrap_markdown_cached
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: load_bootstrap_markdown_cached
-- name: mark_intro_state
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: mark_intro_state
-- name: maybe_mark_intro_done_if_bootstrap_complete
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: maybe_mark_intro_done_if_bootstrap_complete
-- name: maybe_reseed_bootstrap_at_boot
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: maybe_reseed_bootstrap_at_boot
-- name: missing_user_md_bootstrap_fields
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: missing_user_md_bootstrap_fields
-- name: tier_b_intro_instructions
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: tier_b_intro_instructions
-- name: user_md_bootstrap_profile_incomplete
-  file: src/sevn/gateway/onboarding/first_session.py
-  symbol: user_md_bootstrap_profile_incomplete
-- name: PendingGatewayRestart
-  file: src/sevn/gateway/runtime/gateway_restart_ack.py
-  symbol: PendingGatewayRestart
-- name: claim_pending_gateway_restarts
-  file: src/sevn/gateway/runtime/gateway_restart_ack.py
-  symbol: claim_pending_gateway_restarts
-- name: clear_pending_gateway_restarts
-  file: src/sevn/gateway/runtime/gateway_restart_ack.py
-  symbol: clear_pending_gateway_restarts
-- name: conversation_snapshot_for_session
-  file: src/sevn/gateway/runtime/gateway_restart_ack.py
-  symbol: conversation_snapshot_for_session
-- name: deliver_pending_gateway_restart_acks
-  file: src/sevn/gateway/runtime/gateway_restart_ack.py
-  symbol: deliver_pending_gateway_restart_acks
-- name: has_pending_gateway_restart
-  file: src/sevn/gateway/runtime/gateway_restart_ack.py
-  symbol: has_pending_gateway_restart
-- name: load_pending_gateway_restarts
-  file: src/sevn/gateway/runtime/gateway_restart_ack.py
-  symbol: load_pending_gateway_restarts
-- name: mark_restart_ack_delivered
-  file: src/sevn/gateway/runtime/gateway_restart_ack.py
-  symbol: mark_restart_ack_delivered
-- name: pending_restart_store_path
-  file: src/sevn/gateway/runtime/gateway_restart_ack.py
-  symbol: pending_restart_store_path
-- name: recent_restart_ack_delivered
-  file: src/sevn/gateway/runtime/gateway_restart_ack.py
-  symbol: recent_restart_ack_delivered
-- name: record_pending_gateway_restart
-  file: src/sevn/gateway/runtime/gateway_restart_ack.py
-  symbol: record_pending_gateway_restart
-- name: restart_ack_delivered_path
-  file: src/sevn/gateway/runtime/gateway_restart_ack.py
-  symbol: restart_ack_delivered_path
-- name: generate_gateway_token
-  file: src/sevn/gateway/runtime/gateway_token.py
-  symbol: generate_gateway_token
-- name: resolve_config_ref
-  file: src/sevn/gateway/runtime/gateway_token.py
-  symbol: resolve_config_ref
-- name: resolve_gateway_token_ref
-  file: src/sevn/gateway/runtime/gateway_token.py
-  symbol: resolve_gateway_token_ref
-- name: validate_gateway_token_plaintext
-  file: src/sevn/gateway/runtime/gateway_token.py
-  symbol: validate_gateway_token_plaintext
-- name: mount_gui_proxy
-  file: src/sevn/gateway/api/gui_proxy.py
-  symbol: mount_gui_proxy
+- name: GatewayEvent
+  file: src/sevn/gateway/hooks/event_hooks.py
+  symbol: GatewayEvent
+- name: GatewayEventPayload
+  file: src/sevn/gateway/hooks/event_hooks.py
+  symbol: GatewayEventPayload
+- name: clear_gateway_event_hooks
+  file: src/sevn/gateway/hooks/event_hooks.py
+  symbol: clear_gateway_event_hooks
+- name: emit_gateway_event
+  file: src/sevn/gateway/hooks/event_hooks.py
+  symbol: emit_gateway_event
+- name: register_gateway_event_hook
+  file: src/sevn/gateway/hooks/event_hooks.py
+  symbol: register_gateway_event_hook
+- name: PostTurnContext
+  file: src/sevn/gateway/hooks/post_turn_hooks.py
+  symbol: PostTurnContext
+- name: clear_post_turn_hooks
+  file: src/sevn/gateway/hooks/post_turn_hooks.py
+  symbol: clear_post_turn_hooks
+- name: register_post_turn_hook
+  file: src/sevn/gateway/hooks/post_turn_hooks.py
+  symbol: register_post_turn_hook
+- name: run_post_turn_hooks
+  file: src/sevn/gateway/hooks/post_turn_hooks.py
+  symbol: run_post_turn_hooks
+- name: register_trajectory_ingest_hooks
+  file: src/sevn/gateway/hooks/trajectory_ingest_hooks.py
+  symbol: register_trajectory_ingest_hooks
 - name: DeferredGatewayOnboardingRoute
   file: src/sevn/gateway/http_server.py
   symbol: DeferredGatewayOnboardingRoute
@@ -666,72 +612,81 @@ interfaces:
 - name: resolve_mission_control_state
   file: src/sevn/gateway/mission/mission_trace_sink.py
   symbol: resolve_mission_control_state
+- name: bootstrap_capture_active
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: bootstrap_capture_active
+- name: bootstrap_capture_instructions
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: bootstrap_capture_instructions
+- name: bootstrap_completion_state
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: bootstrap_completion_state
+- name: clear_bootstrap_markdown_cache
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: clear_bootstrap_markdown_cache
+- name: clear_intro_state_cache
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: clear_intro_state_cache
+- name: count_user_messages
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: count_user_messages
+- name: count_user_messages_in_session
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: count_user_messages_in_session
+- name: first_session_intro_enabled
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: first_session_intro_enabled
+- name: first_session_intro_max_output_tokens
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: first_session_intro_max_output_tokens
+- name: intro_state_for_scope
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: intro_state_for_scope
+- name: intro_state_for_session
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: intro_state_for_session
+- name: is_first_session_turn
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: is_first_session_turn
+- name: load_bootstrap_markdown
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: load_bootstrap_markdown
+- name: load_bootstrap_markdown_cached
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: load_bootstrap_markdown_cached
+- name: mark_intro_state
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: mark_intro_state
+- name: maybe_mark_intro_done_if_bootstrap_complete
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: maybe_mark_intro_done_if_bootstrap_complete
+- name: maybe_reseed_bootstrap_at_boot
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: maybe_reseed_bootstrap_at_boot
+- name: missing_user_md_bootstrap_fields
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: missing_user_md_bootstrap_fields
+- name: tier_b_intro_instructions
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: tier_b_intro_instructions
+- name: user_md_bootstrap_profile_incomplete
+  file: src/sevn/gateway/onboarding/first_session.py
+  symbol: user_md_bootstrap_profile_incomplete
 - name: mount_gateway_onboarding
   file: src/sevn/gateway/onboarding/onboarding_mount.py
   symbol: mount_gateway_onboarding
 - name: resolve_gateway_onboarding_token
   file: src/sevn/gateway/onboarding/onboarding_mount.py
   symbol: resolve_gateway_onboarding_token
-- name: ChatCompletionRequest
-  file: src/sevn/gateway/api/openai_compat_api.py
-  symbol: ChatCompletionRequest
-- name: ChatMessage
-  file: src/sevn/gateway/api/openai_compat_api.py
-  symbol: ChatMessage
-- name: build_openai_compat_router
-  file: src/sevn/gateway/api/openai_compat_api.py
-  symbol: build_openai_compat_router
-- name: register_openai_compat_routes
-  file: src/sevn/gateway/api/openai_compat_api.py
-  symbol: register_openai_compat_routes
-- name: sweep_outbound_retries
-  file: src/sevn/gateway/routing/outbound_sweep.py
-  symbol: sweep_outbound_retries
 - name: PairingStore
   file: src/sevn/gateway/onboarding/pairing.py
   symbol: PairingStore
 - name: pairing_dir_for_content_root
   file: src/sevn/gateway/onboarding/pairing.py
   symbol: pairing_dir_for_content_root
-- name: PlanGateCallbackHandler
-  file: src/sevn/gateway/routing/plan_gate.py
-  symbol: PlanGateCallbackHandler
-- name: PlanGateWaitRegistry
-  file: src/sevn/gateway/routing/plan_gate.py
-  symbol: PlanGateWaitRegistry
-- name: SqlitePlanGate
-  file: src/sevn/gateway/routing/plan_gate.py
-  symbol: SqlitePlanGate
-- name: build_plan_inline_keyboard
-  file: src/sevn/gateway/routing/plan_gate.py
-  symbol: build_plan_inline_keyboard
-- name: format_plan_message_text
-  file: src/sevn/gateway/routing/plan_gate.py
-  symbol: format_plan_message_text
-- name: parse_plan_callback_data
-  file: src/sevn/gateway/routing/plan_gate.py
-  symbol: parse_plan_callback_data
-- name: PlatformRuntimeRegistry
-  file: src/sevn/gateway/runtime/platform_runtime.py
-  symbol: PlatformRuntimeRegistry
-- name: PlatformRuntimeState
-  file: src/sevn/gateway/runtime/platform_runtime.py
-  symbol: PlatformRuntimeState
-- name: PostTurnContext
-  file: src/sevn/gateway/hooks/post_turn_hooks.py
-  symbol: PostTurnContext
-- name: clear_post_turn_hooks
-  file: src/sevn/gateway/hooks/post_turn_hooks.py
-  symbol: clear_post_turn_hooks
-- name: register_post_turn_hook
-  file: src/sevn/gateway/hooks/post_turn_hooks.py
-  symbol: register_post_turn_hook
-- name: run_post_turn_hooks
-  file: src/sevn/gateway/hooks/post_turn_hooks.py
-  symbol: run_post_turn_hooks
-- name: render_gateway_metrics
-  file: src/sevn/gateway/runtime/prometheus_metrics.py
-  symbol: render_gateway_metrics
+- name: CascadeBudget
+  file: src/sevn/gateway/queue/cascade_budget.py
+  symbol: CascadeBudget
 - name: MultiDispatchHooks
   file: src/sevn/gateway/queue/queue_multi.py
   symbol: MultiDispatchHooks
@@ -744,12 +699,21 @@ interfaces:
 - name: spawn_multi_l1_via_supervisor
   file: src/sevn/gateway/queue/queue_multi.py
   symbol: spawn_multi_l1_via_supervisor
-- name: TokenBucketLimiter
-  file: src/sevn/gateway/runtime/rate_limit.py
-  symbol: TokenBucketLimiter
-- name: redact_inline
-  file: src/sevn/gateway/util/redact.py
-  symbol: redact_inline
+- name: SessionBoundSteerInject
+  file: src/sevn/gateway/queue/steer_store.py
+  symbol: SessionBoundSteerInject
+- name: SessionSteerStore
+  file: src/sevn/gateway/queue/steer_store.py
+  symbol: SessionSteerStore
+- name: SteerEnqueueResult
+  file: src/sevn/gateway/queue/steer_store.py
+  symbol: SteerEnqueueResult
+- name: owner_user_ids_from_workspace
+  file: src/sevn/gateway/queue/steer_store.py
+  symbol: owner_user_ids_from_workspace
+- name: parse_steer_command_text
+  file: src/sevn/gateway/queue/steer_store.py
+  symbol: parse_steer_command_text
 - name: ReplayJobEventFanout
   file: src/sevn/gateway/replay/replay_job_events.py
   symbol: ReplayJobEventFanout
@@ -774,6 +738,30 @@ interfaces:
 - name: register_replay_worker_hooks
   file: src/sevn/gateway/replay/replay_worker_hooks.py
   symbol: register_replay_worker_hooks
+- name: CodingAgentRouter
+  file: src/sevn/gateway/routing/coding_agent_router.py
+  symbol: CodingAgentRouter
+- name: sweep_outbound_retries
+  file: src/sevn/gateway/routing/outbound_sweep.py
+  symbol: sweep_outbound_retries
+- name: PlanGateCallbackHandler
+  file: src/sevn/gateway/routing/plan_gate.py
+  symbol: PlanGateCallbackHandler
+- name: PlanGateWaitRegistry
+  file: src/sevn/gateway/routing/plan_gate.py
+  symbol: PlanGateWaitRegistry
+- name: SqlitePlanGate
+  file: src/sevn/gateway/routing/plan_gate.py
+  symbol: SqlitePlanGate
+- name: build_plan_inline_keyboard
+  file: src/sevn/gateway/routing/plan_gate.py
+  symbol: build_plan_inline_keyboard
+- name: format_plan_message_text
+  file: src/sevn/gateway/routing/plan_gate.py
+  symbol: format_plan_message_text
+- name: parse_plan_callback_data
+  file: src/sevn/gateway/routing/plan_gate.py
+  symbol: parse_plan_callback_data
 - name: is_intentional_silence_agent_result
   file: src/sevn/gateway/routing/response_filters.py
   symbol: is_intentional_silence_agent_result
@@ -795,36 +783,81 @@ interfaces:
 - name: telegram_show_routing_enabled
   file: src/sevn/gateway/routing/routing_footer.py
   symbol: telegram_show_routing_enabled
+- name: load_or_create_deployment_id
+  file: src/sevn/gateway/runtime/deployment_id.py
+  symbol: load_or_create_deployment_id
+- name: PendingGatewayRestart
+  file: src/sevn/gateway/runtime/gateway_restart_ack.py
+  symbol: PendingGatewayRestart
+- name: claim_pending_gateway_restarts
+  file: src/sevn/gateway/runtime/gateway_restart_ack.py
+  symbol: claim_pending_gateway_restarts
+- name: clear_pending_gateway_restarts
+  file: src/sevn/gateway/runtime/gateway_restart_ack.py
+  symbol: clear_pending_gateway_restarts
+- name: conversation_snapshot_for_session
+  file: src/sevn/gateway/runtime/gateway_restart_ack.py
+  symbol: conversation_snapshot_for_session
+- name: deliver_pending_gateway_restart_acks
+  file: src/sevn/gateway/runtime/gateway_restart_ack.py
+  symbol: deliver_pending_gateway_restart_acks
+- name: has_pending_gateway_restart
+  file: src/sevn/gateway/runtime/gateway_restart_ack.py
+  symbol: has_pending_gateway_restart
+- name: load_pending_gateway_restarts
+  file: src/sevn/gateway/runtime/gateway_restart_ack.py
+  symbol: load_pending_gateway_restarts
+- name: mark_restart_ack_delivered
+  file: src/sevn/gateway/runtime/gateway_restart_ack.py
+  symbol: mark_restart_ack_delivered
+- name: pending_restart_store_path
+  file: src/sevn/gateway/runtime/gateway_restart_ack.py
+  symbol: pending_restart_store_path
+- name: recent_restart_ack_delivered
+  file: src/sevn/gateway/runtime/gateway_restart_ack.py
+  symbol: recent_restart_ack_delivered
+- name: record_pending_gateway_restart
+  file: src/sevn/gateway/runtime/gateway_restart_ack.py
+  symbol: record_pending_gateway_restart
+- name: restart_ack_delivered_path
+  file: src/sevn/gateway/runtime/gateway_restart_ack.py
+  symbol: restart_ack_delivered_path
+- name: generate_gateway_token
+  file: src/sevn/gateway/runtime/gateway_token.py
+  symbol: generate_gateway_token
+- name: resolve_config_ref
+  file: src/sevn/gateway/runtime/gateway_token.py
+  symbol: resolve_config_ref
+- name: resolve_gateway_token_ref
+  file: src/sevn/gateway/runtime/gateway_token.py
+  symbol: resolve_gateway_token_ref
+- name: validate_gateway_token_plaintext
+  file: src/sevn/gateway/runtime/gateway_token.py
+  symbol: validate_gateway_token_plaintext
+- name: PlatformRuntimeRegistry
+  file: src/sevn/gateway/runtime/platform_runtime.py
+  symbol: PlatformRuntimeRegistry
+- name: PlatformRuntimeState
+  file: src/sevn/gateway/runtime/platform_runtime.py
+  symbol: PlatformRuntimeState
+- name: render_gateway_metrics
+  file: src/sevn/gateway/runtime/prometheus_metrics.py
+  symbol: render_gateway_metrics
+- name: TokenBucketLimiter
+  file: src/sevn/gateway/runtime/rate_limit.py
+  symbol: TokenBucketLimiter
+- name: release_leaked_multiprocessing_semaphores
+  file: src/sevn/gateway/runtime/shutdown_cleanup.py
+  symbol: release_leaked_multiprocessing_semaphores
+- name: register_telemetry_boot_hooks
+  file: src/sevn/gateway/runtime/telemetry_boot.py
+  symbol: register_telemetry_boot_hooks
 - name: SelfImproveJobEventFanout
   file: src/sevn/gateway/self_improve/self_improve_job_events.py
   symbol: SelfImproveJobEventFanout
 - name: resolve_owner_telegram_user_id
   file: src/sevn/gateway/self_improve/self_improve_job_events.py
   symbol: resolve_owner_telegram_user_id
-- name: SessionManager
-  file: src/sevn/gateway/session_manager.py
-  symbol: SessionManager
-- name: SessionRow
-  file: src/sevn/gateway/session_manager.py
-  symbol: SessionRow
-- name: format_lcm_status_lines
-  file: src/sevn/gateway/session_manager.py
-  symbol: format_lcm_status_lines
-- name: get_tts_mode_override
-  file: src/sevn/gateway/session_manager.py
-  symbol: get_tts_mode_override
-- name: latest_messages
-  file: src/sevn/gateway/session_manager.py
-  symbol: latest_messages
-- name: load_session_row
-  file: src/sevn/gateway/session_manager.py
-  symbol: load_session_row
-- name: set_tts_mode_override
-  file: src/sevn/gateway/session_manager.py
-  symbol: set_tts_mode_override
-- name: unanswered_tail_message_id
-  file: src/sevn/gateway/session_manager.py
-  symbol: unanswered_tail_message_id
 - name: mark_session_superseded
   file: src/sevn/gateway/session/session_mirror.py
   symbol: mark_session_superseded
@@ -882,45 +915,30 @@ interfaces:
 - name: spawn_subagent
   file: src/sevn/gateway/session/sessions_query.py
   symbol: spawn_subagent
-- name: release_leaked_multiprocessing_semaphores
-  file: src/sevn/gateway/runtime/shutdown_cleanup.py
-  symbol: release_leaked_multiprocessing_semaphores
-- name: SlashAccessPolicy
-  file: src/sevn/gateway/access/slash_access.py
-  symbol: SlashAccessPolicy
-- name: canonical_slash_command
-  file: src/sevn/gateway/access/slash_access.py
-  symbol: canonical_slash_command
-- name: is_admin_slash_command
-  file: src/sevn/gateway/access/slash_access.py
-  symbol: is_admin_slash_command
-- name: policy_for_message
-  file: src/sevn/gateway/access/slash_access.py
-  symbol: policy_for_message
-- name: policy_from_channel_extra
-  file: src/sevn/gateway/access/slash_access.py
-  symbol: policy_from_channel_extra
-- name: slash_allowed_for_actor
-  file: src/sevn/gateway/access/slash_access.py
-  symbol: slash_allowed_for_actor
-- name: SessionBoundSteerInject
-  file: src/sevn/gateway/queue/steer_store.py
-  symbol: SessionBoundSteerInject
-- name: SessionSteerStore
-  file: src/sevn/gateway/queue/steer_store.py
-  symbol: SessionSteerStore
-- name: SteerEnqueueResult
-  file: src/sevn/gateway/queue/steer_store.py
-  symbol: SteerEnqueueResult
-- name: owner_user_ids_from_workspace
-  file: src/sevn/gateway/queue/steer_store.py
-  symbol: owner_user_ids_from_workspace
-- name: parse_steer_command_text
-  file: src/sevn/gateway/queue/steer_store.py
-  symbol: parse_steer_command_text
-- name: blocked_inbound_user_message
-  file: src/sevn/gateway/util/strings.py
-  symbol: blocked_inbound_user_message
+- name: SessionManager
+  file: src/sevn/gateway/session_manager.py
+  symbol: SessionManager
+- name: SessionRow
+  file: src/sevn/gateway/session_manager.py
+  symbol: SessionRow
+- name: format_lcm_status_lines
+  file: src/sevn/gateway/session_manager.py
+  symbol: format_lcm_status_lines
+- name: get_tts_mode_override
+  file: src/sevn/gateway/session_manager.py
+  symbol: get_tts_mode_override
+- name: latest_messages
+  file: src/sevn/gateway/session_manager.py
+  symbol: latest_messages
+- name: load_session_row
+  file: src/sevn/gateway/session_manager.py
+  symbol: load_session_row
+- name: set_tts_mode_override
+  file: src/sevn/gateway/session_manager.py
+  symbol: set_tts_mode_override
+- name: unanswered_tail_message_id
+  file: src/sevn/gateway/session_manager.py
+  symbol: unanswered_tail_message_id
 - name: build_announce_back_hook
   file: src/sevn/gateway/subagents/subagents_announce.py
   symbol: build_announce_back_hook
@@ -1059,21 +1077,6 @@ interfaces:
 - name: ensure_webhook_secret_token
   file: src/sevn/gateway/telegram/telegram_webhook_secret.py
   symbol: ensure_webhook_secret_token
-- name: register_telemetry_boot_hooks
-  file: src/sevn/gateway/runtime/telemetry_boot.py
-  symbol: register_telemetry_boot_hooks
-- name: operator_local_date_iso
-  file: src/sevn/gateway/util/timestamps.py
-  symbol: operator_local_date_iso
-- name: resolve_time_range
-  file: src/sevn/gateway/util/timestamps.py
-  symbol: resolve_time_range
-- name: to_user_tz
-  file: src/sevn/gateway/util/timestamps.py
-  symbol: to_user_tz
-- name: register_trajectory_ingest_hooks
-  file: src/sevn/gateway/hooks/trajectory_ingest_hooks.py
-  symbol: register_trajectory_ingest_hooks
 - name: persist_triage_decision
   file: src/sevn/gateway/triage/triage_audit.py
   symbol: persist_triage_decision
@@ -1260,12 +1263,21 @@ interfaces:
 - name: set_user_timezone
   file: src/sevn/gateway/user/user_profile.py
   symbol: set_user_timezone
-- name: WebChannelTransport
-  file: src/sevn/gateway/api/web_transport.py
-  symbol: WebChannelTransport
-- name: WebSocketLike
-  file: src/sevn/gateway/api/web_transport.py
-  symbol: WebSocketLike
+- name: redact_inline
+  file: src/sevn/gateway/util/redact.py
+  symbol: redact_inline
+- name: blocked_inbound_user_message
+  file: src/sevn/gateway/util/strings.py
+  symbol: blocked_inbound_user_message
+- name: operator_local_date_iso
+  file: src/sevn/gateway/util/timestamps.py
+  symbol: operator_local_date_iso
+- name: resolve_time_range
+  file: src/sevn/gateway/util/timestamps.py
+  symbol: resolve_time_range
+- name: to_user_tz
+  file: src/sevn/gateway/util/timestamps.py
+  symbol: to_user_tz
 - name: consume_webapp_dispatcher_token
   file: src/sevn/gateway/webapp/webapp_qa.py
   symbol: consume_webapp_dispatcher_token
@@ -1347,22 +1359,8 @@ interfaces:
 - name: webapp_viewer_launch_allowed
   file: src/sevn/gateway/webapp/webapp_viewer.py
   symbol: webapp_viewer_launch_allowed
-- name: del_nested
-  file: src/sevn/gateway/config_io/workspace_config_io.py
-  symbol: del_nested
-- name: load_raw_sevn_json
-  file: src/sevn/gateway/config_io/workspace_config_io.py
-  symbol: load_raw_sevn_json
-- name: mutate_sevn_json
-  file: src/sevn/gateway/config_io/workspace_config_io.py
-  symbol: mutate_sevn_json
-- name: set_nested
-  file: src/sevn/gateway/config_io/workspace_config_io.py
-  symbol: set_nested
-specs: []
-personas: []
-prd_profile: null
 ---
+
 ## Purpose
 
 Run the long-lived **gateway** process: accept channel ingress (Telegram poll/webhook,

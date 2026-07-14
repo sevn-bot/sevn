@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the primary daily-driver channel for personal messaging: a ChannelAdapter
   implementation that normalises Telegram Updates into spec-17-gateway IncomingMessage
   / OutgoingMessage and implements '
-last_updated: '2026-07-12'
-fingerprint: sha256:374cf638eff859b6e68373302bb3734271c26da2b07567d8787c6a87db8fe59b
+last_updated: '2026-07-14'
+fingerprint: sha256:36de57ba2907253aeb41e68515b98b476428d4bc8c75d84bbb40262edd17ddb9
 related: []
 sources:
 - src/sevn/channels/**
@@ -427,11 +427,7 @@ interfaces:
 - name: webchat_config_from_workspace
   file: src/sevn/channels/webchat.py
   symbol: webchat_config_from_workspace
-specs: []
-personas: []
-prd_profile: null
 ---
-
 
 ## Purpose
 

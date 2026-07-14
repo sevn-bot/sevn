@@ -6,8 +6,8 @@ status: scaffold
 owner: Alex
 summary: 'Own the provider-chain facades for speech-to-text and text-to-speech so
   the gateway can:'
-last_updated: '2026-07-12'
-fingerprint: sha256:4c2908fbd8c41f1682736822897a1fe5b9a7535d1022136beb2e2c407b4e1784
+last_updated: '2026-07-14'
+fingerprint: sha256:d86e09e3208ae192ad94bd266d4f8ca2d60ca1324c6652df8e90d9abf2ae784d
 related: []
 sources:
 - src/sevn/voice/**
@@ -138,11 +138,7 @@ interfaces:
 - name: model_path_for
   file: src/sevn/voice/whisper_model_provisioner.py
   symbol: model_path_for
-specs: []
-personas: []
-prd_profile: null
 ---
-
 
 ## Purpose
 

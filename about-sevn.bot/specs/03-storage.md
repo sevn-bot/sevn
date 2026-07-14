@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own application persistence: connection setup (WAL, foreign keys), versioned
   migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence
   contracts for crash-resume and (w'
-last_updated: '2026-07-12'
-fingerprint: sha256:c8d8696bb48df26ee44ca00953ab251cbd6b6d6cfc93c2d07da470a38c46aa9c
+last_updated: '2026-07-14'
+fingerprint: sha256:34f61cb771058582360586333ab36dec8cf45a50d4f4a78442ac694de0d9f9e4
 related: []
 sources:
 - src/sevn/storage/**
@@ -67,11 +67,7 @@ interfaces:
 - name: open_sevn_sqlite
   file: src/sevn/storage/sqlite.py
   symbol: open_sevn_sqlite
-specs: []
-personas: []
-prd_profile: null
 ---
-
 
 ## Purpose
 
