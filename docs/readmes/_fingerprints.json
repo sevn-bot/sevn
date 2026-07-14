@@ -10,7 +10,7 @@
     },
     "channels": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T14:49:10Z",
+      "computed_at": "2026-07-14T14:54:40Z",
       "digest": "374cf638eff859b6e68373302bb3734271c26da2b07567d8787c6a87db8fe59b",
       "source_globs": [
         "src/sevn/channels/**"
@@ -18,7 +18,7 @@
     },
     "code-understanding": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T14:49:12Z",
+      "computed_at": "2026-07-14T14:54:53Z",
       "digest": "5a97e9841a414ba088717f40956b00e55c59c77add891779e0555da9bb2c9f93",
       "source_globs": [
         "src/sevn/code_understanding/**"
@@ -52,7 +52,7 @@
     },
     "integrations": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T14:49:12Z",
+      "computed_at": "2026-07-14T14:54:55Z",
       "digest": "99a185af444a73436b77fa1c7fb9312a557a45d4c300bb87ddf8d21ddb7e0f6f",
       "source_globs": [
         "src/sevn/integrations/**"
@@ -60,7 +60,7 @@
     },
     "memory-context": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T14:49:11Z",
+      "computed_at": "2026-07-14T14:54:49Z",
       "digest": "210a42748c1bfeebeabbfdf106fe758bf396797d2dabef09e51886ca62ec9c06",
       "source_globs": [
         "src/sevn/memory/**",
@@ -87,8 +87,8 @@
     },
     "root": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T14:49:10Z",
-      "digest": "d1b855581c3500a41f057bce304b294be2a8809f95d0f0a5f2151497d4fa4769",
+      "computed_at": "2026-07-14T14:54:31Z",
+      "digest": "df595f59132a7996a06dd68d9c81ed17b82f76cd684d1c966388f4cc2132a3f3",
       "source_globs": [
         "pyproject.toml",
         "CLAUDE.md",
@@ -99,7 +99,7 @@
     },
     "second-brain": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T14:49:12Z",
+      "computed_at": "2026-07-14T14:54:51Z",
       "digest": "12c8243b0fcc82e791221e55eb0e0bf9567ac67714950e6a56b301a790a18944",
       "source_globs": [
         "src/sevn/second_brain/**"
@@ -164,7 +164,7 @@
     },
     "tools": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T14:49:10Z",
+      "computed_at": "2026-07-14T14:54:42Z",
       "digest": "207556c8650740a8335885e8fa26f8946cef7f269b331f4957fbb74207414f2c",
       "source_globs": [
         "src/sevn/tools/**"
@@ -181,7 +181,7 @@
     },
     "triggers": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T14:49:12Z",
+      "computed_at": "2026-07-14T14:54:46Z",
       "digest": "3ba449957038898a3f00cba876819d2398f3dfd4e02ca942fbeb846280cdcd61",
       "source_globs": [
         "src/sevn/triggers/**"
@@ -197,7 +197,7 @@
     },
     "voice": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T14:49:12Z",
+      "computed_at": "2026-07-14T14:54:44Z",
       "digest": "4c2908fbd8c41f1682736822897a1fe5b9a7535d1022136beb2e2c407b4e1784",
       "source_globs": [
         "src/sevn/voice/**"

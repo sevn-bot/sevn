@@ -1,4 +1,4 @@
-<!-- generated: do not edit by hand; run `sevn readme update memory-context` -->
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint memory-context` -->
 # Memory & context — LCM store, compaction, user model, dreaming, and Honcho opt-ins
 
 [![Spec][spec-badge]][spec-link]
@@ -9,42 +9,39 @@
 
 ## Level 1 — Overview (non-technical)
 
-**Memory & context** is a core part of sevn.bot — the personal AI assistant you run on your own machine. LCM store, compaction, user model, dreaming, and Honcho opt-ins.
+**Memory & context** keeps conversations usable without losing history. **LCM** (Lossless Conversation Memory) stores every qualifying message, compacts it into summaries, and assembles context for each turn. **Dreaming** promotes scored recall signals into long-term `MEMORY.md` prose at the workspace root. **Honcho-style user model** (opt-in) accumulates inferred operator facts in `.sevn/user_model.json`.
 
-In everyday use, memory & context helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
+Second Brain wiki vault is a separate subsystem — see [`second-brain.md`](second-brain.md).
 
 ## Level 2 — How it works (technical)
 
-### Components and layout
+Implementation spans [`src/sevn/lcm/`](../../src/sevn/lcm/) (lossless store + assembly) and [`src/sevn/memory/`](../../src/sevn/memory/) (dreaming, user model, search telemetry).
 
-Implementation spans `src/sevn/lcm/`, `src/sevn/memory/`. The package contains 34 Python module(s); primary entry points include `src/sevn/lcm/__init__.py`, `src/sevn/lcm/assembler.py`, `src/sevn/lcm/compaction.py`, `src/sevn/lcm/engine.py`, `src/sevn/lcm/flush.py`, `src/sevn/lcm/large_files.py`, and 28 more.
+### LCM and dreaming split
 
-### Data and control flow
+| Concern | Package | Key entry points |
+| --- | --- | --- |
+| Ingest | [`lcm/engine.py`](../../src/sevn/lcm/engine.py) | [`LcmEngine.ingest`](../../src/sevn/lcm/engine.py#L242) |
+| Assemble context | [`lcm/assembler.py`](../../src/sevn/lcm/assembler.py) | [`LcmAssembler.assemble`](../../src/sevn/lcm/assembler.py#L69) |
+| Compaction | [`lcm/compaction.py`](../../src/sevn/lcm/compaction.py) | [`CompactionScheduler.run_incremental`](../../src/sevn/lcm/compaction.py#L100) |
+| Post-turn hooks | [`lcm/engine.py`](../../src/sevn/lcm/engine.py) | [`LcmEngine.after_turn`](../../src/sevn/lcm/engine.py#L446) |
+| Dreaming → MEMORY.md | [`memory/dreaming/engine.py`](../../src/sevn/memory/dreaming/engine.py) | [`DreamingEngine.run_scheduled`](../../src/sevn/memory/dreaming/engine.py#L110) promotes via [`promoter.py`](../../src/sevn/memory/dreaming/promoter.py) |
+| Honcho user model | [`memory/user_model/`](../../src/sevn/memory/user_model/) | [`UserModelExtractor`](../../src/sevn/memory/user_model/extractor.py#L52), [`schedule_user_model_extraction`](../../src/sevn/memory/user_model/queue.py#L84) |
 
-Memory & context is organized around `  init  `, `assembler`, `compaction`, `engine`, and 2 more under `src/sevn/memory/`; implementation spans `src/sevn/lcm/`, `src/sevn/memory/`. Primary entry points include assembler.py (LcmAssembler.assemble), compaction.py (completion_text), engine.py (LcmEngine.ingest), flush.py (is_allowlisted_relative_path).
+Dreaming reads recall signals ([`memory/dreaming/sources.py`](../../src/sevn/memory/dreaming/sources.py)), scores candidates ([`scorer.py`](../../src/sevn/memory/dreaming/scorer.py)), and appends bullets to workspace `MEMORY.md` — it does **not** mutate LCM tables.
 
-### Configuration
-
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/15-memory-lcm.md`, `about-sevn.bot/specs/31-memory-dreaming.md`, `about-sevn.bot/specs/32-memory-honcho.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+User-model extraction is gated by [`user_model_extraction_enabled`](../../src/sevn/config/model_resolution.py#L827); persistence via [`UserModelStore`](../../src/sevn/memory/user_model/store.py#L146) under `.sevn/user_model.json`.
 
 ### Key modules
 
-- `src/sevn/lcm/assembler.py` — `LcmAssembler.assemble`
-- `src/sevn/lcm/compaction.py` — `completion_text`, `CompactionScheduler.run_incremental`
-- `src/sevn/lcm/engine.py` — `LcmEngine.ingest`, `LcmEngine.assemble`, `LcmEngine.after_turn`, `LcmEngine (+4 methods)`
-- `src/sevn/lcm/flush.py` — `is_allowlisted_relative_path`, `validate_memory_writes`, `run_flush_decode_with_retry_once`
-- `src/sevn/lcm/large_files.py` — `maybe_spill_large_payload`
+- [`lcm/engine.py`](../../src/sevn/lcm/engine.py) — ingest/assemble/after_turn façade
+- [`lcm/compaction.py`](../../src/sevn/lcm/compaction.py) — incremental compaction scheduler
+- [`memory/dreaming/engine.py`](../../src/sevn/memory/dreaming/engine.py) — cron-invoked dreaming pipeline
+- [`memory/user_model/extractor.py`](../../src/sevn/memory/user_model/extractor.py) — structured LLM profile extraction
+- [`memory/search_telemetry.py`](../../src/sevn/memory/search_telemetry.py) — recall signals for dreaming
 
-### Spec context
+Normative specs: [`15-memory-lcm.md`](../../about-sevn.bot/specs/15-memory-lcm.md), [`31-memory-dreaming.md`](../../about-sevn.bot/specs/31-memory-dreaming.md), [`32-memory-honcho.md`](../../about-sevn.bot/specs/32-memory-honcho.md).
 
-From about-sevn.bot/specs/15-memory-lcm.md:
-LCM is the lossless conversation memory for a workspace (prd-02-personality-and-memory §5.2–§5.4): every qualifying message is stored; compaction summarises without deleting source rows; the assembler
-
-From about-sevn.bot/specs/31-memory-dreaming.md:
-Provide scored consolidation from short-term recall signals into curated long-term prose (MEMORY.md) on a daily (configurable) cadence, without mutating LCM tables or crossing into Second Brain (wiki/
-
-From about-sevn.bot/specs/32-memory-honcho.md:
-Deliver an opt-in inferred profile that accumulates stable operator-facing facts (preferences, recurring context the operator states in chat) without requiring manual USER.md edits for every drift.
 
 ## Level 3 — Deep dive (low-level, technical)
 

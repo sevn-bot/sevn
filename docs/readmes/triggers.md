@@ -1,4 +1,4 @@
-<!-- generated: do not edit by hand; run `sevn readme update triggers` -->
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint triggers` -->
 # Non-interactive triggers — Webhooks, cron, dedupe, dispatcher, and notify-only automation
 
 [![Spec][spec-badge]][spec-link]
@@ -9,31 +9,40 @@
 
 ## Level 1 — Overview (non-technical)
 
-**Non-interactive triggers** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Webhooks, cron, dedupe, dispatcher, and notify-only automation.
+**Non-interactive triggers** wake sevn.bot without a live chat turn: inbound webhooks (GitHub, Slack, Stripe), scheduled cron jobs, and the HTTP triggers API. Each run either passes a prompt to the agent (**agent_pass**) or renders a template notification only (**notify_only**).
 
-In everyday use, non-interactive triggers helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
+Bearer auth protects the triggers API; webhook dedupe prevents double-processing the same delivery.
 
 ## Level 2 — How it works (technical)
 
-### Components and layout
+Package [`src/sevn/triggers/`](../../src/sevn/triggers/). [`build_api_router`](../../src/sevn/triggers/api_router.py#L112) mounts the HTTP API; [`build_webhook_router`](../../src/sevn/triggers/webhook_router.py#L309) adds explicit provider webhook paths on the gateway app.
 
-Implementation lives under `src/sevn/triggers/`. The package contains 19 Python module(s); primary entry points include `src/sevn/triggers/__init__.py`, `src/sevn/triggers/api_router.py`, `src/sevn/triggers/auth.py`, `src/sevn/triggers/coding_agent_loop.py`, `src/sevn/triggers/cron.py`, `src/sevn/triggers/dedupe.py`, and 13 more.
+### Webhook routes and delivery modes
 
-### Data and control flow
+| Route | Handler module | Purpose |
+| --- | --- | --- |
+| `POST /webhook/github` | [`webhook_router.py`](../../src/sevn/triggers/webhook_router.py#L320) | GitHub deliveries |
+| `POST /webhook/slack` | [`webhook_router.py`](../../src/sevn/triggers/webhook_router.py#L324) | Slack events |
+| `POST /webhook/stripe` | [`webhook_router.py`](../../src/sevn/triggers/webhook_router.py#L335) | Stripe webhooks |
 
-Non-interactive triggers is organized around `  init  `, `api router`, `auth`, `coding agent loop`, and 2 more under `src/sevn/triggers/` with 19 Python module(s) in the scanned tree. Primary entry points include api_router.py (build_api_router), auth.py (triggers_api_auth_required), coding_agent_loop.py (mine_session_trajectories), cron.py (format_next_fire_at_iso).
+**Delivery modes** ([`DeliveryMode`](../../src/sevn/triggers/request.py#L26)):
+- **`agent_pass`** (default) — enqueue a full agent turn via [`_dispatch_run_agent_pass`](../../src/sevn/triggers/dispatcher.py#L396)
+- **`notify_only`** — template render + LOG channel via [`dispatch_notify_only`](../../src/sevn/triggers/dispatcher.py#L197); cron jobs store `notify_only` in SQLite ([`cron.py`](../../src/sevn/triggers/cron.py) [`_normalize_delivery_mode`](../../src/sevn/triggers/cron.py))
 
-### Configuration
+**API bearer auth:** [`verify_triggers_api_bearer`](../../src/sevn/triggers/auth.py#L42) / [`triggers_api_auth_required`](../../src/sevn/triggers/auth.py#L19) guard `/api/v1/triggers/*`.
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/30-non-interactive-triggers.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+**Dedupe:** [`try_insert_webhook_dedupe`](../../src/sevn/triggers/dedupe.py#L25) inserts idempotency keys; [`prune_webhook_dedupe_expired`](../../src/sevn/triggers/dedupe.py#L73) cleans stale rows.
 
 ### Key modules
 
-- `src/sevn/triggers/api_router.py` — `build_api_router`
-- `src/sevn/triggers/auth.py` — `triggers_api_auth_required`, `verify_triggers_api_bearer`
-- `src/sevn/triggers/coding_agent_loop.py` — `mine_session_trajectories`, `coding_agent_loop_trigger`
-- `src/sevn/triggers/cron.py` — `format_next_fire_at_iso`, `cron_job_to_dict`, `cron_job_to_list_dict`, `SqliteCronStore.list_due`
-- `src/sevn/triggers/dedupe.py` — `try_insert_webhook_dedupe`, `prune_webhook_dedupe_expired`
+- [`dispatcher.py`](../../src/sevn/triggers/dispatcher.py) — agent_pass vs notify_only dispatch
+- [`webhook_router.py`](../../src/sevn/triggers/webhook_router.py) — explicit `/webhook/<provider>` paths
+- [`cron.py`](../../src/sevn/triggers/cron.py) — SQLite cron store + due-job polling
+- [`dedupe.py`](../../src/sevn/triggers/dedupe.py) — webhook idempotency
+- [`auth.py`](../../src/sevn/triggers/auth.py) — triggers API bearer verification
+
+Normative spec: [`30-non-interactive-triggers.md`](../../about-sevn.bot/specs/30-non-interactive-triggers.md).
+
 
 ## Level 3 — Deep dive (low-level, technical)
 

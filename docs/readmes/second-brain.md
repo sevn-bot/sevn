@@ -1,4 +1,4 @@
-<!-- generated: do not edit by hand; run `sevn readme update second-brain` -->
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint second-brain` -->
 # Second brain — Wiki vault layout, ingest paths, and wikilink-compatible provenance for operator knowledge
 
 [![Spec][spec-badge]][spec-link]
@@ -9,31 +9,39 @@
 
 ## Level 1 — Overview (non-technical)
 
-**Second brain** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Wiki vault layout, ingest paths, and wikilink-compatible provenance for operator knowledge.
+**Second brain** is sevn.bot's operator wiki vault: capture sources under `raw/`, curate pages under `wiki/`, and search/apply wikilinks compatible with Obsidian-style layouts. It is **not** a sync daemon — sevn provides wikilink/layout compatibility and ingest tooling, not bidirectional Obsidian sync.
 
-In everyday use, second brain helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
+Tools [`wiki_search`](../../src/sevn/second_brain/__init__.py), [`wiki_get`](../../src/sevn/second_brain/__init__.py), [`wiki_apply`](../../src/sevn/second_brain/__init__.py), and [`wiki_lint`](../../src/sevn/second_brain/__init__.py) expose the vault to the agent.
 
 ## Level 2 — How it works (technical)
 
-### Components and layout
+Package [`src/sevn/second_brain/`](../../src/sevn/second_brain/). Vault paths resolve through [`paths.py`](../../src/sevn/second_brain/paths.py).
 
-Implementation lives under `src/sevn/second_brain/`. The package contains 18 Python module(s); primary entry points include `src/sevn/second_brain/__init__.py`, `src/sevn/second_brain/bootstrap.py`, `src/sevn/second_brain/errors.py`, `src/sevn/second_brain/fetch.py`, `src/sevn/second_brain/folder_picker.py`, `src/sevn/second_brain/frontmatter.py`, and 12 more.
+### Vault layout and Obsidian resolution
 
-### Data and control flow
+| Path (under scope) | Purpose |
+| --- | --- |
+| `raw/` | Captured sources (URL fetch, uploads) — [`fetch_url_to_raw`](../../src/sevn/second_brain/fetch.py#L100) |
+| `wiki/` | Curated markdown pages + [`wiki/index.md`](../../src/sevn/second_brain/query.py) |
+| `wiki/ingests/` | Ingested/stub pages from raw — [`run_ingest`](../../src/sevn/second_brain/ingest.py#L145) |
+| `outputs/` | Generated artefacts |
 
-Second brain is organized around `  init  `, `bootstrap`, `errors`, `fetch`, and 2 more under `src/sevn/second_brain/` with 18 Python module(s) in the scanned tree. Primary entry points include __init__.py (wiki_search_tool), bootstrap.py (ensure_second_brain_scope_layout), fetch.py (fetch_url_to_raw), folder_picker.py (normalise_browse_path).
+**Custom vault root:** `sevn.json` → `second_brain.paths.vault` resolves via [`resolve_vault_base`](../../src/sevn/second_brain/paths.py#L108) (legacy default: [`vault_root`](../../src/sevn/second_brain/paths.py#L32) → `second_brain/` under content root). Obsidian operators set `paths.vault` to their vault directory; doctor probes layout with [`probe_second_brain_vault_layout`](../../src/sevn/second_brain/layout_probe.py#L71).
 
-### Configuration
+Wikilink resolution: [`resolve_wiki_target`](../../src/sevn/second_brain/links.py#L98). Scope bootstrap: [`ensure_second_brain_scope_layout`](../../src/sevn/second_brain/bootstrap.py#L49).
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/27-second-brain.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Gateway boot registers tools via [`register_second_brain_tools`](../../src/sevn/second_brain/__init__.py#L562).
 
 ### Key modules
 
-- `src/sevn/second_brain/__init__.py` — `wiki_search_tool`, `wiki_get_tool`, `wiki_apply_tool`, `wiki_lint_tool`
-- `src/sevn/second_brain/bootstrap.py` — `ensure_second_brain_scope_layout`
-- `src/sevn/second_brain/fetch.py` — `fetch_url_to_raw`
-- `src/sevn/second_brain/folder_picker.py` — `normalise_browse_path`, `list_workspace_subdirs`
-- `src/sevn/second_brain/frontmatter.py` — `split_frontmatter`, `dumps_frontmatter`, `normalise_agent_keys`, `okf_type_required`
+- [`paths.py`](../../src/sevn/second_brain/paths.py) — [`resolve_vault_base`](../../src/sevn/second_brain/paths.py#L108), scope roots
+- [`ingest.py`](../../src/sevn/second_brain/ingest.py) — raw → wiki ingest pipeline
+- [`__init__.py`](../../src/sevn/second_brain/__init__.py) — wiki tool registration
+- [`bootstrap.py`](../../src/sevn/second_brain/bootstrap.py) — idempotent layout creation
+- [`layout_probe.py`](../../src/sevn/second_brain/layout_probe.py) — doctor vault layout checks
+
+Normative spec: [`27-second-brain.md`](../../about-sevn.bot/specs/27-second-brain.md).
+
 
 ## Level 3 — Deep dive (low-level, technical)
 

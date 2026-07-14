@@ -67,16 +67,20 @@ specs = [
   "about-sevn.bot/specs/18-channel-telegram.md",
   "about-sevn.bot/specs/19-channel-webui.md",
 ]
+curated = true
+template = "docs/readmes/_templates/channels.md"
 
 [[readme]]
 slug = "tools"
 title = "Tools registry"
 summary = "Module inventory for the tools registry, adapters, and permission gates."
-profile = "catalog"
+profile = "subsystem"
 tier_owner = "tools"
 output = "docs/readmes/tools.md"
 source_globs = ["src/sevn/tools/**"]
 specs = ["about-sevn.bot/specs/11-tools-registry.md"]
+curated = true
+template = "docs/readmes/_templates/tools.md"
 
 [[readme]]
 slug = "skills"
@@ -181,6 +185,8 @@ specs = [
   "about-sevn.bot/specs/31-memory-dreaming.md",
   "about-sevn.bot/specs/32-memory-honcho.md",
 ]
+curated = true
+template = "docs/readmes/_templates/memory-context.md"
 
 [[readme]]
 slug = "second-brain"
@@ -191,6 +197,8 @@ tier_owner = "memory"
 output = "docs/readmes/second-brain.md"
 source_globs = ["src/sevn/second_brain/**"]
 specs = ["about-sevn.bot/specs/27-second-brain.md"]
+curated = true
+template = "docs/readmes/_templates/second-brain.md"
 
 [[readme]]
 slug = "voice"
@@ -203,6 +211,8 @@ source_globs = ["src/sevn/voice/**"]
 turn_spine = true
 provider_keys_via_proxy = true
 specs = ["about-sevn.bot/specs/20-voice.md"]
+curated = true
+template = "docs/readmes/_templates/voice.md"
 
 [[readme]]
 slug = "triggers"
@@ -213,6 +223,8 @@ tier_owner = "gateway"
 output = "docs/readmes/triggers.md"
 source_globs = ["src/sevn/triggers/**"]
 specs = ["about-sevn.bot/specs/30-non-interactive-triggers.md"]
+curated = true
+template = "docs/readmes/_templates/triggers.md"
 
 [[readme]]
 slug = "config-workspace"
@@ -251,6 +263,8 @@ tier_owner = "code"
 output = "docs/readmes/code-understanding.md"
 source_globs = ["src/sevn/code_understanding/**"]
 specs = ["about-sevn.bot/specs/28-code-understanding.md"]
+curated = true
+template = "docs/readmes/_templates/code-understanding.md"
 
 [[readme]]
 slug = "self-improve"

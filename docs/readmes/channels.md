@@ -1,4 +1,4 @@
-<!-- generated: do not edit by hand; run `sevn readme update channels` -->
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint channels` -->
 # Channels — Telegram, Web UI bridge, and channel adapter patterns
 
 [![Spec][spec-badge]][spec-link]
@@ -9,31 +9,38 @@
 
 ## Level 1 — Overview (non-technical)
 
-**Channels** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Telegram, Web UI bridge, and channel adapter patterns.
+**Channels** are how you talk to sevn.bot — Telegram, the browser Web UI (WebChat), and optional Discord/Slack adapters. Each channel normalises inbound messages into the gateway turn spine and delivers replies back through the same adapter.
 
-In everyday use, channels helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
+Production paths today are **Telegram** and **WebChat**; Discord and Slack ship as narrower stubs (webhook-first / Events-API slices) until their specs mature.
 
 ## Level 2 — How it works (technical)
 
-### Components and layout
+Implementation lives under [`src/sevn/channels/`](../../src/sevn/channels/). [`channel_boot.py`](../../src/sevn/gateway/channel_boot.py) loads configured adapters at gateway boot; [`channel_router.py`](../../src/sevn/gateway/channel_router.py) [`route_incoming`](../../src/sevn/gateway/channel_router.py#L1348) dispatches normalised events into the turn spine.
 
-Implementation lives under `src/sevn/channels/`. The package contains 35 Python module(s); primary entry points include `src/sevn/channels/__init__.py`, `src/sevn/channels/_common.py`, `src/sevn/channels/callback_overflow.py`, `src/sevn/channels/discord.py`, `src/sevn/channels/markdown_safe.py`, `src/sevn/channels/self_improve_copy.py`, and 29 more.
+### Stub vs production adapters
 
-### Data and control flow
+| Channel | Adapter | Maturity | Notes |
+| --- | --- | --- | --- |
+| Telegram | [`TelegramAdapter`](../../src/sevn/channels/telegram.py#L106) | **Production** | Full inbound/outbound, menus, rich messages |
+| Web UI | [`WebChatAdapter`](../../src/sevn/channels/webchat.py#L82) | **Production** | Browser bridge via [`webchat.py`](../../src/sevn/channels/webchat.py); config from [`webchat_config_from_workspace`](../../src/sevn/channels/webchat.py#L55) |
+| Discord | [`DiscordChannelAdapter`](../../src/sevn/channels/discord.py#L26) | Stub | Webhook-first slice — [`from_gateway_boot`](../../src/sevn/channels/discord.py#L59) |
+| Slack | [`SlackChannelAdapter`](../../src/sevn/channels/slack.py#L27) | Stub | Events-API slice — [`from_gateway_boot`](../../src/sevn/channels/slack.py#L60) |
+| Other platforms | [`StubChannelAdapter`](../../src/sevn/channels/stub.py#L20) | Stub | Tier 2/3 placeholder via [`make_stub_adapter_class`](../../src/sevn/channels/stub.py#L127) |
 
-Channels sits in the sevn.bot turn spine: a channel delivers a message, the gateway normalises it, triage routes work to the right executor, and the reply returns through the same channel adapter. This subsystem owns the responsibilities described in the manifest summary.
+Shared policy helpers ([`_common.py`](../../src/sevn/channels/_common.py)): [`platform_config_from_workspace`](../../src/sevn/channels/_common.py#L42), [`dm_policy_for_channel`](../../src/sevn/channels/_common.py#L117), [`session_reset_policy_for_channel`](../../src/sevn/channels/_common.py#L93).
 
-### Configuration
-
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/18-channel-telegram.md`, `about-sevn.bot/specs/19-channel-webui.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Telegram callback overflow is handled in [`callback_overflow.py`](../../src/sevn/channels/callback_overflow.py) ([`resolve_dispatcher_overflow_callback_data`](../../src/sevn/channels/callback_overflow.py#L127)).
 
 ### Key modules
 
-- `src/sevn/channels/_common.py` — `platform_config_from_workspace`, `busy_input_mode_for_channel`, `session_reset_policy_for_channel`, `dm_policy_for_channel`
-- `src/sevn/channels/callback_overflow.py` — `telegram_callback_data_utf8_len`, `tokenize_inline_keyboard_callback_data`, `resolve_dispatcher_overflow_callback_data`
-- `src/sevn/channels/discord.py` — `DiscordChannelAdapter.from_gateway_boot`, `DiscordChannelAdapter.name`, `DiscordChannelAdapter.config`, `DiscordChannelAdapter (+2 methods)`
-- `src/sevn/channels/markdown_safe.py` — `escape_markdown_v2`, `escape_intent_footer`
-- `src/sevn/channels/self_improve_copy.py` — `format_self_improve_job_telegram`
+- [`telegram.py`](../../src/sevn/channels/telegram.py) — production Telegram adapter
+- [`webchat.py`](../../src/sevn/channels/webchat.py) — Web UI bridge ([`WebChatAdapter`](../../src/sevn/channels/webchat.py#L82))
+- [`discord.py`](../../src/sevn/channels/discord.py) / [`slack.py`](../../src/sevn/channels/slack.py) — stub adapters
+- [`markdown_safe.py`](../../src/sevn/channels/markdown_safe.py) — Telegram MarkdownV2 escaping
+- [`_common.py`](../../src/sevn/channels/_common.py) — shared channel policy helpers
+
+Normative specs: [`18-channel-telegram.md`](../../about-sevn.bot/specs/18-channel-telegram.md), [`19-channel-webui.md`](../../about-sevn.bot/specs/19-channel-webui.md).
+
 
 ## Level 3 — Deep dive (low-level, technical)
 

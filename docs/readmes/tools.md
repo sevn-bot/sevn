@@ -1,51 +1,148 @@
-<!-- generated: do not edit by hand; run `sevn readme update tools` -->
-# Tools registry
+<!-- curated: hand-authored; after source changes review the body, then run `sevn readme fingerprint tools` -->
+# Tools registry — Module inventory for the tools registry, adapters, and permission gates
+
+[![Spec][spec-badge]][spec-link]
+[![Source][source-badge]][source-link]
+[![Index][index-badge]][index-link]
 
 > **Summary.** Module inventory for the tools registry, adapters, and permission gates.
 
-| Name | Path | Summary |
-|------|------|---------|
-| `__init__` | [`../../src/sevn/tools/__init__.py`](../../src/sevn/tools/__init__.py) | Tools registry package (about-sevn.bot/specs/11-tools-registry.md). |
-| `base` | [`../../src/sevn/tools/base.py`](../../src/sevn/tools/base.py) | Core registry types: definitions, envelopes, dispatcher (about-sevn.bot/specs/11-tools-registry.md §2-§3). |
-| `browser` | [`../../src/sevn/tools/browser.py`](../../src/sevn/tools/browser.py) | sevn-native browser tool — drive host Chrome over CDP (native engine). |
-| `cache` | [`../../src/sevn/tools/cache.py`](../../src/sevn/tools/cache.py) | Per-session lazy payload cache keyed by registry generation (about-sevn.bot/specs/11-tools-registry.md §3.2). |
-| `codes` | [`../../src/sevn/tools/codes.py`](../../src/sevn/tools/codes.py) | Normative ToolResult JSON code field values (about-sevn.bot/specs/11-tools-registry.md §3.1). |
-| `coding_agent_invoke` | [`../../src/sevn/tools/coding_agent_invoke.py`](../../src/sevn/tools/coding_agent_invoke.py) | coding_agent_invoke tier-B/C tool — invoke a bound coding agent (CA6.1 + CA6.4). |
-| `context` | [`../../src/sevn/tools/context.py`](../../src/sevn/tools/context.py) | Framework-agnostic runtime passed into every @sevn_tool body (about-sevn.bot/specs/11-tools-registry.md §2.3). |
-| `decorator` | [`../../src/sevn/tools/decorator.py`](../../src/sevn/tools/decorator.py) | Declarative @sevn_tool metadata binding (about-sevn.bot/specs/11-tools-registry.md §2.3). |
-| `entrypoints` | [`../../src/sevn/tools/entrypoints.py`](../../src/sevn/tools/entrypoints.py) | Setuptools sevn.tools entry-point group (about-sevn.bot/specs/11-tools-registry.md §2.8). |
-| `evolution_issues` | [`../../src/sevn/tools/evolution_issues.py`](../../src/sevn/tools/evolution_issues.py) | Agent tool for filing evolution issues (about-sevn.bot/specs/35-bot-evolution.md EV-4). |
-| `__init__` | [`../../src/sevn/tools/file_ops/__init__.py`](../../src/sevn/tools/file_ops/__init__.py) | Workspace file operation tools (the design docs Wave 1-3). |
-| `delete` | [`../../src/sevn/tools/file_ops/delete.py`](../../src/sevn/tools/file_ops/delete.py) | Workspace delete tool with human gate (about-sevn.bot/specs/11-tools-registry.md §8). |
-| `docstrings` | [`../../src/sevn/tools/file_ops/docstrings.py`](../../src/sevn/tools/file_ops/docstrings.py) | AST-backed docstring/symbol helpers for workspace Python files. |
-| `graphify_result_prefix` | [`../../src/sevn/tools/file_ops/graphify_result_prefix.py`](../../src/sevn/tools/file_ops/graphify_result_prefix.py) | Graphify search-tool prefix injection (about-sevn.bot/specs/28-code-understanding.md §2.5). |
-| `list_glob` | [`../../src/sevn/tools/file_ops/list_glob.py`](../../src/sevn/tools/file_ops/list_glob.py) | Directory listing, glob, find, and metadata tools (about-sevn.bot/specs/11-tools-registry.md §4.3). |
-| `read` | [`../../src/sevn/tools/file_ops/read.py`](../../src/sevn/tools/file_ops/read.py) | Line-numbered read tool for workspace files and directories (about-sevn.bot/specs/11-tools-registry.md §4.3). |
-| `search` | [`../../src/sevn/tools/file_ops/search.py`](../../src/sevn/tools/file_ops/search.py) | Ripgrep-backed search_in_file tool (about-sevn.bot/specs/11-tools-registry.md §4.3). |
-| `write` | [`../../src/sevn/tools/file_ops/write.py`](../../src/sevn/tools/file_ops/write.py) | Mutating workspace file tools except delete (about-sevn.bot/specs/11-tools-registry.md §4.3). |
-| `integration_classifier` | [`../../src/sevn/tools/integration_classifier.py`](../../src/sevn/tools/integration_classifier.py) | Heuristics for integration_call abortability toggles (about-sevn.bot/specs/11-tools-registry.md §8). |
-| `integration_gh_repo` | [`../../src/sevn/tools/integration_gh_repo.py`](../../src/sevn/tools/integration_gh_repo.py) | Legacy gh_repo_* aliases mapped to :func:integration_call payloads (about-sevn.bot/specs/11-tools-registry.md §4.1). |
-| `integration_proxy_client` | [`../../src/sevn/tools/integration_proxy_client.py`](../../src/sevn/tools/integration_proxy_client.py) | Egress-paired /integration client for gateway integration_call (Wave W2). |
-| `llm_guard_tool` | [`../../src/sevn/tools/llm_guard_tool.py`](../../src/sevn/tools/llm_guard_tool.py) | Manual LLM Guard scan tool (the design docs Wave 7). |
-| `log_query` | [`../../src/sevn/tools/log_query.py`](../../src/sevn/tools/log_query.py) | Gateway log read/filter tool (the design docs Wave 7). |
-| `mcp_stdio_client` | [`../../src/sevn/tools/mcp_stdio_client.py`](../../src/sevn/tools/mcp_stdio_client.py) | Concrete stdio MCP client implementing :class:McpStdioClient (about-sevn.bot/specs/11-tools-registry.md §2.7, §10.2). |
-| `memory_tools` | [`../../src/sevn/tools/memory_tools.py`](../../src/sevn/tools/memory_tools.py) | Short-term memory K/V tools and federated search (the design docs Wave 4). |
-| `meta_escalation` | [`../../src/sevn/tools/meta_escalation.py`](../../src/sevn/tools/meta_escalation.py) | Tier-only escalation tool (about-sevn.bot/specs/14-executor-tier-b.md §2.4). |
-| `meta_loaders` | [`../../src/sevn/tools/meta_loaders.py`](../../src/sevn/tools/meta_loaders.py) | Load meta tools attaching lazy bodies (about-sevn.bot/specs/11-tools-registry.md §2.4). |
-| `outbound` | [`../../src/sevn/tools/outbound.py`](../../src/sevn/tools/outbound.py) | Outbound messaging and media tools (the design docs Wave 6). |
-| `paths` | [`../../src/sevn/tools/paths.py`](../../src/sevn/tools/paths.py) | Path helpers rejecting .llmignore/ realpaths (about-sevn.bot/specs/11-tools-registry.md §4.3). |
-| `permissions` | [`../../src/sevn/tools/permissions.py`](../../src/sevn/tools/permissions.py) | Minimal permission surfaces for invoke-time gating (about-sevn.bot/specs/11-tools-registry.md §8). |
-| `process` | [`../../src/sevn/tools/process.py`](../../src/sevn/tools/process.py) | Background process management tool (the design docs Wave 8). |
-| `readiness` | [`../../src/sevn/tools/readiness.py`](../../src/sevn/tools/readiness.py) | Tool readiness hints for registry surfaces and error envelopes (Wave W6 / W1). |
-| `registry` | [`../../src/sevn/tools/registry.py`](../../src/sevn/tools/registry.py) | Session-scoped ToolSet snapshots + staged registration helpers (about-sevn.bot/specs/11-tools-registry.md §4). |
-| `runtime_bindings_factory` | [`../../src/sevn/tools/runtime_bindings_factory.py`](../../src/sevn/tools/runtime_bindings_factory.py) | Single gateway-boot factory for :class:~sevn.tools.runtime_dispatch.RuntimeToolBindings. |
-| `runtime_dispatch` | [`../../src/sevn/tools/runtime_dispatch.py`](../../src/sevn/tools/runtime_dispatch.py) | Runtime hooks wiring integration_call / sandbox_exec / MCP stdio (about-sevn.bot/specs/11-tools-registry.md §4.1, §4.2, §10.1). |
-| `semantic_search` | [`../../src/sevn/tools/semantic_search.py`](../../src/sevn/tools/semantic_search.py) | Witchcraft semantic search tool (the design docs Wave 7). |
-| `skills_register` | [`../../src/sevn/tools/skills_register.py`](../../src/sevn/tools/skills_register.py) | Register skill tools backed by :class:SkillsManager (about-sevn.bot/specs/11-tools-registry.md §2.4-§2.5). |
-| `spill_gc` | [`../../src/sevn/tools/spill_gc.py`](../../src/sevn/tools/spill_gc.py) | Best-effort cleanup for .sevn/tool_results/ trees (about-sevn.bot/specs/11-tools-registry.md §3.1). |
-| `subagent_spawn` | [`../../src/sevn/tools/subagent_spawn.py`](../../src/sevn/tools/subagent_spawn.py) | spawn_subagent — level-1 → level-2 sub-agent spawn tool (D9, about-sevn.bot/specs/36-sub-agents.md). |
-| `terminal` | [`../../src/sevn/tools/terminal.py`](../../src/sevn/tools/terminal.py) | Persistent terminal session tools (the design docs Wave 8). |
-| `transcript` | [`../../src/sevn/tools/transcript.py`](../../src/sevn/tools/transcript.py) | Always-available session history tools for the current gateway session. |
-| `validation` | [`../../src/sevn/tools/validation.py`](../../src/sevn/tools/validation.py) | Minimal JSON Schema object validation for adapter-bound arguments (about-sevn.bot/specs/11-tools-registry.md §6). |
-| `web` | [`../../src/sevn/tools/web.py`](../../src/sevn/tools/web.py) | Web search and fetch tools (the design docs Wave 5). |
-| `workspace_files` | [`../../src/sevn/tools/workspace_files.py`](../../src/sevn/tools/workspace_files.py) | Bootstrap-safe workspace markdown writes (the design docs Wave 3). |
+## Level 1 — Overview (non-technical)
+
+The **tools registry** is the executor's toolbox: every `@sevn_tool` the tier-B/C agent can invoke is registered on a per-session [`ToolExecutor`](../../src/sevn/tools/base.py). Tools cover workspace file I/O, web search, memory, skills, integrations, sub-agents, and more — with permission gates and lazy caching between turns.
+
+This README separates **registered tool names** (what the model sees) from **module files** (where implementations live — see Level 3).
+
+## Level 2 — How it works (technical)
+
+[`build_session_registry`](../../src/sevn/tools/registry.py#L1569) assembles the session toolset at gateway boot: file ops, web, memory, skills, second-brain wiki tools, code-understanding tools, integration/sandbox bindings, and plugin entry points.
+
+### Registered tool names
+
+| Tool name | Role | Registering module |
+| --- | --- | --- |
+| `read`, `write`, `edit`, `glob`, `search_in_file`, `delete` | Workspace file I/O | [`file_ops/`](../../src/sevn/tools/file_ops/__init__.py) via [`register_file_ops_tools`](../../src/sevn/tools/file_ops/__init__.py#L68) |
+| `serp`, `web_search`, `web_fetch`, `get_page_content` | Web search/fetch | [`web.py`](../../src/sevn/tools/web.py) |
+| `spawn_subagent` | Level-1 → level-2 sub-agent spawn | [`subagent_spawn.py`](../../src/sevn/tools/subagent_spawn.py#L107) |
+| `integration_call` | Egress-proxied external REST | [`runtime_dispatch.py`](../../src/sevn/tools/runtime_dispatch.py#L295) |
+| `sandbox_exec` | Sandboxed command execution | [`runtime_dispatch.py`](../../src/sevn/tools/runtime_dispatch.py) |
+| `memory_store`, `memory_get`, `memory_search` | Short-term memory K/V | [`memory_tools.py`](../../src/sevn/tools/memory_tools.py) |
+| `load_skill`, `run_skill_script` | Skills subprocess runners | [`skills_register.py`](../../src/sevn/tools/skills_register.py) |
+| `log_query`, `semantic_search`, `llm_guard_scan` | Gateway observability / Witchcraft | respective modules under [`src/sevn/tools/`](../../src/sevn/tools/) |
+
+[`runtime_dispatch.py`](../../src/sevn/tools/runtime_dispatch.py): [`IntegrationProxyClient.integration_call`](../../src/sevn/tools/runtime_dispatch.py#L148) dispatches through the egress proxy [`POST /integration`](../../src/sevn/proxy/integration/router.py) route when enabled.
+
+Tools registered **outside** `source_globs` but wired at boot: [`register_code_understanding_tools`](../../src/sevn/code_understanding/tools_register.py) (e.g. legacy [`roam_code_tool`](../../src/sevn/code_understanding/tools_register.py#L228)), [`register_second_brain_tools`](../../src/sevn/second_brain/__init__.py#L562), [`register_openui_tools`](../../src/sevn/ui/openui/tools_register.py).
+
+### Key modules
+
+- [`registry.py`](../../src/sevn/tools/registry.py) — [`build_session_registry`](../../src/sevn/tools/registry.py#L1569), dispatch, caching
+- [`decorator.py`](../../src/sevn/tools/decorator.py) — `@sevn_tool` metadata binding
+- [`runtime_dispatch.py`](../../src/sevn/tools/runtime_dispatch.py) — integration/sandbox/MCP runtime hooks
+- [`permissions.py`](../../src/sevn/tools/permissions.py) — invoke-time permission surfaces
+- [`code_understanding/tools_register.py`](../../src/sevn/code_understanding/tools_register.py) — code-orientation tools outside `tools/**` globs
+
+Normative spec: [`11-tools-registry.md`](../../about-sevn.bot/specs/11-tools-registry.md).
+
+
+## Level 3 — Deep dive (low-level, technical)
+
+Primary source tree: [`src/sevn/tools`](../../src/sevn/tools/) (44 Python files). Normative design: `about-sevn.bot/specs/11-tools-registry.md`.
+
+### Module inventory
+
+Tools registry package (about-sevn.bot/specs/11-tools-registry.md).
+
+Working with [`__init__.py`](../../src/sevn/tools/__init__.py): inspect the public entry points below.
+
+Core registry types: definitions, envelopes, dispatcher (about-sevn.bot/specs/11-tools-registry.md §2-§3).
+
+Implements JSON result envelopes (§3.1), coarse validation, timeouts, tracing hooks,
+.llmignore aware spill paths, and non-abortable asyncio.shield wrapping.
+
+Working with [`base.py`](../../src/sevn/tools/base.py): inspect the public entry points below.
+Start with [`ToolDefinition.to_dict`](../../src/sevn/tools/base.py#L96), then [`Tool.definition`](../../src/sevn/tools/base.py#L142), [`Tool.execute`](../../src/sevn/tools/base.py#L154), [`enveloped_success`](../../src/sevn/tools/base.py#L236).
+
+sevn-native browser tool — drive host Chrome over CDP (native engine).
+
+A single multi-action @sevn_tool over the :mod:sevn.browser engine: tab CRUD,
+navigation, extraction, synthetic click/fill/type, screenshots, cookies, and a gated
+eval. Attaches to the operator's Chrome (or spawns one) via the shared
+sevn.skills.browser_session lifecycle; recipe actions (Google/Gmail/Telegram/…)
+are layered on in later waves.
+
+Working with [`browser.py`](../../src/sevn/tools/browser.py): inspect the public entry points below.
+Start with [`set_eval_allowed`](../../src/sevn/tools/browser.py#L1002), then [`browser_tool`](../../src/sevn/tools/browser.py#L1032), [`register_browser_tool`](../../src/sevn/tools/browser.py#L1225).
+
+Per-session lazy payload cache keyed by registry generation (about-sevn.bot/specs/11-tools-registry.md §3.2).
+
+Uses a bounded OrderedDict eviction policy (FIFO) with configurable capacity.
+
+Working with [`cache.py`](../../src/sevn/tools/cache.py): inspect the public entry points below.
+Start with [`LoadedBodyCache.get`](../../src/sevn/tools/cache.py#L48), then [`LoadedBodyCache.set`](../../src/sevn/tools/cache.py#L73), [`LoadedBodyCache.clear`](../../src/sevn/tools/cache.py#L99).
+
+Normative ToolResult JSON code field values (about-sevn.bot/specs/11-tools-registry.md §3.1).
+
+Extend this enum rather than scattering string literals across tools and adapters.
+
+Working with [`codes.py`](../../src/sevn/tools/codes.py): inspect the public entry points below.
+
+coding_agent_invoke tier-B/C tool — invoke a bound coding agent (CA6.1 + CA6.4).
+
+Working with [`coding_agent_invoke.py`](../../src/sevn/tools/coding_agent_invoke.py): inspect the public entry points below.
+Start with [`coding_agent_invoke_tool`](../../src/sevn/tools/coding_agent_invoke.py#L69), then [`register_coding_agent_invoke_tool`](../../src/sevn/tools/coding_agent_invoke.py#L294), [`coding_agent_invoke`](../../src/sevn/tools/coding_agent_invoke.py#L313).
+
+Framework-agnostic runtime passed into every @sevn_tool body (about-sevn.bot/specs/11-tools-registry.md §2.3).
+
+Hosts session identifiers, filesystem roots, tracing, and coarse permission gates. Optional
+handles stay None until gateway/sandbox/channel wiring lands.
+
+Working with [`context.py`](../../src/sevn/tools/context.py): inspect the public entry points below.
+
+Declarative @sevn_tool metadata binding (about-sevn.bot/specs/11-tools-registry.md §2.3).
+
+Stores a finalized ToolDefinition on callable objects so gateways can iterate
+registration tables without duplicated dictionaries.
+
+Working with [`decorator.py`](../../src/sevn/tools/decorator.py): inspect the public entry points below.
+Start with [`sevn_tool`](../../src/sevn/tools/decorator.py#L41), then [`tool_from_decorated`](../../src/sevn/tools/decorator.py#L125).
+
+Setuptools sevn.tools entry-point group (about-sevn.bot/specs/11-tools-registry.md §2.8).
+
+Third-party packages register Tool factories under [project.entry-points."sevn.tools"].
+The core wheel ships a no-op row so the entry-point table validates under uv build.
+
+Working with [`entrypoints.py`](../../src/sevn/tools/entrypoints.py): inspect the public entry points below.
+Start with [`reserved_plugin_row`](../../src/sevn/tools/entrypoints.py#L20).
+
+Agent tool for filing evolution issues (about-sevn.bot/specs/35-bot-evolution.md EV-4).
+
+Working with [`evolution_issues.py`](../../src/sevn/tools/evolution_issues.py): inspect the public entry points below.
+Start with [`file_evolution_issue_tool`](../../src/sevn/tools/evolution_issues.py#L80), then [`register_evolution_issue_tools`](../../src/sevn/tools/evolution_issues.py#L128).
+
+Workspace file operation tools (about-sevn.bot/plan/tools-skills-full-inventory-wave-plan.md Wave 1-3).
+
+Working with [`__init__.py`](../../src/sevn/tools/file_ops/__init__.py): inspect the public entry points below.
+Start with [`register_file_ops_tools`](../../src/sevn/tools/file_ops/__init__.py#L68).
+
+Workspace delete tool with human gate (about-sevn.bot/specs/11-tools-registry.md §8).
+
+Working with [`delete.py`](../../src/sevn/tools/file_ops/delete.py): inspect the public entry points below.
+Start with [`delete_tool`](../../src/sevn/tools/file_ops/delete.py#L58).
+
+32 more Python files under [`src/sevn/tools`](../../src/sevn/tools/) — including `src/sevn/tools/file_ops/docstrings.py`, `src/sevn/tools/file_ops/graphify_result_prefix.py`, `src/sevn/tools/file_ops/list_glob.py`, `src/sevn/tools/file_ops/read.py`.
+
+### Extension and invariants
+
+Follow [`11-tools-registry.md`](../../about-sevn.bot/specs/11-tools-registry.md) for merge gates, error semantics, and compatibility constraints. After code changes under [`src/sevn/tools`](../../src/sevn/tools/), run `sevn readme update tools` and `make readme-check`.
+
+## References
+
+- [../../about-sevn.bot/specs/11-tools-registry.md](../../about-sevn.bot/specs/11-tools-registry.md)
+
+[spec-badge]: https://img.shields.io/badge/Spec-2a7fc6?style=for-the-badge&logo=readthedocs&logoColor=white
+[spec-link]: ../../about-sevn.bot/specs/11-tools-registry.md
+[source-badge]: https://img.shields.io/badge/Source-0c0a09?style=for-the-badge&logo=github&logoColor=white
+[source-link]: ../../src/sevn/tools/
+[index-badge]: https://img.shields.io/badge/All_READMEs-5fb1f7?style=for-the-badge&logo=markdown&logoColor=white
+[index-link]: INDEX.md

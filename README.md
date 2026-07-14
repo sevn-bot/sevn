@@ -88,7 +88,7 @@ See [README catalog](docs/readmes/INDEX.md) and [Architecture](about-sevn.bot/AR
 | [Gateway](docs/readmes/gateway.md) | `subsystem` | FastAPI control plane: channels, sessions, turn spine, queue/steer, Telegram menus. |
 | [Agent runtime](docs/readmes/agent.md) | `subsystem` | Triager, tier-B/C executors, harness discipline, sandboxes, and turn orchestration. |
 | [Channels](docs/readmes/channels.md) | `subsystem` | Telegram, Web UI bridge, and channel adapter patterns. |
-| [Tools registry](docs/readmes/tools.md) | `catalog` | Module inventory for the tools registry, adapters, and permission gates. |
+| [Tools registry](docs/readmes/tools.md) | `subsystem` | Module inventory for the tools registry, adapters, and permission gates. |
 | [Skills system](docs/readmes/skills.md) | `catalog` | Curated inventory of bundled and workspace skills, loaders, and subprocess runners. |
 | [Mission Control UI](docs/readmes/ui-mission-control.md) | `subsystem` | Dashboard SPA, tab registry, traces, ops surfaces, and OpenUI delivery. |
 | [Security scanner](docs/readmes/security.md) | `subsystem` | LLM Guard, .llmignore, block-and-notify, and channel security copy. |

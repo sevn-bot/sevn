@@ -9,31 +9,42 @@
 
 ## Level 1 — Overview (non-technical)
 
-**Integrations** is a core part of sevn.bot — the personal AI assistant you run on your own machine. Cursor Cloud, GitHub skill clients, and external integration call paths.
-
-In everyday use, integrations helps Sevn do its job reliably: you interact through familiar channels (Telegram, browser, voice), and this layer keeps those interactions safe, consistent, and under your control.
+**Integrations** connect sevn.bot to external systems through the egress proxy: **Cursor Cloud Agents** for remote coding sessions, **GitHub** REST via the bundled gh-* skills, and generic **`integration_call`** dispatch for other services. Provider secrets for upstream APIs resolve on the proxy — outbound calls use [`integration_post_sync`](../../src/sevn/integrations/proxy_client.py) rather than loading keys in the gateway turn spine.
 
 ## Level 2 — How it works (technical)
 
-### Components and layout
+Package [`src/sevn/integrations/`](../../src/sevn/integrations/). Normative spec: [`29-cursor-cloud-agent.md`](../../about-sevn.bot/specs/29-cursor-cloud-agent.md).
 
-Implementation lives under `src/sevn/integrations/`. The package contains 16 Python module(s); primary entry points include `src/sevn/integrations/__init__.py`, `src/sevn/integrations/code_graph_rag/__init__.py`, `src/sevn/integrations/cursor_cloud/__init__.py`, `src/sevn/integrations/cursor_cloud/client.py`, `src/sevn/integrations/cursor_cloud/config.py`, `src/sevn/integrations/cursor_cloud/errors.py`, and 10 more.
+### Cursor Cloud call path
 
-### Data and control flow
+1. Operator or skill invokes [`create_cloud_agent`](../../src/sevn/integrations/cursor_cloud/client.py#L62) with repo/ref/prompt.
+2. Settings load from workspace via [`load_cursor_cloud_settings`](../../src/sevn/integrations/cursor_cloud/config.py#L61).
+3. HTTP POST goes through egress proxy service **`cursor`** ([`integration_post_sync`](../../src/sevn/integrations/proxy_client.py)) — not direct from gateway.
+4. Job persisted in SQLite: [`insert_job`](../../src/sevn/integrations/cursor_cloud/jobs.py#L132) / [`update_job`](../../src/sevn/integrations/cursor_cloud/jobs.py#L253); poll via [`refresh_job_status`](../../src/sevn/integrations/cursor_cloud/client.py).
 
-Integrations is organized around `  init  `, `  init  `, `  init  `, `client`, and 2 more under `src/sevn/integrations/` with 16 Python module(s) in the scanned tree. Primary entry points include client.py (create_cloud_agent), config.py (load_cursor_cloud_settings), jobs.py (insert_job), client.py (parse_github_repo).
+Agent/tool surface: tier-B [`integration_call`](../../src/sevn/tools/runtime_dispatch.py#L295) → proxy [`POST /integration`](../../src/sevn/proxy/integration/router.py) → upstream Cursor Cloud API.
 
-### Configuration
+### GitHub skill call path
 
-Operator settings come from `sevn.json` in the workspace. Related normative specs: `about-sevn.bot/specs/29-cursor-cloud-agent.md`. Run `sevn config validate` after edits; use `sevn doctor` to confirm the install sees the expected layout.
+Bundled skills (`gh-issues`, `gh-pr`, `github-manager`) call helpers in [`github_skill/`](../../src/sevn/integrations/github_skill/):
+
+| Step | Function | Module |
+| --- | --- | --- |
+| Parse `owner/repo` | [`parse_github_repo`](../../src/sevn/integrations/github_skill/client.py#L29) | [`client.py`](../../src/sevn/integrations/github_skill/client.py) |
+| Dispatch REST | [`github_integration_call`](../../src/sevn/integrations/github_skill/client.py#L67) | routes through proxy integration transport |
+| Legacy aliases | [`github_legacy_call`](../../src/sevn/integrations/github_skill/client.py#L138) | maps historic `gh_repo_*` kwargs via [`integration_gh_repo.py`](../../src/sevn/tools/integration_gh_repo.py) |
+
+Issue/PR/manager scripts: [`gh_issues.py`](../../src/sevn/integrations/github_skill/gh_issues.py), [`gh_pr.py`](../../src/sevn/integrations/github_skill/gh_pr.py), [`github_manager.py`](../../src/sevn/integrations/github_skill/github_manager.py).
+
+Hooks wiring: [`GithubSkillHooks`](../../src/sevn/integrations/github_skill/hooks.py) via [`resolve_github_skill_hooks`](../../src/sevn/integrations/github_skill/hooks.py).
 
 ### Key modules
 
-- `src/sevn/integrations/cursor_cloud/client.py` — `create_cloud_agent`, `get_agent`, `get_run`, `list_artifacts`
-- `src/sevn/integrations/cursor_cloud/config.py` — `load_cursor_cloud_settings`
-- `src/sevn/integrations/cursor_cloud/jobs.py` — `insert_job`, `get_job`, `update_job`, `list_workspace_jobs`
-- `src/sevn/integrations/github_skill/client.py` — `parse_github_repo`, `github_integration_call`, `github_integration_call_sync`, `github_legacy_call`
-- `src/sevn/integrations/github_skill/gh_issues.py` — `list_issues`, `view_issue`, `create_issue`, `comment_on_issue`
+- [`cursor_cloud/client.py`](../../src/sevn/integrations/cursor_cloud/client.py) — cloud agent lifecycle
+- [`cursor_cloud/jobs.py`](../../src/sevn/integrations/cursor_cloud/jobs.py) — SQLite job persistence
+- [`github_skill/client.py`](../../src/sevn/integrations/github_skill/client.py) — GitHub integration_call dispatch
+- [`proxy_client.py`](../../src/sevn/integrations/proxy_client.py) — shared egress integration HTTP client
+
 
 ## Level 3 — Deep dive (low-level, technical)
 
