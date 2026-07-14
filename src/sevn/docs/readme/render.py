@@ -331,7 +331,8 @@ async def write_readme(
     )
     output_path = repo_root / entry.output
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(markdown, encoding="utf-8")
+    if not (output_path.is_file() and output_path.read_text(encoding="utf-8") == markdown):
+        output_path.write_text(markdown, encoding="utf-8")
 
     fp_path = fingerprints_path or default_fingerprints_path(repo_root)
     store = load_fingerprints(fp_path)

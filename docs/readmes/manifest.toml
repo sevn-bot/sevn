@@ -57,7 +57,7 @@ template = "docs/readmes/_templates/agent.md"
 [[readme]]
 slug = "channels"
 title = "Channels"
-summary = "Telegram, Web UI bridge, voice hooks, and channel adapter patterns."
+summary = "Telegram, Web UI bridge, and channel adapter patterns."
 profile = "subsystem"
 tier_owner = "channels"
 output = "docs/readmes/channels.md"
@@ -71,7 +71,7 @@ specs = [
 [[readme]]
 slug = "tools"
 title = "Tools registry"
-summary = "Curated inventory of @sevn_tool plugins, adapters, and permission gates."
+summary = "Module inventory for the tools registry, adapters, and permission gates."
 profile = "catalog"
 tier_owner = "tools"
 output = "docs/readmes/tools.md"
@@ -121,7 +121,7 @@ template = "docs/readmes/_templates/security.md"
 [[readme]]
 slug = "secrets"
 title = "Secrets"
-summary = "Secrets backends, logical keys, fingerprint confirmation — keys never in the gateway process."
+summary = "Secrets backends, logical-key chain, TTL, and fingerprint confirmation."
 profile = "subsystem"
 tier_owner = "security"
 output = "docs/readmes/secrets.md"
@@ -134,7 +134,7 @@ specs = ["about-sevn.bot/specs/06-secrets.md"]
 [[readme]]
 slug = "proxy-egress"
 title = "Egress proxy"
-summary = "Paired proxy daemon, /llm/* routes, Transport wire shapes, and session tokens."
+summary = "Shared-secret-guarded `/llm/*` egress proxy, Transport wire shapes, and route handlers."
 profile = "subsystem"
 tier_owner = "infra"
 output = "docs/readmes/proxy-egress.md"
@@ -147,7 +147,7 @@ specs = [
 [[readme]]
 slug = "tracing"
 title = "Tracing"
-summary = "TraceSink, JSONL/SQLite/Logfire/OTel pipelines, and trace maintenance."
+summary = "TraceSink JSONL/SQLite sinks, OTLP export bridge, and trace maintenance."
 profile = "subsystem"
 tier_owner = "infra"
 output = "docs/readmes/tracing.md"
@@ -177,7 +177,7 @@ specs = [
 [[readme]]
 slug = "second-brain"
 title = "Second brain"
-summary = "Wiki, Obsidian sync, ingest paths, and provenance for operator knowledge."
+summary = "Wiki vault layout, ingest paths, and wikilink-compatible provenance for operator knowledge."
 profile = "subsystem"
 tier_owner = "memory"
 output = "docs/readmes/second-brain.md"
@@ -225,7 +225,7 @@ template = "docs/readmes/_templates/config-workspace.md"
 [[readme]]
 slug = "storage"
 title = "Storage"
-summary = "SQLite schema, migrations, D1 paths, and ActiveRunSnapshot persistence."
+summary = "SQLite paths, connections, schema migrations, and D1 layout."
 profile = "subsystem"
 tier_owner = "infra"
 output = "docs/readmes/storage.md"
@@ -262,7 +262,7 @@ profile = "subsystem"
 tier_owner = "integrations"
 output = "docs/readmes/integrations.md"
 source_globs = ["src/sevn/integrations/**"]
-specs = ["about-sevn.bot/specs/34-plugin-hooks.md"]
+specs = ["about-sevn.bot/specs/29-cursor-cloud-agent.md"]
 
 [[readme]]
 slug = "onboarding"
@@ -309,7 +309,7 @@ template = "docs/readmes/_templates/subagents.md"
 [[readme]]
 slug = "index"
 title = "README catalog"
-summary = "Generated index: every subsystem README with profile, summary, and staleness status."
+summary = "Generated index: every subsystem README with profile, summary, and fingerprint freshness status."
 profile = "index"
 tier_owner = "docs"
 output = "docs/readmes/INDEX.md"
