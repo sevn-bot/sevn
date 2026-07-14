@@ -2,7 +2,7 @@
 id: spec-07-egress-proxy
 kind: spec
 title: Egress proxy — Spec
-status: done
+status: draft
 owner: Alex
 summary: Product pairing (v1). Deployment, paired daemon install, onboarding validation,
   and Mission Control management of the proxy are specified in prd-06-setup-and-operations
@@ -130,30 +130,75 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Egress proxy — Spec (spec-07-egress-proxy) — Purpose.
+Product pairing (v1). Deployment, paired daemon install, onboarding validation, and Mission Control management of the proxy are specified in prd-06-setup-and-operations and prd-07-mission-control §5.1
 
+Primary code trees: [`src/sevn/proxy`](src/sevn/proxy/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Egress proxy — Spec (spec-07-egress-proxy) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`normalize_anthropic_request_body`](src/sevn/proxy/anthropic_body.py) — `src/sevn/proxy/anthropic_body.py`
+- [`create_app`](src/sevn/proxy/app.py) — `src/sevn/proxy/app.py`
+- [`llm_post_auth_failure`](src/sevn/proxy/auth.py) — `src/sevn/proxy/auth.py`
+- [`converse_via_bedrock`](src/sevn/proxy/bedrock_converse.py) — `src/sevn/proxy/bedrock_converse.py`
+- [`aggregate_responses_sse`](src/sevn/proxy/codex_translation.py) — `src/sevn/proxy/codex_translation.py`
+- [`translate_chat_to_responses_request`](src/sevn/proxy/codex_translation.py) — `src/sevn/proxy/codex_translation.py`
+- [`translate_responses_sse_to_chat_stream`](src/sevn/proxy/codex_translation.py) — `src/sevn/proxy/codex_translation.py`
+- [`translate_responses_to_chat_completion`](src/sevn/proxy/codex_translation.py) — `src/sevn/proxy/codex_translation.py`
+- [`build_codex_request_headers`](src/sevn/proxy/codex_transport.py) — `src/sevn/proxy/codex_transport.py`
+- [`codex_responses_url`](src/sevn/proxy/codex_transport.py) — `src/sevn/proxy/codex_transport.py`
+- [`ProviderCredentialEntry`](src/sevn/proxy/credentials.py) — `src/sevn/proxy/credentials.py`
+- [`ProviderCredentials`](src/sevn/proxy/credentials.py) — `src/sevn/proxy/credentials.py`
+- _…and 23 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Egress proxy — Spec (spec-07-egress-proxy) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`normalize_anthropic_request_body`](src/sevn/proxy/anthropic_body.py) — `src/sevn/proxy/anthropic_body.py`
+- [`create_app`](src/sevn/proxy/app.py) — `src/sevn/proxy/app.py`
+- [`llm_post_auth_failure`](src/sevn/proxy/auth.py) — `src/sevn/proxy/auth.py`
+- [`converse_via_bedrock`](src/sevn/proxy/bedrock_converse.py) — `src/sevn/proxy/bedrock_converse.py`
+- [`aggregate_responses_sse`](src/sevn/proxy/codex_translation.py) — `src/sevn/proxy/codex_translation.py`
+- [`translate_chat_to_responses_request`](src/sevn/proxy/codex_translation.py) — `src/sevn/proxy/codex_translation.py`
+- [`translate_responses_sse_to_chat_stream`](src/sevn/proxy/codex_translation.py) — `src/sevn/proxy/codex_translation.py`
+- [`translate_responses_to_chat_completion`](src/sevn/proxy/codex_translation.py) — `src/sevn/proxy/codex_translation.py`
+- [`build_codex_request_headers`](src/sevn/proxy/codex_transport.py) — `src/sevn/proxy/codex_transport.py`
+- [`codex_responses_url`](src/sevn/proxy/codex_transport.py) — `src/sevn/proxy/codex_transport.py`
+- [`ProviderCredentialEntry`](src/sevn/proxy/credentials.py) — `src/sevn/proxy/credentials.py`
+- [`ProviderCredentials`](src/sevn/proxy/credentials.py) — `src/sevn/proxy/credentials.py`
+- _…and 23 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Egress proxy — Spec (spec-07-egress-proxy) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/proxy`](src/sevn/proxy/__init__.py).
 ## Behavior
 
-Offline scaffold for Egress proxy — Spec (spec-07-egress-proxy) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/proxy`](src/sevn/proxy/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Egress proxy — Spec (spec-07-egress-proxy) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Offline scaffold for Egress proxy — Spec (spec-07-egress-proxy) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

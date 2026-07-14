@@ -2,7 +2,7 @@
 id: spec-23-cli
 kind: spec
 title: CLI — Spec
-status: done
+status: draft
 owner: Alex
 summary: Deliver the primary operator and automation surface for install, upgrades,
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
@@ -725,36 +725,105 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for CLI — Spec (spec-23-cli) — Purpose.
+Deliver the primary operator and automation surface for install, upgrades, health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI is not the agent’s in-harness tool API and no
 
+Primary code trees: [`src/sevn/cli`](src/sevn/cli/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for CLI — Spec (spec-23-cli) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`main`](src/sevn/cli/app.py) — `src/sevn/cli/app.py`
+- [`version_detail`](src/sevn/cli/app.py) — `src/sevn/cli/app.py`
+- [`run_sync_coro`](src/sevn/cli/asyncio_util.py) — `src/sevn/cli/asyncio_util.py`
+- [`install_cli_activity_log`](src/sevn/cli/cli_activity_log.py) — `src/sevn/cli/cli_activity_log.py`
+- [`log_cli_activity`](src/sevn/cli/cli_activity_log.py) — `src/sevn/cli/cli_activity_log.py`
+- [`log_cli_invocation`](src/sevn/cli/cli_activity_log.py) — `src/sevn/cli/cli_activity_log.py`
+- [`resolve_cli_log_path`](src/sevn/cli/cli_activity_log.py) — `src/sevn/cli/cli_activity_log.py`
+- [`shutdown_cli_activity_log`](src/sevn/cli/cli_activity_log.py) — `src/sevn/cli/cli_activity_log.py`
+- [`register`](src/sevn/cli/commands/about_docs_cmd.py) — `src/sevn/cli/commands/about_docs_cmd.py`
+- [`register`](src/sevn/cli/commands/agent_cmd.py) — `src/sevn/cli/commands/agent_cmd.py`
+- [`register`](src/sevn/cli/commands/channels_cmd.py) — `src/sevn/cli/commands/channels_cmd.py`
+- [`register`](src/sevn/cli/commands/completion.py) — `src/sevn/cli/commands/completion.py`
+- _…and 221 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for CLI — Spec (spec-23-cli) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`main`](src/sevn/cli/app.py) — `src/sevn/cli/app.py`
+- [`version_detail`](src/sevn/cli/app.py) — `src/sevn/cli/app.py`
+- [`run_sync_coro`](src/sevn/cli/asyncio_util.py) — `src/sevn/cli/asyncio_util.py`
+- [`install_cli_activity_log`](src/sevn/cli/cli_activity_log.py) — `src/sevn/cli/cli_activity_log.py`
+- [`log_cli_activity`](src/sevn/cli/cli_activity_log.py) — `src/sevn/cli/cli_activity_log.py`
+- [`log_cli_invocation`](src/sevn/cli/cli_activity_log.py) — `src/sevn/cli/cli_activity_log.py`
+- [`resolve_cli_log_path`](src/sevn/cli/cli_activity_log.py) — `src/sevn/cli/cli_activity_log.py`
+- [`shutdown_cli_activity_log`](src/sevn/cli/cli_activity_log.py) — `src/sevn/cli/cli_activity_log.py`
+- [`register`](src/sevn/cli/commands/about_docs_cmd.py) — `src/sevn/cli/commands/about_docs_cmd.py`
+- [`register`](src/sevn/cli/commands/agent_cmd.py) — `src/sevn/cli/commands/agent_cmd.py`
+- [`register`](src/sevn/cli/commands/channels_cmd.py) — `src/sevn/cli/commands/channels_cmd.py`
+- [`register`](src/sevn/cli/commands/completion.py) — `src/sevn/cli/commands/completion.py`
+- _…and 221 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for CLI — Spec (spec-23-cli) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/cli`](src/sevn/cli/__init__.py).
 ## Behavior
 
-Offline scaffold for CLI — Spec (spec-23-cli) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/cli`](src/sevn/cli/__init__.py).
 ## Failure Modes
 
-Offline scaffold for CLI — Spec (spec-23-cli) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Amendments (spec-36-sub-agents)
 
 New command group `sevn subagents list|kill|limits` and `sevn config subagents`
 summary (`src/sevn/cli/commands/subagents_cmd.py`). Doctor probe `subagents_registry`
 reports orphan counts (D13).
 
+## Implemented by
+
+- [`main`](src/sevn/cli/app.py) — `src/sevn/cli/app.py`
+- [`version_detail`](src/sevn/cli/app.py) — `src/sevn/cli/app.py`
+- [`run_sync_coro`](src/sevn/cli/asyncio_util.py) — `src/sevn/cli/asyncio_util.py`
+- [`install_cli_activity_log`](src/sevn/cli/cli_activity_log.py) — `src/sevn/cli/cli_activity_log.py`
+- [`log_cli_activity`](src/sevn/cli/cli_activity_log.py) — `src/sevn/cli/cli_activity_log.py`
+- [`log_cli_invocation`](src/sevn/cli/cli_activity_log.py) — `src/sevn/cli/cli_activity_log.py`
+- [`resolve_cli_log_path`](src/sevn/cli/cli_activity_log.py) — `src/sevn/cli/cli_activity_log.py`
+- [`shutdown_cli_activity_log`](src/sevn/cli/cli_activity_log.py) — `src/sevn/cli/cli_activity_log.py`
+- [`register`](src/sevn/cli/commands/about_docs_cmd.py) — `src/sevn/cli/commands/about_docs_cmd.py`
+- [`register`](src/sevn/cli/commands/agent_cmd.py) — `src/sevn/cli/commands/agent_cmd.py`
+- [`register`](src/sevn/cli/commands/channels_cmd.py) — `src/sevn/cli/commands/channels_cmd.py`
+- [`register`](src/sevn/cli/commands/completion.py) — `src/sevn/cli/commands/completion.py`
+- [`register`](src/sevn/cli/commands/config_cmd.py) — `src/sevn/cli/commands/config_cmd.py`
+- [`register`](src/sevn/cli/commands/dashboard_cmd.py) — `src/sevn/cli/commands/dashboard_cmd.py`
+- [`register_set_login_password`](src/sevn/cli/commands/dashboard_set_login_password.py) — `src/sevn/cli/commands/dashboard_set_login_password.py`
+- [`register`](src/sevn/cli/commands/deploy_cmd.py) — `src/sevn/cli/commands/deploy_cmd.py`
+- [`register`](src/sevn/cli/commands/doctor.py) — `src/sevn/cli/commands/doctor.py`
+- [`register`](src/sevn/cli/commands/export_secrets_cmd.py) — `src/sevn/cli/commands/export_secrets_cmd.py`
+- [`register`](src/sevn/cli/commands/gateway.py) — `src/sevn/cli/commands/gateway.py`
+- [`register_set_gateway_token`](src/sevn/cli/commands/gateway_set_token.py) — `src/sevn/cli/commands/gateway_set_token.py`
+- _…and 213 more in frontmatter `interfaces:`._
+
 ## Test Strategy
 
-Offline scaffold for CLI — Spec (spec-23-cli) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

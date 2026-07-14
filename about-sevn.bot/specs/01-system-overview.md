@@ -2,13 +2,13 @@
 id: spec-01-system-overview
 kind: spec
 title: System overview — Spec
-status: done
+status: draft
 owner: Alex
 summary: 'Give implementers a single picture of the runtime before feature work: package
   boundaries under src/sevn/, allowed import directions, and the shared protocols
   that keep LLM wiring, observability, and '
 last_updated: '2026-07-14'
-fingerprint: sha256:9faced107902c5c61b5b1d2d31122823f4c01815d70a93df6a144d28161a6278
+fingerprint: sha256:0ecfd826f9e394e922b3e914a3dc874eefb75b149180ee0f7ea17c3bf7ff90b5
 related: []
 sources:
 - src/sevn/**
@@ -5789,6 +5789,9 @@ interfaces:
 - name: offline_sections
   file: src/sevn/docs/readme/model.py
   symbol: offline_sections
+- name: strip_inline_code
+  file: src/sevn/docs/readme/model.py
+  symbol: strip_inline_code
 - name: truncate_at_sentence
   file: src/sevn/docs/readme/model.py
   symbol: truncate_at_sentence
@@ -5846,6 +5849,9 @@ interfaces:
 - name: scan_repo_context
   file: src/sevn/docs/readme/scanner.py
   symbol: scan_repo_context
+- name: symbol_lineno_for_module
+  file: src/sevn/docs/readme/scanner.py
+  symbol: symbol_lineno_for_module
 - name: ReadmePipelineSettings
   file: src/sevn/docs/readme/settings.py
   symbol: ReadmePipelineSettings
@@ -5858,6 +5864,9 @@ interfaces:
 - name: resolve_readme_settings
   file: src/sevn/docs/readme/settings.py
   symbol: resolve_readme_settings
+- name: extract_curated_prose_section
+  file: src/sevn/docs/readme/symbol_refs.py
+  symbol: extract_curated_prose_section
 - name: extract_level3_section
   file: src/sevn/docs/readme/symbol_refs.py
   symbol: extract_level3_section
@@ -5882,6 +5891,12 @@ interfaces:
 - name: validate_against_template
   file: src/sevn/docs/readme/templates.py
   symbol: validate_against_template
+- name: SummaryLintFinding
+  file: src/sevn/docs/readme/verify.py
+  symbol: SummaryLintFinding
+- name: lint_summaries
+  file: src/sevn/docs/readme/verify.py
+  symbol: lint_summaries
 - name: EvolutionApproval
   file: src/sevn/evolution/approvals.py
   symbol: EvolutionApproval
@@ -11979,28 +11994,70 @@ prd_profile: null
 
 ## Purpose
 
-Offline scaffold for System overview — Spec (spec-01-system-overview) — Purpose.
+Give implementers a single picture of the runtime before feature work: package boundaries under src/sevn/, allowed import directions, and the shared protocols that keep LLM wiring, observability, and
 
+Implementation spans [`src/sevn`](src/sevn/__init__.py). The frontmatter `interfaces:` block is code-owned (refresh with `make about-docs-extract DOC_ID=spec-01-system-overview`).
+
+<!-- HUMAN-INPUT[owner=operator]: Author the full normative contract for this mega-spec — do not hand-expand the whole-tree interfaces dump. -->
 ## Public Interface
 
-Offline scaffold for System overview — Spec (spec-01-system-overview) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`default_codemode_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
+- [`install_monty_resource_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
+- [`lambda_rlm_filter`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
+- [`to_dspy_tools`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
+- [`EgressBridgeContext`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`build_sevn_anthropic_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`build_sevn_httpx_event_hooks`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`build_sevn_openai_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`redact_httpx_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`redact_llm_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`redact_proxy_transport_request`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`resolve_proxy_shared_secret`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- _…and 3973 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for System overview — Spec (spec-01-system-overview) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`default_codemode_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
+- [`install_monty_resource_limits`](src/sevn/agent/adapters/_monty_limits.py) — `src/sevn/agent/adapters/_monty_limits.py`
+- [`lambda_rlm_filter`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
+- [`to_dspy_tools`](src/sevn/agent/adapters/dspy_adapter.py) — `src/sevn/agent/adapters/dspy_adapter.py`
+- [`EgressBridgeContext`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`build_sevn_anthropic_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`build_sevn_httpx_event_hooks`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`build_sevn_openai_client`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`redact_httpx_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`redact_llm_request_snapshot`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`redact_proxy_transport_request`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- [`resolve_proxy_shared_secret`](src/sevn/agent/adapters/egress_bridge.py) — `src/sevn/agent/adapters/egress_bridge.py`
+- _…and 3973 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for System overview — Spec (spec-01-system-overview) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn`](src/sevn/__init__.py).
 ## Behavior
 
-Offline scaffold for System overview — Spec (spec-01-system-overview) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn`](src/sevn/__init__.py).
 ## Failure Modes
 
-Offline scaffold for System overview — Spec (spec-01-system-overview) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Offline scaffold for System overview — Spec (spec-01-system-overview) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

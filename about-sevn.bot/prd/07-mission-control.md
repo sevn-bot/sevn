@@ -25,6 +25,19 @@ personas:
 prd_profile: standard
 ---
 
+## Spec implementation status (W9 seed)
+
+This PRD is `ready` while linked specs below are not normatively complete (`draft` / `scaffold` / `rejected`). Code may run ahead of spec prose.
+
+| Spec | Status |
+| --- | --- |
+| spec-04-tracing | draft |
+| spec-07-egress-proxy | draft |
+| spec-24-dashboard | draft |
+| spec-35-bot-evolution | scaffold |
+
+<!-- HUMAN-INPUT[owner=operator]: Reconcile PRD `ready` vs implementing spec maturity — downgrade PRD, or keep ready and finish normative spec bodies. -->
+
 ## Problem & Motivation
 
 A self-hosted AI bot that *can* do a lot is hard to live with unless you can *see* what it just

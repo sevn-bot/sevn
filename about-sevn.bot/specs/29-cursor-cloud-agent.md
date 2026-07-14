@@ -2,7 +2,7 @@
 id: spec-29-cursor-cloud-agent
 kind: spec
 title: Cursor Cloud Agent — Spec
-status: done
+status: draft
 owner: Alex
 summary: Let operators and agents launch, poll, and inspect Cursor Cloud Agents against
   any GitHub/GitLab repo when skills.cursor_cloud.enabled is true, returning PR URLs,
@@ -171,30 +171,75 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Cursor Cloud Agent — Spec (spec-29-cursor-cloud-agent) — Purpose.
+Let operators and agents launch, poll, and inspect Cursor Cloud Agents against any GitHub/GitLab repo when skills.cursor_cloud.enabled is true, returning PR URLs, dashboard links (remote desktop), and
 
+Primary code trees: [`src/sevn/integrations`](src/sevn/integrations/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Cursor Cloud Agent — Spec (spec-29-cursor-cloud-agent) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`artifact_download_url`](src/sevn/integrations/cursor_cloud/client.py) — `src/sevn/integrations/cursor_cloud/client.py`
+- [`create_cloud_agent`](src/sevn/integrations/cursor_cloud/client.py) — `src/sevn/integrations/cursor_cloud/client.py`
+- [`get_agent`](src/sevn/integrations/cursor_cloud/client.py) — `src/sevn/integrations/cursor_cloud/client.py`
+- [`get_run`](src/sevn/integrations/cursor_cloud/client.py) — `src/sevn/integrations/cursor_cloud/client.py`
+- [`list_artifacts`](src/sevn/integrations/cursor_cloud/client.py) — `src/sevn/integrations/cursor_cloud/client.py`
+- [`parse_mcp_servers_json`](src/sevn/integrations/cursor_cloud/client.py) — `src/sevn/integrations/cursor_cloud/client.py`
+- [`parse_subagents_json`](src/sevn/integrations/cursor_cloud/client.py) — `src/sevn/integrations/cursor_cloud/client.py`
+- [`refresh_job_status`](src/sevn/integrations/cursor_cloud/client.py) — `src/sevn/integrations/cursor_cloud/client.py`
+- [`CursorCloudSettings`](src/sevn/integrations/cursor_cloud/config.py) — `src/sevn/integrations/cursor_cloud/config.py`
+- [`load_cursor_cloud_settings`](src/sevn/integrations/cursor_cloud/config.py) — `src/sevn/integrations/cursor_cloud/config.py`
+- [`CursorCloudJob`](src/sevn/integrations/cursor_cloud/jobs.py) — `src/sevn/integrations/cursor_cloud/jobs.py`
+- [`get_job`](src/sevn/integrations/cursor_cloud/jobs.py) — `src/sevn/integrations/cursor_cloud/jobs.py`
+- _…and 37 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Cursor Cloud Agent — Spec (spec-29-cursor-cloud-agent) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`artifact_download_url`](src/sevn/integrations/cursor_cloud/client.py) — `src/sevn/integrations/cursor_cloud/client.py`
+- [`create_cloud_agent`](src/sevn/integrations/cursor_cloud/client.py) — `src/sevn/integrations/cursor_cloud/client.py`
+- [`get_agent`](src/sevn/integrations/cursor_cloud/client.py) — `src/sevn/integrations/cursor_cloud/client.py`
+- [`get_run`](src/sevn/integrations/cursor_cloud/client.py) — `src/sevn/integrations/cursor_cloud/client.py`
+- [`list_artifacts`](src/sevn/integrations/cursor_cloud/client.py) — `src/sevn/integrations/cursor_cloud/client.py`
+- [`parse_mcp_servers_json`](src/sevn/integrations/cursor_cloud/client.py) — `src/sevn/integrations/cursor_cloud/client.py`
+- [`parse_subagents_json`](src/sevn/integrations/cursor_cloud/client.py) — `src/sevn/integrations/cursor_cloud/client.py`
+- [`refresh_job_status`](src/sevn/integrations/cursor_cloud/client.py) — `src/sevn/integrations/cursor_cloud/client.py`
+- [`CursorCloudSettings`](src/sevn/integrations/cursor_cloud/config.py) — `src/sevn/integrations/cursor_cloud/config.py`
+- [`load_cursor_cloud_settings`](src/sevn/integrations/cursor_cloud/config.py) — `src/sevn/integrations/cursor_cloud/config.py`
+- [`CursorCloudJob`](src/sevn/integrations/cursor_cloud/jobs.py) — `src/sevn/integrations/cursor_cloud/jobs.py`
+- [`get_job`](src/sevn/integrations/cursor_cloud/jobs.py) — `src/sevn/integrations/cursor_cloud/jobs.py`
+- _…and 37 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Cursor Cloud Agent — Spec (spec-29-cursor-cloud-agent) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/integrations`](src/sevn/integrations/__init__.py).
 ## Behavior
 
-Offline scaffold for Cursor Cloud Agent — Spec (spec-29-cursor-cloud-agent) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/integrations`](src/sevn/integrations/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Cursor Cloud Agent — Spec (spec-29-cursor-cloud-agent) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Offline scaffold for Cursor Cloud Agent — Spec (spec-29-cursor-cloud-agent) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

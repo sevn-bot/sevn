@@ -2,7 +2,7 @@
 id: spec-28-code-understanding
 kind: spec
 title: Code understanding — Spec
-status: done
+status: draft
 owner: Alex
 summary: 'Deliver the code-orientation stack the coding companion PRD names: five
   orthogonal capabilities (MYCODE, Memgraph CGR, code-review-graph (SQLite MCP), roam-code,
@@ -268,30 +268,75 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Code understanding — Spec (spec-28-code-understanding) — Purpose.
+Deliver the code-orientation stack the coding companion PRD names: five orthogonal capabilities (MYCODE, Memgraph CGR, code-review-graph (SQLite MCP), roam-code, Graphify) that Triager and executors c
 
+Primary code trees: [`src/sevn/code_understanding`](src/sevn/code_understanding/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Code understanding — Spec (spec-28-code-understanding) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`code_orientation_doctor_checks`](src/sevn/code_understanding/bootstrap.py) — `src/sevn/code_understanding/bootstrap.py`
+- [`mycode_needs_refresh`](src/sevn/code_understanding/bootstrap.py) — `src/sevn/code_understanding/bootstrap.py`
+- [`refresh_mycode_scan_cache`](src/sevn/code_understanding/bootstrap.py) — `src/sevn/code_understanding/bootstrap.py`
+- [`build_cgr_argv`](src/sevn/code_understanding/cgr_adapter.py) — `src/sevn/code_understanding/cgr_adapter.py`
+- [`read_export_capped`](src/sevn/code_understanding/cgr_adapter.py) — `src/sevn/code_understanding/cgr_adapter.py`
+- [`read_export_file`](src/sevn/code_understanding/cgr_runner.py) — `src/sevn/code_understanding/cgr_runner.py`
+- [`run_cgr_subprocess`](src/sevn/code_understanding/cgr_runner.py) — `src/sevn/code_understanding/cgr_runner.py`
+- [`DocstringGap`](src/sevn/code_understanding/code_index.py) — `src/sevn/code_understanding/code_index.py`
+- [`SymbolEntry`](src/sevn/code_understanding/code_index.py) — `src/sevn/code_understanding/code_index.py`
+- [`audit_docstring_coverage`](src/sevn/code_understanding/code_index.py) — `src/sevn/code_understanding/code_index.py`
+- [`collect_module_symbols`](src/sevn/code_understanding/code_index.py) — `src/sevn/code_understanding/code_index.py`
+- [`extract_listed_symbols`](src/sevn/code_understanding/code_index.py) — `src/sevn/code_understanding/code_index.py`
+- _…and 67 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Code understanding — Spec (spec-28-code-understanding) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`code_orientation_doctor_checks`](src/sevn/code_understanding/bootstrap.py) — `src/sevn/code_understanding/bootstrap.py`
+- [`mycode_needs_refresh`](src/sevn/code_understanding/bootstrap.py) — `src/sevn/code_understanding/bootstrap.py`
+- [`refresh_mycode_scan_cache`](src/sevn/code_understanding/bootstrap.py) — `src/sevn/code_understanding/bootstrap.py`
+- [`build_cgr_argv`](src/sevn/code_understanding/cgr_adapter.py) — `src/sevn/code_understanding/cgr_adapter.py`
+- [`read_export_capped`](src/sevn/code_understanding/cgr_adapter.py) — `src/sevn/code_understanding/cgr_adapter.py`
+- [`read_export_file`](src/sevn/code_understanding/cgr_runner.py) — `src/sevn/code_understanding/cgr_runner.py`
+- [`run_cgr_subprocess`](src/sevn/code_understanding/cgr_runner.py) — `src/sevn/code_understanding/cgr_runner.py`
+- [`DocstringGap`](src/sevn/code_understanding/code_index.py) — `src/sevn/code_understanding/code_index.py`
+- [`SymbolEntry`](src/sevn/code_understanding/code_index.py) — `src/sevn/code_understanding/code_index.py`
+- [`audit_docstring_coverage`](src/sevn/code_understanding/code_index.py) — `src/sevn/code_understanding/code_index.py`
+- [`collect_module_symbols`](src/sevn/code_understanding/code_index.py) — `src/sevn/code_understanding/code_index.py`
+- [`extract_listed_symbols`](src/sevn/code_understanding/code_index.py) — `src/sevn/code_understanding/code_index.py`
+- _…and 67 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Code understanding — Spec (spec-28-code-understanding) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/code_understanding`](src/sevn/code_understanding/__init__.py).
 ## Behavior
 
-Offline scaffold for Code understanding — Spec (spec-28-code-understanding) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/code_understanding`](src/sevn/code_understanding/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Code understanding — Spec (spec-28-code-understanding) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Offline scaffold for Code understanding — Spec (spec-28-code-understanding) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

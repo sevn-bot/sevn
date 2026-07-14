@@ -2,7 +2,7 @@
 id: spec-34-plugin-hooks
 kind: spec
 title: Plugin hooks & channel plugins — Spec
-status: done
+status: draft
 owner: Alex
 summary: Deliver the in-process extension layer that intercepts existing tool and
   terminal I/O paths and registers dispatcher-level commands, without adding new tool
@@ -96,30 +96,75 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Plugin hooks & channel plugins — Spec (spec-34-plugin-hooks) — Purpose.
+Deliver the in-process extension layer that intercepts existing tool and terminal I/O paths and registers dispatcher-level commands, without adding new tool symbols or transports in-tree.
 
+Primary code trees: [`src/sevn/plugins`](src/sevn/plugins/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Plugin hooks & channel plugins — Spec (spec-34-plugin-hooks) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`PluginCommandSpec`](src/sevn/plugins/command_spec.py) — `src/sevn/plugins/command_spec.py`
+- [`PluginSlashBinding`](src/sevn/plugins/command_spec.py) — `src/sevn/plugins/command_spec.py`
+- [`Block`](src/sevn/plugins/hook.py) — `src/sevn/plugins/hook.py`
+- [`Continue`](src/sevn/plugins/hook.py) — `src/sevn/plugins/hook.py`
+- [`HookContext`](src/sevn/plugins/hook.py) — `src/sevn/plugins/hook.py`
+- [`PluginHook`](src/sevn/plugins/hook.py) — `src/sevn/plugins/hook.py`
+- [`PluginHookBase`](src/sevn/plugins/hook.py) — `src/sevn/plugins/hook.py`
+- [`Replace`](src/sevn/plugins/hook.py) — `src/sevn/plugins/hook.py`
+- [`ChannelPluginSpec`](src/sevn/plugins/registry.py) — `src/sevn/plugins/registry.py`
+- [`DashboardBadgeEntry`](src/sevn/plugins/registry.py) — `src/sevn/plugins/registry.py`
+- [`build_trigger_mux`](src/sevn/plugins/registry.py) — `src/sevn/plugins/registry.py`
+- [`collect_plugin_slash_bindings`](src/sevn/plugins/registry.py) — `src/sevn/plugins/registry.py`
+- _…and 9 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Plugin hooks & channel plugins — Spec (spec-34-plugin-hooks) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`PluginCommandSpec`](src/sevn/plugins/command_spec.py) — `src/sevn/plugins/command_spec.py`
+- [`PluginSlashBinding`](src/sevn/plugins/command_spec.py) — `src/sevn/plugins/command_spec.py`
+- [`Block`](src/sevn/plugins/hook.py) — `src/sevn/plugins/hook.py`
+- [`Continue`](src/sevn/plugins/hook.py) — `src/sevn/plugins/hook.py`
+- [`HookContext`](src/sevn/plugins/hook.py) — `src/sevn/plugins/hook.py`
+- [`PluginHook`](src/sevn/plugins/hook.py) — `src/sevn/plugins/hook.py`
+- [`PluginHookBase`](src/sevn/plugins/hook.py) — `src/sevn/plugins/hook.py`
+- [`Replace`](src/sevn/plugins/hook.py) — `src/sevn/plugins/hook.py`
+- [`ChannelPluginSpec`](src/sevn/plugins/registry.py) — `src/sevn/plugins/registry.py`
+- [`DashboardBadgeEntry`](src/sevn/plugins/registry.py) — `src/sevn/plugins/registry.py`
+- [`build_trigger_mux`](src/sevn/plugins/registry.py) — `src/sevn/plugins/registry.py`
+- [`collect_plugin_slash_bindings`](src/sevn/plugins/registry.py) — `src/sevn/plugins/registry.py`
+- _…and 9 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Plugin hooks & channel plugins — Spec (spec-34-plugin-hooks) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/plugins`](src/sevn/plugins/__init__.py).
 ## Behavior
 
-Offline scaffold for Plugin hooks & channel plugins — Spec (spec-34-plugin-hooks) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/plugins`](src/sevn/plugins/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Plugin hooks & channel plugins — Spec (spec-34-plugin-hooks) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Offline scaffold for Plugin hooks & channel plugins — Spec (spec-34-plugin-hooks) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

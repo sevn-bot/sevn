@@ -2,7 +2,7 @@
 id: spec-24-dashboard
 kind: spec
 title: Mission Control (dashboard) — Spec
-status: done
+status: draft
 owner: Alex
 summary: 'Deliver Mission Control: a same-process dashboard (prd-07-mission-control)
   so the owner can inspect traces, costs, provider health, in-flight runs, proxy status,
@@ -956,36 +956,105 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Mission Control (dashboard) — Spec (spec-24-dashboard) — Purpose.
+Deliver Mission Control: a same-process dashboard (prd-07-mission-control) so the owner can inspect traces, costs, provider health, in-flight runs, proxy status, and config without opening SQLite from
 
+Primary code trees: [`src/sevn/ui`](src/sevn/ui/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Mission Control (dashboard) — Spec (spec-24-dashboard) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`register_dashboard_routes`](src/sevn/ui/dashboard/__init__.py) — `src/sevn/ui/dashboard/__init__.py`
+- [`create_dashboard_api_router`](src/sevn/ui/dashboard/api/__init__.py) — `src/sevn/ui/dashboard/api/__init__.py`
+- [`config_error`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`config_validation_error`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`deep_merge`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`load_workspace_document`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`persist_workspace_document`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`read_config_body`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`SkillInstallBody`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- [`SkillToggleBody`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- [`agent_config_get`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- [`agent_config_put`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- _…and 297 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Mission Control (dashboard) — Spec (spec-24-dashboard) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`register_dashboard_routes`](src/sevn/ui/dashboard/__init__.py) — `src/sevn/ui/dashboard/__init__.py`
+- [`create_dashboard_api_router`](src/sevn/ui/dashboard/api/__init__.py) — `src/sevn/ui/dashboard/api/__init__.py`
+- [`config_error`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`config_validation_error`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`deep_merge`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`load_workspace_document`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`persist_workspace_document`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`read_config_body`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`SkillInstallBody`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- [`SkillToggleBody`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- [`agent_config_get`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- [`agent_config_put`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- _…and 297 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Mission Control (dashboard) — Spec (spec-24-dashboard) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/ui`](src/sevn/ui/__init__.py).
 ## Behavior
 
-Offline scaffold for Mission Control (dashboard) — Spec (spec-24-dashboard) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/ui`](src/sevn/ui/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Mission Control (dashboard) — Spec (spec-24-dashboard) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Amendments (spec-36-sub-agents)
 
 Observability group gains **Sub-agents** tab: L1/L2 count chips, running table with
 kill actions, recent history, read-only limits. APIs:
 `GET /api/v1/mission/subagents`, `POST .../kill`, `POST .../kill_all` (D13).
 
+## Implemented by
+
+- [`register_dashboard_routes`](src/sevn/ui/dashboard/__init__.py) — `src/sevn/ui/dashboard/__init__.py`
+- [`create_dashboard_api_router`](src/sevn/ui/dashboard/api/__init__.py) — `src/sevn/ui/dashboard/api/__init__.py`
+- [`config_error`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`config_validation_error`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`deep_merge`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`load_workspace_document`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`persist_workspace_document`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`read_config_body`](src/sevn/ui/dashboard/api/_config_persist.py) — `src/sevn/ui/dashboard/api/_config_persist.py`
+- [`SkillInstallBody`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- [`SkillToggleBody`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- [`agent_config_get`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- [`agent_config_put`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- [`agent_permissions_get`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- [`agent_permissions_put`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- [`llm_params_get`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- [`llm_params_put`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- [`mcp_servers_put`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- [`mcp_servers_registry`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- [`skills_bundled_list`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- [`skills_install`](src/sevn/ui/dashboard/api/agent.py) — `src/sevn/ui/dashboard/api/agent.py`
+- _…and 289 more in frontmatter `interfaces:`._
+
 ## Test Strategy
 
-Offline scaffold for Mission Control (dashboard) — Spec (spec-24-dashboard) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

@@ -107,7 +107,7 @@ output = "docs/readmes/ui-mission-control.md"
 source_globs = ["src/sevn/ui/**"]
 specs = [
   "about-sevn.bot/specs/24-dashboard.md",
-  "about-sevn.bot/specs/29-openui.md",
+  "about-sevn.bot/specs/37-openui.md",
 ]
 curated = true
 template = "docs/readmes/_templates/ui-mission-control.md"

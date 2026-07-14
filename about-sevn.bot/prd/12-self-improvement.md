@@ -29,6 +29,23 @@ personas:
 prd_profile: ai-native
 ---
 
+## Spec implementation status (W9 seed)
+
+This PRD is `ready` while linked specs below are not normatively complete (`draft` / `scaffold` / `rejected`). Code may run ahead of spec prose.
+
+| Spec | Status |
+| --- | --- |
+| spec-33-self-improvement | draft |
+| spec-17-gateway | draft |
+| spec-24-dashboard | draft |
+| spec-19-channel-webui | draft |
+| spec-18-channel-telegram | draft |
+| spec-20-voice | draft |
+| spec-21-executor-tier-cd | draft |
+| spec-04-tracing | draft |
+
+<!-- HUMAN-INPUT[owner=operator]: Reconcile PRD `ready` vs implementing spec maturity — downgrade PRD, or keep ready and finish normative spec bodies. -->
+
 ## Problem & Motivation
 
 A self-hosted assistant that never improves becomes stale: Triager prompts drift from real

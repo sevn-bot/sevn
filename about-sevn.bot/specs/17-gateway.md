@@ -2,7 +2,7 @@
 id: spec-17-gateway
 kind: spec
 title: Gateway — Spec
-status: done
+status: draft
 owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
@@ -1364,30 +1364,71 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Gateway — Spec (spec-17-gateway) — Purpose.
+Run the long-lived gateway process that accepts channel ingress (Telegram poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner, rate limits), persists session history, an
 
+Primary code trees: [`src/sevn/gateway`](src/sevn/gateway/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Gateway — Spec (spec-17-gateway) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`SecretDeleteBody`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`SecretDeleteResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`SecretEntryOut`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`SecretPutBody`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`SecretPutResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`SecretsListResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`register_admin_secrets_routes`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`build_agent_run_turn`](src/sevn/gateway/agent_turn.py) — `src/sevn/gateway/agent_turn.py`
+- [`build_intro_extra_instructions`](src/sevn/gateway/agent_turn.py) — `src/sevn/gateway/agent_turn.py`
+- [`JWTClaims`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
+- [`extract_bearer`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
+- [`login_page_html`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
+- _…and 434 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Gateway — Spec (spec-17-gateway) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`SecretDeleteBody`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`SecretDeleteResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`SecretEntryOut`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`SecretPutBody`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`SecretPutResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`SecretsListResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`register_admin_secrets_routes`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`build_agent_run_turn`](src/sevn/gateway/agent_turn.py) — `src/sevn/gateway/agent_turn.py`
+- [`build_intro_extra_instructions`](src/sevn/gateway/agent_turn.py) — `src/sevn/gateway/agent_turn.py`
+- [`JWTClaims`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
+- [`extract_bearer`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
+- [`login_page_html`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
+- _…and 434 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Gateway — Spec (spec-17-gateway) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/gateway`](src/sevn/gateway/__init__.py).
 ## Behavior
 
-Offline scaffold for Gateway — Spec (spec-17-gateway) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/gateway`](src/sevn/gateway/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Gateway — Spec (spec-17-gateway) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Amendments (spec-36-sub-agents)
 
 `gateway.queue_mode` and per-channel `busy_input_mode` gain `"multi"`.
@@ -1395,6 +1436,34 @@ Offline scaffold for Gateway — Spec (spec-17-gateway) — Failure Modes.
 and may spawn concurrent L1 tier-B runs (`src/sevn/gateway/queue_multi.py`).
 `routing_footer.py` tags parallel L1 replies with short sub-agent ids (D7).
 
+## Implemented by
+
+- [`SecretDeleteBody`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`SecretDeleteResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`SecretEntryOut`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`SecretPutBody`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`SecretPutResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`SecretsListResponse`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`register_admin_secrets_routes`](src/sevn/gateway/admin_secrets.py) — `src/sevn/gateway/admin_secrets.py`
+- [`build_agent_run_turn`](src/sevn/gateway/agent_turn.py) — `src/sevn/gateway/agent_turn.py`
+- [`build_intro_extra_instructions`](src/sevn/gateway/agent_turn.py) — `src/sevn/gateway/agent_turn.py`
+- [`JWTClaims`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
+- [`extract_bearer`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
+- [`login_page_html`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
+- [`mint_webchat_jwt`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
+- [`refresh_webchat_access_token`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
+- [`secrets_compare`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
+- [`verify_gateway_bearer`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
+- [`verify_login_gateway_token`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
+- [`verify_telegram_init_data`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
+- [`verify_telegram_secret`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
+- [`verify_webchat_jwt`](src/sevn/gateway/auth.py) — `src/sevn/gateway/auth.py`
+- _…and 426 more in frontmatter `interfaces:`._
+
 ## Test Strategy
 
-Offline scaffold for Gateway — Spec (spec-17-gateway) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

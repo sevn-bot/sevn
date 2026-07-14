@@ -22,6 +22,16 @@ personas:
 prd_profile: standard
 ---
 
+## Spec implementation status (W9 seed)
+
+This PRD is `ready` while linked specs below are not normatively complete (`draft` / `scaffold` / `rejected`). Code may run ahead of spec prose.
+
+| Spec | Status |
+| --- | --- |
+| spec-27-second-brain | scaffold |
+
+<!-- HUMAN-INPUT[owner=operator]: Reconcile PRD `ready` vs implementing spec maturity — downgrade PRD, or keep ready and finish normative spec bodies. -->
+
 ## Problem & Motivation
 
 A daily-driver AI loses most of its value when it has to start from zero on every research

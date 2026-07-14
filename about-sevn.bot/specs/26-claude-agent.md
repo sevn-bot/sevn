@@ -103,30 +103,78 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Claude Agent — Spec (spec-26-claude-agent) — Purpose.
 
+
+> **Legacy tree:** `src/sevn/coding_agents/**` remains in the checkout but this spec is **rejected** for v0.0.2 — do not treat as normative product scope.
+- N/A: Spec rejected — no implementation rows for v0.0.2.
+
+Primary code trees: [`src/sevn/coding_agents`](src/sevn/coding_agents/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Claude Agent — Spec (spec-26-claude-agent) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`EvaluatorResult`](src/sevn/coding_agents/alrca/evaluator.py) — `src/sevn/coding_agents/alrca/evaluator.py`
+- [`NullEvaluator`](src/sevn/coding_agents/alrca/evaluator.py) — `src/sevn/coding_agents/alrca/evaluator.py`
+- [`evaluate_turn`](src/sevn/coding_agents/alrca/evaluator.py) — `src/sevn/coding_agents/alrca/evaluator.py`
+- [`GoalContract`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`GoalStatus`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`list_goals`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`load_goal`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`new_goal`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`save_goal`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`ALRCALoopWorker`](src/sevn/coding_agents/alrca/loop_worker.py) — `src/sevn/coding_agents/alrca/loop_worker.py`
+- [`LoopResult`](src/sevn/coding_agents/alrca/loop_worker.py) — `src/sevn/coding_agents/alrca/loop_worker.py`
+- [`run_alrca_loop`](src/sevn/coding_agents/alrca/loop_worker.py) — `src/sevn/coding_agents/alrca/loop_worker.py`
+- _…and 16 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Claude Agent — Spec (spec-26-claude-agent) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`EvaluatorResult`](src/sevn/coding_agents/alrca/evaluator.py) — `src/sevn/coding_agents/alrca/evaluator.py`
+- [`NullEvaluator`](src/sevn/coding_agents/alrca/evaluator.py) — `src/sevn/coding_agents/alrca/evaluator.py`
+- [`evaluate_turn`](src/sevn/coding_agents/alrca/evaluator.py) — `src/sevn/coding_agents/alrca/evaluator.py`
+- [`GoalContract`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`GoalStatus`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`list_goals`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`load_goal`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`new_goal`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`save_goal`](src/sevn/coding_agents/alrca/goal.py) — `src/sevn/coding_agents/alrca/goal.py`
+- [`ALRCALoopWorker`](src/sevn/coding_agents/alrca/loop_worker.py) — `src/sevn/coding_agents/alrca/loop_worker.py`
+- [`LoopResult`](src/sevn/coding_agents/alrca/loop_worker.py) — `src/sevn/coding_agents/alrca/loop_worker.py`
+- [`run_alrca_loop`](src/sevn/coding_agents/alrca/loop_worker.py) — `src/sevn/coding_agents/alrca/loop_worker.py`
+- _…and 16 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Claude Agent — Spec (spec-26-claude-agent) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/coding_agents`](src/sevn/coding_agents/__init__.py).
 ## Behavior
 
-Offline scaffold for Claude Agent — Spec (spec-26-claude-agent) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/coding_agents`](src/sevn/coding_agents/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Claude Agent — Spec (spec-26-claude-agent) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Offline scaffold for Claude Agent — Spec (spec-26-claude-agent) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

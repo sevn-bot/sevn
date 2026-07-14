@@ -963,8 +963,8 @@ async def _validate_field(
             return False, "gateway.host is required"
         return True, "ok"
     if field_id == "gateway.queue_mode":
-        if str(value) not in ("cancel", "steer"):
-            return False, "gateway.queue_mode must be cancel or steer"
+        if str(value) not in ("cancel", "steer", "multi"):
+            return False, "gateway.queue_mode must be cancel, steer, or multi"
         return True, "ok"
     if field_id == "onboarding.applied_profile":
         pid = str(value).strip()

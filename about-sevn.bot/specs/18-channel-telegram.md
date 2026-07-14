@@ -2,7 +2,7 @@
 id: spec-18-channel-telegram
 kind: spec
 title: Channel — Telegram — Spec
-status: done
+status: draft
 owner: Alex
 summary: 'Deliver the primary daily-driver channel for personal messaging: a ChannelAdapter
   implementation that normalises Telegram Updates into spec-17-gateway IncomingMessage
@@ -432,36 +432,105 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Channel — Telegram — Spec (spec-18-channel-telegram) — Purpose.
+Deliver the primary daily-driver channel for personal messaging: a ChannelAdapter implementation that normalises Telegram Updates into spec-17-gateway IncomingMessage / OutgoingMessage and implements
 
+Primary code trees: [`src/sevn/channels`](src/sevn/channels/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Channel — Telegram — Spec (spec-18-channel-telegram) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`PlatformChannelConfig`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`busy_input_mode_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`channel_blob`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`dm_policy_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`platform_config_from_workspace`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`session_reset_policy_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`resolve_dispatcher_overflow_callback_data`](src/sevn/channels/callback_overflow.py) — `src/sevn/channels/callback_overflow.py`
+- [`telegram_callback_data_utf8_len`](src/sevn/channels/callback_overflow.py) — `src/sevn/channels/callback_overflow.py`
+- [`tokenize_inline_keyboard_callback_data`](src/sevn/channels/callback_overflow.py) — `src/sevn/channels/callback_overflow.py`
+- [`DiscordChannelAdapter`](src/sevn/channels/discord.py) — `src/sevn/channels/discord.py`
+- [`escape_intent_footer`](src/sevn/channels/markdown_safe.py) — `src/sevn/channels/markdown_safe.py`
+- [`escape_markdown_v2`](src/sevn/channels/markdown_safe.py) — `src/sevn/channels/markdown_safe.py`
+- _…and 123 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Channel — Telegram — Spec (spec-18-channel-telegram) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`PlatformChannelConfig`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`busy_input_mode_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`channel_blob`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`dm_policy_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`platform_config_from_workspace`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`session_reset_policy_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`resolve_dispatcher_overflow_callback_data`](src/sevn/channels/callback_overflow.py) — `src/sevn/channels/callback_overflow.py`
+- [`telegram_callback_data_utf8_len`](src/sevn/channels/callback_overflow.py) — `src/sevn/channels/callback_overflow.py`
+- [`tokenize_inline_keyboard_callback_data`](src/sevn/channels/callback_overflow.py) — `src/sevn/channels/callback_overflow.py`
+- [`DiscordChannelAdapter`](src/sevn/channels/discord.py) — `src/sevn/channels/discord.py`
+- [`escape_intent_footer`](src/sevn/channels/markdown_safe.py) — `src/sevn/channels/markdown_safe.py`
+- [`escape_markdown_v2`](src/sevn/channels/markdown_safe.py) — `src/sevn/channels/markdown_safe.py`
+- _…and 123 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Channel — Telegram — Spec (spec-18-channel-telegram) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/channels`](src/sevn/channels/__init__.py).
 ## Behavior
 
-Offline scaffold for Channel — Telegram — Spec (spec-18-channel-telegram) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/channels`](src/sevn/channels/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Channel — Telegram — Spec (spec-18-channel-telegram) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Amendments (spec-36-sub-agents)
 
 Telegram `/config` gains **Sub-agents** section: limits, live L1/L2 counts, queue mode
 incl. `multi`, and **Running** kill submenu (owner-only). `busy_input_mode` may be
 `multi`. Documented in `about-sevn.bot/Telegram Menu.html` (D13).
 
+## Implemented by
+
+- [`PlatformChannelConfig`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`busy_input_mode_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`channel_blob`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`dm_policy_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`platform_config_from_workspace`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`session_reset_policy_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
+- [`resolve_dispatcher_overflow_callback_data`](src/sevn/channels/callback_overflow.py) — `src/sevn/channels/callback_overflow.py`
+- [`telegram_callback_data_utf8_len`](src/sevn/channels/callback_overflow.py) — `src/sevn/channels/callback_overflow.py`
+- [`tokenize_inline_keyboard_callback_data`](src/sevn/channels/callback_overflow.py) — `src/sevn/channels/callback_overflow.py`
+- [`DiscordChannelAdapter`](src/sevn/channels/discord.py) — `src/sevn/channels/discord.py`
+- [`escape_intent_footer`](src/sevn/channels/markdown_safe.py) — `src/sevn/channels/markdown_safe.py`
+- [`escape_markdown_v2`](src/sevn/channels/markdown_safe.py) — `src/sevn/channels/markdown_safe.py`
+- [`SelfImproveTelegramNotification`](src/sevn/channels/self_improve_copy.py) — `src/sevn/channels/self_improve_copy.py`
+- [`format_self_improve_job_telegram`](src/sevn/channels/self_improve_copy.py) — `src/sevn/channels/self_improve_copy.py`
+- [`SlackChannelAdapter`](src/sevn/channels/slack.py) — `src/sevn/channels/slack.py`
+- [`StubChannelAdapter`](src/sevn/channels/stub.py) — `src/sevn/channels/stub.py`
+- [`make_stub_adapter_class`](src/sevn/channels/stub.py) — `src/sevn/channels/stub.py`
+- [`TelegramAdapter`](src/sevn/channels/telegram.py) — `src/sevn/channels/telegram.py`
+- [`TelegramApiMixin`](src/sevn/channels/telegram_api.py) — `src/sevn/channels/telegram_api.py`
+- [`RichCapability`](src/sevn/channels/telegram_capabilities.py) — `src/sevn/channels/telegram_capabilities.py`
+- _…and 115 more in frontmatter `interfaces:`._
+
 ## Test Strategy
 
-Offline scaffold for Channel — Telegram — Spec (spec-18-channel-telegram) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

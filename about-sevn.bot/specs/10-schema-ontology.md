@@ -2,7 +2,7 @@
 id: spec-10-schema-ontology
 kind: spec
 title: Schema & ontology — Spec
-status: done
+status: draft
 owner: Alex
 summary: 'Define the runtime ontology for Triager output and related labels across
   the agent core: canonical field names, closed enums, typing conventions, and how
@@ -700,30 +700,75 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Schema & ontology — Spec (spec-10-schema-ontology) — Purpose.
+Define the runtime ontology for Triager output and related labels across the agent core: canonical field names, closed enums, typing conventions, and how they compose with executor dispatch described
 
+Primary code trees: [`src/sevn/config`](src/sevn/config/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Schema & ontology — Spec (spec-10-schema-ontology) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`SevnConfigError`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
+- [`SevnJsonNotFoundError`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
+- [`TriagerUnavailable`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
+- [`UnsupportedSchemaVersionError`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
+- [`field_help_for`](src/sevn/config/field_help.py) — `src/sevn/config/field_help.py`
+- [`load_config_field_help`](src/sevn/config/field_help.py) — `src/sevn/config/field_help.py`
+- [`urls_in_help_text`](src/sevn/config/field_help.py) — `src/sevn/config/field_help.py`
+- [`ReasoningParams`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
+- [`SamplingParams`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
+- [`builtin_llm_params_doc`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
+- [`load_or_create_llm_params_doc`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
+- [`resolve_effective_max_output_tokens`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
+- _…and 211 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Schema & ontology — Spec (spec-10-schema-ontology) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`SevnConfigError`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
+- [`SevnJsonNotFoundError`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
+- [`TriagerUnavailable`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
+- [`UnsupportedSchemaVersionError`](src/sevn/config/errors.py) — `src/sevn/config/errors.py`
+- [`field_help_for`](src/sevn/config/field_help.py) — `src/sevn/config/field_help.py`
+- [`load_config_field_help`](src/sevn/config/field_help.py) — `src/sevn/config/field_help.py`
+- [`urls_in_help_text`](src/sevn/config/field_help.py) — `src/sevn/config/field_help.py`
+- [`ReasoningParams`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
+- [`SamplingParams`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
+- [`builtin_llm_params_doc`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
+- [`load_or_create_llm_params_doc`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
+- [`resolve_effective_max_output_tokens`](src/sevn/config/llm_params.py) — `src/sevn/config/llm_params.py`
+- _…and 211 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Schema & ontology — Spec (spec-10-schema-ontology) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/config`](src/sevn/config/__init__.py).
 ## Behavior
 
-Offline scaffold for Schema & ontology — Spec (spec-10-schema-ontology) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/config`](src/sevn/config/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Schema & ontology — Spec (spec-10-schema-ontology) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Offline scaffold for Schema & ontology — Spec (spec-10-schema-ontology) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.

@@ -213,7 +213,7 @@ re-derive during later waves.
 | D12 | Tracing | Every sub-agent run = one OTel span (`sevn.subagent`, attrs: id/level/role/specialist/parent) child of the spawning span; mission telemetry kinds `subagent_spawned` / `subagent_finished` / `subagent_killed` added to `mission_state_models.py`; Prometheus gauge `sevn_subagents_running{level,role}` + counter `sevn_subagents_total{status}`. |
 | D13 | Kill surfaces | Mission Control (button per row + kill-all per role), Telegram `/config → Sub-agents → Running` (inline kill buttons, owner-only), CLI `sevn subagents kill <id> [--force]`. All route through supervisor kill (D4). |
 | D14 | Deterministic chart | Single source-of-truth topology descriptor `about-sevn.bot/_sources/subagents-topology.json` → `scripts/gen_subagents_chart.py` renders a **deterministic** static SVG (sorted keys, fixed layout, no timestamps/randomness) embedded in new `about-sevn.bot/sub-agents.html`. `make about-site` regenerates; a `subagents-chart-check` Make step fails CI-docs when the committed SVG differs from a fresh render (byte-identical). |
-| D15 | Changelog skill | New Claude Code skill `.claude/skills/changelog/SKILL.md`: maintains root `CHANGELOG.md` in **Keep a Changelog 1.1** format, deriving entries from Conventional Commits since the last tag; invoked before releases and at plan Finals. Seed `CHANGELOG.md` with an `[Unreleased]` section including this feature. |
+| D15 | Changelog skill | Changelog workflow: tracked `.claude/skills/changelog/SKILL.md` (local-only on clone) and in-tree [`src/sevn/data/standards/README.md`](src/sevn/data/standards/README.md) + `.cursor/skills/changelog-author/SKILL.md`. Maintains root `CHANGELOG.md` in **Keep a Changelog 1.1** format; invoked before releases and at plan Finals. |
 | D16 | Naming | Public name "sub-agents" everywhere (config key `subagents`, CLI `sevn subagents`, spec 36). Specialist ids are snake_case (`media_generator`); the operator-visible label for the example instance is `sub_agent_2_media_generator`. |
 
 Full authoring landed in wave W9 (2026-07-12). Locked decisions D1–D16 below
@@ -429,5 +429,5 @@ Docs gate: `make subagents-chart-check` (deterministic SVG); `make ci-docs`.
 
 - [x] Full spec 36 prose + cross-edits to specs 02/03/04/12/13/14/17/18/21/23/24 and prd-04 Experience (2026-07-12 ✅: `about-sevn.bot/specs/36-sub-agents.md`, `make about-docs-index`)
 - [x] Deterministic topology chart + `sub-agents.html` + Makefile `subagents-chart` / `subagents-chart-check` wired into `about-site` and `ci-docs` (2026-07-12 ✅: `scripts/gen_subagents_chart.py`, `about-sevn.bot/_sources/subagents-topology.json`)
-- [x] Changelog skill wrapping existing `CHANGELOG.md` / `changelog_validate.py` machinery (2026-07-12 ✅: `.claude/skills/changelog/SKILL.md`)
+- [x] Changelog skill wrapping existing `CHANGELOG.md` / `changelog_validate.py` machinery (2026-07-12 ✅: `.claude/skills/changelog/SKILL.md` + `src/sevn/data/standards/README.md`; local `.claude/` may be absent on clone)
 - [x] `docs/readmes/subagents.md` + `make readme-check` (2026-07-12 ✅: `docs/readmes/manifest.toml`)

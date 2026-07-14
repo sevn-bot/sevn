@@ -7,7 +7,7 @@ owner: Alex
 summary: Local-first bots are judged in the first ten minutes—clone, three setup commands,
   and a Telegram reply, or the operator returns to a hosted assistant.
 last_updated: '2026-07-14'
-fingerprint: sha256:741b4c699a4bd6d02b2dcd9f97a6fcd4eb37d776a4c3f074b612f5c8cd35d17c
+fingerprint: sha256:51b4dde166085b95253bb3dbbb4f3707fa7ed33a92124f719a1995866545aa52
 related: []
 sources:
 - src/sevn/config/**
@@ -28,6 +28,21 @@ personas:
 - operator
 prd_profile: standard
 ---
+
+## Spec implementation status (W9 seed)
+
+This PRD is `ready` while linked specs below are not normatively complete (`draft` / `scaffold` / `rejected`). Code may run ahead of spec prose.
+
+| Spec | Status |
+| --- | --- |
+| spec-02-config-and-workspace | draft |
+| spec-07-egress-proxy | draft |
+| spec-22-onboarding | draft |
+| spec-23-cli | draft |
+| spec-24-dashboard | draft |
+| spec-25-cicd-full | draft |
+
+<!-- HUMAN-INPUT[owner=operator]: Reconcile PRD `ready` vs implementing spec maturity — downgrade PRD, or keep ready and finish normative spec bodies. -->
 
 ## Problem & Motivation
 

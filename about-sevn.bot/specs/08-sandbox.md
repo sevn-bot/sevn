@@ -2,7 +2,7 @@
 id: spec-08-sandbox
 kind: spec
 title: Sandbox — Spec
-status: done
+status: draft
 owner: Alex
 summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / safebash
   (when routed through the execution sandbox), process when configured for sandbox
@@ -300,30 +300,75 @@ personas: []
 prd_profile: null
 ---
 
+
 ## Purpose
 
-Offline scaffold for Sandbox — Spec (spec-08-sandbox) — Purpose.
+Deliver a single tool-execution sandbox used by sandbox_exec, exec / safebash (when routed through the execution sandbox), process when configured for sandbox routing, and skill subprocesses spawned b
 
+Primary code trees: [`src/sevn/security`](src/sevn/security/__init__.py).
+
+Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
 ## Public Interface
 
-Offline scaffold for Sandbox — Spec (spec-08-sandbox) — Public Interface.
+Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
+
+- [`apply_namespace_egress_firewall`](src/sevn/security/egress_firewall.py) — `src/sevn/security/egress_firewall.py`
+- [`egress_firewall_noop`](src/sevn/security/egress_firewall.py) — `src/sevn/security/egress_firewall.py`
+- [`write_linux_iptables_ruleset`](src/sevn/security/egress_firewall.py) — `src/sevn/security/egress_firewall.py`
+- [`write_macos_pf_ruleset`](src/sevn/security/egress_firewall.py) — `src/sevn/security/egress_firewall.py`
+- [`BlockReason`](src/sevn/security/llm_guard_scanner.py) — `src/sevn/security/llm_guard_scanner.py`
+- [`LLMGuardScanner`](src/sevn/security/llm_guard_scanner.py) — `src/sevn/security/llm_guard_scanner.py`
+- [`ScanResult`](src/sevn/security/llm_guard_scanner.py) — `src/sevn/security/llm_guard_scanner.py`
+- [`ScanVerdict`](src/sevn/security/llm_guard_scanner.py) — `src/sevn/security/llm_guard_scanner.py`
+- [`scan_patch_diff`](src/sevn/security/llm_guard_scanner.py) — `src/sevn/security/llm_guard_scanner.py`
+- [`assert_shadow_workspace_excludes_llmignore`](src/sevn/security/llmignore.py) — `src/sevn/security/llmignore.py`
+- [`ensure_llmignore_layout`](src/sevn/security/llmignore.py) — `src/sevn/security/llmignore.py`
+- [`is_llmignored`](src/sevn/security/llmignore.py) — `src/sevn/security/llmignore.py`
+- _…and 79 more in frontmatter `interfaces:`._
 ## Data Model
 
-Offline scaffold for Sandbox — Spec (spec-08-sandbox) — Data Model.
+Initial draft for **Data Model** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
+
+- [`apply_namespace_egress_firewall`](src/sevn/security/egress_firewall.py) — `src/sevn/security/egress_firewall.py`
+- [`egress_firewall_noop`](src/sevn/security/egress_firewall.py) — `src/sevn/security/egress_firewall.py`
+- [`write_linux_iptables_ruleset`](src/sevn/security/egress_firewall.py) — `src/sevn/security/egress_firewall.py`
+- [`write_macos_pf_ruleset`](src/sevn/security/egress_firewall.py) — `src/sevn/security/egress_firewall.py`
+- [`BlockReason`](src/sevn/security/llm_guard_scanner.py) — `src/sevn/security/llm_guard_scanner.py`
+- [`LLMGuardScanner`](src/sevn/security/llm_guard_scanner.py) — `src/sevn/security/llm_guard_scanner.py`
+- [`ScanResult`](src/sevn/security/llm_guard_scanner.py) — `src/sevn/security/llm_guard_scanner.py`
+- [`ScanVerdict`](src/sevn/security/llm_guard_scanner.py) — `src/sevn/security/llm_guard_scanner.py`
+- [`scan_patch_diff`](src/sevn/security/llm_guard_scanner.py) — `src/sevn/security/llm_guard_scanner.py`
+- [`assert_shadow_workspace_excludes_llmignore`](src/sevn/security/llmignore.py) — `src/sevn/security/llmignore.py`
+- [`ensure_llmignore_layout`](src/sevn/security/llmignore.py) — `src/sevn/security/llmignore.py`
+- [`is_llmignored`](src/sevn/security/llmignore.py) — `src/sevn/security/llmignore.py`
+- _…and 79 more in frontmatter `interfaces:`._
 ## Internal Architecture
 
-Offline scaffold for Sandbox — Spec (spec-08-sandbox) — Internal Architecture.
-
+See **Implemented by** and [`src/sevn/security`](src/sevn/security/__init__.py).
 ## Behavior
 
-Offline scaffold for Sandbox — Spec (spec-08-sandbox) — Behavior.
+Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+
+Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/security`](src/sevn/security/__init__.py).
 ## Failure Modes
 
-Offline scaffold for Sandbox — Spec (spec-08-sandbox) — Failure Modes.
+Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
 
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
+
+Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Offline scaffold for Sandbox — Spec (spec-08-sandbox) — Test Strategy.
+Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+
+<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
+
+Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
