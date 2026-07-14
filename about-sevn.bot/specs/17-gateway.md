@@ -1381,7 +1381,7 @@ and channel routing.
 | `IncomingMessage` / `OutgoingMessage` | `src/sevn/gateway/channel_types.py` | Channel envelopes |
 | `triage_context_from_session` | `src/sevn/gateway/triage_context.py` | Triager inputs |
 | `CascadeBudget` | `src/sevn/gateway/cascade_budget.py` | Tier-B retry budget |
-| `TurnFinalizer` | `src/sevn/gateway/turn_finalizer.py` | Placeholder/edit dance |
+| `TierBAnswerFinalizer` | `src/sevn/gateway/turn_finalizer.py` | Placeholder/edit dance |
 | HTTP lifespan | `src/sevn/gateway/http_server.py` | ASGI server boot |
 
 Amendments from spec-36: `queue_mode`/`busy_input_mode` `"multi"`, relatedness classify,
@@ -1416,7 +1416,7 @@ Channel adapter → ChannelRouter.route_incoming
     → build_agent_run_turn._run_guarded → _run
         → triage_turn | passthrough
         → tier A | run_b_turn | run_cd_turn
-    → ChannelRouter outbound (+ TurnFinalizer)
+    → ChannelRouter outbound (+ TierBAnswerFinalizer)
 ```
 
 Sub-agent L1 registration/finalize hooks in `_run_guarded` (spec-36).

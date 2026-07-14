@@ -424,7 +424,7 @@ Docs tooling in scope: `src/sevn/docs/about/check.py` (`check_about_docs`),
 
 ## Data Model
 
-### `CI_STEPS` (39 ordered steps)
+### `CI_STEPS` (31 ordered steps)
 
 Defined in root `Makefile` — consumed by `make ci-resume` via `scripts/ci_resume.sh`.
 First infra step includes `make config-schema` against `infra/sevn.schema.json` goldens.
