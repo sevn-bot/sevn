@@ -64,6 +64,28 @@ class TelegramInboundMixin(TelegramSendHost):
                 self._seen_updates.popitem(last=False)
         return True
 
+    def _commit_name_upsert(self, sql: str, params: tuple[Any, ...], *, log_event: str) -> None:
+        """Run one display-name upsert and commit; log failures without raising.
+
+        Args:
+            sql (str): Parameterized INSERT … ON CONFLICT statement.
+            params (tuple[Any, ...]): Bound values for ``sql``.
+            log_event (str): Loguru event name when ``sqlite3.Error`` occurs.
+
+        Examples:
+            >>> from sevn.channels.telegram import TelegramAdapter
+            >>> adapter = TelegramAdapter(resolved_bot_token="t")
+            >>> adapter._commit_name_upsert("", (), log_event="noop") is None
+            True
+        """
+        if self._conn is None:
+            return
+        try:
+            self._conn.execute(sql, params)
+            self._conn.commit()
+        except sqlite3.Error:
+            logger.exception(log_event)
+
     def _upsert_topic_name(self, chat_id: int, topic_id: int, name: str) -> None:
         """Persist the latest known display name for a forum topic.
         Failures are logged at exception level but never raised, so a
@@ -78,22 +100,70 @@ class TelegramInboundMixin(TelegramSendHost):
             >>> adapter._upsert_topic_name(1, 2, "general") is None
             True
         """
-        if self._conn is None:
+        self._commit_name_upsert(
+            """
+            INSERT INTO telegram_topic_names (chat_id, topic_id, name, updated_at)
+            VALUES (?, ?, ?, datetime('now'))
+            ON CONFLICT(chat_id, topic_id) DO UPDATE SET
+                name = excluded.name,
+                updated_at = excluded.updated_at
+            """,
+            (chat_id, topic_id, name),
+            log_event="telegram_topic_names_upsert_failed",
+        )
+
+    def _upsert_chat_name(self, chat_id: int, name: str) -> None:
+        """Persist the latest known display title for a group or supergroup chat.
+
+        Failures are logged at exception level but never raised, so a transient
+        sqlite issue cannot break message ingestion.
+
+        Args:
+            chat_id (int): Telegram chat id.
+            name (str): Latest ``chat.title`` from an inbound message.
+
+        Examples:
+            >>> from sevn.channels.telegram import TelegramAdapter
+            >>> adapter = TelegramAdapter(resolved_bot_token="t")
+            >>> adapter._upsert_chat_name(-1, "Ops") is None
+            True
+        """
+        self._commit_name_upsert(
+            """
+            INSERT INTO telegram_chat_names (chat_id, name, updated_at)
+            VALUES (?, ?, datetime('now'))
+            ON CONFLICT(chat_id) DO UPDATE SET
+                name = excluded.name,
+                updated_at = excluded.updated_at
+            """,
+            (chat_id, name),
+            log_event="telegram_chat_names_upsert_failed",
+        )
+
+    def _maybe_upsert_chat_name_from_chat(self, chat: dict[str, Any]) -> None:
+        """Capture ``chat.title`` for group/supergroup messages when present.
+
+        Args:
+            chat (dict[str, Any]): Telegram chat object from an inbound message.
+
+        Examples:
+            >>> from sevn.channels.telegram import TelegramAdapter
+            >>> adapter = TelegramAdapter(resolved_bot_token="t")
+            >>> adapter._maybe_upsert_chat_name_from_chat(
+            ...     {"id": -1, "type": "supergroup", "title": "Ops"},
+            ... ) is None
+            True
+        """
+        chat_type = str(chat.get("type") or "")
+        if chat_type not in ("group", "supergroup"):
             return
-        try:
-            self._conn.execute(
-                """
-                INSERT INTO telegram_topic_names (chat_id, topic_id, name, updated_at)
-                VALUES (?, ?, ?, datetime('now'))
-                ON CONFLICT(chat_id, topic_id) DO UPDATE SET
-                    name = excluded.name,
-                    updated_at = excluded.updated_at
-                """,
-                (chat_id, topic_id, name),
-            )
-            self._conn.commit()
-        except sqlite3.Error:
-            logger.exception("telegram_topic_names_upsert_failed")
+        title = chat.get("title")
+        if not isinstance(title, str) or not title.strip():
+            return
+        cid = chat.get("id")
+        if not isinstance(cid, int):
+            return
+        self._upsert_chat_name(cid, title.strip())
 
     def _apply_forum_service(self, msg: dict[str, Any]) -> None:
         """Capture topic-name updates from ``forum_topic_{created,edited}`` events.
@@ -496,6 +566,7 @@ class TelegramInboundMixin(TelegramSendHost):
         chat_id = chat.get("id")
         if not isinstance(chat_id, int):
             return None
+        self._maybe_upsert_chat_name_from_chat(chat)
         mtid = cq.get("message_thread_id")
         if mtid is None and isinstance(msg, dict):
             mtid = msg.get("message_thread_id")
@@ -696,6 +767,7 @@ class TelegramInboundMixin(TelegramSendHost):
         chat_id = chat.get("id")
         if not isinstance(chat_id, int):
             return None
+        self._maybe_upsert_chat_name_from_chat(chat)
         if msg.get("forum_topic_created") or msg.get("forum_topic_edited"):
             self._apply_forum_service(msg)
             return None

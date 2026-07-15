@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import os
-import re
+import sqlite3
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
@@ -22,6 +22,12 @@ from typing import Any
 from loguru import logger
 
 from sevn.config.workspace_config import GatewaySessionMirrorConfig, WorkspaceConfig
+from sevn.gateway.session.path_names import (
+    SessionPathNameLookup,
+    coerce_name_lookup,
+    parse_telegram_scope_rel,
+    safe_path_segment,
+)
 
 _INDEX_NAME = "_index.json"
 _jsonl_lock_guard = threading.Lock()
@@ -126,15 +132,19 @@ def _safe_segment(value: str) -> str:
         >>> _safe_segment("telegram:123:topic:42")
         'telegram_123_topic_42'
     """
-    cleaned = re.sub(r"[^\w.\-]+", "_", value.strip())
-    return cleaned or "unknown"
+    return safe_path_segment(value)
 
 
-def _parse_scope_key(scope_key: str) -> tuple[str, dict[str, Any]]:
+def _parse_scope_key(
+    scope_key: str,
+    *,
+    lookup: SessionPathNameLookup | sqlite3.Connection | None = None,
+) -> tuple[str, dict[str, Any]]:
     """Map ``gateway_sessions.scope_key`` to mirror path parts.
 
     Args:
         scope_key (str): Session scope key.
+        lookup (SessionPathNameLookup | sqlite3.Connection | None): Optional title lookup.
 
     Returns:
         tuple[str, dict[str, Any]]: Relative path under ``sessions/`` and extras.
@@ -146,15 +156,10 @@ def _parse_scope_key(scope_key: str) -> tuple[str, dict[str, Any]]:
         >>> extra["topic_id"]
         '7'
     """
-    if scope_key.startswith("telegram:"):
-        parts = scope_key.split(":")
-        chat_id = parts[1] if len(parts) > 1 else "0"
-        if len(parts) >= 4 and parts[2] == "topic":
-            topic_id = parts[3]
-            rel = f"telegram/chats/{_safe_segment(chat_id)}/topics/{_safe_segment(topic_id)}"
-            return rel, {"chat_id": chat_id, "topic_id": topic_id}
-        rel = f"telegram/chats/{_safe_segment(chat_id)}/general"
-        return rel, {"chat_id": chat_id, "topic_id": None}
+    resolved = coerce_name_lookup(lookup)
+    telegram = parse_telegram_scope_rel(scope_key, resolved)
+    if telegram is not None:
+        return telegram
     if scope_key.startswith("webchat:"):
         sub = scope_key.split(":", 1)[1] if ":" in scope_key else "user"
         rel = f"webchat/users/{_safe_segment(sub)}"
@@ -316,6 +321,7 @@ def mirror_gateway_message(
     created_at: str,
     extras_json: str | None,
     turn_id: str | None = None,
+    lookup: SessionPathNameLookup | sqlite3.Connection | None = None,
 ) -> None:
     """Append one gateway message row to the workspace JSONL mirror (best-effort).
 
@@ -335,6 +341,7 @@ def mirror_gateway_message(
         created_at (str): Row timestamp.
         extras_json (str | None): Adapter metadata JSON.
         turn_id (str | None): Optional turn correlation id.
+        lookup (SessionPathNameLookup | sqlite3.Connection | None): Optional title lookup.
 
     Examples:
         >>> from pathlib import Path
@@ -360,7 +367,7 @@ def mirror_gateway_message(
     if not session_mirror_enabled(workspace):
         return
     try:
-        scope_rel, scope_extras = _parse_scope_key(scope_key)
+        scope_rel, scope_extras = _parse_scope_key(scope_key, lookup=lookup)
         extras: dict[str, Any] = dict(scope_extras)
         if extras_json:
             try:
@@ -415,5 +422,5 @@ def mirror_gateway_message(
                 + "\n",
                 encoding="utf-8",
             )
-    except OSError as exc:
+    except (OSError, sqlite3.Error) as exc:
         logger.warning("session_mirror append failed session_id={} err={}", session_id, exc)

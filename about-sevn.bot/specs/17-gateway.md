@@ -7,8 +7,8 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
-last_updated: '2026-07-14'
-fingerprint: sha256:3347abb42f8cf3fec3b41af080dea85b5d442e762f8f05a60e49420cf13ba15b
+last_updated: '2026-07-15'
+fingerprint: sha256:e08cdf0fb6c4eb29a736e0c9438655b59c4526d6a97c8a121e818ec03c6a37c7
 related: []
 sources:
 - src/sevn/gateway/**
@@ -858,6 +858,30 @@ interfaces:
 - name: resolve_owner_telegram_user_id
   file: src/sevn/gateway/self_improve/self_improve_job_events.py
   symbol: resolve_owner_telegram_user_id
+- name: SessionPathNameLookup
+  file: src/sevn/gateway/session/path_names.py
+  symbol: SessionPathNameLookup
+- name: SessionPathNameResolver
+  file: src/sevn/gateway/session/path_names.py
+  symbol: SessionPathNameResolver
+- name: chat_path_segment
+  file: src/sevn/gateway/session/path_names.py
+  symbol: chat_path_segment
+- name: coerce_name_lookup
+  file: src/sevn/gateway/session/path_names.py
+  symbol: coerce_name_lookup
+- name: format_named_path_segment
+  file: src/sevn/gateway/session/path_names.py
+  symbol: format_named_path_segment
+- name: parse_telegram_scope_rel
+  file: src/sevn/gateway/session/path_names.py
+  symbol: parse_telegram_scope_rel
+- name: safe_path_segment
+  file: src/sevn/gateway/session/path_names.py
+  symbol: safe_path_segment
+- name: topic_path_segment
+  file: src/sevn/gateway/session/path_names.py
+  symbol: topic_path_segment
 - name: mark_session_superseded
   file: src/sevn/gateway/session/session_mirror.py
   symbol: mark_session_superseded

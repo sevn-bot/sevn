@@ -19,6 +19,7 @@ are cut into a dated, versioned section at release time.
 - [2026-07-15] `make spec-kit-wave-test` runs the skw pytest suite in `ci-docs` so validator regressions cannot slip through partial iteration
 - [2026-07-15] `make ci-affected` triggers `about-docs-check` when `about-sevn.bot/specs/`, `about-sevn.bot/prd/`, or `spec-kit-wave/` paths change
 - [2026-07-15] Gateway README Level 3 module inventory lists every gateway subpackage module with docstring prose and symbol anchors for operator and LLM readers
+- [2026-07-15] Telegram session mirror paths under `sessions/telegram/chats/` include sanitized group and forum topic titles with `--{id}` suffixes for uniqueness; group titles persist in `telegram_chat_names`; ID-only segments when names are unknown; existing JSONL folders are not moved (#21)
 
 - [2026-07-14] `skw docs sync` refreshes about-doc frontmatter and scaffolds missing PRD/spec files via `make spec-sync` and `make prd-sync`
 - [2026-07-13] `sevn dashboard set-login-password` stores the Mission Control owner password in the workspace secrets chain and stamps `dashboard.login_password` with a `${SECRET:…}` ref
@@ -65,6 +66,7 @@ are cut into a dated, versioned section at release time.
 ### Fixed
 
 - [2026-07-14] Bundled skill seeding skips `__pycache__` when copying packaged skills, avoiding parallel-test flakes on transient `.pyc` files
+- [2026-07-15] Telegram session mirror title lookup is best-effort when SQLite errors occur; group titles also persist from inline-keyboard callbacks (#21)
 - [2026-07-15] Restored spec-36 sub-agent amendment cross-reference in `14-executor-tier-b.md` after W9 body rewrite
 - [2026-07-15] `scripts/changelog_validate.py` shim re-exports `load_changelog_rules`, `validate_changelog`, and `check_staged_gate` for backward compatibility
 - [2026-07-15] Gateway README module count and `build_agent_run_turn` line anchors updated after W12 subpackage reorg
