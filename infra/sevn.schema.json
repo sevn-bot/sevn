@@ -114,7 +114,7 @@
       "type": "object",
       "required": ["model", "provider"],
       "description": "Level-2 specialist executor entry (`about-sevn.bot/sub-agents.html` D8).",
-      "long_description": "Example (documented default, not shipped as a config default — `subagents.specialists` defaults to an empty object): `media_generator` → `provider: \"minimax\"`, `model: \"minimax-3\"`, `assigned_to: [\"tier_b\"]`, `requestable_by: [\"triager\", \"tier_b\"]`, `max_concurrent: 2`. `assigned_to` statically binds the specialist to level-1 roles that may spawn it; `requestable_by` additionally allows the named roles to grant/request it at runtime (e.g. the triager attaching it to a tier-B dispatch).",
+      "long_description": "Example (documented default, not shipped as a config default — `subagents.specialists` defaults to an empty object): `media_generator` → `provider: \"minimax\"`, `model: \"minimax-3\"`, `assigned_to: [\"tier_b\"]`, `requestable_by: [\"triager\", \"tier_b\"]`, `max_concurrent: 2`; `social_media_manager` → TwexAPI + CDP `browser` toolkit via optional `skills`/`tools` arrays (https://docs.twexapi.io/). `assigned_to` statically binds the specialist to level-1 roles that may spawn it; `requestable_by` additionally allows the named roles to grant/request it at runtime (e.g. the triager attaching it to a tier-B dispatch).",
       "properties": {
         "model": { "type": "string", "description": "Model id/alias for this specialist (resolved via the provider's model catalog)." },
         "provider": { "type": "string", "description": "Provider registry name (e.g. `minimax`)." },
@@ -131,8 +131,20 @@
           "description": "Level-1 roles that may request/grant this specialist at runtime even if not in `assigned_to`."
         },
         "max_concurrent": { "type": "integer", "minimum": 1, "default": 2, "description": "Max concurrent running instances of this specialist across the workspace." },
-        "skill": { "type": ["string", "null"], "description": "Bundled skill name this specialist is wired to (e.g. `media_generation`)." },
-        "system_prompt_ref": { "type": ["string", "null"], "description": "Optional reference to a system-prompt override for this specialist." }
+        "skill": { "type": ["string", "null"], "description": "Bundled skill name this specialist is wired to (e.g. `media_generation` or `social_media_manager`)." },
+        "system_prompt_ref": { "type": ["string", "null"], "description": "Optional reference to a system-prompt override for this specialist." },
+        "skills": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Optional list of core skill ids assigned to this specialist's toolkit (e.g. social_media_manager → x-use, playwright-browser, …)."
+        },
+        "tools": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Optional list of core tool ids assigned to this specialist's toolkit (e.g. social_media_manager → browser CDP automator, get_page_content, …)."
+        }
       },
       "additionalProperties": false
     }

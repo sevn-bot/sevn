@@ -47,6 +47,7 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | second_brain | Karpathy-style raw→wiki ingest, lint, and file-back flows (`specs/27-second-brain.md`). |
 | sessions_management | Gateway sessions, history, send, spawn, yield, and status (`specs/17-gateway.md`). |
 | skill_management | Authoring workflows for generated skills; pairs with native skill_create and promote_generated_skill (`specs/12-skills-system.md` §2.5). |
+| social_media_manager | Monitor and interact with social media via TwexAPI, sevn CDP browser, and assigned social skills (x-use, facebook-use, linkedin-use). |
 | telegram | Telegram inline custom buttons and forum supergroup helpers (Bot API + allowlist/userbot hooks). |
 | telegram_test | Run host-side Playwright Telegram E2E (sevn telegram-test) while building sevn.bot. Use after gateway/menu/session/diagnostics changes. Not in gateway container. |
 | sevn-diagnostics | sevn.bot operator repair playbooks for `sevn doctor --with-agent` (gateway, secrets, proxy, models, browser, voice). |

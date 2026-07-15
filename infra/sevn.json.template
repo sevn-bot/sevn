@@ -222,7 +222,7 @@
   "doctor": { "strict": false },
 
   // Sub-agents (L1/L2) orchestration — see about-sevn.bot/sub-agents.html. `specialists` defaults empty;
-  // documented example for media generation (W8 — not shipped as a default):
+  // documented examples (not shipped as defaults):
   // "specialists": {
   //   "media_generator": {
   //     "model": "minimax-3",
@@ -231,8 +231,23 @@
   //     "requestable_by": ["triager", "tier_b"],
   //     "max_concurrent": 2,
   //     "skill": "media_generation"
+  //   },
+  //   "social_media_manager": {
+  //     "model": "gpt-4o-mini",
+  //     "provider": "openai",
+  //     "assigned_to": ["tier_b"],
+  //     "requestable_by": ["triager", "tier_b"],
+  //     "max_concurrent": 2,
+  //     "skill": "social_media_manager",
+  //     "skills": ["social_media_manager", "x-use", "facebook-use", "linkedin-use",
+  //               "playwright-browser", "browser-harness", "last30days", "yt-dlp",
+  //               "media_generation", "scheduling"],
+  //     "tools": ["browser", "get_page_content", "web_fetch", "web_search", "serp",
+  //               "load_skill", "run_skill_script", "send_file", "message"]
   //   }
   // }
+  // TwexAPI key for social_media_manager (https://docs.twexapi.io/):
+  // "skills": { "social_media_manager": { "twexapi": { "api_key": "${SECRET:SEVN_SECRET_TWEXAPI}" } } }
   "subagents": {
     "enabled": true,
     "max_level1_default": 5,

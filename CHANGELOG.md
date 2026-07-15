@@ -31,6 +31,7 @@ are cut into a dated, versioned section at release time.
 - [2026-07-14] Witchcraft semantic reindex for the Second Brain vault via `sevn second-brain setup --reindex` and opt-in `witchcraft.reindex_on_startup` (default false)
 - [2026-07-12] Logfire trace export: `tracing.sinks[]` logfire sink with secrets-managed token, `sevn tracing` / `sevn config tracing` CLI, Telegram `/config → Logs` toggle and token form, and Mission Control ops endpoints
 - [2026-07-12] Sub-agents orchestration with level-1 role runs, level-2 workers and specialists, `multi` queue mode, Mission Control and Telegram kill surfaces, and `media_generation` skill via the `media_generator` specialist
+- [2026-07-15] `social_media_manager` specialist + bundled skill: TwexAPI medium (https://docs.twexapi.io/), sevn CDP `browser` tool, and assigned core social skills (`x-use`, `facebook-use`, `linkedin-use`, `playwright-browser`, …)
 
 ### Changed
 

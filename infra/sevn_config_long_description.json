@@ -441,8 +441,8 @@
       "how_to_collect": "Add an entry only for roles that need a limit different from the *_default values."
     },
     "subagents.specialists": {
-      "long_description": "Level-2 specialist executors by name (default empty object — no specialists configured). Documented example (not a shipped default): media_generator -> {\"model\": \"minimax-3\", \"provider\": \"minimax\", \"assigned_to\": [\"tier_b\"], \"requestable_by\": [\"triager\", \"tier_b\"], \"max_concurrent\": 2} (D8), operator-visible label sub_agent_2_media_generator (D16).",
-      "how_to_collect": "Add one entry per specialist you configure; each requires model + provider at minimum. assigned_to statically binds roles that may spawn it; requestable_by additionally allows those roles to grant/request it at runtime."
+      "long_description": "Level-2 specialist executors by name (default empty object — no specialists configured). Documented examples (not shipped defaults): media_generator -> {\"model\": \"minimax-3\", \"provider\": \"minimax\", \"assigned_to\": [\"tier_b\"], \"requestable_by\": [\"triager\", \"tier_b\"], \"max_concurrent\": 2, \"skill\": \"media_generation\"} (D8); social_media_manager -> TwexAPI + CDP browser specialist with optional skills/tools toolkit lists (https://docs.twexapi.io/).",
+      "how_to_collect": "Add one entry per specialist you configure; each requires model + provider at minimum. assigned_to statically binds roles that may spawn it; requestable_by additionally allows those roles to grant/request it at runtime. Optional skills/tools arrays declare the specialist toolkit (used by social_media_manager)."
     },
     "max_concurrent_subagents_total": {
       "long_description": "Workspace-wide total subagent cap across sessions. Pre-existing, unimplemented placeholder distinct from subagents.max_override (about-sevn.bot/sub-agents.html D2) — a true workspace-total cap is explicitly out of scope for v1 (sub-agents-orchestration risk #6) and may retire this key later.",

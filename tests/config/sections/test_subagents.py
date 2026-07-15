@@ -95,6 +95,8 @@ def test_specialist_config_round_trip() -> None:
         assigned_to=["tier_b"],
         requestable_by=["triager", "tier_b"],
         max_concurrent=2,
+        skills=["x-use"],
+        tools=["browser"],
     )
     cfg = SubAgentsWorkspaceConfig(specialists={"media_generator": specialist})
     assert cfg.specialists["media_generator"].model == "minimax-3"
@@ -102,10 +104,13 @@ def test_specialist_config_round_trip() -> None:
     assert cfg.specialists["media_generator"].assigned_to == ["tier_b"]
     assert cfg.specialists["media_generator"].requestable_by == ["triager", "tier_b"]
     assert cfg.specialists["media_generator"].max_concurrent == 2
+    assert cfg.specialists["media_generator"].skills == ["x-use"]
+    assert cfg.specialists["media_generator"].tools == ["browser"]
 
     dumped = cfg.model_dump(mode="python")
     restored = SubAgentsWorkspaceConfig.model_validate(dumped)
     assert restored.specialists["media_generator"].model == "minimax-3"
+    assert restored.specialists["media_generator"].tools == ["browser"]
 
 
 def test_specialists_default_empty_via_workspace_config() -> None:

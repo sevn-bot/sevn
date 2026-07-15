@@ -33,6 +33,9 @@
 <rect x="380" y="278" width="120" height="44" rx="6" fill="#3a2448" stroke="#b48ad9" stroke-width="1.5"/>
 <text x="440" y="294" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">L2 specialist</text>
 <text x="440" y="308" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" fill="#e8eaed">media_generator</text>
+<rect x="520" y="278" width="120" height="44" rx="6" fill="#3a2448" stroke="#b48ad9" stroke-width="1.5"/>
+<text x="580" y="294" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">L2 specialist</text>
+<text x="580" y="308" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" fill="#e8eaed">social_media_manager</text>
 <rect x="140" y="278" width="120" height="44" rx="6" fill="#2a3540" stroke="#7a8a9a" stroke-width="1.5"/>
 <text x="200" y="294" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">L2</text>
 <text x="200" y="308" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" fill="#e8eaed">generic worker</text>
@@ -52,6 +55,8 @@
 <text x="240" y="226" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">spawn_subagent</text>
 <line x1="280" y1="182" x2="440" y2="278" stroke="#8ab4f8" stroke-width="1.5" marker-end="url(#arrow)"/>
 <text x="360" y="226" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">spawn specialist</text>
+<line x1="280" y1="182" x2="580" y2="278" stroke="#8ab4f8" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="430" y="226" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">spawn specialist</text>
 <line x1="120" y1="182" x2="280" y2="138" stroke="#8ab4f8" stroke-width="1.5" marker-end="url(#arrow)"/>
 <text x="200" y="156" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="9" fill="#e8eaed">specialist_grants</text>
 <text x="640" y="200" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="10" fill="#e8eaed">multi: new_task / related_steer / supersede_cancel</text>

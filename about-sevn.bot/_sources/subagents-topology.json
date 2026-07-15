@@ -22,6 +22,39 @@
       "requestable_by": ["triager", "tier_b"],
       "max_concurrent": 2,
       "skill": "media_generation"
+    },
+    {
+      "id": "social_media_manager",
+      "label": "social_media_manager",
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "assigned_to": ["tier_b"],
+      "requestable_by": ["triager", "tier_b"],
+      "max_concurrent": 2,
+      "skill": "social_media_manager",
+      "skills": [
+        "social_media_manager",
+        "x-use",
+        "facebook-use",
+        "linkedin-use",
+        "playwright-browser",
+        "browser-harness",
+        "last30days",
+        "yt-dlp",
+        "media_generation",
+        "scheduling"
+      ],
+      "tools": [
+        "browser",
+        "get_page_content",
+        "web_fetch",
+        "web_search",
+        "serp",
+        "load_skill",
+        "run_skill_script",
+        "send_file",
+        "message"
+      ]
     }
   ],
   "nodes": [
@@ -38,6 +71,7 @@
     {"from": "gateway", "to": "tier_d", "label": "L1 register"},
     {"from": "tier_b", "to": "l2_generic", "label": "spawn_subagent"},
     {"from": "tier_b", "to": "media_generator", "label": "spawn specialist"},
+    {"from": "tier_b", "to": "social_media_manager", "label": "spawn specialist"},
     {"from": "triager", "to": "tier_b", "label": "specialist_grants"},
     {"from": "gateway", "to": "multi_classifier", "label": "queue_mode multi"},
     {"from": "multi_classifier", "to": "tier_b", "label": "new_task"},
