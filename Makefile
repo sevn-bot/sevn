@@ -313,14 +313,26 @@ about-docs-check: ## Validate about-docs + skw spec/prd folder gates
 	$(MAKE) prd-check
 
 spec-check: ## Validate+score every spec in about-sevn.bot/specs (skw docs validate)
-	$(MAKE) -C spec-kit-wave spec-check
+	@if [ -d spec-kit-wave ]; then \
+		$(MAKE) -C spec-kit-wave spec-check; \
+	else \
+		echo "spec-check: skipped (spec-kit-wave not present)"; \
+	fi
 
 changelog-check: ## Changelog gate: Keep-a-Changelog lint + Unreleased diff gate (SEVN_CI_BASE=<ref>)
-	python3 scripts/changelog_validate.py --repo . --base $${SEVN_CI_BASE:-origin/main}
+	@if [ -d spec-kit-wave/src ]; then \
+		python3 scripts/changelog_validate.py --repo . --base $${SEVN_CI_BASE:-origin/main}; \
+	else \
+		echo "changelog-check: skipped (spec-kit-wave not present)"; \
+	fi
 
 changelog-eval: ## Advisory LLM double-score of Unreleased entries (not in CI; needs model access — MODEL=, BASE=)
-	PYTHONPATH=spec-kit-wave/src $(UV) run python -m skw.changelog_eval --repo . \
-		$(if $(MODEL),--model $(MODEL),) $(if $(BASE),--base $(BASE),)
+	@if [ -d spec-kit-wave/src ]; then \
+		PYTHONPATH=spec-kit-wave/src $(UV) run python -m skw.changelog_eval --repo . \
+			$(if $(MODEL),--model $(MODEL),) $(if $(BASE),--base $(BASE),); \
+	else \
+		echo "changelog-eval: skipped (spec-kit-wave not present)"; \
+	fi
 
 about-docs-migrate: ## Migrate legacy root prd/specs seed into about-sevn.bot/
 	PYTHONPATH=. $(UV) run sevn about-docs migrate --repo .
@@ -337,16 +349,32 @@ about-docs-generate: ## Generate offline body for one doc (DOC_ID=spec-17-gatewa
 	PYTHONPATH=. $(UV) run sevn about-docs generate $(DOC_ID) --repo .
 
 spec-sync: ## Refresh spec frontmatter in about-sevn.bot/specs (skw docs sync)
-	$(MAKE) -C spec-kit-wave spec-sync
+	@if [ -d spec-kit-wave ]; then \
+		$(MAKE) -C spec-kit-wave spec-sync; \
+	else \
+		echo "spec-sync: skipped (spec-kit-wave not present)"; \
+	fi
 
 prd-sync: ## Refresh PRD frontmatter in about-sevn.bot/prd (skw docs sync)
-	$(MAKE) -C spec-kit-wave prd-sync
+	@if [ -d spec-kit-wave ]; then \
+		$(MAKE) -C spec-kit-wave prd-sync; \
+	else \
+		echo "prd-sync: skipped (spec-kit-wave not present)"; \
+	fi
 
 prd-check: ## Validate+score every PRD in about-sevn.bot/prd (skw docs validate)
-	$(MAKE) -C spec-kit-wave prd-check
+	@if [ -d spec-kit-wave ]; then \
+		$(MAKE) -C spec-kit-wave prd-check; \
+	else \
+		echo "prd-check: skipped (spec-kit-wave not present)"; \
+	fi
 
 spec-kit-wave-test: ## Run spec-kit-wave pytest suite (skw validators + sync contracts)
-	$(MAKE) -C spec-kit-wave test
+	@if [ -d spec-kit-wave ]; then \
+		$(MAKE) -C spec-kit-wave test; \
+	else \
+		echo "spec-kit-wave-test: skipped (spec-kit-wave not present)"; \
+	fi
 
 subagents-chart: ## Regenerate deterministic sub-agents topology SVG (D14)
 	$(UV) run python scripts/gen_subagents_chart.py

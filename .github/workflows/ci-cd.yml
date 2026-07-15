@@ -1,4 +1,4 @@
-# CI disabled until open-source migration — restore commented `on:` block below to re-enable.
+# Active delivery pipeline: triggers on push to main, v* tags, and manual dispatch.
 #
 # SPDX-License-Identifier: MIT
 #
