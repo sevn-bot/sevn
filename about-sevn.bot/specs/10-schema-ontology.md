@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Define the runtime ontology for Triager output and related labels across
   the agent core: canonical field names, closed enums, typing conventions, and how
   they compose with executor dispatch described '
-last_updated: '2026-07-14'
-fingerprint: sha256:5974dac305546f994730735acb3807d00aff5d24e1ad06c19cbab944953f0f67
+last_updated: '2026-07-15'
+fingerprint: sha256:7cf3d8fd17e33c2aae58d61815d1a103982511cd848292e3d8bf776364340a08
 related: []
 sources:
 - src/sevn/config/**
@@ -284,6 +284,9 @@ interfaces:
 - name: show_intent_footer
   file: src/sevn/config/sections/accessors.py
   symbol: show_intent_footer
+- name: social_media_manager_settings
+  file: src/sevn/config/sections/accessors.py
+  symbol: social_media_manager_settings
 - name: tier_b_answer_mode
   file: src/sevn/config/sections/accessors.py
   symbol: tier_b_answer_mode
@@ -641,6 +644,21 @@ interfaces:
 - name: SelfImproveWorkspaceConfig
   file: src/sevn/config/sections/self_improve.py
   symbol: SelfImproveWorkspaceConfig
+- name: PlatformMediumConfig
+  file: src/sevn/config/sections/skills_social_media.py
+  symbol: PlatformMediumConfig
+- name: SocialMediaManagerSkillConfig
+  file: src/sevn/config/sections/skills_social_media.py
+  symbol: SocialMediaManagerSkillConfig
+- name: TwexApiSkillBlock
+  file: src/sevn/config/sections/skills_social_media.py
+  symbol: TwexApiSkillBlock
+- name: social_media_manager_block_dict
+  file: src/sevn/config/sections/skills_social_media.py
+  symbol: social_media_manager_block_dict
+- name: social_media_manager_settings
+  file: src/sevn/config/sections/skills_social_media.py
+  symbol: social_media_manager_settings
 - name: SpecialistConfig
   file: src/sevn/config/sections/subagents.py
   symbol: SpecialistConfig
@@ -695,10 +713,8 @@ interfaces:
 - name: parse_workspace_config
   file: src/sevn/config/workspace_config.py
   symbol: parse_workspace_config
-specs: []
-personas: []
-prd_profile: null
 ---
+
 ## Purpose
 
 Define the **triager ontology** — the structured vocabulary (`Intent`, `ComplexityTier`,

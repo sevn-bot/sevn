@@ -78,6 +78,10 @@ from sevn.gateway.menu.menu_branding import (
     SEVN_BOT_ROOT_TILE_LABEL,
     config_sevn_bot_section_title,
 )
+from sevn.gateway.menu.social_media_manager_menu import (
+    build_social_media_manager_keyboard_rows,
+    social_media_manager_menu_caption,
+)
 from sevn.onboarding.seed import resolve_agent_display_name
 from sevn.second_brain.paths import display_scope_root_relative, effective_scope, resolve_scope_root
 
@@ -112,6 +116,7 @@ ConfigSection = Literal[
     "channels",
     "secrets",
     "skills",
+    "skills:social_media_manager",
     "tools",
     "code",
     "security",
@@ -141,6 +146,7 @@ _CONFIG_SECTIONS: frozenset[str] = frozenset(
         "channels",
         "secrets",
         "skills",
+        "skills:social_media_manager",
         "tools",
         "code",
         "security",
@@ -2045,7 +2051,9 @@ def _OPT_IN_DEFAULT_FALSE_SKILL_KEYS() -> frozenset[str]:
         >>> "lume" in _OPT_IN_DEFAULT_FALSE_SKILL_KEYS()
         True
     """
-    return frozenset({"computer_use", "cua_agent", "lume", "openwiki", "cursor_cloud"})
+    return frozenset(
+        {"computer_use", "cua_agent", "lume", "openwiki", "cursor_cloud", "social_media_manager"}
+    )
 
 
 def _skill_enabled(workspace: WorkspaceConfig, skill_key: str) -> bool:
@@ -2448,7 +2456,7 @@ def _build_skills_keyboard_rows(
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
         >>> _build_skills_keyboard_rows(WorkspaceConfig.minimal())
-        []
+        [[{'text': '📱 Social Media Manager', 'callback_data': 'cfg:section:skills:social_media_manager'}]]
     """
     rows: list[list[dict[str, Any]]] = []
     url = _mission_control_url(workspace, fragment="skills")
@@ -2471,6 +2479,15 @@ def _build_skills_keyboard_rows(
             )
     if content_root is not None:
         rows.append([{"text": "🔄 Refresh index", "callback_data": "cfg:skills:refresh"}])
+    if _schema_has_config_path("skills.social_media_manager"):
+        rows.append(
+            [
+                {
+                    "text": "📱 Social Media Manager",
+                    "callback_data": "cfg:section:skills:social_media_manager",
+                },
+            ],
+        )
     return rows
 
 
@@ -3331,6 +3348,8 @@ def build_config_menu_keyboard(
         rows_sec = _build_agents_keyboard_rows(workspace)
     elif section == "skills":
         rows_sec = _build_skills_keyboard_rows(workspace, content_root)
+    elif section == "skills:social_media_manager":
+        rows_sec = build_social_media_manager_keyboard_rows(workspace, content_root)
     elif section == "tools":
         rows_sec = _build_tools_keyboard_rows(workspace, content_root)
     elif section == "rlm":
@@ -3633,6 +3652,8 @@ def config_menu_message_text(
         if not _schema_parent_allows_child_enabled("skills") and not url:
             lines.append("No skill toggles in menu — set web_ui.url or extend the schema.")
         return "\n".join(lines)
+    if section == "skills:social_media_manager":
+        return social_media_manager_menu_caption(workspace, content_root)
     if section == "tools":
         tool_surface = _config_menu_tool_surface(workspace, content_root)
         native_n = len(tool_surface.native)

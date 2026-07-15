@@ -7,8 +7,8 @@ owner: Alex
 summary: Let operators and agents launch, poll, and inspect Cursor Cloud Agents against
   any GitHub/GitLab repo when skills.cursor_cloud.enabled is true, returning PR URLs,
   dashboard links (remote desktop), and
-last_updated: '2026-07-12'
-fingerprint: sha256:99a185af444a73436b77fa1c7fb9312a557a45d4c300bb87ddf8d21ddb7e0f6f
+last_updated: '2026-07-15'
+fingerprint: sha256:28f24683c550944697048f4dd7fbc7c563fbde06bee3ff73ccb13d08f3d2221c
 related: []
 sources:
 - src/sevn/integrations/**
@@ -166,11 +166,58 @@ interfaces:
 - name: integration_post_sync
   file: src/sevn/integrations/proxy_client.py
   symbol: integration_post_sync
-specs: []
-personas: []
-prd_profile: null
+- name: build_capabilities_matrix
+  file: src/sevn/integrations/social_media/capabilities.py
+  symbol: build_capabilities_matrix
+- name: site_skill_hints
+  file: src/sevn/integrations/social_media/capabilities.py
+  symbol: site_skill_hints
+- name: validate_config_cycle_mutation
+  file: src/sevn/integrations/social_media/cycle_validation.py
+  symbol: validate_config_cycle_mutation
+- name: allowed_media_for_site
+  file: src/sevn/integrations/social_media/medium.py
+  symbol: allowed_media_for_site
+- name: resolve_social_medium
+  file: src/sevn/integrations/social_media/medium.py
+  symbol: resolve_social_medium
+- name: build_social_media_readiness
+  file: src/sevn/integrations/social_media/readiness.py
+  symbol: build_social_media_readiness
+- name: build_social_media_readiness_sync
+  file: src/sevn/integrations/social_media/readiness.py
+  symbol: build_social_media_readiness_sync
+- name: format_browser_session_hint
+  file: src/sevn/integrations/social_media/readiness.py
+  symbol: format_browser_session_hint
+- name: platform_readiness_fields
+  file: src/sevn/integrations/social_media/readiness.py
+  symbol: platform_readiness_fields
+- name: site_login_probe
+  file: src/sevn/integrations/social_media/readiness.py
+  symbol: site_login_probe
+- name: twexapi_key_configured
+  file: src/sevn/integrations/social_media/readiness.py
+  symbol: twexapi_key_configured
+- name: TwexApiClient
+  file: src/sevn/integrations/twexapi/client.py
+  symbol: TwexApiClient
+- name: TwexApiError
+  file: src/sevn/integrations/twexapi/client.py
+  symbol: TwexApiError
+- name: TwexApiSettings
+  file: src/sevn/integrations/twexapi/config.py
+  symbol: TwexApiSettings
+- name: load_twexapi_settings
+  file: src/sevn/integrations/twexapi/config.py
+  symbol: load_twexapi_settings
+- name: resolve_twexapi_api_key
+  file: src/sevn/integrations/twexapi/config.py
+  symbol: resolve_twexapi_api_key
+- name: validate_twexapi_base_url
+  file: src/sevn/integrations/twexapi/config.py
+  symbol: validate_twexapi_base_url
 ---
-
 
 ## Purpose
 

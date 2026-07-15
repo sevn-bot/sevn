@@ -41,10 +41,14 @@ class SubAgentRoleLimits(BaseModel):
 class SpecialistConfig(BaseModel):
     """``subagents.specialists.<name>`` — level-2 specialist entry (D8).
 
-    First entry documented (not defaulted — specialists default to an empty
-    dict): ``media_generator`` → ``provider: "minimax"``, ``model: "minimax-3"``,
-    ``assigned_to: ["tier_b"]``, ``requestable_by: ["triager", "tier_b"]``,
-    ``max_concurrent: 2``.
+    Documented entries (not shipped as defaults — specialists default to an
+    empty dict):
+
+    - ``media_generator`` → ``provider: "minimax"``, ``model: "minimax-3"``,
+      ``assigned_to: ["tier_b"]``, ``requestable_by: ["triager", "tier_b"]``,
+      ``max_concurrent: 2``, ``skill: "media_generation"``.
+    - ``social_media_manager`` → TwexAPI + CDP browser specialist with
+      ``skills`` / ``tools`` toolkit lists (see ``social_media_worker`` defaults).
     """
 
     model_config = ConfigDict(extra="allow")
@@ -56,6 +60,10 @@ class SpecialistConfig(BaseModel):
     max_concurrent: int = Field(default=DEFAULT_SUBAGENT_SPECIALIST_MAX_CONCURRENT, ge=1)
     skill: str | None = None
     system_prompt_ref: str | None = None
+    skills: list[str] = Field(default_factory=list)
+    """Optional core skill ids assigned to this specialist's toolkit."""
+    tools: list[str] = Field(default_factory=list)
+    """Optional core tool ids assigned to this specialist's toolkit."""
 
 
 class SubAgentsWorkspaceConfig(BaseModel):

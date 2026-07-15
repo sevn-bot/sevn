@@ -60,7 +60,7 @@ async def _specialist_worker_body(
         specialist (str | None): Specialist name when this is a specialist spawn.
 
     Returns:
-        str: Worker result text (JSON for ``media_generator``).
+        str: Worker result text (JSON for known specialists).
 
     Raises:
         Exception: Propagates generation failures to the spawn tool wait path.
@@ -74,6 +74,12 @@ async def _specialist_worker_body(
         from sevn.agent.subagents.media_worker import execute_media_generator_for_context
 
         return await execute_media_generator_for_context(ctx, task)
+    if specialist == "social_media_manager":
+        from sevn.agent.subagents.social_media_worker import (
+            execute_social_media_manager_for_context,
+        )
+
+        return await execute_social_media_manager_for_context(ctx, task)
     return await _placeholder_worker_body(task=task, specialist=specialist)
 
 
@@ -122,8 +128,9 @@ async def _placeholder_worker_body(*, task: str, specialist: str | None) -> str:
             "specialist": {
                 "type": "string",
                 "description": (
-                    "Optional specialist name (e.g. 'media_generator'). Omit for a "
-                    "generic worker using the parent's own model configuration."
+                    "Optional specialist name (e.g. 'media_generator' or "
+                    "'social_media_manager'). Omit for a generic worker using the "
+                    "parent's own model configuration."
                 ),
             },
             "wait": {

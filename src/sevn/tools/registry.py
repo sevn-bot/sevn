@@ -190,6 +190,10 @@ DEFAULT_SKILL_MANIFESTS: Final[dict[str, str]] = {
     "second_brain": "Second Brain wiki query, ingest, and lint automation.",
     "sessions_management": "Gateway sessions, history, spawn, yield, and status scripts.",
     "skill_management": "Authoring workflows for manifests and promotions.",
+    "social_media_manager": (
+        "Monitor and interact with social media via TwexAPI, sevn CDP browser, "
+        "and assigned social skills (x-use, facebook-use, linkedin-use)."
+    ),
     "telegram": "Telegram inline buttons and forum supergroup helpers.",
     # telegram_test is host-only Playwright E2E (quarantined from the runtime skill index;
     # W1.4 / tool-skill-readiness-matrix.md). Not in DEFAULT_SKILL_MANIFESTS so it is

@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-07-15'
-fingerprint: sha256:e08cdf0fb6c4eb29a736e0c9438655b59c4526d6a97c8a121e818ec03c6a37c7
+fingerprint: sha256:b2e5ca04048fdf9aea995a62f0b5ed7668e06d37c369479d3fb3edd73bff853c
 related: []
 sources:
 - src/sevn/gateway/**
@@ -540,6 +540,12 @@ interfaces:
 - name: registry_implementation_counts
   file: src/sevn/gateway/menu/menu_registry.py
   symbol: registry_implementation_counts
+- name: build_social_media_manager_keyboard_rows
+  file: src/sevn/gateway/menu/social_media_manager_menu.py
+  symbol: build_social_media_manager_keyboard_rows
+- name: social_media_manager_menu_caption
+  file: src/sevn/gateway/menu/social_media_manager_menu.py
+  symbol: social_media_manager_menu_caption
 - name: EmptyMissionControlState
   file: src/sevn/gateway/mission/mission_api.py
   symbol: EmptyMissionControlState

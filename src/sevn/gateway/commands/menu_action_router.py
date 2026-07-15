@@ -81,7 +81,7 @@ from sevn.onboarding.web_app import _get_nested, _set_nested
 if TYPE_CHECKING:
     from sevn.gateway.channel_router import ChannelRouter, IncomingMessage
 
-ActionKind = Literal["toggle", "prompt", "skill", "action", "scene", "form"]
+ActionKind = Literal["toggle", "cycle", "prompt", "skill", "action", "scene", "form"]
 
 _SECTION_TOGGLES: dict[str, tuple[str, Any, Any]] = {
     "voice:mode:off": ("voice.tts_mode", "off", "off"),
@@ -176,8 +176,16 @@ def infer_config_section_from_callback(data: str) -> ConfigSection:
         return "my_sevn_bot"
     if raw.startswith("act:sevn_bot:"):
         return "sevn_bot"
+    if raw.startswith("cfg:cycle:"):
+        path = raw.removeprefix("cfg:cycle:").rsplit(":", 1)[0]
+        if path.startswith("skills.social_media_manager"):
+            return "skills:social_media_manager"
+        top = path.split(".", 1)[0]
+        return _CONFIG_PATH_SECTION.get(top, "root")
     if raw.startswith("cfg:toggle:"):
         path = raw.removeprefix("cfg:toggle:").split(":", 1)[0]
+        if path.startswith("skills.social_media_manager"):
+            return "skills:social_media_manager"
         if path.startswith("agent.codemode"):
             return "codemode"
         if path.startswith("subagents"):
@@ -243,6 +251,12 @@ def parse_action_callback(data: str) -> tuple[ActionKind, str, str | None] | Non
             return ("action", "models:swap", None)
         if kind == "pick":
             return ("action", f"models:pick:{slot_key}:{idx}", None)
+    if raw.startswith("cfg:cycle:"):
+        rest = raw.removeprefix("cfg:cycle:")
+        if ":" in rest:
+            path, val = rest.rsplit(":", 1)
+            return ("cycle", path, val)
+        return None
     if raw.startswith("cfg:toggle:"):
         rest = raw.removeprefix("cfg:toggle:")
         if ":" in rest:
@@ -363,6 +377,22 @@ class MenuActionRouter:
         if parsed is None or parsed[0] == "form":
             return None
         kind, target, value = parsed
+        if kind == "cycle":
+            if value is None:
+                return None
+            from sevn.integrations.social_media.cycle_validation import (
+                validate_config_cycle_mutation,
+            )
+
+            if not validate_config_cycle_mutation(target, value):
+                toast = "Invalid cycle value."
+                answered = await self._refresh_config_menu_after_action(msg, raw, toast=toast)
+                return None if answered else toast
+            mutate_sevn_json(self._sevn_json, lambda d: _set_nested(d, target, value))
+            self._reload_workspace()
+            toast = "✅ Updated."
+            answered = await self._refresh_config_menu_after_action(msg, raw, toast=toast)
+            return None if answered else toast
         if kind == "toggle":
             if value is None:
                 return None

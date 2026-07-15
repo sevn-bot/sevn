@@ -14,6 +14,7 @@ from __future__ import annotations
 import copy
 import json
 from collections.abc import Callable
+from pathlib import Path
 from typing import NoReturn
 
 import typer
@@ -298,6 +299,14 @@ def register(app: typer.Typer) -> None:
 
     @cfg.command("validate")
     def config_validate(
+        path: Path | None = typer.Option(
+            None,
+            "--path",
+            help="Validate an explicit sevn.json file instead of the bound workspace.",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+        ),
         json_out: bool = typer.Option(
             False,
             "--json",
@@ -305,6 +314,42 @@ def register(app: typer.Typer) -> None:
         ),
     ) -> None:
         """Re-parse bound ``sevn.json`` with schema gate."""
+        if path is not None:
+            try:
+                raw = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                if json_out:
+                    emit_json_failure(
+                        command="sevn config validate",
+                        error_code="READ",
+                        message=str(exc),
+                        exit_code=1,
+                    )
+                else:
+                    typer.secho(str(exc), err=True)
+                raise typer.Exit(1) from exc
+            try:
+                validate_workspace_document(raw)
+            except ValueError as exc:
+                if json_out:
+                    emit_json_failure(
+                        command="sevn config validate",
+                        error_code="VALIDATION",
+                        message=str(exc),
+                        exit_code=1,
+                    )
+                else:
+                    typer.secho(str(exc), err=True)
+                raise typer.Exit(1) from exc
+            if json_out:
+                emit_json_success(
+                    command="sevn config validate",
+                    data={"sevn_json": str(path.resolve()), "ok": True},
+                )
+            else:
+                typer.echo("sevn.json: valid")
+            raise typer.Exit(0)
+
         try:
             bw = load_bound_workspace()
         except CliPreconditionError as exc:

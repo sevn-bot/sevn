@@ -44,6 +44,7 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | printing-press-library | Starter-pack Printing Press CLIs — ESPN, flights, movies, recipes (Go binaries on PATH). |
 | roam_code | Lightweight roam-code path Q&A (`specs/28-code-understanding.md` §2.2). |
 | scheduling | Cron jobs and one-shot reminders via workspace trigger store (`specs/30-non-interactive-triggers.md`). |
+| social_media_manager | Browser-first social monitoring across six platforms via the social_media_manager L2 specialist; TwexAPI optional on X only (spec 36). |
 | second_brain | Karpathy-style raw→wiki ingest, lint, and file-back flows (`specs/27-second-brain.md`). |
 | sessions_management | Gateway sessions, history, send, spawn, yield, and status (`specs/17-gateway.md`). |
 | skill_management | Authoring workflows for generated skills; pairs with native skill_create and promote_generated_skill (`specs/12-skills-system.md` §2.5). |

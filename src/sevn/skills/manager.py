@@ -69,6 +69,10 @@ from sevn.skills.manifest import (
 from sevn.skills.models import ProvenanceKind, SkillRecord
 from sevn.skills.openwiki import OPENWIKI_SKILL_ID, gate_openwiki_core_skill
 from sevn.skills.openwiki_secrets import merge_openwiki_proc_env
+from sevn.skills.social_media_manager import (
+    SOCIAL_MEDIA_MANAGER_SKILL_ID,
+    gate_social_media_manager_core_skill,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -733,6 +737,12 @@ def _scan_skills_tree(
                 sub == "core"
                 and child.name == CURSOR_CLOUD_SKILL_ID
                 and gate_cursor_cloud_core_skill(cfg) == "skip"
+            ):
+                continue
+            if (
+                sub == "core"
+                and child.name == SOCIAL_MEDIA_MANAGER_SKILL_ID
+                and gate_social_media_manager_core_skill(cfg) == "skip"
             ):
                 continue
             if (

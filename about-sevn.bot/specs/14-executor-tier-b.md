@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Tier B is the default “do work” executor for messages the Triager classifies
   as complexity == B (prd-04-getting-things-done §5.2): a single pydantic-ai Agent
   loop over the user’s incoming_text, with t'
-last_updated: '2026-07-14'
-fingerprint: sha256:c5f4e9986dd7986c181ddabef6e00a1d920bfb4da5028e38b3c75146d2288c1c
+last_updated: '2026-07-15'
+fingerprint: sha256:894b4e6aad417fe06e86f82706174b0f9749f2cedd0b229a59a89a1d5468566a
 related: []
 sources:
 - src/sevn/agent/**
@@ -811,6 +811,30 @@ interfaces:
 - name: SubAgentRegistry
   file: src/sevn/agent/subagents/registry.py
   symbol: SubAgentRegistry
+- name: SocialMediaManagerError
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: SocialMediaManagerError
+- name: SocialMediaTask
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: SocialMediaTask
+- name: assigned_skills_for
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: assigned_skills_for
+- name: assigned_tools_for
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: assigned_tools_for
+- name: execute_social_media_manager_for_context
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: execute_social_media_manager_for_context
+- name: execute_social_media_manager_task
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: execute_social_media_manager_task
+- name: parse_social_media_task
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: parse_social_media_task
+- name: require_social_media_manager
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: require_social_media_manager
 - name: ResolvedSpecialist
   file: src/sevn/agent/subagents/specialists.py
   symbol: ResolvedSpecialist

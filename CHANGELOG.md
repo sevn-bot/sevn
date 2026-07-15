@@ -20,6 +20,7 @@ are cut into a dated, versioned section at release time.
 - [2026-07-15] `make ci-affected` triggers `about-docs-check` when `about-sevn.bot/specs/`, `about-sevn.bot/prd/`, or `spec-kit-wave/` paths change
 - [2026-07-15] Gateway README Level 3 module inventory lists every gateway subpackage module with docstring prose and symbol anchors for operator and LLM readers
 - [2026-07-15] Telegram session mirror paths under `sessions/telegram/chats/` include sanitized group and forum topic titles with `--{id}` suffixes for uniqueness; group titles persist in `telegram_chat_names`; ID-only segments when names are unknown; existing JSONL folders are not moved (#21)
+- [2026-07-15] Browser-first `social_media_manager` L2 specialist with per-platform medium under `skills.social_media_manager`, TwexAPI optional on X only, Telegram `/config → Skills → Social Media Manager`, and six-site CDP browser matrix
 
 - [2026-07-14] `skw docs sync` refreshes about-doc frontmatter and scaffolds missing PRD/spec files via `make spec-sync` and `make prd-sync`
 - [2026-07-13] `sevn dashboard set-login-password` stores the Mission Control owner password in the workspace secrets chain and stamps `dashboard.login_password` with a `${SECRET:…}` ref
