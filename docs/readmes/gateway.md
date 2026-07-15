@@ -31,6 +31,10 @@ Every user message follows the same five-step path — the **turn spine** — re
 
 Provider API calls are brokered by the egress proxy — keys never load in the gateway process.
 
+### Session mirror paths
+
+When `gateway.session_mirror` is enabled, messages are also appended to workspace JSONL under `sessions/telegram/chats/`. For groups and forum topics, [`format_named_path_segment`](../../src/sevn/gateway/session/session_mirror.py#L119) builds `{sanitized_title}--{id}` folder segments (e.g. `My_Group--1001234567890/topics/General--7/`); non-topic group scopes use `…/general/`. Titles come from SQLite via [`SessionPathNameResolver`](../../src/sevn/gateway/session/path_names.py#L59), which looks up persisted group and forum topic names. Private chats and scopes where no title is known yet keep ID-only segments; existing JSONL on disk is not moved when a name is learned later.
+
 ### Queue and steer modes
 
 When a session is already processing a turn, `gateway.queue_mode` in `sevn.json` decides what happens to new input:
