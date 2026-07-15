@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-07-15'
-fingerprint: sha256:ef87d6bfd8d48b7baf115aa4b0dc3859e5999ec92495adafe30d838cb72ef553
+fingerprint: sha256:b019fe04a7e5a9d8253f8b375b2f002f0e697c867204e1948237097a19ff156f
 related: []
 sources:
 - src/sevn/gateway/**
@@ -540,6 +540,12 @@ interfaces:
 - name: registry_implementation_counts
   file: src/sevn/gateway/menu/menu_registry.py
   symbol: registry_implementation_counts
+- name: build_social_media_manager_keyboard_rows
+  file: src/sevn/gateway/menu/social_media_manager_menu.py
+  symbol: build_social_media_manager_keyboard_rows
+- name: social_media_manager_menu_caption
+  file: src/sevn/gateway/menu/social_media_manager_menu.py
+  symbol: social_media_manager_menu_caption
 - name: EmptyMissionControlState
   file: src/sevn/gateway/mission/mission_api.py
   symbol: EmptyMissionControlState
@@ -858,6 +864,30 @@ interfaces:
 - name: resolve_owner_telegram_user_id
   file: src/sevn/gateway/self_improve/self_improve_job_events.py
   symbol: resolve_owner_telegram_user_id
+- name: SessionPathNameLookup
+  file: src/sevn/gateway/session/path_names.py
+  symbol: SessionPathNameLookup
+- name: SessionPathNameResolver
+  file: src/sevn/gateway/session/path_names.py
+  symbol: SessionPathNameResolver
+- name: chat_path_segment
+  file: src/sevn/gateway/session/path_names.py
+  symbol: chat_path_segment
+- name: coerce_name_lookup
+  file: src/sevn/gateway/session/path_names.py
+  symbol: coerce_name_lookup
+- name: format_named_path_segment
+  file: src/sevn/gateway/session/path_names.py
+  symbol: format_named_path_segment
+- name: parse_telegram_scope_rel
+  file: src/sevn/gateway/session/path_names.py
+  symbol: parse_telegram_scope_rel
+- name: safe_path_segment
+  file: src/sevn/gateway/session/path_names.py
+  symbol: safe_path_segment
+- name: topic_path_segment
+  file: src/sevn/gateway/session/path_names.py
+  symbol: topic_path_segment
 - name: mark_session_superseded
   file: src/sevn/gateway/session/session_mirror.py
   symbol: mark_session_superseded
