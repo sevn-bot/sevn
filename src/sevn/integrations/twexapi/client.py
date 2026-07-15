@@ -63,6 +63,17 @@ class TwexApiClient:
         base_url: str = DEFAULT_TWEXAPI_BASE_URL,
         timeout_s: float = _DEFAULT_HTTP_TIMEOUT_S,
     ) -> None:
+        """Create a TwexAPI client.
+
+        Args:
+            api_key (str): TwexAPI Bearer token.
+            base_url (str): API base URL.
+            timeout_s (float): Per-request HTTP timeout.
+
+        Examples:
+            >>> TwexApiClient("sk")._base_url.startswith("https://")
+            True
+        """
         self._api_key = api_key.strip()
         self._base_url = base_url.rstrip("/")
         self._timeout_s = timeout_s

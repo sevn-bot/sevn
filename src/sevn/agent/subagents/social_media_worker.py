@@ -6,6 +6,7 @@ Depends: sevn.agent.subagents.specialists, sevn.integrations.twexapi,
 
 Exports:
     SOCIAL_MEDIA_MANAGER_* — specialist id and default assigned skills/tools.
+    SocialMediaManagerError — specialist misconfiguration error.
     SocialMediaTask — parsed task payload.
     parse_social_media_task — task-string → :class:`SocialMediaTask`.
     require_social_media_manager — resolve configured specialist or raise.
