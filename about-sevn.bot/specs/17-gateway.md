@@ -865,7 +865,7 @@ interfaces:
   file: src/sevn/gateway/session/path_names.py
   symbol: SessionPathNameResolver
 - name: format_named_path_segment
-  file: src/sevn/gateway/session/session_mirror.py
+  file: src/sevn/gateway/session/path_names.py
   symbol: format_named_path_segment
 - name: mark_session_superseded
   file: src/sevn/gateway/session/session_mirror.py

@@ -65,6 +65,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-14] Bundled skill seeding skips `__pycache__` when copying packaged skills, avoiding parallel-test flakes on transient `.pyc` files
 - [2026-07-15] Telegram session mirror title lookup is best-effort when SQLite errors occur; group titles also persist from inline-keyboard callbacks (#21)
 - [2026-07-15] Restored spec-36 sub-agent amendment cross-reference in `14-executor-tier-b.md` after W9 body rewrite
 - [2026-07-15] `scripts/changelog_validate.py` shim re-exports `load_changelog_rules`, `validate_changelog`, and `check_staged_gate` for backward compatibility
