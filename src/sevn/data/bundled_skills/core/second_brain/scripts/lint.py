@@ -6,6 +6,9 @@ Depends: argparse, pathlib, ``sevn.second_brain``
 
 Exports:
     main — CLI entry; JSON envelope on stdout.
+
+Uses :func:`~sevn.second_brain.lint_local.lint_vault_tree` over
+:class:`~sevn.second_brain.paths.VaultLayout` content roots (legacy or PARA).
 """
 
 from __future__ import annotations
@@ -51,18 +54,22 @@ def main() -> int:
     args = parser.parse_args()
     workspace = Path(os.environ.get("SEVN_WORKSPACE", ".")).resolve()
     from sevn.config.loader import SevnJsonNotFoundError, load_workspace
-    from sevn.second_brain.lint_local import lint_wiki_tree
-    from sevn.second_brain.paths import resolve_scope_root, wiki_dir_for_scope
+    from sevn.config.workspace_config import SecondBrainWorkspaceConfig
+    from sevn.second_brain.lint_local import lint_vault_tree
+    from sevn.second_brain.paths import VaultLayout
 
     try:
         cfg, _layout = load_workspace(sevn_json=workspace / "sevn.json")
         sb_cfg = cfg.second_brain
     except SevnJsonNotFoundError:
         sb_cfg = None
-    wiki = wiki_dir_for_scope(resolve_scope_root(workspace, sb_cfg, args.scope))
-    issues = lint_wiki_tree(wiki)
+    sb = sb_cfg or SecondBrainWorkspaceConfig()
+    layout = VaultLayout(workspace, sb, args.scope)
+    issues = lint_vault_tree(layout)
+    curated = layout.role_dir("curated")
+    curated.mkdir(parents=True, exist_ok=True)
     today = date.today().isoformat()
-    report = wiki / f"lint-report-{today}.md"
+    report = curated / f"lint-report-{today}.md"
     lines = [
         f"# Lint report {today}",
         "",
@@ -73,7 +80,7 @@ def main() -> int:
     if not issues:
         lines.append("- (no issues)")
     report.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    payload = {"report_path": report.relative_to(wiki).as_posix(), "issue_count": len(issues)}
+    payload = {"report_path": report.relative_to(curated).as_posix(), "issue_count": len(issues)}
     sys.stdout.write(
         json.dumps({"ok": True, "data": payload, "message": None}, separators=(",", ":"))
     )

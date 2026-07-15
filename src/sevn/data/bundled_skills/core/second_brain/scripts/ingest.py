@@ -6,6 +6,9 @@ Depends: argparse, pathlib, ``sevn.second_brain.ingest``
 
 Exports:
     main — CLI entry; JSON envelope on stdout.
+
+Resolves ingest landing paths through :class:`~sevn.second_brain.paths.VaultLayout`
+(legacy ``wiki/ingests`` vs PARA ``00_Inbox``).
 """
 
 from __future__ import annotations
@@ -47,11 +50,12 @@ def main() -> int:
         True
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument("--raw", required=True, help="Path relative to scope raw/ (POSIX).")
+    parser.add_argument("--raw", required=True, help="Path relative to scope sources/ (POSIX).")
     parser.add_argument("--scope", default="owner")
     args = parser.parse_args()
     workspace = Path(os.environ.get("SEVN_WORKSPACE", ".")).resolve()
     from sevn.config.loader import SevnJsonNotFoundError, load_workspace
+    from sevn.config.workspace_config import SecondBrainWorkspaceConfig
     from sevn.second_brain.ingest import run_ingest
     from sevn.second_brain.paths import resolve_scope_root
 
@@ -67,6 +71,7 @@ def main() -> int:
             vault_users_scope=scope_path,
             raw_relpath=args.raw,
             sevn_source="tool:skill:ingest",
+            sb_cfg=sb_cfg or SecondBrainWorkspaceConfig(),
         )
     except (OSError, FileNotFoundError) as exc:
         sys.stdout.write(

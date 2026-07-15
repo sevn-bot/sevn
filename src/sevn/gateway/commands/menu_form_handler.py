@@ -832,20 +832,26 @@ class MenuFormHandler:
             >>> inspect.iscoroutinefunction(MenuFormHandler._apply_second_brain_vault_path)
             True
         """
-        from sevn.config.sections.features import _normalise_vault_path
-        from sevn.second_brain.bootstrap import ensure_second_brain_scope_layout
+        from sevn.config.sections.features import SecondBrainParaConfig, _normalise_vault_path
+        from sevn.second_brain.bootstrap import detect_layout, ensure_second_brain_scope_layout
         from sevn.second_brain.paths import effective_scope, resolve_scope_root
 
         vault_norm = _normalise_vault_path(rel_path)
+        vault_abs = (self._content_root / vault_norm).resolve()
+        detected = detect_layout(vault_abs)
+        layout_choice = detected or "legacy"
 
         def _apply(doc: dict[str, Any]) -> None:
             _set_nested(doc, "second_brain.enabled", True)
             _set_nested(doc, "second_brain.paths.vault", vault_norm)
+            _set_nested(doc, "second_brain.layout", layout_choice)
             sb = doc.get("second_brain")
             if isinstance(sb, dict):
                 paths = sb.get("paths")
                 if isinstance(paths, dict):
                     paths.pop("wiki", None)
+                if layout_choice == "para" and "para" not in sb:
+                    sb["para"] = SecondBrainParaConfig().model_dump()
 
         mutate_sevn_json(self._sevn_json, _apply)
         from sevn.config.loader import load_workspace
@@ -854,7 +860,7 @@ class MenuFormHandler:
         sb_cfg = cfg.second_brain
         scope = effective_scope(None, sb_cfg)
         scope_root = resolve_scope_root(self._content_root, sb_cfg, scope)
-        ensure_second_brain_scope_layout(scope_root)
+        ensure_second_brain_scope_layout(scope_root, cfg=cfg)
 
     async def _send_second_brain_browse_keyboard(
         self,

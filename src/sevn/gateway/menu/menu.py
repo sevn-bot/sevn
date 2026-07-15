@@ -83,7 +83,13 @@ from sevn.gateway.menu.social_media_manager_menu import (
     social_media_manager_menu_caption,
 )
 from sevn.onboarding.seed import resolve_agent_display_name
-from sevn.second_brain.paths import display_scope_root_relative, effective_scope, resolve_scope_root
+from sevn.second_brain.paths import (
+    LayoutRole,
+    VaultLayout,
+    display_scope_root_relative,
+    effective_scope,
+    resolve_scope_root,
+)
 
 _SECRET_REF_PATTERN = re.compile(r"\$\{SECRET:([^}]+)\}")
 
@@ -2800,6 +2806,90 @@ def _second_brain_ingest_mode(workspace: WorkspaceConfig) -> str:
     return "weekly"
 
 
+_SECOND_BRAIN_LAYOUT_CYCLE: tuple[str, ...] = ("legacy", "para")
+
+_SECOND_BRAIN_CAPTION_ROLES: tuple[LayoutRole, ...] = (
+    "capture",
+    "projects",
+    "areas",
+    "curated",
+    "archive",
+    "sources",
+    "outputs",
+)
+
+
+def _second_brain_layout(workspace: WorkspaceConfig) -> str:
+    """Return effective ``second_brain.layout`` (defaults to ``legacy``).
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        str: Active vault layout id.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> _second_brain_layout(WorkspaceConfig.minimal())
+        'legacy'
+    """
+    sb = workspace.second_brain
+    if sb is not None and sb.layout:
+        return str(sb.layout)
+    return "legacy"
+
+
+def _next_second_brain_layout(current: str) -> str:
+    """Return the next layout in the legacy → para cycle.
+
+    Args:
+        current (str): Active ``second_brain.layout``.
+
+    Returns:
+        str: Next layout in :data:`_SECOND_BRAIN_LAYOUT_CYCLE`.
+
+    Examples:
+        >>> _next_second_brain_layout("legacy")
+        'para'
+        >>> _next_second_brain_layout("para")
+        'legacy'
+    """
+    try:
+        idx = _SECOND_BRAIN_LAYOUT_CYCLE.index(current)
+    except ValueError:
+        idx = 0
+    return _SECOND_BRAIN_LAYOUT_CYCLE[(idx + 1) % len(_SECOND_BRAIN_LAYOUT_CYCLE)]
+
+
+def _second_brain_role_path_lines(content_root: Path, workspace: WorkspaceConfig) -> list[str]:
+    """Return caption lines for resolved layout role paths.
+
+    Args:
+        content_root (Path): Workspace content root.
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[str]: Human-readable ``role: path`` lines.
+
+    Examples:
+        >>> from pathlib import Path
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> lines = _second_brain_role_path_lines(Path("/tmp"), WorkspaceConfig.minimal())
+        >>> any("wiki" in line for line in lines)
+        True
+    """
+    from sevn.config.workspace_config import SecondBrainWorkspaceConfig
+
+    sb = workspace.second_brain or SecondBrainWorkspaceConfig()
+    scope = effective_scope(None, sb)
+    layout = VaultLayout(content_root, sb, scope)
+    lines: list[str] = []
+    for role in _SECOND_BRAIN_CAPTION_ROLES:
+        rel = display_scope_root_relative(content_root, layout.role_dir(role))
+        lines.append(f"  {role}: {rel}")
+    return lines
+
+
 def _second_brain_vault_display(content_root: Path, workspace: WorkspaceConfig) -> str:
     """Return workspace-relative vault path for Second Brain captions.
 
@@ -2926,6 +3016,8 @@ def _build_second_brain_keyboard_rows(workspace: WorkspaceConfig) -> list[list[d
         True
     """
     enabled = _second_brain_enabled(workspace)
+    current_layout = _second_brain_layout(workspace)
+    next_layout = _next_second_brain_layout(current_layout)
     rows: list[list[dict[str, Any]]] = [
         [
             _config_bool_toggle_button(
@@ -2933,6 +3025,12 @@ def _build_second_brain_keyboard_rows(workspace: WorkspaceConfig) -> list[list[d
                 "second_brain.enabled",
                 enabled=enabled,
             ),
+        ],
+        [
+            {
+                "text": f"Layout: {current_layout} (-> {next_layout})",
+                "callback_data": f"cfg:toggle:second_brain.layout:{next_layout}",
+            },
         ],
         [
             {"text": "📁 Set vault path", "callback_data": "form:second_brain_vault_path"},
@@ -3836,14 +3934,18 @@ def config_menu_message_text(
     if section == "second_brain":
         enabled = _second_brain_enabled(workspace)
         ingest = _second_brain_ingest_mode(workspace)
+        layout_name = _second_brain_layout(workspace)
         lines = [
             "Second Brain",
             "",
             f"Enabled: {'on' if enabled else 'off'}",
             f"Ingest schedule: {ingest}",
+            f"Layout: {layout_name}",
         ]
         if content_root is not None:
             lines.append(f"Vault: {_second_brain_vault_display(content_root, workspace)}")
+            lines.append("Role paths:")
+            lines.extend(_second_brain_role_path_lines(content_root, workspace))
         url = web_ui_url_from_workspace(workspace)
         if url:
             lines.append(f"Mission Control: {url}#second_brain")

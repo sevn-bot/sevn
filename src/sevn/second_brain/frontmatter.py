@@ -1,26 +1,42 @@
 """YAML frontmatter parse/merge for wiki pages (`specs/27-second-brain.md` §3.3).
 
 Module: sevn.second_brain.frontmatter
-Depends: re, yaml
+Depends: re, yaml, sevn.second_brain.paths
 
 Exports:
     split_frontmatter — body + raw YAML text + unknown round-trip.
     dumps_frontmatter — serialise mapping back to YAML block.
-    normalise_agent_keys — normalise ``sevn_*`` aliases on a frontmatter dict.
+    normalise_agent_keys — normalise agent/Obsidian aliases on a frontmatter dict.
     compose_page — build full markdown with ``---`` fenced YAML.
     okf_type_required — whether an OKF page requires a ``type`` frontmatter key.
     missing_okf_type — whether frontmatter is missing required ``type``.
+    reserved_basenames_for_layout — index/log basenames for the active vault layout.
 """
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import yaml
 
+if TYPE_CHECKING:
+    from sevn.second_brain.paths import VaultLayout
+
 OKF_RESERVED_BASENAMES = frozenset({"index.md", "log.md"})
+
+PARA_FRONTMATTER_KEYS: frozenset[str] = frozenset(
+    {
+        "tags",
+        "aliases",
+        "created",
+        "updated",
+        "source",
+        "source_hash",
+        "captured",
+    },
+)
 
 _FRONTMATTER_RE = re.compile(
     r"\A---\s*\n(.*?)\n---\s*\n(.*)\Z",
@@ -84,8 +100,8 @@ def dumps_frontmatter(fm: dict[str, Any]) -> str:
     )
 
 
-def normalise_agent_keys(fm: dict[str, Any]) -> dict[str, Any]:
-    """Copy ``source``→``sevn_source``, etc., then prefer ``sevn_*`` when both exist.
+def _normalise_legacy_agent_keys(fm: dict[str, Any]) -> dict[str, Any]:
+    """Map short provenance keys to canonical ``sevn_*`` names (legacy OKF layout).
 
     Args:
         fm (dict[str, Any]): Incoming frontmatter mapping.
@@ -94,10 +110,9 @@ def normalise_agent_keys(fm: dict[str, Any]) -> dict[str, Any]:
         dict[str, Any]: New dict with canonical ``sevn_*`` keys preferred.
 
     Examples:
-        >>> normalise_agent_keys({"source": "x"})["sevn_source"]
+        >>> _normalise_legacy_agent_keys({"source": "x"})["sevn_source"]
         'x'
     """
-
     out = dict(fm)
     aliases = (
         ("source", "sevn_source"),
@@ -114,13 +129,99 @@ def normalise_agent_keys(fm: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def okf_type_required(rel_path: str) -> bool:
+def _normalise_para_agent_keys(fm: dict[str, Any]) -> dict[str, Any]:
+    """Keep Obsidian-native PARA keys; accept ``sevn_*`` aliases for interop.
+
+    Args:
+        fm (dict[str, Any]): Incoming frontmatter mapping.
+
+    Returns:
+        dict[str, Any]: New dict with native PARA keys preferred over ``sevn_*``.
+
+    Examples:
+        >>> _normalise_para_agent_keys({"sevn_source": "x"})["source"]
+        'x'
+    """
+    out = dict(fm)
+    interop = (
+        ("sevn_source", "source"),
+        ("sevn_evidence", "evidence"),
+        ("sevn_freshness", "freshness"),
+        ("sevn_contradictions", "contradictions"),
+    )
+    for sevn_key, native_key in interop:
+        if sevn_key in out and native_key in out:
+            del out[sevn_key]
+            continue
+        if sevn_key in out and native_key not in out:
+            out[native_key] = out.pop(sevn_key)
+    return out
+
+
+def normalise_agent_keys(
+    fm: dict[str, Any],
+    *,
+    layout: Literal["legacy", "para"] = "legacy",
+) -> dict[str, Any]:
+    """Normalise agent/Obsidian aliases on a frontmatter dict.
+
+    Legacy layout maps ``source``→``sevn_source`` (OKF provenance). PARA layout keeps
+    Obsidian-native keys and accepts ``sevn_*`` aliases for interop.
+
+    Args:
+        fm (dict[str, Any]): Incoming frontmatter mapping.
+        layout (Literal["legacy", "para"]): Active vault layout for alias rules.
+
+    Returns:
+        dict[str, Any]: New dict with canonical keys for the active layout.
+
+    Examples:
+        >>> normalise_agent_keys({"source": "x"})["sevn_source"]
+        'x'
+        >>> normalise_agent_keys({"sevn_source": "x"}, layout="para")["source"]
+        'x'
+    """
+
+    if layout == "para":
+        return _normalise_para_agent_keys(fm)
+    return _normalise_legacy_agent_keys(fm)
+
+
+def reserved_basenames_for_layout(layout: VaultLayout) -> frozenset[str]:
+    """Return reserved note basenames for the active layout (index/log home notes).
+
+    Args:
+        layout (VaultLayout): Active vault layout resolver.
+
+    Returns:
+        frozenset[str]: Basenames exempt from mandatory ``type`` and orphan lint.
+
+    Examples:
+        >>> import tempfile
+        >>> from pathlib import Path
+        >>> from sevn.config.workspace_config import SecondBrainWorkspaceConfig
+        >>> from sevn.second_brain.paths import VaultLayout
+        >>> ws = Path(tempfile.mkdtemp())
+        >>> legacy = VaultLayout(ws, SecondBrainWorkspaceConfig(), "owner")
+        >>> "index.md" in reserved_basenames_for_layout(legacy)
+        True
+    """
+    return frozenset({layout.index_note().name, layout.log_note().name})
+
+
+def okf_type_required(
+    rel_path: str,
+    *,
+    reserved_basenames: frozenset[str] | None = None,
+) -> bool:
     """Return whether OKF expects a non-empty ``type`` field on ``rel_path``.
 
-    Reserved files ``index.md`` and ``log.md`` are exempt at any directory depth.
+    Reserved files (index/log home notes) are exempt at any directory depth.
 
     Args:
         rel_path (str): Wiki-relative path (POSIX).
+        reserved_basenames (frozenset[str] | None): Override reserved basenames; defaults
+            to :data:`OKF_RESERVED_BASENAMES`.
 
     Returns:
         bool: ``True`` when ``type`` should be present.
@@ -131,7 +232,8 @@ def okf_type_required(rel_path: str) -> bool:
         >>> okf_type_required("subdir/index.md")
         False
     """
-    return Path(rel_path).name not in OKF_RESERVED_BASENAMES
+    basenames = OKF_RESERVED_BASENAMES if reserved_basenames is None else reserved_basenames
+    return Path(rel_path).name not in basenames
 
 
 def missing_okf_type(fm: dict[str, Any]) -> bool:
@@ -174,10 +276,12 @@ def compose_page(fm: dict[str, Any], body: str) -> str:
 
 __all__ = [
     "OKF_RESERVED_BASENAMES",
+    "PARA_FRONTMATTER_KEYS",
     "compose_page",
     "dumps_frontmatter",
     "missing_okf_type",
     "normalise_agent_keys",
     "okf_type_required",
+    "reserved_basenames_for_layout",
     "split_frontmatter",
 ]

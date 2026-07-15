@@ -6,6 +6,7 @@ Depends: pathlib, re
 Exports:
     iter_internal_link_targets — yield wikilink and OKF markdown link targets from body text.
     resolve_wiki_target — map a link target to an existing wiki-relative ``.md`` path.
+    collect_vault_md_by_rel — build vault-relative path map across content roots.
     index_line_targets — extract catalog targets from one index bullet line.
 """
 
@@ -69,6 +70,80 @@ def _normalise_okf_target(target: str, *, source_rel: str) -> str | None:
     return None
 
 
+def collect_vault_md_by_rel(
+    content_roots: tuple[Path, ...],
+    *,
+    vault_root: Path,
+    extra_files: tuple[Path, ...] = (),
+) -> dict[str, Path]:
+    """Build a vault-relative ``.md`` path map across multiple content roots.
+
+    Args:
+        content_roots (tuple[Path, ...]): Directories to scan recursively for ``*.md``.
+        vault_root (Path): Vault scope root used for relative path keys.
+        extra_files (tuple[Path, ...]): Additional note files (e.g. root index/log).
+
+    Returns:
+        dict[str, Path]: Map of vault-relative POSIX paths to absolute file paths.
+
+    Examples:
+        >>> import tempfile
+        >>> from pathlib import Path
+        >>> root = Path(tempfile.mkdtemp())
+        >>> wiki = root / "wiki"
+        >>> _ = wiki.mkdir()
+        >>> _ = (wiki / "a.md").write_text("# a")
+        >>> rels = collect_vault_md_by_rel((wiki,), vault_root=root)
+        >>> rels["wiki/a.md"].name
+        'a.md'
+    """
+    by_rel: dict[str, Path] = {}
+    vault = vault_root.resolve()
+    for root in content_roots:
+        if not root.is_dir():
+            continue
+        for fp in sorted(root.rglob("*.md")):
+            rel = fp.resolve().relative_to(vault).as_posix()
+            by_rel[rel] = fp.resolve()
+    for fp in extra_files:
+        if fp.is_file():
+            rel = fp.resolve().relative_to(vault).as_posix()
+            by_rel[rel] = fp.resolve()
+    return by_rel
+
+
+def _resolve_wikilink_target(target: str, by_rel: dict[str, Path]) -> str | None:
+    """Resolve a wikilink target against a vault-relative path map.
+
+    Args:
+        target (str): Raw wikilink target from ``[[…]]``.
+        by_rel (dict[str, Path]): Vault-relative path map.
+
+    Returns:
+        str | None: Resolved vault-relative path when found; else ``None``.
+
+    Examples:
+        >>> from pathlib import Path
+        >>> by = {"10_Projects/foo.md": Path("10_Projects/foo.md")}
+        >>> _resolve_wikilink_target("foo", by)
+        '10_Projects/foo.md'
+    """
+    wikilink_cand = _normalise_wikilink_target(target)
+    if not wikilink_cand:
+        return None
+    if wikilink_cand in by_rel:
+        return wikilink_cand
+    basename = PurePosixPath(wikilink_cand).name
+    matches = [rel for rel in by_rel if PurePosixPath(rel).name == basename]
+    if len(matches) == 1:
+        return matches[0]
+    stem = PurePosixPath(wikilink_cand).stem
+    stem_matches = [rel for rel in by_rel if PurePosixPath(rel).stem == stem]
+    if len(stem_matches) == 1:
+        return stem_matches[0]
+    return None
+
+
 def iter_internal_link_targets(body: str) -> Iterable[tuple[str, str]]:
     """Yield ``(kind, target)`` pairs for internal links in ``body``.
 
@@ -108,10 +183,10 @@ def resolve_wiki_target(
         kind (str): ``wikilink`` or ``okf_md``.
         target (str): Raw link target from :func:`iter_internal_link_targets`.
         source_rel (str): Wiki-relative path of the page containing the link.
-        by_rel (dict[str, Path]): Map of wiki-relative paths to files under ``wiki/``.
+        by_rel (dict[str, Path]): Map of vault-relative paths to files under content roots.
 
     Returns:
-        str | None: Resolved wiki-relative path when it exists in ``by_rel``; else ``None``.
+        str | None: Resolved vault-relative path when it exists in ``by_rel``; else ``None``.
 
     Examples:
         >>> from pathlib import Path
@@ -120,8 +195,7 @@ def resolve_wiki_target(
         'a.md'
     """
     if kind == "wikilink":
-        wikilink_cand = _normalise_wikilink_target(target)
-        return wikilink_cand if wikilink_cand in by_rel else None
+        return _resolve_wikilink_target(target, by_rel)
     if kind == "okf_md":
         okf_cand = _normalise_okf_target(target, source_rel=source_rel)
         return okf_cand if okf_cand and okf_cand in by_rel else None
@@ -166,6 +240,7 @@ def index_line_targets(line: str) -> list[str]:
 
 
 __all__ = [
+    "collect_vault_md_by_rel",
     "index_line_targets",
     "iter_internal_link_targets",
     "resolve_wiki_target",

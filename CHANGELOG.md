@@ -12,6 +12,9 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- [2026-07-15] PARA/Obsidian-native Second Brain vault layout via `second_brain.layout: "legacy" | "para"` with a configurable `second_brain.para` folder profile (Inbox, Projects, Areas, Resources, Archive, Templates) and non-destructive adoption of existing Obsidian vaults
+- [2026-07-15] `sevn second-brain setup --layout {auto,legacy,para}` detects or selects the vault layout, bootstraps PARA role folders and Obsidian templates, and exposes resolved role paths via `sevn config second-brain` and `sevn doctor`
+- [2026-07-15] Layout-aware Second Brain ingest, search, Witchcraft indexing, and lint operate across PARA content roots (Inbox/Projects/Areas/Resources) while legacy `wiki/raw/outputs` installs remain byte-for-byte unchanged
 - [2026-07-14] `skw spec_validate` and `make spec-check` validate the committed 7-section about-sevn.bot spec format with deterministic 0–100 validity scores (`make docs-score`, folder rollup)
 - [2026-07-14] `docs-folder-author` agent (`.cursor/agents/` + `spec-kit-wave/agents/`) validates and updates whole `about-sevn.bot/specs/` or `about-sevn.bot/prd/` folders against code and template rules
 - [2026-07-14] Unreleased changelog bullets require a leading `[YYYY-MM-DD]` datestamp enforced by `make changelog-check`
@@ -36,6 +39,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- [2026-07-15] Telegram `/config`, onboarding wizard, and Mission Control Knowledge view expose Second Brain layout selection and resolved PARA role paths instead of assuming legacy `wiki/raw/outputs` folders
 - [2026-07-14] The about-docs generator no longer writes `interfaces`, `depends_on`, or `build_phase` into `kind: prd` frontmatter (spec-only keys; aligns with `skw prd-validate`)
 - [2026-07-14] `make about-docs-check` chains `make spec-check` and `make prd-check` so CI catches doc regressions; about-docs check rejects specs with `status: done` over scaffold placeholder bodies
 - [2026-07-14] Changelog validator canonical implementation lives in `spec-kit-wave/src/skw/changelog_validate.py`; `scripts/changelog_validate.py` is a shim

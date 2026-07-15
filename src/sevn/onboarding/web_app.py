@@ -1382,12 +1382,29 @@ def create_onboarding_app(
         _: None = Depends(_require_token_union),
     ) -> dict[str, Any]:
         """List workspace subdirectories for onboarding folder_picker controls."""
+        from sevn.second_brain.bootstrap import detect_layout
         from sevn.second_brain.folder_picker import list_workspace_subdirs, normalise_browse_path
 
         content_root = _content_root_for_wizard()
         rel = normalise_browse_path(path)
         entries = list_workspace_subdirs(content_root, rel)
-        return {"path": rel, "entries": entries}
+        detected_layout: str | None = None
+        adoption_note: str | None = None
+        if rel and rel != ".":
+            target = (content_root / rel).resolve()
+            if target.is_dir():
+                detected_layout = detect_layout(target)
+                if detected_layout == "para":
+                    adoption_note = (
+                        "Existing PARA vault detected — choose layout para to adopt "
+                        "non-destructively (missing folders only)."
+                    )
+        return {
+            "path": rel,
+            "entries": entries,
+            "detected_layout": detected_layout,
+            "adoption_note": adoption_note,
+        }
 
     @app.get("/api/profile-inspector", response_class=JSONResponse)
     async def api_profile_inspector(

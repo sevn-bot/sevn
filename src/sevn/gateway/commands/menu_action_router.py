@@ -411,6 +411,12 @@ class MenuActionRouter:
 
                 def _apply_toggle(doc: dict[str, Any]) -> None:
                     _set_nested(doc, target, parsed_val)
+                    if target == "second_brain.layout" and parsed_val == "para":
+                        sb_obj = doc.get("second_brain")
+                        if isinstance(sb_obj, dict) and "para" not in sb_obj:
+                            from sevn.config.sections.features import SecondBrainParaConfig
+
+                            sb_obj["para"] = SecondBrainParaConfig().model_dump()
                     if target == "executors.tier_cd.lambda_rlm.enabled" and parsed_val is True:
                         raw_allowlist = _get_nested(doc, "rlm.lambda_tool_allowlist")
                         if isinstance(raw_allowlist, list) and any(
@@ -422,6 +428,17 @@ class MenuActionRouter:
 
                 mutate_sevn_json(self._sevn_json, _apply_toggle)
                 self._reload_workspace()
+                if target == "second_brain.layout":
+                    from sevn.config.loader import load_workspace
+                    from sevn.second_brain.bootstrap import ensure_second_brain_scope_layout
+                    from sevn.second_brain.paths import effective_scope, resolve_scope_root
+
+                    cfg, _lay = load_workspace(sevn_json=self._sevn_json)
+                    sb_cfg = cfg.second_brain
+                    if sb_cfg is not None:
+                        scope = effective_scope(None, sb_cfg)
+                        scope_root = resolve_scope_root(self._content_root, sb_cfg, scope)
+                        ensure_second_brain_scope_layout(scope_root, cfg=cfg)
                 toast = "✅ Updated."
             answered = await self._refresh_config_menu_after_action(msg, raw, toast=toast)
             return None if answered else toast

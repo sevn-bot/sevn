@@ -394,7 +394,19 @@
     },
     "second_brain.paths": {
       "long_description": "Optional workspace-relative Obsidian vault folder for Second Brain (e.g. obsidian/alex_AI). When unset, sevn uses second_brain/users/<scope>/.",
-      "how_to_collect": "Choose an existing folder under the workspace content root; sevn creates raw/, wiki/, outputs/, and stub index/log files on bootstrap."
+      "how_to_collect": "Choose an existing folder under the workspace content root; sevn creates layout-specific folders on bootstrap (legacy: raw/, wiki/, outputs/; para: 00_Inbox…90_Templates)."
+    },
+    "second_brain.layout": {
+      "long_description": "Vault layout: legacy (default, wiki/raw/outputs under scope) or para (Obsidian PARA folders under paths.vault). Legacy remains byte-for-byte unchanged.",
+      "how_to_collect": "Use `sevn second-brain setup --layout {auto,legacy,para}` or set second_brain.layout in sevn.json; default is legacy when omitted."
+    },
+    "second_brain.para": {
+      "long_description": "PARA folder profile when layout=para: inbox, projects, areas, resources, archive, templates, plus sources/outputs subdirs under resources and root index/log note names.",
+      "how_to_collect": "Omit for defaults (00_Inbox, 10_Projects, …); override individual folder segment names only when your vault uses different labels."
+    },
+    "second_brain.para.inbox": {
+      "long_description": "Capture inbox folder segment (default 00_Inbox).",
+      "how_to_collect": "Match your Obsidian vault folder name; single path segment only."
     },
     "second_brain.paths.vault": {
       "long_description": "Workspace-relative directory that acts as the Second Brain vault root for default_scope.",

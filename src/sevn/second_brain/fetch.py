@@ -5,7 +5,7 @@ writes on rejection (`specs/27-second-brain.md` §6).
 
 Exports:
     SecondBrainFetchError — policy or transport failure.
-    fetch_url_to_raw — stream GET and atomically write under ``scope_root/raw/``.
+    fetch_url_to_raw — stream GET and atomically write under the sources role directory.
 """
 
 from __future__ import annotations
@@ -18,9 +18,10 @@ from urllib.parse import urlparse
 import httpx
 
 from sevn.second_brain.errors import SecondBrainError
+from sevn.second_brain.paths import VaultLayout, effective_scope
 
 if TYPE_CHECKING:
-    from sevn.config.workspace_config import SecondBrainFetchConfig
+    from sevn.config.workspace_config import SecondBrainFetchConfig, SecondBrainWorkspaceConfig
 
 
 class SecondBrainFetchError(SecondBrainError):
@@ -97,20 +98,60 @@ def _filename_from_url(url: str, host: str) -> str:
     return (slug or "fetched")[:180] + ".md"
 
 
+def _resolve_sources_dir(
+    *,
+    scope_root: Path,
+    workspace_root: Path | None,
+    sb_cfg: SecondBrainWorkspaceConfig | None,
+    scope: str | None,
+) -> Path:
+    """Return the sources role directory for fetch writes.
+
+    Args:
+        scope_root (Path): Vault user scope root (legacy fallback parent).
+        workspace_root (Path | None): Workspace content root for layout resolution.
+        sb_cfg (SecondBrainWorkspaceConfig | None): Second Brain slice when layout-aware.
+        scope (str | None): Scope id when ``sb_cfg`` is set.
+
+    Returns:
+        Path: Resolved sources directory (``raw/`` legacy or PARA ``_sources/``).
+
+    Examples:
+        >>> p = _resolve_sources_dir(
+        ...     scope_root=Path("/tmp/u"),
+        ...     workspace_root=None,
+        ...     sb_cfg=None,
+        ...     scope=None,
+        ... )
+        >>> p.name
+        'raw'
+    """
+    if workspace_root is not None and sb_cfg is not None:
+        layout = VaultLayout(workspace_root, sb_cfg, effective_scope(scope, sb_cfg))
+        return layout.role_dir("sources")
+    return (scope_root / "raw").resolve()
+
+
 async def fetch_url_to_raw(
     *,
     url: str,
     scope_root: Path,
     fetch_cfg: SecondBrainFetchConfig,
     client: httpx.AsyncClient | None = None,
+    workspace_root: Path | None = None,
+    sb_cfg: SecondBrainWorkspaceConfig | None = None,
+    scope: str | None = None,
 ) -> dict[str, object]:
-    """GET ``url`` and atomically write under ``scope_root/raw/``.
+    """GET ``url`` and atomically write under the active layout sources directory.
 
     Args:
         url (str): HTTPS URL to retrieve.
-        scope_root (Path): Vault user scope root (contains ``raw/``).
+        scope_root (Path): Vault user scope root (legacy fallback when layout args omitted).
         fetch_cfg (SecondBrainFetchConfig): Allowlist, size, timeout policy.
         client (httpx.AsyncClient | None): Optional shared client; otherwise a short-lived one.
+        workspace_root (Path | None): Workspace content root for :class:`VaultLayout` resolution.
+        sb_cfg (SecondBrainWorkspaceConfig | None): Second Brain slice for layout-aware paths.
+        scope (str | None): Scope id when ``sb_cfg`` is set.
 
     Returns:
         dict[str, object]: ``raw_relpath``, ``bytes_written``, and ``host`` metadata.
@@ -170,7 +211,12 @@ async def fetch_url_to_raw(
         if own_client:
             await http_client.aclose()
 
-    raw_dir = (scope_root / "raw").resolve()
+    raw_dir = _resolve_sources_dir(
+        scope_root=scope_root,
+        workspace_root=workspace_root,
+        sb_cfg=sb_cfg,
+        scope=scope,
+    )
     raw_dir.mkdir(parents=True, exist_ok=True)
     name = _filename_from_url(url, host)
     dest = raw_dir / name

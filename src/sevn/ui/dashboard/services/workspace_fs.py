@@ -30,8 +30,8 @@ from sevn.code_understanding.effective_settings import (
     graphify_enabled_for_checkout,
 )
 from sevn.code_understanding.graphify import graph_json_path, resolve_profiles
-from sevn.config.workspace_config import WorkspaceConfig
-from sevn.second_brain.paths import resolve_scope_root, wiki_dir_for_scope
+from sevn.config.workspace_config import SecondBrainWorkspaceConfig, WorkspaceConfig
+from sevn.second_brain.paths import VaultLayout
 from sevn.tools.paths import WorkspacePathError, resolve_workspace_relative_path
 from sevn.workspace.layout import WorkspaceLayout
 
@@ -124,8 +124,9 @@ def resolve_root_base(
     if key in {"workspace", "memory"}:
         return root
     if key == "second-brain":
-        scope_root = resolve_scope_root(root, workspace.second_brain, "owner")
-        return wiki_dir_for_scope(scope_root).resolve()
+        sb_cfg = workspace.second_brain or SecondBrainWorkspaceConfig()
+        vault_layout = VaultLayout(root, sb_cfg, "owner")
+        return vault_layout.role_dir("curated").resolve()
     if key == "skills":
         return (root / "skills").resolve()
     if key == "standards":

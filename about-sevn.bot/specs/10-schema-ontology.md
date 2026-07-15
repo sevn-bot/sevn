@@ -8,7 +8,7 @@ summary: 'Define the runtime ontology for Triager output and related labels acro
   the agent core: canonical field names, closed enums, typing conventions, and how
   they compose with executor dispatch described '
 last_updated: '2026-07-15'
-fingerprint: sha256:7cf3d8fd17e33c2aae58d61815d1a103982511cd848292e3d8bf776364340a08
+fingerprint: sha256:16fde42bc9e491c6b598d61126de536d60bcbf3787b42f1461e7157c9456e6f3
 related: []
 sources:
 - src/sevn/config/**
@@ -284,9 +284,6 @@ interfaces:
 - name: show_intent_footer
   file: src/sevn/config/sections/accessors.py
   symbol: show_intent_footer
-- name: social_media_manager_settings
-  file: src/sevn/config/sections/accessors.py
-  symbol: social_media_manager_settings
 - name: tier_b_answer_mode
   file: src/sevn/config/sections/accessors.py
   symbol: tier_b_answer_mode
@@ -452,6 +449,9 @@ interfaces:
 - name: SecondBrainFetchConfig
   file: src/sevn/config/sections/features.py
   symbol: SecondBrainFetchConfig
+- name: SecondBrainParaConfig
+  file: src/sevn/config/sections/features.py
+  symbol: SecondBrainParaConfig
 - name: SecondBrainPathsConfig
   file: src/sevn/config/sections/features.py
   symbol: SecondBrainPathsConfig
@@ -644,21 +644,6 @@ interfaces:
 - name: SelfImproveWorkspaceConfig
   file: src/sevn/config/sections/self_improve.py
   symbol: SelfImproveWorkspaceConfig
-- name: PlatformMediumConfig
-  file: src/sevn/config/sections/skills_social_media.py
-  symbol: PlatformMediumConfig
-- name: SocialMediaManagerSkillConfig
-  file: src/sevn/config/sections/skills_social_media.py
-  symbol: SocialMediaManagerSkillConfig
-- name: TwexApiSkillBlock
-  file: src/sevn/config/sections/skills_social_media.py
-  symbol: TwexApiSkillBlock
-- name: social_media_manager_block_dict
-  file: src/sevn/config/sections/skills_social_media.py
-  symbol: social_media_manager_block_dict
-- name: social_media_manager_settings
-  file: src/sevn/config/sections/skills_social_media.py
-  symbol: social_media_manager_settings
 - name: SpecialistConfig
   file: src/sevn/config/sections/subagents.py
   symbol: SpecialistConfig

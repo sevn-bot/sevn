@@ -164,6 +164,7 @@ artifacts = [
     "src/sevn/data/skills/INDEX.md",
     "src/sevn/data/standards/**/*.md",
     "src/sevn/data/second_brain/**/*.md",
+    "src/sevn/data/second_brain/**/*.json",
     "src/sevn/pdf/assets/*.ttf",
     "src/sevn/pdf/assets/*.txt",
     "src/sevn/data/branding/*.png",

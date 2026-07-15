@@ -6,8 +6,8 @@ status: ready
 owner: Alex
 summary: Without accumulated knowledge, every research thread starts at zero—operators
   need a provenance-backed wiki vault the assistant can search and cite in chat.
-last_updated: '2026-07-14'
-fingerprint: sha256:12c8243b0fcc82e791221e55eb0e0bf9567ac67714950e6a56b301a790a18944
+last_updated: '2026-07-15'
+fingerprint: sha256:1d0efdd7856ce0cba6b5ed3cafc9d0c03065244ef6f327a554b4bd76add14113
 related:
 - prd-02-personality-and-memory
 - prd-03-trust-and-control
@@ -23,15 +23,15 @@ personas:
 prd_profile: standard
 ---
 
-## Spec implementation status (W9 seed)
+## Spec implementation status (W9)
 
-This PRD is `ready` while linked specs below are not normatively complete (`draft` / `scaffold` / `rejected`). Code may run ahead of spec prose.
+This PRD is `ready` while linked spec **§3.2/§5** are normatively complete; other spec sections remain draft until a follow-up author pass. Code may run ahead of remaining spec prose.
 
 | Spec | Status |
 | --- | --- |
-| spec-27-second-brain | scaffold |
+| spec-27-second-brain | partial (§3.2/§5 normative; Behavior/FM sections pending author pass) |
 
-<!-- HUMAN-INPUT[owner=operator]: Reconcile PRD `ready` vs implementing spec maturity — downgrade PRD, or keep ready and finish normative spec bodies. -->
+**Honest status:** `second_brain.layout` defaults to **`legacy`** — existing installs are byte-for-byte unchanged. PARA is opt-in via `layout: "para"` or `sevn second-brain setup --layout para`.
 
 ## Problem & Motivation
 
@@ -59,7 +59,7 @@ Obsidian-compatible files the operator can edit offline.
 | --- | --- | --- | --- |
 | UJ-001 | Research operator | Finishes reading a long doc or thread | Source lands in `raw/`; structured wiki page exists with provenance the assistant can cite |
 | UJ-002 | Returning operator | Asks about a topic discussed days ago | Assistant searches the vault and answers with wiki-backed context—not a blank slate |
-| UJ-003 | Obsidian user | Edits notes locally and syncs the vault | Bidirectional sync resolves conflicts safely; bot reads the same wiki the operator sees |
+| UJ-003 | Obsidian user | Edits notes locally in a PARA or legacy vault and syncs the folder | Bidirectional sync resolves conflicts safely; bot reads the same tree the operator sees — PARA layout uses vault-root `index.md`/`log.md` and wikilinks across `00_Inbox`…`30_Resources` |
 | UJ-004 | Operator auditing trust | Wants to verify a claim | Assistant or Mission Control surfaces which wiki page and raw source backed the answer |
 
 **Narrative:**
@@ -71,9 +71,11 @@ Obsidian-compatible files the operator can edit offline.
 - **UJ-002 — Recall without re-explaining:** A week later the operator asks about rate-limiting
   trade-offs. The triage/executor tier searches the vault first, returns an answer grounded in
   the filed wiki page, and names the slug—not a vague "I think we discussed this."
-- **UJ-003 — Obsidian as editor of record:** The operator maintains the vault in Obsidian;
-  sevn reads the synced tree. Merge conflicts surface as operator-visible errors with a git
-  merge path rather than silent overwrites.
+- **UJ-003 — Obsidian as editor of record:** The operator maintains the vault in Obsidian
+  (legacy OKF `wiki/` tree or PARA `00_Inbox`…`40_Archive` layout). sevn reads the synced
+  tree via `VaultLayout` role resolution. Merge conflicts surface as operator-visible errors
+  with a git merge path rather than silent overwrites. PARA adoption is additive-only —
+  existing notes and `.obsidian/` are never clobbered.
 - **UJ-004 — Provenance check:** From Telegram or Mission Control Knowledge, the operator opens
   the wiki page, follows links to the ingest stub and raw hash, and confirms the assistant did
   not invent the citation.
@@ -81,8 +83,9 @@ Obsidian-compatible files the operator can edit offline.
 ## Goals
 
 - **FR-001:** The product shall provide an **opt-in Second Brain vault** per workspace with
-  per-scope `raw/`, `wiki/`, and `outputs/` trees the operator controls (default off until
-  enabled in config).
+  layout-aware role directories the operator controls (`legacy`: per-scope `raw/`, `wiki/`,
+  `outputs/`; `para`: PARA folders under `paths.vault`) — default off until enabled in config.
+  **`layout` defaults to `legacy`**; PARA is opt-in.
 - **FR-002:** Operators shall **ingest sources into structured wiki pages** via deterministic
   raw→wiki pipelines (skill scripts and native tools) with `index.md` and `log.md` kept current.
 - **FR-003:** Wiki pages shall carry **provenance**—links or frontmatter back to raw sources
@@ -92,8 +95,14 @@ Obsidian-compatible files the operator can edit offline.
   is enabled.
 - **FR-005:** Operators shall **lint the wiki** for OKF/Obsidian conventions (missing `type`,
   orphan links) and receive actionable reports without manual grep.
-- **FR-006:** The product shall support **Obsidian bidirectional sync** semantics: external
-  edits merge safely; conflicts require explicit operator resolution—not silent clobber.
+- **FR-006:** The product shall support **Obsidian bidirectional sync** semantics for both
+  legacy and PARA vault layouts: external edits merge safely; conflicts require explicit
+  operator resolution—not silent clobber. PARA acceptance path: operator points
+  `second_brain.paths.vault` at an existing Obsidian PARA vault, sets `layout: "para"` (or
+  `sevn second-brain setup --vault <path> --layout para`), and edits notes in Obsidian while
+  the bot searches/ingests across PARA content roots (`00_Inbox`, `10_Projects`, `20_Areas`,
+  `30_Resources`). Deeper sync-engine mechanics remain unchanged; this FR covers layout-native
+  filesystem compatibility, not a new sync daemon.
 - **FR-007:** Mission Control shall expose a **Knowledge** view of vault layout, wiki index,
   and scope status when the dashboard is enabled—read-only inspection, not a second editor.
 - **FR-008:** Second Brain shall remain **separate from session memory** (LCM, `MEMORY.md`,
@@ -120,11 +129,13 @@ Obsidian-compatible files the operator can edit offline.
 - **Happy path (enable):** Operator sets `second_brain.enabled` in config (onboarding capability
   or manual edit). Vault appears under the workspace. Optional `second_brain.paths.vault` points
   at an existing Obsidian folder (CLI `sevn second-brain setup --vault`, Telegram `/config`, or
-  onboarding folder picker) without symlinks. They ingest a source, see a new wiki page
-  and index line, and ask a follow-up question in Telegram—the bot searches the vault and cites
-  the page.
-- **Happy path (Obsidian):** Operator opens the vault folder in Obsidian, edits wikilinks and
-  concept pages, syncs back. The bot's next query sees the updated tree after lint passes.
+  onboarding folder picker) without symlinks. Choose **`layout: "legacy"`** (default) or
+  **`layout: "para"`** for PARA Obsidian vaults (`--layout auto` detects existing structure).
+  They ingest a source, see a new note and index/log line, and ask a follow-up question in
+  Telegram—the bot searches the vault and cites the page.
+- **Happy path (Obsidian PARA):** Operator runs `sevn second-brain setup --vault obsidian/my_vault --layout para`,
+  opens the vault in Obsidian, edits wikilinks across PARA folders, syncs back. The bot's next
+  query sees the updated tree across content roots after lint passes.
 - **Operator controls:** Enable/disable Second Brain; per-scope roots; skill scripts for ingest,
   lint, and file-back; optional legacy ingest stub gated off by default; witchcraft semantic
   mode when installed and allowed.

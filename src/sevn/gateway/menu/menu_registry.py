@@ -732,6 +732,15 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         implemented=True,
         notes="Owner folder browser wizard",
     )
+    add(
+        "C13.6",
+        r"^cfg:toggle:second_brain\.layout:(?:legacy|para)$",
+        "C",
+        "second_brain",
+        "Vault layout",
+        implemented=True,
+        notes="legacy ↔ para cycle",
+    )
 
     # --- C25. Sub-agents (Advanced nested) ---
     add(

@@ -39,14 +39,15 @@ from sevn.code_understanding.effective_settings import (
 )
 from sevn.code_understanding.graphify import graph_json_path, graph_report_path, resolve_profiles
 from sevn.config.defaults import DEFAULT_SECOND_BRAIN_ENABLED
-from sevn.config.workspace_config import WorkspaceConfig
+from sevn.config.workspace_config import SecondBrainWorkspaceConfig, WorkspaceConfig
 from sevn.memory.user_model.store import UserModelStore
 from sevn.second_brain.paths import (
+    LayoutRole,
+    VaultLayout,
     display_scope_root_relative,
     effective_scope,
     resolve_scope_root,
     vault_root,
-    wiki_dir_for_scope,
 )
 from sevn.tools.file_ops.list_glob import MAX_LISTING_RESULTS, _entry_metadata
 from sevn.tools.paths import (
@@ -70,6 +71,19 @@ _MEMORY_PREVIEW_CHARS = 240
 _MEMORY_MD_PREVIEW_CHARS = 4000
 _WIKI_PAGE_LIMIT = 200
 _MEMORY_ROW_LIMIT = 100
+
+_LAYOUT_ROLES: tuple[LayoutRole, ...] = (
+    "capture",
+    "projects",
+    "areas",
+    "curated",
+    "archive",
+    "templates",
+    "sources",
+    "outputs",
+    "index_note",
+    "log_note",
+)
 
 
 def _error_response(
@@ -289,12 +303,49 @@ def _second_brain_enabled(workspace: WorkspaceConfig) -> bool:
     return bool(sb.enabled)
 
 
-def _list_wiki_pages(wiki_root: Path, *, limit: int) -> list[dict[str, Any]]:
+def _resolved_role_paths(
+    content_root: Path,
+    sb_cfg: SecondBrainWorkspaceConfig,
+    scope: str,
+) -> dict[str, str]:
+    """Map layout role names to workspace-relative paths.
+
+    Args:
+        content_root (Path): Workspace content root.
+        sb_cfg (SecondBrainWorkspaceConfig): Parsed ``second_brain`` slice.
+        scope (str): Active scope id.
+
+    Returns:
+        dict[str, str]: Role name → workspace-relative path.
+
+    Examples:
+        >>> import tempfile
+        >>> from pathlib import Path
+        >>> from sevn.config.workspace_config import SecondBrainWorkspaceConfig
+        >>> root = Path(tempfile.mkdtemp())
+        >>> roles = _resolved_role_paths(root, SecondBrainWorkspaceConfig(), "owner")
+        >>> roles["curated"].endswith("wiki")
+        True
+    """
+    layout = VaultLayout(content_root, sb_cfg, scope)
+    return {
+        role: display_scope_root_relative(content_root, layout.role_dir(role))
+        for role in _LAYOUT_ROLES
+    }
+
+
+def _list_wiki_pages(
+    wiki_root: Path,
+    *,
+    limit: int,
+    path_base: Path | None = None,
+) -> list[dict[str, Any]]:
     """Collect wiki ``*.md`` paths under ``wiki_root`` (relative POSIX).
 
     Args:
         wiki_root (Path): Resolved ``wiki/`` directory.
         limit (int): Maximum pages.
+        path_base (Path | None): Base for relative ``path`` keys (vault root in PARA).
 
     Returns:
         list[dict[str, Any]]: Page metadata rows.
@@ -309,11 +360,12 @@ def _list_wiki_pages(wiki_root: Path, *, limit: int) -> list[dict[str, Any]]:
     if not wiki_root.is_dir():
         return []
     pages: list[dict[str, Any]] = []
+    rel_base = (path_base or wiki_root).resolve()
     for path in sorted(wiki_root.rglob("*.md")):
         if not path.is_file():
             continue
         try:
-            rel = path.relative_to(wiki_root.resolve()).as_posix()
+            rel = path.relative_to(rel_base).as_posix()
         except ValueError:
             continue
         stat = path.stat()
@@ -598,25 +650,55 @@ async def second_brain_overview(
 
     workspace: WorkspaceConfig = request.app.state.workspace
     layout: WorkspaceLayout = request.app.state.layout
+    from sevn.config.loader import load_workspace
+
+    workspace, _layout = load_workspace(sevn_json=layout.sevn_json_path)
     enabled = _second_brain_enabled(workspace)
-    sb_cfg = workspace.second_brain
+    sb_cfg = workspace.second_brain or SecondBrainWorkspaceConfig()
     scope_name = effective_scope(scope, sb_cfg)
     scope_root = resolve_scope_root(layout.content_root, sb_cfg, scope_name)
-    wiki = wiki_dir_for_scope(scope_root)
     legacy_vault = vault_root(layout.content_root)
+    layout_name = sb_cfg.layout or "legacy"
 
     def _build() -> dict[str, object]:
-        pages = _list_wiki_pages(wiki, limit=_WIKI_PAGE_LIMIT)
+        vault_layout = VaultLayout(layout.content_root, sb_cfg, scope_name)
+        curated = vault_layout.role_dir("curated")
+        pages: list[dict[str, Any]] = []
+        page_path_base = vault_layout.scope_root if layout_name == "para" else None
+        for root in vault_layout.content_roots():
+            remaining = _WIKI_PAGE_LIMIT - len(pages)
+            if remaining <= 0:
+                break
+            pages.extend(
+                _list_wiki_pages(root, limit=remaining, path_base=page_path_base),
+            )
+        roles = _resolved_role_paths(layout.content_root, sb_cfg, scope_name)
+        content_roots = [
+            display_scope_root_relative(layout.content_root, root)
+            for root in vault_layout.content_roots()
+        ]
+        index_path = vault_layout.role_dir("index_note")
+        index_excerpt = ""
+        if index_path.is_file():
+            try:
+                index_excerpt = index_path.read_text(encoding="utf-8")[:400]
+            except OSError:
+                index_excerpt = ""
+        elif curated.is_dir():
+            index_excerpt = _index_excerpt(curated)
         return {
             "enabled": enabled,
+            "layout": layout_name,
+            "roles": roles,
+            "content_roots": content_roots,
             "vault_path": str(scope_root),
             "vault_relative": display_scope_root_relative(layout.content_root, scope_root),
             "scope": scope_name,
             "scopes": _second_brain_scopes(legacy_vault),
-            "wiki_path": str(wiki),
+            "wiki_path": str(curated),
             "wiki_page_count": len(pages),
             "wiki_pages": pages,
-            "index_excerpt": _index_excerpt(wiki),
+            "index_excerpt": index_excerpt,
             "gateway_fetch": "/api/second_brain/fetch",
         }
 

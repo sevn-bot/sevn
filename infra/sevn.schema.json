@@ -1782,6 +1782,12 @@
       "type": "object",
       "properties": {
         "enabled": { "type": "boolean", "default": true },
+        "layout": {
+          "type": "string",
+          "enum": ["legacy", "para"],
+          "default": "legacy",
+          "description": "Vault layout: legacy (wiki/raw/outputs) or para (Obsidian PARA folders)."
+        },
         "paths": {
           "type": "object",
           "additionalProperties": false,
@@ -1791,10 +1797,27 @@
               "description": "Workspace-relative Obsidian vault folder (e.g. obsidian/alex_AI). Unset preserves second_brain/users/<scope>/ layout."
             }
           }
+        },
+        "para": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "PARA folder profile (used when layout=para). Each value is a single safe path segment.",
+          "properties": {
+            "inbox": { "type": "string", "default": "00_Inbox" },
+            "projects": { "type": "string", "default": "10_Projects" },
+            "areas": { "type": "string", "default": "20_Areas" },
+            "resources": { "type": "string", "default": "30_Resources" },
+            "archive": { "type": "string", "default": "40_Archive" },
+            "templates": { "type": "string", "default": "90_Templates" },
+            "sources_subdir": { "type": "string", "default": "_sources" },
+            "outputs_subdir": { "type": "string", "default": "_outputs" },
+            "index_note": { "type": "string", "default": "index.md" },
+            "log_note": { "type": "string", "default": "log.md" }
+          }
         }
       },
       "additionalProperties": true,
-      "$comment": "second_brain.paths.vault — workspace-relative Obsidian vault root under content root; unset uses legacy second_brain/users/<scope>/ layout."
+      "$comment": "second_brain.layout legacy|para (default legacy); second_brain.para folder profile when layout=para; paths.vault is workspace-relative vault root."
     },
     "openui": {
       "type": "object",

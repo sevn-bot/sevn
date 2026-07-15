@@ -74,3 +74,32 @@ def test_reindex_workspace_wiki_disabled_when_second_brain_off(tmp_path: Path) -
         witchcraft_enabled=True,
     )
     assert reindex_workspace_wiki(config=cfg, content_root=tmp_path) is False
+
+
+def test_resolve_index_wiki_paths_para_layout(tmp_path: Path) -> None:
+    vault = tmp_path / "obsidian" / "alex_AI"
+    for name in ("00_Inbox", "10_Projects", "20_Areas", "30_Resources"):
+        (vault / name).mkdir(parents=True)
+    cfg = WorkspaceConfig.minimal(
+        second_brain={
+            "enabled": True,
+            "layout": "para",
+            "paths": {"vault": "obsidian/alex_AI"},
+        },
+        witchcraft_enabled=True,
+    )
+    out = resolve_index_wiki_paths(config=cfg, content_root=tmp_path)
+    assert out is not None
+    user_roots, shared = out
+    assert shared is None
+    if isinstance(user_roots, tuple):
+        resolved = {p.resolve() for p in user_roots}
+    else:
+        resolved = {user_roots.resolve()}
+    expected = {
+        (vault / "00_Inbox").resolve(),
+        (vault / "10_Projects").resolve(),
+        (vault / "20_Areas").resolve(),
+        (vault / "30_Resources").resolve(),
+    }
+    assert resolved == expected

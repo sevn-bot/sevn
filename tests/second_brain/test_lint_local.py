@@ -76,3 +76,16 @@ def test_lint_wikilink_regression(tmp_path: Path) -> None:
     )
     issues = lint_wiki_tree(wiki)
     assert any(i.path == "a.md" and "orphan wikilink" in i.message for i in issues)
+
+
+def test_legacy_type_missing_is_error_severity(tmp_path: Path) -> None:
+    wiki = tmp_path / "wiki"
+    wiki.mkdir()
+    (wiki / "note.md").write_text(
+        compose_page({"title": "Note"}, "# Note\n\nShort.\n"),
+        encoding="utf-8",
+    )
+    issues = lint_wiki_tree(wiki)
+    type_issues = [i for i in issues if i.path == "note.md" and "type" in i.message.lower()]
+    assert type_issues
+    assert type_issues[0].severity == "error"

@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import cast
 
 from sevn.coding_agents.artifacts.vault import list_all_runs, list_run_artifacts, read_artifact
+from sevn.config.workspace_config import SecondBrainWorkspaceConfig
 from sevn.gateway.telegram.telegram_inline_agent import (
     build_agent_inline_results,
     capture_router_outbound_text,
@@ -59,11 +60,10 @@ from sevn.gateway.telegram.telegram_inline_printing_press import build_printing_
 from sevn.gateway.telegram.telegram_inline_types import InlineSourceKind, inline_source_cache_time
 from sevn.gateway.webapp.webapp_viewer import infer_viewer_payload_from_markdown
 from sevn.second_brain.paths import (
+    VaultLayout,
     effective_scope,
     legacy_shared_vault_root,
-    resolve_scope_root,
     shared_wiki_root,
-    wiki_dir_for_scope,
 )
 from sevn.second_brain.query import second_brain_query
 
@@ -131,8 +131,9 @@ def build_second_brain_inline_results(
 
     sb_cfg = ctx.workspace.second_brain if ctx.workspace is not None else None
     scope = effective_scope(ctx.second_brain_scope or ctx.user_id, sb_cfg)
-    user_root = resolve_scope_root(ctx.content_root, sb_cfg, scope)
-    user_wiki = wiki_dir_for_scope(user_root)
+    sb = sb_cfg or SecondBrainWorkspaceConfig()
+    layout = VaultLayout(ctx.content_root, sb, scope)
+    user_wiki = layout.role_dir("curated")
     shared = shared_wiki_root(legacy_shared_vault_root(ctx.content_root))
     runner = query_fn or second_brain_query
 
@@ -144,6 +145,9 @@ def build_second_brain_inline_results(
             include_shared=True,
             limit=max_results,
             workspace_path=ctx.content_root,
+            content_roots=layout.content_roots(),
+            vault_root=layout.scope_root,
+            index_note=layout.index_note(),
         )
     except Exception as exc:
         return InlineSourceResult(

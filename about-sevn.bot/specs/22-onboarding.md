@@ -8,7 +8,7 @@ summary: 'Deliver the merge + validation + promotion pipeline every setup path s
   so sevn.json stays the single source of truth (prd-06-setup-and-operations §5.4,
   spec-02-config-and-workspace): shipped pres'
 last_updated: '2026-07-15'
-fingerprint: sha256:93647238f530c904630ecd64d715fb386cae3af9ca051679a7db2509436779a5
+fingerprint: sha256:9a73be6e295b8ee0b7f301f098646130a5ef0775df65be874d16e2b1ca88d4b1
 related: []
 sources:
 - src/sevn/onboarding/**
@@ -60,9 +60,6 @@ interfaces:
 - name: list_groups
   file: src/sevn/onboarding/capabilities_manifest.py
   symbol: list_groups
-- name: load_capabilities_manifest
-  file: src/sevn/onboarding/capabilities_manifest.py
-  symbol: load_capabilities_manifest
 - name: load_manifest
   file: src/sevn/onboarding/capabilities_manifest.py
   symbol: load_manifest

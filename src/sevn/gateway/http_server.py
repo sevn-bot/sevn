@@ -153,7 +153,7 @@ from sevn.plugins.registry import (
     load_plugin_hook_chain,
 )
 from sevn.second_brain.fetch import SecondBrainFetchError, fetch_url_to_raw
-from sevn.second_brain.paths import display_scope_root_relative, resolve_scope_root
+from sevn.second_brain.paths import VaultLayout, display_scope_root_relative, resolve_scope_root
 from sevn.security.llm_guard_scanner import LLMGuardScanner
 from sevn.security.secrets.factory import secrets_chain_from_workspace
 from sevn.self_improve.effective import effective_self_improve_enabled
@@ -2155,7 +2155,14 @@ def create_app(
             raise HTTPException(status_code=400, detail="missing_url")
         scope_path = resolve_scope_root(ly.content_root, sb_cfg, scope)
         try:
-            out = await fetch_url_to_raw(url=url, scope_root=scope_path, fetch_cfg=sb_cfg.fetch)
+            out = await fetch_url_to_raw(
+                url=url,
+                scope_root=scope_path,
+                fetch_cfg=sb_cfg.fetch,
+                workspace_root=ly.content_root,
+                sb_cfg=sb_cfg,
+                scope=scope,
+            )
         except SecondBrainFetchError as exc:
             host_guess = urlparse(url).hostname or ""
             await _emit_webchat_trace(
@@ -2171,6 +2178,11 @@ def create_app(
             )
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         host_out = str(out.get("host", ""))
+        vault_layout = VaultLayout(ly.content_root, sb_cfg, scope)
+        sources_rel = display_scope_root_relative(
+            ly.content_root,
+            vault_layout.role_dir("sources"),
+        )
         await _emit_webchat_trace(
             trace_local,
             kind="second_brain.fetch",
@@ -2179,9 +2191,7 @@ def create_app(
             attrs={
                 "second_brain.scope": scope,
                 "fetch.host": host_out,
-                "second_brain.paths_touched": [
-                    f"{display_scope_root_relative(ly.content_root, scope_path)}/raw/{out['raw_relpath']}"
-                ],
+                "second_brain.paths_touched": [f"{sources_rel}/{out['raw_relpath']}"],
             },
         )
         return JSONResponse({"ok": True, "data": out})

@@ -5,6 +5,7 @@ Depends: pydantic, sevn.config.defaults
 
 Exports:
     SecondBrainFetchConfig — ``second_brain.fetch`` allowlist + HTTP caps (`specs/27-second-brain.md` §5).
+    SecondBrainParaConfig — ``second_brain.para`` PARA folder profile (`specs/27-second-brain.md` §5).
     SecondBrainPathsConfig — ``second_brain.paths`` vault root (`specs/27-second-brain.md` §5).
     SecondBrainWorkspaceConfig — ``second_brain`` subtree (`specs/27-second-brain.md` §5).
     OpenUIWorkspaceConfig — ``openui`` subtree (`specs/29-openui.md` §5).
@@ -15,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from sevn.config.defaults import (
     DEFAULT_OPENUI_CALLBACK_TIMEOUT_SECONDS,
@@ -117,6 +118,41 @@ def _normalise_vault_path(value: str) -> str:
     return "/".join(parts)
 
 
+def _normalise_para_segment(value: str, *, field: str) -> str:
+    """Validate and normalise a single PARA profile path segment or note basename.
+
+    Args:
+        value (str): Raw ``second_brain.para.<field>`` value.
+        field (str): Dotted field name for error messages.
+
+    Returns:
+        str: Normalised single segment (no ``/`` or ``..`` traversal).
+
+    Raises:
+        ValueError: When the segment is empty, absolute, or unsafe.
+
+    Examples:
+        >>> _normalise_para_segment("00_Inbox", field="inbox")
+        '00_Inbox'
+        >>> _normalise_para_segment("index.md", field="index_note")
+        'index.md'
+    """
+    text = value.strip().replace("\\", "/")
+    if text.startswith("/") or "://" in text:
+        msg = f"second_brain.para.{field} must be a single path segment (no leading / or scheme)"
+        raise ValueError(msg)
+    if "/" in text:
+        msg = f"second_brain.para.{field} must be a single path segment (got {value!r})"
+        raise ValueError(msg)
+    if text in (".", "..") or ".." in text:
+        msg = f"second_brain.para.{field} must not contain '..' components"
+        raise ValueError(msg)
+    if not text:
+        msg = f"second_brain.para.{field} must be a non-empty string"
+        raise ValueError(msg)
+    return text
+
+
 class SecondBrainPathsConfig(BaseModel):
     """``second_brain.paths`` — custom Obsidian vault root (`specs/27-second-brain.md` §5)."""
 
@@ -175,12 +211,65 @@ class SecondBrainPathsConfig(BaseModel):
         return _normalise_vault_path(v)
 
 
+class SecondBrainParaConfig(BaseModel):
+    """``second_brain.para`` — PARA folder profile used when ``layout="para"``."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    inbox: str = "00_Inbox"
+    projects: str = "10_Projects"
+    areas: str = "20_Areas"
+    resources: str = "30_Resources"
+    archive: str = "40_Archive"
+    templates: str = "90_Templates"
+    sources_subdir: str = "_sources"
+    outputs_subdir: str = "_outputs"
+    index_note: str = "index.md"
+    log_note: str = "log.md"
+
+    @field_validator(
+        "inbox",
+        "projects",
+        "areas",
+        "resources",
+        "archive",
+        "templates",
+        "sources_subdir",
+        "outputs_subdir",
+        "index_note",
+        "log_note",
+        mode="before",
+    )
+    @classmethod
+    def _validate_segment(cls, v: object, info: ValidationInfo) -> object:
+        """Normalise each PARA profile segment.
+
+        Args:
+            cls (type): Pydantic model class.
+            v (object): Raw JSON value.
+            info (ValidationInfo): Pydantic validation info (field name).
+
+        Returns:
+            object: Normalised segment string.
+
+        Examples:
+            >>> SecondBrainParaConfig(inbox="00_Capture").inbox
+            '00_Capture'
+        """
+        field = info.field_name or "segment"
+        if not isinstance(v, str):
+            msg = f"second_brain.para.{field} must be a string"
+            raise ValueError(msg)
+        return _normalise_para_segment(v, field=field)
+
+
 class SecondBrainWorkspaceConfig(BaseModel):
     """Typed ``second_brain`` subtree (`specs/27-second-brain.md` §5)."""
 
     model_config = ConfigDict(extra="allow")
 
     enabled: bool = Field(default=DEFAULT_SECOND_BRAIN_ENABLED)
+    layout: Literal["legacy", "para"] = "legacy"
     topology: Literal["single_instance", "per_user", "shared_core_overlay"] = "single_instance"
     default_scope: str = Field(default="owner", min_length=1)
     outputs_retention_days: int = Field(
@@ -191,8 +280,46 @@ class SecondBrainWorkspaceConfig(BaseModel):
     conflict_strategy: Literal["atomic_reject", "git_merge"] = "atomic_reject"
     fetch: SecondBrainFetchConfig = Field(default_factory=SecondBrainFetchConfig)
     paths: SecondBrainPathsConfig = Field(default_factory=SecondBrainPathsConfig)
+    para: SecondBrainParaConfig = Field(default_factory=SecondBrainParaConfig)
     ingest_batch_cron: str = Field(default="weekly", min_length=1)
     lint_cron: str = Field(default="first_sunday_09:00_local", min_length=1)
+
+    @field_validator("layout", mode="before")
+    @classmethod
+    def _normalise_layout(cls, v: object) -> object:
+        """Normalise ``layout``: whitespace-only blank → ``legacy``; reject empty or unknown values.
+
+        Args:
+            cls (type): Pydantic model class.
+            v (object): Raw JSON value.
+
+        Returns:
+            object: ``"legacy"`` or ``"para"``.
+
+        Examples:
+            >>> SecondBrainWorkspaceConfig._normalise_layout(None)
+            'legacy'
+            >>> SecondBrainWorkspaceConfig._normalise_layout("para")
+            'para'
+        """
+        if v is None:
+            return "legacy"
+        if not isinstance(v, str):
+            msg = "second_brain.layout must be a string"
+            raise ValueError(msg)
+        if v == "":
+            msg = "second_brain.layout must be 'legacy' or 'para'"
+            raise ValueError(msg)
+        stripped = v.strip()
+        if not stripped:
+            return "legacy"
+        if stripped != stripped.lower():
+            msg = f"second_brain.layout must be lowercase 'legacy' or 'para' (got {v!r})"
+            raise ValueError(msg)
+        if stripped not in ("legacy", "para"):
+            msg = f"second_brain.layout must be 'legacy' or 'para' (got {v!r})"
+            raise ValueError(msg)
+        return stripped
 
     @field_validator("default_scope", mode="before")
     @classmethod

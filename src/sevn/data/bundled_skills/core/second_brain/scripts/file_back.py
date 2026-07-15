@@ -6,6 +6,9 @@ Depends: argparse, pathlib, ``sevn.second_brain``
 
 Exports:
     main — CLI entry; JSON envelope on stdout.
+
+Writes pages under :meth:`~sevn.second_brain.paths.VaultLayout.role_dir` ``curated``
+and updates :meth:`~sevn.second_brain.paths.VaultLayout.index_note`.
 """
 
 from __future__ import annotations
@@ -55,16 +58,19 @@ def main() -> int:
     if args.body_file:
         body = Path(args.body_file).read_text(encoding="utf-8")
     from sevn.config.loader import SevnJsonNotFoundError, load_workspace
+    from sevn.config.workspace_config import SecondBrainWorkspaceConfig
     from sevn.second_brain.frontmatter import compose_page, normalise_agent_keys
-    from sevn.second_brain.paths import resolve_scope_root, wiki_dir_for_scope
+    from sevn.second_brain.paths import VaultLayout
 
     try:
         cfg, _layout = load_workspace(sevn_json=workspace / "sevn.json")
         sb_cfg = cfg.second_brain
     except SevnJsonNotFoundError:
         sb_cfg = None
-    wiki = wiki_dir_for_scope(resolve_scope_root(workspace, sb_cfg, args.scope))
-    wiki.mkdir(parents=True, exist_ok=True)
+    sb = sb_cfg or SecondBrainWorkspaceConfig()
+    layout = VaultLayout(workspace, sb, args.scope)
+    curated = layout.role_dir("curated")
+    curated.mkdir(parents=True, exist_ok=True)
     slug = args.slug.strip().replace("/", "").replace("..", "")
     if not slug:
         sys.stdout.write(
@@ -74,25 +80,27 @@ def main() -> int:
             )
         )
         return 1
-    path = wiki / f"{slug}.md"
-    fm = normalise_agent_keys(
-        {
-            "type": "Note",
-            "title": args.title,
-            "sevn_source": "tool:skill:file_back",
-        },
-    )
+    path = curated / f"{slug}.md"
+    fm_keys: dict[str, str] = {
+        "title": args.title,
+        "sevn_source": "tool:skill:file_back",
+    }
+    if sb.layout == "legacy":
+        fm_keys["type"] = "Note"
+    fm = normalise_agent_keys(fm_keys, layout=sb.layout)
     md_body = f"# {args.title}\n\n{body}\n"
     path.write_text(compose_page(fm, md_body), encoding="utf-8")
-    idx = wiki / "index.md"
+    idx = layout.index_note()
     bullet = f"- [[{slug}]] — {args.title} (file-back)"
     if idx.is_file():
         idx.write_text(idx.read_text(encoding="utf-8").rstrip() + f"\n{bullet}\n", encoding="utf-8")
     else:
+        idx.parent.mkdir(parents=True, exist_ok=True)
         idx.write_text(f"# Index\n\n{bullet}\n", encoding="utf-8")
+    rel = path.relative_to(curated).as_posix()
     sys.stdout.write(
         json.dumps(
-            {"ok": True, "data": {"path": path.relative_to(wiki).as_posix()}, "message": None},
+            {"ok": True, "data": {"path": rel}, "message": None},
             separators=(",", ":"),
         )
     )

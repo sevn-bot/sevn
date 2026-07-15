@@ -51,6 +51,7 @@ from sevn.config.sections.features import (
     OpenUIWorkspaceConfig,
     PluginHookEntryConfig,
     SecondBrainFetchConfig,
+    SecondBrainParaConfig,
     SecondBrainWorkspaceConfig,
 )
 from sevn.config.sections.gateway import (
@@ -236,6 +237,7 @@ __all__ = [
     "RlmWorkspaceConfig",
     "SandboxConfig",
     "SecondBrainFetchConfig",
+    "SecondBrainParaConfig",
     "SecondBrainWorkspaceConfig",
     "SecretsBackendSectionConfig",
     "SecurityAuditSubConfig",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -25,15 +26,45 @@ from sevn.ui.dashboard.services.auth import DASHBOARD_CSRF_COOKIE_NAME, DASHBOAR
 from sevn.ui.dashboard.tab_registry import WIRED_SLUGS
 from sevn.workspace.layout import WorkspaceLayout
 
+_DASHBOARD_DOC: dict[str, object] = {
+    "enabled": True,
+    "login_password": "pw",
+    "jwt_secret": "dashboard-secret",
+    "local_open": False,
+}
 
-@contextmanager
-def _client(tmp_path: Path) -> Iterator[TestClient]:
-    sevn_json = tmp_path / "sevn.json"
+
+def _load_dashboard_cfg(sevn_json: Path) -> WorkspaceConfig:
+    """Build dashboard test config, preserving an existing ``second_brain.layout``."""
+    if sevn_json.is_file():
+        doc = json.loads(sevn_json.read_text(encoding="utf-8"))
+        sb = doc.get("second_brain")
+        if isinstance(sb, dict) and "layout" in sb:
+            doc.setdefault("schema_version", 1)
+            doc.setdefault("workspace_root", ".")
+            dash = doc.setdefault("dashboard", {})
+            if isinstance(dash, dict):
+                dash.update(_DASHBOARD_DOC)
+            doc.setdefault(
+                "security",
+                {"scanner": {"heuristic_only": True}},
+            )
+            doc.setdefault("gateway", {"token": "${SECRET:keychain:sevn.gateway.token}"})
+            sevn_json.write_text(json.dumps(doc), encoding="utf-8")
+            cfg = WorkspaceConfig.model_validate(doc)
+            if cfg.dashboard is not None:
+                return cfg.model_copy(
+                    update={
+                        "dashboard": cfg.dashboard.model_copy(update={"local_open": False}),
+                    },
+                )
+            return cfg
+
     sevn_json.write_text(
         '{"schema_version": 1, "workspace_root": ".", "gateway": {"token": "${SECRET:keychain:sevn.gateway.token}"}}',
         encoding="utf-8",
     )
-    cfg = WorkspaceConfig(
+    return WorkspaceConfig(
         schema_version=1,
         workspace_root=".",
         dashboard=DashboardWorkspaceConfig(
@@ -47,6 +78,12 @@ def _client(tmp_path: Path) -> Iterator[TestClient]:
         ),
         gateway={"token": "${SECRET:keychain:sevn.gateway.token}"},
     )
+
+
+@contextmanager
+def _client(tmp_path: Path) -> Iterator[TestClient]:
+    sevn_json = tmp_path / "sevn.json"
+    cfg = _load_dashboard_cfg(sevn_json)
     layout = WorkspaceLayout.from_config(sevn_json, cfg)
 
     def factory() -> sqlite3.Connection:
@@ -113,6 +150,40 @@ def test_knowledge_second_brain_vault_layout(tmp_path: Path) -> None:
         assert body["gateway_fetch"] == "/api/second_brain/fetch"
         paths = {p["path"] for p in body["wiki_pages"]}
         assert "a.md" in paths
+
+
+def test_knowledge_second_brain_para_roles(tmp_path: Path) -> None:
+    vault = tmp_path / "obsidian" / "alex_AI"
+    for name in ("00_Inbox", "10_Projects", "20_Areas", "30_Resources"):
+        (vault / name).mkdir(parents=True)
+    (vault / "index.md").write_text("# Index\n", encoding="utf-8")
+    sevn_json = tmp_path / "sevn.json"
+    sevn_json.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "workspace_root": ".",
+                "gateway": {"token": "test-token-1234567890"},
+                "second_brain": {
+                    "enabled": True,
+                    "layout": "para",
+                    "paths": {"vault": "obsidian/alex_AI"},
+                },
+            },
+        ),
+        encoding="utf-8",
+    )
+    with _client(tmp_path) as client:
+        _login(client)
+        resp = client.get("/api/v1/knowledge/second-brain")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body.get("layout") == "para"
+        roles = body.get("roles") or {}
+        assert "capture" in roles
+        assert roles["capture"].endswith("00_Inbox")
+        assert "curated" in roles
+        assert roles["curated"].endswith("30_Resources")
 
 
 def test_knowledge_workspace_files_lists_with_redaction(tmp_path: Path) -> None:
