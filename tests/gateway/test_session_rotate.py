@@ -7,6 +7,8 @@ import sqlite3
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.gateway.onboarding.first_session import intro_state_for_scope, mark_intro_state
 from sevn.gateway.session_manager import SessionManager, format_lcm_status_lines, load_session_row
@@ -105,7 +107,89 @@ def test_session_mirror_separate_jsonl_per_session(tmp_path: Path) -> None:
         return s1, s2
 
     s1, s2 = asyncio.run(_run())
+    # D7: positive chat_id (private-style scope) stays ID-only even after W3.
     base = content_root / "sessions" / "telegram" / "chats" / "99" / "general"
+    p1 = base / f"{s1}.jsonl"
+    p2 = base / f"{s2}.jsonl"
+    assert p1.is_file()
+    assert p2.is_file()
+    assert p1 != p2
+
+
+def test_session_mirror_separate_jsonl_per_session_group_enriched_path(tmp_path: Path) -> None:
+    """W1.6: supergroup ``/new`` rotation writes under name-enriched chat folder."""
+    import inspect
+
+    from sevn.gateway.session.session_mirror import mirror_gateway_message
+
+    conn = sqlite3.connect(":memory:")
+    apply_migrations(conn)
+    content_root = tmp_path / "ws"
+    content_root.mkdir()
+    ws = WorkspaceConfig(
+        schema_version=1,
+        gateway={
+            "session_mirror": {"enabled": True},
+            "token": "${SECRET:keychain:sevn.gateway.token}",
+        },
+    )
+    sm = SessionManager(conn, content_root=content_root, workspace=ws)
+    scope = "telegram:-1001234567890:general"
+    conn.execute(
+        "INSERT INTO telegram_chat_names (chat_id, name, updated_at) VALUES (?, ?, datetime('now'))",
+        (-1001234567890, "Ops Team"),
+    )
+    conn.commit()
+    mirror_kwargs: dict[str, object] = {}
+    sig = inspect.signature(mirror_gateway_message)
+    for param_name in ("name_resolver", "resolver", "conn"):
+        if param_name in sig.parameters:
+            mirror_kwargs[param_name] = conn
+            break
+    else:
+        pytest.fail("mirror_gateway_message has no conn/resolver parameter (green after W3)")
+
+    async def _run() -> tuple[str, str]:
+        s1 = await sm.ensure_session(scope_key=scope, channel="telegram", user_id="42")
+        mirror_gateway_message(
+            content_root=content_root,
+            workspace=ws,
+            session_id=s1,
+            scope_key=scope,
+            channel="telegram",
+            user_id="42",
+            message_id=1,
+            role="user",
+            kind="message",
+            content="hello",
+            visible_to_llm=1,
+            status="sent",
+            created_at="2026-05-22T10:00:00",
+            extras_json=None,
+            **mirror_kwargs,
+        )
+        s2 = await sm.rotate_session(s1)
+        mirror_gateway_message(
+            content_root=content_root,
+            workspace=ws,
+            session_id=s2,
+            scope_key=scope,
+            channel="telegram",
+            user_id="42",
+            message_id=2,
+            role="user",
+            kind="message",
+            content="after new",
+            visible_to_llm=1,
+            status="sent",
+            created_at="2026-05-22T10:01:00",
+            extras_json=None,
+            **mirror_kwargs,
+        )
+        return s1, s2
+
+    s1, s2 = asyncio.run(_run())
+    base = content_root / "sessions" / "telegram" / "chats" / "Ops_Team--1001234567890" / "general"
     p1 = base / f"{s1}.jsonl"
     p2 = base / f"{s2}.jsonl"
     assert p1.is_file()
