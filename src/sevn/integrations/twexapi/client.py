@@ -11,6 +11,7 @@ Exports:
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -18,21 +19,24 @@ from sevn.integrations.twexapi.config import DEFAULT_TWEXAPI_BASE_URL
 
 _DEFAULT_HTTP_TIMEOUT_S = 60.0
 
-# Curated allowlist of read-oriented TwexAPI operations used by the specialist.
-# Paths mirror https://docs.twexapi.io/ — extend carefully.
+# Curated allowlist keyed to https://docs.twexapi.io/openapi.json paths.
 TWEXAPI_OPS: dict[str, tuple[str, str]] = {
     "search": ("POST", "/twitter/advanced_search"),
     "search_page": ("POST", "/twitter/advanced_search/page"),
-    "users": ("GET", "/twitter/users"),
-    "users_by_ids": ("POST", "/twitter/user/batch"),
-    "timeline_page": ("POST", "/twitter/user/timeline/page"),
-    "tweet_detail": ("POST", "/twitter/tweets"),
+    "users": ("POST", "/twitter/users"),
+    "users_by_ids": ("POST", "/twitter/users/by_ids"),
+    "timeline_page": ("POST", "/twitter/{screen_name}/timeline/page"),
+    "tweet_detail": ("POST", "/twitter/tweets/lookup"),
     "replies_page": ("POST", "/twitter/tweets/{tweet_id}/replies/page"),
-    "trending_topics": ("GET", "/twitter/trends"),
-    "balance": ("GET", "/twitter/balance"),
+    "trending_topics": ("GET", "/twitter/{country}/trending"),
+    "balance": ("GET", "/balance"),
 }
 
+# Ops whose JSON body is a raw array (not an object) per OpenAPI.
+TWEXAPI_ARRAY_BODY_OPS: frozenset[str] = frozenset({"users", "users_by_ids", "tweet_detail"})
+
 __all__ = [
+    "TWEXAPI_ARRAY_BODY_OPS",
     "TWEXAPI_OPS",
     "TwexApiClient",
     "TwexApiError",
@@ -85,7 +89,7 @@ class TwexApiClient:
         path: str,
         *,
         params: dict[str, Any] | None = None,
-        json_body: dict[str, Any] | None = None,
+        json_body: dict[str, Any] | list[Any] | None = None,
         path_params: dict[str, str] | None = None,
     ) -> Any:
         """Perform one TwexAPI HTTP request.
@@ -94,7 +98,7 @@ class TwexApiClient:
             method (str): HTTP method.
             path (str): Path under the API base (may contain ``{placeholders}``).
             params (dict[str, Any] | None): Query string parameters.
-            json_body (dict[str, Any] | None): JSON body for POST/PUT.
+            json_body (dict[str, Any] | list[Any] | None): JSON body (object or array).
             path_params (dict[str, str] | None): Values for path placeholders.
 
         Returns:
@@ -111,7 +115,7 @@ class TwexApiClient:
         rendered = path
         if path_params:
             for key, value in path_params.items():
-                rendered = rendered.replace("{" + key + "}", value)
+                rendered = rendered.replace("{" + key + "}", quote(str(value), safe=""))
         url = f"{self._base_url}{rendered}"
         async with httpx.AsyncClient(timeout=self._timeout_s) as client:
             response = await client.request(
@@ -140,7 +144,7 @@ class TwexApiClient:
         op: str,
         *,
         params: dict[str, Any] | None = None,
-        body: dict[str, Any] | None = None,
+        body: dict[str, Any] | list[Any] | None = None,
         path_params: dict[str, str] | None = None,
     ) -> Any:
         """Dispatch a named allowlisted TwexAPI operation.
@@ -148,7 +152,7 @@ class TwexApiClient:
         Args:
             op (str): Operation id (see :data:`TWEXAPI_OPS`).
             params (dict[str, Any] | None): Query parameters.
-            body (dict[str, Any] | None): JSON body.
+            body (dict[str, Any] | list[Any] | None): JSON body.
             path_params (dict[str, str] | None): Path placeholder values.
 
         Returns:

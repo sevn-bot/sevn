@@ -14,7 +14,7 @@ from sevn.agent.subagents.registry import SubAgentRegistry
 from sevn.agent.subagents.social_media_worker import (
     DEFAULT_SOCIAL_MEDIA_MANAGER_SKILLS,
     DEFAULT_SOCIAL_MEDIA_MANAGER_TOOLS,
-    SOCIAL_MEDIA_MANAGER_UNCONFIGURED,
+    SocialMediaManagerError,
     assigned_skills_for,
     assigned_tools_for,
     execute_social_media_manager_task,
@@ -24,7 +24,6 @@ from sevn.agent.subagents.social_media_worker import (
 from sevn.agent.subagents.specialists import merge_specialist_grants
 from sevn.agent.subagents.supervisor import SubAgentSupervisor
 from sevn.config.sections.subagents import SpecialistConfig, SubAgentsWorkspaceConfig
-from sevn.integrations.twexapi.client import TwexApiError
 from sevn.storage.migrate import apply_migrations
 from sevn.storage.paths import sevn_db_path
 from sevn.tools.context import ToolContext
@@ -153,7 +152,7 @@ class TestToolkitAssignment:
         assert grants == frozenset({"social_media_manager"})
 
     def test_require_unconfigured(self) -> None:
-        with pytest.raises(TwexApiError, match="social_media_manager"):
+        with pytest.raises(SocialMediaManagerError, match="social_media_manager"):
             require_social_media_manager(None)
 
 
@@ -222,12 +221,47 @@ class TestTwexApiMedium:
 
     @pytest.mark.asyncio
     async def test_unconfigured_specialist(self, tmp_path: Path) -> None:
-        with pytest.raises(TwexApiError, match=SOCIAL_MEDIA_MANAGER_UNCONFIGURED.split("—")[0].strip()):
+        with pytest.raises(SocialMediaManagerError, match="social_media_manager"):
             await execute_social_media_manager_task(
                 "capabilities",
                 content_root=tmp_path,
                 subagents_cfg=SubAgentsWorkspaceConfig(),
             )
+
+
+    @pytest.mark.asyncio
+    async def test_users_sends_array_body(
+        self,
+        smm_workspace: tuple[Path, sqlite3.Connection],
+    ) -> None:
+        workspace, _conn = smm_workspace
+        captured: dict[str, Any] = {}
+
+        async def _fake_call_op(
+            self: Any,
+            op: str,
+            *,
+            params: dict[str, Any] | None = None,
+            body: dict[str, Any] | list[Any] | None = None,
+            path_params: dict[str, str] | None = None,
+        ) -> dict[str, Any]:
+            _ = self, params, path_params
+            captured["op"] = op
+            captured["body"] = body
+            return {"users": [{"username": "elonmusk"}]}
+
+        with patch(
+            "sevn.agent.subagents.social_media_worker.TwexApiClient.call_op",
+            new=_fake_call_op,
+        ):
+            result = await execute_social_media_manager_task(
+                '{"medium":"twexapi","op":"users","query":"elonmusk"}',
+                content_root=workspace,
+                subagents_cfg=_SMM_CFG,
+            )
+        assert captured["op"] == "users"
+        assert captured["body"] == ["elonmusk"]
+        assert result["data"]["users"][0]["username"] == "elonmusk"
 
 
 class TestSpawnPath:

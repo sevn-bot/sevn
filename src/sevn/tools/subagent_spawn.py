@@ -60,7 +60,7 @@ async def _specialist_worker_body(
         specialist (str | None): Specialist name when this is a specialist spawn.
 
     Returns:
-        str: Worker result text (JSON for ``media_generator``).
+        str: Worker result text (JSON for known specialists).
 
     Raises:
         Exception: Propagates generation failures to the spawn tool wait path.

@@ -30,7 +30,7 @@ def main(argv: list[str] | None = None) -> int:
     task = {
         "medium": "twexapi",
         "op": "users",
-        "params": {"usernames": args.usernames.lstrip("@")},
+        "query": args.usernames.lstrip("@"),
     }
     return run_social_media_task(task, dry_run=args.dry_run or dry_run_requested([]))
 

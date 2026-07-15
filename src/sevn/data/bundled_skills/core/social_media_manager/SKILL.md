@@ -62,6 +62,10 @@ for monitoring and interacting with social media across two media:
 
 ## Assigned core skills
 
+Declared specialist toolkit (returned by `medium=capabilities`; parent/tier-B
+turns may `load_skill` these). The L2 worker executes **TwexAPI** inline;
+**browser** medium returns a CDP `browser` tool plan for the parent turn.
+
 | Skill | Role |
 |-------|------|
 | `social_media_manager` | This specialist binding + TwexAPI scripts |

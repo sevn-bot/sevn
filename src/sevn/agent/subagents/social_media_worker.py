@@ -29,7 +29,12 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from sevn.agent.subagents.specialists import resolve_specialist
 from sevn.config.loader import load_workspace
-from sevn.integrations.twexapi.client import TWEXAPI_OPS, TwexApiClient, TwexApiError
+from sevn.integrations.twexapi.client import (
+    TWEXAPI_ARRAY_BODY_OPS,
+    TWEXAPI_OPS,
+    TwexApiClient,
+    TwexApiError,
+)
 from sevn.integrations.twexapi.config import (
     load_twexapi_settings,
     resolve_twexapi_api_key,
@@ -45,8 +50,11 @@ SOCIAL_MEDIA_MANAGER_UNCONFIGURED = (
     "social media management requires subagents.specialists.social_media_manager — "
     "configure the specialist (see infra/sevn.schema.json D8 example)"
 )
+_MAX_RESULT_JSON_CHARS = 48_000
 
-# Existing core skills the Social Media Manager should have in its toolkit.
+# Declared toolkit for this specialist (surfaced via medium=capabilities).
+# Parent/tier-B turns still load these via load_skill / browser when needed;
+# the L2 worker itself executes TwexAPI and returns browser/CDP plans.
 DEFAULT_SOCIAL_MEDIA_MANAGER_SKILLS: tuple[str, ...] = (
     "social_media_manager",
     "x-use",
@@ -60,7 +68,7 @@ DEFAULT_SOCIAL_MEDIA_MANAGER_SKILLS: tuple[str, ...] = (
     "scheduling",
 )
 
-# Existing core tools — includes sevn's native CDP ``browser`` automator.
+# Declared tools — includes sevn's native CDP ``browser`` automator.
 DEFAULT_SOCIAL_MEDIA_MANAGER_TOOLS: tuple[str, ...] = (
     "browser",
     "get_page_content",
@@ -81,6 +89,7 @@ __all__ = [
     "SOCIAL_MEDIA_MANAGER_SKILL",
     "SOCIAL_MEDIA_MANAGER_SPECIALIST",
     "SOCIAL_MEDIA_MANAGER_UNCONFIGURED",
+    "SocialMediaManagerError",
     "SocialMediaTask",
     "assigned_skills_for",
     "assigned_tools_for",
@@ -89,6 +98,10 @@ __all__ = [
     "parse_social_media_task",
     "require_social_media_manager",
 ]
+
+
+class SocialMediaManagerError(RuntimeError):
+    """Raised when the social_media_manager specialist is misconfigured."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,18 +131,17 @@ def require_social_media_manager(
         SpecialistConfig: Configured specialist.
 
     Raises:
-        TwexApiError: When the specialist is not configured (shared error type
-            for specialist misconfiguration on this worker).
+        SocialMediaManagerError: When the specialist is not configured.
 
     Examples:
         >>> require_social_media_manager(None)  # doctest: +IGNORE_EXCEPTION_DETAIL
         Traceback (most recent call last):
             ...
-        TwexApiError
+        SocialMediaManagerError
     """
     entry = resolve_specialist(cfg, SOCIAL_MEDIA_MANAGER_SPECIALIST)
     if entry is None:
-        raise TwexApiError(SOCIAL_MEDIA_MANAGER_UNCONFIGURED)
+        raise SocialMediaManagerError(SOCIAL_MEDIA_MANAGER_UNCONFIGURED)
     return entry
 
 
@@ -257,8 +269,79 @@ def parse_social_media_task(task: str) -> SocialMediaTask:
     raise ValueError(msg)
 
 
+def _capped_data(data: Any) -> Any:
+    """Return ``data`` unchanged or a truncated stub when JSON is too large.
+
+    Args:
+        data (Any): TwexAPI response payload.
+
+    Returns:
+        Any: Original payload or a stub with ``truncated`` / ``preview``.
+
+    Examples:
+        >>> _capped_data({"ok": True})
+        {'ok': True}
+    """
+    try:
+        encoded = json.dumps(data, default=str)
+    except (TypeError, ValueError):
+        return {"truncated": True, "preview": str(data)[:_MAX_RESULT_JSON_CHARS]}
+    if len(encoded) <= _MAX_RESULT_JSON_CHARS:
+        return data
+    return {
+        "truncated": True,
+        "original_chars": len(encoded),
+        "max_chars": _MAX_RESULT_JSON_CHARS,
+        "preview": encoded[:_MAX_RESULT_JSON_CHARS],
+    }
+
+
+def _normalize_twexapi_body(
+    op: str,
+    *,
+    body: dict[str, Any],
+    params: dict[str, Any],
+    query: str | None,
+) -> dict[str, Any] | list[Any] | None:
+    """Build the JSON body for an allowlisted TwexAPI op.
+
+    Args:
+        op (str): Allowlisted op id.
+        body (dict[str, Any]): Parsed object body from the task.
+        params (dict[str, Any]): Query params (may hold username/id hints).
+        query (str | None): Shorthand query string from the task.
+
+    Returns:
+        dict[str, Any] | list[Any] | None: Object or array body for the request.
+
+    Examples:
+        >>> _normalize_twexapi_body("users", body={}, params={}, query="elonmusk")
+        ['elonmusk']
+    """
+    if op in TWEXAPI_ARRAY_BODY_OPS:
+        if isinstance(body.get("items"), list):
+            return [str(x) for x in body["items"]]
+        for key in ("usernames", "user_ids", "tweet_ids", "ids"):
+            raw = body.get(key, params.get(key))
+            if isinstance(raw, list):
+                return [str(x) for x in raw]
+            if isinstance(raw, str) and raw.strip():
+                return [part.strip() for part in raw.split(",") if part.strip()]
+        if query:
+            return [part.strip() for part in query.split(",") if part.strip()]
+        return []
+    out = dict(body)
+    if op == "search" and query and "searchTerms" not in out:
+        out["searchTerms"] = [query]
+    return out or None
+
+
 def _browser_plan(task: SocialMediaTask) -> dict[str, Any]:
     """Build a browser-medium plan that uses sevn's CDP ``browser`` tool.
+
+    The L2 worker does not attach CDP itself (same boundary as other specialists
+    that return structured results for the parent turn). The plan tells the
+    caller to invoke the native ``browser`` tool with ``action=social``.
 
     Args:
         task (SocialMediaTask): Parsed browser request.
@@ -309,7 +392,8 @@ async def execute_social_media_manager_task(
         dict[str, Any]: Result metadata (medium, op, data / plan / capabilities).
 
     Raises:
-        TwexApiError: When specialist/API config is missing or TwexAPI fails.
+        SocialMediaManagerError: When the specialist is misconfigured.
+        TwexApiError: When TwexAPI is disabled or the HTTP call fails.
         ValueError: When the task string is malformed.
 
     Examples:
@@ -332,6 +416,10 @@ async def execute_social_media_manager_task(
             "medium": "capabilities",
             "skills": skills,
             "tools": tools,
+            "note": (
+                "skills/tools are the declared specialist toolkit (parent turns may "
+                "load_skill / call browser). TwexAPI runs inside this L2 worker."
+            ),
             "media": {
                 "twexapi": {
                     "docs": settings.docs_url,
@@ -342,6 +430,7 @@ async def execute_social_media_manager_task(
                 "browser": {
                     "engine": "cdp",
                     "tool": "browser",
+                    "mode": "plan",
                     "skills": [
                         s
                         for s in (
@@ -359,7 +448,7 @@ async def execute_social_media_manager_task(
 
     if parsed.medium == "browser":
         if "browser" not in tools:
-            raise TwexApiError(
+            raise SocialMediaManagerError(
                 "social_media_manager tools list does not include `browser` (CDP automator)"
             )
         return {
@@ -372,29 +461,54 @@ async def execute_social_media_manager_task(
     # medium == twexapi
     settings, _cfg = load_twexapi_settings(content_root)
     if not settings.enabled:
-        raise TwexApiError("TwexAPI medium disabled (skills.social_media_manager.twexapi.enabled=false)")
+        raise SocialMediaManagerError(
+            "TwexAPI medium disabled (skills.social_media_manager.twexapi.enabled=false)"
+        )
     api_key = await resolve_twexapi_api_key(content_root=content_root, settings=settings)
     client = TwexApiClient(api_key, base_url=settings.base_url)
     op = parsed.op or "search"
     body = dict(parsed.body)
     params = dict(parsed.params)
     path_params = dict(parsed.path_params)
-    if op == "search" and parsed.query and "searchTerms" not in body:
-        body["searchTerms"] = [parsed.query]
-    if op == "users" and parsed.query and "usernames" not in params:
-        params["usernames"] = parsed.query
     if op == "replies_page" and "tweet_id" not in path_params:
         tweet_id = str(body.pop("tweet_id", "") or params.pop("tweet_id", "")).strip()
         if not tweet_id:
             raise TwexApiError("replies_page requires path_params.tweet_id")
         path_params["tweet_id"] = tweet_id
-    data = await client.call_op(op, params=params or None, body=body or None, path_params=path_params or None)
+    if op == "timeline_page" and "screen_name" not in path_params:
+        screen = str(
+            body.pop("screen_name", "") or params.pop("screen_name", "") or (parsed.query or "")
+        ).strip().lstrip("@")
+        if not screen:
+            raise TwexApiError("timeline_page requires path_params.screen_name")
+        path_params["screen_name"] = screen
+    if op == "trending_topics" and "country" not in path_params:
+        country = str(
+            body.pop("country", "") or params.pop("country", "") or (parsed.query or "worldwide")
+        ).strip()
+        path_params["country"] = country or "worldwide"
+    request_body = _normalize_twexapi_body(
+        op,
+        body=body,
+        params=params,
+        query=parsed.query,
+    )
+    # Array-body ops do not use leftover query params for usernames/ids.
+    if op in TWEXAPI_ARRAY_BODY_OPS:
+        for key in ("usernames", "user_ids", "tweet_ids", "ids"):
+            params.pop(key, None)
+    data = await client.call_op(
+        op,
+        params=params or None,
+        body=request_body,
+        path_params=path_params or None,
+    )
     return {
         "specialist": SOCIAL_MEDIA_MANAGER_SPECIALIST,
         "medium": "twexapi",
         "op": op,
         "docs": settings.docs_url,
-        "data": data,
+        "data": _capped_data(data),
         "skills": skills,
         "tools": tools,
     }

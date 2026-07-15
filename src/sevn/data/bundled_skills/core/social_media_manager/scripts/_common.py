@@ -18,7 +18,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from sevn.agent.subagents.social_media_worker import execute_social_media_manager_task
+from sevn.agent.subagents.social_media_worker import (
+    SocialMediaManagerError,
+    execute_social_media_manager_task,
+)
 from sevn.config.loader import load_workspace
 from sevn.integrations.twexapi.client import TwexApiError
 from sevn.lcm.script_cli import write_error, write_ok, workspace_from_env
@@ -104,7 +107,7 @@ def run_social_media_task(task_obj: dict[str, Any], *, dry_run: bool = False) ->
         return 0
     try:
         result = asyncio.run(_run_async(task_obj))
-    except (TwexApiError, ValueError, OSError, RuntimeError) as exc:
+    except (SocialMediaManagerError, TwexApiError, ValueError, OSError, RuntimeError) as exc:
         write_error(str(exc))
         return 1
     write_ok(result)
