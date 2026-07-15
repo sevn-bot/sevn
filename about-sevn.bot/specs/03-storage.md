@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own application persistence: connection setup (WAL, foreign keys), versioned
   migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence
   contracts for crash-resume and (w'
-last_updated: '2026-07-14'
-fingerprint: sha256:34f61cb771058582360586333ab36dec8cf45a50d4f4a78442ac694de0d9f9e4
+last_updated: '2026-07-15'
+fingerprint: sha256:85f34b43acb73c9b4fe676572dedb4fb6cfad90dff961d0f559fa4dde378f55b
 related: []
 sources:
 - src/sevn/storage/**

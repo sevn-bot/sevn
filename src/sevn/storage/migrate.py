@@ -538,6 +538,16 @@ _MIGRATION_23: Final[tuple[str, ...]] = (
     "CREATE INDEX IF NOT EXISTS ix_subagent_runs_status ON subagent_runs(status)",
 )
 
+# Group chat display names for session mirror paths (issue #21; `specs/18-channel-telegram.md`).
+_MIGRATION_24: Final[tuple[str, ...]] = (
+    """CREATE TABLE IF NOT EXISTS telegram_chat_names (
+    chat_id INTEGER PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+)""",
+    "CREATE INDEX IF NOT EXISTS ix_telegram_chat_names_updated_at ON telegram_chat_names(updated_at)",
+)
+
 MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (1, _MIGRATION_1),
     (2, _MIGRATION_2),
@@ -562,6 +572,7 @@ MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (21, _MIGRATION_21),
     (22, _MIGRATION_22),
     (23, _MIGRATION_23),
+    (24, _MIGRATION_24),
 )
 
 MIGRATION_HEAD_VERSION: Final[int] = max(v for v, _ in MIGRATIONS)
