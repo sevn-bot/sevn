@@ -320,7 +320,11 @@ spec-check: ## Validate+score every spec in about-sevn.bot/specs (skw docs valid
 	fi
 
 changelog-check: ## Changelog gate: Keep-a-Changelog lint + Unreleased diff gate (SEVN_CI_BASE=<ref>)
-	python3 scripts/changelog_validate.py --repo . --base $${SEVN_CI_BASE:-origin/main}
+	@if [ -d spec-kit-wave/src ]; then \
+		python3 scripts/changelog_validate.py --repo . --base $${SEVN_CI_BASE:-origin/main}; \
+	else \
+		echo "changelog-check: skipped (spec-kit-wave not present)"; \
+	fi
 
 changelog-eval: ## Advisory LLM double-score of Unreleased entries (not in CI; needs model access — MODEL=, BASE=)
 	@if [ -d spec-kit-wave/src ]; then \
