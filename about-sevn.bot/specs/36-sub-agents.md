@@ -8,7 +8,7 @@ summary: Level-1 sub-agents (tracked, concurrent, killable role runs) that may s
   level-2 workers (incl. specialists); multi queue mode; limits, tracing, kill surfaces,
   media_generation skill.
 last_updated: '2026-07-15'
-fingerprint: sha256:d094b1c15ca7555f4e79abde7c607b0bc126a49b8dd604ac5167d05f433a0977
+fingerprint: sha256:345cabbb1262539490ed39b7cc3141ba611aca6453afeb89caa1e6609c35718e
 related: []
 sources:
 - src/sevn/agent/subagents/**
@@ -80,6 +80,30 @@ interfaces:
 - name: SubAgentRegistry
   file: src/sevn/agent/subagents/registry.py
   symbol: SubAgentRegistry
+- name: SocialMediaManagerError
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: SocialMediaManagerError
+- name: SocialMediaTask
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: SocialMediaTask
+- name: assigned_skills_for
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: assigned_skills_for
+- name: assigned_tools_for
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: assigned_tools_for
+- name: execute_social_media_manager_for_context
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: execute_social_media_manager_for_context
+- name: execute_social_media_manager_task
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: execute_social_media_manager_task
+- name: parse_social_media_task
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: parse_social_media_task
+- name: require_social_media_manager
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: require_social_media_manager
 - name: ResolvedSpecialist
   file: src/sevn/agent/subagents/specialists.py
   symbol: ResolvedSpecialist

@@ -8,7 +8,7 @@ summary: 'Provide a single, testable configuration surface before storage, traci
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
 last_updated: '2026-07-15'
-fingerprint: sha256:45904d2d1d26f41f5408ef3f9fb61fd8266201014ea4160da245fbfc91abedbe
+fingerprint: sha256:7cf3d8fd17e33c2aae58d61815d1a103982511cd848292e3d8bf776364340a08
 related: []
 sources:
 - src/sevn/config/**
@@ -635,6 +635,21 @@ interfaces:
 - name: SelfImproveWorkspaceConfig
   file: src/sevn/config/sections/self_improve.py
   symbol: SelfImproveWorkspaceConfig
+- name: PlatformMediumConfig
+  file: src/sevn/config/sections/skills_social_media.py
+  symbol: PlatformMediumConfig
+- name: SocialMediaManagerSkillConfig
+  file: src/sevn/config/sections/skills_social_media.py
+  symbol: SocialMediaManagerSkillConfig
+- name: TwexApiSkillBlock
+  file: src/sevn/config/sections/skills_social_media.py
+  symbol: TwexApiSkillBlock
+- name: social_media_manager_block_dict
+  file: src/sevn/config/sections/skills_social_media.py
+  symbol: social_media_manager_block_dict
+- name: social_media_manager_settings
+  file: src/sevn/config/sections/skills_social_media.py
+  symbol: social_media_manager_settings
 - name: SpecialistConfig
   file: src/sevn/config/sections/subagents.py
   symbol: SpecialistConfig

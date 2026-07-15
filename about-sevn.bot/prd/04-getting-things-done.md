@@ -8,7 +8,7 @@ summary: A general-purpose AI assistant earns its keep by doing things—answeri
   fetching pages, opening PRs, and acting on the operator's behalf via tools, skills,
   and tiered executors.
 last_updated: '2026-07-15'
-fingerprint: sha256:64e5cc9c709d938b9c558f457fec75d51bdc6cd1273899cfa9478aa21136ceee
+fingerprint: sha256:741e68e9c522e22e6c543522e69d85b56ab6a646c6cd02536b35ad9c6fe6c0d2
 related:
 - prd-03-trust-and-control
 - prd-08-coding-companion
