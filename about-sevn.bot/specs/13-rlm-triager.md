@@ -7,8 +7,8 @@ owner: Alex
 summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–§5.2):
   a single, tool-less outbound generation step that emits validated TriageResult consumed
   by tier dispatch (A / B / C / D), MCP e'
-last_updated: '2026-07-14'
-fingerprint: sha256:c5f4e9986dd7986c181ddabef6e00a1d920bfb4da5028e38b3c75146d2288c1c
+last_updated: '2026-07-15'
+fingerprint: sha256:f185d24f034271596cc00b2b7e6b44bbdfafbb103dd778f371e1e3dd49a4e3cf
 related: []
 sources:
 - src/sevn/agent/**
@@ -809,6 +809,30 @@ interfaces:
 - name: SubAgentRegistry
   file: src/sevn/agent/subagents/registry.py
   symbol: SubAgentRegistry
+- name: SocialMediaManagerError
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: SocialMediaManagerError
+- name: SocialMediaTask
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: SocialMediaTask
+- name: assigned_skills_for
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: assigned_skills_for
+- name: assigned_tools_for
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: assigned_tools_for
+- name: execute_social_media_manager_for_context
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: execute_social_media_manager_for_context
+- name: execute_social_media_manager_task
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: execute_social_media_manager_task
+- name: parse_social_media_task
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: parse_social_media_task
+- name: require_social_media_manager
+  file: src/sevn/agent/subagents/social_media_worker.py
+  symbol: require_social_media_manager
 - name: ResolvedSpecialist
   file: src/sevn/agent/subagents/specialists.py
   symbol: ResolvedSpecialist

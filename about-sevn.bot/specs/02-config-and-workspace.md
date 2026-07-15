@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Provide a single, testable configuration surface before storage, tracing,
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
-last_updated: '2026-07-14'
-fingerprint: sha256:5974dac305546f994730735acb3807d00aff5d24e1ad06c19cbab944953f0f67
+last_updated: '2026-07-15'
+fingerprint: sha256:3d4b1d33bb80536e9c258bc3d9428cf56c6882c0a81c308035308bbec2b4acd5
 related: []
 sources:
 - src/sevn/config/**
@@ -686,10 +686,8 @@ interfaces:
 - name: parse_workspace_config
   file: src/sevn/config/workspace_config.py
   symbol: parse_workspace_config
-specs: []
-personas: []
-prd_profile: null
 ---
+
 ## Purpose
 
 Provide a single, testable configuration surface before storage, tracing, proxy, and

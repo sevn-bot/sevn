@@ -7,8 +7,8 @@ owner: Alex
 summary: Let operators and agents launch, poll, and inspect Cursor Cloud Agents against
   any GitHub/GitLab repo when skills.cursor_cloud.enabled is true, returning PR URLs,
   dashboard links (remote desktop), and
-last_updated: '2026-07-12'
-fingerprint: sha256:99a185af444a73436b77fa1c7fb9312a557a45d4c300bb87ddf8d21ddb7e0f6f
+last_updated: '2026-07-15'
+fingerprint: sha256:19818f08f462f00c357eef1e68c043a5b3ac5b9532d7ec99c3a136b08f18722a
 related: []
 sources:
 - src/sevn/integrations/**
@@ -166,11 +166,22 @@ interfaces:
 - name: integration_post_sync
   file: src/sevn/integrations/proxy_client.py
   symbol: integration_post_sync
-specs: []
-personas: []
-prd_profile: null
+- name: TwexApiClient
+  file: src/sevn/integrations/twexapi/client.py
+  symbol: TwexApiClient
+- name: TwexApiError
+  file: src/sevn/integrations/twexapi/client.py
+  symbol: TwexApiError
+- name: TwexApiSettings
+  file: src/sevn/integrations/twexapi/config.py
+  symbol: TwexApiSettings
+- name: load_twexapi_settings
+  file: src/sevn/integrations/twexapi/config.py
+  symbol: load_twexapi_settings
+- name: resolve_twexapi_api_key
+  file: src/sevn/integrations/twexapi/config.py
+  symbol: resolve_twexapi_api_key
 ---
-
 
 ## Purpose
 
