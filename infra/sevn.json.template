@@ -217,6 +217,23 @@
     // When true on Darwin, onboarding installs cua-driver and prompts for Accessibility + Screen Recording entitlements.
     // the design docsa, the design docs
     "computer_use": { "enabled": false }
+    // Per-platform medium for social_media_manager L2 specialist (browser-first; TwexAPI optional on X only).
+    // Uncomment and configure when the specialist is explicitly enabled under subagents.specialists.
+    // "social_media_manager": {
+    //   "default_medium": "browser",
+    //   "twexapi": {
+    //     "enabled": false,
+    //     "api_key": "${SECRET:keychain:sevn.twexapi}"
+    //   },
+    //   "platforms": {
+    //     "x": { "medium": "browser" },
+    //     "facebook": { "medium": "browser" },
+    //     "instagram": { "medium": "browser" },
+    //     "linkedin": { "medium": "browser" },
+    //     "reddit": { "medium": "browser" },
+    //     "tiktok": { "medium": "browser" }
+    //   }
+    // }
   },
 
   "doctor": { "strict": false },

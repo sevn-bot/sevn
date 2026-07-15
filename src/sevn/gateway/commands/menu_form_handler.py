@@ -41,6 +41,7 @@ from sevn.gateway.menu.menu import (
     ConfigSection,
     refresh_config_menu_message,
 )
+from sevn.integrations.twexapi.config import TWEXAPI_SECRET_ALIAS
 from sevn.onboarding.web_app import _get_nested, _set_nested
 from sevn.security.secrets.factory import secrets_chain_from_workspace
 
@@ -93,6 +94,10 @@ def parse_form_callback(data: str) -> str | None:
         return "logs_span_id"
     if raw == "form:logs:logfire_token":
         return "logs_logfire_token"
+    if raw.startswith("form:secret_wizard:"):
+        alias = raw.removeprefix("form:secret_wizard:").strip()
+        if alias and _SECRET_ALIAS_RE.match(alias):
+            return f"secret_wizard:{alias}"
     if raw.startswith("form:sb_browse:"):
         return "second_brain_vault_browse"
     if raw.startswith("form:subagents_limits:"):
@@ -208,6 +213,10 @@ class MenuFormHandler:
         if target == "secret_wizard" and not self._router._resolve_owner_flag(msg):
             await self._answer_callback(msg, text="Owner only.")
             return
+        preset_alias: str | None = None
+        if target.startswith("secret_wizard:"):
+            preset_alias = target.removeprefix("secret_wizard:").strip()
+            target = "secret_wizard"
         # ``logs_grep`` / ``logs_span_id`` are owner-only operator diagnostics
         # (`specs/18-channel-telegram.md` §4.7).
         if target in {
@@ -227,8 +236,10 @@ class MenuFormHandler:
         self._consume_active_forms(msg)
         kind = "secret_wizard" if target == "secret_wizard" else "form"
         if target == "secret_wizard":
-            section = "secrets"
-            step = "key"
+            section = (
+                "skills:social_media_manager" if preset_alias == TWEXAPI_SECRET_ALIAS else "secrets"
+            )
+            step = "value" if preset_alias else "key"
         elif target == "agent_display_name":
             section = "agents"
             step = "name"
@@ -266,6 +277,8 @@ class MenuFormHandler:
         }
         if target.startswith("subagents_limits:"):
             payload_obj["role"] = target.removeprefix("subagents_limits:").strip()
+        if preset_alias:
+            payload_obj["alias"] = preset_alias
         payload = json.dumps(
             payload_obj,
             separators=(",", ":"),
@@ -282,7 +295,10 @@ class MenuFormHandler:
             ttl_seconds=dispatcher_state_ttl_for_kind(kind, self._workspace),
         )
         if target == "secret_wizard":
-            prompt = "Send the secret logical key (e.g. providers.openai.api_key):"
+            if preset_alias:
+                prompt = f"Send the secret value for `{preset_alias}` (not shown again):"
+            else:
+                prompt = "Send the secret logical key (e.g. providers.openai.api_key):"
         elif target == "agent_display_name":
             prompt = "Send the new bot display name:"
         elif target == "logs_grep":
@@ -1038,7 +1054,8 @@ class MenuFormHandler:
                 await self._send_chat(msg, f"Could not store secret: {exc}")
                 return
             self._consume_token(token)
-            await self._refresh_section(msg, section="secrets", toast=None)
+            section = str(payload.get("section") or "secrets")
+            await self._refresh_section(msg, section=section, toast=None)
             await self._send_chat(msg, f"✅ Secret `{alias}` stored.")
 
     def _find_active_form(

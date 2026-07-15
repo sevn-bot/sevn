@@ -21,6 +21,7 @@ Exports:
     tier_b_answer_mode — effective ``gateway.output.tier_b_answer_mode``.
     show_intent_footer — effective ``gateway.output.show_intent_footer``.
     browser_settings — effective ``skills.browser.*``.
+    social_media_manager_settings — effective ``skills.social_media_manager.*``.
 """
 
 from __future__ import annotations
@@ -37,6 +38,12 @@ from sevn.config.sections.gateway import GatewayBudgetConfig, GatewayOutputConfi
 from sevn.config.sections.ops import BrowserWorkspaceConfig
 from sevn.config.sections.root import (
     WorkspaceConfig,  # noqa: TC001 — used in doctests and annotations
+)
+from sevn.config.sections.skills_social_media import (
+    SocialMediaManagerSkillConfig,
+)
+from sevn.config.sections.skills_social_media import (
+    social_media_manager_settings as _social_media_manager_settings,
 )
 
 
@@ -141,6 +148,24 @@ def browser_settings(cfg: WorkspaceConfig | None) -> BrowserWorkspaceConfig:
     if not isinstance(block, dict):
         return BrowserWorkspaceConfig()
     return BrowserWorkspaceConfig.model_validate(block)
+
+
+def social_media_manager_settings(
+    cfg: WorkspaceConfig | None,
+) -> SocialMediaManagerSkillConfig:
+    """Return effective ``skills.social_media_manager.*`` settings.
+
+    Args:
+        cfg (WorkspaceConfig | None): Parsed workspace config.
+
+    Returns:
+        SocialMediaManagerSkillConfig: Defaults when the section is absent.
+
+    Examples:
+        >>> social_media_manager_settings(None).default_medium
+        'browser'
+    """
+    return _social_media_manager_settings(cfg)
 
 
 def tier_b_rounds_expanded(cfg: WorkspaceConfig | None) -> int:

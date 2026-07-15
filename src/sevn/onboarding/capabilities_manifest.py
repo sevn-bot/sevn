@@ -10,6 +10,7 @@ Exports:
     CapabilityManifest — full ``onboarding_capabilities.json`` document.
     GroupWithCapabilities — group row plus nested capabilities for API responses.
     load_manifest — parse and validate the packaged manifest.
+    load_capabilities_manifest — alias for :func:`load_manifest`.
     list_groups — return groups with nested capabilities.
     resolve_install_plan — ordered install actions for selected capabilities.
     merged_capability_defaults — profile-aware default values for the wizard.
@@ -81,6 +82,29 @@ class CapabilityEntry(BaseModel):
     select_options: list[str] | None = None
     depends_on: list[str] | None = None
     wizard_tab: str | None = None
+
+    @property
+    def id(self) -> str:
+        """Return :attr:`capability_id` (wave-plan / test compatibility).
+
+        Returns:
+            str: Manifest capability id (e.g. ``skill.social_media_manager``).
+
+        Examples:
+            >>> CapabilityEntry(
+            ...     capability_id="skill.x_use",
+            ...     group="B",
+            ...     label="x-use",
+            ...     description="x",
+            ...     config_paths=["skills.x_use.enabled"],
+            ...     control="checkbox",
+            ...     default=True,
+            ...     profile_overridable=True,
+            ...     install_actions=[],
+            ... ).id
+            'skill.x_use'
+        """
+        return self.capability_id
 
     @field_validator("select_options")
     @classmethod
@@ -175,6 +199,20 @@ def manifest_resource_path() -> str:
         'onboarding_capabilities.json'
     """
     return "onboarding_capabilities.json"
+
+
+def load_capabilities_manifest() -> CapabilityManifest:
+    """Load and validate ``onboarding_capabilities.json`` (alias for :func:`load_manifest`).
+
+    Returns:
+        CapabilityManifest: Parsed manifest.
+
+    Examples:
+        >>> m = load_capabilities_manifest()
+        >>> any(c.id == "gateway.queue_mode" for c in m.capabilities)
+        True
+    """
+    return load_manifest()
 
 
 def load_manifest() -> CapabilityManifest:
@@ -397,6 +435,7 @@ __all__ = [
     "InstallActionKind",
     "index_skill_capability_ids",
     "list_groups",
+    "load_capabilities_manifest",
     "load_manifest",
     "manifest_resource_path",
     "merged_capability_defaults",

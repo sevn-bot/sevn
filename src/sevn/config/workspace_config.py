@@ -121,6 +121,12 @@ from sevn.config.sections.self_improve import (
     SelfImproveSpecKitConfig,
     SelfImproveWorkspaceConfig,
 )
+from sevn.config.sections.skills_social_media import (
+    PlatformMediumConfig,
+    SocialMediaManagerSkillConfig,
+    SocialMedium,
+    TwexApiSkillBlock,
+)
 from sevn.config.sections.subagents import (
     Role as SubAgentRole,
 )
@@ -139,6 +145,7 @@ rlm_json_dict = _accessors_section.rlm_json_dict
 tier_b_skill_cap = _accessors_section.tier_b_skill_cap
 tier_b_rounds = _accessors_section.tier_b_rounds
 browser_settings = _accessors_section.browser_settings
+social_media_manager_settings = _accessors_section.social_media_manager_settings
 tier_b_rounds_expanded = _accessors_section.tier_b_rounds_expanded
 tier_b_count_planning = _accessors_section.tier_b_count_planning
 tool_debug_result_max_chars = _accessors_section.tool_debug_result_max_chars
@@ -222,6 +229,7 @@ __all__ = [
     "OpenUIWorkspaceConfig",
     "OwnerScannerOverrides",
     "PlanApprovalWorkspaceConfig",
+    "PlatformMediumConfig",
     "PluginHookEntryConfig",
     "ProtonPassBackendEntry",
     "ReplayWorkspaceConfig",
@@ -245,6 +253,8 @@ __all__ = [
     "SelfImproveSamplerWorkspaceConfig",
     "SelfImproveSpecKitConfig",
     "SelfImproveWorkspaceConfig",
+    "SocialMediaManagerSkillConfig",
+    "SocialMedium",
     "SpecKitOptionsWorkspaceConfig",
     "SpecKitWorkspaceConfig",
     "SpecialistConfig",
@@ -267,6 +277,7 @@ __all__ = [
     "TriagerTimeoutConfig",
     "TriagerWorkspaceConfig",
     "TriggersWorkspaceConfig",
+    "TwexApiSkillBlock",
     "UserModelWorkspaceConfig",
     "VoiceConfig",
     "WebChatChannelConfig",
@@ -283,6 +294,7 @@ __all__ = [
     "resolve_subagent_limits",
     "rlm_json_dict",
     "show_intent_footer",
+    "social_media_manager_settings",
     "tier_b_answer_mode",
     "tier_b_count_planning",
     "tier_b_executor_timeout_s",

@@ -418,6 +418,16 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         notes="form wizard; TMF Wave 3",
     )
     add(
+        "C6.1b",
+        r"^form:secret_wizard:[a-zA-Z0-9._-]+$",
+        "C",
+        "skills:social_media_manager",
+        "Set TwexAPI key (scoped wizard)",
+        implemented=True,
+        owner_only=True,
+        notes="SMM TwexAPI key wizard with preset alias",
+    )
+    add(
         "C6.2",
         r"^caption:secrets:refs$",
         "C",
@@ -458,6 +468,42 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "Refresh skill index",
         implemented=True,
         notes="Caption refresh; TMF Wave 8",
+    )
+    add(
+        "C7.4",
+        _exact("cfg:section:skills:social_media_manager"),
+        "C",
+        "skills",
+        "Social Media Manager submenu",
+        implemented=True,
+        notes="Per-platform medium cycles; schema-gated when skills.social_media_manager declared",
+    )
+    add(
+        "C7.5",
+        r"^cfg:cycle:skills\.social_media_manager\.(?:default_medium|platforms\.[^.]+\.medium):(?:browser|twexapi)$",
+        "C",
+        "skills:social_media_manager",
+        "Platform/default medium cycle",
+        implemented=True,
+        notes="TwexAPI only on X; browser universal (D3/D4)",
+    )
+    add(
+        "C7.6",
+        _toggle("skills.social_media_manager.twexapi.enabled"),
+        "C",
+        "skills:social_media_manager",
+        "TwexAPI enabled toggle",
+        implemented=True,
+        notes="D13 default false until operator enables",
+    )
+    add(
+        "C7.7",
+        _exact("form:secret_wizard"),
+        "C",
+        "skills:social_media_manager",
+        "Set TwexAPI key",
+        implemented=True,
+        notes="Secret wizard; store SEVN_SECRET_TWEXAPI",
     )
 
     # --- C8. Tools ---

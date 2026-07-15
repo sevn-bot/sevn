@@ -2008,6 +2008,58 @@
           },
           "$comment": "Maintainer: browser-session-lifecycle W5 — D8 idle TTL, D13 headed default, Brave multi-arch Docker; registry under `.sevn/browser-sessions/`."
         },
+        "social_media_manager": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Per-platform default medium for the social_media_manager L2 specialist (browser-first; TwexAPI optional on X only).",
+          "properties": {
+            "default_medium": {
+              "type": "string",
+              "enum": ["browser", "twexapi"],
+              "default": "browser",
+              "description": "Fallback medium when a platform has no explicit override and the task omits medium."
+            },
+            "twexapi": {
+              "type": "object",
+              "additionalProperties": true,
+              "description": "TwexAPI REST settings (X/Twitter only; opt-in).",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "When true, TwexAPI medium is available on X when configured with an API key."
+                },
+                "api_key": {
+                  "type": "string",
+                  "description": "TwexAPI Bearer token ref (${SECRET:…}) or literal; also SEVN_SECRET_TWEXAPI / TWEXAPI_API_KEY env."
+                },
+                "base_url": {
+                  "type": "string",
+                  "description": "TwexAPI API base URL (default https://api.twexapi.io)."
+                }
+              }
+            },
+            "platforms": {
+              "type": "object",
+              "description": "Per-site medium overrides keyed by SocialRecipe site id.",
+              "propertyNames": {
+                "enum": ["x", "facebook", "instagram", "linkedin", "reddit", "tiktok"]
+              },
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": true,
+                "properties": {
+                  "medium": {
+                    "type": "string",
+                    "enum": ["browser", "twexapi"],
+                    "description": "Default medium for this platform; omitted keys inherit default_medium at resolve time."
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "Maintainer: social-media-manager wave W2 — D1 skills.social_media_manager; D2 browser default; D13 twexapi.enabled default false."
+        },
         "openwiki": {
           "type": "object",
           "additionalProperties": true,

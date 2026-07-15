@@ -7,8 +7,8 @@ owner: Alex
 summary: Level-1 sub-agents (tracked, concurrent, killable role runs) that may spawn
   level-2 workers (incl. specialists); multi queue mode; limits, tracing, kill surfaces,
   media_generation skill.
-last_updated: '2026-07-14'
-fingerprint: sha256:754939f15c1da72186b75fa10bbcfacd35f50a678c19689018c49f0cadd05500
+last_updated: '2026-07-15'
+fingerprint: sha256:d094b1c15ca7555f4e79abde7c607b0bc126a49b8dd604ac5167d05f433a0977
 related: []
 sources:
 - src/sevn/agent/subagents/**
@@ -320,6 +320,40 @@ granted specialists bypass `assigned_to` when `triager` is in `requestable_by`.
 First documented specialist: `media_generator` (MiniMax-3) bound to
 `media_generation` skill via `wait: true` spawn path.
 
+Second documented specialist: `social_media_manager` — browser-first social
+monitoring across six platforms with per-site medium config under
+`skills.social_media_manager` (not on `SpecialistConfig`).
+
+#### `social_media_manager` L2 boundary
+
+Platform keys match [`SocialRecipe._SUPPORTED_SITES`](src/sevn/browser/recipes/social.py):
+`x`, `facebook`, `instagram`, `linkedin`, `reddit`, `tiktok`.
+
+| Resolved medium | L2 behaviour |
+|-----------------|--------------|
+| `twexapi` | Execute TwexAPI REST **inline** when site is `x` and TwexAPI is enabled |
+| `browser` | Return a structured CDP plan (`tool=browser`, `action=social`, `site`, `op`, …) for the **parent** turn — L2 does not attach CDP |
+
+Medium resolution order: task JSON `medium` → `skills.social_media_manager.platforms.<site>.medium` → `default_medium` → `"browser"`. TwexAPI is **X-only** — when site ≠ `x` and medium would be `twexapi`, coerce to `browser` at runtime (no TwexAPI HTTP).
+
+Operator config under **`skills.social_media_manager`** (D1):
+
+| Key | Type | Default | Notes |
+|-----|------|---------|-------|
+| `default_medium` | `"browser" \| "twexapi"` | `"browser"` | Fallback when per-site medium unset |
+| `twexapi.enabled` | bool | `false` | Opt-in; key present does not auto-enable |
+| `twexapi.api_key` | string | — | `${SECRET:SEVN_SECRET_TWEXAPI}` or env |
+| `twexapi.base_url` | string | TwexAPI default | REST base |
+| `platforms.<site>.medium` | `"browser" \| "twexapi"` | inherits `default_medium` | Per-site operator default |
+
+Telegram **`/config → Skills → Social Media Manager`**: cycle per-site medium (TwexAPI offered on `x` only), TwexAPI enabled toggle, Set API key via secrets wizard (`SEVN_SECRET_TWEXAPI`), readiness hints (key yes/no, CDP/profile, login).
+
+Specialists remain **opt-in empty by default** — `subagents.specialists` defaults to `{}`; operator must explicitly add `social_media_manager` (D11/D14). Onboarding capability `skill.social_media_manager` defaults **`false`** (D12).
+
+`medium=capabilities` returns a per-platform matrix: `{site: {medium, allowed_media, effective_medium, skills[], tools[], readiness{…}}}` (D8).
+
+Public entrypoints: `execute_social_media_manager_task`, `parse_social_media_task`, `resolve_social_medium`, `allowed_media_for_site`, bundled `social_media_manager` skill scripts (`capabilities.py`, `session_status.py`, TwexAPI helpers).
+
 ## Behavior
 
 - **Degenerate case**: concurrency limits at 1 reproduce classic single-agent turns.
@@ -359,6 +393,7 @@ Unit/harness tests only — no live LLM in CI:
 | Telegram menu | `tests/gateway/test_config_subagents_menu.py` |
 | CLI | `tests/cli/test_subagents_cmd.py` |
 | Media skill | `tests/skills/test_media_generation_skill.py` |
+| Social media specialist | `tests/agent/subagents/test_social_media_platform_medium.py`, `tests/skills/test_social_media_manager_skill.py`, `tests/gateway/test_social_media_manager_menu.py`, `tests/integrations/test_social_media_config.py`, `tests/integrations/test_twexapi_client.py` |
 
 Docs gate: `make subagents-chart-check` (deterministic SVG); `make ci-docs`.
 
@@ -428,3 +463,10 @@ Docs gate: `make subagents-chart-check` (deterministic SVG); `make ci-docs`.
 - [x] Deterministic topology chart + `sub-agents.html` + Makefile `subagents-chart` / `subagents-chart-check` wired into `about-site` and `ci-docs` (2026-07-12 ✅: `scripts/gen_subagents_chart.py`, `about-sevn.bot/_sources/subagents-topology.json`)
 - [x] Changelog skill wrapping existing `CHANGELOG.md` / `changelog_validate.py` machinery (2026-07-12 ✅: `.claude/skills/changelog/SKILL.md` + `src/sevn/data/standards/README.md`; local `.claude/` may be absent on clone)
 - [x] `docs/readmes/subagents.md` + `make readme-check` (2026-07-12 ✅: `docs/readmes/manifest.toml`)
+
+### 10.10 Social media manager — platform medium + browser-first specialist — append-only
+
+- [x] `social_media_manager` L2 worker + per-platform medium resolution under `skills.social_media_manager` (2026-07-15 ✅: `src/sevn/agent/subagents/social_media_worker.py`, `src/sevn/integrations/social_media/medium.py`)
+- [x] TwexAPI X-only guard + browser CDP plan return path (2026-07-15 ✅: worker + `src/sevn/integrations/twexapi/`)
+- [x] Telegram `/config → Skills → Social Media Manager` menu (2026-07-15 ✅: `src/sevn/gateway/menu/social_media_manager_menu.py`)
+- [x] Bundled skill + onboarding opt-in (`default: false`) + normative docs (2026-07-15 ✅: W5 spec/PRD/SKILL/onboarding)

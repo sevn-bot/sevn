@@ -7,8 +7,8 @@ owner: Alex
 summary: A general-purpose AI assistant earns its keep by doing things—answering questions,
   fetching pages, opening PRs, and acting on the operator's behalf via tools, skills,
   and tiered executors.
-last_updated: '2026-07-14'
-fingerprint: sha256:90c034d7ea3e4c3df0ee5396c2e0001cfed708867844c0960f2ff6889df679cd
+last_updated: '2026-07-15'
+fingerprint: sha256:64e5cc9c709d938b9c558f457fec75d51bdc6cd1273899cfa9478aa21136ceee
 related:
 - prd-03-trust-and-control
 - prd-08-coding-companion
@@ -151,6 +151,14 @@ becoming the integration layer.
   steering or cancelling the in-flight run (spec-36-sub-agents).
 - **Media via specialist:** Image/video/music generation routes through the
   `media_generator` level-2 specialist and `media_generation` bundled skill.
+- **Social monitoring via specialist:** Browser-first monitoring and interaction
+  across six platforms (`x`, `facebook`, `instagram`, `linkedin`, `reddit`,
+  `tiktok`) routes through the `social_media_manager` level-2 specialist and
+  bundled skill. Operators configure per-platform default medium under
+  `skills.social_media_manager` from Telegram **`/config → Skills → Social Media
+  Manager`**. **Browser (CDP `browser` tool, `action=social`)** is always
+  available; **TwexAPI** is an optional extra on **X only** when enabled and
+  keyed. Specialists remain opt-in — `subagents.specialists` defaults empty.
 - **Operator controls:** Enable/disable tools and skills; approve or reject plans; steer or
   cancel active runs; kill running sub-agents from Mission Control, Telegram
   `/config → Sub-agents → Running`, or `sevn subagents kill` (view limits and live

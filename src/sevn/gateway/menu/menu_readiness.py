@@ -126,6 +126,11 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C25.6",
         "C25.7",
         "C25.8",
+        # Social Media Manager (W3)
+        "C7.4",
+        "C7.5",
+        "C7.6",
+        "C7.7",
     },
 )
 

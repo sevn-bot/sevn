@@ -606,6 +606,27 @@
       "long_description": "Apple-Silicon VM lifecycle via the `lume` CLI (`run`, `stop`, `ls`, `pull`). Also selectable as a computer-use sandbox target through `cua do switch lume`. macOS Apple-Silicon only.",
       "how_to_collect": "Enable when you run local VMs for isolated computer-use sessions. Install `lume` first; keep disabled on Intel Macs or non-Darwin hosts."
     },
+    "skills.social_media_manager.default_medium": {
+      "long_description": "Fallback medium for the social_media_manager L2 specialist when a task omits medium and the target platform has no explicit override. `browser` uses the CDP browser tool (`action=social`); `twexapi` is X/Twitter REST only.",
+      "how_to_collect": "Leave `browser` unless you routinely want TwexAPI on X without per-platform overrides. Task JSON `medium` and `platforms.<site>.medium` take precedence over this default."
+    },
+    "skills.social_media_manager.twexapi.enabled": {
+      "long_description": "Opt-in gate for TwexAPI REST on X. When false, TwexAPI is not offered even if an API key is stored. Does not auto-enable when a key appears (D13).",
+      "how_to_collect": "Enable only after storing a TwexAPI key via Telegram `/config` secret wizard (`SEVN_SECRET_TWEXAPI`) or `skills.social_media_manager.twexapi.api_key`. Keep false until you intend to use TwexAPI egress."
+    },
+    "skills.social_media_manager.twexapi.api_key": {
+      "long_description": "TwexAPI Bearer token reference or literal. Resolved via secrets chain; also accepts TWEXAPI_API_KEY / SEVN_TWEXAPI_API_KEY env vars.",
+      "how_to_collect": "Prefer `${SECRET:keychain:sevn.twexapi}` via `/config → Skills → Social Media Manager → Set API key`, or run `sevn secrets set` for alias SEVN_SECRET_TWEXAPI.",
+      "secret_label": "sevn.twexapi"
+    },
+    "skills.social_media_manager.twexapi.base_url": {
+      "long_description": "TwexAPI API base URL (default https://api.twexapi.io). Override only for staging or self-hosted endpoints documented by TwexAPI.",
+      "how_to_collect": "Leave unset for production TwexAPI. Set explicitly when your operator docs specify a non-default host."
+    },
+    "skills.social_media_manager.platforms": {
+      "long_description": "Per-platform default medium overrides keyed by SocialRecipe site id (`x`, `facebook`, `instagram`, `linkedin`, `reddit`, `tiktok`). TwexAPI is valid only on `x`; other sites coerce to browser at runtime.",
+      "how_to_collect": "Configure via Telegram `/config → Skills → Social Media Manager` cycle buttons, or edit `platforms.<site>.medium` in sevn.json. Omit sites to inherit `default_medium`."
+    },
     "skills.cursor_cloud.enabled": {
       "long_description": "Exposes the bundled cursor_cloud skill so the agent can launch Cursor Cloud Agents against GitHub/GitLab repos (code changes, optional PR, dashboard link, artifacts). Requires a Cursor API key on the egress proxy.",
       "how_to_collect": "Enable when you want sevn to delegate heavy coding tasks to Cursor's cloud VMs. Store integration.cursor.api_key via sevn secrets (Cursor Dashboard → Integrations). Connect GitHub/GitLab to your Cursor account."
