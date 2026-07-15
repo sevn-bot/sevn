@@ -68,6 +68,34 @@ def test_supergroup_message_updates_chat_title_on_rename() -> None:
     conn.close()
 
 
+def test_supergroup_callback_persists_chat_title() -> None:
+    """Callback-only group traffic still upserts ``telegram_chat_names``."""
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
+    apply_migrations(conn)
+    adapter = TelegramAdapter(config=TelegramConfig(bot_token=""), sqlite_conn=conn)
+    payload: dict[str, Any] = {
+        "update_id": 300,
+        "callback_query": {
+            "id": "cb1",
+            "from": {"id": 42},
+            "message": {
+                "message_id": 1,
+                "chat": {"id": -1001234567890, "type": "supergroup", "title": "Callback Group"},
+            },
+            "data": "menu:home",
+        },
+    }
+    msg = adapter.parse_webhook(payload)
+    assert msg is not None
+    row = conn.execute(
+        "SELECT name FROM telegram_chat_names WHERE chat_id = ?",
+        (-1001234567890,),
+    ).fetchone()
+    assert row is not None
+    assert row[0] == "Callback Group"
+    conn.close()
+
+
 def test_private_chat_message_does_not_require_chat_names_row() -> None:
     """D7: private DM messages must not upsert group title rows."""
     conn = sqlite3.connect(":memory:", check_same_thread=False)

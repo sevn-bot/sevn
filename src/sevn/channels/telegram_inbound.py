@@ -554,6 +554,7 @@ class TelegramInboundMixin(TelegramSendHost):
         chat_id = chat.get("id")
         if not isinstance(chat_id, int):
             return None
+        self._maybe_upsert_chat_name_from_chat(chat)
         mtid = cq.get("message_thread_id")
         if mtid is None and isinstance(msg, dict):
             mtid = msg.get("message_thread_id")
