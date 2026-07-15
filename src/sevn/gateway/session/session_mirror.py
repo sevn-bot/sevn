@@ -7,6 +7,7 @@ Exports:
     session_mirror_enabled — read ``gateway.session_mirror.enabled``.
     mirror_gateway_message — append one JSONL line under ``sessions/``.
     mark_session_superseded — link archived session id to successor in ``_index.json``.
+    format_named_path_segment — build ``{slug}--{id}`` or ID-only mirror segment.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sqlite3
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
@@ -22,6 +24,7 @@ from typing import Any
 from loguru import logger
 
 from sevn.config.workspace_config import GatewaySessionMirrorConfig, WorkspaceConfig
+from sevn.gateway.session.path_names import SessionPathNameLookup, SessionPathNameResolver
 
 _INDEX_NAME = "_index.json"
 _jsonl_lock_guard = threading.Lock()
@@ -113,6 +116,28 @@ def session_mirror_enabled(workspace: WorkspaceConfig) -> bool:
     return _mirror_cfg(workspace).enabled
 
 
+def format_named_path_segment(name: str | None, entity_id: str) -> str:
+    """Build a mirror path segment with optional ``{slug}--{id}`` suffix (D1/D2).
+
+    Args:
+        name (str | None): Human-readable title; ``None`` or blank → ID-only segment.
+        entity_id (str): Stable Telegram id string used for uniqueness.
+
+    Returns:
+        str: Filesystem-safe path segment.
+
+    Examples:
+        >>> format_named_path_segment("My Group", "-1001234567890")
+        'My_Group--1001234567890'
+        >>> format_named_path_segment(None, "7")
+        '7'
+    """
+    if name is None or not name.strip():
+        return entity_id
+    suffix_id = entity_id[1:] if entity_id.startswith("-") else entity_id
+    return f"{_safe_segment(name)}--{suffix_id}"
+
+
 def _safe_segment(value: str) -> str:
     """Sanitize a path segment for mirror directories and filenames.
 
@@ -130,11 +155,133 @@ def _safe_segment(value: str) -> str:
     return cleaned or "unknown"
 
 
-def _parse_scope_key(scope_key: str) -> tuple[str, dict[str, Any]]:
+def _should_enrich_telegram_names(chat_id: str) -> bool:
+    """Return whether D7 allows slug lookup for this Telegram chat id.
+
+    Args:
+        chat_id (str): Parsed chat id from a scope key.
+
+    Returns:
+        bool: True for group/supergroup ids (negative integers).
+
+    Examples:
+        >>> _should_enrich_telegram_names("-1001234567890")
+        True
+        >>> _should_enrich_telegram_names("99")
+        False
+    """
+    try:
+        return int(chat_id) < 0
+    except ValueError:
+        return False
+
+
+def _chat_path_segment(chat_id: str, resolver: SessionPathNameLookup | None) -> str:
+    """Build the ``telegram/chats/{segment}`` folder name for one chat id.
+
+    Args:
+        chat_id (str): Parsed chat id from a scope key.
+        resolver (SessionPathNameLookup | None): Optional title lookup.
+
+    Returns:
+        str: Filesystem-safe chat folder segment.
+
+    Examples:
+        >>> _chat_path_segment("99", None)
+        '99'
+    """
+    if resolver is not None and _should_enrich_telegram_names(chat_id):
+        return format_named_path_segment(resolver.get_chat_name(chat_id), chat_id)
+    return _safe_segment(chat_id)
+
+
+def _topic_path_segment(
+    chat_id: str,
+    topic_id: str,
+    resolver: SessionPathNameLookup | None,
+) -> str:
+    """Build the ``topics/{segment}`` folder name for one forum topic id.
+
+    Args:
+        chat_id (str): Parsed chat id from a scope key.
+        topic_id (str): Parsed topic id from a scope key.
+        resolver (SessionPathNameLookup | None): Optional title lookup.
+
+    Returns:
+        str: Filesystem-safe topic folder segment.
+
+    Examples:
+        >>> _topic_path_segment("-100", "7", None)
+        '7'
+    """
+    if resolver is not None and _should_enrich_telegram_names(chat_id):
+        return format_named_path_segment(resolver.get_topic_name(chat_id, topic_id), topic_id)
+    return _safe_segment(topic_id)
+
+
+def _coerce_name_lookup(
+    value: SessionPathNameLookup | sqlite3.Connection | None,
+) -> SessionPathNameLookup | None:
+    """Normalize resolver arguments, wrapping bare SQLite connections.
+
+    Args:
+        value (SessionPathNameLookup | sqlite3.Connection | None): Lookup source.
+
+    Returns:
+        SessionPathNameLookup | None: Coerced resolver, or ``None``.
+
+    Examples:
+        >>> _coerce_name_lookup(None) is None
+        True
+    """
+    if value is None:
+        return None
+    if isinstance(value, sqlite3.Connection):
+        return SessionPathNameResolver(value)
+    return value
+
+
+def _resolve_name_lookup(
+    *,
+    name_resolver: SessionPathNameLookup | sqlite3.Connection | None = None,
+    resolver: SessionPathNameLookup | sqlite3.Connection | None = None,
+    conn: sqlite3.Connection | None = None,
+) -> SessionPathNameLookup | None:
+    """Pick the first available name lookup source.
+
+    Args:
+        name_resolver (SessionPathNameLookup | sqlite3.Connection | None): Explicit resolver.
+        resolver (SessionPathNameLookup | sqlite3.Connection | None): Alias for ``name_resolver``.
+        conn (sqlite3.Connection | None): SQLite connection for DB lookup.
+
+    Returns:
+        SessionPathNameLookup | None: Resolver instance, or ``None`` when absent.
+
+    Examples:
+        >>> _resolve_name_lookup() is None
+        True
+    """
+    for candidate in (name_resolver, resolver):
+        lookup = _coerce_name_lookup(candidate)
+        if lookup is not None:
+            return lookup
+    return _coerce_name_lookup(conn)
+
+
+def _parse_scope_key(
+    scope_key: str,
+    *,
+    name_resolver: SessionPathNameLookup | sqlite3.Connection | None = None,
+    resolver: SessionPathNameLookup | sqlite3.Connection | None = None,
+    conn: sqlite3.Connection | None = None,
+) -> tuple[str, dict[str, Any]]:
     """Map ``gateway_sessions.scope_key`` to mirror path parts.
 
     Args:
         scope_key (str): Session scope key.
+        name_resolver (SessionPathNameLookup | None): Optional title lookup.
+        resolver (SessionPathNameLookup | None): Alias for ``name_resolver``.
+        conn (sqlite3.Connection | None): SQLite connection for DB-backed lookup.
 
     Returns:
         tuple[str, dict[str, Any]]: Relative path under ``sessions/`` and extras.
@@ -146,14 +293,17 @@ def _parse_scope_key(scope_key: str) -> tuple[str, dict[str, Any]]:
         >>> extra["topic_id"]
         '7'
     """
+    lookup = _resolve_name_lookup(name_resolver=name_resolver, resolver=resolver, conn=conn)
     if scope_key.startswith("telegram:"):
         parts = scope_key.split(":")
         chat_id = parts[1] if len(parts) > 1 else "0"
+        chat_seg = _chat_path_segment(chat_id, lookup)
         if len(parts) >= 4 and parts[2] == "topic":
             topic_id = parts[3]
-            rel = f"telegram/chats/{_safe_segment(chat_id)}/topics/{_safe_segment(topic_id)}"
+            topic_seg = _topic_path_segment(chat_id, topic_id, lookup)
+            rel = f"telegram/chats/{chat_seg}/topics/{topic_seg}"
             return rel, {"chat_id": chat_id, "topic_id": topic_id}
-        rel = f"telegram/chats/{_safe_segment(chat_id)}/general"
+        rel = f"telegram/chats/{chat_seg}/general"
         return rel, {"chat_id": chat_id, "topic_id": None}
     if scope_key.startswith("webchat:"):
         sub = scope_key.split(":", 1)[1] if ":" in scope_key else "user"
@@ -316,6 +466,9 @@ def mirror_gateway_message(
     created_at: str,
     extras_json: str | None,
     turn_id: str | None = None,
+    name_resolver: SessionPathNameLookup | sqlite3.Connection | None = None,
+    resolver: SessionPathNameLookup | sqlite3.Connection | None = None,
+    conn: sqlite3.Connection | None = None,
 ) -> None:
     """Append one gateway message row to the workspace JSONL mirror (best-effort).
 
@@ -335,6 +488,9 @@ def mirror_gateway_message(
         created_at (str): Row timestamp.
         extras_json (str | None): Adapter metadata JSON.
         turn_id (str | None): Optional turn correlation id.
+        name_resolver (SessionPathNameLookup | None): Optional title lookup.
+        resolver (SessionPathNameLookup | None): Alias for ``name_resolver``.
+        conn (sqlite3.Connection | None): SQLite connection for DB-backed lookup.
 
     Examples:
         >>> from pathlib import Path
@@ -360,7 +516,12 @@ def mirror_gateway_message(
     if not session_mirror_enabled(workspace):
         return
     try:
-        scope_rel, scope_extras = _parse_scope_key(scope_key)
+        scope_rel, scope_extras = _parse_scope_key(
+            scope_key,
+            name_resolver=name_resolver,
+            resolver=resolver,
+            conn=conn,
+        )
         extras: dict[str, Any] = dict(scope_extras)
         if extras_json:
             try:

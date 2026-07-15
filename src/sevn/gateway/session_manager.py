@@ -700,6 +700,7 @@ class SessionManager:
                         created_at=now,
                         extras_json=metadata_blob,
                         turn_id=turn_id,
+                        conn=self._conn,
                     )
             return mid
 
