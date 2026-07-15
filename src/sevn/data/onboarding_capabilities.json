@@ -1045,6 +1045,26 @@
       ]
     },
     {
+      "capability_id": "skill.social_media_manager",
+      "group": "B",
+      "label": "social_media_manager",
+      "description": "Monitor and interact with social media via TwexAPI, sevn CDP browser, and assigned social skills (x-use, facebook-use, linkedin-use).",
+      "config_paths": [
+        "skills.social_media_manager.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.social_media_manager.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
       "capability_id": "skill.telegram",
       "group": "B",
       "label": "telegram",

@@ -228,7 +228,6 @@ class TestTwexApiMedium:
                 subagents_cfg=SubAgentsWorkspaceConfig(),
             )
 
-
     @pytest.mark.asyncio
     async def test_users_sends_array_body(
         self,

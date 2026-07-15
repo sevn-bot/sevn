@@ -129,7 +129,9 @@ class TwexApiClient:
             response.raise_for_status()
         except httpx.HTTPStatusError as exc:
             detail = response.text[:500]
-            msg = f"TwexAPI {method.upper()} {rendered} failed: HTTP {response.status_code}: {detail}"
+            msg = (
+                f"TwexAPI {method.upper()} {rendered} failed: HTTP {response.status_code}: {detail}"
+            )
             raise TwexApiError(msg) from exc
         if not response.content:
             return {}

@@ -366,7 +366,13 @@ def _browser_plan(task: SocialMediaTask) -> dict[str, Any]:
         "query": task.query,
         "url": task.url,
         "body": task.text,
-        "skills": ["playwright-browser", "browser-harness", "x-use", "facebook-use", "linkedin-use"],
+        "skills": [
+            "playwright-browser",
+            "browser-harness",
+            "x-use",
+            "facebook-use",
+            "linkedin-use",
+        ],
         "hint": (
             "Invoke the native `browser` tool (sevn CDP automator) with "
             f"action=social, site={site}, op={op}. "
@@ -476,9 +482,13 @@ async def execute_social_media_manager_task(
             raise TwexApiError("replies_page requires path_params.tweet_id")
         path_params["tweet_id"] = tweet_id
     if op == "timeline_page" and "screen_name" not in path_params:
-        screen = str(
-            body.pop("screen_name", "") or params.pop("screen_name", "") or (parsed.query or "")
-        ).strip().lstrip("@")
+        screen = (
+            str(
+                body.pop("screen_name", "") or params.pop("screen_name", "") or (parsed.query or "")
+            )
+            .strip()
+            .lstrip("@")
+        )
         if not screen:
             raise TwexApiError("timeline_page requires path_params.screen_name")
         path_params["screen_name"] = screen

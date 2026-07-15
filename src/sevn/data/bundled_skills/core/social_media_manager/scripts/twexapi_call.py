@@ -63,7 +63,10 @@ def main(argv: list[str] | None = None) -> int:
         "op": args.op,
         "body": _parse_json_flag(args.body, label="body"),
         "params": _parse_json_flag(args.params, label="params"),
-        "path_params": {str(k): str(v) for k, v in _parse_json_flag(args.path_params, label="path-params").items()},
+        "path_params": {
+            str(k): str(v)
+            for k, v in _parse_json_flag(args.path_params, label="path-params").items()
+        },
     }
     return run_social_media_task(task, dry_run=args.dry_run or dry_run_requested([]))
 
