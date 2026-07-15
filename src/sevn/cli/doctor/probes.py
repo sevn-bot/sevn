@@ -1135,18 +1135,24 @@ def run_doctor_probes(
         raw_doc=bw.raw,
     )
     if sb_probe is not None:
+        sb_cfg = bw.config.second_brain
+        sb_check_id = (
+            "second_brain_vault_layout_para"
+            if sb_cfg is not None and sb_cfg.layout == "para"
+            else "second_brain_vault_layout"
+        )
         result.add(
             DoctorCheck(
-                id="second_brain_vault_layout",
-                section=section_for("second_brain_vault_layout"),
-                title=title_for("second_brain_vault_layout"),
+                id=sb_check_id,
+                section=section_for(sb_check_id),
+                title=title_for(sb_check_id),
                 ok=sb_probe.ok,
                 detail=sb_probe.detail,
                 hint=sb_probe.hint,
             ),
         )
         if not sb_probe.ok:
-            msg = f"second_brain_vault_layout: {sb_probe.detail}"
+            msg = f"{sb_check_id}: {sb_probe.detail}"
             if sb_probe.hint:
                 msg = f"{msg} — {sb_probe.hint}"
             result.warnings.append(msg)

@@ -1648,6 +1648,13 @@ function renderCapabilityControl(cap, mergedDefault) {
       );
       if (!res.ok) return;
       const entries = body.entries || [];
+      if (body.adoption_note) {
+        const note = document.createElement("p");
+        note.className = "hint";
+        note.style.fontSize = "var(--sevn-fs-xs)";
+        note.textContent = body.adoption_note;
+        listHost.appendChild(note);
+      }
       if (browsePath !== ".") {
         const up = document.createElement("button");
         up.type = "button";

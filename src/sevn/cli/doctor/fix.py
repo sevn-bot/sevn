@@ -192,9 +192,15 @@ def _fix_second_brain_vault_layout(ctx: FixContext) -> FixOutcome | None:
     )
     if probe is None or probe.ok:
         return None
+    sb_cfg = ctx.bw.config.second_brain
+    check_id = (
+        "second_brain_vault_layout_para"
+        if sb_cfg is not None and sb_cfg.layout == "para"
+        else "second_brain_vault_layout"
+    )
     if not _needs_confirm(ctx, f"Bootstrap Second Brain layout at {probe.scope_root_relative}?"):
         return FixOutcome(
-            "second_brain_vault_layout",
+            check_id,
             "manual",
             "layout left incomplete (re-run with --yes)",
         )
@@ -203,7 +209,7 @@ def _fix_second_brain_vault_layout(ctx: FixContext) -> FixOutcome | None:
         content_root=ctx.bw.layout.content_root,
     )
     detail = f"created {', '.join(created)}" if created else "layout already complete"
-    return FixOutcome("second_brain_vault_layout", "fixed", detail)
+    return FixOutcome(check_id, "fixed", detail)
 
 
 def _fix_sqlite_wal(ctx: FixContext) -> FixOutcome | None:
@@ -533,6 +539,7 @@ _FIX_HANDLERS: dict[str, Any] = {
     "operator_lock": _fix_operator_lock,
     "llmignore": _fix_llmignore,
     "second_brain_vault_layout": _fix_second_brain_vault_layout,
+    "second_brain_vault_layout_para": _fix_second_brain_vault_layout,
     "sqlite": _fix_sqlite_wal,
     "secrets_backend": _fix_secrets_backend,
     "provider_credentials": _fix_provider_credentials,

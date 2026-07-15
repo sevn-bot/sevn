@@ -9,24 +9,41 @@
 
 ## Level 1 — Overview (non-technical)
 
-**Second brain** is sevn.bot's operator wiki vault: capture sources under `raw/`, curate pages under `wiki/`, and search/apply wikilinks compatible with Obsidian-style layouts. It is **not** a sync daemon — sevn provides wikilink/layout compatibility and ingest tooling, not bidirectional Obsidian sync.
+**Second brain** is sevn.bot's operator wiki vault: capture sources, curate markdown notes, and search/apply wikilinks compatible with Obsidian. Choose **`layout: "legacy"`** (default OKF `raw/` + `wiki/` tree) or **`layout: "para"`** (Obsidian PARA folders `00_Inbox`…`40_Archive`). It is **not** a sync daemon — sevn provides layout-aware ingest and search, not bidirectional Obsidian sync.
 
 Tools [`wiki_search`](../../src/sevn/second_brain/__init__.py), [`wiki_get`](../../src/sevn/second_brain/__init__.py), [`wiki_apply`](../../src/sevn/second_brain/__init__.py), and [`wiki_lint`](../../src/sevn/second_brain/__init__.py) expose the vault to the agent.
 
 ## Level 2 — How it works (technical)
 
-Package [`src/sevn/second_brain/`](../../src/sevn/second_brain/). Vault paths resolve through [`paths.py`](../../src/sevn/second_brain/paths.py).
+Package [`src/sevn/second_brain/`](../../src/sevn/second_brain/). Vault paths resolve through [`VaultLayout`](../../src/sevn/second_brain/paths.py) in [`paths.py`](../../src/sevn/second_brain/paths.py).
 
 ### Vault layout and Obsidian resolution
 
-| Path (under scope) | Purpose |
-| --- | --- |
-| `raw/` | Captured sources (URL fetch, uploads) — [`fetch_url_to_raw`](../../src/sevn/second_brain/fetch.py#L100) |
-| `wiki/` | Curated markdown pages + [`wiki/index.md`](../../src/sevn/second_brain/query.py) |
-| `wiki/ingests/` | Ingested/stub pages from raw — [`run_ingest`](../../src/sevn/second_brain/ingest.py#L145) |
-| `outputs/` | Generated artefacts |
+`second_brain.layout` selects the path model (default **`legacy`**). All tools and ingest paths resolve through [`VaultLayout`](../../src/sevn/second_brain/paths.py).
 
-**Custom vault root:** `sevn.json` → `second_brain.paths.vault` resolves via [`resolve_vault_base`](../../src/sevn/second_brain/paths.py#L108) (legacy default: [`vault_root`](../../src/sevn/second_brain/paths.py#L32) → `second_brain/` under content root). Obsidian operators set `paths.vault` to their vault directory; doctor probes layout with [`probe_second_brain_vault_layout`](../../src/sevn/second_brain/layout_probe.py#L71).
+#### Legacy layout (default)
+
+| Path (under scope) | Role | Purpose |
+| --- | --- | --- |
+| `raw/` | `sources` | Captured sources — [`fetch_url_to_raw`](../../src/sevn/second_brain/fetch.py) |
+| `wiki/` | `curated` | Curated markdown + [`wiki/index.md`](../../src/sevn/second_brain/query.py) |
+| `wiki/ingests/` | `capture` | Ingested/stub pages — [`run_ingest`](../../src/sevn/second_brain/ingest.py) |
+| `outputs/` | `outputs` | Generated artefacts |
+
+#### PARA layout (`layout: "para"`)
+
+| Path (defaults) | Role | Purpose |
+| --- | --- | --- |
+| `00_Inbox/` | `capture` | Capture + ingest landing |
+| `10_Projects/`, `20_Areas/` | `projects`, `areas` | PARA active work |
+| `30_Resources/` | `curated` | Curated reference notes |
+| `30_Resources/_sources/` | `sources` | Immutable fetched sources |
+| `30_Resources/_outputs/` | `outputs` | Bot analyses |
+| `index.md`, `log.md` (vault root) | `index_note`, `log_note` | Home + ingest log |
+
+Folder names are configurable via `second_brain.para`. Search, index, and lint scan [`content_roots()`](../../src/sevn/second_brain/paths.py) (PARA: inbox + projects + areas + resources).
+
+**Custom vault root:** `sevn.json` → `second_brain.paths.vault` resolves via [`resolve_vault_base`](../../src/sevn/second_brain/paths.py). CLI `sevn second-brain setup --vault <path> --layout {auto,legacy,para}` writes config and bootstraps additively ([`detect_layout`](../../src/sevn/second_brain/bootstrap.py), [`ensure_second_brain_scope_layout`](../../src/sevn/second_brain/bootstrap.py)). Doctor probes with [`probe_second_brain_vault_layout`](../../src/sevn/second_brain/layout_probe.py).
 
 Wikilink resolution: [`resolve_wiki_target`](../../src/sevn/second_brain/links.py#L98). Scope bootstrap: [`ensure_second_brain_scope_layout`](../../src/sevn/second_brain/bootstrap.py#L49).
 
@@ -34,7 +51,7 @@ Gateway boot registers tools via [`register_second_brain_tools`](../../src/sevn/
 
 ### Key modules
 
-- [`paths.py`](../../src/sevn/second_brain/paths.py) — [`resolve_vault_base`](../../src/sevn/second_brain/paths.py#L108), scope roots
+- [`paths.py`](../../src/sevn/second_brain/paths.py) — [`VaultLayout`](../../src/sevn/second_brain/paths.py), [`resolve_vault_base`](../../src/sevn/second_brain/paths.py), layout roles
 - [`ingest.py`](../../src/sevn/second_brain/ingest.py) — raw → wiki ingest pipeline
 - [`__init__.py`](../../src/sevn/second_brain/__init__.py) — wiki tool registration
 - [`bootstrap.py`](../../src/sevn/second_brain/bootstrap.py) — idempotent layout creation

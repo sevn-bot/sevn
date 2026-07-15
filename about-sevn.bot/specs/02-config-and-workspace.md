@@ -8,7 +8,7 @@ summary: 'Provide a single, testable configuration surface before storage, traci
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
 last_updated: '2026-07-15'
-fingerprint: sha256:7cf3d8fd17e33c2aae58d61815d1a103982511cd848292e3d8bf776364340a08
+fingerprint: sha256:fba831861a4e62636bcafb6ef57e3ab15bc6624b6180f49f3b96fba3c6b82d12
 related: []
 sources:
 - src/sevn/config/**
@@ -443,6 +443,9 @@ interfaces:
 - name: SecondBrainFetchConfig
   file: src/sevn/config/sections/features.py
   symbol: SecondBrainFetchConfig
+- name: SecondBrainParaConfig
+  file: src/sevn/config/sections/features.py
+  symbol: SecondBrainParaConfig
 - name: SecondBrainPathsConfig
   file: src/sevn/config/sections/features.py
   symbol: SecondBrainPathsConfig

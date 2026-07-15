@@ -78,3 +78,34 @@ async def test_fetch_writes_pdf_raw(tmp_path) -> None:
         )
     assert out["raw_relpath"].endswith(".pdf")
     assert (tmp_path / "raw" / str(out["raw_relpath"])).read_bytes().startswith(b"%PDF")
+
+
+@pytest.mark.asyncio
+async def test_fetch_writes_para_sources(tmp_path) -> None:
+    from sevn.config.workspace_config import SecondBrainWorkspaceConfig
+
+    vault = tmp_path / "obsidian" / "alex_AI"
+    vault.mkdir(parents=True)
+    cfg = SecondBrainFetchConfig(allow_domains=["example.com"], max_response_mib=1)
+    sb_cfg = SecondBrainWorkspaceConfig(
+        layout="para",
+        paths={"vault": "obsidian/alex_AI"},
+    )
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            200, headers={"content-type": "text/html; charset=utf-8"}, content=b"hello"
+        ),
+    )
+    async with httpx.AsyncClient(transport=transport) as client:
+        out = await fetch_url_to_raw(
+            url="https://example.com/page",
+            scope_root=vault,
+            fetch_cfg=cfg,
+            client=client,
+            workspace_root=tmp_path,
+            sb_cfg=sb_cfg,
+            scope="owner",
+        )
+    sources = vault / "30_Resources" / "_sources"
+    assert sources.is_dir()
+    assert (sources / str(out["raw_relpath"])).is_file()

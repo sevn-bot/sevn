@@ -1,4 +1,7 @@
-# MODEL — Second Brain schema
+# MODEL — Second Brain schema (legacy layout)
+
+> **PARA layout?** When `second_brain.layout` is `"para"`, see bundled
+> [`para_MODEL.md`](para_MODEL.md) (copied to vault `MODEL.md` on PARA bootstrap).
 
 ## Identity
 

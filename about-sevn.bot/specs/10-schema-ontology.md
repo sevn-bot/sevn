@@ -8,7 +8,7 @@ summary: 'Define the runtime ontology for Triager output and related labels acro
   the agent core: canonical field names, closed enums, typing conventions, and how
   they compose with executor dispatch described '
 last_updated: '2026-07-15'
-fingerprint: sha256:7cf3d8fd17e33c2aae58d61815d1a103982511cd848292e3d8bf776364340a08
+fingerprint: sha256:fba831861a4e62636bcafb6ef57e3ab15bc6624b6180f49f3b96fba3c6b82d12
 related: []
 sources:
 - src/sevn/config/**
@@ -452,6 +452,9 @@ interfaces:
 - name: SecondBrainFetchConfig
   file: src/sevn/config/sections/features.py
   symbol: SecondBrainFetchConfig
+- name: SecondBrainParaConfig
+  file: src/sevn/config/sections/features.py
+  symbol: SecondBrainParaConfig
 - name: SecondBrainPathsConfig
   file: src/sevn/config/sections/features.py
   symbol: SecondBrainPathsConfig

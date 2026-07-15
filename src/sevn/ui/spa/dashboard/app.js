@@ -2040,11 +2040,31 @@ async function renderSecondBrain() {
     modified_unix_s: p.modified_unix_s,
   }));
   const scopes = (data.scopes || []).join(", ") || "—";
+  const roleRows = data.roles
+    ? Object.entries(data.roles).map(([role, path]) => ({ role, path }))
+    : [];
+  const layoutBlock = data.layout
+    ? `<p><strong>Layout:</strong> <code>${escapeHtml(data.layout)}</code></p>`
+    : "";
+  const rolesBlock =
+    roleRows.length > 0
+      ? `<h3>Layout roles</h3>${tableFromRows(roleRows, [
+          { key: "role", label: "Role" },
+          { key: "path", label: "Path" },
+        ])}`
+      : "";
+  const contentRoots =
+    (data.content_roots || []).length > 0
+      ? `<p class="muted">Content roots: ${escapeHtml((data.content_roots || []).join(", "))}</p>`
+      : "";
   return `
     <p class="muted">Vault at <code>${escapeHtml(data.vault_path || "")}</code> · scope <code>${escapeHtml(data.scope || "owner")}</code>
       · ${data.enabled ? "enabled" : "disabled"} · ingest via <code>POST ${escapeHtml(data.gateway_fetch || "/api/second_brain/fetch")}</code></p>
+    ${layoutBlock}
+    ${contentRoots}
     <p><strong>Scopes:</strong> ${escapeHtml(scopes)}</p>
-    <h3>Wiki pages (${data.wiki_page_count ?? 0})</h3>
+    ${rolesBlock}
+    <h3>Vault pages (${data.wiki_page_count ?? 0})</h3>
     ${tableFromRows(pages, [
       { key: "path", label: "Page" },
       { key: "size_bytes", label: "Bytes" },
@@ -2056,7 +2076,7 @@ async function renderSecondBrain() {
         : ""
     }
     <h3>Wiki editor</h3>
-    ${fileEditorShell("", "", "Open a wiki page path under second_brain/… or pick from the list above.")}
+    ${fileEditorShell("", "", "Open a vault page path or pick from the list above.")}
   `;
 }
 

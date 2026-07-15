@@ -1443,10 +1443,37 @@
       ]
     },
     {
+      "capability_id": "memory.second_brain.layout",
+      "group": "D",
+      "label": "Vault layout",
+      "description": "legacy (wiki/raw/outputs) or para (Obsidian PARA: Inbox/Projects/Areas/Resources).",
+      "config_paths": [
+        "second_brain.layout"
+      ],
+      "control": "select",
+      "default": "legacy",
+      "select_options": [
+        "legacy",
+        "para"
+      ],
+      "profile_overridable": true,
+      "depends_on": [
+        "memory.second_brain"
+      ],
+      "install_actions": [
+        {
+          "id": "memory.second_brain.layout.bootstrap",
+          "kind": "second_brain_bootstrap",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
       "capability_id": "memory.second_brain.vault_path",
       "group": "D",
       "label": "Second Brain vault path",
-      "description": "Workspace-relative Obsidian vault folder (e.g. obsidian/alex_AI). Leave empty for default second_brain/users/<scope>/ layout.",
+      "description": "Workspace-relative Obsidian vault folder (e.g. obsidian/alex_AI). When layout is para, existing PARA folders are detected and adopted non-destructively. Leave empty for default second_brain/users/<scope>/ layout.",
       "config_paths": [
         "second_brain.paths.vault"
       ],

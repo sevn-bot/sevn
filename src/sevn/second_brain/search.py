@@ -6,6 +6,9 @@ index (<5 min); otherwise keyword-only (`specs/27-second-brain.md` §6).
 Exports:
     SearchHit — ranked hit row (path, title, score, snippet, origin).
     wiki_search — scan user (and optional shared) wiki trees and rank matches.
+
+Callers pass ``user_wiki`` as the primary content root; optional ``content_roots`` scans
+all layout content roots (PARA inbox/projects/areas/resources).
 """
 
 from __future__ import annotations
@@ -134,18 +137,23 @@ def wiki_search(
     use_witchcraft: bool = False,
     witchcraft_cfg: WitchcraftConfig | None = None,
     workspace_path: Path | None = None,
+    content_roots: tuple[Path, ...] | None = None,
+    vault_root: Path | None = None,
 ) -> list[dict[str, object]]:
     """Rank wiki pages by substring/TF; optional semantic blend when fresh.
 
     Args:
         query (str): Search string.
-        user_wiki (Path): User-scope ``wiki/`` root.
+        user_wiki (Path): Primary user-scope wiki/content root (legacy ``wiki/``).
         shared_wiki (Path | None): Optional shared wiki overlay root.
         limit (int): Maximum hits (clamped to ``[1, 50]``).
         mode (str | None): Pass ``semantic`` to request semantic blending when allowed.
         use_witchcraft (bool): Force semantic path when integration reports fresh index.
         witchcraft_cfg (WitchcraftConfig | None): Parsed Witchcraft config for probe + dispatch.
         workspace_path (Path | None): Workspace root for relative db path resolution.
+        content_roots (tuple[Path, ...] | None): When set, scan all layout content roots.
+        vault_root (Path | None): Scope root for vault-relative hit paths when multiple
+            content roots are scanned (PARA).
 
     Returns:
         list[dict[str, object]]: Hit dicts with ``path``, ``title``, ``score``, ``snippet``, ``origin``.
@@ -163,10 +171,16 @@ def wiki_search(
     tokens = _tokenize(q)
     lim = max(1, min(50, limit))
     hits: list[SearchHit] = []
+    scan_roots = content_roots if content_roots else (user_wiki,)
+    multi_root = len(scan_roots) > 1
+    path_base = vault_root.resolve() if multi_root and vault_root is not None else None
 
     def scan_root(root: Path, origin: str) -> None:
         for fp in _iter_wiki_files(root):
-            rel = fp.relative_to(root).as_posix()
+            if path_base is not None:
+                rel = fp.relative_to(path_base).as_posix()
+            else:
+                rel = fp.relative_to(root).as_posix()
             text = fp.read_text(encoding="utf-8", errors="replace")
             fm, body, _ = split_frontmatter(text)
             title_o = fm.get("title")
@@ -184,9 +198,12 @@ def wiki_search(
                 ),
             )
 
-    scan_root(user_wiki, "user")
+    for root in scan_roots:
+        scan_root(root, "user")
     if shared_wiki and shared_wiki.is_dir():
-        user_names = {p.name for p in _iter_wiki_files(user_wiki)}
+        user_names: set[str] = set()
+        for root in scan_roots:
+            user_names.update(p.name for p in _iter_wiki_files(root))
         for fp in _iter_wiki_files(shared_wiki):
             if fp.name in user_names:
                 continue
@@ -210,8 +227,9 @@ def wiki_search(
 
     want_sem = (mode or "").lower() == "semantic" or use_witchcraft
     if want_sem and semantic_mode_allowed(witchcraft_cfg, workspace_path):
+        semantic_root = path_base if path_base is not None else user_wiki
         sem = maybe_semantic_scores(
-            user_wiki,
+            semantic_root,
             query=q,
             _shared_wiki=shared_wiki,
             witchcraft_cfg=witchcraft_cfg,

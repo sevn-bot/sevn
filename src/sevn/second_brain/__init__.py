@@ -23,15 +23,15 @@ from sevn.config.workspace_config import WorkspaceConfig
 from sevn.second_brain.errors import SecondBrainMergeNeededError, SecondBrainPathError
 from sevn.second_brain.frontmatter import compose_page, normalise_agent_keys, split_frontmatter
 from sevn.second_brain.ingest_stub import run_ingest_stub
-from sevn.second_brain.lint_local import issues_to_json, lint_wiki_tree
+from sevn.second_brain.lint_local import issues_to_json, lint_vault_tree
 from sevn.second_brain.paths import (
+    VaultLayout,
     display_scope_root_relative,
     effective_scope,
     legacy_shared_vault_root,
     resolve_scope_root,
-    resolve_wiki_file,
+    resolve_vault_note_file,
     shared_wiki_root,
-    wiki_dir_for_scope,
 )
 from sevn.second_brain.query import second_brain_query
 from sevn.second_brain.search import wiki_search
@@ -132,7 +132,7 @@ def _shared_optional(sb: Any, content_root: Any) -> Any:
 @sevn_tool(
     name="wiki_search",
     category="second_brain",
-    description="Search wiki pages by substring/TF rank; optional semantic when indexer fresh.",
+    description="Search vault notes by substring/TF rank; optional semantic when indexer fresh.",
     parameters={
         "type": "object",
         "properties": {
@@ -155,7 +155,7 @@ async def wiki_search_tool(
     limit: int = 20,
     mode: str | None = None,
 ) -> str:
-    """Search the wiki and return an enveloped JSON result string.
+    """Search vault notes and return an enveloped JSON result string.
 
     Args:
         ctx (ToolContext): Tool execution context (workspace, tracing, ids).
@@ -173,8 +173,8 @@ async def wiki_search_tool(
     """
     cfg, sb, root = _load_sb(ctx)
     sc = effective_scope(scope, sb)
-    scope_path = resolve_scope_root(root, sb, sc)
-    wiki = wiki_dir_for_scope(scope_path)
+    layout = VaultLayout(root, sb, sc)
+    wiki = layout.role_dir("curated")
     shared = _shared_optional(sb, root)
     wc_cfg = WitchcraftConfig.from_workspace_config(cfg)
     await _trace_sb(
@@ -192,6 +192,8 @@ async def wiki_search_tool(
         use_witchcraft=(mode or "").lower() == "semantic",
         witchcraft_cfg=wc_cfg,
         workspace_path=root,
+        content_roots=layout.content_roots(),
+        vault_root=layout.scope_root,
     )
     return enveloped_success({"results": rows})
 
@@ -199,7 +201,7 @@ async def wiki_search_tool(
 @sevn_tool(
     name="wiki_get",
     category="second_brain",
-    description="Read one wiki page (path relative to wiki/) with frontmatter.",
+    description="Read one vault note (path relative to curated/resources root) with frontmatter.",
     parameters={
         "type": "object",
         "properties": {"path": {"type": "string"}, "scope": {"type": "string"}},
@@ -208,11 +210,11 @@ async def wiki_search_tool(
     see_also=("second_brain",),
 )
 async def wiki_get_tool(ctx: ToolContext, path: str, scope: str | None = None) -> str:
-    """Read one wiki page (path under ``wiki/``) and return enveloped JSON.
+    """Read one vault note (path under the curated content root) and return enveloped JSON.
 
     Args:
         ctx (ToolContext): Tool execution context.
-        path (str): Wiki-relative path to the markdown file.
+        path (str): Note path relative to the curated/resources root.
         scope (str | None): Scope id; defaults from config when omitted.
 
     Returns:
@@ -224,15 +226,15 @@ async def wiki_get_tool(ctx: ToolContext, path: str, scope: str | None = None) -
     """
     _cfg, sb, root = _load_sb(ctx)
     sc = effective_scope(scope, sb)
-    scope_path = resolve_scope_root(root, sb, sc)
-    wiki = wiki_dir_for_scope(scope_path)
+    layout = VaultLayout(root, sb, sc)
     try:
-        target = resolve_wiki_file(wiki_root=wiki, workspace_root=root, rel_path=path)
+        target = resolve_vault_note_file(layout=layout, workspace_root=root, rel_path=path)
     except SecondBrainPathError as exc:
         return enveloped_failure(str(exc), code=ToolResultCode.VALIDATION_ERROR)
     if not target.is_file():
         return enveloped_failure(f"not found: {path}", code=ToolResultCode.VALIDATION_ERROR)
     _, fm, body = wiki_read(target)
+    display_path = target.relative_to(layout.scope_root).as_posix() if sb.layout == "para" else path
     await _trace_sb(
         ctx,
         kind="second_brain.query",
@@ -242,13 +244,13 @@ async def wiki_get_tool(ctx: ToolContext, path: str, scope: str | None = None) -
             "second_brain.paths_touched": [str(target.relative_to(root))],
         },
     )
-    return enveloped_success({"path": path, "body": body, "frontmatter": fm})
+    return enveloped_success({"path": display_path, "body": body, "frontmatter": fm})
 
 
 @sevn_tool(
     name="wiki_apply",
     category="second_brain",
-    description="Atomic wiki write; full-file patch string; rejects on base_hash mismatch.",
+    description="Atomic vault note write; full-file patch string; rejects on base_hash mismatch.",
     parameters={
         "type": "object",
         "properties": {
@@ -268,11 +270,11 @@ async def wiki_apply_tool(
     base_hash: str,
     scope: str | None = None,
 ) -> str:
-    """Apply a full-file wiki patch atomically; return enveloped JSON.
+    """Apply a full-file vault note patch atomically; return enveloped JSON.
 
     Args:
         ctx (ToolContext): Tool execution context.
-        path (str): Wiki-relative path to write.
+        path (str): Note path relative to the curated/resources root.
         patch (str): Complete new file text including frontmatter fence.
         base_hash (str): Expected SHA-256 hex of current on-disk bytes.
         scope (str | None): Scope id; defaults from config when omitted.
@@ -286,14 +288,13 @@ async def wiki_apply_tool(
     """
     cfg, sb, root = _load_sb(ctx)
     sc = effective_scope(scope, sb)
-    scope_path = resolve_scope_root(root, sb, sc)
-    wiki = wiki_dir_for_scope(scope_path)
+    layout = VaultLayout(root, sb, sc)
     try:
-        target = resolve_wiki_file(wiki_root=wiki, workspace_root=root, rel_path=path)
+        target = resolve_vault_note_file(layout=layout, workspace_root=root, rel_path=path)
     except SecondBrainPathError as exc:
         return enveloped_failure(str(exc), code=ToolResultCode.VALIDATION_ERROR)
     fm_in, body_in, _ = split_frontmatter(patch)
-    merged_fm = normalise_agent_keys(fm_in)
+    merged_fm = normalise_agent_keys(fm_in, layout=sb.layout)
     composed = compose_page(merged_fm, body_in)
     try:
         wiki_apply_atomic(path=target, patch=composed, base_hash=base_hash, workspace_root=root)
@@ -326,16 +327,18 @@ async def wiki_apply_tool(
     )
     wc_cfg = WitchcraftConfig.from_workspace_config(cfg)
     shared = _shared_optional(sb, root)
+    reindex_roots = layout.content_roots()
     await schedule_reindex_debounced(
-        wiki, witchcraft_cfg=wc_cfg, workspace_path=root, shared_wiki=shared
+        reindex_roots, witchcraft_cfg=wc_cfg, workspace_path=root, shared_wiki=shared
     )
-    return enveloped_success({"path": path, "written": True})
+    display_path = target.relative_to(layout.scope_root).as_posix() if sb.layout == "para" else path
+    return enveloped_success({"path": display_path, "written": True})
 
 
 @sevn_tool(
     name="wiki_lint",
     category="second_brain",
-    description="Lint wiki for orphan links, missing OKF type, missing sources, stale freshness.",
+    description="Lint vault notes for orphan links, missing type (legacy), sources, staleness.",
     parameters={
         "type": "object",
         "properties": {
@@ -351,7 +354,7 @@ async def wiki_lint_tool(
     scope_root: str,
     rules: list[str] | None = None,
 ) -> str:
-    """Lint wiki files under a scope; return enveloped JSON with issues.
+    """Lint vault notes under a scope; return enveloped JSON with issues.
 
     Args:
         ctx (ToolContext): Tool execution context.
@@ -368,9 +371,8 @@ async def wiki_lint_tool(
     _ = rules
     _cfg, sb, root = _load_sb(ctx)
     sc = effective_scope(scope_root, sb)
-    scope_path = resolve_scope_root(root, sb, sc)
-    wiki = wiki_dir_for_scope(scope_path)
-    issues = lint_wiki_tree(wiki)
+    layout = VaultLayout(root, sb, sc)
+    issues = lint_vault_tree(layout)
     await _trace_sb(
         ctx,
         kind="second_brain.lint",
@@ -386,7 +388,7 @@ async def wiki_lint_tool(
 @sevn_tool(
     name="second_brain_query",
     category="second_brain",
-    description="Query wiki: index.md first, then bodies; optional shared union.",
+    description="Query vault: index note first, then note bodies; optional shared union.",
     parameters={
         "type": "object",
         "properties": {
@@ -408,12 +410,12 @@ async def second_brain_query_tool(
     use_witchcraft: bool = False,
     limit: int = 20,
 ) -> str:
-    """Query wiki (index-first, then ranked search); return enveloped JSON.
+    """Query vault notes (index-first, then ranked search); return enveloped JSON.
 
     Args:
         ctx (ToolContext): Tool execution context.
         q (str): Query text.
-        scope (str): Scope id for the user wiki root.
+        scope (str): Scope id for the user vault root.
         include_shared (bool): Whether to union shared wiki hits when configured.
         use_witchcraft (bool): Whether to request semantic ranking when allowed.
         limit (int): Maximum rows returned (clamped by the implementation).
@@ -427,8 +429,8 @@ async def second_brain_query_tool(
     """
     cfg, sb, root = _load_sb(ctx)
     sc = effective_scope(scope, sb)
-    scope_path = resolve_scope_root(root, sb, sc)
-    wiki = wiki_dir_for_scope(scope_path)
+    layout = VaultLayout(root, sb, sc)
+    wiki = layout.role_dir("curated")
     shared = _shared_optional(sb, root) if include_shared else None
     wc_cfg = WitchcraftConfig.from_workspace_config(cfg)
     rows = second_brain_query(
@@ -440,6 +442,9 @@ async def second_brain_query_tool(
         limit=limit,
         witchcraft_cfg=wc_cfg,
         workspace_path=root,
+        content_roots=layout.content_roots(),
+        vault_root=layout.scope_root,
+        index_note=layout.index_note(),
     )
     await _trace_sb(
         ctx,
@@ -493,18 +498,23 @@ async def second_brain_ingest_stub_tool(
             vault_users_scope=scope_path,
             raw_relpath=raw_relpath,
             sevn_source=sevn_src,
+            sb_cfg=sb,
+            scope=sc,
         )
     except (SecondBrainPathError, OSError, FileNotFoundError) as exc:
         return enveloped_failure(str(exc), code=ToolResultCode.VALIDATION_ERROR)
+    page_rel = str(out.get("path") or "")
+    if sb.layout == "para" and page_rel:
+        trace_path = f"{display_scope_root_relative(root, scope_path)}/{page_rel}"
+    else:
+        trace_path = f"{display_scope_root_relative(root, scope_path)}/wiki/{page_rel}"
     await _trace_sb(
         ctx,
         kind="second_brain.ingest",
         status="ok",
         attrs={
             "second_brain.scope": sc,
-            "second_brain.paths_touched": [
-                f"{display_scope_root_relative(root, scope_path)}/wiki/{out['path']}"
-            ],
+            "second_brain.paths_touched": [trace_path],
         },
     )
     return enveloped_success(out)

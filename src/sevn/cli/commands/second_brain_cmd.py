@@ -12,26 +12,167 @@ Exports:
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 import typer
 
 from sevn.cli.errors import CliPreconditionError
 from sevn.cli.workspace import load_bound_workspace
-from sevn.config.sections.features import _normalise_vault_path
-from sevn.config.workspace_config import WorkspaceConfig
+from sevn.config.sections.features import SecondBrainParaConfig, _normalise_vault_path
+from sevn.config.workspace_config import SecondBrainWorkspaceConfig, WorkspaceConfig
 from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
 from sevn.onboarding.web_app import _set_nested
-from sevn.second_brain.bootstrap import ensure_second_brain_scope_layout
-from sevn.second_brain.paths import display_scope_root_relative, effective_scope, resolve_scope_root
+from sevn.second_brain.bootstrap import detect_layout, ensure_second_brain_scope_layout
+from sevn.second_brain.layout_probe import _missing_layout_paths
+from sevn.second_brain.paths import (
+    LayoutRole,
+    VaultLayout,
+    display_scope_root_relative,
+    effective_scope,
+    resolve_scope_root,
+)
 from sevn.second_brain.witchcraft_bridge import WitchcraftConfig, witchcraft_indexer_available
 from sevn.second_brain.witchcraft_reindex import reindex_workspace_wiki, resolve_index_wiki_paths
 
+_LAYOUT_ROLES: tuple[LayoutRole, ...] = (
+    "capture",
+    "projects",
+    "areas",
+    "curated",
+    "archive",
+    "templates",
+    "sources",
+    "outputs",
+    "index_note",
+    "log_note",
+)
 
-def _layout_status(scope_root: Path) -> tuple[bool, list[str]]:
-    """Return whether the standard layout is complete and missing relative paths.
+
+def _role_path_relative(content_root: Path, path: Path) -> str:
+    """Return *path* as a workspace-relative POSIX string for operator display.
+
+    Args:
+        content_root (Path): Workspace content root.
+        path (Path): Resolved role path (directory or note file).
+
+    Returns:
+        str: Display path relative to *content_root*.
+
+    Examples:
+        >>> import tempfile
+        >>> from pathlib import Path
+        >>> ws = Path(tempfile.mkdtemp())
+        >>> note = ws / "obsidian" / "x" / "index.md"
+        >>> _ = note.parent.mkdir(parents=True)
+        >>> _role_path_relative(ws, note)
+        'obsidian/x/index.md'
+    """
+    return display_scope_root_relative(content_root, path)
+
+
+def _resolved_roles_map(
+    content_root: Path,
+    sb_cfg: SecondBrainWorkspaceConfig,
+    scope: str,
+) -> dict[str, str]:
+    """Build a map of layout role names to workspace-relative paths.
+
+    Args:
+        content_root (Path): Workspace content root.
+        sb_cfg (SecondBrainWorkspaceConfig): Parsed ``second_brain`` workspace slice.
+        scope (str): Active scope id.
+
+    Returns:
+        dict[str, str]: Role name → workspace-relative path.
+
+    Examples:
+        >>> import tempfile
+        >>> from pathlib import Path
+        >>> from sevn.config.workspace_config import SecondBrainWorkspaceConfig
+        >>> ws = Path(tempfile.mkdtemp())
+        >>> roles = _resolved_roles_map(ws, SecondBrainWorkspaceConfig(), "owner")
+        >>> roles["curated"].endswith("wiki")
+        True
+    """
+    layout = VaultLayout(content_root, sb_cfg, scope)
+    return {
+        role: _role_path_relative(content_root, layout.role_dir(role)) for role in _LAYOUT_ROLES
+    }
+
+
+def _content_roots_relative(
+    content_root: Path,
+    sb_cfg: SecondBrainWorkspaceConfig,
+    scope: str,
+) -> list[str]:
+    """Return workspace-relative paths for layout content roots.
+
+    Args:
+        content_root (Path): Workspace content root.
+        sb_cfg (SecondBrainWorkspaceConfig): Parsed ``second_brain`` workspace slice.
+        scope (str): Active scope id.
+
+    Returns:
+        list[str]: Content root paths for search/index/lint.
+
+    Examples:
+        >>> import tempfile
+        >>> from pathlib import Path
+        >>> from sevn.config.workspace_config import SecondBrainWorkspaceConfig
+        >>> ws = Path(tempfile.mkdtemp())
+        >>> roots = _content_roots_relative(ws, SecondBrainWorkspaceConfig(), "owner")
+        >>> len(roots)
+        1
+    """
+    layout = VaultLayout(content_root, sb_cfg, scope)
+    return [_role_path_relative(content_root, root) for root in layout.content_roots()]
+
+
+def _resolve_setup_layout(
+    choice: Literal["auto", "legacy", "para"],
+    *,
+    content_root: Path,
+    vault_norm: str | None,
+) -> Literal["legacy", "para"]:
+    """Resolve ``--layout auto`` to ``legacy`` or ``para`` using on-disk detection.
+
+    Args:
+        choice (Literal["auto", "legacy", "para"]): CLI layout flag value.
+        content_root (Path): Workspace content root.
+        vault_norm (str | None): Normalised ``paths.vault`` when ``--vault`` was passed.
+
+    Returns:
+        Literal["legacy", "para"]: Layout to persist in ``sevn.json``.
+
+    Examples:
+        >>> import tempfile
+        >>> from pathlib import Path
+        >>> ws = Path(tempfile.mkdtemp())
+        >>> _resolve_setup_layout("legacy", content_root=ws, vault_norm=None)
+        'legacy'
+    """
+    if choice != "auto":
+        return choice
+    if vault_norm is None:
+        return "legacy"
+    detected = detect_layout((content_root / vault_norm).resolve())
+    return detected if detected is not None else "legacy"
+
+
+def _layout_status(
+    scope_root: Path,
+    *,
+    content_root: Path,
+    sb_cfg: SecondBrainWorkspaceConfig,
+    scope: str,
+) -> tuple[bool, list[str]]:
+    """Return whether the active layout is complete and missing relative paths.
 
     Args:
         scope_root (Path): Resolved scope directory.
+        content_root (Path): Workspace content root.
+        sb_cfg (SecondBrainWorkspaceConfig): Parsed ``second_brain`` workspace slice.
+        scope (str): Active scope id.
 
     Returns:
         tuple[bool, list[str]]: Complete flag and missing relative paths.
@@ -39,28 +180,26 @@ def _layout_status(scope_root: Path) -> tuple[bool, list[str]]:
     Examples:
         >>> import tempfile
         >>> from pathlib import Path
+        >>> from sevn.config.workspace_config import SecondBrainWorkspaceConfig
+        >>> from sevn.second_brain.paths import resolve_scope_root
         >>> with tempfile.TemporaryDirectory() as td:
         ...     root = Path(td)
-        ...     ok, missing = _layout_status(root)
+        ...     cfg = SecondBrainWorkspaceConfig()
+        ...     scope_root = resolve_scope_root(root, cfg, "owner")
+        ...     ok, missing = _layout_status(
+        ...         scope_root, content_root=root, sb_cfg=cfg, scope="owner"
+        ...     )
         ...     ok is False and "wiki/index.md" in missing
         True
     """
-    required = (
-        "raw",
-        "wiki",
-        "wiki/ingests",
-        "outputs",
-        "wiki/index.md",
-        "wiki/log.md",
+    missing = list(
+        _missing_layout_paths(
+            scope_root,
+            content_root=content_root,
+            cfg=sb_cfg,
+            scope=scope,
+        ),
     )
-    missing: list[str] = []
-    for rel in required:
-        target = scope_root / rel
-        if rel.endswith(".md"):
-            if not target.is_file():
-                missing.append(rel)
-        elif not target.is_dir():
-            missing.append(rel)
     return not missing, missing
 
 
@@ -95,9 +234,9 @@ def _run_reindex(config: WorkspaceConfig, content_root: Path) -> None:
     ok = reindex_workspace_wiki(config=config, content_root=content_root)
     if not ok:
         raise CliPreconditionError(
-            "witchcraft reindex failed — install the witchcraft binary and ensure wiki has content"
+            "witchcraft reindex failed — install the witchcraft binary and ensure vault has content"
         )
-    typer.echo(f"Witchcraft index built for wiki: {user_wiki}")
+    typer.echo(f"Witchcraft index built for vault content roots (primary: {user_wiki})")
 
 
 def register(app: typer.Typer) -> None:
@@ -121,6 +260,11 @@ def register(app: typer.Typer) -> None:
             "--vault",
             help="Workspace-relative Obsidian vault folder (e.g. obsidian/alex_AI).",
         ),
+        layout: Literal["auto", "legacy", "para"] = typer.Option(
+            "auto",
+            "--layout",
+            help="Vault layout: auto (detect), legacy (wiki/raw/outputs), or para (Obsidian PARA).",
+        ),
         no_model: bool = typer.Option(False, "--no-model", help="Skip copying MODEL.md stub."),
         reindex: bool = typer.Option(
             False,
@@ -138,8 +282,19 @@ def register(app: typer.Typer) -> None:
             except ValueError as exc:
                 raise CliPreconditionError(str(exc)) from exc
 
+        resolved_layout = _resolve_setup_layout(
+            layout,
+            content_root=content_root,
+            vault_norm=vault_norm,
+        )
+
         def _apply(doc: dict[str, object]) -> None:
             _set_nested(doc, "second_brain.enabled", True)
+            _set_nested(doc, "second_brain.layout", resolved_layout)
+            if resolved_layout == "para":
+                sb_obj = doc.setdefault("second_brain", {})
+                if isinstance(sb_obj, dict) and "para" not in sb_obj:
+                    sb_obj["para"] = SecondBrainParaConfig().model_dump()
             if vault_norm is not None:
                 paths = doc.setdefault("second_brain", {})
                 if isinstance(paths, dict):
@@ -151,13 +306,25 @@ def register(app: typer.Typer) -> None:
         mutate_sevn_json(bw.layout.sevn_json_path, _apply)
         bw = load_bound_workspace()
         sb_cfg = bw.config.second_brain
+        if sb_cfg is None:
+            raise CliPreconditionError("second_brain config missing after setup")
         scope = effective_scope(None, sb_cfg)
         scope_root = resolve_scope_root(content_root, sb_cfg, scope)
-        created = ensure_second_brain_scope_layout(scope_root, copy_model=not no_model)
+        created = ensure_second_brain_scope_layout(
+            scope_root,
+            cfg=bw.config,
+            copy_model=not no_model,
+        )
         rel = display_scope_root_relative(content_root, scope_root)
+        roles = _resolved_roles_map(content_root, sb_cfg, scope)
+        content_roots = _content_roots_relative(content_root, sb_cfg, scope)
         typer.echo(f"Second Brain enabled for scope {scope!r}")
+        typer.echo(f"Layout: {sb_cfg.layout}")
         typer.echo(f"Vault: {rel}")
         typer.echo(f"Absolute: {scope_root}")
+        for role in _LAYOUT_ROLES:
+            typer.echo(f"  {role}: {roles[role]}")
+        typer.echo(f"Content roots: {', '.join(content_roots)}")
         if created:
             typer.echo(f"Created: {', '.join(created)}")
         if reindex:
@@ -166,7 +333,7 @@ def register(app: typer.Typer) -> None:
 
     @sb.command("reindex")
     def reindex_cmd() -> None:
-        """Build or refresh the Witchcraft semantic index for the resolved wiki vault."""
+        """Build or refresh the Witchcraft semantic index for the resolved vault."""
         bw = load_bound_workspace()
         _run_reindex(bw.config, bw.layout.content_root)
         raise typer.Exit(0)
@@ -193,7 +360,14 @@ def show_second_brain_config(*, json_out: bool = False) -> None:
     content_root = bw.layout.content_root
     scope = effective_scope(None, sb_cfg)
     scope_root = resolve_scope_root(content_root, sb_cfg, scope)
-    complete, missing = _layout_status(scope_root)
+    complete, missing = _layout_status(
+        scope_root,
+        content_root=content_root,
+        sb_cfg=sb_cfg,
+        scope=scope,
+    )
+    roles = _resolved_roles_map(content_root, sb_cfg, scope)
+    content_roots = _content_roots_relative(content_root, sb_cfg, scope)
     raw_doc = load_raw_sevn_json(bw.layout.sevn_json_path)
     sb_raw = raw_doc.get("second_brain")
     sb_dict = sb_raw if isinstance(sb_raw, dict) else {}
@@ -208,10 +382,13 @@ def show_second_brain_config(*, json_out: bool = False) -> None:
     )
     payload = {
         "enabled": bool(sb_cfg.enabled),
+        "layout": sb_cfg.layout,
         "paths_vault": sb_cfg.paths.vault,
         "scope": scope,
         "scope_root_relative": display_scope_root_relative(content_root, scope_root),
         "scope_root_absolute": str(scope_root),
+        "roles": roles,
+        "content_roots": content_roots,
         "layout_complete": complete,
         "layout_missing": missing,
         "paths_wiki_alias": wiki_alias,
@@ -223,10 +400,14 @@ def show_second_brain_config(*, json_out: bool = False) -> None:
         emit_json_success(command="sevn config second-brain", data=payload)
     else:
         typer.echo(f"Enabled: {'on' if sb_cfg.enabled else 'off'}")
+        typer.echo(f"Layout: {sb_cfg.layout}")
         vault_line = sb_cfg.paths.vault or "(default second_brain/users/<scope>)"
         typer.echo(f"paths.vault: {vault_line}")
         typer.echo(f"Scope: {scope}")
         typer.echo(f"Resolved vault: {payload['scope_root_relative']}")
+        for role in _LAYOUT_ROLES:
+            typer.echo(f"  {role}: {roles[role]}")
+        typer.echo(f"Content roots: {', '.join(content_roots)}")
         typer.echo(f"Layout complete: {'yes' if complete else 'no'}")
         if missing:
             typer.echo(f"Missing: {', '.join(missing)}")
@@ -237,7 +418,7 @@ def show_second_brain_config(*, json_out: bool = False) -> None:
         if wc_cfg is not None:
             typer.echo(f"Witchcraft: enabled (index ready: {'yes' if witchcraft_ready else 'no'})")
             if wiki_index_path:
-                typer.echo(f"Wiki index path: {wiki_index_path}")
+                typer.echo(f"Vault index path: {wiki_index_path}")
             typer.echo("Run `sevn second-brain reindex` to build or refresh the semantic index.")
     raise typer.Exit(0)
 

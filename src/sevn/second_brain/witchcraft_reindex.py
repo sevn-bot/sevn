@@ -5,22 +5,22 @@ Depends: pathlib, sevn.config.workspace_config, sevn.second_brain.paths,
     sevn.second_brain.witchcraft_bridge
 
 Exports:
-    resolve_index_wiki_paths — user + optional shared wiki dirs for indexing.
+    resolve_index_wiki_paths — user content root(s) + optional shared wiki for indexing.
     reindex_workspace_wiki — synchronous Witchcraft index build for the workspace.
     maybe_reindex_workspace_on_startup — startup hook using resolved paths.
 """
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.second_brain.paths import (
+    VaultLayout,
     effective_scope,
     legacy_shared_vault_root,
-    resolve_scope_root,
     shared_wiki_root,
-    wiki_dir_for_scope,
 )
 from sevn.second_brain.witchcraft_bridge import (
     WitchcraftConfig,
@@ -34,8 +34,11 @@ def resolve_index_wiki_paths(
     config: WorkspaceConfig,
     content_root: Path,
     scope: str | None = None,
-) -> tuple[Path, Path | None] | None:
-    """Return ``(user_wiki, shared_wiki)`` when Second Brain is enabled.
+) -> tuple[Path | tuple[Path, ...], Path | None] | None:
+    """Return wiki/content roots for Witchcraft indexing when Second Brain is enabled.
+
+    Legacy layout returns a single curated ``wiki/`` path. PARA layout returns the
+    four :meth:`VaultLayout.content_roots` directories (inbox, projects, areas, resources).
 
     Args:
         config (WorkspaceConfig): Parsed workspace config.
@@ -43,7 +46,8 @@ def resolve_index_wiki_paths(
         scope (str | None): Optional scope override.
 
     Returns:
-        tuple[Path, Path | None] | None: Wiki roots for Witchcraft indexing, or ``None``.
+        tuple[Path | tuple[Path, ...], Path | None] | None: User root(s) and optional shared
+        wiki, or ``None`` when Second Brain is disabled.
 
     Examples:
         >>> resolve_index_wiki_paths.__name__
@@ -53,8 +57,9 @@ def resolve_index_wiki_paths(
     if sb is None or not sb.enabled:
         return None
     sc = effective_scope(scope, sb)
-    scope_root = resolve_scope_root(content_root, sb, sc)
-    user_wiki = wiki_dir_for_scope(scope_root)
+    layout = VaultLayout(content_root, sb, sc)
+    roots = layout.content_roots()
+    user_wiki: Path | tuple[Path, ...] = roots if sb.layout == "para" else roots[0]
     shared: Path | None = None
     if sb.topology == "shared_core_overlay":
         shared = shared_wiki_root(legacy_shared_vault_root(content_root))
@@ -91,7 +96,9 @@ def reindex_workspace_wiki(
     if paths is None:
         return False
     user_wiki, shared = paths
-    user_wiki.mkdir(parents=True, exist_ok=True)
+    wiki_roots: Sequence[Path] = user_wiki if isinstance(user_wiki, tuple) else (user_wiki,)
+    for root in wiki_roots:
+        root.mkdir(parents=True, exist_ok=True)
     return build_wiki_index(
         user_wiki,
         witchcraft_cfg=wc_cfg,

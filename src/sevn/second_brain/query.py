@@ -2,6 +2,9 @@
 
 Exports:
     second_brain_query — combine ``index.md`` hints with ranked wiki search.
+
+Callers pass ``user_wiki`` as the primary content root; optional ``content_roots`` scans
+all layout content roots (PARA inbox/projects/areas/resources).
 """
 
 from __future__ import annotations
@@ -34,6 +37,34 @@ def _extract_source_refs(body: str) -> list[str]:
     return refs
 
 
+def _resolve_index_path(
+    user_wiki: Path,
+    content_roots: tuple[Path, ...] | None,
+    *,
+    index_note: Path | None = None,
+) -> Path:
+    """Return the vault index note path for legacy or multi-root PARA layouts.
+
+    Args:
+        user_wiki (Path): Primary user wiki/content root.
+        content_roots (tuple[Path, ...] | None): Optional layout content roots.
+        index_note (Path | None): Explicit index note path from :class:`VaultLayout`.
+
+    Returns:
+        Path: Resolved ``index.md`` path for index-first query hints.
+
+    Examples:
+        >>> from pathlib import Path
+        >>> _resolve_index_path(Path("/tmp/wiki"), None)
+        PosixPath('/tmp/wiki/index.md')
+    """
+    if index_note is not None:
+        return index_note
+    if content_roots and len(content_roots) > 1:
+        return content_roots[0].parent / "index.md"
+    return user_wiki / "index.md"
+
+
 def second_brain_query(
     *,
     q: str,
@@ -44,18 +75,24 @@ def second_brain_query(
     limit: int = 20,
     witchcraft_cfg: WitchcraftConfig | None = None,
     workspace_path: Path | None = None,
+    content_roots: tuple[Path, ...] | None = None,
+    vault_root: Path | None = None,
+    index_note: Path | None = None,
 ) -> list[dict[str, object]]:
-    """Read ``wiki/index.md`` first, then match bodies; union overlay semantics.
+    """Read the vault index note first, then match bodies; union overlay semantics.
 
     Args:
         q (str): Query text for index and body matching.
-        user_wiki (Path): Resolved ``wiki/`` directory for the user scope.
+        user_wiki (Path): Resolved primary content root for the user scope.
         shared_wiki (Path | None): Optional shared wiki root for overlay reads.
         include_shared (bool): When false, do not scan ``shared_wiki``.
         use_witchcraft (bool): When true and integration allows, blend semantic scores.
         limit (int): Maximum rows returned (clamped to ``[1, 50]``).
         witchcraft_cfg (WitchcraftConfig | None): Parsed Witchcraft config for probe + dispatch.
         workspace_path (Path | None): Workspace root for relative db path resolution.
+        content_roots (tuple[Path, ...] | None): When set, scan all layout content roots.
+        vault_root (Path | None): Vault scope root for vault-relative path resolution.
+        index_note (Path | None): Explicit index note path from :class:`VaultLayout`.
 
     Returns:
         list[dict[str, object]]: Rows with ``page``, ``snippet``, ``frontmatter``, ``origin``.
@@ -78,7 +115,7 @@ def second_brain_query(
     """
 
     lim = max(1, min(50, limit))
-    index_path = user_wiki / "index.md"
+    index_path = _resolve_index_path(user_wiki, content_roots, index_note=index_note)
     candidates: list[str] = []
     if index_path.is_file():
         text = index_path.read_text(encoding="utf-8", errors="replace")
@@ -97,6 +134,8 @@ def second_brain_query(
         use_witchcraft=use_witchcraft and semantic_mode_allowed(witchcraft_cfg, workspace_path),
         witchcraft_cfg=witchcraft_cfg,
         workspace_path=workspace_path,
+        content_roots=content_roots,
+        vault_root=vault_root,
     )
 
     seen: set[tuple[str, str]] = set()
@@ -112,11 +151,42 @@ def second_brain_query(
         key = (origin, rel)
         if key in seen:
             return
-        root = user_wiki if origin == "user" else shared_wiki
-        if root is None:
-            return
-        fp = (root / rel).resolve()
-        if not fp.is_file() or not str(fp).startswith(str(root.resolve())):
+        fp: Path | None = None
+        if content_roots and origin == "user":
+            if vault_root is not None and "/" in rel:
+                candidate = (vault_root / rel).resolve()
+                try:
+                    candidate.relative_to(vault_root.resolve())
+                    if candidate.is_file():
+                        fp = candidate
+                except ValueError:
+                    fp = None
+            if fp is None:
+                for root in content_roots:
+                    candidate = (root / rel).resolve()
+                    try:
+                        candidate.relative_to(root.resolve())
+                    except ValueError:
+                        continue
+                    if candidate.is_file():
+                        fp = candidate
+                        break
+        else:
+            if origin == "user":
+                root = user_wiki
+            else:
+                shared_root = shared_wiki
+                if shared_root is None:
+                    return
+                root = shared_root
+            candidate = (root / rel).resolve()
+            try:
+                candidate.relative_to(root.resolve())
+            except ValueError:
+                return
+            if candidate.is_file():
+                fp = candidate
+        if fp is None:
             return
         seen.add(key)
         full = fp.read_text(encoding="utf-8", errors="replace")

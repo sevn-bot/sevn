@@ -23,6 +23,7 @@ import json
 import shutil
 import subprocess  # nosec B404
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -279,7 +280,7 @@ def maybe_semantic_scores(
 
 
 def build_wiki_index(
-    user_wiki: Path,
+    user_wiki: Path | Sequence[Path],
     *,
     witchcraft_cfg: WitchcraftConfig,
     workspace_path: Path | None = None,
@@ -287,12 +288,13 @@ def build_wiki_index(
 ) -> bool:
     """Build or refresh the Witchcraft wiki index synchronously.
 
-    Runs ``witchcraft index --db <db> <user_wiki> [--shared-wiki <shared>]``.
-    Creates the db parent directory when absent. Returns ``False`` when the binary
-    is absent or the subprocess exits non-zero.
+    Runs ``witchcraft index --db <db> <wiki>… [--shared-wiki <shared>]``. When
+    ``user_wiki`` is a sequence (PARA content roots), each root is passed to the
+    binary. Creates the db parent directory when absent. Returns ``False`` when the
+    binary is absent or the subprocess exits non-zero.
 
     Args:
-        user_wiki (Path): User wiki root to index.
+        user_wiki (Path | Sequence[Path]): User wiki root(s) to index.
         witchcraft_cfg (WitchcraftConfig): Typed config providing ``db_path``.
         workspace_path (Path | None): Workspace root for relative db path resolution.
         shared_wiki (Path | None): Optional shared wiki to include in the index.
@@ -311,7 +313,8 @@ def build_wiki_index(
         return False
     db = _resolve_db(witchcraft_cfg, workspace_path)
     db.parent.mkdir(parents=True, exist_ok=True)
-    cmd = [binary, "index", "--db", str(db), str(user_wiki)]
+    wiki_roots = user_wiki if isinstance(user_wiki, tuple) else (user_wiki,)
+    cmd = [binary, "index", "--db", str(db), *[str(root) for root in wiki_roots]]
     if shared_wiki and shared_wiki.is_dir():
         cmd.extend(["--shared-wiki", str(shared_wiki)])
     try:
@@ -325,7 +328,7 @@ _REINDEX_TASK: asyncio.Task[None] | None = None
 
 
 async def _run_delayed_reindex(
-    user_wiki: Path,
+    user_wiki: Path | Sequence[Path],
     witchcraft_cfg: WitchcraftConfig,
     workspace_path: Path | None,
     shared_wiki: Path | None,
@@ -357,7 +360,7 @@ async def _run_delayed_reindex(
 
 
 async def schedule_reindex_debounced(
-    user_wiki: Path,
+    user_wiki: Path | Sequence[Path],
     *,
     witchcraft_cfg: WitchcraftConfig | None,
     workspace_path: Path | None = None,
@@ -397,7 +400,7 @@ async def schedule_reindex_debounced(
 
 def maybe_reindex_on_startup(
     witchcraft_cfg: WitchcraftConfig | None,
-    user_wiki: Path,
+    user_wiki: Path | Sequence[Path],
     *,
     workspace_path: Path | None = None,
     shared_wiki: Path | None = None,

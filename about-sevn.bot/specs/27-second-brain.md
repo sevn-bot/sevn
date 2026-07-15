@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the Second Brain subsystem: filesystem wiki engine + agent surface
   so operators curate sources in raw/ and maintain a structured wiki/ with index.md,
   log.md, lint reports, and provenance-beari'
-last_updated: '2026-07-12'
-fingerprint: sha256:12c8243b0fcc82e791221e55eb0e0bf9567ac67714950e6a56b301a790a18944
+last_updated: '2026-07-15'
+fingerprint: sha256:1d0efdd7856ce0cba6b5ed3cafc9d0c03065244ef6f327a554b4bd76add14113
 related: []
 sources:
 - src/sevn/second_brain/**
@@ -53,6 +53,9 @@ interfaces:
 - name: wiki_search_tool
   file: src/sevn/second_brain/__init__.py
   symbol: wiki_search_tool
+- name: detect_layout
+  file: src/sevn/second_brain/bootstrap.py
+  symbol: detect_layout
 - name: ensure_second_brain_scope_layout
   file: src/sevn/second_brain/bootstrap.py
   symbol: ensure_second_brain_scope_layout
@@ -92,6 +95,9 @@ interfaces:
 - name: okf_type_required
   file: src/sevn/second_brain/frontmatter.py
   symbol: okf_type_required
+- name: reserved_basenames_for_layout
+  file: src/sevn/second_brain/frontmatter.py
+  symbol: reserved_basenames_for_layout
 - name: split_frontmatter
   file: src/sevn/second_brain/frontmatter.py
   symbol: split_frontmatter
@@ -113,6 +119,9 @@ interfaces:
 - name: probe_second_brain_vault_layout
   file: src/sevn/second_brain/layout_probe.py
   symbol: probe_second_brain_vault_layout
+- name: collect_vault_md_by_rel
+  file: src/sevn/second_brain/links.py
+  symbol: collect_vault_md_by_rel
 - name: index_line_targets
   file: src/sevn/second_brain/links.py
   symbol: index_line_targets
@@ -128,6 +137,9 @@ interfaces:
 - name: issues_to_json
   file: src/sevn/second_brain/lint_local.py
   symbol: issues_to_json
+- name: lint_vault_tree
+  file: src/sevn/second_brain/lint_local.py
+  symbol: lint_vault_tree
 - name: lint_wiki_tree
   file: src/sevn/second_brain/lint_local.py
   symbol: lint_wiki_tree
@@ -137,9 +149,15 @@ interfaces:
 - name: try_git_merge
   file: src/sevn/second_brain/merge.py
   symbol: try_git_merge
+- name: VaultLayout
+  file: src/sevn/second_brain/paths.py
+  symbol: VaultLayout
 - name: assert_wiki_relative_safe
   file: src/sevn/second_brain/paths.py
   symbol: assert_wiki_relative_safe
+- name: content_roots_for
+  file: src/sevn/second_brain/paths.py
+  symbol: content_roots_for
 - name: display_scope_root_relative
   file: src/sevn/second_brain/paths.py
   symbol: display_scope_root_relative
@@ -164,6 +182,9 @@ interfaces:
 - name: resolve_vault_base
   file: src/sevn/second_brain/paths.py
   symbol: resolve_vault_base
+- name: resolve_vault_note_file
+  file: src/sevn/second_brain/paths.py
+  symbol: resolve_vault_note_file
 - name: resolve_wiki_file
   file: src/sevn/second_brain/paths.py
   symbol: resolve_wiki_file
@@ -233,15 +254,11 @@ interfaces:
 - name: resolve_index_wiki_paths
   file: src/sevn/second_brain/witchcraft_reindex.py
   symbol: resolve_index_wiki_paths
-specs: []
-personas: []
-prd_profile: null
 ---
-
 
 ## Purpose
 
-Deliver the Second Brain subsystem: filesystem wiki engine + agent surface so operators curate sources in raw/ and maintain a structured wiki/ with index.md, log.md, lint reports, and provenance-beari
+Deliver the Second Brain subsystem: filesystem wiki engine + agent surface so operators curate sources and maintain structured vault notes with index/log, lint reports, and provenance-bearing frontmatter. Supports **legacy** OKF layout (`raw/`, `wiki/`, `outputs/`) and **PARA** Obsidian-native layout (`00_Inbox`…`40_Archive`) via `second_brain.layout`.
 
 Primary code trees: [`src/sevn/second_brain`](src/sevn/second_brain/__init__.py).
 
@@ -274,8 +291,22 @@ Initial draft for **Public Interface** — grounded in extracted interfaces; con
 | Key | Role |
 |-----|------|
 | `second_brain.enabled` | Master toggle |
-| `second_brain.paths.vault` | Workspace-relative Obsidian vault folder (e.g. `obsidian/alex_AI`); unset → legacy layout |
+| `second_brain.layout` | Vault layout: `"legacy"` (default) or `"para"`. Legacy reproduces the OKF `wiki/raw/outputs` tree byte-for-byte; PARA maps semantic roles onto a PARA Obsidian folder profile. |
+| `second_brain.para` | PARA folder profile (used only when `layout="para"`). All keys optional with PARA defaults; each value is a single safe path segment. Unknown keys rejected (`extra="forbid"`). |
+| `second_brain.para.inbox` | Capture role folder (default `00_Inbox`) |
+| `second_brain.para.projects` | Projects role folder (default `10_Projects`) |
+| `second_brain.para.areas` | Areas role folder (default `20_Areas`) |
+| `second_brain.para.resources` | Curated/reference role folder (default `30_Resources`) |
+| `second_brain.para.archive` | Archive role folder (default `40_Archive`) |
+| `second_brain.para.templates` | Templates role folder (default `90_Templates`) |
+| `second_brain.para.sources_subdir` | Immutable sources under resources (default `_sources`) |
+| `second_brain.para.outputs_subdir` | Bot outputs under resources (default `_outputs`) |
+| `second_brain.para.index_note` | Vault home note basename (default `index.md` at vault root) |
+| `second_brain.para.log_note` | Vault log note basename (default `log.md` at vault root) |
+| `second_brain.paths.vault` | Workspace-relative Obsidian vault folder (e.g. `obsidian/alex_AI`); unset → legacy `second_brain/users/<scope>/` |
 | `second_brain.paths.wiki` | **Read alias only** for `vault`; doctor warns; writes normalize to `vault` |
+
+CLI `sevn second-brain setup --layout {auto,legacy,para}` writes `layout` and, when needed, a default `para` block. `--layout auto` (default) calls `detect_layout` on the target vault and falls back to `legacy` when inconclusive.
 
 ## Implemented by
 
@@ -305,9 +336,46 @@ Initial draft for **Public Interface** — grounded in extracted interfaces; con
 
 ### §3.2 Vault layout
 
-Paths resolve under the workspace content root. When `second_brain.paths.vault` is **unset**, the legacy layout applies: `second_brain/users/<scope>/{raw,wiki,outputs}`. When set, `default_scope` uses `<workspace>/<paths.vault>/` directly (no `users/<scope>/` segment). Non-default scopes keep the legacy path. `shared/wiki` remains at `second_brain/shared/wiki`.
+Second Brain resolves vault paths through a **`VaultLayout`** resolver (`paths.py`) that maps semantic **layout roles** to concrete directories. The active layout comes from `second_brain.layout` (`"legacy"` default | `"para"`).
 
-Bootstrap (`ensure_second_brain_scope_layout`) idempotently creates `raw/`, `wiki/`, `wiki/ingests/`, `outputs/`, stub `wiki/index.md`, `wiki/log.md`, and optional `MODEL.md`.
+**Scope root:** Paths resolve under the workspace content root. When `second_brain.paths.vault` is **unset**, the legacy layout applies: `second_brain/users/<scope>/{raw,wiki,outputs}`. When set, `default_scope` uses `<workspace>/<paths.vault>/` directly (no `users/<scope>/` segment). Non-default scopes keep the legacy path. `shared/wiki` remains at `second_brain/shared/wiki` (legacy overlay only).
+
+#### Layout roles
+
+| Role | Legacy path | PARA path (defaults) |
+|------|-------------|----------------------|
+| `capture` | aliases `curated` → `wiki/` | `00_Inbox/` |
+| `projects` | aliases `curated` | `10_Projects/` |
+| `areas` | aliases `curated` | `20_Areas/` |
+| `curated` | `wiki/` | `30_Resources/` |
+| `archive` | aliases `curated` | `40_Archive/` |
+| `templates` | aliases `curated` | `90_Templates/` |
+| `sources` | `raw/` | `30_Resources/_sources/` |
+| `outputs` | `outputs/` | `30_Resources/_outputs/` |
+| `index_note` | `wiki/index.md` | vault-root `index.md` |
+| `log_note` | `wiki/log.md` | vault-root `log.md` |
+
+**Content roots** (search, semantic index, lint scan): legacy → `(wiki,)`; PARA → `(inbox, projects, areas, resources)` — excludes templates, archive, and machinery subdirs.
+
+Legacy shims `wiki_dir_for_scope`, `raw_dir_for_scope`, and `outputs_dir_for_scope` delegate to `VaultLayout.role_dir(...)` for back-compat.
+
+#### Legacy layout (default)
+
+When `layout="legacy"` (the default), behavior is **byte-for-byte unchanged** from pre-PARA installs: OKF `type:` is required on concept pages; ingest lands curated pages under `wiki/ingests/`; sources under `raw/`; bot outputs under `outputs/`.
+
+Bootstrap (`ensure_second_brain_scope_layout`) idempotently creates `raw/`, `wiki/`, `wiki/ingests/`, `outputs/`, stub `wiki/index.md`, `wiki/log.md`, and optional `MODEL.md` (from `default_MODEL.md`).
+
+#### PARA layout
+
+When `layout="para"`, the scope root is the PARA Obsidian vault (typically via `paths.vault`). Bootstrap creates the role tree from `second_brain.para`, vault-root `index.md`/`log.md`, bundled folder READMEs, `90_Templates/*`, minimal `.obsidian/`, and `MODEL.md` (from `para_MODEL.md`) — **only where missing**.
+
+**Adoption / no-clobber:** `detect_layout(vault_root)` returns `"para"` when ≥2 PARA folders (or `.obsidian/` + ≥1 PARA folder) exist, `"legacy"` when both `wiki/` and `raw/` exist, else `None`. Bootstrap and adoption are **additive-only**: never overwrite existing notes, `MODEL.md`, or an existing `.obsidian/`. No auto-migration from legacy to PARA.
+
+**Frontmatter:** PARA uses Obsidian-native keys (`tags`, `aliases`, `created`, `updated`, `source`, `source_hash`, `captured`); `type:` is **advisory** (lint warning, not error). Legacy OKF `type:` enforcement is unchanged.
+
+**Lint:** `lint_vault_tree(layout)` scans `content_roots()`; `lint_wiki_tree` remains a legacy shim. Templates and archive are excluded from orphan/staleness checks in both layouts.
+
+**Ingest:** Sources land under `role_dir("sources")`; curated ingest pages under `role_dir("capture")` (PARA inbox); outputs under `role_dir("outputs")`; log lines append to `log_note()`.
 
 ## Behavior
 
@@ -341,6 +409,4 @@ Unit tests under `tests/second_brain/` cover path resolution, bootstrap idempote
 
 ## Human-input needed
 
-Prose body not yet authored (W9 scope). Normative contract requires operator or
-follow-up wave authoring against verified code (`sevn about-docs extract` + graphify).
-Do not mark `status: done` until `make -C spec-kit-wave spec-check` scores ≥ 80.
+§3.2 and §5 normative bodies authored in W9 (PARA/legacy layout model). Remaining sections (Behavior, Failure Modes) still scaffold — confirm via `make -C spec-kit-wave spec-check` before `status: done`.

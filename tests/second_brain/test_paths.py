@@ -36,6 +36,16 @@ def test_default_scope_layout_unchanged(tmp_path) -> None:
     assert wiki_dir_for_scope(scope_root).name == "wiki"
 
 
+def test_wiki_dir_shim_returns_wiki_for_legacy_layout(tmp_path) -> None:
+    from sevn.second_brain.paths import VaultLayout  # type: ignore[attr-defined]
+
+    cfg = SecondBrainWorkspaceConfig()
+    scope_root = resolve_scope_root(tmp_path, cfg, "owner")
+    layout = VaultLayout(tmp_path, cfg, "owner")
+    assert wiki_dir_for_scope(scope_root).resolve() == layout.role_dir("curated").resolve()
+    assert wiki_dir_for_scope(scope_root).name == "wiki"
+
+
 def test_custom_vault_resolves_under_workspace(tmp_path) -> None:
     target = tmp_path / "obsidian" / "alex_AI"
     target.mkdir(parents=True)
@@ -82,3 +92,38 @@ def test_paths_wiki_alias_maps_to_vault() -> None:
         },
     )
     assert doc.second_brain.paths.vault == "obsidian/legacy"
+
+
+def test_resolve_vault_note_file_para_index_and_archive(tmp_path) -> None:
+    from sevn.second_brain.paths import VaultLayout, resolve_vault_note_file
+
+    vault = tmp_path / "obsidian" / "alex_AI"
+    inbox = vault / "00_Inbox"
+    archive = vault / "40_Archive"
+    resources = vault / "30_Resources"
+    for d in (inbox, archive, resources):
+        d.mkdir(parents=True)
+    (vault / "index.md").write_text("# home\n", encoding="utf-8")
+    (vault / "log.md").write_text("# log\n", encoding="utf-8")
+    cfg = SecondBrainWorkspaceConfig(
+        layout="para",
+        paths={"vault": "obsidian/alex_AI"},
+    )
+    layout = VaultLayout(tmp_path, cfg, "owner")
+
+    index_hit = resolve_vault_note_file(layout=layout, workspace_root=tmp_path, rel_path="index.md")
+    assert index_hit == (vault / "index.md").resolve()
+
+    archive_new = resolve_vault_note_file(
+        layout=layout,
+        workspace_root=tmp_path,
+        rel_path="40_Archive/new.md",
+    )
+    assert archive_new == (archive / "new.md").resolve()
+
+    inbox_hit = resolve_vault_note_file(
+        layout=layout,
+        workspace_root=tmp_path,
+        rel_path="00_Inbox/capture.md",
+    )
+    assert inbox_hit == (inbox / "capture.md").resolve()

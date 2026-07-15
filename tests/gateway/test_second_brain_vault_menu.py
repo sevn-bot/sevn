@@ -32,3 +32,26 @@ def test_second_brain_caption_shows_vault_path(tmp_path: Path) -> None:
 def test_vault_display_default_layout(tmp_path: Path) -> None:
     rel = _second_brain_vault_display(tmp_path, WorkspaceConfig.minimal())
     assert rel == "second_brain/users/owner"
+
+
+def test_second_brain_caption_shows_layout_and_role_paths(tmp_path: Path) -> None:
+    sj = tmp_path / "sevn.json"
+    sj.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "gateway": {"token": "x"},
+                "second_brain": {
+                    "enabled": True,
+                    "layout": "para",
+                    "paths": {"vault": "obsidian/alex_AI"},
+                },
+            },
+        ),
+        encoding="utf-8",
+    )
+    ws = WorkspaceConfig.model_validate(json.loads(sj.read_text(encoding="utf-8")))
+    caption = config_menu_message_text(ws, section="second_brain", content_root=tmp_path)
+    assert "Layout: para" in caption
+    assert "00_Inbox" in caption
+    assert "30_Resources" in caption

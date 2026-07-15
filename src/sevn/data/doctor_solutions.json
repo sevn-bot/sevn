@@ -570,11 +570,26 @@
       "explanation": "Second Brain vault layout is incomplete or uses legacy paths.wiki alias.",
       "fix_command": "sevn second-brain setup",
       "remediation": [
-        "Run `sevn second-brain setup --vault <path>` or `sevn doctor --fix` to bootstrap raw/, wiki/, and outputs/.",
+        "Run `sevn second-brain setup --vault <path>` or `sevn doctor --fix` to bootstrap legacy raw/, wiki/, and outputs/.",
+        "For PARA Obsidian vaults, run `sevn second-brain setup --vault <path> --layout para` (or `--layout auto` to detect).",
         "Set `second_brain.paths.vault` to a workspace-relative Obsidian folder when using a custom vault."
       ],
       "severity": "warn",
       "title": "Second Brain vault"
+    },
+    "second_brain_vault_layout_para": {
+      "agent_only": false,
+      "auto_fixable": true,
+      "docs_url": "specs/27-second-brain.md",
+      "explanation": "PARA Second Brain vault is missing required role folders or root index/log notes.",
+      "fix_command": "sevn second-brain setup --layout para",
+      "remediation": [
+        "Run `sevn second-brain setup --vault <path> --layout para` to scaffold missing PARA folders.",
+        "Use `--layout auto` when the vault already has PARA folders (00_Inbox, 10_Projects, …).",
+        "Run `sevn doctor --fix` to bootstrap the active layout non-destructively."
+      ],
+      "severity": "warn",
+      "title": "Second Brain PARA vault"
     }
   }
 }
