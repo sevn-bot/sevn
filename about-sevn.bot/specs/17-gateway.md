@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-07-15'
-fingerprint: sha256:e30a140c33870fd391bddb1adde7f0b69cfe72bba6d93208781c467d9a89cc87
+fingerprint: sha256:e08cdf0fb6c4eb29a736e0c9438655b59c4526d6a97c8a121e818ec03c6a37c7
 related: []
 sources:
 - src/sevn/gateway/**
@@ -864,9 +864,24 @@ interfaces:
 - name: SessionPathNameResolver
   file: src/sevn/gateway/session/path_names.py
   symbol: SessionPathNameResolver
+- name: chat_path_segment
+  file: src/sevn/gateway/session/path_names.py
+  symbol: chat_path_segment
+- name: coerce_name_lookup
+  file: src/sevn/gateway/session/path_names.py
+  symbol: coerce_name_lookup
 - name: format_named_path_segment
   file: src/sevn/gateway/session/path_names.py
   symbol: format_named_path_segment
+- name: parse_telegram_scope_rel
+  file: src/sevn/gateway/session/path_names.py
+  symbol: parse_telegram_scope_rel
+- name: safe_path_segment
+  file: src/sevn/gateway/session/path_names.py
+  symbol: safe_path_segment
+- name: topic_path_segment
+  file: src/sevn/gateway/session/path_names.py
+  symbol: topic_path_segment
 - name: mark_session_superseded
   file: src/sevn/gateway/session/session_mirror.py
   symbol: mark_session_superseded

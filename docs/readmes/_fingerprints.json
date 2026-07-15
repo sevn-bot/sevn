@@ -10,8 +10,8 @@
     },
     "channels": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-15T11:41:57Z",
-      "digest": "5d19745c8875fa0d4412f68793b5df1dd3e00d0036e77181803dc03c7f80d918",
+      "computed_at": "2026-07-15T12:45:15Z",
+      "digest": "5843b7f3b42946565394dd8075f9b7d17326418bf153c9fc6fb6f5ae973d8071",
       "source_globs": [
         "src/sevn/channels/**"
       ]
@@ -44,8 +44,8 @@
     },
     "gateway": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-15T12:17:59Z",
-      "digest": "e30a140c33870fd391bddb1adde7f0b69cfe72bba6d93208781c467d9a89cc87",
+      "computed_at": "2026-07-15T12:45:15Z",
+      "digest": "e08cdf0fb6c4eb29a736e0c9438655b59c4526d6a97c8a121e818ec03c6a37c7",
       "source_globs": [
         "src/sevn/gateway/**"
       ]
