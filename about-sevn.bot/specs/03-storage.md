@@ -8,7 +8,7 @@ summary: 'Own application persistence: connection setup (WAL, foreign keys), ver
   migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence
   contracts for crash-resume and (w'
 last_updated: '2026-07-15'
-fingerprint: sha256:85f34b43acb73c9b4fe676572dedb4fb6cfad90dff961d0f559fa4dde378f55b
+fingerprint: sha256:e137b7d914427fd13aa35a7b3326888c676fb1518e5948eefaad855c36678f55
 related: []
 sources:
 - src/sevn/storage/**
@@ -67,6 +67,12 @@ interfaces:
 - name: open_sevn_sqlite
   file: src/sevn/storage/sqlite.py
   symbol: open_sevn_sqlite
+- name: get_telegram_chat_name
+  file: src/sevn/storage/telegram_names.py
+  symbol: get_telegram_chat_name
+- name: get_telegram_topic_name
+  file: src/sevn/storage/telegram_names.py
+  symbol: get_telegram_topic_name
 ---
 
 ## Purpose
