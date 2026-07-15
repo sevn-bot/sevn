@@ -144,6 +144,7 @@ Thumbs.db
 /style
 /.cursor
 /.claude
+/spec-kit-wave
 .index/code_index/INDEX.md
 CLAUDE.md
 /graphify-out/cache
