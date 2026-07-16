@@ -1,0 +1,74 @@
+# PullFrog PR review runs alongside CodeRabbit; do not make it a required gate
+# until the subscription secret has been configured and the signal is proven.
+name: PullFrog
+
+on:
+  pull_request:
+    branches: [main, develop, test-pre, pre-0.0.1]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # PullFrog uses OIDC to mint short-lived GitHub App installation tokens.
+  id-token: write
+  issues: write
+  pull-requests: write
+  statuses: write
+
+concurrency:
+  group: pullfrog-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: PullFrog review
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HAS_CLAUDE_CODE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+      HAS_CODEX_AUTH: ${{ secrets.CODEX_AUTH_JSON != '' }}
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: PullFrog PR review (Claude subscription)
+        if: env.HAS_CLAUDE_CODE == 'true'
+        continue-on-error: true
+        uses: pullfrog/pullfrog@a809795406487e13f894c681ea09b4f96015284d # v0
+        with:
+          model: anthropic/claude-sonnet
+          push: disabled
+          shell: disabled
+          status_checks: enabled
+          prompt: |
+            Review this pull request as an additional reviewer alongside CodeRabbit.
+            Focus on correctness, security, regressions, missing tests, and maintainability.
+            Leave concise, actionable comments only for issues that should be addressed before merge.
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+      - name: PullFrog PR review (Codex/OpenAI subscription)
+        if: env.HAS_CLAUDE_CODE != 'true' && env.HAS_CODEX_AUTH == 'true'
+        continue-on-error: true
+        uses: pullfrog/pullfrog@a809795406487e13f894c681ea09b4f96015284d # v0
+        with:
+          model: openai/gpt
+          push: disabled
+          shell: disabled
+          status_checks: enabled
+          prompt: |
+            Review this pull request as an additional reviewer alongside CodeRabbit.
+            Focus on correctness, security, regressions, missing tests, and maintainability.
+            Leave concise, actionable comments only for issues that should be addressed before merge.
+        env:
+          CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
+
+      - name: Skip PullFrog when subscription auth is not configured
+        if: env.HAS_CLAUDE_CODE != 'true' && env.HAS_CODEX_AUTH != 'true'
+        run: |
+          echo "::notice title=PullFrog skipped::Configure CLAUDE_CODE_OAUTH_TOKEN or CODEX_AUTH_JSON to enable PullFrog reviews."
