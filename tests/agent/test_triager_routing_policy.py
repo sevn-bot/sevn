@@ -493,7 +493,7 @@ def test_package_install_message_detected() -> None:
 
 def test_playwright_browser_message_detected() -> None:
     assert is_playwright_browser_message("get a screenshot of https://example.com")
-    assert is_playwright_browser_message("use playwright-browser to goto the page")
+    assert is_playwright_browser_message("capture a screenshot of the login page")
     assert is_playwright_browser_message("Search nba.com")
     assert not is_playwright_browser_message("hello")
 
@@ -507,10 +507,10 @@ def test_merge_package_install_tools_prefers_process() -> None:
 
 def test_merge_playwright_browser_surface() -> None:
     tools, skills = _merge_playwright_browser_surface(["terminal_run", "process"], [])
-    assert tools == ["load_skill", "run_skill_script", "send_file"]
+    assert tools == ["browser", "load_tool", "send_file"]
     assert "terminal_run" not in tools
     assert "process" not in tools
-    assert "playwright-browser" in skills
+    assert "playwright-browser" not in skills
 
 
 def test_package_install_routes_to_process_tool() -> None:
@@ -535,7 +535,7 @@ def test_package_install_routes_to_process_tool() -> None:
     assert "terminal_run" not in out.tools
 
 
-def test_playwright_browser_routes_to_skill_surface() -> None:
+def test_playwright_browser_routes_to_browser_tool_surface() -> None:
     parsed = TriageResult(
         intent=Intent.NEW_REQUEST,
         complexity=ComplexityTier.A,
@@ -553,10 +553,10 @@ def test_playwright_browser_routes_to_skill_surface() -> None:
         turn_id="pw-1",
     )
     assert out.complexity == ComplexityTier.B
-    assert out.tools == ["load_skill", "run_skill_script", "send_file"]
-    assert "run_skill_script" in out.tools
+    assert out.tools == ["browser", "load_tool", "send_file"]
+    assert "browser" in out.tools
     assert "send_file" in out.tools
-    assert "playwright-browser" in out.skills
+    assert "playwright-browser" not in out.skills
     assert "terminal_run" not in out.tools
     assert "process" not in out.tools
     assert "get_page_content" not in out.tools
@@ -875,13 +875,13 @@ def test_apply_routing_policy_merges_live_factual_tools() -> None:
     assert {"web_fetch", "web_search"} <= set(out.tools)
 
 
-def test_apply_routing_policy_playwright_plus_live_factual_includes_get_page_content() -> None:
+def test_apply_routing_policy_browser_plus_live_factual_includes_get_page_content() -> None:
     parsed = TriageResult.model_construct(
         intent=Intent.FOLLOWUP,
         complexity=ComplexityTier.B,
         first_message="On it.",
-        tools=["load_skill", "run_skill_script"],
-        skills=["playwright-browser"],
+        tools=["browser", "load_tool"],
+        skills=[],
         mcp_servers_required=[],
         confidence=0.9,
         requires_vision=False,
@@ -893,9 +893,10 @@ def test_apply_routing_policy_playwright_plus_live_factual_includes_get_page_con
         current_message="use playwright for NBA finals score",
         turn_id="live-2",
     )
-    assert "playwright-browser" in out.skills
+    assert "playwright-browser" not in out.skills
+    assert "browser" in out.tools
     assert "get_page_content" in out.tools
-    assert "run_skill_script" in out.tools
+    assert "load_tool" in out.tools
 
 
 def test_apply_routing_policy_merges_web_companions_for_get_page_content() -> None:

@@ -1100,20 +1100,13 @@ def steer_for_triager_bound_tools_unused(
     if bound_skills:
         parts.append("skills: " + ", ".join(sorted(bound_skills)))
     bound_summary = "; ".join(parts) if parts else "the triager-selected toolkit"
-    steer = (
+    return (
         f"The triager bound {bound_summary} for this turn but you called none of them "
         "and produced no tool-backed result. Do not answer from memory or fabricate "
         "tool output. Call the bound tool(s) or skill script(s) now — or, if you "
         "genuinely cannot, reply with one honest, specific line saying exactly what "
         "is blocking you."
     )
-    if "playwright-browser" in bound_skills:
-        steer += (
-            " For playwright-browser: call load_skill then run_skill_script with "
-            "scripts/goto.py and argv containing the full https URL before stating "
-            "any page content."
-        )
-    return steer
 
 
 def steer_for_promised_action() -> str:

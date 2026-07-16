@@ -1399,7 +1399,6 @@ async def run_live_validation(
 
 
 _UV_EXTRA_IMPORT_PROBE: dict[str, str] = {
-    "browser": "import playwright",
     "browser-cdp": "import websockets",
     "web-fetch": "import brotli",
     "web-extract": "import readability",
@@ -1434,9 +1433,9 @@ def install_status_to_dict(row: InstallStatusRow) -> dict[str, Any]:
 
     Examples:
         >>> install_status_to_dict(
-        ...     InstallStatusRow("extra.browser", "extra.browser.cmd", True, "info", "ok", True, True)
+        ...     InstallStatusRow("extra.browser_cdp", "extra.browser_cdp.uv", True, "info", "ok", True, True)
         ... )["capability_id"]
-        'extra.browser'
+        'extra.browser_cdp'
     """
     return {
         "capability_id": row.capability_id,

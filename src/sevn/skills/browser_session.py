@@ -6,20 +6,9 @@ Depends: asyncio, hashlib, json, os, pathlib, subprocess, urllib
 Exports:
     BrowserSessionRegistry — persisted registry row for one gateway session.
     CloseBrowserResult — outcome of :func:`close_browser_session`.
-    TabOperationError — tab CRUD refused (for example last-tab close).
-    TabSessionView — duck-typed browser surface for tab enumeration and CRUD.
-    activate_tab — focus a tab and persist ``active_target_id`` (D14).
     browser_autoclose_enabled — read ``SEVN_BROWSER_AUTOCLOSE`` (default keep-alive).
-    browser_page — async context manager yielding a Playwright ``Page``.
-    close_tab — close one tab; refuses the last tab (D14).
-    connected_tab_session — async context manager yielding :class:`TabSessionView`.
-    list_tabs — enumerate tabs with ``target_id``, url, title, and active flag.
-    open_tab — open a URL in a new tab; optionally activate (D14).
-    page_target_id — stable tab id (Playwright GUID or CDP /json/list fallback).
     persist_active_target_id — update registry ``active_target_id`` for a session.
-    try_persist_active_page — best-effort registry ``active_target_id`` after navigation.
     cdp_list_page_targets — fetch Chrome DevTools page targets from ``/json/list``.
-    resolve_target_page — resolve explicit ``--tab`` id, registry active, or heuristic.
     cdp_port_from_url — parse TCP port from a CDP base URL.
     cdp_port_seed — deterministic seed port hint from ``session_id`` (D2).
     cdp_reachable — probe ``/json/version`` on a CDP endpoint.
@@ -29,7 +18,6 @@ Exports:
     close_idle_browser_sessions — close stale sevn-spawned browsers by ``last_used_at``.
     default_cdp_url — read ``SEVN_CDP_URL`` when set.
     merge_browser_proc_env — inject content root, profile, CDP env for skill runs.
-    pick_work_page — choose a tab; prefer registry ``active_target_id``.
     read_devtools_active_port — read Chrome ``DevToolsActivePort`` line 1.
     read_registry — load registry JSON for a session.
     registry_path — path to ``.sevn/browser-sessions/<session_id>.json``.
@@ -46,7 +34,6 @@ Exports:
     restart_browser_session — close then spawn and wait for CDP.
     session_status_payload — unified JSON status dict for lifecycle scripts.
     spawn_chrome — detached Chrome with ``--remote-debugging-port=0`` (D2/D5).
-    wait_for_page_ready — post-navigation load + best-effort network idle.
     write_registry — atomic JSON write for a session registry row.
 """
 
@@ -65,22 +52,15 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final
+from typing import Any, Final
 from urllib.parse import urlparse
 
 from sevn.config.workspace_config import WorkspaceConfig
 
-if TYPE_CHECKING:
-    from playwright.async_api import Browser, BrowserContext, Page, Playwright
-
-BROWSER_SKILL_IDS: Final[frozenset[str]] = frozenset(
-    {"playwright-browser", "browser-harness", "x-use", "facebook-use"},
-)
+BROWSER_SKILL_IDS: Final[frozenset[str]] = frozenset({"browser-harness"})
 EXTERNAL_CDP: Final[str] = "EXTERNAL_CDP"
 _DEFAULT_SESSION_ID: Final[str] = "default"
 _PROFILE_ENV: Final[str] = "SEVN_BROWSER_PROFILE_DIR"
@@ -110,81 +90,6 @@ class CloseBrowserResult:
     ok: bool
     code: str
     message: str
-
-
-class TabOperationError(Exception):
-    """Tab CRUD refused — for example closing the last tab (D14)."""
-
-    def __init__(self, code: str, message: str) -> None:
-        """Store a machine-readable tab error code and operator message.
-
-        Args:
-            code (str): Error code (for example ``LAST_TAB``).
-            message (str): Human-readable explanation.
-
-        Returns:
-            None
-
-        Examples:
-            >>> err = TabOperationError("LAST_TAB", "cannot close the last tab")
-            >>> err.code
-            'LAST_TAB'
-        """
-        super().__init__(message)
-        self.code = code
-        self.message = message
-
-
-@dataclass
-class TabSessionView:
-    """Duck-typed browser surface for tab CRUD over CDP attach or persistent context."""
-
-    browser: Any | None = None
-    context: Any | None = None
-    cdp_url: str | None = None
-
-    def collect_pages(self) -> list[Any]:
-        """Return all open pages across the session browser.
-
-        Returns:
-            list[Any]: Playwright ``Page`` instances.
-
-        Examples:
-            >>> view = TabSessionView(context=type("C", (), {"pages": []})())
-            >>> view.collect_pages()
-            []
-        """
-        if self.context is not None:
-            return list(self.context.pages)
-        pages: list[Any] = []
-        if self.browser is not None:
-            for ctx in self.browser.contexts:
-                pages.extend(ctx.pages)
-        return pages
-
-    async def new_page(self) -> Any:
-        """Open a new page in the default browser context.
-
-        Returns:
-            Any: New Playwright ``Page``.
-
-        Raises:
-            RuntimeError: When no browser or context is attached.
-
-        Examples:
-            >>> import inspect
-            >>> inspect.iscoroutinefunction(TabSessionView.new_page)
-            True
-        """
-        if self.context is not None:
-            return await self.context.new_page()
-        if self.browser is None:
-            msg = "no browser context available for new_page"
-            raise RuntimeError(msg)
-        ctx = (
-            self.browser.contexts[0] if self.browser.contexts else await self.browser.new_context()
-        )
-        return await ctx.new_page()
 
 
 def _normalise_session_id(session_id: str | None) -> str:
@@ -431,7 +336,6 @@ def resolve_profile_dir(
     """Resolve the persistent Chrome profile directory for a gateway session (D1).
 
     Precedence: ``SEVN_BROWSER_PROFILE_DIR`` → ``skills.browser.profile_dir`` →
-    ``skills.social_browser.profile_dir`` →
     ``<content_root>/.sevn/browser-profiles/<session_id|default>``.
 
     Args:
@@ -452,8 +356,6 @@ def resolve_profile_dir(
     if env_raw:
         return Path(env_raw).expanduser().resolve()
     from_cfg = _read_profile_from_cfg(cfg, "browser")
-    if from_cfg is None:
-        from_cfg = _read_profile_from_cfg(cfg, "social_browser")
     if from_cfg is not None:
         return from_cfg.expanduser().resolve()
     sid = _normalise_session_id(session_id)
@@ -964,7 +866,7 @@ def resolve_browser_headless(cfg: WorkspaceConfig | None = None) -> bool:
 
     Headed on host when Chrome exists unless ``skills.browser.headless`` is true.
     ``SEVN_BROWSER_HEADLESS`` wins over config when set. When no Chrome binary
-    exists, headless is forced for Playwright fallback paths.
+    exists, headless is forced.
 
     Args:
         cfg (WorkspaceConfig | None): Workspace config.
@@ -1160,134 +1062,6 @@ def _is_chrome_internal_or_ntp(url: str) -> bool:
     return False
 
 
-async def pick_work_page(
-    browser: Any,
-    *,
-    active_target_id: str | None = None,
-    cdp_url: str | None = None,
-) -> Any:
-    """Choose a tab for interaction; prefer registry ``active_target_id`` (D14).
-
-    Args:
-        browser (Any): Playwright ``Browser`` connected over CDP.
-        active_target_id (str | None): Registry active tab id when known.
-        cdp_url (str | None): Reachable CDP base URL for target-id fallback matching.
-
-    Returns:
-        Any: Selected or newly created ``Page``.
-
-    Examples:
-        >>> import inspect
-        >>> inspect.iscoroutinefunction(pick_work_page)
-        True
-    """
-    pages: list[Any] = []
-    for ctx in browser.contexts:
-        pages.extend(ctx.pages)
-    cdp_targets = cdp_list_page_targets(cdp_url) if cdp_url and cdp_reachable(cdp_url) else None
-    if active_target_id:
-        for page in pages:
-            try:
-                if (
-                    page_target_id(page, cdp_url=cdp_url, cdp_targets=cdp_targets)
-                    == active_target_id
-                ):
-                    return page
-            except RuntimeError:
-                continue
-    if not pages:
-        ctx = browser.contexts[0] if browser.contexts else await browser.new_context()
-        return await ctx.new_page()
-    for page in reversed(pages):
-        url = page.url or ""
-        if url.startswith(("http://", "https://")) and not _is_chrome_internal_or_ntp(url):
-            return page
-    for page in reversed(pages):
-        if (page.url or "").startswith("https://"):
-            return page
-    return pages[-1]
-
-
-def page_target_id(
-    page: Any,
-    *,
-    cdp_url: str | None = None,
-    cdp_targets: list[dict[str, Any]] | None = None,
-    title: str = "",
-) -> str:
-    """Return a stable tab id — Playwright GUID or CDP ``/json/list`` fallback (D14).
-
-    Args:
-        page (Any): Playwright ``Page``.
-        cdp_url (str | None): CDP base URL used to fetch ``/json/list`` when GUID absent.
-        cdp_targets (list[dict[str, Any]] | None): Pre-fetched CDP page targets.
-        title (str): Optional page title to disambiguate CDP matches.
-
-    Returns:
-        str: Tab target id string.
-
-    Raises:
-        RuntimeError: When neither Playwright GUID nor CDP target id resolves.
-
-    Examples:
-        >>> class _FakePage:
-        ...     _guid = "page-guid-abc"
-        >>> page_target_id(_FakePage())
-        'page-guid-abc'
-    """
-    guid = getattr(page, "_guid", None) or getattr(page, "guid", None)
-    if guid:
-        return str(guid)
-    targets = cdp_targets
-    if targets is None and cdp_url and cdp_reachable(cdp_url):
-        targets = cdp_list_page_targets(cdp_url)
-    if targets:
-        matched = _match_cdp_target_for_page(page, targets, title=title)
-        if matched:
-            return matched
-    msg = "page has no stable target id"
-    raise RuntimeError(msg)
-
-
-async def try_persist_active_page(
-    page: Any,
-    *,
-    content_root: Path,
-    session_id: str,
-    cdp_url: str | None = None,
-) -> str | None:
-    """Persist registry ``active_target_id`` when the page target id resolves.
-
-    Args:
-        page (Any): Playwright ``Page`` after navigation or attach.
-        content_root (Path): Workspace content root.
-        session_id (str): Gateway session id.
-        cdp_url (str | None): Optional reachable CDP base URL for fallback matching.
-
-    Returns:
-        str | None: Resolved target id, or ``None`` when not persistable.
-
-    Examples:
-        >>> import inspect
-        >>> inspect.iscoroutinefunction(try_persist_active_page)
-        True
-    """
-    resolved_cdp = cdp_url
-    if not resolved_cdp:
-        candidate = resolve_cdp_url(content_root, session_id)
-        if cdp_reachable(candidate):
-            resolved_cdp = candidate.rstrip("/")
-    title = ""
-    with contextlib.suppress(Exception):
-        title = await page.title()
-    try:
-        target_id = page_target_id(page, cdp_url=resolved_cdp, title=title)
-    except RuntimeError:
-        return None
-    persist_active_target_id(content_root, session_id, target_id)
-    return target_id
-
-
 def persist_active_target_id(
     content_root: Path,
     session_id: str,
@@ -1335,338 +1109,6 @@ def persist_active_target_id(
             headless_persistent=row.headless_persistent,
         ),
     )
-
-
-def _find_page_by_target_id(view: TabSessionView, target_id: str) -> Any | None:
-    """Locate a page by ``target_id`` within a tab session view.
-
-    Args:
-        view (TabSessionView): Session browser view.
-        target_id (str): Playwright GUID or CDP target id to match.
-
-    Returns:
-        Any | None: Matching ``Page`` or ``None``.
-
-    Examples:
-        >>> class _P:
-        ...     _guid = "g1"
-        >>> page = _P()
-        >>> view = TabSessionView(context=type("C", (), {"pages": [page]})())
-        >>> _find_page_by_target_id(view, "g1") is page
-        True
-    """
-    needle = target_id.strip()
-    if not needle:
-        return None
-    cdp_targets = (
-        cdp_list_page_targets(view.cdp_url)
-        if view.cdp_url and cdp_reachable(view.cdp_url)
-        else None
-    )
-    for page in view.collect_pages():
-        try:
-            if page_target_id(page, cdp_url=view.cdp_url, cdp_targets=cdp_targets) == needle:
-                return page
-        except RuntimeError:
-            continue
-    return None
-
-
-async def resolve_target_page(
-    view: TabSessionView,
-    *,
-    active_target_id: str | None = None,
-    tab_target_id: str | None = None,
-) -> Any:
-    """Resolve interaction page: explicit tab id, registry active, then heuristic (D14).
-
-    Args:
-        view (TabSessionView): Session browser view.
-        active_target_id (str | None): Registry active tab when known.
-        tab_target_id (str | None): Explicit ``--tab`` override.
-
-    Returns:
-        Any: Selected Playwright ``Page``.
-
-    Raises:
-        RuntimeError: When ``tab_target_id`` does not match any open tab.
-        TabOperationError: When no pages exist and a new page cannot be created.
-
-    Examples:
-        >>> import inspect
-        >>> inspect.iscoroutinefunction(resolve_target_page)
-        True
-    """
-    if tab_target_id:
-        page = _find_page_by_target_id(view, tab_target_id)
-        if page is None:
-            msg = f"tab not found: {tab_target_id}"
-            raise RuntimeError(msg)
-        return page
-    if view.browser is not None:
-        return await pick_work_page(
-            view.browser,
-            active_target_id=active_target_id,
-            cdp_url=view.cdp_url,
-        )
-    pages = view.collect_pages()
-    cdp_targets = (
-        cdp_list_page_targets(view.cdp_url)
-        if view.cdp_url and cdp_reachable(view.cdp_url)
-        else None
-    )
-    if active_target_id:
-        for page in pages:
-            try:
-                if (
-                    page_target_id(page, cdp_url=view.cdp_url, cdp_targets=cdp_targets)
-                    == active_target_id
-                ):
-                    return page
-            except RuntimeError:
-                continue
-    if not pages:
-        return await view.new_page()
-    for page in reversed(pages):
-        url = page.url or ""
-        if url.startswith(("http://", "https://")) and not _is_chrome_internal_or_ntp(url):
-            return page
-    return pages[-1]
-
-
-async def list_tabs(
-    view: TabSessionView,
-    *,
-    active_target_id: str | None = None,
-) -> dict[str, object]:
-    """Enumerate open tabs with stable ``target_id`` values (D14).
-
-    Uses Playwright GUIDs when present; otherwise matches CDP ``/json/list`` page
-    targets by URL/title. Reports ``untrackable_count`` when pages exist but cannot
-    be mapped.
-
-    Args:
-        view (TabSessionView): Session browser view.
-        active_target_id (str | None): Registry active tab id for the ``active`` flag.
-
-    Returns:
-        dict[str, object]: ``tabs``, ``count``, ``page_count``, optional ``untrackable_count``.
-
-    Examples:
-        >>> import inspect
-        >>> inspect.iscoroutinefunction(list_tabs)
-        True
-    """
-    pages = view.collect_pages()
-    cdp_targets = (
-        cdp_list_page_targets(view.cdp_url)
-        if view.cdp_url and cdp_reachable(view.cdp_url)
-        else None
-    )
-    rows: list[dict[str, object]] = []
-    for page in pages:
-        title = ""
-        with contextlib.suppress(Exception):
-            title = await page.title()
-        try:
-            tid = page_target_id(
-                page,
-                cdp_url=view.cdp_url,
-                cdp_targets=cdp_targets,
-                title=title,
-            )
-        except RuntimeError:
-            continue
-        rows.append(
-            {
-                "target_id": tid,
-                "url": page.url or "",
-                "title": title,
-                "active": tid == active_target_id if active_target_id else False,
-                "id_source": (
-                    "playwright"
-                    if getattr(page, "_guid", None) or getattr(page, "guid", None)
-                    else "cdp"
-                ),
-            },
-        )
-    untrackable = len(pages) - len(rows)
-    payload: dict[str, object] = {
-        "tabs": rows,
-        "count": len(rows),
-        "page_count": len(pages),
-    }
-    if untrackable:
-        payload["untrackable_count"] = untrackable
-        payload["note"] = (
-            f"{untrackable} page(s) open but no stable target id "
-            "(Playwright GUID and CDP fallback both failed)"
-        )
-    return payload
-
-
-async def open_tab(
-    view: TabSessionView,
-    url: str,
-    *,
-    activate: bool = True,
-    content_root: Path | None = None,
-    session_id: str | None = None,
-) -> dict[str, object]:
-    """Open ``url`` in a new tab; optionally focus and persist ``active_target_id`` (D14).
-
-    Args:
-        view (TabSessionView): Session browser view.
-        url (str): Navigation URL (may be ``about:blank``).
-        activate (bool): When ``True``, ``bring_to_front`` and update registry active tab.
-        content_root (Path | None): Content root for registry persistence.
-        session_id (str | None): Gateway session id for registry persistence.
-
-    Returns:
-        dict[str, object]: ``{target_id, url, title, active}``.
-
-    Examples:
-        >>> import inspect
-        >>> inspect.iscoroutinefunction(open_tab)
-        True
-    """
-    page = await view.new_page()
-    dest = (url or "about:blank").strip() or "about:blank"
-    if dest != "about:blank":
-        await page.goto(dest, wait_until="load", timeout=60_000)
-        await wait_for_page_ready(page)
-    title = ""
-    with contextlib.suppress(Exception):
-        title = await page.title()
-    tid = page_target_id(page, cdp_url=view.cdp_url, title=title)
-    if activate:
-        with contextlib.suppress(Exception):
-            await page.bring_to_front()
-        if content_root is not None and session_id is not None:
-            persist_active_target_id(content_root, session_id, tid)
-    return {
-        "target_id": tid,
-        "url": page.url or dest,
-        "title": title,
-        "active": activate,
-    }
-
-
-async def close_tab(
-    view: TabSessionView,
-    target_id: str,
-    *,
-    content_root: Path | None = None,
-    session_id: str | None = None,
-) -> dict[str, object]:
-    """Close one tab by ``target_id``; refuse when it is the last tab (D14).
-
-    Args:
-        view (TabSessionView): Session browser view.
-        target_id (str): Page GUID to close.
-        content_root (Path | None): Content root for registry persistence.
-        session_id (str | None): Gateway session id for registry persistence.
-
-    Returns:
-        dict[str, object]: ``{target_id, closed: True}``.
-
-    Raises:
-        TabOperationError: When ``target_id`` is missing or is the last tab.
-        RuntimeError: When ``target_id`` does not match any open tab.
-
-    Examples:
-        >>> import inspect
-        >>> inspect.iscoroutinefunction(close_tab)
-        True
-    """
-    pages = view.collect_pages()
-    if len(pages) <= 1:
-        raise TabOperationError("LAST_TAB", "cannot close the last tab")
-    page = _find_page_by_target_id(view, target_id)
-    if page is None:
-        msg = f"tab not found: {target_id}"
-        raise RuntimeError(msg)
-    title = ""
-    with contextlib.suppress(Exception):
-        title = await page.title()
-    closing_id = page_target_id(page, cdp_url=view.cdp_url, title=title)
-    await page.close()
-    if content_root is not None and session_id is not None:
-        row = read_registry(content_root, session_id)
-        if row is not None and row.active_target_id == closing_id:
-            remaining = view.collect_pages()
-            new_active: str | None = None
-            if remaining:
-                with contextlib.suppress(RuntimeError):
-                    new_active = page_target_id(remaining[-1], cdp_url=view.cdp_url)
-            persist_active_target_id(content_root, session_id, new_active)
-    return {"target_id": closing_id, "closed": True}
-
-
-async def activate_tab(
-    view: TabSessionView,
-    target_id: str,
-    *,
-    content_root: Path | None = None,
-    session_id: str | None = None,
-) -> dict[str, object]:
-    """Focus a tab via ``bring_to_front`` and persist ``active_target_id`` (D14).
-
-    Args:
-        view (TabSessionView): Session browser view.
-        target_id (str): Page GUID to activate.
-        content_root (Path | None): Content root for registry persistence.
-        session_id (str | None): Gateway session id for registry persistence.
-
-    Returns:
-        dict[str, object]: ``{target_id, url, title, active: True}``.
-
-    Raises:
-        RuntimeError: When ``target_id`` does not match any open tab.
-
-    Examples:
-        >>> import inspect
-        >>> inspect.iscoroutinefunction(activate_tab)
-        True
-    """
-    page = _find_page_by_target_id(view, target_id)
-    if page is None:
-        msg = f"tab not found: {target_id}"
-        raise RuntimeError(msg)
-    title = ""
-    with contextlib.suppress(Exception):
-        title = await page.title()
-    tid = page_target_id(page, cdp_url=view.cdp_url, title=title)
-    with contextlib.suppress(Exception):
-        await page.bring_to_front()
-    if content_root is not None and session_id is not None:
-        persist_active_target_id(content_root, session_id, tid)
-    return {
-        "target_id": tid,
-        "url": page.url or "",
-        "title": title,
-        "active": True,
-    }
-
-
-async def wait_for_page_ready(page: Any, *, network_idle_ms: float = 15_000.0) -> None:
-    """After navigation, wait for load then best-effort network idle.
-
-    Args:
-        page (Any): Playwright ``Page``.
-        network_idle_ms (float): ``networkidle`` timeout in milliseconds.
-
-    Returns:
-        None
-
-    Examples:
-        >>> import inspect
-        >>> inspect.iscoroutinefunction(wait_for_page_ready)
-        True
-    """
-    await page.wait_for_load_state("load")
-    with contextlib.suppress(Exception):
-        await page.wait_for_load_state("networkidle", timeout=int(network_idle_ms))
 
 
 def _utc_now_iso() -> str:
@@ -1926,397 +1368,6 @@ async def restart_browser_session(
     return row
 
 
-async def _session_browser_resources(
-    *,
-    content_root: Path,
-    session_id: str,
-    cfg: WorkspaceConfig | None,
-    headless_fallback: bool,
-) -> tuple[
-    Playwright,
-    Browser | None,
-    BrowserContext | None,
-    subprocess.Popen[bytes] | None,
-    bool,
-    bool,
-    str,
-    BrowserSessionRegistry | None,
-    Path,
-    bool,
-]:
-    """Attach or spawn the session browser; shared setup for page and tab entry points.
-
-    Args:
-        content_root (Path): Workspace content root.
-        session_id (str): Gateway session id.
-        cfg (WorkspaceConfig | None): Workspace config.
-        headless_fallback (bool): Allow Playwright headless fallback when Chrome absent.
-
-    Returns:
-        tuple: Playwright handle, browser, persistent context, chrome proc, spawn flags,
-        session id, registry row, profile dir, headless flag.
-
-    Examples:
-        >>> import inspect
-        >>> inspect.iscoroutinefunction(_session_browser_resources)
-        True
-    """
-    from playwright.async_api import async_playwright
-
-    sid = _normalise_session_id(session_id or os.environ.get(_SESSION_ID_ENV, ""))
-    profile_dir = resolve_profile_dir(content_root, sid, cfg=cfg)
-    headless = resolve_browser_headless(cfg)
-    operator_cdp = default_cdp_url()
-    registry_row = read_registry(content_root, sid)
-    active_target_id = registry_row.active_target_id if registry_row else None
-
-    cdp_url = resolve_cdp_url(content_root, sid, cfg=cfg)
-    chrome_proc: subprocess.Popen[bytes] | None = None
-    playwright = await async_playwright().start()
-    if playwright is None:
-        msg = "playwright failed to start"
-        raise RuntimeError(msg)
-    browser: Browser | None = None
-    persistent_context: BrowserContext | None = None
-    launched_headless_fallback = False
-    we_spawned_chrome = False
-    spawn_attempted = False
-
-    async def try_cdp(url: str) -> Browser | None:
-        try:
-            return await playwright.chromium.connect_over_cdp(url)
-        except Exception:
-            return None
-
-    if cdp_reachable(cdp_url):
-        browser = await try_cdp(cdp_url)
-
-    if browser is None and operator_cdp is None:
-        exe = resolve_chrome_executable(cfg)
-        if exe:
-            spawn_attempted = True
-            seed = cdp_port_seed(sid)
-            chrome_proc, port, spawned_url = await asyncio.to_thread(
-                spawn_chrome,
-                profile_dir,
-                headless=headless,
-                seed_port=seed,
-                cfg=cfg,
-            )
-            we_spawned_chrome = True
-            cdp_url = spawned_url
-            for _ in range(50):
-                await asyncio.sleep(0.2)
-                if cdp_reachable(cdp_url):
-                    break
-            if cdp_reachable(cdp_url):
-                browser = await try_cdp(cdp_url)
-            if browser is not None:
-                registry_row = BrowserSessionRegistry(
-                    pid=chrome_proc.pid if chrome_proc else None,
-                    cdp_url=cdp_url,
-                    cdp_port=port,
-                    profile_dir=str(profile_dir),
-                    headless=headless,
-                    spawned_by_sevn=True,
-                    last_used_at=_utc_now_iso(),
-                    active_target_id=active_target_id,
-                )
-                write_registry(content_root, sid, registry_row)
-            elif chrome_proc is not None and chrome_proc.poll() is None:
-                chrome_proc.terminate()
-                with contextlib.suppress(subprocess.TimeoutExpired):
-                    chrome_proc.wait(timeout=5)
-                chrome_proc = None
-                we_spawned_chrome = False
-
-    if browser is None and headless_fallback and operator_cdp is None:
-        profile_dir.mkdir(parents=True, exist_ok=True)
-        launch_kwargs: dict[str, Any] = {"headless": True}
-        exe_path = resolve_chrome_executable(cfg)
-        if exe_path and os.path.isfile(exe_path):  # noqa: ASYNC240
-            launch_kwargs["executable_path"] = exe_path
-        extra_args = resolve_browser_extra_args()
-        if extra_args:
-            launch_kwargs["args"] = extra_args
-        persistent_context = await playwright.chromium.launch_persistent_context(
-            str(profile_dir),
-            **launch_kwargs,
-        )
-        launched_headless_fallback = True
-        registry_row = BrowserSessionRegistry(
-            pid=chrome_proc.pid if chrome_proc else None,
-            cdp_url="",
-            cdp_port=0,
-            profile_dir=str(profile_dir),
-            headless=True,
-            spawned_by_sevn=True,
-            last_used_at=_utc_now_iso(),
-            active_target_id=active_target_id,
-            headless_persistent=True,
-        )
-        write_registry(content_root, sid, registry_row)
-        return (
-            playwright,
-            None,
-            persistent_context,
-            chrome_proc,
-            launched_headless_fallback,
-            we_spawned_chrome,
-            sid,
-            registry_row,
-            profile_dir,
-            headless,
-        )
-
-    if browser is None:
-        if operator_cdp is not None:
-            msg = (
-                f"CDP attach-only mode: operator SEVN_CDP_URL ({operator_cdp}) is not reachable. "
-                "Start Chrome on that URL or unset SEVN_CDP_URL."
-            )
-        elif spawn_attempted:
-            msg = (
-                f"Chrome spawn failed: CDP not reachable at {cdp_url} after starting system Chrome."
-            )
-        elif resolve_chrome_executable(cfg) is None and not headless_fallback:
-            msg = "No browser available: system Chrome not found and headless fallback is disabled."
-        elif resolve_chrome_executable(cfg) is None:
-            msg = "No browser available: system Chrome not found and headless fallback failed."
-        elif not headless_fallback:
-            msg = "No browser available: CDP not reachable and headless fallback is disabled."
-        else:
-            msg = "No browser available: CDP not reachable and headless fallback failed."
-        raise RuntimeError(msg)
-
-    if registry_row is not None:
-        write_registry(
-            content_root,
-            sid,
-            BrowserSessionRegistry(
-                pid=registry_row.pid,
-                cdp_url=registry_row.cdp_url or cdp_url,
-                cdp_port=registry_row.cdp_port or cdp_port_from_url(cdp_url),
-                profile_dir=registry_row.profile_dir or str(profile_dir),
-                headless=registry_row.headless,
-                spawned_by_sevn=registry_row.spawned_by_sevn,
-                last_used_at=_utc_now_iso(),
-                active_target_id=registry_row.active_target_id,
-                headless_persistent=registry_row.headless_persistent,
-            ),
-        )
-
-    return (
-        playwright,
-        browser,
-        persistent_context,
-        chrome_proc,
-        launched_headless_fallback,
-        we_spawned_chrome,
-        sid,
-        registry_row,
-        profile_dir,
-        headless,
-    )
-
-
-async def _release_session_browser_resources(
-    *,
-    playwright: Playwright | None,
-    browser: Browser | None,
-    persistent_context: BrowserContext | None,
-    chrome_proc: subprocess.Popen[bytes] | None,
-    launched_headless_fallback: bool,
-    we_spawned_chrome: bool,
-) -> None:
-    """Teardown Playwright without ``Browser.close()`` on CDP attach (D4).
-
-    Args:
-        playwright (Playwright | None): Playwright driver handle.
-        browser (Browser | None): CDP-attached browser.
-        persistent_context (BrowserContext | None): Headless persistent context.
-        chrome_proc (subprocess.Popen[bytes] | None): Spawned Chrome process.
-        launched_headless_fallback (bool): Whether headless persistent path was used.
-        we_spawned_chrome (bool): Whether this call spawned Chrome.
-
-    Returns:
-        None
-
-    Examples:
-        >>> import inspect
-        >>> inspect.iscoroutinefunction(_release_session_browser_resources)
-        True
-    """
-    if launched_headless_fallback and persistent_context is not None:
-        if browser_autoclose_enabled():
-            with contextlib.suppress(Exception):
-                await persistent_context.close()
-    elif browser is not None and not launched_headless_fallback:
-        pass
-    if (
-        we_spawned_chrome
-        and browser_autoclose_enabled()
-        and chrome_proc is not None
-        and chrome_proc.poll() is None
-    ):
-        chrome_proc.terminate()
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            chrome_proc.wait(timeout=8)
-    with contextlib.suppress(Exception):
-        if playwright is not None:
-            await playwright.stop()
-
-
-@asynccontextmanager
-async def connected_tab_session(
-    *,
-    content_root: Path,
-    session_id: str = "",
-    cfg: WorkspaceConfig | None = None,
-    headless_fallback: bool = True,
-) -> AsyncIterator[TabSessionView]:
-    """Yield a :class:`TabSessionView` for tab CRUD without closing CDP Chrome (D14).
-
-    Args:
-        content_root (Path): Workspace content root.
-        session_id (str): Gateway session id.
-        cfg (WorkspaceConfig | None): Workspace config.
-        headless_fallback (bool): Allow Playwright headless fallback when Chrome absent.
-
-    Yields:
-        TabSessionView: Session browser surface for :func:`list_tabs` and friends.
-
-    Returns:
-        AsyncIterator[TabSessionView]: Async context manager over the tab view.
-
-    Examples:
-        >>> import inspect
-        >>> inspect.isasyncgenfunction(connected_tab_session.__wrapped__)
-        True
-    """
-    (
-        playwright,
-        browser,
-        persistent_context,
-        chrome_proc,
-        launched_headless_fallback,
-        we_spawned_chrome,
-        _sid,
-        _registry_row,
-        _profile_dir,
-        _headless,
-    ) = await _session_browser_resources(
-        content_root=content_root,
-        session_id=session_id,
-        cfg=cfg,
-        headless_fallback=headless_fallback,
-    )
-    cdp_url = (
-        _registry_row.cdp_url.rstrip("/")
-        if _registry_row is not None
-        and _registry_row.cdp_url.strip()
-        and cdp_reachable(_registry_row.cdp_url)
-        else None
-    )
-    view = TabSessionView(browser=browser, context=persistent_context, cdp_url=cdp_url)
-    try:
-        yield view
-    finally:
-        await _release_session_browser_resources(
-            playwright=playwright,
-            browser=browser,
-            persistent_context=persistent_context,
-            chrome_proc=chrome_proc,
-            launched_headless_fallback=launched_headless_fallback,
-            we_spawned_chrome=we_spawned_chrome,
-        )
-
-
-@asynccontextmanager
-async def browser_page(
-    *,
-    content_root: Path,
-    session_id: str = "",
-    cfg: WorkspaceConfig | None = None,
-    headless_fallback: bool = True,
-    tab_target_id: str | None = None,
-) -> AsyncIterator[Any]:
-    """Yield a Playwright ``Page`` using CDP attach or sevn-spawned Chrome (D4/D5).
-
-    Never calls ``Browser.close()`` on CDP attach — only disconnects Playwright.
-    Updates ``last_used_at`` in the registry on successful attach/spawn.
-
-    Args:
-        content_root (Path): Workspace content root.
-        session_id (str): Gateway session id.
-        cfg (WorkspaceConfig | None): Workspace config.
-        headless_fallback (bool): Allow Playwright headless fallback when Chrome absent.
-        tab_target_id (str | None): Explicit ``--tab`` target id override (D14).
-
-    Yields:
-        Any: Playwright ``Page``.
-
-    Returns:
-        AsyncIterator[Any]: Async context manager over the active page.
-
-    Raises:
-        RuntimeError: When no browser can be attached or spawned.
-
-    Examples:
-        >>> import inspect
-        >>> inspect.isasyncgenfunction(browser_page.__wrapped__)
-        True
-    """
-    (
-        playwright,
-        browser,
-        persistent_context,
-        chrome_proc,
-        launched_headless_fallback,
-        we_spawned_chrome,
-        _sid,
-        registry_row,
-        _profile_dir,
-        _headless,
-    ) = await _session_browser_resources(
-        content_root=content_root,
-        session_id=session_id,
-        cfg=cfg,
-        headless_fallback=headless_fallback,
-    )
-    active_target_id = registry_row.active_target_id if registry_row else None
-    cdp_url = (
-        registry_row.cdp_url.rstrip("/")
-        if registry_row is not None
-        and registry_row.cdp_url.strip()
-        and cdp_reachable(registry_row.cdp_url)
-        else None
-    )
-    view = TabSessionView(browser=browser, context=persistent_context, cdp_url=cdp_url)
-    try:
-        work_page: Page = await resolve_target_page(
-            view,
-            active_target_id=active_target_id,
-            tab_target_id=tab_target_id,
-        )
-        await try_persist_active_page(
-            work_page,
-            content_root=content_root,
-            session_id=_sid,
-            cdp_url=cdp_url,
-        )
-        yield work_page
-    finally:
-        await _release_session_browser_resources(
-            playwright=playwright,
-            browser=browser,
-            persistent_context=persistent_context,
-            chrome_proc=chrome_proc,
-            launched_headless_fallback=launched_headless_fallback,
-            we_spawned_chrome=we_spawned_chrome,
-        )
-
-
 def session_status_payload(
     *,
     content_root: Path,
@@ -2401,7 +1452,7 @@ def merge_browser_proc_env(
         ...     content_root=Path(tempfile.mkdtemp()),
         ...     session_id="s1",
         ...     cfg=None,
-        ...     skill_name="playwright-browser",
+        ...     skill_name="browser-harness",
         ... )
         >>> env.get("SEVN_CONTENT_ROOT") is not None
         True
@@ -2424,11 +1475,7 @@ __all__ = [
     "BrowserReadiness",
     "BrowserSessionRegistry",
     "CloseBrowserResult",
-    "TabOperationError",
-    "TabSessionView",
-    "activate_tab",
     "browser_autoclose_enabled",
-    "browser_page",
     "browser_readiness_snapshot",
     "cdp_list_page_targets",
     "cdp_port_from_url",
@@ -2438,16 +1485,10 @@ __all__ = [
     "close_all_gateway_browsers",
     "close_browser_session",
     "close_idle_browser_sessions",
-    "close_tab",
-    "connected_tab_session",
     "default_cdp_url",
     "is_brave_executable",
-    "list_tabs",
     "merge_browser_proc_env",
-    "open_tab",
-    "page_target_id",
     "persist_active_target_id",
-    "pick_work_page",
     "read_devtools_active_port",
     "read_registry",
     "registry_path",
@@ -2458,11 +1499,8 @@ __all__ = [
     "resolve_chrome_executable",
     "resolve_idle_close_seconds",
     "resolve_profile_dir",
-    "resolve_target_page",
     "restart_browser_session",
     "session_status_payload",
     "spawn_chrome",
-    "try_persist_active_page",
-    "wait_for_page_ready",
     "write_registry",
 ]

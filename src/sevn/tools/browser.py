@@ -1026,7 +1026,7 @@ def set_eval_allowed(allowed: bool) -> None:
     parameters=_BROWSER_PARAMS,
     requires_human=False,
     large_result=True,
-    see_also=["playwright-browser", "get_page_content", "web_fetch"],
+    see_also=["browser-harness", "get_page_content", "web_fetch"],
     long_description_file="tools/browser.md",
 )
 async def browser_tool(

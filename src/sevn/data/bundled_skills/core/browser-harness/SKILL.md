@@ -3,7 +3,7 @@ name: browser-harness
 description: Thin CDP harness with extendable helpers.py for open-ended browser control.
 version: "0.1.0"
 see_also:
-  - playwright-browser
+  - browser
 egress:
   - "*"
 scripts:
@@ -26,8 +26,8 @@ scripts:
 Minimal CDP harness: **`helpers.py`** exposes starter primitives and **`browser_cdp`**
 raw passthrough. The agent may **edit `helpers.py` mid-task** to add missing helpers.
 
-Prefer **`playwright-browser`** for stable, reviewed automation scripts; use
-**browser-harness** for exploratory flows or one-off CDP behaviour.
+Prefer the native **`browser`** tool for stable automation; use **browser-harness**
+for exploratory flows or one-off CDP behaviour.
 
 ## Files
 
@@ -47,7 +47,7 @@ Prefer **`playwright-browser`** for stable, reviewed automation scripts; use
 Chrome with remote debugging on **`SEVN_CDP_URL`** (default `http://127.0.0.1:9222`), plus:
 
 ```bash
-uv sync --extra browser
+uv sync --extra browser-cdp
 ```
 
 ## Egress

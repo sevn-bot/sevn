@@ -440,48 +440,15 @@ interfaces:
 - name: write_workspace_scan_summary
   file: src/sevn/skills/security_scan.py
   symbol: write_workspace_scan_summary
-- name: cdp_reachable
-  file: src/sevn/skills/social_browser.py
-  symbol: cdp_reachable
-- name: default_cdp_url
-  file: src/sevn/skills/social_browser.py
-  symbol: default_cdp_url
-- name: dry_run_requested
-  file: src/sevn/skills/social_browser.py
-  symbol: dry_run_requested
-- name: facebook_search_url
-  file: src/sevn/skills/social_browser.py
-  symbol: facebook_search_url
-- name: fetch_page_snapshot
-  file: src/sevn/skills/social_browser.py
-  symbol: fetch_page_snapshot
-- name: host_allowed
-  file: src/sevn/skills/social_browser.py
-  symbol: host_allowed
-- name: logged_in_browser_page
-  file: src/sevn/skills/social_browser.py
-  symbol: logged_in_browser_page
-- name: merge_social_browser_proc_env
-  file: src/sevn/skills/social_browser.py
-  symbol: merge_social_browser_proc_env
-- name: resolve_browser_profile
-  file: src/sevn/skills/social_browser.py
-  symbol: resolve_browser_profile
-- name: session_status_payload
-  file: src/sevn/skills/social_browser.py
-  symbol: session_status_payload
-- name: validate_social_url
-  file: src/sevn/skills/social_browser.py
-  symbol: validate_social_url
-- name: x_search_url
-  file: src/sevn/skills/social_browser.py
-  symbol: x_search_url
 - name: gate_social_media_manager_core_skill
   file: src/sevn/skills/social_media_manager.py
   symbol: gate_social_media_manager_core_skill
 - name: social_media_manager_config_enabled
   file: src/sevn/skills/social_media_manager.py
   symbol: social_media_manager_config_enabled
+specs: []
+personas: []
+prd_profile: null
 ---
 
 ## Purpose

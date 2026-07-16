@@ -343,7 +343,7 @@ def resolve_install_plan(
         ValueError: When an unknown id is selected or dependencies are cyclic.
 
     Examples:
-        >>> plan = resolve_install_plan(["extra.browser"])
+        >>> plan = resolve_install_plan(["extra.browser_cdp"])
         >>> plan[0].kind in ("uv_extra", "subprocess", "noop")
         True
     """

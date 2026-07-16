@@ -532,12 +532,8 @@ _PACKAGE_INSTALL_PATTERNS: Final[tuple[re.Pattern[str], ...]] = (
 )
 
 _PLAYWRIGHT_BROWSER_PATTERNS: Final[tuple[re.Pattern[str], ...]] = (
-    re.compile(r"\bplaywright[- ]browser\b", re.I),
-    re.compile(r"\bplaywright\b.+\b(skill|script|screenshot|browser)\b", re.I),
     re.compile(r"\bscreenshot\b.+\b(url|page|http|https)\b", re.I),
     re.compile(r"\b(take|get|capture)\b.+\bscreenshot\b", re.I),
-    re.compile(r"\brun_skill_script\b.+\b(capture|goto|screenshot)\b", re.I),
-    re.compile(r"\b(capture|screenshot)\.py\b", re.I),
     re.compile(r"\bsearch\s+\S+\.(?:com|org|net)\b", re.I),
     re.compile(r"\b(?:nba|espn)\.com\b", re.I),
 )
@@ -559,8 +555,8 @@ _LIVE_FACTUAL_TOOL_IDS: Final[tuple[str, ...]] = ("get_page_content", "serp")
 
 _PACKAGE_INSTALL_TOOL_IDS: Final[tuple[str, ...]] = ("process",)
 _PLAYWRIGHT_BROWSER_TOOL_IDS: Final[tuple[str, ...]] = (
-    "load_skill",
-    "run_skill_script",
+    "browser",
+    "load_tool",
     "send_file",
 )
 
@@ -1224,7 +1220,7 @@ def _merge_playwright_browser_surface(
     tools: list[str],
     skills: list[str],
 ) -> tuple[list[str], list[str]]:
-    """Replace tools with the playwright-browser surface for screenshot/navigation turns.
+    """Pin the native ``browser`` tool for screenshot/navigation turns.
 
     Args:
         tools (list[str]): Triager-selected tool ids (ignored except for doctest parity).
@@ -1234,15 +1230,12 @@ def _merge_playwright_browser_surface(
         tuple[list[str], list[str]]: Pinned ``(tools, skills)`` without ``terminal_run``.
 
     Examples:
-        >>> _merge_playwright_browser_surface(["terminal_run", "process"], [])
-        (['load_skill', 'run_skill_script', 'send_file'], ['playwright-browser'])
+        >>> _merge_playwright_browser_surface(["terminal_run", "process"], ["canvas"])
+        (['browser', 'load_tool', 'send_file'], ['canvas'])
     """
     _ = tools
     tool_out: list[str] = list(_PLAYWRIGHT_BROWSER_TOOL_IDS)
-    skill_out = list(skills)
-    if "playwright-browser" not in skill_out:
-        skill_out.append("playwright-browser")
-    return tool_out, skill_out
+    return tool_out, list(skills)
 
 
 def _merge_repo_file_ops_tools(tools: list[str]) -> list[str]:

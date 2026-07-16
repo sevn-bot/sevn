@@ -25,21 +25,6 @@ def test_seed_bundled_skills_then_verify_empty_missing(tmp_path: Path) -> None:
     assert len(expected_core_skill_ids()) >= 20
 
 
-def test_refresh_bundled_core_skills_overwrites_stale_package(tmp_path: Path) -> None:
-    """Sync refresh replaces an existing core skill tree from the bundled source."""
-    from sevn.onboarding.seed import refresh_bundled_core_skills
-
-    seed_bundled_skills(tmp_path)
-    pw = tmp_path / "skills" / "core" / "playwright-browser"
-    stale = pw / "scripts" / "click.py"
-    stale.parent.mkdir(parents=True, exist_ok=True)
-    stale.write_text("# stale marker\n", encoding="utf-8")
-    refreshed = refresh_bundled_core_skills(tmp_path)
-    assert "playwright-browser" in refreshed
-    assert not stale.exists()
-    assert (pw / "scripts" / "click_element.py").is_file()
-
-
 def test_list_deployed_core_skill_ids_empty_without_core_dir(tmp_path: Path) -> None:
     """Missing skills/core returns an empty list instead of raising."""
     assert list_deployed_core_skill_ids(tmp_path) == []

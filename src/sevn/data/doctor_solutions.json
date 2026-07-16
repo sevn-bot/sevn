@@ -14,19 +14,6 @@
       "severity": "warn",
       "title": "auto_run_on_import"
     },
-    "browser_extra": {
-      "agent_only": true,
-      "auto_fixable": false,
-      "docs_url": "specs/23-cli.md",
-      "explanation": "Playwright browser extra is not installed.",
-      "fix_command": null,
-      "remediation": [
-        "Run `uv sync --extra browser && playwright install chromium`.",
-        "Enable browser skills in sevn.json when ready."
-      ],
-      "severity": "warn",
-      "title": "Browser (Playwright)"
-    },
     "browser_readiness": {
       "auto_fixable": false,
       "docs_url": "specs/23-cli.md",

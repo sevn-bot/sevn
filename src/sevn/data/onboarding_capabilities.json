@@ -46,39 +46,6 @@
   ],
   "capabilities": [
     {
-      "capability_id": "extra.browser",
-      "group": "A",
-      "label": "Browser (Playwright)",
-      "description": "Playwright browser skills and CDP session lifecycle.",
-      "config_paths": [
-        "skills.browser.enabled"
-      ],
-      "control": "checkbox",
-      "default": false,
-      "profile_overridable": true,
-      "install_actions": [
-        {
-          "id": "extra.browser.uv",
-          "kind": "uv_extra",
-          "argv": [
-            "browser"
-          ],
-          "fatal": true
-        },
-        {
-          "id": "extra.browser.cmd",
-          "kind": "subprocess",
-          "argv": [
-            "playwright",
-            "install",
-            "chromium"
-          ],
-          "fatal": true,
-          "idempotent_check": "playwright --version"
-        }
-      ]
-    },
-    {
       "capability_id": "extra.browser_cdp",
       "group": "A",
       "label": "Browser (CDP engine)",
@@ -378,7 +345,7 @@
       "capability_id": "skill.canvas",
       "group": "B",
       "label": "canvas",
-      "description": "Cursor Canvas and rich analytical layouts via OpenUI compose helpers (`specs/11-tools-registry.md` §3.4, `specs/29-op...",
+      "description": "Cursor Canvas and rich analytical layouts via OpenUI compose helpers (`specs/11-tools-registry.md` \u00a73.4, `specs/29-op...",
       "config_paths": [
         "skills.canvas.enabled"
       ],
@@ -398,7 +365,7 @@
       "capability_id": "skill.code_graph_rag",
       "group": "B",
       "label": "code_graph_rag",
-      "description": "CGR export reader + allowlisted cgr CLI (`specs/28-code-understanding.md` §2.2).",
+      "description": "CGR export reader + allowlisted cgr CLI (`specs/28-code-understanding.md` \u00a72.2).",
       "config_paths": [
         "skills.code_graph_rag.enabled"
       ],
@@ -546,30 +513,10 @@
       ]
     },
     {
-      "capability_id": "skill.facebook_use",
-      "group": "B",
-      "label": "facebook-use",
-      "description": "Facebook workflows via a logged-in browser profile or CDP attach (feed read, search).",
-      "config_paths": [
-        "skills.facebook_use.enabled"
-      ],
-      "control": "checkbox",
-      "default": true,
-      "profile_overridable": true,
-      "install_actions": [
-        {
-          "id": "skill.facebook_use.noop",
-          "kind": "noop",
-          "argv": [],
-          "fatal": false
-        }
-      ]
-    },
-    {
       "capability_id": "skill.gh_issues",
       "group": "B",
       "label": "gh-issues",
-      "description": "GitHub issue lifecycle — list, view, create, comment via integration_call.",
+      "description": "GitHub issue lifecycle \u2014 list, view, create, comment via integration_call.",
       "config_paths": [
         "skills.gh_issues.enabled"
       ],
@@ -589,7 +536,7 @@
       "capability_id": "skill.gh_pr",
       "group": "B",
       "label": "gh-pr",
-      "description": "Pull request lifecycle — list, view, create, merge, close, reviewers via integration_call.",
+      "description": "Pull request lifecycle \u2014 list, view, create, merge, close, reviewers via integration_call.",
       "config_paths": [
         "skills.gh_pr.enabled"
       ],
@@ -609,7 +556,7 @@
       "capability_id": "skill.github_manager",
       "group": "B",
       "label": "github-manager",
-      "description": "Advanced GitHub operations — branches, Actions, CI/CD secrets, environments, deployments via integration_call.",
+      "description": "Advanced GitHub operations \u2014 branches, Actions, CI/CD secrets, environments, deployments via integration_call.",
       "config_paths": [
         "skills.github_manager.enabled"
       ],
@@ -629,7 +576,7 @@
       "capability_id": "skill.graphify",
       "group": "B",
       "label": "graphify",
-      "description": "Knowledge-graph orientation for code (`specs/28-code-understanding.md` §2.4).",
+      "description": "Knowledge-graph orientation for code (`specs/28-code-understanding.md` \u00a72.4).",
       "config_paths": [
         "skills.graphify.enabled"
       ],
@@ -766,26 +713,6 @@
       ]
     },
     {
-      "capability_id": "skill.linkedin_use",
-      "group": "B",
-      "label": "linkedin-use",
-      "description": "LinkedIn staff/company/connection scraping via logged-in browser + Voyager API (StaffSpy port).",
-      "config_paths": [
-        "skills.linkedin_use.enabled"
-      ],
-      "control": "checkbox",
-      "default": true,
-      "profile_overridable": true,
-      "install_actions": [
-        {
-          "id": "skill.linkedin_use.noop",
-          "kind": "noop",
-          "argv": [],
-          "fatal": false
-        }
-      ]
-    },
-    {
       "capability_id": "skill.lume",
       "group": "B",
       "label": "lume",
@@ -822,7 +749,7 @@
       "capability_id": "skill.mycode",
       "group": "B",
       "label": "mycode",
-      "description": "Deterministic repo scan + MYCODE.md write (`specs/28-code-understanding.md` §2.4).",
+      "description": "Deterministic repo scan + MYCODE.md write (`specs/28-code-understanding.md` \u00a72.4).",
       "config_paths": [
         "skills.mycode.enabled"
       ],
@@ -890,30 +817,10 @@
       ]
     },
     {
-      "capability_id": "skill.playwright_browser",
-      "group": "B",
-      "label": "playwright-browser",
-      "description": "Web automation with CDP-first Playwright scripts (navigate, screenshot, click, extract text).",
-      "config_paths": [
-        "skills.playwright_browser.enabled"
-      ],
-      "control": "checkbox",
-      "default": true,
-      "profile_overridable": true,
-      "install_actions": [
-        {
-          "id": "skill.playwright_browser.noop",
-          "kind": "noop",
-          "argv": [],
-          "fatal": false
-        }
-      ]
-    },
-    {
       "capability_id": "skill.printing_press_library",
       "group": "B",
       "label": "printing-press-library",
-      "description": "Starter-pack Printing Press CLIs — ESPN, flights, movies, recipes (Go binaries on PATH).",
+      "description": "Starter-pack Printing Press CLIs \u2014 ESPN, flights, movies, recipes (Go binaries on PATH).",
       "config_paths": [
         "skills.printing_press_library.enabled"
       ],
@@ -948,7 +855,7 @@
       "capability_id": "skill.roam_code",
       "group": "B",
       "label": "roam_code",
-      "description": "Lightweight roam-code path Q&A (`specs/28-code-understanding.md` §2.2).",
+      "description": "Lightweight roam-code path Q&A (`specs/28-code-understanding.md` \u00a72.2).",
       "config_paths": [
         "skills.roam_code.enabled"
       ],
@@ -1008,7 +915,7 @@
       "capability_id": "skill.second_brain",
       "group": "B",
       "label": "second_brain",
-      "description": "Karpathy-style raw→wiki ingest, lint, and file-back flows (`specs/27-second-brain.md`).",
+      "description": "Karpathy-style raw\u2192wiki ingest, lint, and file-back flows (`specs/27-second-brain.md`).",
       "config_paths": [
         "skills.second_brain.enabled"
       ],
@@ -1118,26 +1025,6 @@
       "install_actions": [
         {
           "id": "skill.sevn_diagnostics.noop",
-          "kind": "noop",
-          "argv": [],
-          "fatal": false
-        }
-      ]
-    },
-    {
-      "capability_id": "skill.x_use",
-      "group": "B",
-      "label": "x-use",
-      "description": "X (Twitter) workflows via a logged-in browser profile or CDP attach (timeline, search).",
-      "config_paths": [
-        "skills.x_use.enabled"
-      ],
-      "control": "checkbox",
-      "default": true,
-      "profile_overridable": true,
-      "install_actions": [
-        {
-          "id": "skill.x_use.noop",
           "kind": "noop",
           "argv": [],
           "fatal": false
@@ -1425,7 +1312,7 @@
       "capability_id": "memory.second_brain",
       "group": "D",
       "label": "Second Brain",
-      "description": "Karpathy-style raw→wiki ingest flows. Set an Obsidian vault folder under the workspace (optional).",
+      "description": "Karpathy-style raw\u2192wiki ingest flows. Set an Obsidian vault folder under the workspace (optional).",
       "config_paths": [
         "second_brain.enabled",
         "second_brain.paths.vault"
@@ -1692,7 +1579,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
@@ -1713,7 +1600,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
@@ -1734,7 +1621,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
@@ -1755,7 +1642,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
@@ -1776,7 +1663,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
@@ -1797,7 +1684,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
@@ -1818,7 +1705,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
@@ -1839,7 +1726,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
@@ -1860,7 +1747,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
@@ -1881,7 +1768,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
@@ -1902,7 +1789,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
@@ -1923,7 +1810,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
@@ -1944,7 +1831,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
@@ -1965,7 +1852,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
@@ -1986,7 +1873,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
@@ -2007,7 +1894,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
@@ -2028,7 +1915,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
@@ -2049,7 +1936,7 @@
           "kind": "noop",
           "argv": [],
           "fatal": false,
-          "note": "Coming soon — noop install."
+          "note": "Coming soon \u2014 noop install."
         }
       ]
     },
