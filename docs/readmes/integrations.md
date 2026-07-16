@@ -108,10 +108,10 @@ Pull request operations for bundled gh-pr skill scripts.
 Working with [`gh_pr.py`](../../src/sevn/integrations/github_skill/gh_pr.py): inspect the public entry points below.
 Start with [`list_pull_requests`](../../src/sevn/integrations/github_skill/gh_pr.py#L25), then [`view_pull_request`](../../src/sevn/integrations/github_skill/gh_pr.py#L69), [`create_pull_request`](../../src/sevn/integrations/github_skill/gh_pr.py#L109), [`merge_pull_request`](../../src/sevn/integrations/github_skill/gh_pr.py#L166).
 
-GitHub manager operations for bundled github-manager skill scripts.
+GitHub manager operations for bundled github-manager / gh-issues skill scripts.
 
 Working with [`github_manager.py`](../../src/sevn/integrations/github_skill/github_manager.py): inspect the public entry points below.
-Start with [`list_branches`](../../src/sevn/integrations/github_skill/github_manager.py#L32), then [`create_branch`](../../src/sevn/integrations/github_skill/github_manager.py#L67), [`delete_branch`](../../src/sevn/integrations/github_skill/github_manager.py#L112), [`list_workflows`](../../src/sevn/integrations/github_skill/github_manager.py#L150).
+Start with [`map_gh_issue_create_error`](../../src/sevn/integrations/github_skill/github_manager.py#L53), then [`create_issue_via_gh`](../../src/sevn/integrations/github_skill/github_manager.py#L109), [`view_issue_via_gh`](../../src/sevn/integrations/github_skill/github_manager.py#L189), [`list_branches`](../../src/sevn/integrations/github_skill/github_manager.py#L249).
 
 12 more Python files under [`src/sevn/integrations`](../../src/sevn/integrations/) — including `src/sevn/integrations/github_skill/hooks.py`, `src/sevn/integrations/litellm_lap/__init__.py`, `src/sevn/integrations/litellm_lap/client.py`, `src/sevn/integrations/proxy_client.py`.
 
