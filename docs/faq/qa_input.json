@@ -1,0 +1,135 @@
+{
+  "title": "Frequently Asked Questions (FAQ)",
+  "sections": [
+    {
+      "id": "general",
+      "title": "General",
+      "questions": [
+        {
+          "id": "what-is-sevn",
+          "question": "What is sevn.bot?",
+          "answer": "sevn.bot is a single AI assistant that you own and that lives in the channels you already use, such as Telegram or a browser. It remembers context across sessions, runs on the LLM provider you choose, and gets work done by composing tools, skills, and external integrations under your control. The {{ref:architecture}} describes the turn spine that connects a channel message all the way through to a reply.",
+          "references": {
+            "architecture": {
+              "path": "about-sevn.bot/ARCHITECTURE.md",
+              "text": "architecture overview"
+            }
+          }
+        },
+        {
+          "id": "which-channels",
+          "question": "Which channels can I talk to sevn.bot through?",
+          "answer": "Today sevn.bot ships with a Telegram adapter and a browser-based Web UI bridge, with voice input/output layered on top of the gateway. Every channel talks to the same triage and executor pipeline, so the assistant behaves consistently no matter which surface you use. See {{ref:channels}} for the adapter patterns and how new channels plug into the turn spine.",
+          "references": {
+            "channels": {
+              "path": "docs/readmes/channels.md",
+              "text": "channels subsystem README"
+            }
+          }
+        },
+        {
+          "id": "how-to-install",
+          "question": "How do I install and run sevn.bot?",
+          "answer": "The project ships a Makefile with setup and install targets, plus Docker Compose files for local or production deployment, so you can pick whichever workflow fits your environment. Configuration lives in a workspace sevn.json file that controls channels, models, and enabled skills. Start with {{ref:getting-started}} for the step-by-step operator walkthrough.",
+          "references": {
+            "getting-started": {
+              "path": "about-sevn.bot/getting-started.html",
+              "text": "getting started guide"
+            }
+          }
+        },
+        {
+          "id": "how-to-contribute",
+          "question": "How can I contribute to the project?",
+          "answer": "Contributions are welcome via pull requests that follow the project's conventional-commit style and pass the CI gates defined in the Makefile. Before opening a change, read {{ref:contributing}} for the local setup, linting, and test commands expected of every submission, and check open issues for good first tasks.",
+          "references": {
+            "contributing": {
+              "path": "CONTRIBUTING.md",
+              "text": "CONTRIBUTING.md"
+            }
+          }
+        },
+        {
+          "id": "what-are-skills",
+          "question": "What are skills and how do they extend sevn.bot?",
+          "answer": "Skills are self-contained capability bundles the assistant can load on demand, ranging from bundled core skills to workspace-specific ones an operator adds. They let sevn.bot pick up new abilities, like querying an API or running a specialised workflow, without changing the core agent runtime. The {{ref:skills-readme}} catalogs the bundled and workspace skill loaders and subprocess runners.",
+          "references": {
+            "skills-readme": {
+              "path": "docs/readmes/skills.md",
+              "text": "skills system README"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "technical",
+      "title": "Technical Q&A",
+      "questions": [
+        {
+          "id": "turn-spine",
+          "question": "How does a single turn flow through the system?",
+          "answer": "A turn moves through a fixed spine: a channel receives a message, hands it to the gateway, which runs triage to size and route the work, then dispatches it to a tier-appropriate executor that calls tools and skills before producing a reply. Secrets and LLM calls are routed through a paired egress proxy rather than being called directly. The {{ref:agent-runtime}} documents the triager, tier-B/C executors, and sandboxing that back this pipeline.",
+          "references": {
+            "agent-runtime": {
+              "path": "docs/readmes/agent.md",
+              "text": "agent runtime README"
+            }
+          }
+        },
+        {
+          "id": "security-model",
+          "question": "How does sevn.bot guard against unsafe or risky requests?",
+          "answer": "Built-in safety checks screen requests before they run, combining an LLM Guard scanner with a llmignore mechanism and a block-and-notify flow so risky actions surface to the operator instead of executing silently. This scanning layer sits ahead of tool execution in the turn spine and is implemented in {{ref:llm-guard}}, with the broader model described in {{ref:security-readme}}.",
+          "references": {
+            "llm-guard": {
+              "path": "src/sevn/security/llm_guard_scanner.py",
+              "text": "LLM Guard scanner implementation"
+            },
+            "security-readme": {
+              "path": "docs/readmes/security.md",
+              "text": "security scanner README"
+            }
+          }
+        },
+        {
+          "id": "secrets-handling",
+          "question": "How are secrets and credentials managed?",
+          "answer": "Secrets live behind pluggable backends selected by a logical-key chain, with per-secret TTLs and a fingerprint confirmation step before a sensitive value is used, so credentials are never handed to a model or tool without an explicit, auditable check. The fingerprinting logic itself is implemented in {{ref:fingerprint}}, and the full backend/TTL model is documented in {{ref:secrets-readme}}.",
+          "references": {
+            "fingerprint": {
+              "path": "src/sevn/secrets/fingerprint.py",
+              "text": "secrets fingerprint module"
+            },
+            "secrets-readme": {
+              "path": "docs/readmes/secrets.md",
+              "text": "secrets subsystem README"
+            }
+          }
+        },
+        {
+          "id": "memory-model",
+          "question": "How does sevn.bot remember context across conversations?",
+          "answer": "Memory is backed by an LCM (long-context memory) store that compacts older turns, maintains a per-user model, and can run background 'dreaming' passes to consolidate what it has learned, with optional Honcho integrations for richer recall. This lets the assistant reference earlier conversations without replaying the full transcript on every turn. Details live in {{ref:memory-readme}}.",
+          "references": {
+            "memory-readme": {
+              "path": "docs/readmes/memory-context.md",
+              "text": "memory & context README"
+            }
+          }
+        },
+        {
+          "id": "cli-entrypoint",
+          "question": "Is there a command-line interface for operating sevn.bot?",
+          "answer": "Yes, the sevn command-line interface is the operator entry point for tasks like generating READMEs, managing configuration, and running diagnostics, and it is registered through the project's packaging metadata. The CLI's top-level application wiring lives in {{ref:cli-app}}, which is a good starting point for tracing how subcommands are registered.",
+          "references": {
+            "cli-app": {
+              "path": "src/sevn/cli/app.py",
+              "text": "CLI application entry point"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

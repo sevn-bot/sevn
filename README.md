@@ -56,6 +56,7 @@ Your gateway, your rules — I run where you chose.<br>
 - [Install](#install)
 - [Docs by goal](#docs-by-goal)
 - [Community](#community)
+- [Frequently Asked Questions (FAQ)](#frequently-asked-questions-faq)
 - [License](#license)
 - [Acknowledgements](#acknowledgements)
 
@@ -149,6 +150,10 @@ Operator-owned gateway with paired egress proxy, secrets backends, and LLM Guard
 ## Community
 
 Issues and discussions: [GitHub](https://github.com/sevn-bot/sevn).
+
+## Frequently Asked Questions (FAQ)
+
+General and technical questions about sevn.bot, code-generated from [`docs/faq/qa_input.json`](docs/faq/qa_input.json) — see [docs/FAQ.md](docs/FAQ.md) for the full list.
 
 ## License
 
