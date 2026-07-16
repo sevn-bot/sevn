@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import json
-import os
-
 import pytest
 
 from proton_cli.hv.resolver import cli_hv_resolver
@@ -23,7 +20,9 @@ def test_hv_resolver_uses_env_token(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_hv_resolver_raises_without_token(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("PROTON_HV_TOKEN", raising=False)
     with pytest.raises(ErrHVUnavailable):
-        cli_hv_resolver(HumanVerificationError(token="x", methods=["captcha"], web_url="https://hv"))
+        cli_hv_resolver(
+            HumanVerificationError(token="x", methods=["captcha"], web_url="https://hv")
+        )
 
 
 def test_api_response_json_body(capsys: pytest.CaptureFixture[str]) -> None:
@@ -44,7 +43,7 @@ def test_settings_keys_list() -> None:
 
 def test_calendar_list_mock() -> None:
     class FakeClient:
-        def decode(self, req, out):  # noqa: ANN001
+        def decode(self, req, out):
             out.clear()
             out.update({"Calendars": []})
 

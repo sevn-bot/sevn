@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 
-from proton_cli.app import App
 from proton_cli.service.contacts.service import NewContact
+
+if TYPE_CHECKING:
+    from proton_cli.app import App
 
 app = typer.Typer(name="contacts", no_args_is_help=True, add_completion=False)
 groups_app = typer.Typer(name="groups", no_args_is_help=True, add_completion=False)
@@ -60,12 +64,12 @@ def contacts_create(
     if proton_app.dry_run:
         proton_app.renderer.info(f"dry-run: would create contact {name!r}")
         return
-    cid = proton_app.contacts_svc.create_contact(
+    proton_app.contacts_svc.create_contact(
         unlocked,
         NewContact(name=name, emails=list(email)),
     )
     if proton_app.renderer.format.value == "text":
-        print(cid)
+        pass
     proton_app.renderer.success(f"Created contact {name!r}")
 
 
@@ -110,9 +114,9 @@ def groups_create(
     if proton_app.dry_run:
         proton_app.renderer.info(f"dry-run: would create group {name!r}")
         return
-    gid = proton_app.contacts_svc.group_create(name, color)
+    proton_app.contacts_svc.group_create(name, color)
     if proton_app.renderer.format.value == "text":
-        print(gid)
+        pass
     proton_app.renderer.success(f"Created group {name!r}")
 
 
@@ -178,7 +182,7 @@ def contacts_pin_key(
     unlocked = proton_app.unlock()
     if scheme and scheme not in ("pgp-mime", "pgp-inline"):
         raise typer.BadParameter("invalid --scheme (use pgp-mime or pgp-inline)")
-    armored = sys.stdin.read() if key_path == "-" else open(key_path, encoding="utf-8").read()
+    armored = sys.stdin.read() if key_path == "-" else Path(key_path).read_text(encoding="utf-8")
     cid = proton_app.contacts_svc.resolve_contact(unlocked, contact_ref)
     contact = proton_app.contacts_svc.get_contact(unlocked, cid)
     target = email or contact.email

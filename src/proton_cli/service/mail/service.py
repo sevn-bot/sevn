@@ -5,17 +5,20 @@ from __future__ import annotations
 import base64
 import secrets
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from pgpy import PGPKey, PGPMessage
 
-from proton_cli.account.keys import Unlocked
 from proton_cli.proton.client import Client, Request
 from proton_cli.ref import pick
 from proton_cli.service.drive import blocks
 from proton_cli.service.mail import crypto as mail_crypto
 from proton_cli.service.mail import mime as mail_mime
 from proton_cli.service.mail.folders import LABEL_STARRED, LABEL_TRASH, resolve_folder
+
+if TYPE_CHECKING:
+    from proton_cli.account.keys import Unlocked
 
 PKG_INTERNAL = 1
 PKG_CLEAR = 4
@@ -215,9 +218,7 @@ class MailService:
                 return msg.id
         needle = message_ref.lower()
         matches = [
-            m
-            for m in messages
-            if needle in m.subject.lower() or needle in m.from_address.lower()
+            m for m in messages if needle in m.subject.lower() or needle in m.from_address.lower()
         ]
         chosen = pick(
             "message",
@@ -410,7 +411,9 @@ class MailService:
             )
         return out
 
-    def attachment_download(self, unlocked: Unlocked, message_id: str, attachment_id: str) -> tuple[bytes, str]:
+    def attachment_download(
+        self, unlocked: Unlocked, message_id: str, attachment_id: str
+    ) -> tuple[bytes, str]:
         payload: dict = {}
         self._client.decode(
             Request(method="GET", path=f"/mail/v4/messages/{message_id}"),
@@ -565,7 +568,7 @@ def _dedupe(emails: list[str]) -> list[str]:
 
 
 def _parse_date(value: str) -> int:
-    return int(datetime.strptime(value, "%Y-%m-%d").timestamp())
+    return int(datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=UTC).timestamp())
 
 
 def _attachment_key_packets(

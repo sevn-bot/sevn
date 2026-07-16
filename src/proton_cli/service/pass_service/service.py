@@ -149,9 +149,9 @@ class PassService:
         share_key = sk.get(rotation) if sk else None
         if not share_key:
             raise ValueError(f"no share key for rotation {rotation}")
-        name, desc = ("", "")
+        _name, desc = ("", "")
         if content:
-            name, desc = _decrypt_vault(content, share_key)
+            _name, desc = _decrypt_vault(content, share_key)
         vault_bytes = item_proto.encode_vault(new_name, desc)
         ct = aead.encrypt(share_key, vault_bytes, aead.TAG_VAULT_CONTENT)
         self._client.decode(
@@ -193,8 +193,7 @@ class PassService:
         matches = [
             it
             for it in items
-            if needle in it.name.lower()
-            or any(needle in u.lower() for u in it.urls)
+            if needle in it.name.lower() or any(needle in u.lower() for u in it.urls)
         ]
         chosen = pick(
             "item",
@@ -370,7 +369,9 @@ class PassService:
         share_id = self.resolve_vault(unlocked, vault_filter)
         existing = self.find_login_by_name(unlocked, name, vault_filter=share_id)
         if existing:
-            self.item_edit(unlocked, existing.share_id, existing.item_id, ItemPatch(password=password))
+            self.item_edit(
+                unlocked, existing.share_id, existing.item_id, ItemPatch(password=password)
+            )
             return existing.item_id
         return self.item_create(
             unlocked,
@@ -502,7 +503,6 @@ def _latest_key(sk: dict[int, bytes]) -> tuple[bytes, int]:
 
 
 def _encrypt_binary(keys: list, data: bytes) -> bytes:
-    from pgpy import PGPKey
 
     message = PGPMessage.new(data)
     last_err: Exception | None = None

@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import base64
 import json
+from typing import TYPE_CHECKING
 
 from proton_cli.crypto.modulus import decode_modulus
 from proton_cli.crypto.srp.user import User
-from proton_cli.proton.client import Client
 from proton_cli.proton.errors import HumanVerificationError
+
+if TYPE_CHECKING:
+    from proton_cli.proton.client import Client
 
 
 def login(client: Client, username: str, password: str, totp: str = "") -> None:

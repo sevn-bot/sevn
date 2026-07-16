@@ -5,8 +5,9 @@ from __future__ import annotations
 import hashlib
 import re
 import time
-from dataclasses import dataclass, field as dc_field
-from datetime import datetime, timedelta, timezone
+from dataclasses import dataclass
+from dataclasses import field as dc_field
+from datetime import UTC, datetime, timedelta
 
 
 def field(ical_text: str, key: str) -> str:
@@ -37,11 +38,11 @@ def fields(text: str, key: str) -> list[str]:
         upper = line.upper()
         if upper.startswith(prefix.upper()):
             out.append(line.split(":", 1)[1])
-        elif upper.startswith(prefix_param.upper()):
-            idx = line.find(":")
-            if idx >= 0:
-                out.append(line[idx + 1 :])
-        elif f".{key.upper()};" in upper or f".{key.upper()}:" in upper:
+        elif (
+            upper.startswith(prefix_param.upper())
+            or f".{key.upper()};" in upper
+            or f".{key.upper()}:" in upper
+        ):
             idx = line.find(":")
             if idx >= 0:
                 out.append(line[idx + 1 :])
@@ -67,8 +68,7 @@ class Attendee:
 
 
 def attendee_token(uid: str, email: str) -> str:
-    digest = hashlib.sha1((uid + canonical_email(email)).encode()).hexdigest()
-    return digest
+    return hashlib.sha1((uid + canonical_email(email)).encode()).hexdigest()
 
 
 def _event_dates(start: datetime, end: datetime, all_day: bool) -> tuple[str, str]:
@@ -77,8 +77,8 @@ def _event_dates(start: datetime, end: datetime, all_day: bool) -> tuple[str, st
             f"DTSTART;VALUE=DATE:{start.strftime('%Y%m%d')}",
             f"DTEND;VALUE=DATE:{end.strftime('%Y%m%d')}",
         )
-    start_utc = start.astimezone(timezone.utc)
-    end_utc = end.astimezone(timezone.utc)
+    start_utc = start.astimezone(UTC)
+    end_utc = end.astimezone(UTC)
     return (
         f"DTSTART:{start_utc.strftime('%Y%m%dT%H%M%SZ')}",
         f"DTEND:{end_utc.strftime('%Y%m%dT%H%M%SZ')}",
@@ -101,7 +101,7 @@ def signed_vevent(
     rrule: str,
     organizer: str,
 ) -> str:
-    dtstamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    dtstamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     dtstart, dtend = _event_dates(start, end, all_day)
     lines = [
         "BEGIN:VCALENDAR",
@@ -162,7 +162,7 @@ def invite_ics(
     organizer: str,
     attendees: list[Attendee],
 ) -> str:
-    dtstamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    dtstamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     dtstart, dtend = _event_dates(start, end, all_day)
     lines = [
         "BEGIN:VCALENDAR",
@@ -201,7 +201,7 @@ def reply_ics(
     all_day: bool,
     proton_reply: bool,
 ) -> str:
-    dtstamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    dtstamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     dtstart, dtend = _event_dates(start, end, all_day)
     lines = [
         "BEGIN:VCALENDAR",
@@ -238,7 +238,7 @@ def parse_time(value: str) -> datetime:
         "%Y-%m-%d",
     ):
         try:
-            parsed = datetime.strptime(value, fmt)
+            parsed = datetime.strptime(value, fmt).replace(tzinfo=UTC)
             if parsed.tzinfo is None:
                 return parsed
             return parsed.astimezone()
@@ -330,9 +330,13 @@ def email_group(text: str, email: str) -> str:
     want = canonical_email(email)
     for raw in text.replace("\r\n", "\n").split("\n"):
         parsed = _parse_vcard_line(raw)
-        if parsed and parsed.field == "EMAIL" and parsed.group:
-            if canonical_email(parsed.value) == want:
-                return parsed.group
+        if (
+            parsed
+            and parsed.field == "EMAIL"
+            and parsed.group
+            and canonical_email(parsed.value) == want
+        ):
+            return parsed.group
     return ""
 
 

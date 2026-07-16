@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from pgpy import PGPKey, PGPMessage
+from pgpy import PGPKey
 
-from proton_cli.account.keys import Unlocked
 from proton_cli.crypto import cards as card_crypto
 from proton_cli.crypto import ical as ical_crypto
 from proton_cli.crypto import vcard as vcard_crypto
 from proton_cli.errors import NotFound
 from proton_cli.proton.client import Client, Request
 from proton_cli.ref import pick
+
+if TYPE_CHECKING:
+    from proton_cli.account.keys import Unlocked
 
 
 @dataclass
@@ -108,8 +111,7 @@ class ContactsService:
         matches = [
             c
             for c in rows
-            if needle in c.name.lower()
-            or any(needle in e.lower() for e in c.emails)
+            if needle in c.name.lower() or any(needle in e.lower() for e in c.emails)
         ]
         chosen = pick(
             "contact",
@@ -208,7 +210,7 @@ class ContactsService:
         if not ok:
             return None
         try:
-            contact = self.get_contact(unlocked, contact_id)
+            self.get_contact(unlocked, contact_id)
         except Exception:
             return None
         joined = "\n".join(

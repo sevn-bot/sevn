@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pgpy import PGPKey
-from pgpy.constants import EllipticCurveOID, HashAlgorithm, PubKeyAlgorithm, SymmetricKeyAlgorithm
+from pgpy.constants import EllipticCurveOID, PubKeyAlgorithm
 
 from proton_cli.crypto import ical as ical_crypto
 from proton_cli.hv import helper as hv_helper
 from proton_cli.hv.resolver import cli_hv_resolver
-from proton_cli.proton.errors import ErrHVUnavailable, HumanVerificationError
+from proton_cli.proton.errors import HumanVerificationError
 from proton_cli.service.calendar.service import status_from_flag
 from proton_cli.service.drive import blocks
 from proton_cli.service.drive.keygen import _generate_armored_locked_key_python
@@ -19,8 +19,8 @@ from proton_cli.service.mail import mime as mail_mime
 
 
 def test_ical_signed_and_encrypted_vevent() -> None:
-    start = datetime(2026, 7, 16, 10, 0, tzinfo=timezone.utc)
-    end = datetime(2026, 7, 16, 11, 0, tzinfo=timezone.utc)
+    start = datetime(2026, 7, 16, 10, 0, tzinfo=UTC)
+    end = datetime(2026, 7, 16, 11, 0, tzinfo=UTC)
     uid = "uid@test"
     signed = ical_crypto.signed_vevent(uid, start, end, False, 0, "", "org@proton.me")
     encrypted = ical_crypto.encrypted_vevent("Title", "Room", "Notes")
@@ -40,7 +40,7 @@ def test_attendee_token_deterministic() -> None:
 
 
 def test_encrypt_data_packet_roundtrip() -> None:
-    key = PGPKey.new(PubKeyAlgorithm.ECDH, EllipticCurveOID.Curve25519)
+    PGPKey.new(PubKeyAlgorithm.ECDH, EllipticCurveOID.Curve25519)
     session_key = blocks.make_session_key()
     plain = b"SUMMARY:Meet"
     packet = blocks.encrypt_data_packet(plain, session_key)
@@ -52,7 +52,7 @@ def test_status_from_flag() -> None:
     from proton_cli.service.calendar.service import PARTSTAT_ACCEPTED
 
     assert status_from_flag("accept") == PARTSTAT_ACCEPTED
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="invalid --status"):
         status_from_flag("maybe")
 
 

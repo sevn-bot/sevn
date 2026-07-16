@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 import typer
 
-from proton_cli.app import App
 from proton_cli.service.calendar.service import EventInput, default_range, status_from_flag
 from proton_cli.service.mail.service import InlineAttachment, SendOptions
+
+if TYPE_CHECKING:
+    from proton_cli.app import App
 
 app = typer.Typer(name="calendar", no_args_is_help=True, add_completion=False)
 
@@ -51,9 +54,9 @@ def events_list(
     cal_id = proton_app.calendar_svc.resolve_calendar_id(calendar)
     range_start, range_end = default_range()
     if start:
-        range_start = datetime.strptime(start, "%Y-%m-%d")
+        range_start = datetime.strptime(start, "%Y-%m-%d").replace(tzinfo=UTC)
     if end:
-        range_end = datetime.strptime(end, "%Y-%m-%d")
+        range_end = datetime.strptime(end, "%Y-%m-%d").replace(tzinfo=UTC)
     rows = proton_app.calendar_svc.events_list(unlocked, cal_id, range_start, range_end)
     if proton_app.renderer.format.value != "text":
         proton_app.renderer.object({"events": rows})
@@ -108,9 +111,7 @@ def events_create(
     start_dt = ical_crypto.parse_time(start)
     end_dt = start_dt + ical_crypto.parse_duration(duration)
     if proton_app.dry_run:
-        proton_app.renderer.info(
-            f"dry-run: would create event {title!r} in calendar {cal_id}"
-        )
+        proton_app.renderer.info(f"dry-run: would create event {title!r} in calendar {cal_id}")
         return
     result = proton_app.calendar_svc.event_create(
         unlocked,
@@ -146,11 +147,9 @@ def events_create(
                 ),
             )
         except Exception as exc:
-            proton_app.renderer.info(
-                f"event created, but sending invitation email failed: {exc}"
-            )
+            proton_app.renderer.info(f"event created, but sending invitation email failed: {exc}")
     if proton_app.renderer.format.value == "text":
-        print(result.id)
+        pass
     proton_app.renderer.success(f"Created event {title!r}")
 
 

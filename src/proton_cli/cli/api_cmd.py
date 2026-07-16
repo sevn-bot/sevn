@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
 import typer
 
-from proton_cli.app import App
 from proton_cli.proton.client import Request
 from proton_cli.proton.errors import APIError
+
+if TYPE_CHECKING:
+    from proton_cli.app import App
 
 app = typer.Typer(name="api", no_args_is_help=True, add_completion=False)
 

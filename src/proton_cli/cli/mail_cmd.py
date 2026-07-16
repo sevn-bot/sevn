@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 
-from proton_cli.app import App
 from proton_cli.service.mail.service import ListOptions, SearchOptions, SendOptions
+
+if TYPE_CHECKING:
+    from proton_cli.app import App
 
 app = typer.Typer(name="mail", no_args_is_help=True, add_completion=False)
 
@@ -128,16 +132,15 @@ def messages_send(
     body_file: str = typer.Option("", "--body-file", help="Read body from file; - for stdin"),
     html: bool = typer.Option(False, "--html"),
     attach: list[str] = typer.Option([], "--attach", help="Attachment file path (repeatable)"),
-    attach_inline: list[str] = typer.Option([], "--attach-inline", help="Inline image path (repeatable)"),
+    attach_inline: list[str] = typer.Option(
+        [], "--attach-inline", help="Inline image path (repeatable)"
+    ),
 ) -> None:
     """Send an email with optional attachments."""
     proton_app = _run(ctx)
     text = body
     if body_file:
-        if body_file == "-":
-            text = sys.stdin.read()
-        else:
-            text = open(body_file, encoding="utf-8").read()
+        text = sys.stdin.read() if body_file == "-" else Path(body_file).read_text(encoding="utf-8")
     if not text:
         raise typer.BadParameter("provide --body or --body-file")
     if proton_app.dry_run:
@@ -156,7 +159,6 @@ def messages_send(
         ),
     )
     if proton_app.renderer.format.value == "text":
-        print(message_id)
         proton_app.renderer.success("Message sent.")
     else:
         proton_app.renderer.object({"message_id": message_id})
@@ -196,7 +198,7 @@ def attachments_download(
     unlocked = proton_app.unlock()
     data, name = proton_app.mail_svc.attachment_download(unlocked, message_id, attachment_id)
     if output:
-        open(output, "wb").write(data)
+        Path(output).write_bytes(data)
         proton_app.renderer.success(f"Wrote {output}")
         return
     if proton_app.renderer.format.value != "text":
@@ -258,5 +260,5 @@ def labels_list(ctx: typer.Context) -> None:
         return
     proton_app.renderer.table(
         ["ID", "NAME", "TYPE"],
-        [[l.id, l.name, str(l.type)] for l in labels + folders],
+        [[entry.id, entry.name, str(entry.type)] for entry in labels + folders],
     )

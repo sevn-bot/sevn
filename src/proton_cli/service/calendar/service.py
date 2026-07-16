@@ -4,17 +4,20 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 from pgpy import PGPKey, PGPMessage
 
-from proton_cli.account.keys import Unlocked
 from proton_cli.crypto import cards as card_crypto
 from proton_cli.crypto import ical as ical_crypto
 from proton_cli.errors import NotFound
 from proton_cli.proton.client import Client, Request
 from proton_cli.ref import pick
 from proton_cli.service.drive import blocks
+
+if TYPE_CHECKING:
+    from proton_cli.account.keys import Unlocked
 
 PARTSTAT_NEEDS_ACTION = 0
 PARTSTAT_TENTATIVE = 1
@@ -180,15 +183,17 @@ class CalendarService:
             ),
         )
 
-    def event_create(self, unlocked: Unlocked, calendar_id: str, event_in: EventInput) -> EventResult:
+    def event_create(
+        self, unlocked: Unlocked, calendar_id: str, event_in: EventInput
+    ) -> EventResult:
         keys = self._unlock_calendar(unlocked, calendar_id)
         notifs = ical_crypto.build_reminders(event_in.reminders or [])
         organizer = keys.email if event_in.attendees else ""
         uid = ical_crypto.event_uid()
         signed = ical_crypto.signed_vevent(
             uid,
-            event_in.start or datetime.now(),
-            event_in.end or datetime.now(),
+            event_in.start or datetime.now(UTC),
+            event_in.end or datetime.now(UTC),
             event_in.all_day,
             0,
             event_in.rrule,
@@ -215,7 +220,9 @@ class CalendarService:
         }
         invite: Invite | None = None
         if event_in.attendees:
-            atts, clear, added, external = self._build_attendees(uid, event_in.attendees, session_key)
+            atts, clear, added, external = self._build_attendees(
+                uid, event_in.attendees, session_key
+            )
             att_card = card_crypto.encrypt_part_with_session_key(
                 ical_crypto.attendees_vevent(uid, atts),
                 session_key,
@@ -232,8 +239,8 @@ class CalendarService:
                         event_in.title,
                         event_in.location,
                         event_in.description,
-                        event_in.start or datetime.now(),
-                        event_in.end or datetime.now(),
+                        event_in.start or datetime.now(UTC),
+                        event_in.end or datetime.now(UTC),
                         event_in.all_day,
                         organizer,
                         atts,
@@ -253,9 +260,7 @@ class CalendarService:
         result = EventResult(invite=invite)
         responses = payload.get("Responses") or []
         if responses:
-            result.id = str(
-                (responses[0].get("Response") or {}).get("Event", {}).get("ID", "")
-            )
+            result.id = str((responses[0].get("Response") or {}).get("Event", {}).get("ID", ""))
         return result
 
     def event_respond(
@@ -290,7 +295,7 @@ class CalendarService:
             Request(
                 method="PUT",
                 path=f"/calendar/v1/{calendar_id}/events/{event_id}/attendees/{attendee_id}",
-                body={"Status": status, "UpdateTime": int(datetime.now().timestamp())},
+                body={"Status": status, "UpdateTime": int(datetime.now(UTC).timestamp())},
             ),
         )
         result = RespondResult(status=_status_word(status))
@@ -311,8 +316,8 @@ class CalendarService:
             )
             result.title = title
             if organizer and organizer.lower() != self_email.lower():
-                start = datetime.fromtimestamp(int(raw.get("StartTime", 0) or 0))
-                end = datetime.fromtimestamp(int(raw.get("EndTime", 0) or 0))
+                start = datetime.fromtimestamp(int(raw.get("StartTime", 0) or 0), tz=UTC)
+                end = datetime.fromtimestamp(int(raw.get("EndTime", 0) or 0), tz=UTC)
                 result.reply = Reply(
                     ics=ical_crypto.reply_ics(
                         uid,
@@ -427,7 +432,9 @@ class CalendarService:
         uid: str,
         emails: list[str],
         session_key: blocks.SessionKey,
-    ) -> tuple[list[ical_crypto.Attendee], list[dict[str, object]], list[dict[str, object]], list[str]]:
+    ) -> tuple[
+        list[ical_crypto.Attendee], list[dict[str, object]], list[dict[str, object]], list[str]
+    ]:
         seen: set[str] = set()
         atts: list[ical_crypto.Attendee] = []
         clear: list[dict[str, object]] = []
@@ -458,9 +465,7 @@ class CalendarService:
             if keys:
                 rec_key, _ = PGPKey.from_blob(str(keys[0].get("PublicKey", "")))
                 kp = blocks.encrypt_session_key_packet(rec_key, session_key)
-                added.append(
-                    {"Email": email, "AddressKeyPacket": base64.b64encode(kp).decode()}
-                )
+                added.append({"Email": email, "AddressKeyPacket": base64.b64encode(kp).decode()})
             else:
                 external.append(email)
         return atts, clear, added, external
@@ -541,15 +546,15 @@ class CalendarService:
             title=ical_crypto.field(joined, "SUMMARY"),
             location=ical_crypto.field(joined, "LOCATION"),
             description=ical_crypto.field(joined, "DESCRIPTION"),
-            start=datetime.fromtimestamp(start_ts),
-            end=datetime.fromtimestamp(end_ts),
+            start=datetime.fromtimestamp(start_ts, tz=UTC),
+            end=datetime.fromtimestamp(end_ts, tz=UTC),
             all_day=int(raw.get("FullDay", 0) or 0) == 1,
             uid=str(raw.get("UID", "")),
         )
 
 
 def default_range() -> tuple[datetime, datetime]:
-    now = datetime.now()
+    now = datetime.now(UTC)
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     return start, start + timedelta(days=30)
 

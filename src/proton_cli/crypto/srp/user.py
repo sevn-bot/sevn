@@ -25,7 +25,9 @@ def hash_k(hash_class: type[PMHash], g: int, modulus: int, width: int) -> int:
     return bytes_to_long(h.digest())
 
 
-def calculate_x(hash_class: type[PMHash], salt: bytes, password: bytes, modulus: int, version: int) -> int:
+def calculate_x(
+    hash_class: type[PMHash], salt: bytes, password: bytes, modulus: int, version: int
+) -> int:
     exp = hash_password(hash_class, password, salt, long_to_bytes(modulus, SRP_LEN_BYTES), version)
     return bytes_to_long(exp)
 

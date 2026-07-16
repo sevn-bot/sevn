@@ -40,9 +40,7 @@ def decrypt_cards(
     out: list[str] = []
     for raw in cards:
         card = card_from_api(raw)
-        if card.type == CARD_CLEAR:
-            out.append(card.data)
-        elif card.type == CARD_SIGNED:
+        if card.type == CARD_CLEAR or card.type == CARD_SIGNED:
             out.append(card.data)
         elif card.type in (CARD_ENCRYPTED, CARD_ENCRYPTED_SIGNED):
             plain = _decrypt_card_data(card.data, key_packet, decryption_key)

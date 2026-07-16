@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import sys
-
 import typer
 
 from proton_cli import __version__
 from proton_cli.app import Options, new_app
 from proton_cli.errors import classify_exit_code
-from proton_cli.render.output import Format, parse_format
+from proton_cli.render.output import parse_format
 
 app = typer.Typer(
     name="proton-cli",
@@ -22,7 +20,7 @@ app = typer.Typer(
 def _version_callback(value: bool) -> None:
     if value:
         typer.echo(__version__)
-        raise typer.Exit()
+        raise typer.Exit
 
 
 @app.callback()
@@ -63,7 +61,16 @@ def main(
     )
 
 
-from proton_cli.cli import api_cmd, calendar_cmd, contacts_cmd, drive_cmd, mail_cmd, pass_cmd, settings_cmd, status_cmd  # noqa: E402
+from proton_cli.cli import (  # noqa: E402
+    api_cmd,
+    calendar_cmd,
+    contacts_cmd,
+    drive_cmd,
+    mail_cmd,
+    pass_cmd,
+    settings_cmd,
+    status_cmd,
+)
 
 app.add_typer(status_cmd.app, name="status")
 app.add_typer(api_cmd.app, name="api")
@@ -83,7 +90,6 @@ def cli_main() -> None:
     except KeyboardInterrupt:
         raise SystemExit(130) from None
     except Exception as exc:
-        print(str(exc), file=sys.stderr)
         raise SystemExit(classify_exit_code(exc)) from exc
 
 

@@ -128,7 +128,20 @@ class ProtonPassCliBackend:
 
     @staticmethod
     def _is_proton_cli(exe: str) -> bool:
-        """Return True when ``exe`` is the Python ``proton-cli`` port."""
+        """Return True when ``exe`` is the Python ``proton-cli`` port.
+
+        Args:
+            exe (str): Resolved CLI path.
+
+        Returns:
+            bool: True for ``proton-cli`` / ``*-proton-cli`` binary names.
+
+        Examples:
+            >>> ProtonPassCliBackend._is_proton_cli("/usr/bin/proton-cli")
+            True
+            >>> ProtonPassCliBackend._is_proton_cli("/usr/bin/proton-pass")
+            False
+        """
         base = Path(exe).name
         return base == "proton-cli" or base.endswith("-proton-cli")
 
@@ -230,7 +243,15 @@ class ProtonPassCliBackend:
             raise SecretsBackendError(msg)
         label = self._item_label(key)
         if self._is_proton_cli(exe):
-            args = [exe, "pass", "secrets", "set", label, value, *self._vault_flags(proton_cli=True)]
+            args = [
+                exe,
+                "pass",
+                "secrets",
+                "set",
+                label,
+                value,
+                *self._vault_flags(proton_cli=True),
+            ]
         elif self._is_pass_cli(exe):
             args = [
                 exe,

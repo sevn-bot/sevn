@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import base64
 import mimetypes
-import os
 import secrets
 from dataclasses import dataclass
 from email import policy
@@ -49,7 +48,9 @@ def prepare_attachments(
     return out
 
 
-def prepare_inline_images(body: str, paths: list[str], sender_email: str) -> tuple[str, list[PreparedAttachment]]:
+def prepare_inline_images(
+    body: str, paths: list[str], sender_email: str
+) -> tuple[str, list[PreparedAttachment]]:
     if not paths:
         return body, []
     out: list[PreparedAttachment] = []

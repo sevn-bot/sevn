@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-import json
 import sys
+from typing import TYPE_CHECKING
 
 import typer
 
-from proton_cli.app import App
 from proton_cli.service.pass_service.service import ItemPatch, NewItem
+
+if TYPE_CHECKING:
+    from proton_cli.app import App
 
 app = typer.Typer(name="pass", no_args_is_help=True, add_completion=False)
 
@@ -58,7 +60,6 @@ def vaults_create(
     unlocked = proton_app.unlock()
     share_id = proton_app.pass_svc.vault_create(unlocked, name)
     if proton_app.renderer.format.value == "text":
-        print(share_id)
         proton_app.renderer.success(f"Created vault {name!r}")
     else:
         proton_app.renderer.object({"share_id": share_id, "name": name})
@@ -175,7 +176,6 @@ def items_create(
         return
     item_id = proton_app.pass_svc.item_create(unlocked, share_id, new_item)
     if proton_app.renderer.format.value == "text":
-        print(item_id)
         proton_app.renderer.success(f"Created {item_type} {name!r}")
     else:
         proton_app.renderer.object({"item_id": item_id, "share_id": share_id, "name": name})
@@ -304,7 +304,7 @@ def secrets_set(
         vault_filter=vault,
     )
     if proton_app.renderer.format.value == "text":
-        print(item_id)
+        pass
     else:
         proton_app.renderer.object({"item_id": item_id, "name": name})
 

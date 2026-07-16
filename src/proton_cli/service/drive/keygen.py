@@ -71,9 +71,7 @@ def _generate_armored_locked_key_python(passphrase: bytes) -> str:
 def _generate_armored_locked_key_go(passphrase: bytes) -> str:
     go = shutil.which("go")
     if not go:
-        msg = (
-            "unable to generate Drive node keys (pgpy keygen failed and Go is not installed)"
-        )
+        msg = "unable to generate Drive node keys (pgpy keygen failed and Go is not installed)"
         raise RuntimeError(msg)
     with tempfile.TemporaryDirectory(prefix="proton-cli-keygen-") as tmp:
         mod_dir = Path(tmp)
@@ -100,4 +98,7 @@ def _generate_armored_locked_key_go(passphrase: bytes) -> str:
         out = proc.stdout.decode()
         if "-----END PGP PRIVATE KEY BLOCK-----" not in out:
             raise RuntimeError("go keygen returned invalid armored key")
-        return out.split("-----END PGP PRIVATE KEY BLOCK-----")[0] + "-----END PGP PRIVATE KEY BLOCK-----\n"
+        return (
+            out.split("-----END PGP PRIVATE KEY BLOCK-----")[0]
+            + "-----END PGP PRIVATE KEY BLOCK-----\n"
+        )
