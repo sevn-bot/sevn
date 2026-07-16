@@ -283,9 +283,13 @@ class MailService:
             raise ValueError("at least one --to recipient is required")
         addr_keys, _addr_id, sender_email = unlocked.primary_addr()
         mime_type = "text/html" if opts.html else "text/plain"
+        key0 = addr_keys[0]
         message = PGPMessage.new(opts.body)
-        with addr_keys[0].unlock(None):
-            enc = addr_keys[0].encrypt(message)
+        if key0.is_unlocked:
+            enc = key0.encrypt(message)
+        else:
+            with key0.unlock(None):
+                enc = key0.encrypt(message)
         armored = str(enc)
 
         draft_payload: dict = {}
@@ -353,17 +357,24 @@ class MailService:
         plans: list[tuple[str, int, str]],
         addr_keys: list,
     ) -> list[dict[str, object]]:
+        key0 = addr_keys[0]
         session_message = PGPMessage.new(body)
-        with addr_keys[0].unlock(None):
-            enc_body = addr_keys[0].encrypt(session_message)
+        if key0.is_unlocked:
+            enc_body = key0.encrypt(session_message)
+        else:
+            with key0.unlock(None):
+                enc_body = key0.encrypt(session_message)
         body_b64 = base64.b64encode(bytes(enc_body)).decode()
 
         internal_addrs: dict[str, object] = {}
         clear_addrs: dict[str, object] = {}
         for email, scheme, armored_key in plans:
             if scheme == PKG_INTERNAL and armored_key:
-                with addr_keys[0].unlock(None):
-                    wrapped = addr_keys[0].encrypt(PGPMessage.new(body))
+                if key0.is_unlocked:
+                    wrapped = key0.encrypt(PGPMessage.new(body))
+                else:
+                    with key0.unlock(None):
+                        wrapped = key0.encrypt(PGPMessage.new(body))
                 internal_addrs[email] = {
                     "Type": PKG_INTERNAL,
                     "BodyKeyPacket": base64.b64encode(bytes(wrapped)).decode(),
@@ -374,8 +385,11 @@ class MailService:
 
         packages: list[dict[str, object]] = []
         if internal_addrs:
-            with addr_keys[0].unlock(None):
-                sender_wrap = addr_keys[0].encrypt(PGPMessage.new(body))
+            if key0.is_unlocked:
+                sender_wrap = key0.encrypt(PGPMessage.new(body))
+            else:
+                with key0.unlock(None):
+                    sender_wrap = key0.encrypt(PGPMessage.new(body))
             packages.append(
                 {
                     "Addresses": internal_addrs,
