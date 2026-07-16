@@ -43,6 +43,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- [2026-07-16] Residual Playwright symbols renamed to browser_tool (routing/grounding), deprecated prompt aliases dropped, OpenUI rasteriser is weasyprint-only, and docker/.env install paths use `browser-cdp` without `playwright install`
 - [2026-07-15] Telegram `/config`, onboarding wizard, and Mission Control Knowledge view expose Second Brain layout selection and resolved PARA role paths instead of assuming legacy `wiki/raw/outputs` folders
 - [2026-07-16] Remove Playwright browser extra and Playwright-based skills (`playwright-browser`, `facebook-use`, `linkedin-use`, `x-use`); install/sync paths prefer `browser-cdp` only (WIP on `remove/playwright`)
 - [2026-07-14] The about-docs generator no longer writes `interfaces`, `depends_on`, or `build_phase` into `kind: prd` frontmatter (spec-only keys; aligns with `skw prd-validate`)
@@ -75,6 +76,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-16] README fingerprint stamps skip rewriting `_fingerprints.json` when the source digest is unchanged, so curated pre-commit sync no longer loops on timestamp-only churn
 - [2026-07-16] Browser spawn defaults include AutomationControlled and hygiene flags so Google/X sign-in is not blocked; closing then reopening the same profile clears stale CDP port and Singleton locks and ignores outdated DevToolsActivePort files
 - [2026-07-14] Bundled skill seeding skips `__pycache__` when copying packaged skills, avoiding parallel-test flakes on transient `.pyc` files
 - [2026-07-15] Telegram session mirror title lookup is best-effort when SQLite errors occur; group titles also persist from inline-keyboard callbacks (#21)
