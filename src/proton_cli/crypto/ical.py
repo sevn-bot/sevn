@@ -68,7 +68,7 @@ class Attendee:
 
 
 def attendee_token(uid: str, email: str) -> str:
-    # codeql[py/weak-sensitive-data-hashing] Proton calendar attendee token format
+    # codeql[py/weak-sensitive-data-hashing]
     return hashlib.sha1((uid + canonical_email(email)).encode()).hexdigest()
 
 
