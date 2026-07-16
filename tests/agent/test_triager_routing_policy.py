@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import pytest
+
 from sevn.agent.openers import BARE_OPENERS
 from sevn.agent.triager.models import ComplexityTier, Intent, TriageResult
 from sevn.agent.triager.routing_policy import (
@@ -1304,3 +1306,41 @@ def test_intent_router_applied_log_skipped_for_premerged_workspace_tools_w10() -
         assert not _intent_router_log_lines(captured)
     finally:
         loguru_logger.remove(sink_id)
+
+
+# --- W1 RED (DP3): playwright → browser_tool renames (green after W5) ---
+
+
+@pytest.mark.xfail(reason="green after W5: DP3 is_browser_tool_message rename", strict=False)
+def test_is_browser_tool_message_renamed_and_behaves() -> None:
+    """DP3: is_browser_tool_message exists and mirrors prior screenshot/browser detection."""
+    from sevn.agent.triager.routing_policy import is_browser_tool_message
+
+    assert is_browser_tool_message("get a screenshot of https://example.com")
+    assert is_browser_tool_message("capture a screenshot of the login page")
+    assert is_browser_tool_message("Search nba.com")
+    assert not is_browser_tool_message("hello")
+
+
+@pytest.mark.xfail(reason="green after W5: DP3 _merge_browser_tool_surface rename", strict=False)
+def test_merge_browser_tool_surface_renamed() -> None:
+    """DP3: _merge_browser_tool_surface replaces _merge_playwright_browser_surface."""
+    from sevn.agent.triager import routing_policy as rp
+
+    assert hasattr(rp, "_merge_browser_tool_surface")
+    assert not hasattr(rp, "_merge_playwright_browser_surface")
+    tools, skills = rp._merge_browser_tool_surface(["terminal_run", "process"], [])
+    assert tools == ["browser", "load_tool", "send_file"]
+    assert "playwright-browser" not in skills
+
+
+@pytest.mark.xfail(reason="green after W5: DP3 old playwright routing symbols gone", strict=False)
+def test_playwright_routing_symbols_removed() -> None:
+    """DP3: old playwright-named routing helpers are absent after rename."""
+    from sevn.agent.triager import routing_policy as rp
+
+    assert not hasattr(rp, "is_playwright_browser_message")
+    assert not hasattr(rp, "_PLAYWRIGHT_BROWSER_PATTERNS")
+    assert not hasattr(rp, "_PLAYWRIGHT_BROWSER_TOOL_IDS")
+    assert hasattr(rp, "_BROWSER_TOOL_PATTERNS")
+    assert hasattr(rp, "_BROWSER_TOOL_TOOL_IDS")
