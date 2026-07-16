@@ -11,11 +11,6 @@ from sevn.tools.context import ToolContext
 from sevn.tools.permissions import AllowAllPermissionPolicy
 from sevn.tools.transcript import read_transcript_tool
 
-_XFAIL_W4 = pytest.mark.xfail(
-    reason="green after W4: read_transcript int.get crash (D10)",
-    strict=False,
-)
-
 
 def _tool_heavy_provider_messages(*, tool_count: int = 12) -> list[dict[str, object]]:
     """Build provider_turn_messages dense enough to exercise provenance compaction."""
@@ -116,7 +111,6 @@ def ctx(tool_heavy_workspace: tuple[Path, str]) -> ToolContext:
     )
 
 
-@_XFAIL_W4
 @pytest.mark.asyncio
 @pytest.mark.parametrize("limit", [5, 6, 20])
 async def test_d10_read_transcript_tool_heavy_limits_never_int_get(

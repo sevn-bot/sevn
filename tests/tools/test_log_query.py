@@ -682,11 +682,6 @@ async def test_log_query_bad_when_is_validation_error(dated_ctx: ToolContext) ->
 # D11 — pattern → matching lines (paged), not tail_summary (green after W4)
 # ---------------------------------------------------------------------------
 
-_XFAIL_W4_D11 = pytest.mark.xfail(
-    reason="green after W4: log_query pattern returns matching lines (D11)",
-    strict=False,
-)
-
 
 @pytest.fixture
 def patterned_log_workspace(tmp_path: Path) -> Path:
@@ -719,7 +714,6 @@ def patterned_ctx(patterned_log_workspace: Path) -> ToolContext:
     )
 
 
-@_XFAIL_W4_D11
 @pytest.mark.asyncio
 async def test_d11_pattern_returns_matching_lines_not_tail_summary(
     patterned_ctx: ToolContext,
