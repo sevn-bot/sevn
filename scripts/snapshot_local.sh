@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Snapshot local-only, gitignored trees that `git clean -fdx` (or rm -rf) would destroy
-# and git cannot restore: plan/, plans/, prd/, specs/, prompts/, examples/, .cursor/,
-# .claude/ agent config+memory, docs/, and the conversation-eval tools.
+# and git cannot restore: whole ROOT TREES — .ignorelocal/, spec-kit-wave/,
+# build-plan-from-review/, .cursor/, .claude/ agent config+memory+skills+commands, docs/.
+#
+# Also installable as a standalone launchd timer (every 3h, independent of git push) —
+# see scripts/launchd/bot.sevn.snapshot-local.plist + scripts/install_snapshot_timer.sh.
 #
 # Strategy (Time-Machine style):
 #   - rsync each path into a fresh dated snapshot under $backup_root/snapshots/
@@ -28,14 +31,16 @@ keep="${SEVN_LOCAL_BACKUP_KEEP:-40}"
 
 mkdir -p "$snaps" 2>/dev/null || { echo "snapshot-local: cannot write $snaps" >&2; exit 0; }
 
-# High-value local-only paths (gitignored; not recoverable from git history).
+# High-value local-only trees (gitignored; not recoverable from git history).
+# Back up whole ROOT TREES, not hand-picked subpaths — a narrow allow-list is exactly
+# how an `rm -rf` of an un-enumerated sibling folder slipped past this backup before.
 paths=(
-  .ignorelocal/design/plan .ignorelocal/design/plans .ignorelocal/design/prd
-  .ignorelocal/design/specs .ignorelocal/design/prompts .ignorelocal/design/examples
+  .ignorelocal
+  spec-kit-wave
+  build-plan-from-review
   .cursor
   .claude/agents .claude/agent-memory .claude/skills .claude/commands
   docs
-  tools/conversation_eval.py tools/conversation_eval_rubric.md
 )
 
 present=()
@@ -45,12 +50,27 @@ if [[ ${#present[@]} -eq 0 ]]; then
   exit 0
 fi
 
-# Skip regenerable / huge / runtime noise.
+# Skip regenerable / huge / runtime noise — and, critically, secrets. Broadening the
+# trees above means we now sweep over dirs that may hold dotenv secrets and rebuildable
+# indexes, so the denylist below is what keeps those out of the backup.
+#
+# .env carve-out: rsync applies include/exclude rules in order, FIRST match wins. The
+# two --include lines therefore MUST precede the two .env --exclude lines so that
+# tracked templates (.env.example, .env.proxy.example, …) are kept while real secret
+# files (.env, .env.proxy, .env.local, …) are dropped.
 excludes=(
   --exclude='__pycache__/' --exclude='*.pyc' --exclude='.DS_Store'
   --exclude='.venv/' --exclude='node_modules/'
   --exclude='.mypy_cache/' --exclude='.ruff_cache/' --exclude='.pytest_cache/'
   --exclude='*.db' --exclude='*.db-shm' --exclude='*.db-wal'
+  # keep dotenv TEMPLATES (tracked docs) ...
+  --include='.env.example' --include='.env.*.example'
+  # ... but never back up real dotenv SECRETS
+  --exclude='.env' --exclude='.env.*'
+  # regenerable / huge index dirs pulled in by the broadened trees
+  --exclude='graphify-out/'
+  --exclude='MyCodeGraph/'
+  --exclude='.understand-anything/'
 )
 
 latest="$(ls -1dt "$snaps"/sevn-* 2>/dev/null | head -1 || true)"

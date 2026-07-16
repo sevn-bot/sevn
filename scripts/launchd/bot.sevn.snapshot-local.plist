@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  bot.sevn.snapshot-local — macOS LaunchAgent that runs the local-only backup snapshot
+  every 3 hours, independent of git push. Protection no longer depends on remembering
+  to push a feature branch.
+
+  Install with: bash scripts/install_snapshot_timer.sh
+  (copies this plist to ~/Library/LaunchAgents/ and bootstraps it into the user domain).
+
+  Note: the log path below is expanded by the installer (launchd does NOT expand ~ or
+  $HOME in plist string values), so this checked-in copy uses the concrete path.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>bot.sevn.snapshot-local</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/alex/Documents/code/sevn.bot/sevn/scripts/snapshot_local.sh</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/alex/Documents/code/sevn.bot/sevn</string>
+
+  <key>StartInterval</key>
+  <integer>10800</integer>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/alex/.sevn-local-backups/sevn.bot/snapshot-cron.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/alex/.sevn-local-backups/sevn.bot/snapshot-cron.log</string>
+</dict>
+</plist>
