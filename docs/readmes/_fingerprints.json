@@ -77,8 +77,8 @@
     },
     "onboarding": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-15T18:16:30Z",
-      "digest": "895d7ad78d521dea322b185c69de44bbd2d502f456d7b17c4a318d1e20488f2d",
+      "computed_at": "2026-07-16T19:35:58Z",
+      "digest": "5f8e4e6cb2a518d194c62de31295adc87dde5be4586065f949ba72909e429fc4",
       "source_globs": [
         "src/sevn/onboarding/**",
         "src/sevn/cli/commands/onboard.py",
@@ -103,8 +103,8 @@
     },
     "root": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-15T18:16:29Z",
-      "digest": "222980b7a79993d517583c14a736f524656d7391a6660d3bc74bd59bc63cafdc",
+      "computed_at": "2026-07-16T19:35:58Z",
+      "digest": "5a0756e0de966cd79afaaa5d5384d441a4709f39b82ec51a555cb9ecee5643e0",
       "source_globs": [
         "pyproject.toml",
         "CLAUDE.md",
@@ -148,8 +148,8 @@
     },
     "skills": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-15T18:16:30Z",
-      "digest": "6c53883a221bf0db8737b4b598d83cb758145c1e8a4e8d823677de8926535d41",
+      "computed_at": "2026-07-16T19:35:58Z",
+      "digest": "e0ce165abc44b7acb7c1dfa07d7410159d7ad5d003470d9ee835743123226f6d",
       "source_globs": [
         "src/sevn/skills/**",
         "src/sevn/data/bundled_skills/**",
@@ -180,8 +180,8 @@
     },
     "tools": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-15T18:16:29Z",
-      "digest": "253a2f73aec570ddd844f09c440db278306d750ca2fdf9553b56d5b1c9082ac3",
+      "computed_at": "2026-07-16T19:35:58Z",
+      "digest": "d6b98fefe404d2fa31b72d885b0fb79a9fdda25a3dc06f39deedfa8f4c7264b0",
       "source_globs": [
         "src/sevn/tools/**"
       ]
