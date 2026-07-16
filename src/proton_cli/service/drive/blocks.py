@@ -127,7 +127,7 @@ def _encrypt_openpgp_cfb(plaintext: bytes, key: bytes, block_size: int) -> bytes
     for i in range(0, len(plaintext), block_size):
         block = plaintext[i : i + block_size]
         keystream = ecb.update(feedback)
-        cipher_block = bytes(a ^ b for a, b in zip(block, keystream, strict=True))
+        cipher_block = bytes(a ^ b for a, b in zip(block, keystream, strict=False))
         out.extend(cipher_block)
         feedback = (
             cipher_block
@@ -145,7 +145,7 @@ def _decrypt_openpgp_cfb(ciphertext: bytes, key: bytes, block_size: int) -> byte
     for i in range(0, len(ciphertext), block_size):
         block = ciphertext[i : i + block_size]
         keystream = ecb.update(feedback)
-        out.extend(a ^ b for a, b in zip(block, keystream, strict=True))
+        out.extend(a ^ b for a, b in zip(block, keystream, strict=False))
         feedback = block if len(block) == block_size else block + bytes(block_size - len(block))
     ecb.finalize()
     return bytes(out)
