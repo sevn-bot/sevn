@@ -12,12 +12,15 @@ secrets_backup_env.env
 infra/cloudflared/config.yml
 !infra/cloudflared/config.example.yml
 
-# --- Docs: publish readmes + brand only ---
+# --- Docs: publish readmes + brand + faq only ---
 docs/*
 !docs/readmes/
 !docs/readmes/**
 !docs/brand/
 !docs/brand/**
+!docs/faq/
+!docs/faq/**
+!docs/FAQ.md
 
 # --- Operator-private (details not listed here) ---
 .ignorelocal/
