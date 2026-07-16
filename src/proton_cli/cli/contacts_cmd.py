@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import typer
 
-from proton_cli.app import App
 from proton_cli.service.contacts.service import NewContact
+
+if TYPE_CHECKING:
+    from proton_cli.app import App
 
 app = typer.Typer(name="contacts", no_args_is_help=True, add_completion=False)
 
@@ -61,7 +65,7 @@ def contacts_create(
         NewContact(name=name, emails=list(email)),
     )
     if proton_app.renderer.format.value == "text":
-        print(cid)
+        typer.echo(cid)
     proton_app.renderer.success(f"Created contact {name!r}")
 
 

@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from proton_cli.account.keys import Unlocked
 from proton_cli.crypto import cards as card_crypto
 from proton_cli.crypto import vcard as vcard_crypto
-from proton_cli.errors import NotFound
 from proton_cli.proton.client import Client, Request
 from proton_cli.ref import pick
+
+if TYPE_CHECKING:
+    from proton_cli.account.keys import Unlocked
 
 
 @dataclass
@@ -89,8 +91,7 @@ class ContactsService:
         matches = [
             c
             for c in rows
-            if needle in c.name.lower()
-            or any(needle in e.lower() for e in c.emails)
+            if needle in c.name.lower() or any(needle in e.lower() for e in c.emails)
         ]
         chosen = pick(
             "contact",

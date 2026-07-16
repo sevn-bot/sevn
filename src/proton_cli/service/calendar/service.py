@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 from pgpy import PGPKey, PGPMessage
 
-from proton_cli.account.keys import Unlocked
 from proton_cli.crypto import cards as card_crypto
 from proton_cli.crypto import ical as ical_crypto
 from proton_cli.errors import NotFound
 from proton_cli.proton.client import Client, Request
 from proton_cli.ref import pick
+
+if TYPE_CHECKING:
+    from proton_cli.account.keys import Unlocked
 
 
 @dataclass
@@ -235,14 +238,14 @@ class CalendarService:
             title=ical_crypto.field(joined, "SUMMARY"),
             location=ical_crypto.field(joined, "LOCATION"),
             description=ical_crypto.field(joined, "DESCRIPTION"),
-            start=datetime.fromtimestamp(start_ts),
-            end=datetime.fromtimestamp(end_ts),
+            start=datetime.fromtimestamp(start_ts, tz=UTC),
+            end=datetime.fromtimestamp(end_ts, tz=UTC),
             all_day=int(raw.get("FullDay", 0) or 0) == 1,
             uid=str(raw.get("UID", "")),
         )
 
 
 def default_range() -> tuple[datetime, datetime]:
-    now = datetime.now()
+    now = datetime.now(tz=UTC)
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     return start, start + timedelta(days=30)

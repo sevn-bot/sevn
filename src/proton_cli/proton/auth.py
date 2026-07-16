@@ -4,34 +4,26 @@ from __future__ import annotations
 
 import base64
 import json
+from typing import TYPE_CHECKING
 
 from proton_cli.crypto.modulus import decode_modulus
 from proton_cli.crypto.srp.user import User
-from proton_cli.proton.client import Client
 from proton_cli.proton.errors import HumanVerificationError
+
+if TYPE_CHECKING:
+    from proton_cli.proton.client import Client
 
 
 def login(client: Client, username: str, password: str, totp: str = "") -> None:
     """Perform full web-client auth: session → SRP → optional 2FA."""
     sess = _create_session(client)
     client.set_tokens(sess["UID"], sess["AccessToken"], sess["RefreshToken"])
-    auth = _login_srp_with_hv(client, username, password)
+    auth = _login_srp(client, username, password, "", "")
     client.set_tokens(auth["UID"], auth["AccessToken"], auth["RefreshToken"])
     if int(auth.get("2FA", {}).get("Enabled", 0) or 0) & 1:
         if not totp:
             raise ValueError("account requires 2FA but no TOTP code provided")
         _auth_2fa(client, totp)
-
-
-def _login_srp_with_hv(client: Client, username: str, password: str) -> dict:
-    try:
-        return _login_srp(client, username, password, "", "")
-    except HumanVerificationError as hv_err:
-        resolver = client._get_hv_resolver()
-        if not resolver:
-            raise
-        token, kind = resolver(hv_err)
-        return _login_srp(client, username, password, token, kind)
 
 
 def _create_session(client: Client) -> dict:

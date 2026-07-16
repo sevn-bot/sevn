@@ -84,4 +84,7 @@ def generate_armored_locked_key(passphrase: bytes) -> str:
         out = proc.stdout.decode()
         if "-----END PGP PRIVATE KEY BLOCK-----" not in out:
             raise RuntimeError("go keygen returned invalid armored key")
-        return out.split("-----END PGP PRIVATE KEY BLOCK-----")[0] + "-----END PGP PRIVATE KEY BLOCK-----\n"
+        return (
+            out.split("-----END PGP PRIVATE KEY BLOCK-----")[0]
+            + "-----END PGP PRIVATE KEY BLOCK-----\n"
+        )

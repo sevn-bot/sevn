@@ -3,16 +3,24 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
 import typer
 
-from proton_cli.app import App
 from proton_cli.proton.client import Request
+
+if TYPE_CHECKING:
+    from proton_cli.app import App
 
 app = typer.Typer(name="settings", no_args_is_help=True, add_completion=False)
 
 MAIL_SETTINGS: dict[str, tuple[str, str, bool, str]] = {
-    "page-size": ("/mail/v4/settings/pagesize", "PageSize", True, "messages per page (50, 100, 200)"),
+    "page-size": (
+        "/mail/v4/settings/pagesize",
+        "PageSize",
+        True,
+        "messages per page (50, 100, 200)",
+    ),
     "view-mode": ("/mail/v4/settings/viewmode", "ViewMode", True, "0=conversations, 1=messages"),
     "sign": ("/mail/v4/settings/sign", "Sign", True, "0=off, 1=sign outgoing"),
     "attach-public-key": ("/mail/v4/settings/attachpublic", "AttachPublicKey", True, "0/1"),
@@ -83,7 +91,9 @@ def settings_set(
         return
     spec = MAIL_SETTINGS.get(key)
     if spec is None:
-        raise typer.BadParameter(f"unknown setting {key!r}; run `settings set` with no args to list keys")
+        raise typer.BadParameter(
+            f"unknown setting {key!r}; run `settings set` with no args to list keys"
+        )
     path, field, is_int, _desc = spec
     if proton_app.dry_run:
         proton_app.renderer.info(f"dry-run: would set {key} = {value}")

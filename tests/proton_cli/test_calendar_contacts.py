@@ -20,7 +20,7 @@ def test_default_range() -> None:
 
 def test_calendar_list_mock() -> None:
     class FakeClient:
-        def decode(self, req, out):  # noqa: ANN001
+        def decode(self, req, out):
             out.clear()
             out.update(
                 {

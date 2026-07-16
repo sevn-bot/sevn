@@ -5,15 +5,17 @@ from __future__ import annotations
 import base64
 import hashlib
 from dataclasses import dataclass
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
 
 import httpx
 from pgpy import PGPKey, PGPMessage
 
-from proton_cli.account.keys import Unlocked
 from proton_cli.errors import NotFound
 from proton_cli.proton.client import Client, Request
 from proton_cli.service.drive import blocks, crypto, paths
+
+if TYPE_CHECKING:
+    from proton_cli.account.keys import Unlocked
 
 BLOCK_SIZE = 4 * 1024 * 1024
 
@@ -129,7 +131,6 @@ class DriveService:
             )
         parts = [p for p in path.strip("/").split("/") if p]
         current_id = dc.root_link_id
-        parent_key = dc.share_key
         current_key = root_key
         for i, part in enumerate(parts):
             is_last = i == len(parts) - 1
@@ -157,7 +158,6 @@ class DriveService:
                 )
             if found.type != 1:
                 raise ValueError(f"{part} is not a folder")
-            parent_key = current_key
             current_key = child_key
             current_id = found.link_id
         raise ValueError("path resolution failed")
@@ -298,7 +298,9 @@ class DriveService:
         )
         upload_links = upload_payload.get("UploadLinks") or []
         for i, link in enumerate(upload_links):
-            self._upload_block(link.get("BareURL", ""), link.get("Token", ""), block_infos[i]["enc_data"])
+            self._upload_block(
+                link.get("BareURL", ""), link.get("Token", ""), block_infos[i]["enc_data"]
+            )
 
         manifest = b"".join(base64.b64decode(str(b["hash"])) for b in block_infos)
         with dc.addr_key.unlock(None):
@@ -465,10 +467,14 @@ class DriveService:
     def _upload_block(self, url: str, token: str, data: bytes) -> None:
         boundary = "proton-cli-boundary"
         body = (
-            f"--{boundary}\r\n"
-            'Content-Disposition: form-data; name="Block"; filename="blob"\r\n'
-            "Content-Type: application/octet-stream\r\n\r\n"
-        ).encode() + data + f"\r\n--{boundary}--\r\n".encode()
+            (
+                f"--{boundary}\r\n"
+                'Content-Disposition: form-data; name="Block"; filename="blob"\r\n'
+                "Content-Type: application/octet-stream\r\n\r\n"
+            ).encode()
+            + data
+            + f"\r\n--{boundary}--\r\n".encode()
+        )
         resp = httpx.post(
             url,
             content=body,

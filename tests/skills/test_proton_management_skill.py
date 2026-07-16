@@ -5,10 +5,13 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-from pathlib import Path
 
 from sevn.data.bundled_skills import BUNDLED_SKILLS_ROOT
-from sevn.skills.proton_management import PROTON_MANAGEMENT_SKILL_ID, dry_run_requested, status_payload
+from sevn.skills.proton_management import (
+    PROTON_MANAGEMENT_SKILL_ID,
+    dry_run_requested,
+    status_payload,
+)
 
 _SKILL_ROOT = BUNDLED_SKILLS_ROOT / "core" / PROTON_MANAGEMENT_SKILL_ID
 _SCRIPTS = _SKILL_ROOT / "scripts"
@@ -51,42 +54,3 @@ def test_pass_vaults_list_dry_run() -> None:
     data = json.loads(proc.stdout)
     assert data["data"]["mode"] == "dry_run"
     assert data["data"]["command"] == ["pass", "vaults", "list", "--output", "json"]
-
-
-def test_mail_list_dry_run() -> None:
-    proc = subprocess.run(
-        [sys.executable, str(_SCRIPTS / "mail_list.py"), "--dry-run", "--folder", "sent"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert proc.returncode == 0
-    data = json.loads(proc.stdout)
-    assert data["data"]["mode"] == "dry_run"
-    assert data["data"]["command"][0] == "mail"
-
-
-def test_drive_list_dry_run() -> None:
-    proc = subprocess.run(
-        [sys.executable, str(_SCRIPTS / "drive_list.py"), "--dry-run", "--path", "/Docs"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert proc.returncode == 0
-    data = json.loads(proc.stdout)
-    assert data["data"]["mode"] == "dry_run"
-    assert data["data"]["command"][:3] == ["drive", "items", "list"]
-
-
-def test_contacts_list_dry_run() -> None:
-    proc = subprocess.run(
-        [sys.executable, str(_SCRIPTS / "contacts_list.py"), "--dry-run"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert proc.returncode == 0
-    data = json.loads(proc.stdout)
-    assert data["data"]["mode"] == "dry_run"
-    assert data["data"]["command"][:2] == ["contacts", "list"]

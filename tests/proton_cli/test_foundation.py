@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
-
-import pytest
+from typing import TYPE_CHECKING
 
 from proton_cli.account import session as session_store
 from proton_cli.crypto import aead
 from proton_cli.env import env_for_profile, profile_env_segment
 from proton_cli.errors import Ambiguous, NotFound, classify_exit_code
 from proton_cli.proton.errors import ErrUnauthorized
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def test_profile_env_segment() -> None:

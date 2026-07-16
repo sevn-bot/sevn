@@ -49,12 +49,10 @@ class APIError(Exception):
 class HumanVerificationError(Exception):
     """Proton code 9001 — CAPTCHA required."""
 
-    def __init__(self, *, token: str = "", methods: list[str] | None = None, web_url: str = "") -> None:
+    def __init__(
+        self, *, token: str = "", methods: list[str] | None = None, web_url: str = ""
+    ) -> None:
         self.token = token
         self.methods = methods or []
         self.web_url = web_url
         super().__init__(f"human verification required: {web_url}")
-
-
-class ErrHVUnavailable(Exception):
-    """HV challenge could not be solved automatically."""

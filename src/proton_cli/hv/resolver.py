@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import sys
 
 from proton_cli.proton.errors import ErrHVUnavailable, HumanVerificationError
 
@@ -22,17 +21,7 @@ def cli_hv_resolver(hv_err: HumanVerificationError) -> tuple[str, str]:
 
     methods = hv_err.methods or ["captcha"]
     if "captcha" in methods and hv_err.web_url:
-        print(
-            f"Human verification required. Open {hv_err.web_url} in a browser, "
-            "solve the challenge, then retry with:\n"
-            "  export PROTON_HV_TOKEN='<token from browser>'\n"
-            "  export PROTON_HV_TYPE='captcha'",
-            file=sys.stderr,
-        )
+        pass
     else:
-        print(
-            f"Human verification required (methods: {methods}) but no resolver is "
-            "available. Set PROTON_HV_TOKEN after completing verification.",
-            file=sys.stderr,
-        )
+        pass
     raise ErrHVUnavailable(str(hv_err))
