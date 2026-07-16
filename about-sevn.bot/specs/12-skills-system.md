@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own everything under workspace/skills/: how skills are discovered, validated,
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
-last_updated: '2026-07-15'
-fingerprint: sha256:d673882ffd32bea1cc3567d4c8ebfe74c476097411b5fc4224d864131cccb431
+last_updated: '2026-07-16'
+fingerprint: sha256:5aa3291720b15b99e7c584444fc5de7d243641b49132d1d31e6826d45407a83b
 related: []
 sources:
 - src/sevn/skills/**
@@ -395,6 +395,24 @@ interfaces:
 - name: openwiki_credentials_resolved
   file: src/sevn/skills/openwiki_secrets.py
   symbol: openwiki_credentials_resolved
+- name: ProtonProfile
+  file: src/sevn/skills/proton_management.py
+  symbol: ProtonProfile
+- name: cli_argv
+  file: src/sevn/skills/proton_management.py
+  symbol: cli_argv
+- name: dry_run_requested
+  file: src/sevn/skills/proton_management.py
+  symbol: dry_run_requested
+- name: resolve_cli
+  file: src/sevn/skills/proton_management.py
+  symbol: resolve_cli
+- name: run_proton_cli
+  file: src/sevn/skills/proton_management.py
+  symbol: run_proton_cli
+- name: status_payload
+  file: src/sevn/skills/proton_management.py
+  symbol: status_payload
 - name: BaselineSuppression
   file: src/sevn/skills/security_scan.py
   symbol: BaselineSuppression
