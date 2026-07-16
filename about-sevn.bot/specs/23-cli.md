@@ -169,9 +169,6 @@ interfaces:
   file: src/sevn/cli/commands/sync_cmd.py
   symbol: register
 - name: register
-  file: src/sevn/cli/commands/telegram_test.py
-  symbol: register
-- name: register
   file: src/sevn/cli/commands/tools_cmd.py
   symbol: register
 - name: register

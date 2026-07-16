@@ -4,7 +4,8 @@ description: Research any topic across Reddit, X, YouTube, HN, Polymarket, and t
 version: "3.3.2"
 see_also:
   - yt-dlp
-  - x-use
+  - browser
+  - social_media_manager
   - serp
   - web_search
   - get_page_content

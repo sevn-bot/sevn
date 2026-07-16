@@ -2,7 +2,7 @@
   "name": "sevn-bot",
   "private": true,
   "version": "0.0.0",
-  "description": "Node tooling stub for sevn.bot (Python is the source of truth). Playwright E2E removed in W6.",
+  "description": "Node tooling stub for sevn.bot (Python is the source of truth).",
   "scripts": {},
   "devDependencies": {}
 }

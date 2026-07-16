@@ -109,8 +109,9 @@ gives up and returns to a hosted assistant that "just works." Self-hosted produc
   vendor-managed funnel (see prd-00-main Non-Goals).
 - Replacing Mission Control for day-two observability—setup gets you running; prd-07-mission-control
   owns traces, provider panels, and ops surfaces.
-- Running Playwright Telegram E2E **inside** the default gateway container—host-side smoke stays
-  the developer path; Docker ships gateway + proxy, not headed browser automation by default.
+- Running headed Telegram Web E2E **inside** the default gateway container—host-side browser
+  `telegram_web` / `telegram_checks` smoke stays the developer path; Docker ships gateway + proxy,
+  not headed browser automation by default.
 - Enterprise fleet management (MDM, multi-tenant RBAC, org-wide billing)—v1 centers the **solo
   operator** workspace.
 - Hand-editing `sevn.json` as the recommended first-time path—advanced edits are supported, but

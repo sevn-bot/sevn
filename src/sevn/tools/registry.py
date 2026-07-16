@@ -188,8 +188,8 @@ DEFAULT_SKILL_MANIFESTS: Final[dict[str, str]] = {
     "sessions_management": "Gateway sessions, history, spawn, yield, and status scripts.",
     "skill_management": "Authoring workflows for manifests and promotions.",
     "social_media_manager": (
-        "Monitor and interact with social media via TwexAPI, sevn CDP browser, "
-        "and assigned social skills (x-use, facebook-use, linkedin-use)."
+        "Monitor and interact with social media via TwexAPI and the sevn CDP "
+        "browser tool (unified X ops facade; six-site social recipes)."
     ),
     "telegram": "Telegram inline buttons and forum supergroup helpers.",
     "yt-dlp": "Download video/audio and metadata with yt-dlp (allowlisted hosts).",

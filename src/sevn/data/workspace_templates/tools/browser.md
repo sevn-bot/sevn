@@ -1,7 +1,7 @@
 # browser — sevn-native CDP browser automation
 
 Drive the operator's **host Chrome** over the Chrome DevTools Protocol. Pure sevn code
-(no Playwright, no WebDriver); needs `uv sync --extra browser-cdp`.
+(native CDP only; no third-party browser automation drivers); needs `uv sync --extra browser-cdp`.
 
 The tool attaches to an already-running Chrome (`SEVN_CDP_URL` or the session registry)
 or **spawns** a headed Chrome with a persistent profile when none is reachable. Logins
@@ -37,12 +37,12 @@ and cookies persist across runs via that profile. Operator Chrome is never force
 | `dismiss_blockers` | — | best-effort accept/close cookie + consent banners |
 | `get_cookies` / `set_cookies` | `cookies?` | read / write cookies (login portability) |
 | `eval` | `expression` | **gated** — only when `tools.browser.allow_eval=true` |
-| `telegram` | `op`, `chat?`, `value?`, `query?` | Telegram Web recipe — `op`: `login` (QR/code human-handoff) · `chats` · `read` · `send` · `reply` · `search` · `botfather` (read a bot token) |
+| `telegram` | `op`, `chat?`, `value?`, `query?` | Telegram Web recipe — `op`: `login` (QR/code human-handoff) · `chats` · `read` · `send` · `reply` · `search` · `botfather` (read a bot token). Host E2E / send-receive checks use `sevn.browser.recipes.telegram_checks` on this recipe (the old `telegram_test` CLI/harness is removed). |
 | `google_search` | `query`, `mode?` | Google Search — `mode`: `results` (organic + People-Also-Ask) or `ask` (AI Overview, Gemini fallback) |
 | `gmail` | `op`, `query?`, `message_id?`, `to?`, `subject?`, `body?` | Gmail — `op`: `list` · `read` · `search` · `compose` · `reply` (writes require `tools.browser.gmail.allow_write=true`) |
 | `maps` | `op`, `query?`, `place?`, `origin?`, `destination?` | Google Maps — `op`: `search` · `place` · `directions` · `reviews` |
 | `youtube` | `op`, `url?`, `query?`, `comment_hint?`, `body?` | YouTube — `op`: `search` · `info` · `comments` · `read_replies` · `comment` · `reply` (writes require `tools.browser.youtube.allow_write=true`) |
-| `social` | `site`, `op`, `url?`, `query?`, `body?` | Social sites — `site`: `x` · `facebook` · `instagram` · `linkedin` · `reddit` · `tiktok`; `op`: `read` · `post` · `reply` · `read_replies` · `search` · `timeline_collect` · `home_feed`. On **X**, `read` / `timeline_collect` / `home_feed` return structured `{tweet_url, author_handle, text}[]` posts (status permalinks, not raw HTML). Writes require `tools.browser.social.<site>.allow_write=true` |
+| `social` | `site`, `op`, `url?`, `query?`, `body?` | Social sites — `site`: `x` · `facebook` · `instagram` · `linkedin` · `reddit` · `tiktok`; `op`: `read` · `post` · `reply` · `read_replies` · `search` · `timeline_collect` · `home_feed`. On **X**, `read` / `timeline_collect` / `home_feed` return structured `{tweet_url, author_handle, text}[]` posts (status permalinks, not raw HTML). Full X endpoint set (search, tweet-actions, users, articles, `session_status`) is also callable via the `social_media_manager` `x_ops` facade over `browser` \| `twexapi`. Writes require `tools.browser.social.<site>.allow_write=true` |
 
 ## Element targeting
 Prefer a precise CSS `selector`. When you only know the label, pass `text` — the tool

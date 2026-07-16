@@ -895,7 +895,7 @@
       "capability_id": "skill.social_media_manager",
       "group": "B",
       "label": "social_media_manager",
-      "description": "Browser-first social monitoring across six platforms via the social_media_manager L2 specialist; TwexAPI optional on X only (spec 36).",
+      "description": "Browser-first social monitoring across six platforms via the social_media_manager L2 specialist; unified X ops over browser|twexapi; TwexAPI optional on X only (spec 36).",
       "config_paths": [
         "skills.social_media_manager.enabled"
       ],
