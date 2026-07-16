@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- [2026-07-16] `gh-issues` authenticated read/watch/track via `gh` (`issue_view`/`issue_watch`/`issue_track`) with `.sevn/gh-watch/` state and a `gh-issue-watch` cron scope (~15 min) that notifies on issue changes via the `message` tool
 - [2026-07-16] `gh-issues` `issue_create` creates issues in one call via authenticated `gh` with `templates/{feature,bug,chore}.md` (default `feature`), defaults `--repo` from `my_sevn.repo_url`, returns `{url,number,repo}`, falls back to the egress proxy only when `gh` is absent, and maps failures to precise messages instead of bare `proxy status 404`
 - [2026-07-16] `make install-snapshot-timer` installs a launchd agent that runs the local gitignored-tree snapshot every 3 hours, so operator-only plans, specs, and agent config are protected on a schedule instead of only on `git push`
 - [2026-07-16] Local snapshot backup covers whole gitignored trees (`.ignorelocal`, `spec-kit-wave`, `build-plan-from-review`, `.cursor`, `.claude` agent config, `docs`) and excludes secrets and regenerable indexes (`.env`/`.env.*`, `graphify-out`, `MyCodeGraph`, `.venv`, caches) while keeping `.env.example` templates

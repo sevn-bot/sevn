@@ -8,16 +8,11 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-import pytest
+import pytest  # noqa: TC002 — annotations for MonkeyPatch after W6 un-xfail
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _GH_ISSUES_ROOT = _REPO_ROOT / "src" / "sevn" / "data" / "bundled_skills" / "core" / "gh-issues"
 _SCRIPTS = _GH_ISSUES_ROOT / "scripts"
-
-_XFAIL_W6 = pytest.mark.xfail(
-    reason="green after W6: issue view/watch/track + cron (D13)",
-    strict=False,
-)
 
 
 def _load_script(name: str) -> Any:
@@ -31,7 +26,6 @@ def _load_script(name: str) -> Any:
     return mod
 
 
-@_XFAIL_W6
 def test_d13_issue_view_includes_comment_bodies(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -80,7 +74,6 @@ def test_d13_issue_view_includes_comment_bodies(
         assert code == 0
 
 
-@_XFAIL_W6
 def test_d13_issue_watch_emits_only_diff(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """D13: ``issue_watch`` emits only changes vs ``.sevn/gh-watch/.../<n>.json``."""
     workspace = tmp_path / "ws"
@@ -142,7 +135,6 @@ def test_d13_issue_watch_emits_only_diff(tmp_path: Path, monkeypatch: pytest.Mon
     assert again_changes in (None, {}, [], {"changes": []}) or again.get("changed") is False
 
 
-@_XFAIL_W6
 def test_d13_issue_track_add_remove_list(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """D13: ``issue_track --add/--remove/--list`` mutates ``tracked.json``."""
     workspace = tmp_path / "ws"
@@ -162,7 +154,6 @@ def test_d13_issue_track_add_remove_list(tmp_path: Path, monkeypatch: pytest.Mon
     assert "21" not in json.dumps(data2) or data2 in ([], {}, {"issues": []})
 
 
-@_XFAIL_W6
 def test_d13_cron_scope_registered_and_notifies_on_diff() -> None:
     """D13: cron scope for issue_watch exists; on diff it calls the ``message`` tool (shape)."""
     from sevn.triggers import cron as cron_mod

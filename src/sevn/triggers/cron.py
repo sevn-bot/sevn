@@ -14,6 +14,7 @@ Exports:
     edit_cron_job — patch an existing cron job row.
     delete_cron_job — remove a cron job row.
     add_reminder — one-shot reminder row (cron at absolute datetime).
+    run_issue_watch_cron — watch tracked issues / notify on diffs (D13).
     cron_tick — gateway lifespan hook (loads due jobs; dispatch is injected).
 """
 
@@ -37,6 +38,82 @@ from loguru import logger
 from sevn.agent.tracing.sink import TraceEvent, TraceSink
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.triggers.request import DeliveryMode, DispatchRequest, ResultChannel, RoutingMode
+
+# Built-in GitHub issue-watch cron scope (D13). Default ~15 minutes.
+ISSUE_WATCH_CRON_JOB_ID = "gh-issue-watch"
+ISSUE_WATCH_CRON_EXPR = "*/15 * * * *"
+
+
+def run_issue_watch_cron(
+    *,
+    workspace: Path | None = None,
+    diffs: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Run issue watch over the tracked set, or notify precomputed ``diffs``.
+
+    When ``diffs`` is provided (tests / manual), skip fetch and only notify.
+    Otherwise load ``.sevn/gh-watch/tracked.json``, run ``watch_issue`` for each
+    entry, and notify when any entry reports changes.
+
+    Args:
+        workspace (Path | None, optional): Workspace root; defaults to ``SEVN_WORKSPACE``.
+        diffs (list[dict[str, Any]] | None, optional): Precomputed diffs to notify.
+
+    Returns:
+        list[dict[str, Any]]: Diffs that were (or would be) notified.
+
+    Examples:
+        >>> run_issue_watch_cron(diffs=[])
+        []
+    """
+    from sevn.triggers.dispatcher import notify_issue_watch_diff
+
+    if diffs is not None:
+        if diffs:
+            notify_issue_watch_diff(diffs=diffs)
+        return list(diffs)
+
+    import importlib.util
+    import os
+
+    root = (
+        workspace
+        if workspace is not None
+        else Path(os.environ.get("SEVN_WORKSPACE", ".")).resolve()
+    )
+    scripts_root = (
+        Path(__file__).resolve().parents[1]
+        / "data"
+        / "bundled_skills"
+        / "core"
+        / "gh-issues"
+        / "scripts"
+    )
+    track_path = scripts_root / "issue_track.py"
+    watch_path = scripts_root / "issue_watch.py"
+    track_spec = importlib.util.spec_from_file_location("gh_issues_issue_track", track_path)
+    watch_spec = importlib.util.spec_from_file_location("gh_issues_issue_watch", watch_path)
+    if (
+        track_spec is None
+        or track_spec.loader is None
+        or watch_spec is None
+        or watch_spec.loader is None
+    ):
+        msg = "gh-issues track/watch scripts unavailable"
+        raise RuntimeError(msg)
+    track_mod = importlib.util.module_from_spec(track_spec)
+    watch_mod = importlib.util.module_from_spec(watch_spec)
+    track_spec.loader.exec_module(track_mod)
+    watch_spec.loader.exec_module(watch_mod)
+
+    collected: list[dict[str, Any]] = []
+    for item in track_mod.load_tracked(root):
+        result = watch_mod.watch_issue(root, str(item["repo"]), int(item["number"]))
+        if isinstance(result, dict) and result.get("changed"):
+            collected.append(result)
+    if collected:
+        notify_issue_watch_diff(diffs=collected)
+    return collected
 
 
 @dataclass(frozen=True)
@@ -1063,6 +1140,34 @@ async def cron_tick(
     due = cron_store.list_due(now_ns)
     for row in due:
         correlation_id = str(uuid.uuid4())
+        if row.job_id == ISSUE_WATCH_CRON_JOB_ID:
+            try:
+                run_issue_watch_cron(workspace=content_root)
+                nxt = compute_next_fire_ns(
+                    cron_expr=row.cron_expr,
+                    tz_name=row.timezone,
+                    from_ns=time.time_ns(),
+                )
+                cron_store.update_schedule(
+                    job_id=row.job_id,
+                    next_fire_at_ns=nxt,
+                    last_correlation_id=correlation_id,
+                    last_status="ok",
+                )
+            except Exception:
+                logger.exception("cron_issue_watch_failed job_id={}", row.job_id)
+                nxt = compute_next_fire_ns(
+                    cron_expr=row.cron_expr,
+                    tz_name=row.timezone,
+                    from_ns=time.time_ns(),
+                )
+                cron_store.update_schedule(
+                    job_id=row.job_id,
+                    next_fire_at_ns=nxt,
+                    last_correlation_id=correlation_id,
+                    last_status="error",
+                )
+            continue
         try:
             rc_data = json.loads(row.result_channel_json)
             rc = ResultChannel.model_validate(rc_data)
@@ -1081,6 +1186,7 @@ async def cron_tick(
                 "transport": "cron",
                 "cron_job_id": row.job_id,
                 "overlap_policy": row.overlap_policy,
+                "scope": ("issue_watch" if row.job_id == ISSUE_WATCH_CRON_JOB_ID else "default"),
             },
             notify_template=row.payload_template if row.delivery_mode == "notify_only" else None,
         )

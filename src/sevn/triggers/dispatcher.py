@@ -8,6 +8,7 @@ Exports:
     agent_dispatch_kwargs — build ``run_turn`` kwargs from gateway router.
     dispatch_notify_only — template render + LOG channel + traces.
     dispatch_run — agent-pass via shared ``RunTurnFn`` when wired at gateway boot.
+    notify_issue_watch_diff — operator notify for GitHub issue-watch diffs (D13).
 """
 
 from __future__ import annotations
@@ -35,6 +36,35 @@ from sevn.triggers.request import DispatchRequest, NotifyHandle, RunHandle
 from sevn.triggers.settings import effective_max_inline_bytes
 
 RunTurnFn = Callable[[str, str], Awaitable[None]]
+
+# Built-in cron scope id for GitHub issue watch (D13 / W6).
+ISSUE_WATCH_CRON_SCOPE = "gh-issue-watch"
+
+
+def notify_issue_watch_diff(*, diffs: list[dict[str, Any]]) -> None:
+    """Notify the operator of GitHub issue-watch diffs via the ``message`` tool.
+
+    Args:
+        diffs (list[dict[str, Any]]): Diff payloads from ``issue_watch`` /
+            ``run_issue_watch_cron`` (each typically has ``repo``, ``number``,
+            ``changes``).
+
+    Examples:
+        >>> notify_issue_watch_diff(diffs=[])  # no-op
+    """
+    if not diffs:
+        return
+    lines: list[str] = ["GitHub issue watch detected changes:"]
+    for item in diffs:
+        repo = item.get("repo") or "?"
+        number = item.get("number") or "?"
+        changes = item.get("changes") if isinstance(item.get("changes"), dict) else item
+        lines.append(f"- {repo}#{number}: {json.dumps(changes, sort_keys=True)}")
+    text = "\n".join(lines)
+    # Import path matches tests that patch ``sevn.tools.message.message_tool``.
+    from sevn.tools.message import message_tool
+
+    message_tool(text=text)
 
 
 def agent_dispatch_kwargs(gateway_router: Any | None) -> dict[str, Any]:

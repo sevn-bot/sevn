@@ -1,12 +1,14 @@
 """GitHub manager operations for bundled ``github-manager`` / ``gh-issues`` skill scripts.
 
 Module: sevn.integrations.github_skill.github_manager
-Depends: re, subprocess, sevn.integrations.github_skill.client, sevn.integrations.github_skill.hooks
+Depends: json, re, subprocess, sevn.integrations.github_skill.client,
+    sevn.integrations.github_skill.hooks
 
 Exports:
     GhCliMissingError — raised when the ``gh`` binary is not on PATH.
     map_gh_issue_create_error — map ``gh`` stderr to a precise operator message.
     create_issue_via_gh — create an issue via authenticated ``gh issue create``.
+    view_issue_via_gh — view an issue via authenticated ``gh issue view --json``.
     list_branches — list repository branches.
     create_branch — create a branch ref.
     delete_branch — delete a branch ref.
@@ -24,6 +26,7 @@ Exports:
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from typing import TYPE_CHECKING, Any
@@ -39,6 +42,8 @@ _ISSUE_URL_RE = re.compile(
     r"https://github\.com/(?P<owner>[^/\s]+)/(?P<repo>[^/\s]+)/issues/(?P<number>\d+)",
     re.IGNORECASE,
 )
+
+_ISSUE_VIEW_JSON_FIELDS = "number,title,state,url,updatedAt,labels,assignees,comments"
 
 
 class GhCliMissingError(RuntimeError):
@@ -179,6 +184,66 @@ def create_issue_via_gh(
         "number": int(match.group("number")),
         "repo": f"{match.group('owner')}/{match.group('repo')}",
     }
+
+
+def view_issue_via_gh(repo: str, issue_number: int) -> dict[str, Any]:
+    """Fetch one issue via ``gh issue view --json`` (includes comment bodies).
+
+    Args:
+        repo (str): ``owner/repo`` slug.
+        issue_number (int): Issue number.
+
+    Returns:
+        dict[str, Any]: Parsed ``gh`` JSON payload (number, title, state, url,
+            updatedAt, labels, assignees, comments with bodies).
+
+    Raises:
+        GhCliMissingError: When ``gh`` is not installed / not on ``PATH``.
+        RuntimeError: When ``gh`` exits non-zero (message already mapped).
+        ValueError: When stdout is not valid JSON.
+
+    Examples:
+        >>> view_issue_via_gh.__name__
+        'view_issue_via_gh'
+    """
+    cmd: list[str] = [
+        "gh",
+        "issue",
+        "view",
+        str(int(issue_number)),
+        "--repo",
+        repo,
+        "--json",
+        _ISSUE_VIEW_JSON_FIELDS,
+    ]
+    try:
+        completed = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise GhCliMissingError("gh binary not found on PATH") from exc
+    if completed.returncode != 0:
+        detail = map_gh_issue_create_error(
+            (completed.stderr or "") + "\n" + (completed.stdout or ""),
+            repo=repo,
+        )
+        raise RuntimeError(detail)
+    raw = (completed.stdout or "").strip()
+    if not raw:
+        msg = f"gh issue view returned empty JSON for {repo}#{issue_number}"
+        raise ValueError(msg)
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        msg = f"gh issue view returned invalid JSON for {repo}#{issue_number}"
+        raise ValueError(msg) from exc
+    if not isinstance(payload, dict):
+        msg = f"gh issue view JSON must be an object for {repo}#{issue_number}"
+        raise ValueError(msg)
+    return payload
 
 
 async def list_branches(
