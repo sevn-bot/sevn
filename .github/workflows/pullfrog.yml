@@ -10,6 +10,8 @@ on:
 
 permissions:
   contents: read
+  # PullFrog uses OIDC to mint short-lived GitHub App installation tokens.
+  id-token: write
   issues: write
   pull-requests: write
   statuses: write
