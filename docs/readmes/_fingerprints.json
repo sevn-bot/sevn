@@ -26,7 +26,7 @@
     },
     "config-workspace": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-16T19:52:55Z",
+      "computed_at": "2026-07-16T20:14:32Z",
       "digest": "e584d18d9ed405ec2c12476a67c883b172c858e1764e7136ff7a56e20e16bc10",
       "source_globs": [
         "src/sevn/config/**",
