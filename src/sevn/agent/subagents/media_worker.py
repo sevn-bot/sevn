@@ -2,7 +2,8 @@
 
 Module: sevn.agent.subagents.media_worker
 Depends: json, pathlib, sqlite3, sevn.agent.subagents.media_minimax,
-    sevn.agent.subagents.specialists, sevn.config.loader, sevn.gateway.media.media_store
+    sevn.agent.subagents.media_prompts, sevn.agent.subagents.specialists,
+    sevn.config.loader, sevn.gateway.media.media_store
 
 Exports:
     MediaTask — parsed generation request.
@@ -24,14 +25,30 @@ import base64
 import json
 import os
 import re
+import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from sevn.agent.subagents.media_minimax import (
+    DEFAULT_IMAGE_MODEL,
+    DEFAULT_MUSIC_MODEL,
+    DEFAULT_SPEECH_MODEL,
+    DEFAULT_VIDEO_I2V_MODEL,
+    DEFAULT_VIDEO_MODEL,
     MiniMaxMediaError,
+    clone_voice_bytes,
     generate_image_bytes,
     generate_music_bytes,
     generate_video_bytes,
+    generate_video_from_image_bytes,
+    generate_video_template_bytes,
+    synthesize_speech_bytes,
+)
+from sevn.agent.subagents.media_prompts import (
+    augment_prompt,
+    build_media_trace,
+    resolve_video_agent_template,
 )
 from sevn.agent.subagents.specialists import resolve_specialist
 from sevn.config.loader import load_workspace
@@ -45,7 +62,6 @@ from sevn.security.secrets.value_expand import EnvUnresolvedError, expand_refs_e
 
 if TYPE_CHECKING:
     import sqlite3
-    from pathlib import Path
 
     from sevn.config.sections.subagents import SpecialistConfig, SubAgentsWorkspaceConfig
     from sevn.tools.context import ToolContext
@@ -56,8 +72,9 @@ MEDIA_GENERATOR_UNCONFIGURED = (
     "configure the specialist (see infra/sevn.schema.json D8 example)"
 )
 
-MediaKind = Literal["image", "video", "music"]
+MediaKind = Literal["image", "video", "video_i2v", "video_template", "music", "voice"]
 _FILENAME_SAFE = re.compile(r"[^a-zA-Z0-9._-]+")
+_AUDIO_EXTENSIONS = {".mp3", ".m4a", ".wav"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,15 +83,58 @@ class MediaTask:
 
     kind: MediaKind
     prompt: str
+    template_key: str | None = None
     aspect_ratio: str = "1:1"
     duration: int = 6
     resolution: str = "720P"
     lyrics: str | None = None
     is_instrumental: bool = False
+    first_frame_image: str | None = None
+    template_id: str | None = None
+    text_inputs: tuple[str, ...] = ()
+    media_inputs: tuple[str, ...] = ()
+    voice_id: str | None = None
+    source_audio: str | None = None
+    preview_text: str | None = None
+    prompt_audio: str | None = None
+    prompt_text: str | None = None
+    speech_text: str | None = None
+
+
+def _coerce_str_list(raw: object) -> tuple[str, ...]:
+    """Normalize a JSON list field to a tuple of strings.
+
+    Args:
+        raw (object): Parsed JSON value.
+
+    Returns:
+        tuple[str, ...]: Stripped string entries.
+
+    Examples:
+        >>> _coerce_str_list([" a ", "b"])
+        ('a', 'b')
+    """
+    if not isinstance(raw, list):
+        return ()
+    out: list[str] = []
+    for item in raw:
+        if isinstance(item, str) and item.strip():
+            out.append(item.strip())
+    return tuple(out)
 
 
 def parse_media_task(task: str) -> MediaTask:
     """Parse a media task string (JSON or ``kind:prompt`` shorthand).
+
+    JSON fields:
+        - ``kind`` / ``media``: ``image``, ``video``, ``video_i2v``, ``video_template``,
+          ``music``, ``voice``
+        - ``prompt``: short user intent (augmented with templates server-side)
+        - ``template``: augmentation template slug (e.g. ``portrait``, ``lofi``)
+        - ``first_frame_image``: URL or workspace path for image-to-video
+        - ``template_id`` / ``template_slug``: Video Agent template ref
+        - ``text_inputs``, ``media_inputs``: Video Agent slot values
+        - ``voice_id``, ``source_audio``, ``preview_text``, ``speech_text``: voice flows
 
     Args:
         task (str): Spawn/skill task text.
@@ -101,26 +161,49 @@ def parse_media_task(task: str) -> MediaTask:
             msg = "media task JSON must be an object"
             raise ValueError(msg)
         kind = str(raw.get("kind") or raw.get("media") or "").strip().lower()
-        prompt = str(raw.get("prompt") or "").strip()
-        if kind not in ("image", "video", "music") or not prompt:
-            msg = "media task JSON requires kind=image|video|music and prompt"
+        prompt = str(raw.get("prompt") or raw.get("user_request") or "").strip()
+        valid_kinds = ("image", "video", "video_i2v", "video_template", "music", "voice")
+        if kind not in valid_kinds:
+            msg = f"media task JSON requires kind in {valid_kinds}"
             raise ValueError(msg)
+        if kind != "video_template" and not prompt:
+            msg = "media task JSON requires prompt (short user intent)"
+            raise ValueError(msg)
+        template_ref = str(
+            raw.get("template_id") or raw.get("template_slug") or raw.get("video_template") or "",
+        ).strip() or None
         return MediaTask(
             kind=kind,  # type: ignore[arg-type]
             prompt=prompt,
+            template_key=(str(raw["template"]).strip() if raw.get("template") else None),
             aspect_ratio=str(raw.get("aspect_ratio") or "1:1"),
             duration=int(raw.get("duration") or 6),
             resolution=str(raw.get("resolution") or "720P"),
             lyrics=(str(raw["lyrics"]).strip() if raw.get("lyrics") else None),
             is_instrumental=bool(raw.get("is_instrumental")),
+            first_frame_image=(
+                str(raw["first_frame_image"]).strip() if raw.get("first_frame_image") else None
+            ),
+            template_id=template_ref,
+            text_inputs=_coerce_str_list(raw.get("text_inputs")),
+            media_inputs=_coerce_str_list(raw.get("media_inputs")),
+            voice_id=(str(raw["voice_id"]).strip() if raw.get("voice_id") else None),
+            source_audio=(str(raw["source_audio"]).strip() if raw.get("source_audio") else None),
+            preview_text=(str(raw["preview_text"]).strip() if raw.get("preview_text") else None),
+            prompt_audio=(str(raw["prompt_audio"]).strip() if raw.get("prompt_audio") else None),
+            prompt_text=(str(raw["prompt_text"]).strip() if raw.get("prompt_text") else None),
+            speech_text=(str(raw["speech_text"]).strip() if raw.get("speech_text") else None),
         )
     if ":" in text:
         head, _, tail = text.partition(":")
         kind = head.strip().lower()
         prompt = tail.strip()
-        if kind in ("image", "video", "music") and prompt:
+        if kind in ("image", "video", "video_i2v", "music", "voice") and prompt:
             return MediaTask(kind=kind, prompt=prompt)  # type: ignore[arg-type]
-    msg = "media task must be JSON or kind:prompt (image|video|music)"
+    msg = (
+        "media task must be JSON or kind:prompt "
+        "(image|video|video_i2v|music|voice)"
+    )
     raise ValueError(msg)
 
 
@@ -238,6 +321,61 @@ async def resolve_minimax_api_key(
     )
 
 
+def _resolve_local_file(path_ref: str, *, content_root: Path) -> Path:
+    """Resolve a workspace-relative or absolute file path.
+
+    Args:
+        path_ref (str): Path reference.
+        content_root (Path): Workspace content root.
+
+    Returns:
+        Path: Resolved existing file.
+
+    Raises:
+        MiniMaxMediaError: When the file is not found.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.isfunction(_resolve_local_file)
+        True
+    """
+    ref = path_ref.strip()
+    path = Path(ref).expanduser()
+    if not path.is_absolute():
+        candidate = (content_root / ref).resolve()
+        if candidate.is_file():
+            return candidate
+    if path.is_file():
+        return path.resolve()
+    raise MiniMaxMediaError(f"file not found: {path_ref}")
+
+
+def _read_audio_bytes(path_ref: str, *, content_root: Path) -> tuple[bytes, str]:
+    """Read audio bytes and infer filename from a path reference.
+
+    Args:
+        path_ref (str): Workspace-relative or absolute audio path.
+        content_root (Path): Workspace content root.
+
+    Returns:
+        tuple[bytes, str]: ``(bytes, filename)``.
+
+    Raises:
+        MiniMaxMediaError: When the file is missing or has an unsupported extension.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.isfunction(_read_audio_bytes)
+        True
+    """
+    path = _resolve_local_file(path_ref, content_root=content_root)
+    if path.suffix.lower() not in _AUDIO_EXTENSIONS:
+        raise MiniMaxMediaError(
+            f"unsupported audio format {path.suffix!r} — use mp3, m4a, or wav",
+        )
+    return path.read_bytes(), path.name
+
+
 def _safe_filename(kind: MediaKind, prompt: str) -> str:
     """Build a filesystem-safe artifact basename.
 
@@ -253,8 +391,29 @@ def _safe_filename(kind: MediaKind, prompt: str) -> str:
         'media-image-hello-world.jpg'
     """
     stem = _FILENAME_SAFE.sub("-", prompt.strip().lower())[:48].strip("-") or "artifact"
-    ext = {"image": "jpg", "video": "mp4", "music": "mp3"}[kind]
+    ext = {
+        "image": "jpg",
+        "video": "mp4",
+        "video_i2v": "mp4",
+        "video_template": "mp4",
+        "music": "mp3",
+        "voice": "mp3",
+    }[kind]
     return f"media-{kind}-{stem}.{ext}"
+
+
+def _new_voice_id() -> str:
+    """Generate a MiniMax-compatible custom voice id.
+
+    Returns:
+        str: Voice id starting with a letter, 8+ chars.
+
+    Examples:
+        >>> vid = _new_voice_id()
+        >>> vid[0].isalpha() and len(vid) >= 8
+        True
+    """
+    return f"SevnVoice{uuid.uuid4().hex[:12]}"
 
 
 async def _persist_bytes(
@@ -305,6 +464,9 @@ async def execute_media_generator_task(
 ) -> dict[str, object]:
     """Run one ``media_generator`` job and persist the artifact.
 
+    Every kind augments the short ``prompt`` with templates before calling MiniMax.
+    Results include a ``trace`` block for observability.
+
     Args:
         task (str): Spawn/skill task (JSON or ``kind:prompt``).
         session_id (str): Gateway session id for ``channel_files/`` layout.
@@ -317,7 +479,7 @@ async def execute_media_generator_task(
         video_max_polls (int | None, optional): Test-only poll cap override.
 
     Returns:
-        dict[str, object]: ``artifact_path``, ``kind``, ``bytes`` metadata.
+        dict[str, object]: ``artifact_path``, ``kind``, ``bytes``, ``trace`` metadata.
 
     Raises:
         MiniMaxMediaError: When specialist/API/config is missing or generation fails.
@@ -336,32 +498,179 @@ async def execute_media_generator_task(
     )
     poll_interval = video_poll_interval_s if video_poll_interval_s is not None else 5.0
     poll_cap = video_max_polls if video_max_polls is not None else 120
+
+    trace_extra: dict[str, object] = {}
+    api_model: str | None = None
+    data: bytes
+
     if media_task.kind == "image":
+        template_key, augmented = augment_prompt(
+            "image",
+            media_task.prompt,
+            template_key=media_task.template_key,
+        )
+        api_model = DEFAULT_IMAGE_MODEL
         data = await generate_image_bytes(
             api_key,
-            media_task.prompt,
+            augmented,
             aspect_ratio=media_task.aspect_ratio,
             client=http_client,
         )
     elif media_task.kind == "video":
+        # Text-to-video, or image-to-video when first_frame_image is set.
+        prompt_kind = "video_i2v" if media_task.first_frame_image else "video"
+        template_key, augmented = augment_prompt(
+            prompt_kind,
+            media_task.prompt,
+            template_key=media_task.template_key,
+        )
+        api_model = DEFAULT_VIDEO_MODEL
         data = await generate_video_bytes(
             api_key,
-            media_task.prompt,
+            augmented,
             duration=media_task.duration,
             resolution=media_task.resolution,
+            first_frame_image=media_task.first_frame_image,
+            content_root=content_root,
             poll_interval_s=poll_interval,
             max_polls=poll_cap,
             client=http_client,
         )
-    else:
+        if media_task.first_frame_image:
+            trace_extra["first_frame_image"] = media_task.first_frame_image
+    elif media_task.kind == "video_i2v":
+        if not media_task.first_frame_image:
+            raise MiniMaxMediaError("video_i2v requires first_frame_image")
+        template_key, augmented = augment_prompt(
+            "video_i2v",
+            media_task.prompt,
+            template_key=media_task.template_key,
+        )
+        api_model = DEFAULT_VIDEO_I2V_MODEL
+        data = await generate_video_from_image_bytes(
+            api_key,
+            augmented,
+            media_task.first_frame_image,
+            duration=media_task.duration,
+            resolution=media_task.resolution,
+            content_root=content_root,
+            poll_interval_s=poll_interval,
+            max_polls=poll_cap,
+            client=http_client,
+        )
+        trace_extra["first_frame_image"] = media_task.first_frame_image
+    elif media_task.kind == "video_template":
+        if not media_task.template_id:
+            raise MiniMaxMediaError("video_template requires template_id or template_slug")
+        catalog_entry = resolve_video_agent_template(media_task.template_id)
+        template_key = media_task.template_key or "default"
+        augmented = media_task.prompt or catalog_entry.description
+        text_inputs = list(media_task.text_inputs)
+        if media_task.prompt and not text_inputs and catalog_entry.text_inputs_required:
+            text_inputs = [media_task.prompt]
+        api_model = f"video_agent:{catalog_entry.template_id}"
+        data = await generate_video_template_bytes(
+            api_key,
+            catalog_entry.template_id,
+            text_inputs=text_inputs or None,
+            media_inputs=list(media_task.media_inputs) or None,
+            content_root=content_root,
+            poll_interval_s=poll_interval,
+            max_polls=poll_cap,
+            client=http_client,
+        )
+        trace_extra["video_template"] = {
+            "template_id": catalog_entry.template_id,
+            "slug": catalog_entry.slug,
+            "name": catalog_entry.name,
+        }
+    elif media_task.kind == "music":
+        template_key, augmented = augment_prompt(
+            "music",
+            media_task.prompt,
+            template_key=media_task.template_key,
+        )
+        api_model = DEFAULT_MUSIC_MODEL
         data = await generate_music_bytes(
             api_key,
-            media_task.prompt,
+            augmented,
             lyrics=media_task.lyrics,
             is_instrumental=media_task.is_instrumental,
             client=http_client,
         )
-    filename = _safe_filename(media_task.kind, media_task.prompt)
+    else:
+        # voice: clone from source_audio and/or synthesize with voice_id
+        template_key, augmented = augment_prompt(
+            "voice",
+            media_task.prompt,
+            template_key=media_task.template_key,
+        )
+        api_model = DEFAULT_SPEECH_MODEL
+        voice_id = media_task.voice_id
+        cloned_voice_id: str | None = None
+
+        if media_task.source_audio:
+            source_bytes, source_name = _read_audio_bytes(
+                media_task.source_audio,
+                content_root=content_root,
+            )
+            assigned_voice = voice_id or _new_voice_id()
+            prompt_audio_bytes: bytes | None = None
+            prompt_name = "prompt_sample.mp3"
+            if media_task.prompt_audio:
+                prompt_audio_bytes, prompt_name = _read_audio_bytes(
+                    media_task.prompt_audio,
+                    content_root=content_root,
+                )
+            preview = media_task.preview_text or media_task.speech_text or augmented
+            cloned_voice_id, preview_bytes = await clone_voice_bytes(
+                api_key,
+                source_bytes,
+                voice_id=assigned_voice,
+                source_filename=source_name,
+                preview_text=preview,
+                prompt_audio=prompt_audio_bytes,
+                prompt_text=media_task.prompt_text,
+                prompt_filename=prompt_name,
+                client=http_client,
+            )
+            voice_id = cloned_voice_id
+            trace_extra["cloned_voice_id"] = cloned_voice_id
+            trace_extra["source_audio"] = media_task.source_audio
+            if preview_bytes is not None:
+                data = preview_bytes
+            elif media_task.speech_text and voice_id:
+                data = await synthesize_speech_bytes(
+                    api_key,
+                    augment_prompt("voice", media_task.speech_text, template_key=media_task.template_key)[1],
+                    voice_id=voice_id,
+                    client=http_client,
+                )
+            else:
+                raise MiniMaxMediaError(
+                    "voice clone succeeded but no preview audio — set preview_text or speech_text",
+                )
+        elif voice_id and media_task.speech_text:
+            speech_key, speech_augmented = augment_prompt(
+                "voice",
+                media_task.speech_text,
+                template_key=media_task.template_key,
+            )
+            trace_extra["speech_template_key"] = speech_key
+            trace_extra["speech_augmented_prompt"] = speech_augmented
+            data = await synthesize_speech_bytes(
+                api_key,
+                speech_augmented,
+                voice_id=voice_id,
+                client=http_client,
+            )
+            trace_extra["voice_id"] = voice_id
+        else:
+            raise MiniMaxMediaError(
+                "voice requires source_audio (clone) or voice_id + speech_text (TTS)",
+            )
+
+    filename = _safe_filename(media_task.kind, media_task.prompt or media_task.template_id or "media")
     rel_path = await _persist_bytes(
         conn=conn,
         content_root=content_root,
@@ -369,14 +678,26 @@ async def execute_media_generator_task(
         filename=filename,
         data=data,
     )
-    return {
+    trace = build_media_trace(
+        kind=media_task.kind,
+        user_request=media_task.prompt,
+        augmented_prompt=augmented if media_task.kind != "voice" or not media_task.speech_text else augmented,
+        template_key=template_key,
+        api_model=api_model,
+        extra=trace_extra or None,
+    )
+    result: dict[str, object] = {
         "artifact_path": rel_path,
         "kind": media_task.kind,
         "bytes": len(data),
         "specialist": MEDIA_GENERATOR_SPECIALIST,
         "model": specialist.model,
         "provider": specialist.provider,
+        "trace": trace,
     }
+    if media_task.kind == "voice" and voice_id:
+        result["voice_id"] = voice_id
+    return result
 
 
 async def execute_media_generator_for_context(ctx: ToolContext, task: str) -> str:

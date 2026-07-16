@@ -33,15 +33,18 @@ def main() -> int:
         True
     """
     parser = argparse.ArgumentParser(description="Generate a video via media_generator")
-    parser.add_argument("prompt", help="Text prompt")
+    parser.add_argument("prompt", help="Short video intent (augmented with templates)")
     parser.add_argument("--duration", type=int, default=6)
     parser.add_argument("--resolution", default="720P")
+    parser.add_argument("--template", default=None, help="Template slug: default, commercial, nature")
+    parser.add_argument("--image", default=None, dest="first_frame_image", help="Optional first-frame image for i2v")
     args = parser.parse_args()
-    exit_code: int = run_media_generation(
-        "video",
-        args.prompt,
-        extra={"duration": args.duration, "resolution": args.resolution},
-    )
+    extra: dict[str, object] = {"duration": args.duration, "resolution": args.resolution}
+    if args.template:
+        extra["template"] = args.template
+    if args.first_frame_image:
+        extra["first_frame_image"] = args.first_frame_image
+    exit_code: int = run_media_generation("video", args.prompt, extra=extra)
     return exit_code
 
 
