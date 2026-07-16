@@ -60,10 +60,6 @@ _MAX_RESULT_JSON_CHARS = 48_000
 
 DEFAULT_SOCIAL_MEDIA_MANAGER_SKILLS: tuple[str, ...] = (
     "social_media_manager",
-    "x-use",
-    "facebook-use",
-    "linkedin-use",
-    "playwright-browser",
     "browser-harness",
     "last30days",
     "yt-dlp",
@@ -162,8 +158,10 @@ def assigned_skills_for(specialist: SpecialistConfig) -> list[str]:
 
     Examples:
         >>> from sevn.config.sections.subagents import SpecialistConfig
-        >>> assigned_skills_for(SpecialistConfig(model="m", provider="p", skills=["x-use"]))
-        ['x-use']
+        >>> assigned_skills_for(
+        ...     SpecialistConfig(model="m", provider="p", skills=["social_media_manager"])
+        ... )
+        ['social_media_manager']
     """
     explicit = [s.strip() for s in specialist.skills if s.strip()]
     if explicit:
@@ -208,7 +206,7 @@ def _site_skill_hints(site: str) -> list[str]:
 
     Examples:
         >>> _site_skill_hints("x")
-        ['x-use']
+        ['social_media_manager']
     """
     return site_skill_hints(site)
 

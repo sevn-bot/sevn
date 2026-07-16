@@ -62,7 +62,7 @@ def test_log_provenance_playbook_covers_audit_shape() -> None:
 
 
 def test_bound_browser_tool_playbook_and_mandate() -> None:
-    """DP3 residue: browser tool playbook replaces playwright-browser capture scripts."""
+    """DP3 residue: browser tool playbook replaces retired capture-script skills."""
     from sevn.prompts.tier_b import (
         tier_b_browser_tool_prompt,
         tier_b_triager_bound_mandate_prompt,

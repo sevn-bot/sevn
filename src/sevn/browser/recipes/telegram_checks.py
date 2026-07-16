@@ -1,6 +1,6 @@
 """Telegram Web + Bot-API assertion helpers replacing ``tools/telegram-tester``.
 
-Host Playwright E2E (``sevn telegram-test``) used to assert send/receive/thread
+The retired host E2E CLI (``sevn telegram-test``) used to assert send/receive/thread
 behaviour on Telegram Web K and probe the bot via the Bot API. Those checks now
 live here on top of :class:`~sevn.browser.recipes.telegram_web.TelegramWeb` and a
 browser-free ``getMe`` smoke call.

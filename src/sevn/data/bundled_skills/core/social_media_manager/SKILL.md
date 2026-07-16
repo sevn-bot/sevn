@@ -67,8 +67,8 @@ Level-2 **`social_media_manager`** specialist (`subagents.specialists.social_med
 for monitoring and interacting with social media across **six platforms**. **Browser (CDP)
 is the universal default medium**; TwexAPI is optional on **X only**.
 
-Platform-specific social skills (`x-use`, `facebook-use`, `linkedin-use`, and the
-former browser automation skill) were removed — use the native **`browser`** tool
+Platform-specific social skills (platform `*-use` skills and the former
+browser-automation skill) were removed — use the native **`browser`** tool
 (`action=social`) and this skill’s `x_ops` facade for X.
 
 ## Platform matrix

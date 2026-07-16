@@ -52,7 +52,7 @@ async def test_client_call_op_has_no_site_parameter() -> None:
     http_mock.assert_called_once()
 
 
-# --- W1 RED (playwright-removal / X parity): DB7 TWEXAPI_OPS expand (green after W4) ---
+# --- W1 RED (browser-removal / X parity): DB7 TWEXAPI_OPS expand (green after W4) ---
 
 # §4 TwexAPI paths that must be *added* in W4 (beyond the pre-W4 baseline allowlist).
 _SECTION4_NEW_TWEXAPI_OPS: tuple[str, ...] = (

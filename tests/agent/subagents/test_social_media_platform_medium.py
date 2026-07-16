@@ -225,12 +225,12 @@ class TestCapabilitiesMatrix:
     @pytest.mark.parametrize(
         ("site", "must_include", "must_exclude"),
         [
-            ("x", ("x-use",), ("facebook-use",)),
-            ("facebook", ("facebook-use",), ("x-use",)),
-            ("linkedin", ("linkedin-use",), ("x-use",)),
-            ("instagram", ("playwright-browser",), ("x-use",)),
-            ("reddit", ("playwright-browser",), ("facebook-use",)),
-            ("tiktok", ("playwright-browser",), ("linkedin-use",)),
+            ("x", ("social_media_manager",), ("browser-harness",)),
+            ("facebook", ("social_media_manager",), ("browser-harness",)),
+            ("linkedin", ("social_media_manager",), ("yt-dlp",)),
+            ("instagram", ("browser-harness",), ("last30days",)),
+            ("reddit", ("browser-harness", "last30days"), ("yt-dlp",)),
+            ("tiktok", ("browser-harness", "yt-dlp"), ("last30days",)),
         ],
     )
     @pytest.mark.asyncio
@@ -333,10 +333,10 @@ class TestBrowserPlanSkills:
     @pytest.mark.parametrize(
         ("site", "must_include", "must_exclude"),
         [
-            ("instagram", ("playwright-browser",), ("x-use",)),
-            ("x", ("x-use",), ()),
-            ("facebook", ("facebook-use",), ("x-use",)),
-            ("tiktok", ("playwright-browser", "browser-harness"), ("facebook-use",)),
+            ("instagram", ("browser-harness",), ("last30days",)),
+            ("x", ("social_media_manager",), ()),
+            ("facebook", ("social_media_manager",), ("yt-dlp",)),
+            ("tiktok", ("browser-harness", "yt-dlp"), ("last30days",)),
         ],
     )
     def test_browser_plan_skill_hints(

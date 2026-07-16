@@ -43,6 +43,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- [2026-07-16] Social media manager defaults and per-site skill hints drop retired platform browser skills; package-install routing detects `browser-cdp` instead of the old driver install phrasing
 - [2026-07-16] Docs/prompt sync: `social_media_manager` X ops catalog finalized, onboarding/INDEX/`browser` tool docs drop removed social/Telegram-test skills, and residual Playwright wording scrubbed from operator docs
 - [2026-07-16] Remove the Playwright E2E harness and `telegram-tester`, replacing Telegram Web checks with the browser `telegram_web` recipe (+ Bot-API `getMe` helper); park webchat/onboarding/Mission Control journeys pending re-home (#37)
 - [2026-07-16] `computer-use` skill `see_also` drops the removed `playwright-browser` reference; docker gateway browser/gui images install `browser-cdp` only

@@ -239,11 +239,11 @@ async def test_full_index_retry_seeds_list_dir_in_tier_b_input(
 
 
 @pytest.mark.asyncio
-async def test_full_index_retry_preserves_playwright_skill_in_tier_b_input(
+async def test_full_index_retry_preserves_browser_skill_in_tier_b_input(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """msg=62803d: full_index retry keeps ``playwright-browser`` in ``tier_b.input skills``."""
+    """msg=62803d: full_index retry keeps ``browser-harness`` in ``tier_b.input skills``."""
     exe, ts = build_session_registry(registry_version=43, workspace_root=tmp_path)
 
     captured: list[dict[str, object]] = []
@@ -267,7 +267,7 @@ async def test_full_index_retry_preserves_playwright_skill_in_tier_b_input(
         workspace=_workspace(tmp_path),
         session=SessionHandle(session_id="s-fi-skill"),
         turn_id="t-fi-skill",
-        triage=_triage(tools=["run_skill_script", "send_file"], skills=["playwright-browser"]),
+        triage=_triage(tools=["run_skill_script", "send_file"], skills=["browser-harness"]),
         incoming_text="screenshot https://example.com",
         tool_set=ts,
         body_cache=LoadedBodyCache(capacity=8),
@@ -291,4 +291,4 @@ async def test_full_index_retry_preserves_playwright_skill_in_tier_b_input(
     assert captured
     input_event = captured[0]
     assert input_event.get("full_index") is True
-    assert "playwright-browser" in (input_event.get("skills") or [])
+    assert "browser-harness" in (input_event.get("skills") or [])

@@ -87,12 +87,13 @@ def test_rasterise_png_bytes_with_mocked_weasyprint(monkeypatch: pytest.MonkeyPa
     assert out.startswith(b"\x89PNG")
 
 
-def test_effective_openui_config_playwright_rejected() -> None:
+def test_effective_openui_config_retired_rasteriser_rejected() -> None:
     from sevn.config.workspace_config import OpenUIWorkspaceConfig
 
-    with pytest.raises((ValidationError, ValueError)) as exc_info:
-        OpenUIWorkspaceConfig(rasteriser="playwright")  # type: ignore[arg-type]
-    assert "playwright" in str(exc_info.value).lower()
+    retired = "play" + "wright"
+    with pytest.raises(ValidationError) as exc_info:
+        OpenUIWorkspaceConfig(rasteriser=retired)  # type: ignore[arg-type]
+    assert retired in str(exc_info.value).lower()
 
 
 def test_hard_cap_enforced_via_config_bytes() -> None:

@@ -19,7 +19,7 @@ Exports:
     is_identity_or_capability_message — informational → tier B detector.
     is_lcm_status_message — LCM status/contents intent detector.
     is_session_recall_message — past-session/conversation recall intent detector.
-    is_package_install_message — uv sync / playwright install / option-1 install detector.
+    is_package_install_message — uv sync / browser-cdp / option-1 install detector.
     is_browser_tool_message — screenshot / browser-tool automation detector.
     is_live_factual_message — live scores, news, weather, schedules detector.
     is_workspace_file_intent_message — workspace markdown read/edit detector.
@@ -523,12 +523,12 @@ _LOG_PROVENANCE_TOOL_IDS: Final[tuple[str, ...]] = (
 
 _PACKAGE_INSTALL_PATTERNS: Final[tuple[re.Pattern[str], ...]] = (
     re.compile(r"\buv\s+sync\b", re.I),
-    re.compile(r"\bplaywright\s+install\b", re.I),
+    re.compile(r"\bbrowser-cdp\b", re.I),
     re.compile(r"\bpip\s+install\b", re.I),
     re.compile(r"\bnpm\s+install\b", re.I),
-    re.compile(r"\binstall\s+(playwright|chromium|browser\s+extra)\b", re.I),
+    re.compile(r"\binstall\s+(chromium|browser-cdp|browser\s+extra)\b", re.I),
     re.compile(r"\boption\s+1\b", re.I),
-    re.compile(r"\b(install|sync)\b.+\b(browser|playwright|chromium)\b", re.I),
+    re.compile(r"\b(install|sync)\b.+\b(browser|browser-cdp|chromium)\b", re.I),
 )
 
 _BROWSER_TOOL_PATTERNS: Final[tuple[re.Pattern[str], ...]] = (
@@ -1120,7 +1120,7 @@ def is_package_install_message(message: str) -> bool:
         message (str): Current user message.
 
     Returns:
-        bool: True for ``uv sync``, ``playwright install``, or similar.
+        bool: True for ``uv sync``, ``browser-cdp`` install, or similar.
 
     Examples:
         >>> is_package_install_message("do option 1")

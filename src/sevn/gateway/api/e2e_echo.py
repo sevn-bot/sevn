@@ -10,7 +10,7 @@ Exports:
 The module-level constant ``SEVN_E2E_ECHO_DELAY_ENV`` records the env var
 name read by the echo run-turn before sending the outbound reply (test stacks
 only — `specs/17-gateway.md` §2.9). Gated by ``SEVN_E2E_ECHO_TURN`` in
-``http_server``; kept as a thin diagnostics echo after Playwright harness removal.
+``http_server``; kept as a thin diagnostics echo after the TS E2E harness removal.
 """
 
 from __future__ import annotations

@@ -18,10 +18,6 @@ from sevn.storage.paths import sevn_db_path
 
 _DEFAULT_SKILLS = (
     "social_media_manager",
-    "x-use",
-    "facebook-use",
-    "linkedin-use",
-    "playwright-browser",
     "browser-harness",
     "last30days",
     "yt-dlp",
@@ -147,8 +143,8 @@ class TestToolkitAssignment:
             skill="social_media_manager",
         )
         assert "browser" in worker.assigned_tools_for(spec)
-        assert "x-use" in worker.assigned_skills_for(spec)
-        assert "playwright-browser" in worker.assigned_skills_for(spec)
+        assert "social_media_manager" in worker.assigned_skills_for(spec)
+        assert "browser-harness" in worker.assigned_skills_for(spec)
 
     def test_merge_grants_from_skill_name(self) -> None:
         from sevn.agent.subagents.specialists import merge_specialist_grants
@@ -176,7 +172,7 @@ class TestCapabilitiesAndBrowser:
         )
         assert result["medium"] == "capabilities"
         assert "browser" in result["tools"]
-        assert "x-use" in result["skills"]
+        assert "social_media_manager" in result["skills"]
 
     @pytest.mark.asyncio
     async def test_browser_plan(self, smm_workspace: tuple[Path, sqlite3.Connection]) -> None:

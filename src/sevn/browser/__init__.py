@@ -1,4 +1,4 @@
-"""sevn-native CDP browser automator (native engine; no Playwright/WebDriver).
+"""sevn-native CDP browser automator (native engine; no WebDriver).
 
 A pure-Python async Chrome DevTools Protocol engine that drives host Chrome: one
 browser-level WebSocket with flattened ``Target.setAutoAttach`` session routing,

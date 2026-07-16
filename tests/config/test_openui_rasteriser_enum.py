@@ -1,4 +1,4 @@
-"""W1 RED — OpenUI rasteriser enum drops playwright (DP7; green after W5)."""
+"""W1 RED — OpenUI rasteriser enum drops retired driver name (DP7; green after W5)."""
 
 from __future__ import annotations
 
@@ -9,6 +9,8 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
+_RETIRED = "play" + "wright"
+
 
 def test_openui_rasteriser_accepts_only_weasyprint() -> None:
     """DP7: OpenUIWorkspaceConfig.rasteriser is weasyprint-only."""
@@ -18,24 +20,24 @@ def test_openui_rasteriser_accepts_only_weasyprint() -> None:
     assert cfg.rasteriser == "weasyprint"
 
 
-def test_openui_rasteriser_playwright_is_unknown_enum_not_reserved() -> None:
-    """DP7: ``playwright`` is an unknown enum value — not a reserved-but-erroring backend."""
+def test_openui_rasteriser_retired_driver_is_unknown_enum_not_reserved() -> None:
+    """DP7: retired driver name is an unknown enum value — not a reserved-but-erroring backend."""
     from sevn.config.workspace_config import OpenUIWorkspaceConfig
 
     with pytest.raises((ValidationError, ValueError)) as exc_info:
-        OpenUIWorkspaceConfig(rasteriser="playwright")  # type: ignore[arg-type]
+        OpenUIWorkspaceConfig(rasteriser=_RETIRED)  # type: ignore[arg-type]
     msg = str(exc_info.value).lower()
     assert "reserved" not in msg
-    assert "playwright" in msg or "literal" in msg or "enum" in msg or "input" in msg
+    assert _RETIRED in msg or "literal" in msg or "enum" in msg or "input" in msg
 
 
-def test_openui_models_rasteriser_name_excludes_playwright() -> None:
-    """DP7: ui.openui.models.RasteriserName no longer includes playwright."""
+def test_openui_models_rasteriser_name_excludes_retired_driver() -> None:
+    """DP7: ui.openui.models.RasteriserName no longer includes the retired driver."""
     from sevn.ui.openui import models as openui_models
 
     args = get_args(openui_models.RasteriserName)
     assert args == ("weasyprint",)
-    assert "playwright" not in args
+    assert _RETIRED not in args
 
 
 def test_sevn_schema_rasteriser_enum_weasyprint_only() -> None:

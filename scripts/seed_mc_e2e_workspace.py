@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Seed trace + secrets fixtures for Mission Control Playwright E2E (MC W2).
+"""Seed trace + secrets fixtures for Mission Control E2E (MC W2).
 
 Module: scripts.seed_mc_e2e_workspace
 Depends: sevn.agent.tracing.traces_migrate, sevn.cli.workspace, sevn.config.workspace_config,
@@ -290,7 +290,7 @@ def _seed_data_path_improve_job(
 
 
 def _seed_data_path_fixtures(layout: WorkspaceLayout, *, workspace_id: str) -> None:
-    """Opt-in provider.call + trajectory ingest for Playwright data-path specs.
+    """Opt-in provider.call + trajectory ingest for Mission Control data-path specs.
 
     Args:
         layout (WorkspaceLayout): Resolved workspace layout for the MC E2E tree.

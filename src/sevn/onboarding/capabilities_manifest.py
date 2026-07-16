@@ -92,17 +92,17 @@ class CapabilityEntry(BaseModel):
 
         Examples:
             >>> CapabilityEntry(
-            ...     capability_id="skill.x_use",
+            ...     capability_id="skill.social_media_manager",
             ...     group="B",
-            ...     label="x-use",
+            ...     label="social_media_manager",
             ...     description="x",
-            ...     config_paths=["skills.x_use.enabled"],
+            ...     config_paths=["skills.social_media_manager.enabled"],
             ...     control="checkbox",
             ...     default=True,
             ...     profile_overridable=True,
             ...     install_actions=[],
             ... ).id
-            'skill.x_use'
+            'skill.social_media_manager'
         """
         return self.capability_id
 

@@ -60,7 +60,7 @@ def test_app_js_uses_capabilities_ready_gate() -> None:
 
 
 def test_good_value_docker_disables_browser_extra() -> None:
-    """Docker value preset keeps Playwright browser off while CDP engine stays on."""
+    """Docker value preset keeps external browser drivers off while CDP engine stays on."""
     frag = load_profile_fragment("good_value_docker")
     defaults = frag["capabilities_defaults"]
     assert "extra.browser" not in defaults

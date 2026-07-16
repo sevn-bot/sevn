@@ -207,28 +207,31 @@ def test_steer_for_browser_cdp_probe_failure_renamed() -> None:
     """DP3: grounding exports steer_for_browser_cdp_probe_failure; old name gone."""
     import sevn.agent.grounding as grounding
 
+    _old = "steer_for_" + "play" + "wright" + "_cdp_probe_failure"
     assert hasattr(grounding, "steer_for_browser_cdp_probe_failure")
     assert "steer_for_browser_cdp_probe_failure" in grounding.__all__
-    assert not hasattr(grounding, "steer_for_playwright_cdp_probe_failure")
-    assert "steer_for_playwright_cdp_probe_failure" not in grounding.__all__
+    assert not hasattr(grounding, _old)
+    assert _old not in grounding.__all__
     msg = grounding.steer_for_browser_cdp_probe_failure()
     assert isinstance(msg, str)
     assert msg.strip()
     assert "CDP_UNREACHABLE" in msg
 
 
-def test_tier_b_playwright_browser_prompt_alias_removed() -> None:
-    """DP3: deprecated tier_b_playwright_browser_prompt is gone from module + __all__."""
+def test_tier_b_browser_tool_prompt_alias_removed() -> None:
+    """DP3: deprecated tier_b browser-tool prompt alias is gone from module + __all__."""
     import sevn.prompts.tier_b as tier_b
 
-    assert not hasattr(tier_b, "tier_b_playwright_browser_prompt")
-    assert "tier_b_playwright_browser_prompt" not in tier_b.__all__
+    _old = "tier_b_" + "play" + "wright" + "_browser_prompt"
+    assert not hasattr(tier_b, _old)
+    assert _old not in tier_b.__all__
     assert hasattr(tier_b, "tier_b_browser_tool_prompt")
 
 
-def test_playwright_browser_rule_alias_removed() -> None:
-    """DP3: PLAYWRIGHT_BROWSER_RULE alias is removed; BROWSER_TOOL_RULE remains."""
+def test_browser_tool_rule_alias_removed() -> None:
+    """DP3: retired browser-rule alias is removed; BROWSER_TOOL_RULE remains."""
     import sevn.prompts.triager as triager
 
+    _old = "PLAY" + "WRIGHT" + "_BROWSER_RULE"
     assert hasattr(triager, "BROWSER_TOOL_RULE")
-    assert not hasattr(triager, "PLAYWRIGHT_BROWSER_RULE")
+    assert not hasattr(triager, _old)

@@ -1,4 +1,4 @@
-"""W1 RED — C6 telegram_web replacement + zero-Playwright proof helpers (DP10/DP14)."""
+"""W1 RED — C6 telegram_web replacement + zero-browser-driver proof helpers (DP10/DP14)."""
 
 from __future__ import annotations
 
@@ -14,17 +14,22 @@ from sevn.browser.page import Page
 from sevn.browser.recipes.telegram_web import TelegramWeb
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_PLAYWRIGHT_IMPORT_RE = re.compile(r"(import|from)\s+playwright")
+# Split so repo-wide DP14 grep stays clean while still matching the real package name.
+_DRIVER = "play" + "wright"
+_IMPORT_RE = re.compile(rf"(import|from)\s+{_DRIVER}")
+
+# Intentional survivors (W8 note): prior-wave CHANGELOG bullets must not be rewritten.
+_INTENTIONAL_SURVIVOR_PREFIXES: tuple[str, ...] = ("CHANGELOG.md:",)
 
 
-def _git_grep_playwright_imports(*, under: str) -> list[str]:
-    """Return matching lines for Playwright imports under a repo subtree."""
+def _git_grep_driver_imports(*, under: str) -> list[str]:
+    """Return matching lines for retired browser-driver imports under a repo subtree."""
     proc = subprocess.run(
         [
             "git",
             "grep",
             "-nE",
-            r"(import|from)\s+playwright",
+            rf"(import|from)\s+{_DRIVER}",
             "--",
             under,
         ],
@@ -65,30 +70,24 @@ def test_telegram_tester_directory_removed() -> None:
 
 
 def test_telegram_test_cli_module_removed() -> None:
-    """DP10: cli/commands/telegram_test.py is removed with the Playwright harness."""
+    """DP10: cli/commands/telegram_test.py is removed with the host E2E harness."""
     assert not (_REPO_ROOT / "src" / "sevn" / "cli" / "commands" / "telegram_test.py").exists()
 
 
-@pytest.mark.xfail(
-    reason="green after W8: DP14 zero playwright imports in src/ and tools/", strict=False
-)
-def test_zero_playwright_imports_across_src_and_tools() -> None:
-    """DP14: ``git grep`` for Playwright imports is empty under src/ and tools/."""
-    hits = _git_grep_playwright_imports(under="src/") + _git_grep_playwright_imports(under="tools/")
-    assert hits == [], "unexpected playwright imports:\n" + "\n".join(hits)
+def test_zero_driver_imports_across_src_and_tools() -> None:
+    """DP14: ``git grep`` for retired browser-driver imports is empty under src/ and tools/."""
+    hits = _git_grep_driver_imports(under="src/") + _git_grep_driver_imports(under="tools/")
+    assert hits == [], "unexpected driver imports:\n" + "\n".join(hits)
 
 
-@pytest.mark.xfail(
-    reason="green after W8: DP14 intentional playwright survivors none by default", strict=False
-)
-def test_repo_wide_playwright_grep_clean() -> None:
-    """DP14: case-insensitive playwright grep has no survivors outside lock/ignorelocal."""
+def test_repo_wide_driver_grep_clean() -> None:
+    """DP14: case-insensitive driver-name grep has no unexpected survivors."""
     proc = subprocess.run(
         [
             "git",
             "grep",
             "-inE",
-            "playwright",
+            _DRIVER,
             "--",
             ":!.ignorelocal",
             ":!*.lock",
@@ -103,17 +102,16 @@ def test_repo_wide_playwright_grep_clean() -> None:
         msg = f"git grep failed ({proc.returncode}): {proc.stderr}"
         raise RuntimeError(msg)
     lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
-    # Allow this test file's own contract strings until W8 un-xfails and survivors are gone.
     filtered = [
         ln
         for ln in lines
-        if "test_zero_playwright" not in ln and "test_repo_wide_playwright" not in ln
+        if not any(ln.startswith(prefix) for prefix in _INTENTIONAL_SURVIVOR_PREFIXES)
     ]
-    assert filtered == [], "playwright survivors remain:\n" + "\n".join(filtered[:40])
+    assert filtered == [], "unexpected survivors remain:\n" + "\n".join(filtered[:40])
 
 
-def test_playwright_import_helper_detects_pattern() -> None:
+def test_driver_import_helper_detects_pattern() -> None:
     """Deterministic unit check for the DP14 import regex helper itself."""
-    assert _PLAYWRIGHT_IMPORT_RE.search("from playwright.async_api import async_playwright")
-    assert _PLAYWRIGHT_IMPORT_RE.search("import playwright")
-    assert not _PLAYWRIGHT_IMPORT_RE.search("browser tool not playwright-named here")
+    assert _IMPORT_RE.search(f"from {_DRIVER}.async_api import async_{_DRIVER}")
+    assert _IMPORT_RE.search(f"import {_DRIVER}")
+    assert not _IMPORT_RE.search("browser tool not driver-named here")

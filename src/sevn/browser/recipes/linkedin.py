@@ -10,8 +10,8 @@ Exports:
     LinkedInRecipe — high-level LinkedIn scrape operations for tool + skill scripts.
     linkedin_write_allowed — per-recipe write kill-switch helper.
     dry_run_requested — plan-only mode helper for bundled scripts.
-    run_linkedin_op — async entry for bundled ``linkedin-use`` scripts.
-    run_linkedin_op_sync — sync wrapper for bundled ``linkedin-use`` scripts.
+    run_linkedin_op — async entry for bundled LinkedIn skill scripts.
+    run_linkedin_op_sync — sync wrapper for bundled LinkedIn skill scripts.
 
 Examples:
     >>> from sevn.browser.recipes.linkedin import linkedin_write_allowed
@@ -76,7 +76,7 @@ def linkedin_write_allowed(*, browser_tools: dict[str, Any] | None = None) -> bo
 
 
 def dry_run_requested(*, cli_flag: bool = False) -> bool:
-    """Return whether linkedin-use scripts should emit plan-only JSON.
+    """Return whether LinkedIn scripts should emit plan-only JSON.
 
     Args:
         cli_flag (bool): Explicit ``--dry-run`` flag from a script.

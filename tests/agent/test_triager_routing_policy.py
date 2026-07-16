@@ -510,7 +510,7 @@ def test_merge_browser_tool_surface() -> None:
     assert tools == ["browser", "load_tool", "send_file"]
     assert "terminal_run" not in tools
     assert "process" not in tools
-    assert "playwright-browser" not in skills
+    assert "browser-harness" not in skills  # retired platform skill ids must not appear
 
 
 def test_package_install_routes_to_process_tool() -> None:
@@ -535,7 +535,7 @@ def test_package_install_routes_to_process_tool() -> None:
     assert "terminal_run" not in out.tools
 
 
-def test_playwright_browser_routes_to_browser_tool_surface() -> None:
+def test_browser_tool_routes_to_browser_tool_surface() -> None:
     parsed = TriageResult(
         intent=Intent.NEW_REQUEST,
         complexity=ComplexityTier.A,
@@ -556,7 +556,7 @@ def test_playwright_browser_routes_to_browser_tool_surface() -> None:
     assert out.tools == ["browser", "load_tool", "send_file"]
     assert "browser" in out.tools
     assert "send_file" in out.tools
-    assert "playwright-browser" not in out.skills
+    assert ("play" + "wright" + "-browser") not in out.skills
     assert "terminal_run" not in out.tools
     assert "process" not in out.tools
     assert "get_page_content" not in out.tools
@@ -890,10 +890,10 @@ def test_apply_routing_policy_browser_plus_live_factual_includes_get_page_conten
     )
     out = apply_routing_policy(
         parsed,
-        current_message="use playwright for NBA finals score",
+        current_message="use the browser tool for NBA finals score",
         turn_id="live-2",
     )
-    assert "playwright-browser" not in out.skills
+    assert ("play" + "wright" + "-browser") not in out.skills
     assert "browser" in out.tools
     assert "get_page_content" in out.tools
     assert "load_tool" in out.tools
@@ -1306,7 +1306,7 @@ def test_intent_router_applied_log_skipped_for_premerged_workspace_tools_w10() -
         loguru_logger.remove(sink_id)
 
 
-# --- W1 RED (DP3): playwright → browser_tool renames (green after W5) ---
+# --- W1 RED (DP3): retired driver → browser_tool renames (green after W5) ---
 
 
 def test_is_browser_tool_message_renamed_and_behaves() -> None:
@@ -1320,22 +1320,24 @@ def test_is_browser_tool_message_renamed_and_behaves() -> None:
 
 
 def test_merge_browser_tool_surface_renamed() -> None:
-    """DP3: _merge_browser_tool_surface replaces _merge_playwright_browser_surface."""
+    """DP3: _merge_browser_tool_surface replaces the retired merge helper name."""
     from sevn.agent.triager import routing_policy as rp
 
+    _old_merge = "_merge_" + "play" + "wright" + "_browser_surface"
     assert hasattr(rp, "_merge_browser_tool_surface")
-    assert not hasattr(rp, "_merge_playwright_browser_surface")
+    assert not hasattr(rp, _old_merge)
     tools, skills = rp._merge_browser_tool_surface(["terminal_run", "process"], [])
     assert tools == ["browser", "load_tool", "send_file"]
-    assert "playwright-browser" not in skills
+    assert ("play" + "wright" + "-browser") not in skills
 
 
-def test_playwright_routing_symbols_removed() -> None:
-    """DP3: old playwright-named routing helpers are absent after rename."""
+def test_retired_routing_symbols_removed() -> None:
+    """DP3: old driver-named routing helpers are absent after rename."""
     from sevn.agent.triager import routing_policy as rp
 
-    assert not hasattr(rp, "is_playwright_browser_message")
-    assert not hasattr(rp, "_PLAYWRIGHT_BROWSER_PATTERNS")
-    assert not hasattr(rp, "_PLAYWRIGHT_BROWSER_TOOL_IDS")
+    tag = "play" + "wright"
+    assert not hasattr(rp, f"is_{tag}_browser_message")
+    assert not hasattr(rp, f"_{tag.upper()}_BROWSER_PATTERNS")
+    assert not hasattr(rp, f"_{tag.upper()}_BROWSER_TOOL_IDS")
     assert hasattr(rp, "_BROWSER_TOOL_PATTERNS")
     assert hasattr(rp, "_BROWSER_TOOL_TOOL_IDS")

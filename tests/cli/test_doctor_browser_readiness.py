@@ -89,8 +89,6 @@ def test_doctor_browser_readiness_reports_brave(
     def _which(name: str) -> str | None:
         if name == "docker":
             return "/usr/bin/docker"
-        if name == "playwright":
-            return "/usr/local/bin/playwright"
         return None
 
     monkeypatch.setattr(
@@ -122,8 +120,6 @@ def test_doctor_browser_readiness_warns_without_binary_forced_headless(
     def _which(name: str) -> str | None:
         if name == "docker":
             return "/usr/bin/docker"
-        if name == "playwright":
-            return "/usr/local/bin/playwright"
         return None
 
     monkeypatch.setattr(
