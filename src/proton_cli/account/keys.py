@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-<<<<<<< HEAD
 from contextlib import contextmanager
-=======
->>>>>>> origin/pre-0.0.1
 from dataclasses import dataclass, field
 
 import pgpy
