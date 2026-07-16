@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
-from proton_cli.account.keys import persist_unlock, use_unlocked_key
 from pgpy import PGPKey, PGPMessage
 
+from proton_cli.account.keys import persist_unlock, use_unlocked_key
 from proton_cli.crypto import cards as card_crypto
 from proton_cli.crypto import ical as ical_crypto
 from proton_cli.errors import NotFound

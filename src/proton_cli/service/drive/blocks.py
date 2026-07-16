@@ -8,9 +8,10 @@ import struct
 from dataclasses import dataclass
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from proton_cli.account.keys import persist_unlock, use_unlocked_key
 from pgpy import PGPKey, PGPMessage
 from pgpy.packet.fields import ECDHCipherText
+
+from proton_cli.account.keys import use_unlocked_key
 
 _AES256 = 9
 _TAG_SEIPD = 0xD2  # old format tag 18
@@ -71,6 +72,20 @@ def sign_session_key(node_key: PGPKey, sk: SessionKey) -> str:
     with use_unlocked_key(node_key):
         sig = node_key.sign(PGPMessage.new(sk.key))
     return str(sig)
+
+
+def encrypt_data_packet(data: bytes, sk: SessionKey) -> bytes:
+    """Encrypt plaintext bytes into an OpenPGP SEIPD packet."""
+    return _build_seipd_packet(data, sk)
+
+
+def encrypt_and_sign_plaintext(plaintext: str, sk: SessionKey, signing_key: PGPKey) -> bytes:
+    """Encrypt and sign a UTF-8 string for Proton mail body packages."""
+    data = plaintext.encode()
+    enc = _build_seipd_packet(data, sk)
+    with use_unlocked_key(signing_key):
+        signing_key.sign(PGPMessage.new(plaintext))
+    return enc
 
 
 def encrypt_block(

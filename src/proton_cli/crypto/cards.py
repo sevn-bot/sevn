@@ -6,9 +6,9 @@ import base64
 from dataclasses import dataclass
 from typing import Any
 
-from proton_cli.account.keys import use_unlocked_key
 from pgpy import PGPKey, PGPMessage
 
+from proton_cli.account.keys import use_unlocked_key
 from proton_cli.service.drive import blocks
 
 CARD_CLEAR = 0
