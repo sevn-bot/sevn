@@ -153,7 +153,7 @@ def _terminate_pid(pid: int, *, dry_run: bool) -> None:
     """
     if dry_run:
         return
-    from sevn.browser.process import terminate_pid
+    from sevn.util.process import terminate_pid
 
     terminate_pid(pid, escalate=True)
 

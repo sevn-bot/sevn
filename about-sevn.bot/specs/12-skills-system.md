@@ -110,9 +110,6 @@ interfaces:
 - name: pick_work_page
   file: src/sevn/skills/browser_session.py
   symbol: pick_work_page
-- name: pid_is_alive
-  file: src/sevn/skills/browser_session.py
-  symbol: pid_is_alive
 - name: read_devtools_active_port
   file: src/sevn/skills/browser_session.py
   symbol: read_devtools_active_port

@@ -289,13 +289,13 @@ async def test_session_browser_resources_spawns_without_env_cdp(
         cfg: WorkspaceConfig | None = None,
         session_id: str | None = None,
         log_dir: Path | None = None,
-    ) -> tuple[FakeProc, int, str]:
+    ) -> FakeProc:
         _ = (cfg, session_id, log_dir)
         spawn_calls.append((profile_dir, headless, seed_port))
         port = seed_port or 9333
         url = f"http://127.0.0.1:{port}"
         reachable_urls.add(url)
-        return FakeProc(), port, url
+        return FakeProc()
 
     def fake_reachable(url: str, *, timeout: float = 2.0) -> bool:
         return url.rstrip("/") in reachable_urls
@@ -307,6 +307,10 @@ async def test_session_browser_resources_spawns_without_env_cdp(
     mock_pw_factory.start = AsyncMock(return_value=mock_playwright)
 
     monkeypatch.setattr("sevn.skills.browser_session.spawn_chrome", fake_spawn)
+    monkeypatch.setattr(
+        "sevn.skills.browser_session.read_devtools_active_port",
+        lambda *_a, **_k: 9333,
+    )
     monkeypatch.setattr("sevn.skills.browser_session.cdp_reachable", fake_reachable)
     monkeypatch.setattr(
         "sevn.skills.browser_session.resolve_chrome_executable",
@@ -507,9 +511,15 @@ async def test_headless_fallback_uses_executable_path(
     )
     monkeypatch.setattr(
         "sevn.skills.browser_session.spawn_chrome",
-        lambda *_a, **_k: (_FakeProc(), 9333, "http://127.0.0.1:9333"),
+        lambda *_a, **_k: _FakeProc(),
+    )
+    monkeypatch.setattr(
+        "sevn.skills.browser_session.read_devtools_active_port",
+        lambda *_a, **_k: 9333,
     )
     monkeypatch.setattr("sevn.skills.browser_session.cdp_reachable", lambda *_a, **_k: False)
+    monkeypatch.setattr("sevn.browser.lifecycle._SPAWN_CDP_WAIT_STEPS", 2)
+    monkeypatch.setattr("sevn.browser.lifecycle._SPAWN_CDP_WAIT_INTERVAL", 0.01)
     monkeypatch.setattr(
         "playwright.async_api.async_playwright",
         lambda: mock_pw_factory,
@@ -611,9 +621,15 @@ async def test_headless_fallback_appends_extra_args(
     )
     monkeypatch.setattr(
         "sevn.skills.browser_session.spawn_chrome",
-        lambda *_a, **_k: (_FakeProc(), 9333, "http://127.0.0.1:9333"),
+        lambda *_a, **_k: _FakeProc(),
+    )
+    monkeypatch.setattr(
+        "sevn.skills.browser_session.read_devtools_active_port",
+        lambda *_a, **_k: 9333,
     )
     monkeypatch.setattr("sevn.skills.browser_session.cdp_reachable", lambda *_a, **_k: False)
+    monkeypatch.setattr("sevn.browser.lifecycle._SPAWN_CDP_WAIT_STEPS", 2)
+    monkeypatch.setattr("sevn.browser.lifecycle._SPAWN_CDP_WAIT_INTERVAL", 0.01)
     monkeypatch.setattr(
         "playwright.async_api.async_playwright",
         lambda: mock_pw_factory,

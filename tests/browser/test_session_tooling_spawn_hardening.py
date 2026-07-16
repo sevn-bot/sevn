@@ -90,15 +90,16 @@ async def test_d1_reap_clears_locks_for_sevn_pid_only(
         cfg: object = None,
         session_id: str | None = None,
         log_dir: Path | None = None,
-    ) -> tuple[MagicMock, int, str]:
-        _ = (session_id, log_dir)
+    ) -> MagicMock:
+        _ = (session_id, log_dir, headless, seed_port, cfg)
         spawn_calls.append(profile)
         proc = MagicMock()
         proc.pid = 999001
         proc.poll.return_value = None
-        return proc, 59999, "http://127.0.0.1:59999"
+        return proc
 
     monkeypatch.setattr(bs, "spawn_chrome", _fake_spawn)
+    monkeypatch.setattr(bs, "read_devtools_active_port", lambda *_a, **_k: 59999)
     monkeypatch.setattr(bs, "cdp_reachable", lambda _url: True)
 
     async def _attach(cls, url: str) -> MagicMock:
@@ -170,7 +171,7 @@ async def test_d3_failed_spawn_terminates_waits_and_retries_once(
     terminate_count = 0
     spawn_count = 0
 
-    def _fake_spawn(*_a: object, **_k: object) -> tuple[MagicMock, int, str]:
+    def _fake_spawn(*_a: object, **_k: object) -> MagicMock:
         nonlocal spawn_count, terminate_count
         spawn_count += 1
         proc = MagicMock()
@@ -188,9 +189,10 @@ async def test_d3_failed_spawn_terminates_waits_and_retries_once(
 
         proc.terminate.side_effect = _terminate
         proc.wait.side_effect = _wait
-        return proc, 50000 + spawn_count, f"http://127.0.0.1:{50000 + spawn_count}"
+        return proc
 
     monkeypatch.setattr(bs, "spawn_chrome", _fake_spawn)
+    monkeypatch.setattr(bs, "read_devtools_active_port", lambda *_a, **_k: 50001)
     monkeypatch.setattr(bs, "cdp_reachable", lambda _url: False)
     monkeypatch.setattr(bs, "resolve_cdp_url", lambda *_a, **_k: "http://127.0.0.1:1")
 
@@ -271,10 +273,13 @@ async def test_d4_no_cdp_error_includes_chrome_log_path_or_tail(
     monkeypatch.setattr(
         bs,
         "spawn_chrome",
-        lambda *_a, **_k: (proc, 51111, "http://127.0.0.1:51111"),
+        lambda *_a, **_k: proc,
     )
+    monkeypatch.setattr(bs, "read_devtools_active_port", lambda *_a, **_k: 51111)
     monkeypatch.setattr(bs, "cdp_reachable", lambda _url: False)
     monkeypatch.setattr(bs, "resolve_cdp_url", lambda *_a, **_k: "http://127.0.0.1:1")
+    monkeypatch.setattr(lifecycle, "_SPAWN_CDP_WAIT_STEPS", 2)
+    monkeypatch.setattr(lifecycle, "_SPAWN_CDP_WAIT_INTERVAL", 0.01)
 
     with pytest.raises(RuntimeError) as exc_info:
         await lifecycle.spawn_or_attach(content_root, session_id)
@@ -294,16 +299,17 @@ async def test_d5_concurrent_spawn_or_attach_single_flights(
     session_id = "sess-single-flight"
     spawn_count = 0
 
-    def _fake_spawn(*_a: object, **_k: object) -> tuple[MagicMock, int, str]:
+    def _fake_spawn(*_a: object, **_k: object) -> MagicMock:
         nonlocal spawn_count
         spawn_count += 1
         time.sleep(0.05)  # force overlap window for concurrent callers
         proc = MagicMock()
         proc.pid = 555000 + spawn_count
         proc.poll.return_value = None
-        return proc, 59000, "http://127.0.0.1:59000"
+        return proc
 
     monkeypatch.setattr(bs, "spawn_chrome", _fake_spawn)
+    monkeypatch.setattr(bs, "read_devtools_active_port", lambda *_a, **_k: 59000)
     monkeypatch.setattr(bs, "cdp_reachable", lambda _url: "59000" in _url)
     monkeypatch.setattr(bs, "resolve_cdp_url", lambda *_a, **_k: "http://127.0.0.1:1")
 
@@ -372,11 +378,12 @@ async def test_d7_failed_spawn_writes_no_half_record(
     proc.poll.return_value = None
     proc.wait.return_value = -15
 
-    monkeypatch.setattr(
-        bs, "spawn_chrome", lambda *_a, **_k: (proc, 52222, "http://127.0.0.1:52222")
-    )
+    monkeypatch.setattr(bs, "spawn_chrome", lambda *_a, **_k: proc)
+    monkeypatch.setattr(bs, "read_devtools_active_port", lambda *_a, **_k: 52222)
     monkeypatch.setattr(bs, "cdp_reachable", lambda _url: False)
     monkeypatch.setattr(bs, "resolve_cdp_url", lambda *_a, **_k: "http://127.0.0.1:1")
+    monkeypatch.setattr(lifecycle, "_SPAWN_CDP_WAIT_STEPS", 2)
+    monkeypatch.setattr(lifecycle, "_SPAWN_CDP_WAIT_INTERVAL", 0.01)
 
     with pytest.raises(RuntimeError):
         await lifecycle.spawn_or_attach(content_root, session_id)
@@ -401,9 +408,8 @@ async def test_d7_confirmed_spawn_persists_full_record_for_resolve(
     proc.pid = 111001
     proc.poll.return_value = None
 
-    monkeypatch.setattr(
-        bs, "spawn_chrome", lambda *_a, **_k: (proc, 59991, "http://127.0.0.1:59991")
-    )
+    monkeypatch.setattr(bs, "spawn_chrome", lambda *_a, **_k: proc)
+    monkeypatch.setattr(bs, "read_devtools_active_port", lambda *_a, **_k: 59991)
     # First resolve misses; after spawn, registry must win.
     monkeypatch.setattr(bs, "cdp_reachable", lambda url: "59991" in str(url))
 

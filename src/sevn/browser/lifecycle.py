@@ -13,6 +13,7 @@ Depends: asyncio, contextlib, json, os, urllib, sevn.browser.cdp,
 Exports:
     CDPBrowserSession — attach/spawn, target tracking, tab CRUD, page-session access.
     fetch_browser_ws_url — resolve the browser-level WebSocket URL from a CDP HTTP base.
+    await_cdp_after_spawn — poll DevToolsActivePort until CDP is reachable (no seed URL).
     spawn_or_attach — attach to an existing CDP endpoint or spawn host Chrome (D4).
     get_or_create_session — pooled session per gateway ``session_id``.
     release_session — disconnect + evict a pooled session.
@@ -535,6 +536,59 @@ class CDPBrowserSession:
         await self._conn.close()
 
 
+async def await_cdp_after_spawn(
+    proc: Any,
+    profile_dir: Path,
+    *,
+    spawned_after: float,
+    log_path: Path | None = None,
+) -> tuple[int, str]:
+    """Poll ``DevToolsActivePort`` until CDP is reachable after a Chrome spawn.
+
+    Never probes a seed / ``:0`` URL — waits for a fresh port file, then
+    ``cdp_reachable``. Raises ``NO_CDP`` when the ceiling elapses or Chrome exits.
+
+    Args:
+        proc (Any): Chrome ``Popen`` handle from :func:`spawn_chrome`.
+        profile_dir (Path): Chrome ``user-data-dir``.
+        spawned_after (float): Unix time; reject older ``DevToolsActivePort`` files.
+        log_path (Path | None): Optional Chrome log for the ``NO_CDP`` error tail.
+
+    Returns:
+        tuple[int, str]: Live debugging port and ``http://127.0.0.1:<port>`` URL.
+
+    Raises:
+        RuntimeError: When CDP never becomes reachable within the adaptive window.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(await_cdp_after_spawn)
+        True
+    """
+    from sevn.skills.browser_session import cdp_reachable, read_devtools_active_port
+
+    last_url = ""
+    for _ in range(_SPAWN_CDP_WAIT_STEPS):
+        fresh_port = await asyncio.to_thread(
+            read_devtools_active_port,
+            profile_dir,
+            spawned_after=spawned_after,
+        )
+        if fresh_port is not None:
+            last_url = f"http://127.0.0.1:{fresh_port}"
+            if cdp_reachable(last_url):
+                return fresh_port, last_url
+        if proc.poll() is not None:
+            break
+        await asyncio.sleep(_SPAWN_CDP_WAIT_INTERVAL)
+    tail = _chrome_log_tail(log_path) if log_path is not None else ""
+    detail = last_url or "(no DevToolsActivePort yet)"
+    msg = f"NO_CDP: CDP not reachable after spawn at {detail}" + (
+        f" (chrome log: {log_path}" + (f"; tail: {tail}" if tail else "") + ")" if log_path else ""
+    )
+    raise RuntimeError(msg)
+
+
 async def spawn_or_attach(
     content_root: Path,
     session_id: str,
@@ -597,11 +651,9 @@ async def _spawn_or_attach_unlocked(
 
     from sevn.skills.browser_session import (
         BrowserSessionRegistry,
-        cdp_port_seed,
         cdp_reachable,
         clear_registry,
         default_cdp_url,
-        read_devtools_active_port,
         read_registry,
         resolve_browser_headless,
         resolve_profile_dir,
@@ -620,7 +672,6 @@ async def _spawn_or_attach_unlocked(
 
     profile_dir = resolve_profile_dir(content_root, session_id, cfg=cfg)
     headless = resolve_browser_headless(cfg)
-    seed = cdp_port_seed(session_id)
     log_path = _chrome_log_path(content_root, session_id)
     log_dir = log_path.parent
 
@@ -629,65 +680,49 @@ async def _spawn_or_attach_unlocked(
         await asyncio.to_thread(reap_stale_sevn_chrome, content_root, session_id, profile_dir)
         spawn_wall = time.time()
 
-        def _spawn() -> tuple[Any, int, str]:
+        def _spawn() -> Any:
             return spawn_chrome(
                 profile_dir,
                 headless=headless,
-                seed_port=seed,
                 cfg=cfg,
                 session_id=session_id,
                 log_dir=log_dir,
             )
 
-        proc, port, spawned_url = await asyncio.to_thread(_spawn)
-        reachable = False
-        for _ in range(_SPAWN_CDP_WAIT_STEPS):
-            fresh_port = await asyncio.to_thread(
-                read_devtools_active_port,
+        proc = await asyncio.to_thread(_spawn)
+        try:
+            port, spawned_url = await await_cdp_after_spawn(
+                proc,
                 profile_dir,
                 spawned_after=spawn_wall,
+                log_path=log_path,
             )
-            if fresh_port is not None:
-                spawned_url = f"http://127.0.0.1:{fresh_port}"
-                port = fresh_port
-            if cdp_reachable(spawned_url):
-                reachable = True
-                break
-            if proc.poll() is not None:
-                # Chrome already exited — no point burning the full CDP ceiling.
-                break
-            await asyncio.sleep(_SPAWN_CDP_WAIT_INTERVAL)
-        if reachable:
-            write_registry(
-                content_root,
-                session_id,
-                BrowserSessionRegistry(
-                    pid=proc.pid,
-                    cdp_url=spawned_url,
-                    cdp_port=port,
-                    profile_dir=str(profile_dir),
-                    headless=headless,
-                    spawned_by_sevn=True,
-                    last_used_at=datetime.now(tz=UTC).isoformat(),
-                ),
-            )
-            return await CDPBrowserSession.attach(spawned_url)
-
-        # D3: terminate + wait(timeout=5), then exactly one clean retry.
-        if proc.poll() is None:
-            with contextlib.suppress(Exception):
-                proc.terminate()
-            with contextlib.suppress(Exception):
-                await asyncio.to_thread(proc.wait, timeout=5)
-        clear_registry(content_root, session_id)
-        tail = _chrome_log_tail(log_path)
-        last_error = (
-            f"NO_CDP: CDP not reachable after spawn at {spawned_url} "
-            f"(chrome log: {log_path}" + (f"; tail: {tail}" if tail else "") + ")"
+        except RuntimeError as exc:
+            last_error = str(exc)
+            # D3: terminate + wait(timeout=5), then exactly one clean retry.
+            if proc.poll() is None:
+                with contextlib.suppress(Exception):
+                    proc.terminate()
+                with contextlib.suppress(Exception):
+                    await asyncio.to_thread(proc.wait, timeout=5)
+            clear_registry(content_root, session_id)
+            if attempt == 0:
+                continue
+            raise
+        write_registry(
+            content_root,
+            session_id,
+            BrowserSessionRegistry(
+                pid=proc.pid,
+                cdp_url=spawned_url,
+                cdp_port=port,
+                profile_dir=str(profile_dir),
+                headless=headless,
+                spawned_by_sevn=True,
+                last_used_at=datetime.now(tz=UTC).isoformat(),
+            ),
         )
-        if attempt == 0:
-            continue
-        raise RuntimeError(last_error)
+        return await CDPBrowserSession.attach(spawned_url)
     raise RuntimeError(last_error or "NO_CDP: CDP not reachable after spawn")
 
 
@@ -759,6 +794,7 @@ def reset_pool_for_tests() -> None:
 
 __all__ = [
     "CDPBrowserSession",
+    "await_cdp_after_spawn",
     "clear_profile_singleton_locks",
     "fetch_browser_ws_url",
     "get_or_create_session",

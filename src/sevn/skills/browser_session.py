@@ -30,8 +30,6 @@ Exports:
     default_cdp_url — read ``SEVN_CDP_URL`` when set.
     merge_browser_proc_env — inject content root, profile, CDP env for skill runs.
     pick_work_page — choose a tab; prefer registry ``active_target_id``.
-    pid_is_alive — return whether a process id responds to ``signal 0``.
-    pid_matches_sevn_chrome_profile — cmdline identity check before SIGTERM (convention 11).
     read_devtools_active_port — read Chrome ``DevToolsActivePort`` line 1 (optional freshness).
     read_registry — load registry JSON for a session.
     registry_path — path to ``.sevn/browser-sessions/<session_id>.json``.
@@ -47,7 +45,9 @@ Exports:
     resolve_chrome_executable — locate Chrome, Chromium, or Brave binary.
     restart_browser_session — close then spawn and wait for CDP.
     session_status_payload — unified JSON status dict for lifecycle scripts.
-    spawn_chrome — detached Chrome with ``--remote-debugging-port=0`` (D2/D5).
+    spawn_chrome — Popen-only Chrome launch (``--remote-debugging-port=0``); callers
+        must discover a live CDP URL via :func:`sevn.browser.lifecycle.await_cdp_after_spawn`
+        (never trust a seed / ``:0`` URL).
     wait_for_page_ready — post-navigation load + best-effort network idle.
     write_registry — atomic JSON write for a session registry row.
 """
@@ -1027,49 +1027,6 @@ def resolve_idle_close_seconds(cfg: WorkspaceConfig | None = None) -> int:
     return 0
 
 
-def pid_is_alive(pid: int) -> bool:
-    """Return whether ``pid`` responds to ``os.kill(..., 0)``.
-
-    Thin re-export of :func:`sevn.browser.process.pid_is_alive`.
-
-    Args:
-        pid (int): Operating-system process id.
-
-    Returns:
-        bool: ``True`` when the process exists (and is signalable by this user).
-
-    Examples:
-        >>> pid_is_alive(os.getpid())
-        True
-        >>> pid_is_alive(0)
-        False
-    """
-    from sevn.browser.process import pid_is_alive as _alive
-
-    return _alive(pid)
-
-
-def pid_matches_sevn_chrome_profile(pid: int, profile_dir: Path) -> bool:
-    """Return whether ``pid`` still looks like Chrome for ``profile_dir`` (convention 11).
-
-    Thin re-export of :func:`sevn.browser.process.pid_matches_sevn_chrome_profile`.
-
-    Args:
-        pid (int): Candidate process id from the session registry.
-        profile_dir (Path): Expected ``--user-data-dir`` for this session.
-
-    Returns:
-        bool: ``True`` when cmdline mentions Chrome/Chromium and this profile path.
-
-    Examples:
-        >>> pid_matches_sevn_chrome_profile(0, Path("/tmp/p"))
-        False
-    """
-    from sevn.browser.process import pid_matches_sevn_chrome_profile as _match
-
-    return _match(pid, profile_dir)
-
-
 def read_devtools_active_port(
     profile_dir: Path,
     *,
@@ -1128,8 +1085,12 @@ def spawn_chrome(
     cfg: WorkspaceConfig | None = None,
     session_id: str | None = None,
     log_dir: Path | None = None,
-) -> tuple[subprocess.Popen[bytes], int, str]:
-    """Spawn detached Chrome with ``--remote-debugging-port=0`` (D2/D5).
+) -> subprocess.Popen[bytes]:
+    """Spawn detached Chrome with ``--remote-debugging-port=0`` (Popen only).
+
+    Does **not** wait for ``DevToolsActivePort`` and never returns a seed / ``:0``
+    CDP URL. Callers must use :func:`sevn.browser.lifecycle.await_cdp_after_spawn`
+    (or :func:`sevn.browser.lifecycle.spawn_or_attach`) before attaching.
 
     When ``session_id`` and ``log_dir`` are provided, Chrome stdout/stderr are
     redirected to ``log_dir/chrome-<session_id>.log`` (D4) instead of ``DEVNULL``.
@@ -1137,22 +1098,23 @@ def spawn_chrome(
     Args:
         profile_dir (Path): Persistent ``user-data-dir``.
         headless (bool): When ``True``, pass ``--headless=new``.
-        seed_port (int | None): Fallback port when ``DevToolsActivePort`` is slow.
+        seed_port (int | None): Unused (kept for call-site compatibility).
         cfg (WorkspaceConfig | None): Workspace config for ``skills.browser.engine``.
         session_id (str | None): Gateway session id for the Chrome log filename.
         log_dir (Path | None): Directory for ``chrome-<session>.log`` (D4).
 
     Returns:
-        tuple[subprocess.Popen[bytes], int, str]: Process handle, port, CDP URL.
+        subprocess.Popen[bytes]: Detached Chrome process handle.
 
     Raises:
-        RuntimeError: When Chrome is missing or port discovery fails.
+        RuntimeError: When Chrome is missing.
 
     Examples:
         >>> import inspect
         >>> inspect.isfunction(spawn_chrome)
         True
     """
+    _ = seed_port  # port discovery is owned by await_cdp_after_spawn / spawn_or_attach
     exe = resolve_chrome_executable(cfg)
     if not exe:
         msg = "Chrome executable not found"
@@ -1179,7 +1141,7 @@ def spawn_chrome(
         stdout_dest = log_handle
         stderr_dest = log_handle
     try:
-        proc = subprocess.Popen(  # nosec B603
+        return subprocess.Popen(  # nosec B603
             args,
             stdout=stdout_dest,
             stderr=stderr_dest,
@@ -1189,10 +1151,6 @@ def spawn_chrome(
         if log_handle is not None:
             with contextlib.suppress(OSError):
                 log_handle.close()
-    # Return after Popen — lifecycle owns the single adaptive DevTools/CDP wait.
-    port = int(seed_port) if seed_port is not None else 0
-    cdp_url = f"http://127.0.0.1:{port}" if port > 0 else "http://127.0.0.1:0"
-    return proc, port, cdp_url
 
 
 def browser_autoclose_enabled() -> bool:
@@ -2506,8 +2464,6 @@ __all__ = [
     "page_target_id",
     "persist_active_target_id",
     "pick_work_page",
-    "pid_is_alive",
-    "pid_matches_sevn_chrome_profile",
     "read_devtools_active_port",
     "read_registry",
     "registry_path",

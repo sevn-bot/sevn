@@ -27,6 +27,8 @@ _ISSUE_URL_RE = re.compile(
 )
 
 _ISSUE_VIEW_JSON_FIELDS = "number,title,state,url,updatedAt,labels,assignees,comments"
+# Bound hung ``gh`` so cron / issue-watch cannot pin the gateway event loop forever.
+_GH_CLI_TIMEOUT_S = 60.0
 
 
 class GhCliMissingError(RuntimeError):
@@ -91,17 +93,23 @@ def map_gh_cli_error(
     return text or f"gh command failed for {repo}"
 
 
-def run_gh(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+def run_gh(
+    cmd: list[str],
+    *,
+    timeout: float = _GH_CLI_TIMEOUT_S,
+) -> subprocess.CompletedProcess[str]:
     """Run a fixed ``gh`` argv (no shell) and return the completed process.
 
     Args:
         cmd (list[str]): Argv beginning with ``gh``.
+        timeout (float): Seconds before aborting a hung ``gh`` (default 60).
 
     Returns:
         subprocess.CompletedProcess[str]: Captured stdout/stderr result.
 
     Raises:
         GhCliMissingError: When ``gh`` is not installed / not on ``PATH``.
+        RuntimeError: When ``gh`` exceeds ``timeout`` (precise timeout message).
 
     Examples:
         >>> isinstance(GhCliMissingError("missing"), RuntimeError)
@@ -113,9 +121,13 @@ def run_gh(cmd: list[str]) -> subprocess.CompletedProcess[str]:
             capture_output=True,
             text=True,
             check=False,
+            timeout=timeout,
         )
     except FileNotFoundError as exc:
         raise GhCliMissingError("gh binary not found on PATH") from exc
+    except subprocess.TimeoutExpired as exc:
+        msg = f"gh timed out after {timeout:g}s: {' '.join(cmd[:4])}"
+        raise RuntimeError(msg) from exc
 
 
 def create_issue_via_gh(

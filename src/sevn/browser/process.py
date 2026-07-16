@@ -1,16 +1,16 @@
-"""Chrome process helpers: identity, terminate, lock clear, and reap (no CDP types).
+"""Chrome process helpers: identity, lock clear, and reap (no CDP types).
 
 Module: sevn.browser.process
-Depends: contextlib, os, signal, subprocess, time, pathlib
+Depends: contextlib, os, subprocess, pathlib, sevn.util.process
 
-Owns the escalate terminate loop and convention-11 profile identity checks so
-:mod:`sevn.browser.lifecycle` stays a thin spawn/pool layer.
+Owns convention-11 profile identity checks and Chrome lock/reap so
+:mod:`sevn.browser.lifecycle` stays a thin spawn/pool layer. Generic
+``pid_is_alive`` / ``terminate_pid`` live in :mod:`sevn.util.process`
+(re-exported via ``__all__`` for Chrome-path callers).
 
 Exports:
     clear_profile_singleton_locks — delete Chrome singleton/port lockfiles.
-    pid_is_alive — whether a PID responds to ``signal 0``.
     pid_matches_sevn_chrome_profile — cmdline identity check before kill.
-    terminate_pid — SIGTERM then optional SIGKILL with wait.
     terminate_sevn_chrome — kill sevn Chrome for a profile (convention 11).
     reap_stale_sevn_chrome — kill sevn-spawned Chrome for one profile + clear locks.
     reap_sevn_browsers_on_shutdown — terminate all sevn-spawned browsers (D6).
@@ -23,12 +23,11 @@ Examples:
 from __future__ import annotations
 
 import contextlib
-import os
-import signal
 import subprocess  # nosec B404
-import time
 from pathlib import Path
 from typing import Final
+
+from sevn.util.process import pid_is_alive, terminate_pid
 
 _PROFILE_LOCK_FILES: Final[tuple[str, ...]] = (
     "SingletonLock",
@@ -36,34 +35,6 @@ _PROFILE_LOCK_FILES: Final[tuple[str, ...]] = (
     "SingletonCookie",
     "DevToolsActivePort",
 )
-
-
-def pid_is_alive(pid: int) -> bool:
-    """Return whether ``pid`` responds to ``os.kill(..., 0)``.
-
-    Args:
-        pid (int): Operating-system process id.
-
-    Returns:
-        bool: ``True`` when the process exists (and is signalable by this user).
-
-    Examples:
-        >>> pid_is_alive(os.getpid())
-        True
-        >>> pid_is_alive(0)
-        False
-    """
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except OSError:
-        return False
-    return True
 
 
 def _read_pid_cmdline(pid: int) -> str:
@@ -161,45 +132,6 @@ def clear_profile_singleton_locks(profile_dir: Path) -> None:
     for name in _PROFILE_LOCK_FILES:
         with contextlib.suppress(OSError):
             (profile_dir / name).unlink()
-
-
-def terminate_pid(pid: int, *, escalate: bool = True) -> bool:
-    """Send ``SIGTERM`` to ``pid``, optionally escalate to ``SIGKILL`` after wait.
-
-    Shared escalate loop for sevn Chrome reaping and CLI teardown. Blocking
-    (~5-6 s worst case); async callers must wrap with ``asyncio.to_thread``.
-
-    Args:
-        pid (int): Target process id.
-        escalate (bool): When ``True``, ``SIGKILL`` if still alive after wait.
-
-    Returns:
-        bool: ``True`` when ``SIGTERM`` was delivered (process may still exit later).
-
-    Examples:
-        >>> terminate_pid(-1)
-        False
-    """
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, signal.SIGTERM)
-    except ProcessLookupError:
-        return False
-    except OSError:
-        return False
-    for _ in range(50):
-        if not pid_is_alive(pid):
-            return True
-        time.sleep(0.1)
-    if escalate and pid_is_alive(pid):
-        with contextlib.suppress(OSError, ProcessLookupError):
-            os.kill(pid, signal.SIGKILL)
-        for _ in range(20):
-            if not pid_is_alive(pid):
-                break
-            time.sleep(0.05)
-    return True
 
 
 def terminate_sevn_chrome(
