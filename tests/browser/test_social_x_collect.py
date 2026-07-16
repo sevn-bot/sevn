@@ -45,7 +45,6 @@ def _assert_structured_posts(posts: list[dict[str, Any]]) -> None:
         assert not re.fullmatch(r"https://x\.com/[^/]+/?$", url)
 
 
-@pytest.mark.xfail(reason="green after W3: DB4 timeline_collect status permalinks", strict=False)
 @pytest.mark.asyncio
 async def test_timeline_collect_returns_status_permalinks(fake_cdp: Any) -> None:
     """DB4: timeline_collect returns {tweet_url, author_handle, text} with /status/ ids."""
@@ -71,7 +70,6 @@ async def test_timeline_collect_returns_status_permalinks(fake_cdp: Any) -> None
         await conn.close()
 
 
-@pytest.mark.xfail(reason="green after W3: DB4 home_feed alias", strict=False)
 @pytest.mark.asyncio
 async def test_home_feed_returns_structured_posts(fake_cdp: Any) -> None:
     """DB4: home_feed exposes the same structured shape as timeline_collect."""
@@ -91,9 +89,6 @@ async def test_home_feed_returns_structured_posts(fake_cdp: Any) -> None:
         await conn.close()
 
 
-@pytest.mark.xfail(
-    reason="green after W3: DB5 op=read returns structured posts not CSS HTML", strict=False
-)
 @pytest.mark.asyncio
 async def test_x_op_read_returns_structured_posts_not_raw_html(fake_cdp: Any) -> None:
     """DB5: X op=read returns structured posts, not stylesheet/raw HTML noise."""

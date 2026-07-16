@@ -42,7 +42,7 @@ and cookies persist across runs via that profile. Operator Chrome is never force
 | `gmail` | `op`, `query?`, `message_id?`, `to?`, `subject?`, `body?` | Gmail — `op`: `list` · `read` · `search` · `compose` · `reply` (writes require `tools.browser.gmail.allow_write=true`) |
 | `maps` | `op`, `query?`, `place?`, `origin?`, `destination?` | Google Maps — `op`: `search` · `place` · `directions` · `reviews` |
 | `youtube` | `op`, `url?`, `query?`, `comment_hint?`, `body?` | YouTube — `op`: `search` · `info` · `comments` · `read_replies` · `comment` · `reply` (writes require `tools.browser.youtube.allow_write=true`) |
-| `social` | `site`, `op`, `url?`, `query?`, `body?` | Social sites — `site`: `x` · `facebook` · `instagram` · `linkedin` · `reddit` · `tiktok`; `op`: `read` · `post` · `reply` · `read_replies` · `search` (writes require `tools.browser.social.<site>.allow_write=true`) |
+| `social` | `site`, `op`, `url?`, `query?`, `body?` | Social sites — `site`: `x` · `facebook` · `instagram` · `linkedin` · `reddit` · `tiktok`; `op`: `read` · `post` · `reply` · `read_replies` · `search` · `timeline_collect` · `home_feed`. On **X**, `read` / `timeline_collect` / `home_feed` return structured `{tweet_url, author_handle, text}[]` posts (status permalinks, not raw HTML). Writes require `tools.browser.social.<site>.allow_write=true` |
 
 ## Element targeting
 Prefer a precise CSS `selector`. When you only know the label, pass `text` — the tool

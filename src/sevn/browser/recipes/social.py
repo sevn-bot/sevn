@@ -2,13 +2,16 @@
 
 A :class:`SocialRecipe` dispatches per-site operations using selector maps and
 egress allowlists. Write ops require ``tools.browser.social.<site>.allow_write=true``.
+X additionally exposes structured ``timeline_collect`` / ``home_feed`` / ``read``.
 
 Module: sevn.browser.recipes.social
-Depends: asyncio, re, dataclasses, urllib.parse, sevn.browser.auth, sevn.browser.recipes.base
+Depends: asyncio, contextlib, re, dataclasses, urllib.parse, sevn.browser.auth, sevn.browser.recipes.base
 
 Exports:
     parse_post_html — parse a saved post/page HTML into text metadata.
     parse_comments_html — parse saved comments HTML.
+    normalize_x_status_url — canonicalize an X status permalink.
+    parse_x_timeline_html — scrape ``{tweet_url, author_handle, text}`` from X feed HTML.
     social_write_allowed — per-site write kill-switch helper.
     SocialRecipe — multi-site social operations over a page/dom pair.
 
@@ -21,6 +24,7 @@ Examples:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
@@ -81,6 +85,30 @@ _AUTHOR_RE: Final[re.Pattern[str]] = re.compile(
 )
 
 _TYPE_PAUSE_S: Final[float] = 0.2
+_X_SCROLL_PIXELS: Final[int] = 1500
+_X_SCROLL_ROUNDS: Final[int] = 5
+_X_SCROLL_PAUSE_S: Final[float] = 0.15
+_X_HTML_MAX_CHARS: Final[int] = 500_000
+
+_ARTICLE_RE: Final[re.Pattern[str]] = re.compile(
+    r"<article\b[^>]*>(.*?)</article>",
+    re.IGNORECASE | re.DOTALL,
+)
+_STATUS_ANCHOR_RE: Final[re.Pattern[str]] = re.compile(
+    r'<a\b[^>]*href=["\']([^"\']*?/status/\d+[^"\']*)["\'][^>]*>(.*?)</a>',
+    re.IGNORECASE | re.DOTALL,
+)
+_TWEET_TEXT_RE: Final[re.Pattern[str]] = re.compile(
+    r'<div[^>]*data-testid=["\']tweetText["\'][^>]*>(.*?)</div>',
+    re.IGNORECASE | re.DOTALL,
+)
+_STATUS_PATH_RE: Final[re.Pattern[str]] = re.compile(
+    r"(?:https?://(?:www\.)?(?:x|twitter)\.com)?/([^/\s?#]+)/status/(\d+)",
+    re.IGNORECASE,
+)
+_STATUS_TRAILING_NOISE: Final[frozenset[str]] = frozenset(
+    {"analytics", "photo", "likes", "retweets", "quotes", "media", "video"}
+)
 
 
 @dataclass(frozen=True)
@@ -223,6 +251,128 @@ def parse_comments_html(html: str, *, limit: int = 20) -> dict[str, Any]:
     return {"comments": comments, "count": len(comments)}
 
 
+def normalize_x_status_url(href: str) -> str | None:
+    """Normalize an X status ``href`` to ``https://x.com/<user>/status/<id>``.
+
+    Strips query strings and trailing path noise (``/analytics``, ``/photo``, …).
+    Profile/avatar links without a status id return ``None``.
+
+    Args:
+        href (str): Relative or absolute status URL.
+
+    Returns:
+        str | None: Canonical permalink, or ``None`` when not a status URL.
+
+    Examples:
+        >>> normalize_x_status_url("/alice/status/1111111111111111111?s=20")
+        'https://x.com/alice/status/1111111111111111111'
+        >>> normalize_x_status_url("/alice/status/1/analytics")
+        'https://x.com/alice/status/1'
+        >>> normalize_x_status_url("/alice") is None
+        True
+    """
+    match = _STATUS_PATH_RE.search(href or "")
+    if not match:
+        return None
+    user, status_id = match.group(1), match.group(2)
+    if not user or user.lower() in {"i", "intent", "share", "search", "hashtag"}:
+        return None
+    return f"https://x.com/{user}/status/{status_id}"
+
+
+def _pick_status_href(article_html: str) -> str | None:
+    """Return the best ``/status/`` href from one article (timestamp over avatar).
+
+    Prefers an anchor that wraps a ``<time>`` element; otherwise the first status
+    link whose path after the id is empty or only query noise.
+
+    Args:
+        article_html (str): Inner HTML of one ``<article>``.
+
+    Returns:
+        str | None: Raw href, or ``None`` when no status permalink is present.
+
+    Examples:
+        >>> href = _pick_status_href(
+        ...     '<a href="/a/photo"></a><a href="/a/status/1"><time>1h</time></a>'
+        ... )
+        >>> href
+        '/a/status/1'
+    """
+    fallback: str | None = None
+    for match in _STATUS_ANCHOR_RE.finditer(article_html or ""):
+        href = match.group(1) or ""
+        inner = match.group(2) or ""
+        path_match = _STATUS_PATH_RE.search(href)
+        if not path_match:
+            continue
+        trailing = ""
+        remainder = href[path_match.end() :]
+        if remainder.startswith("/"):
+            trailing = remainder[1:].split("?", 1)[0].split("#", 1)[0].split("/", 1)[0]
+        if trailing and trailing.lower() in _STATUS_TRAILING_NOISE:
+            if fallback is None:
+                fallback = href
+            continue
+        if "<time" in inner.lower():
+            return href
+        if fallback is None or not trailing:
+            fallback = href
+    return fallback
+
+
+def parse_x_timeline_html(html: str) -> list[dict[str, str]]:
+    """Parse X home/timeline HTML into structured posts (DB4).
+
+    Per ``article``: take the timestamp ``/status/`` permalink (not avatar/profile),
+    normalize to ``https://x.com/<user>/status/<id>``, read text from
+    ``[data-testid="tweetText"]``, and dedupe by ``tweet_url``.
+
+    Args:
+        html (str): Saved X feed/page HTML.
+
+    Returns:
+        list[dict[str, str]]: ``{tweet_url, author_handle, text}`` rows.
+
+    Examples:
+        >>> rows = parse_x_timeline_html(
+        ...     '<article><a href="/u/status/9"><time>1h</time></a>'
+        ...     '<div data-testid="tweetText">Hi</div></article>'
+        ... )
+        >>> rows[0]["tweet_url"]
+        'https://x.com/u/status/9'
+        >>> rows[0]["author_handle"]
+        'u'
+    """
+    posts: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for article in _ARTICLE_RE.finditer(html or ""):
+        body = article.group(1) or ""
+        href = _pick_status_href(body)
+        if not href:
+            continue
+        tweet_url = normalize_x_status_url(href)
+        if not tweet_url or tweet_url in seen:
+            continue
+        text_match = _TWEET_TEXT_RE.search(body)
+        text = _strip_tags(text_match.group(1) if text_match else "").strip()
+        if not text:
+            continue
+        path = _STATUS_PATH_RE.search(tweet_url)
+        if not path:
+            continue
+        author_handle = path.group(1)
+        seen.add(tweet_url)
+        posts.append(
+            {
+                "tweet_url": tweet_url,
+                "author_handle": author_handle,
+                "text": text,
+            }
+        )
+    return posts
+
+
 def social_write_allowed(site: str, *, browser_tools: dict[str, Any] | None = None) -> bool:
     """Return whether write ops are enabled for a social ``site`` (default off).
 
@@ -334,7 +484,8 @@ class SocialRecipe:
 
         Args:
             site (str): ``x``, ``facebook``, ``instagram``, ``linkedin``, ``reddit``, ``tiktok``.
-            op (str): ``read``, ``post``, ``reply``, ``read_replies``, or ``search``.
+            op (str): ``read``, ``post``, ``reply``, ``read_replies``, ``search``,
+                or X-only ``timeline_collect`` / ``home_feed``.
             target (str): URL or post id for read/reply/read_replies.
             query (str): Search query for ``search``.
             text (str): Body for ``post`` / ``reply``.
@@ -355,6 +506,8 @@ class SocialRecipe:
         normalized = (op or "").strip().lower()
         if normalized == "read":
             return await self.read(site_key, cfg, target)
+        if normalized in {"timeline_collect", "home_feed"}:
+            return await self.timeline_collect(site_key, cfg, op=normalized)
         if normalized == "search":
             return await self.search(site_key, cfg, query or target)
         if normalized == "read_replies":
@@ -363,7 +516,10 @@ class SocialRecipe:
             return await self.post(site_key, cfg, text)
         if normalized == "reply":
             return await self.reply(site_key, cfg, target, text)
-        msg = f"unknown social op: {op!r} (read|post|reply|read_replies|search)"
+        msg = (
+            f"unknown social op: {op!r} "
+            "(read|post|reply|read_replies|search|timeline_collect|home_feed)"
+        )
         raise RecipeError(msg)
 
     async def _require_login(self, cfg: _SiteConfig) -> None:
@@ -395,13 +551,16 @@ class SocialRecipe:
     async def read(self, site_key: str, cfg: _SiteConfig, target: str) -> dict[str, Any]:
         """Read a post or feed page.
 
+        For ``site=x``, returns structured posts (DB5) instead of raw HTML text.
+        Other sites keep the coarse ``parse_post_html`` payload.
+
         Args:
             site_key (str): Site key (``x``, ``facebook``, …).
             cfg (_SiteConfig): Site configuration.
             target (str): URL to open; home feed when empty.
 
         Returns:
-            dict[str, Any]: Parsed post text payload.
+            dict[str, Any]: Parsed post text payload, or X ``{posts, count}``.
 
         Examples:
             >>> import inspect
@@ -413,10 +572,132 @@ class SocialRecipe:
             validate_egress(url, allowlist=cfg.egress)
         else:
             url = cfg.home_url
+        if site_key == "x":
+            return await self._collect_x_posts(cfg, url=url, op="read")
         await self._page.goto(url, wait_until="none")
         html = await self._page.extract_html()
         parsed = parse_post_html(html)
         return {"site": site_key, "op": "read", "url": url, **parsed}
+
+    async def timeline_collect(
+        self,
+        site_key: str,
+        cfg: _SiteConfig,
+        *,
+        op: str = "timeline_collect",
+    ) -> dict[str, Any]:
+        """Scroll the X home timeline and return structured posts (DB4).
+
+        ``home_feed`` is an alias with the same scrape. Non-X sites raise.
+
+        Args:
+            site_key (str): Must be ``x``.
+            cfg (_SiteConfig): Site configuration.
+            op (str): Result ``op`` label (``timeline_collect`` or ``home_feed``).
+
+        Returns:
+            dict[str, Any]: ``{site, op, url, posts, count}``.
+
+        Raises:
+            RecipeError: When ``site_key`` is not ``x``.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(SocialRecipe.timeline_collect)
+            True
+        """
+        if site_key != "x":
+            msg = f"{op} is only supported for site=x (got {site_key!r})"
+            raise RecipeError(msg)
+        label = op if op in {"timeline_collect", "home_feed"} else "timeline_collect"
+        return await self._collect_x_posts(cfg, url=cfg.home_url, op=label)
+
+    async def home_feed(self, site_key: str, cfg: _SiteConfig) -> dict[str, Any]:
+        """Alias for :meth:`timeline_collect` with ``op=home_feed``.
+
+        Args:
+            site_key (str): Must be ``x``.
+            cfg (_SiteConfig): Site configuration.
+
+        Returns:
+            dict[str, Any]: Structured home-feed posts.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(SocialRecipe.home_feed)
+            True
+        """
+        return await self.timeline_collect(site_key, cfg, op="home_feed")
+
+    async def _collect_x_posts(
+        self,
+        cfg: _SiteConfig,
+        *,
+        url: str,
+        op: str,
+    ) -> dict[str, Any]:
+        """Navigate, dismiss blockers, scroll, and scrape structured X posts.
+
+        Args:
+            cfg (_SiteConfig): X site configuration.
+            url (str): Page to open (home or a status URL).
+            op (str): Result operation label.
+
+        Returns:
+            dict[str, Any]: ``{site, op, url, posts, count}``.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(SocialRecipe._collect_x_posts)
+            True
+        """
+        validate_egress(url, allowlist=cfg.egress)
+        await self._page.goto(url, wait_until="none")
+        await self._dismiss_x_blockers()
+        for _ in range(_X_SCROLL_ROUNDS):
+            with contextlib.suppress(Exception):
+                await self._page.evaluate(f"window.scrollBy(0, {_X_SCROLL_PIXELS})")
+            await asyncio.sleep(_X_SCROLL_PAUSE_S)
+        html = await self._page.extract_html(max_chars=_X_HTML_MAX_CHARS)
+        posts = parse_x_timeline_html(html)
+        return {
+            "site": "x",
+            "op": op,
+            "url": url,
+            "posts": posts,
+            "count": len(posts),
+        }
+
+    async def _dismiss_x_blockers(self) -> None:
+        """Best-effort cookie/consent dismiss via in-page click (no DOM mock needed).
+
+        Returns:
+            None
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(SocialRecipe._dismiss_x_blockers)
+            True
+        """
+        script = """(() => {
+          const labels = [
+            'Accept all cookies', 'Accept all', 'Accept cookies', 'Accept & close',
+            'Allow all cookies', 'Allow all', 'I agree', 'I accept', 'Agree'
+          ];
+          const nodes = Array.from(document.querySelectorAll('button, div[role="button"], a'));
+          for (const el of nodes) {
+            const text = (el.innerText || el.textContent || '').trim();
+            if (!text) continue;
+            if (labels.some((l) => text.toLowerCase() === l.toLowerCase()
+                || text.toLowerCase().includes(l.toLowerCase()))) {
+              el.click();
+              return 1;
+            }
+          }
+          return 0;
+        })()"""
+        with contextlib.suppress(Exception):
+            await self._page.evaluate(script)
 
     async def search(self, site_key: str, cfg: _SiteConfig, query: str) -> dict[str, Any]:
         """Search the site for ``query``.
@@ -574,4 +855,11 @@ class SocialRecipe:
         return None
 
 
-__all__ = ["SocialRecipe", "parse_comments_html", "parse_post_html", "social_write_allowed"]
+__all__ = [
+    "SocialRecipe",
+    "normalize_x_status_url",
+    "parse_comments_html",
+    "parse_post_html",
+    "parse_x_timeline_html",
+    "social_write_allowed",
+]
