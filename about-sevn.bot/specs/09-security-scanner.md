@@ -7,13 +7,12 @@ owner: Alex
 summary: Deliver a single scanner subsystem that runs in the gateway process so hostile
   content is filtered before the Triager or any routing model sees user-visible text,
   transcripts, or selected tool output.
-last_updated: '2026-07-12'
-fingerprint: sha256:47e285d68c9af8fbaece1fe1e31aacf0f75a5e9445adc7275597893857e3427e
+last_updated: '2026-07-16'
+fingerprint: sha256:0b836a01cabccc962542b9e8f22c13fcac7c528fe68aecbe13ed051002a57cdd
 related: []
 sources:
 - src/sevn/security/**
 parent_prd: prd-03-trust-and-control
-depends_on: []
 build_phase: null
 interfaces:
 - name: apply_namespace_egress_firewall
@@ -289,11 +288,7 @@ interfaces:
 - name: expand_secret_refs
   file: src/sevn/security/secrets/value_expand.py
   symbol: expand_secret_refs
-specs: []
-personas: []
-prd_profile: null
 ---
-
 
 ## Purpose
 
