@@ -17,7 +17,7 @@ def main() -> int:
     args = parser.parse_args()
     payload = {
         "variables": list(PROMPT_VARIABLES),
-        "templates": list_prompt_templates(args.kind),  # type: ignore[arg-type]
+        "templates": list_prompt_templates(args.kind),
     }
     write_ok(payload)
     if "--json" in sys.argv:
