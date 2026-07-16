@@ -1,7 +1,7 @@
 ---
 name: proton-management
 description: Proton suite CLI (Python port) — Pass vaults/items with E2EE; Mail/Drive/Calendar/Contacts planned.
-version: "0.1.0"
+version: "0.2.0"
 see_also:
   - load_skill
   - run_skill_script
@@ -31,8 +31,8 @@ scripts:
 # proton-management
 
 Python port of [roman-16/proton-cli](https://github.com/roman-16/proton-cli) integrated as a sevn skill.
-**PR 1** ships foundation + **Pass** (`vaults list`, `items list`, `items get`). Mail, Drive, Calendar,
-and Contacts follow in later incremental PRs.
+**PR 2** adds Pass write paths (`items create/edit/delete`, `vaults create/rename/delete`) and
+`pass secrets {get,set,delete}` for the sevn ``proton_pass`` secrets backend via ``cli_path: proton-cli``.
 
 ## Operator setup
 
@@ -54,7 +54,9 @@ export PROTON_PASSWORD='...'
 proton-cli --version
 proton-cli pass vaults list --output json
 proton-cli pass items list --vault Personal
-proton-cli pass items get SHARE_ID ITEM_ID --output json
+proton-cli pass items create --name "API Key" --password '...' --vault Personal
+proton-cli pass items edit "API Key" --password '...'
+proton-cli pass secrets get "API Key" --vault Personal   # stdout password only
 ```
 
 Sessions persist under `~/.config/proton-cli/sessions/<profile>.json`.
@@ -63,4 +65,4 @@ Sessions persist under `~/.config/proton-cli/sessions/<profile>.json`.
 
 - Skill scripts never echo passwords in stdout.
 - Decrypted secrets are only returned when the operator runs `pass items get` with explicit IDs.
-- Configure `secrets_backend` type `proton_pass` with `cli_path: proton-cli` once Pass write paths land.
+- Configure `secrets_backend` type `proton_pass` with `cli_path: proton-cli` and optional `vault`.
