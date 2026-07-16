@@ -554,10 +554,12 @@ def downgrade_manifest(
     try:
         m = parse_skill_markdown(text, provenance)
     except (SkillExecutionError, yaml.YAMLError) as exc:
+        # Strict parse failed → unloadable; quarantine so advertisers omit/flag (D14).
         m = SkillManifest(
             name=skill_dir_name,
             description=skill_dir_name,
             version="0.0.0",
+            quarantine_flag=True,
         )
         return m, (str(exc),)
     errs: list[str] = []

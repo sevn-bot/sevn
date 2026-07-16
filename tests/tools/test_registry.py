@@ -16,11 +16,6 @@ from sevn.tools.permissions import AllowAllPermissionPolicy
 from sevn.tools.registry import build_session_registry
 from sevn.workspace.layout import WorkspaceLayout
 
-_XFAIL_W7 = pytest.mark.xfail(
-    reason="green after W7: skill registry SSOT (D14)",
-    strict=False,
-)
-
 
 @pytest.fixture(autouse=True)
 def _reset_skill_singletons() -> None:
@@ -75,7 +70,6 @@ def _write_ok_skill(skill_dir: Path) -> None:
     )
 
 
-@_XFAIL_W7
 @pytest.mark.asyncio
 async def test_d14_unloadable_skill_absent_or_quarantined(tmp_path: Path) -> None:
     """D14: a skill whose manifest fails to load is absent or ``quarantine:true``."""
@@ -127,7 +121,6 @@ async def test_d14_unloadable_skill_absent_or_quarantined(tmp_path: Path) -> Non
         assert quarantined.get("broken_unloadable") is True
 
 
-@_XFAIL_W7
 @pytest.mark.asyncio
 async def test_d14_load_skill_on_listed_never_skill_not_found(tmp_path: Path) -> None:
     """D14: ``load_skill`` on any advertised skill never returns ``SKILL_NOT_FOUND``."""
