@@ -63,4 +63,17 @@ def test_mail_list_dry_run() -> None:
     assert proc.returncode == 0
     data = json.loads(proc.stdout)
     assert data["data"]["mode"] == "dry_run"
-    assert "mail" in data["data"]["command"][0] or data["data"]["command"][0] == "mail"
+    assert data["data"]["command"][0] == "mail"
+
+
+def test_drive_list_dry_run() -> None:
+    proc = subprocess.run(
+        [sys.executable, str(_SCRIPTS / "drive_list.py"), "--dry-run", "--path", "/Docs"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0
+    data = json.loads(proc.stdout)
+    assert data["data"]["mode"] == "dry_run"
+    assert data["data"]["command"][:3] == ["drive", "items", "list"]
