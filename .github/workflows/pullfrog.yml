@@ -38,6 +38,7 @@ jobs:
 
       - name: PullFrog PR review (Claude subscription)
         if: env.HAS_CLAUDE_CODE == 'true'
+        continue-on-error: true
         uses: pullfrog/pullfrog@a809795406487e13f894c681ea09b4f96015284d # v0
         with:
           model: anthropic/claude-sonnet
@@ -53,6 +54,7 @@ jobs:
 
       - name: PullFrog PR review (Codex/OpenAI subscription)
         if: env.HAS_CLAUDE_CODE != 'true' && env.HAS_CODEX_AUTH == 'true'
+        continue-on-error: true
         uses: pullfrog/pullfrog@a809795406487e13f894c681ea09b4f96015284d # v0
         with:
           model: openai/gpt
