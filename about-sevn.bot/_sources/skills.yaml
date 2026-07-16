@@ -5,7 +5,7 @@ body: |
 overrides:
   lcm: Search and recall conversation history without losing detail.
   email-management: Search and send email through configured accounts.
-  google-workspace: Gmail, Calendar, Drive, Sheets, Docs, and Contacts via OAuth2 (planned — see google-workspace.html).
+  google-workspace: Gmail, Calendar, Drive, and Contacts via OAuth2, with planned Sheets/Docs expansion (see google-workspace.html).
   playwright-browser: Automate web pages in a controlled browser session.
   github-manager: Work with repositories, branches, and CI from chat.
   last30days: Multi-source social research for the last 30 days (Reddit, X, YouTube, HN, Polymarket).

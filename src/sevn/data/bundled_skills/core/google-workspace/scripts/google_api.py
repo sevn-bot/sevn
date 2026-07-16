@@ -11,6 +11,7 @@ Exports:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 
 from sevn.lcm.script_cli import workspace_from_env, write_error, write_ok
@@ -19,14 +20,26 @@ from sevn.skills.google_workspace_api import (
     calendar_delete,
     calendar_list,
     contacts_list,
+    docs_append,
+    docs_create,
+    docs_get,
+    drive_create_folder,
+    drive_delete,
+    drive_download,
     drive_get,
     drive_search,
+    drive_share,
+    drive_upload,
     gmail_get,
     gmail_labels,
     gmail_modify,
     gmail_reply,
     gmail_search,
     gmail_send,
+    sheets_append,
+    sheets_create,
+    sheets_get,
+    sheets_update,
 )
 
 _DRY_RUN_ENV = "SEVN_GOOGLE_DRY_RUN"
@@ -57,6 +70,15 @@ def _enable_dry_run() -> None:
     """Enable env-based dry-run mode for shared helpers."""
 
     os.environ[_DRY_RUN_ENV] = "1"
+
+
+def _json_array(value: str) -> list[list[object]]:
+    """Parse a CLI JSON payload and require a list-of-lists style structure."""
+
+    parsed = json.loads(value)
+    if not isinstance(parsed, list):
+        raise ValueError("values must decode to a JSON array")
+    return parsed
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -161,6 +183,67 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("file_id")
     p.add_argument("--dry-run", action="store_true")
     p.set_defaults(handler=lambda ws, a: drive_get(ws, a.file_id))
+    p = drive_sub.add_parser("upload")
+    p.add_argument("path")
+    p.add_argument("--name")
+    p.add_argument("--parent")
+    p.add_argument("--mime-type")
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(
+        handler=lambda ws, a: drive_upload(
+            ws,
+            a.path,
+            name=a.name,
+            parent=a.parent,
+            mime_type=a.mime_type,
+        ),
+    )
+    p = drive_sub.add_parser("download")
+    p.add_argument("file_id")
+    p.add_argument("--output")
+    p.add_argument("--export-mime")
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(
+        handler=lambda ws, a: drive_download(
+            ws,
+            a.file_id,
+            output=a.output,
+            export_mime=a.export_mime,
+        ),
+    )
+    p = drive_sub.add_parser("create-folder")
+    p.add_argument("name")
+    p.add_argument("--parent")
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(handler=lambda ws, a: drive_create_folder(ws, a.name, parent=a.parent))
+    p = drive_sub.add_parser("share")
+    p.add_argument("file_id")
+    p.add_argument(
+        "--role",
+        default="reader",
+        choices=["reader", "commenter", "writer", "fileOrganizer", "organizer", "owner"],
+    )
+    p.add_argument("--type", dest="permission_type", default="user", choices=["user", "group", "domain", "anyone"])
+    p.add_argument("--email")
+    p.add_argument("--domain")
+    p.add_argument("--notify", action="store_true")
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(
+        handler=lambda ws, a: drive_share(
+            ws,
+            a.file_id,
+            role=a.role,
+            permission_type=a.permission_type,
+            email=a.email,
+            domain=a.domain,
+            notify=a.notify,
+        ),
+    )
+    p = drive_sub.add_parser("delete")
+    p.add_argument("file_id")
+    p.add_argument("--permanent", action="store_true")
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(handler=lambda ws, a: drive_delete(ws, a.file_id, permanent=a.permanent))
 
     contacts = sub.add_parser("contacts")
     contacts_sub = contacts.add_subparsers(dest="action", required=True)
@@ -168,6 +251,62 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max", type=int, default=20)
     p.add_argument("--dry-run", action="store_true")
     p.set_defaults(handler=lambda ws, a: contacts_list(ws, max_results=a.max))
+
+    sheets = sub.add_parser("sheets")
+    sheets_sub = sheets.add_subparsers(dest="action", required=True)
+    p = sheets_sub.add_parser("get")
+    p.add_argument("sheet_id")
+    p.add_argument("range")
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(handler=lambda ws, a: sheets_get(ws, a.sheet_id, a.range))
+    p = sheets_sub.add_parser("update")
+    p.add_argument("sheet_id")
+    p.add_argument("range")
+    p.add_argument("--values", required=True)
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(
+        handler=lambda ws, a: sheets_update(
+            ws,
+            a.sheet_id,
+            a.range,
+            _json_array(a.values),
+        ),
+    )
+    p = sheets_sub.add_parser("append")
+    p.add_argument("sheet_id")
+    p.add_argument("range")
+    p.add_argument("--values", required=True)
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(
+        handler=lambda ws, a: sheets_append(
+            ws,
+            a.sheet_id,
+            a.range,
+            _json_array(a.values),
+        ),
+    )
+    p = sheets_sub.add_parser("create")
+    p.add_argument("--title", required=True)
+    p.add_argument("--sheet-name")
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(handler=lambda ws, a: sheets_create(ws, a.title, sheet_name=a.sheet_name))
+
+    docs = sub.add_parser("docs")
+    docs_sub = docs.add_subparsers(dest="action", required=True)
+    p = docs_sub.add_parser("get")
+    p.add_argument("doc_id")
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(handler=lambda ws, a: docs_get(ws, a.doc_id))
+    p = docs_sub.add_parser("create")
+    p.add_argument("--title", required=True)
+    p.add_argument("--body")
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(handler=lambda ws, a: docs_create(ws, a.title, body=a.body))
+    p = docs_sub.add_parser("append")
+    p.add_argument("doc_id")
+    p.add_argument("--text", required=True)
+    p.add_argument("--dry-run", action="store_true")
+    p.set_defaults(handler=lambda ws, a: docs_append(ws, a.doc_id, a.text))
 
     return parser
 

@@ -23,6 +23,7 @@ _SKILL_MD = _SKILL_ROOT / "SKILL.md"
 _SCRIPTS = _SKILL_ROOT / "scripts"
 _SETUP_SCRIPT = _SCRIPTS / "setup.py"
 _API_SCRIPT = _SCRIPTS / "google_api.py"
+_GWS_BRIDGE_SCRIPT = _SCRIPTS / "gws_bridge.py"
 _EXPECTED_EGRESS = {
     "gmail.googleapis.com",
     "www.googleapis.com",
@@ -124,8 +125,10 @@ def test_bundled_skill_manifest_exists() -> None:
     for domain in _EXPECTED_EGRESS:
         assert f"  - {domain}" in text
     scripts = {entry.path: entry for entry in manifest.scripts}
+    assert _GWS_BRIDGE_SCRIPT.is_file()
     assert scripts["scripts/setup.py"].abortable is False
     assert scripts["scripts/google_api.py"].abortable is False
+    assert scripts["scripts/gws_bridge.py"].abortable is False
 
 
 def test_manager_registers_google_workspace(tmp_path: Path) -> None:
@@ -168,6 +171,62 @@ def test_gmail_search_dry_run_returns_plan_envelope(tmp_path: Path) -> None:
     params = data.get("parameters")
     assert isinstance(params, dict)
     assert params.get("query") == "is:unread"
+
+
+def test_sheets_get_dry_run_returns_plan_envelope(tmp_path: Path) -> None:
+    """``google_api.py sheets get --dry-run`` returns a Sheets plan envelope."""
+
+    _require_script(_API_SCRIPT)
+    _write_workspace(tmp_path)
+    code, payload = _run_script(
+        _API_SCRIPT,
+        tmp_path,
+        ["sheets", "get", "sheet-123", "Sheet1!A1:D10", "--dry-run"],
+    )
+    assert code == 0
+    assert payload.get("ok") is True
+    data = payload.get("data")
+    assert isinstance(data, dict)
+    assert data.get("mode") == "dry_run"
+    assert data.get("service") == "sheets"
+    assert data.get("operation") == "get"
+    params = data.get("parameters")
+    assert isinstance(params, dict)
+    assert params.get("spreadsheet_id") == "sheet-123"
+    assert params.get("range") == "Sheet1!A1:D10"
+
+
+def test_drive_upload_dry_run_returns_plan_envelope(tmp_path: Path) -> None:
+    """``google_api.py drive upload --dry-run`` returns a Drive upload plan envelope."""
+
+    _require_script(_API_SCRIPT)
+    _write_workspace(tmp_path)
+    code, payload = _run_script(
+        _API_SCRIPT,
+        tmp_path,
+        [
+            "drive",
+            "upload",
+            str(tmp_path / "report.pdf"),
+            "--name",
+            "Quarterly Report.pdf",
+            "--parent",
+            "folder-123",
+            "--dry-run",
+        ],
+    )
+    assert code == 0
+    assert payload.get("ok") is True
+    data = payload.get("data")
+    assert isinstance(data, dict)
+    assert data.get("mode") == "dry_run"
+    assert data.get("service") == "drive"
+    assert data.get("operation") == "upload"
+    params = data.get("parameters")
+    assert isinstance(params, dict)
+    assert params.get("name") == "Quarterly Report.pdf"
+    assert params.get("parent") == "folder-123"
+    assert str(params.get("path", "")).endswith("report.pdf")
 
 
 def test_gmail_search_uses_mocked_api_function(

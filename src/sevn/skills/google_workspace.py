@@ -74,6 +74,9 @@ SERVICE_SCOPE_SETS: Final[dict[str, tuple[str, ...]]] = {
 _TOKEN_ENV: Final[str] = "SEVN_GOOGLE_TOKEN_PATH"
 _CLIENT_SECRET_ENV: Final[str] = "SEVN_GOOGLE_CLIENT_SECRET_PATH"
 _DRY_RUN_ENV: Final[str] = "SEVN_GOOGLE_DRY_RUN"
+_GWS_BIN_ENV: Final[str] = "SEVN_GWS_BIN"
+_GWS_CREDENTIALS_FILE_ENV: Final[str] = "GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE"
+_GWS_TOKEN_ENV: Final[str] = "GOOGLE_WORKSPACE_CLI_TOKEN"
 
 _DOT_SEVN_DIRNAME: Final[str] = ".sevn"
 _TOKEN_FILENAME: Final[str] = "google_token.json"
@@ -84,6 +87,7 @@ _LAST_AUTH_URL_FILENAME: Final[str] = "google_oauth_last_url.txt"
 _DEFAULT_REDIRECT_URI: Final[str] = "http://localhost"
 _GOOGLE_TOKEN_URI: Final[str] = "https://oauth2.googleapis.com/token"
 _GOOGLE_REVOKE_URI: Final[str] = "https://oauth2.googleapis.com/revoke"
+_GWS_TIMEOUT_SECONDS: Final[float] = 120.0
 _TRUTHY: Final[frozenset[str]] = frozenset({"1", "true", "yes", "on"})
 REQUIRED_PACKAGES: Final[tuple[str, ...]] = (
     "google-api-python-client",
@@ -594,8 +598,137 @@ def build_service(workspace: Path, api: str, version: str) -> Any:
     return build(api, version, credentials=get_credentials(workspace), cache_discovery=False)
 
 
+def gws_binary() -> str | None:
+    """Return the configured ``gws`` binary path, or ``None`` when unavailable."""
+
+    override = os.environ.get(_GWS_BIN_ENV, "").strip()
+    if override:
+        return str(Path(override).expanduser())
+    return shutil.which("gws")
+
+
+def get_valid_token_for_gws(workspace: Path) -> str:
+    """Return a refreshed Google access token for the optional ``gws`` CLI."""
+
+    token = _string_or_none(getattr(get_credentials(workspace), "token", None))
+    if token is None:
+        msg = "google_workspace: refreshed credentials did not expose an access token"
+        raise ValueError(msg)
+    return token
+
+
+def run_gws(
+    workspace: Path,
+    parts: list[str],
+    params: Mapping[str, object] | None = None,
+    body: object | None = None,
+) -> dict[str, object]:
+    """Run ``gws`` with refreshed auth env and return parsed output."""
+
+    binary = gws_binary()
+    if binary is None:
+        msg = "google_workspace: gws CLI not found on PATH"
+        raise FileNotFoundError(msg)
+    command = [binary, *[str(part) for part in parts], *_gws_params_argv(params)]
+    proc = subprocess.run(  # nosec B603
+        command,
+        input=_gws_stdin_body(body),
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_gws_environment(workspace),
+        timeout=_GWS_TIMEOUT_SECONDS,
+    )
+    stdout = proc.stdout.strip()
+    stderr = proc.stderr.strip()
+    if proc.returncode != 0:
+        detail = stderr or stdout or f"exit {proc.returncode}"
+        raise RuntimeError(f"google_workspace: gws failed: {detail}")
+    if not stdout:
+        return {}
+    try:
+        parsed = json.loads(stdout)
+    except json.JSONDecodeError:
+        return {"stdout": stdout}
+    if isinstance(parsed, dict):
+        return {str(key): value for key, value in parsed.items()}
+    return {"data": parsed}
+
+
+def prefer_gws_enabled(workspace: Path) -> bool:
+    """Return the effective ``skills.google_workspace.prefer_gws`` setting."""
+
+    settings = _google_workspace_settings_from_disk(workspace)
+    return bool(getattr(settings, "prefer_gws", True))
+
+
 def _dot_sevn_dir(workspace: Path) -> Path:
     return workspace.resolve() / _DOT_SEVN_DIRNAME
+
+
+def _google_workspace_settings_from_disk(workspace: Path) -> Any:
+    from sevn.config.workspace_config import google_workspace_settings, parse_workspace_config
+
+    sevn_json_path = workspace.resolve() / "sevn.json"
+    if not sevn_json_path.is_file():
+        return google_workspace_settings(None)
+    try:
+        with sevn_json_path.open("r", encoding="utf-8") as handle:
+            raw_doc = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return google_workspace_settings(None)
+    if not isinstance(raw_doc, dict):
+        return google_workspace_settings(None)
+    try:
+        return google_workspace_settings(parse_workspace_config(raw_doc))
+    except ValueError:
+        return google_workspace_settings(None)
+
+
+def _gws_environment(workspace: Path) -> dict[str, str]:
+    env = dict(os.environ)
+    token_file = token_path(workspace)
+    try:
+        env[_GWS_TOKEN_ENV] = get_valid_token_for_gws(workspace)
+    except (FileNotFoundError, ImportError, ValueError):
+        if token_file.is_file():
+            env[_GWS_CREDENTIALS_FILE_ENV] = str(token_file)
+        else:
+            raise
+    return env
+
+
+def _gws_params_argv(params: Mapping[str, object] | None) -> list[str]:
+    argv: list[str] = []
+    if not params:
+        return argv
+    for key, raw_value in params.items():
+        flag_name = str(key).strip().replace("_", "-")
+        if not flag_name:
+            continue
+        flag = flag_name if flag_name.startswith("-") else f"--{flag_name}"
+        if raw_value is None or raw_value is False:
+            continue
+        if raw_value is True:
+            argv.append(flag)
+            continue
+        if isinstance(raw_value, Sequence) and not isinstance(raw_value, (str, bytes)):
+            for item in raw_value:
+                argv.extend([flag, str(item)])
+            continue
+        if isinstance(raw_value, Mapping):
+            argv.extend([flag, json.dumps(dict(raw_value), sort_keys=True)])
+            continue
+        argv.extend([flag, str(raw_value)])
+    return argv
+
+
+def _gws_stdin_body(body: object | None) -> str | None:
+    if body is None:
+        return None
+    if isinstance(body, str):
+        return body
+    return json.dumps(body)
 
 
 def _last_auth_url_path(workspace: Path) -> Path:
@@ -776,15 +909,19 @@ __all__ = [
     "dry_run_requested",
     "ensure_google_deps",
     "exchange_auth_code",
+    "get_valid_token_for_gws",
     "get_auth_url",
     "get_credentials",
+    "gws_binary",
     "install_deps",
     "load_token_payload",
     "missing_scopes_from_payload",
     "normalize_authorized_user_payload",
     "pending_auth_path",
     "paths",
+    "prefer_gws_enabled",
     "revoke_token",
+    "run_gws",
     "store_client_secret",
     "token_path",
 ]

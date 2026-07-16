@@ -1,26 +1,39 @@
 """Google Workspace API operations for bundled skill scripts.
 
 Module: sevn.skills.google_workspace_api
-Depends: base64, datetime, email.mime.text, sevn.skills.google_workspace
+Depends: base64, datetime, email.mime.text, mimetypes, sevn.skills.google_workspace
 
 Exports:
     calendar_create — create a calendar event.
     calendar_delete — delete a calendar event.
     calendar_list — list upcoming calendar events.
     contacts_list — list Google contacts via People API.
+    docs_append — append text to a Google Doc.
+    docs_create — create a Google Doc.
+    docs_get — fetch one Google Doc and extract body text.
     drive_get — get Drive file metadata.
+    drive_create_folder — create a Drive folder.
+    drive_delete — trash or permanently delete a Drive file.
+    drive_download — download or export a Drive file.
     drive_search — search Drive files.
+    drive_share — share a Drive file.
+    drive_upload — upload a local file to Drive.
     gmail_get — fetch one Gmail message.
     gmail_labels — list Gmail labels.
     gmail_modify — add/remove Gmail labels.
     gmail_reply — reply to a Gmail thread.
     gmail_search — search Gmail messages.
     gmail_send — send a Gmail message.
+    sheets_append — append values to a Google Sheet.
+    sheets_create — create a Google Sheet.
+    sheets_get — fetch a Sheet range.
+    sheets_update — update a Sheet range.
 """
 
 from __future__ import annotations
 
 import base64
+import mimetypes
 import os
 from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
@@ -131,6 +144,18 @@ def _contacts_scopes() -> list[str]:
     return list(google_workspace.SERVICE_SCOPE_SETS["contacts"])
 
 
+def _sheets_scopes() -> list[str]:
+    """Return Sheets scopes used by spreadsheet operations."""
+
+    return list(google_workspace.SERVICE_SCOPE_SETS["sheets"])
+
+
+def _docs_scopes() -> list[str]:
+    """Return Docs scopes used by document operations."""
+
+    return list(google_workspace.SERVICE_SCOPE_SETS["docs"])
+
+
 def _workspace_path(workspace: str | Path) -> Path:
     """Normalize a workspace argument to an absolute path."""
 
@@ -177,6 +202,48 @@ def _datetime_with_timezone(value: str | None) -> str | None:
     if "+" in tail or "-" in tail:
         return text
     return f"{text}Z"
+
+
+def _extract_doc_text(document: dict[str, object]) -> str:
+    """Extract plain text content from a Google Docs document resource."""
+
+    text_parts: list[str] = []
+    body = document.get("body", {})
+    content = body.get("content", []) if isinstance(body, dict) else []
+    for element in content:
+        if not isinstance(element, dict):
+            continue
+        paragraph = element.get("paragraph", {})
+        elements = paragraph.get("elements", []) if isinstance(paragraph, dict) else []
+        for paragraph_element in elements:
+            if not isinstance(paragraph_element, dict):
+                continue
+            text_run = paragraph_element.get("textRun", {})
+            if not isinstance(text_run, dict):
+                continue
+            content_text = text_run.get("content")
+            if isinstance(content_text, str) and content_text:
+                text_parts.append(content_text)
+    return "".join(text_parts)
+
+
+def _docs_insert_text(workspace: str | Path, document_id: str, text: str, index: int) -> None:
+    """Insert text into a Google Doc using a single batchUpdate request."""
+
+    service = google_workspace.build_service(_workspace_path(workspace), "docs", "v1")
+    service.documents().batchUpdate(
+        documentId=document_id,
+        body={
+            "requests": [
+                {
+                    "insertText": {
+                        "location": {"index": index},
+                        "text": text,
+                    },
+                },
+            ],
+        },
+    ).execute()
 
 
 def gmail_search(workspace: str, query: str, max_results: int = 10) -> list[dict[str, object]] | dict[str, object]:
@@ -591,6 +658,227 @@ def drive_get(workspace: str, file_id: str) -> dict[str, object]:
     }
 
 
+def drive_upload(
+    workspace: str | Path,
+    path: str | Path,
+    *,
+    name: str | None = None,
+    parent: str | None = None,
+    mime_type: str | None = None,
+) -> dict[str, object]:
+    """Upload a local file to Google Drive."""
+
+    local_path = Path(path).expanduser()
+    params = {
+        "path": str(local_path),
+        "name": name,
+        "parent": parent,
+        "mime_type": mime_type,
+    }
+    if _dry_run_requested():
+        return _dry_run(
+            workspace,
+            service="drive",
+            operation="upload",
+            parameters=params,
+            scopes=_drive_scopes(),
+        )
+    if not local_path.exists():
+        raise ValueError(f"file not found: {local_path}")
+    from googleapiclient.http import MediaFileUpload
+
+    detected_mime = mime_type or mimetypes.guess_type(str(local_path))[0] or "application/octet-stream"
+    metadata: dict[str, object] = {"name": name or local_path.name}
+    if parent:
+        metadata["parents"] = [parent]
+    service = google_workspace.build_service(_workspace_path(workspace), "drive", "v3")
+    media = MediaFileUpload(str(local_path), mimetype=detected_mime, resumable=True)
+    result = service.files().create(
+        body=metadata,
+        media_body=media,
+        fields="id, name, mimeType, webViewLink",
+    ).execute()
+    return {
+        "status": "uploaded",
+        "id": str(result.get("id", "")),
+        "name": str(result.get("name", "")),
+        "mimeType": str(result.get("mimeType", "")),
+        "webViewLink": str(result.get("webViewLink", "")),
+    }
+
+
+def drive_download(
+    workspace: str | Path,
+    file_id: str,
+    *,
+    output: str | Path | None = None,
+    export_mime: str | None = None,
+) -> dict[str, object]:
+    """Download or export a Drive file to a local path."""
+
+    params = {
+        "file_id": file_id,
+        "output": str(output) if output is not None else None,
+        "export_mime": export_mime,
+    }
+    if _dry_run_requested():
+        return _dry_run(
+            workspace,
+            service="drive",
+            operation="download",
+            parameters=params,
+            scopes=_drive_scopes(),
+        )
+    from googleapiclient.http import MediaIoBaseDownload
+
+    service = google_workspace.build_service(_workspace_path(workspace), "drive", "v3")
+    metadata = service.files().get(fileId=file_id, fields="id, name, mimeType").execute()
+    mime_type_value = str(metadata.get("mimeType", ""))
+    name = str(metadata.get("name", file_id))
+    native_export_map = {
+        "application/vnd.google-apps.document": ("application/pdf", ".pdf"),
+        "application/vnd.google-apps.spreadsheet": ("text/csv", ".csv"),
+        "application/vnd.google-apps.presentation": ("application/pdf", ".pdf"),
+        "application/vnd.google-apps.drawing": ("image/png", ".png"),
+    }
+    out_path = (
+        Path(output).expanduser()
+        if output is not None
+        else (Path.cwd() / name)
+    )
+    if mime_type_value in native_export_map:
+        download_mime, default_suffix = native_export_map[mime_type_value]
+        if export_mime:
+            download_mime = export_mime
+        if output is None and not out_path.suffix:
+            out_path = out_path.with_suffix(default_suffix)
+        request = service.files().export_media(fileId=file_id, mimeType=download_mime)
+    else:
+        request = service.files().get_media(fileId=file_id)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("wb") as handle:
+        downloader = MediaIoBaseDownload(handle, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+    return {
+        "status": "downloaded",
+        "id": file_id,
+        "name": name,
+        "path": str(out_path),
+        "mimeType": mime_type_value,
+    }
+
+
+def drive_create_folder(
+    workspace: str | Path,
+    name: str,
+    *,
+    parent: str | None = None,
+) -> dict[str, object]:
+    """Create a Google Drive folder."""
+
+    params = {"name": name, "parent": parent}
+    if _dry_run_requested():
+        return _dry_run(
+            workspace,
+            service="drive",
+            operation="create-folder",
+            parameters=params,
+            scopes=_drive_scopes(),
+        )
+    body: dict[str, object] = {
+        "name": name,
+        "mimeType": "application/vnd.google-apps.folder",
+    }
+    if parent:
+        body["parents"] = [parent]
+    service = google_workspace.build_service(_workspace_path(workspace), "drive", "v3")
+    result = service.files().create(body=body, fields="id, name, webViewLink").execute()
+    return {
+        "status": "created",
+        "id": str(result.get("id", "")),
+        "name": str(result.get("name", "")),
+        "webViewLink": str(result.get("webViewLink", "")),
+    }
+
+
+def drive_share(
+    workspace: str | Path,
+    file_id: str,
+    *,
+    role: str = "reader",
+    permission_type: str = "user",
+    email: str | None = None,
+    domain: str | None = None,
+    notify: bool = False,
+) -> dict[str, object]:
+    """Create a Drive permission for a file."""
+
+    permission: dict[str, object] = {
+        "type": permission_type,
+        "role": role,
+    }
+    if permission_type in {"user", "group"}:
+        if not email:
+            raise ValueError("--email is required for type=user or type=group")
+        permission["emailAddress"] = email
+    elif permission_type == "domain":
+        if not domain:
+            raise ValueError("--domain is required for type=domain")
+        permission["domain"] = domain
+    params = {
+        "file_id": file_id,
+        "role": role,
+        "type": permission_type,
+        "email": email,
+        "domain": domain,
+        "notify": notify,
+    }
+    if _dry_run_requested():
+        return _dry_run(
+            workspace,
+            service="drive",
+            operation="share",
+            parameters=params,
+            scopes=_drive_scopes(),
+        )
+    service = google_workspace.build_service(_workspace_path(workspace), "drive", "v3")
+    result = service.permissions().create(
+        fileId=file_id,
+        body=permission,
+        sendNotificationEmail=notify,
+        fields="id",
+    ).execute()
+    return {
+        "status": "shared",
+        "permissionId": str(result.get("id", "")),
+        "fileId": file_id,
+        "role": role,
+        "type": permission_type,
+    }
+
+
+def drive_delete(workspace: str | Path, file_id: str, *, permanent: bool = False) -> dict[str, object]:
+    """Trash or permanently delete a Google Drive file."""
+
+    params = {"file_id": file_id, "permanent": permanent}
+    if _dry_run_requested():
+        return _dry_run(
+            workspace,
+            service="drive",
+            operation="delete",
+            parameters=params,
+            scopes=_drive_scopes(),
+        )
+    service = google_workspace.build_service(_workspace_path(workspace), "drive", "v3")
+    if permanent:
+        service.files().delete(fileId=file_id).execute()
+        return {"status": "deleted", "fileId": file_id, "permanent": True}
+    service.files().update(fileId=file_id, body={"trashed": True}).execute()
+    return {"status": "trashed", "fileId": file_id, "permanent": False}
+
+
 def contacts_list(workspace: str, max_results: int = 20) -> list[dict[str, object]] | dict[str, object]:
     """List Google contacts via the People API."""
 
@@ -638,17 +926,240 @@ def contacts_list(workspace: str, max_results: int = 20) -> list[dict[str, objec
     return output
 
 
+def sheets_get(
+    workspace: str | Path,
+    spreadsheet_id: str,
+    range_name: str,
+) -> list[list[object]] | dict[str, object]:
+    """Fetch values for a Google Sheets range."""
+
+    params = {"spreadsheet_id": spreadsheet_id, "range": range_name}
+    if _dry_run_requested():
+        return _dry_run(
+            workspace,
+            service="sheets",
+            operation="get",
+            parameters=params,
+            scopes=_sheets_scopes(),
+        )
+    service = google_workspace.build_service(_workspace_path(workspace), "sheets", "v4")
+    result = service.spreadsheets().values().get(
+        spreadsheetId=spreadsheet_id,
+        range=range_name,
+    ).execute()
+    values = result.get("values", []) if isinstance(result, dict) else []
+    return [row for row in values if isinstance(row, list)]
+
+
+def sheets_update(
+    workspace: str | Path,
+    spreadsheet_id: str,
+    range_name: str,
+    values: list[list[object]],
+) -> dict[str, object]:
+    """Update a Google Sheets range with user-entered values."""
+
+    params = {
+        "spreadsheet_id": spreadsheet_id,
+        "range": range_name,
+        "values": values,
+    }
+    if _dry_run_requested():
+        return _dry_run(
+            workspace,
+            service="sheets",
+            operation="update",
+            parameters=params,
+            scopes=_sheets_scopes(),
+        )
+    service = google_workspace.build_service(_workspace_path(workspace), "sheets", "v4")
+    result = service.spreadsheets().values().update(
+        spreadsheetId=spreadsheet_id,
+        range=range_name,
+        valueInputOption="USER_ENTERED",
+        body={"values": values},
+    ).execute()
+    return {
+        "updatedCells": int(result.get("updatedCells", 0)),
+        "updatedRange": str(result.get("updatedRange", "")),
+    }
+
+
+def sheets_append(
+    workspace: str | Path,
+    spreadsheet_id: str,
+    range_name: str,
+    values: list[list[object]],
+) -> dict[str, object]:
+    """Append rows to a Google Sheets range."""
+
+    params = {
+        "spreadsheet_id": spreadsheet_id,
+        "range": range_name,
+        "values": values,
+    }
+    if _dry_run_requested():
+        return _dry_run(
+            workspace,
+            service="sheets",
+            operation="append",
+            parameters=params,
+            scopes=_sheets_scopes(),
+        )
+    service = google_workspace.build_service(_workspace_path(workspace), "sheets", "v4")
+    result = service.spreadsheets().values().append(
+        spreadsheetId=spreadsheet_id,
+        range=range_name,
+        valueInputOption="USER_ENTERED",
+        insertDataOption="INSERT_ROWS",
+        body={"values": values},
+    ).execute()
+    updates = result.get("updates", {}) if isinstance(result, dict) else {}
+    return {"updatedCells": int(updates.get("updatedCells", 0))}
+
+
+def sheets_create(
+    workspace: str | Path,
+    title: str,
+    *,
+    sheet_name: str | None = None,
+) -> dict[str, object]:
+    """Create a new Google Sheets spreadsheet."""
+
+    params = {"title": title, "sheet_name": sheet_name}
+    if _dry_run_requested():
+        return _dry_run(
+            workspace,
+            service="sheets",
+            operation="create",
+            parameters=params,
+            scopes=_sheets_scopes(),
+        )
+    body: dict[str, object] = {"properties": {"title": title}}
+    if sheet_name:
+        body["sheets"] = [{"properties": {"title": sheet_name}}]
+    service = google_workspace.build_service(_workspace_path(workspace), "sheets", "v4")
+    result = service.spreadsheets().create(
+        body=body,
+        fields="spreadsheetId,properties,spreadsheetUrl",
+    ).execute()
+    properties = result.get("properties", {}) if isinstance(result, dict) else {}
+    return {
+        "status": "created",
+        "spreadsheetId": str(result.get("spreadsheetId", "")),
+        "title": str(properties.get("title", "")) if isinstance(properties, dict) else "",
+        "spreadsheetUrl": str(result.get("spreadsheetUrl", "")),
+    }
+
+
+def docs_get(workspace: str | Path, document_id: str) -> dict[str, object]:
+    """Fetch a Google Doc and return extracted plain text."""
+
+    params = {"document_id": document_id}
+    if _dry_run_requested():
+        return _dry_run(
+            workspace,
+            service="docs",
+            operation="get",
+            parameters=params,
+            scopes=_docs_scopes(),
+        )
+    service = google_workspace.build_service(_workspace_path(workspace), "docs", "v1")
+    result = service.documents().get(documentId=document_id).execute()
+    return {
+        "title": str(result.get("title", "")),
+        "documentId": str(result.get("documentId", "")),
+        "body": _extract_doc_text(result),
+    }
+
+
+def docs_create(
+    workspace: str | Path,
+    title: str,
+    *,
+    body: str | None = None,
+) -> dict[str, object]:
+    """Create a new Google Doc, optionally with initial body text."""
+
+    params = {"title": title, "body": body}
+    if _dry_run_requested():
+        return _dry_run(
+            workspace,
+            service="docs",
+            operation="create",
+            parameters=params,
+            scopes=_docs_scopes(),
+        )
+    service = google_workspace.build_service(_workspace_path(workspace), "docs", "v1")
+    result = service.documents().create(body={"title": title}).execute()
+    document_id = str(result.get("documentId", ""))
+    if body and document_id:
+        _docs_insert_text(workspace, document_id, body, 1)
+    return {
+        "status": "created",
+        "documentId": document_id,
+        "title": str(result.get("title", "")),
+        "url": f"https://docs.google.com/document/d/{document_id}/edit" if document_id else "",
+    }
+
+
+def docs_append(workspace: str | Path, document_id: str, text: str) -> dict[str, object]:
+    """Append text to the end of a Google Doc."""
+
+    params = {"document_id": document_id, "text": text}
+    if _dry_run_requested():
+        return _dry_run(
+            workspace,
+            service="docs",
+            operation="append",
+            parameters=params,
+            scopes=_docs_scopes(),
+        )
+    service = google_workspace.build_service(_workspace_path(workspace), "docs", "v1")
+    document = service.documents().get(documentId=document_id).execute()
+    body = document.get("body", {})
+    content = body.get("content", []) if isinstance(body, dict) else []
+    end_index = 1
+    for element in content:
+        if not isinstance(element, dict):
+            continue
+        raw_end_index = element.get("endIndex")
+        if isinstance(raw_end_index, int) and raw_end_index > end_index:
+            end_index = raw_end_index
+    insert_index = max(end_index - 1, 1)
+    appended_text = text if text.endswith("\n") else f"{text}\n"
+    _docs_insert_text(workspace, document_id, appended_text, insert_index)
+    return {
+        "status": "appended",
+        "documentId": document_id,
+        "inserted_at": insert_index,
+        "characters": len(appended_text),
+    }
+
+
 __all__ = [
     "calendar_create",
     "calendar_delete",
     "calendar_list",
     "contacts_list",
+    "docs_append",
+    "docs_create",
+    "docs_get",
+    "drive_create_folder",
+    "drive_delete",
+    "drive_download",
     "drive_get",
     "drive_search",
+    "drive_share",
+    "drive_upload",
     "gmail_get",
     "gmail_labels",
     "gmail_modify",
     "gmail_reply",
     "gmail_search",
     "gmail_send",
+    "sheets_append",
+    "sheets_create",
+    "sheets_get",
+    "sheets_update",
 ]

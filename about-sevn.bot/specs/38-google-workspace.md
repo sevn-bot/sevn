@@ -39,18 +39,18 @@ Operator-facing function catalog: [`google-workspace.html`](../google-workspace.
 
 | Area | Hermes google-workspace | sevn today |
 |------|-------------------------|------------|
-| Gmail read/search | OAuth + Gmail API (`gmail search`, `gmail get`) | Browser recipe `browser` → `gmail` (`list`, `read`, `search`); `email-management` IMAP live |
-| Gmail send/reply | OAuth API (`gmail send`, `gmail reply`, labels) | Browser gated writes; `email-management` SMTP |
-| Gmail labels | `gmail labels`, `gmail modify` | Not implemented |
-| Calendar | list/create/delete | Not implemented |
-| Drive | search/get/upload/download/folder/share/delete | Not implemented |
-| Sheets | create/get/update/append | Not implemented |
-| Docs | get/create/append | Not implemented |
-| Contacts | list | Not implemented |
-| OAuth setup | Agent-driven PKCE flow (`setup.py`) | Not implemented (IMAP app passwords only) |
-| Backend | `gws` preferred, Python fallback | CDP scraping + IMAP |
+| Gmail read/search | OAuth + Gmail API (`gmail search`, `gmail get`) | Shipped in bundled `google-workspace`; browser/email-management remain fallbacks |
+| Gmail send/reply | OAuth API (`gmail send`, `gmail reply`, labels) | Shipped in bundled `google-workspace`; browser gated writes and `email-management` still available |
+| Gmail labels | `gmail labels`, `gmail modify` | Shipped in bundled `google-workspace` |
+| Calendar | list/create/delete | Shipped in bundled `google-workspace` |
+| Drive | search/get/upload/download/folder/share/delete | Search/get shipped in bundled `google-workspace`; write flows still pending |
+| Sheets | create/get/update/append | Not implemented yet |
+| Docs | get/create/append | Not implemented yet |
+| Contacts | list | Shipped in bundled `google-workspace` |
+| OAuth setup | Agent-driven PKCE flow (`setup.py`) | Shipped in bundled `google-workspace` |
+| Backend | `gws` preferred, Python fallback | Python/OAuth backend shipped; `gws` bridge still pending |
 
-**Conclusion:** sevn covers Gmail **read** via browser and **email-only** via IMAP. Full Workspace API coverage requires a new skill; browser paths remain as fallbacks when OAuth is unavailable.
+**Conclusion:** sevn now ships a bundled `google-workspace` core surface for OAuth setup, Gmail API, Calendar, Drive search/get, and Contacts. Browser paths and `email-management` remain the fallbacks for no-OAuth or quick email-only work, while Sheets/Docs, Drive write flows, and the `gws` bridge remain follow-on work.
 
 ## 3. Architecture (sevn-adapted)
 
@@ -221,7 +221,7 @@ Full usage table: [`google-workspace.html`](../google-workspace.html).
 
 ## 5. Agent consumption (sevn skills system)
 
-1. Triager adds `google-workspace` to `TriageResult.skills` for mail/calendar/drive/sheets/docs intents.
+1. Triager adds `google-workspace` to `TriageResult.skills` for Gmail API, calendar, drive, sheets, docs, and contacts intents.
 2. Tier-B attaches deferred capability `google-workspace__run_skill_script`.
 3. Agent calls `load_skill("google-workspace")` → receives `capabilities[]` from `SKILL.md` scripts + prose.
 4. Agent invokes e.g. `run_skill_script("google-workspace", "scripts/google_api.py", ["gmail", "search", "is:unread", "--max", "10"])`.
@@ -230,8 +230,8 @@ Full usage table: [`google-workspace.html`](../google-workspace.html).
 
 ## 6. Relationship to existing integrations
 
-| Existing | After google-workspace ships |
-|----------|------------------------------|
+| Existing | Current role with shipped core surface |
+|----------|----------------------------------------|
 | `email-management` | Keep for multi-account IMAP/SMTP and non-Google mail; Gmail API dry-run plans migrate to live calls via shared helpers or deprecation notice in SKILL.md |
 | `browser` gmail recipe | Keep for operators without OAuth; document as fallback in google-workspace SKILL.md |
 | `browser` google_search/maps/youtube | Unchanged; not part of this skill |
@@ -246,36 +246,37 @@ Full usage table: [`google-workspace.html`](../google-workspace.html).
 
 ### Phase 1 — OAuth + auth library
 
-- [ ] `src/sevn/skills/google_workspace.py` — paths, token load/refresh, scope sets
-- [ ] `scripts/setup.py` — PKCE flow ported from Hermes, sevn path conventions
-- [ ] Config section + egress registration
-- [ ] Unit tests with fixture tokens (no network)
+- [x] `src/sevn/skills/google_workspace.py` — paths, token load/refresh, scope sets
+- [x] `scripts/setup.py` — PKCE flow ported from Hermes, sevn path conventions
+- [x] Config section + egress registration
+- [x] Unit tests with fixture tokens (no network)
 
 ### Phase 2 — Core API (Python fallback)
 
-- [ ] `scripts/google_api.py` — Gmail + Calendar read/write
-- [ ] Drive search/get
-- [ ] Contacts list
-- [ ] JSON output contract tests (golden files)
+- [x] `scripts/google_api.py` — Gmail + Calendar read/write
+- [x] Drive search/get
+- [x] Contacts list
+- [x] JSON output contract tests (golden files)
 
-### Phase 3 — Docs/Sheets + Drive writes
+### Phase 3 — Docs/Sheets + Drive writes (partial)
 
+- [x] Help/catalog routing reserves Sheets/Docs/Drive intents for `google-workspace`
 - [ ] Sheets create/get/update/append
 - [ ] Docs get/create/append
 - [ ] Drive upload/download/folder/share/delete
 
-### Phase 4 — gws bridge
+### Phase 4 — gws bridge (partial)
 
 - [ ] `scripts/gws_bridge.py`
-- [ ] `prefer_gws` config flag
+- [x] `prefer_gws` config flag
 - [ ] Doctor check: `sevn doctor` reports gws presence
 
-### Phase 5 — Bundling and routing
+### Phase 5 — Bundling and routing (partial)
 
-- [ ] `SKILL.md` + `INDEX.md` row
-- [ ] Triager routing hints (workspace template / AGENTS.md)
-- [ ] Onboarding capability stub update (`onboarding_capabilities.json`)
-- [ ] E2E test: setup dry-run + gmail search mock
+- [x] `SKILL.md` + `INDEX.md` row
+- [x] Triager routing hints (workspace template / AGENTS.md)
+- [x] Onboarding capability stub update (`onboarding_capabilities.json`)
+- [ ] Agent-level E2E test beyond setup dry-run + gmail search mock coverage
 
 ## 8. Testing strategy
 

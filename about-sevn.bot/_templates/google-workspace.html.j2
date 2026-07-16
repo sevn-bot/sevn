@@ -8,6 +8,7 @@
     .fn-table code { font-size: 0.82rem; word-break: break-word; }
     .fn-table td:first-child { white-space: nowrap; font-weight: 500; }
     .invoke-cell { max-width: 28rem; }
+    .status-skill { background: #103c2a; color: #8ee6b6; }
     .status-planned { background: #4a3410; color: #ffb74d; }
     .status-browser { background: #1a3a4a; color: #81d4fa; }
     .status-email-management { background: #2a2a4a; color: #b39ddb; }
@@ -19,7 +20,8 @@
 <div class="help-body">
   {{ body_html | safe }}
   <div class="legend" aria-label="Status legend">
-    <span><span class="badge status-planned">planned</span> google-workspace skill (spec 38)</span>
+    <span><span class="badge status-skill">skill</span> shipped in bundled google-workspace skill</span>
+    <span><span class="badge status-planned">planned</span> tracked next in spec 38</span>
     <span><span class="badge status-browser">browser</span> available today via browser tool</span>
     <span><span class="badge status-email-management">email-management</span> IMAP path today</span>
   </div>
@@ -57,7 +59,7 @@
   </section>
   {% endfor %}
 
-  <h2>Troubleshooting (planned)</h2>
+  <h2>Troubleshooting</h2>
   <table class="catalog-table">
     <thead><tr><th>Problem</th><th>Fix</th></tr></thead>
     <tbody>
