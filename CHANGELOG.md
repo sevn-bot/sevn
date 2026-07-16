@@ -72,6 +72,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-16] Browser spawn survives concurrent retries and gateway restarts: stale sevn Chrome is reaped, profile singleton/port locks cleared, CDP wait is adaptive with one clean retry, Chrome stderr lands in `logs/chrome-<session>.log`, and the session registry only stores confirmed live CDP endpoints
 - [2026-07-14] Bundled skill seeding skips `__pycache__` when copying packaged skills, avoiding parallel-test flakes on transient `.pyc` files
 - [2026-07-15] Telegram session mirror title lookup is best-effort when SQLite errors occur; group titles also persist from inline-keyboard callbacks (#21)
 - [2026-07-15] Restored spec-36 sub-agent amendment cross-reference in `14-executor-tier-b.md` after W9 body rewrite

@@ -30,7 +30,8 @@ Exports:
     default_cdp_url — read ``SEVN_CDP_URL`` when set.
     merge_browser_proc_env — inject content root, profile, CDP env for skill runs.
     pick_work_page — choose a tab; prefer registry ``active_target_id``.
-    read_devtools_active_port — read Chrome ``DevToolsActivePort`` line 1.
+    pid_is_alive — return whether a process id responds to ``signal 0``.
+    read_devtools_active_port — read Chrome ``DevToolsActivePort`` line 1 (optional freshness).
     read_registry — load registry JSON for a session.
     registry_path — path to ``.sevn/browser-sessions/<session_id>.json``.
     resolve_browser_engine — read ``skills.browser.engine`` / ``SEVN_BROWSER_ENGINE``.
@@ -1024,15 +1025,56 @@ def resolve_idle_close_seconds(cfg: WorkspaceConfig | None = None) -> int:
     return 0
 
 
-def read_devtools_active_port(profile_dir: Path, *, timeout: float = 15.0) -> int | None:
+def pid_is_alive(pid: int) -> bool:
+    """Return whether ``pid`` responds to ``os.kill(..., 0)``.
+
+    Args:
+        pid (int): Operating-system process id.
+
+    Returns:
+        bool: ``True`` when the process exists (and is signalable by this user).
+
+    Examples:
+        >>> pid_is_alive(os.getpid())
+        True
+        >>> pid_is_alive(0)
+        False
+    """
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def read_devtools_active_port(
+    profile_dir: Path,
+    *,
+    timeout: float | None = None,
+    spawned_after: float | None = None,
+) -> int | None:
     """Read Chrome's chosen debugging port from ``DevToolsActivePort`` (D2).
+
+    When ``spawned_after`` is set, only accept a port file whose mtime is
+    strictly later than that unix timestamp (a stale file from a prior Chrome
+    is ignored). Callers that need to wait for a fresh write should poll this
+    helper inside their own wait window (or pass an explicit ``timeout``).
 
     Args:
         profile_dir (Path): Chrome ``user-data-dir``.
-        timeout (float): Maximum seconds to wait for the file.
+        timeout (float | None): Maximum seconds to wait. Defaults to ``15.0``
+            when ``spawned_after`` is omitted, or ``0.0`` (single check) when
+            freshness is requested so callers own the adaptive wait loop.
+        spawned_after (float | None): Unix mtime lower bound for freshness.
 
     Returns:
-        int | None: Port number from line 1, or ``None`` on timeout.
+        int | None: Port number from line 1, or ``None`` on timeout / stale.
 
     Examples:
         >>> import tempfile
@@ -1040,18 +1082,25 @@ def read_devtools_active_port(profile_dir: Path, *, timeout: float = 15.0) -> in
         >>> read_devtools_active_port(d, timeout=0.05) is None
         True
     """
+    wait_s = (
+        15.0 if timeout is None and spawned_after is None else (0.0 if timeout is None else timeout)
+    )
     port_file = profile_dir / "DevToolsActivePort"
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
+    deadline = time.monotonic() + wait_s
+    while True:
         if port_file.is_file():
             try:
-                lines = port_file.read_text(encoding="utf-8").splitlines()
-                if lines:
-                    return int(lines[0].strip())
+                if spawned_after is not None and port_file.stat().st_mtime <= spawned_after:
+                    pass
+                else:
+                    lines = port_file.read_text(encoding="utf-8").splitlines()
+                    if lines:
+                        return int(lines[0].strip())
             except (OSError, ValueError):
                 pass
+        if time.monotonic() >= deadline:
+            return None
         time.sleep(0.05)
-    return None
 
 
 def spawn_chrome(
@@ -1060,14 +1109,21 @@ def spawn_chrome(
     headless: bool = False,
     seed_port: int | None = None,
     cfg: WorkspaceConfig | None = None,
+    session_id: str | None = None,
+    log_dir: Path | None = None,
 ) -> tuple[subprocess.Popen[bytes], int, str]:
     """Spawn detached Chrome with ``--remote-debugging-port=0`` (D2/D5).
+
+    When ``session_id`` and ``log_dir`` are provided, Chrome stdout/stderr are
+    redirected to ``log_dir/chrome-<session_id>.log`` (D4) instead of ``DEVNULL``.
 
     Args:
         profile_dir (Path): Persistent ``user-data-dir``.
         headless (bool): When ``True``, pass ``--headless=new``.
         seed_port (int | None): Fallback port when ``DevToolsActivePort`` is slow.
         cfg (WorkspaceConfig | None): Workspace config for ``skills.browser.engine``.
+        session_id (str | None): Gateway session id for the Chrome log filename.
+        log_dir (Path | None): Directory for ``chrome-<session>.log`` (D4).
 
     Returns:
         tuple[subprocess.Popen[bytes], int, str]: Process handle, port, CDP URL.
@@ -1095,13 +1151,33 @@ def spawn_chrome(
     ]
     if headless:
         args.append("--headless=new")
-    proc = subprocess.Popen(  # nosec B603
-        args,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        stdin=subprocess.DEVNULL,
+    spawn_started = time.time()
+    log_handle = None
+    stdout_dest: Any = subprocess.DEVNULL
+    stderr_dest: Any = subprocess.DEVNULL
+    sid = (session_id or "").strip()
+    if sid and log_dir is not None:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / f"chrome-{sid}.log"
+        log_handle = log_path.open("ab")
+        stdout_dest = log_handle
+        stderr_dest = log_handle
+    try:
+        proc = subprocess.Popen(  # nosec B603
+            args,
+            stdout=stdout_dest,
+            stderr=stderr_dest,
+            stdin=subprocess.DEVNULL,
+        )
+    finally:
+        if log_handle is not None:
+            with contextlib.suppress(OSError):
+                log_handle.close()
+    port = read_devtools_active_port(
+        profile_dir,
+        timeout=15.0,
+        spawned_after=spawn_started,
     )
-    port = read_devtools_active_port(profile_dir)
     if port is None and seed_port is not None:
         port = seed_port
     if port is None:
@@ -1110,6 +1186,8 @@ def spawn_chrome(
             with contextlib.suppress(subprocess.TimeoutExpired):
                 proc.wait(timeout=5)
         msg = "Failed to read DevToolsActivePort after spawning Chrome"
+        if sid and log_dir is not None:
+            msg = f"{msg} (see {log_dir / f'chrome-{sid}.log'})"
         raise RuntimeError(msg)
     cdp_url = f"http://127.0.0.1:{port}"
     return proc, port, cdp_url
@@ -2448,6 +2526,7 @@ __all__ = [
     "page_target_id",
     "persist_active_target_id",
     "pick_work_page",
+    "pid_is_alive",
     "read_devtools_active_port",
     "read_registry",
     "registry_path",

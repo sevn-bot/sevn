@@ -19,8 +19,6 @@ import pytest
 from sevn.browser import lifecycle
 from sevn.skills import browser_session as bs
 
-_XFAIL_W2 = pytest.mark.xfail(reason="green after W2: CDP spawn hardening (D1-D7)", strict=False)
-
 
 def _profile_with_locks(profile_dir: Path, *, port: int = 52377) -> None:
     profile_dir.mkdir(parents=True, exist_ok=True)
@@ -32,7 +30,6 @@ def _profile_with_locks(profile_dir: Path, *, port: int = 52377) -> None:
     )
 
 
-@_XFAIL_W2
 @pytest.mark.asyncio
 async def test_d1_reap_clears_locks_for_sevn_pid_only(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -108,7 +105,6 @@ async def test_d1_reap_clears_locks_for_sevn_pid_only(
     assert foreign_pid not in killed
 
 
-@_XFAIL_W2
 def test_d2_stale_devtools_active_port_rejected(tmp_path: Path) -> None:
     """D2: DevToolsActivePort with mtime older than spawn time is ignored."""
     profile_dir = tmp_path / "profile"
@@ -123,7 +119,6 @@ def test_d2_stale_devtools_active_port_rejected(tmp_path: Path) -> None:
     assert result is None
 
 
-@_XFAIL_W2
 def test_d2_fresh_devtools_active_port_accepted(tmp_path: Path) -> None:
     """D2: DevToolsActivePort written after spawn time is accepted."""
     profile_dir = tmp_path / "profile"
@@ -137,7 +132,6 @@ def test_d2_fresh_devtools_active_port_accepted(tmp_path: Path) -> None:
     assert result == 59999
 
 
-@_XFAIL_W2
 def test_d3_adaptive_wait_ceiling_is_20_to_25s() -> None:
     """D3: spawn CDP wait ceiling rises from 10 s to ~20-25 s."""
     steps = lifecycle._SPAWN_CDP_WAIT_STEPS
@@ -146,7 +140,6 @@ def test_d3_adaptive_wait_ceiling_is_20_to_25s() -> None:
     assert 20.0 <= ceiling <= 25.0
 
 
-@_XFAIL_W2
 @pytest.mark.asyncio
 async def test_d3_failed_spawn_terminates_waits_and_retries_once(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -195,7 +188,6 @@ async def test_d3_failed_spawn_terminates_waits_and_retries_once(
     assert any(t == 5 or t == 5.0 for t in waits), "terminate must be followed by wait(timeout=5)"
 
 
-@_XFAIL_W2
 def test_d4_spawn_chrome_redirects_stderr_to_session_log(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -245,7 +237,6 @@ def test_d4_spawn_chrome_redirects_stderr_to_session_log(
     )
 
 
-@_XFAIL_W2
 @pytest.mark.asyncio
 async def test_d4_no_cdp_error_includes_chrome_log_path_or_tail(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -279,7 +270,6 @@ async def test_d4_no_cdp_error_includes_chrome_log_path_or_tail(
     assert "chrome-" in msg or "SingletonLock" in msg or str(log_path) in msg
 
 
-@_XFAIL_W2
 @pytest.mark.asyncio
 async def test_d5_concurrent_spawn_or_attach_single_flights(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -317,7 +307,6 @@ async def test_d5_concurrent_spawn_or_attach_single_flights(
     assert getattr(results[0], "cdp_url", None) == getattr(results[1], "cdp_url", None)
 
 
-@_XFAIL_W2
 def test_d6_gateway_shutdown_hook_terminates_sevn_browsers(tmp_path: Path) -> None:
     """D6: shutdown hook terminate()+wait()s all sevn-spawned browsers (presence/shape)."""
     from sevn.gateway.runtime import shutdown_cleanup
@@ -354,7 +343,6 @@ def test_d6_gateway_shutdown_hook_terminates_sevn_browsers(tmp_path: Path) -> No
         assert row is None or row.pid is None
 
 
-@_XFAIL_W2
 @pytest.mark.asyncio
 async def test_d7_failed_spawn_writes_no_half_record(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -385,7 +373,6 @@ async def test_d7_failed_spawn_writes_no_half_record(
     assert row is None
 
 
-@_XFAIL_W2
 @pytest.mark.asyncio
 async def test_d7_confirmed_spawn_persists_full_record_for_resolve(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch

@@ -1564,6 +1564,10 @@ def create_app(
             content_root=ly.content_root,
             conn=conn,
         )
+        with suppress(Exception):
+            from sevn.browser.lifecycle import reap_sevn_browsers_on_shutdown
+
+            await asyncio.to_thread(reap_sevn_browsers_on_shutdown, ly.content_root)
         await asyncio.to_thread(
             prune_orphan_tool_result_dirs,
             content_root=ly.content_root,
