@@ -40,12 +40,16 @@ from sevn.tools.paths import resolve_workspace_relative_path
 if TYPE_CHECKING:
     from sevn.tools.base import ToolExecutor
 
-ProcessAction = Literal["start", "stop", "list", "output"]
+ProcessAction = Literal["start", "stop", "list", "output", "read"]
 JobStatus = Literal["running", "completed", "stopped", "failed"]
 
 DEFAULT_OUTPUT_TAIL_LINES: Final[int] = 200
 MAX_OUTPUT_TAIL_LINES: Final[int] = 2000
 MAX_CAPTURE_CHARS: Final[int] = 256_000
+
+# Model-facing aliases mapped before dispatch (D8). ``run`` stays unknown so
+# ``did_you_mean`` can offer start|output — it is ambiguous between them.
+_ACTION_ALIASES: Final[dict[str, str]] = {"read": "output"}
 
 _PROCESS_TOOLS: tuple[Any, ...] = ()
 _jobs_by_session: dict[str, dict[str, BackgroundJob]] = {}
@@ -444,17 +448,93 @@ async def _output_job(ctx: ToolContext, *, job_id: str, lines: int | None) -> st
     )
 
 
+def _job_status_for_error(ctx: ToolContext, job_id: str | None) -> dict[str, object]:
+    """Build wrong-action error extras including the referenced job's status.
+
+    Args:
+        ctx (ToolContext): Active tool runtime frame.
+        job_id (str | None): Job id from the failed call, when present.
+
+    Returns:
+        dict[str, object]: Payload fragment with ``job_id`` / ``job_status`` when known.
+
+    Examples:
+        >>> reset_process_store_for_tests()
+        >>> from pathlib import Path
+        >>> ctx = ToolContext(
+        ...     session_id="s", workspace_path=Path("."), workspace_id="w", registry_version=1
+        ... )
+        >>> _job_status_for_error(ctx, None)
+        {}
+    """
+    if not job_id:
+        return {}
+    job = _session_jobs(ctx.session_id).get(job_id)
+    if job is None:
+        return {"job_id": job_id, "job_status": None}
+    _finalize_job_status(job)
+    return {"job_id": job_id, "job_status": job.status}
+
+
+def _unknown_action_failure(
+    ctx: ToolContext,
+    *,
+    action: str,
+    job_id: str | None,
+) -> str:
+    """Return a self-correcting failure for an invalid ``process`` action.
+
+    Includes the referenced ``job_id``'s current status when known (D8) so one
+    follow-up call can choose ``output`` / ``stop`` without a separate ``list``.
+
+    Args:
+        ctx (ToolContext): Active tool runtime frame.
+        action (str): The invalid action string as supplied by the model.
+        job_id (str | None): Optional job id from the same call.
+
+    Returns:
+        str: §3.1 JSON failure envelope.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.isfunction(_unknown_action_failure)
+        True
+    """
+    extras = _job_status_for_error(ctx, job_id)
+    status = extras.get("job_status")
+    status_clause = ""
+    if job_id and status is not None:
+        status_clause = f" Referenced job {job_id!r} status is {status}."
+    elif job_id:
+        status_clause = f" Referenced job_id {job_id!r} is unknown."
+    return enveloped_failure(
+        f"unknown action {action!r}; expected one of start|stop|list|output "
+        f"(read is an alias for output).{status_clause} "
+        "process runs background jobs only — there is no synchronous run: use "
+        "action=start then action=output (or action=read), or terminal_run "
+        "for an interactive shell.",
+        code=ToolResultCode.VALIDATION_ERROR,
+        data={"action": action, **extras},
+    )
+
+
 @sevn_tool(
     name="process",
     category="process",
-    description="Start, stop, list, or read output from background workspace subprocesses.",
+    description=(
+        "Start, stop, list, or read output from background workspace subprocesses. "
+        "action=read is an alias for action=output; there is no synchronous run."
+    ),
     parameters={
         "type": "object",
         "properties": {
             "action": {
                 "type": "string",
-                "enum": ["start", "stop", "list", "output"],
-                "description": "Operation to perform on the session job table.",
+                "enum": ["start", "stop", "list", "output", "read"],
+                "description": (
+                    "Operation on the session job table. "
+                    "``read`` is an alias for ``output`` (fetch captured stdout/stderr)."
+                ),
             },
             "command": {
                 "type": "string",
@@ -471,11 +551,11 @@ async def _output_job(ctx: ToolContext, *, job_id: str, lines: int | None) -> st
             },
             "job_id": {
                 "type": "string",
-                "description": "Background job id for action=stop or action=output.",
+                "description": "Background job id for action=stop or action=output/read.",
             },
             "lines": {
                 "type": "integer",
-                "description": "Tail line cap for action=output (default 200).",
+                "description": "Tail line cap for action=output/read (default 200).",
             },
         },
         "required": ["action"],
@@ -486,7 +566,7 @@ async def _output_job(ctx: ToolContext, *, job_id: str, lines: int | None) -> st
 async def process_tool(
     ctx: ToolContext,
     *,
-    action: ProcessAction,
+    action: str,
     command: str | None = None,
     argv: list[str] | None = None,
     cwd: str | None = None,
@@ -497,12 +577,12 @@ async def process_tool(
 
     Args:
         ctx (ToolContext): Active tool runtime frame.
-        action (ProcessAction): One of ``start``, ``stop``, ``list``, or ``output``.
+        action (str): ``start``, ``stop``, ``list``, ``output``, or alias ``read``.
         command (str | None): Shell command when ``action=start``.
         argv (list[str] | None): Optional argv override when ``action=start``.
         cwd (str | None): Workspace-relative cwd when ``action=start``.
-        job_id (str | None): Target job for ``stop`` / ``output``.
-        lines (int | None): Tail cap for ``output``.
+        job_id (str | None): Target job for ``stop`` / ``output`` / ``read``.
+        lines (int | None): Tail cap for ``output`` / ``read``.
 
     Returns:
         str: §3.1 JSON envelope string.
@@ -512,7 +592,9 @@ async def process_tool(
         >>> inspect.iscoroutinefunction(process_tool)
         True
     """
-    if action == "start":
+    canonical = _ACTION_ALIASES.get(action, action)
+
+    if canonical == "start":
         cmd: str | list[str]
         if argv:
             cmd = argv
@@ -525,10 +607,10 @@ async def process_tool(
             )
         return await _start_job(ctx, command=cmd, cwd=cwd)
 
-    if action == "list":
+    if canonical == "list":
         return enveloped_success({"jobs": list_session_jobs(ctx.session_id)})
 
-    if action == "stop":
+    if canonical == "stop":
         if not job_id:
             return enveloped_failure(
                 "job_id is required for action=stop and action=output",
@@ -536,7 +618,7 @@ async def process_tool(
             )
         return await _stop_job(ctx, job_id=job_id)
 
-    if action == "output":
+    if canonical == "output":
         if not job_id:
             return enveloped_failure(
                 "job_id is required for action=stop and action=output",
@@ -544,12 +626,7 @@ async def process_tool(
             )
         return await _output_job(ctx, job_id=job_id, lines=lines)
 
-    return enveloped_failure(
-        f"unknown action {action!r}; expected one of start|stop|list|output. "
-        "process runs background jobs only — there is no synchronous run: use "
-        "action=start then action=output, or terminal_run for an interactive shell.",
-        code=ToolResultCode.VALIDATION_ERROR,
-    )
+    return _unknown_action_failure(ctx, action=action, job_id=job_id)
 
 
 _PROCESS_TOOLS = (process_tool,)

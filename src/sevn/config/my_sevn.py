@@ -9,6 +9,7 @@ Exports:
     effective_my_sevn_issues — resolve typed ``my_sevn.issues`` with defaults.
     effective_my_sevn_pipelines — resolve typed ``my_sevn.pipelines`` with defaults.
     effective_my_sevn_sync — resolve typed ``my_sevn.sync`` with defaults.
+    default_github_repo_slug — ``owner/repo`` from ``my_sevn.repo_url`` (no ``git remote``).
     resolve_my_sevn_repo_path — checkout path from ``my_sevn.repo_path`` in ``sevn.json``.
     persist_my_sevn_repo_path — record a resolved checkout into ``my_sevn.repo_path``.
 """
@@ -197,7 +198,47 @@ def effective_my_sevn(ws: WorkspaceConfig) -> MySevnWorkspaceConfig:
     return MySevnWorkspaceConfig()
 
 
+def default_github_repo_slug(ws: WorkspaceConfig) -> str:
+    """Return ``owner/repo`` from ``my_sevn.repo_url`` without shelling out to git.
+
+    Tools and gh-issue scripts must use this (or the equivalent config field)
+    instead of ``git remote`` against the read-only ``source_code/`` mirror.
+
+    Args:
+        ws (WorkspaceConfig): Parsed workspace root model.
+
+    Returns:
+        str: GitHub slug such as ``sevn-bot/sevn``.
+
+    Raises:
+        ValueError: When ``my_sevn.repo_url`` cannot be parsed as ``owner/repo``.
+
+    Examples:
+        >>> default_github_repo_slug(WorkspaceConfig.minimal())
+        'sevn-bot/sevn'
+    """
+    raw = (effective_my_sevn(ws).repo_url or "").strip()
+    if not raw:
+        msg = "my_sevn.repo_url is empty"
+        raise ValueError(msg)
+    # Keep this helper free of integrations/tools imports (lint-imports contracts).
+    lowered = raw.lower()
+    if "github.com/" in lowered:
+        tail = raw[lowered.index("github.com/") + len("github.com/") :]
+    else:
+        tail = raw
+    parts = [p for p in tail.split("/") if p]
+    if len(parts) < 2:
+        msg = f"cannot parse owner/repo from my_sevn.repo_url: {raw!r}"
+        raise ValueError(msg)
+    owner, repo = parts[0], parts[1]
+    if repo.endswith(".git"):
+        repo = repo[: -len(".git")]
+    return f"{owner}/{repo}"
+
+
 __all__ = [
+    "default_github_repo_slug",
     "effective_my_sevn",
     "effective_my_sevn_executors",
     "effective_my_sevn_issues",

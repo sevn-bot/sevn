@@ -17,10 +17,6 @@ from sevn.tools.permissions import AllowAllPermissionPolicy
 from sevn.tools.process import reset_process_store_for_tests
 from sevn.tools.registry import build_session_registry
 
-_XFAIL_W3 = pytest.mark.xfail(
-    reason="green after W3: process read alias + job status (D8/D9)", strict=False
-)
-
 
 @pytest.fixture(autouse=True)
 def _clean_stores() -> None:
@@ -65,7 +61,6 @@ async def _start_echo_job(ctx: ToolContext) -> str:
     return str(env["data"]["job_id"])
 
 
-@_XFAIL_W3
 @pytest.mark.asyncio
 async def test_d8_action_read_aliases_output(ctx: ToolContext) -> None:
     """D8: ``action='read'`` returns the same payload shape as ``action='output'``."""
@@ -89,7 +84,6 @@ async def test_d8_action_read_aliases_output(ctx: ToolContext) -> None:
     assert read_env["data"]["stdout"] == out_env["data"]["stdout"]
 
 
-@_XFAIL_W3
 @pytest.mark.asyncio
 async def test_d8_action_run_still_returns_did_you_mean(ctx: ToolContext) -> None:
     """D8: ``action='run'`` stays ambiguous and returns ``did_you_mean`` (not an alias)."""
@@ -106,7 +100,6 @@ async def test_d8_action_run_still_returns_did_you_mean(ctx: ToolContext) -> Non
     assert "start" in suggestions or "output" in suggestions
 
 
-@_XFAIL_W3
 @pytest.mark.asyncio
 async def test_d8_wrong_action_error_includes_job_status(ctx: ToolContext) -> None:
     """D8: wrong-action errors include the referenced job's current status."""
@@ -126,7 +119,6 @@ async def test_d8_wrong_action_error_includes_job_status(ctx: ToolContext) -> No
     assert any(status in blob for status in ("running", "completed", "stopped", "failed"))
 
 
-@_XFAIL_W3
 def test_d9_slug_defaults_from_my_sevn_repo_url_without_git_remote() -> None:
     """D9: GitHub slug resolves from ``my_sevn.repo_url`` — never via ``git remote``."""
     ws = WorkspaceConfig.minimal()

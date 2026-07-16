@@ -72,6 +72,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-16] `process` accepts `action=read` as an alias for `output`, keeps `run` returning `did_you_mean`, and wrong-action errors include the referenced job's current status; workspace `sevn.bot.md` surfaces `my_sevn.repo_url` so agents never need `git remote` against the read-only mirror
 - [2026-07-16] Browser spawn survives concurrent retries and gateway restarts: stale sevn Chrome is reaped, profile singleton/port locks cleared, CDP wait is adaptive with one clean retry, Chrome stderr lands in `logs/chrome-<session>.log`, and the session registry only stores confirmed live CDP endpoints
 - [2026-07-14] Bundled skill seeding skips `__pycache__` when copying packaged skills, avoiding parallel-test flakes on transient `.pyc` files
 - [2026-07-15] Telegram session mirror title lookup is best-effort when SQLite errors occur; group titles also persist from inline-keyboard callbacks (#21)
