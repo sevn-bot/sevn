@@ -8,7 +8,7 @@ summary: 'Define the runtime ontology for Triager output and related labels acro
   the agent core: canonical field names, closed enums, typing conventions, and how
   they compose with executor dispatch described '
 last_updated: '2026-07-16'
-fingerprint: sha256:450f2929a9287d7a7f299f32cad42151f499488225ebb04910e1cb70c3e43bbe
+fingerprint: sha256:6fca928fd7c91a794e511907f3c80d6e849854adc9c36f13fb5c8c5538fcee86
 related: []
 sources:
 - src/sevn/config/**
@@ -206,9 +206,15 @@ interfaces:
 - name: effective_my_sevn_sync
   file: src/sevn/config/my_sevn.py
   symbol: effective_my_sevn_sync
+- name: parse_github_repo_slug
+  file: src/sevn/config/my_sevn.py
+  symbol: parse_github_repo_slug
 - name: persist_my_sevn_repo_path
   file: src/sevn/config/my_sevn.py
   symbol: persist_my_sevn_repo_path
+- name: resolve_github_repo_slug
+  file: src/sevn/config/my_sevn.py
+  symbol: resolve_github_repo_slug
 - name: resolve_my_sevn_repo_path
   file: src/sevn/config/my_sevn.py
   symbol: resolve_my_sevn_repo_path

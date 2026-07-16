@@ -8,7 +8,7 @@ summary: 'Deliver non-interactive dispatch: external events (“something happen
   and schedules (“tick”) compile to DispatchRequest, optionally pass through notify_only
   (zero LLM, zero sandbox boot), otherwise'
 last_updated: '2026-07-16'
-fingerprint: sha256:0c329b0fe8ab679f7e7267014d9ea5775c2471c13d328b7255006e6932159ca6
+fingerprint: sha256:cba9dff781c745b124968af4cd49ca19317fbd0d15090408648dccc08517e6b6
 related: []
 sources:
 - src/sevn/triggers/**
@@ -97,9 +97,9 @@ interfaces:
 - name: list_cron_jobs
   file: src/sevn/triggers/cron.py
   symbol: list_cron_jobs
-- name: run_issue_watch_cron
+- name: register_cron_job_handler
   file: src/sevn/triggers/cron.py
-  symbol: run_issue_watch_cron
+  symbol: register_cron_job_handler
 - name: prune_webhook_dedupe_expired
   file: src/sevn/triggers/dedupe.py
   symbol: prune_webhook_dedupe_expired
@@ -124,9 +124,6 @@ interfaces:
 - name: dispatch_run
   file: src/sevn/triggers/dispatcher.py
   symbol: dispatch_run
-- name: notify_issue_watch_diff
-  file: src/sevn/triggers/dispatcher.py
-  symbol: notify_issue_watch_diff
 - name: TriggerPluginHookSurface
   file: src/sevn/triggers/hooks_protocol.py
   symbol: TriggerPluginHookSurface
@@ -139,6 +136,33 @@ interfaces:
 - name: prune_inbox_spill
   file: src/sevn/triggers/inbox.py
   symbol: prune_inbox_spill
+- name: ensure_issue_watch_cron_job
+  file: src/sevn/triggers/issue_watch_cron.py
+  symbol: ensure_issue_watch_cron_job
+- name: notify_issue_watch_diff
+  file: src/sevn/triggers/issue_watch_cron.py
+  symbol: notify_issue_watch_diff
+- name: register_issue_watch_cron_handler
+  file: src/sevn/triggers/issue_watch_cron.py
+  symbol: register_issue_watch_cron_handler
+- name: run_issue_watch_cron
+  file: src/sevn/triggers/issue_watch_cron.py
+  symbol: run_issue_watch_cron
+- name: deliver_operator_notify
+  file: src/sevn/triggers/operator_notify.py
+  symbol: deliver_operator_notify
+- name: reset_operator_notify_for_tests
+  file: src/sevn/triggers/operator_notify.py
+  symbol: reset_operator_notify_for_tests
+- name: set_operator_notify
+  file: src/sevn/triggers/operator_notify.py
+  symbol: set_operator_notify
+- name: unwire_operator_notify
+  file: src/sevn/triggers/operator_notify.py
+  symbol: unwire_operator_notify
+- name: wire_operator_notify
+  file: src/sevn/triggers/operator_notify.py
+  symbol: wire_operator_notify
 - name: DispatchRequest
   file: src/sevn/triggers/request.py
   symbol: DispatchRequest

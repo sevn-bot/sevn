@@ -8,7 +8,7 @@ summary: 'Own everything under workspace/skills/: how skills are discovered, val
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
 last_updated: '2026-07-16'
-fingerprint: sha256:e85dc271dbd71abd423b4a562ee0ebe39d6d28a1b61d25605be0bb9bd648ef4f
+fingerprint: sha256:1f3c69f33a03ba3d9e8ec82b103c4da05887af1e00101a2cf73a2a73cfdd4d2d
 related: []
 sources:
 - src/sevn/skills/**
@@ -32,9 +32,6 @@ interfaces:
 - name: BrowserReadiness
   file: src/sevn/skills/browser_session.py
   symbol: BrowserReadiness
-- name: BrowserSessionRegistry
-  file: src/sevn/skills/browser_session.py
-  symbol: BrowserSessionRegistry
 - name: CloseBrowserResult
   file: src/sevn/skills/browser_session.py
   symbol: CloseBrowserResult
@@ -59,18 +56,6 @@ interfaces:
 - name: cdp_list_page_targets
   file: src/sevn/skills/browser_session.py
   symbol: cdp_list_page_targets
-- name: cdp_port_from_url
-  file: src/sevn/skills/browser_session.py
-  symbol: cdp_port_from_url
-- name: cdp_port_seed
-  file: src/sevn/skills/browser_session.py
-  symbol: cdp_port_seed
-- name: cdp_reachable
-  file: src/sevn/skills/browser_session.py
-  symbol: cdp_reachable
-- name: clear_registry
-  file: src/sevn/skills/browser_session.py
-  symbol: clear_registry
 - name: close_all_gateway_browsers
   file: src/sevn/skills/browser_session.py
   symbol: close_all_gateway_browsers
@@ -86,12 +71,6 @@ interfaces:
 - name: connected_tab_session
   file: src/sevn/skills/browser_session.py
   symbol: connected_tab_session
-- name: default_cdp_url
-  file: src/sevn/skills/browser_session.py
-  symbol: default_cdp_url
-- name: is_brave_executable
-  file: src/sevn/skills/browser_session.py
-  symbol: is_brave_executable
 - name: list_tabs
   file: src/sevn/skills/browser_session.py
   symbol: list_tabs
@@ -110,36 +89,9 @@ interfaces:
 - name: pick_work_page
   file: src/sevn/skills/browser_session.py
   symbol: pick_work_page
-- name: read_devtools_active_port
-  file: src/sevn/skills/browser_session.py
-  symbol: read_devtools_active_port
-- name: read_registry
-  file: src/sevn/skills/browser_session.py
-  symbol: read_registry
-- name: registry_path
-  file: src/sevn/skills/browser_session.py
-  symbol: registry_path
-- name: resolve_browser_engine
-  file: src/sevn/skills/browser_session.py
-  symbol: resolve_browser_engine
-- name: resolve_browser_extra_args
-  file: src/sevn/skills/browser_session.py
-  symbol: resolve_browser_extra_args
-- name: resolve_browser_headless
-  file: src/sevn/skills/browser_session.py
-  symbol: resolve_browser_headless
-- name: resolve_cdp_url
-  file: src/sevn/skills/browser_session.py
-  symbol: resolve_cdp_url
-- name: resolve_chrome_executable
-  file: src/sevn/skills/browser_session.py
-  symbol: resolve_chrome_executable
 - name: resolve_idle_close_seconds
   file: src/sevn/skills/browser_session.py
   symbol: resolve_idle_close_seconds
-- name: resolve_profile_dir
-  file: src/sevn/skills/browser_session.py
-  symbol: resolve_profile_dir
 - name: resolve_target_page
   file: src/sevn/skills/browser_session.py
   symbol: resolve_target_page
@@ -149,18 +101,12 @@ interfaces:
 - name: session_status_payload
   file: src/sevn/skills/browser_session.py
   symbol: session_status_payload
-- name: spawn_chrome
-  file: src/sevn/skills/browser_session.py
-  symbol: spawn_chrome
 - name: try_persist_active_page
   file: src/sevn/skills/browser_session.py
   symbol: try_persist_active_page
 - name: wait_for_page_ready
   file: src/sevn/skills/browser_session.py
   symbol: wait_for_page_ready
-- name: write_registry
-  file: src/sevn/skills/browser_session.py
-  symbol: write_registry
 - name: build_skill_capability_rows
   file: src/sevn/skills/capabilities.py
   symbol: build_skill_capability_rows
