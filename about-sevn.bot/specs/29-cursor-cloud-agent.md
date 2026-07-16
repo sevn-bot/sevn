@@ -8,7 +8,7 @@ summary: Let operators and agents launch, poll, and inspect Cursor Cloud Agents 
   any GitHub/GitLab repo when skills.cursor_cloud.enabled is true, returning PR URLs,
   dashboard links (remote desktop), and
 last_updated: '2026-07-16'
-fingerprint: sha256:a4ac39dffed1679f81cc9a82d601cbff96cbef287e1db494a1740519e28abfd3
+fingerprint: sha256:c8a7a3428df72e3ef200e9325f9023caf48d83cbdecfb2b019754d2c7d9084b5
 related: []
 sources:
 - src/sevn/integrations/**
@@ -199,66 +199,63 @@ interfaces:
 - name: twexapi_key_configured
   file: src/sevn/integrations/social_media/readiness.py
   symbol: twexapi_key_configured
-- name: advanced_search_page
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: advanced_search_page
-- name: bookmark
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: bookmark
 - name: cookie_bridge_log_safe
-  file: src/sevn/integrations/social_media/x_ops.py
+  file: src/sevn/integrations/social_media/x_ops_dispatch.py
   symbol: cookie_bridge_log_safe
 - name: cookies_for_twexapi
-  file: src/sevn/integrations/social_media/x_ops.py
+  file: src/sevn/integrations/social_media/x_ops_dispatch.py
   symbol: cookies_for_twexapi
-- name: create_quote_tweet
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: create_quote_tweet
-- name: create_tweet_or_reply
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: create_tweet_or_reply
-- name: create_tweet_thread
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: create_tweet_thread
-- name: delete_bookmark
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: delete_bookmark
-- name: delete_retweet
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: delete_retweet
-- name: delete_tweets
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: delete_tweets
-- name: fetch_article_markdown
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: fetch_article_markdown
-- name: follow_user
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: follow_user
-- name: get_users_by_usernames
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: get_users_by_usernames
-- name: home_timeline_collect
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: home_timeline_collect
-- name: like_tweet
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: like_tweet
-- name: post_tweet_auto_cookie
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: post_tweet_auto_cookie
-- name: retweet
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: retweet
-- name: search_hashtags
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: search_hashtags
-- name: session_status
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: session_status
-- name: unlike_tweet
-  file: src/sevn/integrations/social_media/x_ops.py
-  symbol: unlike_tweet
+- name: envelope
+  file: src/sevn/integrations/social_media/x_ops_dispatch.py
+  symbol: envelope
+- name: resolve_content_root
+  file: src/sevn/integrations/social_media/x_ops_dispatch.py
+  symbol: resolve_content_root
+- name: run_op
+  file: src/sevn/integrations/social_media/x_ops_dispatch.py
+  symbol: run_op
+- name: smm_cfg
+  file: src/sevn/integrations/social_media/x_ops_dispatch.py
+  symbol: smm_cfg
+- name: pack_advanced_search_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_advanced_search_body
+- name: pack_auto_cookie_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_auto_cookie_body
+- name: pack_create_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_create_body
+- name: pack_delete_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_delete_body
+- name: pack_empty_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_empty_body
+- name: pack_follow_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_follow_body
+- name: pack_hashtags_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_hashtags_body
+- name: pack_quote_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_quote_body
+- name: pack_thread_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_thread_body
+- name: pack_timeline_path
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_timeline_path
+- name: pack_tweet_id_path
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_tweet_id_path
+- name: pack_users_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_users_body
+- name: thread_items
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: thread_items
 - name: TwexApiClient
   file: src/sevn/integrations/twexapi/client.py
   symbol: TwexApiClient

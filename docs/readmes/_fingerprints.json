@@ -2,8 +2,8 @@
   "entries": {
     "agent": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-16T19:03:21Z",
-      "digest": "0ad507a0d6f21d84a7942d56d12fdfdea0b13364ad5082d65ae88c85dfd4aa3f",
+      "computed_at": "2026-07-16T20:08:09Z",
+      "digest": "8638000b9fd2d19d6b57ab3723a6e70e7f18d286caf0cbe979e227c65b83a2bb",
       "source_globs": [
         "src/sevn/agent/**"
       ]
@@ -60,8 +60,8 @@
     },
     "integrations": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-16T19:03:22Z",
-      "digest": "a4ac39dffed1679f81cc9a82d601cbff96cbef287e1db494a1740519e28abfd3",
+      "computed_at": "2026-07-16T20:08:10Z",
+      "digest": "c8a7a3428df72e3ef200e9325f9023caf48d83cbdecfb2b019754d2c7d9084b5",
       "source_globs": [
         "src/sevn/integrations/**"
       ]
@@ -103,8 +103,8 @@
     },
     "root": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-16T18:22:23Z",
-      "digest": "9306350a53ea57e9ecbf27855c021acb4d28b11ef1760709bfcb2a57c6e0dc4a",
+      "computed_at": "2026-07-16T20:08:09Z",
+      "digest": "27447852c6b027a1df0e8b15b8478dbe300fa04ab8e5cf289bc1730bfbf36416",
       "source_globs": [
         "pyproject.toml",
         "CLAUDE.md",
@@ -148,8 +148,8 @@
     },
     "skills": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-16T19:03:22Z",
-      "digest": "3b67eadd9fb663c9c25742729897a37e9107a0cb8124ea345df7ce7ca23d36fd",
+      "computed_at": "2026-07-16T20:08:09Z",
+      "digest": "627923ab67b3062ec340a487b724c4b229afe32fdd33831b0b0ae281b7e84dc1",
       "source_globs": [
         "src/sevn/skills/**",
         "src/sevn/data/bundled_skills/**",
@@ -166,8 +166,8 @@
     },
     "subagents": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-16T19:03:22Z",
-      "digest": "56384f8d9f70f3288cb512d04ea92e8bae469858712ecb27537f69988f366978",
+      "computed_at": "2026-07-16T20:08:10Z",
+      "digest": "74a82cb01a626f2a01566ad034e41a1bdeb60e001c8f4b7dbf1c1050a79b4a1e",
       "source_globs": [
         "src/sevn/agent/subagents/**",
         "src/sevn/config/sections/subagents.py",
