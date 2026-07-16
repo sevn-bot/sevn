@@ -13,7 +13,7 @@ Private:
     _repo_root_from_workspace — checkout recorded as ``my_sevn.repo_path`` in the bound config.
     _git — run git in ``repo_root``.
     _is_ancestor — merge-base helper.
-    _run_sync_cli — invoke ``make sync-cli`` in the checkout (editable CLI + Playwright + browser-cdp).
+    _run_sync_cli — invoke ``make sync-cli`` in the checkout (editable CLI + browser-cdp).
     _maybe_build_graphify — best-effort ``graphify update`` to refresh ``.index/graphify``.
     _maybe_logo_mark_animate — run ``make logo-mark-animate`` on ``--latest`` when TTY.
     _refresh_workspace_skills — replace ``skills/core`` from bundled tree when installed.
@@ -277,7 +277,7 @@ def _ensure_tracking_branch(repo_root: Path, *, dry_run: bool = False) -> None:
 
 
 def _run_sync_cli(repo_root: Path, *, dry_run: bool = False) -> None:
-    """Run ``make sync-cli`` in the checkout (editable CLI, Playwright, browser-cdp from tree tip).
+    """Run ``make sync-cli`` in the checkout (editable CLI + browser-cdp from tree tip).
 
     Args:
         repo_root (Path): Repository root.

@@ -37,7 +37,6 @@
 | `skill_management` | [`../../src/sevn/data/bundled_skills/core/skill_management/SKILL.md`](../../src/sevn/data/bundled_skills/core/skill_management/SKILL.md) | Authoring workflows for generated skills; pairs with native skill_create and promote_generated_skill (about-sevn.bot/specs/12-skills-system.md §2.5). |
 | `social_media_manager` | [`../../src/sevn/data/bundled_skills/core/social_media_manager/SKILL.md`](../../src/sevn/data/bundled_skills/core/social_media_manager/SKILL.md) | Browser-first social monitoring across six platforms via CDP browser; TwexAPI optional on X only. |
 | `telegram` | [`../../src/sevn/data/bundled_skills/core/telegram/SKILL.md`](../../src/sevn/data/bundled_skills/core/telegram/SKILL.md) | Telegram inline custom buttons and forum supergroup helpers (Bot API + allowlist/userbot hooks). |
-| `telegram_test` | [`../../src/sevn/data/bundled_skills/core/telegram_test/SKILL.md`](../../src/sevn/data/bundled_skills/core/telegram_test/SKILL.md) | Run host-side Playwright Telegram E2E (sevn telegram-test) while building sevn.bot. Use after gateway/menu/session/diagnostics changes. Not in gateway container. |
 | `yt-dlp` | [`../../src/sevn/data/bundled_skills/core/yt-dlp/SKILL.md`](../../src/sevn/data/bundled_skills/core/yt-dlp/SKILL.md) | Download video/audio and metadata with yt-dlp (YouTube, Vimeo, X, TikTok, and allowlisted hosts). |
 
 ## Runtime loaders

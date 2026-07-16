@@ -192,9 +192,6 @@ DEFAULT_SKILL_MANIFESTS: Final[dict[str, str]] = {
         "and assigned social skills (x-use, facebook-use, linkedin-use)."
     ),
     "telegram": "Telegram inline buttons and forum supergroup helpers.",
-    # telegram_test is host-only Playwright E2E (quarantined from the runtime skill index;
-    # W1.4 / tool-skill-readiness-matrix.md). Not in DEFAULT_SKILL_MANIFESTS so it is
-    # never surfaced via list_registry or load_skill in the gateway session.
     "yt-dlp": "Download video/audio and metadata with yt-dlp (allowlisted hosts).",
 }
 

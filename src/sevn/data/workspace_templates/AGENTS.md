@@ -50,7 +50,7 @@ Building blocks: file system, logs, memory, web, code, GitHub, code execution, s
 - **§6 GitHub** — `integration_call`; bundled: **`github-manager`**, **`gh-pr`**, **`gh-issues`**
 - **§7 Code execution** — `sandbox_exec`; `process` for background jobs; `terminal_spawn`/`terminal_run`/`terminal_close` for interactive shells
 - **§8 Scheduling** — **`scheduling`** skill; **`sessions_management`** skill
-- **§9 Skills platform** — `load_skill`, `run_skill_script`, `run_skill_runnable`, `skill_create`, `promote_generated_skill`; bundled: `browser-harness`, `canvas`, `code_graph_rag`, `computer-use`, `conventional_commit`, `cursor_cloud`, `email-management`, `gh-issues`, `gh-pr`, `github-manager`, `graphify`, `last30days`, `lcm`, `mycode`, `pdf`, `roam_code`, `scheduling`, `second_brain`, `sessions_management`, `skill_management`, `telegram`, `telegram_test`, `yt-dlp`
+- **§9 Skills platform** — `load_skill`, `run_skill_script`, `run_skill_runnable`, `skill_create`, `promote_generated_skill`; bundled: `browser-harness`, `canvas`, `code_graph_rag`, `computer-use`, `conventional_commit`, `cursor_cloud`, `email-management`, `gh-issues`, `gh-pr`, `github-manager`, `graphify`, `last30days`, `lcm`, `mycode`, `pdf`, `roam_code`, `scheduling`, `second_brain`, `sessions_management`, `skill_management`, `telegram`, `yt-dlp`
 - **§10 Rich UI** — `openui_render` + **`canvas`** skill
 - **§11 Messaging & media** — `message`, `send_file`, `tts`; **`pdf`** skill; **`yt-dlp`** skill
 - **§12 Telegram** — **`telegram`** skill (buttons, forum topics)

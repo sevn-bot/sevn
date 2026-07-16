@@ -173,7 +173,7 @@ Cross-session coordination uses the **`sessions_management`** skill for list/his
 
 **Meta tools:** `load_skill`, `run_skill_script`, `run_skill_runnable`, `skill_create`, `promote_generated_skill`.
 
-**Bundled skills** (default registry): `browser-harness`, `canvas`, `code_graph_rag`, `computer-use`, `conventional_commit`, `cursor_cloud`, `email-management`, `gh-issues`, `gh-pr`, `github-manager`, `graphify`, `last30days`, `lcm`, `mycode`, `pdf`, `roam_code`, `scheduling`, `second_brain`, `sessions_management`, `skill_management`, `telegram`, `telegram_test`, `yt-dlp`.
+**Bundled skills** (default registry): `browser-harness`, `canvas`, `code_graph_rag`, `computer-use`, `conventional_commit`, `cursor_cloud`, `email-management`, `gh-issues`, `gh-pr`, `github-manager`, `graphify`, `last30days`, `lcm`, `mycode`, `pdf`, `roam_code`, `scheduling`, `second_brain`, `sessions_management`, `skill_management`, `telegram`, `yt-dlp`.
 
 Keep skill packages under `skills/core/`, `skills/user/`, or `skills/generated/` — not loose directories directly under `skills/`. Promote generated drafts with `promote_generated_skill` or the **`skill_management`** scripts.
 

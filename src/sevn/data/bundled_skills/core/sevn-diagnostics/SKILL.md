@@ -7,7 +7,6 @@ description: >-
 version: "1.0.0"
 see_also:
   - conventional_commit
-  - telegram_test
 ---
 
 # sevn-diagnostics skill

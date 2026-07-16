@@ -992,26 +992,6 @@
       ]
     },
     {
-      "capability_id": "skill.telegram_test",
-      "group": "B",
-      "label": "telegram_test",
-      "description": "Run host-side Playwright Telegram E2E (sevn telegram-test) while building sevn.bot. Use after gateway/menu/session/di...",
-      "config_paths": [
-        "skills.telegram_test.enabled"
-      ],
-      "control": "checkbox",
-      "default": true,
-      "profile_overridable": true,
-      "install_actions": [
-        {
-          "id": "skill.telegram_test.noop",
-          "kind": "noop",
-          "argv": [],
-          "fatal": false
-        }
-      ]
-    },
-    {
       "capability_id": "skill.sevn_diagnostics",
       "group": "B",
       "label": "sevn-diagnostics",

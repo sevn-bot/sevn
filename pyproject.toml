@@ -83,7 +83,6 @@ yt-dlp = ["yt-dlp==2026.6.9"]
 web-extract = ["readability-lxml==0.8.4.1"]
 web-fetch = ["brotli>=1.1.0"]
 dev = [
-    "sevn-telegram-tester",
     "pytest==9.0.3",
     "pytest-asyncio==1.3.0",
     "pytest-xdist==3.8.0",
@@ -109,9 +108,6 @@ dev = [
     "pytest-split==0.11.0",
 ]
 
-[tool.uv.workspace]
-members = ["tools/telegram-tester"]
-
 [tool.uv]
 # python-jobspy (job-ops extra) hard-pins markdownify<0.14.0, but sevn pins
 # markdownify==1.2.2; the markdownify() API is stable across the range, so force
@@ -119,7 +115,6 @@ members = ["tools/telegram-tester"]
 override-dependencies = ["typer==0.25.1", "joserfc>=1.6.7", "markdownify==1.2.2"]
 
 [tool.uv.sources]
-sevn-telegram-tester = { workspace = true }
 skillspector = { git = "https://github.com/NVIDIA/SkillSpector", branch = "main" }
 
 [tool.hatch.metadata]
@@ -214,7 +209,7 @@ ignore_imports = [
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-src = ["src", "tests", "scripts", "tools/telegram-tester/src", "tools/telegram-tester/tests"]
+src = ["src", "tests", "scripts"]
 extend-exclude = [
     "src/sevn/data/bundled_skills/core/last30days/scripts/lib",
     "src/sevn/data/bundled_skills/core/last30days/scripts/last30days.py",
@@ -291,7 +286,7 @@ ignore = [
 max-complexity = 187
 
 [tool.ruff.lint.isort]
-known-first-party = ["sevn", "sevn_telegram_tester"]
+known-first-party = ["sevn"]
 
 [tool.ruff.lint.per-file-ignores]
 ".vulture_whitelist.py" = ["B018", "F821"]  # vulture name-registration baseline (W3)
@@ -318,7 +313,6 @@ known-first-party = ["sevn", "sevn_telegram_tester"]
     "SLF", "ARG", "PLC0415", "PLR2004", "FBT", "BLE", "DTZ",
     "PTH", "C4", "PERF", "FURB", "TRY", "EM", "N", "PL", "ERA", "ISC", "ICN", "C901",
 ]
-"tools/telegram-tester/**" = ["TC003", "T20"]
 "tools/explore_gateway_log.py" = ["T20", "UP035"]
 # CDP browser engine: a transport-facing client where per-call timeout args are the
 # intended API (mirrors httpx/aiohttp); ASYNC109 would force asyncio.timeout ceremony.
@@ -472,7 +466,7 @@ DEP002 = [
     "selectolax",
 ]
 DEP003 = ["mcp", "jsonschema", "PIL", "tomli"]
-DEP004 = ["sevn_telegram_tester", "sevn-telegram-tester"]
+DEP004 = []
 
 [tool.interrogate]
 # D6 baseline (W4): coverage % floor observed 2026-06-17 on src+scripts (excl. tests/bundled_skills).

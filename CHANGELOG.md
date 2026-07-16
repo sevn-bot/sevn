@@ -43,6 +43,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- [2026-07-16] Remove the Playwright E2E harness and `telegram-tester`, replacing Telegram Web checks with the browser `telegram_web` recipe (+ Bot-API `getMe` helper); park webchat/onboarding/Mission Control journeys pending re-home (#37)
 - [2026-07-16] `computer-use` skill `see_also` drops the removed `playwright-browser` reference; docker gateway browser/gui images install `browser-cdp` only
 - [2026-07-16] Residual Playwright symbols renamed to browser_tool (routing/grounding), deprecated prompt aliases dropped, OpenUI rasteriser is weasyprint-only, and docker/.env install paths use `browser-cdp` without `playwright install`
 - [2026-07-15] Telegram `/config`, onboarding wizard, and Mission Control Knowledge view expose Second Brain layout selection and resolved PARA role paths instead of assuming legacy `wiki/raw/outputs` folders

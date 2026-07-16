@@ -830,7 +830,7 @@ class SessionManager:
             if effective_mode != "cancel":
                 in_flight = self._active_dispatch_task.get(session_id)
                 if in_flight is not None and not in_flight.done() and q.qsize() >= 1:
-                    # Steer/queue observability — TE-8 Playwright greps this
+                    # Steer/queue observability — browser telegram_web / Bot-API checks may grep this
                     # via `/logs` (`specs/17-gateway.md` §2.9).
                     logger.info(
                         "gateway.queue_steer_queued session_id={} depth={}",

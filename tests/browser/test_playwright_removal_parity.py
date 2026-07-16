@@ -39,9 +39,6 @@ def _git_grep_playwright_imports(*, under: str) -> list[str]:
     return [ln for ln in proc.stdout.splitlines() if ln.strip()]
 
 
-@pytest.mark.xfail(
-    reason="green after W6: DP10 C6 telegram_web replacement path invocable", strict=False
-)
 @pytest.mark.asyncio
 async def test_telegram_web_replacement_send_receive_invocable(fake_cdp: object) -> None:
     """DP10 / C6: browser telegram_web recipe exposes send/read/reply for E2E replacement."""
@@ -62,13 +59,11 @@ async def test_telegram_web_replacement_send_receive_invocable(fake_cdp: object)
         await conn.close()
 
 
-@pytest.mark.xfail(reason="green after W6: DP10 tools/telegram-tester removed", strict=False)
 def test_telegram_tester_directory_removed() -> None:
     """DP10: tools/telegram-tester is gone after browser telegram_web replacement lands."""
     assert not (_REPO_ROOT / "tools" / "telegram-tester").exists()
 
 
-@pytest.mark.xfail(reason="green after W6: DP10 sevn telegram-test CLI removed", strict=False)
 def test_telegram_test_cli_module_removed() -> None:
     """DP10: cli/commands/telegram_test.py is removed with the Playwright harness."""
     assert not (_REPO_ROOT / "src" / "sevn" / "cli" / "commands" / "telegram_test.py").exists()
