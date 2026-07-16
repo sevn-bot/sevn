@@ -51,3 +51,16 @@ def test_pass_vaults_list_dry_run() -> None:
     data = json.loads(proc.stdout)
     assert data["data"]["mode"] == "dry_run"
     assert data["data"]["command"] == ["pass", "vaults", "list", "--output", "json"]
+
+
+def test_mail_list_dry_run() -> None:
+    proc = subprocess.run(
+        [sys.executable, str(_SCRIPTS / "mail_list.py"), "--dry-run", "--folder", "sent"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0
+    data = json.loads(proc.stdout)
+    assert data["data"]["mode"] == "dry_run"
+    assert "mail" in data["data"]["command"][0] or data["data"]["command"][0] == "mail"

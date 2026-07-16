@@ -63,8 +63,9 @@ def main(
     )
 
 
-from proton_cli.cli import pass_cmd  # noqa: E402
+from proton_cli.cli import mail_cmd, pass_cmd  # noqa: E402
 
+app.add_typer(mail_cmd.app, name="mail")
 app.add_typer(pass_cmd.app, name="pass")
 
 
