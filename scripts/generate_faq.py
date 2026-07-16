@@ -100,14 +100,19 @@ def main(argv: list[str] | None = None, *, repo_root: Path | None = None) -> int
     )
     args = parser.parse_args(argv)
 
-    input_path = root / args.input
-    output_path = root / args.output
+    input_path = (root / args.input).resolve()
+    output_path = (root / args.output).resolve()
+
+    if not input_path.is_relative_to(root) or not output_path.is_relative_to(root):
+        print("faq: paths must resolve within the repository root", file=sys.stderr)
+        return 1
 
     if not input_path.is_file():
         print(f"faq: input not found: {input_path}", file=sys.stderr)
         return 1
 
-    markdown, errors = generate(repo_root=root, input_path=input_path, output_path=args.output)
+    output_rel = output_path.relative_to(root).as_posix()
+    markdown, errors = generate(repo_root=root, input_path=input_path, output_path=output_rel)
     if errors or markdown is None:
         print("faq: validation failed:", file=sys.stderr)
         for err in errors:
