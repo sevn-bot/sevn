@@ -46,7 +46,11 @@ def read_clear_signed_message(signed_message: str) -> str:
     if len(trailing) > 1 and trailing[1].strip():
         raise ModulusError("extra data after modulus")
 
-    armored_sig = sig_begin + sig_part.split("-----END PGP SIGNATURE-----", 1)[0] + "-----END PGP SIGNATURE-----"
+    armored_sig = (
+        sig_begin
+        + sig_part.split("-----END PGP SIGNATURE-----", 1)[0]
+        + "-----END PGP SIGNATURE-----"
+    )
     key, _ = PGPKey.from_blob(MODULUS_PUBKEY)
     sig = PGPSignature.from_blob(armored_sig)
     with key.unlock(None):

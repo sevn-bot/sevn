@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 
-from proton_cli.app import App
 from proton_cli.service.mail.service import ListOptions, SearchOptions, SendOptions
+
+if TYPE_CHECKING:
+    from proton_cli.app import App
 
 app = typer.Typer(name="mail", no_args_is_help=True, add_completion=False)
 
@@ -132,10 +136,7 @@ def messages_send(
     proton_app = _run(ctx)
     text = body
     if body_file:
-        if body_file == "-":
-            text = sys.stdin.read()
-        else:
-            text = open(body_file, encoding="utf-8").read()
+        text = sys.stdin.read() if body_file == "-" else Path(body_file).read_text(encoding="utf-8")
     if not text:
         raise typer.BadParameter("provide --body or --body-file")
     if proton_app.dry_run:
@@ -147,7 +148,7 @@ def messages_send(
         SendOptions(to=list(to), subject=subject, body=text, html=html),
     )
     if proton_app.renderer.format.value == "text":
-        print(message_id)
+        typer.echo(message_id)
         proton_app.renderer.success("Message sent.")
     else:
         proton_app.renderer.object({"message_id": message_id})
@@ -206,5 +207,5 @@ def labels_list(ctx: typer.Context) -> None:
         return
     proton_app.renderer.table(
         ["ID", "NAME", "TYPE"],
-        [[l.id, l.name, str(l.type)] for l in labels + folders],
+        [[entry.id, entry.name, str(entry.type)] for entry in labels + folders],
     )

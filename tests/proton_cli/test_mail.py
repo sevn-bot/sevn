@@ -19,7 +19,7 @@ def test_recipient_list_and_dedupe() -> None:
 
 def test_list_messages_mock_client() -> None:
     class FakeClient:
-        def decode(self, req, out):  # noqa: ANN001
+        def decode(self, req, out):
             assert req.path == "/mail/v4/messages"
             out.clear()
             out.update(
