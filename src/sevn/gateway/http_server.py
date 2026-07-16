@@ -166,7 +166,6 @@ from sevn.self_improve.jobs.worker import ImproveJobWorker
 from sevn.self_improve.types import ImproveJobId, OwnerPrincipal
 from sevn.skills.browser_gc import prune_orphan_browser_profiles
 from sevn.skills.browser_session import (
-    close_all_gateway_browsers,
     close_idle_browser_sessions,
     resolve_idle_close_seconds,
 )
@@ -1307,35 +1306,39 @@ def create_app(
         await asyncio.to_thread(run_cron_reconciles, conn, ws)
 
         # D13: wire real operator notify for issue-watch cron (Telegram to owner).
+        # When no Telegram owner is configured, leave the sink unwired so
+        # deliver_operator_notify falls back to ``.sevn/trigger_runs/`` LOG
+        # artefacts — never install a no-op that reports cron ok with zero delivery.
         from sevn.gateway.channel_router import OutgoingMessage
         from sevn.triggers.operator_notify import set_operator_notify
 
         owner_tg = resolve_owner_telegram_user_id(ws)
-        loop = asyncio.get_running_loop()
-
-        def _operator_notify_sink(text: str) -> None:
-            if not owner_tg or not text.strip():
-                return
+        if owner_tg:
+            loop = asyncio.get_running_loop()
             dest = owner_tg
-            session_id = f"telegram:{dest}:general"
 
-            async def _send() -> None:
-                try:
-                    await gateway_router.route_outgoing(
-                        OutgoingMessage(
-                            channel="telegram",
-                            user_id=dest,
-                            text=text.strip(),
-                            session_id=session_id,
-                            metadata={"source": "operator_notify"},
-                        ),
-                    )
-                except Exception:
-                    logger.exception("operator_notify_route_outgoing_failed")
+            def _operator_notify_sink(text: str) -> None:
+                if not text.strip():
+                    return
+                session_id = f"telegram:{dest}:general"
 
-            loop.call_soon_threadsafe(lambda: asyncio.create_task(_send()))
+                async def _send() -> None:
+                    try:
+                        await gateway_router.route_outgoing(
+                            OutgoingMessage(
+                                channel="telegram",
+                                user_id=dest,
+                                text=text.strip(),
+                                session_id=session_id,
+                                metadata={"source": "operator_notify"},
+                            ),
+                        )
+                    except Exception:
+                        logger.exception("operator_notify_route_outgoing_failed")
 
-        set_operator_notify(_operator_notify_sink)
+                loop.call_soon_threadsafe(lambda: asyncio.create_task(_send()))
+
+            set_operator_notify(_operator_notify_sink)
         app.state.memory_job_lock = asyncio.Lock()
         app.state.dreaming_engine = DreamingEngine(
             conn, trace, app.state.memory_job_lock, transport=None
@@ -1593,11 +1596,8 @@ def create_app(
         if isinstance(trigger_gate, TriggerDispatchGate):
             await trigger_gate.drain_background(timeout_s=_shutdown_timeout_s(ws))
         await sessions.drain(grace_period_s=_shutdown_timeout_s(ws))
-        await asyncio.to_thread(
-            close_all_gateway_browsers,
-            content_root=ly.content_root,
-            conn=conn,
-        )
+        # Single shutdown owner for sevn Chrome (D6): registry-based reap with
+        # TERM/wait/KILL — do not also call close_all_gateway_browsers (divergent).
         with suppress(Exception):
             from sevn.browser.lifecycle import reap_sevn_browsers_on_shutdown
 

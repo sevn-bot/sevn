@@ -20,7 +20,8 @@ import json
 from pathlib import Path  # noqa: TC003 — used in doctests and at runtime
 from typing import Any
 
-from sevn.integrations.github_skill.github_manager import view_issue_via_gh
+from sevn.integrations.github_skill.client import parse_github_repo
+from sevn.integrations.github_skill.gh_cli import view_issue_via_gh
 
 
 def tracked_path(workspace: Path) -> Path:
@@ -39,35 +40,13 @@ def tracked_path(workspace: Path) -> Path:
     return workspace / ".sevn" / "gh-watch" / "tracked.json"
 
 
-def _split_repo(repo: str) -> tuple[str, str]:
-    """Split ``owner/repo`` into owner and name.
-
-    Args:
-        repo (str): ``owner/repo`` slug.
-
-    Returns:
-        tuple[str, str]: ``(owner, name)``.
-
-    Raises:
-        ValueError: When the slug is not ``owner/repo``.
-
-    Examples:
-        >>> _split_repo("acme/app")
-        ('acme', 'app')
-    """
-    parts = repo.strip().split("/")
-    if len(parts) != 2 or not parts[0] or not parts[1]:
-        msg = f"invalid repo slug: {repo!r} (expected owner/repo)"
-        raise ValueError(msg)
-    return parts[0], parts[1]
-
-
 def watch_state_path(workspace: Path, repo: str, issue_number: int) -> Path:
     """Return the last-seen state file for one issue.
 
     Args:
         workspace (Path): Workspace root.
-        repo (str): ``owner/repo`` slug.
+        repo (str): ``owner/repo`` slug (or URL / SCP form accepted by
+            :func:`~sevn.integrations.github_skill.client.parse_github_repo`).
         issue_number (int): Issue number.
 
     Returns:
@@ -78,7 +57,7 @@ def watch_state_path(workspace: Path, repo: str, issue_number: int) -> Path:
         >>> p.as_posix().endswith(".sevn/gh-watch/o/r/1.json")
         True
     """
-    owner, name = _split_repo(repo)
+    owner, name = parse_github_repo(repo)
     return workspace / ".sevn" / "gh-watch" / owner / name / f"{int(issue_number)}.json"
 
 

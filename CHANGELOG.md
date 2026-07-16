@@ -74,6 +74,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-16] Thermos iter2: operator notify skips a no-op Telegram sink when no owner is configured (LOG under `.sevn/trigger_runs/` instead); issue-watch cron and Chrome reap run off the event loop; one `terminate_sevn_chrome` / shutdown path; issue-watch extracted from `cron.py`; `gh` CLI lives in `gh_cli.py`; spawn no longer stacks dual DevTools waits; restart uses hardened lifecycle spawn
 - [2026-07-16] Thermos D16: issue-watch cron delivers via injectable operator notify (gateway Telegram / LOG artefact) instead of a fake `message_tool` stub; watch/track live in `sevn.integrations.github_skill.watch` (no `importlib` from cron); `gh-issue-watch` cron job is seeded at gateway boot
 - [2026-07-16] Thermos D16: spawn-path Chrome reap waits after SIGTERM before clearing locks; single `pid_is_alive` + cmdline profile identity before kill; remove TypeError spawn kwargs fallback; always-await CDP attach
 - [2026-07-16] Thermos D16: `default_github_repo_slug` parses SCP `git@host:owner/repo.git`; `log_query` pattern paging uses match-set `offset_from_tail`; `process` restores typed `ProcessAction` / `ProcessActionInput`

@@ -18,6 +18,8 @@ Exports:
     release_session — disconnect + evict a pooled session.
     reset_pool_for_tests — clear the pool (unit tests only).
     clear_profile_singleton_locks — delete Chrome singleton/port lockfiles.
+    terminate_pid — SIGTERM then optional SIGKILL with wait (shared escalate loop).
+    terminate_sevn_chrome — kill sevn Chrome for a profile (convention 11).
     reap_stale_sevn_chrome — kill sevn-spawned Chrome for one profile + clear locks.
     reap_sevn_browsers_on_shutdown — terminate all sevn-spawned browsers (D6).
 
@@ -143,6 +145,75 @@ def clear_profile_singleton_locks(profile_dir: Path) -> None:
             (profile_dir / name).unlink()
 
 
+def terminate_pid(pid: int, *, escalate: bool = True) -> bool:
+    """Send ``SIGTERM`` to ``pid``, optionally escalate to ``SIGKILL`` after wait.
+
+    Shared escalate loop for sevn Chrome reaping and CLI teardown.
+
+    Args:
+        pid (int): Target process id.
+        escalate (bool): When ``True``, ``SIGKILL`` if still alive after wait.
+
+    Returns:
+        bool: ``True`` when ``SIGTERM`` was delivered (process may still exit later).
+
+    Examples:
+        >>> terminate_pid(-1)
+        False
+    """
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return False
+    for _ in range(50):
+        if not pid_is_alive(pid):
+            return True
+        time.sleep(0.1)
+    if escalate and pid_is_alive(pid):
+        with contextlib.suppress(OSError, ProcessLookupError):
+            os.kill(pid, signal.SIGKILL)
+        for _ in range(20):
+            if not pid_is_alive(pid):
+                break
+            time.sleep(0.05)
+    return True
+
+
+def terminate_sevn_chrome(
+    pid: int,
+    profile_dir: Path | None,
+    *,
+    escalate: bool = True,
+) -> bool:
+    """Terminate a sevn-spawned Chrome PID for ``profile_dir`` (convention 11).
+
+    When ``profile_dir`` is set, refuses to signal unless the cmdline still looks
+    like sevn Chrome for that profile. When ``profile_dir`` is ``None``, only
+    checks liveness then terminates (caller already validated identity).
+
+    Args:
+        pid (int): Recorded Chrome process id.
+        profile_dir (Path | None): Profile directory to match, or ``None``.
+        escalate (bool): Pass through to :func:`terminate_pid`.
+
+    Returns:
+        bool: ``True`` when a terminate signal was attempted.
+
+    Examples:
+        >>> terminate_sevn_chrome(-1, None)
+        False
+    """
+    if pid <= 0 or not pid_is_alive(pid):
+        return False
+    if profile_dir is not None and not pid_matches_sevn_chrome_profile(pid, profile_dir):
+        return False
+    return terminate_pid(pid, escalate=escalate)
+
+
 def reap_stale_sevn_chrome(
     content_root: Path,
     session_id: str,
@@ -183,26 +254,8 @@ def reap_stale_sevn_chrome(
         except OSError:
             recorded = Path(row.profile_dir)
             target = profile_dir
-        if (
-            recorded == target
-            and pid_is_alive(row.pid)
-            and pid_matches_sevn_chrome_profile(row.pid, profile_dir)
-        ):
-            # Convention 11: cmdline still looks like sevn Chrome for this profile.
-            with contextlib.suppress(OSError):
-                os.kill(row.pid, signal.SIGTERM)
-            # Wait like the shutdown path before clearing lockfiles (Thermos).
-            for _ in range(50):
-                if not pid_is_alive(row.pid):
-                    break
-                time.sleep(0.1)
-            if pid_is_alive(row.pid) and pid_matches_sevn_chrome_profile(row.pid, profile_dir):
-                with contextlib.suppress(OSError):
-                    os.kill(row.pid, signal.SIGKILL)
-                for _ in range(20):
-                    if not pid_is_alive(row.pid):
-                        break
-                    time.sleep(0.05)
+        if recorded == target:
+            terminate_sevn_chrome(row.pid, profile_dir, escalate=True)
     clear_profile_singleton_locks(profile_dir)
 
 
@@ -285,16 +338,7 @@ def reap_sevn_browsers_on_shutdown(content_root: Path) -> list[int]:
             if profile is None or not pid_matches_sevn_chrome_profile(pid, profile):
                 clear_registry(content_root, session_id)
                 continue
-            with contextlib.suppress(OSError):
-                os.kill(pid, signal.SIGTERM)
-            # Best-effort wait so gateway restarts do not leave orphans.
-            for _ in range(50):
-                if not pid_is_alive(pid):
-                    break
-                time.sleep(0.1)
-            if pid_is_alive(pid) and pid_matches_sevn_chrome_profile(pid, profile):
-                with contextlib.suppress(OSError):
-                    os.kill(pid, signal.SIGKILL)
+            terminate_sevn_chrome(pid, profile, escalate=True)
         clear_registry(content_root, session_id)
         if row.profile_dir:
             with contextlib.suppress(OSError):
@@ -781,7 +825,7 @@ async def _spawn_or_attach_unlocked(
 
     last_error = ""
     for attempt in range(2):
-        reap_stale_sevn_chrome(content_root, session_id, profile_dir)
+        await asyncio.to_thread(reap_stale_sevn_chrome, content_root, session_id, profile_dir)
         spawn_wall = time.time()
 
         def _spawn() -> tuple[Any, int, str]:
@@ -923,4 +967,6 @@ __all__ = [
     "release_session",
     "reset_pool_for_tests",
     "spawn_or_attach",
+    "terminate_pid",
+    "terminate_sevn_chrome",
 ]

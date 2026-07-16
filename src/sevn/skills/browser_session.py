@@ -1249,23 +1249,12 @@ def spawn_chrome(
         if log_handle is not None:
             with contextlib.suppress(OSError):
                 log_handle.close()
-    port = read_devtools_active_port(
-        profile_dir,
-        timeout=15.0,
-        spawned_after=spawn_started,
-    )
-    if port is None and seed_port is not None:
-        port = seed_port
-    if port is None:
-        if proc.poll() is None:
-            proc.terminate()
-            with contextlib.suppress(subprocess.TimeoutExpired):
-                proc.wait(timeout=5)
-        msg = "Failed to read DevToolsActivePort after spawning Chrome"
-        if sid and log_dir is not None:
-            msg = f"{msg} (see {log_dir / f'chrome-{sid}.log'})"
-        raise RuntimeError(msg)
-    cdp_url = f"http://127.0.0.1:{port}"
+    # Return after Popen — lifecycle (or caller) owns the single adaptive
+    # DevTools/CDP wait. Avoid stacking spawn's former ~15s poll on top of
+    # lifecycle's ~20s adaptive wait (Thermos).
+    _ = spawn_started
+    port = int(seed_port) if seed_port is not None else 0
+    cdp_url = f"http://127.0.0.1:{port}" if port > 0 else "http://127.0.0.1:0"
     return proc, port, cdp_url
 
 
@@ -1836,14 +1825,15 @@ def _utc_now_iso() -> str:
     return datetime.now(tz=UTC).isoformat()
 
 
-def _kill_pid(pid: int | None) -> bool:
-    """Best-effort terminate a browser process by pid.
+def _kill_pid(pid: int | None, *, profile_dir: Path | None = None) -> bool:
+    """Best-effort terminate a browser process by pid via lifecycle SSOT.
 
     Args:
         pid (int | None): Operating-system process id.
+        profile_dir (Path | None): Optional profile for convention-11 matching.
 
     Returns:
-        bool: ``True`` when ``SIGTERM`` was delivered.
+        bool: ``True`` when a terminate signal was attempted.
 
     Examples:
         >>> _kill_pid(None)
@@ -1851,11 +1841,9 @@ def _kill_pid(pid: int | None) -> bool:
     """
     if pid is None or pid <= 0:
         return False
-    try:
-        os.kill(pid, 15)
-    except OSError:
-        return False
-    return True
+    from sevn.browser.lifecycle import terminate_sevn_chrome
+
+    return terminate_sevn_chrome(pid, profile_dir, escalate=True)
 
 
 def close_browser_session(
@@ -1904,7 +1892,8 @@ def close_browser_session(
     if pid is None:
         clear_registry(content_root, session_id)
         return CloseBrowserResult(ok=True, code="ALREADY_DEAD", message="no pid recorded")
-    killed = _kill_pid(pid)
+    profile = Path(row.profile_dir) if row is not None and row.profile_dir else None
+    killed = _kill_pid(pid, profile_dir=profile)
     clear_registry(content_root, session_id)
     if killed:
         return CloseBrowserResult(ok=True, code="CLOSED", message=f"terminated pid {pid}")
@@ -2028,7 +2017,7 @@ async def restart_browser_session(
     cfg: WorkspaceConfig | None = None,
     force_close: bool = False,
 ) -> BrowserSessionRegistry:
-    """Close then respawn the session browser and wait for CDP.
+    """Close then respawn via the hardened lifecycle spawn path.
 
     Args:
         content_root (Path): Workspace content root.
@@ -2048,35 +2037,13 @@ async def restart_browser_session(
         True
     """
     close_browser_session(content_root, session_id, force=force_close)
-    profile_dir = resolve_profile_dir(content_root, session_id, cfg=cfg)
-    headless = resolve_browser_headless(cfg)
-    seed = cdp_port_seed(session_id)
-    proc, port, cdp_url = await asyncio.to_thread(
-        spawn_chrome,
-        profile_dir,
-        headless=headless,
-        seed_port=seed,
-        cfg=cfg,
-    )
-    for _ in range(50):
-        if cdp_reachable(cdp_url):
-            break
-        await asyncio.sleep(0.2)
-    if not cdp_reachable(cdp_url):
-        if proc.poll() is None:
-            proc.terminate()
-        msg = f"CDP not reachable after restart at {cdp_url}"
+    from sevn.browser.lifecycle import spawn_or_attach
+
+    await spawn_or_attach(content_root, session_id, cfg=cfg)
+    row = read_registry(content_root, session_id)
+    if row is None or not row.cdp_url.strip():
+        msg = f"CDP not reachable after restart for session {session_id}"
         raise RuntimeError(msg)
-    row = BrowserSessionRegistry(
-        pid=proc.pid,
-        cdp_url=cdp_url,
-        cdp_port=port,
-        profile_dir=str(profile_dir),
-        headless=headless,
-        spawned_by_sevn=True,
-        last_used_at=_utc_now_iso(),
-    )
-    write_registry(content_root, session_id, row)
     return row
 
 
@@ -2150,24 +2117,39 @@ async def _session_browser_resources(
         if exe:
             spawn_attempted = True
             seed = cdp_port_seed(sid)
-            chrome_proc, port, spawned_url = await asyncio.to_thread(
+            spawn_wall = time.time()
+            spawned_proc, port, spawned_url = await asyncio.to_thread(
                 spawn_chrome,
                 profile_dir,
                 headless=headless,
                 seed_port=seed,
                 cfg=cfg,
+                session_id=sid,
+                log_dir=content_root / "logs",
             )
+            chrome_proc = spawned_proc
             we_spawned_chrome = True
             cdp_url = spawned_url
-            for _ in range(50):
-                await asyncio.sleep(0.2)
+            # Single adaptive wait (spawn returns after Popen — no nested 15s).
+            for _ in range(100):
+                fresh = await asyncio.to_thread(
+                    read_devtools_active_port,
+                    profile_dir,
+                    spawned_after=spawn_wall,
+                )
+                if fresh is not None:
+                    port = fresh
+                    cdp_url = f"http://127.0.0.1:{fresh}"
                 if cdp_reachable(cdp_url):
                     break
+                if spawned_proc.poll() is not None:
+                    break
+                await asyncio.sleep(0.2)
             if cdp_reachable(cdp_url):
                 browser = await try_cdp(cdp_url)
             if browser is not None:
                 registry_row = BrowserSessionRegistry(
-                    pid=chrome_proc.pid if chrome_proc else None,
+                    pid=spawned_proc.pid,
                     cdp_url=cdp_url,
                     cdp_port=port,
                     profile_dir=str(profile_dir),
@@ -2177,10 +2159,10 @@ async def _session_browser_resources(
                     active_target_id=active_target_id,
                 )
                 write_registry(content_root, sid, registry_row)
-            elif chrome_proc is not None and chrome_proc.poll() is None:
-                chrome_proc.terminate()
+            elif spawned_proc.poll() is None:
+                spawned_proc.terminate()
                 with contextlib.suppress(subprocess.TimeoutExpired):
-                    chrome_proc.wait(timeout=5)
+                    spawned_proc.wait(timeout=5)
                 chrome_proc = None
                 we_spawned_chrome = False
 

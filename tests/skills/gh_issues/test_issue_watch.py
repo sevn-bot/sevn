@@ -161,31 +161,21 @@ def test_d13_issue_track_add_remove_list(tmp_path: Path, monkeypatch: pytest.Mon
 
 
 def test_d13_cron_scope_registered_and_notifies_on_diff() -> None:
-    """D13: cron scope for issue_watch exists; on diff it calls the ``message`` tool (shape)."""
-    from sevn.triggers import cron as cron_mod
+    """D13: cron scope for issue_watch exists; on diff it delivers operator notify."""
     from sevn.triggers import dispatcher as dispatcher_mod
+    from sevn.triggers import issue_watch_cron as watch_cron_mod
 
-    # Presence: a named scope / job id / handler for gh issue watch.
-    names = set(dir(cron_mod)) | set(dir(dispatcher_mod))
-    assert (
-        any(
-            "issue_watch" in n.lower() or "gh_watch" in n.lower() or "gh-watch" in n.lower()
-            for n in names
-        )
-        or hasattr(cron_mod, "ISSUE_WATCH_CRON_JOB_ID")
-        or hasattr(dispatcher_mod, "dispatch_issue_watch")
-    )
+    assert hasattr(watch_cron_mod, "ISSUE_WATCH_CRON_JOB_ID")
+    assert watch_cron_mod.ISSUE_WATCH_CRON_JOB_ID == "gh-issue-watch"
+    assert callable(watch_cron_mod.run_issue_watch_cron)
 
-    notify = getattr(dispatcher_mod, "notify_issue_watch_diff", None) or getattr(
-        cron_mod, "run_issue_watch_cron", None
-    )
-    assert callable(notify), "cron must expose an issue-watch runner that can notify"
+    notify = getattr(dispatcher_mod, "notify_issue_watch_diff", None)
+    assert callable(notify), "dispatcher must expose issue-watch notify"
 
     message_calls: list[object] = []
 
-    def _fake_message(*_a: object, **_k: object) -> str:
+    def _fake_message(*_a: object, **_k: object) -> None:
         message_calls.append((_a, _k))
-        return '{"ok":true}'
 
     with patch("sevn.triggers.operator_notify.deliver_operator_notify", _fake_message):
         notify(diffs=[{"repo": "sevn-bot/sevn", "number": 21, "changes": {"new_comment": "hi"}}])

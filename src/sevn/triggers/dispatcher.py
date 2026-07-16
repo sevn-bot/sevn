@@ -37,8 +37,8 @@ from sevn.triggers.settings import effective_max_inline_bytes
 
 RunTurnFn = Callable[[str, str], Awaitable[None]]
 
-# Built-in cron scope id for GitHub issue watch (D13 / W6).
-ISSUE_WATCH_CRON_SCOPE = "gh-issue-watch"
+# Built-in cron job id for GitHub issue watch is ISSUE_WATCH_CRON_JOB_ID in
+# :mod:`sevn.triggers.issue_watch_cron` (single SSOT).
 
 
 def notify_issue_watch_diff(

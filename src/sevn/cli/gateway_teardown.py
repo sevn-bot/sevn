@@ -1,7 +1,8 @@
 """Stop sevn-owned gateway processes during operator teardown.
 
 Module: sevn.cli.gateway_teardown
-Depends: os, signal, subprocess, time, pathlib, sevn.cli.gateway_client, sevn.cli.service_manager
+Depends: os, subprocess, time, pathlib, sevn.cli.gateway_client, sevn.cli.service_manager,
+    sevn.browser.lifecycle
 
 Exports:
     stop_all_gateway_instances — stop units, unload labels, kill orphan listeners.
@@ -10,9 +11,7 @@ Exports:
 
 from __future__ import annotations
 
-import os
 import shutil
-import signal
 import subprocess  # nosec B404
 import sys
 import time
@@ -113,7 +112,7 @@ def _read_cmdline(pid: int) -> str:
         str: Command line or empty string.
 
     Examples:
-        >>> isinstance(_read_cmdline(os.getpid()), str)
+        >>> isinstance(_read_cmdline(1), str)
         True
     """
     if sys.platform.startswith("linux"):
@@ -139,7 +138,7 @@ def _read_cmdline(pid: int) -> str:
 
 
 def _terminate_pid(pid: int, *, dry_run: bool) -> None:
-    """SIGTERM then SIGKILL a process when owned by sevn gateway.
+    """SIGTERM then SIGKILL via the shared escalate helper.
 
     Args:
         pid (int): Target process id.
@@ -149,29 +148,14 @@ def _terminate_pid(pid: int, *, dry_run: bool) -> None:
         None
 
     Examples:
-        >>> _terminate_pid(os.getpid(), dry_run=True) is None
+        >>> _terminate_pid(1, dry_run=True) is None
         True
     """
     if dry_run:
         return
-    try:
-        os.kill(pid, signal.SIGTERM)
-    except ProcessLookupError:
-        return
-    except OSError:
-        return
-    for _ in range(10):
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
-            return
-        except OSError:
-            return
-        time.sleep(0.5)
-    try:
-        os.kill(pid, signal.SIGKILL)
-    except (ProcessLookupError, OSError):
-        return
+    from sevn.browser.lifecycle import terminate_pid
+
+    terminate_pid(pid, escalate=True)
 
 
 def _bootout_launchd_labels(*, home: Path, dry_run: bool) -> None:

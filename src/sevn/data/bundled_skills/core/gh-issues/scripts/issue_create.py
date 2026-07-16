@@ -19,7 +19,7 @@ from typing import Any
 
 from sevn.config.my_sevn import resolve_github_repo_slug
 from sevn.integrations.github_skill import gh_issues, resolve_github_skill_hooks
-from sevn.integrations.github_skill.github_manager import (
+from sevn.integrations.github_skill.gh_cli import (
     GhCliMissingError,
     create_issue_via_gh,
     map_gh_cli_error,

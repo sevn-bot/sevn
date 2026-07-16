@@ -27,10 +27,11 @@ _GITHUB_REPO_RE = re.compile(
 
 
 def parse_github_repo(repo: str) -> tuple[str, str]:
-    """Parse ``owner`` and ``repo`` from ``owner/repo`` or a GitHub URL.
+    """Parse ``owner`` and ``repo`` from ``owner/repo``, HTTPS, or SCP URL.
 
     Args:
-        repo (str): Repository slug or URL.
+        repo (str): Repository slug, ``https://github.com/…`` URL, or
+            ``git@host:owner/repo.git`` SCP form.
 
     Returns:
         tuple[str, str]: ``(owner, repo_name)``.
@@ -43,11 +44,24 @@ def parse_github_repo(repo: str) -> tuple[str, str]:
         ('octocat', 'Hello-World')
         >>> parse_github_repo("https://github.com/acme/widgets.git")
         ('acme', 'widgets')
+        >>> parse_github_repo("git@github.com:acme/app.git")
+        ('acme', 'app')
     """
     raw = repo.strip()
     if not raw:
         msg = "repo is required (owner/repo)"
         raise ValueError(msg)
+    # SCP-style: git@host:owner/repo(.git) — colon separates host from path.
+    if "@" in raw and "://" not in raw and ":" in raw.split("@", 1)[-1]:
+        tail = raw.rsplit(":", 1)[-1].strip("/")
+        parts = [p for p in tail.split("/") if p]
+        if len(parts) < 2:
+            msg = f"invalid repo slug: {repo!r}"
+            raise ValueError(msg)
+        owner, name = parts[0], parts[1]
+        if name.endswith(".git"):
+            name = name[:-4]
+        return owner, name
     if "://" in raw:
         parsed = urlparse(raw)
         path = (parsed.path or "").strip("/")

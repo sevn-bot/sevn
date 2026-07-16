@@ -287,8 +287,10 @@ async def test_session_browser_resources_spawns_without_env_cdp(
         headless: bool = False,
         seed_port: int | None = None,
         cfg: WorkspaceConfig | None = None,
+        session_id: str | None = None,
+        log_dir: Path | None = None,
     ) -> tuple[FakeProc, int, str]:
-        _ = cfg
+        _ = (cfg, session_id, log_dir)
         spawn_calls.append((profile_dir, headless, seed_port))
         port = seed_port or 9333
         url = f"http://127.0.0.1:{port}"
