@@ -1,70 +1,48 @@
 """Session-scoped browser lifecycle — profile, CDP, registry, spawn/attach/close.
 
 Module: sevn.skills.browser_session
-Depends: asyncio, hashlib, json, os, pathlib, subprocess, urllib
+Depends: asyncio, json, os, pathlib, sevn.browser.chrome, sevn.browser.registry
 
 Exports:
-    BrowserSessionRegistry — persisted registry row for one gateway session.
+    BrowserReadiness — dataclass returned by :func:`browser_readiness_snapshot`.
     CloseBrowserResult — outcome of :func:`close_browser_session`.
     TabOperationError — tab CRUD refused (for example last-tab close).
     TabSessionView — duck-typed browser surface for tab enumeration and CRUD.
-    activate_tab — focus a tab and persist ``active_target_id`` (D14).
+    activate_tab — focus a tab and persist ``active_target_id``.
     browser_autoclose_enabled — read ``SEVN_BROWSER_AUTOCLOSE`` (default keep-alive).
     browser_page — async context manager yielding a Playwright ``Page``.
-    close_tab — close one tab; refuses the last tab (D14).
-    connected_tab_session — async context manager yielding :class:`TabSessionView`.
-    list_tabs — enumerate tabs with ``target_id``, url, title, and active flag.
-    open_tab — open a URL in a new tab; optionally activate (D14).
-    page_target_id — stable tab id (Playwright GUID or CDP /json/list fallback).
-    persist_active_target_id — update registry ``active_target_id`` for a session.
-    try_persist_active_page — best-effort registry ``active_target_id`` after navigation.
+    browser_readiness_snapshot — doctor/CLI browser readiness probe.
     cdp_list_page_targets — fetch Chrome DevTools page targets from ``/json/list``.
-    resolve_target_page — resolve explicit ``--tab`` id, registry active, or heuristic.
-    cdp_port_from_url — parse TCP port from a CDP base URL.
-    cdp_port_seed — deterministic seed port hint from ``session_id`` (D2).
-    cdp_reachable — probe ``/json/version`` on a CDP endpoint.
-    clear_registry — remove the registry file for a session.
     close_all_gateway_browsers — thin wrapper over registry reap SSOT.
     close_browser_session — kill sevn-spawned browser or skip external CDP.
     close_idle_browser_sessions — close stale sevn-spawned browsers by ``last_used_at``.
-    default_cdp_url — read ``SEVN_CDP_URL`` when set.
+    close_tab — close one tab; refuses the last tab.
+    connected_tab_session — async context manager yielding :class:`TabSessionView`.
+    list_tabs — enumerate tabs with ``target_id``, url, title, and active flag.
     merge_browser_proc_env — inject content root, profile, CDP env for skill runs.
+    open_tab — open a URL in a new tab; optionally activate.
+    page_target_id — stable tab id (Playwright GUID or CDP /json/list fallback).
+    persist_active_target_id — update registry ``active_target_id`` for a session.
     pick_work_page — choose a tab; prefer registry ``active_target_id``.
-    read_devtools_active_port — read Chrome ``DevToolsActivePort`` line 1 (optional freshness).
-    read_registry — load registry JSON for a session.
-    registry_path — path to ``.sevn/browser-sessions/<session_id>.json``.
-    resolve_browser_engine — read ``skills.browser.engine`` / ``SEVN_BROWSER_ENGINE``.
-    resolve_browser_extra_args — parse ``SEVN_BROWSER_EXTRA_ARGS`` spawn flags.
-    is_brave_executable — detect Brave from a resolved binary path.
-    browser_readiness_snapshot — doctor/CLI browser readiness probe.
-    BrowserReadiness — dataclass returned by :func:`browser_readiness_snapshot`.
-    resolve_profile_dir — session-scoped persistent profile directory.
-    resolve_browser_headless — headed default on host unless config/binary absent (D13).
-    resolve_idle_close_seconds — read ``skills.browser.idle_close_seconds`` (D8).
-    resolve_cdp_url — operator CDP override, else registry, else seed hint URL.
-    resolve_chrome_executable — locate Chrome, Chromium, or Brave binary.
+    resolve_idle_close_seconds — read ``skills.browser.idle_close_seconds``.
+    resolve_target_page — resolve explicit ``--tab`` id, registry active, or heuristic.
     restart_browser_session — close then spawn and wait for CDP.
     session_status_payload — unified JSON status dict for lifecycle scripts.
-    spawn_chrome — Popen-only Chrome launch (``--remote-debugging-port=0``); callers
-        must discover a live CDP URL via :func:`sevn.browser.lifecycle.await_cdp_after_spawn`
-        (never trust a seed / ``:0`` URL).
+    try_persist_active_page — best-effort registry ``active_target_id`` after navigation.
     wait_for_page_ready — post-navigation load + best-effort network idle.
-    write_registry — atomic JSON write for a session registry row.
+
+    Thin re-exports from :mod:`sevn.browser.registry` / :mod:`sevn.browser.chrome`
+    remain in ``__all__`` for backward-compatible skill imports.
 """
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
-import hashlib
 import json
 import os
-import shutil
 import sqlite3
 import subprocess  # nosec B404
-import sys
-import tempfile
-import time
 import urllib.error
 import urllib.request
 from collections.abc import AsyncIterator
@@ -75,6 +53,34 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlparse
 
+from sevn.browser.chrome import (
+    cdp_port_from_url,
+    cdp_port_seed,
+    cdp_reachable,
+    default_cdp_url,
+    is_brave_executable,
+    read_devtools_active_port,
+    resolve_browser_engine,
+    resolve_browser_extra_args,
+    resolve_browser_headless,
+    resolve_cdp_url,
+    resolve_chrome_executable,
+    resolve_profile_dir,
+    spawn_chrome,
+)
+from sevn.browser.registry import (
+    DEFAULT_SESSION_ID as _DEFAULT_SESSION_ID,
+)
+from sevn.browser.registry import (
+    BrowserSessionRegistry,
+    clear_registry,
+    read_registry,
+    registry_path,
+    write_registry,
+)
+from sevn.browser.registry import (
+    normalise_session_id as _normalise_session_id,
+)
 from sevn.config.workspace_config import WorkspaceConfig
 
 if TYPE_CHECKING:
@@ -85,25 +91,9 @@ BROWSER_SKILL_IDS: Final[frozenset[str]] = frozenset(
 )
 EXTERNAL_CDP: Final[str] = "EXTERNAL_CDP"
 IDENTITY_MISMATCH: Final[str] = "IDENTITY_MISMATCH"
-_DEFAULT_SESSION_ID: Final[str] = "default"
-_PROFILE_ENV: Final[str] = "SEVN_BROWSER_PROFILE_DIR"
 _CONTENT_ROOT_ENV: Final[str] = "SEVN_CONTENT_ROOT"
 _SESSION_ID_ENV: Final[str] = "SEVN_SESSION_ID"
-
-
-@dataclass(frozen=True)
-class BrowserSessionRegistry:
-    """Persisted browser session metadata under ``.sevn/browser-sessions/`` (D3)."""
-
-    pid: int | None
-    cdp_url: str
-    cdp_port: int
-    profile_dir: str
-    headless: bool
-    spawned_by_sevn: bool
-    last_used_at: str
-    active_target_id: str | None = None
-    headless_persistent: bool = False
+_PROFILE_ENV: Final[str] = "SEVN_BROWSER_PROFILE_DIR"
 
 
 @dataclass(frozen=True)
@@ -188,390 +178,6 @@ class TabSessionView:
             self.browser.contexts[0] if self.browser.contexts else await self.browser.new_context()
         )
         return await ctx.new_page()
-
-
-def _normalise_session_id(session_id: str | None) -> str:
-    """Return a filesystem-safe session id segment (D1 fallback ``default``).
-
-    Args:
-        session_id (str | None): Gateway session id or ``None``.
-
-    Returns:
-        str: Non-empty session key.
-
-    Examples:
-        >>> _normalise_session_id("")
-        'default'
-        >>> _normalise_session_id("web:abc")
-        'web:abc'
-    """
-    text = (session_id or "").strip()
-    return text or _DEFAULT_SESSION_ID
-
-
-def _registry_dir(content_root: Path) -> Path:
-    """Return ``<content_root>/.sevn/browser-sessions`` directory path.
-
-    Args:
-        content_root (Path): Workspace content root.
-
-    Returns:
-        Path: Registry directory (may not exist yet).
-
-    Examples:
-        >>> import tempfile
-        >>> d = _registry_dir(Path(tempfile.mkdtemp()))
-        >>> d.name
-        'browser-sessions'
-    """
-    return content_root / ".sevn" / "browser-sessions"
-
-
-def registry_path(content_root: Path, session_id: str) -> Path:
-    """Return the registry JSON path for ``session_id``.
-
-    Args:
-        content_root (Path): Workspace content root.
-        session_id (str): Gateway session id.
-
-    Returns:
-        Path: ``.sevn/browser-sessions/<session_id>.json``.
-
-    Examples:
-        >>> import tempfile
-        >>> p = registry_path(Path(tempfile.mkdtemp()), "s1")
-        >>> p.suffix
-        '.json'
-    """
-    sid = _normalise_session_id(session_id)
-    return _registry_dir(content_root) / f"{sid}.json"
-
-
-def _atomic_write_json(path: Path, payload: dict[str, object]) -> None:
-    """Write JSON via temp file + ``os.replace``.
-
-    Args:
-        path (Path): Destination file path.
-        payload (dict[str, object]): Serializable registry payload.
-
-    Returns:
-        None
-
-    Examples:
-        >>> import tempfile
-        >>> p = Path(tempfile.mkdtemp()) / "reg.json"
-        >>> _atomic_write_json(p, {"cdp_url": "http://127.0.0.1:9222"})
-        >>> json.loads(p.read_text(encoding="utf-8"))["cdp_url"]
-        'http://127.0.0.1:9222'
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(
-        dir=path.parent,
-        prefix=".browser-session-",
-        suffix=".tmp",
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(payload, fh, indent=2, sort_keys=True)
-            fh.write("\n")
-        os.replace(tmp_name, path)
-    except OSError:
-        with contextlib.suppress(OSError):
-            os.unlink(tmp_name)
-        raise
-
-
-def _registry_from_dict(data: dict[str, object]) -> BrowserSessionRegistry:
-    """Coerce a decoded JSON dict into :class:`BrowserSessionRegistry`.
-
-    Args:
-        data (dict[str, object]): Raw registry JSON object.
-
-    Returns:
-        BrowserSessionRegistry: Parsed row.
-
-    Examples:
-        >>> row = _registry_from_dict({"cdp_url": "http://127.0.0.1:1", "cdp_port": 1,
-        ...     "profile_dir": "/p", "headless": False, "spawned_by_sevn": True,
-        ...     "last_used_at": "2026-01-01T00:00:00+00:00"})
-        >>> row.cdp_port
-        1
-    """
-    pid_raw = data.get("pid")
-    pid = int(pid_raw) if isinstance(pid_raw, int) else None
-    port_raw = data.get("cdp_port", 0)
-    cdp_port = int(port_raw) if isinstance(port_raw, int) else 0
-    active = data.get("active_target_id")
-    active_target_id = active if isinstance(active, str) and active.strip() else None
-    return BrowserSessionRegistry(
-        pid=pid,
-        cdp_url=str(data.get("cdp_url", "")),
-        cdp_port=cdp_port,
-        profile_dir=str(data.get("profile_dir", "")),
-        headless=bool(data.get("headless", False)),
-        spawned_by_sevn=bool(data.get("spawned_by_sevn", False)),
-        last_used_at=str(data.get("last_used_at", "")),
-        active_target_id=active_target_id,
-        headless_persistent=bool(data.get("headless_persistent", False)),
-    )
-
-
-def read_registry(content_root: Path, session_id: str) -> BrowserSessionRegistry | None:
-    """Load registry JSON for ``session_id`` when present.
-
-    Args:
-        content_root (Path): Workspace content root.
-        session_id (str): Gateway session id.
-
-    Returns:
-        BrowserSessionRegistry | None: Parsed row or ``None`` when missing.
-
-    Examples:
-        >>> import tempfile
-        >>> root = Path(tempfile.mkdtemp())
-        >>> read_registry(root, "missing") is None
-        True
-    """
-    path = registry_path(content_root, session_id)
-    if not path.is_file():
-        return None
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    if not isinstance(data, dict):
-        return None
-    return _registry_from_dict(data)
-
-
-def write_registry(content_root: Path, session_id: str, row: BrowserSessionRegistry) -> None:
-    """Atomically persist registry JSON for ``session_id``.
-
-    Args:
-        content_root (Path): Workspace content root.
-        session_id (str): Gateway session id.
-        row (BrowserSessionRegistry): Registry payload.
-
-    Returns:
-        None
-
-    Examples:
-        >>> import tempfile
-        >>> from datetime import UTC, datetime
-        >>> root = Path(tempfile.mkdtemp())
-        >>> row = BrowserSessionRegistry(
-        ...     pid=1, cdp_url="http://127.0.0.1:9333", cdp_port=9333,
-        ...     profile_dir="/tmp/p", headless=False, spawned_by_sevn=True,
-        ...     last_used_at=datetime.now(tz=UTC).isoformat(),
-        ... )
-        >>> write_registry(root, "s1", row)
-        >>> read_registry(root, "s1") is not None
-        True
-    """
-    path = registry_path(content_root, session_id)
-    payload: dict[str, object] = dict(asdict(row))
-    _atomic_write_json(path, payload)
-
-
-def clear_registry(content_root: Path, session_id: str) -> None:
-    """Remove the registry file for ``session_id`` when it exists.
-
-    Args:
-        content_root (Path): Workspace content root.
-        session_id (str): Gateway session id.
-
-    Returns:
-        None
-
-    Examples:
-        >>> import tempfile
-        >>> from datetime import UTC, datetime
-        >>> root = Path(tempfile.mkdtemp())
-        >>> row = BrowserSessionRegistry(
-        ...     pid=None, cdp_url="", cdp_port=0, profile_dir="/p",
-        ...     headless=False, spawned_by_sevn=False,
-        ...     last_used_at=datetime.now(tz=UTC).isoformat(),
-        ... )
-        >>> write_registry(root, "s1", row)
-        >>> clear_registry(root, "s1")
-        >>> read_registry(root, "s1") is None
-        True
-    """
-    path = registry_path(content_root, session_id)
-    with contextlib.suppress(OSError):
-        path.unlink()
-
-
-def _read_profile_from_cfg(cfg: WorkspaceConfig | None, key: str) -> Path | None:
-    """Read ``skills.<key>.profile_dir`` when configured.
-
-    Args:
-        cfg (WorkspaceConfig | None): Parsed workspace config.
-        key (str): Skills subtree key (for example ``browser``).
-
-    Returns:
-        Path | None: Configured profile path or ``None``.
-
-    Examples:
-        >>> _read_profile_from_cfg(None, "browser") is None
-        True
-    """
-    if cfg is None or not isinstance(cfg.skills, dict):
-        return None
-    block = cfg.skills.get(key)
-    if isinstance(block, dict):
-        raw = block.get("profile_dir")
-        if isinstance(raw, str) and raw.strip():
-            return Path(raw.strip()).expanduser()
-    return None
-
-
-def resolve_profile_dir(
-    content_root: Path,
-    session_id: str,
-    cfg: WorkspaceConfig | None = None,
-) -> Path:
-    """Resolve the persistent Chrome profile directory for a gateway session (D1).
-
-    Precedence: ``SEVN_BROWSER_PROFILE_DIR`` → ``skills.browser.profile_dir`` →
-    ``skills.social_browser.profile_dir`` →
-    ``<content_root>/.sevn/browser-profiles/<session_id|default>``.
-
-    Args:
-        content_root (Path): Workspace content root (not shadow workspace).
-        session_id (str): Gateway session id.
-        cfg (WorkspaceConfig | None): Optional workspace config overrides.
-
-    Returns:
-        Path: Absolute profile directory (may not exist yet).
-
-    Examples:
-        >>> import tempfile
-        >>> root = Path(tempfile.mkdtemp())
-        >>> resolve_profile_dir(root, "conv-1").name
-        'conv-1'
-    """
-    env_raw = os.environ.get(_PROFILE_ENV, "").strip()
-    if env_raw:
-        return Path(env_raw).expanduser().resolve()
-    from_cfg = _read_profile_from_cfg(cfg, "browser")
-    if from_cfg is None:
-        from_cfg = _read_profile_from_cfg(cfg, "social_browser")
-    if from_cfg is not None:
-        return from_cfg.expanduser().resolve()
-    sid = _normalise_session_id(session_id)
-    return (content_root / ".sevn" / "browser-profiles" / sid).resolve()
-
-
-def cdp_port_seed(session_id: str) -> int:
-    """Return a deterministic CDP port seed hint from ``session_id`` (D2).
-
-    Args:
-        session_id (str): Gateway session id.
-
-    Returns:
-        int: Port in ``9300..9399`` range.
-
-    Examples:
-        >>> cdp_port_seed("session-a") == cdp_port_seed("session-a")
-        True
-        >>> 9300 <= cdp_port_seed("session-a") <= 9399
-        True
-    """
-    sid = _normalise_session_id(session_id)
-    digest = hashlib.sha256(sid.encode()).hexdigest()
-    return 9300 + (int(digest[:4], 16) % 100)
-
-
-def default_cdp_url() -> str | None:
-    """Return operator ``SEVN_CDP_URL`` when set (D6 attach-only override).
-
-    Returns:
-        str | None: Normalised CDP base URL or ``None`` when unset.
-
-    Examples:
-        >>> default_cdp_url() is None or default_cdp_url().startswith("http")
-        True
-    """
-    raw = os.environ.get("SEVN_CDP_URL", "").strip()
-    return raw.rstrip("/") if raw else None
-
-
-def cdp_port_from_url(url: str) -> int:
-    """Parse the TCP port embedded in a CDP URL.
-
-    Args:
-        url (str): CDP base URL.
-
-    Returns:
-        int: Explicit port or default ``9222``.
-
-    Examples:
-        >>> cdp_port_from_url("http://127.0.0.1:9333")
-        9333
-    """
-    parsed = urlparse(url)
-    if parsed.port is not None:
-        return parsed.port
-    return 9222
-
-
-def resolve_cdp_url(
-    content_root: Path,
-    session_id: str,
-    cfg: WorkspaceConfig | None = None,
-) -> str:
-    """Resolve the effective CDP URL for a session (D2/D6).
-
-    Operator ``SEVN_CDP_URL`` wins. Otherwise use the registry ``cdp_url`` when
-    present. When neither applies, return a seed-hint URL for legacy attach attempts.
-
-    Args:
-        content_root (Path): Workspace content root.
-        session_id (str): Gateway session id.
-        cfg (WorkspaceConfig | None): Unused today; reserved for future config keys.
-
-    Returns:
-        str: CDP base URL (may not be reachable until spawn completes).
-
-    Examples:
-        >>> import tempfile
-        >>> root = Path(tempfile.mkdtemp())
-        >>> url = resolve_cdp_url(root, "sess-1")
-        >>> url.startswith("http://127.0.0.1:")
-        True
-    """
-    _ = cfg
-    operator = default_cdp_url()
-    if operator:
-        return operator
-    row = read_registry(content_root, session_id)
-    if row is not None and row.cdp_url.strip():
-        return row.cdp_url.rstrip("/")
-    port = cdp_port_seed(session_id)
-    return f"http://127.0.0.1:{port}"
-
-
-def cdp_reachable(url: str, *, timeout: float = 2.0) -> bool:
-    """Return whether the CDP HTTP endpoint responds.
-
-    Args:
-        url (str): CDP base URL.
-        timeout (float): Probe timeout in seconds.
-
-    Returns:
-        bool: ``True`` when ``/json/version`` returns HTTP 200.
-
-    Examples:
-        >>> cdp_reachable("http://127.0.0.1:1")
-        False
-    """
-    try:
-        ver = f"{url.rstrip('/')}/json/version"
-        with urllib.request.urlopen(ver, timeout=timeout) as response:  # nosec B310
-            return int(response.getcode()) == 200
-    except (urllib.error.URLError, OSError, ValueError):
-        return False
 
 
 def cdp_list_page_targets(cdp_url: str, *, timeout: float = 2.0) -> list[dict[str, Any]]:
@@ -690,230 +296,6 @@ def _match_cdp_target_for_page(
     return None
 
 
-_BROWSER_ENGINE_VALUES: Final[frozenset[str]] = frozenset({"auto", "chrome", "chromium", "brave"})
-_CHROME_PATH_NAMES: Final[tuple[str, ...]] = ("google-chrome-stable", "google-chrome", "chrome")
-_CHROMIUM_PATH_NAMES: Final[tuple[str, ...]] = ("chromium", "chromium-browser")
-_BRAVE_PATH_NAMES: Final[tuple[str, ...]] = ("brave-browser", "brave")
-
-
-def resolve_browser_engine(cfg: WorkspaceConfig | None = None) -> str:
-    """Return configured browser engine preference (``skills.browser.engine`` or env).
-
-    Args:
-        cfg (WorkspaceConfig | None): Workspace config.
-
-    Returns:
-        str: One of ``auto``, ``chrome``, ``chromium``, ``brave``.
-
-    Examples:
-        >>> resolve_browser_engine(None)
-        'auto'
-    """
-    env = (os.environ.get("SEVN_BROWSER_ENGINE") or "").strip().lower()
-    if env in _BROWSER_ENGINE_VALUES:
-        return env
-    if cfg is not None and isinstance(cfg.skills, dict):
-        block = cfg.skills.get("browser")
-        if isinstance(block, dict):
-            raw = block.get("engine")
-            if isinstance(raw, str):
-                engine = raw.strip().lower()
-                if engine in _BROWSER_ENGINE_VALUES:
-                    return engine
-    return "auto"
-
-
-def _first_existing_file(candidates: tuple[str, ...]) -> str | None:
-    """Return the first path in ``candidates`` that exists as a regular file.
-
-    Args:
-        candidates (tuple[str, ...]): Absolute or relative executable paths.
-
-    Returns:
-        str | None: First existing file path.
-
-    Examples:
-        >>> _first_existing_file(()) is None
-        True
-    """
-    for candidate in candidates:
-        if Path(candidate).is_file():
-            return candidate
-    return None
-
-
-def _first_on_path(names: tuple[str, ...]) -> str | None:
-    """Return the first name in ``names`` found on ``PATH`` via :func:`shutil.which`.
-
-    Args:
-        names (tuple[str, ...]): Binary names to probe.
-
-    Returns:
-        str | None: Resolved executable path when found.
-
-    Examples:
-        >>> _first_on_path(("definitely-not-a-real-binary-name-xyz",)) is None
-        True
-    """
-    for name in names:
-        found = shutil.which(name)
-        if found:
-            return found
-    return None
-
-
-def _chrome_app_candidates() -> tuple[str, ...]:
-    """Platform-specific Google Chrome install paths (not Chromium-only).
-
-    Returns:
-        tuple[str, ...]: Candidate paths for the current platform.
-
-    Examples:
-        >>> isinstance(_chrome_app_candidates(), tuple)
-        True
-    """
-    if sys.platform == "darwin":
-        return (
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            "/Applications/Chromium.app/Contents/MacOS/Chromium",
-        )
-    if sys.platform == "win32":
-        pf = os.environ.get("ProgramFiles", r"C:\Program Files")  # noqa: SIM112
-        pfx86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")  # noqa: SIM112
-        return (
-            str(Path(pf) / "Google" / "Chrome" / "Application" / "chrome.exe"),
-            str(Path(pfx86) / "Google" / "Chrome" / "Application" / "chrome.exe"),
-        )
-    return ()
-
-
-def _chromium_app_candidates() -> tuple[str, ...]:
-    """Platform-specific Chromium-only install paths.
-
-    Returns:
-        tuple[str, ...]: Candidate paths for the current platform.
-
-    Examples:
-        >>> isinstance(_chromium_app_candidates(), tuple)
-        True
-    """
-    if sys.platform == "darwin":
-        return ("/Applications/Chromium.app/Contents/MacOS/Chromium",)
-    return ()
-
-
-def _brave_app_candidates() -> tuple[str, ...]:
-    """Platform-specific Brave install paths.
-
-    Returns:
-        tuple[str, ...]: Candidate paths for the current platform.
-
-    Examples:
-        >>> isinstance(_brave_app_candidates(), tuple)
-        True
-    """
-    if sys.platform == "darwin":
-        return ("/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",)
-    if sys.platform == "win32":
-        pf = os.environ.get("ProgramFiles", r"C:\Program Files")  # noqa: SIM112
-        pfx86 = os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")  # noqa: SIM112
-        return (
-            str(Path(pf) / "BraveSoftware" / "Brave-Browser" / "Application" / "brave.exe"),
-            str(Path(pfx86) / "BraveSoftware" / "Brave-Browser" / "Application" / "brave.exe"),
-        )
-    return ()
-
-
-def _resolve_chrome_family(engine: str) -> str | None:
-    """Resolve a binary for ``engine`` (``auto``, ``chrome``, ``chromium``, ``brave``).
-
-    Args:
-        engine (str): Browser engine preference.
-
-    Returns:
-        str | None: Executable path when found.
-
-    Examples:
-        >>> _resolve_chrome_family("brave") is None or True
-        True
-    """
-    if engine == "chrome":
-        return _first_existing_file(_chrome_app_candidates()) or _first_on_path(_CHROME_PATH_NAMES)
-    if engine == "chromium":
-        return _first_existing_file(_chromium_app_candidates()) or _first_on_path(
-            _CHROMIUM_PATH_NAMES
-        )
-    if engine == "brave":
-        return _first_existing_file(_brave_app_candidates()) or _first_on_path(_BRAVE_PATH_NAMES)
-    chrome = _first_existing_file(_chrome_app_candidates()) or _first_on_path(
-        _CHROME_PATH_NAMES + _CHROMIUM_PATH_NAMES,
-    )
-    if chrome:
-        return chrome
-    return _first_existing_file(_brave_app_candidates()) or _first_on_path(_BRAVE_PATH_NAMES)
-
-
-def resolve_chrome_executable(cfg: WorkspaceConfig | None = None) -> str | None:
-    """Locate a Chrome, Chromium, or Brave binary on the host.
-
-    Precedence: ``SEVN_CHROME_EXECUTABLE`` env, then ``skills.browser.engine`` /
-    ``SEVN_BROWSER_ENGINE`` (``auto`` prefers Chrome/Chromium before Brave).
-
-    Args:
-        cfg (WorkspaceConfig | None): Workspace config for engine preference.
-
-    Returns:
-        str | None: Executable path when found.
-
-    Examples:
-        >>> isinstance(resolve_chrome_executable(), str) or resolve_chrome_executable() is None
-        True
-    """
-    env = (os.environ.get("SEVN_CHROME_EXECUTABLE") or "").strip()
-    if env and Path(env).is_file():
-        return env
-    engine = resolve_browser_engine(cfg)
-    return _resolve_chrome_family(engine)
-
-
-def is_brave_executable(path: str) -> bool:
-    """Return whether ``path`` points at a Brave browser binary.
-
-    Args:
-        path (str): Resolved executable path.
-
-    Returns:
-        bool: True when the basename or install path indicates Brave.
-
-    Examples:
-        >>> is_brave_executable("/usr/bin/brave-browser")
-        True
-        >>> is_brave_executable("/usr/bin/google-chrome-stable")
-        False
-    """
-    lowered = path.replace("\\", "/").lower()
-    base = Path(path).name.lower()
-    if base in {"brave-browser", "brave", "brave.exe"}:
-        return True
-    return "/brave.com/" in lowered or "/bravesoftware/" in lowered
-
-
-def resolve_browser_extra_args() -> list[str]:
-    """Parse ``SEVN_BROWSER_EXTRA_ARGS`` (space-separated spawn flags).
-
-    Returns:
-        list[str]: Extra CLI args appended when spawning Chrome-compatible browsers.
-
-    Examples:
-        >>> resolve_browser_extra_args()
-        []
-    """
-    raw = (os.environ.get("SEVN_BROWSER_EXTRA_ARGS") or "").strip()
-    if not raw:
-        return []
-    return raw.split()
-
-
 @dataclass(frozen=True, slots=True)
 class BrowserReadiness:
     """Snapshot of browser binary resolution and CDP reachability for doctor probes."""
@@ -962,41 +344,6 @@ def browser_readiness_snapshot(
     )
 
 
-def resolve_browser_headless(cfg: WorkspaceConfig | None = None) -> bool:
-    """Return whether new browser spawns should be headless (D13).
-
-    Headed on host when Chrome exists unless ``skills.browser.headless`` is true.
-    ``SEVN_BROWSER_HEADLESS`` wins over config when set. When no Chrome binary
-    exists, headless is forced for Playwright fallback paths.
-
-    Args:
-        cfg (WorkspaceConfig | None): Workspace config.
-
-    Returns:
-        bool: ``True`` when spawns should use ``--headless=new``.
-
-    Examples:
-        >>> resolve_browser_headless(None) in (True, False)
-        True
-    """
-    if resolve_chrome_executable(cfg) is None:
-        return True
-    env = os.environ.get("SEVN_BROWSER_HEADLESS", "").strip().lower()
-    if env in {"1", "true", "yes", "on"}:
-        return True
-    if env in {"0", "false", "no", "off"}:
-        return False
-    if cfg is not None and isinstance(cfg.skills, dict):
-        block = cfg.skills.get("browser")
-        if isinstance(block, dict):
-            raw = block.get("headless")
-            if isinstance(raw, bool):
-                return raw
-            if isinstance(raw, str) and raw.strip().lower() in {"1", "true", "yes", "on"}:
-                return True
-    return False
-
-
 def resolve_idle_close_seconds(cfg: WorkspaceConfig | None = None) -> int:
     """Return configured browser idle-close TTL in seconds (D8).
 
@@ -1025,132 +372,6 @@ def resolve_idle_close_seconds(cfg: WorkspaceConfig | None = None) -> int:
     if isinstance(raw, str) and raw.strip().isdigit():
         return max(0, int(raw.strip()))
     return 0
-
-
-def read_devtools_active_port(
-    profile_dir: Path,
-    *,
-    timeout: float | None = None,
-    spawned_after: float | None = None,
-) -> int | None:
-    """Read Chrome's chosen debugging port from ``DevToolsActivePort`` (D2).
-
-    When ``spawned_after`` is set, only accept a port file whose mtime is
-    strictly later than that unix timestamp (a stale file from a prior Chrome
-    is ignored). Callers that need to wait for a fresh write should poll this
-    helper inside their own wait window (or pass an explicit ``timeout``).
-
-    Args:
-        profile_dir (Path): Chrome ``user-data-dir``.
-        timeout (float | None): Maximum seconds to wait. Defaults to ``15.0``
-            when ``spawned_after`` is omitted, or ``0.0`` (single check) when
-            freshness is requested so callers own the adaptive wait loop.
-        spawned_after (float | None): Unix mtime lower bound for freshness.
-
-    Returns:
-        int | None: Port number from line 1, or ``None`` on timeout / stale.
-
-    Examples:
-        >>> import tempfile
-        >>> d = Path(tempfile.mkdtemp())
-        >>> read_devtools_active_port(d, timeout=0.05) is None
-        True
-    """
-    wait_s = (
-        15.0 if timeout is None and spawned_after is None else (0.0 if timeout is None else timeout)
-    )
-    port_file = profile_dir / "DevToolsActivePort"
-    deadline = time.monotonic() + wait_s
-    while True:
-        if port_file.is_file():
-            try:
-                if spawned_after is not None and port_file.stat().st_mtime <= spawned_after:
-                    pass
-                else:
-                    lines = port_file.read_text(encoding="utf-8").splitlines()
-                    if lines:
-                        return int(lines[0].strip())
-            except (OSError, ValueError):
-                pass
-        if time.monotonic() >= deadline:
-            return None
-        time.sleep(0.05)
-
-
-def spawn_chrome(
-    profile_dir: Path,
-    *,
-    headless: bool = False,
-    seed_port: int | None = None,
-    cfg: WorkspaceConfig | None = None,
-    session_id: str | None = None,
-    log_dir: Path | None = None,
-) -> subprocess.Popen[bytes]:
-    """Spawn detached Chrome with ``--remote-debugging-port=0`` (Popen only).
-
-    Does **not** wait for ``DevToolsActivePort`` and never returns a seed / ``:0``
-    CDP URL. Callers must use :func:`sevn.browser.lifecycle.await_cdp_after_spawn`
-    (or :func:`sevn.browser.lifecycle.spawn_or_attach`) before attaching.
-
-    When ``session_id`` and ``log_dir`` are provided, Chrome stdout/stderr are
-    redirected to ``log_dir/chrome-<session_id>.log`` (D4) instead of ``DEVNULL``.
-
-    Args:
-        profile_dir (Path): Persistent ``user-data-dir``.
-        headless (bool): When ``True``, pass ``--headless=new``.
-        seed_port (int | None): Unused (kept for call-site compatibility).
-        cfg (WorkspaceConfig | None): Workspace config for ``skills.browser.engine``.
-        session_id (str | None): Gateway session id for the Chrome log filename.
-        log_dir (Path | None): Directory for ``chrome-<session>.log`` (D4).
-
-    Returns:
-        subprocess.Popen[bytes]: Detached Chrome process handle.
-
-    Raises:
-        RuntimeError: When Chrome is missing.
-
-    Examples:
-        >>> import inspect
-        >>> inspect.isfunction(spawn_chrome)
-        True
-    """
-    _ = seed_port  # port discovery is owned by await_cdp_after_spawn / spawn_or_attach
-    exe = resolve_chrome_executable(cfg)
-    if not exe:
-        msg = "Chrome executable not found"
-        raise RuntimeError(msg)
-    profile_dir.mkdir(parents=True, exist_ok=True)
-    args = [
-        exe,
-        "--remote-debugging-port=0",
-        f"--user-data-dir={profile_dir}",
-        "--no-first-run",
-        "--no-default-browser-check",
-        *resolve_browser_extra_args(),
-    ]
-    if headless:
-        args.append("--headless=new")
-    log_handle = None
-    stdout_dest: Any = subprocess.DEVNULL
-    stderr_dest: Any = subprocess.DEVNULL
-    sid = (session_id or "").strip()
-    if sid and log_dir is not None:
-        log_dir.mkdir(parents=True, exist_ok=True)
-        log_path = log_dir / f"chrome-{sid}.log"
-        log_handle = log_path.open("ab")
-        stdout_dest = log_handle
-        stderr_dest = log_handle
-    try:
-        return subprocess.Popen(  # nosec B603
-            args,
-            stdout=stdout_dest,
-            stderr=stderr_dest,
-            stdin=subprocess.DEVNULL,
-        )
-    finally:
-        if log_handle is not None:
-            with contextlib.suppress(OSError):
-                log_handle.close()
 
 
 def browser_autoclose_enabled() -> bool:
@@ -1861,7 +1082,7 @@ def close_idle_browser_sessions(
     """
     if idle_seconds <= 0:
         return 0
-    reg_dir = _registry_dir(content_root)
+    reg_dir = content_root / ".sevn" / "browser-sessions"
     if not reg_dir.is_dir():
         return 0
     now = datetime.now(tz=UTC)
@@ -2162,21 +1383,13 @@ async def _release_session_browser_resources(
         >>> inspect.iscoroutinefunction(_release_session_browser_resources)
         True
     """
+    _ = (chrome_proc, we_spawned_chrome)  # lifecycle owns Chrome; never kill here
     if launched_headless_fallback and persistent_context is not None:
         if browser_autoclose_enabled():
             with contextlib.suppress(Exception):
                 await persistent_context.close()
     elif browser is not None and not launched_headless_fallback:
         pass
-    if (
-        we_spawned_chrome
-        and browser_autoclose_enabled()
-        and chrome_proc is not None
-        and chrome_proc.poll() is None
-    ):
-        chrome_proc.terminate()
-        with contextlib.suppress(subprocess.TimeoutExpired):
-            chrome_proc.wait(timeout=8)
     with contextlib.suppress(Exception):
         if playwright is not None:
             await playwright.stop()

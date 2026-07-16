@@ -16,8 +16,15 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from sevn.browser import lifecycle
+from sevn.browser import chrome, lifecycle
 from sevn.skills import browser_session as bs
+
+
+def _patch_chrome(monkeypatch: pytest.MonkeyPatch, name: str, value: object) -> None:
+    """Patch the canonical chrome symbol and the skills re-export."""
+    monkeypatch.setattr(chrome, name, value)
+    if hasattr(bs, name):
+        monkeypatch.setattr(bs, name, value)
 
 
 def _profile_with_locks(profile_dir: Path, *, port: int = 52377) -> None:
@@ -86,21 +93,20 @@ async def test_d1_reap_clears_locks_for_sevn_pid_only(
         profile: Path,
         *,
         headless: bool = False,
-        seed_port: int | None = None,
         cfg: object = None,
         session_id: str | None = None,
         log_dir: Path | None = None,
     ) -> MagicMock:
-        _ = (session_id, log_dir, headless, seed_port, cfg)
+        _ = (session_id, log_dir, headless, cfg)
         spawn_calls.append(profile)
         proc = MagicMock()
         proc.pid = 999001
         proc.poll.return_value = None
         return proc
 
-    monkeypatch.setattr(bs, "spawn_chrome", _fake_spawn)
-    monkeypatch.setattr(bs, "read_devtools_active_port", lambda *_a, **_k: 59999)
-    monkeypatch.setattr(bs, "cdp_reachable", lambda _url: True)
+    _patch_chrome(monkeypatch, "spawn_chrome", _fake_spawn)
+    _patch_chrome(monkeypatch, "read_devtools_active_port", lambda *_a, **_k: 59999)
+    _patch_chrome(monkeypatch, "cdp_reachable", lambda _url: True)
 
     async def _attach(cls, url: str) -> MagicMock:
         return MagicMock(cdp_url=url)
@@ -191,10 +197,10 @@ async def test_d3_failed_spawn_terminates_waits_and_retries_once(
         proc.wait.side_effect = _wait
         return proc
 
-    monkeypatch.setattr(bs, "spawn_chrome", _fake_spawn)
-    monkeypatch.setattr(bs, "read_devtools_active_port", lambda *_a, **_k: 50001)
-    monkeypatch.setattr(bs, "cdp_reachable", lambda _url: False)
-    monkeypatch.setattr(bs, "resolve_cdp_url", lambda *_a, **_k: "http://127.0.0.1:1")
+    _patch_chrome(monkeypatch, "spawn_chrome", _fake_spawn)
+    _patch_chrome(monkeypatch, "read_devtools_active_port", lambda *_a, **_k: 50001)
+    _patch_chrome(monkeypatch, "cdp_reachable", lambda _url: False)
+    _patch_chrome(monkeypatch, "resolve_cdp_url", lambda *_a, **_k: "http://127.0.0.1:1")
 
     with pytest.raises(RuntimeError, match=r"NO_CDP|CDP not reachable|not reachable"):
         await lifecycle.spawn_or_attach(content_root, session_id)
@@ -229,10 +235,12 @@ def test_d4_spawn_chrome_redirects_stderr_to_session_log(
         def wait(self, timeout: float | None = None) -> int:
             return 0
 
-    monkeypatch.setattr(bs.subprocess, "Popen", _FakePopen)
-    monkeypatch.setattr(bs, "resolve_chrome_executable", lambda _cfg=None: "/usr/bin/google-chrome")
-    monkeypatch.setattr(bs, "resolve_browser_extra_args", list)
-    monkeypatch.setattr(bs, "read_devtools_active_port", lambda *_a, **_k: 59999)
+    monkeypatch.setattr(chrome.subprocess, "Popen", _FakePopen)
+    _patch_chrome(
+        monkeypatch, "resolve_chrome_executable", lambda _cfg=None: "/usr/bin/google-chrome"
+    )
+    _patch_chrome(monkeypatch, "resolve_browser_extra_args", list)
+    _patch_chrome(monkeypatch, "read_devtools_active_port", lambda *_a, **_k: 59999)
 
     try:
         bs.spawn_chrome(
@@ -246,7 +254,7 @@ def test_d4_spawn_chrome_redirects_stderr_to_session_log(
 
     stderr = captured.get("stderr")
     assert stderr is not None
-    assert stderr is not bs.subprocess.DEVNULL
+    assert stderr is not chrome.subprocess.DEVNULL
     log_path = logs / f"chrome-{session_id}.log"
     assert log_path.exists() or (
         hasattr(stderr, "name") and "chrome-" in str(getattr(stderr, "name", ""))
@@ -270,14 +278,14 @@ async def test_d4_no_cdp_error_includes_chrome_log_path_or_tail(
     proc.poll.return_value = None
     proc.wait.return_value = -15
 
-    monkeypatch.setattr(
-        bs,
+    _patch_chrome(
+        monkeypatch,
         "spawn_chrome",
         lambda *_a, **_k: proc,
     )
-    monkeypatch.setattr(bs, "read_devtools_active_port", lambda *_a, **_k: 51111)
-    monkeypatch.setattr(bs, "cdp_reachable", lambda _url: False)
-    monkeypatch.setattr(bs, "resolve_cdp_url", lambda *_a, **_k: "http://127.0.0.1:1")
+    _patch_chrome(monkeypatch, "read_devtools_active_port", lambda *_a, **_k: 51111)
+    _patch_chrome(monkeypatch, "cdp_reachable", lambda _url: False)
+    _patch_chrome(monkeypatch, "resolve_cdp_url", lambda *_a, **_k: "http://127.0.0.1:1")
     monkeypatch.setattr(lifecycle, "_SPAWN_CDP_WAIT_STEPS", 2)
     monkeypatch.setattr(lifecycle, "_SPAWN_CDP_WAIT_INTERVAL", 0.01)
 
@@ -308,10 +316,10 @@ async def test_d5_concurrent_spawn_or_attach_single_flights(
         proc.poll.return_value = None
         return proc
 
-    monkeypatch.setattr(bs, "spawn_chrome", _fake_spawn)
-    monkeypatch.setattr(bs, "read_devtools_active_port", lambda *_a, **_k: 59000)
-    monkeypatch.setattr(bs, "cdp_reachable", lambda _url: "59000" in _url)
-    monkeypatch.setattr(bs, "resolve_cdp_url", lambda *_a, **_k: "http://127.0.0.1:1")
+    _patch_chrome(monkeypatch, "spawn_chrome", _fake_spawn)
+    _patch_chrome(monkeypatch, "read_devtools_active_port", lambda *_a, **_k: 59000)
+    _patch_chrome(monkeypatch, "cdp_reachable", lambda _url: "59000" in _url)
+    _patch_chrome(monkeypatch, "resolve_cdp_url", lambda *_a, **_k: "http://127.0.0.1:1")
 
     async def _attach(_cls: type, url: str) -> MagicMock:
         return MagicMock(cdp_url=url)
@@ -378,10 +386,10 @@ async def test_d7_failed_spawn_writes_no_half_record(
     proc.poll.return_value = None
     proc.wait.return_value = -15
 
-    monkeypatch.setattr(bs, "spawn_chrome", lambda *_a, **_k: proc)
-    monkeypatch.setattr(bs, "read_devtools_active_port", lambda *_a, **_k: 52222)
-    monkeypatch.setattr(bs, "cdp_reachable", lambda _url: False)
-    monkeypatch.setattr(bs, "resolve_cdp_url", lambda *_a, **_k: "http://127.0.0.1:1")
+    _patch_chrome(monkeypatch, "spawn_chrome", lambda *_a, **_k: proc)
+    _patch_chrome(monkeypatch, "read_devtools_active_port", lambda *_a, **_k: 52222)
+    _patch_chrome(monkeypatch, "cdp_reachable", lambda _url: False)
+    _patch_chrome(monkeypatch, "resolve_cdp_url", lambda *_a, **_k: "http://127.0.0.1:1")
     monkeypatch.setattr(lifecycle, "_SPAWN_CDP_WAIT_STEPS", 2)
     monkeypatch.setattr(lifecycle, "_SPAWN_CDP_WAIT_INTERVAL", 0.01)
 
@@ -408,10 +416,10 @@ async def test_d7_confirmed_spawn_persists_full_record_for_resolve(
     proc.pid = 111001
     proc.poll.return_value = None
 
-    monkeypatch.setattr(bs, "spawn_chrome", lambda *_a, **_k: proc)
-    monkeypatch.setattr(bs, "read_devtools_active_port", lambda *_a, **_k: 59991)
+    _patch_chrome(monkeypatch, "spawn_chrome", lambda *_a, **_k: proc)
+    _patch_chrome(monkeypatch, "read_devtools_active_port", lambda *_a, **_k: 59991)
     # First resolve misses; after spawn, registry must win.
-    monkeypatch.setattr(bs, "cdp_reachable", lambda url: "59991" in str(url))
+    _patch_chrome(monkeypatch, "cdp_reachable", lambda url: "59991" in str(url))
 
     async def _attach(_cls: type, url: str) -> MagicMock:
         return MagicMock(cdp_url=url)
@@ -427,3 +435,31 @@ async def test_d7_confirmed_spawn_persists_full_record_for_resolve(
 
     resolved = bs.resolve_cdp_url(content_root, session_id)
     assert resolved == "http://127.0.0.1:59991"
+
+
+def test_pid_matches_rejects_prefix_profile_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Convention 11: ``…/a`` must not match a Chrome cmdline for ``…/ab``."""
+    from sevn.browser.process import pid_matches_sevn_chrome_profile
+
+    profile_a = tmp_path / "a"
+    profile_ab = tmp_path / "ab"
+    profile_a.mkdir()
+    profile_ab.mkdir()
+    cmdline_ab = (
+        f"/usr/bin/google-chrome --remote-debugging-port=0 "
+        f"--user-data-dir={profile_ab.resolve()} --headless=new"
+    )
+    monkeypatch.setattr(
+        "sevn.browser.process._read_pid_cmdline",
+        lambda _pid: cmdline_ab,
+    )
+    assert pid_matches_sevn_chrome_profile(4242, profile_a) is False
+
+    cmdline_a = cmdline_ab.replace(str(profile_ab.resolve()), str(profile_a.resolve()))
+    monkeypatch.setattr(
+        "sevn.browser.process._read_pid_cmdline",
+        lambda _pid: cmdline_a,
+    )
+    assert pid_matches_sevn_chrome_profile(4242, profile_a) is True

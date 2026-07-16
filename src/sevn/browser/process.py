@@ -23,11 +23,16 @@ Examples:
 from __future__ import annotations
 
 import contextlib
+import re
 import subprocess  # nosec B404
 from pathlib import Path
 from typing import Final
 
 from sevn.util.process import pid_is_alive, terminate_pid
+
+_USER_DATA_DIR_RE: Final[re.Pattern[str]] = re.compile(
+    r"(?:^|\s)--user-data-dir=([^\s]+)",
+)
 
 _PROFILE_LOCK_FILES: Final[tuple[str, ...]] = (
     "SingletonLock",
@@ -80,11 +85,32 @@ def _read_pid_cmdline(pid: int) -> str:
     return (completed.stdout or "").strip()
 
 
+def _cmdline_user_data_dir(cmdline: str) -> str | None:
+    """Return the ``--user-data-dir`` argv value from ``cmdline``, if present.
+
+    Args:
+        cmdline (str): Process command line (space-separated).
+
+    Returns:
+        str | None: Exact ``user-data-dir`` path token, or ``None``.
+
+    Examples:
+        >>> _cmdline_user_data_dir("chrome --user-data-dir=/tmp/a --headless")
+        '/tmp/a'
+        >>> _cmdline_user_data_dir("chrome --headless") is None
+        True
+    """
+    match = _USER_DATA_DIR_RE.search(cmdline)
+    return match.group(1) if match else None
+
+
 def pid_matches_sevn_chrome_profile(pid: int, profile_dir: Path) -> bool:
     """Return whether ``pid`` still looks like Chrome for ``profile_dir`` (convention 11).
 
     Fail closed: when the cmdline cannot be read, returns ``False`` so we never
-    SIGTERM/SIGKILL an unverified PID (operator Chrome / PID reuse).
+    SIGTERM/SIGKILL an unverified PID (operator Chrome / PID reuse). Matches
+    ``--user-data-dir=<profile>`` as a full argv token so prefix profiles
+    (``…/a`` vs ``…/ab``) do not cross-match.
 
     Args:
         pid (int): Candidate process id from the session registry.
@@ -109,7 +135,13 @@ def pid_matches_sevn_chrome_profile(pid: int, profile_dir: Path) -> bool:
     lowered = cmdline.lower()
     if "chrome" not in lowered and "chromium" not in lowered:
         return False
-    return needle in cmdline or f"--user-data-dir={needle}" in cmdline
+    user_data = _cmdline_user_data_dir(cmdline)
+    if user_data is None:
+        return False
+    try:
+        return Path(user_data).expanduser().resolve() == Path(needle)
+    except OSError:
+        return user_data == needle
 
 
 def clear_profile_singleton_locks(profile_dir: Path) -> None:
@@ -191,7 +223,7 @@ def reap_stale_sevn_chrome(
         >>> inspect.isfunction(reap_stale_sevn_chrome)
         True
     """
-    from sevn.skills.browser_session import read_registry
+    from sevn.browser.registry import read_registry
 
     row = read_registry(content_root, session_id)
     if (
@@ -238,7 +270,7 @@ def reap_sevn_browsers_on_shutdown(content_root: Path) -> list[int]:
         >>> reap_sevn_browsers_on_shutdown(Path(tempfile.mkdtemp()))
         []
     """
-    from sevn.skills.browser_session import clear_registry, read_registry
+    from sevn.browser.registry import clear_registry, read_registry
 
     sessions_dir = content_root / ".sevn" / "browser-sessions"
     if not sessions_dir.is_dir():

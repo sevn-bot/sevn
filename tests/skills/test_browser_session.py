@@ -266,7 +266,7 @@ async def test_session_browser_resources_spawns_without_env_cdp(
 ) -> None:
     """Fresh session without SEVN_CDP_URL env spawns Chrome instead of attach-only fail."""
     monkeypatch.delenv("SEVN_CDP_URL", raising=False)
-    spawn_calls: list[tuple[Path, bool, int | None]] = []
+    spawn_calls: list[tuple[Path, bool]] = []
     reachable_urls: set[str] = set()
 
     class FakeProc:
@@ -285,15 +285,13 @@ async def test_session_browser_resources_spawns_without_env_cdp(
         profile_dir: Path,
         *,
         headless: bool = False,
-        seed_port: int | None = None,
         cfg: WorkspaceConfig | None = None,
         session_id: str | None = None,
         log_dir: Path | None = None,
     ) -> FakeProc:
         _ = (cfg, session_id, log_dir)
-        spawn_calls.append((profile_dir, headless, seed_port))
-        port = seed_port or 9333
-        url = f"http://127.0.0.1:{port}"
+        spawn_calls.append((profile_dir, headless))
+        url = "http://127.0.0.1:9333"
         reachable_urls.add(url)
         return FakeProc()
 
@@ -306,14 +304,16 @@ async def test_session_browser_resources_spawns_without_env_cdp(
     mock_pw_factory = MagicMock()
     mock_pw_factory.start = AsyncMock(return_value=mock_playwright)
 
-    monkeypatch.setattr("sevn.skills.browser_session.spawn_chrome", fake_spawn)
+    monkeypatch.setattr("sevn.browser.chrome.spawn_chrome", fake_spawn)
     monkeypatch.setattr(
-        "sevn.skills.browser_session.read_devtools_active_port",
+        "sevn.browser.chrome.read_devtools_active_port",
         lambda *_a, **_k: 9333,
     )
+    monkeypatch.setattr("sevn.browser.chrome.cdp_reachable", fake_reachable)
+    # Re-exported binding used by Playwright glue after spawn_or_attach.
     monkeypatch.setattr("sevn.skills.browser_session.cdp_reachable", fake_reachable)
     monkeypatch.setattr(
-        "sevn.skills.browser_session.resolve_chrome_executable",
+        "sevn.browser.chrome.resolve_chrome_executable",
         lambda *_a, **_k: "/fake/chrome",
     )
     monkeypatch.setattr(
@@ -369,7 +369,7 @@ def test_resolve_chrome_executable_env_wins(
     exe.write_text("", encoding="utf-8")
     monkeypatch.setenv("SEVN_CHROME_EXECUTABLE", str(exe))
     monkeypatch.setattr(
-        "sevn.skills.browser_session.shutil.which", lambda _n: "/usr/bin/google-chrome-stable"
+        "sevn.browser.chrome.shutil.which", lambda _n: "/usr/bin/google-chrome-stable"
     )
     from sevn.skills.browser_session import resolve_chrome_executable
 
@@ -386,7 +386,7 @@ def test_resolve_chrome_executable_brave_on_path(monkeypatch: pytest.MonkeyPatch
             return "/usr/bin/brave-browser"
         return None
 
-    monkeypatch.setattr("sevn.skills.browser_session.shutil.which", _which)
+    monkeypatch.setattr("sevn.browser.chrome.shutil.which", _which)
     from sevn.skills.browser_session import is_brave_executable, resolve_chrome_executable
 
     resolved = resolve_chrome_executable()
@@ -407,10 +407,10 @@ def test_resolve_chrome_executable_auto_prefers_chrome(monkeypatch: pytest.Monke
         return None
 
     monkeypatch.setattr(
-        "sevn.skills.browser_session._first_existing_file",
+        "sevn.browser.chrome._first_existing_file",
         lambda _candidates: None,
     )
-    monkeypatch.setattr("sevn.skills.browser_session.shutil.which", _which)
+    monkeypatch.setattr("sevn.browser.chrome.shutil.which", _which)
     from sevn.skills.browser_session import resolve_chrome_executable
 
     assert resolve_chrome_executable() == "/usr/bin/google-chrome-stable"
@@ -455,14 +455,14 @@ def test_spawn_chrome_appends_extra_args(
 
     monkeypatch.setenv("SEVN_BROWSER_EXTRA_ARGS", "--no-sandbox --disable-dev-shm-usage")
     monkeypatch.setattr(
-        "sevn.skills.browser_session.resolve_chrome_executable",
+        "sevn.browser.chrome.resolve_chrome_executable",
         lambda *_a, **_k: "/usr/bin/brave-browser",
     )
     monkeypatch.setattr(
-        "sevn.skills.browser_session.read_devtools_active_port",
+        "sevn.browser.chrome.read_devtools_active_port",
         lambda *_a, **_k: 9333,
     )
-    monkeypatch.setattr("sevn.skills.browser_session.subprocess.Popen", _popen)
+    monkeypatch.setattr("sevn.browser.chrome.subprocess.Popen", _popen)
     from sevn.skills.browser_session import spawn_chrome
 
     spawn_chrome(tmp_path / "profile", headless=True)
@@ -506,18 +506,18 @@ async def test_headless_fallback_uses_executable_path(
     brave.write_text("", encoding="utf-8")
     monkeypatch.setenv("SEVN_CHROME_EXECUTABLE", str(brave))
     monkeypatch.setattr(
-        "sevn.skills.browser_session.resolve_chrome_executable",
+        "sevn.browser.chrome.resolve_chrome_executable",
         lambda *_a, **_k: str(brave),
     )
     monkeypatch.setattr(
-        "sevn.skills.browser_session.spawn_chrome",
+        "sevn.browser.chrome.spawn_chrome",
         lambda *_a, **_k: _FakeProc(),
     )
     monkeypatch.setattr(
-        "sevn.skills.browser_session.read_devtools_active_port",
+        "sevn.browser.chrome.read_devtools_active_port",
         lambda *_a, **_k: 9333,
     )
-    monkeypatch.setattr("sevn.skills.browser_session.cdp_reachable", lambda *_a, **_k: False)
+    monkeypatch.setattr("sevn.browser.chrome.cdp_reachable", lambda *_a, **_k: False)
     monkeypatch.setattr("sevn.browser.lifecycle._SPAWN_CDP_WAIT_STEPS", 2)
     monkeypatch.setattr("sevn.browser.lifecycle._SPAWN_CDP_WAIT_INTERVAL", 0.01)
     monkeypatch.setattr(
@@ -560,13 +560,13 @@ def test_spawn_chrome_respects_engine_config(
             return "/usr/bin/brave-browser"
         return None
 
-    monkeypatch.setattr("sevn.skills.browser_session.shutil.which", _which)
+    monkeypatch.setattr("sevn.browser.chrome.shutil.which", _which)
     monkeypatch.setattr(
-        "sevn.skills.browser_session.read_devtools_active_port",
+        "sevn.browser.chrome.read_devtools_active_port",
         lambda *_a, **_k: 9333,
     )
     monkeypatch.setattr(
-        "sevn.skills.browser_session.subprocess.Popen",
+        "sevn.browser.chrome.subprocess.Popen",
         lambda args, **_kwargs: captured.append(args) or _Proc(),
     )
     cfg = WorkspaceConfig.model_validate(
@@ -616,18 +616,18 @@ async def test_headless_fallback_appends_extra_args(
     brave.write_text("", encoding="utf-8")
     monkeypatch.setenv("SEVN_BROWSER_EXTRA_ARGS", "--no-sandbox")
     monkeypatch.setattr(
-        "sevn.skills.browser_session.resolve_chrome_executable",
+        "sevn.browser.chrome.resolve_chrome_executable",
         lambda *_a, **_k: str(brave),
     )
     monkeypatch.setattr(
-        "sevn.skills.browser_session.spawn_chrome",
+        "sevn.browser.chrome.spawn_chrome",
         lambda *_a, **_k: _FakeProc(),
     )
     monkeypatch.setattr(
-        "sevn.skills.browser_session.read_devtools_active_port",
+        "sevn.browser.chrome.read_devtools_active_port",
         lambda *_a, **_k: 9333,
     )
-    monkeypatch.setattr("sevn.skills.browser_session.cdp_reachable", lambda *_a, **_k: False)
+    monkeypatch.setattr("sevn.browser.chrome.cdp_reachable", lambda *_a, **_k: False)
     monkeypatch.setattr("sevn.browser.lifecycle._SPAWN_CDP_WAIT_STEPS", 2)
     monkeypatch.setattr("sevn.browser.lifecycle._SPAWN_CDP_WAIT_INTERVAL", 0.01)
     monkeypatch.setattr(
@@ -650,7 +650,7 @@ def test_resolve_browser_headless_env_overrides_config(monkeypatch: pytest.Monke
     """SEVN_BROWSER_HEADLESS wins over skills.browser.headless when set."""
     monkeypatch.setenv("SEVN_BROWSER_HEADLESS", "0")
     monkeypatch.setattr(
-        "sevn.skills.browser_session.resolve_chrome_executable",
+        "sevn.browser.chrome.resolve_chrome_executable",
         lambda *_a, **_k: "/usr/bin/brave-browser",
     )
     cfg = WorkspaceConfig.model_validate(

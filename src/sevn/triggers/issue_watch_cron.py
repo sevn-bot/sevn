@@ -143,7 +143,6 @@ def ensure_issue_watch_cron_job(conn: sqlite3.Connection, workspace: WorkspaceCo
             overlap_policy, result_channel_json, payload_template
         ) VALUES (?, 1, ?, 'UTC', ?, 0, 'fixed', 'notify_only', 'default', 0, 'skip', '{}', ?)
         ON CONFLICT(job_id) DO UPDATE SET
-            enabled = 1,
             cron_expr = excluded.cron_expr,
             timezone = excluded.timezone,
             next_fire_at_ns = CASE

@@ -2,13 +2,14 @@
 
 A :class:`CDPBrowserSession` owns one browser-level :class:`CDPConnection` plus a map
 of attached page targets (``{target_id: CDPSession}``) maintained via flattened
-``Target.setAutoAttach``. It reuses the shipped ``sevn.skills.browser_session``
-discovery/spawn/registry layer, so ``target_id`` strings and the persisted
-``active_target_id`` stay interchangeable with the rest of the codebase.
+``Target.setAutoAttach``. It reuses :mod:`sevn.browser.chrome` /
+:mod:`sevn.browser.registry` for discovery/spawn/registry, so ``target_id``
+strings and the persisted ``active_target_id`` stay interchangeable with the
+rest of the codebase.
 
 Module: sevn.browser.lifecycle
 Depends: asyncio, contextlib, json, os, urllib, sevn.browser.cdp,
-    sevn.browser.process, sevn.skills.browser_session
+    sevn.browser.chrome, sevn.browser.process, sevn.browser.registry
 
 Exports:
     CDPBrowserSession — attach/spawn, target tracking, tab CRUD, page-session access.
@@ -106,6 +107,9 @@ def _spawn_lock_for(session_id: str) -> asyncio.Lock:
 def _chrome_log_path(content_root: Path, session_id: str) -> Path:
     """Return the Chrome stderr log path for ``session_id`` (D4).
 
+    ``session_id`` is sanitized to a filesystem-safe segment (colons/slashes
+    become ``-``) so Telegram-style ids cannot escape the logs directory.
+
     Args:
         content_root (Path): Workspace content root.
         session_id (str): Gateway session id.
@@ -117,8 +121,15 @@ def _chrome_log_path(content_root: Path, session_id: str) -> Path:
         >>> from pathlib import Path as _P
         >>> str(_chrome_log_path(_P("/ws"), "abc")).endswith("logs/chrome-abc.log")
         True
+        >>> str(_chrome_log_path(_P("/ws"), "telegram:1:g")).endswith(
+        ...     "logs/chrome-telegram-1-g.log"
+        ... )
+        True
     """
-    return content_root / "logs" / f"chrome-{session_id}.log"
+    from sevn.browser.chrome import _safe_chrome_log_session_id
+
+    sid = _safe_chrome_log_session_id(session_id) or "default"
+    return content_root / "logs" / f"chrome-{sid}.log"
 
 
 def _chrome_log_tail(log_path: Path, *, max_chars: int = 800) -> str:
@@ -565,7 +576,7 @@ async def await_cdp_after_spawn(
         >>> inspect.iscoroutinefunction(await_cdp_after_spawn)
         True
     """
-    from sevn.skills.browser_session import cdp_reachable, read_devtools_active_port
+    from sevn.browser.chrome import cdp_reachable, read_devtools_active_port
 
     last_url = ""
     for _ in range(_SPAWN_CDP_WAIT_STEPS):
@@ -597,10 +608,11 @@ async def spawn_or_attach(
 ) -> CDPBrowserSession:
     """Attach to an existing CDP endpoint, or spawn host Chrome and attach (D4).
 
-    Reuses ``sevn.skills.browser_session`` for URL resolution, spawn, and registry
-    persistence. Never closes an operator-owned Chrome. Spawns are single-flight
-    per ``session_id`` (D5); before launch, stale sevn Chrome for this profile is
-    reaped and singleton/port lockfiles cleared (D1).
+    Reuses :mod:`sevn.browser.chrome` / :mod:`sevn.browser.registry` for URL
+    resolution, spawn, and registry persistence. Never closes an operator-owned
+    Chrome. Spawns are single-flight per ``session_id`` (D5); before launch,
+    stale sevn Chrome for this profile is reaped and singleton/port lockfiles
+    cleared (D1).
 
     Args:
         content_root (Path): Workspace content root.
@@ -649,15 +661,17 @@ async def _spawn_or_attach_unlocked(
     """
     from datetime import UTC, datetime
 
-    from sevn.skills.browser_session import (
-        BrowserSessionRegistry,
+    from sevn.browser.chrome import (
         cdp_reachable,
-        clear_registry,
         default_cdp_url,
-        read_registry,
         resolve_browser_headless,
         resolve_profile_dir,
         spawn_chrome,
+    )
+    from sevn.browser.registry import (
+        BrowserSessionRegistry,
+        clear_registry,
+        read_registry,
         write_registry,
     )
 
