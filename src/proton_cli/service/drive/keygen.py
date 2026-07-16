@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 
 from pgpy import PGPKey
+from pgpy.constants import EllipticCurveOID, HashAlgorithm, PubKeyAlgorithm, SymmetricKeyAlgorithm
 
 _GO_SOURCE = """package main
 
@@ -52,11 +53,26 @@ def generate_node_key() -> tuple[PGPKey, str, bytes]:
 
 
 def generate_armored_locked_key(passphrase: bytes) -> str:
+    try:
+        return _generate_armored_locked_key_python(passphrase)
+    except Exception:
+        return _generate_armored_locked_key_go(passphrase)
+
+
+def _generate_armored_locked_key_python(passphrase: bytes) -> str:
+    key = PGPKey.new(PubKeyAlgorithm.ECDH, EllipticCurveOID.Curve25519)
+    key.protect(passphrase, SymmetricKeyAlgorithm.AES256, HashAlgorithm.SHA256)
+    armored = str(key)
+    if "-----END PGP PRIVATE KEY BLOCK-----" not in armored:
+        raise RuntimeError("pgpy keygen returned invalid armored key")
+    return armored
+
+
+def _generate_armored_locked_key_go(passphrase: bytes) -> str:
     go = shutil.which("go")
     if not go:
         msg = (
-            "Go toolchain required to generate Drive node keys "
-            "(install Go or use read-only Drive commands)"
+            "unable to generate Drive node keys (pgpy keygen failed and Go is not installed)"
         )
         raise RuntimeError(msg)
     with tempfile.TemporaryDirectory(prefix="proton-cli-keygen-") as tmp:

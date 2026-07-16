@@ -3,15 +3,18 @@
 from __future__ import annotations
 
 import base64
+import secrets
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from pgpy import PGPMessage
+from pgpy import PGPKey, PGPMessage
 
 from proton_cli.account.keys import Unlocked
 from proton_cli.proton.client import Client, Request
 from proton_cli.ref import pick
+from proton_cli.service.drive import blocks
 from proton_cli.service.mail import crypto as mail_crypto
+from proton_cli.service.mail import mime as mail_mime
 from proton_cli.service.mail.folders import LABEL_STARRED, LABEL_TRASH, resolve_folder
 
 PKG_INTERNAL = 1
@@ -73,6 +76,28 @@ class SearchOptions:
 
 
 @dataclass
+class InlineAttachment:
+    filename: str
+    mime_type: str
+    data: bytes
+
+
+@dataclass
+class Attachment:
+    id: str
+    name: str = ""
+    size: int = 0
+    mime_type: str = ""
+    disposition: str = ""
+
+
+@dataclass
+class UploadedAttachment:
+    id: str
+    session_key: blocks.SessionKey
+
+
+@dataclass
 class SendOptions:
     to: list[str]
     subject: str
@@ -80,6 +105,9 @@ class SendOptions:
     cc: list[str] = field(default_factory=list)
     bcc: list[str] = field(default_factory=list)
     html: bool = False
+    attachments: list[str] = field(default_factory=list)
+    inline_attach: list[str] = field(default_factory=list)
+    inline_attachments: list[InlineAttachment] = field(default_factory=list)
 
 
 class MailService:
@@ -278,12 +306,29 @@ class MailService:
         )
 
     def send(self, unlocked: Unlocked, opts: SendOptions) -> str:
-        """Send a plain-text message (internal Proton recipients; no attachments)."""
+        """Send a message to internal and cleartext recipients (with optional attachments)."""
         if not opts.to:
             raise ValueError("at least one --to recipient is required")
         addr_keys, _addr_id, sender_email = unlocked.primary_addr()
         mime_type = "text/html" if opts.html else "text/plain"
-        message = PGPMessage.new(opts.body)
+        body = opts.body
+        if opts.inline_attach:
+            if not opts.html:
+                raise ValueError("--attach-inline requires --html")
+            body, inline_prepared = mail_mime.prepare_inline_images(
+                body,
+                opts.inline_attach,
+                sender_email,
+            )
+        else:
+            inline_prepared = []
+        prepared = mail_mime.prepare_attachments(opts.attachments, opts.inline_attachments)
+        prepared.extend(inline_prepared)
+        if prepared:
+            body = mail_mime.build_mime_message(body, mime_type, prepared)
+            mime_type = "multipart/mixed"
+
+        message = PGPMessage.new(body)
         with addr_keys[0].unlock(None):
             enc = addr_keys[0].encrypt(message)
         armored = str(enc)
@@ -311,12 +356,25 @@ class MailService:
         if not message_id:
             raise ValueError("draft creation did not return a message id")
 
+        uploaded: list[UploadedAttachment] = []
+        for attachment in prepared:
+            uploaded.append(
+                self._upload_attachment_data(
+                    addr_keys[0],
+                    message_id,
+                    attachment.filename,
+                    attachment.mime_type,
+                    attachment.content_id,
+                    attachment.data,
+                )
+            )
+
         plans = []
         for email in _dedupe(opts.to + opts.cc + opts.bcc):
             scheme, armored_key = self._classify_recipient(email)
             plans.append((email, scheme, armored_key))
 
-        packages = self._build_body_packages(opts.body, mime_type, plans, addr_keys)
+        packages = self._build_body_packages(body, mime_type, plans, addr_keys, uploaded)
         try:
             self._client.decode(
                 Request(
@@ -329,6 +387,98 @@ class MailService:
             self.delete([message_id])
             raise
         return message_id
+
+    def attachments_list(self, message_id: str, include_inline: bool = False) -> list[Attachment]:
+        payload: dict = {}
+        self._client.decode(
+            Request(method="GET", path=f"/mail/v4/messages/{message_id}"),
+            payload,
+        )
+        out: list[Attachment] = []
+        for raw in (payload.get("Message") or {}).get("Attachments") or []:
+            disposition = str(raw.get("Disposition", ""))
+            if not include_inline and disposition == "inline":
+                continue
+            out.append(
+                Attachment(
+                    id=str(raw.get("ID", "")),
+                    name=str(raw.get("Name", "")),
+                    size=int(raw.get("Size", 0) or 0),
+                    mime_type=str(raw.get("MIMEType", "")),
+                    disposition=disposition,
+                )
+            )
+        return out
+
+    def attachment_download(self, unlocked: Unlocked, message_id: str, attachment_id: str) -> tuple[bytes, str]:
+        payload: dict = {}
+        self._client.decode(
+            Request(method="GET", path=f"/mail/v4/messages/{message_id}"),
+            payload,
+        )
+        raw_message = payload.get("Message") or {}
+        address_id = str(raw_message.get("AddressID", ""))
+        addr_keys = unlocked.addr_keys.get(address_id)
+        if not addr_keys:
+            addr_keys, _, _ = unlocked.primary_addr()
+        key_packets = ""
+        name = ""
+        for raw in raw_message.get("Attachments") or []:
+            if str(raw.get("ID", "")) == attachment_id:
+                key_packets = str(raw.get("KeyPackets", ""))
+                name = str(raw.get("Name", ""))
+                break
+        if not key_packets:
+            from proton_cli.errors import NotFound
+
+            raise NotFound("attachment", attachment_id)
+        response = self._client.do(
+            Request(method="GET", path=f"/mail/v4/attachments/{attachment_id}")
+        )
+        key_packet = base64.b64decode(key_packets)
+        sk = blocks.decrypt_session_key_packet(key_packet, addr_keys[0])
+        return blocks.decrypt_block(response.body, sk), name
+
+    def _upload_attachment_data(
+        self,
+        addr_key: PGPKey,
+        message_id: str,
+        filename: str,
+        mime_type: str,
+        content_id: str,
+        data: bytes,
+    ) -> UploadedAttachment:
+        sk = blocks.make_session_key()
+        data_packet = blocks.encrypt_data_packet(data, sk)
+        key_packet = blocks.encrypt_session_key_packet(addr_key, sk)
+        with addr_key.unlock(None):
+            sig = addr_key.sign(PGPMessage.new(data))
+        sig_bytes = bytes(sig)
+        body, content_type = _build_attachment_form(
+            {
+                "Filename": filename,
+                "MessageID": message_id,
+                "ContentID": content_id,
+                "MIMEType": mime_type,
+            },
+            {
+                "KeyPackets": key_packet,
+                "DataPacket": data_packet,
+                "Signature": sig_bytes,
+            },
+        )
+        payload: dict = {}
+        self._client.decode(
+            Request(
+                method="POST",
+                path="/mail/v4/attachments",
+                body=body,
+                content_type=content_type,
+            ),
+            payload,
+        )
+        att_id = str((payload.get("Attachment") or {}).get("ID", ""))
+        return UploadedAttachment(id=att_id, session_key=sk)
 
     def _classify_recipient(self, email: str) -> tuple[int, str]:
         payload: dict = {}
@@ -352,37 +502,40 @@ class MailService:
         mime_type: str,
         plans: list[tuple[str, int, str]],
         addr_keys: list,
+        attachments: list[UploadedAttachment] | None = None,
     ) -> list[dict[str, object]]:
-        session_message = PGPMessage.new(body)
-        with addr_keys[0].unlock(None):
-            enc_body = addr_keys[0].encrypt(session_message)
-        body_b64 = base64.b64encode(bytes(enc_body)).decode()
+        session_key = blocks.make_session_key()
+        enc_body = blocks.encrypt_and_sign_plaintext(body, session_key, addr_keys[0])
+        body_b64 = base64.b64encode(enc_body).decode()
 
         internal_addrs: dict[str, object] = {}
         clear_addrs: dict[str, object] = {}
         for email, scheme, armored_key in plans:
             if scheme == PKG_INTERNAL and armored_key:
-                with addr_keys[0].unlock(None):
-                    wrapped = addr_keys[0].encrypt(PGPMessage.new(body))
-                internal_addrs[email] = {
+                rec_key, _ = PGPKey.from_blob(armored_key)
+                rec_kp = blocks.encrypt_session_key_packet(rec_key, session_key)
+                addr_entry: dict[str, object] = {
                     "Type": PKG_INTERNAL,
-                    "BodyKeyPacket": base64.b64encode(bytes(wrapped)).decode(),
+                    "BodyKeyPacket": base64.b64encode(rec_kp).decode(),
                     "Signature": 0,
                 }
+                att_packets = _attachment_key_packets(rec_key, attachments or [])
+                if att_packets:
+                    addr_entry["AttachmentKeyPackets"] = att_packets
+                internal_addrs[email] = addr_entry
             else:
                 clear_addrs[email] = {"Type": PKG_CLEAR, "Signature": 0}
 
         packages: list[dict[str, object]] = []
         if internal_addrs:
-            with addr_keys[0].unlock(None):
-                sender_wrap = addr_keys[0].encrypt(PGPMessage.new(body))
+            sender_kp = blocks.encrypt_session_key_packet(addr_keys[0], session_key)
             packages.append(
                 {
                     "Addresses": internal_addrs,
                     "MIMEType": mime_type,
                     "Type": PKG_INTERNAL,
                     "Body": body_b64,
-                    "BodyKeyPacket": base64.b64encode(bytes(sender_wrap)).decode(),
+                    "BodyKeyPacket": base64.b64encode(sender_kp).decode(),
                 }
             )
         if clear_addrs:
@@ -413,3 +566,39 @@ def _dedupe(emails: list[str]) -> list[str]:
 
 def _parse_date(value: str) -> int:
     return int(datetime.strptime(value, "%Y-%m-%d").timestamp())
+
+
+def _attachment_key_packets(
+    recipient_key: PGPKey,
+    attachments: list[UploadedAttachment],
+) -> dict[str, str]:
+    if not attachments:
+        return {}
+    out: dict[str, str] = {}
+    for attachment in attachments:
+        kp = blocks.encrypt_session_key_packet(recipient_key, attachment.session_key)
+        out[attachment.id] = base64.b64encode(kp).decode()
+    return out
+
+
+def _build_attachment_form(
+    fields: dict[str, str],
+    files: dict[str, bytes],
+) -> tuple[bytes, str]:
+    boundary = "proton-cli-attach-" + secrets.token_hex(8)
+    lines: list[bytes] = []
+    for key, value in fields.items():
+        lines.append(f"--{boundary}\r\n".encode())
+        lines.append(f'Content-Disposition: form-data; name="{key}"\r\n\r\n'.encode())
+        lines.append(f"{value}\r\n".encode())
+    for name, data in files.items():
+        lines.append(f"--{boundary}\r\n".encode())
+        lines.append(
+            f'Content-Disposition: form-data; name="{name}"; filename="{name}"\r\n'.encode()
+        )
+        lines.append(b"Content-Type: application/octet-stream\r\n\r\n")
+        lines.append(data)
+        lines.append(b"\r\n")
+    lines.append(f"--{boundary}--\r\n".encode())
+    body = b"".join(lines)
+    return body, f"multipart/form-data; boundary={boundary}"
