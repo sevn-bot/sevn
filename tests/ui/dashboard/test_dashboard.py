@@ -149,14 +149,14 @@ def test_dashboard_replay_idempotency_returns_same_job(tmp_path: Path) -> None:
         path = traces_sqlite_path(client.app.state.layout.dot_sevn)
         conn = ensure_trace_connection(path)
         try:
-            conn.execute(
-                """INSERT INTO trace_events (
-                    span_id, parent_span_id, session_id, turn_id, tier, kind,
-                    ts_start_ns, ts_end_ns, status, attrs_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                ("span-idem", None, "s1", "t1", "B", "b_turn", 1, 2, "ok", "{}"),
-            )
-            conn.commit()
+            with conn:
+                conn.execute(
+                    """INSERT INTO trace_events (
+                        span_id, parent_span_id, session_id, turn_id, tier, kind,
+                        ts_start_ns, ts_end_ns, status, attrs_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    ("span-idem", None, "s1", "t1", "B", "b_turn", 1, 2, "ok", "{}"),
+                )
         finally:
             conn.close()
         first = client.post(
