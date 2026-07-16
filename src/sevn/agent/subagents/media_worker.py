@@ -580,6 +580,7 @@ async def execute_media_generator_task(
     trace_extra: dict[str, object] = {}
     api_model: str | None = None
     format_ctx: dict[str, str] = {}
+    voice_id: str | None = None
     data: bytes
     template_key = "default"
     augmented = media_task.prompt

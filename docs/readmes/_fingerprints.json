@@ -2,8 +2,8 @@
   "entries": {
     "agent": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-16T18:49:43Z",
-      "digest": "09e50c75e2eec8c0643012e8eaacf259a6f7bf6a41681fe1ed8fb0d04010d704",
+      "computed_at": "2026-07-16T18:57:48Z",
+      "digest": "ba20d7d95206b5202e15b82f4f56b893bad4e2cedc6afe9f86d7600d76070f3f",
       "source_globs": [
         "src/sevn/agent/**"
       ]
@@ -166,8 +166,8 @@
     },
     "subagents": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-16T18:49:45Z",
-      "digest": "6dffa24a9a738209769e22abb264a7f9d9de4f5520618d4594c578344d3013c3",
+      "computed_at": "2026-07-16T18:57:51Z",
+      "digest": "2072d2ca577b8b0d88632611ebd88d2bffd7662830b11595af3ab1f5e47e5a5a",
       "source_globs": [
         "src/sevn/agent/subagents/**",
         "src/sevn/config/sections/subagents.py",
