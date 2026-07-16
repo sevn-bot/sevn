@@ -5,7 +5,6 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -50,8 +49,7 @@ def _valid_input() -> dict:
     }
 
 
-def _repo_with_input(raw: dict) -> Path:
-    repo = Path(tempfile.mkdtemp())
+def _repo_with_input(raw: dict, repo: Path) -> Path:
     target = repo / "docs" / "target.md"
     target.parent.mkdir(parents=True)
     target.write_text("# Target\n", encoding="utf-8")
@@ -61,10 +59,10 @@ def _repo_with_input(raw: dict) -> Path:
     return repo
 
 
-def test_main_writes_faq_when_valid() -> None:
+def test_main_writes_faq_when_valid(tmp_path: Path) -> None:
     """Default invocation writes docs/FAQ.md when the input JSON validates."""
     main = _load_generate_faq_main()
-    repo = _repo_with_input(_valid_input())
+    repo = _repo_with_input(_valid_input(), tmp_path)
     exit_code = main([], repo_root=repo)
     assert exit_code == 0
     output = repo / "docs" / "FAQ.md"
@@ -72,41 +70,71 @@ def test_main_writes_faq_when_valid() -> None:
     assert "What is this project?" in output.read_text(encoding="utf-8")
 
 
-def test_main_check_fails_when_output_missing(capsys: pytest.CaptureFixture[str]) -> None:
+def test_main_check_fails_when_output_missing(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path,
+) -> None:
     """--check fails (exit 1) when docs/FAQ.md has not been generated yet."""
     main = _load_generate_faq_main()
-    repo = _repo_with_input(_valid_input())
+    repo = _repo_with_input(_valid_input(), tmp_path)
     exit_code = main(["--check"], repo_root=repo)
     captured = capsys.readouterr()
     assert exit_code == 1
     assert "stale" in captured.err.lower()
 
 
-def test_main_check_passes_after_generate() -> None:
+def test_main_check_passes_after_generate(tmp_path: Path) -> None:
     """--check succeeds once docs/FAQ.md matches the freshly rendered content."""
     main = _load_generate_faq_main()
-    repo = _repo_with_input(_valid_input())
+    repo = _repo_with_input(_valid_input(), tmp_path)
     assert main([], repo_root=repo) == 0
     assert main(["--check"], repo_root=repo) == 0
 
 
-def test_main_reports_validation_errors(capsys: pytest.CaptureFixture[str]) -> None:
+def test_main_reports_validation_errors(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path,
+) -> None:
     """An answer missing a reference placeholder fails with a clear error."""
     main = _load_generate_faq_main()
     raw = _valid_input()
     raw["sections"][0]["questions"][0]["answer"] = "Too short."
-    repo = _repo_with_input(raw)
+    repo = _repo_with_input(raw, tmp_path)
     exit_code = main([], repo_root=repo)
     captured = capsys.readouterr()
     assert exit_code == 1
     assert "validation failed" in captured.err.lower()
 
 
-def test_main_missing_input_file(capsys: pytest.CaptureFixture[str]) -> None:
+def test_main_missing_input_file(capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
     """A missing qa_input.json fails with a clear error instead of a traceback."""
     main = _load_generate_faq_main()
-    repo = Path(tempfile.mkdtemp())
-    exit_code = main([], repo_root=repo)
+    exit_code = main([], repo_root=tmp_path)
     captured = capsys.readouterr()
     assert exit_code == 1
     assert "input not found" in captured.err.lower()
+
+
+def test_main_rejects_input_path_escaping_repo_root(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path,
+) -> None:
+    """An --input path that resolves outside the repo root is rejected, not read."""
+    main = _load_generate_faq_main()
+    repo = _repo_with_input(_valid_input(), tmp_path)
+    outside = tmp_path.parent / "outside.json"
+    outside.write_text(json.dumps(_valid_input()), encoding="utf-8")
+    exit_code = main(["--input", f"../{outside.name}"], repo_root=repo)
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "must resolve within the repository root" in captured.err.lower()
+
+
+def test_main_rejects_output_path_escaping_repo_root(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path,
+) -> None:
+    """An --output path that resolves outside the repo root is rejected, not written."""
+    main = _load_generate_faq_main()
+    repo = _repo_with_input(_valid_input(), tmp_path)
+    exit_code = main(["--output", "../outside.md"], repo_root=repo)
+    captured = capsys.readouterr()
+    assert exit_code == 1
+    assert "must resolve within the repository root" in captured.err.lower()
+    assert not (tmp_path.parent / "outside.md").exists()

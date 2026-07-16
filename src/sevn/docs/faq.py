@@ -121,7 +121,10 @@ def load_document(raw: dict[str, Any]) -> Document:
         raw (dict[str, Any]): Deserialized JSON (``{"title": ..., "sections": [...]}}``).
 
     Returns:
-        Document: Parsed sections/questions/references (no validation applied).
+        Document: Parsed sections/questions/references. Malformed entries
+        (non-dict sections/questions/references, missing fields) are dropped
+        or defaulted rather than raising, so structural problems surface as
+        ``validate_document`` errors instead of parser exceptions.
 
     Examples:
         >>> raw = {
@@ -144,30 +147,48 @@ def load_document(raw: dict[str, Any]) -> Document:
         >>> load_document(raw).sections[0].questions[0].id
         'q1'
     """
+    sections_raw = raw.get("sections", [])
+    if not isinstance(sections_raw, list):
+        sections_raw = []
     sections: list[Section] = []
-    for raw_section in raw.get("sections", []):
+    for raw_section in sections_raw:
+        if not isinstance(raw_section, dict):
+            continue
+        questions_raw = raw_section.get("questions", [])
+        if not isinstance(questions_raw, list):
+            questions_raw = []
         questions: list[Question] = []
-        for raw_question in raw_section.get("questions", []):
-            references = {
-                ref_id: Reference(path=ref["path"], text=ref["text"])
-                for ref_id, ref in raw_question.get("references", {}).items()
-            }
+        for raw_question in questions_raw:
+            if not isinstance(raw_question, dict):
+                continue
+            references_raw = raw_question.get("references", {})
+            if not isinstance(references_raw, dict):
+                references_raw = {}
+            references: dict[str, Reference] = {}
+            for ref_id, ref in references_raw.items():
+                if not isinstance(ref, dict):
+                    continue
+                references[ref_id] = Reference(
+                    path=str(ref.get("path", "")),
+                    text=str(ref.get("text", "")),
+                )
             questions.append(
                 Question(
-                    id=raw_question.get("id", ""),
-                    question=raw_question.get("question", ""),
-                    answer=raw_question.get("answer", ""),
+                    id=str(raw_question.get("id", "")),
+                    question=str(raw_question.get("question", "")),
+                    answer=str(raw_question.get("answer", "")),
                     references=references,
                 ),
             )
         sections.append(
             Section(
-                id=raw_section.get("id", ""),
-                title=raw_section.get("title", ""),
+                id=str(raw_section.get("id", "")),
+                title=str(raw_section.get("title", "")),
                 questions=questions,
             ),
         )
-    return Document(title=raw.get("title", "Frequently Asked Questions (FAQ)"), sections=sections)
+    title = raw.get("title", "Frequently Asked Questions (FAQ)")
+    return Document(title=str(title), sections=sections)
 
 
 def _validate_reference(
@@ -378,11 +399,70 @@ def _render_answer(question: Question, *, output_path: str) -> str:
     """
 
     def _replace(match: re.Match[str]) -> str:
+        """Return the markdown link for one ``{{ref:<id>}}`` regex match.
+
+        Args:
+            match (re.Match[str]): Match whose group 1 is the reference id.
+
+        Returns:
+            str: Rendered ``[text](href)`` markdown link.
+
+        Examples:
+            >>> import re
+            >>> q = Question(
+            ...     id="q1", question="What?", answer="See {{ref:r}}.",
+            ...     references={"r": Reference(path="README.md", text="the README")},
+            ... )
+            >>> _render_answer(q, output_path="docs/FAQ.md")
+            'See [the README](../README.md).'
+        """
         ref = question.references[match.group(1)]
         href = _relative_href(output_path=output_path, target_path=ref.path)
         return f"[{ref.text}]({href})"
 
     return _REF_PATTERN.sub(_replace, question.answer)
+
+
+def _unique_heading_slugs(document: Document) -> dict[str, str]:
+    """Return a GitHub-deduplicated heading slug for every section/question.
+
+    GitHub disambiguates repeated heading text within one page by appending
+    ``-1``, ``-2``, ... to later occurrences (in document order), leaving the
+    first occurrence unchanged. Both the table of contents and the actual
+    ``##``/``###`` headings must agree on these slugs, so this is computed
+    once up front and looked up by a stable ``section:<id>`` / ``question:<id>``
+    key in both rendering passes.
+
+    Args:
+        document (Document): Parsed FAQ document.
+
+    Returns:
+        dict[str, str]: Maps ``f"section:{section.id}"`` and
+        ``f"question:{question.id}"`` to their deduplicated anchor slug.
+
+    Examples:
+        >>> q1 = Question(id="q1", question="What?", answer="A.", references={})
+        >>> q2 = Question(id="q2", question="What?", answer="B.", references={})
+        >>> section = Section(id="s", title="S", questions=[q1, q2])
+        >>> slugs = _unique_heading_slugs(Document(title="FAQ", sections=[section]))
+        >>> (slugs["question:q1"], slugs["question:q2"])
+        ('what', 'what-1')
+    """
+    counts: dict[str, int] = {}
+    slugs: dict[str, str] = {}
+
+    def _assign(key: str, text: str) -> None:
+        base = slugify(text)
+        count = counts.get(base, 0)
+        slugs[key] = base if count == 0 else f"{base}-{count}"
+        counts[base] = count + 1
+
+    for section in document.sections:
+        _assign(f"section:{section.id}", section.title)
+        for question in section.questions:
+            _assign(f"question:{question.id}", question.question)
+
+    return slugs
 
 
 def render_markdown(document: Document, *, output_path: str = "docs/FAQ.md") -> str:
@@ -410,13 +490,14 @@ def render_markdown(document: Document, *, output_path: str = "docs/FAQ.md") -> 
         True
     """
     lines: list[str] = [_GENERATED_HEADER, "", f"# {document.title}", ""]
+    slugs = _unique_heading_slugs(document)
 
     lines.append("## Table of contents")
     lines.append("")
     for section in document.sections:
-        lines.append(f"- [{section.title}](#{slugify(section.title)})")
+        lines.append(f"- [{section.title}](#{slugs[f'section:{section.id}']})")
         for question in section.questions:
-            lines.append(f"  - [{question.question}](#{slugify(question.question)})")
+            lines.append(f"  - [{question.question}](#{slugs[f'question:{question.id}']})")
     lines.append("")
 
     for section in document.sections:
