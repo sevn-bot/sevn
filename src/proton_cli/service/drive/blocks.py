@@ -8,9 +8,10 @@ import struct
 from dataclasses import dataclass
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from proton_cli.account.keys import persist_unlock, use_unlocked_key
 from pgpy import PGPKey, PGPMessage
 from pgpy.packet.fields import ECDHCipherText
+
+from proton_cli.account.keys import use_unlocked_key
 
 _AES256 = 9
 _TAG_SEIPD = 0xD2  # old format tag 18
