@@ -15,7 +15,9 @@ Exports:
 
 Examples:
     >>> from sevn.agent.subagents.media_prompts import augment_prompt, MediaPromptVars
-    >>> augment_prompt("image", "fox in leaves", vars=MediaPromptVars(scene="forest", style="watercolor"))
+    >>> _k, prompt, ctx = augment_prompt("image", "fox in leaves", vars=MediaPromptVars(scene="forest", style="watercolor"))
+    >>> "forest" in prompt and "fox in leaves" in ctx["user_request"]
+    True
 """
 
 from __future__ import annotations
