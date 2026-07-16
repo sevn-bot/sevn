@@ -220,6 +220,28 @@
       ]
     },
     {
+      "capability_id": "extra.google_workspace",
+      "group": "A",
+      "label": "Google Workspace extra",
+      "description": "Google API client and OAuth dependencies for the google-workspace skill.",
+      "config_paths": [
+        "skills.google_workspace.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "extra.google_workspace.uv",
+          "kind": "uv_extra",
+          "argv": [
+            "google-workspace"
+          ],
+          "fatal": true
+        }
+      ]
+    },
+    {
       "capability_id": "extra.openwiki",
       "group": "A",
       "label": "OpenWiki extra",
@@ -623,6 +645,29 @@
           "argv": [],
           "fatal": false
         }
+      ]
+    },
+    {
+      "capability_id": "skill.google_workspace",
+      "group": "B",
+      "label": "google-workspace",
+      "description": "Gmail, Calendar, Drive, Sheets, Docs, and Contacts via OAuth2-authenticated Google Workspace APIs.",
+      "config_paths": [
+        "skills.google_workspace.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.google_workspace.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "depends_on": [
+        "extra.google_workspace"
       ]
     },
     {

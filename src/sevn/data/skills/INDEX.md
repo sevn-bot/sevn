@@ -29,6 +29,7 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | gh-issues | GitHub issue lifecycle — list, view, create, comment via integration_call. |
 | gh-pr | Pull request lifecycle — list, view, create, merge, close, reviewers via integration_call. |
 | github-manager | Advanced GitHub operations — branches, Actions, CI/CD secrets, environments, deployments via integration_call. |
+| google-workspace | Gmail, Calendar, Drive, Sheets, Docs, and Contacts via OAuth2-authenticated Google Workspace APIs. |
 | graphify | Knowledge-graph orientation for code (`specs/28-code-understanding.md` §2.4). |
 | job-ops | Discover jobs across global + Europe boards, AI fit-score them against your resume, and optionally tailor a CV summary (JobOps port). |
 | kokoro-tts | Local Kokoro ONNX text-to-speech engine backing the voice TTS pipeline (kokoro backend). Not a model-facing research skill. |
