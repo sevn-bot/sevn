@@ -2,7 +2,8 @@
 
 Module: sevn.integrations.social_media.x_ops_dispatch
 Depends: sevn.browser.recipes.social, sevn.integrations.social_media.medium,
-    sevn.integrations.social_media.readiness, sevn.integrations.twexapi
+    sevn.integrations.social_media.readiness, sevn.integrations.social_media.x_ops_pack,
+    sevn.integrations.twexapi
 
 Exports:
     cookies_for_twexapi — map browser export_cookies payload → TwexAPI cookie field.
@@ -11,15 +12,14 @@ Exports:
     resolve_content_root — resolve workspace content root from a task.
     run_op — normalize args and dispatch one facade op.
     smm_cfg — extract skills.social_media_manager block.
-    thread_items — ordered thread texts from items/texts.
 
-``FACADE_OPS`` (frozenset of §4 op names) is also exported via ``__all__``.
+``FACADE_OPS`` (frozenset of §4 op names) and ``thread_items`` (re-export from
+``x_ops_pack``) are also exported via ``__all__``.
 """
 
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -29,6 +29,23 @@ from sevn.integrations.social_media.medium import resolve_social_medium
 from sevn.integrations.social_media.readiness import (
     build_social_media_readiness_sync,
     twexapi_key_configured,
+)
+from sevn.integrations.social_media.x_ops_pack import (
+    TwexBodyPacker,
+    TwexPathPacker,
+    pack_advanced_search_body,
+    pack_auto_cookie_body,
+    pack_create_body,
+    pack_delete_body,
+    pack_empty_body,
+    pack_follow_body,
+    pack_hashtags_body,
+    pack_quote_body,
+    pack_thread_body,
+    pack_timeline_path,
+    pack_tweet_id_path,
+    pack_users_body,
+    thread_items,
 )
 from sevn.integrations.twexapi.client import (
     TWEXAPI_WRITE_OPS,
@@ -52,287 +69,17 @@ __all__ = [
     "thread_items",
 ]
 
-_BROWSER_WRITE_OPS: frozenset[str] = frozenset(
-    {
-        "like_tweet",
-        "unlike_tweet",
-        "retweet",
-        "delete_retweet",
-        "bookmark",
-        "delete_bookmark",
-        "create_tweet_or_reply",
-        "create_quote_tweet",
-        "create_tweet_thread",
-        "delete_tweets",
-        "follow_user",
-        "post_tweet_auto_cookie",
-    }
-)
-
-_BROWSER_UNSUPPORTED_OPS: frozenset[str] = frozenset(
-    {
-        "like_tweet",
-        "unlike_tweet",
-        "retweet",
-        "delete_retweet",
-        "bookmark",
-        "delete_bookmark",
-        "follow_user",
-        "delete_tweets",
-        "create_quote_tweet",
-    }
-)
-
-TwexBodyPacker = Callable[[dict[str, Any]], dict[str, Any] | list[Any] | None]
-TwexPathPacker = Callable[[dict[str, Any]], dict[str, str] | None]
-
-
-def _pack_empty_body(_task: dict[str, Any]) -> dict[str, Any]:
-    """Return an empty TwexAPI JSON body.
-
-    Args:
-        _task (dict[str, Any]): Unused task payload.
-
-    Returns:
-        dict[str, Any]: Empty body.
-
-    Examples:
-        >>> _pack_empty_body({})
-        {}
-    """
-    return {}
-
-
-def _pack_tweet_id_path(task: dict[str, Any]) -> dict[str, str]:
-    """Pack ``tweet_id`` path params for tweet-action ops.
-
-    Args:
-        task (dict[str, Any]): Task with optional ``tweet_id``.
-
-    Returns:
-        dict[str, str]: Path params (``\"0\"`` when missing).
-
-    Examples:
-        >>> _pack_tweet_id_path({"tweet_id": "9"})["tweet_id"]
-        '9'
-    """
-    tweet_id = str(task.get("tweet_id") or "").strip()
-    return {"tweet_id": tweet_id or "0"}
-
-
-def _pack_advanced_search_body(task: dict[str, Any]) -> dict[str, Any] | None:
-    """Pack TwexAPI ``search_page`` body from task fields.
-
-    Args:
-        task (dict[str, Any]): Task with ``query`` / ``searchTerms``.
-
-    Returns:
-        dict[str, Any] | None: Body or ``None`` when empty.
-
-    Examples:
-        >>> _pack_advanced_search_body({"query": "ai"})["searchTerms"]
-        ['ai']
-    """
-    body: dict[str, Any] = {}
-    if "searchTerms" in task:
-        body["searchTerms"] = task["searchTerms"]
-    elif task.get("query"):
-        body["searchTerms"] = [str(task["query"])]
-    for key in ("sortBy", "next_cursor"):
-        if task.get(key):
-            body[key] = task[key]
-    return body or None
-
-
-def _pack_hashtags_body(task: dict[str, Any]) -> dict[str, Any]:
-    """Pack TwexAPI ``hashtags`` body.
-
-    Args:
-        task (dict[str, Any]): Task with ``hashtags`` / ``query``.
-
-    Returns:
-        dict[str, Any]: ``{\"hashtags\": [...]}``.
-
-    Examples:
-        >>> _pack_hashtags_body({"query": "ai"})["hashtags"]
-        ['ai']
-    """
-    tags = task.get("hashtags")
-    if isinstance(tags, str):
-        tags = [tags]
-    if not tags and task.get("query"):
-        tags = [str(task["query"])]
-    return {"hashtags": list(tags or [])}
-
-
-def _pack_create_body(task: dict[str, Any]) -> dict[str, Any]:
-    """Pack create-tweet / reply body.
-
-    Args:
-        task (dict[str, Any]): Task with ``text`` / ``tweet_content``.
-
-    Returns:
-        dict[str, Any]: TwexAPI create body.
-
-    Examples:
-        >>> _pack_create_body({"text": "hi"})["tweet_content"]
-        'hi'
-    """
-    text = str(task.get("text") or task.get("tweet_content") or "")
-    body: dict[str, Any] = {"tweet_content": text}
-    for key in ("reply_tweet_id", "media_url"):
-        if task.get(key):
-            body[key] = task[key]
-    return body
-
-
-def _pack_quote_body(task: dict[str, Any]) -> dict[str, Any]:
-    """Pack quote-tweet body.
-
-    Args:
-        task (dict[str, Any]): Task with text and quote target fields.
-
-    Returns:
-        dict[str, Any]: TwexAPI quote body.
-
-    Examples:
-        >>> _pack_quote_body({"text": "q", "tweet_id": "1"})["tweet_id"]
-        '1'
-    """
-    text = str(task.get("text") or task.get("tweet_content") or "")
-    body: dict[str, Any] = {"tweet_content": text}
-    for key in ("tweet_id", "quoted_tweet_id", "media_url"):
-        if task.get(key):
-            body[key] = task[key]
-    return body
-
-
-def _pack_thread_body(task: dict[str, Any]) -> dict[str, Any]:
-    """Pack tweet-thread body from ``items`` / ``texts``.
-
-    Args:
-        task (dict[str, Any]): Task payload.
-
-    Returns:
-        dict[str, Any]: ``{\"items\": [...]}``.
-
-    Examples:
-        >>> _pack_thread_body({"items": ["a"]})["items"]
-        ['a']
-    """
-    return {"items": list(thread_items(task))}
-
-
-def _pack_delete_body(task: dict[str, Any]) -> dict[str, Any]:
-    """Pack delete-tweets body.
-
-    Args:
-        task (dict[str, Any]): Task with optional id fields.
-
-    Returns:
-        dict[str, Any]: Sparse delete body.
-
-    Examples:
-        >>> _pack_delete_body({"username": "a"})["username"]
-        'a'
-    """
-    return {k: task[k] for k in ("username", "target_id", "tweet_ids") if k in task}
-
-
-def _pack_auto_cookie_body(task: dict[str, Any]) -> dict[str, Any]:
-    """Pack pool-cookie post body.
-
-    Args:
-        task (dict[str, Any]): Task with ``text`` / ``tweet_content``.
-
-    Returns:
-        dict[str, Any]: ``{\"tweet_content\": ...}``.
-
-    Examples:
-        >>> _pack_auto_cookie_body({"text": "x"})["tweet_content"]
-        'x'
-    """
-    text = str(task.get("text") or task.get("tweet_content") or "")
-    return {"tweet_content": text}
-
-
-def _pack_users_body(task: dict[str, Any]) -> list[Any]:
-    """Pack usernames list body for TwexAPI ``users``.
-
-    Args:
-        task (dict[str, Any]): Task with ``usernames`` / ``query``.
-
-    Returns:
-        list[Any]: Username strings.
-
-    Examples:
-        >>> _pack_users_body({"query": "@bob"})
-        ['bob']
-    """
-    names = task.get("usernames")
-    if isinstance(names, str):
-        names = [n.strip() for n in names.split(",") if n.strip()]
-    if not names and task.get("query"):
-        names = [str(task["query"]).lstrip("@")]
-    return list(names or [])
-
-
-def _pack_follow_body(task: dict[str, Any]) -> dict[str, Any]:
-    """Pack follow-user body.
-
-    Args:
-        task (dict[str, Any]): Task with ``username`` / ``query``.
-
-    Returns:
-        dict[str, Any]: ``{\"username\": ...}``.
-
-    Examples:
-        >>> _pack_follow_body({"username": "@a"})["username"]
-        'a'
-    """
-    username = str(task.get("username") or task.get("query") or "").lstrip("@")
-    return {"username": username}
-
-
-def _pack_timeline_path(task: dict[str, Any]) -> dict[str, str]:
-    """Pack timeline ``screen_name`` path params.
-
-    Args:
-        task (dict[str, Any]): Task with optional screen/username.
-
-    Returns:
-        dict[str, str]: Path params (default ``home``).
-
-    Examples:
-        >>> _pack_timeline_path({})["screen_name"]
-        'home'
-    """
-    screen = str(task.get("screen_name") or task.get("username") or "home").lstrip("@")
-    return {"screen_name": screen}
-
 
 @dataclass(frozen=True, slots=True)
 class _OpSpec:
-    """Table-driven metadata for one §4 facade op."""
+    """Table-driven metadata for one §4 facade op (sole capability table)."""
 
     name: str
     twex_key: str | None = None
     browser_social_op: str | None = None
+    is_write: bool = False
     pack_body: TwexBodyPacker | None = None
     pack_path: TwexPathPacker | None = None
-
-    @property
-    def is_write(self) -> bool:
-        """Return whether this op is a write (DB8 / ``_BROWSER_WRITE_OPS``).
-
-        Returns:
-            bool: ``True`` when ``name`` is in the write-ops set.
-
-        Examples:
-            >>> _OpSpec("like_tweet").is_write
-            True
-        """
-        return self.name in _BROWSER_WRITE_OPS
 
     @property
     def twexapi_op(self) -> str:
@@ -355,79 +102,86 @@ _OP_SPECS: dict[str, _OpSpec] = {
             "advanced_search_page",
             twex_key="search_page",
             browser_social_op="search",
-            pack_body=_pack_advanced_search_body,
+            pack_body=pack_advanced_search_body,
         ),
         _OpSpec(
             "search_hashtags",
             twex_key="hashtags",
             browser_social_op="search",
-            pack_body=_pack_hashtags_body,
+            pack_body=pack_hashtags_body,
         ),
         _OpSpec(
             "like_tweet",
-            pack_path=_pack_tweet_id_path,
-            pack_body=_pack_empty_body,
+            is_write=True,
+            pack_path=pack_tweet_id_path,
+            pack_body=pack_empty_body,
         ),
         _OpSpec(
             "unlike_tweet",
-            pack_path=_pack_tweet_id_path,
-            pack_body=_pack_empty_body,
+            is_write=True,
+            pack_path=pack_tweet_id_path,
+            pack_body=pack_empty_body,
         ),
         _OpSpec(
             "retweet",
-            pack_path=_pack_tweet_id_path,
-            pack_body=_pack_empty_body,
+            is_write=True,
+            pack_path=pack_tweet_id_path,
+            pack_body=pack_empty_body,
         ),
         _OpSpec(
             "delete_retweet",
-            pack_path=_pack_tweet_id_path,
-            pack_body=_pack_empty_body,
+            is_write=True,
+            pack_path=pack_tweet_id_path,
+            pack_body=pack_empty_body,
         ),
         _OpSpec(
             "bookmark",
-            pack_path=_pack_tweet_id_path,
-            pack_body=_pack_empty_body,
+            is_write=True,
+            pack_path=pack_tweet_id_path,
+            pack_body=pack_empty_body,
         ),
         _OpSpec(
             "delete_bookmark",
-            pack_path=_pack_tweet_id_path,
-            pack_body=_pack_empty_body,
+            is_write=True,
+            pack_path=pack_tweet_id_path,
+            pack_body=pack_empty_body,
         ),
         _OpSpec(
             "create_tweet_or_reply",
             browser_social_op="post",
-            pack_body=_pack_create_body,
+            is_write=True,
+            pack_body=pack_create_body,
         ),
-        _OpSpec("create_quote_tweet", pack_body=_pack_quote_body),
+        _OpSpec("create_quote_tweet", is_write=True, pack_body=pack_quote_body),
         _OpSpec(
             "create_tweet_thread",
             browser_social_op="post",
-            pack_body=_pack_thread_body,
+            is_write=True,
+            pack_body=pack_thread_body,
         ),
-        _OpSpec("delete_tweets", pack_body=_pack_delete_body),
+        _OpSpec("delete_tweets", is_write=True, pack_body=pack_delete_body),
         _OpSpec(
             "post_tweet_auto_cookie",
             browser_social_op="post",
-            pack_body=_pack_auto_cookie_body,
+            is_write=True,
+            pack_body=pack_auto_cookie_body,
         ),
         _OpSpec(
             "get_users_by_usernames",
             twex_key="users",
-            browser_social_op="read",
-            pack_body=_pack_users_body,
+            pack_body=pack_users_body,
         ),
-        _OpSpec("follow_user", pack_body=_pack_follow_body),
+        _OpSpec("follow_user", is_write=True, pack_body=pack_follow_body),
         _OpSpec(
             "fetch_article_markdown",
-            browser_social_op="read",
-            pack_path=_pack_tweet_id_path,
+            pack_path=pack_tweet_id_path,
         ),
         _OpSpec(
             "home_timeline_collect",
             twex_key="timeline_page",
             browser_social_op="home_feed",
-            pack_path=_pack_timeline_path,
-            pack_body=_pack_empty_body,
+            pack_path=pack_timeline_path,
+            pack_body=pack_empty_body,
         ),
         _OpSpec("session_status"),
     )
@@ -645,27 +399,6 @@ def resolve_content_root(task: dict[str, Any]) -> Path:
     return Path.cwd()
 
 
-def thread_items(task: dict[str, Any]) -> list[str]:
-    """Return ordered thread texts from ``items`` / ``texts``.
-
-    Args:
-        task (dict[str, Any]): Task payload.
-
-    Returns:
-        list[str]: Thread item strings (may be empty).
-
-    Examples:
-        >>> thread_items({"items": ["a", "b"]})
-        ['a', 'b']
-    """
-    items = task.get("items") or task.get("texts") or []
-    if isinstance(items, str):
-        return [items] if items.strip() else []
-    if isinstance(items, list):
-        return [str(x) for x in items if str(x).strip()]
-    return []
-
-
 def _browser_plan(op: str, task: dict[str, Any], site: str, social_op: str) -> dict[str, Any]:
     """Build a CDP ``browser`` tool plan for the parent turn.
 
@@ -827,7 +560,7 @@ async def _dispatch(
             coerced["code"] = "COERCED_BROWSER_CREATE"
         return coerced
 
-    if medium == "browser" and op in _BROWSER_UNSUPPORTED_OPS:
+    if medium == "browser" and spec.browser_social_op is None:
         return envelope(
             ok=False,
             medium="browser",

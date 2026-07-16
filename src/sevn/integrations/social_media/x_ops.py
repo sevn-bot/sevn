@@ -1,7 +1,7 @@
 """Unified X/Twitter ops facade over ``browser`` | ``twexapi`` (DB6-DB10).
 
 Thin public wrappers over :func:`sevn.integrations.social_media.x_ops_dispatch.run_op`.
-TwexAPI body/path packing lives on OpSpec in ``x_ops_dispatch``.
+TwexAPI body/path packing lives in ``x_ops_pack``; OpSpec rows wire them in ``x_ops_dispatch``.
 
 Module: sevn.integrations.social_media.x_ops
 Depends: sevn.integrations.social_media.x_ops_dispatch

@@ -120,6 +120,32 @@ def test_cookie_bridge_maps_export_cookies_without_leaking_values() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("op_name", "task"),
+    [
+        ("fetch_article_markdown", {"medium": "browser", "tweet_id": "1"}),
+        ("get_users_by_usernames", {"medium": "browser", "usernames": ["alice"]}),
+    ],
+)
+async def test_browser_readish_ops_return_browser_op_unsupported(
+    op_name: str,
+    task: dict[str, Any],
+) -> None:
+    """Thermos i3 M1: article/users are TwexAPI-only — no false-success home scrape."""
+    x_ops = _import_x_ops()
+    fn = getattr(x_ops, op_name)
+    with patch(
+        "sevn.integrations.social_media.x_ops_dispatch.resolve_social_medium",
+        return_value="browser",
+    ):
+        result = await fn(task=task, cfg={}, site="x")
+    assert result["ok"] is False
+    assert result["medium"] == "browser"
+    assert result["op"] == op_name
+    assert result.get("code") == "BROWSER_OP_UNSUPPORTED"
+
+
+@pytest.mark.asyncio
 async def test_session_status_reports_fields_without_leaking_key() -> None:
     """DB10: session_status reports reachability/profile/login/key-present; never the key."""
     x_ops = _import_x_ops()

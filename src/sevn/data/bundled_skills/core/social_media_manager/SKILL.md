@@ -308,9 +308,9 @@ on `medium=twexapi` it substitutes TwexAPI `timeline_page`.
 | `create_tweet_thread` | both* | yes | `items` / `texts` list | browser maps to `post` only when items present in plan; else unsupported |
 | `delete_tweets` | **twexapi** | yes | tweet id(s) / username | browser → `BROWSER_OP_UNSUPPORTED` |
 | `post_tweet_auto_cookie` | twexapi (browser coerces) | yes | `text` | TwexAPI pool cookie; browser → `create_tweet_or_reply` |
-| `get_users_by_usernames` | both | no | `usernames` | TwexAPI alias `users` |
+| `get_users_by_usernames` | **twexapi** | no | `usernames` | TwexAPI alias `users`; browser → `BROWSER_OP_UNSUPPORTED` (no profile-batch SocialRecipe) |
 | `follow_user` | **twexapi** | yes | `username` | browser → `BROWSER_OP_UNSUPPORTED` |
-| `fetch_article_markdown` | both | no | `tweet_id` | |
+| `fetch_article_markdown` | **twexapi** | no | `tweet_id` | browser → `BROWSER_OP_UNSUPPORTED` (no article extract SocialRecipe) |
 | `home_timeline_collect` | both | no | `screen_name?` | browser `home_feed`; twexapi `timeline_page` |
 | `session_status` | both | no | — | CDP reachability, profile, login probe, `twexapi_key_present` (boolean only) |
 
