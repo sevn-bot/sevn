@@ -7,8 +7,8 @@ owner: Alex
 summary: Level-1 sub-agents (tracked, concurrent, killable role runs) that may spawn
   level-2 workers (incl. specialists); multi queue mode; limits, tracing, kill surfaces,
   media_generation skill.
-last_updated: '2026-07-15'
-fingerprint: sha256:345cabbb1262539490ed39b7cc3141ba611aca6453afeb89caa1e6609c35718e
+last_updated: '2026-07-16'
+fingerprint: sha256:da8d76fb96109bf5f51c41fda253aca08a54c82827b1ad0e2c9170d9365695b1
 related: []
 sources:
 - src/sevn/agent/subagents/**

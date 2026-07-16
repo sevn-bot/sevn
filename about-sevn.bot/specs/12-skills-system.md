@@ -8,7 +8,7 @@ summary: 'Own everything under workspace/skills/: how skills are discovered, val
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
 last_updated: '2026-07-16'
-fingerprint: sha256:6f153ba14dae6911b763d0594cfd983da4dfa60429ed017debc331db2a37f7a6
+fingerprint: sha256:11129c7a98f8936d0145b01220c8e8582c39f7c858663eb7d2ae533953987ecc
 related: []
 sources:
 - src/sevn/skills/**

@@ -137,7 +137,7 @@ def _capability_switch_id(capability_id: str) -> str:
 
     Examples:
         >>> _capability_switch_id("extra.browser_cdp")
-        'cap__extra_browser'
+        'cap__extra_browser_cdp'
     """
     safe = capability_id.replace(".", "_").replace("-", "_")
     return f"cap__{safe}"
