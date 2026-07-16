@@ -508,9 +508,12 @@ def _encrypt_binary(keys: list, data: bytes) -> bytes:
     last_err: Exception | None = None
     for key in keys:
         try:
-            with key.unlock(None):
+            if key.is_unlocked:
                 encrypted = key.encrypt(message)
-                return bytes(encrypted)
+            else:
+                with key.unlock(None):
+                    encrypted = key.encrypt(message)
+            return bytes(encrypted)
         except Exception as exc:
             last_err = exc
     if last_err:
