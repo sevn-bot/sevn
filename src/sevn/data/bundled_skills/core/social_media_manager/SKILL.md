@@ -297,22 +297,24 @@ on `medium=twexapi` it substitutes TwexAPI `timeline_page`.
 |----|--------|--------|----------|-------|
 | `advanced_search_page` | both | no | `query` / `searchTerms`, `sortBy`, `next_cursor` | TwexAPI alias `search_page` |
 | `search_hashtags` | both | no | `hashtags` / `query` | TwexAPI alias `hashtags` |
-| `like_tweet` | both | yes | `tweet_id` | |
-| `unlike_tweet` | both | yes | `tweet_id` | |
-| `retweet` | both | yes | `tweet_id` | |
-| `delete_retweet` | both | yes | `tweet_id` | |
-| `bookmark` | both | yes | `tweet_id` | |
-| `delete_bookmark` | both | yes | `tweet_id` | |
-| `create_tweet_or_reply` | both | yes | `text` / `tweet_content`, `reply_tweet_id?` | |
-| `create_quote_tweet` | both | yes | `text`, quote target | |
-| `create_tweet_thread` | both | yes | `items` list | |
-| `delete_tweets` | both | yes | tweet id(s) / username | |
+| `like_tweet` | **twexapi** | yes | `tweet_id` | browser → `BROWSER_OP_UNSUPPORTED` (SocialRecipe has no tweet-actions) |
+| `unlike_tweet` | **twexapi** | yes | `tweet_id` | browser → `BROWSER_OP_UNSUPPORTED` |
+| `retweet` | **twexapi** | yes | `tweet_id` | browser → `BROWSER_OP_UNSUPPORTED` |
+| `delete_retweet` | **twexapi** | yes | `tweet_id` | browser → `BROWSER_OP_UNSUPPORTED` |
+| `bookmark` | **twexapi** | yes | `tweet_id` | browser → `BROWSER_OP_UNSUPPORTED` |
+| `delete_bookmark` | **twexapi** | yes | `tweet_id` | browser → `BROWSER_OP_UNSUPPORTED` |
+| `create_tweet_or_reply` | both | yes | `text` / `tweet_content`, `reply_tweet_id?` | browser `post` / `reply` |
+| `create_quote_tweet` | **twexapi** | yes | `text`, quote target | browser → `BROWSER_OP_UNSUPPORTED` (no quote in SocialRecipe) |
+| `create_tweet_thread` | both* | yes | `items` / `texts` list | browser maps to `post` only when items present in plan; else unsupported |
+| `delete_tweets` | **twexapi** | yes | tweet id(s) / username | browser → `BROWSER_OP_UNSUPPORTED` |
 | `post_tweet_auto_cookie` | twexapi (browser coerces) | yes | `text` | TwexAPI pool cookie; browser → `create_tweet_or_reply` |
 | `get_users_by_usernames` | both | no | `usernames` | TwexAPI alias `users` |
-| `follow_user` | both | yes | `username` | |
+| `follow_user` | **twexapi** | yes | `username` | browser → `BROWSER_OP_UNSUPPORTED` |
 | `fetch_article_markdown` | both | no | `tweet_id` | |
 | `home_timeline_collect` | both | no | `screen_name?` | browser `home_feed`; twexapi `timeline_page` |
 | `session_status` | both | no | — | CDP reachability, profile, login probe, `twexapi_key_present` (boolean only) |
+
+Browser `SocialRecipe` ops are only: `read` \| `post` \| `reply` \| `read_replies` \| `search` \| `timeline_collect` \| `home_feed`.
 
 ```
 run_skill_script social_media_manager x_ops.py home_timeline_collect --medium browser

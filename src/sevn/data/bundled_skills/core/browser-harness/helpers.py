@@ -1,7 +1,7 @@
 """CDP harness helpers for the bundled ``browser-harness`` skill.
 
 Module: sevn.data.bundled_skills.core.browser-harness.helpers
-Depends: json, os, urllib.request, websocket
+Depends: asyncio, json, os, urllib.request, websockets
 
 Exports:
     default_cdp_url — resolve ``SEVN_CDP_URL``.
@@ -15,6 +15,7 @@ Examples:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import uuid
@@ -137,40 +138,44 @@ def browser_cdp(
         True
     """
     try:
-        import websocket  # type: ignore[import-untyped]
+        import websockets
     except ImportError as exc:
-        msg = "websocket-client not installed (uv sync --extra browser)"
+        msg = "websockets not installed — run: uv sync --extra browser-cdp"
         raise RuntimeError(msg) from exc
 
     ws_url = _ws_debugger_url()
     target_id = _pick_page_target()
-    msg_id = 1
-    with websocket.create_connection(ws_url, timeout=15) as conn:
-        attach = {
-            "id": msg_id,
-            "method": "Target.attachToTarget",
-            "params": {"targetId": target_id, "flatten": True},
-        }
-        msg_id += 1
-        conn.send(json.dumps(attach))
-        attach_resp = json.loads(conn.recv())
-        if attach_resp.get("error"):
-            err = attach_resp["error"]
-            raise RuntimeError(f"Target.attachToTarget failed: {err}")
-        attached_session = attach_resp.get("result", {}).get("sessionId")
-        active_session = session_id or attached_session
-        if not isinstance(active_session, str) or not active_session.strip():
-            raise RuntimeError("CDP attach did not return sessionId")
 
-        payload: dict[str, Any] = {
-            "id": msg_id,
-            "method": method,
-            "params": dict(params or {}),
-            "sessionId": active_session,
-        }
-        conn.send(json.dumps(payload))
-        raw = json.loads(conn.recv())
-        if raw.get("error"):
-            raise RuntimeError(f"CDP error for {method}: {raw['error']}")
-        result = raw.get("result")
-        return result if isinstance(result, dict) else {"value": result}
+    async def _call() -> dict[str, Any]:
+        msg_id = 1
+        async with websockets.connect(ws_url, open_timeout=15) as conn:
+            attach = {
+                "id": msg_id,
+                "method": "Target.attachToTarget",
+                "params": {"targetId": target_id, "flatten": True},
+            }
+            msg_id += 1
+            await conn.send(json.dumps(attach))
+            attach_resp = json.loads(await conn.recv())
+            if attach_resp.get("error"):
+                err = attach_resp["error"]
+                raise RuntimeError(f"Target.attachToTarget failed: {err}")
+            attached_session = attach_resp.get("result", {}).get("sessionId")
+            active_session = session_id or attached_session
+            if not isinstance(active_session, str) or not active_session.strip():
+                raise RuntimeError("CDP attach did not return sessionId")
+
+            payload: dict[str, Any] = {
+                "id": msg_id,
+                "method": method,
+                "params": dict(params or {}),
+                "sessionId": active_session,
+            }
+            await conn.send(json.dumps(payload))
+            raw = json.loads(await conn.recv())
+            if raw.get("error"):
+                raise RuntimeError(f"CDP error for {method}: {raw['error']}")
+            result = raw.get("result")
+            return result if isinstance(result, dict) else {"value": result}
+
+    return asyncio.run(_call())

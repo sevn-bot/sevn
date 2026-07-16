@@ -46,6 +46,30 @@ from sevn.integrations.twexapi.config import (
     resolve_twexapi_api_key,
 )
 
+# §4 facade ops owned by ``sevn.integrations.social_media.x_ops``.
+_X_FACADE_OPS: frozenset[str] = frozenset(
+    {
+        "advanced_search_page",
+        "search_hashtags",
+        "like_tweet",
+        "unlike_tweet",
+        "retweet",
+        "delete_retweet",
+        "bookmark",
+        "delete_bookmark",
+        "create_tweet_or_reply",
+        "create_quote_tweet",
+        "create_tweet_thread",
+        "delete_tweets",
+        "post_tweet_auto_cookie",
+        "get_users_by_usernames",
+        "follow_user",
+        "fetch_article_markdown",
+        "home_timeline_collect",
+        "session_status",
+    }
+)
+
 if TYPE_CHECKING:
     from sevn.config.sections.subagents import SpecialistConfig, SubAgentsWorkspaceConfig
     from sevn.tools.context import ToolContext
@@ -400,8 +424,7 @@ def _normalize_twexapi_body(
 def _browser_plan(task: SocialMediaTask) -> dict[str, Any]:
     """Build a browser-medium plan that uses sevn's CDP ``browser`` tool (D7).
 
-    The L2 worker does not attach CDP itself. The plan tells the caller to
-    invoke the native ``browser`` tool with ``action=social``.
+    Used for non-facade / non-X browser tasks. X §4 ops route through ``x_ops``.
 
     Args:
         task (SocialMediaTask): Parsed browser request.
@@ -436,6 +459,103 @@ def _browser_plan(task: SocialMediaTask) -> dict[str, Any]:
             f"Load site skills: {', '.join(site_skills)}."
         ),
     }
+
+
+def _task_payload_for_x_ops(parsed: SocialMediaTask, *, content_root: Path) -> dict[str, Any]:
+    """Build an ``x_ops`` task dict from a parsed specialist task.
+
+    Args:
+        parsed (SocialMediaTask): Parsed spawn/skill task.
+        content_root (Path): Workspace content root.
+
+    Returns:
+        dict[str, Any]: Task payload for the X ops facade.
+
+    Examples:
+        >>> t = SocialMediaTask("browser", "like_tweet", {}, {}, {}, site="x")
+        >>> _task_payload_for_x_ops(t, content_root=Path("."))["op"]
+        'like_tweet'
+    """
+    payload: dict[str, Any] = {
+        "medium": parsed.medium,
+        "op": parsed.op,
+        "content_root": str(content_root),
+        **dict(parsed.params),
+        **dict(parsed.body),
+        **{k: v for k, v in parsed.path_params.items()},
+    }
+    if parsed.site:
+        payload["site"] = parsed.site
+    if parsed.query:
+        payload["query"] = parsed.query
+    if parsed.url:
+        payload["url"] = parsed.url
+    if parsed.text:
+        payload["text"] = parsed.text
+    return payload
+
+
+def _wrap_x_ops_result(
+    envelope: dict[str, Any],
+    *,
+    skills: list[str],
+    tools: list[str],
+    twex_docs: str | None = None,
+) -> dict[str, Any]:
+    """Preserve specialist return shape around an ``x_ops`` envelope.
+
+    Args:
+        envelope (dict[str, Any]): Normalized ``{ok, medium, op, data, …}``.
+        skills (list[str]): Declared specialist skills.
+        tools (list[str]): Declared specialist tools.
+        twex_docs (str | None): Optional TwexAPI docs URL for twexapi medium.
+
+    Returns:
+        dict[str, Any]: Worker result with specialist/skills/tools.
+
+    Examples:
+        >>> out = _wrap_x_ops_result(
+        ...     {"ok": True, "medium": "browser", "op": "search", "data": {}},
+        ...     skills=["social_media_manager"],
+        ...     tools=["browser"],
+        ... )
+        >>> out["specialist"]
+        'social_media_manager'
+    """
+    base: dict[str, Any] = {
+        "specialist": SOCIAL_MEDIA_MANAGER_SPECIALIST,
+        "ok": envelope.get("ok"),
+        "medium": envelope.get("medium"),
+        "op": envelope.get("op"),
+        "skills": skills,
+        "tools": tools,
+    }
+    if envelope.get("error") is not None:
+        base["error"] = envelope["error"]
+    if envelope.get("code") is not None:
+        base["code"] = envelope["code"]
+    data = envelope.get("data") or {}
+    if envelope.get("medium") == "browser":
+        plan = data.get("browser_plan") if isinstance(data, dict) else None
+        plan = plan if isinstance(plan, dict) else {}
+        site = str(plan.get("site") or "x")
+        return {
+            **base,
+            "tool": "browser",
+            "engine": "cdp",
+            "action": plan.get("action", "social"),
+            "site": site,
+            "query": plan.get("query"),
+            "url": plan.get("url"),
+            "body": plan.get("body"),
+            "hint": plan.get("hint"),
+            "data": data,
+            "skills": list(dict.fromkeys([*_site_skill_hints(site), *skills])),
+        }
+    if twex_docs:
+        base["docs"] = twex_docs
+    base["data"] = _capped_data(data)
+    return base
 
 
 async def _execute_twexapi_path(
@@ -579,6 +699,38 @@ async def execute_social_media_manager_task(
     site = parsed.site or "x"
     task_dict = _task_dict_for_resolution(task, parsed)
     effective_medium = resolve_social_medium(task_dict, smm_cfg, site)
+
+    # X §4 facade ops: single owner is ``x_ops`` (browser plan or TwexAPI).
+    if site == "x" and parsed.op in _X_FACADE_OPS:
+        from sevn.integrations.social_media import x_ops as x_ops_mod
+
+        if effective_medium == "browser" and "browser" not in tools:
+            raise SocialMediaManagerError(
+                "social_media_manager tools list does not include `browser` (CDP automator)"
+            )
+        fn = getattr(x_ops_mod, parsed.op)
+        cfg_stub: dict[str, Any] = {
+            "skills": {"social_media_manager": smm_cfg},
+        }
+        tools_cfg = getattr(workspace_cfg, "tools", None)
+        if tools_cfg is not None:
+            browser_cfg = getattr(tools_cfg, "browser", None)
+            if browser_cfg is not None:
+                if hasattr(browser_cfg, "model_dump"):
+                    cfg_stub["tools"] = {"browser": browser_cfg.model_dump()}
+                elif isinstance(browser_cfg, dict):
+                    cfg_stub["tools"] = {"browser": browser_cfg}
+        envelope = await fn(
+            task=_task_payload_for_x_ops(parsed, content_root=content_root),
+            cfg=cfg_stub,
+            site=site,
+        )
+        return _wrap_x_ops_result(
+            envelope,
+            skills=skills,
+            tools=tools,
+            twex_docs=getattr(twex_settings, "docs_url", None),
+        )
 
     if effective_medium == "browser":
         if "browser" not in tools:

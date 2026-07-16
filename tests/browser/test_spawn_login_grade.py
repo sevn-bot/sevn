@@ -120,7 +120,7 @@ def test_close_browser_session_clears_profile_locks_for_sevn_pid(
     monkeypatch: MonkeyPatch,
 ) -> None:
     """DB2 + convention 11: sevn-spawned close deletes stale port/singleton files."""
-    profile = tmp_path / "profiles" / "sevn"
+    profile = tmp_path / ".sevn" / "browser-profiles" / "sevn"
     _seed_profile_locks(profile)
     write_registry(
         tmp_path,
@@ -149,7 +149,7 @@ def test_close_browser_session_leaves_foreign_profile_locks(
     monkeypatch: MonkeyPatch,
 ) -> None:
     """DB2 + convention 11: foreign PID/profile locks are not touched."""
-    sevn_profile = tmp_path / "profiles" / "sevn"
+    sevn_profile = tmp_path / ".sevn" / "browser-profiles" / "sevn"
     foreign_profile = tmp_path / "profiles" / "foreign"
     _seed_profile_locks(sevn_profile)
     _seed_profile_locks(foreign_profile)

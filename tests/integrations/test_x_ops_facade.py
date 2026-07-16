@@ -61,7 +61,7 @@ async def test_x_ops_dispatch_returns_normalized_envelope(medium: str) -> None:
     """DB6: resolve_social_medium drives dispatch; envelope is {ok,medium,op,data,...}."""
     x_ops = _import_x_ops()
     with patch(
-        "sevn.integrations.social_media.x_ops.resolve_social_medium",
+        "sevn.integrations.social_media.x_ops_dispatch.resolve_social_medium",
         return_value=medium,
     ):
         result = await x_ops.home_timeline_collect(
@@ -85,7 +85,7 @@ async def test_browser_write_op_blocked_returns_error_envelope_not_exception() -
     x_ops = _import_x_ops()
     cfg = {"tools": {"browser": {"social": {"x": {"allow_write": False}}}}}
     with patch(
-        "sevn.integrations.social_media.x_ops.resolve_social_medium",
+        "sevn.integrations.social_media.x_ops_dispatch.resolve_social_medium",
         return_value="browser",
     ):
         result = await x_ops.like_tweet(
@@ -106,7 +106,7 @@ async def test_twexapi_write_op_disabled_returns_error_envelope() -> None:
     x_ops = _import_x_ops()
     cfg = {"integrations": {"twexapi": {"enabled": False}}}
     with patch(
-        "sevn.integrations.social_media.x_ops.resolve_social_medium",
+        "sevn.integrations.social_media.x_ops_dispatch.resolve_social_medium",
         return_value="twexapi",
     ):
         result = await x_ops.create_tweet_or_reply(

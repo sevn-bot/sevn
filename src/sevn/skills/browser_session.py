@@ -58,6 +58,8 @@ from pathlib import Path
 from typing import Any, Final
 from urllib.parse import urlparse
 
+from loguru import logger
+
 from sevn.config.workspace_config import WorkspaceConfig
 
 BROWSER_SKILL_IDS: Final[frozenset[str]] = frozenset({"browser-harness"})
@@ -947,12 +949,52 @@ def resolve_idle_close_seconds(cfg: WorkspaceConfig | None = None) -> int:
     return 0
 
 
+def _is_sevn_owned_profile_dir(profile_dir: Path) -> bool:
+    """Return whether ``profile_dir`` is under a sevn-managed profiles root.
+
+    Accepts ``…/.sevn/browser-profiles/…`` or the resolved
+    ``SEVN_BROWSER_PROFILE_DIR`` override (exact match or child).
+
+    Args:
+        profile_dir (Path): Candidate Chrome ``user-data-dir``.
+
+    Returns:
+        bool: ``True`` when lock cleanup is safe.
+
+    Examples:
+        >>> import tempfile
+        >>> root = Path(tempfile.mkdtemp())
+        >>> d = root / ".sevn" / "browser-profiles" / "s1"
+        >>> _ = d.mkdir(parents=True)
+        >>> _is_sevn_owned_profile_dir(d)
+        True
+        >>> _is_sevn_owned_profile_dir(root / "other")
+        False
+    """
+    resolved = profile_dir.expanduser().resolve()
+    parts = resolved.parts
+    for i in range(len(parts) - 1):
+        if parts[i] == ".sevn" and parts[i + 1] == "browser-profiles":
+            return True
+    env_raw = os.environ.get(_PROFILE_ENV, "").strip()
+    if env_raw:
+        env_path = Path(env_raw).expanduser().resolve()
+        if resolved == env_path:
+            return True
+        try:
+            resolved.relative_to(env_path)
+            return True
+        except ValueError:
+            return False
+    return False
+
+
 def _clear_profile_browser_locks(profile_dir: Path) -> None:
     """Delete stale CDP port / Singleton lock files under a sevn profile (DB2).
 
-    Only call for a profile sevn owns (recorded registry ``profile_dir`` or the
-    path about to be used by :func:`spawn_chrome`). Never pass an operator Chrome
-    user-data directory (convention 11).
+    Only deletes when ``profile_dir`` is under
+    ``<content_root>/.sevn/browser-profiles/`` (or the resolved
+    ``SEVN_BROWSER_PROFILE_DIR`` root). Outside that tree: no-op + warning.
 
     Args:
         profile_dir (Path): Chrome ``user-data-dir`` owned by sevn.
@@ -962,12 +1004,20 @@ def _clear_profile_browser_locks(profile_dir: Path) -> None:
 
     Examples:
         >>> import tempfile
-        >>> d = Path(tempfile.mkdtemp())
+        >>> root = Path(tempfile.mkdtemp())
+        >>> d = root / ".sevn" / "browser-profiles" / "s1"
+        >>> _ = d.mkdir(parents=True)
         >>> _ = (d / "DevToolsActivePort").write_text("1\\n", encoding="utf-8")
         >>> _clear_profile_browser_locks(d)
         >>> (d / "DevToolsActivePort").exists()
         False
     """
+    if not _is_sevn_owned_profile_dir(profile_dir):
+        logger.warning(
+            "skipping browser lock cleanup — profile_dir not under sevn browser-profiles root: {}",
+            profile_dir,
+        )
+        return
     for name in _PROFILE_BROWSER_LOCK_NAMES:
         path = profile_dir / name
         with contextlib.suppress(OSError):

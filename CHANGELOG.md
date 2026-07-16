@@ -41,6 +41,11 @@ are cut into a dated, versioned section at release time.
 - [2026-07-12] Logfire trace export: `tracing.sinks[]` logfire sink with secrets-managed token, `sevn tracing` / `sevn config tracing` CLI, Telegram `/config → Logs` toggle and token form, and Mission Control ops endpoints
 - [2026-07-12] Sub-agents orchestration with level-1 role runs, level-2 workers and specialists, `multi` queue mode, Mission Control and Telegram kill surfaces, and `media_generation` skill via the `media_generator` specialist
 
+### Fixed
+
+- [2026-07-16] X ops facade resolves TwexAPI keys via `resolve_twexapi_api_key` (`KEY_MISSING` when absent), gates TwexAPI on workspace `settings.enabled`, rejects tweet-action/quote ops on `medium=browser` with `BROWSER_OP_UNSUPPORTED`, and puts thread `items`/`texts` into browser plans
+- [2026-07-16] `browser-harness` `browser_cdp` uses the `websockets` package from the `browser-cdp` extra (no `websocket-client`); profile lock cleanup only runs under `.sevn/browser-profiles/` (or `SEVN_BROWSER_PROFILE_DIR`)
+
 ### Changed
 
 - [2026-07-16] Social media manager defaults and per-site skill hints drop retired platform browser skills; package-install routing detects `browser-cdp` instead of the old driver install phrasing
