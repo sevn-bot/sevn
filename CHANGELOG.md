@@ -43,6 +43,9 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-16] `social_media_manager` worker forwards `tools.browser` from workspace `JsonDict` config (`.get("browser")`) so `allow_write=true` reaches the X ops write gate instead of always returning `WRITE_DISABLED`
+- [2026-07-16] Worker browser plans expose SocialRecipe `op` (e.g. `home_feed`/`post`) at the top level with facade name under `facade_op`, so `action=social` callers do not hit `unknown social op`
+- [2026-07-16] `browser-harness` WebSocket connects with `max_size=256MiB` matching core CDPConnection so large screenshots/DOM payloads do not fail
 - [2026-07-16] X ops facade resolves TwexAPI keys via `resolve_twexapi_api_key` (`KEY_MISSING` when absent), gates TwexAPI on workspace `settings.enabled`, rejects tweet-action/quote ops on `medium=browser` with `BROWSER_OP_UNSUPPORTED`, and puts thread `items`/`texts` into browser plans
 - [2026-07-16] `browser-harness` `browser_cdp` uses the `websockets` package from the `browser-cdp` extra (no `websocket-client`); profile lock cleanup only runs under `.sevn/browser-profiles/` (or `SEVN_BROWSER_PROFILE_DIR`)
 

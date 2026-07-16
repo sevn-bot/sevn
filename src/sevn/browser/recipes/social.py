@@ -6,7 +6,7 @@ X additionally exposes structured ``timeline_collect`` / ``home_feed`` / ``read`
 (via :mod:`sevn.browser.recipes.x_timeline`).
 
 Module: sevn.browser.recipes.social
-Depends: asyncio, contextlib, re, dataclasses, urllib.parse, sevn.browser.auth,
+Depends: asyncio, re, dataclasses, urllib.parse, sevn.browser.auth,
     sevn.browser.recipes.base, sevn.browser.recipes.x_timeline
 
 Exports:
@@ -24,7 +24,6 @@ Examples:
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
@@ -33,9 +32,12 @@ from urllib.parse import quote_plus
 from sevn.browser.auth import login_state
 from sevn.browser.recipes.base import RecipeError, validate_egress
 from sevn.browser.recipes.x_timeline import (
+    collect_x_posts,
     normalize_x_status_url,
     parse_x_timeline_html,
 )
+from sevn.browser.recipes.x_timeline import home_feed as x_home_feed
+from sevn.browser.recipes.x_timeline import timeline_collect as x_timeline_collect
 
 X_EGRESS_DOMAINS: Final[tuple[str, ...]] = (
     "x.com",
@@ -89,10 +91,6 @@ _AUTHOR_RE: Final[re.Pattern[str]] = re.compile(
 )
 
 _TYPE_PAUSE_S: Final[float] = 0.2
-_X_SCROLL_PIXELS: Final[int] = 1500
-_X_SCROLL_ROUNDS: Final[int] = 5
-_X_SCROLL_PAUSE_S: Final[float] = 0.15
-_X_HTML_MAX_CHARS: Final[int] = 500_000
 
 
 @dataclass(frozen=True)
@@ -435,7 +433,7 @@ class SocialRecipe:
         else:
             url = cfg.home_url
         if site_key == "x":
-            return await self._collect_x_posts(cfg, url=url, op="read")
+            return await collect_x_posts(self._page, url=url, op="read", egress=cfg.egress)
         await self._page.goto(url, wait_until="none")
         html = await self._page.extract_html()
         parsed = parse_post_html(html)
@@ -451,6 +449,7 @@ class SocialRecipe:
         """Scroll the X home timeline and return structured posts (DB4).
 
         ``home_feed`` is an alias with the same scrape. Non-X sites raise.
+        CDP orchestration lives in :mod:`sevn.browser.recipes.x_timeline`.
 
         Args:
             site_key (str): Must be ``x``.
@@ -471,8 +470,12 @@ class SocialRecipe:
         if site_key != "x":
             msg = f"{op} is only supported for site=x (got {site_key!r})"
             raise RecipeError(msg)
-        label = op if op in {"timeline_collect", "home_feed"} else "timeline_collect"
-        return await self._collect_x_posts(cfg, url=cfg.home_url, op=label)
+        return await x_timeline_collect(
+            self._page,
+            egress=cfg.egress,
+            home_url=cfg.home_url,
+            op=op,
+        )
 
     async def home_feed(self, site_key: str, cfg: _SiteConfig) -> dict[str, Any]:
         """Alias for :meth:`timeline_collect` with ``op=home_feed``.
@@ -484,82 +487,22 @@ class SocialRecipe:
         Returns:
             dict[str, Any]: Structured home-feed posts.
 
+        Raises:
+            RecipeError: When ``site_key`` is not ``x``.
+
         Examples:
             >>> import inspect
             >>> inspect.iscoroutinefunction(SocialRecipe.home_feed)
             True
         """
-        return await self.timeline_collect(site_key, cfg, op="home_feed")
-
-    async def _collect_x_posts(
-        self,
-        cfg: _SiteConfig,
-        *,
-        url: str,
-        op: str,
-    ) -> dict[str, Any]:
-        """Navigate, dismiss blockers, scroll, and scrape structured X posts.
-
-        Args:
-            cfg (_SiteConfig): X site configuration.
-            url (str): Page to open (home or a status URL).
-            op (str): Result operation label.
-
-        Returns:
-            dict[str, Any]: ``{site, op, url, posts, count}``.
-
-        Examples:
-            >>> import inspect
-            >>> inspect.iscoroutinefunction(SocialRecipe._collect_x_posts)
-            True
-        """
-        validate_egress(url, allowlist=cfg.egress)
-        await self._page.goto(url, wait_until="none")
-        await self._dismiss_x_blockers()
-        for _ in range(_X_SCROLL_ROUNDS):
-            with contextlib.suppress(Exception):
-                await self._page.evaluate(f"window.scrollBy(0, {_X_SCROLL_PIXELS})")
-            await asyncio.sleep(_X_SCROLL_PAUSE_S)
-        html = await self._page.extract_html(max_chars=_X_HTML_MAX_CHARS)
-        posts = parse_x_timeline_html(html)
-        return {
-            "site": "x",
-            "op": op,
-            "url": url,
-            "posts": posts,
-            "count": len(posts),
-        }
-
-    async def _dismiss_x_blockers(self) -> None:
-        """Best-effort cookie/consent dismiss via in-page click (no DOM mock needed).
-
-        Returns:
-            None
-
-        Examples:
-            >>> import inspect
-            >>> inspect.iscoroutinefunction(SocialRecipe._dismiss_x_blockers)
-            True
-        """
-        script = """(() => {
-          const labels = [
-            'Accept all cookies', 'Accept all', 'Accept cookies', 'Accept & close',
-            'Allow all cookies', 'Allow all', 'I agree', 'I accept', 'Agree'
-          ];
-          const nodes = Array.from(document.querySelectorAll('button, div[role="button"], a'));
-          for (const el of nodes) {
-            const text = (el.innerText || el.textContent || '').trim();
-            if (!text) continue;
-            if (labels.some((l) => text.toLowerCase() === l.toLowerCase()
-                || text.toLowerCase().includes(l.toLowerCase()))) {
-              el.click();
-              return 1;
-            }
-          }
-          return 0;
-        })()"""
-        with contextlib.suppress(Exception):
-            await self._page.evaluate(script)
+        if site_key != "x":
+            msg = f"home_feed is only supported for site=x (got {site_key!r})"
+            raise RecipeError(msg)
+        return await x_home_feed(
+            self._page,
+            egress=cfg.egress,
+            home_url=cfg.home_url,
+        )
 
     async def search(self, site_key: str, cfg: _SiteConfig, query: str) -> dict[str, Any]:
         """Search the site for ``query``.

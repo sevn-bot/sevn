@@ -2,7 +2,7 @@
 
 Module: sevn.integrations.social_media.x_ops_dispatch
 Depends: sevn.browser.recipes.social, sevn.integrations.social_media.medium,
-    sevn.integrations.twexapi
+    sevn.integrations.social_media.readiness, sevn.integrations.twexapi
 
 Exports:
     cookies_for_twexapi — map browser export_cookies payload → TwexAPI cookie field.
@@ -12,27 +12,37 @@ Exports:
     run_op — normalize args and dispatch one facade op.
     smm_cfg — extract skills.social_media_manager block.
     thread_items — ordered thread texts from items/texts.
+
+``FACADE_OPS`` (frozenset of §4 op names) is also exported via ``__all__``.
 """
 
 from __future__ import annotations
 
+import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from sevn.browser.recipes.social import social_write_allowed
 from sevn.integrations.social_media.medium import resolve_social_medium
+from sevn.integrations.social_media.readiness import (
+    build_social_media_readiness_sync,
+    twexapi_key_configured,
+)
 from sevn.integrations.twexapi.client import (
     TWEXAPI_WRITE_OPS,
     TwexApiClient,
     TwexApiError,
 )
 from sevn.integrations.twexapi.config import (
+    TWEXAPI_ENV_KEYS,
     load_twexapi_settings,
     resolve_twexapi_api_key,
 )
 
 __all__ = [
+    "FACADE_OPS",
     "cookie_bridge_log_safe",
     "cookies_for_twexapi",
     "envelope",
@@ -73,6 +83,233 @@ _BROWSER_UNSUPPORTED_OPS: frozenset[str] = frozenset(
     }
 )
 
+TwexBodyPacker = Callable[[dict[str, Any]], dict[str, Any] | list[Any] | None]
+TwexPathPacker = Callable[[dict[str, Any]], dict[str, str] | None]
+
+
+def _pack_empty_body(_task: dict[str, Any]) -> dict[str, Any]:
+    """Return an empty TwexAPI JSON body.
+
+    Args:
+        _task (dict[str, Any]): Unused task payload.
+
+    Returns:
+        dict[str, Any]: Empty body.
+
+    Examples:
+        >>> _pack_empty_body({})
+        {}
+    """
+    return {}
+
+
+def _pack_tweet_id_path(task: dict[str, Any]) -> dict[str, str]:
+    """Pack ``tweet_id`` path params for tweet-action ops.
+
+    Args:
+        task (dict[str, Any]): Task with optional ``tweet_id``.
+
+    Returns:
+        dict[str, str]: Path params (``\"0\"`` when missing).
+
+    Examples:
+        >>> _pack_tweet_id_path({"tweet_id": "9"})["tweet_id"]
+        '9'
+    """
+    tweet_id = str(task.get("tweet_id") or "").strip()
+    return {"tweet_id": tweet_id or "0"}
+
+
+def _pack_advanced_search_body(task: dict[str, Any]) -> dict[str, Any] | None:
+    """Pack TwexAPI ``search_page`` body from task fields.
+
+    Args:
+        task (dict[str, Any]): Task with ``query`` / ``searchTerms``.
+
+    Returns:
+        dict[str, Any] | None: Body or ``None`` when empty.
+
+    Examples:
+        >>> _pack_advanced_search_body({"query": "ai"})["searchTerms"]
+        ['ai']
+    """
+    body: dict[str, Any] = {}
+    if "searchTerms" in task:
+        body["searchTerms"] = task["searchTerms"]
+    elif task.get("query"):
+        body["searchTerms"] = [str(task["query"])]
+    for key in ("sortBy", "next_cursor"):
+        if task.get(key):
+            body[key] = task[key]
+    return body or None
+
+
+def _pack_hashtags_body(task: dict[str, Any]) -> dict[str, Any]:
+    """Pack TwexAPI ``hashtags`` body.
+
+    Args:
+        task (dict[str, Any]): Task with ``hashtags`` / ``query``.
+
+    Returns:
+        dict[str, Any]: ``{\"hashtags\": [...]}``.
+
+    Examples:
+        >>> _pack_hashtags_body({"query": "ai"})["hashtags"]
+        ['ai']
+    """
+    tags = task.get("hashtags")
+    if isinstance(tags, str):
+        tags = [tags]
+    if not tags and task.get("query"):
+        tags = [str(task["query"])]
+    return {"hashtags": list(tags or [])}
+
+
+def _pack_create_body(task: dict[str, Any]) -> dict[str, Any]:
+    """Pack create-tweet / reply body.
+
+    Args:
+        task (dict[str, Any]): Task with ``text`` / ``tweet_content``.
+
+    Returns:
+        dict[str, Any]: TwexAPI create body.
+
+    Examples:
+        >>> _pack_create_body({"text": "hi"})["tweet_content"]
+        'hi'
+    """
+    text = str(task.get("text") or task.get("tweet_content") or "")
+    body: dict[str, Any] = {"tweet_content": text}
+    for key in ("reply_tweet_id", "media_url"):
+        if task.get(key):
+            body[key] = task[key]
+    return body
+
+
+def _pack_quote_body(task: dict[str, Any]) -> dict[str, Any]:
+    """Pack quote-tweet body.
+
+    Args:
+        task (dict[str, Any]): Task with text and quote target fields.
+
+    Returns:
+        dict[str, Any]: TwexAPI quote body.
+
+    Examples:
+        >>> _pack_quote_body({"text": "q", "tweet_id": "1"})["tweet_id"]
+        '1'
+    """
+    text = str(task.get("text") or task.get("tweet_content") or "")
+    body: dict[str, Any] = {"tweet_content": text}
+    for key in ("tweet_id", "quoted_tweet_id", "media_url"):
+        if task.get(key):
+            body[key] = task[key]
+    return body
+
+
+def _pack_thread_body(task: dict[str, Any]) -> dict[str, Any]:
+    """Pack tweet-thread body from ``items`` / ``texts``.
+
+    Args:
+        task (dict[str, Any]): Task payload.
+
+    Returns:
+        dict[str, Any]: ``{\"items\": [...]}``.
+
+    Examples:
+        >>> _pack_thread_body({"items": ["a"]})["items"]
+        ['a']
+    """
+    return {"items": list(thread_items(task))}
+
+
+def _pack_delete_body(task: dict[str, Any]) -> dict[str, Any]:
+    """Pack delete-tweets body.
+
+    Args:
+        task (dict[str, Any]): Task with optional id fields.
+
+    Returns:
+        dict[str, Any]: Sparse delete body.
+
+    Examples:
+        >>> _pack_delete_body({"username": "a"})["username"]
+        'a'
+    """
+    return {k: task[k] for k in ("username", "target_id", "tweet_ids") if k in task}
+
+
+def _pack_auto_cookie_body(task: dict[str, Any]) -> dict[str, Any]:
+    """Pack pool-cookie post body.
+
+    Args:
+        task (dict[str, Any]): Task with ``text`` / ``tweet_content``.
+
+    Returns:
+        dict[str, Any]: ``{\"tweet_content\": ...}``.
+
+    Examples:
+        >>> _pack_auto_cookie_body({"text": "x"})["tweet_content"]
+        'x'
+    """
+    text = str(task.get("text") or task.get("tweet_content") or "")
+    return {"tweet_content": text}
+
+
+def _pack_users_body(task: dict[str, Any]) -> list[Any]:
+    """Pack usernames list body for TwexAPI ``users``.
+
+    Args:
+        task (dict[str, Any]): Task with ``usernames`` / ``query``.
+
+    Returns:
+        list[Any]: Username strings.
+
+    Examples:
+        >>> _pack_users_body({"query": "@bob"})
+        ['bob']
+    """
+    names = task.get("usernames")
+    if isinstance(names, str):
+        names = [n.strip() for n in names.split(",") if n.strip()]
+    if not names and task.get("query"):
+        names = [str(task["query"]).lstrip("@")]
+    return list(names or [])
+
+
+def _pack_follow_body(task: dict[str, Any]) -> dict[str, Any]:
+    """Pack follow-user body.
+
+    Args:
+        task (dict[str, Any]): Task with ``username`` / ``query``.
+
+    Returns:
+        dict[str, Any]: ``{\"username\": ...}``.
+
+    Examples:
+        >>> _pack_follow_body({"username": "@a"})["username"]
+        'a'
+    """
+    username = str(task.get("username") or task.get("query") or "").lstrip("@")
+    return {"username": username}
+
+
+def _pack_timeline_path(task: dict[str, Any]) -> dict[str, str]:
+    """Pack timeline ``screen_name`` path params.
+
+    Args:
+        task (dict[str, Any]): Task with optional screen/username.
+
+    Returns:
+        dict[str, str]: Path params (default ``home``).
+
+    Examples:
+        >>> _pack_timeline_path({})["screen_name"]
+        'home'
+    """
+    screen = str(task.get("screen_name") or task.get("username") or "home").lstrip("@")
+    return {"screen_name": screen}
+
 
 @dataclass(frozen=True, slots=True)
 class _OpSpec:
@@ -81,6 +318,8 @@ class _OpSpec:
     name: str
     twex_key: str | None = None
     browser_social_op: str | None = None
+    pack_body: TwexBodyPacker | None = None
+    pack_path: TwexPathPacker | None = None
 
     @property
     def is_write(self) -> bool:
@@ -112,30 +351,89 @@ class _OpSpec:
 _OP_SPECS: dict[str, _OpSpec] = {
     spec.name: spec
     for spec in (
-        _OpSpec("advanced_search_page", twex_key="search_page", browser_social_op="search"),
-        _OpSpec("search_hashtags", twex_key="hashtags", browser_social_op="search"),
-        _OpSpec("like_tweet"),
-        _OpSpec("unlike_tweet"),
-        _OpSpec("retweet"),
-        _OpSpec("delete_retweet"),
-        _OpSpec("bookmark"),
-        _OpSpec("delete_bookmark"),
-        _OpSpec("create_tweet_or_reply", browser_social_op="post"),
-        _OpSpec("create_quote_tweet"),
-        _OpSpec("create_tweet_thread", browser_social_op="post"),
-        _OpSpec("delete_tweets"),
-        _OpSpec("post_tweet_auto_cookie", browser_social_op="post"),
-        _OpSpec("get_users_by_usernames", twex_key="users", browser_social_op="read"),
-        _OpSpec("follow_user"),
-        _OpSpec("fetch_article_markdown", browser_social_op="read"),
+        _OpSpec(
+            "advanced_search_page",
+            twex_key="search_page",
+            browser_social_op="search",
+            pack_body=_pack_advanced_search_body,
+        ),
+        _OpSpec(
+            "search_hashtags",
+            twex_key="hashtags",
+            browser_social_op="search",
+            pack_body=_pack_hashtags_body,
+        ),
+        _OpSpec(
+            "like_tweet",
+            pack_path=_pack_tweet_id_path,
+            pack_body=_pack_empty_body,
+        ),
+        _OpSpec(
+            "unlike_tweet",
+            pack_path=_pack_tweet_id_path,
+            pack_body=_pack_empty_body,
+        ),
+        _OpSpec(
+            "retweet",
+            pack_path=_pack_tweet_id_path,
+            pack_body=_pack_empty_body,
+        ),
+        _OpSpec(
+            "delete_retweet",
+            pack_path=_pack_tweet_id_path,
+            pack_body=_pack_empty_body,
+        ),
+        _OpSpec(
+            "bookmark",
+            pack_path=_pack_tweet_id_path,
+            pack_body=_pack_empty_body,
+        ),
+        _OpSpec(
+            "delete_bookmark",
+            pack_path=_pack_tweet_id_path,
+            pack_body=_pack_empty_body,
+        ),
+        _OpSpec(
+            "create_tweet_or_reply",
+            browser_social_op="post",
+            pack_body=_pack_create_body,
+        ),
+        _OpSpec("create_quote_tweet", pack_body=_pack_quote_body),
+        _OpSpec(
+            "create_tweet_thread",
+            browser_social_op="post",
+            pack_body=_pack_thread_body,
+        ),
+        _OpSpec("delete_tweets", pack_body=_pack_delete_body),
+        _OpSpec(
+            "post_tweet_auto_cookie",
+            browser_social_op="post",
+            pack_body=_pack_auto_cookie_body,
+        ),
+        _OpSpec(
+            "get_users_by_usernames",
+            twex_key="users",
+            browser_social_op="read",
+            pack_body=_pack_users_body,
+        ),
+        _OpSpec("follow_user", pack_body=_pack_follow_body),
+        _OpSpec(
+            "fetch_article_markdown",
+            browser_social_op="read",
+            pack_path=_pack_tweet_id_path,
+        ),
         _OpSpec(
             "home_timeline_collect",
             twex_key="timeline_page",
             browser_social_op="home_feed",
+            pack_path=_pack_timeline_path,
+            pack_body=_pack_empty_body,
         ),
         _OpSpec("session_status"),
     )
 }
+
+FACADE_OPS: frozenset[str] = frozenset(_OP_SPECS)
 
 
 def cookies_for_twexapi(export_payload: dict[str, Any]) -> str:
@@ -417,6 +715,62 @@ def _browser_plan(op: str, task: dict[str, Any], site: str, social_op: str) -> d
     return plan
 
 
+async def _session_status(
+    task: dict[str, Any],
+    cfg: dict[str, Any],
+    site: str,
+) -> dict[str, Any]:
+    """Report CDP reachability, profile, login probe, and TwexAPI key presence.
+
+    Args:
+        task (dict[str, Any]): Optional ``content_root``.
+        cfg (dict[str, Any]): Config / test stub.
+        site (str): Platform site key for login probe.
+
+    Returns:
+        dict[str, Any]: Normalized envelope with readiness fields under ``data``.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_session_status)
+        True
+    """
+    medium = resolve_social_medium(task, smm_cfg(cfg), site)
+    content_root = resolve_content_root(task)
+    try:
+        snap = build_social_media_readiness_sync(content_root, site=site)
+    except (OSError, ValueError, RuntimeError) as exc:
+        return envelope(
+            ok=False,
+            medium=medium,
+            op="session_status",
+            data={},
+            error=str(exc),
+            code="STATUS_ERROR",
+        )
+    raw_browser = snap.get("browser")
+    browser: dict[str, Any] = raw_browser if isinstance(raw_browser, dict) else {}
+    raw_twex = snap.get("twexapi")
+    twex: dict[str, Any] = raw_twex if isinstance(raw_twex, dict) else {}
+    settings, _ = load_twexapi_settings(content_root)
+    key_present = twexapi_key_configured(settings) or any(
+        os.environ.get(name, "").strip() for name in ("SEVN_SECRET_TWEXAPI", *TWEXAPI_ENV_KEYS)
+    )
+    data = {
+        "cdp_reachable": bool(browser.get("cdp_reachable")),
+        "cdp_ok": bool(browser.get("cdp_reachable")),
+        "reachability": "ok" if browser.get("cdp_reachable") else "down",
+        "profile_path": browser.get("profile_dir"),
+        "profile_dir": browser.get("profile_dir"),
+        "profile_exists": bool(browser.get("profile_exists")),
+        "login": snap.get("site"),
+        "twexapi_key_present": bool(key_present),
+        "key_present": bool(key_present),
+        "twexapi_enabled": bool(twex.get("enabled")),
+    }
+    return envelope(ok=True, medium=medium, op="session_status", data=data)
+
+
 async def _dispatch(
     op: str,
     task: dict[str, Any],
@@ -446,6 +800,9 @@ async def _dispatch(
         >>> inspect.iscoroutinefunction(_dispatch)
         True
     """
+    if op == "session_status":
+        return await _session_status(task, cfg, site)
+
     spec = _OP_SPECS[op]
     is_write = spec.is_write
     medium = resolve_social_medium(task, smm_cfg(cfg), site)
@@ -610,6 +967,9 @@ async def run_op(
 ) -> dict[str, Any]:
     """Normalize args and dispatch one facade op.
 
+    When ``twexapi_body`` / ``twexapi_path_params`` are omitted, OpSpec packers
+    derive them from ``task`` (single packing source for public wrappers + worker).
+
     Args:
         op (str): Facade op name.
         task (dict[str, Any] | None): Task payload.
@@ -622,17 +982,32 @@ async def run_op(
     Returns:
         dict[str, Any]: Normalized envelope.
 
+    Raises:
+        KeyError: When ``op`` is not a known facade op.
+
     Examples:
         >>> import inspect
         >>> inspect.iscoroutinefunction(run_op)
         True
     """
+    task_d = dict(task or {})
+    cfg_d = dict(cfg or {})
+    if op not in _OP_SPECS:
+        msg = f"unknown facade op: {op!r}"
+        raise KeyError(msg)
+    spec = _OP_SPECS[op]
+    body = twexapi_body
+    if body is None and spec.pack_body is not None:
+        body = spec.pack_body(task_d)
+    path_params = twexapi_path_params
+    if path_params is None and spec.pack_path is not None:
+        path_params = spec.pack_path(task_d)
     return await _dispatch(
         op,
-        dict(task or {}),
-        dict(cfg or {}),
+        task_d,
+        cfg_d,
         site,
-        twexapi_body=twexapi_body,
-        twexapi_path_params=twexapi_path_params,
+        twexapi_body=body,
+        twexapi_path_params=path_params,
         twexapi_params=twexapi_params,
     )

@@ -19,9 +19,12 @@ import asyncio
 import json
 import os
 import uuid
-from typing import Any
+from typing import Any, Final
 from urllib import error as urlerror
 from urllib import request as urlrequest
+
+# Match ``sevn.browser.cdp.connection`` — DOM/screenshot payloads exceed 1 MiB default.
+_MAX_WS_SIZE: Final[int] = 256 * 1024 * 1024
 
 
 def default_cdp_url() -> str:
@@ -148,7 +151,7 @@ def browser_cdp(
 
     async def _call() -> dict[str, Any]:
         msg_id = 1
-        async with websockets.connect(ws_url, open_timeout=15) as conn:
+        async with websockets.connect(ws_url, open_timeout=15, max_size=_MAX_WS_SIZE) as conn:
             attach = {
                 "id": msg_id,
                 "method": "Target.attachToTarget",

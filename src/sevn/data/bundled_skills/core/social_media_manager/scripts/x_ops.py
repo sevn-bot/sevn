@@ -20,29 +20,8 @@ if str(_SCRIPTS) not in sys.path:
 from _common import content_root_from_env, dry_run_requested  # noqa: E402
 
 from sevn.config.loader import load_workspace  # noqa: E402
-from sevn.integrations.social_media import x_ops  # noqa: E402
+from sevn.integrations.social_media.x_ops_dispatch import FACADE_OPS, run_op  # noqa: E402
 from sevn.lcm.script_cli import write_error, write_ok  # noqa: E402
-
-_FACADE_OPS: tuple[str, ...] = (
-    "advanced_search_page",
-    "search_hashtags",
-    "like_tweet",
-    "unlike_tweet",
-    "retweet",
-    "delete_retweet",
-    "bookmark",
-    "delete_bookmark",
-    "create_tweet_or_reply",
-    "create_quote_tweet",
-    "create_tweet_thread",
-    "delete_tweets",
-    "post_tweet_auto_cookie",
-    "get_users_by_usernames",
-    "follow_user",
-    "fetch_article_markdown",
-    "home_timeline_collect",
-    "session_status",
-)
 
 
 def _parse_task(raw: str | None) -> dict[str, Any]:
@@ -80,7 +59,11 @@ def main(argv: list[str] | None = None) -> int:
         int: Process exit code.
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("op", choices=_FACADE_OPS, help="Facade op name")
+    parser.add_argument(
+        "op",
+        choices=sorted(FACADE_OPS),
+        help="Facade op name",
+    )
     parser.add_argument("--task", default=None, help="JSON object task payload")
     parser.add_argument("--medium", default=None, help="Override medium (browser|twexapi)")
     parser.add_argument("--site", default="x", help="Platform site key (default x)")
@@ -116,9 +99,8 @@ def main(argv: list[str] | None = None) -> int:
                 tw = smm.get("twexapi")
                 if isinstance(tw, dict):
                     cfg["integrations"] = {"twexapi": {"enabled": bool(tw.get("enabled"))}}
-        fn = getattr(x_ops, args.op)
-        result = asyncio.run(fn(task=task, cfg=cfg, site=args.site))
-    except (OSError, RuntimeError, ValueError, TypeError) as exc:
+        result = asyncio.run(run_op(args.op, task, cfg, args.site))
+    except (OSError, RuntimeError, ValueError, TypeError, KeyError) as exc:
         write_error(code="X_OPS_ERROR", error=str(exc))
         return 1
     if not isinstance(result, dict) or not result.get("ok", False):

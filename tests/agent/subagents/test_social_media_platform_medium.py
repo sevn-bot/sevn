@@ -378,3 +378,94 @@ class TestBrowserPlanSkills:
         assert plan["action"] == "social"
         assert plan["site"] == "instagram"
         assert plan["engine"] == "cdp"
+
+
+class TestWorkerToolsBrowserForwarding:
+    """Thermos i2 H1 — JsonDict tools.browser must reach x_ops write gate."""
+
+    @pytest.fixture
+    def allow_write_workspace(self, tmp_path: Path) -> Path:
+        root = tmp_path / "ws"
+        root.mkdir()
+        (root / "sevn.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "gateway": {"token": "test-token"},
+                    "tools": {
+                        "browser": {
+                            "social": {"x": {"allow_write": True}},
+                        },
+                    },
+                    "skills": {
+                        "social_media_manager": {
+                            "default_medium": "browser",
+                            "twexapi": {"enabled": False},
+                        },
+                    },
+                    "subagents": {
+                        "specialists": {
+                            "social_media_manager": {
+                                "model": "gpt-4o-mini",
+                                "provider": "openai",
+                                "skill": "social_media_manager",
+                                "tools": ["browser"],
+                            },
+                        },
+                    },
+                },
+            ),
+            encoding="utf-8",
+        )
+        return root
+
+    def test_browser_tools_from_workspace_dict(self) -> None:
+        worker = _import_worker_module()
+        ws = type(
+            "_Ws",
+            (),
+            {"tools": {"browser": {"social": {"x": {"allow_write": True}}}}},
+        )()
+        assert worker._browser_tools_from_workspace(ws) == {
+            "social": {"x": {"allow_write": True}},
+        }
+
+    @pytest.mark.asyncio
+    async def test_allow_write_true_not_write_disabled(self, allow_write_workspace: Path) -> None:
+        worker = _import_worker_module()
+        result = await worker.execute_social_media_manager_task(
+            '{"medium":"browser","op":"create_tweet_or_reply","site":"x","text":"hi"}',
+            content_root=allow_write_workspace,
+        )
+        assert result.get("code") != "WRITE_DISABLED"
+        assert result.get("ok") is True
+        assert result.get("medium") == "browser"
+        assert result.get("op") == "post"
+        assert result.get("facade_op") == "create_tweet_or_reply"
+
+
+class TestWrapPromotesSocialOp:
+    """Thermos i2 M1 — browser_plan social op at top-level for action=social."""
+
+    def test_wrap_promotes_plan_op_keeps_facade(self) -> None:
+        worker = _import_worker_module()
+        out = worker._wrap_x_ops_result(
+            {
+                "ok": True,
+                "medium": "browser",
+                "op": "home_timeline_collect",
+                "data": {
+                    "browser_plan": {
+                        "action": "social",
+                        "site": "x",
+                        "op": "home_feed",
+                        "facade_op": "home_timeline_collect",
+                    },
+                },
+            },
+            skills=["social_media_manager"],
+            tools=["browser"],
+        )
+        assert out["op"] == "home_feed"
+        assert out["facade_op"] == "home_timeline_collect"
+        assert out["action"] == "social"

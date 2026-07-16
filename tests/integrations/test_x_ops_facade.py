@@ -11,32 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-# §4 facade ops (DB6) — one function per op in sevn.integrations.social_media.x_ops
-_FACADE_OPS: tuple[str, ...] = (
-    # search
-    "advanced_search_page",
-    "search_hashtags",
-    # tweet-actions
-    "like_tweet",
-    "unlike_tweet",
-    "retweet",
-    "delete_retweet",
-    "bookmark",
-    "delete_bookmark",
-    "create_tweet_or_reply",
-    "create_quote_tweet",
-    "create_tweet_thread",
-    "delete_tweets",
-    "post_tweet_auto_cookie",
-    # users
-    "get_users_by_usernames",
-    "follow_user",
-    # articles
-    "fetch_article_markdown",
-    # also
-    "home_timeline_collect",
-    "session_status",
-)
+from sevn.integrations.social_media.x_ops_dispatch import FACADE_OPS
 
 _ENVELOPE_KEYS = frozenset({"ok", "medium", "op", "data"})
 
@@ -47,7 +22,7 @@ def _import_x_ops() -> Any:
     return x_ops
 
 
-@pytest.mark.parametrize("op_name", _FACADE_OPS)
+@pytest.mark.parametrize("op_name", sorted(FACADE_OPS))
 def test_x_ops_facade_exports_every_section4_op(op_name: str) -> None:
     """DB6: each §4 op is a callable on the facade owner module."""
     x_ops = _import_x_ops()
@@ -151,7 +126,7 @@ async def test_session_status_reports_fields_without_leaking_key() -> None:
     secret_key = "sk-twexapi-LIVE-SECRET-999"
     with (
         patch(
-            "sevn.integrations.social_media.x_ops.resolve_social_medium",
+            "sevn.integrations.social_media.x_ops_dispatch.resolve_social_medium",
             return_value="browser",
         ),
         patch.dict("os.environ", {"SEVN_SECRET_TWEXAPI": secret_key}, clear=False),

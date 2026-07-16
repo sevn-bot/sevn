@@ -1,11 +1,15 @@
-"""X/Twitter timeline HTML scrape helpers for structured post collection.
+"""X/Twitter timeline scrape + CDP orchestration for structured post collection.
 
 Module: sevn.browser.recipes.x_timeline
-Depends: re
+Depends: asyncio, contextlib, re, sevn.browser.recipes.base
 
 Exports:
     normalize_x_status_url — canonicalize an X status permalink.
     parse_x_timeline_html — scrape ``{tweet_url, author_handle, text}`` from X feed HTML.
+    dismiss_x_blockers — best-effort cookie/consent dismiss on a page.
+    collect_x_posts — navigate, scroll, and return structured X posts.
+    timeline_collect — home-timeline collect labeled ``timeline_collect``.
+    home_feed — home-timeline collect labeled ``home_feed``.
 
 Examples:
     >>> from sevn.browser.recipes.x_timeline import normalize_x_status_url
@@ -15,12 +19,23 @@ Examples:
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import re
-from typing import Final
+from typing import TYPE_CHECKING, Any, Final
+
+from sevn.browser.recipes.base import validate_egress
+
+if TYPE_CHECKING:
+    from sevn.browser.page import Page
 
 __all__ = [
+    "collect_x_posts",
+    "dismiss_x_blockers",
+    "home_feed",
     "normalize_x_status_url",
     "parse_x_timeline_html",
+    "timeline_collect",
 ]
 
 _ARTICLE_RE: Final[re.Pattern[str]] = re.compile(
@@ -42,6 +57,12 @@ _STATUS_PATH_RE: Final[re.Pattern[str]] = re.compile(
 _STATUS_TRAILING_NOISE: Final[frozenset[str]] = frozenset(
     {"analytics", "photo", "likes", "retweets", "quotes", "media", "video"}
 )
+
+_X_SCROLL_PIXELS: Final[int] = 1500
+_X_SCROLL_ROUNDS: Final[int] = 5
+_X_SCROLL_PAUSE_S: Final[float] = 0.15
+_X_HTML_MAX_CHARS: Final[int] = 500_000
+_X_HOME_URL: Final[str] = "https://x.com/home"
 
 
 def _strip_tags(text: str) -> str:
@@ -181,3 +202,130 @@ def parse_x_timeline_html(html: str) -> list[dict[str, str]]:
             }
         )
     return posts
+
+
+async def dismiss_x_blockers(page: Page) -> None:
+    """Best-effort cookie/consent dismiss via in-page click (no DOM mock needed).
+
+    Args:
+        page (Page): CDP page handle.
+
+    Returns:
+        None
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(dismiss_x_blockers)
+        True
+    """
+    script = """(() => {
+      const labels = [
+        'Accept all cookies', 'Accept all', 'Accept cookies', 'Accept & close',
+        'Allow all cookies', 'Allow all', 'I agree', 'I accept', 'Agree'
+      ];
+      const nodes = Array.from(document.querySelectorAll('button, div[role="button"], a'));
+      for (const el of nodes) {
+        const text = (el.innerText || el.textContent || '').trim();
+        if (!text) continue;
+        if (labels.some((l) => text.toLowerCase() === l.toLowerCase()
+            || text.toLowerCase().includes(l.toLowerCase()))) {
+          el.click();
+          return 1;
+        }
+      }
+      return 0;
+    })()"""
+    with contextlib.suppress(Exception):
+        await page.evaluate(script)
+
+
+async def collect_x_posts(
+    page: Page,
+    *,
+    url: str,
+    op: str,
+    egress: tuple[str, ...],
+) -> dict[str, Any]:
+    """Navigate, dismiss blockers, scroll, and scrape structured X posts.
+
+    Args:
+        page (Page): CDP page handle.
+        url (str): Page to open (home or a status URL).
+        op (str): Result operation label.
+        egress (tuple[str, ...]): Allowed egress domains for ``url``.
+
+    Returns:
+        dict[str, Any]: ``{site, op, url, posts, count}``.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(collect_x_posts)
+        True
+    """
+    validate_egress(url, allowlist=egress)
+    await page.goto(url, wait_until="none")
+    await dismiss_x_blockers(page)
+    for _ in range(_X_SCROLL_ROUNDS):
+        with contextlib.suppress(Exception):
+            await page.evaluate(f"window.scrollBy(0, {_X_SCROLL_PIXELS})")
+        await asyncio.sleep(_X_SCROLL_PAUSE_S)
+    html = await page.extract_html(max_chars=_X_HTML_MAX_CHARS)
+    posts = parse_x_timeline_html(html)
+    return {
+        "site": "x",
+        "op": op,
+        "url": url,
+        "posts": posts,
+        "count": len(posts),
+    }
+
+
+async def timeline_collect(
+    page: Page,
+    *,
+    egress: tuple[str, ...],
+    home_url: str = _X_HOME_URL,
+    op: str = "timeline_collect",
+) -> dict[str, Any]:
+    """Scroll the X home timeline and return structured posts (DB4).
+
+    Args:
+        page (Page): CDP page handle.
+        egress (tuple[str, ...]): Allowed egress domains.
+        home_url (str): Home timeline URL.
+        op (str): Result ``op`` label (``timeline_collect`` or ``home_feed``).
+
+    Returns:
+        dict[str, Any]: ``{site, op, url, posts, count}``.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(timeline_collect)
+        True
+    """
+    label = op if op in {"timeline_collect", "home_feed"} else "timeline_collect"
+    return await collect_x_posts(page, url=home_url, op=label, egress=egress)
+
+
+async def home_feed(
+    page: Page,
+    *,
+    egress: tuple[str, ...],
+    home_url: str = _X_HOME_URL,
+) -> dict[str, Any]:
+    """Alias for :func:`timeline_collect` with ``op=home_feed``.
+
+    Args:
+        page (Page): CDP page handle.
+        egress (tuple[str, ...]): Allowed egress domains.
+        home_url (str): Home timeline URL.
+
+    Returns:
+        dict[str, Any]: Structured home-feed posts.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(home_feed)
+        True
+    """
+    return await timeline_collect(page, egress=egress, home_url=home_url, op="home_feed")

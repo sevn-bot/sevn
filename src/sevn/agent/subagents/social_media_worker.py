@@ -36,6 +36,7 @@ from sevn.integrations.social_media.capabilities import (
     site_skill_hints,
 )
 from sevn.integrations.social_media.medium import resolve_social_medium
+from sevn.integrations.social_media.x_ops_dispatch import FACADE_OPS, run_op
 from sevn.integrations.twexapi.client import (
     TWEXAPI_ARRAY_BODY_OPS,
     TwexApiClient,
@@ -44,30 +45,6 @@ from sevn.integrations.twexapi.client import (
 from sevn.integrations.twexapi.config import (
     load_twexapi_settings,
     resolve_twexapi_api_key,
-)
-
-# §4 facade ops owned by ``sevn.integrations.social_media.x_ops``.
-_X_FACADE_OPS: frozenset[str] = frozenset(
-    {
-        "advanced_search_page",
-        "search_hashtags",
-        "like_tweet",
-        "unlike_tweet",
-        "retweet",
-        "delete_retweet",
-        "bookmark",
-        "delete_bookmark",
-        "create_tweet_or_reply",
-        "create_quote_tweet",
-        "create_tweet_thread",
-        "delete_tweets",
-        "post_tweet_auto_cookie",
-        "get_users_by_usernames",
-        "follow_user",
-        "fetch_article_markdown",
-        "home_timeline_collect",
-        "session_status",
-    }
 )
 
 if TYPE_CHECKING:
@@ -495,6 +472,41 @@ def _task_payload_for_x_ops(parsed: SocialMediaTask, *, content_root: Path) -> d
     return payload
 
 
+def _browser_tools_from_workspace(workspace_cfg: Any) -> dict[str, Any] | None:
+    """Extract ``tools.browser`` from a workspace config (dict or model).
+
+    ``WorkspaceConfig.tools`` is a ``JsonDict`` — attribute access via
+    ``getattr(tools, "browser")`` always misses; prefer ``.get("browser")``.
+
+    Args:
+        workspace_cfg (Any): Loaded workspace config (or stub).
+
+    Returns:
+        dict[str, Any] | None: Browser tools section, or ``None``.
+
+    Examples:
+        >>> class _Ws:
+        ...     tools = {"browser": {"social": {"x": {"allow_write": True}}}}
+        >>> _browser_tools_from_workspace(_Ws())["social"]["x"]["allow_write"]
+        True
+    """
+    tools_cfg = getattr(workspace_cfg, "tools", None)
+    if tools_cfg is None:
+        return None
+    if isinstance(tools_cfg, dict):
+        browser_cfg = tools_cfg.get("browser")
+    else:
+        browser_cfg = getattr(tools_cfg, "browser", None)
+    if browser_cfg is None:
+        return None
+    if hasattr(browser_cfg, "model_dump"):
+        dumped = browser_cfg.model_dump()
+        return dumped if isinstance(dumped, dict) else None
+    if isinstance(browser_cfg, dict):
+        return browser_cfg
+    return None
+
+
 def _wrap_x_ops_result(
     envelope: dict[str, Any],
     *,
@@ -522,11 +534,12 @@ def _wrap_x_ops_result(
         >>> out["specialist"]
         'social_media_manager'
     """
+    facade_op = envelope.get("op")
     base: dict[str, Any] = {
         "specialist": SOCIAL_MEDIA_MANAGER_SPECIALIST,
         "ok": envelope.get("ok"),
         "medium": envelope.get("medium"),
-        "op": envelope.get("op"),
+        "op": facade_op,
         "skills": skills,
         "tools": tools,
     }
@@ -539,8 +552,11 @@ def _wrap_x_ops_result(
         plan = data.get("browser_plan") if isinstance(data, dict) else None
         plan = plan if isinstance(plan, dict) else {}
         site = str(plan.get("site") or "x")
+        social_op = plan.get("op") or facade_op
         return {
             **base,
+            "op": social_op,
+            "facade_op": plan.get("facade_op") or facade_op,
             "tool": "browser",
             "engine": "cdp",
             "action": plan.get("action", "social"),
@@ -700,30 +716,23 @@ async def execute_social_media_manager_task(
     task_dict = _task_dict_for_resolution(task, parsed)
     effective_medium = resolve_social_medium(task_dict, smm_cfg, site)
 
-    # X §4 facade ops: single owner is ``x_ops`` (browser plan or TwexAPI).
-    if site == "x" and parsed.op in _X_FACADE_OPS:
-        from sevn.integrations.social_media import x_ops as x_ops_mod
-
+    # X §4 facade ops: single owner is ``x_ops`` / ``run_op`` (browser plan or TwexAPI).
+    if site == "x" and parsed.op in FACADE_OPS:
         if effective_medium == "browser" and "browser" not in tools:
             raise SocialMediaManagerError(
                 "social_media_manager tools list does not include `browser` (CDP automator)"
             )
-        fn = getattr(x_ops_mod, parsed.op)
         cfg_stub: dict[str, Any] = {
             "skills": {"social_media_manager": smm_cfg},
         }
-        tools_cfg = getattr(workspace_cfg, "tools", None)
-        if tools_cfg is not None:
-            browser_cfg = getattr(tools_cfg, "browser", None)
-            if browser_cfg is not None:
-                if hasattr(browser_cfg, "model_dump"):
-                    cfg_stub["tools"] = {"browser": browser_cfg.model_dump()}
-                elif isinstance(browser_cfg, dict):
-                    cfg_stub["tools"] = {"browser": browser_cfg}
-        envelope = await fn(
-            task=_task_payload_for_x_ops(parsed, content_root=content_root),
-            cfg=cfg_stub,
-            site=site,
+        browser_cfg = _browser_tools_from_workspace(workspace_cfg)
+        if browser_cfg is not None:
+            cfg_stub["tools"] = {"browser": browser_cfg}
+        envelope = await run_op(
+            str(parsed.op),
+            _task_payload_for_x_ops(parsed, content_root=content_root),
+            cfg_stub,
+            site,
         )
         return _wrap_x_ops_result(
             envelope,
