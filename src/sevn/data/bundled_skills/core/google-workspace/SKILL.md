@@ -1,6 +1,6 @@
 ---
 name: google-workspace
-description: Gmail, Calendar, Drive, Sheets, Docs, and Contacts via OAuth2-authenticated Google Workspace APIs.
+description: Gmail, Calendar, Drive, and Contacts via OAuth2-authenticated Google Workspace APIs (Sheets/Docs in Phase 3).
 version: "0.1.0"
 see_also:
   - load_skill
@@ -22,16 +22,16 @@ scripts:
     args_overview: "--check | --client-secret PATH | --auth-url [--services email|calendar|drive|sheets|docs|contacts|all] [--format json|text] | --auth-code URL_OR_CODE [--format json|text] | --revoke | --install-deps"
     abortable: false
   - path: scripts/google_api.py
-    description: Hermes-compatible Google Workspace CLI for Gmail, Calendar, Drive, Sheets, Docs, and Contacts operations.
-    args_overview: "gmail|calendar|drive|sheets|docs|contacts <operation> [args...] [--dry-run]"
+    description: Hermes-compatible Google Workspace CLI for Gmail, Calendar, Drive, and Contacts (Sheets/Docs planned).
+    args_overview: "gmail|calendar|drive|contacts <operation> [args...] [--dry-run]"
     abortable: false
 ---
 
 # google-workspace
 
-Google Workspace workflows for **Gmail**, **Calendar**, **Drive**, **Sheets**,
-**Docs**, and **Contacts** using OAuth2 tokens stored under the workspace
-(`.sevn/google_token.json` by default).
+Google Workspace workflows for **Gmail**, **Calendar**, **Drive**, and **Contacts**
+using OAuth2 tokens stored under the workspace (`.sevn/google_token.json` by
+default). **Sheets** and **Docs** operations are planned for Phase 3.
 
 Prefer **`email-management`** when the operator only needs quick email access
 across multiple providers or wants IMAP/SMTP without creating a Google Cloud
