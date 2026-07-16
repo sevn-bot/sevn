@@ -2,8 +2,8 @@
   "entries": {
     "agent": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T21:26:52Z",
-      "digest": "c5f4e9986dd7986c181ddabef6e00a1d920bfb4da5028e38b3c75146d2288c1c",
+      "computed_at": "2026-07-15T15:11:31Z",
+      "digest": "6207c77410e64117158344b0ae2d3e8047c444dac7996e609b7e5f39f9187f71",
       "source_globs": [
         "src/sevn/agent/**"
       ]
@@ -77,8 +77,8 @@
     },
     "onboarding": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T21:27:31Z",
-      "digest": "d34ace4345233edffd842a30deaa1ee6a8df24cccdb73720aa8fdc98dab18136",
+      "computed_at": "2026-07-15T15:11:32Z",
+      "digest": "a877126426d44e186a5be809312f391440e12dce8aaa5700455efb5c77ce4740",
       "source_globs": [
         "src/sevn/onboarding/**",
         "src/sevn/cli/commands/onboard.py",
@@ -103,8 +103,8 @@
     },
     "root": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T21:28:08Z",
-      "digest": "110cb202e951086a4977c4a2247f003336ab9bc12f53a2b2c8b0fe03c9920bd5",
+      "computed_at": "2026-07-15T15:11:31Z",
+      "digest": "49e8f9096ca0746e323630144458acbb100025d265e6510f3c27c10bf5b1d517",
       "source_globs": [
         "pyproject.toml",
         "CLAUDE.md",
@@ -148,8 +148,8 @@
     },
     "skills": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T21:27:36Z",
-      "digest": "e2f5db065341457993efb63d7fbb7aca5b94f37053fc6cb89926be7735d9ffd5",
+      "computed_at": "2026-07-15T15:11:32Z",
+      "digest": "70c97d0ea7464d50fa53ed01a133064c433add15fb389498dcc063971784bc57",
       "source_globs": [
         "src/sevn/skills/**",
         "src/sevn/data/bundled_skills/**",
@@ -180,8 +180,8 @@
     },
     "tools": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-14T21:27:08Z",
-      "digest": "6a6f78395399232925316b0ed98588975c005a59e61174879b5d0cac787f3a3a",
+      "computed_at": "2026-07-15T15:11:31Z",
+      "digest": "f2bdd3b8b2e1c9f0102f42c78dda2c7dae1eeea93d80d5af7bc167c6bebe05dc",
       "source_globs": [
         "src/sevn/tools/**"
       ]

@@ -32,7 +32,8 @@ Exports:
     tier_b_no_preamble_echo_prompt — do not restate the triager early ack.
     tier_b_no_silent_substitution_prompt — never silently swap a missing target.
     tier_b_persistence_prompt — iterate tool→error→adjust until success/empty/budget (D8).
-    tier_b_playwright_browser_prompt — playwright-browser session/restart/capture playbook.
+    tier_b_browser_tool_prompt — native browser tool screenshot/navigation playbook.
+    tier_b_playwright_browser_prompt — deprecated alias for tier_b_browser_tool_prompt.
     tier_b_process_install_prompt — use process (not terminal_run) for package installs.
     tier_b_retrieval_honesty_prompt — retrieval failed vs empty + capability honesty (verify before denying).
     tier_b_sessions_context_prompt — SESSIONS.md recall guide loaded every tier-B turn.
@@ -762,27 +763,20 @@ def tier_b_process_install_prompt() -> str:
     """
     return (
         "## Package installs (mandatory)\n"
-        "For `uv sync`, `playwright install`, `pip install`, and other long "
+        "For `uv sync`, `pip install`, and other long "
         "non-interactive commands:\n"
         "1. Use **`process` with `action=start`** and an **argv list** (not a shell "
         'string). Example: `{"action":"start","argv":["uv","sync","--extra",'
-        '"browser"],"cwd":"source_code"}`.\n'
+        '"browser-cdp"],"cwd":"source_code"}`.\n'
         "2. Poll **`process` with `action=output`** until the job status is "
         "`completed` or `failed`.\n"
         "3. **Do not use `terminal_run`** for installs — it uses a persistent pexpect "
         "shell that returns stale echoed output and burns the round budget.\n"
-        "4. After `uv sync --extra browser`, run a second `process` job for "
-        "`playwright install chromium` (or use the repo `.venv/bin/playwright`).\n"
+        "4. For browser automation, use `uv sync --extra browser-cdp` and a system Chrome/Brave binary.\n"
     )
 
 
 _BOUND_SKILL_ENTRY_SCRIPTS: dict[str, tuple[str, ...]] = {
-    "playwright-browser": (
-        'scripts/capture.py "<url>" [path] — navigate + screenshot in one step',
-        'scripts/goto.py "<url>" — navigate active tab',
-        "scripts/session_status.py — CDP/login state",
-        "scripts/restart_browser.py — spawn Chrome when CDP unreachable",
-    ),
     "last30days": ("scripts/research — full research engine (via run_skill_script)",),
 }
 
@@ -791,8 +785,7 @@ def tier_b_bound_skill_playbook_prompt(bound_skills: Sequence[str]) -> str:
     """Tier-B playbook when the triager bound one or more skills (W4 / ``62803d``).
 
     Mandates ``load_skill(name)`` then ``run_skill_script`` before any
-    "tool/skill unavailable" claim. ``playwright-browser`` gets explicit
-    ``capture.py`` + ``send_file`` wiring.
+    "tool/skill unavailable" claim.
 
     Args:
         bound_skills (Sequence[str]): ``TriageResult.skills`` for this turn.
@@ -801,8 +794,8 @@ def tier_b_bound_skill_playbook_prompt(bound_skills: Sequence[str]) -> str:
         str: Markdown block or empty string when no skills are bound.
 
     Examples:
-        >>> body = tier_b_bound_skill_playbook_prompt(["playwright-browser"])
-        >>> "load_skill" in body and "capture.py" in body
+        >>> body = tier_b_bound_skill_playbook_prompt(["last30days"])
+        >>> "load_skill" in body
         True
         >>> tier_b_bound_skill_playbook_prompt(()) == ""
         True
@@ -830,56 +823,44 @@ def tier_b_bound_skill_playbook_prompt(bound_skills: Sequence[str]) -> str:
                 lines.append(f"  - `{script}`")
         else:
             lines.append("  - Read `SKILL.md` via `load_skill` for declared `scripts/` paths.")
-    if "playwright-browser" in names:
-        lines.extend(
-            [
-                "",
-                "**Screenshot delivery (`playwright-browser`):**",
-                "1. `load_skill(name='playwright-browser')`",
-                '2. `run_skill_script(skill_name="playwright-browser", '
-                'script_path="scripts/capture.py", '
-                'args=["https://example.com/page"])`',
-                "3. Deliver the saved PNG via native **`send_file`** with the workspace path "
-                "from the script result — do not claim Playwright is absent before step 2.",
-                "",
-                "**CDP probe (`cdp_probe` / `session_status.py`):** `CDP_UNREACHABLE` on the "
-                "default port is **expected** before the first `capture.py` or `goto.py` — "
-                "those scripts spawn Chrome. Do not treat probe failure as skill broken.",
-            ],
-        )
     return "\n".join(lines)
 
 
-def tier_b_playwright_browser_prompt() -> str:
-    """Tier-B playbook for playwright-browser screenshots and navigation.
+def tier_b_browser_tool_prompt() -> str:
+    """Tier-B playbook for native ``browser`` tool screenshots and navigation.
 
     Returns:
         str: Markdown block for tier-B ``system_prompt`` assembly.
 
     Examples:
-        >>> "session_status" in tier_b_playwright_browser_prompt()
+        >>> "screenshot" in tier_b_browser_tool_prompt()
         True
-        >>> "restart_browser" in tier_b_playwright_browser_prompt()
+        >>> "browser" in tier_b_browser_tool_prompt()
         True
     """
     return (
-        "## Playwright-browser playbook (mandatory when bound)\n"
-        "When using the `playwright-browser` skill:\n"
-        "1. Run **`scripts/session_status.py`** when CDP/login state is uncertain.\n"
-        "2. If CDP is unreachable, run **`scripts/restart_browser.py`** or proceed to "
-        "**`scripts/capture.py` / `scripts/goto.py`** — do not stop after `cdp_probe` alone "
-        "(probe does not spawn Chrome; `CDP_UNREACHABLE` on the default port is expected "
-        "before the first capture/goto).\n"
-        "3. **`scripts/goto.py`**, **`scripts/new_tab.py`**, and **`scripts/capture.py`** "
-        "require the full URL in `argv` — empty `argv` fails with `SKILL_SCRIPT_ARGS`.\n"
-        "4. For read-only factual pages, try native **`get_page_content`** before opening "
-        "the browser.\n"
-        "5. After navigation, prefer **`extract_page_text.py`** or **`page_state.py`** "
-        "over ad-hoc **`evaluate.py`**.\n"
-        "6. Capture with **`scripts/capture.py <url> [path]`** or `goto` + "
-        "`screenshot.py`, then deliver via native **`send_file`**.\n"
-        "7. Do not use `terminal_run` for browser work or installs.\n"
+        "## Browser tool playbook (mandatory when bound)\n"
+        "When using the native **`browser`** tool (CDP engine; requires `uv sync --extra browser-cdp`):\n"
+        "1. Call **`load_tool(name='browser')`** when the tool schema is not already loaded.\n"
+        "2. Use **`browser` with `action=list_tabs`** when tab state is uncertain.\n"
+        "3. Navigate with **`action=goto`** or **`action=open_tab`** — the tool spawns or attaches Chrome automatically.\n"
+        "4. For read-only factual pages, try native **`get_page_content`** before opening the browser.\n"
+        "5. Capture with **`action=screenshot`**, then deliver via native **`send_file`**.\n"
+        "6. Do not use `terminal_run` for browser work or installs.\n"
     )
+
+
+def tier_b_playwright_browser_prompt() -> str:
+    """Deprecated alias for :func:`tier_b_browser_tool_prompt`.
+
+    Returns:
+        str: Same markdown block as :func:`tier_b_browser_tool_prompt`.
+
+    Examples:
+        >>> tier_b_playwright_browser_prompt() == tier_b_browser_tool_prompt()
+        True
+    """
+    return tier_b_browser_tool_prompt()
 
 
 def tier_b_log_provenance_playbook_prompt() -> str:
@@ -988,12 +969,6 @@ def tier_b_triager_bound_mandate_prompt(
         "\nIf you genuinely cannot run a bound tool, say exactly what blocks you — "
         "never skip the toolkit silently."
     )
-    if "playwright-browser" in bound_skills:
-        sections.append(
-            "\nFor `playwright-browser`: call `load_skill` then `run_skill_script` with "
-            "non-empty `argv` (e.g. `scripts/goto.py` and "
-            '`argv=["https://example.com"]`) before stating any page content.'
-        )
     if "list_registry" in bound_tools:
         sections.append(
             "\nFor `list_registry`: call `list_registry()` first with no arguments; "

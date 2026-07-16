@@ -25,7 +25,6 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | cua-agent | Autonomous GUI loop via cua-agent — model drives the screen toward a goal; requires computer-use enabled and explicit per-run operator approval (HITL). |
 | cursor_cloud | Delegate code+PR work to Cursor Cloud Agent; returns PR, dashboard, and artifact links. |
 | email-management | Multi-account IMAP and Gmail API mail read/search/send scripts. |
-| facebook-use | Facebook workflows via a logged-in browser profile or CDP attach (feed read, search). |
 | gh-issues | GitHub issue lifecycle — list, view, create, comment via integration_call. |
 | gh-pr | Pull request lifecycle — list, view, create, merge, close, reviewers via integration_call. |
 | github-manager | Advanced GitHub operations — branches, Actions, CI/CD secrets, environments, deployments via integration_call. |
@@ -34,13 +33,11 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | kokoro-tts | Local Kokoro ONNX text-to-speech engine backing the voice TTS pipeline (kokoro backend). Not a model-facing research skill. |
 | last30days | Research any topic across Reddit, X, YouTube, HN, Polymarket, and the web from the last 30 days. |
 | lcm | Lossless context search, drill-back, and conversation index (`specs/15-memory-lcm.md`). |
-| linkedin-use | LinkedIn staff/company/connection scraping via logged-in browser + Voyager API (StaffSpy port). |
 | lume | Apple-Silicon VM lifecycle via the lume CLI (run/stop/ls/pull); opt-in; also a computer-use sandbox target via `cua do switch lume` |
 | media_generation | Generate images, video, and music via the MiniMax-backed media_generator specialist (spec 36 D8). |
 | mycode | Deterministic repo scan + MYCODE.md write (`specs/28-code-understanding.md` §2.4). |
 | openwiki | LLM-generated agent wiki for a codebase (LangChain OpenWiki CLI). |
 | pdf | Render markdown/HTML to workspace PDFs; extract text/tables; structured load/chunk. |
-| playwright-browser | Web automation with CDP-first Playwright scripts (navigate, screenshot, click, extract text). |
 | printing-press-library | Starter-pack Printing Press CLIs — ESPN, flights, movies, recipes (Go binaries on PATH). |
 | roam_code | Lightweight roam-code path Q&A (`specs/28-code-understanding.md` §2.2). |
 | scheduling | Cron jobs and one-shot reminders via workspace trigger store (`specs/30-non-interactive-triggers.md`). |
@@ -50,5 +47,4 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | telegram | Telegram inline custom buttons and forum supergroup helpers (Bot API + allowlist/userbot hooks). |
 | telegram_test | Run host-side Playwright Telegram E2E (sevn telegram-test) while building sevn.bot. Use after gateway/menu/session/diagnostics changes. Not in gateway container. |
 | sevn-diagnostics | sevn.bot operator repair playbooks for `sevn doctor --with-agent` (gateway, secrets, proxy, models, browser, voice). |
-| x-use | X (Twitter) workflows via a logged-in browser profile or CDP attach (timeline, search). |
 | yt-dlp | Download video/audio and metadata with yt-dlp (YouTube, Vimeo, X, TikTok, and allowlisted hosts). |

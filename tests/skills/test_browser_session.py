@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
-
-import pytest
+from typing import TYPE_CHECKING
 
 from sevn.config.workspace_config import WorkspaceConfig
+
+if TYPE_CHECKING:
+    from _pytest.monkeypatch import MonkeyPatch
 from sevn.skills.browser_session import (
     EXTERNAL_CDP,
     BrowserSessionRegistry,
@@ -71,7 +72,7 @@ def test_registry_write_read_clear(tmp_path: Path) -> None:
     assert read_registry(tmp_path, "s1") is None
 
 
-def test_close_browser_skips_external_cdp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_close_browser_skips_external_cdp(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     """Close returns EXTERNAL_CDP for attach-only sessions unless force=True (D6)."""
     row = BrowserSessionRegistry(
         pid=99999,
@@ -110,9 +111,7 @@ def test_close_browser_skips_external_cdp(tmp_path: Path, monkeypatch: pytest.Mo
     assert op_result.code == EXTERNAL_CDP
 
 
-def test_browser_autoclose_default_respected(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_browser_autoclose_default_respected(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     """Browser skills default to keep-alive via merge_browser_proc_env (D4)."""
     env: dict[str, str] = {}
     merge_browser_proc_env(
@@ -120,7 +119,7 @@ def test_browser_autoclose_default_respected(
         content_root=tmp_path,
         session_id="s1",
         cfg=None,
-        skill_name="playwright-browser",
+        skill_name="browser-harness",
     )
     assert env.get("SEVN_BROWSER_AUTOCLOSE") == "0"
     assert env.get("SEVN_CONTENT_ROOT") == str(tmp_path.resolve())
@@ -138,7 +137,7 @@ def test_browser_autoclose_default_respected(
         content_root=tmp_path,
         session_id="s1",
         cfg=None,
-        skill_name="playwright-browser",
+        skill_name="browser-harness",
     )
     assert env2["SEVN_BROWSER_AUTOCLOSE"] == "1"
 
@@ -160,7 +159,7 @@ def test_resolve_cdp_url_prefers_registry(tmp_path: Path) -> None:
     assert resolve_cdp_url(tmp_path, "sess-x", cfg=None) == "http://127.0.0.1:9400"
 
 
-def test_resolve_profile_config_precedence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_profile_config_precedence(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
     """Profile resolution honours env then skills.browser.profile_dir."""
     custom = tmp_path / "cfg-profile"
     custom.mkdir()
@@ -196,7 +195,7 @@ def test_merge_browser_proc_env_injects_content_root(tmp_path: Path) -> None:
         content_root=tmp_path,
         session_id="sess-scoped",
         cfg=None,
-        skill_name="playwright-browser",
+        skill_name="browser-harness",
     )
     assert env.get("SEVN_CONTENT_ROOT") == str(tmp_path.resolve())
     assert env.get("SEVN_BROWSER_AUTOCLOSE") == "0"
@@ -214,7 +213,7 @@ def test_merge_browser_proc_env_does_not_inject_seed_cdp(tmp_path: Path) -> None
         content_root=tmp_path,
         session_id="fresh-session",
         cfg=None,
-        skill_name="playwright-browser",
+        skill_name="browser-harness",
     )
     assert "SEVN_CDP_URL" not in env
 
@@ -228,7 +227,7 @@ def test_merge_browser_proc_env_preserves_operator_cdp(tmp_path: Path) -> None:
         content_root=tmp_path,
         session_id="attach-session",
         cfg=None,
-        skill_name="playwright-browser",
+        skill_name="browser-harness",
     )
     assert env["SEVN_CDP_URL"] == operator_url
 
@@ -259,94 +258,9 @@ def test_session_status_not_seed_hint_with_registry(tmp_path: Path) -> None:
     assert payload["cdp_url_is_seed_hint"] is False
 
 
-@pytest.mark.asyncio
-async def test_session_browser_resources_spawns_without_env_cdp(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Fresh session without SEVN_CDP_URL env spawns Chrome instead of attach-only fail."""
-    monkeypatch.delenv("SEVN_CDP_URL", raising=False)
-    spawn_calls: list[tuple[Path, bool, int | None]] = []
-    reachable_urls: set[str] = set()
-
-    class FakeProc:
-        pid = 12345
-
-        def poll(self) -> None:
-            return None
-
-        def terminate(self) -> None:
-            pass
-
-        def wait(self, timeout: float = 0) -> None:
-            pass
-
-    def fake_spawn(
-        profile_dir: Path,
-        *,
-        headless: bool = False,
-        seed_port: int | None = None,
-        cfg: WorkspaceConfig | None = None,
-    ) -> tuple[FakeProc, int, str]:
-        _ = cfg
-        spawn_calls.append((profile_dir, headless, seed_port))
-        port = seed_port or 9333
-        url = f"http://127.0.0.1:{port}"
-        reachable_urls.add(url)
-        return FakeProc(), port, url
-
-    def fake_reachable(url: str, *, timeout: float = 2.0) -> bool:
-        return url.rstrip("/") in reachable_urls
-
-    mock_browser = MagicMock()
-    mock_playwright = MagicMock()
-    mock_playwright.chromium.connect_over_cdp = AsyncMock(return_value=mock_browser)
-    mock_pw_factory = MagicMock()
-    mock_pw_factory.start = AsyncMock(return_value=mock_playwright)
-
-    monkeypatch.setattr("sevn.skills.browser_session.spawn_chrome", fake_spawn)
-    monkeypatch.setattr("sevn.skills.browser_session.cdp_reachable", fake_reachable)
-    monkeypatch.setattr(
-        "sevn.skills.browser_session.resolve_chrome_executable",
-        lambda *_a, **_k: "/fake/chrome",
-    )
-    monkeypatch.setattr(
-        "playwright.async_api.async_playwright",
-        lambda: mock_pw_factory,
-    )
-
-    from sevn.skills.browser_session import _session_browser_resources
-
-    (
-        _playwright,
-        browser,
-        _persistent_context,
-        _chrome_proc,
-        _launched_headless_fallback,
-        we_spawned_chrome,
-        sid,
-        registry_row,
-        _profile_dir,
-        _headless,
-    ) = await _session_browser_resources(
-        content_root=tmp_path,
-        session_id="sess-spawn",
-        cfg=None,
-        headless_fallback=False,
-    )
-
-    assert len(spawn_calls) == 1
-    assert we_spawned_chrome is True
-    assert browser is mock_browser
-    assert sid == "sess-spawn"
-    assert registry_row is not None
-    assert registry_row.spawned_by_sevn is True
-    assert registry_row.cdp_url.startswith("http://127.0.0.1:")
-
-
 def test_resolve_chrome_executable_env_wins(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     """SEVN_CHROME_EXECUTABLE takes precedence over discovery."""
     exe = tmp_path / "custom-brave"
@@ -360,7 +274,7 @@ def test_resolve_chrome_executable_env_wins(
     assert resolve_chrome_executable() == str(exe)
 
 
-def test_resolve_chrome_executable_brave_on_path(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_chrome_executable_brave_on_path(monkeypatch: MonkeyPatch) -> None:
     """Brave resolves from PATH when engine is brave."""
     monkeypatch.delenv("SEVN_CHROME_EXECUTABLE", raising=False)
     monkeypatch.setenv("SEVN_BROWSER_ENGINE", "brave")
@@ -378,7 +292,7 @@ def test_resolve_chrome_executable_brave_on_path(monkeypatch: pytest.MonkeyPatch
     assert is_brave_executable(resolved)
 
 
-def test_resolve_chrome_executable_auto_prefers_chrome(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_chrome_executable_auto_prefers_chrome(monkeypatch: MonkeyPatch) -> None:
     """Auto engine prefers Chrome/Chromium before Brave."""
     monkeypatch.delenv("SEVN_CHROME_EXECUTABLE", raising=False)
     monkeypatch.delenv("SEVN_BROWSER_ENGINE", raising=False)
@@ -416,7 +330,7 @@ def test_resolve_browser_engine_from_config() -> None:
 
 def test_spawn_chrome_appends_extra_args(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     """SEVN_BROWSER_EXTRA_ARGS are appended to the spawn argv."""
     captured: list[list[str]] = []
@@ -456,67 +370,9 @@ def test_spawn_chrome_appends_extra_args(
     assert "--headless=new" in captured[0]
 
 
-@pytest.mark.asyncio
-async def test_headless_fallback_uses_executable_path(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Playwright tier-3 fallback honors SEVN_CHROME_EXECUTABLE."""
-    launch_kwargs: dict[str, object] = {}
-
-    class _FakeProc:
-        pid = 1
-
-        def poll(self) -> None:
-            return None
-
-        def terminate(self) -> None:
-            pass
-
-        def wait(self, timeout: float = 0) -> None:
-            pass
-
-    async def _launch_persistent_context(profile: str, **kwargs: object) -> MagicMock:
-        launch_kwargs.update(kwargs)
-        return MagicMock()
-
-    mock_playwright = MagicMock()
-    mock_playwright.chromium.connect_over_cdp = AsyncMock(return_value=None)
-    mock_playwright.chromium.launch_persistent_context = _launch_persistent_context
-    mock_pw_factory = MagicMock()
-    mock_pw_factory.start = AsyncMock(return_value=mock_playwright)
-
-    brave = tmp_path / "brave-bin"
-    brave.write_text("", encoding="utf-8")
-    monkeypatch.setenv("SEVN_CHROME_EXECUTABLE", str(brave))
-    monkeypatch.setattr(
-        "sevn.skills.browser_session.resolve_chrome_executable",
-        lambda *_a, **_k: str(brave),
-    )
-    monkeypatch.setattr(
-        "sevn.skills.browser_session.spawn_chrome",
-        lambda *_a, **_k: (_FakeProc(), 9333, "http://127.0.0.1:9333"),
-    )
-    monkeypatch.setattr("sevn.skills.browser_session.cdp_reachable", lambda *_a, **_k: False)
-    monkeypatch.setattr(
-        "playwright.async_api.async_playwright",
-        lambda: mock_pw_factory,
-    )
-
-    from sevn.skills.browser_session import _session_browser_resources
-
-    await _session_browser_resources(
-        content_root=tmp_path,
-        session_id="fb",
-        cfg=None,
-        headless_fallback=True,
-    )
-    assert launch_kwargs.get("executable_path") == str(brave)
-
-
 def test_spawn_chrome_respects_engine_config(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     """spawn_chrome honors skills.browser.engine via cfg."""
     captured: list[list[str]] = []
@@ -560,65 +416,7 @@ def test_spawn_chrome_respects_engine_config(
     assert captured[0][0] == "/usr/bin/brave-browser"
 
 
-@pytest.mark.asyncio
-async def test_headless_fallback_appends_extra_args(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Playwright tier-3 fallback forwards SEVN_BROWSER_EXTRA_ARGS."""
-    launch_kwargs: dict[str, object] = {}
-
-    class _FakeProc:
-        pid = 1
-
-        def poll(self) -> None:
-            return None
-
-        def terminate(self) -> None:
-            pass
-
-        def wait(self, timeout: float = 0) -> None:
-            pass
-
-    async def _launch_persistent_context(profile: str, **kwargs: object) -> MagicMock:
-        launch_kwargs.update(kwargs)
-        return MagicMock()
-
-    mock_playwright = MagicMock()
-    mock_playwright.chromium.connect_over_cdp = AsyncMock(return_value=None)
-    mock_playwright.chromium.launch_persistent_context = _launch_persistent_context
-    mock_pw_factory = MagicMock()
-    mock_pw_factory.start = AsyncMock(return_value=mock_playwright)
-
-    brave = tmp_path / "brave-bin"
-    brave.write_text("", encoding="utf-8")
-    monkeypatch.setenv("SEVN_BROWSER_EXTRA_ARGS", "--no-sandbox")
-    monkeypatch.setattr(
-        "sevn.skills.browser_session.resolve_chrome_executable",
-        lambda *_a, **_k: str(brave),
-    )
-    monkeypatch.setattr(
-        "sevn.skills.browser_session.spawn_chrome",
-        lambda *_a, **_k: (_FakeProc(), 9333, "http://127.0.0.1:9333"),
-    )
-    monkeypatch.setattr("sevn.skills.browser_session.cdp_reachable", lambda *_a, **_k: False)
-    monkeypatch.setattr(
-        "playwright.async_api.async_playwright",
-        lambda: mock_pw_factory,
-    )
-
-    from sevn.skills.browser_session import _session_browser_resources
-
-    await _session_browser_resources(
-        content_root=tmp_path,
-        session_id="fb-args",
-        cfg=None,
-        headless_fallback=True,
-    )
-    assert launch_kwargs.get("args") == ["--no-sandbox"]
-
-
-def test_resolve_browser_headless_env_overrides_config(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_browser_headless_env_overrides_config(monkeypatch: MonkeyPatch) -> None:
     """SEVN_BROWSER_HEADLESS wins over skills.browser.headless when set."""
     monkeypatch.setenv("SEVN_BROWSER_HEADLESS", "0")
     monkeypatch.setattr(

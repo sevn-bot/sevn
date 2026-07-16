@@ -11,12 +11,12 @@ from sevn.browser.element import Dom
 from sevn.browser.page import Page
 from sevn.browser.recipes.base import RecipeError, validate_egress
 from sevn.browser.recipes.social import (
+    X_EGRESS_DOMAINS,
     SocialRecipe,
     parse_comments_html,
     parse_post_html,
     social_write_allowed,
 )
-from sevn.skills.social_browser import X_EGRESS_DOMAINS
 
 _FIXTURES = Path(__file__).parent / "recipes" / "fixtures"
 

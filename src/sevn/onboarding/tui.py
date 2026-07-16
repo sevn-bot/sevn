@@ -136,7 +136,7 @@ def _capability_switch_id(capability_id: str) -> str:
         str: Widget id prefixed with ``cap__``.
 
     Examples:
-        >>> _capability_switch_id("extra.browser")
+        >>> _capability_switch_id("extra.browser_cdp")
         'cap__extra_browser'
     """
     safe = capability_id.replace(".", "_").replace("-", "_")

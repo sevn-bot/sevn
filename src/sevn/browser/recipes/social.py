@@ -1,8 +1,7 @@
 """Social-site recipes — read/post/reply/search across major platforms.
 
 A :class:`SocialRecipe` dispatches per-site operations using selector maps and
-egress allowlists (reuses :mod:`sevn.skills.social_browser` constants where
-present). Write ops require ``tools.browser.social.<site>.allow_write=true``.
+egress allowlists. Write ops require ``tools.browser.social.<site>.allow_write=true``.
 
 Module: sevn.browser.recipes.social
 Depends: asyncio, re, dataclasses, urllib.parse, sevn.browser.auth, sevn.browser.recipes.base
@@ -29,7 +28,27 @@ from urllib.parse import quote_plus
 
 from sevn.browser.auth import login_state
 from sevn.browser.recipes.base import RecipeError, validate_egress
-from sevn.skills.social_browser import FACEBOOK_EGRESS_DOMAINS, X_EGRESS_DOMAINS
+
+X_EGRESS_DOMAINS: Final[tuple[str, ...]] = (
+    "x.com",
+    "twitter.com",
+    "twimg.com",
+    "abs.twimg.com",
+    "pbs.twimg.com",
+    "video.twimg.com",
+    "api.twitter.com",
+    "api.x.com",
+    "t.co",
+)
+
+FACEBOOK_EGRESS_DOMAINS: Final[tuple[str, ...]] = (
+    "facebook.com",
+    "fb.com",
+    "fbcdn.net",
+    "fbsbx.com",
+    "facebook.net",
+    "messenger.com",
+)
 
 if TYPE_CHECKING:
     from sevn.browser.element import Dom

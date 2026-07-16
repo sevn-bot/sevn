@@ -103,7 +103,7 @@ NO_SILENT_SUBSTITUTION_RULE: str = (
 
 PROCESS_INSTALL_RULE: str = (
     "PROCESS_INSTALL_RULE: for package or dependency installs (`uv sync`, "
-    "`playwright install`, `pip install`, `npm install`, installing browser extras, "
+    "`pip install`, `npm install`, installing browser-cdp extra, "
     "or operator follow-ups like 'do option 1' after an install offer), route "
     "complexity B with tools=[process] (and load_tool only if needed). Do NOT "
     "seed terminal_run for these — it is for short interactive shell probes only. "
@@ -112,15 +112,16 @@ PROCESS_INSTALL_RULE: str = (
 )
 
 
-PLAYWRIGHT_BROWSER_RULE: str = (
-    "PLAYWRIGHT_BROWSER_RULE: for browser automation, screenshots, or "
-    "playwright-browser skill work, route skills=[playwright-browser] and "
-    "tools=[load_skill, run_skill_script, send_file] (plus process only when "
+BROWSER_TOOL_RULE: str = (
+    "BROWSER_TOOL_RULE: for browser automation or screenshots, route "
+    "tools=[browser, load_tool, send_file] (plus process only when "
     "installing deps — see PROCESS_INSTALL_RULE). Do NOT seed terminal_run. "
-    "The executor should run scripts/session_status.py first when CDP state is "
-    "uncertain; if CDP is down, run scripts/restart_browser.py before "
-    "capture/goto/screenshot. cdp_probe alone does not start a browser."
+    "The executor should use browser action=list_tabs when CDP state is "
+    "uncertain; goto/open_tab spawn or attach Chrome automatically."
 )
+
+
+PLAYWRIGHT_BROWSER_RULE: str = BROWSER_TOOL_RULE
 
 
 LIVE_FACTUAL_RULE: str = (

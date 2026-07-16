@@ -79,7 +79,7 @@ pdf-native-libs: ## Install WeasyPrint native libs (pango/cairo/gobject) for PDF
 	  echo "⚠️  Unknown OS ($$uname_s). Install pango/cairo/gobject native libs manually, then run 'sevn doctor'."; \
 	fi
 
-sync-cli: install-cli-browser ## Operator `sevn sync`: editable CLI + Playwright + browser-cdp (no pre-commit hooks)
+sync-cli: install-cli-browser ## Operator `sevn sync`: editable CLI + browser-cdp (no pre-commit hooks)
 
 install-cli: styles-build ## Install the `sevn` console script as a uv tool (on PATH via ~/.local/bin)
 	@$(UV) tool install --reinstall --force --editable . >/dev/null
@@ -92,13 +92,10 @@ install-cli: styles-build ## Install the `sevn` console script as a uv tool (on 
 	     echo "  Run 'uv tool update-shell' (or add the line above to your shell rc), open a new shell, then re-run 'sevn'."; ;; \
 	esac
 
-install-cli-browser: install-cli ## Gateway host: uv-tool `sevn` + Playwright + browser-cdp extras + Chromium
+install-cli-browser: install-cli ## Gateway host: uv-tool `sevn` + browser-cdp extra
 	@$(UV) sync --extra browser-cdp
 	@$(UV) tool install --reinstall --force --editable . \
-	  --with playwright==1.60.0 --with websocket-client==1.9.0 --with websockets>=12 >/dev/null
-	@pw="$$($(UV) tool dir)/sevn/bin/playwright"; \
-	echo "Installing Chromium for gateway tool env ($$pw)…"; \
-	PLAYWRIGHT_BROWSERS_PATH= "$$pw" install chromium
+	  --with websockets>=12 >/dev/null
 
 lockcheck: ## Fail if uv.lock is out of date
 	$(UV) lock --check

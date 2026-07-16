@@ -35,6 +35,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- [2026-07-16] Remove Playwright browser extra and Playwright-based skills (`playwright-browser`, `facebook-use`, `linkedin-use`, `x-use`); install/sync paths prefer `browser-cdp` only (WIP on `remove/playwright`)
 - [2026-07-14] The about-docs generator no longer writes `interfaces`, `depends_on`, or `build_phase` into `kind: prd` frontmatter (spec-only keys; aligns with `skw prd-validate`)
 - [2026-07-14] `make about-docs-check` chains `make spec-check` and `make prd-check` so CI catches doc regressions; about-docs check rejects specs with `status: done` over scaffold placeholder bodies
 - [2026-07-14] Changelog validator canonical implementation lives in `spec-kit-wave/src/skw/changelog_validate.py`; `scripts/changelog_validate.py` is a shim
