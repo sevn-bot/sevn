@@ -187,6 +187,11 @@ DEFAULT_SKILL_MANIFESTS: Final[dict[str, str]] = {
         "(gateway, secrets, proxy, models, browser, voice)."
     ),
     "cursor_cloud": "Delegate code+PR work to Cursor Cloud Agent; PR, dashboard, artifacts.",
+    "defuddle": "Extract clean markdown from web pages with Defuddle CLI.",
+    "json-canvas": "Create and edit Obsidian JSON Canvas files.",
+    "obsidian-bases": "Create and edit Obsidian Bases files.",
+    "obsidian-cli": "Interact with Obsidian vaults using the Obsidian CLI.",
+    "obsidian-markdown": "Create and edit Obsidian Flavored Markdown.",
     "second_brain": "Second Brain wiki query, ingest, and lint automation.",
     "sessions_management": "Gateway sessions, history, spawn, yield, and status scripts.",
     "skill_management": "Authoring workflows for manifests and promotions.",

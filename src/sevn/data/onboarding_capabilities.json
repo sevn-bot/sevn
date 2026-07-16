@@ -526,6 +526,26 @@
       ]
     },
     {
+      "capability_id": "skill.defuddle",
+      "group": "B",
+      "label": "defuddle",
+      "description": "Extract clean markdown from web pages with Defuddle CLI, removing clutter and navigation.",
+      "config_paths": [
+        "skills.defuddle.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.defuddle.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
       "capability_id": "skill.email_management",
       "group": "B",
       "label": "email-management",
@@ -639,6 +659,26 @@
       "install_actions": [
         {
           "id": "skill.graphify.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.json_canvas",
+      "group": "B",
+      "label": "json-canvas",
+      "description": "Create and edit Obsidian JSON Canvas `.canvas` files with nodes, edges, groups, and connections.",
+      "config_paths": [
+        "skills.json_canvas.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.json_canvas.noop",
           "kind": "noop",
           "argv": [],
           "fatal": false
@@ -832,6 +872,66 @@
       "install_actions": [
         {
           "id": "skill.mycode.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.obsidian_bases",
+      "group": "B",
+      "label": "obsidian-bases",
+      "description": "Create and edit Obsidian Bases `.base` files with views, filters, formulas, and summaries.",
+      "config_paths": [
+        "skills.obsidian_bases.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.obsidian_bases.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.obsidian_cli",
+      "group": "B",
+      "label": "obsidian-cli",
+      "description": "Interact with Obsidian vaults using Obsidian CLI to read, create, search, and manage notes.",
+      "config_paths": [
+        "skills.obsidian_cli.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.obsidian_cli.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.obsidian_markdown",
+      "group": "B",
+      "label": "obsidian-markdown",
+      "description": "Create and edit Obsidian Flavored Markdown with wikilinks, embeds, callouts, and properties.",
+      "config_paths": [
+        "skills.obsidian_markdown.enabled"
+      ],
+      "control": "checkbox",
+      "default": true,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.obsidian_markdown.noop",
           "kind": "noop",
           "argv": [],
           "fatal": false

@@ -10,6 +10,13 @@ from sevn.workspace.layout import WorkspaceLayout
 
 
 def test_default_skills_scan_includes_packaged_second_brain(tmp_path: Path) -> None:
+    """Default skill roots resolve bundled Second Brain and Obsidian skills.
+
+    Examples:
+        >>> expected_id = "obsidian-markdown"
+        >>> expected_id == "obsidian-markdown"
+        True
+    """
     SkillsManager.reset_singletons_for_tests()
     try:
         (tmp_path / "skills").mkdir()
