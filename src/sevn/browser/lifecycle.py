@@ -488,6 +488,7 @@ async def spawn_or_attach(
         write_registry,
     )
 
+    # Never treat a dead registry / seed cdp_url as authoritative without a probe (DB2).
     cdp_url = resolve_cdp_url(content_root, session_id, cfg)
     if cdp_reachable(cdp_url):
         return await CDPBrowserSession.attach(cdp_url)
@@ -495,6 +496,7 @@ async def spawn_or_attach(
     profile_dir = resolve_profile_dir(content_root, session_id, cfg=cfg)
     headless = resolve_browser_headless(cfg)
     seed = cdp_port_seed(session_id)
+    # spawn_chrome clears stale DevToolsActivePort/Singleton* and freshness-gates the port.
     proc, port, spawned_url = await asyncio.to_thread(
         spawn_chrome,
         profile_dir,

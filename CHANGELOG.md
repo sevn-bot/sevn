@@ -73,6 +73,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-16] Browser spawn defaults include AutomationControlled and hygiene flags so Google/X sign-in is not blocked; closing then reopening the same profile clears stale CDP port and Singleton locks and ignores outdated DevToolsActivePort files
 - [2026-07-14] Bundled skill seeding skips `__pycache__` when copying packaged skills, avoiding parallel-test flakes on transient `.pyc` files
 - [2026-07-15] Telegram session mirror title lookup is best-effort when SQLite errors occur; group titles also persist from inline-keyboard callbacks (#21)
 - [2026-07-15] Restored spec-36 sub-agent amendment cross-reference in `14-executor-tier-b.md` after W9 body rewrite

@@ -18,7 +18,7 @@ Exports:
     close_idle_browser_sessions — close stale sevn-spawned browsers by ``last_used_at``.
     default_cdp_url — read ``SEVN_CDP_URL`` when set.
     merge_browser_proc_env — inject content root, profile, CDP env for skill runs.
-    read_devtools_active_port — read Chrome ``DevToolsActivePort`` line 1.
+    read_devtools_active_port — read Chrome ``DevToolsActivePort`` (optional freshness gate).
     read_registry — load registry JSON for a session.
     registry_path — path to ``.sevn/browser-sessions/<session_id>.json``.
     resolve_browser_engine — read ``skills.browser.engine`` / ``SEVN_BROWSER_ENGINE``.
@@ -33,7 +33,7 @@ Exports:
     resolve_chrome_executable — locate Chrome, Chromium, or Brave binary.
     restart_browser_session — close then spawn and wait for CDP.
     session_status_payload — unified JSON status dict for lifecycle scripts.
-    spawn_chrome — detached Chrome with ``--remote-debugging-port=0`` (D2/D5).
+    spawn_chrome — detached Chrome with login-grade defaults + ``--remote-debugging-port=0``.
     write_registry — atomic JSON write for a session registry row.
 """
 
@@ -66,6 +66,27 @@ _DEFAULT_SESSION_ID: Final[str] = "default"
 _PROFILE_ENV: Final[str] = "SEVN_BROWSER_PROFILE_DIR"
 _CONTENT_ROOT_ENV: Final[str] = "SEVN_CONTENT_ROOT"
 _SESSION_ID_ENV: Final[str] = "SEVN_SESSION_ID"
+# Login-grade defaults (DB1): re-passed on every spawn; cookies live in the profile.
+_LOGIN_GRADE_CHROME_ARGS: Final[tuple[str, ...]] = (
+    "--remote-allow-origins=*",
+    "--no-service-autorun",
+    "--homepage=about:blank",
+    "--no-pings",
+    "--password-store=basic",
+    "--disable-infobars",
+    "--disable-breakpad",
+    "--disable-dev-shm-usage",
+    "--disable-session-crashed-bubble",
+    "--disable-search-engine-choice-screen",
+    "--disable-features=IsolateOrigins,site-per-process",
+    "--disable-blink-features=AutomationControlled",
+)
+_PROFILE_BROWSER_LOCK_NAMES: Final[tuple[str, ...]] = (
+    "DevToolsActivePort",
+    "SingletonLock",
+    "SingletonCookie",
+    "SingletonSocket",
+)
 
 
 @dataclass(frozen=True)
@@ -926,15 +947,56 @@ def resolve_idle_close_seconds(cfg: WorkspaceConfig | None = None) -> int:
     return 0
 
 
-def read_devtools_active_port(profile_dir: Path, *, timeout: float = 15.0) -> int | None:
-    """Read Chrome's chosen debugging port from ``DevToolsActivePort`` (D2).
+def _clear_profile_browser_locks(profile_dir: Path) -> None:
+    """Delete stale CDP port / Singleton lock files under a sevn profile (DB2).
+
+    Only call for a profile sevn owns (recorded registry ``profile_dir`` or the
+    path about to be used by :func:`spawn_chrome`). Never pass an operator Chrome
+    user-data directory (convention 11).
+
+    Args:
+        profile_dir (Path): Chrome ``user-data-dir`` owned by sevn.
+
+    Returns:
+        None
+
+    Examples:
+        >>> import tempfile
+        >>> d = Path(tempfile.mkdtemp())
+        >>> _ = (d / "DevToolsActivePort").write_text("1\\n", encoding="utf-8")
+        >>> _clear_profile_browser_locks(d)
+        >>> (d / "DevToolsActivePort").exists()
+        False
+    """
+    for name in _PROFILE_BROWSER_LOCK_NAMES:
+        path = profile_dir / name
+        with contextlib.suppress(OSError):
+            if path.is_symlink() or path.is_file():
+                path.unlink()
+            elif path.exists():
+                # Singleton* can be a socket / special file on some platforms.
+                path.unlink(missing_ok=True)
+
+
+def read_devtools_active_port(
+    profile_dir: Path,
+    *,
+    timeout: float = 15.0,
+    spawn_started_at: float | None = None,
+) -> int | None:
+    """Read Chrome's chosen debugging port from ``DevToolsActivePort`` (D2/DB2).
+
+    When ``spawn_started_at`` is set, ignore a port file whose mtime is not
+    strictly later than that instant (stale file from a prior process).
 
     Args:
         profile_dir (Path): Chrome ``user-data-dir``.
-        timeout (float): Maximum seconds to wait for the file.
+        timeout (float): Maximum seconds to wait for a fresh file.
+        spawn_started_at (float | None): ``time.time()`` at spawn start for the
+            freshness probe; ``None`` accepts any present file.
 
     Returns:
-        int | None: Port number from line 1, or ``None`` on timeout.
+        int | None: Port number from line 1, or ``None`` on timeout / stale-only.
 
     Examples:
         >>> import tempfile
@@ -947,6 +1009,11 @@ def read_devtools_active_port(profile_dir: Path, *, timeout: float = 15.0) -> in
     while time.monotonic() < deadline:
         if port_file.is_file():
             try:
+                if spawn_started_at is not None:
+                    mtime = port_file.stat().st_mtime
+                    if mtime <= spawn_started_at:
+                        time.sleep(0.05)
+                        continue
                 lines = port_file.read_text(encoding="utf-8").splitlines()
                 if lines:
                     return int(lines[0].strip())
@@ -963,10 +1030,14 @@ def spawn_chrome(
     seed_port: int | None = None,
     cfg: WorkspaceConfig | None = None,
 ) -> tuple[subprocess.Popen[bytes], int, str]:
-    """Spawn detached Chrome with ``--remote-debugging-port=0`` (D2/D5).
+    """Spawn detached Chrome with login-grade defaults and ephemeral CDP (D2/DB1).
+
+    Clears stale ``DevToolsActivePort`` / Singleton* under ``profile_dir`` before
+    launch, then re-passes AutomationControlled + hygiene flags every spawn.
+    ``SEVN_BROWSER_EXTRA_ARGS`` still merge after the baked defaults.
 
     Args:
-        profile_dir (Path): Persistent ``user-data-dir``.
+        profile_dir (Path): Persistent sevn ``user-data-dir``.
         headless (bool): When ``True``, pass ``--headless=new``.
         seed_port (int | None): Fallback port when ``DevToolsActivePort`` is slow.
         cfg (WorkspaceConfig | None): Workspace config for ``skills.browser.engine``.
@@ -987,23 +1058,26 @@ def spawn_chrome(
         msg = "Chrome executable not found"
         raise RuntimeError(msg)
     profile_dir.mkdir(parents=True, exist_ok=True)
+    _clear_profile_browser_locks(profile_dir)
     args = [
         exe,
         "--remote-debugging-port=0",
         f"--user-data-dir={profile_dir}",
         "--no-first-run",
         "--no-default-browser-check",
+        *_LOGIN_GRADE_CHROME_ARGS,
         *resolve_browser_extra_args(),
     ]
     if headless:
         args.append("--headless=new")
+    spawn_started_at = time.time()
     proc = subprocess.Popen(  # nosec B603
         args,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         stdin=subprocess.DEVNULL,
     )
-    port = read_devtools_active_port(profile_dir)
+    port = read_devtools_active_port(profile_dir, spawn_started_at=spawn_started_at)
     if port is None and seed_port is not None:
         port = seed_port
     if port is None:
@@ -1189,10 +1263,17 @@ def close_browser_session(
             message="browser was not spawned by sevn; use force=True to override",
         )
     pid = row.pid if row is not None else None
+    profile_dir: Path | None = None
+    if row is not None and row.spawned_by_sevn and row.profile_dir.strip():
+        profile_dir = Path(row.profile_dir)
     if pid is None:
+        if profile_dir is not None:
+            _clear_profile_browser_locks(profile_dir)
         clear_registry(content_root, session_id)
         return CloseBrowserResult(ok=True, code="ALREADY_DEAD", message="no pid recorded")
     killed = _kill_pid(pid)
+    if profile_dir is not None:
+        _clear_profile_browser_locks(profile_dir)
     clear_registry(content_root, session_id)
     if killed:
         return CloseBrowserResult(ok=True, code="CLOSED", message=f"terminated pid {pid}")

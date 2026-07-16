@@ -8,8 +8,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import pytest
-
 from sevn.skills.browser_session import (
     BrowserSessionRegistry,
     close_browser_session,
@@ -84,9 +82,6 @@ def _capture_spawn_args(
     return captured[0]
 
 
-@pytest.mark.xfail(
-    reason="green after W2: DB1 AutomationControlled + hygiene defaults", strict=False
-)
 def test_spawn_chrome_defaults_include_automation_controlled(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
@@ -98,7 +93,6 @@ def test_spawn_chrome_defaults_include_automation_controlled(
         assert flag in args, f"missing hygiene flag: {flag}"
 
 
-@pytest.mark.xfail(reason="green after W2: DB1 merges SEVN_BROWSER_EXTRA_ARGS", strict=False)
 def test_spawn_chrome_merges_extra_args_with_defaults(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
@@ -121,10 +115,6 @@ def _seed_profile_locks(profile: Path) -> None:
         (profile / name).write_text("lock", encoding="utf-8")
 
 
-@pytest.mark.xfail(
-    reason="green after W2: DB2 close clears DevToolsActivePort/Singleton* for sevn profile",
-    strict=False,
-)
 def test_close_browser_session_clears_profile_locks_for_sevn_pid(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
@@ -154,10 +144,6 @@ def test_close_browser_session_clears_profile_locks_for_sevn_pid(
         assert not (profile / name).exists(), f"{name} should be cleared"
 
 
-@pytest.mark.xfail(
-    reason="green after W2: DB2 foreign profile locks left untouched",
-    strict=False,
-)
 def test_close_browser_session_leaves_foreign_profile_locks(
     tmp_path: Path,
     monkeypatch: MonkeyPatch,
@@ -188,9 +174,6 @@ def test_close_browser_session_leaves_foreign_profile_locks(
         assert (foreign_profile / name).is_file()
 
 
-@pytest.mark.xfail(
-    reason="green after W2: DB2 freshness rejects stale DevToolsActivePort", strict=False
-)
 def test_read_devtools_active_port_rejects_stale_mtime(tmp_path: Path) -> None:
     """DB2: a DevToolsActivePort older than spawn start is rejected (stale-port race)."""
     from sevn.skills.browser_session import read_devtools_active_port
@@ -207,9 +190,6 @@ def test_read_devtools_active_port_rejects_stale_mtime(tmp_path: Path) -> None:
     assert port is None
 
 
-@pytest.mark.xfail(
-    reason="green after W2: DB2 freshness accepts fresh DevToolsActivePort", strict=False
-)
 def test_read_devtools_active_port_accepts_fresh_mtime(tmp_path: Path) -> None:
     """DB2: a DevToolsActivePort newer than spawn start is accepted."""
     from sevn.skills.browser_session import read_devtools_active_port
@@ -224,7 +204,6 @@ def test_read_devtools_active_port_accepts_fresh_mtime(tmp_path: Path) -> None:
     assert port == 9333
 
 
-@pytest.mark.xfail(reason="green after W2: DB3 headed default on host-with-Chrome", strict=False)
 def test_resolve_browser_headless_false_when_chrome_present(monkeypatch: MonkeyPatch) -> None:
     """DB3: host with Chrome stays headed (headless=False) when env/config unset."""
     monkeypatch.delenv("SEVN_BROWSER_HEADLESS", raising=False)
