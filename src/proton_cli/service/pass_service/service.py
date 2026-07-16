@@ -8,10 +8,9 @@ from dataclasses import dataclass, field
 
 from pgpy import PGPMessage
 
-from proton_cli.account.keys import Unlocked, decrypt_pgp_message
+from proton_cli.account.keys import Unlocked, decrypt_pgp_message, use_unlocked_key
 from proton_cli.crypto import aead
 from proton_cli.errors import NotFound
-from proton_cli.account.keys import use_unlocked_key
 from proton_cli.proto import item as item_proto
 from proton_cli.proto.vault import decode_vault_name_description
 from proton_cli.proton.client import Client, Request

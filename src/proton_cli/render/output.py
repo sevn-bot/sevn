@@ -38,6 +38,28 @@ class Renderer:
         self.stderr = stderr or sys.stderr
         self.quiet = quiet
 
+    def json_body(self, body: bytes) -> None:
+        """Print raw JSON bytes (API passthrough)."""
+        if self.format == Format.JSON:
+            try:
+                parsed = json.loads(body)
+                json.dump(parsed, self.stdout, indent=2)
+                self.stdout.write("\n")
+            except json.JSONDecodeError:
+                self.stdout.write(body.decode("utf-8", errors="replace"))
+                if not body.endswith(b"\n"):
+                    self.stdout.write("\n")
+        elif self.format == Format.YAML:
+            try:
+                parsed = json.loads(body)
+                yaml.safe_dump(parsed, self.stdout, sort_keys=False)
+            except json.JSONDecodeError:
+                self.stdout.write(body.decode("utf-8", errors="replace"))
+        else:
+            self.stdout.write(body.decode("utf-8", errors="replace"))
+            if not body.endswith(b"\n"):
+                self.stdout.write("\n")
+
     def object(self, data: Any) -> None:
         if self.format == Format.JSON:
             json.dump(_to_snake_obj(data), self.stdout, indent=2, default=str)

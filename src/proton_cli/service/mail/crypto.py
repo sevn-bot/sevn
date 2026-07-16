@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from proton_cli.account.keys import use_unlocked_key
 from pgpy import PGPMessage
+
+from proton_cli.account.keys import use_unlocked_key
 
 
 def decrypt_body(armored: str, addr_keys: list) -> tuple[str, str]:
