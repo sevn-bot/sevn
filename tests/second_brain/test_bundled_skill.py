@@ -21,6 +21,15 @@ def test_default_skills_scan_includes_packaged_second_brain(tmp_path: Path) -> N
                 {"schema_version": 1, "gateway": {"token": "${SECRET:keychain:sevn.gateway.token}"}}
             ),
         )
-        assert "second_brain" in man.get_record("second_brain").canonical_id
+        expected = {
+            "defuddle",
+            "json-canvas",
+            "obsidian-bases",
+            "obsidian-cli",
+            "obsidian-markdown",
+            "second_brain",
+        }
+        for skill_id in expected:
+            assert man.get_record(skill_id).canonical_id == skill_id
     finally:
         SkillsManager.reset_singletons_for_tests()
