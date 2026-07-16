@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from proton_cli.account.keys import use_unlocked_key
 from pgpy import PGPMessage
 
 
@@ -16,7 +17,7 @@ def decrypt_body(armored: str, addr_keys: list) -> tuple[str, str]:
     last_err: Exception | None = None
     for key in addr_keys:
         try:
-            with key.unlock(None):
+            with use_unlocked_key(key):
                 decrypted = key.decrypt(message)
                 return str(decrypted.message), "verified"
         except Exception as exc:

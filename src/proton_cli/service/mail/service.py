@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 from pgpy import PGPKey, PGPMessage
 
+from proton_cli.account.keys import use_unlocked_key
 from proton_cli.proton.client import Client, Request
 from proton_cli.ref import pick
 from proton_cli.service.drive import blocks
@@ -330,7 +331,7 @@ class MailService:
             mime_type = "multipart/mixed"
 
         message = PGPMessage.new(body)
-        with addr_keys[0].unlock(None):
+        with use_unlocked_key(addr_keys[0]):
             enc = addr_keys[0].encrypt(message)
         armored = str(enc)
 
@@ -454,7 +455,7 @@ class MailService:
         sk = blocks.make_session_key()
         data_packet = blocks.encrypt_data_packet(data, sk)
         key_packet = blocks.encrypt_session_key_packet(addr_key, sk)
-        with addr_key.unlock(None):
+        with use_unlocked_key(addr_key):
             sig = addr_key.sign(PGPMessage.new(data))
         sig_bytes = bytes(sig)
         body, content_type = _build_attachment_form(

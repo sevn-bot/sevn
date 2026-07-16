@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
+from proton_cli.account.keys import persist_unlock, use_unlocked_key
 from pgpy import PGPKey, PGPMessage
 
 from proton_cli.crypto import cards as card_crypto
@@ -402,7 +403,7 @@ class CalendarService:
             if str(mp.get("MemberID", "")) != member_id:
                 continue
             msg = PGPMessage.from_blob(str(mp.get("Passphrase", "")))
-            with addr_key.unlock(None):
+            with use_unlocked_key(addr_key):
                 dec = addr_key.decrypt(msg)
             cal_pass = dec.message.encode() if isinstance(dec.message, str) else bytes(dec.message)
             break
@@ -418,9 +419,8 @@ class CalendarService:
         for row in key_payload.get("Keys") or []:
             locked, _ = PGPKey.from_blob(str(row.get("PrivateKey", "")))
             try:
-                with locked.unlock(cal_pass):
-                    cal_key = locked
-                    break
+                cal_key = persist_unlock(locked, cal_pass)
+                break
             except Exception:
                 continue
         if cal_key is None:

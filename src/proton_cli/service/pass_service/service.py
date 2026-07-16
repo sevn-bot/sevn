@@ -11,6 +11,7 @@ from pgpy import PGPMessage
 from proton_cli.account.keys import Unlocked, decrypt_pgp_message
 from proton_cli.crypto import aead
 from proton_cli.errors import NotFound
+from proton_cli.account.keys import use_unlocked_key
 from proton_cli.proto import item as item_proto
 from proton_cli.proto.vault import decode_vault_name_description
 from proton_cli.proton.client import Client, Request
@@ -149,9 +150,9 @@ class PassService:
         share_key = sk.get(rotation) if sk else None
         if not share_key:
             raise ValueError(f"no share key for rotation {rotation}")
-        _name, desc = ("", "")
+        desc = ""
         if content:
-            _name, desc = _decrypt_vault(content, share_key)
+            _, desc = _decrypt_vault(content, share_key)
         vault_bytes = item_proto.encode_vault(new_name, desc)
         ct = aead.encrypt(share_key, vault_bytes, aead.TAG_VAULT_CONTENT)
         self._client.decode(
@@ -508,7 +509,7 @@ def _encrypt_binary(keys: list, data: bytes) -> bytes:
     last_err: Exception | None = None
     for key in keys:
         try:
-            with key.unlock(None):
+            with use_unlocked_key(key):
                 encrypted = key.encrypt(message)
                 return bytes(encrypted)
         except Exception as exc:

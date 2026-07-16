@@ -39,18 +39,21 @@ def encode_login_item(
     email: str = "",
     password: str = "",
     url: str = "",
+    urls: list[str] | None = None,
     totp: str = "",
 ) -> bytes:
     """Encode a login ``Item`` protobuf."""
-    login = b"".join(
-        [
-            _write_string(1, email),
-            _write_string(2, password),
-            _write_string(3, url) if url else b"",
-            _write_string(4, totp),
-            _write_string(6, username),
-        ]
-    )
+    url_values = list(urls or [])
+    if url and not url_values:
+        url_values = [url]
+    login_parts = [
+        _write_string(1, email),
+        _write_string(2, password),
+        _write_string(4, totp),
+        _write_string(6, username),
+    ]
+    login_parts.extend(_write_string(3, value) for value in url_values if value)
+    login = b"".join(login_parts)
     content = _write_message(3, login)
     metadata = b"".join([_write_string(1, name), _write_string(2, note)])
     return b"".join([_write_message(1, metadata), _write_message(2, content)])
@@ -96,7 +99,7 @@ def patch_login_item(
         username=str(parsed.get("username", "")),
         email=str(parsed.get("email", "")),
         password=str(parsed.get("password", "")),
-        url=(parsed.get("urls") or [""])[0] if parsed.get("urls") else "",
+        urls=[str(u) for u in (parsed.get("urls") or []) if str(u)],
         totp=str(parsed.get("totp", "")),
     )
 
