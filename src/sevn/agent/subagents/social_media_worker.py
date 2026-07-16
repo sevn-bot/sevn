@@ -81,6 +81,7 @@ DEFAULT_SOCIAL_MEDIA_MANAGER_TOOLS: tuple[str, ...] = (
 )
 
 SocialMedium = Literal["twexapi", "browser", "capabilities"]
+# ``None`` medium = omitted from task JSON → resolve via config defaults (D2).
 
 __all__ = [
     "DEFAULT_SOCIAL_MEDIA_MANAGER_SKILLS",
@@ -107,7 +108,7 @@ class SocialMediaManagerError(RuntimeError):
 class SocialMediaTask:
     """One social-media specialist request parsed from a spawn/skill task string."""
 
-    medium: SocialMedium
+    medium: SocialMedium | None
     op: str
     params: dict[str, Any]
     body: dict[str, Any]
@@ -228,7 +229,9 @@ def _task_dict_for_resolution(task: str, parsed: SocialMediaTask) -> dict[str, A
         'twexapi'
     """
     task_dict = _task_dict_from_string(task)
-    if "medium" not in task_dict and parsed.medium != "capabilities":
+    # Only inject an explicit medium when the task stated one — omitted medium
+    # must fall through to platforms.<site>.medium / default_medium (D2).
+    if "medium" not in task_dict and parsed.medium:
         task_dict = {**task_dict, "medium": parsed.medium}
     if parsed.site and "site" not in task_dict:
         task_dict = {**task_dict, "site": parsed.site}
@@ -262,10 +265,16 @@ def parse_social_media_task(task: str) -> SocialMediaTask:
         if not isinstance(raw, dict):
             msg = "social media task JSON must be an object"
             raise ValueError(msg)
-        medium = str(raw.get("medium") or "browser").strip().lower()
-        if medium not in ("twexapi", "browser", "capabilities"):
-            msg = "medium must be twexapi|browser|capabilities"
-            raise ValueError(msg)
+        raw_medium = raw.get("medium")
+        medium: SocialMedium | None
+        if raw_medium is None or (isinstance(raw_medium, str) and not raw_medium.strip()):
+            medium = None
+        else:
+            candidate = str(raw_medium).strip().lower()
+            if candidate not in ("twexapi", "browser", "capabilities"):
+                msg = "medium must be twexapi|browser|capabilities"
+                raise ValueError(msg)
+            medium = candidate  # type: ignore[assignment]
         path_params_raw = raw.get("path_params") or {}
         if not isinstance(path_params_raw, dict):
             msg = "path_params must be an object"
@@ -276,7 +285,7 @@ def parse_social_media_task(task: str) -> SocialMediaTask:
             msg = "params/body must be objects"
             raise ValueError(msg)
         return SocialMediaTask(
-            medium=medium,  # type: ignore[arg-type]
+            medium=medium,
             op=str(raw.get("op") or raw.get("action") or "").strip().lower(),
             params={str(k): v for k, v in params_raw.items()},
             body={str(k): v for k, v in body_raw.items()},
@@ -288,12 +297,12 @@ def parse_social_media_task(task: str) -> SocialMediaTask:
         )
     if ":" in text:
         head, _, tail = text.partition(":")
-        medium = head.strip().lower()
+        shorthand_medium = head.strip().lower()
         op = tail.strip().lower()
-        if medium in ("twexapi", "browser", "capabilities"):
+        if shorthand_medium in ("twexapi", "browser", "capabilities"):
             return SocialMediaTask(
-                medium=medium,  # type: ignore[arg-type]
-                op=op if medium != "capabilities" else "list",
+                medium=shorthand_medium,  # type: ignore[arg-type]
+                op=op if shorthand_medium != "capabilities" else "list",
                 params={},
                 body={},
                 path_params={},
@@ -453,14 +462,18 @@ def _task_payload_for_x_ops(parsed: SocialMediaTask, *, content_root: Path) -> d
         >>> _task_payload_for_x_ops(t, content_root=Path("."))["op"]
         'like_tweet'
     """
+    # Merge untrusted task fields first; then pin trusted content_root so
+    # params/body cannot override the spawn workspace root (thermos i4 M1).
     payload: dict[str, Any] = {
-        "medium": parsed.medium,
         "op": parsed.op,
-        "content_root": str(content_root),
         **dict(parsed.params),
         **dict(parsed.body),
         **{k: v for k, v in parsed.path_params.items()},
     }
+    payload.pop("content_root", None)
+    payload["content_root"] = str(content_root)
+    if parsed.medium:
+        payload["medium"] = parsed.medium
     if parsed.site:
         payload["site"] = parsed.site
     if parsed.query:

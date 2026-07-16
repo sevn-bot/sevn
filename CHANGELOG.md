@@ -43,6 +43,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-16] `social_media_manager` pins trusted `content_root` after merging task params/body (blocks override), leaves omitted JSON `medium` unset so `default_medium`/`platforms.<site>.medium` resolve, and X ops reject missing `tweet_id` with `TWEET_ID_REQUIRED` instead of path ``0``
 - [2026-07-16] X ops `fetch_article_markdown` and `get_users_by_usernames` reject `medium=browser` with `BROWSER_OP_UNSUPPORTED` instead of returning a false-success home scrape plan
 - [2026-07-16] `social_media_manager` worker forwards `tools.browser` from workspace `JsonDict` config (`.get("browser")`) so `allow_write=true` reaches the X ops write gate instead of always returning `WRITE_DISABLED`
 - [2026-07-16] Worker browser plans expose SocialRecipe `op` (e.g. `home_feed`/`post`) at the top level with facade name under `facade_op`, so `action=social` callers do not hit `unknown social op`

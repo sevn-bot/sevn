@@ -168,3 +168,21 @@ async def test_session_status_reports_fields_without_leaking_key() -> None:
     assert key_present in (True, False, None) or isinstance(key_present, bool)
     blob = str(result)
     assert secret_key not in blob
+
+
+@pytest.mark.asyncio
+async def test_missing_tweet_id_returns_tweet_id_required_not_zero() -> None:
+    """Thermos i4 M3: empty tweet_id fails closed — never path ``0``."""
+    x_ops = _import_x_ops()
+    with patch(
+        "sevn.integrations.social_media.x_ops_dispatch.resolve_social_medium",
+        return_value="twexapi",
+    ):
+        result = await x_ops.like_tweet(
+            task={"medium": "twexapi", "cookie": "ct0=x"},
+            cfg={"integrations": {"twexapi": {"enabled": True}}},
+            site="x",
+        )
+    assert result["ok"] is False
+    assert result.get("code") == "TWEET_ID_REQUIRED"
+    assert "0" not in str(result.get("data") or {})

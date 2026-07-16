@@ -729,12 +729,25 @@ async def run_op(
         msg = f"unknown facade op: {op!r}"
         raise KeyError(msg)
     spec = _OP_SPECS[op]
-    body = twexapi_body
-    if body is None and spec.pack_body is not None:
-        body = spec.pack_body(task_d)
-    path_params = twexapi_path_params
-    if path_params is None and spec.pack_path is not None:
-        path_params = spec.pack_path(task_d)
+    try:
+        body = twexapi_body
+        if body is None and spec.pack_body is not None:
+            body = spec.pack_body(task_d)
+        path_params = twexapi_path_params
+        if path_params is None and spec.pack_path is not None:
+            path_params = spec.pack_path(task_d)
+    except ValueError as exc:
+        medium = resolve_social_medium(task_d, smm_cfg(cfg_d), site)
+        err = str(exc)
+        code = "TWEET_ID_REQUIRED" if "tweet_id" in err.lower() else "INVALID_TASK"
+        return envelope(
+            ok=False,
+            medium=medium,
+            op=op,
+            data={},
+            error=err,
+            code=code,
+        )
     return await _dispatch(
         op,
         task_d,

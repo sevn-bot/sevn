@@ -88,17 +88,23 @@ def pack_tweet_id_path(task: dict[str, Any]) -> dict[str, str]:
     """Pack ``tweet_id`` path params for tweet-action ops.
 
     Args:
-        task (dict[str, Any]): Task with optional ``tweet_id``.
+        task (dict[str, Any]): Task with required ``tweet_id``.
 
     Returns:
-        dict[str, str]: Path params (``\"0\"`` when missing).
+        dict[str, str]: Path params.
+
+    Raises:
+        ValueError: When ``tweet_id`` is missing or blank.
 
     Examples:
         >>> pack_tweet_id_path({"tweet_id": "9"})["tweet_id"]
         '9'
     """
     tweet_id = str(task.get("tweet_id") or "").strip()
-    return {"tweet_id": tweet_id or "0"}
+    if not tweet_id:
+        msg = "tweet_id is required"
+        raise ValueError(msg)
+    return {"tweet_id": tweet_id}
 
 
 def pack_advanced_search_body(task: dict[str, Any]) -> dict[str, Any] | None:

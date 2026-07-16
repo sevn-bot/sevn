@@ -124,10 +124,16 @@ class TestParseSocialMediaTask:
         assert task.site == "x"
         assert task.query == "ai"
 
-    def test_default_medium_browser_when_omitted(self) -> None:
+    def test_omitted_medium_leaves_resolution_to_config(self) -> None:
+        """Omitted JSON medium is unset so D2 config defaults apply (thermos i4 M2)."""
         worker = _import_worker()
         task = worker.parse_social_media_task('{"op":"search","site":"x","query":"ai"}')
-        assert task.medium == "browser"
+        assert task.medium is None
+        task_dict = worker._task_dict_for_resolution(
+            '{"op":"search","site":"x","query":"ai"}',
+            task,
+        )
+        assert "medium" not in task_dict
 
 
 class TestToolkitAssignment:

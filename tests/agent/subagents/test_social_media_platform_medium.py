@@ -469,3 +469,62 @@ class TestWrapPromotesSocialOp:
         assert out["op"] == "home_feed"
         assert out["facade_op"] == "home_timeline_collect"
         assert out["action"] == "social"
+
+
+class TestContentRootTrustAndDefaultMedium:
+    """Thermos i4 M1/M2 — content_root pin + omitted medium uses config default."""
+
+    def test_task_payload_pins_trusted_content_root(self, tmp_path: Path) -> None:
+        worker = _import_worker_module()
+        trusted = tmp_path / "trusted"
+        trusted.mkdir()
+        task = worker.SocialMediaTask(
+            medium="browser",
+            op="home_timeline_collect",
+            params={},
+            body={"content_root": "/evil/override"},
+            path_params={},
+            site="x",
+        )
+        payload = worker._task_payload_for_x_ops(task, content_root=trusted)
+        assert payload["content_root"] == str(trusted)
+        assert payload["content_root"] != "/evil/override"
+
+    @pytest.mark.asyncio
+    async def test_omitted_medium_honors_default_twexapi(self, tmp_path: Path) -> None:
+        worker = _import_worker_module()
+        root = tmp_path / "ws"
+        root.mkdir()
+        (root / "sevn.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "gateway": {"token": "test-token"},
+                    "skills": {
+                        "social_media_manager": {
+                            "default_medium": "twexapi",
+                            "twexapi": {"enabled": False},
+                        },
+                    },
+                    "subagents": {
+                        "specialists": {
+                            "social_media_manager": {
+                                "model": "gpt-4o-mini",
+                                "provider": "openai",
+                                "skill": "social_media_manager",
+                                "tools": ["browser"],
+                            },
+                        },
+                    },
+                },
+            ),
+            encoding="utf-8",
+        )
+        result = await worker.execute_social_media_manager_task(
+            '{"op":"home_timeline_collect","site":"x"}',
+            content_root=root,
+        )
+        assert result.get("medium") == "twexapi"
+        # TwexAPI disabled → error envelope, not a browser plan
+        assert result.get("ok") is False
+        assert result.get("code") in {"TWEXAPI_DISABLED", "KEY_MISSING"} or result.get("error")
