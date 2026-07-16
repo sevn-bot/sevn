@@ -74,6 +74,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-16] On classifier timeout, the queue relatedness path treats the message as its own turn (`new_task`) instead of merging it into an unrelated in-flight task via `related_steer`
 - [2026-07-16] Skill registry and `load_skill` share one source of truth: `list_registry` advertises only non-quarantined skills from the live `SkillsManager` scan (no unloadable `DEFAULT_SKILL_MANIFESTS` stubs), and skills whose manifests fail to parse are flagged `quarantine:true` so listed skills never return `SKILL_NOT_FOUND`
 - [2026-07-16] `read_transcript` no longer crashes on tool-heavy turns with small limits when mirrored tool results are bare JSON scalars; `log_query` with a `pattern` returns matching lines (paged under the inline budget) instead of collapsing to a `tail_summary` sample
 - [2026-07-16] `process` accepts `action=read` as an alias for `output`, keeps `run` returning `did_you_mean`, and wrong-action errors include the referenced job's current status; workspace `sevn.bot.md` surfaces `my_sevn.repo_url` so agents never need `git remote` against the read-only mirror

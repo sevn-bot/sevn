@@ -10,13 +10,7 @@ from sevn.agent.triager import relatedness as rel
 from sevn.agent.triager.relatedness import RelatednessInput, RelatednessResult, classify_relatedness
 from sevn.config.workspace_config import WorkspaceConfig
 
-_XFAIL_W8 = pytest.mark.xfail(
-    reason="green after W8: classifier timeout must not silently merge (D15)",
-    strict=False,
-)
 
-
-@_XFAIL_W8
 @pytest.mark.asyncio
 async def test_d15_classifier_timeout_enqueues_own_turn_not_related_steer() -> None:
     """D15: on classifier timeout, enqueue as ``new_task`` — never silent ``related_steer``."""
@@ -48,7 +42,6 @@ async def test_d15_classifier_timeout_enqueues_own_turn_not_related_steer() -> N
     assert result.fallback is True
 
 
-@_XFAIL_W8
 @pytest.mark.asyncio
 async def test_d15_unrelated_ask_not_absorbed_into_in_flight_summary() -> None:
     """D15: timed-out unrelated asks must not be absorbed into the in-flight task."""

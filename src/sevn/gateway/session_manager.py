@@ -778,11 +778,6 @@ class SessionManager:
                     queued,
                     new_message_text,
                 )
-                if classifier_fallback:
-                    notice_line = (
-                        "Queue classifier timed out — steering this message into "
-                        "the in-flight task instead."
-                    )
                 if label == "supersede_cancel":
                     effective_mode = "cancel"
                     self._multi_queued_summaries.pop(session_id, None)
@@ -794,6 +789,12 @@ class SessionManager:
                             session_id,
                             correlation_id,
                         )
+                        if classifier_fallback:
+                            notice_line = (
+                                "Queue classifier timed out — queuing this message "
+                                "as its own turn instead."
+                            )
+                            await multi_hooks.notify_operator(session_id, notice_line)
                         return
                     effective_mode = "steer"
                     notice_line = (
@@ -802,6 +803,11 @@ class SessionManager:
                     )
                 else:
                     effective_mode = "steer"
+                    if classifier_fallback:
+                        notice_line = (
+                            "Queue classifier timed out — steering this message into "
+                            "the in-flight task instead."
+                        )
         q = self._queues.setdefault(session_id, asyncio.Queue())
         lock = self._enqueue_lock(session_id)
         async with lock:
