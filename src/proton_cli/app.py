@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from proton_cli import __version__
 from proton_cli.account import keys as keyring
@@ -32,7 +32,7 @@ class App:
     dry_run: bool = False
     full_ids: bool = False
     _cache: keyring.Unlocked | None = None
-    _lock: threading.Lock = threading.Lock()
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def authenticate(self) -> None:
         uid, _, _ = self.api.tokens()

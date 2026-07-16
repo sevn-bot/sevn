@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import base64
 import os
+from typing import TYPE_CHECKING
 
 import bcrypt
 
-from proton_cli.crypto.srp.pmhash import PMHash
+if TYPE_CHECKING:
+    from proton_cli.crypto.srp.pmhash import PMHash
 
 PM_VERSION = 4
 SRP_LEN_BYTES = 256
@@ -21,7 +23,9 @@ def bcrypt_b64_encode(data: bytes) -> bytes:
     return encoded.translate(bytes.maketrans(std_base64chars, bcrypt_base64))
 
 
-def hash_password_3(hash_class: type[PMHash], password: bytes, salt: bytes, modulus: bytes) -> bytes:
+def hash_password_3(
+    hash_class: type[PMHash], password: bytes, salt: bytes, modulus: bytes
+) -> bytes:
     salt = (salt + b"proton")[:16]
     salt = bcrypt_b64_encode(salt)[:22]
     hashed = bcrypt.hashpw(password, b"$2y$10$" + salt)
@@ -63,17 +67,14 @@ def custom_hash(hash_class: type[PMHash], *args: object) -> int:
     for item in args:
         if item is None:
             continue
-        if isinstance(item, int):
-            data = long_to_bytes(item, SRP_LEN_BYTES)
-        else:
-            data = bytes(item)
+        data = long_to_bytes(item, SRP_LEN_BYTES) if isinstance(item, int) else bytes(item)
         h.update(data)
     return bytes_to_long(h.digest())
 
 
 def mailbox_password(password: bytes, salt: bytes) -> bytes:
     """Return full bcrypt hash bytes for mailbox password derivation."""
-    encoded_salt = bcrypt_b64_encode(salt)
+    bcrypt_b64_encode(salt)
     salt_part = bcrypt_b64_encode((salt + b"proton")[:16])[:22]
     return bcrypt.hashpw(password, b"$2y$10$" + salt_part)
 

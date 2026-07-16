@@ -945,6 +945,26 @@
       ]
     },
     {
+      "capability_id": "skill.proton_management",
+      "group": "B",
+      "label": "proton-management",
+      "description": "Python port of proton-cli — Pass vaults/items with E2EE; Mail/Drive/Calendar/Contacts planned.",
+      "config_paths": [
+        "skills.proton_management.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.proton_management.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
       "capability_id": "skill.roam_code",
       "group": "B",
       "label": "roam_code",
