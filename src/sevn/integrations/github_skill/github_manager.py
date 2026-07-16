@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
+import subprocess  # nosec B404 — fixed ``gh`` argv only; no shell
 from typing import TYPE_CHECKING, Any
 
 from sevn.integrations.github_skill.client import github_integration_call, parse_github_repo
@@ -151,7 +151,7 @@ def create_issue_via_gh(
     for assignee in assignees or []:
         cmd.extend(["--assignee", assignee])
     try:
-        completed = subprocess.run(
+        completed = subprocess.run(  # nosec B603 — fixed ``gh`` argv; no shell
             cmd,
             capture_output=True,
             text=True,
@@ -217,7 +217,7 @@ def view_issue_via_gh(repo: str, issue_number: int) -> dict[str, Any]:
         _ISSUE_VIEW_JSON_FIELDS,
     ]
     try:
-        completed = subprocess.run(
+        completed = subprocess.run(  # nosec B603 — fixed ``gh`` argv; no shell
             cmd,
             capture_output=True,
             text=True,
