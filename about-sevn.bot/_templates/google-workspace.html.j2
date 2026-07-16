@@ -1,0 +1,72 @@
+{% extends "base.html.j2" %}
+{% block extra_head %}
+  <style>
+    .fn-section { margin: 2rem 0 1.5rem; }
+    .fn-section h2 { font-size: 1.25rem; margin-bottom: 0.35rem; }
+    .fn-intro { color: var(--sevn-fg-muted); font-size: 0.92rem; max-width: 70ch; margin-bottom: 0.75rem; }
+    .fn-table { font-size: 0.85rem; }
+    .fn-table code { font-size: 0.82rem; word-break: break-word; }
+    .fn-table td:first-child { white-space: nowrap; font-weight: 500; }
+    .invoke-cell { max-width: 28rem; }
+    .status-planned { background: #4a3410; color: #ffb74d; }
+    .status-browser { background: #1a3a4a; color: #81d4fa; }
+    .status-email-management { background: #2a2a4a; color: #b39ddb; }
+    .legend { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1rem 0 1.5rem; font-size: 0.85rem; }
+    .legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+  </style>
+{% endblock %}
+{% block content %}
+<div class="help-body">
+  {{ body_html | safe }}
+  <div class="legend" aria-label="Status legend">
+    <span><span class="badge status-planned">planned</span> google-workspace skill (spec 38)</span>
+    <span><span class="badge status-browser">browser</span> available today via browser tool</span>
+    <span><span class="badge status-email-management">email-management</span> IMAP path today</span>
+  </div>
+  {% for service in services %}
+  <section class="fn-section" id="{{ service.id }}">
+    <h2>{{ service.title }}</h2>
+    {% if service.intro %}<p class="fn-intro">{{ service.intro | safe }}</p>{% endif %}
+    <table class="catalog-table fn-table">
+      <thead>
+        <tr>
+          <th>Function</th>
+          <th>Status</th>
+          <th>Args</th>
+          <th>Returns (JSON)</th>
+          <th>How to invoke in sevn</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for fn in service.functions %}
+        <tr>
+          <td><code>{{ fn.name }}</code>{% if fn.write %}<br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span>{% endif %}</td>
+          <td><span class="badge status-{{ fn.status | replace('_', '-') }}">{{ fn.status }}</span></td>
+          <td><code>{{ fn.args }}</code></td>
+          <td><code>{{ fn.returns }}</code></td>
+          <td class="invoke-cell">
+            <code>{{ fn.invoke }}</code>
+            {% if fn.today %}
+            <br><small style="color:var(--sevn-fg-muted);">Today: <code>{{ fn.today }}</code></small>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endfor %}
+
+  <h2>Troubleshooting (planned)</h2>
+  <table class="catalog-table">
+    <thead><tr><th>Problem</th><th>Fix</th></tr></thead>
+    <tbody>
+      <tr><td><code>NOT_AUTHENTICATED</code></td><td>Run OAuth setup (<code>setup.py --check</code> → auth flow)</td></tr>
+      <tr><td><code>REFRESH_FAILED</code></td><td>Re-authorize (<code>setup.py --revoke</code> then auth steps)</td></tr>
+      <tr><td>403 Insufficient Permission</td><td>Revoke and re-auth with broader <code>--services</code></td></tr>
+      <tr><td>403 Access Not Configured</td><td>Enable API in Google Cloud Console</td></tr>
+      <tr><td><code>gws</code> not found</td><td>Install <code>@googleworkspace/cli</code> or use Python fallback</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}

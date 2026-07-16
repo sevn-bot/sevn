@@ -7,7 +7,7 @@ body: |
     <li>Chat from <strong>Telegram</strong>, the <strong>web UI</strong>, or the CLI</li>
     <li>Adjust behavior from the Telegram <code>/config</code> menu — see the <a href="telegram-menu.html">settings preview</a></li>
     <li>Manage models, memory, and integrations from <a href="mission-control.html">Mission Control</a> when the dashboard is enabled</li>
-    <li>Extend capabilities with bundled <a href="skills.html">skills</a> and built-in <a href="tools.html">tools</a></li>
+    <li>Extend capabilities with bundled <a href="skills.html">skills</a> and built-in <a href="tools.html">tools</a> — including planned <a href="google-workspace.html">Google Workspace</a> (Gmail, Calendar, Drive, Sheets, Docs)</li>
     <li>Run parallel work via <a href="sub-agents.html">sub-agents</a> when <code>gateway.queue_mode</code> is <code>multi</code></li>
   </ul>
   <h2>New here?</h2>

@@ -1,0 +1,60 @@
+title: Google Workspace
+summary: Gmail, Calendar, Drive, Sheets, Docs, and Contacts via OAuth2 — planned bundled skill with Hermes parity, adapted for sevn.
+body: |
+  <p>The <code>google-workspace</code> skill brings full Google Workspace API access to sevn.bot,
+  modeled on the
+  <a href="https://hermes-agent.nousresearch.com/docs/user-guide/skills/google-workspace" rel="noopener">Hermes Agent google-workspace skill</a>.
+  It uses OAuth2 with automatic token refresh and prefers the official
+  <a href="https://github.com/googleworkspace/cli" rel="noopener">Google Workspace CLI (<code>gws</code>)</a>
+  when installed.</p>
+
+  <h2>Status</h2>
+  <p>This skill is <strong>planned</strong> (spec 38). Today, sevn covers partial Google access through:</p>
+  <ul>
+    <li><a href="tools.html"><code>browser</code></a> — Gmail read/search (and gated compose/reply), Google Search, Maps, YouTube</li>
+    <li><a href="skills.html"><code>email-management</code></a> — multi-account IMAP/SMTP (Gmail app passwords; no Cloud project)</li>
+  </ul>
+  <p>When shipped, <code>google-workspace</code> becomes the primary path for Calendar, Drive, Sheets, Docs, and OAuth Gmail API writes.</p>
+
+  <h2>When to use which path</h2>
+  <table class="catalog-table">
+    <thead><tr><th>Need</th><th>Use today</th><th>After google-workspace ships</th></tr></thead>
+    <tbody>
+      <tr><td>Email only, quick setup</td><td><code>email-management</code> (IMAP)</td><td>Still <code>email-management</code></td></tr>
+      <tr><td>Calendar / Drive / Sheets / Docs</td><td>Not available</td><td><code>google-workspace</code></td></tr>
+      <tr><td>Gmail API (labels, threading, HTML)</td><td>Browser recipe</td><td><code>google-workspace</code></td></tr>
+      <tr><td>No OAuth / logged-in browser session</td><td><code>browser</code> gmail</td><td>Browser remains fallback</td></tr>
+    </tbody>
+  </table>
+
+  <h2>How the agent uses the skill</h2>
+  <ol>
+    <li>Triager selects <code>google-workspace</code> for relevant intents.</li>
+    <li>Agent calls <code>load_skill("google-workspace")</code> for setup prose and script capabilities.</li>
+    <li>Agent runs operations with <code>run_skill_script</code>, passing argv to <code>scripts/google_api.py</code> or <code>scripts/setup.py</code>.</li>
+  </ol>
+  <p>Example (planned):</p>
+  <pre><code>run_skill_script(
+    "google-workspace",
+    "scripts/google_api.py",
+    ["gmail", "search", "is:unread", "--max", "10"]
+  )</code></pre>
+
+  <h2>First-time OAuth setup (planned flow)</h2>
+  <ol>
+    <li>Operator creates a Google Cloud project and enables Gmail, Calendar, Drive, Sheets, Docs, and People APIs.</li>
+    <li>Download Desktop OAuth client JSON; agent runs <code>scripts/setup.py --client-secret PATH</code>.</li>
+    <li>Agent returns auth URL; operator approves in browser and pastes redirect URL.</li>
+    <li><code>scripts/setup.py --auth-code …</code> stores token under <code>.sevn/google_token.json</code> (auto-refresh).</li>
+  </ol>
+  <p>Credentials never appear in chat or script JSON output.</p>
+
+  <h2>Safety rules</h2>
+  <ul>
+    <li>Confirm with the operator before sending email, creating/deleting calendar events, uploading or sharing Drive files, or modifying Sheets/Docs.</li>
+    <li>Prefer Drive trash over permanent delete.</li>
+    <li>Calendar times must use ISO 8601 with timezone offset or UTC (<code>Z</code>).</li>
+  </ul>
+
+  <h2>Function reference</h2>
+  <p>Complete list of planned commands, arguments, return fields, and sevn invocation patterns:</p>

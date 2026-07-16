@@ -1,0 +1,227 @@
+# Function catalog for google-workspace help page (Hermes parity, sevn invocation).
+# status: planned | browser | email-management
+
+services:
+  - id: setup
+    title: OAuth setup
+    intro: Run once per workspace. Tokens live in <code>.sevn/google_token.json</code>.
+    functions:
+      - name: setup --check
+        status: planned
+        write: false
+        args: "--check"
+        returns: "AUTHENTICATED | NOT_AUTHENTICATED | partial scope list"
+        invoke: 'run_skill_script("google-workspace", "scripts/setup.py", ["--check"])'
+      - name: setup --client-secret
+        status: planned
+        write: true
+        args: "--client-secret PATH"
+        returns: "{ok, path_stored}"
+        invoke: 'run_skill_script("google-workspace", "scripts/setup.py", ["--client-secret", "/path/to/client_secret.json"])'
+      - name: setup --auth-url
+        status: planned
+        write: false
+        args: "--auth-url [--services email,calendar,...|all] [--format json]"
+        returns: "{auth_url} or plain URL"
+        invoke: 'run_skill_script("google-workspace", "scripts/setup.py", ["--auth-url", "--services", "all", "--format", "json"])'
+      - name: setup --auth-code
+        status: planned
+        write: true
+        args: "--auth-code URL_OR_CODE [--format json]"
+        returns: "{ok, scopes} or fresh auth_url on expiry"
+        invoke: 'run_skill_script("google-workspace", "scripts/setup.py", ["--auth-code", "http://localhost:1/?code=..."])'
+      - name: setup --revoke
+        status: planned
+        write: true
+        args: "--revoke"
+        returns: "{ok, revoked: true}"
+        invoke: 'run_skill_script("google-workspace", "scripts/setup.py", ["--revoke"])'
+      - name: setup --install-deps
+        status: planned
+        write: false
+        args: "--install-deps"
+        returns: "{ok, packages_installed}"
+        invoke: 'run_skill_script("google-workspace", "scripts/setup.py", ["--install-deps"])'
+
+  - id: gmail
+    title: Gmail
+    intro: OAuth Gmail API. For IMAP-only mail today, use <code>email-management</code>. For browser scraping, use <code>browser</code> action <code>gmail</code>.
+    functions:
+      - name: gmail search
+        status: planned
+        write: false
+        args: 'QUERY [--max N]'
+        returns: "[{id, threadId, from, to, subject, date, snippet, labels}]"
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["gmail", "search", "is:unread", "--max", "10"])'
+        today: 'browser(action="gmail", op="search", query="is:unread")'
+      - name: gmail get
+        status: planned
+        write: false
+        args: MESSAGE_ID
+        returns: "{id, threadId, from, to, subject, date, labels, body}"
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["gmail", "get", "MSG_ID"])'
+        today: 'browser(action="gmail", op="read", message_id="…")'
+      - name: gmail send
+        status: planned
+        write: true
+        args: "--to ADDR --subject TEXT --body TEXT [--html] [--from DISPLAY] [--cc ADDRS]"
+        returns: '{status: "sent", id, threadId}'
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["gmail", "send", "--to", "u@ex.com", "--subject", "Hi", "--body", "Hello"])'
+        today: 'browser gmail compose (requires tools.browser.gmail.allow_write=true)'
+      - name: gmail reply
+        status: planned
+        write: true
+        args: "MESSAGE_ID --body TEXT [--from DISPLAY]"
+        returns: '{status: "sent", id, threadId}'
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["gmail", "reply", "MSG_ID", "--body", "Thanks"])'
+        today: 'browser gmail reply (gated write)'
+      - name: gmail labels
+        status: planned
+        write: false
+        args: "(none)"
+        returns: "[{id, name, type}]"
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["gmail", "labels"])'
+      - name: gmail modify
+        status: planned
+        write: true
+        args: "MESSAGE_ID --add-labels IDS | --remove-labels IDS"
+        returns: "{ok, id, labels}"
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["gmail", "modify", "MSG_ID", "--remove-labels", "UNREAD"])'
+
+  - id: calendar
+    title: Calendar
+    intro: List, create, and delete events. Times must include timezone (ISO 8601 with offset or UTC Z).
+    functions:
+      - name: calendar list
+        status: planned
+        write: false
+        args: "[--start ISO] [--end ISO]  (default next 7 days)"
+        returns: "[{id, summary, start, end, location, description, htmlLink}]"
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["calendar", "list"])'
+      - name: calendar create
+        status: planned
+        write: true
+        args: "--summary TEXT --start ISO --end ISO [--location TEXT] [--attendees a@x.com,b@y.com]"
+        returns: '{status: "created", id, summary, htmlLink}'
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["calendar", "create", "--summary", "Standup", "--start", "2026-07-16T10:00:00-05:00", "--end", "2026-07-16T10:30:00-05:00"])'
+      - name: calendar delete
+        status: planned
+        write: true
+        args: EVENT_ID
+        returns: '{status: "deleted", id}'
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["calendar", "delete", "EVENT_ID"])'
+
+  - id: drive
+    title: Drive
+    intro: Search, upload, download, share, and organize files.
+    functions:
+      - name: drive search
+        status: planned
+        write: false
+        args: 'QUERY [--max N] [--raw-query]'
+        returns: "[{id, name, mimeType, modifiedTime, webViewLink}]"
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["drive", "search", "quarterly report", "--max", "10"])'
+      - name: drive get
+        status: planned
+        write: false
+        args: FILE_ID
+        returns: "{id, name, mimeType, modifiedTime, size, webViewLink, parents, owners}"
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["drive", "get", "FILE_ID"])'
+      - name: drive upload
+        status: planned
+        write: true
+        args: "PATH [--name NAME] [--parent FOLDER_ID]"
+        returns: '{status: "uploaded", id, name, mimeType, webViewLink}'
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["drive", "upload", "/path/report.pdf"])'
+      - name: drive download
+        status: planned
+        write: false
+        args: "FILE_ID [--output PATH] [--export-mime MIME]"
+        returns: '{status: "downloaded", id, name, path, mimeType}'
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["drive", "download", "FILE_ID", "--output", "~/doc.pdf"])'
+      - name: drive create-folder
+        status: planned
+        write: true
+        args: "NAME [--parent FOLDER_ID]"
+        returns: '{status: "created", id, name, webViewLink}'
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["drive", "create-folder", "Reports"])'
+      - name: drive share
+        status: planned
+        write: true
+        args: "FILE_ID --email ADDR --role reader|writer [--notify] | --type anyone|domain [--domain D]"
+        returns: '{status: "shared", permissionId, fileId, role, type}'
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["drive", "share", "FILE_ID", "--email", "a@ex.com", "--role", "reader"])'
+      - name: drive delete
+        status: planned
+        write: true
+        args: "FILE_ID [--permanent]"
+        returns: '{status: "trashed"|"deleted", fileId, permanent}'
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["drive", "delete", "FILE_ID"])'
+
+  - id: contacts
+    title: Contacts
+    intro: People API read-only list.
+    functions:
+      - name: contacts list
+        status: planned
+        write: false
+        args: "[--max N]"
+        returns: "[{name, emails: [...], phones: [...]}]"
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["contacts", "list", "--max", "20"])'
+
+  - id: sheets
+    title: Sheets
+    intro: Create spreadsheets and read/write cell ranges.
+    functions:
+      - name: sheets create
+        status: planned
+        write: true
+        args: "--title TEXT [--sheet-name NAME]"
+        returns: '{status: "created", spreadsheetId, title, spreadsheetUrl}'
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["sheets", "create", "--title", "Q4 Budget"])'
+      - name: sheets get
+        status: planned
+        write: false
+        args: 'SHEET_ID "Sheet1!A1:D10"'
+        returns: "2D array [[cell, ...], ...]"
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["sheets", "get", "SHEET_ID", "Sheet1!A1:D10"])'
+      - name: sheets update
+        status: planned
+        write: true
+        args: 'SHEET_ID "RANGE" --values JSON_ARRAY'
+        returns: "{updatedCells, updatedRange}"
+        invoke: >-
+          run_skill_script("google-workspace", "scripts/google_api.py",
+          ["sheets", "update", "ID", "Sheet1!A1:B2", "--values",
+          '[["Name","Score"],["Alice","95"]]'])
+      - name: sheets append
+        status: planned
+        write: true
+        args: 'SHEET_ID "RANGE" --values JSON_ARRAY'
+        returns: "{updates, tableRange}"
+        invoke: >-
+          run_skill_script("google-workspace", "scripts/google_api.py",
+          ["sheets", "append", "ID", "Sheet1!A:C", "--values", '[["a","b","c"]]'])
+
+  - id: docs
+    title: Docs
+    intro: Read, create, and append Google Docs.
+    functions:
+      - name: docs get
+        status: planned
+        write: false
+        args: DOC_ID
+        returns: "{documentId, title, body}"
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["docs", "get", "DOC_ID"])'
+      - name: docs create
+        status: planned
+        write: true
+        args: "--title TEXT [--body TEXT]"
+        returns: '{status: "created", documentId, title, url}'
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["docs", "create", "--title", "Meeting Notes"])'
+      - name: docs append
+        status: planned
+        write: true
+        args: "DOC_ID --text TEXT"
+        returns: '{status: "appended", documentId, inserted_at, characters}'
+        invoke: 'run_skill_script("google-workspace", "scripts/google_api.py", ["docs", "append", "DOC_ID", "--text", "Follow-up items…"])'
