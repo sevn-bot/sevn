@@ -37,10 +37,13 @@ dependencies = [
     "pydantic-evals>=1.99.0",
     "logfire>=4.32.1",
     "pydantic-ai-harness[codemode]>=0.3.0",
+    "bcrypt>=4.2.0",
+    "pgpy>=0.6.0",
 ]
 
 [project.scripts]
 sevn = "sevn.cli.app:main"
+proton-cli = "proton_cli.cli.root:cli_main"
 
 [project.entry-points."sevn.tools"]
 sevn_core_reserved_plugin_table = "sevn.tools.entrypoints:reserved_plugin_row"
@@ -127,7 +130,7 @@ skillspector = { git = "https://github.com/NVIDIA/SkillSpector", branch = "main"
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/sevn"]
+packages = ["src/sevn", "src/proton_cli"]
 artifacts = [
     "src/sevn/ui/webapp/*.html",
     "src/sevn/ui/webapp/*.css",

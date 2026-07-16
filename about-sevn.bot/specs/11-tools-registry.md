@@ -8,7 +8,7 @@ summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that eve
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
 last_updated: '2026-07-16'
-fingerprint: sha256:6b703a4663c13c27a09c90a6876128bef418d21040d8b49bcf5eb5a4ace74210
+fingerprint: sha256:1f0d4489520f69640f2454be9348032fb70500f3946174e029f448847f237151
 related: []
 sources:
 - src/sevn/tools/**
