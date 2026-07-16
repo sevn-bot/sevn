@@ -8,7 +8,6 @@ import json
 import os
 import subprocess
 import sys
-import types
 from contextlib import redirect_stdout
 from pathlib import Path
 
@@ -120,7 +119,7 @@ def test_bundled_skill_manifest_exists() -> None:
     """Manifest exists, declares expected egress, and marks write-capable wrappers non-abortable."""
     assert _SKILL_MD.is_file()
     text = _SKILL_MD.read_text(encoding="utf-8")
-    manifest = parse_skill_markdown(_SKILL_MD.read_text(encoding="utf-8"), "core")
+    manifest = parse_skill_markdown(text, "core")
     assert manifest.name == _SKILL_ID
     for domain in _EXPECTED_EGRESS:
         assert f"  - {domain}" in text
@@ -151,7 +150,7 @@ def test_setup_check_returns_not_authenticated_without_token(tmp_path: Path) -> 
 
 
 def test_gmail_search_dry_run_returns_plan_envelope(tmp_path: Path) -> None:
-    """``google_api.py gmail search --dry-run`` plans work without importing Google deps."""
+    """``google_api.py gmail search --dry-run`` plans work without Google client deps."""
     _require_script(_API_SCRIPT)
     _write_workspace(tmp_path)
     code, payload = _run_script(
@@ -166,21 +165,24 @@ def test_gmail_search_dry_run_returns_plan_envelope(tmp_path: Path) -> None:
     assert data.get("mode") == "dry_run"
     assert data.get("service") == "gmail"
     assert data.get("operation") == "search"
-    assert data.get("query") == "is:unread"
+    params = data.get("parameters")
+    assert isinstance(params, dict)
+    assert params.get("query") == "is:unread"
 
 
 def test_gmail_search_uses_mocked_api_function(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """In-process ``gmail search`` can be driven by a mocked runtime helper."""
+    """In-process ``gmail search`` can be driven by a mocked API helper."""
     _require_script(_API_SCRIPT)
     _write_workspace(tmp_path)
+    google_workspace_api = pytest.importorskip("sevn.skills.google_workspace_api")
 
     captured: dict[str, object] = {}
-    fake_module = types.ModuleType("sevn.skills.google_workspace")
 
-    def _gmail_search(query: str, *, max_results: int) -> list[dict[str, object]]:
+    def _gmail_search(workspace: str, query: str, max_results: int = 10) -> list[dict[str, object]]:
+        captured["workspace"] = workspace
         captured["query"] = query
         captured["max_results"] = max_results
         return [
@@ -196,8 +198,7 @@ def test_gmail_search_uses_mocked_api_function(
             },
         ]
 
-    fake_module.gmail_search = _gmail_search  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "sevn.skills.google_workspace", fake_module)
+    monkeypatch.setattr(google_workspace_api, "gmail_search", _gmail_search)
 
     code, payload = _run_script_main(
         _API_SCRIPT,
@@ -206,12 +207,10 @@ def test_gmail_search_uses_mocked_api_function(
         monkeypatch=monkeypatch,
     )
     assert code == 0
-    assert captured == {"query": "label:unread", "max_results": 7}
+    assert captured["workspace"] == str(tmp_path.resolve())
+    assert captured["query"] == "label:unread"
+    assert captured["max_results"] == 7
     assert payload.get("ok") is True
     data = payload.get("data")
-    assert isinstance(data, dict)
-    assert data.get("mode") == "live"
-    assert data.get("count") == 1
-    messages = data.get("messages")
-    assert isinstance(messages, list)
-    assert messages[0]["id"] == "msg-1"
+    assert isinstance(data, list)
+    assert data[0]["id"] == "msg-1"
