@@ -28,6 +28,15 @@ def _run(ctx: typer.Context) -> App:
     return proton_app
 
 
+def _emit_credential_stdout(value: str) -> None:
+    """Write a credential to stdout for CLI extract and secrets backend contracts."""
+    # lgtm[py/clear-text-logging-sensitive-data]
+    # codeql[py/clear-text-logging-sensitive-data]
+    sys.stdout.write(value)
+    if value and not value.endswith("\n"):
+        sys.stdout.write("\n")
+
+
 @vaults_app.command("list")
 def vaults_list(ctx: typer.Context) -> None:
     """List Pass vaults."""
@@ -138,10 +147,7 @@ def items_get(
     share_id, resolved_item_id = proton_app.pass_svc.resolve_item(unlocked, args)
     item = proton_app.pass_svc.item_get(unlocked, share_id, resolved_item_id)
     if extract == "password":
-        # codeql[py/clear-text-logging-sensitive-data] intentional stdout for CLI extract
-        sys.stdout.write(item.password)
-        if item.password and not item.password.endswith("\n"):
-            sys.stdout.write("\n")
+        _emit_credential_stdout(item.password)
         return
     proton_app.renderer.object(item)
 
@@ -285,10 +291,7 @@ def secrets_get(
     item = proton_app.pass_svc.find_login_by_name(unlocked, name, vault_filter=vault_id)
     if item is None or not item.password:
         raise typer.Exit(3)
-    # codeql[py/clear-text-logging-sensitive-data] intentional stdout for secrets backend
-    sys.stdout.write(item.password)
-    if not item.password.endswith("\n"):
-        sys.stdout.write("\n")
+    _emit_credential_stdout(item.password)
 
 
 @secrets_app.command("set")
