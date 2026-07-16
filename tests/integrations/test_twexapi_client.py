@@ -73,7 +73,6 @@ _SECTION4_NEW_TWEXAPI_OPS: tuple[str, ...] = (
 )
 
 
-@pytest.mark.xfail(reason="green after W4: DB7 TWEXAPI_OPS covers every §4 path", strict=False)
 @pytest.mark.parametrize("op_key", _SECTION4_NEW_TWEXAPI_OPS)
 def test_twexapi_ops_registers_section4_paths(op_key: str) -> None:
     """DB7: TWEXAPI_OPS allowlist includes every §4 TwexAPI endpoint key."""
@@ -85,7 +84,6 @@ def test_twexapi_ops_registers_section4_paths(op_key: str) -> None:
     assert path.startswith("/")
 
 
-@pytest.mark.xfail(reason="green after W4: DB7 cookie-bearing write helpers", strict=False)
 def test_twexapi_write_helpers_accept_cookie_without_logging_it() -> None:
     """DB7 + convention 13: write helpers take cookie/proxy; never embed them in errors."""
     client_mod = _import_client_module()

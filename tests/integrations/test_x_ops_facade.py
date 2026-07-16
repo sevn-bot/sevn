@@ -47,7 +47,6 @@ def _import_x_ops() -> Any:
     return x_ops
 
 
-@pytest.mark.xfail(reason="green after W4: DB6 every §4 facade op exists", strict=False)
 @pytest.mark.parametrize("op_name", _FACADE_OPS)
 def test_x_ops_facade_exports_every_section4_op(op_name: str) -> None:
     """DB6: each §4 op is a callable on the facade owner module."""
@@ -56,7 +55,6 @@ def test_x_ops_facade_exports_every_section4_op(op_name: str) -> None:
     assert callable(fn), f"missing facade op: {op_name}"
 
 
-@pytest.mark.xfail(reason="green after W4: DB6 normalized envelope + medium dispatch", strict=False)
 @pytest.mark.asyncio
 @pytest.mark.parametrize("medium", ["browser", "twexapi"])
 async def test_x_ops_dispatch_returns_normalized_envelope(medium: str) -> None:
@@ -81,7 +79,6 @@ async def test_x_ops_dispatch_returns_normalized_envelope(medium: str) -> None:
         assert "error" in result or "code" in result
 
 
-@pytest.mark.xfail(reason="green after W4: DB8 browser write gate allow_write=false", strict=False)
 @pytest.mark.asyncio
 async def test_browser_write_op_blocked_returns_error_envelope_not_exception() -> None:
     """DB8: browser write with allow_write=false → error envelope, never raw exception."""
@@ -103,7 +100,6 @@ async def test_browser_write_op_blocked_returns_error_envelope_not_exception() -
     assert result.get("error") or result.get("code")
 
 
-@pytest.mark.xfail(reason="green after W4: DB8 TwexAPI write gate when disabled", strict=False)
 @pytest.mark.asyncio
 async def test_twexapi_write_op_disabled_returns_error_envelope() -> None:
     """DB8: TwexAPI write when TwexAPI disabled → error envelope, never exception."""
@@ -124,7 +120,6 @@ async def test_twexapi_write_op_disabled_returns_error_envelope() -> None:
     assert result.get("error") or result.get("code")
 
 
-@pytest.mark.xfail(reason="green after W4: DB9 cookie bridge + no secret leak", strict=False)
 def test_cookie_bridge_maps_export_cookies_without_leaking_values() -> None:
     """DB9 + convention 13: export_cookies → TwexAPI cookie; values never in returned strings."""
     x_ops = _import_x_ops()
@@ -149,7 +144,6 @@ def test_cookie_bridge_maps_export_cookies_without_leaking_values() -> None:
     assert secret not in blob
 
 
-@pytest.mark.xfail(reason="green after W4: DB10 session_status without secret leak", strict=False)
 @pytest.mark.asyncio
 async def test_session_status_reports_fields_without_leaking_key() -> None:
     """DB10: session_status reports reachability/profile/login/key-present; never the key."""

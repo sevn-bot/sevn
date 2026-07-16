@@ -39,6 +39,18 @@ scripts:
     description: Report TwexAPI key readiness, CDP/profile path, and optional per-site login probe.
     args_overview: "[--site SITE] [--dry-run]"
     abortable: true
+  - path: scripts/x_ops.py
+    description: Unified X ops facade — every §4 op over browser|twexapi with normalized {ok,medium,op,data} envelope.
+    args_overview: "OP [--task JSON] [--medium browser|twexapi] [--site x] [--dry-run]"
+    abortable: true
+  - path: scripts/x_timeline.py
+    description: Convenience wrapper for home_timeline_collect / search facade ops.
+    args_overview: "[OP] [--task JSON] [--medium browser|twexapi] [--dry-run]"
+    abortable: true
+  - path: scripts/x_tweet_actions.py
+    description: Tweet-action facade ops (like, retweet, create, bookmark, …) with write gates.
+    args_overview: "OP [--tweet-id ID] [--text TEXT] [--medium browser|twexapi] [--dry-run]"
+    abortable: true
   - path: scripts/twexapi_search.py
     description: Advanced X/Twitter search via TwexAPI (https://docs.twexapi.io/) — X only.
     args_overview: "QUERY [--max-items N] [--dry-run]"
@@ -237,6 +249,48 @@ pointing at a workspace secrets alias (never inline passwords). See
 
 **Cookie export/import:** seed-only portability via `browser` `action=export_cookies`
 / `action=import_cookies` — not a required persistence layer for this specialist.
+Map exported cookies into TwexAPI write bodies with
+`sevn.integrations.social_media.x_ops.cookies_for_twexapi` (never log cookie values).
+`post_tweet_auto_cookie` uses TwexAPI's **pool** cookie on `medium=twexapi`; on
+`medium=browser` it coerces to `create_tweet_or_reply` using the CDP profile session.
+
+## Unified X ops facade (`x_ops`)
+
+Every X/Twitter endpoint is a function on `sevn.integrations.social_media.x_ops`
+and callable via `run_skill_script social_media_manager x_ops.py <OP>`. Each call
+resolves medium (`task → platforms.x → default_medium → browser`), dispatches to
+TwexAPI or a CDP `browser` plan, and returns:
+
+```json
+{"ok": true, "medium": "browser", "op": "home_timeline_collect", "data": {}}
+```
+
+On failure: `ok=false` plus `error` and/or `code` (never a raw exception). Write
+ops require `tools.browser.social.x.allow_write=true` (browser) or TwexAPI
+enabled + cookie (twexapi).
+
+| Op | Medium notes | Key args |
+|----|--------------|----------|
+| `advanced_search_page` | both | `query` / `searchTerms`, `sortBy`, `next_cursor` |
+| `search_hashtags` | both | `hashtags` / `query` |
+| `like_tweet` / `unlike_tweet` | both (write) | `tweet_id` |
+| `retweet` / `delete_retweet` | both (write) | `tweet_id` |
+| `bookmark` / `delete_bookmark` | both (write) | `tweet_id` |
+| `create_tweet_or_reply` | both (write) | `text` / `tweet_content`, `reply_tweet_id?` |
+| `create_quote_tweet` | both (write) | `text`, quote target |
+| `create_tweet_thread` | both (write) | `items` list |
+| `delete_tweets` | both (write) | tweet id(s) / username |
+| `post_tweet_auto_cookie` | twexapi pool cookie; browser coerces to create | `text` |
+| `get_users_by_usernames` | both | `usernames` |
+| `follow_user` | both (write) | `username` |
+| `fetch_article_markdown` | both | `tweet_id` |
+| `home_timeline_collect` | browser `home_feed`; twexapi `timeline_page` substitute | `screen_name?` |
+| `session_status` | both | CDP reachability, profile, login probe, `twexapi_key_present` (boolean) |
+
+```
+run_skill_script social_media_manager x_ops.py home_timeline_collect --medium browser
+run_skill_script social_media_manager x_tweet_actions.py like_tweet --tweet-id 1 --medium twexapi
+```
 
 When triage selects the `social_media_manager` skill, the gateway auto-grants this
 specialist for the tier-B dispatch (W8.3 skill→specialist binding).

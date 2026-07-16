@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- [2026-07-16] Unified X ops facade (`sevn.integrations.social_media.x_ops`) exposes every X/Twitter endpoint as a callable over browser|twexapi with a normalized envelope, write-gates, cookie bridge, and `social_media_manager` skill scripts
 - [2026-07-16] Browser `social` X ops `timeline_collect` / `home_feed` / `read` return structured posts with status permalinks and tweet text instead of raw HTML noise
 - [2026-07-16] `make install-snapshot-timer` installs a launchd agent that runs the local gitignored-tree snapshot every 3 hours, so operator-only plans, specs, and agent config are protected on a schedule instead of only on `git push`
 - [2026-07-16] Local snapshot backup covers whole gitignored trees (`.ignorelocal`, `spec-kit-wave`, `build-plan-from-review`, `.cursor`, `.claude` agent config, `docs`) and excludes secrets and regenerable indexes (`.env`/`.env.*`, `graphify-out`, `MyCodeGraph`, `.venv`, caches) while keeping `.env.example` templates
