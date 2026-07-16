@@ -104,20 +104,40 @@ def _cmdline_user_data_dir(cmdline: str) -> str | None:
     return match.group(1) if match else None
 
 
+def _cmdline_is_chrome_family(cmdline: str) -> bool:
+    """Return whether ``cmdline`` looks like Chrome, Chromium, or Brave.
+
+    Args:
+        cmdline (str): Process command line (space-separated).
+
+    Returns:
+        bool: ``True`` when the binary path mentions a supported engine.
+
+    Examples:
+        >>> _cmdline_is_chrome_family("/usr/bin/brave-browser --headless")
+        True
+        >>> _cmdline_is_chrome_family("/usr/bin/firefox --profile /tmp/p")
+        False
+    """
+    lowered = cmdline.lower()
+    return "chrome" in lowered or "chromium" in lowered or "brave" in lowered
+
+
 def pid_matches_sevn_chrome_profile(pid: int, profile_dir: Path) -> bool:
-    """Return whether ``pid`` still looks like Chrome for ``profile_dir`` (convention 11).
+    """Return whether ``pid`` still looks like Chrome/Brave for ``profile_dir`` (convention 11).
 
     Fail closed: when the cmdline cannot be read, returns ``False`` so we never
     SIGTERM/SIGKILL an unverified PID (operator Chrome / PID reuse). Matches
     ``--user-data-dir=<profile>`` as a full argv token so prefix profiles
-    (``…/a`` vs ``…/ab``) do not cross-match.
+    (``…/a`` vs ``…/ab``) do not cross-match. Accepts Chrome, Chromium, and
+    Brave (``brave-browser``, ``Brave Browser.app``, etc.).
 
     Args:
         pid (int): Candidate process id from the session registry.
         profile_dir (Path): Expected ``--user-data-dir`` for this session.
 
     Returns:
-        bool: ``True`` when cmdline mentions Chrome/Chromium and this profile path.
+        bool: ``True`` when cmdline mentions Chrome/Chromium/Brave and this profile path.
 
     Examples:
         >>> pid_matches_sevn_chrome_profile(0, Path("/tmp/p"))
@@ -132,8 +152,7 @@ def pid_matches_sevn_chrome_profile(pid: int, profile_dir: Path) -> bool:
     cmdline = _read_pid_cmdline(pid)
     if not cmdline:
         return False
-    lowered = cmdline.lower()
-    if "chrome" not in lowered and "chromium" not in lowered:
+    if not _cmdline_is_chrome_family(cmdline):
         return False
     user_data = _cmdline_user_data_dir(cmdline)
     if user_data is None:

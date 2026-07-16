@@ -74,6 +74,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-16] Thermos iter6 residual: Brave-spawned browsers pass `pid_matches_sevn_chrome_profile` (close/reap/shutdown can kill and clear Singleton locks) while still requiring bounded `--user-data-dir=` equality
 - [2026-07-16] Thermos iter5: Chrome profile identity matches a bounded `--user-data-dir=` argv token (prefix profiles no longer cross-match); browser registry/spawn/CDP helpers live in `sevn.browser` so lifecycle/process no longer import skills; issue-watch cron seed no longer force-reenables a disabled job on every boot
 - [2026-07-16] Thermos iter4: `run_gh` times out hung `gh` (60s) so issue-watch/cron cannot pin the gateway; `spawn_chrome` returns Popen only (no fake `:0` CDP URL) with shared `await_cdp_after_spawn`; onboarding uses `clear_profile_singleton_locks` + that wait path; generic `pid_is_alive`/`terminate_pid` live in `sevn.util.process` (gateway teardown imports util; Chrome identity/reap stay in `browser.process`); drop thin `pid_*` re-exports from `browser_session`
 - [2026-07-16] Thermos iter3: browser restart fails clearly under attach-only `SEVN_CDP_URL` (no stale registry success); Chrome terminate/close runs off the event loop; identity-fail kills leave the registry intact; issue-watch continues after per-issue `gh` errors; Playwright attach uses lifecycle spawn SSOT; process/reap lives in `sevn.browser.process`; operator-notify wiring and issue-watch notify moved out of `http_server` / general dispatcher

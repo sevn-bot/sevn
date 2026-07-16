@@ -463,3 +463,48 @@ def test_pid_matches_rejects_prefix_profile_path(
         lambda _pid: cmdline_a,
     )
     assert pid_matches_sevn_chrome_profile(4242, profile_a) is True
+
+
+def test_pid_matches_accepts_brave_cmdline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Brave-spawned browsers must pass convention-11 identity (close/reap/shutdown)."""
+    from sevn.browser.process import pid_matches_sevn_chrome_profile
+
+    profile = tmp_path / "brave-profile"
+    profile.mkdir()
+    cmdline = (
+        f"/usr/bin/brave-browser --remote-debugging-port=0 "
+        f"--user-data-dir={profile.resolve()} --headless=new"
+    )
+    monkeypatch.setattr(
+        "sevn.browser.process._read_pid_cmdline",
+        lambda _pid: cmdline,
+    )
+    assert pid_matches_sevn_chrome_profile(4242, profile) is True
+
+
+def test_pid_matches_brave_rejects_prefix_profile_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Brave identity still requires bounded ``--user-data-dir=`` equality."""
+    from sevn.browser.process import pid_matches_sevn_chrome_profile
+
+    profile_a = tmp_path / "a"
+    profile_ab = tmp_path / "ab"
+    profile_a.mkdir()
+    profile_ab.mkdir()
+    cmdline_ab = (
+        f"/Applications/Brave Browser.app/Contents/MacOS/Brave Browser "
+        f"--remote-debugging-port=0 --user-data-dir={profile_ab.resolve()}"
+    )
+    monkeypatch.setattr(
+        "sevn.browser.process._read_pid_cmdline",
+        lambda _pid: cmdline_ab,
+    )
+    assert pid_matches_sevn_chrome_profile(4242, profile_a) is False
+
+    cmdline_a = cmdline_ab.replace(str(profile_ab.resolve()), str(profile_a.resolve()))
+    monkeypatch.setattr(
+        "sevn.browser.process._read_pid_cmdline",
+        lambda _pid: cmdline_a,
+    )
+    assert pid_matches_sevn_chrome_profile(4242, profile_a) is True
