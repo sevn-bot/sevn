@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import json
 import sys
-from enum import Enum
+from enum import StrEnum
 from typing import Any, TextIO
 
 import yaml
 
 
-class Format(str, Enum):
+class Format(StrEnum):
     TEXT = "text"
     JSON = "json"
     YAML = "yaml"

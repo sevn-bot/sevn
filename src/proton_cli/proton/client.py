@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import threading
 import time
@@ -159,10 +160,8 @@ class Client:
     def decode(self, req: Request, out: Any = None) -> None:
         resp = self.do(req)
         env: dict[str, Any] = {}
-        try:
+        with contextlib.suppress(json.JSONDecodeError):
             env = json.loads(resp.body)
-        except json.JSONDecodeError:
-            pass
         code = int(env.get("Code", 0) or 0)
         if code not in (0, 1000, 1001):
             raise APIError(
@@ -187,7 +186,7 @@ class Client:
             key = _response_list_key(parsed)
             out.extend(parsed.get(key, []))
         else:
-            setattr(out, "_payload", parsed)
+            out._payload = parsed
 
     def _do_once(self, req: Request) -> Response:
         with self._lock:
@@ -220,7 +219,9 @@ class Client:
             headers["x-pm-human-verification-token"] = req.hv_token
             headers["x-pm-human-verification-token-type"] = req.hv_type
         try:
-            response = self._client.request(req.method.upper(), url, headers=headers, content=content)
+            response = self._client.request(
+                req.method.upper(), url, headers=headers, content=content
+            )
         except httpx.HTTPError as exc:
             raise NetworkError(str(exc)) from exc
         return Response(
@@ -327,7 +328,9 @@ def _classify_error(status: int, body: bytes) -> tuple[HumanVerificationError | 
                 methods=list(details.get("HumanVerificationMethods") or []),
                 web_url=str(details.get("WebUrl", details.get("WebURL", ""))),
             ),
-            APIError(http_status=status, code=code, message=str(env.get("Error", "")), raw_body=body),
+            APIError(
+                http_status=status, code=code, message=str(env.get("Error", "")), raw_body=body
+            ),
         )
     return None, APIError(
         http_status=status,

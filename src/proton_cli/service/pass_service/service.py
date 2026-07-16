@@ -147,7 +147,9 @@ class PassService:
                 continue
         return out or None
 
-    def _fetch_items(self, share_id: str, share_keys: dict[int, bytes], unlocked: Unlocked) -> list[Item]:
+    def _fetch_items(
+        self, share_id: str, share_keys: dict[int, bytes], unlocked: Unlocked
+    ) -> list[Item]:
         payload: dict = {}
         self._client.decode(Request(method="GET", path=f"/pass/v1/share/{share_id}/item"), payload)
         out: list[Item] = []

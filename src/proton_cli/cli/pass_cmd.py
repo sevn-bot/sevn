@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import typer
 
-from proton_cli.app import App
+if TYPE_CHECKING:
+    from proton_cli.app import App
 
 app = typer.Typer(name="pass", no_args_is_help=True, add_completion=False)
 

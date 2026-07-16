@@ -5,10 +5,13 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-from pathlib import Path
 
 from sevn.data.bundled_skills import BUNDLED_SKILLS_ROOT
-from sevn.skills.proton_management import PROTON_MANAGEMENT_SKILL_ID, dry_run_requested, status_payload
+from sevn.skills.proton_management import (
+    PROTON_MANAGEMENT_SKILL_ID,
+    dry_run_requested,
+    status_payload,
+)
 
 _SKILL_ROOT = BUNDLED_SKILLS_ROOT / "core" / PROTON_MANAGEMENT_SKILL_ID
 _SCRIPTS = _SKILL_ROOT / "scripts"
