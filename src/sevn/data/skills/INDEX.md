@@ -26,7 +26,7 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | cursor_cloud | Delegate code+PR work to Cursor Cloud Agent; returns PR, dashboard, and artifact links. |
 | email-management | Multi-account IMAP and Gmail API mail read/search/send scripts. |
 | facebook-use | Facebook workflows via a logged-in browser profile or CDP attach (feed read, search). |
-| gh-issues | GitHub issue lifecycle — list, view, create, comment via integration_call. |
+| gh-issues | GitHub issue lifecycle — templated create via gh CLI (proxy fallback), plus list/view/comment. |
 | gh-pr | Pull request lifecycle — list, view, create, merge, close, reviewers via integration_call. |
 | github-manager | Advanced GitHub operations — branches, Actions, CI/CD secrets, environments, deployments via integration_call. |
 | graphify | Knowledge-graph orientation for code (`specs/28-code-understanding.md` §2.4). |

@@ -9,16 +9,11 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
-import pytest
+import pytest  # noqa: TC002 — annotations for MonkeyPatch/CaptureFixture after W5 un-xfail
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _GH_ISSUES_ROOT = _REPO_ROOT / "src" / "sevn" / "data" / "bundled_skills" / "core" / "gh-issues"
 _CREATE_SCRIPT = _GH_ISSUES_ROOT / "scripts" / "issue_create.py"
-
-_XFAIL_W5 = pytest.mark.xfail(
-    reason="green after W5: templated gh issue create (D12)",
-    strict=False,
-)
 
 
 def _load_issue_create() -> Any:
@@ -46,7 +41,6 @@ def _workspace_with_repo(tmp_path: Path) -> Path:
     return workspace
 
 
-@_XFAIL_W5
 def test_d12_templates_exist_with_placeholders() -> None:
     """D12: ``templates/{feature,bug,chore}.md`` exist with required placeholders."""
     templates = _GH_ISSUES_ROOT / "templates"
@@ -65,7 +59,6 @@ def test_d12_templates_exist_with_placeholders() -> None:
             assert placeholder in text, f"{name}.md missing {placeholder}"
 
 
-@_XFAIL_W5
 def test_d12_single_call_template_invokes_gh_once(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -117,7 +110,6 @@ def test_d12_single_call_template_invokes_gh_once(
     assert "--title" in cmd
 
 
-@_XFAIL_W5
 def test_d12_omitted_repo_defaults_from_my_sevn(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -144,7 +136,6 @@ def test_d12_omitted_repo_defaults_from_my_sevn(
     assert any("--repo" in c and "sevn-bot/sevn" in c for c in captured)
 
 
-@_XFAIL_W5
 def test_d12_gh_auth_error_is_precise_not_proxy_404(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -172,7 +163,6 @@ def test_d12_gh_auth_error_is_precise_not_proxy_404(
     assert "gh not authenticated" in err.lower() or "gh auth login" in err.lower()
 
 
-@_XFAIL_W5
 def test_d12_gh_absent_falls_back_to_proxy(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

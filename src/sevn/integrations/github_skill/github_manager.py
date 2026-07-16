@@ -1,9 +1,12 @@
-"""GitHub manager operations for bundled ``github-manager`` skill scripts.
+"""GitHub manager operations for bundled ``github-manager`` / ``gh-issues`` skill scripts.
 
 Module: sevn.integrations.github_skill.github_manager
-Depends: sevn.integrations.github_skill.client, sevn.integrations.github_skill.hooks
+Depends: re, subprocess, sevn.integrations.github_skill.client, sevn.integrations.github_skill.hooks
 
 Exports:
+    GhCliMissingError — raised when the ``gh`` binary is not on PATH.
+    map_gh_issue_create_error — map ``gh`` stderr to a precise operator message.
+    create_issue_via_gh — create an issue via authenticated ``gh issue create``.
     list_branches — list repository branches.
     create_branch — create a branch ref.
     delete_branch — delete a branch ref.
@@ -21,12 +24,161 @@ Exports:
 
 from __future__ import annotations
 
+import re
+import subprocess
 from typing import TYPE_CHECKING, Any
 
 from sevn.integrations.github_skill.client import github_integration_call, parse_github_repo
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from sevn.integrations.github_skill.hooks import GithubSkillHooks
+
+_ISSUE_URL_RE = re.compile(
+    r"https://github\.com/(?P<owner>[^/\s]+)/(?P<repo>[^/\s]+)/issues/(?P<number>\d+)",
+    re.IGNORECASE,
+)
+
+
+class GhCliMissingError(RuntimeError):
+    """Raised when the ``gh`` binary is absent from ``PATH``."""
+
+
+def map_gh_issue_create_error(
+    stderr: str,
+    *,
+    repo: str,
+    labels: list[str] | None = None,
+) -> str:
+    """Map ``gh issue create`` stderr to a precise, non-proxy error string.
+
+    Args:
+        stderr (str): Combined stderr (and optionally stdout) from ``gh``.
+        repo (str): ``owner/repo`` slug used in the create call.
+        labels (list[str] | None, optional): Labels passed to ``gh`` (for mapping).
+
+    Returns:
+        str: Operator-facing error that never reads as bare ``proxy status 404``.
+
+    Examples:
+        >>> map_gh_issue_create_error("please run: gh auth login", repo="o/r")
+        'gh not authenticated (run: gh auth login)'
+        >>> map_gh_issue_create_error("could not resolve to a Repository", repo="o/r")
+        'repository not found: o/r'
+    """
+    text = (stderr or "").strip()
+    lowered = text.lower()
+    if (
+        "gh auth login" in lowered
+        or "not logged into" in lowered
+        or "to get started with github cli" in lowered
+        or "authentication required" in lowered
+        or "http 401" in lowered
+    ):
+        return "gh not authenticated (run: gh auth login)"
+    if (
+        "could not resolve to a repository" in lowered
+        or "repository not found" in lowered
+        or ("not found" in lowered and "label" not in lowered)
+        or "http 404" in lowered
+    ):
+        return f"repository not found: {repo}"
+    if "label" in lowered and (
+        "not found" in lowered
+        or "does not exist" in lowered
+        or "invalid" in lowered
+        or "could not be found" in lowered
+    ):
+        for label in labels or []:
+            if label.lower() in lowered:
+                return f"label does not exist: {label}"
+        if labels:
+            return f"label does not exist: {labels[0]}"
+        return "label does not exist: (unknown)"
+    if "proxy status" in lowered:
+        return f"repository not found: {repo}"
+    return text or f"gh issue create failed for {repo}"
+
+
+def create_issue_via_gh(
+    *,
+    repo: str,
+    title: str,
+    body_file: Path,
+    labels: list[str] | None = None,
+    assignees: list[str] | None = None,
+) -> dict[str, Any]:
+    """Create a GitHub issue via ``gh issue create`` (authenticated CLI fast path).
+
+    Args:
+        repo (str): ``owner/repo`` slug.
+        title (str): Issue title.
+        body_file (Path): Path to a rendered markdown body file.
+        labels (list[str] | None, optional): Label names to apply.
+        assignees (list[str] | None, optional): Assignee usernames.
+
+    Returns:
+        dict[str, Any]: ``{url, number, repo}`` parsed from the ``gh`` stdout URL.
+
+    Raises:
+        GhCliMissingError: When ``gh`` is not installed / not on ``PATH``.
+        RuntimeError: When ``gh`` exits non-zero (message already mapped).
+        ValueError: When stdout does not contain a parseable issue URL.
+
+    Examples:
+        >>> isinstance(GhCliMissingError("missing"), RuntimeError)
+        True
+    """
+    cmd: list[str] = [
+        "gh",
+        "issue",
+        "create",
+        "--repo",
+        repo,
+        "--title",
+        title,
+        "--body-file",
+        str(body_file),
+    ]
+    for label in labels or []:
+        cmd.extend(["--label", label])
+    for assignee in assignees or []:
+        cmd.extend(["--assignee", assignee])
+    try:
+        completed = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise GhCliMissingError("gh binary not found on PATH") from exc
+    if completed.returncode != 0:
+        detail = map_gh_issue_create_error(
+            (completed.stderr or "") + "\n" + (completed.stdout or ""),
+            repo=repo,
+            labels=labels,
+        )
+        raise RuntimeError(detail)
+    url = ""
+    for line in reversed((completed.stdout or "").splitlines()):
+        candidate = line.strip()
+        if candidate.startswith("http"):
+            url = candidate
+            break
+    if not url:
+        msg = f"gh issue create returned no URL for {repo}"
+        raise ValueError(msg)
+    match = _ISSUE_URL_RE.search(url)
+    if match is None:
+        msg = f"could not parse issue URL from gh output: {url!r}"
+        raise ValueError(msg)
+    return {
+        "url": url,
+        "number": int(match.group("number")),
+        "repo": f"{match.group('owner')}/{match.group('repo')}",
+    }
 
 
 async def list_branches(
