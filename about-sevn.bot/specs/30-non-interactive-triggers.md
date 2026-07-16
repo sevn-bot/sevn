@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver non-interactive dispatch: external events (“something happened”)
   and schedules (“tick”) compile to DispatchRequest, optionally pass through notify_only
   (zero LLM, zero sandbox boot), otherwise'
-last_updated: '2026-07-12'
-fingerprint: sha256:3ba449957038898a3f00cba876819d2398f3dfd4e02ca942fbeb846280cdcd61
+last_updated: '2026-07-16'
+fingerprint: sha256:0c329b0fe8ab679f7e7267014d9ea5775c2471c13d328b7255006e6932159ca6
 related: []
 sources:
 - src/sevn/triggers/**
@@ -97,6 +97,9 @@ interfaces:
 - name: list_cron_jobs
   file: src/sevn/triggers/cron.py
   symbol: list_cron_jobs
+- name: run_issue_watch_cron
+  file: src/sevn/triggers/cron.py
+  symbol: run_issue_watch_cron
 - name: prune_webhook_dedupe_expired
   file: src/sevn/triggers/dedupe.py
   symbol: prune_webhook_dedupe_expired
@@ -121,6 +124,9 @@ interfaces:
 - name: dispatch_run
   file: src/sevn/triggers/dispatcher.py
   symbol: dispatch_run
+- name: notify_issue_watch_diff
+  file: src/sevn/triggers/dispatcher.py
+  symbol: notify_issue_watch_diff
 - name: TriggerPluginHookSurface
   file: src/sevn/triggers/hooks_protocol.py
   symbol: TriggerPluginHookSurface
@@ -175,11 +181,7 @@ interfaces:
 - name: trigger_run_ws_topic
   file: src/sevn/triggers/ws_topics.py
   symbol: trigger_run_ws_topic
-specs: []
-personas: []
-prd_profile: null
 ---
-
 
 ## Purpose
 

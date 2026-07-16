@@ -7,8 +7,8 @@ owner: Alex
 summary: Let operators and agents launch, poll, and inspect Cursor Cloud Agents against
   any GitHub/GitLab repo when skills.cursor_cloud.enabled is true, returning PR URLs,
   dashboard links (remote desktop), and
-last_updated: '2026-07-15'
-fingerprint: sha256:28f24683c550944697048f4dd7fbc7c563fbde06bee3ff73ccb13d08f3d2221c
+last_updated: '2026-07-16'
+fingerprint: sha256:69d150fc746a56a68acc5418ed48d337fa3f42b4b8ccc27aa168014d62112197
 related: []
 sources:
 - src/sevn/integrations/**
@@ -106,12 +106,18 @@ interfaces:
 - name: view_pull_request
   file: src/sevn/integrations/github_skill/gh_pr.py
   symbol: view_pull_request
+- name: GhCliMissingError
+  file: src/sevn/integrations/github_skill/github_manager.py
+  symbol: GhCliMissingError
 - name: create_branch
   file: src/sevn/integrations/github_skill/github_manager.py
   symbol: create_branch
 - name: create_deployment
   file: src/sevn/integrations/github_skill/github_manager.py
   symbol: create_deployment
+- name: create_issue_via_gh
+  file: src/sevn/integrations/github_skill/github_manager.py
+  symbol: create_issue_via_gh
 - name: delete_branch
   file: src/sevn/integrations/github_skill/github_manager.py
   symbol: delete_branch
@@ -133,6 +139,9 @@ interfaces:
 - name: list_workflows
   file: src/sevn/integrations/github_skill/github_manager.py
   symbol: list_workflows
+- name: map_gh_issue_create_error
+  file: src/sevn/integrations/github_skill/github_manager.py
+  symbol: map_gh_issue_create_error
 - name: upsert_environment
   file: src/sevn/integrations/github_skill/github_manager.py
   symbol: upsert_environment
@@ -142,6 +151,9 @@ interfaces:
 - name: upsert_repo_variable
   file: src/sevn/integrations/github_skill/github_manager.py
   symbol: upsert_repo_variable
+- name: view_issue_via_gh
+  file: src/sevn/integrations/github_skill/github_manager.py
+  symbol: view_issue_via_gh
 - name: workflow_run_logs
   file: src/sevn/integrations/github_skill/github_manager.py
   symbol: workflow_run_logs

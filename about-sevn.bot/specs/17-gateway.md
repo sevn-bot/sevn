@@ -7,8 +7,8 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
-last_updated: '2026-07-15'
-fingerprint: sha256:b019fe04a7e5a9d8253f8b375b2f002f0e697c867204e1948237097a19ff156f
+last_updated: '2026-07-16'
+fingerprint: sha256:711b0f51431904c769dc1bf32bf2362439b1533041b1faef412baf27684a6f2f
 related: []
 sources:
 - src/sevn/gateway/**
@@ -852,6 +852,9 @@ interfaces:
 - name: TokenBucketLimiter
   file: src/sevn/gateway/runtime/rate_limit.py
   symbol: TokenBucketLimiter
+- name: reap_sevn_browsers_on_shutdown
+  file: src/sevn/gateway/runtime/shutdown_cleanup.py
+  symbol: reap_sevn_browsers_on_shutdown
 - name: release_leaked_multiprocessing_semaphores
   file: src/sevn/gateway/runtime/shutdown_cleanup.py
   symbol: release_leaked_multiprocessing_semaphores

@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that every
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
-last_updated: '2026-07-15'
-fingerprint: sha256:253a2f73aec570ddd844f09c440db278306d750ca2fdf9553b56d5b1c9082ac3
+last_updated: '2026-07-16'
+fingerprint: sha256:58948e878279d962c76bfb15e5acb9cc90af1c16f5f36691a0a68159c4f4c6fc
 related: []
 sources:
 - src/sevn/tools/**
@@ -242,6 +242,9 @@ interfaces:
 - name: store_memory_row
   file: src/sevn/tools/memory_tools.py
   symbol: store_memory_row
+- name: message_tool
+  file: src/sevn/tools/message.py
+  symbol: message_tool
 - name: request_escalation_pydantic
   file: src/sevn/tools/meta_escalation.py
   symbol: request_escalation_pydantic

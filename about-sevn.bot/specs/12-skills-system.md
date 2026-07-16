@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own everything under workspace/skills/: how skills are discovered, validated,
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
-last_updated: '2026-07-15'
-fingerprint: sha256:d673882ffd32bea1cc3567d4c8ebfe74c476097411b5fc4224d864131cccb431
+last_updated: '2026-07-16'
+fingerprint: sha256:e85dc271dbd71abd423b4a562ee0ebe39d6d28a1b61d25605be0bb9bd648ef4f
 related: []
 sources:
 - src/sevn/skills/**
@@ -110,6 +110,9 @@ interfaces:
 - name: pick_work_page
   file: src/sevn/skills/browser_session.py
   symbol: pick_work_page
+- name: pid_is_alive
+  file: src/sevn/skills/browser_session.py
+  symbol: pid_is_alive
 - name: read_devtools_active_port
   file: src/sevn/skills/browser_session.py
   symbol: read_devtools_active_port
