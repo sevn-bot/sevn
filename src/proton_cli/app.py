@@ -40,11 +40,7 @@ class App:
     dry_run: bool = False
     full_ids: bool = False
     _cache: keyring.Unlocked | None = None
-<<<<<<< HEAD
-    _lock: threading.Lock = field(default_factory=threading.Lock)
-=======
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
->>>>>>> origin/pre-0.0.1
 
     def authenticate(self) -> None:
         uid, _, _ = self.api.tokens()
