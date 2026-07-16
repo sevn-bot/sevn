@@ -126,9 +126,12 @@ def test_doctor_browser_readiness_warns_without_binary_forced_headless(
             return "/usr/local/bin/playwright"
         return None
 
+    # Binary resolution lives in ``sevn.browser.chrome`` (Thermos SSOT); patch
+    # the import used by ``browser_readiness_snapshot`` so app-path + PATH probes
+    # cannot resolve a host browser and spoil the missing-binary warning.
     monkeypatch.setattr(
-        "sevn.skills.browser_session.shutil.which",
-        lambda _name: None,
+        "sevn.skills.browser_session.resolve_chrome_executable",
+        lambda *_a, **_k: None,
     )
     monkeypatch.setattr(
         "sevn.skills.browser_session.cdp_reachable",
