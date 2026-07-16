@@ -63,8 +63,11 @@ def main(
     )
 
 
-from proton_cli.cli import calendar_cmd, contacts_cmd, drive_cmd, mail_cmd, pass_cmd  # noqa: E402
+from proton_cli.cli import api_cmd, calendar_cmd, contacts_cmd, drive_cmd, mail_cmd, pass_cmd, settings_cmd, status_cmd  # noqa: E402
 
+app.add_typer(status_cmd.app, name="status")
+app.add_typer(api_cmd.app, name="api")
+app.add_typer(settings_cmd.app, name="settings")
 app.add_typer(calendar_cmd.app, name="calendar")
 app.add_typer(contacts_cmd.app, name="contacts")
 app.add_typer(drive_cmd.app, name="drive")

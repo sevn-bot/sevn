@@ -140,7 +140,10 @@ class Client:
         if hv_err and not req.hv_token:
             resolver = self._get_hv_resolver()
             if resolver:
-                token, kind = resolver(hv_err)
+                try:
+                    token, kind = resolver(hv_err)
+                except Exception:
+                    raise
                 if token:
                     retry = Request(
                         method=req.method,
