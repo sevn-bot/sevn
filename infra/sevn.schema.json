@@ -1835,9 +1835,9 @@
         },
         "rasteriser": {
           "type": "string",
-          "enum": ["weasyprint", "playwright"],
+          "enum": ["weasyprint"],
           "default": "weasyprint",
-          "description": "v1 implements weasyprint only; playwright must error at config validation (the design docs)."
+          "description": "OpenUI PNG/PDF rasteriser backend; weasyprint only."
         }
       },
       "$comment": "Normative: the design docs — no openui.enabled toggle; tool openui_render is always registered for tier B/C/D."
@@ -2004,7 +2004,7 @@
         "browser": {
           "type": "object",
           "additionalProperties": true,
-          "description": "Session-scoped Playwright browser lifecycle (profile, CDP registry, idle close).",
+          "description": "Session-scoped CDP browser lifecycle (profile, CDP registry, idle close).",
           "properties": {
             "enabled": { "type": "boolean", "default": true },
             "profile_dir": {

@@ -7,8 +7,8 @@ owner: Alex
 summary: Let operators and agents launch, poll, and inspect Cursor Cloud Agents against
   any GitHub/GitLab repo when skills.cursor_cloud.enabled is true, returning PR URLs,
   dashboard links (remote desktop), and
-last_updated: '2026-07-15'
-fingerprint: sha256:28f24683c550944697048f4dd7fbc7c563fbde06bee3ff73ccb13d08f3d2221c
+last_updated: '2026-07-16'
+fingerprint: sha256:49ad42e64376ca85e6f04bb68546580648627d30e7afbad1e605ff7e1bd9a5c9
 related: []
 sources:
 - src/sevn/integrations/**
@@ -199,6 +199,66 @@ interfaces:
 - name: twexapi_key_configured
   file: src/sevn/integrations/social_media/readiness.py
   symbol: twexapi_key_configured
+- name: advanced_search_page
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: advanced_search_page
+- name: bookmark
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: bookmark
+- name: cookie_bridge_log_safe
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: cookie_bridge_log_safe
+- name: cookies_for_twexapi
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: cookies_for_twexapi
+- name: create_quote_tweet
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: create_quote_tweet
+- name: create_tweet_or_reply
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: create_tweet_or_reply
+- name: create_tweet_thread
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: create_tweet_thread
+- name: delete_bookmark
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: delete_bookmark
+- name: delete_retweet
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: delete_retweet
+- name: delete_tweets
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: delete_tweets
+- name: fetch_article_markdown
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: fetch_article_markdown
+- name: follow_user
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: follow_user
+- name: get_users_by_usernames
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: get_users_by_usernames
+- name: home_timeline_collect
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: home_timeline_collect
+- name: like_tweet
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: like_tweet
+- name: post_tweet_auto_cookie
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: post_tweet_auto_cookie
+- name: retweet
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: retweet
+- name: search_hashtags
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: search_hashtags
+- name: session_status
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: session_status
+- name: unlike_tweet
+  file: src/sevn/integrations/social_media/x_ops.py
+  symbol: unlike_tweet
 - name: TwexApiClient
   file: src/sevn/integrations/twexapi/client.py
   symbol: TwexApiClient

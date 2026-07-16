@@ -121,9 +121,6 @@ BROWSER_TOOL_RULE: str = (
 )
 
 
-PLAYWRIGHT_BROWSER_RULE: str = BROWSER_TOOL_RULE
-
-
 LIVE_FACTUAL_RULE: str = (
     "LIVE_FACTUAL_RULE: for live/current factual information — sports scores, "
     "schedules, headlines, weather, stock prices, anything 'now' or 'today' — "

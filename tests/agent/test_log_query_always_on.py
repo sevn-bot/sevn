@@ -61,19 +61,17 @@ def test_log_provenance_playbook_covers_audit_shape() -> None:
     assert "read_transcript" in mandate
 
 
-def test_bound_skill_playbook_playwright_capture_and_send_file() -> None:
+def test_bound_browser_tool_playbook_and_mandate() -> None:
+    """DP3 residue: browser tool playbook replaces playwright-browser capture scripts."""
     from sevn.prompts.tier_b import (
-        tier_b_bound_skill_playbook_prompt,
+        tier_b_browser_tool_prompt,
         tier_b_triager_bound_mandate_prompt,
     )
 
-    body = tier_b_bound_skill_playbook_prompt(["playwright-browser"])
-    assert "Bound skill playbook" in body
-    assert "load_skill" in body
-    assert "run_skill_script" in body
-    assert "scripts/capture.py" in body
+    body = tier_b_browser_tool_prompt()
+    assert "Browser tool playbook" in body
+    assert "screenshot" in body
     assert "send_file" in body
-    assert "unavailable" in body.lower()
-    mandate = tier_b_triager_bound_mandate_prompt([], ["playwright-browser"])
-    assert "playwright-browser" in mandate
-    assert "scripts/capture.py" in mandate
+    assert "browser-cdp" in body
+    mandate = tier_b_triager_bound_mandate_prompt(["browser"], [])
+    assert "browser" in mandate

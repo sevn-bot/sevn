@@ -203,9 +203,6 @@ async def test_bound_skill_disables_streaming_proactively(
 # --- W1 RED (DP3): grounding + prompt alias drops (green after W5) ---
 
 
-@pytest.mark.xfail(
-    reason="green after W5: DP3 steer_for_browser_cdp_probe_failure rename", strict=False
-)
 def test_steer_for_browser_cdp_probe_failure_renamed() -> None:
     """DP3: grounding exports steer_for_browser_cdp_probe_failure; old name gone."""
     import sevn.agent.grounding as grounding
@@ -220,9 +217,6 @@ def test_steer_for_browser_cdp_probe_failure_renamed() -> None:
     assert "CDP_UNREACHABLE" in msg
 
 
-@pytest.mark.xfail(
-    reason="green after W5: DP3 drop tier_b_playwright_browser_prompt alias", strict=False
-)
 def test_tier_b_playwright_browser_prompt_alias_removed() -> None:
     """DP3: deprecated tier_b_playwright_browser_prompt is gone from module + __all__."""
     import sevn.prompts.tier_b as tier_b
@@ -232,7 +226,6 @@ def test_tier_b_playwright_browser_prompt_alias_removed() -> None:
     assert hasattr(tier_b, "tier_b_browser_tool_prompt")
 
 
-@pytest.mark.xfail(reason="green after W5: DP3 drop PLAYWRIGHT_BROWSER_RULE alias", strict=False)
 def test_playwright_browser_rule_alias_removed() -> None:
     """DP3: PLAYWRIGHT_BROWSER_RULE alias is removed; BROWSER_TOOL_RULE remains."""
     import sevn.prompts.triager as triager

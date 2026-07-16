@@ -8,6 +8,7 @@ import types
 from typing import TYPE_CHECKING
 
 import pytest
+from pydantic import ValidationError
 
 from sevn.ui.openui.bridge import inject_submit_token_into_html
 from sevn.ui.openui.models import effective_openui_config
@@ -89,8 +90,9 @@ def test_rasterise_png_bytes_with_mocked_weasyprint(monkeypatch: pytest.MonkeyPa
 def test_effective_openui_config_playwright_rejected() -> None:
     from sevn.config.workspace_config import OpenUIWorkspaceConfig
 
-    with pytest.raises(ValueError, match="playwright"):
-        OpenUIWorkspaceConfig(rasteriser="playwright")
+    with pytest.raises((ValidationError, ValueError)) as exc_info:
+        OpenUIWorkspaceConfig(rasteriser="playwright")  # type: ignore[arg-type]
+    assert "playwright" in str(exc_info.value).lower()
 
 
 def test_hard_cap_enforced_via_config_bytes() -> None:

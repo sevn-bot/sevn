@@ -2,8 +2,8 @@
   "entries": {
     "agent": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-15T18:16:29Z",
-      "digest": "894b4e6aad417fe06e86f82706174b0f9749f2cedd0b229a59a89a1d5468566a",
+      "computed_at": "2026-07-16T18:08:16Z",
+      "digest": "5fcc12fcebad7402363d1cef5473954e52e2a5406a7cd10b33e5bf7f1b85df10",
       "source_globs": [
         "src/sevn/agent/**"
       ]
@@ -26,8 +26,8 @@
     },
     "config-workspace": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-15T18:16:30Z",
-      "digest": "db4a9088fc19378eb7b6ba277efe1d97bfaaff84b9dd95bd365b0551849eb8b0",
+      "computed_at": "2026-07-16T18:08:16Z",
+      "digest": "5e9b877fc9028cc6ff4c0acbc8f1b71a4a609f0ae7c1ad93c92258cc44000f1f",
       "source_globs": [
         "src/sevn/config/**",
         "src/sevn/workspace/**",
@@ -60,8 +60,8 @@
     },
     "integrations": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-15T18:16:30Z",
-      "digest": "28f24683c550944697048f4dd7fbc7c563fbde06bee3ff73ccb13d08f3d2221c",
+      "computed_at": "2026-07-16T18:08:16Z",
+      "digest": "49ad42e64376ca85e6f04bb68546580648627d30e7afbad1e605ff7e1bd9a5c9",
       "source_globs": [
         "src/sevn/integrations/**"
       ]
@@ -87,7 +87,7 @@
     },
     "plugins": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-15T18:16:30Z",
+      "computed_at": "2026-07-16T18:08:16Z",
       "digest": "ab4e914f79036515eb4f237c238304c982aa0fc45e281f11d363ab2dd6627349",
       "source_globs": [
         "src/sevn/plugins/**"
@@ -148,8 +148,8 @@
     },
     "skills": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-15T18:16:30Z",
-      "digest": "6c53883a221bf0db8737b4b598d83cb758145c1e8a4e8d823677de8926535d41",
+      "computed_at": "2026-07-16T18:08:16Z",
+      "digest": "5d761e3ffba57f6f3b34b76197e595c4825027a9c70c62236c99779ec4ecd8f5",
       "source_globs": [
         "src/sevn/skills/**",
         "src/sevn/data/bundled_skills/**",
@@ -205,8 +205,8 @@
     },
     "ui-mission-control": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-15T18:16:30Z",
-      "digest": "e12b293cd8b25af8ebef6647f97e2b0be2b23e54ea7a6b9f97bd3a7182192b2a",
+      "computed_at": "2026-07-16T18:08:16Z",
+      "digest": "c44b7d50d9b0199c73ac949902aa1fa29b41df05a945c3ce9b66c23e72944cb5",
       "source_globs": [
         "src/sevn/ui/**"
       ]

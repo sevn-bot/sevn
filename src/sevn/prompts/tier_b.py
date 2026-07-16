@@ -33,7 +33,6 @@ Exports:
     tier_b_no_silent_substitution_prompt — never silently swap a missing target.
     tier_b_persistence_prompt — iterate tool→error→adjust until success/empty/budget (D8).
     tier_b_browser_tool_prompt — native browser tool screenshot/navigation playbook.
-    tier_b_playwright_browser_prompt — deprecated alias for tier_b_browser_tool_prompt.
     tier_b_process_install_prompt — use process (not terminal_run) for package installs.
     tier_b_retrieval_honesty_prompt — retrieval failed vs empty + capability honesty (verify before denying).
     tier_b_sessions_context_prompt — SESSIONS.md recall guide loaded every tier-B turn.
@@ -850,19 +849,6 @@ def tier_b_browser_tool_prompt() -> str:
     )
 
 
-def tier_b_playwright_browser_prompt() -> str:
-    """Deprecated alias for :func:`tier_b_browser_tool_prompt`.
-
-    Returns:
-        str: Same markdown block as :func:`tier_b_browser_tool_prompt`.
-
-    Examples:
-        >>> tier_b_playwright_browser_prompt() == tier_b_browser_tool_prompt()
-        True
-    """
-    return tier_b_browser_tool_prompt()
-
-
 def tier_b_log_provenance_playbook_prompt() -> str:
     """Tier-B worked examples for log/tool-provenance audit follow-ups.
 
@@ -1565,7 +1551,6 @@ __all__ = [
     "tier_b_no_preamble_echo_prompt",
     "tier_b_no_silent_substitution_prompt",
     "tier_b_persistence_prompt",
-    "tier_b_playwright_browser_prompt",
     "tier_b_process_install_prompt",
     "tier_b_retrieval_honesty_prompt",
     "tier_b_sessions_context_prompt",

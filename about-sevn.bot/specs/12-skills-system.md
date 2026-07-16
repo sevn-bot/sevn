@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own everything under workspace/skills/: how skills are discovered, validated,
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
-last_updated: '2026-07-15'
-fingerprint: sha256:d673882ffd32bea1cc3567d4c8ebfe74c476097411b5fc4224d864131cccb431
+last_updated: '2026-07-16'
+fingerprint: sha256:6f153ba14dae6911b763d0594cfd983da4dfa60429ed017debc331db2a37f7a6
 related: []
 sources:
 - src/sevn/skills/**
@@ -38,21 +38,9 @@ interfaces:
 - name: CloseBrowserResult
   file: src/sevn/skills/browser_session.py
   symbol: CloseBrowserResult
-- name: TabOperationError
-  file: src/sevn/skills/browser_session.py
-  symbol: TabOperationError
-- name: TabSessionView
-  file: src/sevn/skills/browser_session.py
-  symbol: TabSessionView
-- name: activate_tab
-  file: src/sevn/skills/browser_session.py
-  symbol: activate_tab
 - name: browser_autoclose_enabled
   file: src/sevn/skills/browser_session.py
   symbol: browser_autoclose_enabled
-- name: browser_page
-  file: src/sevn/skills/browser_session.py
-  symbol: browser_page
 - name: browser_readiness_snapshot
   file: src/sevn/skills/browser_session.py
   symbol: browser_readiness_snapshot
@@ -80,36 +68,18 @@ interfaces:
 - name: close_idle_browser_sessions
   file: src/sevn/skills/browser_session.py
   symbol: close_idle_browser_sessions
-- name: close_tab
-  file: src/sevn/skills/browser_session.py
-  symbol: close_tab
-- name: connected_tab_session
-  file: src/sevn/skills/browser_session.py
-  symbol: connected_tab_session
 - name: default_cdp_url
   file: src/sevn/skills/browser_session.py
   symbol: default_cdp_url
 - name: is_brave_executable
   file: src/sevn/skills/browser_session.py
   symbol: is_brave_executable
-- name: list_tabs
-  file: src/sevn/skills/browser_session.py
-  symbol: list_tabs
 - name: merge_browser_proc_env
   file: src/sevn/skills/browser_session.py
   symbol: merge_browser_proc_env
-- name: open_tab
-  file: src/sevn/skills/browser_session.py
-  symbol: open_tab
-- name: page_target_id
-  file: src/sevn/skills/browser_session.py
-  symbol: page_target_id
 - name: persist_active_target_id
   file: src/sevn/skills/browser_session.py
   symbol: persist_active_target_id
-- name: pick_work_page
-  file: src/sevn/skills/browser_session.py
-  symbol: pick_work_page
 - name: read_devtools_active_port
   file: src/sevn/skills/browser_session.py
   symbol: read_devtools_active_port
@@ -140,9 +110,6 @@ interfaces:
 - name: resolve_profile_dir
   file: src/sevn/skills/browser_session.py
   symbol: resolve_profile_dir
-- name: resolve_target_page
-  file: src/sevn/skills/browser_session.py
-  symbol: resolve_target_page
 - name: restart_browser_session
   file: src/sevn/skills/browser_session.py
   symbol: restart_browser_session
@@ -152,12 +119,6 @@ interfaces:
 - name: spawn_chrome
   file: src/sevn/skills/browser_session.py
   symbol: spawn_chrome
-- name: try_persist_active_page
-  file: src/sevn/skills/browser_session.py
-  symbol: try_persist_active_page
-- name: wait_for_page_ready
-  file: src/sevn/skills/browser_session.py
-  symbol: wait_for_page_ready
 - name: write_registry
   file: src/sevn/skills/browser_session.py
   symbol: write_registry
@@ -446,9 +407,6 @@ interfaces:
 - name: social_media_manager_config_enabled
   file: src/sevn/skills/social_media_manager.py
   symbol: social_media_manager_config_enabled
-specs: []
-personas: []
-prd_profile: null
 ---
 
 ## Purpose

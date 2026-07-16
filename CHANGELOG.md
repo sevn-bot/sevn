@@ -43,6 +43,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- [2026-07-16] `computer-use` skill `see_also` drops the removed `playwright-browser` reference; docker gateway browser/gui images install `browser-cdp` only
 - [2026-07-16] Residual Playwright symbols renamed to browser_tool (routing/grounding), deprecated prompt aliases dropped, OpenUI rasteriser is weasyprint-only, and docker/.env install paths use `browser-cdp` without `playwright install`
 - [2026-07-15] Telegram `/config`, onboarding wizard, and Mission Control Knowledge view expose Second Brain layout selection and resolved PARA role paths instead of assuming legacy `wiki/raw/outputs` folders
 - [2026-07-16] Remove Playwright browser extra and Playwright-based skills (`playwright-browser`, `facebook-use`, `linkedin-use`, `x-use`); install/sync paths prefer `browser-cdp` only (WIP on `remove/playwright`)

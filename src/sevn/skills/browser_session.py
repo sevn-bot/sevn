@@ -571,10 +571,10 @@ def _match_cdp_target_for_page(
     *,
     title: str = "",
 ) -> str | None:
-    """Match a Playwright page to a CDP ``/json/list`` page target id.
+    """Match a browser page object to a CDP ``/json/list`` page target id.
 
     Args:
-        page (Any): Playwright ``Page``.
+        page (Any): Page-like object with a ``url`` attribute (CDP or driver page).
         targets (list[dict[str, Any]]): Rows from :func:`cdp_list_page_targets`.
         title (str): Optional page title already fetched by the caller.
 
@@ -1109,7 +1109,7 @@ def _is_chrome_internal_or_ntp(url: str) -> bool:
     """Return whether ``url`` is an internal or new-tab page unsuitable as work tab.
 
     Args:
-        url (str): Page URL from Playwright.
+        url (str): Page URL from the browser session.
 
     Returns:
         bool: ``True`` for ``about:``, ``chrome://``, or bare Google NTP URLs.

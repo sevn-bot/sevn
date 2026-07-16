@@ -9,11 +9,10 @@
 #   /operator/workspace/logs/gateway.log  (resolve_service_log_path / diagnostics)
 #   /operator/workspace/.sevn/traces.db
 #
-# Browser skills (Playwright): optional profile `browser` swaps in Dockerfile.gateway.browser
-# (uv sync --extra browser + Brave + playwright install chromium). Profile `gui` adds noVNC.
-# Profiles `browser` and `gui` are mutually exclusive (each excludes the other).
+# Browser CDP (Brave + browser-cdp): optional profile `browser` swaps in Dockerfile.gateway.browser.
+# Profile `gui` adds noVNC. Profiles `browser` and `gui` are mutually exclusive.
 # Default `docker compose up` stays slim.
-# Host-first headed browsing: run gateway on macOS with `uv sync --extra browser` instead.
+# Host-first headed browsing: run gateway on macOS with `uv sync --extra browser-cdp` instead.
 
 services:
   sevn-proxy:

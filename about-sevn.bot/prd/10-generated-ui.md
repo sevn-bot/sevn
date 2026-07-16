@@ -7,8 +7,8 @@ owner: Alex
 summary: Text-only replies hit a wall fast—budget panels, side-by-side diffs, and
   model-pick forms are clearer as sanitised HTML primitives than walls of markdown
   in every channel.
-last_updated: '2026-07-14'
-fingerprint: sha256:bea823d693563b387c0227a26e81a81491fb872ae79aaa1e5fab82ed888727f7
+last_updated: '2026-07-16'
+fingerprint: sha256:5aa743392195fe25912af418aa6b0f87630980172bb755ec271c6e2dc87cfcd6
 related: []
 sources:
 - src/sevn/ui/openui/**

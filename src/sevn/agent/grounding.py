@@ -25,7 +25,7 @@ Exports:
     triager_bound_tools_satisfied — whether any bound tool/skill succeeded (G0 / D0b).
     tools_attempted_from_call_counts — derive attempted tool names from call-count keys.
     steer_for_summarize_after_fetch — steer-inject when tools succeeded but no user answer (W8).
-    steer_for_playwright_cdp_probe_failure — steer when CDP probe fails before browser spawn (W6).
+    steer_for_browser_cdp_probe_failure — steer when CDP probe fails before browser spawn.
     steer_for_codemode_loaded_tool — steer-inject after ``load_tool`` under CodeMode (W7).
     is_self_architecture_query — best-effort self-architecture intent from user text.
     is_routing_footer_query — best-effort Telegram routing-footer intent from user text.
@@ -913,24 +913,24 @@ def steer_for_false_tool_failure_claim() -> str:
     )
 
 
-def steer_for_playwright_cdp_probe_failure() -> str:
+def steer_for_browser_cdp_probe_failure() -> str:
     """Build steer when a CDP probe fails before any browser spawn (W6 / ``62803d``).
 
     ``cdp_probe.py`` and ``session_status.py`` report ``CDP_UNREACHABLE`` on the
     default port until ``capture.py`` or ``goto.py`` spawns Chrome — not a skill outage.
 
     Returns:
-        str: One-line steer directing capture/goto instead of claiming Playwright broken.
+        str: One-line steer directing capture/goto instead of claiming the browser tool is broken.
 
     Examples:
-        >>> msg = steer_for_playwright_cdp_probe_failure()
+        >>> msg = steer_for_browser_cdp_probe_failure()
         >>> "capture.py" in msg and "CDP_UNREACHABLE" in msg
         True
     """
     return (
         "CDP_UNREACHABLE on the default port is **expected** before the first "
         "`capture.py` or `goto.py` run — those scripts spawn Chrome. Do not report "
-        "Playwright as broken; call `run_skill_script` with "
+        "the browser tool as broken; call `run_skill_script` with "
         "`scripts/capture.py` and the target URL in `argv`."
     )
 
@@ -1354,6 +1354,7 @@ __all__ = [
     "is_self_architecture_query",
     "last_model_stop_reason",
     "steer_for_audit_evidence",
+    "steer_for_browser_cdp_probe_failure",
     "steer_for_codemode_loaded_tool",
     "steer_for_direct_tool_call",
     "steer_for_dropped_tool_call",
@@ -1361,7 +1362,6 @@ __all__ = [
     "steer_for_false_tool_failure_claim",
     "steer_for_meta_tool_call",
     "steer_for_opener_only",
-    "steer_for_playwright_cdp_probe_failure",
     "steer_for_promised_action",
     "steer_for_summarize_after_fetch",
     "steer_for_triager_bound_tools_unused",

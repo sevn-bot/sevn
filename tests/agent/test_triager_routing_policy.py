@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-import pytest
-
 from sevn.agent.openers import BARE_OPENERS
 from sevn.agent.triager.models import ComplexityTier, Intent, TriageResult
 from sevn.agent.triager.routing_policy import (
@@ -13,15 +11,16 @@ from sevn.agent.triager.routing_policy import (
     _FIRST_SESSION_ACKS,
     _GREETING_ACK_TOKENS,
     COMPLEXITY_CLAMP_CONFIDENCE_THRESHOLD,
+    _merge_browser_tool_surface,
     _merge_file_ops_tools,
     _merge_package_install_tools,
-    _merge_playwright_browser_surface,
     _merge_repo_file_ops_tools,
     _merge_session_recall_surface,
     apply_routing_policy,
     classify_greeting,
     default_early_ack,
     default_tier_a_reply,
+    is_browser_tool_message,
     is_github_repo_eval_intent_message,
     is_identity_or_capability_message,
     is_lcm_status_message,
@@ -30,7 +29,6 @@ from sevn.agent.triager.routing_policy import (
     is_obvious_continuation_message,
     is_package_install_message,
     is_pdf_file_pipeline_message,
-    is_playwright_browser_message,
     is_registry_capability_intent_message,
     is_registry_meta_howto_message,
     is_repo_code_intent_message,
@@ -493,11 +491,11 @@ def test_package_install_message_detected() -> None:
     assert not is_package_install_message("hello")
 
 
-def test_playwright_browser_message_detected() -> None:
-    assert is_playwright_browser_message("get a screenshot of https://example.com")
-    assert is_playwright_browser_message("capture a screenshot of the login page")
-    assert is_playwright_browser_message("Search nba.com")
-    assert not is_playwright_browser_message("hello")
+def test_browser_tool_message_detected() -> None:
+    assert is_browser_tool_message("get a screenshot of https://example.com")
+    assert is_browser_tool_message("capture a screenshot of the login page")
+    assert is_browser_tool_message("Search nba.com")
+    assert not is_browser_tool_message("hello")
 
 
 def test_merge_package_install_tools_prefers_process() -> None:
@@ -507,8 +505,8 @@ def test_merge_package_install_tools_prefers_process() -> None:
     assert "load_tool" in merged
 
 
-def test_merge_playwright_browser_surface() -> None:
-    tools, skills = _merge_playwright_browser_surface(["terminal_run", "process"], [])
+def test_merge_browser_tool_surface() -> None:
+    tools, skills = _merge_browser_tool_surface(["terminal_run", "process"], [])
     assert tools == ["browser", "load_tool", "send_file"]
     assert "terminal_run" not in tools
     assert "process" not in tools
@@ -1231,7 +1229,7 @@ def test_intent_router_applied_logs_cover_remaining_routers_w10() -> None:
                 requires_vision=False,
                 requires_document=False,
             ),
-            "is_playwright_browser_message",
+            "is_browser_tool_message",
         ),
         (
             "what folders are on the root of sevn.bot?",
@@ -1311,7 +1309,6 @@ def test_intent_router_applied_log_skipped_for_premerged_workspace_tools_w10() -
 # --- W1 RED (DP3): playwright → browser_tool renames (green after W5) ---
 
 
-@pytest.mark.xfail(reason="green after W5: DP3 is_browser_tool_message rename", strict=False)
 def test_is_browser_tool_message_renamed_and_behaves() -> None:
     """DP3: is_browser_tool_message exists and mirrors prior screenshot/browser detection."""
     from sevn.agent.triager.routing_policy import is_browser_tool_message
@@ -1322,7 +1319,6 @@ def test_is_browser_tool_message_renamed_and_behaves() -> None:
     assert not is_browser_tool_message("hello")
 
 
-@pytest.mark.xfail(reason="green after W5: DP3 _merge_browser_tool_surface rename", strict=False)
 def test_merge_browser_tool_surface_renamed() -> None:
     """DP3: _merge_browser_tool_surface replaces _merge_playwright_browser_surface."""
     from sevn.agent.triager import routing_policy as rp
@@ -1334,7 +1330,6 @@ def test_merge_browser_tool_surface_renamed() -> None:
     assert "playwright-browser" not in skills
 
 
-@pytest.mark.xfail(reason="green after W5: DP3 old playwright routing symbols gone", strict=False)
 def test_playwright_routing_symbols_removed() -> None:
     """DP3: old playwright-named routing helpers are absent after rename."""
     from sevn.agent.triager import routing_policy as rp

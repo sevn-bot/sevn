@@ -7,8 +7,8 @@ owner: Alex
 summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–§5.2):
   a single, tool-less outbound generation step that emits validated TriageResult consumed
   by tier dispatch (A / B / C / D), MCP e'
-last_updated: '2026-07-15'
-fingerprint: sha256:894b4e6aad417fe06e86f82706174b0f9749f2cedd0b229a59a89a1d5468566a
+last_updated: '2026-07-16'
+fingerprint: sha256:5fcc12fcebad7402363d1cef5473954e52e2a5406a7cd10b33e5bf7f1b85df10
 related: []
 sources:
 - src/sevn/agent/**
@@ -521,6 +521,9 @@ interfaces:
 - name: steer_for_audit_evidence
   file: src/sevn/agent/grounding.py
   symbol: steer_for_audit_evidence
+- name: steer_for_browser_cdp_probe_failure
+  file: src/sevn/agent/grounding.py
+  symbol: steer_for_browser_cdp_probe_failure
 - name: steer_for_codemode_loaded_tool
   file: src/sevn/agent/grounding.py
   symbol: steer_for_codemode_loaded_tool
@@ -542,9 +545,6 @@ interfaces:
 - name: steer_for_opener_only
   file: src/sevn/agent/grounding.py
   symbol: steer_for_opener_only
-- name: steer_for_playwright_cdp_probe_failure
-  file: src/sevn/agent/grounding.py
-  symbol: steer_for_playwright_cdp_probe_failure
 - name: steer_for_promised_action
   file: src/sevn/agent/grounding.py
   symbol: steer_for_promised_action
@@ -1145,6 +1145,9 @@ interfaces:
 - name: first_message_passes_opener_rule
   file: src/sevn/agent/triager/routing_policy.py
   symbol: first_message_passes_opener_rule
+- name: is_browser_tool_message
+  file: src/sevn/agent/triager/routing_policy.py
+  symbol: is_browser_tool_message
 - name: is_evolution_fix_intent_message
   file: src/sevn/agent/triager/routing_policy.py
   symbol: is_evolution_fix_intent_message
@@ -1178,9 +1181,6 @@ interfaces:
 - name: is_pdf_file_pipeline_message
   file: src/sevn/agent/triager/routing_policy.py
   symbol: is_pdf_file_pipeline_message
-- name: is_playwright_browser_message
-  file: src/sevn/agent/triager/routing_policy.py
-  symbol: is_playwright_browser_message
 - name: is_registry_capability_intent_message
   file: src/sevn/agent/triager/routing_policy.py
   symbol: is_registry_capability_intent_message

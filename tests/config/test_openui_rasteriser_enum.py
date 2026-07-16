@@ -10,7 +10,6 @@ import pytest
 from pydantic import ValidationError
 
 
-@pytest.mark.xfail(reason="green after W5: DP7 rasteriser accepts only weasyprint", strict=False)
 def test_openui_rasteriser_accepts_only_weasyprint() -> None:
     """DP7: OpenUIWorkspaceConfig.rasteriser is weasyprint-only."""
     from sevn.config.workspace_config import OpenUIWorkspaceConfig
@@ -19,10 +18,6 @@ def test_openui_rasteriser_accepts_only_weasyprint() -> None:
     assert cfg.rasteriser == "weasyprint"
 
 
-@pytest.mark.xfail(
-    reason="green after W5: DP7 playwright rejected as unknown enum (not reserved)",
-    strict=False,
-)
 def test_openui_rasteriser_playwright_is_unknown_enum_not_reserved() -> None:
     """DP7: ``playwright`` is an unknown enum value — not a reserved-but-erroring backend."""
     from sevn.config.workspace_config import OpenUIWorkspaceConfig
@@ -34,9 +29,6 @@ def test_openui_rasteriser_playwright_is_unknown_enum_not_reserved() -> None:
     assert "playwright" in msg or "literal" in msg or "enum" in msg or "input" in msg
 
 
-@pytest.mark.xfail(
-    reason="green after W5: DP7 models.RasteriserName drops playwright", strict=False
-)
 def test_openui_models_rasteriser_name_excludes_playwright() -> None:
     """DP7: ui.openui.models.RasteriserName no longer includes playwright."""
     from sevn.ui.openui import models as openui_models
@@ -46,7 +38,6 @@ def test_openui_models_rasteriser_name_excludes_playwright() -> None:
     assert "playwright" not in args
 
 
-@pytest.mark.xfail(reason="green after W5: DP7 schema enum drops playwright", strict=False)
 def test_sevn_schema_rasteriser_enum_weasyprint_only() -> None:
     """DP7: infra/sevn.schema.json openui.rasteriser enum is weasyprint-only."""
     schema_path = Path(__file__).resolve().parents[2] / "infra" / "sevn.schema.json"

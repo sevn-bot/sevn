@@ -141,7 +141,7 @@ class TriggersWorkspaceConfig(BaseModel):
 
 
 class BrowserWorkspaceConfig(BaseModel):
-    """``skills.browser`` subtree (session-scoped Playwright lifecycle).
+    """``skills.browser`` subtree (session-scoped CDP browser lifecycle).
 
     Attributes:
         profile_dir: Optional override for Chrome ``user-data-dir``.
