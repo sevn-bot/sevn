@@ -108,7 +108,7 @@ def _build_seipd_packet(data: bytes, sk: SessionKey) -> bytes:
     prefix = os.urandom(block_size + 2)
     literal = _build_literal_packet(data)
     payload = prefix + literal
-    # codeql[py/weak-sensitive-data-hashing] OpenPGP SEIPD MDC requires SHA-1
+    # codeql[py/weak-sensitive-data-hashing]
     mdc = _MDC_HEADER + hashlib.sha1(payload).digest()
     cfb_plain = payload + mdc
     ciphertext = _encrypt_openpgp_cfb(cfb_plain, sk.key, block_size)
@@ -124,12 +124,13 @@ def _build_literal_packet(data: bytes) -> bytes:
 
 
 def _encrypt_openpgp_cfb(plaintext: bytes, key: bytes, block_size: int) -> bytes:
-    # codeql[py/weak-cryptographic-algorithm] OpenPGP CFB uses AES-ECB for keystream
+    # codeql[py/weak-cryptographic-algorithm]
     ecb = Cipher(algorithms.AES(key), modes.ECB()).encryptor()
     feedback = bytes(block_size)
     out = bytearray()
     for i in range(0, len(plaintext), block_size):
         block = plaintext[i : i + block_size]
+        # codeql[py/weak-cryptographic-algorithm]
         keystream = ecb.update(feedback)
         cipher_block = bytes(a ^ b for a, b in zip(block, keystream, strict=False))
         out.extend(cipher_block)
@@ -143,12 +144,13 @@ def _encrypt_openpgp_cfb(plaintext: bytes, key: bytes, block_size: int) -> bytes
 
 
 def _decrypt_openpgp_cfb(ciphertext: bytes, key: bytes, block_size: int) -> bytes:
-    # codeql[py/weak-cryptographic-algorithm] OpenPGP CFB uses AES-ECB for keystream
+    # codeql[py/weak-cryptographic-algorithm]
     ecb = Cipher(algorithms.AES(key), modes.ECB()).encryptor()
     feedback = bytes(block_size)
     out = bytearray()
     for i in range(0, len(ciphertext), block_size):
         block = ciphertext[i : i + block_size]
+        # codeql[py/weak-cryptographic-algorithm]
         keystream = ecb.update(feedback)
         out.extend(a ^ b for a, b in zip(block, keystream, strict=False))
         feedback = block if len(block) == block_size else block + bytes(block_size - len(block))
@@ -162,7 +164,7 @@ def _verify_mdc(plaintext: bytes) -> None:
     mdc = plaintext[-_MDC_SIZE:]
     if mdc[:2] != _MDC_HEADER:
         raise ValueError("invalid MDC header")
-    # codeql[py/weak-sensitive-data-hashing] OpenPGP SEIPD MDC requires SHA-1
+    # codeql[py/weak-sensitive-data-hashing]
     expected = hashlib.sha1(plaintext[:-_MDC_SIZE]).digest()
     if mdc[2:] != expected:
         raise ValueError("MDC verification failed")
