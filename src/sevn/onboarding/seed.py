@@ -64,13 +64,14 @@ _PERSONALITY_FIELD_KEYS: Final[tuple[str, ...]] = (
 
 # Bundled core skills that require explicit operator opt-in (not required after seed).
 _OPT_IN_CORE_SKILL_IDS: Final[frozenset[str]] = frozenset(
-    {"computer-use", "cursor_cloud", "cua-agent", "lume"}
+    {"computer-use", "cursor_cloud", "cua-agent", "lume", "proton-management"}
 )
 _CAPABILITY_OPT_IN_SKILL_IDS: Final[dict[str, str]] = {
     "skill.computer_use": "computer-use",
     "skill.cursor_cloud": "cursor_cloud",
     "skill.cua_agent": "cua-agent",
     "skill.lume": "lume",
+    "skill.proton_management": "proton-management",
 }
 
 NARRATIVE_TEMPLATE_NAMES: Final[tuple[str, ...]] = (
