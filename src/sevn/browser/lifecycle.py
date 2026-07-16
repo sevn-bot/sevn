@@ -17,7 +17,6 @@ Exports:
     get_or_create_session — pooled session per gateway ``session_id``.
     release_session — disconnect + evict a pooled session.
     reset_pool_for_tests — clear the pool (unit tests only).
-    pid_is_alive — whether a process id responds to ``signal 0``.
     clear_profile_singleton_locks — delete Chrome singleton/port lockfiles.
     reap_stale_sevn_chrome — kill sevn-spawned Chrome for one profile + clear locks.
     reap_sevn_browsers_on_shutdown — terminate all sevn-spawned browsers (D6).
@@ -32,7 +31,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import inspect
 import json
 import os
 import signal
@@ -44,6 +42,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 
 from sevn.browser.cdp import CDPConnection, CDPSession
+from sevn.skills.browser_session import pid_is_alive, pid_matches_sevn_chrome_profile
 
 if TYPE_CHECKING:
     from sevn.config.workspace_config import WorkspaceConfig
@@ -106,51 +105,20 @@ def _spawn_lock_for(session_id: str) -> asyncio.Lock:
 
 
 async def _await_attach(cdp_url: str) -> CDPBrowserSession:
-    """Attach to ``cdp_url``, supporting sync test doubles that return a session.
+    """Attach to ``cdp_url`` (always awaits :meth:`CDPBrowserSession.attach`).
 
     Args:
         cdp_url (str): CDP HTTP base URL.
 
     Returns:
-        CDPBrowserSession: Connected session (or test double).
+        CDPBrowserSession: Connected session.
 
     Examples:
         >>> import inspect
         >>> inspect.iscoroutinefunction(_await_attach)
         True
     """
-    attached = CDPBrowserSession.attach(cdp_url)
-    if inspect.isawaitable(attached):
-        return await attached
-    return attached
-
-
-def pid_is_alive(pid: int) -> bool:
-    """Return whether ``pid`` responds to ``os.kill(..., 0)``.
-
-    Args:
-        pid (int): Operating-system process id.
-
-    Returns:
-        bool: ``True`` when the process exists (and is signalable by this user).
-
-    Examples:
-        >>> pid_is_alive(os.getpid())
-        True
-        >>> pid_is_alive(0)
-        False
-    """
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except OSError:
-        return False
-    return True
+    return await CDPBrowserSession.attach(cdp_url)
 
 
 def clear_profile_singleton_locks(profile_dir: Path) -> None:
@@ -215,9 +183,26 @@ def reap_stale_sevn_chrome(
         except OSError:
             recorded = Path(row.profile_dir)
             target = profile_dir
-        if recorded == target and pid_is_alive(row.pid):
+        if (
+            recorded == target
+            and pid_is_alive(row.pid)
+            and pid_matches_sevn_chrome_profile(row.pid, profile_dir)
+        ):
+            # Convention 11: cmdline still looks like sevn Chrome for this profile.
             with contextlib.suppress(OSError):
                 os.kill(row.pid, signal.SIGTERM)
+            # Wait like the shutdown path before clearing lockfiles (Thermos).
+            for _ in range(50):
+                if not pid_is_alive(row.pid):
+                    break
+                time.sleep(0.1)
+            if pid_is_alive(row.pid) and pid_matches_sevn_chrome_profile(row.pid, profile_dir):
+                with contextlib.suppress(OSError):
+                    os.kill(row.pid, signal.SIGKILL)
+                for _ in range(20):
+                    if not pid_is_alive(row.pid):
+                        break
+                    time.sleep(0.05)
     clear_profile_singleton_locks(profile_dir)
 
 
@@ -296,6 +281,10 @@ def reap_sevn_browsers_on_shutdown(content_root: Path) -> list[int]:
         pid = row.pid
         processed.append(pid)
         if pid_is_alive(pid):
+            profile = Path(row.profile_dir) if row.profile_dir else None
+            if profile is None or not pid_matches_sevn_chrome_profile(pid, profile):
+                clear_registry(content_root, session_id)
+                continue
             with contextlib.suppress(OSError):
                 os.kill(pid, signal.SIGTERM)
             # Best-effort wait so gateway restarts do not leave orphans.
@@ -303,7 +292,7 @@ def reap_sevn_browsers_on_shutdown(content_root: Path) -> list[int]:
                 if not pid_is_alive(pid):
                     break
                 time.sleep(0.1)
-            if pid_is_alive(pid):
+            if pid_is_alive(pid) and pid_matches_sevn_chrome_profile(pid, profile):
                 with contextlib.suppress(OSError):
                     os.kill(pid, signal.SIGKILL)
         clear_registry(content_root, session_id)
@@ -796,23 +785,14 @@ async def _spawn_or_attach_unlocked(
         spawn_wall = time.time()
 
         def _spawn() -> tuple[Any, int, str]:
-            try:
-                return spawn_chrome(
-                    profile_dir,
-                    headless=headless,
-                    seed_port=seed,
-                    cfg=cfg,
-                    session_id=session_id,
-                    log_dir=log_dir,
-                )
-            except TypeError:
-                # Test doubles / older callables may omit D4 kwargs.
-                return spawn_chrome(
-                    profile_dir,
-                    headless=headless,
-                    seed_port=seed,
-                    cfg=cfg,
-                )
+            return spawn_chrome(
+                profile_dir,
+                headless=headless,
+                seed_port=seed,
+                cfg=cfg,
+                session_id=session_id,
+                log_dir=log_dir,
+            )
 
         proc, port, spawned_url = await asyncio.to_thread(_spawn)
         reachable = False

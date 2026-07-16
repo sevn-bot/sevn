@@ -15,6 +15,8 @@ Exports:
     delete_cron_job — remove a cron job row.
     add_reminder — one-shot reminder row (cron at absolute datetime).
     run_issue_watch_cron — watch tracked issues / notify on diffs (D13).
+    ensure_issue_watch_cron_job — seed the built-in watch cron row at boot.
+    register_cron_job_handler — bind a job_id to a sync handler (no magic forks).
     cron_tick — gateway lifespan hook (loads due jobs; dispatch is injected).
 """
 
@@ -43,6 +45,28 @@ from sevn.triggers.request import DeliveryMode, DispatchRequest, ResultChannel, 
 ISSUE_WATCH_CRON_JOB_ID = "gh-issue-watch"
 ISSUE_WATCH_CRON_EXPR = "*/15 * * * *"
 
+# job_id → sync handler ``(*, workspace: Path) -> None`` (avoids magic forks in cron_tick).
+_CRON_JOB_HANDLERS: dict[str, Callable[..., Any]] = {}
+
+
+def register_cron_job_handler(job_id: str, handler: Callable[..., Any]) -> None:
+    """Bind ``job_id`` to a sync cron handler (called from :func:`cron_tick`).
+
+    Args:
+        job_id (str): Persisted ``trigger_cron_jobs.job_id``.
+        handler (Callable[..., Any]): Sync callable; receives ``workspace=``.
+
+    Returns:
+        None
+
+    Examples:
+        >>> register_cron_job_handler("demo", lambda **_k: None)
+        >>> "demo" in _CRON_JOB_HANDLERS
+        True
+        >>> _ = _CRON_JOB_HANDLERS.pop("demo", None)
+    """
+    _CRON_JOB_HANDLERS[job_id.strip()] = handler
+
 
 def run_issue_watch_cron(
     *,
@@ -52,8 +76,8 @@ def run_issue_watch_cron(
     """Run issue watch over the tracked set, or notify precomputed ``diffs``.
 
     When ``diffs`` is provided (tests / manual), skip fetch and only notify.
-    Otherwise load ``.sevn/gh-watch/tracked.json``, run ``watch_issue`` for each
-    entry, and notify when any entry reports changes.
+    Otherwise load tracked issues via :mod:`sevn.integrations.github_skill.watch`
+    and notify when any entry reports changes.
 
     Args:
         workspace (Path | None, optional): Workspace root; defaults to ``SEVN_WORKSPACE``.
@@ -66,54 +90,100 @@ def run_issue_watch_cron(
         >>> run_issue_watch_cron(diffs=[])
         []
     """
-    from sevn.triggers.dispatcher import notify_issue_watch_diff
-
-    if diffs is not None:
-        if diffs:
-            notify_issue_watch_diff(diffs=diffs)
-        return list(diffs)
-
-    import importlib.util
     import os
+
+    from sevn.integrations.github_skill.watch import run_tracked_watch
+    from sevn.triggers.dispatcher import notify_issue_watch_diff
 
     root = (
         workspace
         if workspace is not None
         else Path(os.environ.get("SEVN_WORKSPACE", ".")).resolve()
     )
-    scripts_root = (
-        Path(__file__).resolve().parents[1]
-        / "data"
-        / "bundled_skills"
-        / "core"
-        / "gh-issues"
-        / "scripts"
-    )
-    track_path = scripts_root / "issue_track.py"
-    watch_path = scripts_root / "issue_watch.py"
-    track_spec = importlib.util.spec_from_file_location("gh_issues_issue_track", track_path)
-    watch_spec = importlib.util.spec_from_file_location("gh_issues_issue_watch", watch_path)
-    if (
-        track_spec is None
-        or track_spec.loader is None
-        or watch_spec is None
-        or watch_spec.loader is None
-    ):
-        msg = "gh-issues track/watch scripts unavailable"
-        raise RuntimeError(msg)
-    track_mod = importlib.util.module_from_spec(track_spec)
-    watch_mod = importlib.util.module_from_spec(watch_spec)
-    track_spec.loader.exec_module(track_mod)
-    watch_spec.loader.exec_module(watch_mod)
+    if diffs is not None:
+        if diffs:
+            notify_issue_watch_diff(diffs=diffs, content_root=root)
+        return list(diffs)
 
-    collected: list[dict[str, Any]] = []
-    for item in track_mod.load_tracked(root):
-        result = watch_mod.watch_issue(root, str(item["repo"]), int(item["number"]))
-        if isinstance(result, dict) and result.get("changed"):
-            collected.append(result)
+    collected = run_tracked_watch(root)
     if collected:
-        notify_issue_watch_diff(diffs=collected)
+        notify_issue_watch_diff(diffs=collected, content_root=root)
     return collected
+
+
+def ensure_issue_watch_cron_job(conn: sqlite3.Connection, workspace: WorkspaceConfig) -> None:
+    """Seed the built-in ``gh-issue-watch`` cron row at gateway boot (D13).
+
+    Always ensures the job exists (~15 min). Watching is a no-op until the
+    operator tracks issues under ``.sevn/gh-watch/tracked.json``.
+
+    Args:
+        conn (sqlite3.Connection): Migrated workspace ``sevn.db``.
+        workspace (WorkspaceConfig): Parsed workspace (unused; reserved for gates).
+
+    Returns:
+        None
+
+    Examples:
+        >>> import sqlite3
+        >>> from sevn.storage.migrate import apply_migrations
+        >>> c = sqlite3.connect(":memory:")
+        >>> apply_migrations(c)
+        >>> ensure_issue_watch_cron_job(c, WorkspaceConfig.minimal())
+        >>> c.execute(
+        ...     "SELECT job_id FROM trigger_cron_jobs WHERE job_id = ?",
+        ...     (ISSUE_WATCH_CRON_JOB_ID,),
+        ... ).fetchone()[0]
+        'gh-issue-watch'
+    """
+    _ = workspace
+    now_ns = time.time_ns()
+    nxt = compute_next_fire_ns(
+        cron_expr=ISSUE_WATCH_CRON_EXPR,
+        tz_name="UTC",
+        from_ns=now_ns,
+    )
+    conn.execute(
+        """
+        INSERT INTO trigger_cron_jobs (
+            job_id, enabled, cron_expr, timezone, next_fire_at_ns, jitter_s,
+            routing_mode, delivery_mode, permission_template_ref, allow_tier_cd,
+            overlap_policy, result_channel_json, payload_template
+        ) VALUES (?, 1, ?, 'UTC', ?, 0, 'fixed', 'notify_only', 'default', 0, 'skip', '{}', ?)
+        ON CONFLICT(job_id) DO UPDATE SET
+            enabled = 1,
+            cron_expr = excluded.cron_expr,
+            timezone = excluded.timezone,
+            next_fire_at_ns = CASE
+                WHEN trigger_cron_jobs.next_fire_at_ns > 0
+                THEN trigger_cron_jobs.next_fire_at_ns
+                ELSE excluded.next_fire_at_ns
+            END,
+            delivery_mode = excluded.delivery_mode,
+            payload_template = excluded.payload_template
+        """,
+        (ISSUE_WATCH_CRON_JOB_ID, ISSUE_WATCH_CRON_EXPR, int(nxt), "gh_issue_watch"),
+    )
+    conn.commit()
+
+
+def _handle_issue_watch_cron(*, workspace: Path) -> None:
+    """Cron handler entry for :data:`ISSUE_WATCH_CRON_JOB_ID`.
+
+    Args:
+        workspace (Path): Workspace content root.
+
+    Returns:
+        None
+
+    Examples:
+        >>> _handle_issue_watch_cron.__name__
+        '_handle_issue_watch_cron'
+    """
+    run_issue_watch_cron(workspace=workspace)
+
+
+register_cron_job_handler(ISSUE_WATCH_CRON_JOB_ID, _handle_issue_watch_cron)
 
 
 @dataclass(frozen=True)
@@ -1138,34 +1208,39 @@ async def cron_tick(
         return
     now_ns = time.time_ns()
     due = cron_store.list_due(now_ns)
+
+    def _bump_schedule(*, job_id: str, cron_expr: str, tz_name: str, status: str) -> None:
+        nxt = compute_next_fire_ns(
+            cron_expr=cron_expr,
+            tz_name=tz_name,
+            from_ns=time.time_ns(),
+        )
+        cron_store.update_schedule(
+            job_id=job_id,
+            next_fire_at_ns=nxt,
+            last_correlation_id=correlation_id,
+            last_status=status,
+        )
+
     for row in due:
         correlation_id = str(uuid.uuid4())
-        if row.job_id == ISSUE_WATCH_CRON_JOB_ID:
+        handler = _CRON_JOB_HANDLERS.get(row.job_id)
+        if handler is not None:
             try:
-                run_issue_watch_cron(workspace=content_root)
-                nxt = compute_next_fire_ns(
+                handler(workspace=content_root)
+                _bump_schedule(
+                    job_id=row.job_id,
                     cron_expr=row.cron_expr,
                     tz_name=row.timezone,
-                    from_ns=time.time_ns(),
-                )
-                cron_store.update_schedule(
-                    job_id=row.job_id,
-                    next_fire_at_ns=nxt,
-                    last_correlation_id=correlation_id,
-                    last_status="ok",
+                    status="ok",
                 )
             except Exception:
-                logger.exception("cron_issue_watch_failed job_id={}", row.job_id)
-                nxt = compute_next_fire_ns(
+                logger.exception("cron_handler_failed job_id={}", row.job_id)
+                _bump_schedule(
+                    job_id=row.job_id,
                     cron_expr=row.cron_expr,
                     tz_name=row.timezone,
-                    from_ns=time.time_ns(),
-                )
-                cron_store.update_schedule(
-                    job_id=row.job_id,
-                    next_fire_at_ns=nxt,
-                    last_correlation_id=correlation_id,
-                    last_status="error",
+                    status="error",
                 )
             continue
         try:
@@ -1186,33 +1261,23 @@ async def cron_tick(
                 "transport": "cron",
                 "cron_job_id": row.job_id,
                 "overlap_policy": row.overlap_policy,
-                "scope": ("issue_watch" if row.job_id == ISSUE_WATCH_CRON_JOB_ID else "default"),
+                "scope": "default",
             },
             notify_template=row.payload_template if row.delivery_mode == "notify_only" else None,
         )
         try:
             await asyncio.wait_for(dispatch(req), timeout=600.0)
-            nxt = compute_next_fire_ns(
+            _bump_schedule(
+                job_id=row.job_id,
                 cron_expr=row.cron_expr,
                 tz_name=row.timezone,
-                from_ns=time.time_ns(),
-            )
-            cron_store.update_schedule(
-                job_id=row.job_id,
-                next_fire_at_ns=nxt,
-                last_correlation_id=correlation_id,
-                last_status="ok",
+                status="ok",
             )
         except Exception:
             logger.exception("cron_job_dispatch_failed job_id={}", row.job_id)
-            nxt = compute_next_fire_ns(
+            _bump_schedule(
+                job_id=row.job_id,
                 cron_expr=row.cron_expr,
                 tz_name=row.timezone,
-                from_ns=time.time_ns(),
-            )
-            cron_store.update_schedule(
-                job_id=row.job_id,
-                next_fire_at_ns=nxt,
-                last_correlation_id=correlation_id,
-                last_status="error",
+                status="error",
             )

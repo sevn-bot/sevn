@@ -181,10 +181,12 @@ def _register_builtin_cron_jobs() -> None:
         reconcile_my_sevn_sync_cron_job,
     )
     from sevn.memory.dreaming.scheduler import reconcile_dreaming_cron_job
+    from sevn.triggers.cron import ensure_issue_watch_cron_job
 
     register_cron_job("dreaming", reconcile_dreaming_cron_job, priority=0)
     register_cron_job("my_sevn_sync", reconcile_my_sevn_sync_cron_job, priority=10)
     register_cron_job("my_sevn_issues_sync", reconcile_my_sevn_issues_sync_cron_job, priority=20)
+    register_cron_job("gh_issue_watch", ensure_issue_watch_cron_job, priority=30)
 
 
 _register_builtin_cron_jobs()

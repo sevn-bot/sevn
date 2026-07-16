@@ -16,8 +16,7 @@ import argparse
 import asyncio
 from typing import Any
 
-from sevn.config.loader import load_workspace
-from sevn.config.my_sevn import default_github_repo_slug
+from sevn.config.my_sevn import resolve_github_repo_slug
 from sevn.integrations.github_skill import gh_issues, resolve_github_skill_hooks
 from sevn.integrations.github_skill.github_manager import (
     GhCliMissingError,
@@ -27,19 +26,8 @@ from sevn.lcm.script_cli import workspace_from_env, write_error, write_ok
 
 
 def _resolve_repo_slug(explicit: str | None) -> str:
-    """Return ``owner/repo`` from CLI arg or ``my_sevn.repo_url``.
-
-    Args:
-        explicit (str | None): Positional / ``--repo`` value when provided.
-
-    Returns:
-        str: GitHub ``owner/repo`` slug.
-    """
-    if explicit and explicit.strip():
-        return explicit.strip()
-    workspace = workspace_from_env()
-    cfg, _layout = load_workspace(sevn_json=workspace / "sevn.json")
-    return default_github_repo_slug(cfg)
+    """Return ``owner/repo`` from CLI arg or ``my_sevn.repo_url``."""
+    return resolve_github_repo_slug(explicit, workspace=workspace_from_env())
 
 
 def _view_via_proxy(*, repo: str, issue_number: int) -> dict[str, Any]:

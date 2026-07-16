@@ -41,13 +41,23 @@ RunTurnFn = Callable[[str, str], Awaitable[None]]
 ISSUE_WATCH_CRON_SCOPE = "gh-issue-watch"
 
 
-def notify_issue_watch_diff(*, diffs: list[dict[str, Any]]) -> None:
-    """Notify the operator of GitHub issue-watch diffs via the ``message`` tool.
+def notify_issue_watch_diff(
+    *,
+    diffs: list[dict[str, Any]],
+    content_root: Path | None = None,
+) -> None:
+    """Notify the operator of GitHub issue-watch diffs via operator notify.
+
+    Delivers through the gateway-wired :func:`~sevn.triggers.operator_notify.
+    deliver_operator_notify` sink (Telegram to the owner when bootstrapped).
+    When unwired, persists a LOG artefact under ``content_root`` instead of
+    returning a fake success.
 
     Args:
         diffs (list[dict[str, Any]]): Diff payloads from ``issue_watch`` /
             ``run_issue_watch_cron`` (each typically has ``repo``, ``number``,
             ``changes``).
+        content_root (Path | None, optional): Workspace root for LOG fallback.
 
     Examples:
         >>> notify_issue_watch_diff(diffs=[])  # no-op
@@ -60,11 +70,9 @@ def notify_issue_watch_diff(*, diffs: list[dict[str, Any]]) -> None:
         number = item.get("number") or "?"
         changes = item.get("changes") if isinstance(item.get("changes"), dict) else item
         lines.append(f"- {repo}#{number}: {json.dumps(changes, sort_keys=True)}")
-    text = "\n".join(lines)
-    # Import path matches tests that patch ``sevn.tools.message.message_tool``.
-    from sevn.tools.message import message_tool
+    from sevn.triggers.operator_notify import deliver_operator_notify
 
-    message_tool(text=text)
+    deliver_operator_notify(text="\n".join(lines), content_root=content_root)
 
 
 def agent_dispatch_kwargs(gateway_router: Any | None) -> dict[str, Any]:

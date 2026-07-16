@@ -74,6 +74,9 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-16] Thermos D16: issue-watch cron delivers via injectable operator notify (gateway Telegram / LOG artefact) instead of a fake `message_tool` stub; watch/track live in `sevn.integrations.github_skill.watch` (no `importlib` from cron); `gh-issue-watch` cron job is seeded at gateway boot
+- [2026-07-16] Thermos D16: spawn-path Chrome reap waits after SIGTERM before clearing locks; single `pid_is_alive` + cmdline profile identity before kill; remove TypeError spawn kwargs fallback; always-await CDP attach
+- [2026-07-16] Thermos D16: `default_github_repo_slug` parses SCP `git@host:owner/repo.git`; `log_query` pattern paging uses match-set `offset_from_tail`; `process` restores typed `ProcessAction` / `ProcessActionInput`
 - [2026-07-16] Mark intentional fixed-argv `gh` subprocess calls in `github_manager` with Bandit `# nosec` so the W5/W6 CLI create/view path passes `make security`
 - [2026-07-16] On classifier timeout, the queue relatedness path treats the message as its own turn (`new_task`) instead of merging it into an unrelated in-flight task via `related_steer`
 - [2026-07-16] Skill registry and `load_skill` share one source of truth: `list_registry` advertises only non-quarantined skills from the live `SkillsManager` scan (no unloadable `DEFAULT_SKILL_MANIFESTS` stubs), and skills whose manifests fail to parse are flagged `quarantine:true` so listed skills never return `SKILL_NOT_FOUND`

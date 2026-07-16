@@ -106,7 +106,10 @@ def test_d13_issue_watch_emits_only_diff(tmp_path: Path, monkeypatch: pytest.Mon
     }
 
     mod = _load_script("issue_watch.py")
-    with patch.object(mod, "fetch_issue_state", return_value=current, create=True):
+    with patch(
+        "sevn.integrations.github_skill.watch.fetch_issue_state",
+        return_value=current,
+    ):
         result = mod.watch_issue(workspace, "sevn-bot/sevn", 21)  # type: ignore[attr-defined]
 
     assert isinstance(result, dict)
@@ -129,7 +132,10 @@ def test_d13_issue_watch_emits_only_diff(tmp_path: Path, monkeypatch: pytest.Mon
         ),
         encoding="utf-8",
     )
-    with patch.object(mod, "fetch_issue_state", return_value=current, create=True):
+    with patch(
+        "sevn.integrations.github_skill.watch.fetch_issue_state",
+        return_value=current,
+    ):
         again = mod.watch_issue(workspace, "sevn-bot/sevn", 21)  # type: ignore[attr-defined]
     again_changes = again.get("changes") if isinstance(again, dict) else again
     assert again_changes in (None, {}, [], {"changes": []}) or again.get("changed") is False
@@ -181,6 +187,6 @@ def test_d13_cron_scope_registered_and_notifies_on_diff() -> None:
         message_calls.append((_a, _k))
         return '{"ok":true}'
 
-    with patch("sevn.tools.message.message_tool", _fake_message):
+    with patch("sevn.triggers.operator_notify.deliver_operator_notify", _fake_message):
         notify(diffs=[{"repo": "sevn-bot/sevn", "number": 21, "changes": {"new_comment": "hi"}}])
-    assert message_calls, "on diff, cron must call the message tool"
+    assert message_calls, "on diff, cron must deliver operator notify"

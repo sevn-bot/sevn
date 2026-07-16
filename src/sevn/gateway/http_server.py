@@ -1305,6 +1305,37 @@ def create_app(
         app.state.plugin_hook_chain = plugin_chain
         app.state.triggers_cron_store = SqliteCronStore(conn)
         await asyncio.to_thread(run_cron_reconciles, conn, ws)
+
+        # D13: wire real operator notify for issue-watch cron (Telegram to owner).
+        from sevn.gateway.channel_router import OutgoingMessage
+        from sevn.triggers.operator_notify import set_operator_notify
+
+        owner_tg = resolve_owner_telegram_user_id(ws)
+        loop = asyncio.get_running_loop()
+
+        def _operator_notify_sink(text: str) -> None:
+            if not owner_tg or not text.strip():
+                return
+            dest = owner_tg
+            session_id = f"telegram:{dest}:general"
+
+            async def _send() -> None:
+                try:
+                    await gateway_router.route_outgoing(
+                        OutgoingMessage(
+                            channel="telegram",
+                            user_id=dest,
+                            text=text.strip(),
+                            session_id=session_id,
+                            metadata={"source": "operator_notify"},
+                        ),
+                    )
+                except Exception:
+                    logger.exception("operator_notify_route_outgoing_failed")
+
+            loop.call_soon_threadsafe(lambda: asyncio.create_task(_send()))
+
+        set_operator_notify(_operator_notify_sink)
         app.state.memory_job_lock = asyncio.Lock()
         app.state.dreaming_engine = DreamingEngine(
             conn, trace, app.state.memory_job_lock, transport=None
@@ -1554,6 +1585,9 @@ def create_app(
         cron_task.cancel()
         with suppress(asyncio.CancelledError):
             await cron_task
+        from sevn.triggers.operator_notify import set_operator_notify
+
+        set_operator_notify(None)
         await gateway_router.stop_all()
         trigger_gate = getattr(app.state, "trigger_dispatch_gate", None)
         if isinstance(trigger_gate, TriggerDispatchGate):

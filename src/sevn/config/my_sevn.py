@@ -10,6 +10,7 @@ Exports:
     effective_my_sevn_pipelines — resolve typed ``my_sevn.pipelines`` with defaults.
     effective_my_sevn_sync — resolve typed ``my_sevn.sync`` with defaults.
     default_github_repo_slug — ``owner/repo`` from ``my_sevn.repo_url`` (no ``git remote``).
+    resolve_github_repo_slug — explicit arg or ``my_sevn.repo_url`` (shared by gh scripts).
     resolve_my_sevn_repo_path — checkout path from ``my_sevn.repo_path`` in ``sevn.json``.
     persist_my_sevn_repo_path — record a resolved checkout into ``my_sevn.repo_path``.
 """
@@ -204,6 +205,9 @@ def default_github_repo_slug(ws: WorkspaceConfig) -> str:
     Tools and gh-issue scripts must use this (or the equivalent config field)
     instead of ``git remote`` against the read-only ``source_code/`` mirror.
 
+    Accepts HTTPS (``https://github.com/owner/repo``), SCP
+    (``git@host:owner/repo.git``), and bare ``owner/repo`` forms.
+
     Args:
         ws (WorkspaceConfig): Parsed workspace root model.
 
@@ -216,6 +220,11 @@ def default_github_repo_slug(ws: WorkspaceConfig) -> str:
     Examples:
         >>> default_github_repo_slug(WorkspaceConfig.minimal())
         'sevn-bot/sevn'
+        >>> from sevn.config.sections.evolution import MySevnWorkspaceConfig
+        >>> ws = WorkspaceConfig.minimal()
+        >>> ws.my_sevn = MySevnWorkspaceConfig(repo_url="git@github.com:acme/app.git")
+        >>> default_github_repo_slug(ws)
+        'acme/app'
     """
     raw = (effective_my_sevn(ws).repo_url or "").strip()
     if not raw:
@@ -223,7 +232,10 @@ def default_github_repo_slug(ws: WorkspaceConfig) -> str:
         raise ValueError(msg)
     # Keep this helper free of integrations/tools imports (lint-imports contracts).
     lowered = raw.lower()
-    if "github.com/" in lowered:
+    # SCP-style: git@host:owner/repo(.git) — colon separates host from path.
+    if "@" in raw and "://" not in raw and ":" in raw.split("@", 1)[-1]:
+        tail = raw.rsplit(":", 1)[-1]
+    elif "github.com/" in lowered:
         tail = raw[lowered.index("github.com/") + len("github.com/") :]
     else:
         tail = raw
@@ -237,6 +249,51 @@ def default_github_repo_slug(ws: WorkspaceConfig) -> str:
     return f"{owner}/{repo}"
 
 
+def resolve_github_repo_slug(
+    explicit: str | None = None,
+    *,
+    workspace: Path | None = None,
+    ws: WorkspaceConfig | None = None,
+) -> str:
+    """Return ``owner/repo`` from an explicit arg or ``my_sevn.repo_url``.
+
+    Shared by gh-issues scripts so each does not duplicate slug resolution.
+
+    Args:
+        explicit (str | None, optional): Explicit ``owner/repo`` when provided.
+        workspace (Path | None, optional): Workspace root (loads ``sevn.json``).
+        ws (WorkspaceConfig | None, optional): Pre-loaded config (skips disk load).
+
+    Returns:
+        str: GitHub ``owner/repo`` slug.
+
+    Raises:
+        ValueError: When neither explicit nor config yields a parseable slug.
+
+    Examples:
+        >>> resolve_github_repo_slug("acme/app")
+        'acme/app'
+        >>> resolve_github_repo_slug(ws=WorkspaceConfig.minimal())
+        'sevn-bot/sevn'
+    """
+    if explicit and explicit.strip():
+        return explicit.strip()
+    if ws is not None:
+        return default_github_repo_slug(ws)
+    if workspace is not None:
+        from sevn.config.loader import load_workspace
+
+        cfg, _layout = load_workspace(sevn_json=workspace / "sevn.json")
+        return default_github_repo_slug(cfg)
+    from sevn.lcm.script_cli import workspace_from_env
+
+    root = workspace_from_env()
+    from sevn.config.loader import load_workspace
+
+    cfg, _layout = load_workspace(sevn_json=root / "sevn.json")
+    return default_github_repo_slug(cfg)
+
+
 __all__ = [
     "default_github_repo_slug",
     "effective_my_sevn",
@@ -245,5 +302,6 @@ __all__ = [
     "effective_my_sevn_pipelines",
     "effective_my_sevn_sync",
     "persist_my_sevn_repo_path",
+    "resolve_github_repo_slug",
     "resolve_my_sevn_repo_path",
 ]

@@ -802,12 +802,8 @@ class SessionManager:
                         "in-flight task instead."
                     )
                 else:
+                    # related_steer (classifier never returns timeout+steer after D15)
                     effective_mode = "steer"
-                    if classifier_fallback:
-                        notice_line = (
-                            "Queue classifier timed out — steering this message into "
-                            "the in-flight task instead."
-                        )
         q = self._queues.setdefault(session_id, asyncio.Queue())
         lock = self._enqueue_lock(session_id)
         async with lock:

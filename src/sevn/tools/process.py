@@ -40,7 +40,8 @@ from sevn.tools.paths import resolve_workspace_relative_path
 if TYPE_CHECKING:
     from sevn.tools.base import ToolExecutor
 
-ProcessAction = Literal["start", "stop", "list", "output", "read"]
+ProcessAction = Literal["start", "stop", "list", "output"]
+ProcessActionInput = Literal["start", "stop", "list", "output", "read"]
 JobStatus = Literal["running", "completed", "stopped", "failed"]
 
 DEFAULT_OUTPUT_TAIL_LINES: Final[int] = 200
@@ -49,7 +50,7 @@ MAX_CAPTURE_CHARS: Final[int] = 256_000
 
 # Model-facing aliases mapped before dispatch (D8). ``run`` stays unknown so
 # ``did_you_mean`` can offer start|output — it is ambiguous between them.
-_ACTION_ALIASES: Final[dict[str, str]] = {"read": "output"}
+_ACTION_ALIASES: Final[dict[str, ProcessAction]] = {"read": "output"}
 
 _PROCESS_TOOLS: tuple[Any, ...] = ()
 _jobs_by_session: dict[str, dict[str, BackgroundJob]] = {}
@@ -566,7 +567,7 @@ def _unknown_action_failure(
 async def process_tool(
     ctx: ToolContext,
     *,
-    action: str,
+    action: ProcessActionInput,
     command: str | None = None,
     argv: list[str] | None = None,
     cwd: str | None = None,
@@ -654,6 +655,8 @@ def register_process_tools(executor: ToolExecutor) -> None:
 
 
 __all__ = [
+    "ProcessAction",
+    "ProcessActionInput",
     "list_session_jobs",
     "process_tool",
     "register_process_tools",

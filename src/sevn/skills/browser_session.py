@@ -31,6 +31,7 @@ Exports:
     merge_browser_proc_env — inject content root, profile, CDP env for skill runs.
     pick_work_page — choose a tab; prefer registry ``active_target_id``.
     pid_is_alive — return whether a process id responds to ``signal 0``.
+    pid_matches_sevn_chrome_profile — cmdline identity check before SIGTERM (convention 11).
     read_devtools_active_port — read Chrome ``DevToolsActivePort`` line 1 (optional freshness).
     read_registry — load registry JSON for a session.
     registry_path — path to ``.sevn/browser-sessions/<session_id>.json``.
@@ -1051,6 +1052,81 @@ def pid_is_alive(pid: int) -> bool:
     except OSError:
         return False
     return True
+
+
+def _read_pid_cmdline(pid: int) -> str:
+    """Best-effort process command line for ``pid`` (Linux ``/proc`` or ``ps``).
+
+    Args:
+        pid (int): Operating-system process id.
+
+    Returns:
+        str: Command line text, or empty when unreadable.
+
+    Examples:
+        >>> _read_pid_cmdline(0)
+        ''
+    """
+    if pid <= 0:
+        return ""
+    proc_cmdline = Path(f"/proc/{pid}/cmdline")
+    if proc_cmdline.is_file():
+        try:
+            return (
+                proc_cmdline.read_bytes()
+                .replace(b"\x00", b" ")
+                .decode(
+                    "utf-8",
+                    errors="replace",
+                )
+            )
+        except OSError:
+            return ""
+    try:
+        completed = subprocess.run(  # nosec B603 B607 — fixed argv, no shell
+            ["ps", "-p", str(pid), "-o", "args="],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=2,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    if completed.returncode != 0:
+        return ""
+    return (completed.stdout or "").strip()
+
+
+def pid_matches_sevn_chrome_profile(pid: int, profile_dir: Path) -> bool:
+    """Return whether ``pid`` still looks like Chrome for ``profile_dir`` (convention 11).
+
+    Fail closed: when the cmdline cannot be read, returns ``False`` so we never
+    SIGTERM/SIGKILL an unverified PID (operator Chrome / PID reuse).
+
+    Args:
+        pid (int): Candidate process id from the session registry.
+        profile_dir (Path): Expected ``--user-data-dir`` for this session.
+
+    Returns:
+        bool: ``True`` when cmdline mentions Chrome/Chromium and this profile path.
+
+    Examples:
+        >>> pid_matches_sevn_chrome_profile(0, Path("/tmp/p"))
+        False
+    """
+    if pid <= 0:
+        return False
+    try:
+        needle = str(profile_dir.expanduser().resolve())
+    except OSError:
+        needle = str(profile_dir)
+    cmdline = _read_pid_cmdline(pid)
+    if not cmdline:
+        return False
+    lowered = cmdline.lower()
+    if "chrome" not in lowered and "chromium" not in lowered:
+        return False
+    return needle in cmdline or f"--user-data-dir={needle}" in cmdline
 
 
 def read_devtools_active_port(
@@ -2527,6 +2603,7 @@ __all__ = [
     "persist_active_target_id",
     "pick_work_page",
     "pid_is_alive",
+    "pid_matches_sevn_chrome_profile",
     "read_devtools_active_port",
     "read_registry",
     "registry_path",

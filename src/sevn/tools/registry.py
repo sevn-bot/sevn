@@ -1203,34 +1203,6 @@ def _skill_descriptions_from_index_lines(lines: dict[str, str]) -> dict[str, str
     return out
 
 
-def _skill_descriptions_from_manager(skills_manager: SkillsManager) -> dict[str, str]:
-    """Build ``list_registry`` / Triager skill rows from the live manager (D14 SSOT).
-
-    Only non-quarantined skills are advertised so ``load_skill`` on any listed name
-    never returns ``SKILL_NOT_FOUND``. Packaged ``DEFAULT_SKILL_MANIFESTS`` stubs are
-    not merged in — gated or unloadable skills must not appear as available.
-
-    Args:
-        skills_manager (SkillsManager): Session-scoped skills scan singleton.
-
-    Returns:
-        dict[str, str]: Advertised skill id → one-line summary.
-
-    Examples:
-        >>> from pathlib import Path
-        >>> from sevn.skills.manager import SkillsManager
-        >>> SkillsManager.reset_singletons_for_tests()
-        >>> root = Path("/tmp/sevn-skill-desc-ssot-doctest")
-        >>> root.mkdir(parents=True, exist_ok=True)
-        >>> (root / "skills").mkdir(exist_ok=True)
-        >>> mgr = SkillsManager.shared(root, (root / "skills",))
-        >>> isinstance(_skill_descriptions_from_manager(mgr), dict)
-        True
-        >>> SkillsManager.reset_singletons_for_tests()
-    """
-    return skills_manager.advertised_skill_descriptions()
-
-
 def combine_registry_version(base: int, skills_manager: SkillsManager) -> int:
     """Combine tools-base ``registry_version`` with live skills generation state.
 
@@ -1681,7 +1653,7 @@ def build_session_registry(
     if mgr is not None:
         # D14: advertise only loadable (non-quarantined) skills from the live scan —
         # never merge DEFAULT_SKILL_MANIFESTS stubs that ``load_skill`` cannot resolve.
-        merged_skills = _skill_descriptions_from_manager(mgr)
+        merged_skills = mgr.advertised_skill_descriptions()
         if skill_overrides:
             for key, value in skill_overrides.items():
                 if key in merged_skills:

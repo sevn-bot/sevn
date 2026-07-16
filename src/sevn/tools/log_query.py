@@ -907,15 +907,25 @@ def _query_from_line(
         >>> res.line_numbers
         [2, 3]
     """
-    end_line = start_line + limit - 1
     selected: list[tuple[int, str]] = []
-    for line_no, line in enumerate(physical, start=1):
-        if line_no < start_line:
-            continue
-        if line_no > end_line:
-            break
-        if _line_matches(pattern, line):
+    if pattern is None:
+        end_line = start_line + limit - 1
+        for line_no, line in enumerate(physical, start=1):
+            if line_no < start_line:
+                continue
+            if line_no > end_line:
+                break
             selected.append((line_no, line))
+    else:
+        # Match-set paging: collect matches from start_line forward, then take
+        # up to ``limit`` matches (not a file-line window of size ``limit``).
+        for line_no, line in enumerate(physical, start=1):
+            if line_no < start_line:
+                continue
+            if _line_matches(pattern, line):
+                selected.append((line_no, line))
+                if len(selected) >= limit:
+                    break
     line_numbers = [no for no, _ in selected]
     redacted = [redact_log_line(line) for _, line in selected]
     return LogQueryResult(
@@ -1530,17 +1540,26 @@ async def log_query_tool(
     lines_out = result.lines
     numbers_out = result.line_numbers
     has_more = False
-    if has_pattern and full_lines_bytes > LOG_QUERY_INLINE_MAX_BYTES:
-        # Page matching lines under the inline budget (file-tool cursor idiom) rather than
-        # spilling or collapsing to SUMMARY_INLINE_MAX_LINES.
+    next_offset: int | None = None
+    if has_pattern:
+        # Match-set cursor: offset_from_tail counts matching lines, not file lines.
+        # Fit keeps the newest matches under the inline budget; page older matches
+        # by advancing that match offset. Also signal when the query hit ``lines``.
         page_cap = max(effective_lines, SUMMARY_INLINE_MAX_LINES + 1)
-        lines_out, numbers_out = _fit_inline_lines(
-            result.lines,
-            result.line_numbers,
-            max_lines=page_cap,
-            max_bytes=LOG_QUERY_INLINE_MAX_BYTES,
-        )
-        has_more = len(lines_out) < len(result.lines)
+        if full_lines_bytes > LOG_QUERY_INLINE_MAX_BYTES:
+            lines_out, numbers_out = _fit_inline_lines(
+                result.lines,
+                result.line_numbers,
+                max_lines=page_cap,
+                max_bytes=LOG_QUERY_INLINE_MAX_BYTES,
+            )
+        shown = len(lines_out)
+        truncated_fit = shown < len(result.lines)
+        hit_line_cap = len(result.lines) >= effective_lines
+        if truncated_fit or hit_line_cap:
+            has_more = True
+            # Skip the newest ``shown`` matches already returned (fit keeps the tail).
+            next_offset = effective_offset + shown
     payload: dict[str, Any] = {
         "path": rel_path,
         "file": file,
@@ -1555,13 +1574,13 @@ async def log_query_tool(
         "starting_reading_line": starting_reading_line,
         "ranges": ranges,
     }
-    if has_more:
+    if has_more and next_offset is not None:
         payload["has_more"] = True
-        payload["next_offset_from_tail"] = effective_offset + len(lines_out)
+        payload["next_offset_from_tail"] = next_offset
         payload["summary_notice"] = (
-            f"Paged matching lines: showing {len(lines_out)} of {len(result.lines)} match(es) "
-            "inline. Call again with `offset_from_tail="
-            f"{effective_offset + len(lines_out)}` to page older matches."
+            f"Paged matching lines: showing {len(lines_out)} match(es) inline "
+            f"(match-set offset {effective_offset}). Call again with "
+            f"`offset_from_tail={next_offset}` to page older matches."
         )
     return enveloped_success(payload)
 

@@ -5,7 +5,6 @@ Depends: gc, multiprocessing.synchronize (stdlib)
 
 Exports:
     release_leaked_multiprocessing_semaphores — unlink and unregister named semaphores.
-    reap_sevn_browsers_on_shutdown — terminate sevn-spawned Chrome on gateway stop (D6).
 """
 
 from __future__ import annotations
@@ -13,7 +12,6 @@ from __future__ import annotations
 import contextlib
 import gc
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any, cast
 
 from loguru import logger
@@ -110,31 +108,6 @@ def release_leaked_multiprocessing_semaphores() -> None:
         )
 
 
-def reap_sevn_browsers_on_shutdown(content_root: Path) -> list[int]:
-    """Terminate sevn-spawned Chrome processes at gateway shutdown (D6).
-
-    Thin re-export of :func:`sevn.browser.lifecycle.reap_sevn_browsers_on_shutdown`
-    so gateway shutdown helpers stay discoverable from this module.
-
-    Args:
-        content_root (Path): Workspace content root.
-
-    Returns:
-        list[int]: PIDs processed from sevn-spawned registry rows.
-
-    Examples:
-        >>> import tempfile
-        >>> reap_sevn_browsers_on_shutdown(Path(tempfile.mkdtemp()))
-        []
-    """
-    from sevn.browser.lifecycle import (
-        reap_sevn_browsers_on_shutdown as _reap,
-    )
-
-    return _reap(content_root)
-
-
 __all__ = [
-    "reap_sevn_browsers_on_shutdown",
     "release_leaked_multiprocessing_semaphores",
 ]

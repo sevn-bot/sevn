@@ -6,7 +6,9 @@ Depends: json, re, subprocess, sevn.integrations.github_skill.client,
 
 Exports:
     GhCliMissingError — raised when the ``gh`` binary is not on PATH.
-    map_gh_issue_create_error — map ``gh`` stderr to a precise operator message.
+    map_gh_cli_error — map ``gh`` stderr to a precise operator message.
+    map_gh_issue_create_error — alias of :func:`map_gh_cli_error` (compat).
+    run_gh — run a fixed ``gh`` argv and return ``CompletedProcess``.
     create_issue_via_gh — create an issue via authenticated ``gh issue create``.
     view_issue_via_gh — view an issue via authenticated ``gh issue view --json``.
     list_branches — list repository branches.
@@ -50,26 +52,28 @@ class GhCliMissingError(RuntimeError):
     """Raised when the ``gh`` binary is absent from ``PATH``."""
 
 
-def map_gh_issue_create_error(
+def map_gh_cli_error(
     stderr: str,
     *,
     repo: str,
     labels: list[str] | None = None,
 ) -> str:
-    """Map ``gh issue create`` stderr to a precise, non-proxy error string.
+    """Map ``gh`` CLI stderr to a precise, non-proxy error string.
+
+    Neutral helper shared by create/view (and other) ``gh`` call sites.
 
     Args:
         stderr (str): Combined stderr (and optionally stdout) from ``gh``.
-        repo (str): ``owner/repo`` slug used in the create call.
+        repo (str): ``owner/repo`` slug used in the call.
         labels (list[str] | None, optional): Labels passed to ``gh`` (for mapping).
 
     Returns:
         str: Operator-facing error that never reads as bare ``proxy status 404``.
 
     Examples:
-        >>> map_gh_issue_create_error("please run: gh auth login", repo="o/r")
+        >>> map_gh_cli_error("please run: gh auth login", repo="o/r")
         'gh not authenticated (run: gh auth login)'
-        >>> map_gh_issue_create_error("could not resolve to a Repository", repo="o/r")
+        >>> map_gh_cli_error("could not resolve to a Repository", repo="o/r")
         'repository not found: o/r'
     """
     text = (stderr or "").strip()
@@ -103,7 +107,57 @@ def map_gh_issue_create_error(
         return "label does not exist: (unknown)"
     if "proxy status" in lowered:
         return f"repository not found: {repo}"
-    return text or f"gh issue create failed for {repo}"
+    return text or f"gh command failed for {repo}"
+
+
+def map_gh_issue_create_error(
+    stderr: str,
+    *,
+    repo: str,
+    labels: list[str] | None = None,
+) -> str:
+    """Alias of :func:`map_gh_cli_error` (create-path compatibility).
+
+    Args:
+        stderr (str): Combined stderr from ``gh``.
+        repo (str): ``owner/repo`` slug.
+        labels (list[str] | None, optional): Labels for mapping.
+
+    Returns:
+        str: Operator-facing error string.
+
+    Examples:
+        >>> map_gh_issue_create_error("please run: gh auth login", repo="o/r")
+        'gh not authenticated (run: gh auth login)'
+    """
+    return map_gh_cli_error(stderr, repo=repo, labels=labels)
+
+
+def run_gh(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+    """Run a fixed ``gh`` argv (no shell) and return the completed process.
+
+    Args:
+        cmd (list[str]): Argv beginning with ``gh``.
+
+    Returns:
+        subprocess.CompletedProcess[str]: Captured stdout/stderr result.
+
+    Raises:
+        GhCliMissingError: When ``gh`` is not installed / not on ``PATH``.
+
+    Examples:
+        >>> isinstance(GhCliMissingError("missing"), RuntimeError)
+        True
+    """
+    try:
+        return subprocess.run(  # nosec B603 — fixed ``gh`` argv; no shell
+            cmd,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise GhCliMissingError("gh binary not found on PATH") from exc
 
 
 def create_issue_via_gh(
@@ -150,17 +204,9 @@ def create_issue_via_gh(
         cmd.extend(["--label", label])
     for assignee in assignees or []:
         cmd.extend(["--assignee", assignee])
-    try:
-        completed = subprocess.run(  # nosec B603 — fixed ``gh`` argv; no shell
-            cmd,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except FileNotFoundError as exc:
-        raise GhCliMissingError("gh binary not found on PATH") from exc
+    completed = run_gh(cmd)
     if completed.returncode != 0:
-        detail = map_gh_issue_create_error(
+        detail = map_gh_cli_error(
             (completed.stderr or "") + "\n" + (completed.stdout or ""),
             repo=repo,
             labels=labels,
@@ -216,17 +262,9 @@ def view_issue_via_gh(repo: str, issue_number: int) -> dict[str, Any]:
         "--json",
         _ISSUE_VIEW_JSON_FIELDS,
     ]
-    try:
-        completed = subprocess.run(  # nosec B603 — fixed ``gh`` argv; no shell
-            cmd,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except FileNotFoundError as exc:
-        raise GhCliMissingError("gh binary not found on PATH") from exc
+    completed = run_gh(cmd)
     if completed.returncode != 0:
-        detail = map_gh_issue_create_error(
+        detail = map_gh_cli_error(
             (completed.stderr or "") + "\n" + (completed.stdout or ""),
             repo=repo,
         )

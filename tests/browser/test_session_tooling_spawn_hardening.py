@@ -69,9 +69,14 @@ async def test_d1_reap_clears_locks_for_sevn_pid_only(
     def _pid_alive(pid: int) -> bool:
         return pid == foreign_pid
 
+    def _pid_match(pid: int, _profile: Path) -> bool:
+        return pid == sevn_pid
+
     for mod in (bs, lifecycle):
         if hasattr(mod, "pid_is_alive"):
             monkeypatch.setattr(mod, "pid_is_alive", _pid_alive)
+        if hasattr(mod, "pid_matches_sevn_chrome_profile"):
+            monkeypatch.setattr(mod, "pid_matches_sevn_chrome_profile", _pid_match)
 
     spawn_calls: list[Path] = []
 
@@ -81,7 +86,10 @@ async def test_d1_reap_clears_locks_for_sevn_pid_only(
         headless: bool = False,
         seed_port: int | None = None,
         cfg: object = None,
+        session_id: str | None = None,
+        log_dir: Path | None = None,
     ) -> tuple[MagicMock, int, str]:
+        _ = (session_id, log_dir)
         spawn_calls.append(profile)
         proc = MagicMock()
         proc.pid = 999001
@@ -90,10 +98,14 @@ async def test_d1_reap_clears_locks_for_sevn_pid_only(
 
     monkeypatch.setattr(bs, "spawn_chrome", _fake_spawn)
     monkeypatch.setattr(bs, "cdp_reachable", lambda _url: True)
+
+    async def _attach(cls, url: str) -> MagicMock:
+        return MagicMock(cdp_url=url)
+
     monkeypatch.setattr(
         lifecycle.CDPBrowserSession,
         "attach",
-        classmethod(lambda cls, url: MagicMock(cdp_url=url)),
+        classmethod(_attach),
     )
 
     await lifecycle.spawn_or_attach(content_root, session_id)
@@ -222,11 +234,11 @@ def test_d4_spawn_chrome_redirects_stderr_to_session_log(
         bs.spawn_chrome(
             profile_dir,
             headless=True,
-            session_id=session_id,  # type: ignore[call-arg]
-            log_dir=logs,  # type: ignore[call-arg]
+            session_id=session_id,
+            log_dir=logs,
         )
     except TypeError:
-        bs.spawn_chrome(profile_dir, headless=True)
+        raise AssertionError("spawn_chrome must accept session_id and log_dir") from None
 
     stderr = captured.get("stderr")
     assert stderr is not None
