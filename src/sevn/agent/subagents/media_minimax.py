@@ -36,6 +36,8 @@ MINIMAX_MEDIA_BASE_URL = "https://api.minimax.io/v1"
 DEFAULT_IMAGE_MODEL = "image-01"
 DEFAULT_VIDEO_MODEL = "MiniMax-Hailuo-2.3"
 DEFAULT_VIDEO_I2V_MODEL = "MiniMax-Hailuo-2.3"
+DEFAULT_VIDEO_S2V_MODEL = "S2V-01"
+DEFAULT_VIDEO_FL2V_MODEL = "MiniMax-Hailuo-02"
 DEFAULT_MUSIC_MODEL = "music-2.6"
 DEFAULT_SPEECH_MODEL = "speech-2.8-hd"
 
@@ -271,6 +273,164 @@ async def generate_image_bytes(
     return base64.b64decode(first.encode("ascii"))
 
 
+async def generate_image_from_reference_bytes(
+    api_key: str,
+    prompt: str,
+    reference_image: str,
+    *,
+    model: str = DEFAULT_IMAGE_MODEL,
+    aspect_ratio: str = "1:1",
+    content_root: Path | None = None,
+    client: httpx.AsyncClient | None = None,
+) -> bytes:
+    """Generate image from reference portrait via image-to-image API.
+
+    Args:
+        api_key (str): Resolved MiniMax API key.
+        prompt (str): Template-augmented transformation prompt.
+        reference_image (str): Reference portrait URL or workspace path.
+        model (str, optional): Image model. Defaults to ``image-01``.
+        aspect_ratio (str, optional): Aspect ratio.
+        content_root (Path | None, optional): Workspace root for relative paths.
+        client (httpx.AsyncClient | None, optional): Injectable client for tests.
+
+    Returns:
+        bytes: Decoded JPEG bytes.
+
+    Raises:
+        MiniMaxMediaError: On transport or API failure.
+    """
+    body = {
+        "model": model,
+        "prompt": prompt.strip(),
+        "aspect_ratio": aspect_ratio,
+        "response_format": "base64",
+        "subject_reference": [
+            {
+                "type": "character",
+                "image_file": _resolve_image_ref(reference_image, content_root=content_root),
+            },
+        ],
+    }
+    owns = client is None
+    http = client or httpx.AsyncClient(timeout=_DEFAULT_HTTP_TIMEOUT_S)
+    try:
+        response = await http.post(
+            f"{MINIMAX_MEDIA_BASE_URL}/image_generation",
+            headers=_auth_headers(api_key),
+            json=body,
+        )
+        payload = _raise_for_status_payload(response, context="image_generation_i2i")
+    finally:
+        if owns:
+            await http.aclose()
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        raise MiniMaxMediaError("image_generation_i2i: missing data object")
+    images = data.get("image_base64")
+    if not isinstance(images, list) or not images:
+        raise MiniMaxMediaError("image_generation_i2i: missing image_base64")
+    first = images[0]
+    if not isinstance(first, str):
+        raise MiniMaxMediaError("image_generation_i2i: invalid image_base64 entry")
+    return base64.b64decode(first.encode("ascii"))
+
+
+async def _create_and_download_video(
+    http: httpx.AsyncClient,
+    api_key: str,
+    body: dict[str, Any],
+    *,
+    poll_interval_s: float,
+    max_polls: int,
+) -> bytes:
+    """POST video_generation, poll, and download MP4 bytes."""
+    response = await http.post(
+        f"{MINIMAX_MEDIA_BASE_URL}/video_generation",
+        headers=_auth_headers(api_key),
+        json=body,
+    )
+    payload = _raise_for_status_payload(response, context="video_generation")
+    task_id = payload.get("task_id")
+    if not isinstance(task_id, str) or not task_id.strip():
+        raise MiniMaxMediaError("video_generation: missing task_id")
+    file_id = await _poll_video_file_id(
+        http,
+        api_key,
+        task_id.strip(),
+        poll_interval_s=poll_interval_s,
+        max_polls=max_polls,
+    )
+    return await _download_minimax_file(http, api_key, file_id)
+
+
+async def generate_video_subject_reference_bytes(
+    api_key: str,
+    prompt: str,
+    subject_reference: str,
+    *,
+    model: str = DEFAULT_VIDEO_S2V_MODEL,
+    content_root: Path | None = None,
+    poll_interval_s: float = _DEFAULT_VIDEO_POLL_INTERVAL_S,
+    max_polls: int = _DEFAULT_VIDEO_MAX_POLLS,
+    client: httpx.AsyncClient | None = None,
+) -> bytes:
+    """Subject-reference video (face-consistent character clip)."""
+    body: dict[str, Any] = {
+        "model": model,
+        "prompt": prompt.strip(),
+        "subject_reference": [
+            {
+                "type": "character",
+                "image": [_resolve_image_ref(subject_reference, content_root=content_root)],
+            },
+        ],
+    }
+    owns = client is None
+    http = client or httpx.AsyncClient(timeout=_DEFAULT_HTTP_TIMEOUT_S)
+    try:
+        return await _create_and_download_video(
+            http, api_key, body, poll_interval_s=poll_interval_s, max_polls=max_polls,
+        )
+    finally:
+        if owns:
+            await http.aclose()
+
+
+async def generate_video_first_last_frame_bytes(
+    api_key: str,
+    prompt: str,
+    *,
+    first_frame_image: str,
+    last_frame_image: str,
+    model: str = DEFAULT_VIDEO_FL2V_MODEL,
+    duration: int = 6,
+    resolution: str = "1080P",
+    content_root: Path | None = None,
+    poll_interval_s: float = _DEFAULT_VIDEO_POLL_INTERVAL_S,
+    max_polls: int = _DEFAULT_VIDEO_MAX_POLLS,
+    client: httpx.AsyncClient | None = None,
+) -> bytes:
+    """First-and-last-frame video interpolation (MiniMax-Hailuo-02)."""
+    body: dict[str, Any] = {
+        "model": model,
+        "prompt": prompt.strip(),
+        "first_frame_image": _resolve_image_ref(first_frame_image, content_root=content_root),
+        "last_frame_image": _resolve_image_ref(last_frame_image, content_root=content_root),
+        "duration": duration,
+        "resolution": resolution,
+    }
+    owns = client is None
+    http = client or httpx.AsyncClient(timeout=_DEFAULT_HTTP_TIMEOUT_S)
+    try:
+        return await _create_and_download_video(
+            http, api_key, body, poll_interval_s=poll_interval_s, max_polls=max_polls,
+        )
+    finally:
+        if owns:
+            await http.aclose()
+
+
 async def _poll_video_file_id(
     http: httpx.AsyncClient,
     api_key: str,
@@ -482,23 +642,13 @@ async def generate_video_bytes(
     owns = client is None
     http = client or httpx.AsyncClient(timeout=_DEFAULT_HTTP_TIMEOUT_S)
     try:
-        response = await http.post(
-            f"{MINIMAX_MEDIA_BASE_URL}/video_generation",
-            headers=_auth_headers(api_key),
-            json=body,
-        )
-        payload = _raise_for_status_payload(response, context="video_generation")
-        task_id = payload.get("task_id")
-        if not isinstance(task_id, str) or not task_id.strip():
-            raise MiniMaxMediaError("video_generation: missing task_id")
-        file_id = await _poll_video_file_id(
+        return await _create_and_download_video(
             http,
             api_key,
-            task_id.strip(),
+            body,
             poll_interval_s=poll_interval_s,
             max_polls=max_polls,
         )
-        return await _download_minimax_file(http, api_key, file_id)
     finally:
         if owns:
             await http.aclose()
@@ -857,15 +1007,20 @@ __all__ = [
     "DEFAULT_IMAGE_MODEL",
     "DEFAULT_MUSIC_MODEL",
     "DEFAULT_SPEECH_MODEL",
+    "DEFAULT_VIDEO_FL2V_MODEL",
     "DEFAULT_VIDEO_I2V_MODEL",
     "DEFAULT_VIDEO_MODEL",
+    "DEFAULT_VIDEO_S2V_MODEL",
     "MINIMAX_MEDIA_BASE_URL",
     "MiniMaxMediaError",
     "clone_voice_bytes",
     "generate_image_bytes",
+    "generate_image_from_reference_bytes",
     "generate_music_bytes",
     "generate_video_bytes",
+    "generate_video_first_last_frame_bytes",
     "generate_video_from_image_bytes",
+    "generate_video_subject_reference_bytes",
     "generate_video_template_bytes",
     "synthesize_speech_bytes",
     "upload_file_bytes",
