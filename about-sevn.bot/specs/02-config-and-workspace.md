@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Provide a single, testable configuration surface before storage, tracing,
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
-last_updated: '2026-07-15'
-fingerprint: sha256:fba831861a4e62636bcafb6ef57e3ab15bc6624b6180f49f3b96fba3c6b82d12
+last_updated: '2026-07-16'
+fingerprint: sha256:8989bd0872e617f32bff16f9706148748397e6f80d589b57b10b52dea4ed48a9
 related: []
 sources:
 - src/sevn/config/**
@@ -269,6 +269,9 @@ interfaces:
 - name: complexity_clamp_short_word_limit
   file: src/sevn/config/sections/accessors.py
   symbol: complexity_clamp_short_word_limit
+- name: google_workspace_settings
+  file: src/sevn/config/sections/accessors.py
+  symbol: google_workspace_settings
 - name: rlm_json_dict
   file: src/sevn/config/sections/accessors.py
   symbol: rlm_json_dict
@@ -638,6 +641,12 @@ interfaces:
 - name: SelfImproveWorkspaceConfig
   file: src/sevn/config/sections/self_improve.py
   symbol: SelfImproveWorkspaceConfig
+- name: GoogleWorkspaceSkillConfig
+  file: src/sevn/config/sections/skills_google_workspace.py
+  symbol: GoogleWorkspaceSkillConfig
+- name: google_workspace_settings
+  file: src/sevn/config/sections/skills_google_workspace.py
+  symbol: google_workspace_settings
 - name: PlatformMediumConfig
   file: src/sevn/config/sections/skills_social_media.py
   symbol: PlatformMediumConfig

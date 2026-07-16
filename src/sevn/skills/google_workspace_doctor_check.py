@@ -14,7 +14,12 @@ from pathlib import Path
 from loguru import logger
 
 from sevn.config.workspace_config import WorkspaceConfig, google_workspace_settings
-from sevn.skills.google_workspace import REQUIRED_PACKAGES, ensure_google_deps, gws_binary, token_path
+from sevn.skills.google_workspace import (
+    REQUIRED_PACKAGES,
+    ensure_google_deps,
+    gws_binary,
+    token_path,
+)
 
 
 def probe_google_workspace_skill_warnings(

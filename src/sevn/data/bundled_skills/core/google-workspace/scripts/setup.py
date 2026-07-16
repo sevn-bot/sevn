@@ -63,7 +63,9 @@ def main(argv: list[str] | None = None) -> int:
         help="Refresh token and probe a live Google API call.",
     )
     action.add_argument("--client-secret", metavar="PATH", help="Copy client secret JSON.")
-    action.add_argument("--auth-url", action="store_true", help="Create an OAuth authorization URL.")
+    action.add_argument(
+        "--auth-url", action="store_true", help="Create an OAuth authorization URL."
+    )
     action.add_argument(
         "--auth-code",
         metavar="URL_OR_CODE",
@@ -91,14 +93,24 @@ def main(argv: list[str] | None = None) -> int:
         if args.check:
             result = check_auth(workspace)
             if _check_failed(str(result.get("status", ""))):
-                write_error(code=str(result.get("status", "NOT_AUTHENTICATED")), error=str(result.get("error") or result.get("status") or "Google auth unavailable"))
+                write_error(
+                    code=str(result.get("status", "NOT_AUTHENTICATED")),
+                    error=str(
+                        result.get("error") or result.get("status") or "Google auth unavailable"
+                    ),
+                )
                 return 1
             write_ok(result)
             return 0
         if args.check_live:
             result = check_auth_live(workspace)
             if _check_failed(str(result.get("status", ""))):
-                write_error(code=str(result.get("status", "NOT_AUTHENTICATED")), error=str(result.get("error") or result.get("status") or "Google auth unavailable"))
+                write_error(
+                    code=str(result.get("status", "NOT_AUTHENTICATED")),
+                    error=str(
+                        result.get("error") or result.get("status") or "Google auth unavailable"
+                    ),
+                )
                 return 1
             write_ok(result)
             return 0
@@ -114,7 +126,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.revoke:
             result = revoke_token(workspace)
             if str(result.get("status", "")) == "REVOKE_FAILED":
-                write_error(code="REVOKE_FAILED", error=str(result.get("error", "token revoke failed")))
+                write_error(
+                    code="REVOKE_FAILED", error=str(result.get("error", "token revoke failed"))
+                )
                 return 1
             write_ok(result)
             return 0

@@ -4,9 +4,10 @@ kind: spec
 title: Google Workspace skill — Spec
 status: scaffold
 owner: Alex
-summary: 'Port Hermes google-workspace skill parity into sevn bundled core — OAuth2, gws CLI bridge, Gmail/Calendar/Drive/Sheets/Docs/Contacts scripts, aligned with skills system and existing browser/email paths.'
+summary: Bundled google-workspace skill — OAuth2 Gmail, Calendar, Drive, Sheets, Docs,
+  Contacts; optional gws CLI bridge.
 last_updated: '2026-07-16'
-fingerprint: sha256:0000000000000000000000000000000000000000000000000000000000000000
+fingerprint: sha256:0c462f2c32997929c5c224b4c781394a40a1aec7f89f519422115fad84fe1413
 related:
 - spec-12-skills-system
 - spec-02-config-and-workspace
@@ -23,6 +24,85 @@ depends_on:
 - spec-07-egress-proxy
 - spec-12-skills-system
 build_phase: null
+interfaces:
+- name: main
+  file: src/sevn/data/bundled_skills/core/google-workspace/scripts/google_api.py
+  symbol: main
+- name: main
+  file: src/sevn/data/bundled_skills/core/google-workspace/scripts/gws_bridge.py
+  symbol: main
+- name: main
+  file: src/sevn/data/bundled_skills/core/google-workspace/scripts/setup.py
+  symbol: main
+- name: GoogleWorkspacePaths
+  file: src/sevn/skills/google_workspace.py
+  symbol: GoogleWorkspacePaths
+- name: build_service
+  file: src/sevn/skills/google_workspace.py
+  symbol: build_service
+- name: check_auth
+  file: src/sevn/skills/google_workspace.py
+  symbol: check_auth
+- name: check_auth_live
+  file: src/sevn/skills/google_workspace.py
+  symbol: check_auth_live
+- name: client_secret_path
+  file: src/sevn/skills/google_workspace.py
+  symbol: client_secret_path
+- name: dry_run_requested
+  file: src/sevn/skills/google_workspace.py
+  symbol: dry_run_requested
+- name: ensure_google_deps
+  file: src/sevn/skills/google_workspace.py
+  symbol: ensure_google_deps
+- name: exchange_auth_code
+  file: src/sevn/skills/google_workspace.py
+  symbol: exchange_auth_code
+- name: get_auth_url
+  file: src/sevn/skills/google_workspace.py
+  symbol: get_auth_url
+- name: get_credentials
+  file: src/sevn/skills/google_workspace.py
+  symbol: get_credentials
+- name: get_valid_token_for_gws
+  file: src/sevn/skills/google_workspace.py
+  symbol: get_valid_token_for_gws
+- name: gws_binary
+  file: src/sevn/skills/google_workspace.py
+  symbol: gws_binary
+- name: install_deps
+  file: src/sevn/skills/google_workspace.py
+  symbol: install_deps
+- name: load_token_payload
+  file: src/sevn/skills/google_workspace.py
+  symbol: load_token_payload
+- name: missing_scopes_from_payload
+  file: src/sevn/skills/google_workspace.py
+  symbol: missing_scopes_from_payload
+- name: normalize_authorized_user_payload
+  file: src/sevn/skills/google_workspace.py
+  symbol: normalize_authorized_user_payload
+- name: paths
+  file: src/sevn/skills/google_workspace.py
+  symbol: paths
+- name: pending_auth_path
+  file: src/sevn/skills/google_workspace.py
+  symbol: pending_auth_path
+- name: prefer_gws_enabled
+  file: src/sevn/skills/google_workspace.py
+  symbol: prefer_gws_enabled
+- name: revoke_token
+  file: src/sevn/skills/google_workspace.py
+  symbol: revoke_token
+- name: run_gws
+  file: src/sevn/skills/google_workspace.py
+  symbol: run_gws
+- name: store_client_secret
+  file: src/sevn/skills/google_workspace.py
+  symbol: store_client_secret
+- name: token_path
+  file: src/sevn/skills/google_workspace.py
+  symbol: token_path
 ---
 
 # Google Workspace skill — Spec
@@ -33,7 +113,7 @@ Deliver **Hermes Agent google-workspace parity** as a sevn **bundled core skill*
 
 Reference implementation: [Hermes `skills/productivity/google-workspace/`](https://github.com/NousResearch/hermes-agent/tree/main/skills/productivity/google-workspace) (v1.1+ with optional [`gws` CLI](https://github.com/googleworkspace/cli) backend).
 
-Operator-facing function catalog: [`google-workspace.html`](../google-workspace.html) (help site).
+Operator-facing function catalog: `about-sevn.bot/google-workspace.html` (help site).
 
 ## 2. Gap analysis — Hermes vs sevn today
 
@@ -43,9 +123,9 @@ Operator-facing function catalog: [`google-workspace.html`](../google-workspace.
 | Gmail send/reply | OAuth API (`gmail send`, `gmail reply`, labels) | Shipped in bundled `google-workspace`; browser gated writes and `email-management` still available |
 | Gmail labels | `gmail labels`, `gmail modify` | Shipped in bundled `google-workspace` |
 | Calendar | list/create/delete | Shipped in bundled `google-workspace` |
-| Drive | search/get/upload/download/folder/share/delete | Search/get shipped in bundled `google-workspace`; write flows still pending |
-| Sheets | create/get/update/append | Not implemented yet |
-| Docs | get/create/append | Not implemented yet |
+| Drive | search/get/upload/download/folder/share/delete | Shipped in bundled `google-workspace` |
+| Sheets | create/get/update/append | Shipped in bundled `google-workspace` |
+| Docs | get/create/append | Shipped in bundled `google-workspace` |
 | Contacts | list | Shipped in bundled `google-workspace` |
 | OAuth setup | Agent-driven PKCE flow (`setup.py`) | Shipped in bundled `google-workspace` |
 | Backend | `gws` preferred, Python fallback | Python/OAuth backend shipped; `gws` bridge still pending |
@@ -217,7 +297,7 @@ Service sets: `email`, `calendar`, `drive`, `sheets`, `docs`, `contacts`, `all`.
 | `docs create --title [--body]` | Yes |
 | `docs append DOC_ID --text TEXT` | Yes |
 
-Full usage table: [`google-workspace.html`](../google-workspace.html).
+Full usage table: `about-sevn.bot/google-workspace.html`.
 
 ## 5. Agent consumption (sevn skills system)
 
@@ -258,25 +338,25 @@ Full usage table: [`google-workspace.html`](../google-workspace.html).
 - [x] Contacts list
 - [x] JSON output contract tests (golden files)
 
-### Phase 3 — Docs/Sheets + Drive writes (partial)
+### Phase 3 — Docs/Sheets + Drive writes
 
-- [x] Help/catalog routing reserves Sheets/Docs/Drive intents for `google-workspace`
-- [ ] Sheets create/get/update/append
-- [ ] Docs get/create/append
-- [ ] Drive upload/download/folder/share/delete
+- [x] Sheets create/get/update/append
+- [x] Docs get/create/append
+- [x] Drive upload/download/folder/share/delete
 
-### Phase 4 — gws bridge (partial)
+### Phase 4 — gws bridge
 
-- [ ] `scripts/gws_bridge.py`
+- [x] `scripts/gws_bridge.py`
 - [x] `prefer_gws` config flag
-- [ ] Doctor check: `sevn doctor` reports gws presence
+- [x] Doctor check: `sevn doctor` reports gws presence
 
-### Phase 5 — Bundling and routing (partial)
+### Phase 5 — Bundling and routing
 
 - [x] `SKILL.md` + `INDEX.md` row
 - [x] Triager routing hints (workspace template / AGENTS.md)
 - [x] Onboarding capability stub update (`onboarding_capabilities.json`)
 - [ ] Agent-level E2E test beyond setup dry-run + gmail search mock coverage
+- [ ] Live OAuth E2E with a test Google Cloud project
 
 ## 8. Testing strategy
 
@@ -290,7 +370,7 @@ Full usage table: [`google-workspace.html`](../google-workspace.html).
 
 ## 9. Dependencies
 
-- Optional: `google-api-python-client`, `google-auth-oauthlib` (install via `setup.py --install-deps`)
+- Optional: `google-api-python-client`, `google-auth-oauthlib` (install via `uv pip install 'sevn[google-workspace]'` or `setup.py --install-deps`)
 - Optional system: `gws` (`npm i -g @googleworkspace/cli` or Homebrew)
 - No new MCP server required for v1 (future: expose gws MCP behind egress policy)
 
@@ -302,8 +382,8 @@ Full usage table: [`google-workspace.html`](../google-workspace.html).
 
 ## 11. Acceptance criteria
 
-- [ ] Bundled `google-workspace` skill passes `scripts/check_skills_index.py`
-- [ ] All functions in §4 callable via `run_skill_script` with Hermes-compatible JSON shapes
-- [ ] OAuth setup completable from Telegram/webchat (URL handoff)
+- [x] Bundled `google-workspace` skill passes `scripts/check_skills_index.py`
+- [x] All functions in §4 callable via `run_skill_script` with Hermes-compatible JSON shapes
+- [ ] OAuth setup completable from Telegram/webchat (URL handoff) — manual/live E2E
 - [ ] Write operations blocked without operator confirmation in harness
-- [ ] Help page `google-workspace.html` stays in sync with `SKILL.md` scripts
+- [x] Help page `google-workspace.html` stays in sync with `SKILL.md` scripts

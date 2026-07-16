@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-
-import pytest
+from typing import TYPE_CHECKING
 
 from sevn.config.workspace_config import WorkspaceConfig
+
+if TYPE_CHECKING:
+    from _pytest.monkeypatch import MonkeyPatch
 from sevn.skills.google_workspace_doctor_check import probe_google_workspace_skill_warnings
 
 
@@ -23,7 +25,7 @@ def test_probe_skips_when_skill_disabled(tmp_path: Path) -> None:
 
 def test_probe_reports_requested_warnings(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     """Enabled skill reports token, gws, and optional-deps warnings."""
 
@@ -52,7 +54,7 @@ def test_probe_reports_requested_warnings(
 
 def test_probe_returns_no_warnings_when_ready(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: MonkeyPatch,
 ) -> None:
     """Ready skill configuration returns no warnings."""
 

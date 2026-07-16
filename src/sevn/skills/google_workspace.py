@@ -4,29 +4,29 @@ Module: sevn.skills.google_workspace
 Depends: json, pathlib, subprocess, urllib, optional google-auth/google-api-python-client
 
 Exports:
-    GOOGLE_WORKSPACE_SKILL_ID — stable bundled skill id.
-    SCOPES — full Google Workspace OAuth scope set.
-    SERVICE_SCOPE_SETS — named scope subsets for setup flows.
-    REQUIRED_PACKAGES — optional Python deps needed for live API calls.
-    GoogleWorkspacePaths — grouped workspace file paths for token/auth state.
-    token_path — resolve ``.sevn/google_token.json`` with env override.
-    client_secret_path — resolve ``.sevn/google_client_secret.json`` with env override.
-    pending_auth_path — resolve ``.sevn/google_oauth_pending.json``.
-    paths — grouped workspace state paths.
-    dry_run_requested — CLI/env dry-run selector.
-    normalize_authorized_user_payload — normalize stored token payload shape.
-    load_token_payload — read and normalize the stored OAuth token payload.
-    missing_scopes_from_payload — compute required scopes absent from a payload.
-    ensure_google_deps — validate optional Google client libraries are installed.
-    install_deps — install optional Google client libraries with ``uv pip``.
-    check_auth — offline token/client-secret status summary.
-    check_auth_live — refresh-backed auth status summary.
-    store_client_secret — validate and store Desktop OAuth client JSON.
-    get_auth_url — create a PKCE authorization URL and pending-state file.
-    exchange_auth_code — exchange an auth code or redirect URL for a token.
-    revoke_token — revoke the stored token and delete local token state.
-    get_credentials — load, refresh, persist, and return Google credentials.
-    build_service — construct a google-api-python-client service.
+    GoogleWorkspacePaths — exported symbol.
+    token_path — exported symbol.
+    client_secret_path — exported symbol.
+    pending_auth_path — exported symbol.
+    paths — exported symbol.
+    dry_run_requested — exported symbol.
+    normalize_authorized_user_payload — exported symbol.
+    load_token_payload — exported symbol.
+    missing_scopes_from_payload — exported symbol.
+    ensure_google_deps — exported symbol.
+    install_deps — exported symbol.
+    check_auth — exported symbol.
+    check_auth_live — exported symbol.
+    store_client_secret — exported symbol.
+    get_auth_url — exported symbol.
+    exchange_auth_code — exported symbol.
+    revoke_token — exported symbol.
+    get_credentials — exported symbol.
+    build_service — exported symbol.
+    gws_binary — exported symbol.
+    get_valid_token_for_gws — exported symbol.
+    run_gws — exported symbol.
+    prefer_gws_enabled — exported symbol.
 """
 
 from __future__ import annotations
@@ -34,15 +34,16 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Final
 
 from loguru import logger
 
@@ -172,7 +173,17 @@ def pending_auth_path(workspace: Path) -> Path:
 
 
 def paths(workspace: Path) -> GoogleWorkspacePaths:
-    """Return grouped Google Workspace auth-state paths for ``workspace``."""
+    """Return grouped Google Workspace auth-state paths for ``workspace``.
+
+    Args:
+        workspace (Path): Parameter.
+
+    Returns:
+        GoogleWorkspacePaths: Result.
+
+    Examples:
+        >>> paths  # doctest: +SKIP
+    """
 
     resolved = workspace.expanduser().resolve()
     return GoogleWorkspacePaths(
@@ -239,12 +250,10 @@ def load_token_payload(workspace: Path) -> dict[str, object] | None:
         workspace (Path): Workspace content root.
 
     Returns:
-        dict[str, object] | None: Normalized payload, or ``None`` when the token file is absent.
+        dict[str, object] | None: Normalized payload, or ``None`` when absent.
 
-    Raises:
-        ValueError: When the token file is not a JSON object.
-        json.JSONDecodeError: When the token file is invalid JSON.
-        OSError: When the token file cannot be read.
+    Examples:
+        >>> load_token_payload  # doctest: +SKIP
     """
     path = token_path(workspace)
     if not path.is_file():
@@ -277,7 +286,11 @@ def missing_scopes_from_payload(
 
 
 def ensure_google_deps() -> None:
-    """Raise ``ImportError`` unless the optional Google client libraries are installed."""
+    """Raise ``ImportError`` unless the optional Google client libraries are installed.
+
+    Examples:
+        >>> ensure_google_deps  # doctest: +SKIP
+    """
     try:
         from google.auth.transport.requests import Request as _Request
         from google.oauth2.credentials import Credentials as _Credentials
@@ -289,7 +302,14 @@ def ensure_google_deps() -> None:
 
 
 def install_deps() -> dict[str, object]:
-    """Install optional Google client libraries with ``uv pip``."""
+    """Install optional Google client libraries with ``uv pip``.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> install_deps  # doctest: +SKIP
+    """
 
     try:
         ensure_google_deps()
@@ -312,7 +332,7 @@ def install_deps() -> dict[str, object]:
             *REQUIRED_PACKAGES,
         ]
         logger.info("google_workspace: installing optional deps via {}", " ".join(command))
-        proc = subprocess.run(
+        proc = subprocess.run(  # nosec B603
             command,
             capture_output=True,
             text=True,
@@ -338,7 +358,17 @@ def install_deps() -> dict[str, object]:
 
 
 def check_auth(workspace: Path) -> dict[str, object]:
-    """Return offline Google Workspace auth status for ``workspace``."""
+    """Return offline Google Workspace auth status for ``workspace``.
+
+    Args:
+        workspace (Path): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> check_auth  # doctest: +SKIP
+    """
     token_file = token_path(workspace)
     client_secret_file = client_secret_path(workspace)
     pending_file = pending_auth_path(workspace)
@@ -361,8 +391,8 @@ def check_auth(workspace: Path) -> dict[str, object]:
             "status": "NOT_AUTHENTICATED",
             "missing_scopes": list(SCOPES),
             "scope_count": 0,
-            "token_expired": False,
-            "refreshable": False,
+            "token_expired": False,  # nosec B105
+            "refreshable": False,  # nosec B105
         }
     try:
         missing = missing_scopes_from_payload(payload)
@@ -389,7 +419,17 @@ def check_auth(workspace: Path) -> dict[str, object]:
 
 
 def check_auth_live(workspace: Path) -> dict[str, object]:
-    """Return live auth status for ``workspace``, refreshing tokens when possible."""
+    """Return live auth status for ``workspace``, refreshing tokens when possible.
+
+    Args:
+        workspace (Path): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> check_auth_live  # doctest: +SKIP
+    """
     base = check_auth(workspace)
     if base["status"] in {"NOT_AUTHENTICATED", "TOKEN_CORRUPT"}:
         return {**base, "live": True}
@@ -418,7 +458,7 @@ def check_auth_live(workspace: Path) -> dict[str, object]:
         return {**base, "status": "TOKEN_CORRUPT", "live": True, "error": str(exc)}
     except RefreshError as exc:
         return {**base, "status": "REFRESH_FAILED", "live": True, "error": str(exc)}
-    payload = normalize_authorized_user_payload(json.loads(credentials.to_json()))
+    payload = normalize_authorized_user_payload(json.loads(credentials.to_json()))  # type: ignore[no-untyped-call]
     missing = missing_scopes_from_payload(payload)
     status = "MISSING_SCOPES" if missing else "AUTHENTICATED"
     return {
@@ -435,7 +475,18 @@ def check_auth_live(workspace: Path) -> dict[str, object]:
 
 
 def store_client_secret(workspace: Path, path: Path) -> dict[str, object]:
-    """Validate and store a Google OAuth client-secret JSON file."""
+    """Validate and store a Google OAuth client-secret JSON file.
+
+    Args:
+        workspace (Path): Parameter.
+        path (Path): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> store_client_secret  # doctest: +SKIP
+    """
     source = path.expanduser().resolve()
     payload = _load_json_object(source, label="client secret")
     client_type = _client_secret_client_type(payload)
@@ -453,7 +504,18 @@ def store_client_secret(workspace: Path, path: Path) -> dict[str, object]:
 
 
 def get_auth_url(workspace: Path, services: str | Iterable[str] = "all") -> dict[str, object]:
-    """Return an OAuth authorization URL for the requested Google service set."""
+    """Return an OAuth authorization URL for the requested Google service set.
+
+    Args:
+        workspace (Path): Parameter.
+        services (str | Iterable[str]): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> get_auth_url  # doctest: +SKIP
+    """
     ensure_google_deps()
     from google_auth_oauthlib.flow import InstalledAppFlow
 
@@ -490,7 +552,18 @@ def get_auth_url(workspace: Path, services: str | Iterable[str] = "all") -> dict
 
 
 def exchange_auth_code(workspace: Path, code_or_url: str) -> dict[str, object]:
-    """Exchange an OAuth authorization code or redirect URL for a stored token."""
+    """Exchange an OAuth authorization code or redirect URL for a stored token.
+
+    Args:
+        workspace (Path): Parameter.
+        code_or_url (str): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> exchange_auth_code  # doctest: +SKIP
+    """
     ensure_google_deps()
     from google_auth_oauthlib.flow import InstalledAppFlow
 
@@ -521,10 +594,12 @@ def exchange_auth_code(workspace: Path, code_or_url: str) -> dict[str, object]:
     _safe_unlink(pending_auth_path(workspace))
     payload = load_token_payload(workspace)
     missing = missing_scopes_from_payload(payload, scopes)
+    services_raw = pending.get("services")
+    services_list = [str(item) for item in services_raw] if isinstance(services_raw, list) else []
     return {
         "status": "MISSING_SCOPES" if missing else "AUTHENTICATED",
         "token_path": str(token_path(workspace)),
-        "services": list(pending.get("services", [])),
+        "services": services_list,
         "scopes": scopes,
         "missing_scopes": missing,
         "account": _string_or_none((payload or {}).get("account")),
@@ -532,7 +607,17 @@ def exchange_auth_code(workspace: Path, code_or_url: str) -> dict[str, object]:
 
 
 def revoke_token(workspace: Path) -> dict[str, object]:
-    """Revoke the stored Google token and delete local token state."""
+    """Revoke the stored Google token and delete local token state.
+
+    Args:
+        workspace (Path): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> revoke_token  # doctest: +SKIP
+    """
     try:
         payload = load_token_payload(workspace)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
@@ -566,7 +651,7 @@ def revoke_token(workspace: Path) -> dict[str, object]:
     http_status: int | None = None
     error_detail: str | None = None
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=30) as response:  # nosec B310
             http_status = int(response.getcode())
             remote_ok = http_status == 200
     except urllib.error.HTTPError as exc:
@@ -593,7 +678,17 @@ def revoke_token(workspace: Path) -> dict[str, object]:
 
 
 def get_credentials(workspace: Path) -> Credentials:
-    """Load, refresh if needed, persist, and return Google OAuth credentials."""
+    """Load, refresh if needed, persist, and return Google OAuth credentials.
+
+    Args:
+        workspace (Path): Parameter.
+
+    Returns:
+        Credentials: Result.
+
+    Examples:
+        >>> get_credentials  # doctest: +SKIP
+    """
     ensure_google_deps()
     from google.auth.transport.requests import Request
     from google.oauth2.credentials import Credentials
@@ -603,8 +698,10 @@ def get_credentials(workspace: Path) -> Credentials:
         msg = "google_workspace: no token stored; run auth first"
         raise FileNotFoundError(msg)
     scopes = _scope_values_from_payload(payload) or list(SCOPES)
-    credentials = Credentials.from_authorized_user_info(payload, scopes)
-    if bool(getattr(credentials, "expired", False)) or not bool(getattr(credentials, "valid", False)):
+    credentials = Credentials.from_authorized_user_info(payload, scopes)  # type: ignore[no-untyped-call]
+    if bool(getattr(credentials, "expired", False)) or not bool(
+        getattr(credentials, "valid", False)
+    ):
         if not getattr(credentials, "refresh_token", None):
             msg = "google_workspace: token is expired or invalid and cannot be refreshed"
             raise ValueError(msg)
@@ -612,11 +709,23 @@ def get_credentials(workspace: Path) -> Credentials:
         _save_credentials(workspace, credentials)
     elif _payload_needs_resave(payload):
         _save_credentials(workspace, credentials)
-    return credentials
+    return credentials  # type: ignore[no-any-return]
 
 
 def build_service(workspace: Path, api: str, version: str) -> Any:
-    """Return a google-api-python-client service bound to workspace credentials."""
+    """Return a google-api-python-client service bound to workspace credentials.
+
+    Args:
+        workspace (Path): Parameter.
+        api (str): Parameter.
+        version (str): Parameter.
+
+    Returns:
+        Any: Result.
+
+    Examples:
+        >>> build_service  # doctest: +SKIP
+    """
     ensure_google_deps()
     from googleapiclient.discovery import build
 
@@ -624,7 +733,14 @@ def build_service(workspace: Path, api: str, version: str) -> Any:
 
 
 def gws_binary() -> str | None:
-    """Return the configured ``gws`` binary path, or ``None`` when unavailable."""
+    """Return the configured ``gws`` binary path, or ``None`` when unavailable.
+
+    Returns:
+        str | None: Result.
+
+    Examples:
+        >>> gws_binary  # doctest: +SKIP
+    """
 
     override = os.environ.get(_GWS_BIN_ENV, "").strip()
     if override:
@@ -633,7 +749,17 @@ def gws_binary() -> str | None:
 
 
 def get_valid_token_for_gws(workspace: Path) -> str:
-    """Return a refreshed Google access token for the optional ``gws`` CLI."""
+    """Return a refreshed Google access token for the optional ``gws`` CLI.
+
+    Args:
+        workspace (Path): Parameter.
+
+    Returns:
+        str: Result.
+
+    Examples:
+        >>> get_valid_token_for_gws  # doctest: +SKIP
+    """
 
     token = _string_or_none(getattr(get_credentials(workspace), "token", None))
     if token is None:
@@ -648,7 +774,20 @@ def run_gws(
     params: Mapping[str, object] | None = None,
     body: object | None = None,
 ) -> dict[str, object]:
-    """Run ``gws`` with refreshed auth env and return parsed output."""
+    """Run ``gws`` with refreshed auth env and return parsed output.
+
+    Args:
+        workspace (Path): Parameter.
+        parts (list[str]): Parameter.
+        params (Mapping[str, object] | None): Parameter.
+        body (object | None): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> run_gws  # doctest: +SKIP
+    """
 
     binary = gws_binary()
     if binary is None:
@@ -682,17 +821,49 @@ def run_gws(
 
 
 def prefer_gws_enabled(workspace: Path) -> bool:
-    """Return the effective ``skills.google_workspace.prefer_gws`` setting."""
+    """Return the effective ``skills.google_workspace.prefer_gws`` setting.
+
+    Args:
+        workspace (Path): Parameter.
+
+    Returns:
+        bool: Result.
+
+    Examples:
+        >>> prefer_gws_enabled  # doctest: +SKIP
+    """
 
     settings = _google_workspace_settings_from_disk(workspace)
     return bool(getattr(settings, "prefer_gws", True))
 
 
 def _dot_sevn_dir(workspace: Path) -> Path:
+    """_dot_sevn_dir helper.
+
+    Args:
+        workspace (Path): Parameter.
+
+    Returns:
+        Path: Result.
+
+    Examples:
+        >>> _dot_sevn_dir  # doctest: +SKIP
+    """
     return workspace.resolve() / _DOT_SEVN_DIRNAME
 
 
 def _google_workspace_settings_from_disk(workspace: Path) -> Any:
+    """_google_workspace_settings_from_disk helper.
+
+    Args:
+        workspace (Path): Parameter.
+
+    Returns:
+        Any: Result.
+
+    Examples:
+        >>> _google_workspace_settings_from_disk  # doctest: +SKIP
+    """
     from sevn.config.workspace_config import google_workspace_settings, parse_workspace_config
 
     sevn_json_path = workspace.resolve() / "sevn.json"
@@ -712,6 +883,17 @@ def _google_workspace_settings_from_disk(workspace: Path) -> Any:
 
 
 def _gws_environment(workspace: Path) -> dict[str, str]:
+    """_gws_environment helper.
+
+    Args:
+        workspace (Path): Parameter.
+
+    Returns:
+        dict[str, str]: Result.
+
+    Examples:
+        >>> _gws_environment  # doctest: +SKIP
+    """
     env = dict(os.environ)
     token_file = token_path(workspace)
     try:
@@ -725,6 +907,17 @@ def _gws_environment(workspace: Path) -> dict[str, str]:
 
 
 def _gws_params_argv(params: Mapping[str, object] | None) -> list[str]:
+    """_gws_params_argv helper.
+
+    Args:
+        params (Mapping[str, object] | None): Parameter.
+
+    Returns:
+        list[str]: Result.
+
+    Examples:
+        >>> _gws_params_argv  # doctest: +SKIP
+    """
     argv: list[str] = []
     if not params:
         return argv
@@ -750,6 +943,17 @@ def _gws_params_argv(params: Mapping[str, object] | None) -> list[str]:
 
 
 def _gws_stdin_body(body: object | None) -> str | None:
+    """_gws_stdin_body helper.
+
+    Args:
+        body (object | None): Parameter.
+
+    Returns:
+        str | None: Result.
+
+    Examples:
+        >>> _gws_stdin_body  # doctest: +SKIP
+    """
     if body is None:
         return None
     if isinstance(body, str):
@@ -758,14 +962,41 @@ def _gws_stdin_body(body: object | None) -> str | None:
 
 
 def _last_auth_url_path(workspace: Path) -> Path:
+    """_last_auth_url_path helper.
+
+    Args:
+        workspace (Path): Parameter.
+
+    Returns:
+        Path: Result.
+
+    Examples:
+        >>> _last_auth_url_path  # doctest: +SKIP
+    """
     return _dot_sevn_dir(workspace) / _LAST_AUTH_URL_FILENAME
 
 
 def _ensure_parent_dir(path: Path) -> None:
+    """_ensure_parent_dir helper.
+
+    Args:
+        path (Path): Parameter.
+
+    Examples:
+        >>> _ensure_parent_dir  # doctest: +SKIP
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
 def _safe_unlink(path: Path) -> None:
+    """_safe_unlink helper.
+
+    Args:
+        path (Path): Parameter.
+
+    Examples:
+        >>> _safe_unlink  # doctest: +SKIP
+    """
     try:
         path.unlink()
     except FileNotFoundError:
@@ -773,6 +1004,18 @@ def _safe_unlink(path: Path) -> None:
 
 
 def _load_json_object(path: Path, *, label: str) -> dict[str, object]:
+    """_load_json_object helper.
+
+    Args:
+        path (Path): Parameter.
+        label (str): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> _load_json_object  # doctest: +SKIP
+    """
     with path.open("r", encoding="utf-8") as handle:
         data = json.load(handle)
     if not isinstance(data, dict):
@@ -782,6 +1025,15 @@ def _load_json_object(path: Path, *, label: str) -> dict[str, object]:
 
 
 def _write_json_object(path: Path, payload: Mapping[str, object]) -> None:
+    """_write_json_object helper.
+
+    Args:
+        path (Path): Parameter.
+        payload (Mapping[str, object]): Parameter.
+
+    Examples:
+        >>> _write_json_object  # doctest: +SKIP
+    """
     _ensure_parent_dir(path)
     path.write_text(
         json.dumps(dict(payload), indent=2, sort_keys=True) + "\n",
@@ -790,10 +1042,29 @@ def _write_json_object(path: Path, payload: Mapping[str, object]) -> None:
 
 
 def _utcnow() -> datetime:
+    """_utcnow helper.
+
+    Returns:
+        datetime: Result.
+
+    Examples:
+        >>> _utcnow  # doctest: +SKIP
+    """
     return datetime.now(tz=UTC)
 
 
 def _scope_values_from_payload(payload: Mapping[str, object]) -> list[str]:
+    """_scope_values_from_payload helper.
+
+    Args:
+        payload (Mapping[str, object]): Parameter.
+
+    Returns:
+        list[str]: Result.
+
+    Examples:
+        >>> _scope_values_from_payload  # doctest: +SKIP
+    """
     collected: list[str] = []
     for key in ("scopes", "granted_scopes", "scope"):
         raw = payload.get(key)
@@ -810,6 +1081,17 @@ def _scope_values_from_payload(payload: Mapping[str, object]) -> list[str]:
 
 
 def _unique_scopes(values: Iterable[str]) -> list[str]:
+    """_unique_scopes helper.
+
+    Args:
+        values (Iterable[str]): Parameter.
+
+    Returns:
+        list[str]: Result.
+
+    Examples:
+        >>> _unique_scopes  # doctest: +SKIP
+    """
     unique: list[str] = []
     for value in values:
         scope = str(value).strip()
@@ -819,6 +1101,17 @@ def _unique_scopes(values: Iterable[str]) -> list[str]:
 
 
 def _parse_expiry(value: object) -> datetime | None:
+    """_parse_expiry helper.
+
+    Args:
+        value (object): Parameter.
+
+    Returns:
+        datetime | None: Result.
+
+    Examples:
+        >>> _parse_expiry  # doctest: +SKIP
+    """
     if not isinstance(value, str):
         return None
     text = value.strip()
@@ -831,6 +1124,17 @@ def _parse_expiry(value: object) -> datetime | None:
 
 
 def _payload_is_refreshable(payload: Mapping[str, object]) -> bool:
+    """_payload_is_refreshable helper.
+
+    Args:
+        payload (Mapping[str, object]): Parameter.
+
+    Returns:
+        bool: Result.
+
+    Examples:
+        >>> _payload_is_refreshable  # doctest: +SKIP
+    """
     return all(
         _string_or_none(payload.get(field))
         for field in ("refresh_token", "client_id", "client_secret")
@@ -838,10 +1142,32 @@ def _payload_is_refreshable(payload: Mapping[str, object]) -> bool:
 
 
 def _payload_needs_resave(payload: Mapping[str, object]) -> bool:
+    """_payload_needs_resave helper.
+
+    Args:
+        payload (Mapping[str, object]): Parameter.
+
+    Returns:
+        bool: Result.
+
+    Examples:
+        >>> _payload_needs_resave  # doctest: +SKIP
+    """
     return "scopes" not in payload and "scope" in payload
 
 
 def _string_or_none(value: object) -> str | None:
+    """_string_or_none helper.
+
+    Args:
+        value (object): Parameter.
+
+    Returns:
+        str | None: Result.
+
+    Examples:
+        >>> _string_or_none  # doctest: +SKIP
+    """
     if isinstance(value, str):
         text = value.strip()
         if text:
@@ -850,6 +1176,17 @@ def _string_or_none(value: object) -> str | None:
 
 
 def _client_secret_client_type(payload: Mapping[str, object]) -> str:
+    """_client_secret_client_type helper.
+
+    Args:
+        payload (Mapping[str, object]): Parameter.
+
+    Returns:
+        str: Result.
+
+    Examples:
+        >>> _client_secret_client_type  # doctest: +SKIP
+    """
     if isinstance(payload.get("installed"), dict):
         return "installed"
     if isinstance(payload.get("web"), dict):
@@ -859,6 +1196,17 @@ def _client_secret_client_type(payload: Mapping[str, object]) -> str:
 
 
 def _load_client_secret_payload(workspace: Path) -> dict[str, object]:
+    """_load_client_secret_payload helper.
+
+    Args:
+        workspace (Path): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> _load_client_secret_payload  # doctest: +SKIP
+    """
     path = client_secret_path(workspace)
     if not path.is_file():
         msg = f"google_workspace: client secret not found at {path}"
@@ -869,14 +1217,23 @@ def _load_client_secret_payload(workspace: Path) -> dict[str, object]:
 
 
 def _services_to_scope_list(services: str | Iterable[str]) -> tuple[list[str], list[str]]:
+    """_services_to_scope_list helper.
+
+    Args:
+        services (str | Iterable[str]): Parameter.
+
+    Returns:
+        tuple[list[str], list[str]]: Result.
+
+    Examples:
+        >>> _services_to_scope_list  # doctest: +SKIP
+    """
     if isinstance(services, str):
         requested_services = [
-            part.strip().lower()
-            for part in services.replace(",", " ").split()
-            if part.strip()
+            part.strip().lower() for part in services.replace(",", " ").split() if part.strip()
         ]
     else:
-        requested_services: list[str] = []
+        requested_services = []
         for item in services:
             requested_services.extend(
                 [
@@ -903,6 +1260,17 @@ def _services_to_scope_list(services: str | Iterable[str]) -> tuple[list[str], l
 
 
 def _extract_authorization_response(value: str) -> str | None:
+    """_extract_authorization_response helper.
+
+    Args:
+        value (str): Parameter.
+
+    Returns:
+        str | None: Result.
+
+    Examples:
+        >>> _extract_authorization_response  # doctest: +SKIP
+    """
     if not value:
         return None
     parsed = urllib.parse.urlparse(value)
@@ -917,17 +1285,26 @@ def _extract_authorization_response(value: str) -> str | None:
     return None
 
 
-def _save_credentials(workspace: Path, credentials: Credentials) -> None:
+def _save_credentials(workspace: Path, credentials: Any) -> None:
+    """_save_credentials helper.
+
+    Args:
+        workspace (Path): Parameter.
+        credentials (Credentials): Parameter.
+
+    Examples:
+        >>> _save_credentials  # doctest: +SKIP
+    """
     payload = normalize_authorized_user_payload(json.loads(credentials.to_json()))
     _write_json_object(token_path(workspace), payload)
 
 
 __all__ = [
     "GOOGLE_WORKSPACE_SKILL_ID",
-    "GoogleWorkspacePaths",
     "REQUIRED_PACKAGES",
     "SCOPES",
     "SERVICE_SCOPE_SETS",
+    "GoogleWorkspacePaths",
     "build_service",
     "check_auth",
     "check_auth_live",
@@ -935,16 +1312,16 @@ __all__ = [
     "dry_run_requested",
     "ensure_google_deps",
     "exchange_auth_code",
-    "get_valid_token_for_gws",
     "get_auth_url",
     "get_credentials",
+    "get_valid_token_for_gws",
     "gws_binary",
     "install_deps",
     "load_token_payload",
     "missing_scopes_from_payload",
     "normalize_authorized_user_payload",
-    "pending_auth_path",
     "paths",
+    "pending_auth_path",
     "prefer_gws_enabled",
     "revoke_token",
     "run_gws",

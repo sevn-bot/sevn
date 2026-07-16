@@ -1,0 +1,238 @@
+{
+  "version": "2.1.0",
+  "description": "Copy-paste task examples for media_generator. Pass short prompt + optional scene/style/mood variables.",
+  "variables": [
+    "scene",
+    "style",
+    "subject",
+    "mood",
+    "lighting",
+    "camera",
+    "genre",
+    "tempo",
+    "instrumentation",
+    "delivery"
+  ],
+  "examples": [
+    {
+      "name": "image_portrait",
+      "kind": "image",
+      "task": {
+        "kind": "image",
+        "prompt": "woman reading by window",
+        "template": "portrait",
+        "scene": "cozy library",
+        "style": "film photography",
+        "mood": "contemplative",
+        "lighting": "golden hour window light",
+        "aspect_ratio": "3:4"
+      }
+    },
+    {
+      "name": "image_product",
+      "kind": "image",
+      "task": {
+        "kind": "image",
+        "prompt": "wireless earbuds in charging case",
+        "template": "product",
+        "scene": "white studio sweep",
+        "style": "minimalist commercial",
+        "lighting": "soft box, no harsh shadows"
+      }
+    },
+    {
+      "name": "image_cinematic",
+      "kind": "image",
+      "task": {
+        "kind": "image",
+        "prompt": "lone astronaut on red dunes",
+        "template": "cinematic",
+        "scene": "alien desert at dusk",
+        "style": "sci-fi blockbuster",
+        "mood": "awe and isolation",
+        "camera": "wide establishing shot",
+        "aspect_ratio": "21:9"
+      }
+    },
+    {
+      "name": "image_i2i_style",
+      "kind": "image_i2i",
+      "task": {
+        "kind": "image_i2i",
+        "prompt": "render as oil painting",
+        "template": "style_transfer",
+        "reference_image": "channel_files/sess/portrait.jpg",
+        "style": "impressionist brush strokes",
+        "scene": "garden backdrop",
+        "mood": "serene"
+      }
+    },
+    {
+      "name": "video_t2v_nature",
+      "kind": "video",
+      "task": {
+        "kind": "video",
+        "prompt": "mist rolling over pine forest",
+        "template": "nature",
+        "scene": "mountain forest dawn",
+        "style": "documentary realism",
+        "camera": "[Static shot] slow atmospheric drift",
+        "mood": "peaceful",
+        "duration": 6,
+        "resolution": "1080P"
+      }
+    },
+    {
+      "name": "video_commercial",
+      "kind": "video",
+      "task": {
+        "kind": "video",
+        "prompt": "smartwatch rotates revealing features",
+        "template": "commercial",
+        "scene": "dark studio with accent lights",
+        "style": "premium tech ad",
+        "camera": "[Push in] product hero",
+        "duration": 6,
+        "resolution": "1080P"
+      }
+    },
+    {
+      "name": "video_i2v_subtle",
+      "kind": "video_i2v",
+      "task": {
+        "kind": "video_i2v",
+        "prompt": "hair moves gently in breeze",
+        "template": "subtle",
+        "first_frame_image": "channel_files/sess/portrait.jpg",
+        "scene": "outdoor café",
+        "mood": "relaxed",
+        "duration": 6,
+        "resolution": "1080P"
+      }
+    },
+    {
+      "name": "video_s2v_character",
+      "kind": "video_s2v",
+      "task": {
+        "kind": "video_s2v",
+        "prompt": "smiles and waves at camera",
+        "template": "talking_head",
+        "subject_reference": "channel_files/sess/face.jpg",
+        "subject": "presenter",
+        "scene": "news desk",
+        "delivery": "friendly professional"
+      }
+    },
+    {
+      "name": "video_fl2v_growth",
+      "kind": "video_fl2v",
+      "task": {
+        "kind": "video_fl2v",
+        "prompt": "child grows into adult over years",
+        "template": "growth",
+        "first_frame_image": "channel_files/sess/child.jpg",
+        "last_frame_image": "channel_files/sess/adult.jpg",
+        "scene": "same park bench through seasons",
+        "mood": "bittersweet",
+        "duration": 6,
+        "resolution": "1080P"
+      }
+    },
+    {
+      "name": "video_template_pet_pilot",
+      "kind": "video_template",
+      "task": {
+        "kind": "video_template",
+        "template_id": "pet_pilot",
+        "media_inputs": ["channel_files/sess/cat.jpg"]
+      }
+    },
+    {
+      "name": "video_template_run_for_life",
+      "kind": "video_template",
+      "task": {
+        "kind": "video_template",
+        "template_id": "run_for_life",
+        "prompt": "Tiger",
+        "media_inputs": ["channel_files/sess/dog.jpg"]
+      }
+    },
+    {
+      "name": "music_lofi",
+      "kind": "music",
+      "task": {
+        "kind": "music",
+        "prompt": "late night study session",
+        "template": "lofi",
+        "scene": "rainy city apartment",
+        "mood": "calm focus",
+        "tempo": "slow",
+        "instrumentation": "rhodes, soft drums, vinyl crackle",
+        "is_instrumental": true
+      }
+    },
+    {
+      "name": "music_cinematic_vocal",
+      "kind": "music",
+      "task": {
+        "kind": "music",
+        "prompt": "hero's farewell before battle",
+        "template": "cinematic",
+        "mood": "epic melancholy",
+        "genre": "orchestral hybrid",
+        "lyrics": "[Verse] The dawn is breaking cold and gray..."
+      }
+    },
+    {
+      "name": "music_jingle",
+      "kind": "music",
+      "task": {
+        "kind": "music",
+        "prompt": "fresh bakery opening",
+        "template": "jingle",
+        "genre": "pop",
+        "mood": "cheerful",
+        "lyrics": "[Chorus] Rise and shine, the oven's warm!"
+      }
+    },
+    {
+      "name": "voice_clone",
+      "kind": "voice",
+      "task": {
+        "kind": "voice",
+        "prompt": "warm podcast host",
+        "template": "narration",
+        "delivery": "conversational",
+        "mood": "welcoming",
+        "source_audio": "channel_files/sess/voice_sample.mp3",
+        "preview_text": "Welcome back to the show. Today we're exploring something special."
+      }
+    },
+    {
+      "name": "voice_tts_system",
+      "kind": "voice",
+      "task": {
+        "kind": "voice",
+        "prompt": "documentary narrator",
+        "template": "narration",
+        "voice_id": "English_expressive_narrator",
+        "speech_text": "In the depths of the ocean, life takes forms we are only beginning to understand.",
+        "delivery": "authoritative",
+        "mood": "wonder"
+      }
+    },
+    {
+      "name": "voice_character",
+      "kind": "voice",
+      "task": {
+        "kind": "voice",
+        "prompt": "wise elderly wizard",
+        "template": "character",
+        "voice_id": "English_expressive_narrator",
+        "speech_text": "The stars remember what mortals forget.",
+        "mood": "mysterious",
+        "delivery": "theatrical"
+      }
+    }
+  ]
+}

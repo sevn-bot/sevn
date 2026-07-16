@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own everything under workspace/skills/: how skills are discovered, validated,
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
-last_updated: '2026-07-15'
-fingerprint: sha256:d673882ffd32bea1cc3567d4c8ebfe74c476097411b5fc4224d864131cccb431
+last_updated: '2026-07-16'
+fingerprint: sha256:b8d7c46dc8b26cb3e43a57b11a9f8e9c441ca1df5653094460b8d7ff4dcdf5cc
 related: []
 sources:
 - src/sevn/skills/**
@@ -296,6 +296,150 @@ interfaces:
 - name: success_envelope
   file: src/sevn/skills/errors.py
   symbol: success_envelope
+- name: GoogleWorkspacePaths
+  file: src/sevn/skills/google_workspace.py
+  symbol: GoogleWorkspacePaths
+- name: build_service
+  file: src/sevn/skills/google_workspace.py
+  symbol: build_service
+- name: check_auth
+  file: src/sevn/skills/google_workspace.py
+  symbol: check_auth
+- name: check_auth_live
+  file: src/sevn/skills/google_workspace.py
+  symbol: check_auth_live
+- name: client_secret_path
+  file: src/sevn/skills/google_workspace.py
+  symbol: client_secret_path
+- name: dry_run_requested
+  file: src/sevn/skills/google_workspace.py
+  symbol: dry_run_requested
+- name: ensure_google_deps
+  file: src/sevn/skills/google_workspace.py
+  symbol: ensure_google_deps
+- name: exchange_auth_code
+  file: src/sevn/skills/google_workspace.py
+  symbol: exchange_auth_code
+- name: get_auth_url
+  file: src/sevn/skills/google_workspace.py
+  symbol: get_auth_url
+- name: get_credentials
+  file: src/sevn/skills/google_workspace.py
+  symbol: get_credentials
+- name: get_valid_token_for_gws
+  file: src/sevn/skills/google_workspace.py
+  symbol: get_valid_token_for_gws
+- name: gws_binary
+  file: src/sevn/skills/google_workspace.py
+  symbol: gws_binary
+- name: install_deps
+  file: src/sevn/skills/google_workspace.py
+  symbol: install_deps
+- name: load_token_payload
+  file: src/sevn/skills/google_workspace.py
+  symbol: load_token_payload
+- name: missing_scopes_from_payload
+  file: src/sevn/skills/google_workspace.py
+  symbol: missing_scopes_from_payload
+- name: normalize_authorized_user_payload
+  file: src/sevn/skills/google_workspace.py
+  symbol: normalize_authorized_user_payload
+- name: paths
+  file: src/sevn/skills/google_workspace.py
+  symbol: paths
+- name: pending_auth_path
+  file: src/sevn/skills/google_workspace.py
+  symbol: pending_auth_path
+- name: prefer_gws_enabled
+  file: src/sevn/skills/google_workspace.py
+  symbol: prefer_gws_enabled
+- name: revoke_token
+  file: src/sevn/skills/google_workspace.py
+  symbol: revoke_token
+- name: run_gws
+  file: src/sevn/skills/google_workspace.py
+  symbol: run_gws
+- name: store_client_secret
+  file: src/sevn/skills/google_workspace.py
+  symbol: store_client_secret
+- name: token_path
+  file: src/sevn/skills/google_workspace.py
+  symbol: token_path
+- name: calendar_create
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: calendar_create
+- name: calendar_delete
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: calendar_delete
+- name: calendar_list
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: calendar_list
+- name: contacts_list
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: contacts_list
+- name: docs_append
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: docs_append
+- name: docs_create
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: docs_create
+- name: docs_get
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: docs_get
+- name: drive_create_folder
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: drive_create_folder
+- name: drive_delete
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: drive_delete
+- name: drive_download
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: drive_download
+- name: drive_get
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: drive_get
+- name: drive_search
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: drive_search
+- name: drive_share
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: drive_share
+- name: drive_upload
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: drive_upload
+- name: gmail_get
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: gmail_get
+- name: gmail_labels
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: gmail_labels
+- name: gmail_modify
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: gmail_modify
+- name: gmail_reply
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: gmail_reply
+- name: gmail_search
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: gmail_search
+- name: gmail_send
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: gmail_send
+- name: sheets_append
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: sheets_append
+- name: sheets_create
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: sheets_create
+- name: sheets_get
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: sheets_get
+- name: sheets_update
+  file: src/sevn/skills/google_workspace_api.py
+  symbol: sheets_update
+- name: probe_google_workspace_skill_warnings
+  file: src/sevn/skills/google_workspace_doctor_check.py
+  symbol: probe_google_workspace_skill_warnings
 - name: SkillsIndex
   file: src/sevn/skills/index.py
   symbol: SkillsIndex

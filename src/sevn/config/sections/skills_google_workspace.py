@@ -4,7 +4,6 @@ Module: sevn.config.sections.skills_google_workspace
 Depends: pydantic
 
 Exports:
-    GoogleWorkspaceServiceSet — valid ``default_services`` values.
     GoogleWorkspaceSkillConfig — full ``skills.google_workspace`` block.
     google_workspace_settings — effective settings accessor.
 """

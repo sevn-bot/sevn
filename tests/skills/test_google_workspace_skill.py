@@ -294,7 +294,9 @@ def test_install_deps_uses_uv_when_missing(
         return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
     monkeypatch.setattr(google_workspace, "ensure_google_deps", _ensure_toggle)
-    monkeypatch.setattr(google_workspace.shutil, "which", lambda name: "/usr/bin/uv" if name == "uv" else None)
+    monkeypatch.setattr(
+        google_workspace.shutil, "which", lambda name: "/usr/bin/uv" if name == "uv" else None
+    )
     monkeypatch.setattr(google_workspace.subprocess, "run", _fake_run)
 
     payload = google_workspace.install_deps()

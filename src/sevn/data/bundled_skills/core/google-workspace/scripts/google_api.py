@@ -122,7 +122,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--body", required=True)
     p.add_argument("--from", dest="from_header")
     p.add_argument("--dry-run", action="store_true")
-    p.set_defaults(handler=lambda ws, a: gmail_reply(ws, a.message_id, a.body, from_header=a.from_header))
+    p.set_defaults(
+        handler=lambda ws, a: gmail_reply(ws, a.message_id, a.body, from_header=a.from_header)
+    )
     p = gmail_sub.add_parser("labels")
     p.add_argument("--dry-run", action="store_true")
     p.set_defaults(handler=lambda ws, a: gmail_labels(ws))
@@ -223,7 +225,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default="reader",
         choices=["reader", "commenter", "writer", "fileOrganizer", "organizer", "owner"],
     )
-    p.add_argument("--type", dest="permission_type", default="user", choices=["user", "group", "domain", "anyone"])
+    p.add_argument(
+        "--type",
+        dest="permission_type",
+        default="user",
+        choices=["user", "group", "domain", "anyone"],
+    )
     p.add_argument("--email")
     p.add_argument("--domain")
     p.add_argument("--notify", action="store_true")

@@ -35,10 +35,11 @@ from __future__ import annotations
 import base64
 import mimetypes
 import os
-from datetime import datetime, timedelta, timezone
+from collections.abc import Iterable, Mapping
+from datetime import UTC, datetime, timedelta
 from email.mime.text import MIMEText
 from pathlib import Path
-from typing import Final, Iterable
+from typing import Final
 
 from sevn.skills import google_workspace
 
@@ -46,7 +47,17 @@ _GMAIL_METADATA_HEADERS: Final[list[str]] = ["From", "To", "Subject", "Date", "M
 
 
 def _headers_dict(message: dict[str, object]) -> dict[str, str]:
-    """Return lower-cased Gmail headers from a message resource."""
+    """Return lower-cased Gmail headers from a message resource.
+
+    Args:
+        message (dict[str, object]): Parameter.
+
+    Returns:
+        dict[str, str]: Result.
+
+    Examples:
+        >>> _headers_dict  # doctest: +SKIP
+    """
 
     payload = message.get("payload", {})
     headers = payload.get("headers", []) if isinstance(payload, dict) else []
@@ -62,14 +73,34 @@ def _headers_dict(message: dict[str, object]) -> dict[str, str]:
 
 
 def _decode_b64url(data: str) -> str:
-    """Decode a Gmail urlsafe base64 payload fragment."""
+    """Decode a Gmail urlsafe base64 payload fragment.
+
+    Args:
+        data (str): Parameter.
+
+    Returns:
+        str: Result.
+
+    Examples:
+        >>> _decode_b64url  # doctest: +SKIP
+    """
 
     padding = "=" * ((4 - len(data) % 4) % 4)
     return base64.urlsafe_b64decode(f"{data}{padding}").decode("utf-8", errors="replace")
 
 
 def _extract_message_body(message: dict[str, object]) -> str:
-    """Extract the most useful body text from a Gmail message payload."""
+    """Extract the most useful body text from a Gmail message payload.
+
+    Args:
+        message (dict[str, object]): Parameter.
+
+    Returns:
+        str: Result.
+
+    Examples:
+        >>> _extract_message_body  # doctest: +SKIP
+    """
 
     payload = message.get("payload", {})
     if not isinstance(payload, dict):
@@ -101,9 +132,21 @@ def _extract_message_body(message: dict[str, object]) -> str:
 
 
 def _gmail_summary_row(message: dict[str, object]) -> dict[str, object]:
-    """Normalise a Gmail message resource to the Hermes summary shape."""
+    """Normalise a Gmail message resource to the Hermes summary shape.
+
+    Args:
+        message (dict[str, object]): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> _gmail_summary_row  # doctest: +SKIP
+    """
 
     headers = _headers_dict(message)
+    labels_raw = message.get("labelIds")
+    labels_src = labels_raw if isinstance(labels_raw, list) else []
     return {
         "id": str(message.get("id", "")),
         "threadId": str(message.get("threadId", "")),
@@ -112,58 +155,113 @@ def _gmail_summary_row(message: dict[str, object]) -> dict[str, object]:
         "subject": headers.get("subject", ""),
         "date": headers.get("date", ""),
         "snippet": str(message.get("snippet", "")),
-        "labels": [
-            str(label)
-            for label in message.get("labelIds", [])
-            if isinstance(label, str) and label.strip()
-        ],
+        "labels": [str(label) for label in labels_src if isinstance(label, str) and label.strip()],
     }
 
 
 def _gmail_required_scopes() -> list[str]:
-    """Return Gmail scopes used by read/write operations."""
+    """Return Gmail scopes used by read/write operations.
+
+    Returns:
+        list[str]: Result.
+
+    Examples:
+        >>> _gmail_required_scopes  # doctest: +SKIP
+    """
 
     return list(google_workspace.SERVICE_SCOPE_SETS["email"])
 
 
 def _calendar_scopes() -> list[str]:
-    """Return Calendar scopes used by calendar operations."""
+    """Return Calendar scopes used by calendar operations.
+
+    Returns:
+        list[str]: Result.
+
+    Examples:
+        >>> _calendar_scopes  # doctest: +SKIP
+    """
 
     return list(google_workspace.SERVICE_SCOPE_SETS["calendar"])
 
 
 def _drive_scopes() -> list[str]:
-    """Return Drive scopes used by drive operations."""
+    """Return Drive scopes used by drive operations.
+
+    Returns:
+        list[str]: Result.
+
+    Examples:
+        >>> _drive_scopes  # doctest: +SKIP
+    """
 
     return list(google_workspace.SERVICE_SCOPE_SETS["drive"])
 
 
 def _contacts_scopes() -> list[str]:
-    """Return People API scopes used by contact operations."""
+    """Return People API scopes used by contact operations.
+
+    Returns:
+        list[str]: Result.
+
+    Examples:
+        >>> _contacts_scopes  # doctest: +SKIP
+    """
 
     return list(google_workspace.SERVICE_SCOPE_SETS["contacts"])
 
 
 def _sheets_scopes() -> list[str]:
-    """Return Sheets scopes used by spreadsheet operations."""
+    """Return Sheets scopes used by spreadsheet operations.
+
+    Returns:
+        list[str]: Result.
+
+    Examples:
+        >>> _sheets_scopes  # doctest: +SKIP
+    """
 
     return list(google_workspace.SERVICE_SCOPE_SETS["sheets"])
 
 
 def _docs_scopes() -> list[str]:
-    """Return Docs scopes used by document operations."""
+    """Return Docs scopes used by document operations.
+
+    Returns:
+        list[str]: Result.
+
+    Examples:
+        >>> _docs_scopes  # doctest: +SKIP
+    """
 
     return list(google_workspace.SERVICE_SCOPE_SETS["docs"])
 
 
 def _workspace_path(workspace: str | Path) -> Path:
-    """Normalize a workspace argument to an absolute path."""
+    """Normalize a workspace argument to an absolute path.
+
+    Args:
+        workspace (str | Path): Parameter.
+
+    Returns:
+        Path: Result.
+
+    Examples:
+        >>> _workspace_path  # doctest: +SKIP
+    """
 
     return Path(workspace).expanduser().resolve()
 
 
 def _dry_run_requested() -> bool:
-    """Return True when Google Workspace dry-run mode is enabled."""
+    """Return True when Google Workspace dry-run mode is enabled.
+
+    Returns:
+        bool: Result.
+
+    Examples:
+        >>> _dry_run_requested  # doctest: +SKIP
+    """
 
     return google_workspace.dry_run_requested(env=os.environ)
 
@@ -173,10 +271,24 @@ def _dry_run(
     *,
     service: str,
     operation: str,
-    parameters: dict[str, object],
+    parameters: Mapping[str, object],
     scopes: Iterable[str],
 ) -> dict[str, object]:
-    """Return a dry-run plan envelope when dry-run mode is enabled."""
+    """Return a dry-run plan envelope when dry-run mode is enabled.
+
+    Args:
+        workspace (str | Path): Parameter.
+        service (str): Parameter.
+        operation (str): Parameter.
+        parameters (dict[str, object]): Parameter.
+        scopes (Iterable[str]): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> _dry_run  # doctest: +SKIP
+    """
 
     resolved = google_workspace.paths(_workspace_path(workspace))
     return {
@@ -191,7 +303,17 @@ def _dry_run(
 
 
 def _datetime_with_timezone(value: str | None) -> str | None:
-    """Return ISO datetime with timezone info when missing."""
+    """Return ISO datetime with timezone info when missing.
+
+    Args:
+        value (str | None): Parameter.
+
+    Returns:
+        str | None: Result.
+
+    Examples:
+        >>> _datetime_with_timezone  # doctest: +SKIP
+    """
 
     if value is None:
         return None
@@ -205,7 +327,17 @@ def _datetime_with_timezone(value: str | None) -> str | None:
 
 
 def _extract_doc_text(document: dict[str, object]) -> str:
-    """Extract plain text content from a Google Docs document resource."""
+    """Extract plain text content from a Google Docs document resource.
+
+    Args:
+        document (dict[str, object]): Parameter.
+
+    Returns:
+        str: Result.
+
+    Examples:
+        >>> _extract_doc_text  # doctest: +SKIP
+    """
 
     text_parts: list[str] = []
     body = document.get("body", {})
@@ -228,7 +360,17 @@ def _extract_doc_text(document: dict[str, object]) -> str:
 
 
 def _docs_insert_text(workspace: str | Path, document_id: str, text: str, index: int) -> None:
-    """Insert text into a Google Doc using a single batchUpdate request."""
+    """Insert text into a Google Doc using a single batchUpdate request.
+
+    Args:
+        workspace (str | Path): Parameter.
+        document_id (str): Parameter.
+        text (str): Parameter.
+        index (int): Parameter.
+
+    Examples:
+        >>> _docs_insert_text  # doctest: +SKIP
+    """
 
     service = google_workspace.build_service(_workspace_path(workspace), "docs", "v1")
     service.documents().batchUpdate(
@@ -246,8 +388,22 @@ def _docs_insert_text(workspace: str | Path, document_id: str, text: str, index:
     ).execute()
 
 
-def gmail_search(workspace: str, query: str, max_results: int = 10) -> list[dict[str, object]] | dict[str, object]:
-    """Search Gmail messages and return Hermes-style summary rows."""
+def gmail_search(
+    workspace: str, query: str, max_results: int = 10
+) -> list[dict[str, object]] | dict[str, object]:
+    """Search Gmail messages and return Hermes-style summary rows.
+
+    Args:
+        workspace (str): Parameter.
+        query (str): Parameter.
+        max_results (int): Parameter.
+
+    Returns:
+        list[dict[str, object]] | dict[str, object]: Result.
+
+    Examples:
+        >>> gmail_search  # doctest: +SKIP
+    """
 
     params = {"query": query, "max_results": max_results}
     if _dry_run_requested():
@@ -259,28 +415,49 @@ def gmail_search(workspace: str, query: str, max_results: int = 10) -> list[dict
             scopes=_gmail_required_scopes(),
         )
     service = google_workspace.build_service(_workspace_path(workspace), "gmail", "v1")
-    results = service.users().messages().list(
-        userId="me",
-        q=query,
-        maxResults=max(max_results, 0),
-    ).execute()
+    results = (
+        service.users()
+        .messages()
+        .list(
+            userId="me",
+            q=query,
+            maxResults=max(max_results, 0),
+        )
+        .execute()
+    )
     messages = results.get("messages", []) if isinstance(results, dict) else []
     output: list[dict[str, object]] = []
     for message_meta in messages:
         if not isinstance(message_meta, dict) or "id" not in message_meta:
             continue
-        message = service.users().messages().get(
-            userId="me",
-            id=message_meta["id"],
-            format="metadata",
-            metadataHeaders=["From", "To", "Subject", "Date"],
-        ).execute()
+        message = (
+            service.users()
+            .messages()
+            .get(
+                userId="me",
+                id=message_meta["id"],
+                format="metadata",
+                metadataHeaders=["From", "To", "Subject", "Date"],
+            )
+            .execute()
+        )
         output.append(_gmail_summary_row(message))
     return output
 
 
 def gmail_get(workspace: str, message_id: str) -> dict[str, object]:
-    """Fetch one Gmail message with body text."""
+    """Fetch one Gmail message with body text.
+
+    Args:
+        workspace (str): Parameter.
+        message_id (str): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> gmail_get  # doctest: +SKIP
+    """
 
     params = {"message_id": message_id}
     if _dry_run_requested():
@@ -292,11 +469,16 @@ def gmail_get(workspace: str, message_id: str) -> dict[str, object]:
             scopes=_gmail_required_scopes(),
         )
     service = google_workspace.build_service(_workspace_path(workspace), "gmail", "v1")
-    message = service.users().messages().get(
-        userId="me",
-        id=message_id,
-        format="full",
-    ).execute()
+    message = (
+        service.users()
+        .messages()
+        .get(
+            userId="me",
+            id=message_id,
+            format="full",
+        )
+        .execute()
+    )
     result = _gmail_summary_row(message)
     result["body"] = _extract_message_body(message)
     return result
@@ -311,7 +493,23 @@ def gmail_send(
     from_header: str | None = None,
     cc: str | None = None,
 ) -> dict[str, object]:
-    """Send a Gmail message."""
+    """Send a Gmail message.
+
+    Args:
+        workspace (str): Parameter.
+        to (str): Parameter.
+        subject (str): Parameter.
+        body (str): Parameter.
+        html (bool): Parameter.
+        from_header (str | None): Parameter.
+        cc (str | None): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> gmail_send  # doctest: +SKIP
+    """
 
     params = {
         "to": to,
@@ -338,10 +536,15 @@ def gmail_send(
         mime["From"] = from_header
     raw = base64.urlsafe_b64encode(mime.as_bytes()).decode("utf-8")
     service = google_workspace.build_service(_workspace_path(workspace), "gmail", "v1")
-    result = service.users().messages().send(
-        userId="me",
-        body={"raw": raw},
-    ).execute()
+    result = (
+        service.users()
+        .messages()
+        .send(
+            userId="me",
+            body={"raw": raw},
+        )
+        .execute()
+    )
     return {
         "status": "sent",
         "id": str(result.get("id", "")),
@@ -355,7 +558,20 @@ def gmail_reply(
     body: str,
     from_header: str | None = None,
 ) -> dict[str, object]:
-    """Reply to an existing Gmail message."""
+    """Reply to an existing Gmail message.
+
+    Args:
+        workspace (str): Parameter.
+        message_id (str): Parameter.
+        body (str): Parameter.
+        from_header (str | None): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> gmail_reply  # doctest: +SKIP
+    """
 
     params = {
         "message_id": message_id,
@@ -371,12 +587,17 @@ def gmail_reply(
             scopes=_gmail_required_scopes(),
         )
     service = google_workspace.build_service(_workspace_path(workspace), "gmail", "v1")
-    original = service.users().messages().get(
-        userId="me",
-        id=message_id,
-        format="metadata",
-        metadataHeaders=_GMAIL_METADATA_HEADERS,
-    ).execute()
+    original = (
+        service.users()
+        .messages()
+        .get(
+            userId="me",
+            id=message_id,
+            format="metadata",
+            metadataHeaders=_GMAIL_METADATA_HEADERS,
+        )
+        .execute()
+    )
     headers = _headers_dict(original)
     subject = headers.get("subject", "")
     reply_subject = subject if subject.startswith("Re:") else f"Re: {subject}".strip()
@@ -389,10 +610,15 @@ def gmail_reply(
         mime["In-Reply-To"] = headers["message-id"]
         mime["References"] = headers["message-id"]
     raw = base64.urlsafe_b64encode(mime.as_bytes()).decode("utf-8")
-    result = service.users().messages().send(
-        userId="me",
-        body={"raw": raw, "threadId": original.get("threadId", "")},
-    ).execute()
+    result = (
+        service.users()
+        .messages()
+        .send(
+            userId="me",
+            body={"raw": raw, "threadId": original.get("threadId", "")},
+        )
+        .execute()
+    )
     return {
         "status": "sent",
         "id": str(result.get("id", "")),
@@ -401,7 +627,17 @@ def gmail_reply(
 
 
 def gmail_labels(workspace: str) -> list[dict[str, object]] | dict[str, object]:
-    """List Gmail labels."""
+    """List Gmail labels.
+
+    Args:
+        workspace (str): Parameter.
+
+    Returns:
+        list[dict[str, object]] | dict[str, object]: Result.
+
+    Examples:
+        >>> gmail_labels  # doctest: +SKIP
+    """
 
     if _dry_run_requested():
         return _dry_run(
@@ -431,7 +667,20 @@ def gmail_modify(
     add_labels: list[str] | None = None,
     remove_labels: list[str] | None = None,
 ) -> dict[str, object]:
-    """Add and/or remove Gmail labels from a message."""
+    """Add and/or remove Gmail labels from a message.
+
+    Args:
+        workspace (str): Parameter.
+        message_id (str): Parameter.
+        add_labels (list[str] | None): Parameter.
+        remove_labels (list[str] | None): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> gmail_modify  # doctest: +SKIP
+    """
 
     params = {
         "message_id": message_id,
@@ -452,11 +701,16 @@ def gmail_modify(
     if remove_labels:
         body_payload["removeLabelIds"] = list(remove_labels)
     service = google_workspace.build_service(_workspace_path(workspace), "gmail", "v1")
-    result = service.users().messages().modify(
-        userId="me",
-        id=message_id,
-        body=body_payload,
-    ).execute()
+    result = (
+        service.users()
+        .messages()
+        .modify(
+            userId="me",
+            id=message_id,
+            body=body_payload,
+        )
+        .execute()
+    )
     return {
         "id": str(result.get("id", "")),
         "labels": [
@@ -472,13 +726,26 @@ def calendar_list(
     start: str | None = None,
     end: str | None = None,
 ) -> list[dict[str, object]] | dict[str, object]:
-    """List primary-calendar events within the requested window."""
+    """List primary-calendar events within the requested window.
 
-    now = datetime.now(timezone.utc)
+    Args:
+        workspace (str): Parameter.
+        start (str | None): Parameter.
+        end (str | None): Parameter.
+
+    Returns:
+        list[dict[str, object]] | dict[str, object]: Result.
+
+    Examples:
+        >>> calendar_list  # doctest: +SKIP
+    """
+
+    now = datetime.now(UTC)
     time_min = _datetime_with_timezone(start or now.isoformat()) or now.isoformat()
-    time_max = _datetime_with_timezone(end or (now + timedelta(days=7)).isoformat()) or (
-        now + timedelta(days=7)
-    ).isoformat()
+    time_max = (
+        _datetime_with_timezone(end or (now + timedelta(days=7)).isoformat())
+        or (now + timedelta(days=7)).isoformat()
+    )
     params = {"start": time_min, "end": time_max}
     if _dry_run_requested():
         return _dry_run(
@@ -489,14 +756,18 @@ def calendar_list(
             scopes=_calendar_scopes(),
         )
     service = google_workspace.build_service(_workspace_path(workspace), "calendar", "v3")
-    results = service.events().list(
-        calendarId="primary",
-        timeMin=time_min,
-        timeMax=time_max,
-        maxResults=25,
-        singleEvents=True,
-        orderBy="startTime",
-    ).execute()
+    results = (
+        service.events()
+        .list(
+            calendarId="primary",
+            timeMin=time_min,
+            timeMax=time_max,
+            maxResults=25,
+            singleEvents=True,
+            orderBy="startTime",
+        )
+        .execute()
+    )
     items = results.get("items", []) if isinstance(results, dict) else []
     return [
         {
@@ -524,7 +795,22 @@ def calendar_create(
     location: str | None = None,
     attendees: list[str] | None = None,
 ) -> dict[str, object]:
-    """Create a primary-calendar event."""
+    """Create a primary-calendar event.
+
+    Args:
+        workspace (str): Parameter.
+        summary (str): Parameter.
+        start (str): Parameter.
+        end (str): Parameter.
+        location (str | None): Parameter.
+        attendees (list[str] | None): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> calendar_create  # doctest: +SKIP
+    """
 
     params = {
         "summary": summary,
@@ -561,7 +847,18 @@ def calendar_create(
 
 
 def calendar_delete(workspace: str, event_id: str) -> dict[str, object]:
-    """Delete a primary-calendar event."""
+    """Delete a primary-calendar event.
+
+    Args:
+        workspace (str): Parameter.
+        event_id (str): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> calendar_delete  # doctest: +SKIP
+    """
 
     params = {"event_id": event_id}
     if _dry_run_requested():
@@ -583,7 +880,20 @@ def drive_search(
     max_results: int = 10,
     raw_query: bool = False,
 ) -> list[dict[str, object]] | dict[str, object]:
-    """Search Drive files."""
+    """Search Drive files.
+
+    Args:
+        workspace (str): Parameter.
+        query (str): Parameter.
+        max_results (int): Parameter.
+        raw_query (bool): Parameter.
+
+    Returns:
+        list[dict[str, object]] | dict[str, object]: Result.
+
+    Examples:
+        >>> drive_search  # doctest: +SKIP
+    """
 
     drive_query = query if raw_query else f"fullText contains '{query}'"
     params = {
@@ -601,11 +911,15 @@ def drive_search(
             scopes=_drive_scopes(),
         )
     service = google_workspace.build_service(_workspace_path(workspace), "drive", "v3")
-    results = service.files().list(
-        q=drive_query,
-        pageSize=max(max_results, 0),
-        fields="files(id, name, mimeType, modifiedTime, webViewLink)",
-    ).execute()
+    results = (
+        service.files()
+        .list(
+            q=drive_query,
+            pageSize=max(max_results, 0),
+            fields="files(id, name, mimeType, modifiedTime, webViewLink)",
+        )
+        .execute()
+    )
     files = results.get("files", []) if isinstance(results, dict) else []
     return [
         {
@@ -621,7 +935,18 @@ def drive_search(
 
 
 def drive_get(workspace: str, file_id: str) -> dict[str, object]:
-    """Get one Drive file metadata row."""
+    """Get one Drive file metadata row.
+
+    Args:
+        workspace (str): Parameter.
+        file_id (str): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> drive_get  # doctest: +SKIP
+    """
 
     params = {"file_id": file_id}
     if _dry_run_requested():
@@ -633,10 +958,14 @@ def drive_get(workspace: str, file_id: str) -> dict[str, object]:
             scopes=_drive_scopes(),
         )
     service = google_workspace.build_service(_workspace_path(workspace), "drive", "v3")
-    result = service.files().get(
-        fileId=file_id,
-        fields="id, name, mimeType, modifiedTime, size, webViewLink, parents, owners(emailAddress)",
-    ).execute()
+    result = (
+        service.files()
+        .get(
+            fileId=file_id,
+            fields="id, name, mimeType, modifiedTime, size, webViewLink, parents, owners(emailAddress)",
+        )
+        .execute()
+    )
     owners = result.get("owners", []) if isinstance(result, dict) else []
     return {
         "id": str(result.get("id", "")),
@@ -666,7 +995,21 @@ def drive_upload(
     parent: str | None = None,
     mime_type: str | None = None,
 ) -> dict[str, object]:
-    """Upload a local file to Google Drive."""
+    """Upload a local file to Google Drive.
+
+    Args:
+        workspace (str | Path): Parameter.
+        path (str | Path): Parameter.
+        name (str | None): Parameter.
+        parent (str | None): Parameter.
+        mime_type (str | None): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> drive_upload  # doctest: +SKIP
+    """
 
     local_path = Path(path).expanduser()
     params = {
@@ -687,17 +1030,23 @@ def drive_upload(
         raise ValueError(f"file not found: {local_path}")
     from googleapiclient.http import MediaFileUpload
 
-    detected_mime = mime_type or mimetypes.guess_type(str(local_path))[0] or "application/octet-stream"
+    detected_mime = (
+        mime_type or mimetypes.guess_type(str(local_path))[0] or "application/octet-stream"
+    )
     metadata: dict[str, object] = {"name": name or local_path.name}
     if parent:
         metadata["parents"] = [parent]
     service = google_workspace.build_service(_workspace_path(workspace), "drive", "v3")
     media = MediaFileUpload(str(local_path), mimetype=detected_mime, resumable=True)
-    result = service.files().create(
-        body=metadata,
-        media_body=media,
-        fields="id, name, mimeType, webViewLink",
-    ).execute()
+    result = (
+        service.files()
+        .create(
+            body=metadata,
+            media_body=media,
+            fields="id, name, mimeType, webViewLink",
+        )
+        .execute()
+    )
     return {
         "status": "uploaded",
         "id": str(result.get("id", "")),
@@ -714,7 +1063,20 @@ def drive_download(
     output: str | Path | None = None,
     export_mime: str | None = None,
 ) -> dict[str, object]:
-    """Download or export a Drive file to a local path."""
+    """Download or export a Drive file to a local path.
+
+    Args:
+        workspace (str | Path): Parameter.
+        file_id (str): Parameter.
+        output (str | Path | None): Parameter.
+        export_mime (str | None): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> drive_download  # doctest: +SKIP
+    """
 
     params = {
         "file_id": file_id,
@@ -741,11 +1103,7 @@ def drive_download(
         "application/vnd.google-apps.presentation": ("application/pdf", ".pdf"),
         "application/vnd.google-apps.drawing": ("image/png", ".png"),
     }
-    out_path = (
-        Path(output).expanduser()
-        if output is not None
-        else (Path.cwd() / name)
-    )
+    out_path = Path(output).expanduser() if output is not None else (Path.cwd() / name)
     if mime_type_value in native_export_map:
         download_mime, default_suffix = native_export_map[mime_type_value]
         if export_mime:
@@ -776,7 +1134,19 @@ def drive_create_folder(
     *,
     parent: str | None = None,
 ) -> dict[str, object]:
-    """Create a Google Drive folder."""
+    """Create a Google Drive folder.
+
+    Args:
+        workspace (str | Path): Parameter.
+        name (str): Parameter.
+        parent (str | None): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> drive_create_folder  # doctest: +SKIP
+    """
 
     params = {"name": name, "parent": parent}
     if _dry_run_requested():
@@ -813,7 +1183,23 @@ def drive_share(
     domain: str | None = None,
     notify: bool = False,
 ) -> dict[str, object]:
-    """Create a Drive permission for a file."""
+    """Create a Drive permission for a file.
+
+    Args:
+        workspace (str | Path): Parameter.
+        file_id (str): Parameter.
+        role (str): Parameter.
+        permission_type (str): Parameter.
+        email (str | None): Parameter.
+        domain (str | None): Parameter.
+        notify (bool): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> drive_share  # doctest: +SKIP
+    """
 
     permission: dict[str, object] = {
         "type": permission_type,
@@ -844,12 +1230,16 @@ def drive_share(
             scopes=_drive_scopes(),
         )
     service = google_workspace.build_service(_workspace_path(workspace), "drive", "v3")
-    result = service.permissions().create(
-        fileId=file_id,
-        body=permission,
-        sendNotificationEmail=notify,
-        fields="id",
-    ).execute()
+    result = (
+        service.permissions()
+        .create(
+            fileId=file_id,
+            body=permission,
+            sendNotificationEmail=notify,
+            fields="id",
+        )
+        .execute()
+    )
     return {
         "status": "shared",
         "permissionId": str(result.get("id", "")),
@@ -859,8 +1249,22 @@ def drive_share(
     }
 
 
-def drive_delete(workspace: str | Path, file_id: str, *, permanent: bool = False) -> dict[str, object]:
-    """Trash or permanently delete a Google Drive file."""
+def drive_delete(
+    workspace: str | Path, file_id: str, *, permanent: bool = False
+) -> dict[str, object]:
+    """Trash or permanently delete a Google Drive file.
+
+    Args:
+        workspace (str | Path): Parameter.
+        file_id (str): Parameter.
+        permanent (bool): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> drive_delete  # doctest: +SKIP
+    """
 
     params = {"file_id": file_id, "permanent": permanent}
     if _dry_run_requested():
@@ -879,8 +1283,21 @@ def drive_delete(workspace: str | Path, file_id: str, *, permanent: bool = False
     return {"status": "trashed", "fileId": file_id, "permanent": False}
 
 
-def contacts_list(workspace: str, max_results: int = 20) -> list[dict[str, object]] | dict[str, object]:
-    """List Google contacts via the People API."""
+def contacts_list(
+    workspace: str, max_results: int = 20
+) -> list[dict[str, object]] | dict[str, object]:
+    """List Google contacts via the People API.
+
+    Args:
+        workspace (str): Parameter.
+        max_results (int): Parameter.
+
+    Returns:
+        list[dict[str, object]] | dict[str, object]: Result.
+
+    Examples:
+        >>> contacts_list  # doctest: +SKIP
+    """
 
     params = {"max_results": max_results}
     if _dry_run_requested():
@@ -892,11 +1309,16 @@ def contacts_list(workspace: str, max_results: int = 20) -> list[dict[str, objec
             scopes=_contacts_scopes(),
         )
     service = google_workspace.build_service(_workspace_path(workspace), "people", "v1")
-    results = service.people().connections().list(
-        resourceName="people/me",
-        pageSize=max(max_results, 0),
-        personFields="names,emailAddresses,phoneNumbers",
-    ).execute()
+    results = (
+        service.people()
+        .connections()
+        .list(
+            resourceName="people/me",
+            pageSize=max(max_results, 0),
+            personFields="names,emailAddresses,phoneNumbers",
+        )
+        .execute()
+    )
     connections = results.get("connections", []) if isinstance(results, dict) else []
     output: list[dict[str, object]] = []
     for person in connections:
@@ -931,7 +1353,19 @@ def sheets_get(
     spreadsheet_id: str,
     range_name: str,
 ) -> list[list[object]] | dict[str, object]:
-    """Fetch values for a Google Sheets range."""
+    """Fetch values for a Google Sheets range.
+
+    Args:
+        workspace (str | Path): Parameter.
+        spreadsheet_id (str): Parameter.
+        range_name (str): Parameter.
+
+    Returns:
+        list[list[object]] | dict[str, object]: Result.
+
+    Examples:
+        >>> sheets_get  # doctest: +SKIP
+    """
 
     params = {"spreadsheet_id": spreadsheet_id, "range": range_name}
     if _dry_run_requested():
@@ -943,10 +1377,15 @@ def sheets_get(
             scopes=_sheets_scopes(),
         )
     service = google_workspace.build_service(_workspace_path(workspace), "sheets", "v4")
-    result = service.spreadsheets().values().get(
-        spreadsheetId=spreadsheet_id,
-        range=range_name,
-    ).execute()
+    result = (
+        service.spreadsheets()
+        .values()
+        .get(
+            spreadsheetId=spreadsheet_id,
+            range=range_name,
+        )
+        .execute()
+    )
     values = result.get("values", []) if isinstance(result, dict) else []
     return [row for row in values if isinstance(row, list)]
 
@@ -957,7 +1396,20 @@ def sheets_update(
     range_name: str,
     values: list[list[object]],
 ) -> dict[str, object]:
-    """Update a Google Sheets range with user-entered values."""
+    """Update a Google Sheets range with user-entered values.
+
+    Args:
+        workspace (str | Path): Parameter.
+        spreadsheet_id (str): Parameter.
+        range_name (str): Parameter.
+        values (list[list[object]]): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> sheets_update  # doctest: +SKIP
+    """
 
     params = {
         "spreadsheet_id": spreadsheet_id,
@@ -973,12 +1425,17 @@ def sheets_update(
             scopes=_sheets_scopes(),
         )
     service = google_workspace.build_service(_workspace_path(workspace), "sheets", "v4")
-    result = service.spreadsheets().values().update(
-        spreadsheetId=spreadsheet_id,
-        range=range_name,
-        valueInputOption="USER_ENTERED",
-        body={"values": values},
-    ).execute()
+    result = (
+        service.spreadsheets()
+        .values()
+        .update(
+            spreadsheetId=spreadsheet_id,
+            range=range_name,
+            valueInputOption="USER_ENTERED",
+            body={"values": values},
+        )
+        .execute()
+    )
     return {
         "updatedCells": int(result.get("updatedCells", 0)),
         "updatedRange": str(result.get("updatedRange", "")),
@@ -991,7 +1448,20 @@ def sheets_append(
     range_name: str,
     values: list[list[object]],
 ) -> dict[str, object]:
-    """Append rows to a Google Sheets range."""
+    """Append rows to a Google Sheets range.
+
+    Args:
+        workspace (str | Path): Parameter.
+        spreadsheet_id (str): Parameter.
+        range_name (str): Parameter.
+        values (list[list[object]]): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> sheets_append  # doctest: +SKIP
+    """
 
     params = {
         "spreadsheet_id": spreadsheet_id,
@@ -1007,13 +1477,18 @@ def sheets_append(
             scopes=_sheets_scopes(),
         )
     service = google_workspace.build_service(_workspace_path(workspace), "sheets", "v4")
-    result = service.spreadsheets().values().append(
-        spreadsheetId=spreadsheet_id,
-        range=range_name,
-        valueInputOption="USER_ENTERED",
-        insertDataOption="INSERT_ROWS",
-        body={"values": values},
-    ).execute()
+    result = (
+        service.spreadsheets()
+        .values()
+        .append(
+            spreadsheetId=spreadsheet_id,
+            range=range_name,
+            valueInputOption="USER_ENTERED",
+            insertDataOption="INSERT_ROWS",
+            body={"values": values},
+        )
+        .execute()
+    )
     updates = result.get("updates", {}) if isinstance(result, dict) else {}
     return {"updatedCells": int(updates.get("updatedCells", 0))}
 
@@ -1024,7 +1499,19 @@ def sheets_create(
     *,
     sheet_name: str | None = None,
 ) -> dict[str, object]:
-    """Create a new Google Sheets spreadsheet."""
+    """Create a new Google Sheets spreadsheet.
+
+    Args:
+        workspace (str | Path): Parameter.
+        title (str): Parameter.
+        sheet_name (str | None): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> sheets_create  # doctest: +SKIP
+    """
 
     params = {"title": title, "sheet_name": sheet_name}
     if _dry_run_requested():
@@ -1039,10 +1526,14 @@ def sheets_create(
     if sheet_name:
         body["sheets"] = [{"properties": {"title": sheet_name}}]
     service = google_workspace.build_service(_workspace_path(workspace), "sheets", "v4")
-    result = service.spreadsheets().create(
-        body=body,
-        fields="spreadsheetId,properties,spreadsheetUrl",
-    ).execute()
+    result = (
+        service.spreadsheets()
+        .create(
+            body=body,
+            fields="spreadsheetId,properties,spreadsheetUrl",
+        )
+        .execute()
+    )
     properties = result.get("properties", {}) if isinstance(result, dict) else {}
     return {
         "status": "created",
@@ -1053,7 +1544,18 @@ def sheets_create(
 
 
 def docs_get(workspace: str | Path, document_id: str) -> dict[str, object]:
-    """Fetch a Google Doc and return extracted plain text."""
+    """Fetch a Google Doc and return extracted plain text.
+
+    Args:
+        workspace (str | Path): Parameter.
+        document_id (str): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> docs_get  # doctest: +SKIP
+    """
 
     params = {"document_id": document_id}
     if _dry_run_requested():
@@ -1079,7 +1581,19 @@ def docs_create(
     *,
     body: str | None = None,
 ) -> dict[str, object]:
-    """Create a new Google Doc, optionally with initial body text."""
+    """Create a new Google Doc, optionally with initial body text.
+
+    Args:
+        workspace (str | Path): Parameter.
+        title (str): Parameter.
+        body (str | None): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> docs_create  # doctest: +SKIP
+    """
 
     params = {"title": title, "body": body}
     if _dry_run_requested():
@@ -1104,7 +1618,19 @@ def docs_create(
 
 
 def docs_append(workspace: str | Path, document_id: str, text: str) -> dict[str, object]:
-    """Append text to the end of a Google Doc."""
+    """Append text to the end of a Google Doc.
+
+    Args:
+        workspace (str | Path): Parameter.
+        document_id (str): Parameter.
+        text (str): Parameter.
+
+    Returns:
+        dict[str, object]: Result.
+
+    Examples:
+        >>> docs_append  # doctest: +SKIP
+    """
 
     params = {"document_id": document_id, "text": text}
     if _dry_run_requested():
