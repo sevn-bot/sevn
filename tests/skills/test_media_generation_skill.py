@@ -130,6 +130,28 @@ class TestParseMediaTask:
         task = parse_media_task("music:lofi beat")
         assert task.kind == "music"
 
+    def test_video_i2v_task(self) -> None:
+        task = parse_media_task(
+            '{"kind":"video_i2v","prompt":"wind","first_frame_image":"photo.jpg","template":"subtle"}',
+        )
+        assert task.kind == "video_i2v"
+        assert task.first_frame_image == "photo.jpg"
+        assert task.template_key == "subtle"
+
+    def test_video_template_task(self) -> None:
+        task = parse_media_task(
+            '{"kind":"video_template","template_id":"pet_pilot","media_inputs":["pet.jpg"]}',
+        )
+        assert task.kind == "video_template"
+        assert task.template_id == "pet_pilot"
+
+    def test_voice_clone_task(self) -> None:
+        task = parse_media_task(
+            '{"kind":"voice","prompt":"narrator","source_audio":"sample.mp3","preview_text":"Hi"}',
+        )
+        assert task.kind == "voice"
+        assert task.source_audio == "sample.mp3"
+
 
 class TestSkillSpecialistBinding:
     """W8.3 skill→specialist grant merge."""
@@ -178,6 +200,8 @@ class TestMediaGeneratorSpawn:
         result = json.loads(out["data"]["result"])
         assert result["kind"] == "image"
         assert str(result["artifact_path"]).startswith("channel_files/sess-media/")
+        assert "trace" in result
+        assert result["trace"]["user_request"] == "a fox"
         artifact = workspace / str(result["artifact_path"])
         assert artifact.is_file()
         assert artifact.read_bytes() == image_bytes
@@ -317,6 +341,82 @@ class TestSpecialistConcurrency:
         assert second["ok"] is True
         assert third["ok"] is False
         assert "limit exceeded" in str(third.get("error", "")).lower()
+
+
+class TestExtendedMediaKinds:
+    """New media kinds with mocked MiniMax transport."""
+
+    @pytest.mark.asyncio
+    async def test_video_i2v_returns_trace(
+        self,
+        media_workspace: tuple[Path, sqlite3.Connection],
+    ) -> None:
+        workspace, conn = media_workspace
+        video_bytes = b"\x00\x00\x00\x18ftypmp4"
+        image_path = workspace / "frame.jpg"
+        image_path.write_bytes(b"\xff\xd8\xff fake")
+
+        with (
+            patch.dict(os.environ, {"MINIMAX_API_KEY": "sk-test-minimax"}),
+            patch(
+                "sevn.agent.subagents.media_worker.generate_video_from_image_bytes",
+                new=AsyncMock(return_value=video_bytes),
+            ),
+        ):
+            result = await execute_media_generator_task(
+                json.dumps(
+                    {
+                        "kind": "video_i2v",
+                        "prompt": "gentle wind",
+                        "first_frame_image": str(image_path),
+                        "template": "subtle",
+                    },
+                ),
+                session_id="sess-i2v",
+                content_root=workspace,
+                conn=conn,
+                subagents_cfg=_MEDIA_CFG,
+            )
+
+        assert result["kind"] == "video_i2v"
+        trace = result["trace"]
+        assert isinstance(trace, dict)
+        assert trace["template_key"] == "subtle"
+        assert "gentle wind" in str(trace["augmented_prompt"])
+
+    @pytest.mark.asyncio
+    async def test_voice_speak_mocked(
+        self,
+        media_workspace: tuple[Path, sqlite3.Connection],
+    ) -> None:
+        workspace, conn = media_workspace
+        audio_bytes = b"ID3fake"
+
+        with (
+            patch.dict(os.environ, {"MINIMAX_API_KEY": "sk-test-minimax"}),
+            patch(
+                "sevn.agent.subagents.media_worker.synthesize_speech_bytes",
+                new=AsyncMock(return_value=audio_bytes),
+            ),
+        ):
+            result = await execute_media_generator_task(
+                json.dumps(
+                    {
+                        "kind": "voice",
+                        "prompt": "calm narrator",
+                        "voice_id": "English_expressive_narrator",
+                        "speech_text": "Hello world",
+                    },
+                ),
+                session_id="sess-voice",
+                content_root=workspace,
+                conn=conn,
+                subagents_cfg=_MEDIA_CFG,
+            )
+
+        assert result["kind"] == "voice"
+        assert result["voice_id"] == "English_expressive_narrator"
+        assert "trace" in result
 
 
 @pytest.mark.skipif(

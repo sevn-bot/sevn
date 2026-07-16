@@ -22,7 +22,17 @@ from sevn.agent.subagents.media_worker import execute_media_generator_task
 from sevn.config.loader import load_workspace
 from sevn.lcm.script_cli import open_workspace_db, write_error, write_ok, workspace_from_env
 
-MediaKind = Literal["image", "video", "music"]
+MediaKind = Literal[
+    "image",
+    "image_i2i",
+    "video",
+    "video_i2v",
+    "video_s2v",
+    "video_fl2v",
+    "video_template",
+    "music",
+    "voice",
+]
 
 
 def content_root_from_env() -> Path:
