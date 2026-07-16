@@ -36,7 +36,7 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | lcm | Lossless context search, drill-back, and conversation index (`specs/15-memory-lcm.md`). |
 | linkedin-use | LinkedIn staff/company/connection scraping via logged-in browser + Voyager API (StaffSpy port). |
 | lume | Apple-Silicon VM lifecycle via the lume CLI (run/stop/ls/pull); opt-in; also a computer-use sandbox target via `cua do switch lume` |
-| media_generation | Generate images, video, and music via the MiniMax-backed media_generator specialist (spec 36 D8). |
+| media_generation | MiniMax media generation — 9 API paths, scene/style variables, 40+ prompt templates, 16 video agent templates, voice, music — via media_generator L2 specialist. |
 | mycode | Deterministic repo scan + MYCODE.md write (`specs/28-code-understanding.md` §2.4). |
 | openwiki | LLM-generated agent wiki for a codebase (LangChain OpenWiki CLI). |
 | pdf | Render markdown/HTML to workspace PDFs; extract text/tables; structured load/chunk. |
