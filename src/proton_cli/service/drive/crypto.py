@@ -9,8 +9,9 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-from proton_cli.account.keys import persist_unlock, use_unlocked_key
 from pgpy import PGPKey, PGPMessage
+
+from proton_cli.account.keys import persist_unlock, use_unlocked_key
 
 
 @dataclass

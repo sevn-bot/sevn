@@ -11,7 +11,6 @@ import httpx
 from pgpy import PGPKey, PGPMessage
 
 from proton_cli.account.keys import use_unlocked_key
-
 from proton_cli.errors import NotFound
 from proton_cli.proton.client import Client, Request
 from proton_cli.service.drive import blocks, crypto, paths

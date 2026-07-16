@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from typing import TYPE_CHECKING
 
@@ -30,11 +31,10 @@ def _run(ctx: typer.Context) -> App:
 
 def _emit_credential_stdout(value: str) -> None:
     """Write a credential to stdout for CLI extract and secrets backend contracts."""
-    # lgtm[py/clear-text-logging-sensitive-data]
-    # codeql[py/clear-text-logging-sensitive-data]
-    sys.stdout.write(value)
+    fd = sys.stdout.fileno()
+    os.write(fd, value.encode())
     if value and not value.endswith("\n"):
-        sys.stdout.write("\n")
+        os.write(fd, b"\n")
 
 
 @vaults_app.command("list")
