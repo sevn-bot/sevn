@@ -35,7 +35,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate an image via media_generator")
     parser.add_argument("prompt", help="Short image intent (augmented with templates)")
     parser.add_argument("--aspect-ratio", default="1:1", dest="aspect_ratio")
-    parser.add_argument("--template", default=None, help="Template slug: default, portrait, product, illustration")
+    parser.add_argument(
+        "--template", default=None, help="Template slug: default, portrait, product, illustration"
+    )
     args = parser.parse_args()
     extra: dict[str, object] = {"aspect_ratio": args.aspect_ratio}
     if args.template:

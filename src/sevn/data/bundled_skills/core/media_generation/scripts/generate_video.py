@@ -36,8 +36,12 @@ def main() -> int:
     parser.add_argument("prompt", help="Short video intent (augmented with templates)")
     parser.add_argument("--duration", type=int, default=6)
     parser.add_argument("--resolution", default="720P")
-    parser.add_argument("--template", default=None, help="Template slug: default, commercial, nature")
-    parser.add_argument("--image", default=None, dest="first_frame_image", help="Optional first-frame image for i2v")
+    parser.add_argument(
+        "--template", default=None, help="Template slug: default, commercial, nature"
+    )
+    parser.add_argument(
+        "--image", default=None, dest="first_frame_image", help="Optional first-frame image for i2v"
+    )
     args = parser.parse_args()
     extra: dict[str, object] = {"duration": args.duration, "resolution": args.resolution}
     if args.template:

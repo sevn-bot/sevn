@@ -18,7 +18,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Image-to-image via media_generator")
     parser.add_argument("prompt", help="Short transformation intent")
     parser.add_argument("reference", help="Reference portrait path or URL")
-    parser.add_argument("--template", default=None, help="default|style_transfer|wardrobe|background")
+    parser.add_argument(
+        "--template", default=None, help="default|style_transfer|wardrobe|background"
+    )
     parser.add_argument("--scene", default=None)
     parser.add_argument("--style", default=None)
     parser.add_argument("--mood", default=None)

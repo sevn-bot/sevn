@@ -37,7 +37,7 @@ def main() -> int:
 
     clone = sub.add_parser("clone", help="Clone voice from source audio sample")
     clone.add_argument("prompt", help="Short voice character intent (augmented with templates)")
-    clone.add_argument("source_audio", help="Source audio path (mp3/m4a/wav, 10s–5min)")
+    clone.add_argument("source_audio", help="Source audio path (mp3/m4a/wav, 10s-5min)")
     clone.add_argument("--voice-id", default=None, dest="voice_id")
     clone.add_argument("--preview-text", default=None, dest="preview_text")
     clone.add_argument("--speech-text", default=None, dest="speech_text")

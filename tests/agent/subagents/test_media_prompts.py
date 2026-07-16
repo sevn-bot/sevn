@@ -42,7 +42,7 @@ class TestAugmentPrompt:
         assert key == "default"
 
     def test_empty_request_raises(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="user_request must be non-empty"):
             augment_prompt("image", "  ")
 
 
@@ -58,7 +58,7 @@ class TestVideoAgentTemplates:
         assert t.slug == "run_for_life"
 
     def test_unknown_template_raises(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="unknown video agent template"):
             resolve_video_agent_template("not_a_template")
 
     def test_list_prompt_templates(self) -> None:

@@ -35,7 +35,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate video from image via media_generator")
     parser.add_argument("prompt", help="Short motion/scene intent (augmented with templates)")
     parser.add_argument("image", help="First-frame image path or URL")
-    parser.add_argument("--template", default=None, help="Prompt template slug (default, subtle, dynamic)")
+    parser.add_argument(
+        "--template", default=None, help="Prompt template slug (default, subtle, dynamic)"
+    )
     parser.add_argument("--duration", type=int, default=6)
     parser.add_argument("--resolution", default="1080P")
     args = parser.parse_args()

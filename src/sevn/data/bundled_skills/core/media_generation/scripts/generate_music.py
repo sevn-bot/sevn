@@ -36,7 +36,9 @@ def main() -> int:
     parser.add_argument("prompt", help="Short music intent (augmented with templates)")
     parser.add_argument("--lyrics", default=None, help="Optional vocal lyrics")
     parser.add_argument("--instrumental", action="store_true")
-    parser.add_argument("--template", default=None, help="Template slug: default, lofi, cinematic, jingle")
+    parser.add_argument(
+        "--template", default=None, help="Template slug: default, lofi, cinematic, jingle"
+    )
     args = parser.parse_args()
     extra: dict[str, object] = {"is_instrumental": bool(args.instrumental)}
     if args.lyrics:

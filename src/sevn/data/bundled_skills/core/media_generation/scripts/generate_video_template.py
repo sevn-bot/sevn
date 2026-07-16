@@ -66,7 +66,9 @@ def main() -> int:
     }
     if args.prompt:
         extra["prompt"] = args.prompt
-    exit_code: int = run_media_generation("video_template", args.prompt or args.template, extra=extra)
+    exit_code: int = run_media_generation(
+        "video_template", args.prompt or args.template, extra=extra
+    )
     return exit_code
 
 

@@ -7,14 +7,17 @@ Depends: asyncio, base64, httpx, loguru
 
 Exports:
     MiniMaxMediaError — typed failure from MiniMax media APIs.
-    generate_image_bytes — POST ``/v1/image_generation`` → JPEG bytes.
-    generate_video_bytes — async video task poll + download → MP4 bytes.
-    generate_video_from_image_bytes — image-to-video with optional text prompt.
-    generate_video_template_bytes — Video Agent template generation → MP4 bytes.
-    clone_voice_bytes — upload + clone voice; optional preview TTS → MP3 bytes.
-    synthesize_speech_bytes — T2A with cloned or system voice → MP3 bytes.
     upload_file_bytes — multipart upload for voice_clone / prompt_audio.
-    generate_music_bytes — POST ``/v1/music_generation`` → MP3 bytes.
+    generate_image_bytes — POST ``/v1/image_generation`` (text-to-image).
+    generate_image_from_reference_bytes — image-to-image from reference portrait.
+    generate_video_bytes — async text-to-video task poll + download.
+    generate_video_from_image_bytes — image-to-video with optional text prompt.
+    generate_video_subject_reference_bytes — face-consistent subject-reference video.
+    generate_video_first_last_frame_bytes — interpolate between first and last frames.
+    generate_video_template_bytes — Video Agent template generation.
+    clone_voice_bytes — upload + clone voice; optional preview TTS.
+    synthesize_speech_bytes — T2A with cloned or system voice.
+    generate_music_bytes — POST ``/v1/music_generation``.
 
 Examples:
     >>> from sevn.agent.subagents.media_minimax import DEFAULT_IMAGE_MODEL
@@ -299,6 +302,11 @@ async def generate_image_from_reference_bytes(
 
     Raises:
         MiniMaxMediaError: On transport or API failure.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(generate_image_from_reference_bytes)
+        True
     """
     body = {
         "model": model,
@@ -344,7 +352,26 @@ async def _create_and_download_video(
     poll_interval_s: float,
     max_polls: int,
 ) -> bytes:
-    """POST video_generation, poll, and download MP4 bytes."""
+    """POST ``/v1/video_generation``, poll, and download MP4 bytes.
+
+    Args:
+        http (httpx.AsyncClient): Shared async client.
+        api_key (str): Resolved MiniMax API key.
+        body (dict[str, Any]): Video generation request body.
+        poll_interval_s (float): Sleep between status polls.
+        max_polls (int): Maximum poll attempts.
+
+    Returns:
+        bytes: Downloaded MP4 bytes.
+
+    Raises:
+        MiniMaxMediaError: On transport, poll failure, or timeout.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_create_and_download_video)
+        True
+    """
     response = await http.post(
         f"{MINIMAX_MEDIA_BASE_URL}/video_generation",
         headers=_auth_headers(api_key),
@@ -375,7 +402,29 @@ async def generate_video_subject_reference_bytes(
     max_polls: int = _DEFAULT_VIDEO_MAX_POLLS,
     client: httpx.AsyncClient | None = None,
 ) -> bytes:
-    """Subject-reference video (face-consistent character clip)."""
+    """Generate subject-reference video with face-consistent character.
+
+    Args:
+        api_key (str): Resolved MiniMax API key.
+        prompt (str): Template-augmented action description.
+        subject_reference (str): Face reference image URL or workspace path.
+        model (str, optional): S2V model. Defaults to ``S2V-01``.
+        content_root (Path | None, optional): Workspace root for relative paths.
+        poll_interval_s (float, optional): Poll interval.
+        max_polls (int, optional): Max poll attempts.
+        client (httpx.AsyncClient | None, optional): Injectable client for tests.
+
+    Returns:
+        bytes: MP4 bytes.
+
+    Raises:
+        MiniMaxMediaError: On transport or API failure.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(generate_video_subject_reference_bytes)
+        True
+    """
     body: dict[str, Any] = {
         "model": model,
         "prompt": prompt.strip(),
@@ -390,7 +439,11 @@ async def generate_video_subject_reference_bytes(
     http = client or httpx.AsyncClient(timeout=_DEFAULT_HTTP_TIMEOUT_S)
     try:
         return await _create_and_download_video(
-            http, api_key, body, poll_interval_s=poll_interval_s, max_polls=max_polls,
+            http,
+            api_key,
+            body,
+            poll_interval_s=poll_interval_s,
+            max_polls=max_polls,
         )
     finally:
         if owns:
@@ -411,7 +464,32 @@ async def generate_video_first_last_frame_bytes(
     max_polls: int = _DEFAULT_VIDEO_MAX_POLLS,
     client: httpx.AsyncClient | None = None,
 ) -> bytes:
-    """First-and-last-frame video interpolation (MiniMax-Hailuo-02)."""
+    """Generate video interpolating between first and last frame images.
+
+    Args:
+        api_key (str): Resolved MiniMax API key.
+        prompt (str): Template-augmented transition description.
+        first_frame_image (str): Opening frame URL or workspace path.
+        last_frame_image (str): Closing frame URL or workspace path.
+        model (str, optional): FL2V model. Defaults to ``MiniMax-Hailuo-02``.
+        duration (int, optional): Clip duration seconds.
+        resolution (str, optional): Output resolution label.
+        content_root (Path | None, optional): Workspace root for relative paths.
+        poll_interval_s (float, optional): Poll interval.
+        max_polls (int, optional): Max poll attempts.
+        client (httpx.AsyncClient | None, optional): Injectable client for tests.
+
+    Returns:
+        bytes: MP4 bytes.
+
+    Raises:
+        MiniMaxMediaError: On transport or API failure.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(generate_video_first_last_frame_bytes)
+        True
+    """
     body: dict[str, Any] = {
         "model": model,
         "prompt": prompt.strip(),
@@ -424,7 +502,11 @@ async def generate_video_first_last_frame_bytes(
     http = client or httpx.AsyncClient(timeout=_DEFAULT_HTTP_TIMEOUT_S)
     try:
         return await _create_and_download_video(
-            http, api_key, body, poll_interval_s=poll_interval_s, max_polls=max_polls,
+            http,
+            api_key,
+            body,
+            poll_interval_s=poll_interval_s,
+            max_polls=max_polls,
         )
     finally:
         if owns:
@@ -745,7 +827,9 @@ async def generate_video_template_bytes(
         body["text_inputs"] = [{"value": t.strip()} for t in text_inputs if t.strip()]
     if media_inputs:
         resolved = [
-            _resolve_image_ref(ref, content_root=content_root) for ref in media_inputs if ref.strip()
+            _resolve_image_ref(ref, content_root=content_root)
+            for ref in media_inputs
+            if ref.strip()
         ]
         body["media_inputs"] = [{"value": v} for v in resolved]
     owns = client is None
@@ -856,13 +940,13 @@ async def clone_voice_bytes(
 ) -> tuple[str, bytes | None]:
     """Clone a voice and optionally synthesize a preview clip.
 
-    Uploads source audio (10s–5min), calls ``/v1/voice_clone``, and when
+    Uploads source audio (10s-5min), calls ``/v1/voice_clone``, and when
     ``preview_text`` is set returns synthesized preview MP3 bytes.
 
     Args:
         api_key (str): Resolved MiniMax API key.
         source_audio (bytes): Source audio for cloning (mp3/m4a/wav).
-        voice_id (str): Custom voice id (8–256 chars, starts with letter).
+        voice_id (str): Custom voice id (8-256 chars, starts with letter).
         source_filename (str, optional): Filename for upload. Defaults to ``voice_sample.mp3``.
         preview_text (str | None, optional): Text for preview synthesis after clone.
         prompt_audio (bytes | None, optional): Optional <8s prompt sample for quality.

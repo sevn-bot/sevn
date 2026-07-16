@@ -26,7 +26,7 @@ import json
 import os
 import re
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -118,7 +118,7 @@ class MediaTask:
     reference_image: str | None = None
     subject_reference: str | None = None
     last_frame_image: str | None = None
-    prompt_vars: MediaPromptVars = MediaPromptVars()
+    prompt_vars: MediaPromptVars = field(default_factory=MediaPromptVars)
 
 
 def _coerce_str_list(raw: object) -> tuple[str, ...]:
@@ -199,9 +199,15 @@ def parse_media_task(task: str) -> MediaTask:
         if kind != "video_template" and not prompt:
             msg = "media task JSON requires prompt (short user intent)"
             raise ValueError(msg)
-        template_ref = str(
-            raw.get("template_id") or raw.get("template_slug") or raw.get("video_template") or "",
-        ).strip() or None
+        template_ref = (
+            str(
+                raw.get("template_id")
+                or raw.get("template_slug")
+                or raw.get("video_template")
+                or "",
+            ).strip()
+            or None
+        )
         return MediaTask(
             kind=kind,  # type: ignore[arg-type]
             prompt=prompt,
@@ -223,11 +229,15 @@ def parse_media_task(task: str) -> MediaTask:
             prompt_audio=(str(raw["prompt_audio"]).strip() if raw.get("prompt_audio") else None),
             prompt_text=(str(raw["prompt_text"]).strip() if raw.get("prompt_text") else None),
             speech_text=(str(raw["speech_text"]).strip() if raw.get("speech_text") else None),
-            reference_image=(str(raw["reference_image"]).strip() if raw.get("reference_image") else None),
+            reference_image=(
+                str(raw["reference_image"]).strip() if raw.get("reference_image") else None
+            ),
             subject_reference=(
                 str(raw["subject_reference"]).strip() if raw.get("subject_reference") else None
             ),
-            last_frame_image=(str(raw["last_frame_image"]).strip() if raw.get("last_frame_image") else None),
+            last_frame_image=(
+                str(raw["last_frame_image"]).strip() if raw.get("last_frame_image") else None
+            ),
             prompt_vars=MediaPromptVars.from_mapping(raw),
         )
     if ":" in text:
@@ -236,10 +246,7 @@ def parse_media_task(task: str) -> MediaTask:
         prompt = tail.strip()
         if kind in ("image", "video", "video_i2v", "music", "voice") and prompt:
             return MediaTask(kind=kind, prompt=prompt)  # type: ignore[arg-type]
-    msg = (
-        "media task must be JSON or kind:prompt "
-        "(image|video|video_i2v|music|voice)"
-    )
+    msg = "media task must be JSON or kind:prompt (image|video|video_i2v|music|voice)"
     raise ValueError(msg)
 
 
@@ -461,7 +468,22 @@ def _augment_task(
     *,
     prompt_override: str | None = None,
 ) -> tuple[str, str, dict[str, str]]:
-    """Augment prompt with task template + structured variables."""
+    """Augment prompt with task template and structured variables.
+
+    Args:
+        kind (str): Media prompt family passed to :func:`augment_prompt`.
+        media_task (MediaTask): Parsed task with template key and vars.
+        prompt_override (str | None, optional): Replace ``media_task.prompt`` when set.
+
+    Returns:
+        tuple[str, str, dict[str, str]]: ``(template_key, augmented_prompt, format_context)``.
+
+    Examples:
+        >>> from sevn.agent.subagents.media_worker import MediaTask, _augment_task
+        >>> key, text, ctx = _augment_task("image", MediaTask(kind="image", prompt="fox"))
+        >>> key == "default" and "fox" in text
+        True
+    """
     prompt = (prompt_override or media_task.prompt).strip()
     template_key, augmented, ctx = augment_prompt(
         kind,  # type: ignore[arg-type]
@@ -727,7 +749,9 @@ async def execute_media_generator_task(
             if preview_bytes is not None:
                 data = preview_bytes
             elif media_task.speech_text and voice_id:
-                _, speech_aug, _ = _augment_task("voice", media_task, prompt_override=media_task.speech_text)
+                _, speech_aug, _ = _augment_task(
+                    "voice", media_task, prompt_override=media_task.speech_text
+                )
                 data = await synthesize_speech_bytes(
                     api_key,
                     speech_aug,
@@ -759,7 +783,9 @@ async def execute_media_generator_task(
                 "voice requires source_audio (clone) or voice_id + speech_text (TTS)",
             )
 
-    filename = _safe_filename(media_task.kind, media_task.prompt or media_task.template_id or "media")
+    filename = _safe_filename(
+        media_task.kind, media_task.prompt or media_task.template_id or "media"
+    )
     rel_path = await _persist_bytes(
         conn=conn,
         content_root=content_root,
