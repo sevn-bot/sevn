@@ -7,8 +7,8 @@ owner: Alex
 summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–§5.2):
   a single, tool-less outbound generation step that emits validated TriageResult consumed
   by tier dispatch (A / B / C / D), MCP e'
-last_updated: '2026-07-15'
-fingerprint: sha256:894b4e6aad417fe06e86f82706174b0f9749f2cedd0b229a59a89a1d5468566a
+last_updated: '2026-07-16'
+fingerprint: sha256:8582110e28c032e5586e3f36033792020d20f179d931315adeb306711f77d098
 related: []
 sources:
 - src/sevn/agent/**
@@ -764,15 +764,63 @@ interfaces:
 - name: MiniMaxMediaError
   file: src/sevn/agent/subagents/media_minimax.py
   symbol: MiniMaxMediaError
+- name: clone_voice_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: clone_voice_bytes
 - name: generate_image_bytes
   file: src/sevn/agent/subagents/media_minimax.py
   symbol: generate_image_bytes
+- name: generate_image_from_reference_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_image_from_reference_bytes
 - name: generate_music_bytes
   file: src/sevn/agent/subagents/media_minimax.py
   symbol: generate_music_bytes
 - name: generate_video_bytes
   file: src/sevn/agent/subagents/media_minimax.py
   symbol: generate_video_bytes
+- name: generate_video_first_last_frame_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_video_first_last_frame_bytes
+- name: generate_video_from_image_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_video_from_image_bytes
+- name: generate_video_subject_reference_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_video_subject_reference_bytes
+- name: generate_video_template_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_video_template_bytes
+- name: synthesize_speech_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: synthesize_speech_bytes
+- name: upload_file_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: upload_file_bytes
+- name: MediaPromptVars
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: MediaPromptVars
+- name: PromptTemplateMeta
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: PromptTemplateMeta
+- name: VideoAgentTemplate
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: VideoAgentTemplate
+- name: augment_prompt
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: augment_prompt
+- name: build_media_trace
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: build_media_trace
+- name: list_prompt_templates
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: list_prompt_templates
+- name: list_video_agent_templates
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: list_video_agent_templates
+- name: resolve_video_agent_template
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: resolve_video_agent_template
 - name: MediaTask
   file: src/sevn/agent/subagents/media_worker.py
   symbol: MediaTask
