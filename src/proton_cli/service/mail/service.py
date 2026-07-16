@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from pgpy import PGPMessage
 
-from proton_cli.account.keys import Unlocked
+if TYPE_CHECKING:
+    from proton_cli.account.keys import Unlocked
 from proton_cli.proton.client import Client, Request
 from proton_cli.ref import pick
 from proton_cli.service.mail import crypto as mail_crypto
@@ -187,9 +189,7 @@ class MailService:
                 return msg.id
         needle = message_ref.lower()
         matches = [
-            m
-            for m in messages
-            if needle in m.subject.lower() or needle in m.from_address.lower()
+            m for m in messages if needle in m.subject.lower() or needle in m.from_address.lower()
         ]
         chosen = pick(
             "message",
@@ -412,4 +412,4 @@ def _dedupe(emails: list[str]) -> list[str]:
 
 
 def _parse_date(value: str) -> int:
-    return int(datetime.strptime(value, "%Y-%m-%d").timestamp())
+    return int(datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=UTC).timestamp())

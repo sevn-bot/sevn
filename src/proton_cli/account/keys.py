@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 from dataclasses import dataclass, field
 
 import pgpy
@@ -145,7 +144,9 @@ def _get_addresses(client: Client) -> list[Address]:
     return out
 
 
-def _unlock_keys(keys: list[Key], passphrase: bytes, user_keys: list[PGPKey] | None) -> list[PGPKey]:
+def _unlock_keys(
+    keys: list[Key], passphrase: bytes, user_keys: list[PGPKey] | None
+) -> list[PGPKey]:
     unlocked: list[PGPKey] = []
     for key in keys:
         if key.active == 0 or not key.private_key:

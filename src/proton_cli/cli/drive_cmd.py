@@ -6,11 +6,14 @@ import io
 import sys
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import typer
 
-from proton_cli.app import App
 from proton_cli.service.drive.service import UploadOptions
+
+if TYPE_CHECKING:
+    from proton_cli.app import App
 
 app = typer.Typer(name="drive", no_args_is_help=True, add_completion=False)
 

@@ -4,8 +4,8 @@ from .user import User
 from .util import PM_VERSION, mailbox_password, mailbox_password_secret
 
 __all__ = [
-    "PMHash",
     "PM_VERSION",
+    "PMHash",
     "User",
     "mailbox_password",
     "mailbox_password_secret",

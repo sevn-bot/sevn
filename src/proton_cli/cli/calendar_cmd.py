@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 import typer
 
-from proton_cli.app import App
 from proton_cli.service.calendar.service import default_range
+
+if TYPE_CHECKING:
+    from proton_cli.app import App
 
 app = typer.Typer(name="calendar", no_args_is_help=True, add_completion=False)
 
@@ -50,9 +53,9 @@ def events_list(
     cal_id = proton_app.calendar_svc.resolve_calendar_id(calendar)
     range_start, range_end = default_range()
     if start:
-        range_start = datetime.strptime(start, "%Y-%m-%d")
+        range_start = datetime.strptime(start, "%Y-%m-%d").replace(tzinfo=UTC)
     if end:
-        range_end = datetime.strptime(end, "%Y-%m-%d")
+        range_end = datetime.strptime(end, "%Y-%m-%d").replace(tzinfo=UTC)
     rows = proton_app.calendar_svc.events_list(unlocked, cal_id, range_start, range_end)
     if proton_app.renderer.format.value != "text":
         proton_app.renderer.object({"events": rows})
