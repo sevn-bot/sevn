@@ -6,7 +6,6 @@ Depends: json, re, subprocess
 Exports:
     GhCliMissingError — raised when the ``gh`` binary is not on PATH.
     map_gh_cli_error — map ``gh`` stderr to a precise operator message.
-    map_gh_issue_create_error — alias of :func:`map_gh_cli_error` (compat).
     run_gh — run a fixed ``gh`` argv and return ``CompletedProcess``.
     create_issue_via_gh — create an issue via authenticated ``gh issue create``.
     view_issue_via_gh — view an issue via authenticated ``gh issue view --json``.
@@ -90,29 +89,6 @@ def map_gh_cli_error(
     if "proxy status" in lowered:
         return f"repository not found: {repo}"
     return text or f"gh command failed for {repo}"
-
-
-def map_gh_issue_create_error(
-    stderr: str,
-    *,
-    repo: str,
-    labels: list[str] | None = None,
-) -> str:
-    """Alias of :func:`map_gh_cli_error` (create-path compatibility).
-
-    Args:
-        stderr (str): Combined stderr from ``gh``.
-        repo (str): ``owner/repo`` slug.
-        labels (list[str] | None, optional): Labels for mapping.
-
-    Returns:
-        str: Operator-facing error string.
-
-    Examples:
-        >>> map_gh_issue_create_error("please run: gh auth login", repo="o/r")
-        'gh not authenticated (run: gh auth login)'
-    """
-    return map_gh_cli_error(stderr, repo=repo, labels=labels)
 
 
 def run_gh(cmd: list[str]) -> subprocess.CompletedProcess[str]:
@@ -270,7 +246,6 @@ __all__ = [
     "GhCliMissingError",
     "create_issue_via_gh",
     "map_gh_cli_error",
-    "map_gh_issue_create_error",
     "run_gh",
     "view_issue_via_gh",
 ]

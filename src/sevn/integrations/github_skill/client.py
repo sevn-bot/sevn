@@ -1,10 +1,11 @@
 """Shared GitHub skill helpers — repo parsing and integration dispatch.
 
 Module: sevn.integrations.github_skill.client
-Depends: asyncio, re, sevn.integrations.github_skill.hooks, sevn.tools.integration_gh_repo
+Depends: asyncio, sevn.config.my_sevn, sevn.integrations.github_skill.hooks,
+    sevn.tools.integration_gh_repo
 
 Exports:
-    parse_github_repo — split ``owner/repo`` or GitHub URL.
+    parse_github_repo — split ``owner/repo`` or GitHub URL (wraps config SSOT).
     github_integration_call — dispatch one GitHub REST integration method.
     github_integration_call_sync — synchronous wrapper for integration dispatch.
     github_legacy_call — map historic ``gh_repo_*`` aliases via legacy kwargs helper.
@@ -13,21 +14,18 @@ Exports:
 from __future__ import annotations
 
 import asyncio
-import re
 from typing import Any
-from urllib.parse import urlparse
 
+from sevn.config.my_sevn import parse_github_repo_slug
 from sevn.integrations.github_skill.hooks import GithubSkillHooks, resolve_github_skill_hooks
 from sevn.tools.integration_gh_repo import legacy_gh_repo_integration_kwargs
-
-_GITHUB_REPO_RE = re.compile(
-    r"^(?:https?://(?:www\.)?github\.com/)?(?P<owner>[^/\s]+)/(?P<repo>[^/\s#?]+)",
-    re.IGNORECASE,
-)
 
 
 def parse_github_repo(repo: str) -> tuple[str, str]:
     """Parse ``owner`` and ``repo`` from ``owner/repo``, HTTPS, or SCP URL.
+
+    Thin wrapper over :func:`sevn.config.my_sevn.parse_github_repo_slug` so
+    config and integrations share one parser.
 
     Args:
         repo (str): Repository slug, ``https://github.com/…`` URL, or
@@ -47,35 +45,7 @@ def parse_github_repo(repo: str) -> tuple[str, str]:
         >>> parse_github_repo("git@github.com:acme/app.git")
         ('acme', 'app')
     """
-    raw = repo.strip()
-    if not raw:
-        msg = "repo is required (owner/repo)"
-        raise ValueError(msg)
-    # SCP-style: git@host:owner/repo(.git) — colon separates host from path.
-    if "@" in raw and "://" not in raw and ":" in raw.split("@", 1)[-1]:
-        tail = raw.rsplit(":", 1)[-1].strip("/")
-        parts = [p for p in tail.split("/") if p]
-        if len(parts) < 2:
-            msg = f"invalid repo slug: {repo!r}"
-            raise ValueError(msg)
-        owner, name = parts[0], parts[1]
-        if name.endswith(".git"):
-            name = name[:-4]
-        return owner, name
-    if "://" in raw:
-        parsed = urlparse(raw)
-        path = (parsed.path or "").strip("/")
-        match = _GITHUB_REPO_RE.match(f"https://github.com/{path}")
-    else:
-        match = _GITHUB_REPO_RE.match(raw)
-    if match is None:
-        msg = f"invalid repo slug: {repo!r}"
-        raise ValueError(msg)
-    owner = match.group("owner")
-    name = match.group("repo")
-    if name.endswith(".git"):
-        name = name[:-4]
-    return owner, name
+    return parse_github_repo_slug(repo)
 
 
 async def github_integration_call(

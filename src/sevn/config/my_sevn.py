@@ -10,6 +10,7 @@ Exports:
     effective_my_sevn_pipelines — resolve typed ``my_sevn.pipelines`` with defaults.
     effective_my_sevn_sync — resolve typed ``my_sevn.sync`` with defaults.
     default_github_repo_slug — ``owner/repo`` from ``my_sevn.repo_url`` (no ``git remote``).
+    parse_github_repo_slug — shared ``owner/repo`` parser (HTTPS / SCP / bare slug).
     resolve_github_repo_slug — explicit arg or ``my_sevn.repo_url`` (shared by gh scripts).
     resolve_my_sevn_repo_path — checkout path from ``my_sevn.repo_path`` in ``sevn.json``.
     persist_my_sevn_repo_path — record a resolved checkout into ``my_sevn.repo_path``.
@@ -17,7 +18,9 @@ Exports:
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 from sevn.config.sevn_repo import is_sevn_repo
 from sevn.config.workspace_config import (
@@ -27,6 +30,11 @@ from sevn.config.workspace_config import (
     MySevnSyncWorkspaceConfig,
     MySevnWorkspaceConfig,
     WorkspaceConfig,
+)
+
+_GITHUB_REPO_RE = re.compile(
+    r"^(?:https?://(?:www\.)?github\.com/)?(?P<owner>[^/\s]+)/(?P<repo>[^/\s#?]+)",
+    re.IGNORECASE,
 )
 
 if TYPE_CHECKING:
@@ -199,6 +207,61 @@ def effective_my_sevn(ws: WorkspaceConfig) -> MySevnWorkspaceConfig:
     return MySevnWorkspaceConfig()
 
 
+def parse_github_repo_slug(repo: str) -> tuple[str, str]:
+    """Parse ``owner`` and ``repo`` from ``owner/repo``, HTTPS, or SCP URL.
+
+    Config-safe SSOT for slug parsing (integrations wrap this; do not import
+    ``sevn.integrations`` from config).
+
+    Args:
+        repo (str): Repository slug, ``https://github.com/…`` URL, or
+            ``git@host:owner/repo.git`` SCP form.
+
+    Returns:
+        tuple[str, str]: ``(owner, repo_name)``.
+
+    Raises:
+        ValueError: When the slug cannot be parsed.
+
+    Examples:
+        >>> parse_github_repo_slug("octocat/Hello-World")
+        ('octocat', 'Hello-World')
+        >>> parse_github_repo_slug("https://github.com/acme/widgets.git")
+        ('acme', 'widgets')
+        >>> parse_github_repo_slug("git@github.com:acme/app.git")
+        ('acme', 'app')
+    """
+    raw = repo.strip()
+    if not raw:
+        msg = "repo is required (owner/repo)"
+        raise ValueError(msg)
+    # SCP-style: git@host:owner/repo(.git) — colon separates host from path.
+    if "@" in raw and "://" not in raw and ":" in raw.split("@", 1)[-1]:
+        tail = raw.rsplit(":", 1)[-1].strip("/")
+        parts = [p for p in tail.split("/") if p]
+        if len(parts) < 2:
+            msg = f"invalid repo slug: {repo!r}"
+            raise ValueError(msg)
+        owner, name = parts[0], parts[1]
+        if name.endswith(".git"):
+            name = name[:-4]
+        return owner, name
+    if "://" in raw:
+        parsed = urlparse(raw)
+        path = (parsed.path or "").strip("/")
+        match = _GITHUB_REPO_RE.match(f"https://github.com/{path}")
+    else:
+        match = _GITHUB_REPO_RE.match(raw)
+    if match is None:
+        msg = f"invalid repo slug: {repo!r}"
+        raise ValueError(msg)
+    owner = match.group("owner")
+    name = match.group("repo")
+    if name.endswith(".git"):
+        name = name[:-4]
+    return owner, name
+
+
 def default_github_repo_slug(ws: WorkspaceConfig) -> str:
     """Return ``owner/repo`` from ``my_sevn.repo_url`` without shelling out to git.
 
@@ -230,23 +293,12 @@ def default_github_repo_slug(ws: WorkspaceConfig) -> str:
     if not raw:
         msg = "my_sevn.repo_url is empty"
         raise ValueError(msg)
-    # Keep this helper free of integrations/tools imports (lint-imports contracts).
-    lowered = raw.lower()
-    # SCP-style: git@host:owner/repo(.git) — colon separates host from path.
-    if "@" in raw and "://" not in raw and ":" in raw.split("@", 1)[-1]:
-        tail = raw.rsplit(":", 1)[-1]
-    elif "github.com/" in lowered:
-        tail = raw[lowered.index("github.com/") + len("github.com/") :]
-    else:
-        tail = raw
-    parts = [p for p in tail.split("/") if p]
-    if len(parts) < 2:
+    try:
+        owner, name = parse_github_repo_slug(raw)
+    except ValueError as exc:
         msg = f"cannot parse owner/repo from my_sevn.repo_url: {raw!r}"
-        raise ValueError(msg)
-    owner, repo = parts[0], parts[1]
-    if repo.endswith(".git"):
-        repo = repo[: -len(".git")]
-    return f"{owner}/{repo}"
+        raise ValueError(msg) from exc
+    return f"{owner}/{name}"
 
 
 def resolve_github_repo_slug(
@@ -301,6 +353,7 @@ __all__ = [
     "effective_my_sevn_issues",
     "effective_my_sevn_pipelines",
     "effective_my_sevn_sync",
+    "parse_github_repo_slug",
     "persist_my_sevn_repo_path",
     "resolve_github_repo_slug",
     "resolve_my_sevn_repo_path",

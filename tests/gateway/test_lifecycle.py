@@ -138,7 +138,7 @@ def test_dispatcher_callbacks_ttl_prune_at_boot(tmp_workspace: tuple[object, obj
 def test_shutdown_reaps_sevn_browsers(tmp_workspace: tuple[object, object]) -> None:
     ws, layout = tmp_workspace
     with patch(
-        "sevn.browser.lifecycle.reap_sevn_browsers_on_shutdown",
+        "sevn.browser.process.reap_sevn_browsers_on_shutdown",
         return_value=[],
     ) as mock_reap:
         app = create_app(workspace=ws, layout=layout)

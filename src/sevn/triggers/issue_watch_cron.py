@@ -6,12 +6,15 @@ Depends: os, sqlite3, time, pathlib, sevn.triggers.cron, sevn.integrations.githu
 Exports:
     run_issue_watch_cron — watch tracked issues / notify on diffs.
     ensure_issue_watch_cron_job — seed the built-in watch cron row at boot.
+    register_issue_watch_cron_handler — bind the cron job id (call from boot_registry).
+    notify_issue_watch_diff — operator notify for issue-watch diffs.
 
 Constants (also in ``__all__``): ``ISSUE_WATCH_CRON_JOB_ID``, ``ISSUE_WATCH_CRON_EXPR``.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import time
@@ -24,6 +27,40 @@ from sevn.triggers.cron import compute_next_fire_ns, register_cron_job_handler
 # Built-in GitHub issue-watch cron job id (D13). Single SSOT — do not duplicate.
 ISSUE_WATCH_CRON_JOB_ID = "gh-issue-watch"
 ISSUE_WATCH_CRON_EXPR = "*/15 * * * *"
+
+
+def notify_issue_watch_diff(
+    *,
+    diffs: list[dict[str, Any]],
+    content_root: Path | None = None,
+) -> None:
+    """Notify the operator of GitHub issue-watch diffs via operator notify.
+
+    Delivers through the gateway-wired :func:`~sevn.triggers.operator_notify.
+    deliver_operator_notify` sink (Telegram to the owner when bootstrapped).
+    When unwired, persists a LOG artefact under ``content_root`` instead of
+    returning a fake success.
+
+    Args:
+        diffs (list[dict[str, Any]]): Diff payloads from ``issue_watch`` /
+            ``run_issue_watch_cron`` (each typically has ``repo``, ``number``,
+            ``changes``).
+        content_root (Path | None, optional): Workspace root for LOG fallback.
+
+    Examples:
+        >>> notify_issue_watch_diff(diffs=[])  # no-op
+    """
+    if not diffs:
+        return
+    lines: list[str] = ["GitHub issue watch detected changes:"]
+    for item in diffs:
+        repo = item.get("repo") or "?"
+        number = item.get("number") or "?"
+        changes = item.get("changes") if isinstance(item.get("changes"), dict) else item
+        lines.append(f"- {repo}#{number}: {json.dumps(changes, sort_keys=True)}")
+    from sevn.triggers.operator_notify import deliver_operator_notify
+
+    deliver_operator_notify(text="\n".join(lines), content_root=content_root)
 
 
 def run_issue_watch_cron(
@@ -49,7 +86,6 @@ def run_issue_watch_cron(
         []
     """
     from sevn.integrations.github_skill.watch import run_tracked_watch
-    from sevn.triggers.dispatcher import notify_issue_watch_diff
 
     root = (
         workspace
@@ -139,12 +175,23 @@ def _handle_issue_watch_cron(*, workspace: Path) -> None:
     run_issue_watch_cron(workspace=workspace)
 
 
-register_cron_job_handler(ISSUE_WATCH_CRON_JOB_ID, _handle_issue_watch_cron)
+def register_issue_watch_cron_handler() -> None:
+    """Bind :data:`ISSUE_WATCH_CRON_JOB_ID` to the watch handler (boot_registry only).
+
+    Returns:
+        None
+
+    Examples:
+        >>> register_issue_watch_cron_handler()
+    """
+    register_cron_job_handler(ISSUE_WATCH_CRON_JOB_ID, _handle_issue_watch_cron)
 
 
 __all__ = [
     "ISSUE_WATCH_CRON_EXPR",
     "ISSUE_WATCH_CRON_JOB_ID",
     "ensure_issue_watch_cron_job",
+    "notify_issue_watch_diff",
+    "register_issue_watch_cron_handler",
     "run_issue_watch_cron",
 ]

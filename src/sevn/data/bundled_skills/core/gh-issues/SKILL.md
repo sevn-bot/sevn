@@ -76,8 +76,8 @@ is missing from `PATH`.
    writes the new snapshot.
 3. **Cron scope** — job id `gh-issue-watch` (default `*/15 * * * *`) runs
    watch over the tracked set; on any diff it calls the `message` tool to ping
-   the operator (`sevn.triggers.cron.ISSUE_WATCH_CRON_JOB_ID` /
-   `run_issue_watch_cron`, `sevn.triggers.dispatcher.notify_issue_watch_diff`).
+   the operator (`sevn.triggers.issue_watch_cron.ISSUE_WATCH_CRON_JOB_ID` /
+   `run_issue_watch_cron`, `notify_issue_watch_diff`).
 
 ## List / comment
 

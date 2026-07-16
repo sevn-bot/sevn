@@ -1306,39 +1306,12 @@ def create_app(
         await asyncio.to_thread(run_cron_reconciles, conn, ws)
 
         # D13: wire real operator notify for issue-watch cron (Telegram to owner).
-        # When no Telegram owner is configured, leave the sink unwired so
-        # deliver_operator_notify falls back to ``.sevn/trigger_runs/`` LOG
-        # artefacts — never install a no-op that reports cron ok with zero delivery.
-        from sevn.gateway.channel_router import OutgoingMessage
-        from sevn.triggers.operator_notify import set_operator_notify
+        from sevn.triggers.operator_notify import wire_operator_notify
 
-        owner_tg = resolve_owner_telegram_user_id(ws)
-        if owner_tg:
-            loop = asyncio.get_running_loop()
-            dest = owner_tg
-
-            def _operator_notify_sink(text: str) -> None:
-                if not text.strip():
-                    return
-                session_id = f"telegram:{dest}:general"
-
-                async def _send() -> None:
-                    try:
-                        await gateway_router.route_outgoing(
-                            OutgoingMessage(
-                                channel="telegram",
-                                user_id=dest,
-                                text=text.strip(),
-                                session_id=session_id,
-                                metadata={"source": "operator_notify"},
-                            ),
-                        )
-                    except Exception:
-                        logger.exception("operator_notify_route_outgoing_failed")
-
-                loop.call_soon_threadsafe(lambda: asyncio.create_task(_send()))
-
-            set_operator_notify(_operator_notify_sink)
+        wire_operator_notify(
+            gateway_router=gateway_router,
+            owner_telegram_user_id=resolve_owner_telegram_user_id(ws),
+        )
         app.state.memory_job_lock = asyncio.Lock()
         app.state.dreaming_engine = DreamingEngine(
             conn, trace, app.state.memory_job_lock, transport=None
@@ -1588,9 +1561,9 @@ def create_app(
         cron_task.cancel()
         with suppress(asyncio.CancelledError):
             await cron_task
-        from sevn.triggers.operator_notify import set_operator_notify
+        from sevn.triggers.operator_notify import unwire_operator_notify
 
-        set_operator_notify(None)
+        unwire_operator_notify()
         await gateway_router.stop_all()
         trigger_gate = getattr(app.state, "trigger_dispatch_gate", None)
         if isinstance(trigger_gate, TriggerDispatchGate):
@@ -1599,7 +1572,7 @@ def create_app(
         # Single shutdown owner for sevn Chrome (D6): registry-based reap with
         # TERM/wait/KILL — do not also call close_all_gateway_browsers (divergent).
         with suppress(Exception):
-            from sevn.browser.lifecycle import reap_sevn_browsers_on_shutdown
+            from sevn.browser.process import reap_sevn_browsers_on_shutdown
 
             await asyncio.to_thread(reap_sevn_browsers_on_shutdown, ly.content_root)
         await asyncio.to_thread(

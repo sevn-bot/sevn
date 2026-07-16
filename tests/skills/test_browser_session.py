@@ -317,6 +317,15 @@ async def test_session_browser_resources_spawns_without_env_cdp(
         lambda: mock_pw_factory,
     )
 
+    async def _attach(cls: object, url: str) -> MagicMock:
+        _ = cls
+        return MagicMock(cdp_url=url)
+
+    monkeypatch.setattr(
+        "sevn.browser.lifecycle.CDPBrowserSession.attach",
+        classmethod(_attach),
+    )
+
     from sevn.skills.browser_session import _session_browser_resources
 
     (
@@ -338,7 +347,8 @@ async def test_session_browser_resources_spawns_without_env_cdp(
     )
 
     assert len(spawn_calls) == 1
-    assert we_spawned_chrome is True
+    # Lifecycle owns the Chrome Popen; Playwright path no longer tracks a local proc.
+    assert we_spawned_chrome is False
     assert browser is mock_browser
     assert sid == "sess-spawn"
     assert registry_row is not None

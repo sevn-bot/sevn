@@ -7,8 +7,8 @@ discovery/spawn/registry layer, so ``target_id`` strings and the persisted
 ``active_target_id`` stay interchangeable with the rest of the codebase.
 
 Module: sevn.browser.lifecycle
-Depends: asyncio, contextlib, json, os, signal, urllib, sevn.browser.cdp,
-    sevn.skills.browser_session
+Depends: asyncio, contextlib, json, os, urllib, sevn.browser.cdp,
+    sevn.browser.process, sevn.skills.browser_session
 
 Exports:
     CDPBrowserSession — attach/spawn, target tracking, tab CRUD, page-session access.
@@ -17,11 +17,8 @@ Exports:
     get_or_create_session — pooled session per gateway ``session_id``.
     release_session — disconnect + evict a pooled session.
     reset_pool_for_tests — clear the pool (unit tests only).
-    clear_profile_singleton_locks — delete Chrome singleton/port lockfiles.
-    terminate_pid — SIGTERM then optional SIGKILL with wait (shared escalate loop).
-    terminate_sevn_chrome — kill sevn Chrome for a profile (convention 11).
-    reap_stale_sevn_chrome — kill sevn-spawned Chrome for one profile + clear locks.
-    reap_sevn_browsers_on_shutdown — terminate all sevn-spawned browsers (D6).
+    Process/reap helpers live in :mod:`sevn.browser.process` (re-exported below
+    for spawn-path callers).
 
 Examples:
     >>> import inspect
@@ -34,19 +31,24 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
-import os
-import signal
 import threading
 import time
 import urllib.error
 import urllib.request
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 
 from sevn.browser.cdp import CDPConnection, CDPSession
-from sevn.skills.browser_session import pid_is_alive, pid_matches_sevn_chrome_profile
+from sevn.browser.process import (
+    clear_profile_singleton_locks,
+    reap_sevn_browsers_on_shutdown,
+    reap_stale_sevn_chrome,
+    terminate_pid,
+    terminate_sevn_chrome,
+)
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from sevn.config.workspace_config import WorkspaceConfig
 
 _pool: dict[str, CDPBrowserSession] = {}
@@ -56,12 +58,6 @@ _spawn_locks_mu = threading.Lock()
 # ~20 s adaptive CDP wait (D3); was fixed 10 s (50 * 0.2).
 _SPAWN_CDP_WAIT_STEPS: Final[int] = 100
 _SPAWN_CDP_WAIT_INTERVAL: Final[float] = 0.2
-_PROFILE_LOCK_FILES: Final[tuple[str, ...]] = (
-    "SingletonLock",
-    "SingletonSocket",
-    "SingletonCookie",
-    "DevToolsActivePort",
-)
 
 
 def _get_pool_lock() -> asyncio.Lock:
@@ -106,159 +102,6 @@ def _spawn_lock_for(session_id: str) -> asyncio.Lock:
         return lock
 
 
-async def _await_attach(cdp_url: str) -> CDPBrowserSession:
-    """Attach to ``cdp_url`` (always awaits :meth:`CDPBrowserSession.attach`).
-
-    Args:
-        cdp_url (str): CDP HTTP base URL.
-
-    Returns:
-        CDPBrowserSession: Connected session.
-
-    Examples:
-        >>> import inspect
-        >>> inspect.iscoroutinefunction(_await_attach)
-        True
-    """
-    return await CDPBrowserSession.attach(cdp_url)
-
-
-def clear_profile_singleton_locks(profile_dir: Path) -> None:
-    """Delete Chrome singleton and DevTools port lockfiles under ``profile_dir``.
-
-    Args:
-        profile_dir (Path): Chrome ``user-data-dir`` for this session only.
-
-    Returns:
-        None
-
-    Examples:
-        >>> import tempfile
-        >>> d = Path(tempfile.mkdtemp())
-        >>> _ = (d / "SingletonLock").write_text("x", encoding="utf-8")
-        >>> clear_profile_singleton_locks(d)
-        >>> (d / "SingletonLock").exists()
-        False
-    """
-    for name in _PROFILE_LOCK_FILES:
-        with contextlib.suppress(OSError):
-            (profile_dir / name).unlink()
-
-
-def terminate_pid(pid: int, *, escalate: bool = True) -> bool:
-    """Send ``SIGTERM`` to ``pid``, optionally escalate to ``SIGKILL`` after wait.
-
-    Shared escalate loop for sevn Chrome reaping and CLI teardown.
-
-    Args:
-        pid (int): Target process id.
-        escalate (bool): When ``True``, ``SIGKILL`` if still alive after wait.
-
-    Returns:
-        bool: ``True`` when ``SIGTERM`` was delivered (process may still exit later).
-
-    Examples:
-        >>> terminate_pid(-1)
-        False
-    """
-    if pid <= 0:
-        return False
-    try:
-        os.kill(pid, signal.SIGTERM)
-    except ProcessLookupError:
-        return False
-    except OSError:
-        return False
-    for _ in range(50):
-        if not pid_is_alive(pid):
-            return True
-        time.sleep(0.1)
-    if escalate and pid_is_alive(pid):
-        with contextlib.suppress(OSError, ProcessLookupError):
-            os.kill(pid, signal.SIGKILL)
-        for _ in range(20):
-            if not pid_is_alive(pid):
-                break
-            time.sleep(0.05)
-    return True
-
-
-def terminate_sevn_chrome(
-    pid: int,
-    profile_dir: Path | None,
-    *,
-    escalate: bool = True,
-) -> bool:
-    """Terminate a sevn-spawned Chrome PID for ``profile_dir`` (convention 11).
-
-    When ``profile_dir`` is set, refuses to signal unless the cmdline still looks
-    like sevn Chrome for that profile. When ``profile_dir`` is ``None``, only
-    checks liveness then terminates (caller already validated identity).
-
-    Args:
-        pid (int): Recorded Chrome process id.
-        profile_dir (Path | None): Profile directory to match, or ``None``.
-        escalate (bool): Pass through to :func:`terminate_pid`.
-
-    Returns:
-        bool: ``True`` when a terminate signal was attempted.
-
-    Examples:
-        >>> terminate_sevn_chrome(-1, None)
-        False
-    """
-    if pid <= 0 or not pid_is_alive(pid):
-        return False
-    if profile_dir is not None and not pid_matches_sevn_chrome_profile(pid, profile_dir):
-        return False
-    return terminate_pid(pid, escalate=escalate)
-
-
-def reap_stale_sevn_chrome(
-    content_root: Path,
-    session_id: str,
-    profile_dir: Path,
-) -> None:
-    """Kill a sevn-spawned Chrome for this profile (if live) and clear lockfiles (D1).
-
-    Only acts on a registry PID with ``spawned_by_sevn=True`` whose recorded
-    ``profile_dir`` matches ``profile_dir`` (convention 11). Never signals
-    operator Chrome or another profile's process.
-
-    Args:
-        content_root (Path): Workspace content root.
-        session_id (str): Gateway session id.
-        profile_dir (Path): Target profile directory about to be spawned into.
-
-    Returns:
-        None
-
-    Examples:
-        >>> import inspect
-        >>> inspect.isfunction(reap_stale_sevn_chrome)
-        True
-    """
-    from sevn.skills.browser_session import read_registry
-
-    row = read_registry(content_root, session_id)
-    if (
-        row is not None
-        and row.spawned_by_sevn
-        and row.pid is not None
-        and row.pid > 0
-        and row.profile_dir
-    ):
-        try:
-            recorded = Path(row.profile_dir).expanduser().resolve()
-            target = profile_dir.expanduser().resolve()
-        except OSError:
-            recorded = Path(row.profile_dir)
-            target = profile_dir
-        if recorded == target:
-            terminate_sevn_chrome(row.pid, profile_dir, escalate=True)
-    clear_profile_singleton_locks(profile_dir)
-
-
 def _chrome_log_path(content_root: Path, session_id: str) -> Path:
     """Return the Chrome stderr log path for ``session_id`` (D4).
 
@@ -270,7 +113,8 @@ def _chrome_log_path(content_root: Path, session_id: str) -> Path:
         Path: ``<content_root>/logs/chrome-<session_id>.log``.
 
     Examples:
-        >>> str(_chrome_log_path(Path("/ws"), "abc")).endswith("logs/chrome-abc.log")
+        >>> from pathlib import Path as _P
+        >>> str(_chrome_log_path(_P("/ws"), "abc")).endswith("logs/chrome-abc.log")
         True
     """
     return content_root / "logs" / f"chrome-{session_id}.log"
@@ -287,7 +131,8 @@ def _chrome_log_tail(log_path: Path, *, max_chars: int = 800) -> str:
         str: Tail text, or empty when unreadable / missing.
 
     Examples:
-        >>> _chrome_log_tail(Path("/no/such/chrome.log"))
+        >>> from pathlib import Path as _P
+        >>> _chrome_log_tail(_P("/no/such/chrome.log"))
         ''
     """
     if not log_path.is_file():
@@ -300,50 +145,6 @@ def _chrome_log_tail(log_path: Path, *, max_chars: int = 800) -> str:
     if len(text) <= max_chars:
         return text
     return text[-max_chars:]
-
-
-def reap_sevn_browsers_on_shutdown(content_root: Path) -> list[int]:
-    """Terminate all sevn-spawned browsers recorded under ``content_root`` (D6).
-
-    Scans ``.sevn/browser-sessions/*.json``, signals each ``spawned_by_sevn``
-    PID with ``SIGTERM`` (when alive), ``wait``-analogue via brief poll, and
-    clears the registry entry. Never touches non-sevn or unmatched PIDs.
-
-    Args:
-        content_root (Path): Workspace content root.
-
-    Returns:
-        list[int]: PIDs processed from sevn-spawned registry rows.
-
-    Examples:
-        >>> import tempfile
-        >>> reap_sevn_browsers_on_shutdown(Path(tempfile.mkdtemp()))
-        []
-    """
-    from sevn.skills.browser_session import clear_registry, read_registry
-
-    sessions_dir = content_root / ".sevn" / "browser-sessions"
-    if not sessions_dir.is_dir():
-        return []
-    processed: list[int] = []
-    for path in sorted(sessions_dir.glob("*.json")):
-        session_id = path.stem
-        row = read_registry(content_root, session_id)
-        if row is None or not row.spawned_by_sevn or row.pid is None or row.pid <= 0:
-            continue
-        pid = row.pid
-        processed.append(pid)
-        if pid_is_alive(pid):
-            profile = Path(row.profile_dir) if row.profile_dir else None
-            if profile is None or not pid_matches_sevn_chrome_profile(pid, profile):
-                clear_registry(content_root, session_id)
-                continue
-            terminate_sevn_chrome(pid, profile, escalate=True)
-        clear_registry(content_root, session_id)
-        if row.profile_dir:
-            with contextlib.suppress(OSError):
-                clear_profile_singleton_locks(Path(row.profile_dir))
-    return processed
 
 
 def fetch_browser_ws_url(cdp_url: str, *, timeout: float = 5.0) -> str:
@@ -812,10 +613,10 @@ async def _spawn_or_attach_unlocked(
     # the deterministic seed-hint URL (which is not a live browser).
     operator = default_cdp_url()
     if operator and cdp_reachable(operator):
-        return await _await_attach(operator)
+        return await CDPBrowserSession.attach(operator)
     row = read_registry(content_root, session_id)
     if row is not None and row.cdp_url.strip() and cdp_reachable(row.cdp_url):
-        return await _await_attach(row.cdp_url.rstrip("/"))
+        return await CDPBrowserSession.attach(row.cdp_url.rstrip("/"))
 
     profile_dir = resolve_profile_dir(content_root, session_id, cfg=cfg)
     headless = resolve_browser_headless(cfg)
@@ -870,7 +671,7 @@ async def _spawn_or_attach_unlocked(
                     last_used_at=datetime.now(tz=UTC).isoformat(),
                 ),
             )
-            return await _await_attach(spawned_url)
+            return await CDPBrowserSession.attach(spawned_url)
 
         # D3: terminate + wait(timeout=5), then exactly one clean retry.
         if proc.poll() is None:
@@ -961,7 +762,6 @@ __all__ = [
     "clear_profile_singleton_locks",
     "fetch_browser_ws_url",
     "get_or_create_session",
-    "pid_is_alive",
     "reap_sevn_browsers_on_shutdown",
     "reap_stale_sevn_chrome",
     "release_session",

@@ -72,7 +72,9 @@ async def test_d1_reap_clears_locks_for_sevn_pid_only(
     def _pid_match(pid: int, _profile: Path) -> bool:
         return pid == sevn_pid
 
-    for mod in (bs, lifecycle):
+    from sevn.browser import process as browser_process
+
+    for mod in (bs, lifecycle, browser_process):
         if hasattr(mod, "pid_is_alive"):
             monkeypatch.setattr(mod, "pid_is_alive", _pid_alive)
         if hasattr(mod, "pid_matches_sevn_chrome_profile"):

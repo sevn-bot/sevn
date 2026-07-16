@@ -3,24 +3,28 @@
 Module: sevn.triggers.operator_notify
 Depends: asyncio, json, pathlib, loguru
 
-Gateway boot wires :func:`set_operator_notify` to deliver via
+Gateway boot wires :func:`wire_operator_notify` to deliver via
 :meth:`ChannelRouter.route_outgoing` (owner Telegram). When unwired (tests /
 offline), :func:`deliver_operator_notify` still persists a LOG artefact under
 ``.sevn/trigger_runs/`` so callers never get a fake ``ok`` with zero delivery.
 
 Exports:
     set_operator_notify — install/clear the gateway delivery sink.
+    wire_operator_notify — gateway lifespan helper to install Telegram sink.
+    unwire_operator_notify — clear the sink on shutdown.
     deliver_operator_notify — deliver text via the sink (or LOG fallback).
     reset_operator_notify_for_tests — clear sink (unit tests only).
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 import uuid
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 
@@ -45,6 +49,74 @@ def set_operator_notify(fn: OperatorNotifyFn | None) -> None:
     """
     global _operator_notify
     _operator_notify = fn
+
+
+def wire_operator_notify(
+    *,
+    gateway_router: Any,
+    owner_telegram_user_id: str | None,
+    loop: asyncio.AbstractEventLoop | None = None,
+) -> bool:
+    """Install the Telegram owner sink when an owner id is configured.
+
+    When ``owner_telegram_user_id`` is empty, leaves the sink unwired so
+    :func:`deliver_operator_notify` uses the LOG fallback (never a no-op success).
+
+    Args:
+        gateway_router (Any): Gateway :class:`ChannelRouter` with ``route_outgoing``.
+        owner_telegram_user_id (str | None): Telegram user id for the owner, or ``None``.
+        loop (asyncio.AbstractEventLoop | None): Running loop; defaults to
+            :func:`asyncio.get_running_loop`.
+
+    Returns:
+        bool: ``True`` when a Telegram sink was installed.
+
+    Examples:
+        >>> wire_operator_notify(gateway_router=object(), owner_telegram_user_id=None)
+        False
+    """
+    dest = (owner_telegram_user_id or "").strip()
+    if not dest:
+        return False
+    from sevn.gateway.channel_router import OutgoingMessage
+
+    event_loop = loop if loop is not None else asyncio.get_running_loop()
+
+    def _operator_notify_sink(text: str) -> None:
+        if not text.strip():
+            return
+        session_id = f"telegram:{dest}:general"
+
+        async def _send() -> None:
+            try:
+                await gateway_router.route_outgoing(
+                    OutgoingMessage(
+                        channel="telegram",
+                        user_id=dest,
+                        text=text.strip(),
+                        session_id=session_id,
+                        metadata={"source": "operator_notify"},
+                    ),
+                )
+            except Exception:
+                logger.exception("operator_notify_route_outgoing_failed")
+
+        event_loop.call_soon_threadsafe(lambda: asyncio.create_task(_send()))
+
+    set_operator_notify(_operator_notify_sink)
+    return True
+
+
+def unwire_operator_notify() -> None:
+    """Clear the gateway operator-notify sink (lifespan shutdown).
+
+    Returns:
+        None
+
+    Examples:
+        >>> unwire_operator_notify()
+    """
+    set_operator_notify(None)
 
 
 def reset_operator_notify_for_tests() -> None:
@@ -140,4 +212,6 @@ __all__ = [
     "deliver_operator_notify",
     "reset_operator_notify_for_tests",
     "set_operator_notify",
+    "unwire_operator_notify",
+    "wire_operator_notify",
 ]

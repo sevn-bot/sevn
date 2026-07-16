@@ -4,6 +4,7 @@ Module: sevn.integrations.github_skill.watch
 Depends: json, pathlib, sevn.integrations.github_skill.github_manager
 
 Exports:
+    IssueWatchDiff — typed shape for one changed-issue payload.
     tracked_path — path to ``.sevn/gh-watch/tracked.json``.
     load_tracked — read the tracked issue list.
     save_tracked — write the tracked issue list.
@@ -18,10 +19,22 @@ from __future__ import annotations
 
 import json
 from pathlib import Path  # noqa: TC003 — used in doctests and at runtime
-from typing import Any
+from typing import Any, TypedDict
+
+from loguru import logger
 
 from sevn.integrations.github_skill.client import parse_github_repo
 from sevn.integrations.github_skill.gh_cli import view_issue_via_gh
+
+
+class IssueWatchDiff(TypedDict, total=False):
+    """One changed issue from :func:`run_tracked_watch` / :func:`watch_issue`."""
+
+    repo: str
+    number: int
+    changes: dict[str, Any]
+    changed: bool
+    snapshot: dict[str, Any]
 
 
 def tracked_path(workspace: Path) -> Path:
@@ -337,6 +350,9 @@ def watch_issue(workspace: Path, repo: str, issue_number: int) -> dict[str, Any]
 def run_tracked_watch(workspace: Path) -> list[dict[str, Any]]:
     """Watch every tracked issue and return only entries with changes.
 
+    Per-issue failures are isolated: one ``gh``/IO error does not abort the
+    rest of the tick, and successful diffs are still returned for notify.
+
     Args:
         workspace (Path): Workspace root.
 
@@ -349,13 +365,24 @@ def run_tracked_watch(workspace: Path) -> list[dict[str, Any]]:
     """
     collected: list[dict[str, Any]] = []
     for item in load_tracked(workspace):
-        result = watch_issue(workspace, str(item["repo"]), int(item["number"]))
+        repo = str(item.get("repo") or "")
+        try:
+            number = int(item["number"])
+        except (KeyError, TypeError, ValueError):
+            logger.warning("issue_watch_skip_bad_tracked_row row={}", item)
+            continue
+        try:
+            result = watch_issue(workspace, repo, number)
+        except Exception:
+            logger.exception("issue_watch_issue_failed repo={} number={}", repo, number)
+            continue
         if isinstance(result, dict) and result.get("changed"):
             collected.append(result)
     return collected
 
 
 __all__ = [
+    "IssueWatchDiff",
     "fetch_issue_state",
     "load_tracked",
     "run_tracked_watch",

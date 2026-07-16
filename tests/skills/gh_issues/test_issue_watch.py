@@ -162,15 +162,14 @@ def test_d13_issue_track_add_remove_list(tmp_path: Path, monkeypatch: pytest.Mon
 
 def test_d13_cron_scope_registered_and_notifies_on_diff() -> None:
     """D13: cron scope for issue_watch exists; on diff it delivers operator notify."""
-    from sevn.triggers import dispatcher as dispatcher_mod
     from sevn.triggers import issue_watch_cron as watch_cron_mod
 
     assert hasattr(watch_cron_mod, "ISSUE_WATCH_CRON_JOB_ID")
     assert watch_cron_mod.ISSUE_WATCH_CRON_JOB_ID == "gh-issue-watch"
     assert callable(watch_cron_mod.run_issue_watch_cron)
 
-    notify = getattr(dispatcher_mod, "notify_issue_watch_diff", None)
-    assert callable(notify), "dispatcher must expose issue-watch notify"
+    notify = getattr(watch_cron_mod, "notify_issue_watch_diff", None)
+    assert callable(notify), "issue_watch_cron must expose issue-watch notify"
 
     message_calls: list[object] = []
 

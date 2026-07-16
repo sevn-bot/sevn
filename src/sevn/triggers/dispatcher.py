@@ -8,7 +8,6 @@ Exports:
     agent_dispatch_kwargs — build ``run_turn`` kwargs from gateway router.
     dispatch_notify_only — template render + LOG channel + traces.
     dispatch_run — agent-pass via shared ``RunTurnFn`` when wired at gateway boot.
-    notify_issue_watch_diff — operator notify for GitHub issue-watch diffs (D13).
 """
 
 from __future__ import annotations
@@ -36,43 +35,6 @@ from sevn.triggers.request import DispatchRequest, NotifyHandle, RunHandle
 from sevn.triggers.settings import effective_max_inline_bytes
 
 RunTurnFn = Callable[[str, str], Awaitable[None]]
-
-# Built-in cron job id for GitHub issue watch is ISSUE_WATCH_CRON_JOB_ID in
-# :mod:`sevn.triggers.issue_watch_cron` (single SSOT).
-
-
-def notify_issue_watch_diff(
-    *,
-    diffs: list[dict[str, Any]],
-    content_root: Path | None = None,
-) -> None:
-    """Notify the operator of GitHub issue-watch diffs via operator notify.
-
-    Delivers through the gateway-wired :func:`~sevn.triggers.operator_notify.
-    deliver_operator_notify` sink (Telegram to the owner when bootstrapped).
-    When unwired, persists a LOG artefact under ``content_root`` instead of
-    returning a fake success.
-
-    Args:
-        diffs (list[dict[str, Any]]): Diff payloads from ``issue_watch`` /
-            ``run_issue_watch_cron`` (each typically has ``repo``, ``number``,
-            ``changes``).
-        content_root (Path | None, optional): Workspace root for LOG fallback.
-
-    Examples:
-        >>> notify_issue_watch_diff(diffs=[])  # no-op
-    """
-    if not diffs:
-        return
-    lines: list[str] = ["GitHub issue watch detected changes:"]
-    for item in diffs:
-        repo = item.get("repo") or "?"
-        number = item.get("number") or "?"
-        changes = item.get("changes") if isinstance(item.get("changes"), dict) else item
-        lines.append(f"- {repo}#{number}: {json.dumps(changes, sort_keys=True)}")
-    from sevn.triggers.operator_notify import deliver_operator_notify
-
-    deliver_operator_notify(text="\n".join(lines), content_root=content_root)
 
 
 def agent_dispatch_kwargs(gateway_router: Any | None) -> dict[str, Any]:

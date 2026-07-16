@@ -2,7 +2,7 @@
 
 Module: sevn.cli.gateway_teardown
 Depends: os, subprocess, time, pathlib, sevn.cli.gateway_client, sevn.cli.service_manager,
-    sevn.browser.lifecycle
+    sevn.browser.process
 
 Exports:
     stop_all_gateway_instances — stop units, unload labels, kill orphan listeners.
@@ -153,7 +153,7 @@ def _terminate_pid(pid: int, *, dry_run: bool) -> None:
     """
     if dry_run:
         return
-    from sevn.browser.lifecycle import terminate_pid
+    from sevn.browser.process import terminate_pid
 
     terminate_pid(pid, escalate=True)
 
