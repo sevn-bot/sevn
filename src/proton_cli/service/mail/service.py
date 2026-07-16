@@ -11,6 +11,7 @@ from pgpy import PGPMessage
 
 if TYPE_CHECKING:
     from proton_cli.account.keys import Unlocked
+from proton_cli.account.keys import use_unlocked_key
 from proton_cli.proton.client import Client, Request
 from proton_cli.ref import pick
 from proton_cli.service.mail import crypto as mail_crypto
@@ -284,7 +285,7 @@ class MailService:
         addr_keys, _addr_id, sender_email = unlocked.primary_addr()
         mime_type = "text/html" if opts.html else "text/plain"
         message = PGPMessage.new(opts.body)
-        with addr_keys[0].unlock(None):
+        with use_unlocked_key(addr_keys[0]):
             enc = addr_keys[0].encrypt(message)
         armored = str(enc)
 
@@ -354,7 +355,7 @@ class MailService:
         addr_keys: list,
     ) -> list[dict[str, object]]:
         session_message = PGPMessage.new(body)
-        with addr_keys[0].unlock(None):
+        with use_unlocked_key(addr_keys[0]):
             enc_body = addr_keys[0].encrypt(session_message)
         body_b64 = base64.b64encode(bytes(enc_body)).decode()
 
@@ -362,7 +363,7 @@ class MailService:
         clear_addrs: dict[str, object] = {}
         for email, scheme, armored_key in plans:
             if scheme == PKG_INTERNAL and armored_key:
-                with addr_keys[0].unlock(None):
+                with use_unlocked_key(addr_keys[0]):
                     wrapped = addr_keys[0].encrypt(PGPMessage.new(body))
                 internal_addrs[email] = {
                     "Type": PKG_INTERNAL,
@@ -374,7 +375,7 @@ class MailService:
 
         packages: list[dict[str, object]] = []
         if internal_addrs:
-            with addr_keys[0].unlock(None):
+            with use_unlocked_key(addr_keys[0]):
                 sender_wrap = addr_keys[0].encrypt(PGPMessage.new(body))
             packages.append(
                 {
