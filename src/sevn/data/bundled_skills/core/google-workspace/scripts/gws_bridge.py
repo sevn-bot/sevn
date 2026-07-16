@@ -14,6 +14,8 @@ import os
 import subprocess
 import sys
 
+from loguru import logger
+
 from sevn.lcm.script_cli import workspace_from_env
 from sevn.skills.google_workspace import gws_binary, get_valid_token_for_gws, token_path
 
@@ -40,9 +42,10 @@ def main(argv: list[str] | None = None) -> int:
 
     binary = gws_binary()
     if binary is None:
-        sys.stderr.write("google_workspace: gws CLI not found on PATH\n")
+        logger.error("google_workspace: gws CLI not found on PATH")
         return 127
     args = list(sys.argv[1:] if argv is None else argv)
+    logger.debug("google_workspace: gws bridge {}", " ".join([binary, *args]))
     try:
         completed = subprocess.run(  # nosec B603
             [binary, *args],
@@ -50,7 +53,7 @@ def main(argv: list[str] | None = None) -> int:
             check=False,
         )
     except Exception as exc:
-        sys.stderr.write(f"{exc}\n")
+        logger.exception("google_workspace: gws bridge failed: {}", exc)
         return 1
     return int(completed.returncode)
 

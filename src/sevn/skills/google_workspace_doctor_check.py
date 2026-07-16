@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from loguru import logger
+
 from sevn.config.workspace_config import WorkspaceConfig, google_workspace_settings
 from sevn.skills.google_workspace import REQUIRED_PACKAGES, ensure_google_deps, gws_binary, token_path
 
@@ -53,7 +55,11 @@ def probe_google_workspace_skill_warnings(
         ensure_google_deps()
     except ImportError:
         packages = ", ".join(REQUIRED_PACKAGES)
-        warnings.append(f"google-workspace optional deps not installed ({packages})")
+        hint = "uv pip install --python $(which python3) 'sevn[google-workspace]'"
+        warnings.append(
+            f"google-workspace optional deps not installed ({packages}); run: {hint}",
+        )
+        logger.debug("google_workspace doctor: optional deps missing ({})", packages)
     return warnings
 
 

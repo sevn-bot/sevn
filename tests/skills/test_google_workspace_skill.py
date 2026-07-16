@@ -273,3 +273,33 @@ def test_gmail_search_uses_mocked_api_function(
     data = payload.get("data")
     assert isinstance(data, list)
     assert data[0]["id"] == "msg-1"
+
+
+def test_install_deps_uses_uv_when_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``install_deps`` installs via ``uv pip`` when Google libraries are absent."""
+
+    google_workspace = pytest.importorskip("sevn.skills.google_workspace")
+    calls: list[list[str]] = []
+    state = {"count": 0}
+
+    def _ensure_toggle() -> None:
+        state["count"] += 1
+        if state["count"] == 1:
+            raise ImportError("missing")
+
+    def _fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(google_workspace, "ensure_google_deps", _ensure_toggle)
+    monkeypatch.setattr(google_workspace.shutil, "which", lambda name: "/usr/bin/uv" if name == "uv" else None)
+    monkeypatch.setattr(google_workspace.subprocess, "run", _fake_run)
+
+    payload = google_workspace.install_deps()
+    assert payload["status"] == "INSTALLED"
+    assert payload["installer"] == "uv"
+    assert calls
+    assert calls[0][0] == "/usr/bin/uv"
+    assert calls[0][1:4] == ["pip", "install", "--python"]

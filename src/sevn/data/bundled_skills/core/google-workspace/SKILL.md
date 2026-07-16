@@ -73,6 +73,15 @@ HTML), Calendar, Drive, Sheets, Docs, or Contacts are required.
 6. For plan-only validation, pass `--dry-run` to `scripts/google_api.py` or set
    `SEVN_GOOGLE_DRY_RUN=1`.
 
+7. Install optional Python deps (when live API calls are needed):
+
+   ```bash
+   uv pip install --python "$(which python3)" 'sevn[google-workspace]'
+   ```
+
+   Or run `run_skill_script("google-workspace", "scripts/setup.py", ["--install-deps"])`
+   (uses `uv pip` when `uv` is on PATH).
+
 ## Safety rules
 
 - Ask the operator first before sending email, replying, modifying Gmail

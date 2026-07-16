@@ -18,7 +18,7 @@ Exports:
     load_token_payload — read and normalize the stored OAuth token payload.
     missing_scopes_from_payload — compute required scopes absent from a payload.
     ensure_google_deps — validate optional Google client libraries are installed.
-    install_deps — install optional Google client libraries with ``pip``.
+    install_deps — install optional Google client libraries with ``uv pip``.
     check_auth — offline token/client-secret status summary.
     check_auth_live — refresh-backed auth status summary.
     store_client_secret — validate and store Desktop OAuth client JSON.
@@ -43,6 +43,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Sequence
+
+from loguru import logger
 
 GOOGLE_WORKSPACE_SKILL_ID: Final[str] = "google-workspace"
 
@@ -287,28 +289,51 @@ def ensure_google_deps() -> None:
 
 
 def install_deps() -> dict[str, object]:
-    """Install optional Google client libraries with ``pip``."""
+    """Install optional Google client libraries with ``uv pip``."""
 
     try:
         ensure_google_deps()
     except ImportError:
+        uv_bin = shutil.which("uv")
+        if uv_bin is None:
+            msg = (
+                "google_workspace: uv not found on PATH; install deps with: "
+                "uv pip install --python "
+                f"{sys.executable} 'sevn[google-workspace]'"
+            )
+            logger.error(msg)
+            raise RuntimeError(msg) from None
+        command = [
+            uv_bin,
+            "pip",
+            "install",
+            "--python",
+            sys.executable,
+            *REQUIRED_PACKAGES,
+        ]
+        logger.info("google_workspace: installing optional deps via {}", " ".join(command))
         proc = subprocess.run(
-            [sys.executable, "-m", "pip", "install", *REQUIRED_PACKAGES],
+            command,
             capture_output=True,
             text=True,
             check=False,
         )
         if proc.returncode != 0:
-            detail = proc.stderr.strip() or proc.stdout.strip() or "pip install failed"
+            detail = proc.stderr.strip() or proc.stdout.strip() or "uv pip install failed"
+            logger.error("google_workspace: {}", detail)
             raise RuntimeError(f"google_workspace: {detail}") from None
         ensure_google_deps()
+        logger.info("google_workspace: optional Google client libraries installed")
         return {
             "status": "INSTALLED",
             "packages": list(REQUIRED_PACKAGES),
+            "installer": "uv",
         }
+    logger.debug("google_workspace: optional Google client libraries already installed")
     return {
         "status": "ALREADY_INSTALLED",
         "packages": list(REQUIRED_PACKAGES),
+        "installer": "uv",
     }
 
 
@@ -643,6 +668,7 @@ def run_gws(
     stderr = proc.stderr.strip()
     if proc.returncode != 0:
         detail = stderr or stdout or f"exit {proc.returncode}"
+        logger.error("google_workspace: gws failed ({}): {}", " ".join(command), detail)
         raise RuntimeError(f"google_workspace: gws failed: {detail}")
     if not stdout:
         return {}
