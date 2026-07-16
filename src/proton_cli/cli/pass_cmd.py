@@ -138,6 +138,7 @@ def items_get(
     share_id, resolved_item_id = proton_app.pass_svc.resolve_item(unlocked, args)
     item = proton_app.pass_svc.item_get(unlocked, share_id, resolved_item_id)
     if extract == "password":
+        # codeql[py/clear-text-logging-sensitive-data] intentional stdout for CLI extract
         sys.stdout.write(item.password)
         if item.password and not item.password.endswith("\n"):
             sys.stdout.write("\n")
@@ -284,6 +285,7 @@ def secrets_get(
     item = proton_app.pass_svc.find_login_by_name(unlocked, name, vault_filter=vault_id)
     if item is None or not item.password:
         raise typer.Exit(3)
+    # codeql[py/clear-text-logging-sensitive-data] intentional stdout for secrets backend
     sys.stdout.write(item.password)
     if not item.password.endswith("\n"):
         sys.stdout.write("\n")

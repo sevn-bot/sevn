@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 import pgpy
@@ -48,6 +49,22 @@ class Unlocked:
             if keys:
                 return keys, addr.id, addr.email
         raise ValueError("no address keys available")
+
+
+@contextmanager
+def use_unlocked_key(key: PGPKey):
+    """Use a session-unlocked private key or unlock it for one operation."""
+    if key.is_unlocked:
+        yield key
+    else:
+        with key.unlock(None):
+            yield key
+
+
+def persist_unlock(key: PGPKey, passphrase: bytes | str) -> PGPKey:
+    """Unlock *key* for the remainder of the process (pgpy re-locks on context exit)."""
+    key.unlock(passphrase).__enter__()
+    return key
 
 
 def unlock(client: Client, password: str) -> Unlocked:
@@ -158,8 +175,8 @@ def _unlock_keys(
                 secret = derived
         try:
             pgp_key, _ = PGPKey.from_blob(key.private_key)
-            with pgp_key.unlock(secret):
-                unlocked.append(pgp_key)
+            persist_unlock(pgp_key, secret)
+            unlocked.append(pgp_key)
         except Exception:
             continue
     return unlocked
@@ -170,7 +187,7 @@ def _decrypt_token(token_arm: str, sig_arm: str, keys: list[PGPKey]) -> bytes | 
         message = PGPMessage.from_blob(token_arm)
         signature = pgpy.PGPSignature.from_blob(sig_arm)
         for key in keys:
-            with key.unlock(None):
+            with use_unlocked_key(key):
                 decrypted = key.decrypt(message)
                 if key.verify(decrypted, signature):
                     return bytes(decrypted.message)
@@ -184,7 +201,7 @@ def decrypt_pgp_message(keys: list[PGPKey], data: bytes) -> bytes:
     last_err: Exception | None = None
     for key in keys:
         try:
-            with key.unlock(None):
+            with use_unlocked_key(key):
                 decrypted = key.decrypt(message)
                 return bytes(decrypted.message)
         except Exception as exc:

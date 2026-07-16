@@ -9,6 +9,7 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
+from proton_cli.account.keys import persist_unlock, use_unlocked_key
 from pgpy import PGPKey, PGPMessage
 
 
@@ -88,27 +89,25 @@ def unlock_share(
             addr_email = getattr(addr, "email", "")
             break
     enc = PGPMessage.from_blob(str(share_payload.get("Passphrase", "")))
-    with addr_key.unlock(None):
+    with use_unlocked_key(addr_key):
         dec = addr_key.decrypt(enc)
     phrase = _message_bytes(dec.message)
     locked_share, _ = PGPKey.from_blob(str(share_payload.get("Key", "")))
-    with locked_share.unlock(phrase):
-        return locked_share, address_id, addr_email
+    return persist_unlock(locked_share, phrase), address_id, addr_email
 
 
 def unlock_node(link: Link, parent_key: PGPKey, addr_key: PGPKey | None = None) -> PGPKey:
     enc = PGPMessage.from_blob(link.node_passphrase)
-    with parent_key.unlock(None):
+    with use_unlocked_key(parent_key):
         dec = parent_key.decrypt(enc)
     phrase = _message_bytes(dec.message)
     locked, _ = PGPKey.from_blob(link.node_key)
-    with locked.unlock(phrase):
-        return locked
+    return persist_unlock(locked, phrase)
 
 
 def decrypt_name(enc_name: str, parent_key: PGPKey) -> str:
     msg = PGPMessage.from_blob(enc_name)
-    with parent_key.unlock(None):
+    with use_unlocked_key(parent_key):
         dec = parent_key.decrypt(msg)
     text = dec.message
     return text.decode() if isinstance(text, (bytes, bytearray)) else str(text)
@@ -117,7 +116,7 @@ def decrypt_name(enc_name: str, parent_key: PGPKey) -> str:
 def encrypt_name(name: str, parent_key: PGPKey, addr_key: PGPKey) -> str:
     msg = PGPMessage.new(name)
     pub = parent_key.pubkey
-    with parent_key.unlock(None), addr_key.unlock(None):
+    with use_unlocked_key(parent_key), use_unlocked_key(addr_key):
         enc = pub.encrypt(msg)
     return str(enc)
 
@@ -131,7 +130,7 @@ def hash_key_of(link: Link, node_key: PGPKey) -> bytes:
     if not armored:
         raise ValueError("link has no hash key")
     msg = PGPMessage.from_blob(armored)
-    with node_key.unlock(None):
+    with use_unlocked_key(node_key):
         dec = node_key.decrypt(msg)
     return bytes(dec.message)
 
@@ -147,13 +146,13 @@ def gen_node_keys(parent_key: PGPKey, addr_key: PGPKey) -> tuple[str, str, str, 
     phrase_text = base64.b64encode(phrase_raw).decode()
     locked_key, armored_key, lock_pass = generate_node_key_with_passphrase(phrase_text.encode())
     msg = PGPMessage.new(phrase_text)
-    with parent_key.unlock(None):
+    with use_unlocked_key(parent_key):
         arm_pass = str(parent_key.pubkey.encrypt(msg))
-    with addr_key.unlock(None):
+    with use_unlocked_key(addr_key):
         sig = addr_key.sign(msg)
     arm_sig = str(sig)
-    with locked_key.unlock(lock_pass):
-        return armored_key, arm_pass, arm_sig, locked_key, phrase_text.encode()
+    persist_unlock(locked_key, lock_pass)
+    return armored_key, arm_pass, arm_sig, locked_key, phrase_text.encode()
 
 
 def generate_node_key_with_passphrase(lock_passphrase: bytes) -> tuple[PGPKey, str, bytes]:
@@ -168,7 +167,7 @@ def gen_node_hash_key(node_key: PGPKey) -> str:
     raw = os.urandom(32)
     token = base64.b64encode(raw).decode()
     msg = PGPMessage.new(token)
-    with node_key.unlock(None):
+    with use_unlocked_key(node_key):
         enc = node_key.encrypt(msg)
     return str(enc)
 

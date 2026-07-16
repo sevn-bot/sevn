@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, BinaryIO
 import httpx
 from pgpy import PGPKey, PGPMessage
 
+from proton_cli.account.keys import use_unlocked_key
+
 from proton_cli.errors import NotFound
 from proton_cli.proton.client import Client, Request
 from proton_cli.service.drive import blocks, crypto, paths
@@ -303,7 +305,7 @@ class DriveService:
             )
 
         manifest = b"".join(base64.b64decode(str(b["hash"])) for b in block_infos)
-        with dc.addr_key.unlock(None):
+        with use_unlocked_key(dc.addr_key):
             manifest_sig = str(dc.addr_key.sign(PGPMessage.new(manifest)))
         tokens = [
             {"Index": block_infos[i]["index"], "Token": upload_links[i].get("Token", "")}

@@ -8,6 +8,7 @@ import struct
 from dataclasses import dataclass
 
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from proton_cli.account.keys import persist_unlock, use_unlocked_key
 from pgpy import PGPKey, PGPMessage
 from pgpy.packet.fields import ECDHCipherText
 
@@ -41,7 +42,7 @@ def session_key_payload(sk: SessionKey) -> bytes:
 def encrypt_session_key_packet(node_key: PGPKey, sk: SessionKey) -> bytes:
     payload = session_key_payload(sk)
     pub = node_key.pubkey
-    with node_key.unlock(None):
+    with use_unlocked_key(node_key):
         enc = pub.encrypt(PGPMessage.new(payload))
     raw = bytes(enc)
     return _first_packet_bytes(raw)
@@ -53,7 +54,7 @@ def decrypt_session_key_packet(packet: bytes, node_key: PGPKey) -> SessionKey:
         raise ValueError(f"unsupported PKESK version {pkesk['version']}")
     ct = ECDHCipherText()
     ct.parse(bytearray(pkesk["encrypted_session_key"]))
-    with node_key.unlock(None):
+    with use_unlocked_key(node_key):
         enc_key = _encryption_subkey(node_key)
         payload = bytes(ct.decrypt(enc_key._key))
     if len(payload) < 3:
@@ -67,7 +68,7 @@ def decrypt_session_key_packet(packet: bytes, node_key: PGPKey) -> SessionKey:
 
 
 def sign_session_key(node_key: PGPKey, sk: SessionKey) -> str:
-    with node_key.unlock(None):
+    with use_unlocked_key(node_key):
         sig = node_key.sign(PGPMessage.new(sk.key))
     return str(sig)
 
@@ -81,10 +82,10 @@ def encrypt_block(
     seipd = _build_seipd_packet(data, sk)
     enc_sig = ""
     if addr_key is not None:
-        with addr_key.unlock(None):
+        with use_unlocked_key(addr_key):
             sig = addr_key.sign(PGPMessage.new(data))
         sig_msg = PGPMessage.new(bytes(sig))
-        with node_key.unlock(None):
+        with use_unlocked_key(node_key):
             wrapped = node_key.pubkey.encrypt(sig_msg)
         enc_sig = str(wrapped)
     return seipd, enc_sig
@@ -106,6 +107,7 @@ def _build_seipd_packet(data: bytes, sk: SessionKey) -> bytes:
     prefix = os.urandom(block_size + 2)
     literal = _build_literal_packet(data)
     payload = prefix + literal
+    # codeql[py/weak-sensitive-data-hashing] OpenPGP SEIPD MDC requires SHA-1
     mdc = _MDC_HEADER + hashlib.sha1(payload).digest()
     cfb_plain = payload + mdc
     ciphertext = _encrypt_openpgp_cfb(cfb_plain, sk.key, block_size)
@@ -121,6 +123,7 @@ def _build_literal_packet(data: bytes) -> bytes:
 
 
 def _encrypt_openpgp_cfb(plaintext: bytes, key: bytes, block_size: int) -> bytes:
+    # codeql[py/weak-cryptographic-algorithm] OpenPGP CFB uses AES-ECB for keystream
     ecb = Cipher(algorithms.AES(key), modes.ECB()).encryptor()
     feedback = bytes(block_size)
     out = bytearray()
@@ -139,6 +142,7 @@ def _encrypt_openpgp_cfb(plaintext: bytes, key: bytes, block_size: int) -> bytes
 
 
 def _decrypt_openpgp_cfb(ciphertext: bytes, key: bytes, block_size: int) -> bytes:
+    # codeql[py/weak-cryptographic-algorithm] OpenPGP CFB uses AES-ECB for keystream
     ecb = Cipher(algorithms.AES(key), modes.ECB()).encryptor()
     feedback = bytes(block_size)
     out = bytearray()
@@ -157,6 +161,7 @@ def _verify_mdc(plaintext: bytes) -> None:
     mdc = plaintext[-_MDC_SIZE:]
     if mdc[:2] != _MDC_HEADER:
         raise ValueError("invalid MDC header")
+    # codeql[py/weak-sensitive-data-hashing] OpenPGP SEIPD MDC requires SHA-1
     expected = hashlib.sha1(plaintext[:-_MDC_SIZE]).digest()
     if mdc[2:] != expected:
         raise ValueError("MDC verification failed")

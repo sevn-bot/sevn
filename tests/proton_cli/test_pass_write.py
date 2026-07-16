@@ -34,6 +34,17 @@ def test_patch_login_item_updates_password() -> None:
     assert parsed["password"] == "new"
 
 
+def test_patch_login_item_preserves_multiple_urls() -> None:
+    original = item_proto.encode_login_item(
+        name="k",
+        urls=["https://a.example", "https://b.example"],
+    )
+    patched = item_proto.patch_login_item(original, password="new")
+    parsed = item_proto.decode_item_content(patched)
+    assert parsed["password"] == "new"
+    assert parsed["urls"] == ["https://a.example", "https://b.example"]
+
+
 def test_new_item_and_patch_dataclasses() -> None:
     ni = NewItem(name="x", password="p")
     assert ni.type == "login"
