@@ -169,11 +169,17 @@ class ProtonPassCliBackend:
                 env["PROTON_PASSWORD"] = passphrase
         return env
 
-    async def _run(self, args: list[str]) -> tuple[int, bytes, bytes]:
+    async def _run(
+        self,
+        args: list[str],
+        *,
+        stdin: bytes | None = None,
+    ) -> tuple[int, bytes, bytes]:
         """Run the CLI and return ``(returncode, stdout, stderr)``.
 
         Args:
             args (list[str]): Full argv including the executable path.
+            stdin (bytes | None): Optional bytes written to the child stdin.
 
         Returns:
             tuple[int, bytes, bytes]: Process exit code and captured streams.
@@ -187,9 +193,10 @@ class ProtonPassCliBackend:
             *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            stdin=asyncio.subprocess.PIPE if stdin is not None else None,
             env=self._subprocess_env(),
         )
-        out, err = await proc.communicate()
+        out, err = await proc.communicate(stdin)
         return proc.returncode or 0, out, err
 
     async def get(self, key: str) -> str | None:
@@ -249,9 +256,10 @@ class ProtonPassCliBackend:
                 "secrets",
                 "set",
                 label,
-                value,
+                "-",
                 *self._vault_flags(proton_cli=True),
             ]
+            code, _out, err = await self._run(args, stdin=value.encode("utf-8"))
         elif self._is_pass_cli(exe):
             args = [
                 exe,
@@ -263,9 +271,10 @@ class ProtonPassCliBackend:
                 "--field",
                 f"password={value}",
             ]
+            code, _out, err = await self._run(args)
         else:
             args = [exe, *self._vault_flags(pass_cli=False), "set", label, value]
-        code, _out, err = await self._run(args)
+            code, _out, err = await self._run(args)
         if code != 0:
             detail = err.decode("utf-8", errors="replace").strip()
             msg = f"proton pass CLI set failed (exit {code}): {detail}"

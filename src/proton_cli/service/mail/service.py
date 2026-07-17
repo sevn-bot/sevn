@@ -284,6 +284,7 @@ class MailService:
             raise ValueError("at least one --to recipient is required")
         addr_keys, _addr_id, sender_email = unlocked.primary_addr()
         mime_type = "text/html" if opts.html else "text/plain"
+        key0 = addr_keys[0]
         message = PGPMessage.new(opts.body)
         with use_unlocked_key(addr_keys[0]):
             enc = addr_keys[0].encrypt(message)
@@ -354,9 +355,10 @@ class MailService:
         plans: list[tuple[str, int, str]],
         addr_keys: list,
     ) -> list[dict[str, object]]:
+        key0 = addr_keys[0]
         session_message = PGPMessage.new(body)
-        with use_unlocked_key(addr_keys[0]):
-            enc_body = addr_keys[0].encrypt(session_message)
+        with use_unlocked_key(key0):
+            enc_body = key0.encrypt(session_message)
         body_b64 = base64.b64encode(bytes(enc_body)).decode()
 
         internal_addrs: dict[str, object] = {}
@@ -374,8 +376,8 @@ class MailService:
 
         packages: list[dict[str, object]] = []
         if internal_addrs:
-            with use_unlocked_key(addr_keys[0]):
-                sender_wrap = addr_keys[0].encrypt(PGPMessage.new(body))
+            with use_unlocked_key(key0):
+                sender_wrap = key0.encrypt(PGPMessage.new(body))
             packages.append(
                 {
                     "Addresses": internal_addrs,

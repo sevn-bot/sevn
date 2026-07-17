@@ -109,6 +109,9 @@ def new_app(opts: Options) -> App:
         user_agent=user_agent,
         profile=profile,
     )
+    from proton_cli.hv.resolver import cli_hv_resolver
+
+    client.set_hv_resolver(cli_hv_resolver)
 
     loaded = session_store.load(profile)
     if loaded:

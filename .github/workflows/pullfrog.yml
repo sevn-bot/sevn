@@ -15,7 +15,7 @@ permissions:
   id-token: write
   issues: write
   pull-requests: write
-  statuses: read
+  statuses: write
 
 concurrency:
   group: pullfrog-${{ github.workflow }}-${{ github.ref }}
@@ -87,11 +87,15 @@ jobs:
           (env.HAS_CLAUDE_CODE != 'true' && env.HAS_CODEX_AUTH == 'true' && steps.pullfrog_codex.outcome == 'success')
         env:
           GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
           set -euo pipefail
-          pr="${{ github.event.pull_request.number }}"
-          owner="${{ github.repository_owner }}"
-          repo="${{ github.event.repository.name }}"
+          if [ -z "${PR_NUMBER:-}" ]; then
+            echo "::notice title=PullFrog thread enforcement skipped::No PR number available (e.g. workflow_dispatch event)."
+            exit 0
+          fi
           query='query($owner: String!, $repo: String!, $number: Int!) {
             repository(owner: $owner, name: $repo) {
               pullRequest(number: $number) {
@@ -106,9 +110,9 @@ jobs:
           }'
           for attempt in $(seq 1 30); do
             open="$(gh api graphql -f query="$query" \
-              -f owner="$owner" -f repo="$repo" -F number="$pr" \
-              --jq '[.data.repository.pullRequest.reviewThreads.nodes[]
-                | select(.isResolved == false and (.comments.nodes[0].author.login | startswith("pullfrog")))] | length' \
+              -f owner="$REPO_OWNER" -f repo="$REPO_NAME" -F number="$PR_NUMBER" \
+              --jq '[.data.repository.pullRequest.reviewThreads.nodes[]?
+                | select(.isResolved == false and ((.comments.nodes[0].author.login // "") | startswith("pullfrog")))] | length' \
               2>/dev/null || echo "")"
             if [ -n "$open" ] && [ "$open" != "0" ]; then
               echo "::error title=PullFrog requested changes::${open} unresolved PullFrog review thread(s) remain."
@@ -121,5 +125,5 @@ jobs:
             echo "Waiting for PullFrog review threads (attempt ${attempt}/30)..."
             sleep 10
           done
-          echo "::error title=PullFrog review incomplete::Could not read PullFrog review threads for PR #${pr}."
+          echo "::error title=PullFrog review incomplete::Could not read PullFrog review threads for PR #${PR_NUMBER}."
           exit 1

@@ -9,6 +9,7 @@ import sys
 from sevn.data.bundled_skills import BUNDLED_SKILLS_ROOT
 from sevn.skills.proton_management import (
     PROTON_MANAGEMENT_SKILL_ID,
+    cli_argv,
     dry_run_requested,
     status_payload,
 )
@@ -28,6 +29,16 @@ def test_status_payload() -> None:
     payload = status_payload(profile="default")
     assert "cli_installed" in payload
     assert payload["profile"] == "default"
+
+
+def test_cli_argv_module_mode_profile_before_subcommand() -> None:
+    argv = cli_argv(["pass", "vaults", "list"], profile="work", module_mode=True)
+    assert argv == ["-m", "proton_cli", "--profile", "work", "pass", "vaults", "list"]
+
+
+def test_cli_argv_binary_profile_before_subcommand() -> None:
+    argv = cli_argv(["pass", "vaults", "list"], profile="work", module_mode=False)
+    assert argv == ["--profile", "work", "pass", "vaults", "list"]
 
 
 def test_status_script_json() -> None:

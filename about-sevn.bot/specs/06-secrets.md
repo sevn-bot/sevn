@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver a single trust boundary for credentials: backend modules + TTL cache
   under src/sevn/security/, wired exclusively by the egress proxy (src/sevn/proxy/)
   so agent-facing processes never see raw k'
-last_updated: '2026-07-16'
-fingerprint: sha256:205d538a2cd3a3a5d5c2230126894f6d92cbbc8eebb79a25cc02379318d595bd
+last_updated: '2026-07-17'
+fingerprint: sha256:b9b13a843bf5c1898e696c6424933c3a3cb6da8f56914deabfa2bfb1f2431d31
 related: []
 sources:
 - src/sevn/security/secrets/**
