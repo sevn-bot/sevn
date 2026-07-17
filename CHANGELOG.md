@@ -12,7 +12,10 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- [2026-07-16] `gh-issues` authenticated read/watch/track via `gh` (`issue_view`/`issue_watch`/`issue_track`) with `.sevn/gh-watch/` state and a `gh-issue-watch` cron scope (~15 min) that notifies on issue changes via the `message` tool
+- [2026-07-16] `gh-issues` `issue_create` creates issues in one call via authenticated `gh` with `templates/{feature,bug,chore}.md` (default `feature`), defaults `--repo` from `my_sevn.repo_url`, returns `{url,number,repo}`, falls back to the egress proxy only when `gh` is absent, and maps failures to precise messages instead of bare `proxy status 404`
 - [2026-07-16] Bundled `proton-management` skill with Python `proton-cli` foundation (Pass read, session/SRP auth) and onboarding manifest registration
+
 - [2026-07-16] `make install-snapshot-timer` installs a launchd agent that runs the local gitignored-tree snapshot every 3 hours, so operator-only plans, specs, and agent config are protected on a schedule instead of only on `git push`
 - [2026-07-16] Local snapshot backup covers whole gitignored trees (`.ignorelocal`, `spec-kit-wave`, `build-plan-from-review`, `.cursor`, `.claude` agent config, `docs`) and excludes secrets and regenerable indexes (`.env`/`.env.*`, `graphify-out`, `MyCodeGraph`, `.venv`, caches) while keeping `.env.example` templates
 - [2026-07-15] PARA/Obsidian-native Second Brain vault layout via `second_brain.layout: "legacy" | "para"` with a configurable `second_brain.para` folder profile (Inbox, Projects, Areas, Resources, Archive, Templates) and non-destructive adoption of existing Obsidian vaults
@@ -73,6 +76,20 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-16] Thermos iter6 residual: Brave-spawned browsers pass `pid_matches_sevn_chrome_profile` (close/reap/shutdown can kill and clear Singleton locks) while still requiring bounded `--user-data-dir=` equality
+- [2026-07-16] Thermos iter5: Chrome profile identity matches a bounded `--user-data-dir=` argv token (prefix profiles no longer cross-match); browser registry/spawn/CDP helpers live in `sevn.browser` so lifecycle/process no longer import skills; issue-watch cron seed no longer force-reenables a disabled job on every boot
+- [2026-07-16] Thermos iter4: `run_gh` times out hung `gh` (60s) so issue-watch/cron cannot pin the gateway; `spawn_chrome` returns Popen only (no fake `:0` CDP URL) with shared `await_cdp_after_spawn`; onboarding uses `clear_profile_singleton_locks` + that wait path; generic `pid_is_alive`/`terminate_pid` live in `sevn.util.process` (gateway teardown imports util; Chrome identity/reap stay in `browser.process`); drop thin `pid_*` re-exports from `browser_session`
+- [2026-07-16] Thermos iter3: browser restart fails clearly under attach-only `SEVN_CDP_URL` (no stale registry success); Chrome terminate/close runs off the event loop; identity-fail kills leave the registry intact; issue-watch continues after per-issue `gh` errors; Playwright attach uses lifecycle spawn SSOT; process/reap lives in `sevn.browser.process`; operator-notify wiring and issue-watch notify moved out of `http_server` / general dispatcher
+- [2026-07-16] Thermos iter2: operator notify skips a no-op Telegram sink when no owner is configured (LOG under `.sevn/trigger_runs/` instead); issue-watch cron and Chrome reap run off the event loop; one `terminate_sevn_chrome` / shutdown path; issue-watch extracted from `cron.py`; `gh` CLI lives in `gh_cli.py`; spawn no longer stacks dual DevTools waits; restart uses hardened lifecycle spawn
+- [2026-07-16] Thermos D16: issue-watch cron delivers via injectable operator notify (gateway Telegram / LOG artefact) instead of a fake `message_tool` stub; watch/track live in `sevn.integrations.github_skill.watch` (no `importlib` from cron); `gh-issue-watch` cron job is seeded at gateway boot
+- [2026-07-16] Thermos D16: spawn-path Chrome reap waits after SIGTERM before clearing locks; single `pid_is_alive` + cmdline profile identity before kill; remove TypeError spawn kwargs fallback; always-await CDP attach
+- [2026-07-16] Thermos D16: `default_github_repo_slug` parses SCP `git@host:owner/repo.git`; `log_query` pattern paging uses match-set `offset_from_tail`; `process` restores typed `ProcessAction` / `ProcessActionInput`
+- [2026-07-16] Mark intentional fixed-argv `gh` subprocess calls in `github_manager` with Bandit `# nosec` so the W5/W6 CLI create/view path passes `make security`
+- [2026-07-16] On classifier timeout, the queue relatedness path treats the message as its own turn (`new_task`) instead of merging it into an unrelated in-flight task via `related_steer`
+- [2026-07-16] Skill registry and `load_skill` share one source of truth: `list_registry` advertises only non-quarantined skills from the live `SkillsManager` scan (no unloadable `DEFAULT_SKILL_MANIFESTS` stubs), and skills whose manifests fail to parse are flagged `quarantine:true` so listed skills never return `SKILL_NOT_FOUND`
+- [2026-07-16] `read_transcript` no longer crashes on tool-heavy turns with small limits when mirrored tool results are bare JSON scalars; `log_query` with a `pattern` returns matching lines (paged under the inline budget) instead of collapsing to a `tail_summary` sample
+- [2026-07-16] `process` accepts `action=read` as an alias for `output`, keeps `run` returning `did_you_mean`, and wrong-action errors include the referenced job's current status; workspace `sevn.bot.md` surfaces `my_sevn.repo_url` so agents never need `git remote` against the read-only mirror
+- [2026-07-16] Browser spawn survives concurrent retries and gateway restarts: stale sevn Chrome is reaped, profile singleton/port locks cleared, CDP wait is adaptive with one clean retry, Chrome stderr lands in `logs/chrome-<session>.log`, and the session registry only stores confirmed live CDP endpoints
 - [2026-07-14] Bundled skill seeding skips `__pycache__` when copying packaged skills, avoiding parallel-test flakes on transient `.pyc` files
 - [2026-07-15] Telegram session mirror title lookup is best-effort when SQLite errors occur; group titles also persist from inline-keyboard callbacks (#21)
 - [2026-07-15] Restored spec-36 sub-agent amendment cross-reference in `14-executor-tier-b.md` after W9 body rewrite

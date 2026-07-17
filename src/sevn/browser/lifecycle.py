@@ -2,20 +2,25 @@
 
 A :class:`CDPBrowserSession` owns one browser-level :class:`CDPConnection` plus a map
 of attached page targets (``{target_id: CDPSession}``) maintained via flattened
-``Target.setAutoAttach``. It reuses the shipped ``sevn.skills.browser_session``
-discovery/spawn/registry layer, so ``target_id`` strings and the persisted
-``active_target_id`` stay interchangeable with the rest of the codebase.
+``Target.setAutoAttach``. It reuses :mod:`sevn.browser.chrome` /
+:mod:`sevn.browser.registry` for discovery/spawn/registry, so ``target_id``
+strings and the persisted ``active_target_id`` stay interchangeable with the
+rest of the codebase.
 
 Module: sevn.browser.lifecycle
-Depends: asyncio, contextlib, json, urllib, sevn.browser.cdp, sevn.skills.browser_session
+Depends: asyncio, contextlib, json, os, urllib, sevn.browser.cdp,
+    sevn.browser.chrome, sevn.browser.process, sevn.browser.registry
 
 Exports:
     CDPBrowserSession — attach/spawn, target tracking, tab CRUD, page-session access.
     fetch_browser_ws_url — resolve the browser-level WebSocket URL from a CDP HTTP base.
+    await_cdp_after_spawn — poll DevToolsActivePort until CDP is reachable (no seed URL).
     spawn_or_attach — attach to an existing CDP endpoint or spawn host Chrome (D4).
     get_or_create_session — pooled session per gateway ``session_id``.
     release_session — disconnect + evict a pooled session.
     reset_pool_for_tests — clear the pool (unit tests only).
+    Process/reap helpers live in :mod:`sevn.browser.process` (re-exported below
+    for spawn-path callers).
 
 Examples:
     >>> import inspect
@@ -28,11 +33,20 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import threading
+import time
 import urllib.error
 import urllib.request
 from typing import TYPE_CHECKING, Any, Final
 
 from sevn.browser.cdp import CDPConnection, CDPSession
+from sevn.browser.process import (
+    clear_profile_singleton_locks,
+    reap_sevn_browsers_on_shutdown,
+    reap_stale_sevn_chrome,
+    terminate_pid,
+    terminate_sevn_chrome,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -41,7 +55,10 @@ if TYPE_CHECKING:
 
 _pool: dict[str, CDPBrowserSession] = {}
 _pool_lock: asyncio.Lock | None = None
-_SPAWN_CDP_WAIT_STEPS: Final[int] = 50
+_spawn_locks: dict[str, asyncio.Lock] = {}
+_spawn_locks_mu = threading.Lock()
+# ~20 s adaptive CDP wait (D3); was fixed 10 s (50 * 0.2).
+_SPAWN_CDP_WAIT_STEPS: Final[int] = 100
 _SPAWN_CDP_WAIT_INTERVAL: Final[float] = 0.2
 
 
@@ -60,6 +77,86 @@ def _get_pool_lock() -> asyncio.Lock:
     if _pool_lock is None:
         _pool_lock = asyncio.Lock()
     return _pool_lock
+
+
+def _spawn_lock_for(session_id: str) -> asyncio.Lock:
+    """Return the per-``session_id`` spawn lock (single-flight, D5).
+
+    Uses a threading mutex when creating entries so concurrent asyncio tasks
+    cannot race two distinct locks for the same session id.
+
+    Args:
+        session_id (str): Gateway session id.
+
+    Returns:
+        asyncio.Lock: Lock shared by concurrent spawners for this session.
+
+    Examples:
+        >>> isinstance(_spawn_lock_for("s1"), asyncio.Lock)
+        True
+    """
+    key = (session_id or "default").strip() or "default"
+    with _spawn_locks_mu:
+        lock = _spawn_locks.get(key)
+        if lock is None:
+            lock = asyncio.Lock()
+            _spawn_locks[key] = lock
+        return lock
+
+
+def _chrome_log_path(content_root: Path, session_id: str) -> Path:
+    """Return the Chrome stderr log path for ``session_id`` (D4).
+
+    ``session_id`` is sanitized to a filesystem-safe segment (colons/slashes
+    become ``-``) so Telegram-style ids cannot escape the logs directory.
+
+    Args:
+        content_root (Path): Workspace content root.
+        session_id (str): Gateway session id.
+
+    Returns:
+        Path: ``<content_root>/logs/chrome-<session_id>.log``.
+
+    Examples:
+        >>> from pathlib import Path as _P
+        >>> str(_chrome_log_path(_P("/ws"), "abc")).endswith("logs/chrome-abc.log")
+        True
+        >>> str(_chrome_log_path(_P("/ws"), "telegram:1:g")).endswith(
+        ...     "logs/chrome-telegram-1-g.log"
+        ... )
+        True
+    """
+    from sevn.browser.chrome import _safe_chrome_log_session_id
+
+    sid = _safe_chrome_log_session_id(session_id) or "default"
+    return content_root / "logs" / f"chrome-{sid}.log"
+
+
+def _chrome_log_tail(log_path: Path, *, max_chars: int = 800) -> str:
+    """Return a short tail of ``log_path`` for error messages (D4).
+
+    Args:
+        log_path (Path): Chrome log file.
+        max_chars (int): Maximum characters to include.
+
+    Returns:
+        str: Tail text, or empty when unreadable / missing.
+
+    Examples:
+        >>> from pathlib import Path as _P
+        >>> _chrome_log_tail(_P("/no/such/chrome.log"))
+        ''
+    """
+    if not log_path.is_file():
+        return ""
+    try:
+        text = log_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    text = text.strip()
+    if len(text) <= max_chars:
+        return text
+    return text[-max_chars:]
 
 
 def fetch_browser_ws_url(cdp_url: str, *, timeout: float = 5.0) -> str:
@@ -450,6 +547,59 @@ class CDPBrowserSession:
         await self._conn.close()
 
 
+async def await_cdp_after_spawn(
+    proc: Any,
+    profile_dir: Path,
+    *,
+    spawned_after: float,
+    log_path: Path | None = None,
+) -> tuple[int, str]:
+    """Poll ``DevToolsActivePort`` until CDP is reachable after a Chrome spawn.
+
+    Never probes a seed / ``:0`` URL — waits for a fresh port file, then
+    ``cdp_reachable``. Raises ``NO_CDP`` when the ceiling elapses or Chrome exits.
+
+    Args:
+        proc (Any): Chrome ``Popen`` handle from :func:`spawn_chrome`.
+        profile_dir (Path): Chrome ``user-data-dir``.
+        spawned_after (float): Unix time; reject older ``DevToolsActivePort`` files.
+        log_path (Path | None): Optional Chrome log for the ``NO_CDP`` error tail.
+
+    Returns:
+        tuple[int, str]: Live debugging port and ``http://127.0.0.1:<port>`` URL.
+
+    Raises:
+        RuntimeError: When CDP never becomes reachable within the adaptive window.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(await_cdp_after_spawn)
+        True
+    """
+    from sevn.browser.chrome import cdp_reachable, read_devtools_active_port
+
+    last_url = ""
+    for _ in range(_SPAWN_CDP_WAIT_STEPS):
+        fresh_port = await asyncio.to_thread(
+            read_devtools_active_port,
+            profile_dir,
+            spawned_after=spawned_after,
+        )
+        if fresh_port is not None:
+            last_url = f"http://127.0.0.1:{fresh_port}"
+            if cdp_reachable(last_url):
+                return fresh_port, last_url
+        if proc.poll() is not None:
+            break
+        await asyncio.sleep(_SPAWN_CDP_WAIT_INTERVAL)
+    tail = _chrome_log_tail(log_path) if log_path is not None else ""
+    detail = last_url or "(no DevToolsActivePort yet)"
+    msg = f"NO_CDP: CDP not reachable after spawn at {detail}" + (
+        f" (chrome log: {log_path}" + (f"; tail: {tail}" if tail else "") + ")" if log_path else ""
+    )
+    raise RuntimeError(msg)
+
+
 async def spawn_or_attach(
     content_root: Path,
     session_id: str,
@@ -458,8 +608,11 @@ async def spawn_or_attach(
 ) -> CDPBrowserSession:
     """Attach to an existing CDP endpoint, or spawn host Chrome and attach (D4).
 
-    Reuses ``sevn.skills.browser_session`` for URL resolution, spawn, and registry
-    persistence. Never closes an operator-owned Chrome.
+    Reuses :mod:`sevn.browser.chrome` / :mod:`sevn.browser.registry` for URL
+    resolution, spawn, and registry persistence. Never closes an operator-owned
+    Chrome. Spawns are single-flight per ``session_id`` (D5); before launch,
+    stale sevn Chrome for this profile is reaped and singleton/port lockfiles
+    cleared (D1).
 
     Args:
         content_root (Path): Workspace content root.
@@ -477,56 +630,114 @@ async def spawn_or_attach(
         >>> inspect.iscoroutinefunction(spawn_or_attach)
         True
     """
-    from sevn.skills.browser_session import (
-        BrowserSessionRegistry,
-        cdp_port_seed,
+    lock = _spawn_lock_for(session_id)
+    async with lock:
+        return await _spawn_or_attach_unlocked(content_root, session_id, cfg=cfg)
+
+
+async def _spawn_or_attach_unlocked(
+    content_root: Path,
+    session_id: str,
+    *,
+    cfg: WorkspaceConfig | None = None,
+) -> CDPBrowserSession:
+    """Attach or spawn without taking the per-session lock (caller holds it).
+
+    Args:
+        content_root (Path): Workspace content root.
+        session_id (str): Gateway session id.
+        cfg (WorkspaceConfig | None): Workspace config overrides.
+
+    Returns:
+        CDPBrowserSession: Connected session.
+
+    Raises:
+        RuntimeError: When CDP never becomes reachable after spawn + one retry.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_spawn_or_attach_unlocked)
+        True
+    """
+    from datetime import UTC, datetime
+
+    from sevn.browser.chrome import (
         cdp_reachable,
+        default_cdp_url,
         resolve_browser_headless,
-        resolve_cdp_url,
         resolve_profile_dir,
         spawn_chrome,
+    )
+    from sevn.browser.registry import (
+        BrowserSessionRegistry,
+        clear_registry,
+        read_registry,
         write_registry,
     )
 
-    cdp_url = resolve_cdp_url(content_root, session_id, cfg)
-    if cdp_reachable(cdp_url):
-        return await CDPBrowserSession.attach(cdp_url)
+    # Attach only to a real operator override or a persisted registry URL — never
+    # the deterministic seed-hint URL (which is not a live browser).
+    operator = default_cdp_url()
+    if operator and cdp_reachable(operator):
+        return await CDPBrowserSession.attach(operator)
+    row = read_registry(content_root, session_id)
+    if row is not None and row.cdp_url.strip() and cdp_reachable(row.cdp_url):
+        return await CDPBrowserSession.attach(row.cdp_url.rstrip("/"))
 
     profile_dir = resolve_profile_dir(content_root, session_id, cfg=cfg)
     headless = resolve_browser_headless(cfg)
-    seed = cdp_port_seed(session_id)
-    proc, port, spawned_url = await asyncio.to_thread(
-        spawn_chrome,
-        profile_dir,
-        headless=headless,
-        seed_port=seed,
-        cfg=cfg,
-    )
-    for _ in range(_SPAWN_CDP_WAIT_STEPS):
-        if cdp_reachable(spawned_url):
-            break
-        await asyncio.sleep(_SPAWN_CDP_WAIT_INTERVAL)
-    if not cdp_reachable(spawned_url):
-        if proc.poll() is None:
-            proc.terminate()
-        msg = f"CDP not reachable after spawn at {spawned_url}"
-        raise RuntimeError(msg)
-    from datetime import UTC, datetime
+    log_path = _chrome_log_path(content_root, session_id)
+    log_dir = log_path.parent
 
-    write_registry(
-        content_root,
-        session_id,
-        BrowserSessionRegistry(
-            pid=proc.pid,
-            cdp_url=spawned_url,
-            cdp_port=port,
-            profile_dir=str(profile_dir),
-            headless=headless,
-            spawned_by_sevn=True,
-            last_used_at=datetime.now(tz=UTC).isoformat(),
-        ),
-    )
-    return await CDPBrowserSession.attach(spawned_url)
+    last_error = ""
+    for attempt in range(2):
+        await asyncio.to_thread(reap_stale_sevn_chrome, content_root, session_id, profile_dir)
+        spawn_wall = time.time()
+
+        def _spawn() -> Any:
+            return spawn_chrome(
+                profile_dir,
+                headless=headless,
+                cfg=cfg,
+                session_id=session_id,
+                log_dir=log_dir,
+            )
+
+        proc = await asyncio.to_thread(_spawn)
+        try:
+            port, spawned_url = await await_cdp_after_spawn(
+                proc,
+                profile_dir,
+                spawned_after=spawn_wall,
+                log_path=log_path,
+            )
+        except RuntimeError as exc:
+            last_error = str(exc)
+            # D3: terminate + wait(timeout=5), then exactly one clean retry.
+            if proc.poll() is None:
+                with contextlib.suppress(Exception):
+                    proc.terminate()
+                with contextlib.suppress(Exception):
+                    await asyncio.to_thread(proc.wait, timeout=5)
+            clear_registry(content_root, session_id)
+            if attempt == 0:
+                continue
+            raise
+        write_registry(
+            content_root,
+            session_id,
+            BrowserSessionRegistry(
+                pid=proc.pid,
+                cdp_url=spawned_url,
+                cdp_port=port,
+                profile_dir=str(profile_dir),
+                headless=headless,
+                spawned_by_sevn=True,
+                last_used_at=datetime.now(tz=UTC).isoformat(),
+            ),
+        )
+        return await CDPBrowserSession.attach(spawned_url)
+    raise RuntimeError(last_error or "NO_CDP: CDP not reachable after spawn")
 
 
 async def get_or_create_session(
@@ -592,13 +803,20 @@ def reset_pool_for_tests() -> None:
         True
     """
     _pool.clear()
+    _spawn_locks.clear()
 
 
 __all__ = [
     "CDPBrowserSession",
+    "await_cdp_after_spawn",
+    "clear_profile_singleton_locks",
     "fetch_browser_ws_url",
     "get_or_create_session",
+    "reap_sevn_browsers_on_shutdown",
+    "reap_stale_sevn_chrome",
     "release_session",
     "reset_pool_for_tests",
     "spawn_or_attach",
+    "terminate_pid",
+    "terminate_sevn_chrome",
 ]

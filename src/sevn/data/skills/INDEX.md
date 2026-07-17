@@ -26,7 +26,7 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | cursor_cloud | Delegate code+PR work to Cursor Cloud Agent; returns PR, dashboard, and artifact links. |
 | email-management | Multi-account IMAP and Gmail API mail read/search/send scripts. |
 | facebook-use | Facebook workflows via a logged-in browser profile or CDP attach (feed read, search). |
-| gh-issues | GitHub issue lifecycle — list, view, create, comment via integration_call. |
+| gh-issues | GitHub issue lifecycle — templated create via gh CLI, authenticated view/watch/track + cron notify, plus list/comment. |
 | gh-pr | Pull request lifecycle — list, view, create, merge, close, reviewers via integration_call. |
 | github-manager | Advanced GitHub operations — branches, Actions, CI/CD secrets, environments, deployments via integration_call. |
 | google-workspace | Gmail, Calendar, Drive, Contacts, Sheets, and Docs via OAuth2 Google Workspace APIs. |
@@ -54,4 +54,4 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | sevn-diagnostics | sevn.bot operator repair playbooks for `sevn doctor --with-agent` (gateway, secrets, proxy, models, browser, voice). |
 | x-use | X (Twitter) workflows via a logged-in browser profile or CDP attach (timeline, search). |
 | yt-dlp | Download video/audio and metadata with yt-dlp (YouTube, Vimeo, X, TikTok, and allowlisted hosts). |
-| proton-management | Proton suite CLI (Python port) — Pass, Mail, Drive, Calendar, Contacts, api/settings. |
+| proton-management | Proton suite CLI (Python port) — Pass, Mail, Drive, Calendar, Contacts, attachments, groups, RSVP. |

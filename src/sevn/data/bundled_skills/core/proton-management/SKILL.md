@@ -1,7 +1,7 @@
 ---
 name: proton-management
-description: Proton suite CLI (Python port) — full suite with api/settings polish.
-version: "0.6.0"
+description: Proton suite CLI (Python port) — full deferred feature set.
+version: "0.7.0"
 see_also:
   - load_skill
   - run_skill_script
@@ -53,7 +53,11 @@ scripts:
 
 Python port of [roman-16/proton-cli](https://github.com/roman-16/proton-cli) integrated as a sevn skill.
 
-**PR 6** adds polish: `api`, `settings`, `status`, and env-based HV (`PROTON_HV_TOKEN`).
+**PR 7** completes deferred features: calendar create/RSVP, mail attachments, contact groups/pin-key, pure-Python drive keygen, and HV webview helper support.
+
+**Known limitations:**
+- Mail send packages currently set recipient `Signature: 0` — message *bodies* are encrypted but not signed. Attachments are signed on upload. Body detached-signature support remains a follow-up.
+- `--attach` / `--attach-inline` require Proton (internal) recipients. Cleartext/external recipients are rejected until ClearMIME package support lands.
 
 ## Operator setup
 
@@ -73,31 +77,27 @@ export PROTON_PASSWORD='...'
 
 ```bash
 proton-cli mail messages list --folder inbox --output json
-proton-cli mail messages search --keyword meeting --limit 10
-proton-cli mail messages read MESSAGE_ID --output json
-proton-cli mail messages send --to user@proton.me --subject "Hi" --body "Hello"
-proton-cli mail labels list
+proton-cli mail messages send --to user@proton.me --subject "Hi" --body "Hello" --attach ./doc.pdf
+proton-cli mail attachments list MESSAGE_ID
 proton-cli drive items list /
 proton-cli drive folders create /Notes
-proton-cli drive items upload ./doc.pdf /Documents
-proton-cli drive trash list
-proton-cli calendar calendars list
-proton-cli calendar events list --calendar Work
-proton-cli contacts list --output json
+proton-cli calendar events create --title "Sync" --start 2026-07-16T10:00 --calendar Work
+proton-cli calendar events respond EVENT_TITLE --status accept
+proton-cli contacts groups list
+proton-cli contacts pin-key REF --key ./key.asc --email user@example.com
 proton-cli status
-proton-cli api GET /calendar/v1 --output json
-proton-cli settings mail --output json
 proton-cli pass vaults list --output json
-proton-cli pass secrets get "API Key" --vault Personal
 ```
 
 Sessions persist under `~/.config/proton-cli/sessions/<profile>.json`.
 
-For CAPTCHA challenges during login, set `PROTON_HV_TOKEN` after solving in the browser (optional `PROTON_HV_TYPE=captcha`).
+For CAPTCHA challenges during login:
+- Set `PROTON_HV_TOKEN` after solving in the browser (optional `PROTON_HV_TYPE=captcha`), or
+- Install/run `proton-cli-hv` (override with `PROTON_HV_HELPER`).
 
 ## Security
 
 - Skill scripts never echo passwords in stdout.
 - `mail_read.py` returns decrypted bodies — ask first before running on untrusted refs.
-- `mail messages send` is operator ask-first (mutating).
+- `mail messages send` and `calendar events create` are operator ask-first (mutating).
 - Configure `secrets_backend` type `proton_pass` with `cli_path: proton-cli` and optional `vault`.

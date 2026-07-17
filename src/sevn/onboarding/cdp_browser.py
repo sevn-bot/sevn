@@ -242,7 +242,8 @@ class CDPOnboardingBrowser(BrowserSession):
             >>> inspect.iscoroutinefunction(CDPOnboardingBrowser.start)
             True
         """
-        from sevn.browser.lifecycle import CDPBrowserSession
+        from sevn.browser.lifecycle import CDPBrowserSession, await_cdp_after_spawn
+        from sevn.browser.process import clear_profile_singleton_locks
         from sevn.onboarding.browser_automation import resolve_start_request
         from sevn.skills.browser_session import (
             cdp_reachable,
@@ -270,22 +271,18 @@ class CDPOnboardingBrowser(BrowserSession):
                 from sevn.onboarding.browser_automation import _default_onboard_profile_dir
 
                 profile = Path(req.user_data_dir or _default_onboard_profile_dir())
-                for stale in (
-                    "DevToolsActivePort",
-                    "SingletonLock",
-                    "SingletonSocket",
-                    "SingletonCookie",
-                ):
-                    with contextlib.suppress(OSError):
-                        (profile / stale).unlink()
+                clear_profile_singleton_locks(profile)
                 self._record_step("browser.launch", state="running")
-                proc, _port, launched_url = await asyncio.to_thread(
-                    spawn_chrome, profile, headless=False
-                )
+                spawn_wall = time.time()
+                proc = await asyncio.to_thread(spawn_chrome, profile, headless=False)
                 self._chrome_proc = proc
-                self._cdp_url = launched_url
                 self._spawned_chrome = True
-                await self._await_cdp_ready(launched_url)
+                _port, launched_url = await await_cdp_after_spawn(
+                    proc,
+                    profile,
+                    spawned_after=spawn_wall,
+                )
+                self._cdp_url = launched_url
                 self._engine = await CDPBrowserSession.attach(launched_url)
             self._steps[-1]["state"] = "done"
             await self._bind_active_tab()

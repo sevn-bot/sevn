@@ -5,9 +5,9 @@ Depends: asyncio, os, pydantic, sevn.agent.triager.run, sevn.config.workspace_co
 
 Exports:
     RelatednessInput — classifier inputs (in-flight summary, queued summaries, new message).
-    RelatednessResult — label plus whether a steer fallback was used.
+    RelatednessResult — label plus whether a timeout/failure fallback was used.
     RelatednessDecision — pydantic structured-output row for the triager transport.
-    classify_relatedness — async classifier with strict timeout and ``related_steer`` fallback.
+    classify_relatedness — async classifier with strict timeout and ``new_task`` fallback.
 """
 
 from __future__ import annotations
@@ -198,7 +198,11 @@ async def classify_relatedness(
     trace: TraceSink | None = None,
     classifier: Callable[[RelatednessInput], Awaitable[object]] | None = None,
 ) -> RelatednessResult:
-    """Classify a busy-session message; timeout/failure → ``related_steer`` (D6).
+    """Classify a busy-session message; timeout/failure → ``new_task`` (D15).
+
+    On timeout or transport failure the message is treated as its own turn
+    (``new_task``) rather than silently merged into an unrelated in-flight
+    task via ``related_steer``.
 
     Args:
         workspace (WorkspaceConfig): Parsed workspace configuration.
@@ -212,8 +216,8 @@ async def classify_relatedness(
             ``(inp: RelatednessInput) -> RelatednessLabel | RelatednessResult``.
 
     Returns:
-        RelatednessResult: Label plus ``fallback=True`` when steer was chosen
-        because the classifier timed out or failed.
+        RelatednessResult: Label plus ``fallback=True`` when ``new_task`` was
+        chosen because the classifier timed out or failed.
 
     Examples:
         >>> import asyncio
@@ -260,14 +264,14 @@ async def classify_relatedness(
             turn_id,
             timeout_s,
         )
-        return RelatednessResult(label="related_steer", fallback=True)
+        return RelatednessResult(label="new_task", fallback=True)
     except Exception:
         logger.exception(
             "relatedness_classifier_failed session_id={} turn_id={}",
             session_id,
             turn_id,
         )
-        return RelatednessResult(label="related_steer", fallback=True)
+        return RelatednessResult(label="new_task", fallback=True)
 
 
 __all__ = [

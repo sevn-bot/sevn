@@ -676,3 +676,89 @@ async def test_log_query_bad_when_is_validation_error(dated_ctx: ToolContext) ->
     envelope = json.loads(raw)
     assert envelope["ok"] is False
     assert "unknown relative range" in envelope["error"]
+
+
+# ---------------------------------------------------------------------------
+# D11 — pattern → matching lines (paged), not tail_summary (green after W4)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def patterned_log_workspace(tmp_path: Path) -> Path:
+    """Large gateway.log with many pattern-matching lines (forces auto-bound today)."""
+    root = tmp_path / "ws"
+    logs = root / "logs"
+    logs.mkdir(parents=True)
+    # Long matching lines so a pattern filter still exceeds the inline byte budget
+    # and today's code auto-bounds to tail_summary (D11 must stop that).
+    pad = "x" * 200
+    lines = []
+    for i in range(1, 401):
+        if i % 3 == 0:
+            lines.append(f"ERROR NO_CDP spawn failed port={49000 + i} detail={pad}")
+        else:
+            lines.append(f"INFO heartbeat tick={i} {pad}")
+    (logs / "gateway.log").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return root
+
+
+@pytest.fixture
+def patterned_ctx(patterned_log_workspace: Path) -> ToolContext:
+    return ToolContext(
+        session_id="log-d11",
+        workspace_path=patterned_log_workspace,
+        workspace_id="log-d11-wid",
+        registry_version=1,
+        trace=None,
+        permissions=AllowAllPermissionPolicy(),
+    )
+
+
+@pytest.mark.asyncio
+async def test_d11_pattern_returns_matching_lines_not_tail_summary(
+    patterned_ctx: ToolContext,
+) -> None:
+    """D11: with a pattern, return matching lines — never auto-bound ``tail_summary``."""
+    exe, _ = build_session_registry(registry_version=1)
+    raw = await exe.dispatch(
+        patterned_ctx,
+        ToolCall(
+            name="log_query",
+            arguments={"pattern": "NO_CDP", "lines": 200},
+        ),
+    )
+    env = json.loads(raw)
+    assert env["ok"] is True
+    data = env["data"]
+    assert data.get("mode") != "tail_summary"
+    assert data.get("auto_bounded") is not True
+    lines = data.get("lines") or []
+    assert lines, "expected matching lines for pattern=NO_CDP"
+    assert all("NO_CDP" in line for line in lines)
+    assert len(lines) > 25, "must not collapse to SUMMARY_INLINE_MAX_LINES sample"
+    assert (
+        "spill_path" in data
+        or "cursor" in data
+        or "next_cursor" in data
+        or "offset_from_tail" in data
+        or data.get("has_more") is True
+        or "returned_lines" in data
+    )
+
+
+@pytest.mark.asyncio
+async def test_d11_no_pattern_still_allows_summary_default(
+    patterned_ctx: ToolContext,
+) -> None:
+    """D11: without a pattern, summary/auto-bound mode remains the large-read default."""
+    exe, _ = build_session_registry(registry_version=1)
+    raw = await exe.dispatch(
+        patterned_ctx,
+        ToolCall(name="log_query", arguments={"lines": 200}),
+    )
+    env = json.loads(raw)
+    assert env["ok"] is True
+    data = env["data"]
+    assert (
+        data.get("mode") in ("tail_summary", "tail", "summary") or data.get("auto_bounded") is True
+    )
