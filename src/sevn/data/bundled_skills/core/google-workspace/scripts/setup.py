@@ -15,6 +15,7 @@ from pathlib import Path
 
 from sevn.lcm.script_cli import workspace_from_env, write_error, write_ok
 from sevn.skills.google_workspace import (
+    auth_url_setup_envelope,
     check_auth,
     check_auth_live,
     exchange_auth_code,
@@ -118,7 +119,8 @@ def main(argv: list[str] | None = None) -> int:
             write_ok(store_client_secret(workspace, Path(args.client_secret)))
             return 0
         if args.auth_url:
-            write_ok(get_auth_url(workspace, args.services))
+            get_auth_url(workspace, args.services)
+            write_ok(auth_url_setup_envelope(workspace))
             return 0
         if args.auth_code:
             write_ok(exchange_auth_code(workspace, args.auth_code))
