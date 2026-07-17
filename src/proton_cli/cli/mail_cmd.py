@@ -125,8 +125,12 @@ def messages_send(
     body: str = typer.Option("", "--body", help="Plain-text body"),
     body_file: str = typer.Option("", "--body-file", help="Read body from file; - for stdin"),
     html: bool = typer.Option(False, "--html"),
+    attach: list[str] = typer.Option([], "--attach", help="Attachment file path (repeatable)"),
+    attach_inline: list[str] = typer.Option(
+        [], "--attach-inline", help="Inline image path (repeatable)"
+    ),
 ) -> None:
-    """Send a plain-text email (no attachments in this release)."""
+    """Send an email with optional attachments."""
     proton_app = _run(ctx)
     text = body
     if body_file:
@@ -139,13 +143,63 @@ def messages_send(
     unlocked = proton_app.unlock()
     message_id = proton_app.mail_svc.send(
         unlocked,
-        SendOptions(to=list(to), subject=subject, body=text, html=html),
+        SendOptions(
+            to=list(to),
+            subject=subject,
+            body=text,
+            html=html,
+            attachments=list(attach),
+            inline_attach=list(attach_inline),
+        ),
     )
     if proton_app.renderer.format.value == "text":
         typer.echo(message_id)
         proton_app.renderer.success("Message sent.")
     else:
         proton_app.renderer.object({"message_id": message_id})
+
+
+attachments_app = typer.Typer(name="attachments", no_args_is_help=True, add_completion=False)
+messages_app.add_typer(attachments_app, name="attachments")
+
+
+@attachments_app.command("list")
+def attachments_list(
+    ctx: typer.Context,
+    message_id: str = typer.Argument(..., help="Message ID"),
+    include_inline: bool = typer.Option(False, "--include-inline"),
+) -> None:
+    """List attachments on a message."""
+    proton_app = _run(ctx)
+    rows = proton_app.mail_svc.attachments_list(message_id, include_inline=include_inline)
+    if proton_app.renderer.format.value != "text":
+        proton_app.renderer.object({"attachments": rows})
+        return
+    proton_app.renderer.table(
+        ["ID", "NAME", "SIZE", "MIME"],
+        [[a.id, a.name, str(a.size), a.mime_type] for a in rows],
+    )
+
+
+@attachments_app.command("download")
+def attachments_download(
+    ctx: typer.Context,
+    message_id: str = typer.Argument(..., help="Message ID"),
+    attachment_id: str = typer.Argument(..., help="Attachment ID"),
+    output: str = typer.Option("", "--output", help="Output file path"),
+) -> None:
+    """Download and decrypt one attachment."""
+    proton_app = _run(ctx)
+    unlocked = proton_app.unlock()
+    data, name = proton_app.mail_svc.attachment_download(unlocked, message_id, attachment_id)
+    if output:
+        Path(output).write_bytes(data)
+        proton_app.renderer.success(f"Wrote {output}")
+        return
+    if proton_app.renderer.format.value != "text":
+        proton_app.renderer.object({"name": name, "size": len(data)})
+        return
+    sys.stdout.buffer.write(data)
 
 
 @messages_app.command("trash")

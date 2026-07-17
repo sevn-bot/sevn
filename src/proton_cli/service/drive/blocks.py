@@ -74,6 +74,19 @@ def sign_session_key(node_key: PGPKey, sk: SessionKey) -> str:
     return str(sig)
 
 
+def encrypt_data_packet(data: bytes, sk: SessionKey) -> bytes:
+    """Encrypt plaintext bytes into an OpenPGP SEIPD packet."""
+    return _build_seipd_packet(data, sk)
+
+
+def encrypt_plaintext(plaintext: str, sk: SessionKey) -> bytes:
+    """Encrypt a UTF-8 string into an OpenPGP SEIPD packet for mail body packages.
+
+    Mail packages currently advertise ``Signature: 0``; signing is not attached yet.
+    """
+    return _build_seipd_packet(plaintext.encode(), sk)
+
+
 def encrypt_block(
     data: bytes,
     sk: SessionKey,

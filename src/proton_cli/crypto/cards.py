@@ -66,6 +66,52 @@ def encrypt_and_sign_card(data: str, encryption_key: PGPKey, signing_key: PGPKey
     return {"Type": CARD_ENCRYPTED_SIGNED, "Data": str(enc), "Signature": str(sig)}
 
 
+def encrypt_and_sign_card_split(
+    signed_data: str,
+    encrypted_data: str,
+    encryption_key: PGPKey,
+    signing_key: PGPKey,
+    existing_key_packet_b64: str = "",
+) -> tuple[dict[str, Any], dict[str, Any], str, blocks.SessionKey]:
+    """Produce signed + encrypted calendar cards and optional shared key packet."""
+    signed = sign_card(signed_data, signing_key)
+    enc_msg = PGPMessage.new(encrypted_data)
+    if existing_key_packet_b64:
+        key_packet = base64.b64decode(existing_key_packet_b64)
+        session_key = blocks.decrypt_session_key_packet(key_packet, encryption_key)
+        data_packet = blocks.encrypt_data_packet(encrypted_data.encode(), session_key)
+        key_packet_b64 = ""
+    else:
+        session_key = blocks.make_session_key()
+        key_packet = blocks.encrypt_session_key_packet(encryption_key, session_key)
+        data_packet = blocks.encrypt_data_packet(encrypted_data.encode(), session_key)
+        key_packet_b64 = base64.b64encode(key_packet).decode()
+    with use_unlocked_key(signing_key):
+        sig = signing_key.sign(enc_msg)
+    encrypted = {
+        "Type": CARD_ENCRYPTED_SIGNED,
+        "Data": base64.b64encode(data_packet).decode(),
+        "Signature": str(sig),
+    }
+    return signed, encrypted, key_packet_b64, session_key
+
+
+def encrypt_part_with_session_key(
+    data: str,
+    session_key: blocks.SessionKey,
+    signing_key: PGPKey,
+) -> dict[str, Any]:
+    msg = PGPMessage.new(data)
+    data_packet = blocks.encrypt_data_packet(data.encode(), session_key)
+    with use_unlocked_key(signing_key):
+        sig = signing_key.sign(msg)
+    return {
+        "Type": CARD_ENCRYPTED_SIGNED,
+        "Data": base64.b64encode(data_packet).decode(),
+        "Signature": str(sig),
+    }
+
+
 def _decrypt_card_data(data: str, key_packet: bytes | None, key: PGPKey) -> str:
     if key_packet is not None:
         try:

@@ -2,32 +2,25 @@
 
 from __future__ import annotations
 
-import uuid
+from proton_cli.crypto import ical as ical_crypto
 
 
 def contact_uid() -> str:
-    return str(uuid.uuid4())
+    return ical_crypto.contact_uid()
 
 
 def signed_vcard(name: str, emails: list[str], uid: str) -> str:
-    lines = ["BEGIN:VCARD", "VERSION:4.0", f"FN:{name}", f"UID:{uid}"]
-    for email in emails:
-        if email:
-            lines.append(f"EMAIL:{email}")
-    lines.append("END:VCARD")
-    return "\r\n".join(lines)
+    contact = ical_crypto.SignedContact(
+        name=name,
+        uid=uid,
+        emails=[ical_crypto.SignedEmail(address=email) for email in emails if email],
+    )
+    return ical_crypto.build_signed_vcard(contact)
 
 
 def field(vcard: str, key: str) -> str:
-    for line in vcard.replace("\r\n", "\n").split("\n"):
-        if line.upper().startswith(f"{key}:"):
-            return line.split(":", 1)[1]
-    return ""
+    return ical_crypto.field(vcard, key)
 
 
 def fields(vcard: str, key: str) -> list[str]:
-    out: list[str] = []
-    for line in vcard.replace("\r\n", "\n").split("\n"):
-        if line.upper().startswith(f"{key}:"):
-            out.append(line.split(":", 1)[1])
-    return out
+    return ical_crypto.fields(vcard, key)
