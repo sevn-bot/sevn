@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 
 from pgpy import PGPMessage
 
-from proton_cli.account.keys import Unlocked, decrypt_pgp_message
+from proton_cli.account.keys import Unlocked, decrypt_pgp_message, use_unlocked_key
 from proton_cli.crypto import aead
 from proton_cli.errors import NotFound
 from proton_cli.proto import item as item_proto
@@ -535,11 +535,8 @@ def _encrypt_binary(keys: list, data: bytes) -> bytes:
     last_err: Exception | None = None
     for key in keys:
         try:
-            if key.is_unlocked:
+            with use_unlocked_key(key):
                 encrypted = key.encrypt(message)
-            else:
-                with key.unlock(None):
-                    encrypted = key.encrypt(message)
             return bytes(encrypted)
         except Exception as exc:
             last_err = exc

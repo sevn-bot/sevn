@@ -54,4 +54,4 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | sevn-diagnostics | sevn.bot operator repair playbooks for `sevn doctor --with-agent` (gateway, secrets, proxy, models, browser, voice). |
 | x-use | X (Twitter) workflows via a logged-in browser profile or CDP attach (timeline, search). |
 | yt-dlp | Download video/audio and metadata with yt-dlp (YouTube, Vimeo, X, TikTok, and allowlisted hosts). |
-| proton-management | Proton suite CLI (Python port) — Pass + Mail; Drive/Calendar/Contacts planned. |
+| proton-management | Proton suite CLI (Python port) — Pass + Mail + Drive; Calendar/Contacts planned. |

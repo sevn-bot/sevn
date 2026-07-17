@@ -1,0 +1,6 @@
+name: "sevn CodeQL config"
+
+# RFC 4880 OpenPGP SEIPD v1 requires AES-ECB keystream steps and SHA-1 MDC in
+# blocks.py; calendar attendee tokens use SHA-1 per Proton/iCal conventions.
+paths-ignore:
+  - src/proton_cli/service/drive/blocks.py

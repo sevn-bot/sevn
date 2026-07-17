@@ -1,7 +1,7 @@
 ---
 name: proton-management
-description: Proton suite CLI (Python port) — Pass + Mail; Drive/Calendar/Contacts planned.
-version: "0.3.0"
+description: Proton suite CLI (Python port) — Pass + Mail + Drive; Calendar/Contacts planned.
+version: "0.4.0"
 see_also:
   - load_skill
   - run_skill_script
@@ -35,13 +35,17 @@ scripts:
     description: Read and decrypt one message by ID or search term.
     args_overview: "MESSAGE_ID [--profile NAME] [--dry-run]"
     abortable: true
+  - path: scripts/drive_list.py
+    description: List Drive folder contents via proton-cli drive items list.
+    args_overview: "[--profile NAME] [--path /] [--dry-run]"
+    abortable: true
 ---
 
 # proton-management
 
 Python port of [roman-16/proton-cli](https://github.com/roman-16/proton-cli) integrated as a sevn skill.
 
-**PR 3** adds **Mail**: list, search, read, send (plain text), trash/delete/move, labels list.
+**PR 4** adds **Drive**: list, upload, download, create folder, trash list/restore/empty, delete.
 
 ## Operator setup
 
@@ -65,6 +69,10 @@ proton-cli mail messages search --keyword meeting --limit 10
 proton-cli mail messages read MESSAGE_ID --output json
 proton-cli mail messages send --to user@proton.me --subject "Hi" --body "Hello"
 proton-cli mail labels list
+proton-cli drive items list /
+proton-cli drive folders create /Notes
+proton-cli drive items upload ./doc.pdf /Documents
+proton-cli drive trash list
 proton-cli pass vaults list --output json
 proton-cli pass secrets get "API Key" --vault Personal
 ```

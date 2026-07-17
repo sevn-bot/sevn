@@ -11,6 +11,7 @@ from pgpy import PGPKey, PGPMessage
 
 if TYPE_CHECKING:
     from proton_cli.account.keys import Unlocked
+from proton_cli.account.keys import use_unlocked_key
 from proton_cli.proton.client import Client, Request
 from proton_cli.ref import pick
 from proton_cli.service.mail import crypto as mail_crypto
@@ -283,13 +284,9 @@ class MailService:
             raise ValueError("at least one --to recipient is required")
         addr_keys, _addr_id, sender_email = unlocked.primary_addr()
         mime_type = "text/html" if opts.html else "text/plain"
-        key0 = addr_keys[0]
         message = PGPMessage.new(opts.body)
-        if key0.is_unlocked:
-            enc = key0.encrypt(message)
-        else:
-            with key0.unlock(None):
-                enc = key0.encrypt(message)
+        with use_unlocked_key(addr_keys[0]):
+            enc = addr_keys[0].encrypt(message)
         armored = str(enc)
 
         draft_payload: dict = {}
@@ -359,11 +356,8 @@ class MailService:
     ) -> list[dict[str, object]]:
         key0 = addr_keys[0]
         session_message = PGPMessage.new(body)
-        if key0.is_unlocked:
+        with use_unlocked_key(key0):
             enc_body = key0.encrypt(session_message)
-        else:
-            with key0.unlock(None):
-                enc_body = key0.encrypt(session_message)
         body_b64 = base64.b64encode(bytes(enc_body)).decode()
 
         internal_addrs: dict[str, object] = {}
@@ -381,11 +375,8 @@ class MailService:
 
         packages: list[dict[str, object]] = []
         if internal_addrs:
-            if key0.is_unlocked:
+            with use_unlocked_key(key0):
                 sender_wrap = key0.encrypt(PGPMessage.new(body))
-            else:
-                with key0.unlock(None):
-                    sender_wrap = key0.encrypt(PGPMessage.new(body))
             packages.append(
                 {
                     "Addresses": internal_addrs,

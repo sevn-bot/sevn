@@ -12,6 +12,7 @@ from proton_cli.account import session as session_store
 from proton_cli.env import env_for_profile, first_non_empty
 from proton_cli.proton.client import Client
 from proton_cli.render.output import Format, Renderer
+from proton_cli.service.drive.service import DriveService
 from proton_cli.service.mail.service import MailService
 from proton_cli.service.pass_service.service import PassService
 
@@ -30,6 +31,7 @@ class App:
     api: Client
     pass_svc: PassService
     mail_svc: MailService
+    drive_svc: DriveService
     renderer: Renderer
     dry_run: bool = False
     full_ids: bool = False
@@ -125,6 +127,7 @@ def new_app(opts: Options) -> App:
         api=client,
         pass_svc=PassService(client),
         mail_svc=MailService(client),
+        drive_svc=DriveService(client),
         renderer=renderer,
         dry_run=opts.dry_run,
         full_ids=opts.full_ids,
