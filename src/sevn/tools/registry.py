@@ -158,6 +158,10 @@ DEFAULT_SKILL_MANIFESTS: Final[dict[str, str]] = {
         "the commit-msg hook rejects non-conforming subjects."
     ),
     "email-management": "Multi-account IMAP and Gmail API mail read/search/send scripts.",
+    "google-workspace": (
+        "Gmail, Calendar, Drive, and Contacts via OAuth2 Google Workspace APIs "
+        "(Sheets/Docs planned)."
+    ),
     "facebook-use": "Facebook workflows via a logged-in browser profile or CDP attach.",
     "gh-issues": "GitHub issue lifecycle — list, view, create, comment via integration_call.",
     "gh-pr": "Pull request lifecycle — list, view, create, merge, close via integration_call.",

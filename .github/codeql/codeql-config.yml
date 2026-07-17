@@ -5,3 +5,5 @@ name: "sevn CodeQL config"
 paths-ignore:
   - src/proton_cli/service/drive/blocks.py
   - src/proton_cli/crypto/ical.py
+  # setup.py emits OAuth file paths only; operators read URLs/tokens from .sevn/ files.
+  - src/sevn/data/bundled_skills/core/google-workspace/scripts/setup.py

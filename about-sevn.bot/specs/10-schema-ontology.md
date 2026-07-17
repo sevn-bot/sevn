@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Define the runtime ontology for Triager output and related labels across
   the agent core: canonical field names, closed enums, typing conventions, and how
   they compose with executor dispatch described '
-last_updated: '2026-07-16'
-fingerprint: sha256:6fca928fd7c91a794e511907f3c80d6e849854adc9c36f13fb5c8c5538fcee86
+last_updated: '2026-07-17'
+fingerprint: sha256:0a5eef9dde73e628419fe6c01ee1a765948730fb0f00ae2baf2cf823f5ea5996
 related: []
 sources:
 - src/sevn/config/**
@@ -287,6 +287,9 @@ interfaces:
 - name: complexity_clamp_short_word_limit
   file: src/sevn/config/sections/accessors.py
   symbol: complexity_clamp_short_word_limit
+- name: google_workspace_settings
+  file: src/sevn/config/sections/accessors.py
+  symbol: google_workspace_settings
 - name: rlm_json_dict
   file: src/sevn/config/sections/accessors.py
   symbol: rlm_json_dict
@@ -656,6 +659,12 @@ interfaces:
 - name: SelfImproveWorkspaceConfig
   file: src/sevn/config/sections/self_improve.py
   symbol: SelfImproveWorkspaceConfig
+- name: GoogleWorkspaceSkillConfig
+  file: src/sevn/config/sections/skills_google_workspace.py
+  symbol: GoogleWorkspaceSkillConfig
+- name: google_workspace_settings
+  file: src/sevn/config/sections/skills_google_workspace.py
+  symbol: google_workspace_settings
 - name: PlatformMediumConfig
   file: src/sevn/config/sections/skills_social_media.py
   symbol: PlatformMediumConfig

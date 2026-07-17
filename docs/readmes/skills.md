@@ -19,6 +19,7 @@
 | `gh-issues` | [`../../src/sevn/data/bundled_skills/core/gh-issues/SKILL.md`](../../src/sevn/data/bundled_skills/core/gh-issues/SKILL.md) | GitHub issue lifecycle — templated create via authenticated gh CLI (proxy fallback), authenticated view/watch/track with cron notify on changes, plus list/comment via integration_call. |
 | `gh-pr` | [`../../src/sevn/data/bundled_skills/core/gh-pr/SKILL.md`](../../src/sevn/data/bundled_skills/core/gh-pr/SKILL.md) | Pull request lifecycle — list, view, create, merge, close, reviewers via integration_call. |
 | `github-manager` | [`../../src/sevn/data/bundled_skills/core/github-manager/SKILL.md`](../../src/sevn/data/bundled_skills/core/github-manager/SKILL.md) | Advanced GitHub operations — branches, Actions, CI/CD secrets, environments, deployments via integration_call. |
+| `google-workspace` | [`../../src/sevn/data/bundled_skills/core/google-workspace/SKILL.md`](../../src/sevn/data/bundled_skills/core/google-workspace/SKILL.md) | Gmail, Calendar, Drive, Contacts, Sheets, and Docs via OAuth2-authenticated Google Workspace APIs. |
 | `graphify` | [`../../src/sevn/data/bundled_skills/core/graphify/SKILL.md`](../../src/sevn/data/bundled_skills/core/graphify/SKILL.md) | Knowledge-graph orientation for code (about-sevn.bot/specs/28-code-understanding.md §2.4). |
 | `job-ops` | [`../../src/sevn/data/bundled_skills/core/job-ops/SKILL.md`](../../src/sevn/data/bundled_skills/core/job-ops/SKILL.md) | Discover jobs across global + Europe boards, AI fit-score them against your resume, and optionally tailor a CV summary. |
 | `kokoro-tts` | [`../../src/sevn/data/bundled_skills/core/kokoro-tts/SKILL.md`](../../src/sevn/data/bundled_skills/core/kokoro-tts/SKILL.md) | Local Kokoro ONNX text-to-speech engine backing the voice TTS pipeline (kokoro backend). Not a model-facing research skill. |
@@ -60,6 +61,9 @@
 | `email_management` | [`../../src/sevn/skills/email_management.py`](../../src/sevn/skills/email_management.py) | Module `src/sevn/skills/email_management.py`. |
 | `entrypoints` | [`../../src/sevn/skills/entrypoints.py`](../../src/sevn/skills/entrypoints.py) | Module `src/sevn/skills/entrypoints.py`. |
 | `errors` | [`../../src/sevn/skills/errors.py`](../../src/sevn/skills/errors.py) | Module `src/sevn/skills/errors.py`. |
+| `google_workspace` | [`../../src/sevn/skills/google_workspace.py`](../../src/sevn/skills/google_workspace.py) | Module `src/sevn/skills/google_workspace.py`. |
+| `google_workspace_api` | [`../../src/sevn/skills/google_workspace_api.py`](../../src/sevn/skills/google_workspace_api.py) | Module `src/sevn/skills/google_workspace_api.py`. |
+| `google_workspace_doctor_check` | [`../../src/sevn/skills/google_workspace_doctor_check.py`](../../src/sevn/skills/google_workspace_doctor_check.py) | Module `src/sevn/skills/google_workspace_doctor_check.py`. |
 | `index` | [`../../src/sevn/skills/index.py`](../../src/sevn/skills/index.py) | Module `src/sevn/skills/index.py`. |
 | `lume` | [`../../src/sevn/skills/lume.py`](../../src/sevn/skills/lume.py) | Module `src/sevn/skills/lume.py`. |
 | `manager` | [`../../src/sevn/skills/manager.py`](../../src/sevn/skills/manager.py) | Module `src/sevn/skills/manager.py`. |

@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Google Workspace — sevn.bot help</title>
+  <link rel="icon" href="assets/logos/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="assets/index.css" />
+  <style>
+    .help-shell { display: grid; grid-template-columns: 220px 1fr; gap: 2rem; max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+    @media (max-width: 800px) { .help-shell { grid-template-columns: 1fr; } }
+    .help-nav { position: sticky; top: 1rem; align-self: start; }
+    .help-nav a { display: block; padding: 0.35rem 0; color: var(--sevn-fg-muted); text-decoration: none; font-size: 0.92rem; }
+    .help-nav a:hover, .help-nav a.active { color: var(--sevn-primary); }
+    .help-main h1 { margin-top: 0; font-size: 1.75rem; color: var(--sevn-fg-strong); }
+    .help-summary { color: var(--sevn-fg-muted); font-size: 1.05rem; margin-bottom: 1.5rem; max-width: 60ch; }
+    .help-footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--sevn-border); font-size: 0.78rem; color: var(--sevn-fg-muted); }
+    .help-generated-note { font-size: 0.85rem; color: var(--sevn-fg-muted); font-style: italic; margin-bottom: 1rem; }
+    .help-body p { line-height: 1.6; max-width: 65ch; }
+    .help-body ul, .help-body ol { max-width: 65ch; line-height: 1.6; }
+    .help-body a { color: var(--sevn-primary); }
+    .catalog-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 1rem 0; }
+    .catalog-table th, .catalog-table td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--sevn-border); vertical-align: top; }
+    .catalog-table th { color: var(--sevn-fg-muted); font-weight: 600; }
+    .badge { display: inline-block; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 4px; }
+    .badge-available { background: #1b3d1f; color: #81c784; }
+    .badge-soon { background: #4a3410; color: #ffb74d; }
+    .badge-unavailable { background: #333; color: #bbb; }
+  </style>
+  <style>
+    .fn-section { margin: 2rem 0 1.5rem; }
+    .fn-section h2 { font-size: 1.25rem; margin-bottom: 0.35rem; }
+    .fn-intro { color: var(--sevn-fg-muted); font-size: 0.92rem; max-width: 70ch; margin-bottom: 0.75rem; }
+    .fn-table { font-size: 0.85rem; }
+    .fn-table code { font-size: 0.82rem; word-break: break-word; }
+    .fn-table td:first-child { white-space: nowrap; font-weight: 500; }
+    .invoke-cell { max-width: 28rem; }
+    .status-skill { background: #103c2a; color: #8ee6b6; }
+    .status-planned { background: #4a3410; color: #ffb74d; }
+    .status-browser { background: #1a3a4a; color: #81d4fa; }
+    .status-email-management { background: #2a2a4a; color: #b39ddb; }
+    .legend { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 1rem 0 1.5rem; font-size: 0.85rem; }
+    .legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+  </style>
+</head>
+<body>
+  <div class="help-shell">
+    <nav class="help-nav" aria-label="Help pages">
+      <strong style="display:block;margin-bottom:0.75rem;color:var(--sevn-fg-strong);">sevn.bot help</strong>
+      <a href="index.html">Home</a>
+      <a href="getting-started.html">Getting started</a>
+      <a href="mission-control.html">Mission Control</a>
+      <a href="sub-agents.html">Sub-agents</a>
+      <a href="telegram-menu.html">Telegram settings</a>
+      <a href="tools.html">Tools</a>
+      <a href="skills.html">Skills</a>
+      <a href="google-workspace.html" class="active">Google Workspace</a>
+      <a href="config.html">Settings</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <a href="agent-context.html">Agent context</a>
+    </nav>
+    <main class="help-main">
+      <h1>Google Workspace</h1>
+<p class="help-summary">Bundled OAuth2 skill for Gmail, Calendar, Drive, and Contacts, with browser/email fallbacks and planned Sheets/Docs expansion.</p><div class="help-body">
+  <p>The <code>google-workspace</code> skill brings bundled Google Workspace API access to sevn.bot,
+modeled on the
+<a href="https://hermes-agent.nousresearch.com/docs/user-guide/skills/google-workspace" rel="noopener">Hermes Agent google-workspace skill</a>.
+It uses OAuth2 with automatic token refresh. The current shipped backend is the Python/OAuth path; the optional
+<a href="https://github.com/googleworkspace/cli" rel="noopener">Google Workspace CLI (<code>gws</code>)</a>
+bridge remains planned.</p>
+
+<h2>Status</h2>
+<p><code>google-workspace</code> is now a <strong>bundled skill</strong>. The shipped surface covers Phase 1-3 core flows: OAuth setup, Gmail API operations, Calendar list/create/delete, Drive search/get, and Contacts list. <code>email-management</code> remains the quickest email-only path, and browser Gmail remains the no-OAuth fallback. Sheets/Docs and Drive write commands are still marked <code>planned</code> in the catalog below.</p>
+<ul>
+  <li><a href="tools.html"><code>browser</code></a> — Gmail read/search (and gated compose/reply), Google Search, Maps, YouTube</li>
+  <li><a href="skills.html"><code>email-management</code></a> — multi-account IMAP/SMTP (Gmail app passwords; no Cloud project)</li>
+</ul>
+<p><code>google-workspace</code> is the primary routing target for Calendar, Drive, Sheets, Docs, Contacts, and Gmail API-specific workflows.</p>
+
+<h2>When to use which path</h2>
+<table class="catalog-table">
+  <thead><tr><th>Need</th><th>Best path now</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Email only, quick setup</td><td><code>email-management</code></td><td>Best for IMAP/SMTP, multi-account mail, and non-Google providers</td></tr>
+    <tr><td>Gmail API (labels, threading, HTML send/reply)</td><td><code>google-workspace</code></td><td>Use browser Gmail only as a fallback when OAuth is unavailable</td></tr>
+    <tr><td>Calendar / Drive / Sheets / Docs intents</td><td><code>google-workspace</code></td><td>Primary routing target; some Sheets/Docs and Drive write commands remain planned</td></tr>
+    <tr><td>No OAuth / logged-in browser session</td><td><code>browser</code> gmail</td><td>Good fallback for urgent read/search work without API setup</td></tr>
+  </tbody>
+</table>
+
+<h2>How the agent uses the skill</h2>
+<ol>
+  <li>Triager selects <code>google-workspace</code> for Gmail API, Calendar, Drive, Sheets, Docs, and Contacts intents.</li>
+  <li>Agent calls <code>load_skill("google-workspace")</code> for setup prose and script capabilities.</li>
+  <li>Agent runs operations with <code>run_skill_script</code>, passing argv to <code>scripts/google_api.py</code> or <code>scripts/setup.py</code>.</li>
+</ol>
+<p>Example:</p>
+<pre><code>run_skill_script(
+  "google-workspace",
+  "scripts/google_api.py",
+  ["gmail", "search", "is:unread", "--max", "10"]
+)</code></pre>
+
+<h2>First-time OAuth setup</h2>
+<ol>
+  <li>Operator creates a Google Cloud project and enables Gmail, Calendar, Drive, Sheets, Docs, and People APIs.</li>
+  <li>Download Desktop OAuth client JSON; agent runs <code>scripts/setup.py --client-secret PATH</code>.</li>
+  <li>Agent returns auth URL; operator approves in browser and pastes redirect URL.</li>
+  <li><code>scripts/setup.py --auth-code …</code> stores token under <code>.sevn/google_token.json</code> (auto-refresh).</li>
+</ol>
+<p>Credentials never appear in chat or script JSON output.</p>
+
+<h2>Safety rules</h2>
+<ul>
+  <li>Confirm with the operator before sending email, creating/deleting calendar events, uploading or sharing Drive files, or modifying Sheets/Docs.</li>
+  <li>Prefer Drive trash over permanent delete.</li>
+  <li>Calendar times must use ISO 8601 with timezone offset or UTC (<code>Z</code>).</li>
+</ul>
+
+<h2>Function reference</h2>
+<p>Complete list of shipped and planned commands, arguments, return fields, and sevn invocation patterns:</p>
+
+  <div class="legend" aria-label="Status legend">
+    <span><span class="badge status-skill">skill</span> shipped in bundled google-workspace skill</span>
+    <span><span class="badge status-planned">planned</span> tracked next in spec 38</span>
+    <span><span class="badge status-browser">browser</span> available today via browser tool</span>
+    <span><span class="badge status-email-management">email-management</span> IMAP path today</span>
+  </div>
+  <section class="fn-section" id="setup">
+    <h2>OAuth setup</h2>
+<p class="fn-intro">Run once per workspace. Tokens live in <code>.sevn/google_token.json</code>; this setup flow is now shipped in the bundled skill.</p>    <table class="catalog-table fn-table">
+      <thead>
+        <tr>
+          <th>Function</th>
+          <th>Status</th>
+          <th>Args</th>
+          <th>Returns (JSON)</th>
+          <th>How to invoke in sevn</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>setup --check</code></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>--check</code></td>
+          <td><code>AUTHENTICATED | NOT_AUTHENTICATED | partial scope list</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/setup.py&#34;, [&#34;--check&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>setup --client-secret</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>--client-secret PATH</code></td>
+          <td><code>{ok, path_stored}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/setup.py&#34;, [&#34;--client-secret&#34;, &#34;/path/to/client_secret.json&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>setup --auth-url</code></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>--auth-url [--services email,calendar,...|all] [--format json]</code></td>
+          <td><code>{last_auth_url_path, pending_auth_path} — read URL from last_auth_url_path file</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/setup.py&#34;, [&#34;--auth-url&#34;, &#34;--services&#34;, &#34;all&#34;, &#34;--format&#34;, &#34;json&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>setup --auth-code</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>--auth-code URL_OR_CODE [--format json]</code></td>
+          <td><code>{ok, scopes, token_path} — re-run --auth-url when auth expires</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/setup.py&#34;, [&#34;--auth-code&#34;, &#34;http://localhost:1/?code=...&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>setup --revoke</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>--revoke</code></td>
+          <td><code>{ok, revoked: true}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/setup.py&#34;, [&#34;--revoke&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>setup --install-deps</code></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>--install-deps</code></td>
+          <td><code>{ok, packages_installed}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/setup.py&#34;, [&#34;--install-deps&#34;])</code>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+  <section class="fn-section" id="gmail">
+    <h2>Gmail</h2>
+<p class="fn-intro">OAuth Gmail API. Use <code>email-management</code> for quick email-only work or non-Google mail. Use browser Gmail as the no-OAuth fallback.</p>    <table class="catalog-table fn-table">
+      <thead>
+        <tr>
+          <th>Function</th>
+          <th>Status</th>
+          <th>Args</th>
+          <th>Returns (JSON)</th>
+          <th>How to invoke in sevn</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>gmail search</code></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>QUERY [--max N]</code></td>
+          <td><code>[{id, threadId, from, to, subject, date, snippet, labels}]</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;gmail&#34;, &#34;search&#34;, &#34;is:unread&#34;, &#34;--max&#34;, &#34;10&#34;])</code>
+            <br><small style="color:var(--sevn-fg-muted);">Today: <code>browser(action=&#34;gmail&#34;, op=&#34;search&#34;, query=&#34;is:unread&#34;); email-management is also viable for generic mail search</code></small>
+          </td>
+        </tr>
+        <tr>
+          <td><code>gmail get</code></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>MESSAGE_ID</code></td>
+          <td><code>{id, threadId, from, to, subject, date, labels, body}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;gmail&#34;, &#34;get&#34;, &#34;MSG_ID&#34;])</code>
+            <br><small style="color:var(--sevn-fg-muted);">Today: <code>browser(action=&#34;gmail&#34;, op=&#34;read&#34;, message_id=&#34;…&#34;); email-management is also viable for generic mail reads</code></small>
+          </td>
+        </tr>
+        <tr>
+          <td><code>gmail send</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>--to ADDR --subject TEXT --body TEXT [--html] [--from DISPLAY] [--cc ADDRS]</code></td>
+          <td><code>{status: &#34;sent&#34;, id, threadId}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;gmail&#34;, &#34;send&#34;, &#34;--to&#34;, &#34;u@ex.com&#34;, &#34;--subject&#34;, &#34;Hi&#34;, &#34;--body&#34;, &#34;Hello&#34;])</code>
+            <br><small style="color:var(--sevn-fg-muted);">Today: <code>email-management send for quick email-only work, or browser gmail compose (requires tools.browser.gmail.allow_write=true)</code></small>
+          </td>
+        </tr>
+        <tr>
+          <td><code>gmail reply</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>MESSAGE_ID --body TEXT [--from DISPLAY]</code></td>
+          <td><code>{status: &#34;sent&#34;, id, threadId}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;gmail&#34;, &#34;reply&#34;, &#34;MSG_ID&#34;, &#34;--body&#34;, &#34;Thanks&#34;])</code>
+            <br><small style="color:var(--sevn-fg-muted);">Today: <code>email-management for generic replies, or browser gmail reply (gated write)</code></small>
+          </td>
+        </tr>
+        <tr>
+          <td><code>gmail labels</code></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>(none)</code></td>
+          <td><code>[{id, name, type}]</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;gmail&#34;, &#34;labels&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>gmail modify</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>MESSAGE_ID --add-labels IDS | --remove-labels IDS</code></td>
+          <td><code>{ok, id, labels}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;gmail&#34;, &#34;modify&#34;, &#34;MSG_ID&#34;, &#34;--remove-labels&#34;, &#34;UNREAD&#34;])</code>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+  <section class="fn-section" id="calendar">
+    <h2>Calendar</h2>
+<p class="fn-intro">Shipped Google Calendar API support. Route calendar intents here; times must include timezone (ISO 8601 with offset or UTC Z).</p>    <table class="catalog-table fn-table">
+      <thead>
+        <tr>
+          <th>Function</th>
+          <th>Status</th>
+          <th>Args</th>
+          <th>Returns (JSON)</th>
+          <th>How to invoke in sevn</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>calendar list</code></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>[--start ISO] [--end ISO]  (default next 7 days)</code></td>
+          <td><code>[{id, summary, start, end, location, description, htmlLink}]</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;calendar&#34;, &#34;list&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>calendar create</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>--summary TEXT --start ISO --end ISO [--location TEXT] [--attendees a@x.com,b@y.com]</code></td>
+          <td><code>{status: &#34;created&#34;, id, summary, htmlLink}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;calendar&#34;, &#34;create&#34;, &#34;--summary&#34;, &#34;Standup&#34;, &#34;--start&#34;, &#34;2026-07-16T10:00:00-05:00&#34;, &#34;--end&#34;, &#34;2026-07-16T10:30:00-05:00&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>calendar delete</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>EVENT_ID</code></td>
+          <td><code>{status: &#34;deleted&#34;, id}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;calendar&#34;, &#34;delete&#34;, &#34;EVENT_ID&#34;])</code>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+  <section class="fn-section" id="drive">
+    <h2>Drive</h2>
+<p class="fn-intro">Search, upload, download, share, and organize Drive files via the bundled skill.</p>    <table class="catalog-table fn-table">
+      <thead>
+        <tr>
+          <th>Function</th>
+          <th>Status</th>
+          <th>Args</th>
+          <th>Returns (JSON)</th>
+          <th>How to invoke in sevn</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>drive search</code></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>QUERY [--max N] [--raw-query]</code></td>
+          <td><code>[{id, name, mimeType, modifiedTime, webViewLink}]</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;drive&#34;, &#34;search&#34;, &#34;quarterly report&#34;, &#34;--max&#34;, &#34;10&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>drive get</code></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>FILE_ID</code></td>
+          <td><code>{id, name, mimeType, modifiedTime, size, webViewLink, parents, owners}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;drive&#34;, &#34;get&#34;, &#34;FILE_ID&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>drive upload</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>PATH [--name NAME] [--parent FOLDER_ID]</code></td>
+          <td><code>{status: &#34;uploaded&#34;, id, name, mimeType, webViewLink}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;drive&#34;, &#34;upload&#34;, &#34;/path/report.pdf&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>drive download</code></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>FILE_ID [--output PATH] [--export-mime MIME]</code></td>
+          <td><code>{status: &#34;downloaded&#34;, id, name, path, mimeType}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;drive&#34;, &#34;download&#34;, &#34;FILE_ID&#34;, &#34;--output&#34;, &#34;~/doc.pdf&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>drive create-folder</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>NAME [--parent FOLDER_ID]</code></td>
+          <td><code>{status: &#34;created&#34;, id, name, webViewLink}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;drive&#34;, &#34;create-folder&#34;, &#34;Reports&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>drive share</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>FILE_ID --email ADDR --role reader|writer [--notify] | --type anyone|domain [--domain D]</code></td>
+          <td><code>{status: &#34;shared&#34;, permissionId, fileId, role, type}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;drive&#34;, &#34;share&#34;, &#34;FILE_ID&#34;, &#34;--email&#34;, &#34;a@ex.com&#34;, &#34;--role&#34;, &#34;reader&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>drive delete</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>FILE_ID [--permanent]</code></td>
+          <td><code>{status: &#34;trashed&#34;|&#34;deleted&#34;, fileId, permanent}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;drive&#34;, &#34;delete&#34;, &#34;FILE_ID&#34;])</code>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+  <section class="fn-section" id="contacts">
+    <h2>Contacts</h2>
+<p class="fn-intro">Shipped People API read-only list.</p>    <table class="catalog-table fn-table">
+      <thead>
+        <tr>
+          <th>Function</th>
+          <th>Status</th>
+          <th>Args</th>
+          <th>Returns (JSON)</th>
+          <th>How to invoke in sevn</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>contacts list</code></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>[--max N]</code></td>
+          <td><code>[{name, emails: [...], phones: [...]}]</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;contacts&#34;, &#34;list&#34;, &#34;--max&#34;, &#34;20&#34;])</code>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+  <section class="fn-section" id="sheets">
+    <h2>Sheets</h2>
+<p class="fn-intro">Create spreadsheets and read/write cell ranges via the bundled skill.</p>    <table class="catalog-table fn-table">
+      <thead>
+        <tr>
+          <th>Function</th>
+          <th>Status</th>
+          <th>Args</th>
+          <th>Returns (JSON)</th>
+          <th>How to invoke in sevn</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>sheets create</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>--title TEXT [--sheet-name NAME]</code></td>
+          <td><code>{status: &#34;created&#34;, spreadsheetId, title, spreadsheetUrl}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;sheets&#34;, &#34;create&#34;, &#34;--title&#34;, &#34;Q4 Budget&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>sheets get</code></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>SHEET_ID &#34;Sheet1!A1:D10&#34;</code></td>
+          <td><code>2D array [[cell, ...], ...]</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;sheets&#34;, &#34;get&#34;, &#34;SHEET_ID&#34;, &#34;Sheet1!A1:D10&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>sheets update</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>SHEET_ID &#34;RANGE&#34; --values JSON_ARRAY</code></td>
+          <td><code>{updatedCells, updatedRange}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;sheets&#34;, &#34;update&#34;, &#34;ID&#34;, &#34;Sheet1!A1:B2&#34;, &#34;--values&#34;, &#39;[[&#34;Name&#34;,&#34;Score&#34;],[&#34;Alice&#34;,&#34;95&#34;]]&#39;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>sheets append</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>SHEET_ID &#34;RANGE&#34; --values JSON_ARRAY</code></td>
+          <td><code>{updates, tableRange}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;sheets&#34;, &#34;append&#34;, &#34;ID&#34;, &#34;Sheet1!A:C&#34;, &#34;--values&#34;, &#39;[[&#34;a&#34;,&#34;b&#34;,&#34;c&#34;]]&#39;])</code>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+  <section class="fn-section" id="docs">
+    <h2>Docs</h2>
+<p class="fn-intro">Read, create, and append Google Docs via the bundled skill.</p>    <table class="catalog-table fn-table">
+      <thead>
+        <tr>
+          <th>Function</th>
+          <th>Status</th>
+          <th>Args</th>
+          <th>Returns (JSON)</th>
+          <th>How to invoke in sevn</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>docs get</code></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>DOC_ID</code></td>
+          <td><code>{documentId, title, body}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;docs&#34;, &#34;get&#34;, &#34;DOC_ID&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>docs create</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>--title TEXT [--body TEXT]</code></td>
+          <td><code>{status: &#34;created&#34;, documentId, title, url}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;docs&#34;, &#34;create&#34;, &#34;--title&#34;, &#34;Meeting Notes&#34;])</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>docs append</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
+          <td><span class="badge status-skill">skill</span></td>
+          <td><code>DOC_ID --text TEXT</code></td>
+          <td><code>{status: &#34;appended&#34;, documentId, inserted_at, characters}</code></td>
+          <td class="invoke-cell">
+            <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/google_api.py&#34;, [&#34;docs&#34;, &#34;append&#34;, &#34;DOC_ID&#34;, &#34;--text&#34;, &#34;Follow-up items…&#34;])</code>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <h2>Troubleshooting</h2>
+  <table class="catalog-table">
+    <thead><tr><th>Problem</th><th>Fix</th></tr></thead>
+    <tbody>
+      <tr><td><code>NOT_AUTHENTICATED</code></td><td>Run OAuth setup (<code>setup.py --check</code> → auth flow)</td></tr>
+      <tr><td><code>REFRESH_FAILED</code></td><td>Re-authorize (<code>setup.py --revoke</code> then auth steps)</td></tr>
+      <tr><td>403 Insufficient Permission</td><td>Revoke and re-auth with broader <code>--services</code></td></tr>
+      <tr><td>403 Access Not Configured</td><td>Enable API in Google Cloud Console</td></tr>
+      <tr><td><code>gws</code> not found</td><td>Install <code>@googleworkspace/cli</code> or use Python fallback</td></tr>
+    </tbody>
+  </table>
+</div>
+      <footer class="help-footer">
+        Generated 2026-07-17 from commit a9a7ad6.
+        Edit <code>about-sevn.bot/_sources/google-workspace.yaml</code> or templates — not the HTML directly.
+      </footer>
+    </main>
+  </div>
+</body>
+</html>
