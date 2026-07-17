@@ -2,8 +2,17 @@
 
 from __future__ import annotations
 
+from typer.testing import CliRunner
+
+from proton_cli.cli.root import app as root_app
 from proton_cli.service.mail.folders import resolve_folder
 from proton_cli.service.mail.service import ListOptions, MailService, _dedupe, _recipient_list
+
+
+def test_mail_command_registered() -> None:
+    result = CliRunner().invoke(root_app, ["mail", "--help"])
+    assert result.exit_code == 0
+    assert "messages" in result.output
 
 
 def test_resolve_folder_aliases() -> None:
