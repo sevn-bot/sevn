@@ -7,6 +7,10 @@ class ErrUnauthorized(Exception):
     """Session expired and token refresh did not recover."""
 
 
+class ErrHVUnavailable(Exception):
+    """Human verification required but no token could be resolved."""
+
+
 class NetworkError(Exception):
     """Transport-level failure (exit 5)."""
 

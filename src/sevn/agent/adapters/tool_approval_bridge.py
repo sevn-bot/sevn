@@ -12,6 +12,7 @@ Exports:
     ToolApprovalBridge — pending registry + asyncio wait/resume.
     get_tool_approval_bridge — process-wide bridge accessor.
     install_tool_approval_bridge — attach bridge to gateway app state.
+    reset_tool_approval_bridge_for_tests — clear process-wide bridge (tests).
     summarize_tool_args — redacted args summary for approval cards.
     ack_tool_on_deps — mutate ``human_acknowledged_tools`` on ``BTierDeps``.
 """
@@ -80,6 +81,19 @@ def install_tool_approval_bridge(app: FastAPI, *, hub: DashboardHub | None) -> T
     app.state.tool_approval_bridge = bridge
     _bridge = bridge
     return bridge
+
+
+def reset_tool_approval_bridge_for_tests() -> None:
+    """Clear the process-wide bridge so unit tests do not inherit dashboard installs.
+
+    Examples:
+        >>> reset_tool_approval_bridge_for_tests()
+        >>> get_tool_approval_bridge() is None
+        True
+    """
+
+    global _bridge
+    _bridge = None
 
 
 def summarize_tool_args(args: dict[str, Any], *, max_len: int = 400) -> str:
@@ -408,5 +422,6 @@ __all__ = [
     "ack_tool_on_deps",
     "get_tool_approval_bridge",
     "install_tool_approval_bridge",
+    "reset_tool_approval_bridge_for_tests",
     "summarize_tool_args",
 ]

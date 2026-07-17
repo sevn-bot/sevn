@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from pgpy import PGPMessage
+from pgpy import PGPKey, PGPMessage
 
 if TYPE_CHECKING:
     from proton_cli.account.keys import Unlocked
@@ -354,17 +354,17 @@ class MailService:
         plans: list[tuple[str, int, str]],
         addr_keys: list,
     ) -> list[dict[str, object]]:
+        key0 = addr_keys[0]
         session_message = PGPMessage.new(body)
-        with use_unlocked_key(addr_keys[0]):
-            enc_body = addr_keys[0].encrypt(session_message)
+        with use_unlocked_key(key0):
+            enc_body = key0.encrypt(session_message)
         body_b64 = base64.b64encode(bytes(enc_body)).decode()
 
         internal_addrs: dict[str, object] = {}
         clear_addrs: dict[str, object] = {}
         for email, scheme, armored_key in plans:
             if scheme == PKG_INTERNAL and armored_key:
-                with use_unlocked_key(addr_keys[0]):
-                    wrapped = addr_keys[0].encrypt(PGPMessage.new(body))
+                wrapped = _encrypt_for_recipient(armored_key, body)
                 internal_addrs[email] = {
                     "Type": PKG_INTERNAL,
                     "BodyKeyPacket": base64.b64encode(bytes(wrapped)).decode(),
@@ -375,8 +375,8 @@ class MailService:
 
         packages: list[dict[str, object]] = []
         if internal_addrs:
-            with use_unlocked_key(addr_keys[0]):
-                sender_wrap = addr_keys[0].encrypt(PGPMessage.new(body))
+            with use_unlocked_key(key0):
+                sender_wrap = key0.encrypt(PGPMessage.new(body))
             packages.append(
                 {
                     "Addresses": internal_addrs,
@@ -396,6 +396,11 @@ class MailService:
                 }
             )
         return packages
+
+
+def _encrypt_for_recipient(armored_key: str, body: str) -> bytes:
+    recipient_key, _ = PGPKey.from_blob(armored_key)
+    return bytes(recipient_key.encrypt(PGPMessage.new(body)))
 
 
 def _recipient_list(emails: list[str]) -> list[dict[str, str]]:

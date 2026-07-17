@@ -118,6 +118,16 @@ def _reset_trace_subscribers_after_test() -> Iterator[None]:
 
 
 @pytest.fixture(autouse=True)
+def _reset_tool_approval_bridge_after_test() -> Iterator[None]:
+    """Clear process-wide tool-approval bridge so dashboard installs do not leak across tests."""
+    from sevn.agent.adapters.tool_approval_bridge import reset_tool_approval_bridge_for_tests
+
+    reset_tool_approval_bridge_for_tests()
+    yield
+    reset_tool_approval_bridge_for_tests()
+
+
+@pytest.fixture(autouse=True)
 def _reset_tool_readiness_overrides() -> Iterator[None]:
     """Clear module-level readiness overrides so gated-tool tests stay isolated."""
     from sevn.tools import readiness
