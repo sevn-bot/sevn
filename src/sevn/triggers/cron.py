@@ -14,7 +14,10 @@ Exports:
     edit_cron_job — patch an existing cron job row.
     delete_cron_job — remove a cron job row.
     add_reminder — one-shot reminder row (cron at absolute datetime).
+    register_cron_job_handler — bind a job_id to a sync handler (no magic forks).
     cron_tick — gateway lifespan hook (loads due jobs; dispatch is injected).
+
+Issue-watch cron lives in :mod:`sevn.triggers.issue_watch_cron` (imported at boot).
 """
 
 from __future__ import annotations
@@ -37,6 +40,28 @@ from loguru import logger
 from sevn.agent.tracing.sink import TraceEvent, TraceSink
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.triggers.request import DeliveryMode, DispatchRequest, ResultChannel, RoutingMode
+
+# job_id → sync handler ``(*, workspace: Path) -> None`` (avoids magic forks in cron_tick).
+_CRON_JOB_HANDLERS: dict[str, Callable[..., Any]] = {}
+
+
+def register_cron_job_handler(job_id: str, handler: Callable[..., Any]) -> None:
+    """Bind ``job_id`` to a sync cron handler (called from :func:`cron_tick`).
+
+    Args:
+        job_id (str): Persisted ``trigger_cron_jobs.job_id``.
+        handler (Callable[..., Any]): Sync callable; receives ``workspace=``.
+
+    Returns:
+        None
+
+    Examples:
+        >>> register_cron_job_handler("demo", lambda **_k: None)
+        >>> "demo" in _CRON_JOB_HANDLERS
+        True
+        >>> _ = _CRON_JOB_HANDLERS.pop("demo", None)
+    """
+    _CRON_JOB_HANDLERS[job_id.strip()] = handler
 
 
 @dataclass(frozen=True)
@@ -1061,8 +1086,43 @@ async def cron_tick(
         return
     now_ns = time.time_ns()
     due = cron_store.list_due(now_ns)
+
+    def _bump_schedule(*, job_id: str, cron_expr: str, tz_name: str, status: str) -> None:
+        nxt = compute_next_fire_ns(
+            cron_expr=cron_expr,
+            tz_name=tz_name,
+            from_ns=time.time_ns(),
+        )
+        cron_store.update_schedule(
+            job_id=job_id,
+            next_fire_at_ns=nxt,
+            last_correlation_id=correlation_id,
+            last_status=status,
+        )
+
     for row in due:
         correlation_id = str(uuid.uuid4())
+        handler = _CRON_JOB_HANDLERS.get(row.job_id)
+        if handler is not None:
+            try:
+                # Sync handlers (e.g. issue-watch ``gh`` / subprocess) must not
+                # block the gateway event loop.
+                await asyncio.to_thread(handler, workspace=content_root)
+                _bump_schedule(
+                    job_id=row.job_id,
+                    cron_expr=row.cron_expr,
+                    tz_name=row.timezone,
+                    status="ok",
+                )
+            except Exception:
+                logger.exception("cron_handler_failed job_id={}", row.job_id)
+                _bump_schedule(
+                    job_id=row.job_id,
+                    cron_expr=row.cron_expr,
+                    tz_name=row.timezone,
+                    status="error",
+                )
+            continue
         try:
             rc_data = json.loads(row.result_channel_json)
             rc = ResultChannel.model_validate(rc_data)
@@ -1081,32 +1141,23 @@ async def cron_tick(
                 "transport": "cron",
                 "cron_job_id": row.job_id,
                 "overlap_policy": row.overlap_policy,
+                "scope": "default",
             },
             notify_template=row.payload_template if row.delivery_mode == "notify_only" else None,
         )
         try:
             await asyncio.wait_for(dispatch(req), timeout=600.0)
-            nxt = compute_next_fire_ns(
+            _bump_schedule(
+                job_id=row.job_id,
                 cron_expr=row.cron_expr,
                 tz_name=row.timezone,
-                from_ns=time.time_ns(),
-            )
-            cron_store.update_schedule(
-                job_id=row.job_id,
-                next_fire_at_ns=nxt,
-                last_correlation_id=correlation_id,
-                last_status="ok",
+                status="ok",
             )
         except Exception:
             logger.exception("cron_job_dispatch_failed job_id={}", row.job_id)
-            nxt = compute_next_fire_ns(
+            _bump_schedule(
+                job_id=row.job_id,
                 cron_expr=row.cron_expr,
                 tz_name=row.timezone,
-                from_ns=time.time_ns(),
-            )
-            cron_store.update_schedule(
-                job_id=row.job_id,
-                next_fire_at_ns=nxt,
-                last_correlation_id=correlation_id,
-                last_status="error",
+                status="error",
             )

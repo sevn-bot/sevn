@@ -166,7 +166,6 @@ from sevn.self_improve.jobs.worker import ImproveJobWorker
 from sevn.self_improve.types import ImproveJobId, OwnerPrincipal
 from sevn.skills.browser_gc import prune_orphan_browser_profiles
 from sevn.skills.browser_session import (
-    close_all_gateway_browsers,
     close_idle_browser_sessions,
     resolve_idle_close_seconds,
 )
@@ -1305,6 +1304,14 @@ def create_app(
         app.state.plugin_hook_chain = plugin_chain
         app.state.triggers_cron_store = SqliteCronStore(conn)
         await asyncio.to_thread(run_cron_reconciles, conn, ws)
+
+        # D13: wire real operator notify for issue-watch cron (Telegram to owner).
+        from sevn.triggers.operator_notify import wire_operator_notify
+
+        wire_operator_notify(
+            gateway_router=gateway_router,
+            owner_telegram_user_id=resolve_owner_telegram_user_id(ws),
+        )
         app.state.memory_job_lock = asyncio.Lock()
         app.state.dreaming_engine = DreamingEngine(
             conn, trace, app.state.memory_job_lock, transport=None
@@ -1554,16 +1561,20 @@ def create_app(
         cron_task.cancel()
         with suppress(asyncio.CancelledError):
             await cron_task
+        from sevn.triggers.operator_notify import unwire_operator_notify
+
+        unwire_operator_notify()
         await gateway_router.stop_all()
         trigger_gate = getattr(app.state, "trigger_dispatch_gate", None)
         if isinstance(trigger_gate, TriggerDispatchGate):
             await trigger_gate.drain_background(timeout_s=_shutdown_timeout_s(ws))
         await sessions.drain(grace_period_s=_shutdown_timeout_s(ws))
-        await asyncio.to_thread(
-            close_all_gateway_browsers,
-            content_root=ly.content_root,
-            conn=conn,
-        )
+        # Single shutdown owner for sevn Chrome (D6): registry-based reap with
+        # TERM/wait/KILL — do not also call close_all_gateway_browsers (divergent).
+        with suppress(Exception):
+            from sevn.browser.process import reap_sevn_browsers_on_shutdown
+
+            await asyncio.to_thread(reap_sevn_browsers_on_shutdown, ly.content_root)
         await asyncio.to_thread(
             prune_orphan_tool_result_dirs,
             content_root=ly.content_root,

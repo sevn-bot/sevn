@@ -38,7 +38,8 @@ def main() -> int:
         extra["style"] = args.style
     if args.mood:
         extra["mood"] = args.mood
-    return run_media_generation("image_i2i", args.prompt, extra=extra)
+    rc: int = run_media_generation("image_i2i", args.prompt, extra=extra)
+    return rc
 
 
 if __name__ == "__main__":

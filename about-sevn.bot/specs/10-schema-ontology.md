@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Define the runtime ontology for Triager output and related labels across
   the agent core: canonical field names, closed enums, typing conventions, and how
   they compose with executor dispatch described '
-last_updated: '2026-07-15'
-fingerprint: sha256:fba831861a4e62636bcafb6ef57e3ab15bc6624b6180f49f3b96fba3c6b82d12
+last_updated: '2026-07-16'
+fingerprint: sha256:6fca928fd7c91a794e511907f3c80d6e849854adc9c36f13fb5c8c5538fcee86
 related: []
 sources:
 - src/sevn/config/**
@@ -188,6 +188,9 @@ interfaces:
 - name: workspace_has_minimax_catalog_model
   file: src/sevn/config/model_resolution.py
   symbol: workspace_has_minimax_catalog_model
+- name: default_github_repo_slug
+  file: src/sevn/config/my_sevn.py
+  symbol: default_github_repo_slug
 - name: effective_my_sevn
   file: src/sevn/config/my_sevn.py
   symbol: effective_my_sevn
@@ -203,9 +206,15 @@ interfaces:
 - name: effective_my_sevn_sync
   file: src/sevn/config/my_sevn.py
   symbol: effective_my_sevn_sync
+- name: parse_github_repo_slug
+  file: src/sevn/config/my_sevn.py
+  symbol: parse_github_repo_slug
 - name: persist_my_sevn_repo_path
   file: src/sevn/config/my_sevn.py
   symbol: persist_my_sevn_repo_path
+- name: resolve_github_repo_slug
+  file: src/sevn/config/my_sevn.py
+  symbol: resolve_github_repo_slug
 - name: resolve_my_sevn_repo_path
   file: src/sevn/config/my_sevn.py
   symbol: resolve_my_sevn_repo_path

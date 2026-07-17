@@ -4,6 +4,10 @@ This file lives in your **workspace** and indexes the **sevn.bot source mirror**
 
 **Two path forms, no others:** workspace/user files (this `sevn.bot.md`, `IDENTITY.md`, `MEMORY.md`, `sessions/`, …) are **bare paths** at the workspace root — never prefix them with `workspace/` (no such directory). The sevn.bot source mirror is under **`source_code/`**. There is no `@repo/` prefix — it does not resolve.
 
+## GitHub repository (never `git remote`)
+
+The operator GitHub repo is already in `sevn.json` as **`my_sevn.repo_url`** (default `https://github.com/sevn-bot/sevn` → slug **`sevn-bot/sevn`**). Pass that slug to `gh-issues` / `gh` as `--repo`. **Never** run `git remote` (or any git) against `source_code/` — it is a read-only mirror, not a git checkout.
+
 ## Before you search
 
 1. Confirm the mirror exists: `read` `source_code/src/sevn/gateway/agent_turn.py` (git clone) **or** `source_code/sevn/gateway/agent_turn.py` (installed package). If `source_code/` is empty, ask the operator to set `my_sevn.repo_path` in `sevn.json` to the absolute git root and restart the gateway.

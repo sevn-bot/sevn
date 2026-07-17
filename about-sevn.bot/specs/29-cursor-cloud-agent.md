@@ -7,8 +7,8 @@ owner: Alex
 summary: Let operators and agents launch, poll, and inspect Cursor Cloud Agents against
   any GitHub/GitLab repo when skills.cursor_cloud.enabled is true, returning PR URLs,
   dashboard links (remote desktop), and
-last_updated: '2026-07-15'
-fingerprint: sha256:28f24683c550944697048f4dd7fbc7c563fbde06bee3ff73ccb13d08f3d2221c
+last_updated: '2026-07-16'
+fingerprint: sha256:be26056ab2105277590bbfe95a96c7034b0f68df30416ac2758531aab70350bd
 related: []
 sources:
 - src/sevn/integrations/**
@@ -76,6 +76,21 @@ interfaces:
 - name: parse_github_repo
   file: src/sevn/integrations/github_skill/client.py
   symbol: parse_github_repo
+- name: GhCliMissingError
+  file: src/sevn/integrations/github_skill/gh_cli.py
+  symbol: GhCliMissingError
+- name: create_issue_via_gh
+  file: src/sevn/integrations/github_skill/gh_cli.py
+  symbol: create_issue_via_gh
+- name: map_gh_cli_error
+  file: src/sevn/integrations/github_skill/gh_cli.py
+  symbol: map_gh_cli_error
+- name: run_gh
+  file: src/sevn/integrations/github_skill/gh_cli.py
+  symbol: run_gh
+- name: view_issue_via_gh
+  file: src/sevn/integrations/github_skill/gh_cli.py
+  symbol: view_issue_via_gh
 - name: comment_on_issue
   file: src/sevn/integrations/github_skill/gh_issues.py
   symbol: comment_on_issue
@@ -157,6 +172,33 @@ interfaces:
 - name: resolve_github_skill_hooks
   file: src/sevn/integrations/github_skill/hooks.py
   symbol: resolve_github_skill_hooks
+- name: IssueWatchDiff
+  file: src/sevn/integrations/github_skill/watch.py
+  symbol: IssueWatchDiff
+- name: fetch_issue_state
+  file: src/sevn/integrations/github_skill/watch.py
+  symbol: fetch_issue_state
+- name: load_tracked
+  file: src/sevn/integrations/github_skill/watch.py
+  symbol: load_tracked
+- name: run_tracked_watch
+  file: src/sevn/integrations/github_skill/watch.py
+  symbol: run_tracked_watch
+- name: save_tracked
+  file: src/sevn/integrations/github_skill/watch.py
+  symbol: save_tracked
+- name: snapshot_from_issue
+  file: src/sevn/integrations/github_skill/watch.py
+  symbol: snapshot_from_issue
+- name: tracked_path
+  file: src/sevn/integrations/github_skill/watch.py
+  symbol: tracked_path
+- name: watch_issue
+  file: src/sevn/integrations/github_skill/watch.py
+  symbol: watch_issue
+- name: watch_state_path
+  file: src/sevn/integrations/github_skill/watch.py
+  symbol: watch_state_path
 - name: LitellmLapClient
   file: src/sevn/integrations/litellm_lap/client.py
   symbol: LitellmLapClient

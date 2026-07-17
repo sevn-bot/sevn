@@ -135,16 +135,16 @@ def test_dispatcher_callbacks_ttl_prune_at_boot(tmp_workspace: tuple[object, obj
         conn2.close()
 
 
-def test_shutdown_closes_gateway_browsers(tmp_workspace: tuple[object, object]) -> None:
+def test_shutdown_reaps_sevn_browsers(tmp_workspace: tuple[object, object]) -> None:
     ws, layout = tmp_workspace
     with patch(
-        "sevn.gateway.http_server.close_all_gateway_browsers",
-        return_value=2,
-    ) as mock_close:
+        "sevn.browser.process.reap_sevn_browsers_on_shutdown",
+        return_value=[],
+    ) as mock_reap:
         app = create_app(workspace=ws, layout=layout)
         with TestClient(app):
             pass
-        mock_close.assert_called_once()
+        mock_reap.assert_called_once()
 
 
 def test_boot_outbound_sweep_pending_to_sent(tmp_workspace: tuple[object, object]) -> None:
