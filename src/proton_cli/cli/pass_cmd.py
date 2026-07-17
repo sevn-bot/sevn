@@ -180,7 +180,11 @@ def items_create(
     proton_app = _run(ctx)
     unlocked = proton_app.unlock()
     share_id = proton_app.pass_svc.resolve_vault(unlocked, vault)
-    secret = _resolve_secret_value(password, prompt="Password") if item_type == "login" else (password or "")
+    secret = (
+        _resolve_secret_value(password, prompt="Password")
+        if item_type == "login"
+        else (password or "")
+    )
     new_item = NewItem(
         type=item_type,
         name=name,
@@ -209,7 +213,9 @@ def items_edit(
     item_id: str = typer.Argument(None),
     name: str | None = typer.Option(None, "--name"),
     username: str | None = typer.Option(None, "--username"),
-    password: str | None = typer.Option(None, "--password", help="Omit to leave unchanged; use - for stdin"),
+    password: str | None = typer.Option(
+        None, "--password", help="Omit to leave unchanged; use - for stdin"
+    ),
     email: str | None = typer.Option(None, "--email"),
     url: str | None = typer.Option(None, "--url"),
     note: str | None = typer.Option(None, "--note"),

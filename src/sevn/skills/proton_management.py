@@ -124,7 +124,7 @@ async def run_proton_cli_async(
         args (list[str]): Subcommand argv without executable.
         profile (str): Profile name passed as ``--profile`` when non-empty.
         env (dict[str, str] | None): Extra environment variables merged into the child.
-        timeout (float): Subprocess timeout in seconds.
+        timeout_s (float): Subprocess timeout in seconds.
 
     Returns:
         tuple[int, str, str]: Exit code, stdout, and stderr text.
@@ -190,9 +190,7 @@ def run_proton_cli(
     if exe is None:
         return 127, "", "proton-cli not found on PATH"
     try:
-        return asyncio.run(
-            run_proton_cli_async(args, profile=profile, env=env, timeout_s=timeout)
-        )
+        return asyncio.run(run_proton_cli_async(args, profile=profile, env=env, timeout_s=timeout))
     except RuntimeError:
         # Fallback when already inside a running event loop (skill scripts).
         module_mode = exe.endswith(("python", "python3"))

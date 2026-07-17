@@ -156,7 +156,16 @@ async def test_proton_cli_secrets_subcommands(
     await backend.set("logical", "pw")
     await backend.delete("logical")
     assert calls[0]["args"] == [cli, "pass", "secrets", "get", "logical", "--vault", "Personal"]
-    assert calls[1]["args"] == [cli, "pass", "secrets", "set", "logical", "-", "--vault", "Personal"]
+    assert calls[1]["args"] == [
+        cli,
+        "pass",
+        "secrets",
+        "set",
+        "logical",
+        "-",
+        "--vault",
+        "Personal",
+    ]
     assert stdin_payloads[1] == b"pw"
     assert calls[2]["args"] == [cli, "pass", "secrets", "delete", "logical", "--vault", "Personal"]
 

@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / safebash
   (when routed through the execution sandbox), process when configured for sandbox
   routing, and skill subprocesses spawned b
-last_updated: '2026-07-16'
-fingerprint: sha256:0b836a01cabccc962542b9e8f22c13fcac7c528fe68aecbe13ed051002a57cdd
+last_updated: '2026-07-17'
+fingerprint: sha256:c515c187999a17cbb0c3e46f470d2fbda448737e380deee6417b7145a4217375
 related: []
 sources:
 - src/sevn/security/**
