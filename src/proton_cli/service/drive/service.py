@@ -444,19 +444,27 @@ class DriveService:
         if not revision_id:
             raise ValueError("file has no active revision")
         rev_payload: dict = {}
-        self._client.decode(
-            Request(
-                method="GET",
-                path=f"/drive/shares/{share_id}/files/{link.link_id}/revisions/{revision_id}",
-                query={"FromBlockIndex": "1", "PageSize": "50"},
-            ),
-            rev_payload,
-        )
-        rev_blocks = (rev_payload.get("Revision") or {}).get("Blocks") or []
-        for block in rev_blocks:
-            data = self._download_block(block.get("BareURL", ""), block.get("Token", ""))
-            plain = blocks.decrypt_block(data, sk)
-            writer.write(plain)
+        from_index = 1
+        page_size = 50
+        while True:
+            self._client.decode(
+                Request(
+                    method="GET",
+                    path=f"/drive/shares/{share_id}/files/{link.link_id}/revisions/{revision_id}",
+                    query={"FromBlockIndex": str(from_index), "PageSize": str(page_size)},
+                ),
+                rev_payload,
+            )
+            rev_blocks = (rev_payload.get("Revision") or {}).get("Blocks") or []
+            if not rev_blocks:
+                break
+            for block in rev_blocks:
+                data = self._download_block(block.get("BareURL", ""), block.get("Token", ""))
+                plain = blocks.decrypt_block(data, sk)
+                writer.write(plain)
+            if len(rev_blocks) < page_size:
+                break
+            from_index += len(rev_blocks)
 
     def _download_block(self, url: str, token: str) -> bytes:
         if not url:
