@@ -8,7 +8,7 @@ summary: 'Own everything under workspace/skills/: how skills are discovered, val
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
 last_updated: '2026-07-17'
-fingerprint: sha256:3a2065c47d611a3bfa231564e894209df01fa72ddde20c7c8418f11e00492d51
+fingerprint: sha256:ef3b4b511e9567a6d772c8d8f69dcc38de640d35161f4b4457c53fc32801fb12
 related: []
 sources:
 - src/sevn/skills/**
@@ -299,9 +299,6 @@ interfaces:
 - name: GoogleWorkspacePaths
   file: src/sevn/skills/google_workspace.py
   symbol: GoogleWorkspacePaths
-- name: auth_url_setup_envelope
-  file: src/sevn/skills/google_workspace.py
-  symbol: auth_url_setup_envelope
 - name: build_service
   file: src/sevn/skills/google_workspace.py
   symbol: build_service

@@ -15,12 +15,12 @@ from pathlib import Path
 
 from sevn.lcm.script_cli import workspace_from_env, write_error, write_ok
 from sevn.skills.google_workspace import (
-    auth_url_setup_envelope,
     check_auth,
     check_auth_live,
     exchange_auth_code,
     get_auth_url,
     install_deps,
+    paths,
     revoke_token,
     store_client_secret,
 )
@@ -120,7 +120,14 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.auth_url:
             get_auth_url(workspace, args.services)
-            write_ok(auth_url_setup_envelope(workspace))
+            gw_paths = paths(workspace)
+            write_ok(
+                {
+                    "status": "AUTH_URL_READY",
+                    "last_auth_url_path": str(gw_paths.last_auth_url_path),
+                    "pending_auth_path": str(gw_paths.pending_auth_path),
+                },
+            )
             return 0
         if args.auth_code:
             write_ok(exchange_auth_code(workspace, args.auth_code))

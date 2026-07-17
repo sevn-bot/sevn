@@ -7,7 +7,7 @@ owner: Alex
 summary: Bundled google-workspace skill — OAuth2 Gmail, Calendar, Drive, Sheets, Docs,
   Contacts; optional gws CLI bridge.
 last_updated: '2026-07-17'
-fingerprint: sha256:a9518bbb9ea2204ea09f922ef8cac164f7197256e04e912a414e6e57a3d2186e
+fingerprint: sha256:b7336acc4d6fe05f5e0c694ebcd350d71cf5afc8b8f5620a161abe6faa489644
 related:
 - spec-12-skills-system
 - spec-02-config-and-workspace
@@ -37,9 +37,6 @@ interfaces:
 - name: GoogleWorkspacePaths
   file: src/sevn/skills/google_workspace.py
   symbol: GoogleWorkspacePaths
-- name: auth_url_setup_envelope
-  file: src/sevn/skills/google_workspace.py
-  symbol: auth_url_setup_envelope
 - name: build_service
   file: src/sevn/skills/google_workspace.py
   symbol: build_service

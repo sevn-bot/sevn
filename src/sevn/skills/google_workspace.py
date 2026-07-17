@@ -19,7 +19,6 @@ Exports:
     check_auth_live — exported symbol.
     store_client_secret — exported symbol.
     get_auth_url — exported symbol.
-    auth_url_setup_envelope — exported symbol.
     exchange_auth_code — exported symbol.
     revoke_token — exported symbol.
     get_credentials — exported symbol.
@@ -507,9 +506,8 @@ def store_client_secret(workspace: Path, path: Path) -> dict[str, object]:
 def get_auth_url(workspace: Path, services: str | Iterable[str] = "all") -> None:
     """Write OAuth authorization state to disk for the requested Google service set.
 
-    The authorization URL itself is written to ``last_auth_url_path``; callers that
-    emit JSON to stdout should use :func:`auth_url_setup_envelope` afterward so OAuth
-    secrets never flow through ``write_ok``.
+    The authorization URL itself is written to ``last_auth_url_path``; setup scripts emit
+    only file paths on stdout (read the URL from that file).
 
     Args:
         workspace (Path): Parameter.
@@ -545,31 +543,6 @@ def get_auth_url(workspace: Path, services: str | Iterable[str] = "all") -> None
     _write_json_object(pending_auth_path(workspace), pending_payload)
     last_auth_url_file = _last_auth_url_path(workspace)
     last_auth_url_file.write_text(f"{auth_url}\n", encoding="utf-8")
-
-
-def auth_url_setup_envelope(workspace: Path) -> dict[str, object]:
-    """Return safe setup JSON metadata after :func:`get_auth_url` wrote auth state.
-
-    Args:
-        workspace (Path): Parameter.
-
-    Returns:
-        dict[str, object]: Non-sensitive setup payload for ``write_ok``.
-
-    Examples:
-        >>> auth_url_setup_envelope  # doctest: +SKIP
-    """
-    pending = _load_json_object(pending_auth_path(workspace), label="pending auth")
-    services_raw = pending.get("services")
-    services_list = [str(item) for item in services_raw] if isinstance(services_raw, list) else []
-    scopes = _scope_values_from_payload(pending)
-    return {
-        "status": "AUTH_URL_READY",
-        "services": services_list,
-        "scopes": scopes,
-        "last_auth_url_path": str(_last_auth_url_path(workspace)),
-        "pending_auth_path": str(pending_auth_path(workspace)),
-    }
 
 
 def exchange_auth_code(workspace: Path, code_or_url: str) -> dict[str, object]:
@@ -1331,7 +1304,6 @@ __all__ = [
     "check_auth_live",
     "client_secret_path",
     "dry_run_requested",
-    "auth_url_setup_envelope",
     "ensure_google_deps",
     "exchange_auth_code",
     "get_auth_url",
