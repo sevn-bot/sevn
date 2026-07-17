@@ -64,12 +64,12 @@ def contacts_create(
     if proton_app.dry_run:
         proton_app.renderer.info(f"dry-run: would create contact {name!r}")
         return
-    proton_app.contacts_svc.create_contact(
+    cid = proton_app.contacts_svc.create_contact(
         unlocked,
         NewContact(name=name, emails=list(email)),
     )
     if proton_app.renderer.format.value == "text":
-        pass
+        typer.echo(cid)
     proton_app.renderer.success(f"Created contact {name!r}")
 
 

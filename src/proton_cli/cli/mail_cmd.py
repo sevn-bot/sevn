@@ -153,6 +153,7 @@ def messages_send(
         ),
     )
     if proton_app.renderer.format.value == "text":
+        typer.echo(message_id)
         proton_app.renderer.success("Message sent.")
     else:
         proton_app.renderer.object({"message_id": message_id})

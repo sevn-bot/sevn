@@ -18,7 +18,7 @@ def login(client: Client, username: str, password: str, totp: str = "") -> None:
     """Perform full web-client auth: session → SRP → optional 2FA."""
     sess = _create_session(client)
     client.set_tokens(sess["UID"], sess["AccessToken"], sess["RefreshToken"])
-    auth = _login_srp_with_hv(client, username, password)
+    auth = _login_srp(client, username, password, "", "")
     client.set_tokens(auth["UID"], auth["AccessToken"], auth["RefreshToken"])
     if int(auth.get("2FA", {}).get("Enabled", 0) or 0) & 1:
         if not totp:
@@ -26,29 +26,46 @@ def login(client: Client, username: str, password: str, totp: str = "") -> None:
         _auth_2fa(client, totp)
 
 
-def _login_srp_with_hv(client: Client, username: str, password: str) -> dict:
+def _login_srp(
+    client: Client,
+    username: str,
+    password: str,
+    hv_token: str,
+    hv_type: str,
+) -> dict:
     try:
-        return _login_srp(client, username, password, "", "")
-    except HumanVerificationError as hv_err:
-        resolver = client._get_hv_resolver()
+        return _login_srp_once(client, username, password, hv_token, hv_type)
+    except HumanVerificationError as exc:
+        resolver = client.get_hv_resolver()
         if not resolver:
             raise
-        token, kind = resolver(hv_err)
-        return _login_srp(client, username, password, token, kind)
+        token, kind = resolver(exc)
+        if not token:
+            raise
+        return _login_srp_once(client, username, password, token, kind)
+
+
+def _login_srp_once(
+    client: Client,
+    username: str,
+    password: str,
+    hv_token: str,
+    hv_type: str,
+) -> dict:
+    info = _get_auth_info(client, username)
+    return _srp_login(client, username, password, info, hv_token, hv_type)
 
 
 def _create_session(client: Client) -> dict:
-    body = b"{}"
-    headers = {
-        "Content-Type": "application/json",
-        "User-Agent": client.user_agent,
-        "x-pm-appversion": client.app_version,
-        "x-enforce-unauthsession": "true",
-    }
-    resp = client._client.post(f"{client.base_url}/auth/v4/sessions", headers=headers, content=body)
-    data = resp.json()
+    raw = client.raw_auth(
+        "POST",
+        "/auth/v4/sessions",
+        b"{}",
+        extra_headers={"x-enforce-unauthsession": "true"},
+    )
+    data = json.loads(raw)
     if int(data.get("Code", 0)) != 1000:
-        msg = f"session creation code {data.get('Code')}: {resp.text}"
+        msg = f"session creation code {data.get('Code')}: {raw.decode()}"
         raise ValueError(msg)
     return data
 
@@ -61,17 +78,6 @@ def _get_auth_info(client: Client, username: str) -> dict:
         msg = f"auth info code {data.get('Code')}: {raw.decode()}"
         raise ValueError(msg)
     return data
-
-
-def _login_srp(
-    client: Client,
-    username: str,
-    password: str,
-    hv_token: str,
-    hv_type: str,
-) -> dict:
-    info = _get_auth_info(client, username)
-    return _srp_login(client, username, password, info, hv_token, hv_type)
 
 
 def _srp_login(

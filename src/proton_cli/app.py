@@ -113,6 +113,9 @@ def new_app(opts: Options) -> App:
         user_agent=user_agent,
         profile=profile,
     )
+    from proton_cli.hv.resolver import cli_hv_resolver
+
+    client.set_hv_resolver(cli_hv_resolver)
 
     loaded = session_store.load(profile)
     if loaded:
@@ -136,7 +139,4 @@ def new_app(opts: Options) -> App:
         full_ids=opts.full_ids,
     )
     client.set_persist_hook(app._save_session)
-    from proton_cli.hv import cli_hv_resolver
-
-    client.set_hv_resolver(cli_hv_resolver)
     return app

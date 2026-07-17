@@ -38,7 +38,5 @@ def cli_hv_resolver(hv_err: HumanVerificationError) -> tuple[str, str]:
             pass
 
     if "captcha" in methods and hv_err.web_url:
-        sys.stderr.write(
-            f"Complete verification at {hv_err.web_url}, then set PROTON_HV_TOKEN.\n"
-        )
+        sys.stderr.write(f"Complete verification at {hv_err.web_url}, then set PROTON_HV_TOKEN.\n")
     raise ErrHVUnavailable(str(hv_err))

@@ -2,9 +2,22 @@
 
 from __future__ import annotations
 
+from typer.testing import CliRunner
+
+from proton_cli.cli.root import app as root_app
 from proton_cli.crypto import vcard as vcard_crypto
 from proton_cli.service.calendar.service import CalendarService, default_range
 from proton_cli.service.contacts.service import ContactsService
+
+
+def test_calendar_and_contacts_commands_registered() -> None:
+    runner = CliRunner()
+    cal = runner.invoke(root_app, ["calendar", "--help"])
+    con = runner.invoke(root_app, ["contacts", "--help"])
+    assert cal.exit_code == 0
+    assert con.exit_code == 0
+    assert "events" in cal.output
+    assert "list" in con.output
 
 
 def test_vcard_signed_roundtrip() -> None:

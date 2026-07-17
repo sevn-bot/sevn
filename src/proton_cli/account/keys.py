@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
@@ -11,6 +12,8 @@ from pgpy import PGPKey, PGPMessage
 from proton_cli.account import localkey
 from proton_cli.crypto.srp.util import mailbox_password_secret
 from proton_cli.proton.client import Client, Request
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -114,8 +117,8 @@ def _wrap_and_persist(client: Client, skp: str) -> None:
         blob = localkey.wrap(skp, key)
         client.set_enc_key_blob(blob)
         client.persist()
-    except Exception:
-        pass
+    except (OSError, ValueError, pgpy.errors.PGPError) as exc:
+        _logger.warning("failed to persist wrapped key: %s", exc)
 
 
 def _get_user(client: Client) -> object:
@@ -177,7 +180,8 @@ def _unlock_keys(
             pgp_key, _ = PGPKey.from_blob(key.private_key)
             persist_unlock(pgp_key, secret)
             unlocked.append(pgp_key)
-        except Exception:
+        except (ValueError, pgpy.errors.PGPError) as exc:
+            _logger.debug("failed to unlock key %s: %s", key.id, exc)
             continue
     return unlocked
 
@@ -189,9 +193,10 @@ def _decrypt_token(token_arm: str, sig_arm: str, keys: list[PGPKey]) -> bytes | 
         for key in keys:
             with use_unlocked_key(key):
                 decrypted = key.decrypt(message)
-                if key.verify(decrypted, signature):
-                    return bytes(decrypted.message)
-    except Exception:
+            if key.verify(decrypted, signature):
+                return bytes(decrypted.message)
+    except (ValueError, pgpy.errors.PGPError) as exc:
+        _logger.debug("failed to decrypt address key token: %s", exc)
         return None
     return None
 
@@ -203,7 +208,7 @@ def decrypt_pgp_message(keys: list[PGPKey], data: bytes) -> bytes:
         try:
             with use_unlocked_key(key):
                 decrypted = key.decrypt(message)
-                return bytes(decrypted.message)
+            return bytes(decrypted.message)
         except Exception as exc:
             last_err = exc
             continue

@@ -113,6 +113,10 @@ class Client:
         with self._lock:
             self._hv_resolver = resolver
 
+    def get_hv_resolver(self) -> HVResolver | None:
+        with self._lock:
+            return self._hv_resolver
+
     def _get_hv_resolver(self) -> HVResolver | None:
         with self._lock:
             return self._hv_resolver
@@ -141,10 +145,7 @@ class Client:
         if hv_err and not req.hv_token:
             resolver = self._get_hv_resolver()
             if resolver:
-                try:
-                    token, kind = resolver(hv_err)
-                except Exception:
-                    raise
+                token, kind = resolver(hv_err)
                 if token:
                     retry = Request(
                         method=req.method,
@@ -272,6 +273,7 @@ class Client:
         *,
         hv_token: str = "",
         hv_type: str = "",
+        extra_headers: dict[str, str] | None = None,
     ) -> bytes:
         with self._lock:
             uid, access = self._uid, self._access
@@ -288,7 +290,12 @@ class Client:
         if hv_token and hv_type:
             headers["x-pm-human-verification-token"] = hv_token
             headers["x-pm-human-verification-token-type"] = hv_type
-        resp = self._client.request(method.upper(), url, headers=headers, content=body)
+        if extra_headers:
+            headers.update(extra_headers)
+        try:
+            resp = self._client.request(method.upper(), url, headers=headers, content=body)
+        except httpx.HTTPError as exc:
+            raise NetworkError(str(exc)) from exc
         return resp.content
 
 

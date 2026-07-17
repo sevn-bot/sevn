@@ -1,7 +1,17 @@
-"""Proton Pass CLI backend tests (``specs/06-secrets.md`` §5.3)."""
+"""Proton Pass CLI backend tests (``specs/06-secrets.md`` §5.3).
+
+Exports:
+    _FakeProc
+    test_set_round_trip
+    test_set_raises_on_cli_failure
+    test_delete_missing_is_idempotent
+    test_proton_cli_secrets_subcommands
+    test_pass_cli_item_subcommands
+"""
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -24,7 +34,8 @@ class _FakeProc:
         self._stdout = stdout
         self._stderr = stderr
 
-    async def communicate(self) -> tuple[bytes, bytes]:
+    async def communicate(self, input: bytes | None = None) -> tuple[bytes, bytes]:
+        self.stdin = input
         return self._stdout, self._stderr
 
 
@@ -104,20 +115,38 @@ async def test_delete_missing_is_idempotent(
 @pytest.mark.anyio
 async def test_proton_cli_secrets_subcommands(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Any,
+    tmp_path: Path,
 ) -> None:
-    """``proton-cli`` dialect uses ``pass secrets`` argv."""
+    """``proton-cli`` dialect uses ``pass secrets`` argv without plaintext in args.
+
+    Args:
+        monkeypatch (pytest.MonkeyPatch): Pytest monkeypatch fixture.
+        tmp_path (pathlib.Path): Temporary directory for fake CLI binary.
+
+    Returns:
+        None
+
+    Examples:
+        >>> True
+        True
+    """
     exe = tmp_path / "proton-cli"
     exe.write_text("", encoding="utf-8")
     cli = str(exe)
-    calls: list[list[str]] = []
+    calls: list[dict[str, object]] = []
+    stdin_payloads: list[bytes | None] = []
 
     async def _fake_exec(*args: str, **kwargs: object) -> _FakeProc:
-        _ = kwargs
-        calls.append(list(args))
-        if "get" in args and "secrets" in args:
-            return _FakeProc(returncode=0, stdout=b"secret-value\n")
-        return _FakeProc(returncode=0)
+        calls.append({"args": list(args), "stdin": kwargs.get("stdin")})
+        proc = _FakeProc(returncode=0, stdout=b"secret-value\n" if "get" in args else b"")
+        original_communicate = proc.communicate
+
+        async def _communicate(input: bytes | None = None) -> tuple[bytes, bytes]:
+            stdin_payloads.append(input)
+            return await original_communicate(input)
+
+        proc.communicate = _communicate  # type: ignore[method-assign]
+        return proc
 
     monkeypatch.setattr("shutil.which", lambda _name: cli)
     monkeypatch.setattr("asyncio.create_subprocess_exec", _fake_exec)
@@ -126,9 +155,19 @@ async def test_proton_cli_secrets_subcommands(
     assert await backend.get("logical") == "secret-value"
     await backend.set("logical", "pw")
     await backend.delete("logical")
-    assert calls[0] == [cli, "pass", "secrets", "get", "logical", "--vault", "Personal"]
-    assert calls[1] == [cli, "pass", "secrets", "set", "logical", "pw", "--vault", "Personal"]
-    assert calls[2] == [cli, "pass", "secrets", "delete", "logical", "--vault", "Personal"]
+    assert calls[0]["args"] == [cli, "pass", "secrets", "get", "logical", "--vault", "Personal"]
+    assert calls[1]["args"] == [
+        cli,
+        "pass",
+        "secrets",
+        "set",
+        "logical",
+        "-",
+        "--vault",
+        "Personal",
+    ]
+    assert stdin_payloads[1] == b"pw"
+    assert calls[2]["args"] == [cli, "pass", "secrets", "delete", "logical", "--vault", "Personal"]
 
 
 @pytest.mark.anyio

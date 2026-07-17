@@ -25,6 +25,9 @@ PARTSTAT_TENTATIVE = 1
 PARTSTAT_DECLINED = 2
 PARTSTAT_ACCEPTED = 3
 
+if TYPE_CHECKING:
+    from proton_cli.account.keys import Unlocked
+
 
 @dataclass
 class Calendar:
@@ -554,7 +557,7 @@ class CalendarService:
 
 
 def default_range() -> tuple[datetime, datetime]:
-    now = datetime.now(UTC)
+    now = datetime.now(tz=UTC)
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     return start, start + timedelta(days=30)
 

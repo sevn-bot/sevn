@@ -7,6 +7,10 @@ class ErrUnauthorized(Exception):
     """Session expired and token refresh did not recover."""
 
 
+class ErrHVUnavailable(Exception):
+    """Human verification required but no token could be resolved."""
+
+
 class NetworkError(Exception):
     """Transport-level failure (exit 5)."""
 
@@ -56,7 +60,3 @@ class HumanVerificationError(Exception):
         self.methods = methods or []
         self.web_url = web_url
         super().__init__(f"human verification required: {web_url}")
-
-
-class ErrHVUnavailable(Exception):
-    """HV challenge could not be solved automatically."""
