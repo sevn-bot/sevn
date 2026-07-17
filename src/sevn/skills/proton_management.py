@@ -8,12 +8,14 @@ Exports:
     dry_run_requested — CLI/env dry-run selector.
     resolve_cli — locate ``proton-cli`` or a Python interpreter for ``-m proton_cli``.
     cli_argv — build argv with optional profile and module-mode prefix.
-    run_proton_cli — execute proton-cli and capture stdout/stderr.
+    run_proton_cli — execute proton-cli and capture stdout/stderr (sync wrapper).
+    run_proton_cli_async — async subprocess variant for gateway/skill async paths.
     status_payload — JSON-safe install/session status for skill scripts.
 """
 
 from __future__ import annotations
 
+import asyncio
 import os
 import shutil
 import subprocess  # nosec B404
@@ -94,17 +96,71 @@ def cli_argv(base: list[str], *, profile: str = "", module_mode: bool = False) -
         list[str]: argv suitable for subprocess.
 
     Examples:
-        >>> cli_argv(["pass", "vaults", "list"], profile="work")
-        ['pass', '--profile', 'work', 'vaults', 'list']
+        >>> cli_argv(["pass", "vaults", "list"], profile="work", module_mode=True)
+        ['-m', 'proton_cli', '--profile', 'work', 'pass', 'vaults', 'list']
     """
-    argv = ["-m", "proton_cli", *base] if module_mode else list(base)
+    if module_mode:
+        argv = ["-m", "proton_cli"]
+        if profile:
+            argv.extend(["--profile", profile])
+        argv.extend(base)
+        return argv
+    argv = list(base)
     if profile:
-        argv = (
-            [*argv[:1], "--profile", profile, *argv[1:]]
-            if not module_mode
-            else [*argv, "--profile", profile]
-        )
+        return ["--profile", profile, *argv]
     return argv
+
+
+async def run_proton_cli_async(
+    args: list[str],
+    *,
+    profile: str = "",
+    env: dict[str, str] | None = None,
+    timeout_s: float = 120.0,
+) -> tuple[int, str, str]:
+    """Run proton-cli asynchronously and return ``(code, stdout, stderr)``.
+
+    Args:
+        args (list[str]): Subcommand argv without executable.
+        profile (str): Profile name passed as ``--profile`` when non-empty.
+        env (dict[str, str] | None): Extra environment variables merged into the child.
+        timeout_s (float): Subprocess timeout in seconds.
+
+    Returns:
+        tuple[int, str, str]: Exit code, stdout, and stderr text.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(run_proton_cli_async)
+        True
+    """
+    exe = resolve_cli()
+    if exe is None:
+        return 127, "", "proton-cli not found on PATH"
+    module_mode = exe.endswith(("python", "python3"))
+    argv = cli_argv(args, profile=profile, module_mode=module_mode)
+    cmd = [exe, *argv]
+    proc_env = os.environ.copy()
+    if env:
+        proc_env.update(env)
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        env=proc_env,
+    )
+    try:
+        async with asyncio.timeout(timeout_s):
+            stdout_b, stderr_b = await proc.communicate()
+    except TimeoutError:
+        proc.kill()
+        await proc.wait()
+        return 124, "", f"proton-cli timed out after {timeout_s}s"
+    return (
+        proc.returncode or 0,
+        stdout_b.decode("utf-8", errors="replace"),
+        stderr_b.decode("utf-8", errors="replace"),
+    )
 
 
 def run_proton_cli(
@@ -133,26 +189,25 @@ def run_proton_cli(
     exe = resolve_cli()
     if exe is None:
         return 127, "", "proton-cli not found on PATH"
-    module_mode = exe.endswith(("python", "python3"))
-    argv = cli_argv(args, profile=profile, module_mode=module_mode)
-    if module_mode:
+    try:
+        return asyncio.run(run_proton_cli_async(args, profile=profile, env=env, timeout_s=timeout))
+    except RuntimeError:
+        # Fallback when already inside a running event loop (skill scripts).
+        module_mode = exe.endswith(("python", "python3"))
+        argv = cli_argv(args, profile=profile, module_mode=module_mode)
         cmd = [exe, *argv]
-    else:
-        cmd = [exe, *args]
-        if profile:
-            cmd = [exe, "--profile", profile, *args]
-    proc_env = os.environ.copy()
-    if env:
-        proc_env.update(env)
-    proc = subprocess.run(  # nosec B603
-        cmd,
-        capture_output=True,
-        text=True,
-        env=proc_env,
-        timeout=timeout,
-        check=False,
-    )
-    return proc.returncode, proc.stdout, proc.stderr
+        proc_env = os.environ.copy()
+        if env:
+            proc_env.update(env)
+        proc = subprocess.run(  # nosec B603
+            cmd,
+            capture_output=True,
+            text=True,
+            env=proc_env,
+            timeout=timeout,
+            check=False,
+        )
+        return proc.returncode, proc.stdout, proc.stderr
 
 
 def status_payload(*, profile: str = "default") -> dict[str, object]:

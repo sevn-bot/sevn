@@ -37,6 +37,17 @@ def _emit_credential_stdout(value: str) -> None:
         os.write(fd, b"\n")
 
 
+def _resolve_secret_value(value: str | None, *, prompt: str) -> str:
+    """Read a secret from an explicit value, stdin, or a hidden prompt."""
+    if value is not None and value != "-":
+        return value
+    if not sys.stdin.isatty():
+        data = sys.stdin.read()
+        if data:
+            return data.rstrip("\n")
+    return typer.prompt(prompt, hide_input=True)
+
+
 @vaults_app.command("list")
 def vaults_list(ctx: typer.Context) -> None:
     """List Pass vaults."""
@@ -158,7 +169,7 @@ def items_create(
     name: str = typer.Option(..., "--name", help="Item name"),
     item_type: str = typer.Option("login", "--type", help="Item type (login)"),
     username: str = typer.Option("", "--username"),
-    password: str = typer.Option("", "--password"),
+    password: str | None = typer.Option(None, "--password", help="Omit to read stdin/prompt"),
     email: str = typer.Option("", "--email"),
     url: str = typer.Option("", "--url"),
     note: str = typer.Option("", "--note"),
@@ -169,11 +180,16 @@ def items_create(
     proton_app = _run(ctx)
     unlocked = proton_app.unlock()
     share_id = proton_app.pass_svc.resolve_vault(unlocked, vault)
+    secret = (
+        _resolve_secret_value(password, prompt="Password")
+        if item_type == "login"
+        else (password or "")
+    )
     new_item = NewItem(
         type=item_type,
         name=name,
         username=username,
-        password=password,
+        password=secret,
         email=email,
         url=url,
         note=note,
@@ -195,23 +211,28 @@ def items_edit(
     ctx: typer.Context,
     ref: str = typer.Argument(..., help="Share ID + item ID, or search term"),
     item_id: str = typer.Argument(None),
-    name: str = typer.Option("", "--name"),
-    username: str = typer.Option("", "--username"),
-    password: str = typer.Option("", "--password"),
-    email: str = typer.Option("", "--email"),
-    url: str = typer.Option("", "--url"),
-    note: str = typer.Option("", "--note"),
-    totp: str = typer.Option("", "--totp"),
+    name: str | None = typer.Option(None, "--name"),
+    username: str | None = typer.Option(None, "--username"),
+    password: str | None = typer.Option(
+        None, "--password", help="Omit to leave unchanged; use - for stdin"
+    ),
+    email: str | None = typer.Option(None, "--email"),
+    url: str | None = typer.Option(None, "--url"),
+    note: str | None = typer.Option(None, "--note"),
+    totp: str | None = typer.Option(None, "--totp"),
 ) -> None:
     """Edit a Pass item."""
     proton_app = _run(ctx)
     unlocked = proton_app.unlock()
     args = [ref] if item_id is None else [ref, item_id]
     share_id, resolved_item_id = proton_app.pass_svc.resolve_item(unlocked, args)
+    patch_password = password
+    if password == "-":
+        patch_password = _resolve_secret_value(None, prompt="Password")
     patch = ItemPatch(
         name=name,
         username=username,
-        password=password,
+        password=patch_password,
         email=email,
         url=url,
         note=note,
@@ -298,16 +319,17 @@ def secrets_get(
 def secrets_set(
     ctx: typer.Context,
     name: str = typer.Argument(..., help="Login item name"),
-    value: str = typer.Argument(..., help="Password value"),
+    value: str | None = typer.Argument(None, help="Password value; omit or use - for stdin/prompt"),
     vault: str = typer.Option("", "--vault", help="Vault name or ID"),
 ) -> None:
     """Upsert login password for sevn secrets backend."""
     proton_app = _run(ctx)
     unlocked = proton_app.unlock()
+    secret = _resolve_secret_value(value, prompt="Password")
     item_id = proton_app.pass_svc.upsert_login_password(
         unlocked,
         name=name,
-        password=value,
+        password=secret,
         vault_filter=vault,
     )
     if proton_app.renderer.format.value == "text":

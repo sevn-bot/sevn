@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 from dataclasses import dataclass, field
 
 from pgpy import PGPMessage
@@ -15,6 +16,8 @@ from proton_cli.proto import item as item_proto
 from proton_cli.proto.vault import decode_vault_name_description
 from proton_cli.proton.client import Client, Request
 from proton_cli.ref import pick
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -58,13 +61,13 @@ class NewItem:
 
 @dataclass
 class ItemPatch:
-    name: str = ""
-    username: str = ""
-    password: str = ""
-    email: str = ""
-    url: str = ""
-    note: str = ""
-    totp: str = ""
+    name: str | None = None
+    username: str | None = None
+    password: str | None = None
+    email: str | None = None
+    url: str | None = None
+    note: str | None = None
+    totp: str | None = None
 
 
 class PassService:
@@ -269,6 +272,10 @@ class PassService:
             base64.b64decode(str(raw_item.get("Content", ""))),
             aead.TAG_ITEM_CONTENT,
         )
+        parsed = item_proto.decode_item_content(plain)
+        if parsed.get("type") != "login":
+            msg = f"item_edit only supports login items (got {parsed.get('type')!r})"
+            raise ValueError(msg)
         updated = item_proto.patch_login_item(
             plain,
             name=patch.name,
@@ -451,41 +458,61 @@ class PassService:
         return out
 
     def _fetch_items(self, share_id: str, share_keys: dict[int, bytes]) -> list[Item]:
-        payload: dict = {}
-        self._client.decode(Request(method="GET", path=f"/pass/v1/share/{share_id}/item"), payload)
         out: list[Item] = []
-        for raw in payload.get("Items") or []:
-            entry = raw if isinstance(raw, dict) else json.loads(raw)
-            rotation = int(entry.get("ContentKeyRotation", 0) or 0)
-            share_key = share_keys.get(rotation)
-            if not share_key:
-                continue
-            try:
-                item_key = aead.decrypt(
-                    share_key,
-                    base64.b64decode(str(entry.get("ItemKey", ""))),
-                    aead.TAG_ITEM_KEY,
-                )
-                plain = aead.decrypt(
-                    item_key,
-                    base64.b64decode(str(entry.get("Content", ""))),
-                    aead.TAG_ITEM_CONTENT,
-                )
-                parsed = item_proto.decode_item_content(plain)
-            except Exception:
-                parsed = {"type": "unknown", "name": ""}
-            out.append(
-                Item(
-                    share_id=share_id,
-                    item_id=str(entry.get("ItemID", "")),
-                    revision=int(entry.get("Revision", 0) or 0),
-                    state=int(entry.get("State", 0) or 0),
-                    type=str(parsed.get("type", "")),
-                    name=str(parsed.get("name", "")),
-                    username=str(parsed.get("username", "")),
-                    email=str(parsed.get("email", "")),
-                )
+        since = ""
+        for _page in range(100):
+            query: dict[str, str] = {"Since": since} if since else {}
+            payload: dict = {}
+            self._client.decode(
+                Request(method="GET", path=f"/pass/v1/share/{share_id}/item", query=query or None),
+                payload,
             )
+            items_env = payload.get("Items") or {}
+            if isinstance(items_env, dict):
+                revisions = items_env.get("RevisionsData") or []
+                since = str(items_env.get("LastToken", "") or "")
+            else:
+                revisions = items_env if isinstance(items_env, list) else []
+                since = ""
+            if not revisions:
+                break
+            for raw in revisions:
+                entry = raw if isinstance(raw, dict) else json.loads(raw)
+                if int(entry.get("State", 0) or 0) != 1:
+                    continue
+                rotation = int(entry.get("ContentKeyRotation", 0) or 0)
+                share_key = share_keys.get(rotation)
+                if not share_key:
+                    continue
+                try:
+                    item_key = aead.decrypt(
+                        share_key,
+                        base64.b64decode(str(entry.get("ItemKey", ""))),
+                        aead.TAG_ITEM_KEY,
+                    )
+                    plain = aead.decrypt(
+                        item_key,
+                        base64.b64decode(str(entry.get("Content", ""))),
+                        aead.TAG_ITEM_CONTENT,
+                    )
+                    parsed = item_proto.decode_item_content(plain)
+                except (ValueError, json.JSONDecodeError, KeyError) as exc:
+                    _logger.debug("failed to decrypt pass item %s: %s", entry.get("ItemID"), exc)
+                    parsed = {"type": "unknown", "name": ""}
+                out.append(
+                    Item(
+                        share_id=share_id,
+                        item_id=str(entry.get("ItemID", "")),
+                        revision=int(entry.get("Revision", 0) or 0),
+                        state=int(entry.get("State", 0) or 0),
+                        type=str(parsed.get("type", "")),
+                        name=str(parsed.get("name", "")),
+                        username=str(parsed.get("username", "")),
+                        email=str(parsed.get("email", "")),
+                    )
+                )
+            if not since:
+                break
         return out
 
 

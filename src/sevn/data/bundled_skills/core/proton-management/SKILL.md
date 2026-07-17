@@ -1,11 +1,12 @@
 ---
 name: proton-management
-description: Proton suite CLI (Python port) — Pass vaults/items with E2EE; Mail/Drive/Calendar/Contacts planned.
-version: "0.2.0"
+description: Proton suite CLI (Python port) — Pass + Mail; Drive/Calendar/Contacts planned.
+version: "0.3.0"
 see_also:
   - load_skill
   - run_skill_script
   - sevn-diagnostics
+  - email-management
 egress:
   - mail.proton.me
   - drive.proton.me
@@ -26,13 +27,21 @@ scripts:
     description: List Pass items (metadata; no password fields unless operator uses CLI directly).
     args_overview: "[--profile NAME] [--vault NAME] [--dry-run]"
     abortable: true
+  - path: scripts/mail_list.py
+    description: List mail messages in a folder via proton-cli mail messages list.
+    args_overview: "[--profile NAME] [--folder INBOX] [--limit N] [--dry-run]"
+    abortable: true
+  - path: scripts/mail_read.py
+    description: Read and decrypt one message by ID or search term.
+    args_overview: "MESSAGE_ID [--profile NAME] [--dry-run]"
+    abortable: true
 ---
 
 # proton-management
 
 Python port of [roman-16/proton-cli](https://github.com/roman-16/proton-cli) integrated as a sevn skill.
-**PR 2** adds Pass write paths (`items create/edit/delete`, `vaults create/rename/delete`) and
-`pass secrets {get,set,delete}` for the sevn ``proton_pass`` secrets backend via ``cli_path: proton-cli``.
+
+**PR 3** adds **Mail**: list, search, read, send (plain text), trash/delete/move, labels list.
 
 ## Operator setup
 
@@ -51,12 +60,13 @@ export PROTON_PASSWORD='...'
 ## CLI (also callable directly)
 
 ```bash
-proton-cli --version
+proton-cli mail messages list --folder inbox --output json
+proton-cli mail messages search --keyword meeting --limit 10
+proton-cli mail messages read MESSAGE_ID --output json
+proton-cli mail messages send --to user@proton.me --subject "Hi" --body "Hello"
+proton-cli mail labels list
 proton-cli pass vaults list --output json
-proton-cli pass items list --vault Personal
-proton-cli pass items create --name "API Key" --password '...' --vault Personal
-proton-cli pass items edit "API Key" --password '...'
-proton-cli pass secrets get "API Key" --vault Personal   # stdout password only
+proton-cli pass secrets get "API Key" --vault Personal
 ```
 
 Sessions persist under `~/.config/proton-cli/sessions/<profile>.json`.
@@ -64,5 +74,6 @@ Sessions persist under `~/.config/proton-cli/sessions/<profile>.json`.
 ## Security
 
 - Skill scripts never echo passwords in stdout.
-- Decrypted secrets are only returned when the operator runs `pass items get` with explicit IDs.
+- `mail_read.py` returns decrypted bodies — ask first before running on untrusted refs.
+- `mail messages send` is operator ask-first (mutating).
 - Configure `secrets_backend` type `proton_pass` with `cli_path: proton-cli` and optional `vault`.
