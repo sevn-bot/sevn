@@ -1,6 +1,5 @@
-# PullFrog PR review runs alongside CodeRabbit. With status_checks enabled it
-# posts pullfrog + pullfrog-approval commit statuses; the enforce step below
-# fails the job when PullFrog leaves unresolved findings.
+# PullFrog PR review runs alongside CodeRabbit. The enforce step fails the job
+# when unresolved PullFrog review threads remain on the PR (GraphQL check).
 name: PullFrog
 
 on:
@@ -80,21 +79,37 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          sha="${{ github.event.pull_request.head.sha }}"
-          repo="${{ github.repository }}"
+          pr="${{ github.event.pull_request.number }}"
+          owner="${{ github.repository_owner }}"
+          repo="${{ github.event.repository.name }}"
+          query='query($owner: String!, $repo: String!, $number: Int!) {
+            repository(owner: $owner, name: $repo) {
+              pullRequest(number: $number) {
+                reviewThreads(first: 100) {
+                  nodes {
+                    isResolved
+                    comments(first: 1) { nodes { author { login } } }
+                  }
+                }
+              }
+            }
+          }'
           for attempt in $(seq 1 30); do
-            state="$(gh api "repos/${repo}/commits/${sha}/status" \
-              --jq '.statuses[] | select(.context=="pullfrog-approval") | .state' 2>/dev/null | head -1 || true)"
-            if [ "$state" = "success" ]; then
-              echo "PullFrog approval: no outstanding findings"
-              exit 0
-            fi
-            if [ "$state" = "failure" ]; then
-              echo "::error title=PullFrog requested changes::Unresolved PullFrog review findings remain on this commit."
+            open="$(gh api graphql -f query="$query" \
+              -f owner="$owner" -f repo="$repo" -F number="$pr" \
+              --jq '[.data.repository.pullRequest.reviewThreads.nodes[]
+                | select(.isResolved == false and (.comments.nodes[0].author.login | startswith("pullfrog")))] | length' \
+              2>/dev/null || echo "")"
+            if [ -n "$open" ] && [ "$open" != "0" ]; then
+              echo "::error title=PullFrog requested changes::${open} unresolved PullFrog review thread(s) remain."
               exit 1
             fi
-            echo "Waiting for pullfrog-approval status (attempt ${attempt}/30)..."
+            if [ "$open" = "0" ]; then
+              echo "PullFrog approval: no unresolved review threads"
+              exit 0
+            fi
+            echo "Waiting for PullFrog review threads (attempt ${attempt}/30)..."
             sleep 10
           done
-          echo "::error title=PullFrog approval missing::pullfrog-approval status was not reported for ${sha}."
+          echo "::error title=PullFrog review incomplete::Could not read PullFrog review threads for PR #${pr}."
           exit 1
