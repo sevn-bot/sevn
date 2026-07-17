@@ -79,13 +79,12 @@ def encrypt_data_packet(data: bytes, sk: SessionKey) -> bytes:
     return _build_seipd_packet(data, sk)
 
 
-def encrypt_and_sign_plaintext(plaintext: str, sk: SessionKey, signing_key: PGPKey) -> bytes:
-    """Encrypt and sign a UTF-8 string for Proton mail body packages."""
-    data = plaintext.encode()
-    enc = _build_seipd_packet(data, sk)
-    with use_unlocked_key(signing_key):
-        signing_key.sign(PGPMessage.new(plaintext))
-    return enc
+def encrypt_plaintext(plaintext: str, sk: SessionKey) -> bytes:
+    """Encrypt a UTF-8 string into an OpenPGP SEIPD packet for mail body packages.
+
+    Mail packages currently advertise ``Signature: 0``; signing is not attached yet.
+    """
+    return _build_seipd_packet(plaintext.encode(), sk)
 
 
 def encrypt_block(

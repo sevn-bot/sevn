@@ -509,7 +509,7 @@ class MailService:
         attachments: list[UploadedAttachment] | None = None,
     ) -> list[dict[str, object]]:
         session_key = blocks.make_session_key()
-        enc_body = blocks.encrypt_and_sign_plaintext(body, session_key, addr_keys[0])
+        enc_body = blocks.encrypt_plaintext(body, session_key)
         body_b64 = base64.b64encode(enc_body).decode()
 
         internal_addrs: dict[str, object] = {}

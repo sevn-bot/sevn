@@ -90,6 +90,7 @@ class RespondResult:
     title: str = ""
     status: str = ""
     reply: Reply | None = None
+    notify_error: str = ""
 
 
 @dataclass
@@ -339,8 +340,9 @@ class CalendarService:
                     subject=_reply_subject(start, int(raw.get("FullDay", 0) or 0) == 1),
                     body=_reply_body(self_email, status, title),
                 )
-        except Exception:
-            pass
+        except Exception as exc:
+            # RSVP status update already succeeded; surface notify build failures to the CLI.
+            result.notify_error = str(exc)
         return result
 
     def resolve_event(self, unlocked: Unlocked, args: list[str]) -> tuple[str, str]:

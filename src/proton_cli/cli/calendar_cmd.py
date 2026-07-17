@@ -170,6 +170,10 @@ def events_respond(
         proton_app.renderer.info(f"dry-run: would respond {status!r} to event {ev_id}")
         return
     result = proton_app.calendar_svc.event_respond(unlocked, cal_id, ev_id, partstat)
+    if result.notify_error:
+        proton_app.renderer.info(
+            f"responded, but building organizer notification failed: {result.notify_error}"
+        )
     if result.reply:
         try:
             proton_app.mail_svc.send(
