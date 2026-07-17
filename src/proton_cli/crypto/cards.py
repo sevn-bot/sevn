@@ -8,6 +8,7 @@ from typing import Any
 
 from pgpy import PGPKey, PGPMessage
 
+from proton_cli.account.keys import use_unlocked_key
 from proton_cli.service.drive import blocks
 
 CARD_CLEAR = 0
@@ -51,16 +52,16 @@ def decrypt_cards(
 
 
 def sign_card(data: str, signing_key: PGPKey) -> dict[str, Any]:
-    with signing_key.unlock(None):
+    with use_unlocked_key(signing_key):
         sig = signing_key.sign(PGPMessage.new(data))
     return {"Type": CARD_SIGNED, "Data": data, "Signature": str(sig)}
 
 
 def encrypt_and_sign_card(data: str, encryption_key: PGPKey, signing_key: PGPKey) -> dict[str, Any]:
     msg = PGPMessage.new(data)
-    with encryption_key.unlock(None):
+    with use_unlocked_key(encryption_key):
         enc = encryption_key.encrypt(msg)
-    with signing_key.unlock(None):
+    with use_unlocked_key(signing_key):
         sig = signing_key.sign(msg)
     return {"Type": CARD_ENCRYPTED_SIGNED, "Data": str(enc), "Signature": str(sig)}
 
@@ -71,7 +72,7 @@ def _decrypt_card_data(data: str, key_packet: bytes | None, key: PGPKey) -> str:
             raw = base64.b64decode(data)
         except Exception:
             msg = PGPMessage.from_blob(data)
-            with key.unlock(None):
+            with use_unlocked_key(key):
                 dec = key.decrypt(msg)
             return _as_text(dec.message)
         sk = blocks.decrypt_session_key_packet(key_packet, key)
@@ -79,12 +80,12 @@ def _decrypt_card_data(data: str, key_packet: bytes | None, key: PGPKey) -> str:
         if body and body[0] == 1:
             plain = blocks.decrypt_block(raw if raw[0] in (0xC0, 0xD2) else _wrap_seipd(body), sk)
             return plain.decode("utf-8", errors="replace")
-        with key.unlock(None):
+        with use_unlocked_key(key):
             msg = PGPMessage.from_blob(data)
             dec = key.decrypt(msg)
         return _as_text(dec.message)
     msg = PGPMessage.from_blob(data)
-    with key.unlock(None):
+    with use_unlocked_key(key):
         dec = key.decrypt(msg)
     return _as_text(dec.message)
 
