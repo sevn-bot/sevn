@@ -161,7 +161,7 @@ bridge remains planned.</p>
           <td><code>setup --auth-url</code></td>
           <td><span class="badge status-skill">skill</span></td>
           <td><code>--auth-url [--services email,calendar,...|all] [--format json]</code></td>
-          <td><code>{auth_url} or plain URL</code></td>
+          <td><code>{last_auth_url_path, pending_auth_path} — read URL from last_auth_url_path file</code></td>
           <td class="invoke-cell">
             <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/setup.py&#34;, [&#34;--auth-url&#34;, &#34;--services&#34;, &#34;all&#34;, &#34;--format&#34;, &#34;json&#34;])</code>
           </td>
@@ -170,7 +170,7 @@ bridge remains planned.</p>
           <td><code>setup --auth-code</code><br><span class="badge" style="background:#4a1010;color:#ef9a9a;margin-top:0.25rem;">ask first</span></td>
           <td><span class="badge status-skill">skill</span></td>
           <td><code>--auth-code URL_OR_CODE [--format json]</code></td>
-          <td><code>{ok, scopes} or fresh auth_url on expiry</code></td>
+          <td><code>{ok, scopes, token_path} — re-run --auth-url when auth expires</code></td>
           <td class="invoke-cell">
             <code>run_skill_script(&#34;google-workspace&#34;, &#34;scripts/setup.py&#34;, [&#34;--auth-code&#34;, &#34;http://localhost:1/?code=...&#34;])</code>
           </td>
@@ -526,7 +526,7 @@ bridge remains planned.</p>
   </table>
 </div>
       <footer class="help-footer">
-        Generated 2026-07-16 from commit 681977b.
+        Generated 2026-07-17 from commit 041e48d.
         Edit <code>about-sevn.bot/_sources/google-workspace.yaml</code> or templates — not the HTML directly.
       </footer>
     </main>

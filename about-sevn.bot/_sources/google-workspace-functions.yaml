@@ -22,13 +22,13 @@ services:
         status: skill
         write: false
         args: "--auth-url [--services email,calendar,...|all] [--format json]"
-        returns: "{auth_url} or plain URL"
+        returns: "{last_auth_url_path, pending_auth_path} — read URL from last_auth_url_path file"
         invoke: 'run_skill_script("google-workspace", "scripts/setup.py", ["--auth-url", "--services", "all", "--format", "json"])'
       - name: setup --auth-code
         status: skill
         write: true
         args: "--auth-code URL_OR_CODE [--format json]"
-        returns: "{ok, scopes} or fresh auth_url on expiry"
+        returns: "{ok, scopes, token_path} — re-run --auth-url when auth expires"
         invoke: 'run_skill_script("google-workspace", "scripts/setup.py", ["--auth-code", "http://localhost:1/?code=..."])'
       - name: setup --revoke
         status: skill

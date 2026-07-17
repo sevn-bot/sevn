@@ -134,10 +134,22 @@
       "reviewed": "2026-07-11"
     },
     {
-      "skill_path": ".claude/skills/changelog",
+      "skill_path": "src/sevn/data/bundled_skills/core/changelog",
       "rule_id": "TM1",
       "reason": "Docs-only skill; references make/changelog-check and staged diff gates (no executable tool abuse)",
       "reviewed": "2026-07-12"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/google-workspace",
+      "rule_id": "PE3",
+      "reason": "SKILL.md documents OAuth client-secret/token setup; operator-initiated Google Workspace auth only",
+      "reviewed": "2026-07-17"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/google-workspace",
+      "rule_id": "SC6",
+      "reason": "SkillSpector false positive: stdlib import line flagged as typosquatting isort",
+      "reviewed": "2026-07-17"
     }
   ]
 }

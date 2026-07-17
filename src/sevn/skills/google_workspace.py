@@ -541,12 +541,13 @@ def get_auth_url(workspace: Path, services: str | Iterable[str] = "all") -> dict
         "created_at": _utcnow().isoformat(),
     }
     _write_json_object(pending_auth_path(workspace), pending_payload)
-    _last_auth_url_path(workspace).write_text(f"{auth_url}\n", encoding="utf-8")
+    last_auth_url_file = _last_auth_url_path(workspace)
+    last_auth_url_file.write_text(f"{auth_url}\n", encoding="utf-8")
     return {
         "status": "AUTH_URL_READY",
         "services": service_names,
         "scopes": requested_scopes,
-        "auth_url": auth_url,
+        "last_auth_url_path": str(last_auth_url_file),
         "pending_auth_path": str(pending_auth_path(workspace)),
     }
 
