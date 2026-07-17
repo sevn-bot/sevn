@@ -510,7 +510,7 @@ def _encrypt_binary(keys: list, data: bytes) -> bytes:
         try:
             with use_unlocked_key(key):
                 encrypted = key.encrypt(message)
-                return bytes(encrypted)
+            return bytes(encrypted)
         except Exception as exc:
             last_err = exc
     if last_err:
