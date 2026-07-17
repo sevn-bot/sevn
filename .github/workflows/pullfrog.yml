@@ -1,5 +1,6 @@
-# PullFrog PR review runs alongside CodeRabbit; do not make it a required gate
-# until the subscription secret has been configured and the signal is proven.
+# PullFrog PR review runs alongside CodeRabbit. With status_checks enabled it
+# posts pullfrog + pullfrog-approval commit statuses; the enforce step below
+# fails the job when PullFrog leaves unresolved findings.
 name: PullFrog
 
 on:
@@ -14,7 +15,7 @@ permissions:
   id-token: write
   issues: write
   pull-requests: write
-  statuses: write
+  statuses: read
 
 concurrency:
   group: pullfrog-${{ github.workflow }}-${{ github.ref }}
@@ -38,7 +39,7 @@ jobs:
 
       - name: PullFrog PR review (Claude subscription)
         if: env.HAS_CLAUDE_CODE == 'true'
-        continue-on-error: true
+        id: pullfrog_claude
         uses: pullfrog/pullfrog@a809795406487e13f894c681ea09b4f96015284d # v0
         with:
           model: anthropic/claude-sonnet
@@ -54,7 +55,7 @@ jobs:
 
       - name: PullFrog PR review (Codex/OpenAI subscription)
         if: env.HAS_CLAUDE_CODE != 'true' && env.HAS_CODEX_AUTH == 'true'
-        continue-on-error: true
+        id: pullfrog_codex
         uses: pullfrog/pullfrog@a809795406487e13f894c681ea09b4f96015284d # v0
         with:
           model: openai/gpt
@@ -72,3 +73,28 @@ jobs:
         if: env.HAS_CLAUDE_CODE != 'true' && env.HAS_CODEX_AUTH != 'true'
         run: |
           echo "::notice title=PullFrog skipped::Configure CLAUDE_CODE_OAUTH_TOKEN or CODEX_AUTH_JSON to enable PullFrog reviews."
+
+      - name: Fail when PullFrog requested changes
+        if: env.HAS_CLAUDE_CODE == 'true' || env.HAS_CODEX_AUTH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sha="${{ github.event.pull_request.head.sha }}"
+          repo="${{ github.repository }}"
+          for attempt in $(seq 1 30); do
+            state="$(gh api "repos/${repo}/commits/${sha}/status" \
+              --jq '.statuses[] | select(.context=="pullfrog-approval") | .state' 2>/dev/null | head -1 || true)"
+            if [ "$state" = "success" ]; then
+              echo "PullFrog approval: no outstanding findings"
+              exit 0
+            fi
+            if [ "$state" = "failure" ]; then
+              echo "::error title=PullFrog requested changes::Unresolved PullFrog review findings remain on this commit."
+              exit 1
+            fi
+            echo "Waiting for pullfrog-approval status (attempt ${attempt}/30)..."
+            sleep 10
+          done
+          echo "::error title=PullFrog approval missing::pullfrog-approval status was not reported for ${sha}."
+          exit 1
