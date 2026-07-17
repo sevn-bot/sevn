@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own everything under workspace/skills/: how skills are discovered, validated,
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
-last_updated: '2026-07-16'
-fingerprint: sha256:09fb2b5a4aa63abe067a7a15f2873fe207ed0840344873cd2e509f359150f4e3
+last_updated: '2026-07-17'
+fingerprint: sha256:7d1b8709a5ce879daddc2935204c5b65a3c710b08bb209fa1ea49200b68fea21
 related: []
 sources:
 - src/sevn/skills/**
@@ -356,6 +356,9 @@ interfaces:
 - name: run_proton_cli
   file: src/sevn/skills/proton_management.py
   symbol: run_proton_cli
+- name: run_proton_cli_async
+  file: src/sevn/skills/proton_management.py
+  symbol: run_proton_cli_async
 - name: status_payload
   file: src/sevn/skills/proton_management.py
   symbol: status_payload

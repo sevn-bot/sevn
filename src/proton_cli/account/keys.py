@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 import pgpy
@@ -10,6 +12,8 @@ from pgpy import PGPKey, PGPMessage
 from proton_cli.account import localkey
 from proton_cli.crypto.srp.util import mailbox_password_secret
 from proton_cli.proton.client import Client, Request
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -48,6 +52,22 @@ class Unlocked:
             if keys:
                 return keys, addr.id, addr.email
         raise ValueError("no address keys available")
+
+
+@contextmanager
+def use_unlocked_key(key: PGPKey):
+    """Use a session-unlocked private key or unlock it for one operation."""
+    if key.is_unlocked:
+        yield key
+    else:
+        with key.unlock(None):
+            yield key
+
+
+def persist_unlock(key: PGPKey, passphrase: bytes | str) -> PGPKey:
+    """Unlock *key* for the remainder of the process (pgpy re-locks on context exit)."""
+    key.unlock(passphrase).__enter__()
+    return key
 
 
 def unlock(client: Client, password: str) -> Unlocked:
@@ -97,8 +117,8 @@ def _wrap_and_persist(client: Client, skp: str) -> None:
         blob = localkey.wrap(skp, key)
         client.set_enc_key_blob(blob)
         client.persist()
-    except Exception:
-        pass
+    except (OSError, ValueError, pgpy.errors.PGPError) as exc:
+        _logger.warning("failed to persist wrapped key: %s", exc)
 
 
 def _get_user(client: Client) -> object:
@@ -158,9 +178,10 @@ def _unlock_keys(
                 secret = derived
         try:
             pgp_key, _ = PGPKey.from_blob(key.private_key)
-            with pgp_key.unlock(secret):
-                unlocked.append(pgp_key)
-        except Exception:
+            persist_unlock(pgp_key, secret)
+            unlocked.append(pgp_key)
+        except (ValueError, pgpy.errors.PGPError) as exc:
+            _logger.debug("failed to unlock key %s: %s", key.id, exc)
             continue
     return unlocked
 
@@ -170,11 +191,12 @@ def _decrypt_token(token_arm: str, sig_arm: str, keys: list[PGPKey]) -> bytes | 
         message = PGPMessage.from_blob(token_arm)
         signature = pgpy.PGPSignature.from_blob(sig_arm)
         for key in keys:
-            with key.unlock(None):
+            with use_unlocked_key(key):
                 decrypted = key.decrypt(message)
-                if key.verify(decrypted, signature):
-                    return bytes(decrypted.message)
-    except Exception:
+            if key.verify(decrypted, signature):
+                return bytes(decrypted.message)
+    except (ValueError, pgpy.errors.PGPError) as exc:
+        _logger.debug("failed to decrypt address key token: %s", exc)
         return None
     return None
 
@@ -184,9 +206,9 @@ def decrypt_pgp_message(keys: list[PGPKey], data: bytes) -> bytes:
     last_err: Exception | None = None
     for key in keys:
         try:
-            with key.unlock(None):
+            with use_unlocked_key(key):
                 decrypted = key.decrypt(message)
-                return bytes(decrypted.message)
+            return bytes(decrypted.message)
         except Exception as exc:
             last_err = exc
             continue

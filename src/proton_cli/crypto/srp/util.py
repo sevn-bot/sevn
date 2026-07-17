@@ -23,12 +23,14 @@ def bcrypt_b64_encode(data: bytes) -> bytes:
     return encoded.translate(bytes.maketrans(std_base64chars, bcrypt_base64))
 
 
+def _bcrypt_salt(salt: bytes) -> bytes:
+    return bcrypt_b64_encode((salt + b"proton")[:16])[:22]
+
+
 def hash_password_3(
     hash_class: type[PMHash], password: bytes, salt: bytes, modulus: bytes
 ) -> bytes:
-    salt = (salt + b"proton")[:16]
-    salt = bcrypt_b64_encode(salt)[:22]
-    hashed = bcrypt.hashpw(password, b"$2y$10$" + salt)
+    hashed = bcrypt.hashpw(password, b"$2y$10$" + _bcrypt_salt(salt))
     return hash_class(hashed + modulus).digest()
 
 
@@ -74,9 +76,7 @@ def custom_hash(hash_class: type[PMHash], *args: object) -> int:
 
 def mailbox_password(password: bytes, salt: bytes) -> bytes:
     """Return full bcrypt hash bytes for mailbox password derivation."""
-    bcrypt_b64_encode(salt)
-    salt_part = bcrypt_b64_encode((salt + b"proton")[:16])[:22]
-    return bcrypt.hashpw(password, b"$2y$10$" + salt_part)
+    return bcrypt.hashpw(password, b"$2y$10$" + _bcrypt_salt(salt))
 
 
 def mailbox_password_secret(password: bytes, salt_b64: str) -> str:

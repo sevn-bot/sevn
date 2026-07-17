@@ -1,11 +1,12 @@
 ---
 name: proton-management
-description: Proton suite CLI (Python port) — Pass vaults/items with E2EE; Mail/Drive/Calendar/Contacts planned.
-version: "0.1.0"
+description: Proton suite CLI (Python port) — full suite with api/settings polish.
+version: "0.6.0"
 see_also:
   - load_skill
   - run_skill_script
   - sevn-diagnostics
+  - email-management
 egress:
   - mail.proton.me
   - drive.proton.me
@@ -26,13 +27,33 @@ scripts:
     description: List Pass items (metadata; no password fields unless operator uses CLI directly).
     args_overview: "[--profile NAME] [--vault NAME] [--dry-run]"
     abortable: true
+  - path: scripts/mail_list.py
+    description: List mail messages in a folder via proton-cli mail messages list.
+    args_overview: "[--profile NAME] [--folder INBOX] [--limit N] [--dry-run]"
+    abortable: true
+  - path: scripts/mail_read.py
+    description: Read and decrypt one message by ID or search term.
+    args_overview: "MESSAGE_ID [--profile NAME] [--dry-run]"
+    abortable: true
+  - path: scripts/drive_list.py
+    description: List Drive folder contents via proton-cli drive items list.
+    args_overview: "[--profile NAME] [--path /] [--dry-run]"
+    abortable: true
+  - path: scripts/calendar_events_list.py
+    description: List calendar events via proton-cli calendar events list.
+    args_overview: "[--profile NAME] [--calendar NAME] [--start YYYY-MM-DD] [--dry-run]"
+    abortable: true
+  - path: scripts/contacts_list.py
+    description: List contacts via proton-cli contacts list.
+    args_overview: "[--profile NAME] [--dry-run]"
+    abortable: true
 ---
 
 # proton-management
 
 Python port of [roman-16/proton-cli](https://github.com/roman-16/proton-cli) integrated as a sevn skill.
-**PR 1** ships foundation + **Pass** (`vaults list`, `items list`, `items get`). Mail, Drive, Calendar,
-and Contacts follow in later incremental PRs.
+
+**PR 6** adds polish: `api`, `settings`, `status`, and env-based HV (`PROTON_HV_TOKEN`).
 
 ## Operator setup
 
@@ -51,16 +72,32 @@ export PROTON_PASSWORD='...'
 ## CLI (also callable directly)
 
 ```bash
-proton-cli --version
+proton-cli mail messages list --folder inbox --output json
+proton-cli mail messages search --keyword meeting --limit 10
+proton-cli mail messages read MESSAGE_ID --output json
+proton-cli mail messages send --to user@proton.me --subject "Hi" --body "Hello"
+proton-cli mail labels list
+proton-cli drive items list /
+proton-cli drive folders create /Notes
+proton-cli drive items upload ./doc.pdf /Documents
+proton-cli drive trash list
+proton-cli calendar calendars list
+proton-cli calendar events list --calendar Work
+proton-cli contacts list --output json
+proton-cli status
+proton-cli api GET /calendar/v1 --output json
+proton-cli settings mail --output json
 proton-cli pass vaults list --output json
-proton-cli pass items list --vault Personal
-proton-cli pass items get SHARE_ID ITEM_ID --output json
+proton-cli pass secrets get "API Key" --vault Personal
 ```
 
 Sessions persist under `~/.config/proton-cli/sessions/<profile>.json`.
 
+For CAPTCHA challenges during login, set `PROTON_HV_TOKEN` after solving in the browser (optional `PROTON_HV_TYPE=captcha`).
+
 ## Security
 
 - Skill scripts never echo passwords in stdout.
-- Decrypted secrets are only returned when the operator runs `pass items get` with explicit IDs.
-- Configure `secrets_backend` type `proton_pass` with `cli_path: proton-cli` once Pass write paths land.
+- `mail_read.py` returns decrypted bodies — ask first before running on untrusted refs.
+- `mail messages send` is operator ask-first (mutating).
+- Configure `secrets_backend` type `proton_pass` with `cli_path: proton-cli` and optional `vault`.
