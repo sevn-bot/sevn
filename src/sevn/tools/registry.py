@@ -1653,10 +1653,16 @@ def build_session_registry(
         from sevn.tools.workspace_files import register_write_workspace_md
 
         register_write_workspace_md(exe)
-    merged_skills = merge_skill_manifests(skill_overrides)
     if mgr is not None:
-        live_skills = _skill_descriptions_from_index_lines(mgr.index.lines)
-        merged_skills = {**merged_skills, **live_skills}
+        # D14: advertise only loadable (non-quarantined) skills from the live scan —
+        # never merge DEFAULT_SKILL_MANIFESTS stubs that ``load_skill`` cannot resolve.
+        merged_skills = mgr.advertised_skill_descriptions()
+        if skill_overrides:
+            for key, value in skill_overrides.items():
+                if key in merged_skills:
+                    merged_skills[key] = value
+    else:
+        merged_skills = merge_skill_manifests(skill_overrides)
     toggles = dict(plugins_enabled or {})
     if workspace_config is not None and workspace_config.tools is not None:
         for plugin_id, entry in workspace_config.tools.items():

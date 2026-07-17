@@ -1,7 +1,10 @@
-"""GitHub manager operations for bundled ``github-manager`` skill scripts.
+"""GitHub manager operations for bundled ``github-manager`` / ``gh-issues`` skill scripts.
 
 Module: sevn.integrations.github_skill.github_manager
 Depends: sevn.integrations.github_skill.client, sevn.integrations.github_skill.hooks
+
+REST manager only — ``gh`` CLI helpers live in
+:mod:`sevn.integrations.github_skill.gh_cli`.
 
 Exports:
     list_branches — list repository branches.
@@ -27,6 +30,22 @@ from sevn.integrations.github_skill.client import github_integration_call, parse
 
 if TYPE_CHECKING:
     from sevn.integrations.github_skill.hooks import GithubSkillHooks
+
+__all__ = [
+    "create_branch",
+    "create_deployment",
+    "delete_branch",
+    "dispatch_workflow",
+    "list_branches",
+    "list_environments",
+    "list_repo_secrets",
+    "list_repo_variables",
+    "list_workflows",
+    "upsert_environment",
+    "upsert_repo_secret",
+    "upsert_repo_variable",
+    "workflow_run_logs",
+]
 
 
 async def list_branches(

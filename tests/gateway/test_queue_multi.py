@@ -217,11 +217,12 @@ async def test_multi_supersede_cancel_aborts_in_flight(
 
 
 @pytest.mark.asyncio
-async def test_multi_classifier_timeout_falls_back_to_steer_with_notice(
+async def test_multi_classifier_timeout_queues_new_task_with_notice(
     tmp_path: Path,
     allow_scan: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """D15: classifier timeout → ``new_task`` + operator notice (not steer)."""
     gate = asyncio.Event()
     notices: list[str] = []
 
@@ -230,7 +231,7 @@ async def test_multi_classifier_timeout_falls_back_to_steer_with_notice(
         await asyncio.sleep(0.25)
 
     async def classify(_inp: RelatednessInput) -> RelatednessResult:
-        return RelatednessResult(label="related_steer", fallback=True)
+        return RelatednessResult(label="new_task", fallback=True)
 
     async def notify(_sid: str, line: str) -> None:
         notices.append(line)
@@ -258,6 +259,7 @@ async def test_multi_classifier_timeout_falls_back_to_steer_with_notice(
         )
         await asyncio.gather(t1, t2)
         assert any("timed out" in n.lower() for n in notices)
+        assert any("own turn" in n.lower() or "queuing" in n.lower() for n in notices)
     finally:
         await router.session_manager.drain()
         conn.close()

@@ -6,8 +6,8 @@ status: ready
 owner: Alex
 summary: Events and schedules—not chat—start work via webhooks, cron, dedupe, and
   notify-only paths so operators automate digests, alerts, and agent runs safely.
-last_updated: '2026-07-14'
-fingerprint: sha256:3ba449957038898a3f00cba876819d2398f3dfd4e02ca942fbeb846280cdcd61
+last_updated: '2026-07-16'
+fingerprint: sha256:cba9dff781c745b124968af4cd49ca19317fbd0d15090408648dccc08517e6b6
 related:
 - prd-07-mission-control
 - prd-13-extensibility
