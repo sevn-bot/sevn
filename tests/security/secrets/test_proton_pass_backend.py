@@ -102,6 +102,36 @@ async def test_delete_missing_is_idempotent(
 
 
 @pytest.mark.anyio
+async def test_proton_cli_secrets_subcommands(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Any,
+) -> None:
+    """``proton-cli`` dialect uses ``pass secrets`` argv."""
+    exe = tmp_path / "proton-cli"
+    exe.write_text("", encoding="utf-8")
+    cli = str(exe)
+    calls: list[list[str]] = []
+
+    async def _fake_exec(*args: str, **kwargs: object) -> _FakeProc:
+        _ = kwargs
+        calls.append(list(args))
+        if "get" in args and "secrets" in args:
+            return _FakeProc(returncode=0, stdout=b"secret-value\n")
+        return _FakeProc(returncode=0)
+
+    monkeypatch.setattr("shutil.which", lambda _name: cli)
+    monkeypatch.setattr("asyncio.create_subprocess_exec", _fake_exec)
+
+    backend = ProtonPassCliBackend(vault="Personal", cli_path="proton-cli")
+    assert await backend.get("logical") == "secret-value"
+    await backend.set("logical", "pw")
+    await backend.delete("logical")
+    assert calls[0] == [cli, "pass", "secrets", "get", "logical", "--vault", "Personal"]
+    assert calls[1] == [cli, "pass", "secrets", "set", "logical", "pw", "--vault", "Personal"]
+    assert calls[2] == [cli, "pass", "secrets", "delete", "logical", "--vault", "Personal"]
+
+
+@pytest.mark.anyio
 async def test_pass_cli_item_subcommands(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Any,

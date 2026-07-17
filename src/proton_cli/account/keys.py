@@ -158,8 +158,9 @@ def _unlock_keys(
                 secret = derived
         try:
             pgp_key, _ = PGPKey.from_blob(key.private_key)
-            with pgp_key.unlock(secret):
-                unlocked.append(pgp_key)
+            unlock_ctx = pgp_key.unlock(secret)
+            unlock_ctx.__enter__()
+            unlocked.append(pgp_key)
         except Exception:
             continue
     return unlocked
@@ -170,10 +171,13 @@ def _decrypt_token(token_arm: str, sig_arm: str, keys: list[PGPKey]) -> bytes | 
         message = PGPMessage.from_blob(token_arm)
         signature = pgpy.PGPSignature.from_blob(sig_arm)
         for key in keys:
-            with key.unlock(None):
+            if key.is_unlocked:
                 decrypted = key.decrypt(message)
-                if key.verify(decrypted, signature):
-                    return bytes(decrypted.message)
+            else:
+                with key.unlock(None):
+                    decrypted = key.decrypt(message)
+            if key.verify(decrypted, signature):
+                return bytes(decrypted.message)
     except Exception:
         return None
     return None
@@ -184,9 +188,12 @@ def decrypt_pgp_message(keys: list[PGPKey], data: bytes) -> bytes:
     last_err: Exception | None = None
     for key in keys:
         try:
-            with key.unlock(None):
+            if key.is_unlocked:
                 decrypted = key.decrypt(message)
-                return bytes(decrypted.message)
+            else:
+                with key.unlock(None):
+                    decrypted = key.decrypt(message)
+            return bytes(decrypted.message)
         except Exception as exc:
             last_err = exc
             continue
