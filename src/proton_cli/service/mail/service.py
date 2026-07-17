@@ -324,11 +324,10 @@ class MailService:
             )
         else:
             inline_prepared = []
+        # Attachments are uploaded as separate Attachment resources with
+        # AttachmentKeyPackets — do not MIME-embed them into the encrypted body.
         prepared = mail_mime.prepare_attachments(opts.attachments, opts.inline_attachments)
         prepared.extend(inline_prepared)
-        if prepared:
-            body = mail_mime.build_mime_message(body, mime_type, prepared)
-            mime_type = "multipart/mixed"
 
         message = PGPMessage.new(body)
         with use_unlocked_key(addr_keys[0]):
@@ -521,6 +520,7 @@ class MailService:
                 addr_entry: dict[str, object] = {
                     "Type": PKG_INTERNAL,
                     "BodyKeyPacket": base64.b64encode(rec_kp).decode(),
+                    # Body detached signatures not implemented yet (attachments are signed).
                     "Signature": 0,
                 }
                 att_packets = _attachment_key_packets(rec_key, attachments or [])

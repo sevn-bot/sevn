@@ -55,6 +55,8 @@ Python port of [roman-16/proton-cli](https://github.com/roman-16/proton-cli) int
 
 **PR 7** completes deferred features: calendar create/RSVP, mail attachments, contact groups/pin-key, pure-Python drive keygen, and HV webview helper support.
 
+**Known limitation:** mail send packages currently set recipient `Signature: 0` — message *bodies* are encrypted but not signed. Attachments are signed on upload. Body detached-signature support remains a follow-up.
+
 ## Operator setup
 
 1. Export credentials on the gateway host:
