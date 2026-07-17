@@ -284,7 +284,6 @@ class MailService:
             raise ValueError("at least one --to recipient is required")
         addr_keys, _addr_id, sender_email = unlocked.primary_addr()
         mime_type = "text/html" if opts.html else "text/plain"
-        key0 = addr_keys[0]
         message = PGPMessage.new(opts.body)
         with use_unlocked_key(addr_keys[0]):
             enc = addr_keys[0].encrypt(message)
