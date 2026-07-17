@@ -1,7 +1,7 @@
 ---
 name: proton-management
-description: Proton suite CLI (Python port) — Pass + Mail + Drive; Calendar/Contacts planned.
-version: "0.4.0"
+description: Proton suite CLI (Python port) — full suite with api/settings polish.
+version: "0.6.0"
 see_also:
   - load_skill
   - run_skill_script
@@ -39,13 +39,21 @@ scripts:
     description: List Drive folder contents via proton-cli drive items list.
     args_overview: "[--profile NAME] [--path /] [--dry-run]"
     abortable: true
+  - path: scripts/calendar_events_list.py
+    description: List calendar events via proton-cli calendar events list.
+    args_overview: "[--profile NAME] [--calendar NAME] [--start YYYY-MM-DD] [--dry-run]"
+    abortable: true
+  - path: scripts/contacts_list.py
+    description: List contacts via proton-cli contacts list.
+    args_overview: "[--profile NAME] [--dry-run]"
+    abortable: true
 ---
 
 # proton-management
 
 Python port of [roman-16/proton-cli](https://github.com/roman-16/proton-cli) integrated as a sevn skill.
 
-**PR 4** adds **Drive**: list, upload, download, create folder, trash list/restore/empty, delete.
+**PR 6** adds polish: `api`, `settings`, `status`, and env-based HV (`PROTON_HV_TOKEN`).
 
 ## Operator setup
 
@@ -73,11 +81,19 @@ proton-cli drive items list /
 proton-cli drive folders create /Notes
 proton-cli drive items upload ./doc.pdf /Documents
 proton-cli drive trash list
+proton-cli calendar calendars list
+proton-cli calendar events list --calendar Work
+proton-cli contacts list --output json
+proton-cli status
+proton-cli api GET /calendar/v1 --output json
+proton-cli settings mail --output json
 proton-cli pass vaults list --output json
 proton-cli pass secrets get "API Key" --vault Personal
 ```
 
 Sessions persist under `~/.config/proton-cli/sessions/<profile>.json`.
+
+For CAPTCHA challenges during login, set `PROTON_HV_TOKEN` after solving in the browser (optional `PROTON_HV_TYPE=captcha`).
 
 ## Security
 

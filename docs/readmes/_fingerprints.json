@@ -2,8 +2,8 @@
   "entries": {
     "agent": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-16T19:38:37Z",
-      "digest": "8582110e28c032e5586e3f36033792020d20f179d931315adeb306711f77d098",
+      "computed_at": "2026-07-17T21:31:09Z",
+      "digest": "a154c3119b27f42911fbec20dc60b7b96c49822289db26477b26c14ff08dd03f",
       "source_globs": [
         "src/sevn/agent/**"
       ]
@@ -148,8 +148,8 @@
     },
     "skills": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-17T19:37:05Z",
-      "digest": "644b692592df46257d0295a1755c5d574feb59809587a80e105108e40ec5e4ff",
+      "computed_at": "2026-07-17T21:30:52Z",
+      "digest": "35d9bd48ac320155f6cc9cffe75f58976fe6682baf5a947f14c7272a500176a5",
       "source_globs": [
         "src/sevn/skills/**",
         "src/sevn/data/bundled_skills/**",
