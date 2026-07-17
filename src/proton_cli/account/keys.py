@@ -189,8 +189,8 @@ def _decrypt_token(token_arm: str, sig_arm: str, keys: list[PGPKey]) -> bytes | 
         for key in keys:
             with use_unlocked_key(key):
                 decrypted = key.decrypt(message)
-                if key.verify(decrypted, signature):
-                    return bytes(decrypted.message)
+            if key.verify(decrypted, signature):
+                return bytes(decrypted.message)
     except Exception:
         return None
     return None
@@ -203,7 +203,7 @@ def decrypt_pgp_message(keys: list[PGPKey], data: bytes) -> bytes:
         try:
             with use_unlocked_key(key):
                 decrypted = key.decrypt(message)
-                return bytes(decrypted.message)
+            return bytes(decrypted.message)
         except Exception as exc:
             last_err = exc
             continue
