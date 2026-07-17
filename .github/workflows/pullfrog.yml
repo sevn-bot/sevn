@@ -1,5 +1,6 @@
-# PullFrog PR review runs alongside CodeRabbit. The enforce step fails the job
-# when unresolved PullFrog review threads remain on the PR (GraphQL check).
+# PullFrog PR review runs alongside CodeRabbit. When the review completes,
+# the enforce step fails the job if unresolved PullFrog threads remain.
+# If PullFrog cannot run (e.g. Claude session limit), the job passes.
 name: PullFrog
 
 on:
@@ -39,6 +40,7 @@ jobs:
       - name: PullFrog PR review (Claude subscription)
         if: env.HAS_CLAUDE_CODE == 'true'
         id: pullfrog_claude
+        continue-on-error: true
         uses: pullfrog/pullfrog@a809795406487e13f894c681ea09b4f96015284d # v0
         with:
           model: anthropic/claude-sonnet
@@ -55,6 +57,7 @@ jobs:
       - name: PullFrog PR review (Codex/OpenAI subscription)
         if: env.HAS_CLAUDE_CODE != 'true' && env.HAS_CODEX_AUTH == 'true'
         id: pullfrog_codex
+        continue-on-error: true
         uses: pullfrog/pullfrog@a809795406487e13f894c681ea09b4f96015284d # v0
         with:
           model: openai/gpt
@@ -73,8 +76,15 @@ jobs:
         run: |
           echo "::notice title=PullFrog skipped::Configure CLAUDE_CODE_OAUTH_TOKEN or CODEX_AUTH_JSON to enable PullFrog reviews."
 
+      - name: PullFrog review incomplete (non-fatal)
+        if: always() && ((env.HAS_CLAUDE_CODE == 'true' && steps.pullfrog_claude.outcome != 'success') || (env.HAS_CLAUDE_CODE != 'true' && env.HAS_CODEX_AUTH == 'true' && steps.pullfrog_codex.outcome != 'success'))
+        run: |
+          echo "::notice title=PullFrog skipped::Review did not complete (e.g. Claude session limit). Thread enforcement skipped."
+
       - name: Fail when PullFrog requested changes
-        if: env.HAS_CLAUDE_CODE == 'true' || env.HAS_CODEX_AUTH == 'true'
+        if: |
+          (env.HAS_CLAUDE_CODE == 'true' && steps.pullfrog_claude.outcome == 'success') ||
+          (env.HAS_CLAUDE_CODE != 'true' && env.HAS_CODEX_AUTH == 'true' && steps.pullfrog_codex.outcome == 'success')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
