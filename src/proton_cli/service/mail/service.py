@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from pgpy import PGPMessage
+from pgpy import PGPKey, PGPMessage
 
 if TYPE_CHECKING:
     from proton_cli.account.keys import Unlocked
@@ -370,11 +370,7 @@ class MailService:
         clear_addrs: dict[str, object] = {}
         for email, scheme, armored_key in plans:
             if scheme == PKG_INTERNAL and armored_key:
-                if key0.is_unlocked:
-                    wrapped = key0.encrypt(PGPMessage.new(body))
-                else:
-                    with key0.unlock(None):
-                        wrapped = key0.encrypt(PGPMessage.new(body))
+                wrapped = _encrypt_for_recipient(armored_key, body)
                 internal_addrs[email] = {
                     "Type": PKG_INTERNAL,
                     "BodyKeyPacket": base64.b64encode(bytes(wrapped)).decode(),
@@ -409,6 +405,11 @@ class MailService:
                 }
             )
         return packages
+
+
+def _encrypt_for_recipient(armored_key: str, body: str) -> bytes:
+    recipient_key, _ = PGPKey.from_blob(armored_key)
+    return bytes(recipient_key.encrypt(PGPMessage.new(body)))
 
 
 def _recipient_list(emails: list[str]) -> list[dict[str, str]]:

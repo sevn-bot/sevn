@@ -21,7 +21,7 @@ def decrypt_body(armored: str, addr_keys: list) -> tuple[str, str]:
             else:
                 with key.unlock(None):
                     decrypted = key.decrypt(message)
-            return str(decrypted.message), "verified"
+            return str(decrypted.message), "unverified"
         except Exception as exc:
             last_err = exc
             continue
