@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
+from typer.testing import CliRunner
+
+from proton_cli.cli.root import app as root_app
 from proton_cli.service.drive import blocks, paths
 from proton_cli.service.drive.crypto import lookup_hash
 from proton_cli.service.drive.service import DriveService
+
+
+def test_drive_command_registered() -> None:
+    result = CliRunner().invoke(root_app, ["drive", "--help"])
+    assert result.exit_code == 0
+    assert "items" in result.output
 
 
 def test_path_helpers() -> None:
