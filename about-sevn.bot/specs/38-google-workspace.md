@@ -7,7 +7,7 @@ owner: Alex
 summary: Bundled google-workspace skill — OAuth2 Gmail, Calendar, Drive, Sheets, Docs,
   Contacts; optional gws CLI bridge.
 last_updated: '2026-07-17'
-fingerprint: sha256:b7336acc4d6fe05f5e0c694ebcd350d71cf5afc8b8f5620a161abe6faa489644
+fingerprint: sha256:1c7382e3fc07f38e95cd3cbf5ffb732428db7a165e873e049aef95eeccaade7e
 related:
 - spec-12-skills-system
 - spec-02-config-and-workspace
