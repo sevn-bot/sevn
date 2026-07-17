@@ -106,20 +106,14 @@ def messages_read(
     """Read and decrypt one message."""
     proton_app = _run(ctx)
     unlocked = proton_app.unlock()
+    summaries, _ = proton_app.mail_svc.list_messages(ListOptions(folder="all", page_size=150))
+    resolved = proton_app.mail_svc.resolve_message(message_id, summaries)
+    full = proton_app.mail_svc.read_message(unlocked, resolved)
     if body_only:
-        summaries, _ = proton_app.mail_svc.list_messages(ListOptions(page_size=150))
-        resolved = proton_app.mail_svc.resolve_message(message_id, summaries)
-        full = proton_app.mail_svc.read_message(unlocked, resolved)
         sys.stdout.write(full.body)
         if full.body and not full.body.endswith("\n"):
             sys.stdout.write("\n")
         return
-    summaries, _ = proton_app.mail_svc.list_messages(ListOptions(folder="all", page_size=150))
-    try:
-        resolved = proton_app.mail_svc.resolve_message(message_id, summaries)
-    except Exception:
-        resolved = message_id
-    full = proton_app.mail_svc.read_message(unlocked, resolved)
     proton_app.renderer.object(full)
 
 
