@@ -16,8 +16,8 @@ def _write_varint(value: int) -> bytes:
     return bytes(out)
 
 
-def _write_string(field: int, value: str) -> bytes:
-    if not value:
+def _write_string(field: int, value: str, *, write_empty: bool = False) -> bytes:
+    if not value and not write_empty:
         return b""
     data = value.encode("utf-8")
     tag = (field << 3) | 2
@@ -48,7 +48,7 @@ def encode_login_item(
         url_values = [url]
     login_parts = [
         _write_string(1, email),
-        _write_string(2, password),
+        _write_string(2, password, write_empty=True),
         _write_string(4, totp),
         _write_string(6, username),
     ]
@@ -69,29 +69,32 @@ def encode_vault(name: str, description: str = "") -> bytes:
 def patch_login_item(
     data: bytes,
     *,
-    name: str = "",
-    note: str = "",
-    username: str = "",
-    email: str = "",
-    password: str = "",
-    url: str = "",
-    totp: str = "",
+    name: str | None = None,
+    note: str | None = None,
+    username: str | None = None,
+    email: str | None = None,
+    password: str | None = None,
+    url: str | None = None,
+    totp: str | None = None,
 ) -> bytes:
     """Decode-login-patch-reencode for edit operations."""
     parsed = decode_item_content(data)
-    if name:
+    if parsed.get("type") != "login":
+        msg = f"patch_login_item only supports login items (got {parsed.get('type')!r})"
+        raise ValueError(msg)
+    if name is not None:
         parsed["name"] = name
-    if note:
+    if note is not None:
         parsed["note"] = note
-    if username:
+    if username is not None:
         parsed["username"] = username
-    if email:
+    if email is not None:
         parsed["email"] = email
-    if password:
+    if password is not None:
         parsed["password"] = password
-    if url:
+    if url is not None:
         parsed["urls"] = [url]
-    if totp:
+    if totp is not None:
         parsed["totp"] = totp
     return encode_login_item(
         name=str(parsed.get("name", "")),
@@ -105,7 +108,8 @@ def patch_login_item(
 
 
 def decode_item_content(data: bytes) -> dict[str, object]:
-    result: dict[str, object] = {"type": "login", "urls": []}
+    result: dict[str, object] = {"type": "unknown", "urls": []}
+    content_type: str | None = None
     i = 0
     while i < len(data):
         tag, i = _read_varint(data, i)
@@ -122,7 +126,7 @@ def decode_item_content(data: bytes) -> dict[str, object]:
                 login = _decode_content_chunk(chunk)
                 result.update(login)
                 if login:
-                    result["type"] = "login"
+                    content_type = "login"
         elif wire == 0:
             _, i = _read_varint(data, i)
         elif wire == 1:
@@ -131,6 +135,8 @@ def decode_item_content(data: bytes) -> dict[str, object]:
             i += 4
         else:
             break
+    if content_type:
+        result["type"] = content_type
     return result
 
 

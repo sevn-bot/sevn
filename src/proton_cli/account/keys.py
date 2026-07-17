@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
 import pgpy
@@ -10,6 +11,8 @@ from pgpy import PGPKey, PGPMessage
 from proton_cli.account import localkey
 from proton_cli.crypto.srp.util import mailbox_password_secret
 from proton_cli.proton.client import Client, Request
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -97,8 +100,8 @@ def _wrap_and_persist(client: Client, skp: str) -> None:
         blob = localkey.wrap(skp, key)
         client.set_enc_key_blob(blob)
         client.persist()
-    except Exception:
-        pass
+    except (OSError, ValueError, pgpy.errors.PGPError) as exc:
+        _logger.warning("failed to persist wrapped key: %s", exc)
 
 
 def _get_user(client: Client) -> object:
@@ -161,7 +164,8 @@ def _unlock_keys(
             unlock_ctx = pgp_key.unlock(secret)
             unlock_ctx.__enter__()
             unlocked.append(pgp_key)
-        except Exception:
+        except (ValueError, pgpy.errors.PGPError) as exc:
+            _logger.debug("failed to unlock key %s: %s", key.id, exc)
             continue
     return unlocked
 
@@ -178,7 +182,8 @@ def _decrypt_token(token_arm: str, sig_arm: str, keys: list[PGPKey]) -> bytes | 
                     decrypted = key.decrypt(message)
             if key.verify(decrypted, signature):
                 return bytes(decrypted.message)
-    except Exception:
+    except (ValueError, pgpy.errors.PGPError) as exc:
+        _logger.debug("failed to decrypt address key token: %s", exc)
         return None
     return None
 

@@ -96,8 +96,12 @@ def save(profile: str, session: Session) -> None:
     path = config_dir() / "sessions" / f"{profile}.json"
     path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
     payload = {k: v for k, v in asdict(session).items() if v}
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    path.chmod(0o600)
+    data = json.dumps(payload, indent=2).encode("utf-8")
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        os.write(fd, data)
+    finally:
+        os.close(fd)
 
 
 def clear(profile: str) -> None:
