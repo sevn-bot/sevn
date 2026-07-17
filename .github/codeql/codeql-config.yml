@@ -4,3 +4,4 @@ name: "sevn CodeQL config"
 # blocks.py; calendar attendee tokens use SHA-1 per Proton/iCal conventions.
 paths-ignore:
   - src/proton_cli/service/drive/blocks.py
+  - src/proton_cli/crypto/ical.py
