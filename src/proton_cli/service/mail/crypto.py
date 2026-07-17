@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pgpy import PGPMessage
 
+from proton_cli.account.keys import use_unlocked_key
+
 
 def decrypt_body(armored: str, addr_keys: list) -> tuple[str, str]:
     """Decrypt an armored mail body; return ``(plaintext, signature_status)``."""
@@ -16,11 +18,8 @@ def decrypt_body(armored: str, addr_keys: list) -> tuple[str, str]:
     last_err: Exception | None = None
     for key in addr_keys:
         try:
-            if key.is_unlocked:
+            with use_unlocked_key(key):
                 decrypted = key.decrypt(message)
-            else:
-                with key.unlock(None):
-                    decrypted = key.decrypt(message)
             return str(decrypted.message), "unverified"
         except Exception as exc:
             last_err = exc
