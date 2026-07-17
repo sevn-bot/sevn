@@ -108,4 +108,6 @@ def release_leaked_multiprocessing_semaphores() -> None:
         )
 
 
-__all__ = ["release_leaked_multiprocessing_semaphores"]
+__all__ = [
+    "release_leaked_multiprocessing_semaphores",
+]

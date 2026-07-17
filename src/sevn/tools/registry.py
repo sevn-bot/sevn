@@ -158,6 +158,10 @@ DEFAULT_SKILL_MANIFESTS: Final[dict[str, str]] = {
         "the commit-msg hook rejects non-conforming subjects."
     ),
     "email-management": "Multi-account IMAP and Gmail API mail read/search/send scripts.",
+    "google-workspace": (
+        "Gmail, Calendar, Drive, and Contacts via OAuth2 Google Workspace APIs "
+        "(Sheets/Docs planned)."
+    ),
     "facebook-use": "Facebook workflows via a logged-in browser profile or CDP attach.",
     "gh-issues": "GitHub issue lifecycle — list, view, create, comment via integration_call.",
     "gh-pr": "Pull request lifecycle — list, view, create, merge, close via integration_call.",
@@ -179,6 +183,9 @@ DEFAULT_SKILL_MANIFESTS: Final[dict[str, str]] = {
     "playwright-browser": "Headless/automation Playwright scripts (navigate, screenshot, extract).",
     "printing-press-library": (
         "Starter-pack Printing Press CLIs — ESPN, flights, movies, recipes (host Go binaries)."
+    ),
+    "proton-management": (
+        "Proton suite CLI (Python port) — Pass vaults/items with E2EE; Mail/Drive/Calendar/Contacts planned."
     ),
     "roam_code": "Lightweight roam-code path Q&A without a persistent graph DB.",
     "scheduling": "Cron/reminder authoring via bundled scripts.",
@@ -1655,10 +1662,16 @@ def build_session_registry(
         from sevn.tools.workspace_files import register_write_workspace_md
 
         register_write_workspace_md(exe)
-    merged_skills = merge_skill_manifests(skill_overrides)
     if mgr is not None:
-        live_skills = _skill_descriptions_from_index_lines(mgr.index.lines)
-        merged_skills = {**merged_skills, **live_skills}
+        # D14: advertise only loadable (non-quarantined) skills from the live scan —
+        # never merge DEFAULT_SKILL_MANIFESTS stubs that ``load_skill`` cannot resolve.
+        merged_skills = mgr.advertised_skill_descriptions()
+        if skill_overrides:
+            for key, value in skill_overrides.items():
+                if key in merged_skills:
+                    merged_skills[key] = value
+    else:
+        merged_skills = merge_skill_manifests(skill_overrides)
     toggles = dict(plugins_enabled or {})
     if workspace_config is not None and workspace_config.tools is not None:
         for plugin_id, entry in workspace_config.tools.items():

@@ -21,6 +21,7 @@ Exports:
     tier_b_answer_mode — effective ``gateway.output.tier_b_answer_mode``.
     show_intent_footer — effective ``gateway.output.show_intent_footer``.
     browser_settings — effective ``skills.browser.*``.
+    google_workspace_settings — effective ``skills.google_workspace.*``.
     social_media_manager_settings — effective ``skills.social_media_manager.*``.
 """
 
@@ -38,6 +39,12 @@ from sevn.config.sections.gateway import GatewayBudgetConfig, GatewayOutputConfi
 from sevn.config.sections.ops import BrowserWorkspaceConfig
 from sevn.config.sections.root import (
     WorkspaceConfig,  # noqa: TC001 — used in doctests and annotations
+)
+from sevn.config.sections.skills_google_workspace import (
+    GoogleWorkspaceSkillConfig,
+)
+from sevn.config.sections.skills_google_workspace import (
+    google_workspace_settings as _google_workspace_settings,
 )
 from sevn.config.sections.skills_social_media import (
     SocialMediaManagerSkillConfig,
@@ -166,6 +173,24 @@ def social_media_manager_settings(
         'browser'
     """
     return _social_media_manager_settings(cfg)
+
+
+def google_workspace_settings(
+    cfg: WorkspaceConfig | None,
+) -> GoogleWorkspaceSkillConfig:
+    """Return effective ``skills.google_workspace.*`` settings.
+
+    Args:
+        cfg (WorkspaceConfig | None): Parsed workspace config.
+
+    Returns:
+        GoogleWorkspaceSkillConfig: Defaults when the section is absent.
+
+    Examples:
+        >>> google_workspace_settings(None).default_services
+        'all'
+    """
+    return _google_workspace_settings(cfg)
 
 
 def tier_b_rounds_expanded(cfg: WorkspaceConfig | None) -> int:

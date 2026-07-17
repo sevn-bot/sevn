@@ -347,12 +347,17 @@ class ListRegistryImplementation(Tool):
         self,
         catalog: dict[str, ToolDefinition],
         skill_descriptions: dict[str, str],
+        skills_manager: SkillsManager | None = None,
     ) -> None:
         """Bind pre-meta catalog rows and skill manifest summaries.
 
         Args:
             catalog (dict[str, ToolDefinition]): Native + MCP definitions (**pre-meta** snapshot).
-            skill_descriptions (dict[str, str]): Skill id → one-line summary rows.
+            skill_descriptions (dict[str, str]): Skill id → one-line summary rows (fallback
+                when no live :class:`~sevn.skills.manager.SkillsManager` is bound).
+            skills_manager (SkillsManager | None): When set, ``skills`` are taken from
+                :meth:`SkillsManager.advertised_skill_descriptions` so ``list_registry``
+                and ``load_skill`` share one source of truth (D14).
 
         Examples:
             >>> isinstance(ListRegistryImplementation({}, {}), ListRegistryImplementation)
@@ -360,6 +365,7 @@ class ListRegistryImplementation(Tool):
         """
         self._catalog = dict(catalog)
         self._skill_descriptions = dict(skill_descriptions)
+        self._skills_manager = skills_manager
         self._definition = ToolDefinition(
             name="list_registry",
             category="meta",
@@ -391,6 +397,8 @@ class ListRegistryImplementation(Tool):
 
         Returns:
             str: §3.1 JSON envelope with ``tools`` and ``skills`` string lists.
+                ``skills`` lists only non-quarantined loadable skill ids when a
+                live skills manager is bound (D14).
 
         Examples:
             >>> import inspect
@@ -403,7 +411,10 @@ class ListRegistryImplementation(Tool):
             for name, defn in self._catalog.items()
             if defn.enabled and name not in self._META_NAMES
         )
-        skills = sorted(self._skill_descriptions)
+        if self._skills_manager is not None:
+            skills = sorted(self._skills_manager.advertised_skill_descriptions())
+        else:
+            skills = sorted(self._skill_descriptions)
         payload: dict[str, Any] = {
             "tools": tools,
             "skills": skills,
@@ -478,7 +489,9 @@ def attach_meta_loaders(
 
     catalog: dict[str, ToolDefinition] = dict(native_definitions)
     catalog.update(mcp_definitions)
-    executor.register(ListRegistryImplementation(catalog, skill_descriptions))
+    executor.register(
+        ListRegistryImplementation(catalog, skill_descriptions, skills_manager=skills_manager)
+    )
     executor.register(LoadToolImplementation(catalog, mcp_tool_names))
     if skills_manager is not None:
         from sevn.tools.skills_register import SkillsBackedLoadSkillTool

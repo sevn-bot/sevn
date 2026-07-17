@@ -51,7 +51,7 @@ Initial draft for **Purpose** — grounded in extracted interfaces; confirm norm
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: [`src/sevn/plugins`](../../src/sevn/plugins/) (6 Python files). Normative design: `about-sevn.bot/specs/34-plugin-hooks.md`.
+Primary source tree: [`src/sevn/plugins`](../../src/sevn/plugins/) (6 Python files). Normative design: [`34-plugin-hooks.md`](../../about-sevn.bot/specs/34-plugin-hooks.md).
 
 ### Module inventory
 

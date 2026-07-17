@@ -27,9 +27,10 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | defuddle | Extract clean markdown from web pages with Defuddle CLI, removing clutter and navigation before saving or analyzing sources. |
 | email-management | Multi-account IMAP and Gmail API mail read/search/send scripts. |
 | facebook-use | Facebook workflows via a logged-in browser profile or CDP attach (feed read, search). |
-| gh-issues | GitHub issue lifecycle — list, view, create, comment via integration_call. |
+| gh-issues | GitHub issue lifecycle — templated create via gh CLI, authenticated view/watch/track + cron notify, plus list/comment. |
 | gh-pr | Pull request lifecycle — list, view, create, merge, close, reviewers via integration_call. |
 | github-manager | Advanced GitHub operations — branches, Actions, CI/CD secrets, environments, deployments via integration_call. |
+| google-workspace | Gmail, Calendar, Drive, Contacts, Sheets, and Docs via OAuth2 Google Workspace APIs. |
 | graphify | Knowledge-graph orientation for code (`specs/28-code-understanding.md` §2.4). |
 | json-canvas | Create and edit Obsidian JSON Canvas `.canvas` files with nodes, edges, groups, and connections. |
 | job-ops | Discover jobs across global + Europe boards, AI fit-score them against your resume, and optionally tailor a CV summary (JobOps port). |
@@ -38,7 +39,7 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | lcm | Lossless context search, drill-back, and conversation index (`specs/15-memory-lcm.md`). |
 | linkedin-use | LinkedIn staff/company/connection scraping via logged-in browser + Voyager API (StaffSpy port). |
 | lume | Apple-Silicon VM lifecycle via the lume CLI (run/stop/ls/pull); opt-in; also a computer-use sandbox target via `cua do switch lume` |
-| media_generation | Generate images, video, and music via the MiniMax-backed media_generator specialist (spec 36 D8). |
+| media_generation | MiniMax media generation — 9 API paths, scene/style variables, 40+ prompt templates, 16 video agent templates, voice, music — via media_generator L2 specialist. |
 | mycode | Deterministic repo scan + MYCODE.md write (`specs/28-code-understanding.md` §2.4). |
 | obsidian-bases | Create and edit Obsidian Bases `.base` files with views, filters, formulas, and summaries. |
 | obsidian-cli | Interact with Obsidian vaults using Obsidian CLI to read, create, search, and manage notes, tasks, and properties. |
@@ -58,3 +59,4 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | sevn-diagnostics | sevn.bot operator repair playbooks for `sevn doctor --with-agent` (gateway, secrets, proxy, models, browser, voice). |
 | x-use | X (Twitter) workflows via a logged-in browser profile or CDP attach (timeline, search). |
 | yt-dlp | Download video/audio and metadata with yt-dlp (YouTube, Vimeo, X, TikTok, and allowlisted hosts). |
+| proton-management | Proton suite CLI (Python port) — Pass, Mail, Drive, Calendar, Contacts, attachments, groups, RSVP. |

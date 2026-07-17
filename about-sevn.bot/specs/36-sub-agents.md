@@ -7,8 +7,8 @@ owner: Alex
 summary: Level-1 sub-agents (tracked, concurrent, killable role runs) that may spawn
   level-2 workers (incl. specialists); multi queue mode; limits, tracing, kill surfaces,
   media_generation skill.
-last_updated: '2026-07-15'
-fingerprint: sha256:345cabbb1262539490ed39b7cc3141ba611aca6453afeb89caa1e6609c35718e
+last_updated: '2026-07-16'
+fingerprint: sha256:1e9c50f1746b0218140b90a2086805711483ef22e52617fa8d6245e35f41dc43
 related: []
 sources:
 - src/sevn/agent/subagents/**
@@ -35,15 +35,63 @@ interfaces:
 - name: MiniMaxMediaError
   file: src/sevn/agent/subagents/media_minimax.py
   symbol: MiniMaxMediaError
+- name: clone_voice_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: clone_voice_bytes
 - name: generate_image_bytes
   file: src/sevn/agent/subagents/media_minimax.py
   symbol: generate_image_bytes
+- name: generate_image_from_reference_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_image_from_reference_bytes
 - name: generate_music_bytes
   file: src/sevn/agent/subagents/media_minimax.py
   symbol: generate_music_bytes
 - name: generate_video_bytes
   file: src/sevn/agent/subagents/media_minimax.py
   symbol: generate_video_bytes
+- name: generate_video_first_last_frame_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_video_first_last_frame_bytes
+- name: generate_video_from_image_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_video_from_image_bytes
+- name: generate_video_subject_reference_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_video_subject_reference_bytes
+- name: generate_video_template_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_video_template_bytes
+- name: synthesize_speech_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: synthesize_speech_bytes
+- name: upload_file_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: upload_file_bytes
+- name: MediaPromptVars
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: MediaPromptVars
+- name: PromptTemplateMeta
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: PromptTemplateMeta
+- name: VideoAgentTemplate
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: VideoAgentTemplate
+- name: augment_prompt
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: augment_prompt
+- name: build_media_trace
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: build_media_trace
+- name: list_prompt_templates
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: list_prompt_templates
+- name: list_video_agent_templates
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: list_video_agent_templates
+- name: resolve_video_agent_template
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: resolve_video_agent_template
 - name: MediaTask
   file: src/sevn/agent/subagents/media_worker.py
   symbol: MediaTask
@@ -177,10 +225,28 @@ interfaces:
   file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_image.py
   symbol: main
 - name: main
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_image_from_reference.py
+  symbol: main
+- name: main
   file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_music.py
   symbol: main
 - name: main
   file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_video.py
+  symbol: main
+- name: main
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_video_from_image.py
+  symbol: main
+- name: main
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_video_template.py
+  symbol: main
+- name: main
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/list_prompt_templates.py
+  symbol: main
+- name: main
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/list_video_templates.py
+  symbol: main
+- name: main
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/replicate_voice.py
   symbol: main
 ---
 

@@ -37,10 +37,13 @@ dependencies = [
     "pydantic-evals>=1.99.0",
     "logfire>=4.32.1",
     "pydantic-ai-harness[codemode]>=0.3.0",
+    "bcrypt>=4.2.0",
+    "pgpy>=0.6.0",
 ]
 
 [project.scripts]
 sevn = "sevn.cli.app:main"
+proton-cli = "proton_cli.cli.root:cli_main"
 
 [project.entry-points."sevn.tools"]
 sevn_core_reserved_plugin_table = "sevn.tools.entrypoints:reserved_plugin_row"
@@ -75,6 +78,11 @@ bedrock = ["boto3==1.43.6"]
 code-graph-rag = []
 code-review-graph = ["code-review-graph==2.3.3"]
 graphify = ["graphifyy==0.8.13"]
+google-workspace = [
+    "google-api-python-client==2.198.0",
+    "google-auth-oauthlib==1.4.0",
+    "google-auth-httplib2==0.4.0",
+]
 pdf = ["pdfplumber==0.11.9", "openparse==0.7.0"]
 browser = ["playwright==1.60.0", "websocket-client==1.9.0"]
 browser-cdp = ["websockets>=12"]
@@ -127,7 +135,7 @@ skillspector = { git = "https://github.com/NVIDIA/SkillSpector", branch = "main"
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/sevn"]
+packages = ["src/sevn", "src/proton_cli"]
 artifacts = [
     "src/sevn/ui/webapp/*.html",
     "src/sevn/ui/webapp/*.css",
