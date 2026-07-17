@@ -148,8 +148,6 @@ def events_create(
             )
         except Exception as exc:
             proton_app.renderer.info(f"event created, but sending invitation email failed: {exc}")
-    if proton_app.renderer.format.value == "text":
-        pass
     proton_app.renderer.success(f"Created event {title!r}")
 
 

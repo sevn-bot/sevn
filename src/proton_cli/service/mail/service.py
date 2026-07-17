@@ -329,6 +329,19 @@ class MailService:
         prepared = mail_mime.prepare_attachments(opts.attachments, opts.inline_attachments)
         prepared.extend(inline_prepared)
 
+        plans: list[tuple[str, int, str]] = []
+        clear_recipients: list[str] = []
+        for email in _dedupe(opts.to + opts.cc + opts.bcc):
+            scheme, armored_key = self._classify_recipient(email)
+            plans.append((email, scheme, armored_key))
+            if scheme == PKG_CLEAR:
+                clear_recipients.append(email)
+        if prepared and clear_recipients:
+            raise ValueError(
+                "attachments require Proton (internal) recipients; "
+                f"cleartext recipients not supported yet: {', '.join(clear_recipients)}"
+            )
+
         message = PGPMessage.new(body)
         with use_unlocked_key(addr_keys[0]):
             enc = addr_keys[0].encrypt(message)
@@ -369,11 +382,6 @@ class MailService:
                     attachment.data,
                 )
             )
-
-        plans = []
-        for email in _dedupe(opts.to + opts.cc + opts.bcc):
-            scheme, armored_key = self._classify_recipient(email)
-            plans.append((email, scheme, armored_key))
 
         packages = self._build_body_packages(body, mime_type, plans, addr_keys, uploaded)
         try:

@@ -115,8 +115,6 @@ def groups_create(
         proton_app.renderer.info(f"dry-run: would create group {name!r}")
         return
     proton_app.contacts_svc.group_create(name, color)
-    if proton_app.renderer.format.value == "text":
-        pass
     proton_app.renderer.success(f"Created group {name!r}")
 
 
