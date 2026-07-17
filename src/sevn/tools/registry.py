@@ -184,6 +184,9 @@ DEFAULT_SKILL_MANIFESTS: Final[dict[str, str]] = {
     "printing-press-library": (
         "Starter-pack Printing Press CLIs — ESPN, flights, movies, recipes (host Go binaries)."
     ),
+    "proton-management": (
+        "Proton suite CLI (Python port) — Pass vaults/items with E2EE; Mail/Drive/Calendar/Contacts planned."
+    ),
     "roam_code": "Lightweight roam-code path Q&A without a persistent graph DB.",
     "scheduling": "Cron/reminder authoring via bundled scripts.",
     "sevn-diagnostics": (

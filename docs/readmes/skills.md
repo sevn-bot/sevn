@@ -33,6 +33,7 @@
 | `pdf` | [`../../src/sevn/data/bundled_skills/core/pdf/SKILL.md`](../../src/sevn/data/bundled_skills/core/pdf/SKILL.md) | Render markdown/HTML to workspace PDFs; extract text/tables; structured load/chunk. |
 | `playwright-browser` | [`../../src/sevn/data/bundled_skills/core/playwright-browser/SKILL.md`](../../src/sevn/data/bundled_skills/core/playwright-browser/SKILL.md) | Web automation with CDP-first Playwright scripts (navigate, screenshot, click, extract text). |
 | `printing-press-library` | [`../../src/sevn/data/bundled_skills/core/printing-press-library/SKILL.md`](../../src/sevn/data/bundled_skills/core/printing-press-library/SKILL.md) | Starter-pack Printing Press CLIs — ESPN, flights, movies, recipes (Go binaries on PATH). |
+| `proton-management` | [`../../src/sevn/data/bundled_skills/core/proton-management/SKILL.md`](../../src/sevn/data/bundled_skills/core/proton-management/SKILL.md) | Proton suite CLI (Python port) — Pass + Mail; Drive/Calendar/Contacts planned. |
 | `roam_code` | [`../../src/sevn/data/bundled_skills/core/roam_code/SKILL.md`](../../src/sevn/data/bundled_skills/core/roam_code/SKILL.md) | Lightweight roam-code path Q&A (about-sevn.bot/specs/28-code-understanding.md §2.2). |
 | `scheduling` | [`../../src/sevn/data/bundled_skills/core/scheduling/SKILL.md`](../../src/sevn/data/bundled_skills/core/scheduling/SKILL.md) | Cron jobs and one-shot reminders via workspace trigger store (about-sevn.bot/specs/30-non-interactive-triggers.md). |
 | `second_brain` | [`../../src/sevn/data/bundled_skills/core/second_brain/SKILL.md`](../../src/sevn/data/bundled_skills/core/second_brain/SKILL.md) | Layout-aware raw→vault ingest, lint, and file-back flows (about-sevn.bot/specs/27-second-brain.md). |
@@ -72,6 +73,7 @@
 | `openwiki_doctor_check` | [`../../src/sevn/skills/openwiki_doctor_check.py`](../../src/sevn/skills/openwiki_doctor_check.py) | Module `src/sevn/skills/openwiki_doctor_check.py`. |
 | `openwiki_install` | [`../../src/sevn/skills/openwiki_install.py`](../../src/sevn/skills/openwiki_install.py) | Module `src/sevn/skills/openwiki_install.py`. |
 | `openwiki_secrets` | [`../../src/sevn/skills/openwiki_secrets.py`](../../src/sevn/skills/openwiki_secrets.py) | Module `src/sevn/skills/openwiki_secrets.py`. |
+| `proton_management` | [`../../src/sevn/skills/proton_management.py`](../../src/sevn/skills/proton_management.py) | Module `src/sevn/skills/proton_management.py`. |
 | `security_scan` | [`../../src/sevn/skills/security_scan.py`](../../src/sevn/skills/security_scan.py) | Module `src/sevn/skills/security_scan.py`. |
 | `social_browser` | [`../../src/sevn/skills/social_browser.py`](../../src/sevn/skills/social_browser.py) | Module `src/sevn/skills/social_browser.py`. |
 | `social_media_manager` | [`../../src/sevn/skills/social_media_manager.py`](../../src/sevn/skills/social_media_manager.py) | Module `src/sevn/skills/social_media_manager.py`. |

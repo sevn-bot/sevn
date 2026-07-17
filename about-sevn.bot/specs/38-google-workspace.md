@@ -6,7 +6,7 @@ status: scaffold
 owner: Alex
 summary: Bundled google-workspace skill — OAuth2 Gmail, Calendar, Drive, Sheets, Docs,
   Contacts; optional gws CLI bridge.
-last_updated: '2026-07-16'
+last_updated: '2026-07-17'
 fingerprint: sha256:0c462f2c32997929c5c224b4c781394a40a1aec7f89f519422115fad84fe1413
 related:
 - spec-12-skills-system
