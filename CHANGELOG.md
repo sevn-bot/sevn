@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-18] Onboarding manifest row for quarantined ``discogs-shared`` internal runtime skill
 - [2026-07-18] Quarantine ``discogs-shared`` internal runtime in skills manager and skills INDEX (not model-facing)
 - [2026-07-18] Discogs thermos gate — shared ``discogs-shared`` runtime dedup, OAuth dispatcher payload hygiene (secrets chain only), ``begin_oauth`` hardening, and extracted OAuth wizard module
 - [2026-07-18] Discogs Final gate parity — register five bundled skills in ``DEFAULT_SKILL_MANIFESTS``, align onboarding manifest rows with skills INDEX, add curated README template, and isolate bundled-script imports in tests

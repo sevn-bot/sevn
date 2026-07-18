@@ -680,6 +680,29 @@
       ]
     },
     {
+      "capability_id": "skill.discogs_shared",
+      "group": "B",
+      "label": "discogs-shared",
+      "description": "Internal shared runtime for bundled Discogs skill scripts; not a model-facing research skill.",
+      "config_paths": [
+        "skills.discogs.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.discogs_shared.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "depends_on": [
+        "extra.discogs"
+      ]
+    },
+    {
       "capability_id": "skill.email_management",
       "group": "B",
       "label": "email-management",
