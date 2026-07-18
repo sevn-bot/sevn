@@ -8,8 +8,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from tests.skills.discogs.conftest import load_skill_script, run_skill_script
 
-pytestmark = pytest.mark.xfail(reason="green after W7: discogs-identity scripts", strict=False)
-
 _SKILL_ID = "discogs-identity"
 _READ_SCRIPTS = (
     "get_user.py",
