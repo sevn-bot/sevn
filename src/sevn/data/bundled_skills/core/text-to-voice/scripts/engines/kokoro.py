@@ -1,21 +1,19 @@
-#!/usr/bin/env python3
-"""
-Generate audio from text using Kokoro TTS (kokoro-onnx).
-Usage: python generate.py "Hello world" [--voice af_heart] [--speed 1.0] [--output path.wav]
+"""Kokoro ONNX engine for the text-to-voice skill.
 
 Models and voices are downloaded on first ``generate()`` call from HuggingFace / GitHub.
 Set HF_TOKEN env var if using a gated model or private repo.
 """
 
-import argparse
+from __future__ import annotations
+
 import glob
 import hashlib
 import json
 import os
 import sys
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-SKILL_DIR = os.path.dirname(SCRIPT_DIR)
+_ENGINE_DIR = os.path.dirname(os.path.abspath(__file__))
+SKILL_DIR = os.path.dirname(os.path.dirname(_ENGINE_DIR))
 
 _MODEL_MIN_BYTES = 1_000_000
 _VOICES_MIN_BYTES = 100_000
@@ -24,6 +22,7 @@ _VOICES_EXPECTED_SHA256 = "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe
 _VOICES_URL = (
     "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin"
 )
+DEFAULT_VOICE = "af_heart"
 
 _kokoro_patched = False
 
@@ -58,7 +57,7 @@ def _voices_valid(path: str) -> bool:
 
 
 def _find_voices() -> str | None:
-    """Find voices.bin (npz format expected by kokoro-onnx)."""
+    """Find voices.bin (Numpy format expected by kokoro-onnx)."""
     root_voices = os.path.join(SKILL_DIR, "voices.bin")
     if _voices_valid(root_voices):
         return root_voices
@@ -124,8 +123,6 @@ def _ensure_kokoro_patched() -> None:
     import kokoro_onnx
     import numpy as np
 
-    _orig_create_audio = kokoro_onnx.Kokoro._create_audio
-
     def _patched_create_audio(self, phonemes, voice, speed):
         tokens = np.array(
             self.tokenizer.tokenize(phonemes[: kokoro_onnx.MAX_PHONEME_LENGTH]), dtype=np.int64
@@ -152,13 +149,18 @@ def _ensure_kokoro_patched() -> None:
 
 
 def generate(
-    text: str, voice: str = "af_heart", speed: float = 1.0, output_path: str | None = None
+    text: str,
+    voice: str = DEFAULT_VOICE,
+    speed: float = 1.0,
+    output_path: str | None = None,
+    lang: str | None = None,
 ) -> str:
-    """Generate audio file from text."""
+    """Generate audio file from text via Kokoro ONNX."""
     import kokoro_onnx
     import numpy as np
     import soundfile as sf
 
+    _ = lang  # Kokoro derives language from voice prefix.
     model_path, voices_path = _ensure_assets()
     _ensure_kokoro_patched()
 
@@ -173,10 +175,11 @@ def generate(
     available = kokoro.get_voices()
     if voice not in available:
         print(
-            f"WARNING: Voice '{voice}' not found, falling back to af_heart. Available: {available[:5]}...",
+            f"WARNING: Voice '{voice}' not found for kokoro, falling back to {DEFAULT_VOICE}. "
+            f"Available: {available[:5]}...",
             file=sys.stderr,
         )
-        voice = "af_heart"
+        voice = DEFAULT_VOICE
 
     speed = max(0.5, min(2.0, speed))
 
@@ -194,7 +197,7 @@ def generate(
 
 
 def list_voices() -> None:
-    """Print available voices as JSON (static catalog — no model download)."""
+    """Print available Kokoro voices as JSON (static catalog — no model download)."""
     voices = [
         {"code": "af_heart", "label": "American F, warm"},
         {"code": "af_bella", "label": "American F, bright"},
@@ -211,20 +214,3 @@ def list_voices() -> None:
         {"code": "zf_xiaojiao", "label": "Mandarin F"},
     ]
     print(json.dumps(voices))
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Kokoro TTS")
-    parser.add_argument("text", nargs="?", help="Text to synthesize")
-    parser.add_argument("--voice", "-v", default="af_heart", help="Voice preset")
-    parser.add_argument("--speed", "-s", type=float, default=1.0, help="Speed 0.5-2.0")
-    parser.add_argument("--output", "-o", default=None, help="Output WAV path")
-    parser.add_argument("--list-voices", action="store_true", help="List available voices")
-
-    args = parser.parse_args()
-    if args.list_voices:
-        list_voices()
-    elif args.text:
-        generate(args.text, args.voice, args.speed, args.output)
-    else:
-        parser.print_help()

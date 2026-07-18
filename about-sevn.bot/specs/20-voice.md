@@ -24,6 +24,9 @@ interfaces:
 - name: EdgeTtsBackend
   file: src/sevn/voice/backends.py
   symbol: EdgeTtsBackend
+- name: TextToVoiceBackend
+  file: src/sevn/voice/backends.py
+  symbol: TextToVoiceBackend
 - name: KokoroBackend
   file: src/sevn/voice/backends.py
   symbol: KokoroBackend
@@ -156,6 +159,7 @@ Initial draft for **Public Interface** — grounded in extracted interfaces; con
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
 
 - [`EdgeTtsBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`TextToVoiceBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
 - [`KokoroBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
 - [`SpeechToTextBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
 - [`SynthesisResult`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
@@ -175,6 +179,7 @@ Initial draft for **Data Model** — grounded in extracted interfaces; confirm n
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
 
 - [`EdgeTtsBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
+- [`TextToVoiceBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
 - [`KokoroBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
 - [`SpeechToTextBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
 - [`SynthesisResult`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`

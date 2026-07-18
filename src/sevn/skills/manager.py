@@ -90,11 +90,13 @@ _PROV_ORDER: Final[dict[ProvenanceKind, int]] = {
 # ``telegram_test`` is host-only Playwright E2E; it lives in the dev checkout,
 # not in the gateway image (quarantine; `plan/forward-track-registry-bindings-permissions-
 # v1gate-wave-plan.md` W1.4 / `plan/notes/tool-skill-readiness-matrix.md`).
-# ``kokoro-tts`` is the local TTS *engine* behind the voice ``tts`` tool's ``kokoro`` backend
-# (``sevn.voice.backends.KokoroBackend`` execs ``scripts/generate.py`` directly). It ships and
-# seeds so the backend can find it, but must never be offered to the model as a research skill.
+# ``text-to-voice`` is the local TTS *engine* behind the voice ``tts`` tool's
+# ``text_to_voice`` backend (``sevn.voice.backends.TextToVoiceBackend`` execs
+# ``scripts/generate.py`` directly). It ships and seeds so the backend can find it, but must
+# never be offered to the model as a research skill. Legacy ``kokoro-tts`` stays quarantined
+# for workspaces that have not refreshed bundled skills yet.
 _RUNTIME_QUARANTINED_CORE_SKILL_IDS: Final[frozenset[str]] = frozenset(
-    {"telegram_test", "kokoro-tts"},
+    {"telegram_test", "text-to-voice", "kokoro-tts"},
 )
 
 
