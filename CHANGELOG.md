@@ -10,8 +10,27 @@ are cut into a dated, versioned section at release time.
 
 ## [Unreleased]
 
+### Fixed
+
+- [2026-07-18] Refresh readme fingerprints after gateway OAuth wizard and discogs-shared registry edits
+- [2026-07-18] Thermos close-out — bandit-clean OAuth wizard payload guard and interim-secret cleanup
+- [2026-07-18] Register ``discogs-shared`` in ``DEFAULT_SKILL_MANIFESTS`` for bundled-core parity
+- [2026-07-18] Onboarding manifest row for quarantined ``discogs-shared`` internal runtime skill
+- [2026-07-18] Quarantine ``discogs-shared`` internal runtime in skills manager and skills INDEX (not model-facing)
+- [2026-07-18] Discogs thermos gate — shared ``discogs-shared`` runtime dedup, OAuth dispatcher payload hygiene (secrets chain only), ``begin_oauth`` hardening, and extracted OAuth wizard module
+- [2026-07-18] Discogs Final gate parity — register five bundled skills in ``DEFAULT_SKILL_MANIFESTS``, align onboarding manifest rows with skills INDEX, add curated README template, and isolate bundled-script imports in tests
+
 ### Added
 
+- [2026-07-18] Discogs skills operator README with per-script examples and User-token + OAuth auth walkthroughs; skills INDEX polish, onboarding Group-B `skill.discogs` row, and `[discogs]` extra install action
+- [2026-07-18] Discogs OAuth 1.0a authorization flow from Telegram Setup — consumer key/secret capture, authorize URL + verifier exchange, and access-token storage with auth_method flip
+- [2026-07-18] Telegram config menu for Discogs skills — group and per-skill toggles, Setup submenu with user-token wizard, and whoami auth smoke-test
+- [2026-07-18] Discogs identity skill — whoami auth smoke-test, user profile, lists, search, and contributions subprocess scripts
+- [2026-07-18] Discogs wantlist skill — browse/search wantlist plus add, remove, and edit subprocess scripts with confirm-gated writes
+- [2026-07-18] Discogs collection skill — folder listing, collection search, value stats, and confirm-gated add/remove/move/rate subprocess scripts
+- [2026-07-18] Discogs marketplace skill — inventory search, listings CRUD, orders, messages, and fee subprocess scripts with confirm-gated writes
+- [2026-07-18] Discogs database catalog skill — search plus artist/release/master/label lookups, price suggestions, and marketplace stats subprocess scripts with JSON envelopes
+- [2026-07-18] Optional Discogs skill group foundation — typed ``skills.discogs`` config, group gate, secrets→env injection, shared ``_discogs_common.py`` runtime, and ``python3-discogs-client`` optional extra
 - [2026-07-16] Unified X ops facade (`sevn.integrations.social_media.x_ops`) exposes every X/Twitter endpoint as a callable over browser|twexapi with a normalized envelope, write-gates, cookie bridge, and `social_media_manager` skill scripts
 - [2026-07-16] Browser `social` X ops `timeline_collect` / `home_feed` / `read` return structured posts with status permalinks and tweet text instead of raw HTML noise
 - [2026-07-16] Bundled Obsidian second-brain skills from `kepano/obsidian-skills` (`defuddle`, `json-canvas`, `obsidian-bases`, `obsidian-cli`, `obsidian-markdown`) so sevn can load Obsidian-native markdown, Canvas, Bases, vault CLI, and web-to-markdown workflows out of the box

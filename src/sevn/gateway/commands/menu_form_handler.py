@@ -26,6 +26,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from sevn.config.workspace_config import WorkspaceConfig
+from sevn.gateway.commands.discogs_oauth_wizard import (
+    advance_discogs_oauth,
+    cleanup_discogs_oauth_interim_secrets,
+)
 from sevn.gateway.commands.shortcuts_store import (
     add_shortcut,
     republish_set_my_commands,
@@ -35,6 +39,9 @@ from sevn.gateway.config_io.workspace_config_io import mutate_sevn_json
 from sevn.gateway.dispatcher.dispatcher_state import (
     dispatcher_state_ttl_for_kind,
     insert_dispatcher_state,
+)
+from sevn.gateway.menu.discogs_menu import (
+    DISCOGS_USER_TOKEN_SECRET_ALIAS,
 )
 from sevn.gateway.menu.menu import (
     ConfigMenuRefreshContext,
@@ -59,6 +66,7 @@ FORM_TARGETS: frozenset[str] = frozenset(
         "second_brain_vault_path",
         "second_brain_vault_browse",
         "subagents_max_override",
+        "discogs:oauth_start",
     },
 )
 _SECRET_ALIAS_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
@@ -102,6 +110,8 @@ def parse_form_callback(data: str) -> str | None:
         return "second_brain_vault_browse"
     if raw.startswith("form:subagents_limits:"):
         return raw.removeprefix("form:")
+    if raw == "form:discogs:oauth_start":
+        return "discogs:oauth_start"
     target = raw.removeprefix("form:").strip()
     return target if target in FORM_TARGETS else None
 
@@ -223,6 +233,7 @@ class MenuFormHandler:
             "logs_grep",
             "logs_span_id",
             "logs_logfire_token",
+            "discogs:oauth_start",
         } and not self._router._resolve_owner_flag(msg):
             await self._answer_callback(msg, text="Owner only.")
             return
@@ -233,12 +244,17 @@ class MenuFormHandler:
             await self._answer_callback(msg, text="Owner only.")
             return
         await self._answer_callback(msg)
+        if target == "discogs:oauth_start":
+            await self._cleanup_discogs_oauth_wizard()
         self._consume_active_forms(msg)
         kind = "secret_wizard" if target == "secret_wizard" else "form"
         if target == "secret_wizard":
-            section = (
-                "skills:social_media_manager" if preset_alias == TWEXAPI_SECRET_ALIAS else "secrets"
-            )
+            if preset_alias == TWEXAPI_SECRET_ALIAS:
+                section = "skills:social_media_manager"
+            elif preset_alias == DISCOGS_USER_TOKEN_SECRET_ALIAS:
+                section = "skills:discogs:setup"
+            else:
+                section = "secrets"
             step = "value" if preset_alias else "key"
         elif target == "agent_display_name":
             section = "agents"
@@ -252,6 +268,9 @@ class MenuFormHandler:
         elif target == "logs_logfire_token":
             section = "logs"
             step = "token"
+        elif target == "discogs:oauth_start":
+            section = "skills:discogs:setup"
+            step = "consumer_key"
         elif target == "second_brain_vault_path":
             section = "second_brain"
             step = "path"
@@ -307,6 +326,8 @@ class MenuFormHandler:
             prompt = "Send the trace span id to look up:"
         elif target == "logs_logfire_token":
             prompt = "Send your Logfire write token (pylf_v1_… — not shown again):"
+        elif target == "discogs:oauth_start":
+            prompt = "Send your Discogs OAuth consumer key:"
         elif target == "second_brain_vault_path":
             prompt = "Send the workspace-relative vault path (e.g. obsidian/alex_AI):"
         elif target == "second_brain_vault_browse":
@@ -340,6 +361,8 @@ class MenuFormHandler:
         step = str(payload.get("step", ""))
         text = (msg.text or "").strip()
         if text.lower() in {"cancel", "abort"}:
+            if target == "discogs:oauth_start":
+                await self._cleanup_discogs_oauth_wizard()
             self._consume_token(token)
             await self._send_chat(msg, "Form cancelled.")
             return
@@ -385,6 +408,57 @@ class MenuFormHandler:
             await self._advance_subagents_role_limits(
                 msg, token=token, step=step, text=text, payload=payload
             )
+            return
+        if target == "discogs:oauth_start":
+            await self._advance_discogs_oauth(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+
+    async def _advance_discogs_oauth(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Run the Discogs OAuth 1.0a setup wizard (consumer key → secret → verifier).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_discogs_oauth)
+            True
+        """
+        await advance_discogs_oauth(
+            self,
+            msg,
+            token=token,
+            step=step,
+            text=text,
+            payload=payload,
+        )
+
+    async def _cleanup_discogs_oauth_wizard(self) -> None:
+        """Purge OAuth handshake interim secrets when a wizard is cancelled or restarted.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._cleanup_discogs_oauth_wizard)
+            True
+        """
+        chain = secrets_chain_from_workspace(
+            self._content_root,
+            self._workspace.secrets_backend,
+        )
+        await cleanup_discogs_oauth_interim_secrets(chain)
 
     async def _advance_subagents_max_override(
         self,
@@ -1059,10 +1133,27 @@ class MenuFormHandler:
             except Exception as exc:
                 await self._send_chat(msg, f"Could not store secret: {exc}")
                 return
+            if alias == DISCOGS_USER_TOKEN_SECRET_ALIAS:
+
+                def _apply_discogs_user_token(doc: dict[str, Any]) -> None:
+                    _set_nested(doc, "skills.discogs.auth_method", "user_token")
+                    _set_nested(
+                        doc,
+                        "skills.discogs.user_token",
+                        f"${{SECRET:{DISCOGS_USER_TOKEN_SECRET_ALIAS}}}",
+                    )
+
+                mutate_sevn_json(self._sevn_json, _apply_discogs_user_token)
             self._consume_token(token)
             section = str(payload.get("section") or "secrets")
             await self._refresh_section(msg, section=section, toast=None)
             await self._send_chat(msg, f"✅ Secret `{alias}` stored.")
+            if alias == DISCOGS_USER_TOKEN_SECRET_ALIAS:
+                await self._send_chat(
+                    msg,
+                    "Auth method set to user_token. Tap Test connection to verify.",
+                )
+            return
 
     def _find_active_form(
         self,

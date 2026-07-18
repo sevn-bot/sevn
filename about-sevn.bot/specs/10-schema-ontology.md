@@ -8,7 +8,7 @@ summary: 'Define the runtime ontology for Triager output and related labels acro
   the agent core: canonical field names, closed enums, typing conventions, and how
   they compose with executor dispatch described '
 last_updated: '2026-07-18'
-fingerprint: sha256:2eea6beef0dc479e1d1e12e033619c8f134f4b3c1f96b870a647c7416232a3eb
+fingerprint: sha256:0d5e5725d96000019e7ab0d6256bae592a1303b605b5ec55fd2b7d8a8c1a4307
 related: []
 sources:
 - src/sevn/config/**
@@ -659,6 +659,15 @@ interfaces:
 - name: SelfImproveWorkspaceConfig
   file: src/sevn/config/sections/self_improve.py
   symbol: SelfImproveWorkspaceConfig
+- name: DiscogsSkillsConfig
+  file: src/sevn/config/sections/skills_discogs.py
+  symbol: DiscogsSkillsConfig
+- name: discogs_block_dict
+  file: src/sevn/config/sections/skills_discogs.py
+  symbol: discogs_block_dict
+- name: discogs_settings
+  file: src/sevn/config/sections/skills_discogs.py
+  symbol: discogs_settings
 - name: GoogleWorkspaceSkillConfig
   file: src/sevn/config/sections/skills_google_workspace.py
   symbol: GoogleWorkspaceSkillConfig

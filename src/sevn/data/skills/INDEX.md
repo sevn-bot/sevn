@@ -25,6 +25,12 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | cua-agent | Autonomous GUI loop via cua-agent — model drives the screen toward a goal; requires computer-use enabled and explicit per-run operator approval (HITL). |
 | cursor_cloud | Delegate code+PR work to Cursor Cloud Agent; returns PR, dashboard, and artifact links. |
 | defuddle | Extract clean markdown from web pages with Defuddle CLI, removing clutter and navigation before saving or analyzing sources. |
+| discogs-collection | Discogs user collection — folders, items, value, and collection search; confirm-gated writes. |
+| discogs-database | Discogs public catalog — search, artist/release/master/label lookups, price suggestions, marketplace stats. |
+| discogs-identity | Discogs authed user profile, lists, contributions, and whoami smoke-test. |
+| discogs-marketplace | Discogs marketplace — inventory search, listings CRUD, orders, messages, and fee lookup; confirm-gated writes. |
+| discogs-wantlist | Discogs user wantlist browse, search, and add/remove/edit; confirm-gated writes. |
+| discogs-shared | Internal shared runtime for bundled Discogs skill scripts; not a model-facing research skill. |
 | email-management | Multi-account IMAP and Gmail API mail read/search/send scripts. |
 | gh-issues | GitHub issue lifecycle — templated create via gh CLI, authenticated view/watch/track + cron notify, plus list/comment. |
 | gh-pr | Pull request lifecycle — list, view, create, merge, close, reviewers via integration_call. |

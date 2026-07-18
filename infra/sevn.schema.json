@@ -2156,6 +2156,80 @@
           },
           "$comment": "Maintainer: openwiki bundled skill — host npm CLI; credentials resolved from sevn secrets into subprocess env."
         },
+        "discogs": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Optional Discogs skill group (database, marketplace, collection, wantlist, identity).",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, bundled Discogs core skills are available (off by default)."
+            },
+            "auth_method": {
+              "type": "string",
+              "enum": ["user_token", "oauth"],
+              "default": "user_token",
+              "description": "Credential mode forwarded as DISCOGS_AUTH_METHOD."
+            },
+            "user_agent": {
+              "type": "string",
+              "default": "sevn-discogs/1.0",
+              "description": "Discogs API User-Agent forwarded as DISCOGS_USER_AGENT."
+            },
+            "confirm_writes": {
+              "type": "boolean",
+              "default": true,
+              "description": "When true, write scripts require --confirm (DISCOGS_CONFIRM_WRITES)."
+            },
+            "user_token": {
+              "type": "string",
+              "description": "User-token ref (${SECRET:discogs.user_token}) → DISCOGS_USER_TOKEN."
+            },
+            "consumer_key": {
+              "type": "string",
+              "description": "OAuth consumer key ref → DISCOGS_CONSUMER_KEY."
+            },
+            "consumer_secret": {
+              "type": "string",
+              "description": "OAuth consumer secret ref → DISCOGS_CONSUMER_SECRET."
+            },
+            "oauth_token": {
+              "type": "string",
+              "description": "OAuth access token ref → DISCOGS_OAUTH_TOKEN."
+            },
+            "oauth_token_secret": {
+              "type": "string",
+              "description": "OAuth access token secret ref → DISCOGS_OAUTH_TOKEN_SECRET."
+            },
+            "database.enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Load discogs-database when the group is enabled."
+            },
+            "marketplace.enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Load discogs-marketplace when the group is enabled."
+            },
+            "collection.enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Load discogs-collection when the group is enabled."
+            },
+            "wantlist.enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Load discogs-wantlist when the group is enabled."
+            },
+            "identity.enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Load discogs-identity when the group is enabled."
+            }
+          },
+          "$comment": "Maintainer: discogs skills integration W2 — group gate + per-skill toggles + secrets refs."
+        },
         "printing_press_library": {
           "type": "object",
           "additionalProperties": true,

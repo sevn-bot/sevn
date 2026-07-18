@@ -85,6 +85,30 @@
       <td>Extract clean markdown content from web pages using Defuddle CLI, removing clutter and navigation to save tokens. Use instead of WebFetch when the user provides a URL to read or analyze, for online documentation, articles, blog posts, or any standard web page. Do NOT use for URLs ending in .md — those are already markdown, use WebFetch directly.</td>
     </tr>
     <tr>
+      <td><code>discogs-collection</code></td>
+      <td>Discogs user collection — folders, items, value, and collection search. Writes require --confirm unless confirm_writes is disabled.</td>
+    </tr>
+    <tr>
+      <td><code>discogs-database</code></td>
+      <td>Discogs public catalog — search artists/releases/masters/labels and read release price suggestions and marketplace stats. Works without auth (rate-limited).</td>
+    </tr>
+    <tr>
+      <td><code>discogs-identity</code></td>
+      <td>Discogs authenticated identity — whoami smoke-test, user profiles, public lists, and release contributions.</td>
+    </tr>
+    <tr>
+      <td><code>discogs-marketplace</code></td>
+      <td>Discogs marketplace — inventory search, listings CRUD, orders, messages, and fee lookup. Writes require --confirm unless confirm_writes is disabled.</td>
+    </tr>
+    <tr>
+      <td><code>discogs-shared</code></td>
+      <td>Internal shared runtime for bundled Discogs skill scripts (_discogs_runtime.py). Not a model-facing research skill.</td>
+    </tr>
+    <tr>
+      <td><code>discogs-wantlist</code></td>
+      <td>Discogs user wantlist — browse, search, and manage wants. Writes require --confirm unless confirm_writes is disabled.</td>
+    </tr>
+    <tr>
       <td><code>email-management</code></td>
       <td>Search and send email through configured accounts.</td>
     </tr>
@@ -207,7 +231,7 @@
   </tbody>
 </table>
       <footer class="help-footer">
-        Generated 2026-07-18 from commit 3617fe30.
+        Generated 2026-07-18 from commit 802700d7.
         Edit <code>about-sevn.bot/_sources/skills.yaml</code> or templates — not the HTML directly.
       </footer>
     </main>

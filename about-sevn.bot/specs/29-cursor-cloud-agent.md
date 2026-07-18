@@ -8,7 +8,7 @@ summary: Let operators and agents launch, poll, and inspect Cursor Cloud Agents 
   any GitHub/GitLab repo when skills.cursor_cloud.enabled is true, returning PR URLs,
   dashboard links (remote desktop), and
 last_updated: '2026-07-18'
-fingerprint: sha256:3fb2199482e9a93a5ed9df335adc9b12ede0bf3e14fe95171d4ac91b1a47d020
+fingerprint: sha256:1374de9d249d1fb6588d478d4e445d680a03a1d157247bc6ff6becce6c044c32
 related: []
 sources:
 - src/sevn/integrations/**
@@ -64,6 +64,15 @@ interfaces:
 - name: update_job
   file: src/sevn/integrations/cursor_cloud/jobs.py
   symbol: update_job
+- name: DiscogsOAuthError
+  file: src/sevn/integrations/discogs/oauth.py
+  symbol: DiscogsOAuthError
+- name: begin_oauth
+  file: src/sevn/integrations/discogs/oauth.py
+  symbol: begin_oauth
+- name: complete_oauth
+  file: src/sevn/integrations/discogs/oauth.py
+  symbol: complete_oauth
 - name: github_integration_call
   file: src/sevn/integrations/github_skill/client.py
   symbol: github_integration_call

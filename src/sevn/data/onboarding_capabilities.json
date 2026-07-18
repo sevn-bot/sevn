@@ -268,6 +268,28 @@
       ]
     },
     {
+      "capability_id": "extra.discogs",
+      "group": "A",
+      "label": "Discogs extra",
+      "description": "python3-discogs-client optional extra for the Discogs skill group.",
+      "config_paths": [
+        "skills.discogs.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "extra.discogs.uv",
+          "kind": "uv_extra",
+          "argv": [
+            "discogs"
+          ],
+          "fatal": true
+        }
+      ]
+    },
+    {
       "capability_id": "extra.code_graph_rag",
       "group": "A",
       "label": "Code graph RAG extra",
@@ -532,6 +554,152 @@
           "argv": [],
           "fatal": false
         }
+      ]
+    },
+    {
+      "capability_id": "skill.discogs_collection",
+      "group": "B",
+      "label": "discogs-collection",
+      "description": "Discogs user collection — folders, items, value, and collection search; confirm-gated writes.",
+      "config_paths": [
+        "skills.discogs.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.discogs_collection.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "depends_on": [
+        "extra.discogs"
+      ]
+    },
+    {
+      "capability_id": "skill.discogs_database",
+      "group": "B",
+      "label": "discogs-database",
+      "description": "Discogs public catalog — search, artist/release/master/label lookups, price suggestions, marketplace stats.",
+      "config_paths": [
+        "skills.discogs.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.discogs_database.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "depends_on": [
+        "extra.discogs"
+      ]
+    },
+    {
+      "capability_id": "skill.discogs_identity",
+      "group": "B",
+      "label": "discogs-identity",
+      "description": "Discogs authed user profile, lists, contributions, and whoami smoke-test.",
+      "config_paths": [
+        "skills.discogs.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.discogs_identity.secret",
+          "kind": "secret_required",
+          "argv": [
+            "discogs.user_token"
+          ],
+          "fatal": false
+        },
+        {
+          "id": "skill.discogs_identity.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "depends_on": [
+        "extra.discogs"
+      ]
+    },
+    {
+      "capability_id": "skill.discogs_marketplace",
+      "group": "B",
+      "label": "discogs-marketplace",
+      "description": "Discogs marketplace — inventory search, listings CRUD, orders, messages, and fee lookup; confirm-gated writes.",
+      "config_paths": [
+        "skills.discogs.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.discogs_marketplace.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "depends_on": [
+        "extra.discogs"
+      ]
+    },
+    {
+      "capability_id": "skill.discogs_wantlist",
+      "group": "B",
+      "label": "discogs-wantlist",
+      "description": "Discogs user wantlist browse, search, and add/remove/edit; confirm-gated writes.",
+      "config_paths": [
+        "skills.discogs.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.discogs_wantlist.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "depends_on": [
+        "extra.discogs"
+      ]
+    },
+    {
+      "capability_id": "skill.discogs_shared",
+      "group": "B",
+      "label": "discogs-shared",
+      "description": "Internal shared runtime for bundled Discogs skill scripts; not a model-facing research skill.",
+      "config_paths": [
+        "skills.discogs.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.discogs_shared.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "depends_on": [
+        "extra.discogs"
       ]
     },
     {

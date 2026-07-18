@@ -505,6 +505,9 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         implemented=True,
         notes="Secret wizard; store SEVN_SECRET_TWEXAPI",
     )
+    from sevn.gateway.menu.menu_registry_discogs import register_discogs_menu_entries
+
+    register_discogs_menu_entries(add)
 
     # --- C8. Tools ---
     add(

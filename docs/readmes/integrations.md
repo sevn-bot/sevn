@@ -17,11 +17,11 @@ In everyday use, integrations helps Sevn do its job reliably: you interact throu
 
 ### Components and layout
 
-Implementation lives under `src/sevn/integrations/`. The package contains 29 Python module(s); primary entry points include `src/sevn/integrations/__init__.py`, `src/sevn/integrations/code_graph_rag/__init__.py`, `src/sevn/integrations/cursor_cloud/__init__.py`, `src/sevn/integrations/cursor_cloud/client.py`, `src/sevn/integrations/cursor_cloud/config.py`, `src/sevn/integrations/cursor_cloud/errors.py`, and 23 more.
+Implementation lives under `src/sevn/integrations/`. The package contains 31 Python module(s); primary entry points include `src/sevn/integrations/__init__.py`, `src/sevn/integrations/code_graph_rag/__init__.py`, `src/sevn/integrations/cursor_cloud/__init__.py`, `src/sevn/integrations/cursor_cloud/client.py`, `src/sevn/integrations/cursor_cloud/config.py`, `src/sevn/integrations/cursor_cloud/errors.py`, and 25 more.
 
 ### Data and control flow
 
-Integrations is organized around `  init  `, `  init  `, `  init  `, `client`, and 2 more under `src/sevn/integrations/` with 29 Python module(s) in the scanned tree. Primary entry points include client.py (create_cloud_agent), config.py (load_cursor_cloud_settings), jobs.py (insert_job), client.py (parse_github_repo).
+Integrations is organized around `  init  `, `  init  `, `  init  `, `client`, and 2 more under `src/sevn/integrations/` with 31 Python module(s) in the scanned tree. Primary entry points include client.py (create_cloud_agent), config.py (load_cursor_cloud_settings), jobs.py (insert_job), oauth.py (begin_oauth).
 
 ### Configuration
 
@@ -32,8 +32,8 @@ Operator settings come from `sevn.json` in the workspace. Related normative spec
 - `src/sevn/integrations/cursor_cloud/client.py` — `create_cloud_agent`, `get_agent`, `get_run`, `list_artifacts`
 - `src/sevn/integrations/cursor_cloud/config.py` — `load_cursor_cloud_settings`
 - `src/sevn/integrations/cursor_cloud/jobs.py` — `insert_job`, `get_job`, `update_job`, `list_workspace_jobs`
+- `src/sevn/integrations/discogs/oauth.py` — `begin_oauth`, `complete_oauth`
 - `src/sevn/integrations/github_skill/client.py` — `parse_github_repo`, `github_integration_call`, `github_integration_call_sync`, `github_legacy_call`
-- `src/sevn/integrations/github_skill/gh_cli.py` — `map_gh_cli_error`, `run_gh`, `create_issue_via_gh`, `view_issue_via_gh`
 
 ### Spec context
 
@@ -50,7 +50,7 @@ Initial draft for **Purpose** — grounded in extracted interfaces; confirm norm
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: [`src/sevn/integrations`](../../src/sevn/integrations/) (29 Python files). Normative design: [`29-cursor-cloud-agent.md`](../../about-sevn.bot/specs/29-cursor-cloud-agent.md).
+Primary source tree: [`src/sevn/integrations`](../../src/sevn/integrations/) (31 Python files). Normative design: [`29-cursor-cloud-agent.md`](../../about-sevn.bot/specs/29-cursor-cloud-agent.md).
 
 ### Module inventory
 
@@ -89,6 +89,15 @@ SQLite persistence for Cursor cloud agent jobs.
 Working with [`jobs.py`](../../src/sevn/integrations/cursor_cloud/jobs.py): inspect the public entry points below.
 Start with [`insert_job`](../../src/sevn/integrations/cursor_cloud/jobs.py#L132), then [`get_job`](../../src/sevn/integrations/cursor_cloud/jobs.py#L213), [`update_job`](../../src/sevn/integrations/cursor_cloud/jobs.py#L253), [`list_workspace_jobs`](../../src/sevn/integrations/cursor_cloud/jobs.py#L331).
 
+Discogs REST API integration helpers (OAuth setup for Telegram).
+
+Working with [`__init__.py`](../../src/sevn/integrations/discogs/__init__.py): inspect the public entry points below.
+
+Discogs OAuth 1.0a handshake helpers for Telegram setup (D20).
+
+Working with [`oauth.py`](../../src/sevn/integrations/discogs/oauth.py): inspect the public entry points below.
+Start with [`begin_oauth`](../../src/sevn/integrations/discogs/oauth.py#L54), then [`complete_oauth`](../../src/sevn/integrations/discogs/oauth.py#L110).
+
 GitHub bundled skill helpers — REST via integration_call proxy.
 
 Working with [`__init__.py`](../../src/sevn/integrations/github_skill/__init__.py): inspect the public entry points below.
@@ -103,17 +112,7 @@ Authenticated gh CLI helpers for issue create/view (W5/W6 fast path).
 Working with [`gh_cli.py`](../../src/sevn/integrations/github_skill/gh_cli.py): inspect the public entry points below.
 Start with [`map_gh_cli_error`](../../src/sevn/integrations/github_skill/gh_cli.py#L38), then [`run_gh`](../../src/sevn/integrations/github_skill/gh_cli.py#L96), [`create_issue_via_gh`](../../src/sevn/integrations/github_skill/gh_cli.py#L133), [`view_issue_via_gh`](../../src/sevn/integrations/github_skill/gh_cli.py#L205).
 
-Issue operations for bundled gh-issues skill scripts.
-
-Working with [`gh_issues.py`](../../src/sevn/integrations/github_skill/gh_issues.py): inspect the public entry points below.
-Start with [`list_issues`](../../src/sevn/integrations/github_skill/gh_issues.py#L27), then [`view_issue`](../../src/sevn/integrations/github_skill/gh_issues.py#L64), [`create_issue`](../../src/sevn/integrations/github_skill/gh_issues.py#L99), [`comment_on_issue`](../../src/sevn/integrations/github_skill/gh_issues.py#L145).
-
-Pull request operations for bundled gh-pr skill scripts.
-
-Working with [`gh_pr.py`](../../src/sevn/integrations/github_skill/gh_pr.py): inspect the public entry points below.
-Start with [`list_pull_requests`](../../src/sevn/integrations/github_skill/gh_pr.py#L25), then [`view_pull_request`](../../src/sevn/integrations/github_skill/gh_pr.py#L69), [`create_pull_request`](../../src/sevn/integrations/github_skill/gh_pr.py#L109), [`merge_pull_request`](../../src/sevn/integrations/github_skill/gh_pr.py#L166).
-
-17 more Python files under [`src/sevn/integrations`](../../src/sevn/integrations/) — including `src/sevn/integrations/github_skill/github_manager.py`, `src/sevn/integrations/github_skill/hooks.py`, `src/sevn/integrations/github_skill/watch.py`, `src/sevn/integrations/litellm_lap/__init__.py`.
+19 more Python files under [`src/sevn/integrations`](../../src/sevn/integrations/) — including `src/sevn/integrations/github_skill/gh_issues.py`, `src/sevn/integrations/github_skill/gh_pr.py`, `src/sevn/integrations/github_skill/github_manager.py`, `src/sevn/integrations/github_skill/hooks.py`.
 
 ### Extension and invariants
 
