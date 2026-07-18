@@ -29,7 +29,9 @@ def main() -> int:
     parser.add_argument("prompt", help="Short video intent (augmented with templates)")
     parser.add_argument("--duration", type=int, default=6)
     parser.add_argument("--resolution", default="720P")
-    parser.add_argument("--template", default=None, help="Template slug: default, commercial, nature, …")
+    parser.add_argument(
+        "--template", default=None, help="Template slug: default, commercial, nature, …"
+    )
     parser.add_argument(
         "--image",
         default=None,
