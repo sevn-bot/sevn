@@ -10,6 +10,12 @@ see_also:
   - discogs-collection
   - discogs-wantlist
 scripts:
+  - path: scripts/_discogs_common.py
+    description: Shared Discogs client, JSON envelope, and error-mapping helpers.
+    args_overview: "(library module — not invoked directly)"
+  - path: scripts/_helpers.py
+    description: Shared serialization and CLI runner helpers for this skill's scripts.
+    args_overview: "(library module — not invoked directly)"
   - path: scripts/whoami.py
     description: Auth smoke-test — returns the authenticated Discogs username.
     args_overview: "(no args)"

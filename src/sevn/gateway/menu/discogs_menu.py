@@ -25,13 +25,13 @@ from sevn.config.sections.skills_discogs import (
 from sevn.config.workspace_config import WorkspaceConfig
 
 DISCOGS_CYCLE_PREFIX = "cfg:cycle:skills.discogs"
-DISCOGS_USER_TOKEN_SECRET_ALIAS = "discogs.user_token"
-DISCOGS_CONSUMER_KEY_SECRET_ALIAS = "discogs.consumer_key"
-DISCOGS_CONSUMER_SECRET_SECRET_ALIAS = "discogs.consumer_secret"
-DISCOGS_OAUTH_TOKEN_SECRET_ALIAS = "discogs.oauth_token"
-DISCOGS_OAUTH_TOKEN_SECRET_SECRET_ALIAS = "discogs.oauth_token_secret"
-DISCOGS_OAUTH_REQUEST_TOKEN_SECRET_ALIAS = "discogs.oauth_request_token"
-DISCOGS_OAUTH_REQUEST_SECRET_SECRET_ALIAS = "discogs.oauth_request_secret"
+DISCOGS_USER_TOKEN_SECRET_ALIAS = "discogs.user_token"  # nosec B105 — secrets-chain alias
+DISCOGS_CONSUMER_KEY_SECRET_ALIAS = "discogs.consumer_key"  # nosec B105 — secrets-chain alias
+DISCOGS_CONSUMER_SECRET_SECRET_ALIAS = "discogs.consumer_secret"  # nosec B105 — secrets-chain alias
+DISCOGS_OAUTH_TOKEN_SECRET_ALIAS = "discogs.oauth_token"  # nosec B105 — secrets-chain alias
+DISCOGS_OAUTH_TOKEN_SECRET_SECRET_ALIAS = "discogs.oauth_token_secret"  # nosec B105 — secrets-chain alias
+DISCOGS_OAUTH_REQUEST_TOKEN_SECRET_ALIAS = "discogs.oauth_request_token"  # nosec B105 — secrets-chain alias
+DISCOGS_OAUTH_REQUEST_SECRET_SECRET_ALIAS = "discogs.oauth_request_secret"  # nosec B105 — secrets-chain alias
 
 _DOMAIN_LABELS: dict[DiscogsDomain, str] = {
     "database": "Database",

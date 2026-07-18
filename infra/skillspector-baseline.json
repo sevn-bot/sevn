@@ -150,6 +150,36 @@
       "rule_id": "SC6",
       "reason": "SkillSpector false positive: stdlib import line flagged as typosquatting isort",
       "reviewed": "2026-07-17"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/discogs-collection",
+      "rule_id": "E2",
+      "reason": "_discogs_common.py reads DISCOGS_* env injected by merge_discogs_proc_env; operator-provisioned tokens only (D5/D6)",
+      "reviewed": "2026-07-18"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/discogs-database",
+      "rule_id": "E2",
+      "reason": "_discogs_common.py reads DISCOGS_* env injected by merge_discogs_proc_env; operator-provisioned tokens only (D5/D6)",
+      "reviewed": "2026-07-18"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/discogs-identity",
+      "rule_id": "E2",
+      "reason": "_discogs_common.py reads DISCOGS_* env injected by merge_discogs_proc_env; operator-provisioned tokens only (D5/D6)",
+      "reviewed": "2026-07-18"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/discogs-marketplace",
+      "rule_id": "E2",
+      "reason": "_discogs_common.py reads DISCOGS_* env injected by merge_discogs_proc_env; operator-provisioned tokens only (D5/D6)",
+      "reviewed": "2026-07-18"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/discogs-wantlist",
+      "rule_id": "E2",
+      "reason": "_discogs_common.py reads DISCOGS_* env injected by merge_discogs_proc_env; operator-provisioned tokens only (D5/D6)",
+      "reviewed": "2026-07-18"
     }
   ]
 }

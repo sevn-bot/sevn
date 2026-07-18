@@ -8,7 +8,7 @@ summary: 'Own everything under workspace/skills/: how skills are discovered, val
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
 last_updated: '2026-07-18'
-fingerprint: sha256:89b8559e0d16bf8f996dd94d78a355a535cbebbf47aa3b54e8b360dd975e0805
+fingerprint: sha256:6cd2af18b436a9b2f40fccf86d8fdb78785d06051d6201125ab9e30de63ea028
 related: []
 sources:
 - src/sevn/skills/**
@@ -176,6 +176,18 @@ interfaces:
 - name: gate_cursor_cloud_core_skill
   file: src/sevn/skills/cursor_cloud.py
   symbol: gate_cursor_cloud_core_skill
+- name: discogs_config_enabled
+  file: src/sevn/skills/discogs.py
+  symbol: discogs_config_enabled
+- name: discogs_skill_enabled
+  file: src/sevn/skills/discogs.py
+  symbol: discogs_skill_enabled
+- name: gate_discogs_core_skills
+  file: src/sevn/skills/discogs.py
+  symbol: gate_discogs_core_skills
+- name: merge_discogs_proc_env
+  file: src/sevn/skills/discogs_secrets.py
+  symbol: merge_discogs_proc_env
 - name: EmailAccount
   file: src/sevn/skills/email_management.py
   symbol: EmailAccount

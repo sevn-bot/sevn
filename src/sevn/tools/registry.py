@@ -192,6 +192,24 @@ DEFAULT_SKILL_MANIFESTS: Final[dict[str, str]] = {
     ),
     "cursor_cloud": "Delegate code+PR work to Cursor Cloud Agent; PR, dashboard, artifacts.",
     "defuddle": "Extract clean markdown from web pages with Defuddle CLI.",
+    "discogs-collection": (
+        "Discogs user collection — folders, items, value, and collection search; "
+        "confirm-gated writes."
+    ),
+    "discogs-database": (
+        "Discogs public catalog — search, artist/release/master/label lookups, "
+        "price suggestions, marketplace stats."
+    ),
+    "discogs-identity": (
+        "Discogs authed user profile, lists, contributions, and whoami smoke-test."
+    ),
+    "discogs-marketplace": (
+        "Discogs marketplace — inventory search, listings CRUD, orders, messages, "
+        "and fee lookup; confirm-gated writes."
+    ),
+    "discogs-wantlist": (
+        "Discogs user wantlist browse, search, and add/remove/edit; confirm-gated writes."
+    ),
     "json-canvas": "Create and edit Obsidian JSON Canvas files.",
     "obsidian-bases": "Create and edit Obsidian Bases files.",
     "obsidian-cli": "Interact with Obsidian vaults using the Obsidian CLI.",

@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import os
+import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -70,6 +71,8 @@ def load_skill_script(skill_id: str, script_name: str) -> Any:
     )
     assert spec is not None
     assert spec.loader is not None
+    for shared_name in ("_helpers", "_discogs_common"):
+        sys.modules.pop(shared_name, None)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod

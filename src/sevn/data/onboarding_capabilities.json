@@ -557,10 +557,10 @@
       ]
     },
     {
-      "capability_id": "skill.discogs",
+      "capability_id": "skill.discogs_collection",
       "group": "B",
-      "label": "discogs",
-      "description": "Discogs REST API skill group — catalog search, marketplace, collection, wantlist, and identity via python3-discogs-client; User-token or OAuth auth.",
+      "label": "discogs-collection",
+      "description": "Discogs user collection — folders, items, value, and collection search; confirm-gated writes.",
       "config_paths": [
         "skills.discogs.enabled"
       ],
@@ -569,7 +569,53 @@
       "profile_overridable": true,
       "install_actions": [
         {
-          "id": "skill.discogs.secret",
+          "id": "skill.discogs_collection.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "depends_on": [
+        "extra.discogs"
+      ]
+    },
+    {
+      "capability_id": "skill.discogs_database",
+      "group": "B",
+      "label": "discogs-database",
+      "description": "Discogs public catalog — search, artist/release/master/label lookups, price suggestions, marketplace stats.",
+      "config_paths": [
+        "skills.discogs.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.discogs_database.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "depends_on": [
+        "extra.discogs"
+      ]
+    },
+    {
+      "capability_id": "skill.discogs_identity",
+      "group": "B",
+      "label": "discogs-identity",
+      "description": "Discogs authed user profile, lists, contributions, and whoami smoke-test.",
+      "config_paths": [
+        "skills.discogs.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.discogs_identity.secret",
           "kind": "secret_required",
           "argv": [
             "discogs.user_token"
@@ -577,7 +623,53 @@
           "fatal": false
         },
         {
-          "id": "skill.discogs.noop",
+          "id": "skill.discogs_identity.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "depends_on": [
+        "extra.discogs"
+      ]
+    },
+    {
+      "capability_id": "skill.discogs_marketplace",
+      "group": "B",
+      "label": "discogs-marketplace",
+      "description": "Discogs marketplace — inventory search, listings CRUD, orders, messages, and fee lookup; confirm-gated writes.",
+      "config_paths": [
+        "skills.discogs.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.discogs_marketplace.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ],
+      "depends_on": [
+        "extra.discogs"
+      ]
+    },
+    {
+      "capability_id": "skill.discogs_wantlist",
+      "group": "B",
+      "label": "discogs-wantlist",
+      "description": "Discogs user wantlist browse, search, and add/remove/edit; confirm-gated writes.",
+      "config_paths": [
+        "skills.discogs.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.discogs_wantlist.noop",
           "kind": "noop",
           "argv": [],
           "fatal": false

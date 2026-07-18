@@ -2472,7 +2472,7 @@ def _build_skills_keyboard_rows(
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
         >>> _build_skills_keyboard_rows(WorkspaceConfig.minimal())
-        [[{'text': '📱 Social Media Manager', 'callback_data': 'cfg:section:skills:social_media_manager'}]]
+        [[{'text': '📱 Social Media Manager', 'callback_data': 'cfg:section:skills:social_media_manager'}], [{'text': '📀 Discogs', 'callback_data': 'cfg:section:skills:discogs'}]]
     """
     rows: list[list[dict[str, Any]]] = []
     url = _mission_control_url(workspace, fragment="skills")

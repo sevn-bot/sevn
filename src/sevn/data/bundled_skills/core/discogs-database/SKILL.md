@@ -10,6 +10,12 @@ see_also:
   - discogs-wantlist
   - discogs-identity
 scripts:
+  - path: scripts/_discogs_common.py
+    description: Shared Discogs client, JSON envelope, and error-mapping helpers.
+    args_overview: "(library module — not invoked directly)"
+  - path: scripts/_helpers.py
+    description: Shared serialization and CLI runner helpers for this skill's scripts.
+    args_overview: "(library module — not invoked directly)"
   - path: scripts/search.py
     description: Search the Discogs database (domain search).
     args_overview: >-

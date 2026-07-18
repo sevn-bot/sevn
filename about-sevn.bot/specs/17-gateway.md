@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-07-18'
-fingerprint: sha256:c7f03a9efddbff8a1a2a95bc46f686edb03256284d038e93354d13d147bf6e72
+fingerprint: sha256:94324f19c6cab9d65508b0c359e03dbd94d4a88dd9161fa674c4d9642f15b134
 related: []
 sources:
 - src/sevn/gateway/**
@@ -417,6 +417,18 @@ interfaces:
 - name: MediaStore
   file: src/sevn/gateway/media/media_store.py
   symbol: MediaStore
+- name: build_discogs_keyboard_rows
+  file: src/sevn/gateway/menu/discogs_menu.py
+  symbol: build_discogs_keyboard_rows
+- name: build_discogs_setup_keyboard_rows
+  file: src/sevn/gateway/menu/discogs_menu.py
+  symbol: build_discogs_setup_keyboard_rows
+- name: discogs_menu_caption
+  file: src/sevn/gateway/menu/discogs_menu.py
+  symbol: discogs_menu_caption
+- name: discogs_setup_caption
+  file: src/sevn/gateway/menu/discogs_menu.py
+  symbol: discogs_setup_caption
 - name: ConfigMenuHandler
   file: src/sevn/gateway/menu/menu.py
   symbol: ConfigMenuHandler

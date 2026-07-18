@@ -6,7 +6,7 @@ status: scaffold
 owner: Alex
 summary: Bundled google-workspace skill — OAuth2 Gmail, Calendar, Drive, Sheets, Docs,
   Contacts; optional gws CLI bridge.
-last_updated: '2026-07-17'
+last_updated: '2026-07-18'
 fingerprint: sha256:1c7382e3fc07f38e95cd3cbf5ffb732428db7a165e873e049aef95eeccaade7e
 related:
 - spec-12-skills-system
@@ -106,6 +106,34 @@ interfaces:
 ---
 
 # Google Workspace skill — Spec
+
+## Purpose
+
+Deliver Hermes Agent **google-workspace parity** as a bundled core skill covering Gmail, Calendar, Drive, Sheets, Docs, and Contacts through OAuth2-authenticated Google APIs. See **§1 Goal** below for scope and references.
+
+## Public Interface
+
+Bundled scripts under `src/sevn/data/bundled_skills/core/google-workspace/scripts/` (`setup.py`, `google_api.py`, `gws_bridge.py`) plus `src/sevn/skills/google_workspace.py` helpers (`build_service`, `check_auth`, `get_auth_url`, `exchange_auth_code`, `run_gws`, …). Function inventory in **§4**; agent consumption in **§5**.
+
+## Data Model
+
+OAuth client secret + token payloads stored via the workspace secrets chain; config under `skills.google_workspace.*` in `sevn.json`. Credential paths and token JSON shape in **§3.2** and **§3.4**.
+
+## Internal Architecture
+
+Python Google API client fallback with optional `gws` CLI bridge; skill subprocess JSON envelopes; egress via the workspace proxy. Layout and execution backend in **§3**.
+
+## Behavior
+
+Setup wizard exchanges auth codes, refreshes tokens, routes read/write calls to Gmail/Calendar/Drive/Sheets/Docs/Contacts APIs (or `gws` when enabled). Phased rollout in **§7**; security gates in **§3.6**.
+
+## Failure Modes
+
+Missing deps, expired or revoked tokens, insufficient OAuth scopes, proxy/egress blocks, and gated writes without operator confirmation — surfaced as script envelope errors and `check_auth` diagnostics.
+
+## Test Strategy
+
+Unit tests mock Google API clients and token IO; integration tests cover auth refresh and allowlisted script envelopes; live smoke is operator-observed with real OAuth. See **§8 Testing strategy**.
 
 ## 1. Goal
 

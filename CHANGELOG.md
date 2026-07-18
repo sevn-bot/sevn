@@ -10,6 +10,10 @@ are cut into a dated, versioned section at release time.
 
 ## [Unreleased]
 
+### Fixed
+
+- [2026-07-18] Discogs Final gate parity — register five bundled skills in ``DEFAULT_SKILL_MANIFESTS``, align onboarding manifest rows with skills INDEX, add curated README template, and isolate bundled-script imports in tests
+
 ### Added
 
 - [2026-07-18] Discogs skills operator README with per-script examples and User-token + OAuth auth walkthroughs; skills INDEX polish, onboarding Group-B `skill.discogs` row, and `[discogs]` extra install action
