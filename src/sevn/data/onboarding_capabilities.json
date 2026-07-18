@@ -719,19 +719,19 @@
       ]
     },
     {
-      "capability_id": "skill.kokoro_tts",
+      "capability_id": "skill.text_to_voice",
       "group": "B",
-      "label": "kokoro-tts",
-      "description": "Local Kokoro ONNX text-to-speech engine backing the voice TTS pipeline (kokoro backend).",
+      "label": "text-to-voice",
+      "description": "Unified local text-to-speech engines (Kokoro ONNX + Supertonic) backing the voice TTS pipeline (text_to_voice backend).",
       "config_paths": [
-        "skills.kokoro_tts.enabled"
+        "skills.text_to_voice.enabled"
       ],
       "control": "checkbox",
       "default": true,
       "profile_overridable": true,
       "install_actions": [
         {
-          "id": "skill.kokoro_tts.noop",
+          "id": "skill.text_to_voice.noop",
           "kind": "noop",
           "argv": [],
           "fatal": false
@@ -1381,10 +1381,10 @@
       ]
     },
     {
-      "capability_id": "cli.kokoro",
+      "capability_id": "cli.text_to_voice",
       "group": "C",
-      "label": "Kokoro TTS",
-      "description": "Workspace Kokoro skill path check.",
+      "label": "text-to-voice TTS",
+      "description": "Workspace text-to-voice skill path check (kokoro / supertonic engines).",
       "config_paths": [
         "voice.enabled"
       ],
@@ -1393,7 +1393,7 @@
       "profile_overridable": true,
       "install_actions": [
         {
-          "id": "cli.kokoro.noop",
+          "id": "cli.text_to_voice.noop",
           "kind": "noop",
           "argv": [],
           "fatal": false,

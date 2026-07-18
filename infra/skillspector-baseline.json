@@ -104,10 +104,10 @@
       "reviewed": "2026-07-07"
     },
     {
-      "skill_path": "src/sevn/data/bundled_skills/core/kokoro-tts",
+      "skill_path": "src/sevn/data/bundled_skills/core/text-to-voice",
       "rule_id": "E2",
-      "reason": "generate.py reads cache/model-dir env knobs; local runtime-quarantined TTS, no exfil path",
-      "reviewed": "2026-07-07"
+      "reason": "generate.py / engines read cache/model-dir env knobs; local runtime-quarantined TTS, no exfil path",
+      "reviewed": "2026-07-18"
     },
     {
       "skill_path": "src/sevn/data/bundled_skills/core/openwiki",
@@ -116,10 +116,10 @@
       "reviewed": "2026-07-07"
     },
     {
-      "skill_path": "src/sevn/data/bundled_skills/core/kokoro-tts",
+      "skill_path": "src/sevn/data/bundled_skills/core/text-to-voice",
       "rule_id": "SC4",
-      "reason": "numpy advisories are ancient (<1.22) / disputed; requirements now pin numpy>=1.26",
-      "reviewed": "2026-07-07"
+      "reason": "numpy advisories are ancient (<1.22) / disputed; requirements-kokoro.txt pins numpy>=1.26",
+      "reviewed": "2026-07-18"
     },
     {
       "skill_path": ".claude/skills/diagnosing-bugs",

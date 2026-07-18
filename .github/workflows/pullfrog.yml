@@ -1,13 +1,24 @@
-# PullFrog PR review runs alongside CodeRabbit. When the review completes,
-# the enforce step fails the job if unresolved PullFrog threads remain.
-# If PullFrog cannot run (e.g. Claude session limit), the job passes.
+# PullFrog PR review — DISABLED.
+# To re-enable:
+#   1. Set PULLFROG_ENABLED to "true" below
+#   2. Uncomment the pull_request trigger
+#   3. Restore the jobs.review.if condition (see comment on the job)
+#
+# When enabled, PullFrog runs alongside CodeRabbit. The enforce step fails the
+# job if unresolved PullFrog threads remain. If PullFrog cannot run (e.g. Claude
+# session limit), the job passes.
 name: PullFrog
 
 on:
-  pull_request:
-    branches: [main, develop, test-pre, pre-0.0.1]
-    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
+  # Disabled — uncomment to re-enable PR reviews:
+  # pull_request:
+  #   branches: [main, develop, test-pre, pre-0.0.1]
+  #   types: [opened, synchronize, reopened, ready_for_review]
+
+# Master switch. Set to "true" and restore the pull_request trigger to re-enable.
+env:
+  PULLFROG_ENABLED: "false"
 
 permissions:
   contents: read
@@ -24,7 +35,9 @@ concurrency:
 jobs:
   review:
     name: PullFrog review
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    # DISABLED. Original condition when re-enabling:
+    #   env.PULLFROG_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false)
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:

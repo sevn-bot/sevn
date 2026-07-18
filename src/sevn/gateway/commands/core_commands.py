@@ -38,10 +38,10 @@ _START_WELCOME = (
 )
 _UNKNOWN_COMMAND = "Unknown command — try `/help`."
 
-# Kokoro voice codes look like ``bf_emma`` / ``af_heart`` / ``am_michael`` (2-letter
-# lang+gender prefix, underscore, name). This never collides with the mode keywords
-# (``on``/``off``/``all``/``when_asked``/``reset``/``toggle``) since none match the shape.
-_VOICE_CODE_RE = re.compile(r"^[a-z]{2}_[a-z]+$")
+# Voice codes: Kokoro-style ``bf_emma`` / ``af_heart`` (2-letter lang+gender prefix,
+# underscore, name), or Supertonic ``M1``-``M5`` / ``F1``-``F5``. Never collides with mode
+# keywords (``on``/``off``/``all``/``when_asked``/``reset``/``toggle``).
+_VOICE_CODE_RE = re.compile(r"^(?:[a-z]{2}_[a-z]+|[MF][1-5])$", re.IGNORECASE)
 
 
 def _voice_mode_label(workspace: WorkspaceConfig) -> str:
@@ -383,18 +383,18 @@ class CoreCommandHandler:
         """
         arg = args.strip().lower()
         if arg in {"", "picker"}:
-            current = self._global_tts_voice_id() or "default (af_heart)"
+            current = self._global_tts_voice_id() or "default (engine-dependent)"
             return (
                 f"Voice: {current}. Use /voice on|off|when_asked|reset to control replies, "
-                "or /voice <name> to pick a voice (e.g. bf_emma, af_heart, am_michael). "
+                "or /voice <name> to pick a voice (e.g. af_heart, M1). "
                 "See /voice voices for the full list."
             )
         if arg in {"voices", "list"}:
-            current = self._global_tts_voice_id() or "af_heart (default)"
+            current = self._global_tts_voice_id() or "engine default"
             return (
-                f"Current voice: {current}. Set with /voice <name> — e.g. bf_emma (British "
-                "female), af_heart (US female, warm), am_michael (US male), bf_isabella. "
-                "Full catalogue: kokoro-tts skill `--list-voices`."
+                f"Current voice: {current}. Set with /voice <name> - Kokoro: af_heart, "
+                "bf_emma, am_michael; Supertonic: M1-M5, F1-F5. Full catalogue: "
+                "text-to-voice skill `--list-voices --engine <kokoro|supertonic>`."
             )
         if _VOICE_CODE_RE.match(arg):
             mutate_sevn_json(
