@@ -16,11 +16,6 @@ from tests.skills.discogs.conftest import (
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.security.secrets.chain import SecretsChain
 
-pytestmark = pytest.mark.xfail(
-    reason="green after W2: merge_discogs_proc_env + build_client",
-    strict=False,
-)
-
 
 class _MemBackend:
     def __init__(self, store: dict[str, str]) -> None:

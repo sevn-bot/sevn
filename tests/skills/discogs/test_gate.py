@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from tests.skills.discogs.conftest import (
     DISCOGS_SKILL_IDS,
     enabled_discogs_config,
@@ -13,8 +12,6 @@ from tests.skills.discogs.conftest import (
 
 from sevn.data.bundled_skills import BUNDLED_SKILLS_ROOT
 from sevn.skills.manager import SkillsManager
-
-pytestmark = pytest.mark.xfail(reason="green after W2: gate_discogs_core_skills", strict=False)
 
 
 def _discogs_mod() -> object:

@@ -4595,6 +4595,20 @@ wheels = [
 ]
 
 [[package]]
+name = "python3-discogs-client"
+version = "2.9"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "oauthlib" },
+    { name = "python-dateutil" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6a/5c/48f3b25aeb9a111f09ae3c0f329356c9f4c67c124f0cfb539d19268926a2/python3_discogs_client-2.9.tar.gz", hash = "sha256:f588ad0c998d04b72e1eadcde9b353023cae6c4a3af6d81db15029c83eec5df1", size = 38176, upload-time = "2026-07-15T17:56:17.019Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6f/d7/8436885b1ce3a6bf6a167ba4d0680e2d75a3524bec8a890af4dd3dd5598a/python3_discogs_client-2.9-py3-none-any.whl", hash = "sha256:fc426cb4e97159b6595d264957bb991a928686e54db432c7027dbe05e47cacce", size = 17710, upload-time = "2026-07-15T17:56:15.762Z" },
+]
+
+[[package]]
 name = "pytz"
 version = "2026.2"
 source = { registry = "https://pypi.org/simple" }
@@ -5294,6 +5308,9 @@ dev = [
     { name = "vulture" },
     { name = "xenon" },
 ]
+discogs = [
+    { name = "python3-discogs-client" },
+]
 google-workspace = [
     { name = "google-api-python-client" },
     { name = "google-auth-httplib2" },
@@ -5380,6 +5397,7 @@ requires-dist = [
     { name = "pytest-split", marker = "extra == 'dev'", specifier = "==0.11.0" },
     { name = "pytest-xdist", marker = "extra == 'dev'", specifier = "==3.8.0" },
     { name = "python-jobspy", marker = "extra == 'job-ops'", specifier = ">=1.1.80" },
+    { name = "python3-discogs-client", marker = "extra == 'discogs'", specifier = "==2.9" },
     { name = "pyyaml", specifier = "==6.0.3" },
     { name = "readability-lxml", marker = "extra == 'web-extract'", specifier = "==0.8.4.1" },
     { name = "rich", specifier = "==15.0.0" },
@@ -5398,7 +5416,7 @@ requires-dist = [
     { name = "xenon", marker = "extra == 'dev'", specifier = "==0.9.3" },
     { name = "yt-dlp", marker = "extra == 'yt-dlp'", specifier = "==2026.6.9" },
 ]
-provides-extras = ["bedrock", "code-graph-rag", "code-review-graph", "graphify", "google-workspace", "pdf", "browser-cdp", "job-ops", "skillspector", "yt-dlp", "web-extract", "web-fetch", "dev"]
+provides-extras = ["bedrock", "code-graph-rag", "code-review-graph", "graphify", "google-workspace", "pdf", "browser-cdp", "job-ops", "skillspector", "yt-dlp", "web-extract", "web-fetch", "discogs", "dev"]
 
 [package.metadata.requires-dev]
 dev = [

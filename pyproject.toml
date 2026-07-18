@@ -90,6 +90,7 @@ skillspector = ["skillspector @ git+https://github.com/NVIDIA/SkillSpector@main"
 yt-dlp = ["yt-dlp==2026.6.9"]
 web-extract = ["readability-lxml==0.8.4.1"]
 web-fetch = ["brotli>=1.1.0"]
+discogs = ["python3-discogs-client==2.9"]
 dev = [
     "pytest==9.0.3",
     "pytest-asyncio==1.3.0",

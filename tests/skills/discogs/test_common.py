@@ -9,11 +9,6 @@ from unittest.mock import MagicMock
 import pytest
 from tests.skills.discogs.conftest import load_discogs_common
 
-pytestmark = pytest.mark.xfail(
-    reason="green after W2: _discogs_common helpers",
-    strict=False,
-)
-
 _COMMON: ModuleType | None = None
 
 
@@ -101,4 +96,4 @@ def test_discogs_common_doctests_are_network_free() -> None:
     runner = doctest.DocTestRunner(verbose=False)
     for test in tests:
         result = runner.run(test)
-        assert not result.failures
+        assert result.failed == 0, result

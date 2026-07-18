@@ -13,11 +13,6 @@ from typer.testing import CliRunner
 
 from sevn.cli.app import app
 
-pytestmark = pytest.mark.xfail(
-    reason="green after W2: DiscogsSkillsConfig + schema",
-    strict=False,
-)
-
 REPO = Path(__file__).resolve().parents[2]
 SCHEMA_PATH = REPO / "infra" / "sevn.schema.json"
 
@@ -128,11 +123,11 @@ class TestDiscogsSchemaBlock:
     @pytest.mark.parametrize(
         "domain",
         [
-            ("database",),
-            ("marketplace",),
-            ("collection",),
-            ("wantlist",),
-            ("identity",),
+            "database",
+            "marketplace",
+            "collection",
+            "wantlist",
+            "identity",
         ],
     )
     def test_schema_has_per_skill_toggle(self, domain: str) -> None:

@@ -41,6 +41,8 @@ from sevn.skills.capabilities import build_skill_capability_rows
 from sevn.skills.computer_use import COMPUTER_USE_SKILL_ID, gate_computer_use_core_skill
 from sevn.skills.cua_agent import CUA_AGENT_SKILL_ID, gate_cua_agent_core_skill
 from sevn.skills.cursor_cloud import CURSOR_CLOUD_SKILL_ID, gate_cursor_cloud_core_skill
+from sevn.skills.discogs import DISCOGS_SKILL_IDS, discogs_skill_enabled, gate_discogs_core_skills
+from sevn.skills.discogs_secrets import merge_discogs_proc_env
 from sevn.skills.errors import (
     SKILL_INVALID_JSON,
     SKILL_NOT_FOUND,
@@ -751,6 +753,11 @@ def _scan_skills_tree(
                 and gate_openwiki_core_skill(cfg) == "skip"
             ):
                 continue
+            if sub == "core" and child.name in DISCOGS_SKILL_IDS:
+                if gate_discogs_core_skills(cfg) == "skip":
+                    continue
+                if not discogs_skill_enabled(cfg, child.name):
+                    continue
             if sub == "core" and child.name in _RUNTIME_QUARANTINED_CORE_SKILL_IDS:
                 continue
             try:
@@ -1396,6 +1403,12 @@ class SkillsManager:
                 env.update(env_extra)
             if rec.canonical_id == OPENWIKI_SKILL_ID:
                 await merge_openwiki_proc_env(
+                    env,
+                    content_root=self._workspace_root,
+                    cfg=self._config,
+                )
+            if rec.canonical_id in DISCOGS_SKILL_IDS:
+                await merge_discogs_proc_env(
                     env,
                     content_root=self._workspace_root,
                     cfg=self._config,
