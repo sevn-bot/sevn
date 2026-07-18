@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from sevn.agent.subagents.media_prompts import (
+    MediaPromptVars,
     augment_prompt,
     list_video_agent_templates,
     resolve_video_agent_template,
@@ -25,8 +26,6 @@ class TestAugmentPrompt:
         assert "Lo-fi" in text
 
     def test_scene_style_variables(self) -> None:
-        from sevn.agent.subagents.media_prompts import MediaPromptVars
-
         _key, text, ctx = augment_prompt(
             "image",
             "fox",
@@ -37,9 +36,23 @@ class TestAugmentPrompt:
         assert "noir" in text
         assert ctx["scene"] == "forest"
 
-    def test_unknown_template_falls_back(self) -> None:
-        key, _, _ = augment_prompt("image", "test", template_key="nonexistent")
-        assert key == "default"
+    def test_unset_vars_omitted_from_prompt(self) -> None:
+        _key, text, ctx = augment_prompt(
+            "image",
+            "fox",
+            template_key="cinematic",
+            vars=MediaPromptVars(scene="forest"),
+        )
+        assert "forest" in text
+        assert "Scene:" in text or "scene" in text.lower() or "forest" in text
+        # No filler placeholders for unset slots.
+        assert "Style: ." not in text
+        assert "Mood: ." not in text
+        assert ctx.get("style", "") == ""
+
+    def test_unknown_template_raises(self) -> None:
+        with pytest.raises(ValueError, match="unknown template"):
+            augment_prompt("image", "test", template_key="nonexistent")
 
     def test_empty_request_raises(self) -> None:
         with pytest.raises(ValueError, match="user_request must be non-empty"):
