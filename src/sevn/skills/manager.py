@@ -93,7 +93,7 @@ _PROV_ORDER: Final[dict[ProvenanceKind, int]] = {
 # (``sevn.voice.backends.KokoroBackend`` execs ``scripts/generate.py`` directly). It ships and
 # seeds so the backend can find it, but must never be offered to the model as a research skill.
 _RUNTIME_QUARANTINED_CORE_SKILL_IDS: Final[frozenset[str]] = frozenset(
-    {"kokoro-tts"},
+    {"discogs-shared", "kokoro-tts"},
 )
 
 
