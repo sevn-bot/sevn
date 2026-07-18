@@ -39,7 +39,11 @@ def _oauth_mod() -> Any:
 def test_begin_oauth_returns_authorize_tuple() -> None:
     mod = _oauth_mod()
     client = MagicMock()
-    client.get_authorize_url.return_value = "https://discogs.com/oauth/authorize?oauth_token=req"
+    client.get_authorize_url.return_value = (
+        "req-token",
+        "req-secret",
+        "https://discogs.com/oauth/authorize?oauth_token=req",
+    )
     with patch("sevn.integrations.discogs.oauth.discogs_client") as pkg:
         pkg.Client.return_value = client
         request_token, request_secret, authorize_url = mod.begin_oauth(
@@ -47,10 +51,20 @@ def test_begin_oauth_returns_authorize_tuple() -> None:
             "consumer-secret",
             "sevn-discogs/1.0",
         )
-    assert request_token
-    assert request_secret
+    assert request_token == "req-token"
+    assert request_secret == "req-secret"
     assert authorize_url.startswith("https://")
     client.get_authorize_url.assert_called_once()
+
+
+def test_begin_oauth_rejects_non_tuple_response() -> None:
+    mod = _oauth_mod()
+    client = MagicMock()
+    client.get_authorize_url.return_value = "https://discogs.com/oauth/authorize?oauth_token=req"
+    with patch("sevn.integrations.discogs.oauth.discogs_client") as pkg:
+        pkg.Client.return_value = client
+        with pytest.raises(mod.DiscogsOAuthError, match="Unexpected authorize URL"):
+            mod.begin_oauth("consumer-key", "consumer-secret", "sevn-discogs/1.0")
 
 
 def test_complete_oauth_returns_access_tuple() -> None:
@@ -65,15 +79,35 @@ def test_complete_oauth_returns_access_tuple() -> None:
             "request-token",
             "request-secret",
             "verifier-code",
+            "sevn-discogs/1.0",
         )
     assert access_token == "access-token"
     assert access_secret == "access-secret"
     client.get_access_token.assert_called_once_with("verifier-code")
 
 
+def test_complete_oauth_uses_configured_user_agent() -> None:
+    mod = _oauth_mod()
+    client = MagicMock()
+    client.get_access_token.return_value = ("access-token", "access-secret")
+    with patch("sevn.integrations.discogs.oauth.discogs_client") as pkg:
+        pkg.Client.return_value = client
+        mod.complete_oauth(
+            "consumer-key",
+            "consumer-secret",
+            "request-token",
+            "request-secret",
+            "verifier-code",
+            "custom-agent/2.0",
+        )
+    pkg.Client.assert_called_once()
+    assert pkg.Client.call_args.args[0] == "custom-agent/2.0"
+
+
 @pytest.mark.asyncio
 async def test_advance_discogs_oauth_step_machine(tmp_path: Path) -> None:
     from sevn.gateway.commands.menu_form_handler import MenuFormHandler
+    from sevn.gateway.dispatcher.dispatcher_state import insert_dispatcher_state
 
     store: dict[str, str] = {}
     chain = SecretsChain([_MemBackend(store)])
@@ -99,18 +133,28 @@ async def test_advance_discogs_oauth_step_machine(tmp_path: Path) -> None:
         content_root=tmp_path,
         sevn_json_path=sevn_json,
     )
+    insert_dispatcher_state(
+        conn,
+        token="t1",
+        kind="form",
+        user_id=1,
+        chat_id="1",
+        topic_id=None,
+        payload_json='{"v":1,"target":"discogs:oauth_start","step":"consumer_key"}',
+        ttl_seconds=3600,
+    )
 
     with (
         patch(
-            "sevn.gateway.commands.menu_form_handler.secrets_chain_from_workspace",
+            "sevn.gateway.commands.discogs_oauth_wizard.secrets_chain_from_workspace",
             return_value=chain,
         ),
         patch(
-            "sevn.integrations.discogs.oauth.begin_oauth",
+            "sevn.gateway.commands.discogs_oauth_wizard.begin_oauth",
             return_value=("req-token", "req-secret", "https://discogs.com/oauth/authorize"),
         ),
         patch(
-            "sevn.integrations.discogs.oauth.complete_oauth",
+            "sevn.gateway.commands.discogs_oauth_wizard.complete_oauth",
             return_value=("access-token", "access-secret"),
         ),
     ):
@@ -140,3 +184,16 @@ async def test_advance_discogs_oauth_step_machine(tmp_path: Path) -> None:
 
     assert store.get("discogs.oauth_token") == "access-token"
     assert store.get("discogs.oauth_token_secret") == "access-secret"
+    assert "discogs.oauth_request_token" not in store
+    assert "discogs.oauth_request_secret" not in store
+
+    row = conn.execute(
+        "SELECT payload_json FROM dispatcher_state WHERE token = ?",
+        ("t1",),
+    ).fetchone()
+    assert row is not None
+    payload_text = str(row[0])
+    assert "consumer-key" not in payload_text
+    assert "consumer-secret" not in payload_text
+    assert "req-token" not in payload_text
+    assert "req-secret" not in payload_text

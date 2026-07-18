@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-18] Discogs thermos gate — shared ``discogs-shared`` runtime dedup, OAuth dispatcher payload hygiene (secrets chain only), ``begin_oauth`` hardening, and extracted OAuth wizard module
 - [2026-07-18] Discogs Final gate parity — register five bundled skills in ``DEFAULT_SKILL_MANIFESTS``, align onboarding manifest rows with skills INDEX, add curated README template, and isolate bundled-script imports in tests
 
 ### Added

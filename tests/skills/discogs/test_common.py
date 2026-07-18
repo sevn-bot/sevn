@@ -7,7 +7,7 @@ from types import ModuleType
 from unittest.mock import MagicMock
 
 import pytest
-from tests.skills.discogs.conftest import load_discogs_common
+from tests.skills.discogs.conftest import DISCOGS_SKILL_IDS, common_script_path, load_discogs_common
 
 _COMMON: ModuleType | None = None
 
@@ -86,6 +86,15 @@ def test_map_discogs_error_never_leaks_token_in_message() -> None:
     exc.__str__.return_value = "401 Unauthorized token=leaked-secret"
     mapped = common.map_discogs_error(exc)
     assert "leaked-secret" not in mapped["message"]
+
+
+def test_discogs_common_stubs_are_byte_identical() -> None:
+    canonical = common_script_path("discogs-database").read_bytes()
+    for skill_id in DISCOGS_SKILL_IDS:
+        stub = common_script_path(skill_id).read_bytes()
+        assert stub == canonical, (
+            f"{skill_id}/scripts/_discogs_common.py diverges from canonical stub"
+        )
 
 
 def test_discogs_common_doctests_are_network_free() -> None:

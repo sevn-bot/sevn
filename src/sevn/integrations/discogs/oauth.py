@@ -95,19 +95,16 @@ def begin_oauth(
             "Could not get OAuth request token — check consumer credentials.",
         ) from exc
 
-    if isinstance(result, tuple) and len(result) == 3:
-        request_token, request_secret, authorize_url = result
-        url = str(authorize_url)
-        if url.startswith("?"):
-            url = f"https://www.discogs.com/oauth/authorize{url}"
-        elif not url.startswith("http"):
-            url = f"https://www.discogs.com{url}"
-        return str(request_token), str(request_secret), url
+    if not isinstance(result, tuple) or len(result) != 3:
+        raise DiscogsOAuthError("Unexpected authorize URL response from Discogs.")
 
-    authorize_url = str(result)
-    if authorize_url.startswith("?"):
-        authorize_url = f"https://www.discogs.com/oauth/authorize{authorize_url}"
-    return "request-token", "request-secret", authorize_url
+    request_token, request_secret, authorize_url = result
+    url = str(authorize_url)
+    if url.startswith("?"):
+        url = f"https://www.discogs.com/oauth/authorize{url}"
+    elif not url.startswith("http"):
+        url = f"https://www.discogs.com{url}"
+    return str(request_token), str(request_secret), url
 
 
 def complete_oauth(
@@ -116,6 +113,7 @@ def complete_oauth(
     request_token: str,
     request_secret: str,
     verifier: str,
+    user_agent: str,
 ) -> tuple[str, str]:
     """Exchange a verifier for OAuth access credentials.
 
@@ -125,6 +123,7 @@ def complete_oauth(
         request_token (str): Request token from :func:`begin_oauth`.
         request_secret (str): Request secret from :func:`begin_oauth`.
         verifier (str): Verifier pasted by the operator after authorization.
+        user_agent (str): User-Agent header value for API calls.
 
     Returns:
         tuple[str, str]: ``(access_token, access_token_secret)``.
@@ -150,7 +149,7 @@ def complete_oauth(
         raise DiscogsOAuthError("Consumer credentials, request token, and verifier are required.")
 
     client = discogs_client.Client(
-        _DEFAULT_USER_AGENT,
+        user_agent.strip() or _DEFAULT_USER_AGENT,
         consumer_key=key,
         consumer_secret=secret,
         token=token,

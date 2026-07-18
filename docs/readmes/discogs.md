@@ -93,9 +93,11 @@ Use OAuth when you need a registered Discogs application (consumer key/secret) a
 2. Tap **OAuth**.
 3. **Step 1:** paste **Consumer Key** → stored as `discogs.consumer_key`.
 4. **Step 2:** paste **Consumer Secret** → stored as `discogs.consumer_secret`.
-5. **Step 3:** sevn calls `begin_oauth`, DMs the **authorize URL** — open it in a browser and approve access.
+5. **Step 3:** sevn calls `begin_oauth`, DMs the **authorize URL** — open it in a browser and approve access. The URL embeds a one-time session token; open it only on a trusted device and do not forward the Telegram message to others.
 6. **Step 4:** paste the **verifier** code from Discogs.
 7. sevn calls `complete_oauth`, stores `discogs.oauth_token` and `discogs.oauth_token_secret`, sets `auth_method` to `oauth`, and runs a `whoami` smoke-test.
+
+**Dispatcher payload hygiene:** OAuth wizard state in `dispatcher_state` carries step metadata only — consumer credentials and request tokens live exclusively in the workspace secrets chain, never in the JSON payload.
 
 **Secret aliases:** `discogs.consumer_key`, `discogs.consumer_secret`, `discogs.oauth_token`, `discogs.oauth_token_secret`.
 
