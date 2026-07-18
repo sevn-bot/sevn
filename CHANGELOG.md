@@ -14,6 +14,7 @@ are cut into a dated, versioned section at release time.
 
 - [2026-07-16] Unified X ops facade (`sevn.integrations.social_media.x_ops`) exposes every X/Twitter endpoint as a callable over browser|twexapi with a normalized envelope, write-gates, cookie bridge, and `social_media_manager` skill scripts
 - [2026-07-16] Browser `social` X ops `timeline_collect` / `home_feed` / `read` return structured posts with status permalinks and tweet text instead of raw HTML noise
+- [2026-07-16] Bundled Obsidian second-brain skills from `kepano/obsidian-skills` (`defuddle`, `json-canvas`, `obsidian-bases`, `obsidian-cli`, `obsidian-markdown`) so sevn can load Obsidian-native markdown, Canvas, Bases, vault CLI, and web-to-markdown workflows out of the box
 - [2026-07-16] `gh-issues` authenticated read/watch/track via `gh` (`issue_view`/`issue_watch`/`issue_track`) with `.sevn/gh-watch/` state and a `gh-issue-watch` cron scope (~15 min) that notifies on issue changes via the `message` tool
 - [2026-07-16] `gh-issues` `issue_create` creates issues in one call via authenticated `gh` with `templates/{feature,bug,chore}.md` (default `feature`), defaults `--repo` from `my_sevn.repo_url`, returns `{url,number,repo}`, falls back to the egress proxy only when `gh` is absent, and maps failures to precise messages instead of bare `proxy status 404`
 - [2026-07-16] Bundled `proton-management` skill with Python `proton-cli` foundation (Pass read, session/SRP auth) and onboarding manifest registration
