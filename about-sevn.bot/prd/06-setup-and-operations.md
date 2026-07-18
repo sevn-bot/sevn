@@ -7,7 +7,7 @@ owner: Alex
 summary: Local-first bots are judged in the first ten minutes—clone, three setup commands,
   and a Telegram reply, or the operator returns to a hosted assistant.
 last_updated: '2026-07-18'
-fingerprint: sha256:737800dadfec728724f7b04bbb0b6dcce8d9f52c01636856f41f92031074b013
+fingerprint: sha256:471652b947d8feacf732fccc10a89f1d0506e242813e1b1154e2f360175db6ed
 related:
 - prd-07-mission-control
 sources:
