@@ -14,7 +14,7 @@ _NON_REGISTRY_BACKTICK_NAMES = frozenset({"hi", "thanks", "ok", "bye"})
 # One-release skill index alias (`specs/28-code-understanding.md`).
 _SKILL_INDEX_ALIASES = frozenset({"mycode_scan"})
 # Bundled but not in DEFAULT_SKILL_MANIFESTS (host-only / quarantined from gateway index).
-_QUARANTINED_BUNDLED_CORE_SKILL_DIRS = frozenset({"discogs-shared", "mycode_scan", "kokoro-tts"})
+_QUARANTINED_BUNDLED_CORE_SKILL_DIRS = frozenset({"mycode_scan", "kokoro-tts"})
 
 
 def _allowed_registry_backtick_names() -> frozenset[str]:

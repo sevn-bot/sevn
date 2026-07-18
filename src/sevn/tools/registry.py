@@ -210,6 +210,9 @@ DEFAULT_SKILL_MANIFESTS: Final[dict[str, str]] = {
     "discogs-wantlist": (
         "Discogs user wantlist browse, search, and add/remove/edit; confirm-gated writes."
     ),
+    "discogs-shared": (
+        "Internal shared runtime for bundled Discogs skill scripts; not a model-facing skill."
+    ),
     "json-canvas": "Create and edit Obsidian JSON Canvas files.",
     "obsidian-bases": "Create and edit Obsidian Bases files.",
     "obsidian-cli": "Interact with Obsidian vaults using the Obsidian CLI.",
