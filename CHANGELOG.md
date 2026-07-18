@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- [2026-07-18] Discogs collection skill — folder listing, collection search, value stats, and confirm-gated add/remove/move/rate subprocess scripts
 - [2026-07-18] Discogs marketplace skill — inventory search, listings CRUD, orders, messages, and fee subprocess scripts with confirm-gated writes
 - [2026-07-18] Discogs database catalog skill — search plus artist/release/master/label lookups, price suggestions, and marketplace stats subprocess scripts with JSON envelopes
 - [2026-07-18] Optional Discogs skill group foundation — typed ``skills.discogs`` config, group gate, secrets→env injection, shared ``_discogs_common.py`` runtime, and ``python3-discogs-client`` optional extra

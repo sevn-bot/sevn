@@ -8,8 +8,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from tests.skills.discogs.conftest import run_skill_script
 
-pytestmark = pytest.mark.xfail(reason="green after W5: discogs-collection scripts", strict=False)
-
 _SKILL_ID = "discogs-collection"
 _WRITE_SCRIPTS = (
     ("add_release.py", ["--folder-id", "0", "--release-id", "1"]),
