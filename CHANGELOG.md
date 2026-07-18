@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-18] Thermos close-out — bandit-clean OAuth wizard payload guard and interim-secret cleanup
 - [2026-07-18] Register ``discogs-shared`` in ``DEFAULT_SKILL_MANIFESTS`` for bundled-core parity
 - [2026-07-18] Onboarding manifest row for quarantined ``discogs-shared`` internal runtime skill
 - [2026-07-18] Quarantine ``discogs-shared`` internal runtime in skills manager and skills INDEX (not model-facing)

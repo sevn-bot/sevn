@@ -87,10 +87,8 @@ async def cleanup_discogs_oauth_interim_secrets(chain: SecretsChain) -> None:
         DISCOGS_OAUTH_REQUEST_TOKEN_SECRET_ALIAS,
         DISCOGS_OAUTH_REQUEST_SECRET_SECRET_ALIAS,
     ):
-        try:
+        if await chain.get(alias) is not None:
             await chain.delete(alias)
-        except Exception:
-            continue
 
 
 async def advance_discogs_oauth(
@@ -146,7 +144,9 @@ async def advance_discogs_oauth(
             key: value for key, value in payload.items() if key not in _FORBIDDEN_PAYLOAD_KEYS
         }
         clean_payload["step"] = next_step
-        assert oauth_payload_has_no_secrets(clean_payload)
+        if not oauth_payload_has_no_secrets(clean_payload):
+            msg = "OAuth wizard payload must not store credential fields"
+            raise RuntimeError(msg)
         handler._update_payload(token, clean_payload)
 
     if step == "consumer_key":
