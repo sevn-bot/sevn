@@ -1,4 +1,4 @@
-"""Host Chrome discovery, CDP probes, and spawn (no Playwright).
+"""Host Chrome discovery, CDP probes, and spawn (CDP-only).
 
 Module: sevn.browser.chrome
 Depends: hashlib, os, pathlib, shutil, subprocess, sys, time, urllib,
@@ -493,7 +493,7 @@ def resolve_browser_headless(cfg: WorkspaceConfig | None = None) -> bool:
 
     Headed on host when Chrome exists unless ``skills.browser.headless`` is true.
     ``SEVN_BROWSER_HEADLESS`` wins over config when set. When no Chrome binary
-    exists, headless is forced for Playwright fallback paths.
+    exists, headless is forced for CDP fallback paths.
 
     Args:
         cfg (WorkspaceConfig | None): Workspace config.

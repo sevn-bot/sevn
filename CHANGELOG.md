@@ -46,6 +46,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-18] Scrub residual Playwright wording from `browser.chrome` docs and triager classifier fixture text so the zero-driver repo grep stays clean after merging latest `pre-0.0.1`
 - [2026-07-16] Bump transitive `mcp` 1.27.1 → 1.28.1 to clear CVE-2026-52870 (missing authorization in experimental tasks API)
 - [2026-07-16] `social_media_manager` pins trusted `content_root` after merging task params/body (blocks override), leaves omitted JSON `medium` unset so `default_medium`/`platforms.<site>.medium` resolve, and X ops reject missing `tweet_id` with `TWEET_ID_REQUIRED` instead of path ``0``
 - [2026-07-16] X ops `fetch_article_markdown` and `get_users_by_usernames` reject `medium=browser` with `BROWSER_OP_UNSUPPORTED` instead of returning a false-success home scrape plan

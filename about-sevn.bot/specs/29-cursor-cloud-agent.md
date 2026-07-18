@@ -7,8 +7,8 @@ owner: Alex
 summary: Let operators and agents launch, poll, and inspect Cursor Cloud Agents against
   any GitHub/GitLab repo when skills.cursor_cloud.enabled is true, returning PR URLs,
   dashboard links (remote desktop), and
-last_updated: '2026-07-16'
-fingerprint: sha256:c8a7a3428df72e3ef200e9325f9023caf48d83cbdecfb2b019754d2c7d9084b5
+last_updated: '2026-07-18'
+fingerprint: sha256:3fb2199482e9a93a5ed9df335adc9b12ede0bf3e14fe95171d4ac91b1a47d020
 related: []
 sources:
 - src/sevn/integrations/**

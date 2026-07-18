@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own everything under workspace/skills/: how skills are discovered, validated,
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
-last_updated: '2026-07-16'
-fingerprint: sha256:65008db0a516cf2fbdcb505df423f2e88033e0168da1b5d05e459d4ed7eeecae
+last_updated: '2026-07-18'
+fingerprint: sha256:89b8559e0d16bf8f996dd94d78a355a535cbebbf47aa3b54e8b360dd975e0805
 related: []
 sources:
 - src/sevn/skills/**
@@ -35,6 +35,15 @@ interfaces:
 - name: CloseBrowserResult
   file: src/sevn/skills/browser_session.py
   symbol: CloseBrowserResult
+- name: TabOperationError
+  file: src/sevn/skills/browser_session.py
+  symbol: TabOperationError
+- name: TabSessionView
+  file: src/sevn/skills/browser_session.py
+  symbol: TabSessionView
+- name: activate_tab
+  file: src/sevn/skills/browser_session.py
+  symbol: activate_tab
 - name: browser_autoclose_enabled
   file: src/sevn/skills/browser_session.py
   symbol: browser_autoclose_enabled
@@ -53,60 +62,45 @@ interfaces:
 - name: close_idle_browser_sessions
   file: src/sevn/skills/browser_session.py
   symbol: close_idle_browser_sessions
-- name: default_cdp_url
+- name: close_tab
   file: src/sevn/skills/browser_session.py
-  symbol: default_cdp_url
-- name: is_brave_executable
+  symbol: close_tab
+- name: list_tabs
   file: src/sevn/skills/browser_session.py
-  symbol: is_brave_executable
+  symbol: list_tabs
 - name: merge_browser_proc_env
   file: src/sevn/skills/browser_session.py
   symbol: merge_browser_proc_env
+- name: open_tab
+  file: src/sevn/skills/browser_session.py
+  symbol: open_tab
+- name: page_target_id
+  file: src/sevn/skills/browser_session.py
+  symbol: page_target_id
 - name: persist_active_target_id
   file: src/sevn/skills/browser_session.py
   symbol: persist_active_target_id
-- name: read_devtools_active_port
+- name: pick_work_page
   file: src/sevn/skills/browser_session.py
-  symbol: read_devtools_active_port
-- name: read_registry
-  file: src/sevn/skills/browser_session.py
-  symbol: read_registry
-- name: registry_path
-  file: src/sevn/skills/browser_session.py
-  symbol: registry_path
-- name: resolve_browser_engine
-  file: src/sevn/skills/browser_session.py
-  symbol: resolve_browser_engine
-- name: resolve_browser_extra_args
-  file: src/sevn/skills/browser_session.py
-  symbol: resolve_browser_extra_args
-- name: resolve_browser_headless
-  file: src/sevn/skills/browser_session.py
-  symbol: resolve_browser_headless
-- name: resolve_cdp_url
-  file: src/sevn/skills/browser_session.py
-  symbol: resolve_cdp_url
-- name: resolve_chrome_executable
-  file: src/sevn/skills/browser_session.py
-  symbol: resolve_chrome_executable
+  symbol: pick_work_page
 - name: resolve_idle_close_seconds
   file: src/sevn/skills/browser_session.py
   symbol: resolve_idle_close_seconds
-- name: resolve_profile_dir
+- name: resolve_target_page
   file: src/sevn/skills/browser_session.py
-  symbol: resolve_profile_dir
+  symbol: resolve_target_page
 - name: restart_browser_session
   file: src/sevn/skills/browser_session.py
   symbol: restart_browser_session
 - name: session_status_payload
   file: src/sevn/skills/browser_session.py
   symbol: session_status_payload
-- name: spawn_chrome
+- name: try_persist_active_page
   file: src/sevn/skills/browser_session.py
-  symbol: spawn_chrome
-- name: write_registry
+  symbol: try_persist_active_page
+- name: wait_for_page_ready
   file: src/sevn/skills/browser_session.py
-  symbol: write_registry
+  symbol: wait_for_page_ready
 - name: build_skill_capability_rows
   file: src/sevn/skills/capabilities.py
   symbol: build_skill_capability_rows
