@@ -8,8 +8,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from tests.skills.discogs.conftest import load_skill_script, run_skill_script
 
-pytestmark = pytest.mark.xfail(reason="green after W3: discogs-database scripts", strict=False)
-
 _SKILL_ID = "discogs-database"
 _READ_SCRIPTS = (
     "search.py",

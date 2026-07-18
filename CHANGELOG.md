@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- [2026-07-18] Discogs database catalog skill — search plus artist/release/master/label lookups, price suggestions, and marketplace stats subprocess scripts with JSON envelopes
 - [2026-07-18] Optional Discogs skill group foundation — typed ``skills.discogs`` config, group gate, secrets→env injection, shared ``_discogs_common.py`` runtime, and ``python3-discogs-client`` optional extra
 - [2026-07-16] Unified X ops facade (`sevn.integrations.social_media.x_ops`) exposes every X/Twitter endpoint as a callable over browser|twexapi with a normalized envelope, write-gates, cookie bridge, and `social_media_manager` skill scripts
 - [2026-07-16] Browser `social` X ops `timeline_collect` / `home_feed` / `read` return structured posts with status permalinks and tweet text instead of raw HTML noise

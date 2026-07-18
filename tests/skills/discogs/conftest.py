@@ -4,10 +4,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
-import json
 import os
-import subprocess
-import sys
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -129,25 +126,22 @@ def run_skill_script(
     env: dict[str, str] | None = None,
     workspace: Path | None = None,
 ) -> tuple[int, dict[str, Any]]:
-    """Run a bundled skill script and parse its JSON stdout envelope."""
-    script = skill_root(skill_id) / "scripts" / script_name
-    if not script.is_file():
-        pytest.fail(f"missing script {script}")
+    """Run a bundled skill script in-process and parse its JSON stdout envelope."""
     proc_env = os.environ.copy()
     if workspace is not None:
         proc_env["SEVN_WORKSPACE"] = str(workspace)
     if env:
         proc_env.update(env)
-    proc = subprocess.run(
-        [sys.executable, str(script), *cli_args],
-        capture_output=True,
-        text=True,
-        env=proc_env,
-        check=False,
-    )
-    stdout = proc.stdout.strip() or "{}"
-    payload = json.loads(stdout)
-    return proc.returncode, payload
+    mod = load_skill_script(skill_id, script_name)
+    old_env = os.environ.copy()
+    try:
+        os.environ.clear()
+        os.environ.update(proc_env)
+        code, payload = mod.main(cli_args)
+    finally:
+        os.environ.clear()
+        os.environ.update(old_env)
+    return code, payload
 
 
 def mock_discogs_client() -> MagicMock:
