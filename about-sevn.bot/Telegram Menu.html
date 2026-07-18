@@ -156,26 +156,31 @@
       },
       voice: {
         title: "Voice",
-        status: "WIP",
-        short: "TTS mode for outbound replies: off, all, or when_asked.",
-        long: "Three exact-callback buttons (cfg:voice:mode:off|all|when_asked) write voice.tts_mode in sevn.json via the _SECTION_TOGGLES map in MenuActionRouter. _reload_workspace() refreshes the VoiceRuntimeSettings on the router.\n\nSTT provider cycling is registered in the spec (C3.4) but not rendered by _build_voice_keyboard_rows.",
-        currently: "All three TTS mode buttons are gated 🚧. STT cycle is not in the keyboard at all — only TTS toggles render.",
+        status: "Available",
+        short: "TTS mode, local TTS engine (kokoro/supertonic), and STT provider.",
+        long: "Three exact-callback buttons (cfg:voice:mode:off|all|when_asked) write voice.tts_mode via MenuActionRouter._SECTION_TOGGLES. TTS engine cycle (cfg:voice:engine:next) writes voice.local_tts_engine (kokoro ↔ supertonic). STT cycle (cfg:voice:stt:next) rotates voice.stt_providers. _reload_workspace() rebuilds STT/TTS pipelines so changes apply without restart.",
+        currently: "TTS mode, TTS engine, and STT provider buttons are pressable and persist to sevn.json.",
         buttons: [
-          btn("TTS: off", "WIP",
+          btn("TTS: off", "Available",
             "Set voice.tts_mode = off.",
-            "Disables outbound audio. Caption shows the active mode (no ✅ in label — the label is exact-match, not a toggle).",
-            "Gated 🚧."),
-          btn("TTS: all", "WIP",
+            "Disables outbound audio. Caption shows the active mode; the selected mode row shows ✅.",
+            "Works live."),
+          btn("TTS: all", "Available",
             "Set voice.tts_mode = all.",
             "Attach TTS to every assistant reply when the configured backend succeeds; failures fall back to text with logged warnings.",
-            "Gated 🚧."),
-          btn("TTS: when_asked", "WIP",
+            "Works live."),
+          btn("TTS: when_asked", "Available",
             "Set voice.tts_mode = when_asked.",
             "Speak only when the user explicitly requests voice (via /voice or matching cue).",
-            "Gated 🚧."),
-          btn("STT: whisper_cpp 🔁", "WIP",
-            "TODO: short (Cycles voice.stt_providers primary; wired TMF Wave W4)",
-            "TODO: long (cfg:voice:stt:next)"),
+            "Works live."),
+          btn("TTS engine: kokoro 🔁", "Available",
+            "Cycle voice.local_tts_engine between kokoro and supertonic.",
+            "Writes voice.local_tts_engine and rebuilds the text_to_voice TTS pipeline on reload (cfg:voice:engine:next).",
+            "Works live."),
+          btn("STT: whisper_cpp 🔁", "Available",
+            "Cycle voice.stt_providers primary tag.",
+            "Rotates the STT chain so the next provider is tried first (cfg:voice:stt:next).",
+            "Works live."),
 
         ],
       },
@@ -651,7 +656,7 @@
         title: "Commands",
         status: "Ready",
         short: "Slash command shortcuts (/new, /menu, /help, /status, …).",
-        long: "Caption lists every /config root section with readiness tier. Per-level ❓ Help on any screen describes buttons on that screen. Type slash commands in chat: /new /menu /help /config /status /stop /voice /model.",
+        long: "Caption lists every /config root section with readiness tier. Per-level ❓ Help on any screen describes buttons on that screen. Type slash commands in chat: /new /menu /help /config /status /stop /model. Voice settings live under /config > Voice.",
         currently: "Caption-only section in the live menu; slash shortcuts work when typed in chat.",
         buttons: [],
       },
@@ -662,7 +667,7 @@
       title: "Help",
       status: "Ready",
       short: "Read-only catalog of every /config root section.",
-      long: "Help is a caption-only section — _build_help_keyboard_rows() returns an empty list, so the rendered screen has only the Back/Home chrome. config_menu_help_catalog_text() prints each root tile with its tier ([Ready] / [WIP] / [Stub] / [Not Started]) along with the short/long lines from _CONFIG_SECTION_CATALOG.\n\nSlash commands remain available by typing them: /new /menu /help /config /status /stop /voice /model.",
+      long: "Help is a caption-only section — _build_help_keyboard_rows() returns an empty list, so the rendered screen has only the Back/Home chrome. config_menu_help_catalog_text() prints each root tile with its tier ([Ready] / [WIP] / [Stub] / [Not Started]) along with the short/long lines from _CONFIG_SECTION_CATALOG.\n\nSlash commands remain available by typing them: /new /menu /help /config /status /stop /model. Voice settings live under /config > Voice.",
       currently: "Works as intended — pure caption, no buttons besides Back/Home.",
       buttons: [],
     };
@@ -719,7 +724,8 @@
         const s = SECTIONS[id];
         lines.push(`▸ ${label} [${s.status}]`, s.short, "", s.long.split("\n")[0], "");
       }
-      lines.push("Slash shortcuts (type in chat): /new /menu /help /config /status /stop /voice /model");
+      lines.push("Slash shortcuts (type in chat): /new /menu /help /config /status /stop /model");
+      lines.push("Voice settings: /config > Voice");
       return lines.join("\n");
     }
 

@@ -90,11 +90,12 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C1.4",
         "C1.5",
         "C1.6",
-        # Voice (TTS mode + STT provider cycle — Wave W4)
+        # Voice (TTS mode + STT provider cycle + TTS engine cycle)
         "C3.1",
         "C3.2",
         "C3.3",
         "C3.4",
+        "C3.5",
         # Channels (routing footer + reply keyboard)
         "C5.1",
         "C5.2",
@@ -593,7 +594,7 @@ def config_menu_help_catalog_text() -> str:
         lines.append(long_desc)
         lines.append("")
     lines.append(
-        "Slash shortcuts: /new /menu /help /config /status /stop /voice /model — type in chat."
+        "Slash shortcuts: /new /menu /help /config /status /stop /model — type in chat. Voice: /config > Voice."
     )
     return "\n".join(lines).strip()
 

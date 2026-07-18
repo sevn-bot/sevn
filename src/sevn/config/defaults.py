@@ -71,6 +71,7 @@ Exports:
     DEFAULT_WEBCHAT_PUBLIC — Web UI anonymous binding default (`specs/19-channel-webui.md` §5).
     DEFAULT_VOICE_STT_PROVIDERS — default STT chain tags (`specs/20-voice.md` §5).
     DEFAULT_VOICE_TTS_PROVIDERS — default TTS chain tags (same).
+    DEFAULT_VOICE_LOCAL_TTS_ENGINE — default engine for ``text_to_voice`` (``kokoro`` / ``supertonic``).
     DEFAULT_VOICE_TRIGGER_KEYWORDS — ``when_asked`` word-boundary triggers (same).
     DEFAULT_VOICE_MAX_MB — inbound voice size cap (same).
     DEFAULT_VOICE_MAX_SECONDS — inbound voice duration cap (same).
@@ -470,7 +471,7 @@ DEFAULT_VOICE_STT_PROVIDERS: Final[tuple[str, ...]] = (
     "xai_grok_stt",
 )
 DEFAULT_VOICE_TTS_PROVIDERS: Final[tuple[str, ...]] = (
-    "kokoro",
+    "text_to_voice",
     "kitten_tts",
     "edge_tts",
     "openai_tts",
@@ -478,6 +479,7 @@ DEFAULT_VOICE_TTS_PROVIDERS: Final[tuple[str, ...]] = (
     "mistral_voxtral",
     "google_gemini_tts",
 )
+DEFAULT_VOICE_LOCAL_TTS_ENGINE: Final[str] = "kokoro"
 DEFAULT_VOICE_TRIGGER_KEYWORDS: Final[tuple[str, ...]] = (
     "read aloud",
     "read this aloud",

@@ -250,7 +250,7 @@ def test_build_menu_keyboard_quick_actions_section() -> None:
     ]
     assert "menu:cmd:new" in callbacks
     assert "menu:cmd:help" in callbacks
-    assert "menu:cmd:voice" in callbacks
+    assert "menu:cmd:voice" not in callbacks
     assert "menu:cmd:model" in callbacks
     assert "menu:cmd:status" in callbacks
     assert "menu:cmd:stop" in callbacks

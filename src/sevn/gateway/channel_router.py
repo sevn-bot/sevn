@@ -816,6 +816,11 @@ class ChannelRouter:
 
         maybe_resolve_whisper_model_env(allow_download=False)
         self._stt = build_stt_pipeline(ws, trace=self._trace)
+        self._tts = build_tts_pipeline(
+            ws,
+            content_root=self._content_root,
+            trace=self._trace,
+        )
         tg_adapter = self._adapters.get("telegram")
         if isinstance(tg_adapter, TelegramAdapter):
             tg_adapter._cfg = tg_adapter._cfg.model_copy(
