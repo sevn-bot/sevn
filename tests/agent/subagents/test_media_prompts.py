@@ -37,6 +37,9 @@ class TestAugmentPrompt:
         assert ctx["scene"] == "forest"
 
     def test_unset_vars_omitted_from_prompt(self) -> None:
+        """Unset structured vars are omitted; no empty Label clauses remain."""
+        from sevn.agent.subagents.media_prompts import _UNSET
+
         _key, text, ctx = augment_prompt(
             "image",
             "fox",
@@ -44,17 +47,23 @@ class TestAugmentPrompt:
             vars=MediaPromptVars(scene="forest"),
         )
         assert "forest" in text
-        assert "Scene:" in text or "scene" in text.lower() or "forest" in text
-        # No filler placeholders for unset slots.
         assert "Style: ." not in text
         assert "Mood: ." not in text
-        assert ctx.get("style", "") == ""
+        assert _UNSET not in text
+        assert ctx.get("style") == _UNSET
+
+    def test_scrub_preserves_user_label_text(self) -> None:
+        """User request text ending in a label-like token is not scrubbed away."""
+        _key, text, _ctx = augment_prompt("image", "keep ending Style:")
+        assert "Style:" in text
 
     def test_unknown_template_raises(self) -> None:
+        """Unknown template slugs raise instead of falling back."""
         with pytest.raises(ValueError, match="unknown template"):
             augment_prompt("image", "test", template_key="nonexistent")
 
     def test_empty_request_raises(self) -> None:
+        """Blank user_request raises ValueError."""
         with pytest.raises(ValueError, match="user_request must be non-empty"):
             augment_prompt("image", "  ")
 

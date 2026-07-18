@@ -8,7 +8,7 @@ summary: Level-1 sub-agents (tracked, concurrent, killable role runs) that may s
   level-2 workers (incl. specialists); multi queue mode; limits, tracing, kill surfaces,
   media_generation skill.
 last_updated: '2026-07-18'
-fingerprint: sha256:b3e81fc77fb29e141e67c3a513ca9acad91c86340e225d2e7bd9742fe3d7c8e2
+fingerprint: sha256:b8e615248c95b4fe164de14364be00a6de632f67bea232b9a4cb7cb247d87be7
 related: []
 sources:
 - src/sevn/agent/subagents/**

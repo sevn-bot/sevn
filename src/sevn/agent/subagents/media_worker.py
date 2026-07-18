@@ -532,6 +532,8 @@ async def _persist_bytes(
         >>> inspect.iscoroutinefunction(_persist_bytes)
         True
     """
+    from sevn.agent.subagents.media_minimax import _ensure_under_content_root
+
     store = MediaStore(conn, content_root)
     encoded = base64.b64encode(data).decode("ascii")
     await store.persist_attachment_descriptors(
@@ -539,7 +541,7 @@ async def _persist_bytes(
         [{"filename": filename, "data_base64": encoded}],
     )
     rel_path = f"channel_files/{session_id}/{filename}"
-    written = (content_root / rel_path).resolve()
+    written = _ensure_under_content_root(content_root / rel_path, content_root)
     if not written.is_file() or written.stat().st_size != len(data):
         # MediaStore skips existing names; unique filenames should prevent this.
         # Fall back to a direct write so the returned path always matches bytes.

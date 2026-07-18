@@ -94,10 +94,7 @@ def _raise_for_status_payload(response: httpx.Response, *, context: str) -> dict
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
-        body_snip = (exc.response.text or "")[:240].strip()
-        detail = f" — {body_snip}" if body_snip else ""
-        msg = f"{context}: HTTP {exc.response.status_code}{detail}"
-        raise MiniMaxMediaError(msg) from exc
+        raise MiniMaxMediaError(f"{context}: HTTP {exc.response.status_code}") from exc
     try:
         payload = response.json()
     except ValueError as exc:
@@ -686,7 +683,8 @@ async def _download_minimax_file(
         bytes: Downloaded file bytes.
 
     Raises:
-        MiniMaxMediaError: When retrieve or download fails.
+        MiniMaxMediaError: When retrieve or download fails, or the payload
+            exceeds ``_MAX_DOWNLOAD_BYTES``.
 
     Examples:
         >>> import inspect
@@ -705,9 +703,7 @@ async def _download_minimax_file(
     download_url = file_obj.get("download_url")
     if not isinstance(download_url, str) or not download_url.strip():
         raise MiniMaxMediaError("files_retrieve: missing download_url")
-    dl = await http.get(download_url.strip())
-    dl.raise_for_status()
-    return dl.content
+    return await _download_url(http, download_url.strip())
 
 
 async def _download_url(http: httpx.AsyncClient, url: str) -> bytes:

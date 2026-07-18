@@ -527,8 +527,10 @@ PROMPT_TEMPLATES: dict[MediaPromptKind, dict[str, str]] = {
 
 _LABEL = r"Scene|Style|Subject|Mood|Lighting|Camera|Genre|Tempo|Instrumentation|Delivery"
 # Remove only empty slots: "Scene: ." / "Scene:." / "Scene:" before another label or EOS.
+# Sentinel for unset template slots — scrub only these, never user text.
+_UNSET = "\x1e"
 _EMPTY_CLAUSE_RE = re.compile(
-    rf"\s*(?:{_LABEL}):\s*(?:\.(?=\s|$)|(?=(?:{_LABEL}):)|$)",
+    rf"\s*(?:{_LABEL}):\s*{re.escape(_UNSET)}\.?",
 )
 _MULTI_SPACE_RE = re.compile(r"\s{2,}")
 _SPACE_BEFORE_DOT_RE = re.compile(r"\s+\.")
@@ -564,7 +566,7 @@ def _normalize_template_key(kind: MediaPromptKind, template_key: str | None) -> 
 def _build_format_context(user_request: str, vars: MediaPromptVars | None) -> dict[str, str]:
     """Build format context from ``user_request`` and only explicitly set variables.
 
-    Unset slots become empty strings so templates can be cleaned after format.
+    Unset slots use an internal sentinel so scrubbing never alters user text.
 
     Args:
         user_request (str): Short operator intent.
@@ -576,11 +578,11 @@ def _build_format_context(user_request: str, vars: MediaPromptVars | None) -> di
     Examples:
         >>> _build_format_context("fox", None)["user_request"]
         'fox'
-        >>> _build_format_context("fox", None)["scene"]
-        ''
+        >>> _build_format_context("fox", None)["scene"] == _UNSET
+        True
     """
     v = vars or MediaPromptVars()
-    ctx = {name: "" for name in PROMPT_VARIABLES}
+    ctx = {name: _UNSET for name in PROMPT_VARIABLES}
     ctx["user_request"] = user_request.strip()
     for name in PROMPT_VARIABLES:
         if name == "user_request":
@@ -592,7 +594,10 @@ def _build_format_context(user_request: str, vars: MediaPromptVars | None) -> di
 
 
 def _scrub_empty_clauses(text: str) -> str:
-    """Remove empty ``Label:`` / ``Label: .`` clauses left by unset variables.
+    """Remove ``Label: <unset-sentinel>`` clauses left by unset variables.
+
+    Only generated unset slots (sentinel) are removed — user text like
+    ``Style:`` is preserved.
 
     Args:
         text (str): Formatted template string.
@@ -601,10 +606,13 @@ def _scrub_empty_clauses(text: str) -> str:
         str: Cleaned prompt.
 
     Examples:
-        >>> _scrub_empty_clauses("Image. Scene: . Style: watercolor. Details: fox.")
+        >>> _scrub_empty_clauses(f"Image. Scene: {_UNSET}. Style: watercolor. Details: fox.")
         'Image. Style: watercolor. Details: fox.'
+        >>> "Style:" in _scrub_empty_clauses("Keep ending Style:")
+        True
     """
     cleaned = _EMPTY_CLAUSE_RE.sub("", text)
+    cleaned = cleaned.replace(_UNSET, "")
     cleaned = _MULTI_SPACE_RE.sub(" ", cleaned)
     cleaned = _SPACE_BEFORE_DOT_RE.sub(".", cleaned)
     stripped = cleaned.strip(" .")

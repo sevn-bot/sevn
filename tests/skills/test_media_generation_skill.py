@@ -153,6 +153,7 @@ class TestParseMediaTask:
         assert task.source_audio == "sample.mp3"
 
     def test_voice_shorthand_rejected(self) -> None:
+        """``voice:`` shorthand is rejected; JSON task required."""
         with pytest.raises(ValueError, match="voice shorthand unsupported"):
             parse_media_task("voice:hello there")
 
@@ -393,6 +394,7 @@ class TestExtendedMediaKinds:
         self,
         media_workspace: tuple[Path, sqlite3.Connection],
     ) -> None:
+        """TTS API receives literal speech_text; augmentation stays in trace."""
         workspace, conn = media_workspace
         audio_bytes = b"ID3fake"
         synthesize = AsyncMock(return_value=audio_bytes)
@@ -438,6 +440,7 @@ class TestExtendedMediaKinds:
         self,
         media_workspace: tuple[Path, sqlite3.Connection],
     ) -> None:
+        """Identical prompts produce distinct artifact paths and bytes."""
         workspace, conn = media_workspace
         image_a = b"\xff\xd8\xff aaa"
         image_b = b"\xff\xd8\xff bbb"
@@ -476,6 +479,7 @@ class TestExtendedMediaKinds:
         self,
         media_workspace: tuple[Path, sqlite3.Connection],
     ) -> None:
+        """Reference images outside content_root are rejected."""
         from sevn.agent.subagents.media_minimax import MiniMaxMediaError
 
         workspace, conn = media_workspace

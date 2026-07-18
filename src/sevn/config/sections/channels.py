@@ -181,6 +181,7 @@ class VoiceConfig(BaseModel):
     enabled: bool | None = None
     tts_mode: Literal["off", "all", "when_asked"] | None = None
     tts_voice_id: str | None = None
+    local_tts_engine: Literal["kokoro", "supertonic"] | None = None
 
     @model_validator(mode="after")
     def _validate_voice_tags_and_keywords(self) -> VoiceConfig:
@@ -190,7 +191,7 @@ class VoiceConfig(BaseModel):
             VoiceConfig: ``self`` after validation side effects.
 
         Examples:
-            >>> VoiceConfig(stt_providers=["whisper_cpp"], tts_providers=["kokoro"])
+            >>> VoiceConfig(stt_providers=["whisper_cpp"], tts_providers=["text_to_voice"])
             VoiceConfig(...)
         """
 

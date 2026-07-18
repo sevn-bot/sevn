@@ -32,7 +32,6 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | google-workspace | Gmail, Calendar, Drive, Contacts, Sheets, and Docs via OAuth2 Google Workspace APIs. |
 | graphify | Knowledge-graph orientation for code (`specs/28-code-understanding.md` §2.4). |
 | job-ops | Discover jobs across global + Europe boards, AI fit-score them against your resume, and optionally tailor a CV summary (JobOps port). |
-| kokoro-tts | Local Kokoro ONNX text-to-speech engine backing the voice TTS pipeline (kokoro backend). Not a model-facing research skill. |
 | last30days | Research any topic across Reddit, X, YouTube, HN, Polymarket, and the web from the last 30 days. |
 | lcm | Lossless context search, drill-back, and conversation index (`specs/15-memory-lcm.md`). |
 | linkedin-use | LinkedIn staff/company/connection scraping via logged-in browser + Voyager API (StaffSpy port). |
@@ -51,6 +50,7 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | skill_management | Authoring workflows for generated skills; pairs with native skill_create and promote_generated_skill (`specs/12-skills-system.md` §2.5). |
 | telegram | Telegram inline custom buttons and forum supergroup helpers (Bot API + allowlist/userbot hooks). |
 | telegram_test | Run host-side Playwright Telegram E2E (sevn telegram-test) while building sevn.bot. Use after gateway/menu/session/diagnostics changes. Not in gateway container. |
+| text-to-voice | Unified local text-to-speech engines (Kokoro ONNX + Supertonic) backing the voice TTS pipeline (text_to_voice backend). Not a model-facing research skill. |
 | sevn-diagnostics | sevn.bot operator repair playbooks for `sevn doctor --with-agent` (gateway, secrets, proxy, models, browser, voice). |
 | x-use | X (Twitter) workflows via a logged-in browser profile or CDP attach (timeline, search). |
 | yt-dlp | Download video/audio and metadata with yt-dlp (YouTube, Vimeo, X, TikTok, and allowlisted hosts). |
