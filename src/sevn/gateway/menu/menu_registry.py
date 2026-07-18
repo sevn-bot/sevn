@@ -604,9 +604,9 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "C",
         "skills:discogs:setup",
         "Discogs OAuth setup",
-        implemented=False,
+        implemented=True,
         owner_only=True,
-        notes="W9 OAuth 1.0a multi-step form",
+        notes="OAuth 1.0a multi-step form",
     )
     add(
         "C7.20",

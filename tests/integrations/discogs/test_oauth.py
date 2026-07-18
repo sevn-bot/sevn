@@ -3,20 +3,17 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.gateway.channel_router import IncomingMessage
 from sevn.security.secrets.chain import SecretsChain
-
-pytestmark = pytest.mark.xfail(
-    reason="green after W9: begin_oauth/complete_oauth + _advance_discogs_oauth",
-    strict=False,
-)
+from sevn.storage.migrate import apply_migrations
 
 
 class _MemBackend:
@@ -90,23 +87,30 @@ async def test_advance_discogs_oauth_step_machine(tmp_path: Path) -> None:
     router._resolve_owner_flag.return_value = True
     router._content_root = tmp_path
     router._workspace = cfg
-    router._conn = MagicMock()
-    handler = MenuFormHandler(workspace=cfg, router=router)
+    adapter = MagicMock()
+    adapter.send = AsyncMock()
+    router._adapters = {"telegram": adapter}
+    conn = sqlite3.connect(":memory:")
+    apply_migrations(conn)
+    handler = MenuFormHandler(
+        workspace=cfg,
+        router=router,
+        conn=conn,
+        content_root=tmp_path,
+        sevn_json_path=sevn_json,
+    )
 
-    oauth_mod = _oauth_mod()
     with (
         patch(
-            "sevn.security.secrets.factory.secrets_chain_from_workspace",
+            "sevn.gateway.commands.menu_form_handler.secrets_chain_from_workspace",
             return_value=chain,
         ),
-        patch.object(
-            oauth_mod,
-            "begin_oauth",
+        patch(
+            "sevn.integrations.discogs.oauth.begin_oauth",
             return_value=("req-token", "req-secret", "https://discogs.com/oauth/authorize"),
         ),
-        patch.object(
-            oauth_mod,
-            "complete_oauth",
+        patch(
+            "sevn.integrations.discogs.oauth.complete_oauth",
             return_value=("access-token", "access-secret"),
         ),
     ):

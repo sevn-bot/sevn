@@ -26,6 +26,12 @@ from sevn.config.workspace_config import WorkspaceConfig
 
 DISCOGS_CYCLE_PREFIX = "cfg:cycle:skills.discogs"
 DISCOGS_USER_TOKEN_SECRET_ALIAS = "discogs.user_token"
+DISCOGS_CONSUMER_KEY_SECRET_ALIAS = "discogs.consumer_key"
+DISCOGS_CONSUMER_SECRET_SECRET_ALIAS = "discogs.consumer_secret"
+DISCOGS_OAUTH_TOKEN_SECRET_ALIAS = "discogs.oauth_token"
+DISCOGS_OAUTH_TOKEN_SECRET_SECRET_ALIAS = "discogs.oauth_token_secret"
+DISCOGS_OAUTH_REQUEST_TOKEN_SECRET_ALIAS = "discogs.oauth_request_token"
+DISCOGS_OAUTH_REQUEST_SECRET_SECRET_ALIAS = "discogs.oauth_request_secret"
 
 _DOMAIN_LABELS: dict[DiscogsDomain, str] = {
     "database": "Database",
@@ -36,6 +42,12 @@ _DOMAIN_LABELS: dict[DiscogsDomain, str] = {
 }
 
 __all__ = [
+    "DISCOGS_CONSUMER_KEY_SECRET_ALIAS",
+    "DISCOGS_CONSUMER_SECRET_SECRET_ALIAS",
+    "DISCOGS_OAUTH_REQUEST_SECRET_SECRET_ALIAS",
+    "DISCOGS_OAUTH_REQUEST_TOKEN_SECRET_ALIAS",
+    "DISCOGS_OAUTH_TOKEN_SECRET_ALIAS",
+    "DISCOGS_OAUTH_TOKEN_SECRET_SECRET_ALIAS",
     "DISCOGS_USER_TOKEN_SECRET_ALIAS",
     "build_discogs_keyboard_rows",
     "build_discogs_setup_keyboard_rows",
@@ -57,7 +69,7 @@ def _domain_enabled(settings: DiscogsSkillsConfig, domain: DiscogsDomain) -> boo
     Examples:
         >>> from sevn.config.sections.skills_discogs import discogs_settings
         >>> _domain_enabled(discogs_settings(None), "database")
-        True
+        False
     """
     return bool(getattr(settings, f"{domain}_enabled"))
 
@@ -215,7 +227,7 @@ def build_discogs_setup_keyboard_rows(
     workspace: WorkspaceConfig,
     content_root: Path | None = None,
 ) -> list[list[dict[str, Any]]]:
-    """Build Discogs Setup keyboard (user-token wizard, OAuth placeholder, whoami).
+    """Build Discogs Setup keyboard (user-token wizard, OAuth flow, whoami).
 
     Args:
         workspace (WorkspaceConfig): Parsed workspace settings.

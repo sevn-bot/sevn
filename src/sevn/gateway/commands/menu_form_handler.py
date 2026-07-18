@@ -25,6 +25,7 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from sevn.config.sections.skills_discogs import discogs_settings
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.gateway.commands.shortcuts_store import (
     add_shortcut,
@@ -36,7 +37,15 @@ from sevn.gateway.dispatcher.dispatcher_state import (
     dispatcher_state_ttl_for_kind,
     insert_dispatcher_state,
 )
-from sevn.gateway.menu.discogs_menu import DISCOGS_USER_TOKEN_SECRET_ALIAS
+from sevn.gateway.menu.discogs_menu import (
+    DISCOGS_CONSUMER_KEY_SECRET_ALIAS,
+    DISCOGS_CONSUMER_SECRET_SECRET_ALIAS,
+    DISCOGS_OAUTH_REQUEST_SECRET_SECRET_ALIAS,
+    DISCOGS_OAUTH_REQUEST_TOKEN_SECRET_ALIAS,
+    DISCOGS_OAUTH_TOKEN_SECRET_ALIAS,
+    DISCOGS_OAUTH_TOKEN_SECRET_SECRET_ALIAS,
+    DISCOGS_USER_TOKEN_SECRET_ALIAS,
+)
 from sevn.gateway.menu.menu import (
     ConfigMenuRefreshContext,
     ConfigSection,
@@ -60,6 +69,7 @@ FORM_TARGETS: frozenset[str] = frozenset(
         "second_brain_vault_path",
         "second_brain_vault_browse",
         "subagents_max_override",
+        "discogs:oauth_start",
     },
 )
 _SECRET_ALIAS_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
@@ -103,6 +113,8 @@ def parse_form_callback(data: str) -> str | None:
         return "second_brain_vault_browse"
     if raw.startswith("form:subagents_limits:"):
         return raw.removeprefix("form:")
+    if raw == "form:discogs:oauth_start":
+        return "discogs:oauth_start"
     target = raw.removeprefix("form:").strip()
     return target if target in FORM_TARGETS else None
 
@@ -224,6 +236,7 @@ class MenuFormHandler:
             "logs_grep",
             "logs_span_id",
             "logs_logfire_token",
+            "discogs:oauth_start",
         } and not self._router._resolve_owner_flag(msg):
             await self._answer_callback(msg, text="Owner only.")
             return
@@ -256,6 +269,9 @@ class MenuFormHandler:
         elif target == "logs_logfire_token":
             section = "logs"
             step = "token"
+        elif target == "discogs:oauth_start":
+            section = "skills:discogs:setup"
+            step = "consumer_key"
         elif target == "second_brain_vault_path":
             section = "second_brain"
             step = "path"
@@ -311,6 +327,8 @@ class MenuFormHandler:
             prompt = "Send the trace span id to look up:"
         elif target == "logs_logfire_token":
             prompt = "Send your Logfire write token (pylf_v1_… — not shown again):"
+        elif target == "discogs:oauth_start":
+            prompt = "Send your Discogs OAuth consumer key:"
         elif target == "second_brain_vault_path":
             prompt = "Send the workspace-relative vault path (e.g. obsidian/alex_AI):"
         elif target == "second_brain_vault_browse":
@@ -389,6 +407,190 @@ class MenuFormHandler:
             await self._advance_subagents_role_limits(
                 msg, token=token, step=step, text=text, payload=payload
             )
+            return
+        if target == "discogs:oauth_start":
+            await self._advance_discogs_oauth(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+
+    async def _advance_discogs_oauth(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Run the Discogs OAuth 1.0a setup wizard (consumer key → secret → verifier).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_discogs_oauth)
+            True
+        """
+        from sevn.integrations.discogs.oauth import DiscogsOAuthError, begin_oauth, complete_oauth
+
+        if not self._router._resolve_owner_flag(msg):
+            self._consume_token(token)
+            await self._send_chat(msg, "Owner only.")
+            return
+
+        user_agent = discogs_settings(self._workspace).user_agent
+        chain = secrets_chain_from_workspace(
+            self._content_root,
+            self._workspace.secrets_backend,
+        )
+
+        async def _secret_value(alias: str) -> str | None:
+            value = await chain.get(alias)
+            if value is None:
+                return None
+            stripped = value.strip()
+            return stripped or None
+
+        if step == "consumer_key":
+            consumer_key = text.strip()
+            if not consumer_key:
+                await self._send_chat(msg, "Consumer key cannot be empty.")
+                return
+            try:
+                await chain.set(DISCOGS_CONSUMER_KEY_SECRET_ALIAS, consumer_key)
+            except Exception as exc:
+                await self._send_chat(msg, f"Could not store consumer key: {exc}")
+                return
+            payload["consumer_key"] = consumer_key
+            payload["step"] = "consumer_secret"
+            self._update_payload(token, payload)
+            await self._send_chat(
+                msg,
+                "Send your Discogs OAuth consumer secret (not shown again):",
+            )
+            return
+
+        if step == "consumer_secret":
+            consumer_secret = text.strip()
+            if not consumer_secret:
+                await self._send_chat(msg, "Consumer secret cannot be empty.")
+                return
+            consumer_key = str(payload.get("consumer_key", "")).strip()
+            if not consumer_key:
+                consumer_key = await _secret_value(DISCOGS_CONSUMER_KEY_SECRET_ALIAS) or ""
+            if not consumer_key:
+                self._consume_token(token)
+                await self._send_chat(msg, "Wizard expired — start again from Discogs Setup.")
+                return
+            try:
+                await chain.set(DISCOGS_CONSUMER_SECRET_SECRET_ALIAS, consumer_secret)
+            except Exception as exc:
+                await self._send_chat(msg, f"Could not store consumer secret: {exc}")
+                return
+            try:
+                request_token, request_secret, authorize_url = begin_oauth(
+                    consumer_key,
+                    consumer_secret,
+                    user_agent,
+                )
+            except DiscogsOAuthError as exc:
+                await self._send_chat(msg, exc.message)
+                return
+            try:
+                await chain.set(DISCOGS_OAUTH_REQUEST_TOKEN_SECRET_ALIAS, request_token)
+                await chain.set(DISCOGS_OAUTH_REQUEST_SECRET_SECRET_ALIAS, request_secret)
+            except Exception as exc:
+                await self._send_chat(msg, f"Could not store OAuth request token: {exc}")
+                return
+            payload["consumer_key"] = consumer_key
+            payload["request_token"] = request_token
+            payload["request_secret"] = request_secret
+            payload["step"] = "verifier"
+            self._update_payload(token, payload)
+            await self._send_chat(
+                msg,
+                "Open this URL in a browser, authorize sevn, then paste the verifier code here:\n"
+                f"{authorize_url}",
+            )
+            return
+
+        if step == "verifier":
+            verifier = text.strip()
+            if not verifier:
+                await self._send_chat(msg, "Verifier cannot be empty.")
+                return
+            consumer_key = str(payload.get("consumer_key", "")).strip()
+            if not consumer_key:
+                consumer_key = await _secret_value(DISCOGS_CONSUMER_KEY_SECRET_ALIAS) or ""
+            consumer_secret = await _secret_value(DISCOGS_CONSUMER_SECRET_SECRET_ALIAS) or ""
+            request_token = str(payload.get("request_token", "")).strip()
+            if not request_token:
+                request_token = await _secret_value(DISCOGS_OAUTH_REQUEST_TOKEN_SECRET_ALIAS) or ""
+            request_secret = str(payload.get("request_secret", "")).strip()
+            if not request_secret:
+                request_secret = (
+                    await _secret_value(DISCOGS_OAUTH_REQUEST_SECRET_SECRET_ALIAS) or ""
+                )
+            if not all((consumer_key, consumer_secret, request_token, request_secret)):
+                self._consume_token(token)
+                await self._send_chat(msg, "Wizard expired — start again from Discogs Setup.")
+                return
+            try:
+                access_token, access_secret = complete_oauth(
+                    consumer_key,
+                    consumer_secret,
+                    request_token,
+                    request_secret,
+                    verifier,
+                )
+            except DiscogsOAuthError as exc:
+                await self._send_chat(msg, exc.message)
+                return
+            try:
+                await chain.set(DISCOGS_OAUTH_TOKEN_SECRET_ALIAS, access_token)
+                await chain.set(DISCOGS_OAUTH_TOKEN_SECRET_SECRET_ALIAS, access_secret)
+                await chain.delete(DISCOGS_OAUTH_REQUEST_TOKEN_SECRET_ALIAS)
+                await chain.delete(DISCOGS_OAUTH_REQUEST_SECRET_SECRET_ALIAS)
+            except Exception as exc:
+                await self._send_chat(msg, f"Could not store OAuth access token: {exc}")
+                return
+
+            def _apply_discogs_oauth(doc: dict[str, Any]) -> None:
+                _set_nested(doc, "skills.discogs.auth_method", "oauth")
+                _set_nested(
+                    doc,
+                    "skills.discogs.consumer_key",
+                    f"${{SECRET:{DISCOGS_CONSUMER_KEY_SECRET_ALIAS}}}",
+                )
+                _set_nested(
+                    doc,
+                    "skills.discogs.consumer_secret",
+                    f"${{SECRET:{DISCOGS_CONSUMER_SECRET_SECRET_ALIAS}}}",
+                )
+                _set_nested(
+                    doc,
+                    "skills.discogs.oauth_token",
+                    f"${{SECRET:{DISCOGS_OAUTH_TOKEN_SECRET_ALIAS}}}",
+                )
+                _set_nested(
+                    doc,
+                    "skills.discogs.oauth_token_secret",
+                    f"${{SECRET:{DISCOGS_OAUTH_TOKEN_SECRET_SECRET_ALIAS}}}",
+                )
+
+            mutate_sevn_json(self._sevn_json, _apply_discogs_oauth)
+            self._consume_token(token)
+            await self._refresh_section(msg, section="skills:discogs:setup", toast=None)
+            await self._send_chat(
+                msg,
+                "✅ OAuth tokens stored. Auth method set to oauth. Tap Test connection to verify.",
+            )
+            return
 
     async def _advance_subagents_max_override(
         self,
