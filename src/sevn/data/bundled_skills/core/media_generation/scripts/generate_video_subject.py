@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Image-to-image via media_generator (reference portrait + style/scene vars)."""
+"""Subject-reference video (face-consistent) via media_generator."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from _common import add_prompt_var_args, prompt_vars_from_args, run_media_genera
 
 
 def main() -> int:
-    """Run image-to-image CLI.
+    """Run subject-reference video CLI.
 
     Returns:
         int: ``0`` on success; ``1`` on failure.
@@ -25,25 +25,19 @@ def main() -> int:
         >>> inspect.isfunction(main)
         True
     """
-    parser = argparse.ArgumentParser(description="Image-to-image via media_generator")
-    parser.add_argument("prompt", help="Short transformation intent")
-    parser.add_argument("reference", help="Reference portrait path or URL")
-    parser.add_argument(
-        "--template",
-        default=None,
-        help="default|style_transfer|wardrobe|background",
+    parser = argparse.ArgumentParser(
+        description="Generate face-consistent video via media_generator (S2V)",
     )
-    parser.add_argument("--aspect-ratio", default="1:1", dest="aspect_ratio")
+    parser.add_argument("prompt", help="Short action intent")
+    parser.add_argument("subject_reference", help="Face reference image path or URL")
+    parser.add_argument("--template", default=None, help="default|talking_head|reaction")
     add_prompt_var_args(parser)
     args = parser.parse_args()
-    extra: dict[str, object] = {
-        "reference_image": args.reference,
-        "aspect_ratio": args.aspect_ratio,
-    }
+    extra: dict[str, object] = {"subject_reference": args.subject_reference}
     if args.template:
         extra["template"] = args.template
     extra.update(prompt_vars_from_args(args))
-    return run_media_generation("image_i2i", args.prompt, extra=extra)
+    return run_media_generation("video_s2v", args.prompt, extra=extra)
 
 
 if __name__ == "__main__":

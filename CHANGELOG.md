@@ -62,6 +62,7 @@ are cut into a dated, versioned section at release time.
 - [2026-07-16] Remove the Playwright E2E harness and `telegram-tester`, replacing Telegram Web checks with the browser `telegram_web` recipe (+ Bot-API `getMe` helper); park webchat/onboarding/Mission Control journeys pending re-home (#37)
 - [2026-07-16] `computer-use` skill `see_also` drops the removed `playwright-browser` reference; docker gateway browser/gui images install `browser-cdp` only
 - [2026-07-16] Residual Playwright symbols renamed to browser_tool (routing/grounding), deprecated prompt aliases dropped, OpenUI rasteriser is weasyprint-only, and docker/.env install paths use `browser-cdp` without `playwright install`
+- [2026-07-18] `media_generation` v2.2.0 hardens `media_generator`: voice speaks literal `speech_text`/`preview_text`, unique artifact filenames, `file_id` int|str, lean prompts (fail unknown template), path containment, and S2V/FL2V skill scripts
 - [2026-07-15] Telegram `/config`, onboarding wizard, and Mission Control Knowledge view expose Second Brain layout selection and resolved PARA role paths instead of assuming legacy `wiki/raw/outputs` folders
 - [2026-07-16] Remove Playwright browser extra and Playwright-based skills (`playwright-browser`, `facebook-use`, `linkedin-use`, `x-use`); install/sync paths prefer `browser-cdp` only (WIP on `remove/playwright`)
 - [2026-07-14] The about-docs generator no longer writes `interfaces`, `depends_on`, or `build_phase` into `kind: prd` frontmatter (spec-only keys; aligns with `skw prd-validate`)

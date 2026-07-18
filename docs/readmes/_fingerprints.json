@@ -2,8 +2,8 @@
   "entries": {
     "agent": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T11:52:35Z",
-      "digest": "ca0791d8355b00b6bdcce53746b52c0e7160ba642061f26e1e084cc479780e35",
+      "computed_at": "2026-07-18T13:13:20Z",
+      "digest": "9851d7a984dcbd998629369311e3a4c0a6d7ae8c548cbc60bc24fc8fc51cb27c",
       "source_globs": [
         "src/sevn/agent/**"
       ]
@@ -26,8 +26,8 @@
     },
     "config-workspace": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T11:52:35Z",
-      "digest": "332d8414b172e24381d64a7e279e2f34a9d6258c4b8bce36865562b344625605",
+      "computed_at": "2026-07-18T10:32:43Z",
+      "digest": "89431e4f71e2a94ef9fbe90e251bfe778d2d28d43e5ddaeaa32433e53bfd99a8",
       "source_globs": [
         "src/sevn/config/**",
         "src/sevn/workspace/**",
@@ -44,8 +44,8 @@
     },
     "gateway": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T11:52:35Z",
-      "digest": "c7f03a9efddbff8a1a2a95bc46f686edb03256284d038e93354d13d147bf6e72",
+      "computed_at": "2026-07-18T10:32:41Z",
+      "digest": "3c44ec257b0a94e7e7ffd61a1f48154d757534ca1882541076c01d8d8a98fc74",
       "source_globs": [
         "src/sevn/gateway/**"
       ]
@@ -60,8 +60,8 @@
     },
     "integrations": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T11:52:36Z",
-      "digest": "3fb2199482e9a93a5ed9df335adc9b12ede0bf3e14fe95171d4ac91b1a47d020",
+      "computed_at": "2026-07-16T19:40:42Z",
+      "digest": "be26056ab2105277590bbfe95a96c7034b0f68df30416ac2758531aab70350bd",
       "source_globs": [
         "src/sevn/integrations/**"
       ]
@@ -77,8 +77,8 @@
     },
     "onboarding": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T11:52:36Z",
-      "digest": "243ea59f532c9a787e2975389897e5dd29694a71496d6593680e17e537536fe4",
+      "computed_at": "2026-07-17T21:48:19Z",
+      "digest": "30a02fa38182aac287bfcd88fc52b506832800ab35b65959082e8aa3120ecc9c",
       "source_globs": [
         "src/sevn/onboarding/**",
         "src/sevn/cli/commands/onboard.py",
@@ -87,7 +87,7 @@
     },
     "plugins": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-16T18:08:16Z",
+      "computed_at": "2026-07-15T18:16:30Z",
       "digest": "ab4e914f79036515eb4f237c238304c982aa0fc45e281f11d363ab2dd6627349",
       "source_globs": [
         "src/sevn/plugins/**"
@@ -103,8 +103,8 @@
     },
     "root": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T11:52:34Z",
-      "digest": "376577f78f256d1617d019802952b9cc894d78c69448544e0fdab23f58c4bfb2",
+      "computed_at": "2026-07-17T22:19:24Z",
+      "digest": "268e7c6f937a9e7f2e0c2e5c92574752d3a71f17b7b6859e8e4d6b62d88d078b",
       "source_globs": [
         "pyproject.toml",
         "CLAUDE.md",
@@ -148,8 +148,8 @@
     },
     "skills": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T11:52:35Z",
-      "digest": "a79cdbae85d48007120626364e5ae571336e392b1556d18347c6ccb5b5224238",
+      "computed_at": "2026-07-18T13:13:25Z",
+      "digest": "555ea9a7da01b685c95b14d0a527572b43da921e42193a3bef5ab9a2392053cb",
       "source_globs": [
         "src/sevn/skills/**",
         "src/sevn/data/bundled_skills/**",
@@ -166,8 +166,8 @@
     },
     "subagents": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T11:52:36Z",
-      "digest": "7558e49cc8ec0e4b93fa541560913706fe10e1e9f8024ba98c83612c8fce2bba",
+      "computed_at": "2026-07-18T13:13:22Z",
+      "digest": "135e6ccfce50059d0c33ff5448e1fe0e1d528027cba0ea7936c43ef9732ff27a",
       "source_globs": [
         "src/sevn/agent/subagents/**",
         "src/sevn/config/sections/subagents.py",
@@ -180,8 +180,8 @@
     },
     "tools": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T11:52:35Z",
-      "digest": "a9b722554e9eae7e8009415998dba3fd8c30845d985cc643e12ebc2b8d304639",
+      "computed_at": "2026-07-17T22:19:27Z",
+      "digest": "2a5589ce0775e2a24949272ac549221adc01a19946dfe9878e18be9b8943ecd8",
       "source_globs": [
         "src/sevn/tools/**"
       ]
@@ -205,16 +205,16 @@
     },
     "ui-mission-control": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-16T18:08:16Z",
-      "digest": "c44b7d50d9b0199c73ac949902aa1fa29b41df05a945c3ce9b66c23e72944cb5",
+      "computed_at": "2026-07-15T18:16:30Z",
+      "digest": "e12b293cd8b25af8ebef6647f97e2b0be2b23e54ea7a6b9f97bd3a7182192b2a",
       "source_globs": [
         "src/sevn/ui/**"
       ]
     },
     "voice": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-15T18:16:30Z",
-      "digest": "d86e09e3208ae192ad94bd266d4f8ca2d60ca1324c6652df8e90d9abf2ae784d",
+      "computed_at": "2026-07-18T13:13:27Z",
+      "digest": "715635240bd8d93efbe42647195d9e8fc95bc175017fe0df0594a062a9b83000",
       "source_globs": [
         "src/sevn/voice/**"
       ]
