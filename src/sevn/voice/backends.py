@@ -700,6 +700,11 @@ def _requirements_file_for_engine(skill_dir: Path, engine: str) -> Path | None:
 
     Returns:
         Path | None: Requirements file when present.
+
+    Examples:
+        >>> from pathlib import Path
+        >>> _requirements_file_for_engine(Path("/nonexistent"), "kokoro") is None
+        True
     """
     specific = skill_dir / f"requirements-{engine}.txt"
     if specific.is_file():
@@ -740,7 +745,15 @@ class TextToVoiceBackend:
 
     @property
     def engine(self) -> str:
-        """Active local TTS engine (``kokoro`` or ``supertonic``)."""
+        """Active local TTS engine (``kokoro`` or ``supertonic``).
+
+        Returns:
+            str: Resolved engine tag.
+
+        Examples:
+            >>> TextToVoiceBackend(engine="supertonic").engine
+            'supertonic'
+        """
         return self._engine
 
     async def is_available(self) -> bool:
