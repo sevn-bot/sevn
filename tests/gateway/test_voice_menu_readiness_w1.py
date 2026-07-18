@@ -54,6 +54,27 @@ def test_stt_cycle_callback_parses_and_cycles() -> None:
     assert "stt" in target
 
 
+def test_tts_engine_cycle_spec_resolves_to_c3_5() -> None:
+    spec = match_menu_button_spec("cfg:voice:engine:next")
+    assert spec is not None
+    assert spec.spec_id == "C3.5"
+
+
+def test_tts_engine_cycle_callback_is_ready() -> None:
+    assert readiness_for_callback("cfg:voice:engine:next") == "Ready"
+    rows = [[{"text": "TTS engine: kokoro 🔁", "callback_data": "cfg:voice:engine:next"}]]
+    gated = gate_config_keyboard_rows(rows)
+    assert gated[0][0]["callback_data"] == "cfg:voice:engine:next"
+
+
+def test_tts_engine_cycle_callback_parses() -> None:
+    parsed = parse_action_callback("cfg:voice:engine:next")
+    assert parsed is not None
+    kind, target, _value = parsed
+    assert kind == "action"
+    assert target == "voice:engine:next"
+
+
 # --- W1.5: round trip mutates config + menu reflects new value -------------
 
 
@@ -70,4 +91,24 @@ async def test_voice_mode_round_trip_persists_to_sevn_json(tmp_path: Path) -> No
     assert _get_nested(raw, "voice.tts_mode") == "when_asked"
     assert any("TTS mode: when_asked" in edit.get("text", "") for edit in cap.edited)
     assert cap.sent == []
+    _ = ws
+
+
+@pytest.mark.asyncio
+async def test_tts_engine_round_trip_persists_to_sevn_json(tmp_path: Path) -> None:
+    router, cap, ws = _build_router(tmp_path)
+    await router.route_incoming(
+        _config_callback("cfg:section:voice", callback_query_id="cq-nav-engine"),
+    )
+    await router.route_incoming(
+        _config_callback("cfg:voice:engine:next", callback_query_id="cq-engine"),
+    )
+    raw = load_raw_sevn_json(tmp_path / "w" / "sevn.json")
+    assert _get_nested(raw, "voice.local_tts_engine") == "supertonic"
+    assert any("Active TTS engine: supertonic" in edit.get("text", "") for edit in cap.edited)
+    assert any(
+        any(btn.get("callback_data") == "cfg:voice:engine:next" for btn in row)
+        for edit in cap.edited
+        for row in (edit.get("reply_markup") or {}).get("inline_keyboard", [])
+    )
     _ = ws

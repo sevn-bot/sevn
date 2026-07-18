@@ -297,6 +297,15 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         implemented=True,
         notes="Cycles voice.stt_providers primary; wired TMF Wave W4",
     )
+    add(
+        "C3.5",
+        r"^cfg:voice:engine:.*$",
+        "C",
+        "voice",
+        "TTS engine cycle",
+        implemented=True,
+        notes="Cycles voice.local_tts_engine (kokoro / supertonic)",
+    )
 
     # --- C4. Models ---
     add(
@@ -1211,7 +1220,6 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
     for spec_id, cmd in (
         ("D2.1", "new"),
         ("D2.2", "help"),
-        ("D2.3", "voice"),
         ("D2.4", "model"),
         ("D2.5", "status"),
         ("D2.6", "stop"),
@@ -1295,7 +1303,6 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         ("F1", "new"),
         ("F2", "stop"),
         ("F3", "status"),
-        ("F4", "voice"),
         ("F5", "model"),
     ):
         add(

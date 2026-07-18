@@ -42,7 +42,7 @@ from sevn.cli.service_manager import (
     unit_file_exists,
 )
 from sevn.cli.workspace import sevn_home_dir
-from sevn.config.defaults import DEFAULT_VOICE_STT_PROVIDERS
+from sevn.config.defaults import DEFAULT_VOICE_LOCAL_TTS_ENGINE, DEFAULT_VOICE_STT_PROVIDERS
 from sevn.config.model_resolution import (
     ModelSlot,
     apply_model_to_picker_slot,
@@ -77,6 +77,7 @@ from sevn.gateway.menu.menu import (
     service_restart_confirm_message,
 )
 from sevn.onboarding.web_app import _get_nested, _set_nested
+from sevn.voice.backends import KNOWN_LOCAL_TTS_ENGINES
 
 if TYPE_CHECKING:
     from sevn.gateway.channel_router import ChannelRouter, IncomingMessage
@@ -232,6 +233,8 @@ def parse_action_callback(data: str) -> tuple[ActionKind, str, str | None] | Non
         ('toggle', 'voice.tts_mode', 'off')
         >>> parse_action_callback("cfg:voice:stt:next")
         ('action', 'voice:stt:next', None)
+        >>> parse_action_callback("cfg:voice:engine:next")
+        ('action', 'voice:engine:next', None)
         >>> parse_action_callback("cfg:dashboard:refresh_pin")
         ('action', 'dashboard:refresh_pin', None)
         >>> parse_action_callback("cfg:dashboard:create_pin")
@@ -284,6 +287,8 @@ def parse_action_callback(data: str) -> tuple[ActionKind, str, str | None] | Non
         if key in _CFG_ACTION_KEYS:
             return ("action", key, None)
         if key.startswith("voice:stt:"):
+            return ("action", key, None)
+        if key.startswith("voice:engine:"):
             return ("action", key, None)
         if key.endswith((":off", ":on")):
             parts = key.rsplit(":", 1)
@@ -485,6 +490,8 @@ class MenuActionRouter:
                 return await self._handle_shortcut_delete(msg, raw, target)
             if target.startswith("voice:stt:"):
                 return await self._handle_voice_stt_cycle(msg, raw, target)
+            if target.startswith("voice:engine:"):
+                return await self._handle_voice_engine_cycle(msg, raw, target)
             if target == "models:swap":
                 return await self._handle_models_swap(msg, raw)
             if target.startswith("models:pick:"):
@@ -959,6 +966,55 @@ class MenuActionRouter:
         mutate_sevn_json(self._sevn_json, _apply)
         self._reload_workspace()
         toast = f"STT provider: {new_active}"
+        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+        return None if answered else toast
+
+    async def _handle_voice_engine_cycle(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        target: str,
+    ) -> str | None:
+        """Cycle ``voice.local_tts_engine`` between ``kokoro`` and ``supertonic``.
+
+        Writes the next engine into ``sevn.json`` and reloads workspace settings so
+        :meth:`ChannelRouter.apply_workspace` rebuilds the TTS pipeline with the new
+        engine. A specific engine tag as the callback suffix (e.g.
+        ``cfg:voice:engine:supertonic``) jumps directly to that engine.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed action target (``voice:engine:<suffix>``).
+
+        Returns:
+            str | None: Toast text, or ``None`` when the config menu was edited in place.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_voice_engine_cycle)
+            True
+        """
+        suffix = target.removeprefix("voice:engine:").strip().casefold()
+        engines = tuple(sorted(KNOWN_LOCAL_TTS_ENGINES))
+        configured = (
+            str(self._workspace.voice.local_tts_engine).strip().casefold()
+            if self._workspace.voice and self._workspace.voice.local_tts_engine
+            else DEFAULT_VOICE_LOCAL_TTS_ENGINE
+        )
+        active = configured if configured in engines else DEFAULT_VOICE_LOCAL_TTS_ENGINE
+        if suffix and suffix != "next" and suffix in engines:
+            new_active = suffix
+        else:
+            idx = engines.index(active)
+            new_active = engines[(idx + 1) % len(engines)]
+
+        def _apply(doc: dict[str, Any]) -> None:
+            _set_nested(doc, "voice.local_tts_engine", new_active)
+
+        mutate_sevn_json(self._sevn_json, _apply)
+        self._reload_workspace()
+        toast = f"TTS engine: {new_active}"
         answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
         return None if answered else toast
 
