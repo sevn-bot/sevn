@@ -89,10 +89,6 @@
       <td>Search and send email through configured accounts.</td>
     </tr>
     <tr>
-      <td><code>facebook-use</code></td>
-      <td>Facebook workflows via a logged-in browser profile or CDP attach (feed read, search).</td>
-    </tr>
-    <tr>
       <td><code>gh-issues</code></td>
       <td>GitHub issue lifecycle — templated create via authenticated gh CLI (proxy fallback), authenticated view/watch/track with cron notify on changes, plus list/comment via integration_call.</td>
     </tr>
@@ -133,16 +129,12 @@
       <td>Search and recall conversation history without losing detail.</td>
     </tr>
     <tr>
-      <td><code>linkedin-use</code></td>
-      <td>LinkedIn staff/company/connection scraping via logged-in browser + Voyager API (StaffSpy port).</td>
-    </tr>
-    <tr>
       <td><code>lume</code></td>
       <td>Apple-Silicon VM lifecycle via the lume CLI (run/stop/ls/pull); opt-in; also a computer-use sandbox target via `cua do switch lume`</td>
     </tr>
     <tr>
       <td><code>media_generation</code></td>
-      <td>MiniMax media generation — 9 API paths, scene/style variables, 40+ prompt templates, 16 video agent templates, voice, music — via media_generator L2 specialist.</td>
+      <td>MiniMax media generation — image, video (t2v/i2v/s2v/fl2v/templates), voice clone/TTS, music — via media_generator L2 specialist with lean prompt templates and trace metadata.</td>
     </tr>
     <tr>
       <td><code>mycode</code></td>
@@ -167,10 +159,6 @@
     <tr>
       <td><code>pdf</code></td>
       <td>Extract text and metadata from PDF documents.</td>
-    </tr>
-    <tr>
-      <td><code>playwright-browser</code></td>
-      <td>Automate web pages in a controlled browser session.</td>
     </tr>
     <tr>
       <td><code>printing-press-library</code></td>
@@ -213,21 +201,13 @@
       <td>Telegram inline custom buttons and forum supergroup helpers (Bot API + allowlist/userbot hooks).</td>
     </tr>
     <tr>
-      <td><code>telegram_test</code></td>
-      <td>Run host-side Playwright Telegram E2E (sevn telegram-test) while building sevn.bot. Use after gateway/menu/session/diagnostics changes. Not in gateway container.</td>
-    </tr>
-    <tr>
-      <td><code>x-use</code></td>
-      <td>X (Twitter) workflows via a logged-in browser profile or CDP attach (timeline, search).</td>
-    </tr>
-    <tr>
       <td><code>yt-dlp</code></td>
       <td>Download video/audio and metadata with yt-dlp (YouTube, Vimeo, X, TikTok, and allowlisted hosts).</td>
     </tr>
   </tbody>
 </table>
       <footer class="help-footer">
-        Generated 2026-07-17 from commit a9a7ad6.
+        Generated 2026-07-18 from commit 3617fe30.
         Edit <code>about-sevn.bot/_sources/skills.yaml</code> or templates — not the HTML directly.
       </footer>
     </main>

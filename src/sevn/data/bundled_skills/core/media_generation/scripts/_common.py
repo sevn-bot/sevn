@@ -142,6 +142,62 @@ def run_media_generation(
     return 0
 
 
+_PROMPT_VAR_FLAGS = (
+    ("--scene", "scene"),
+    ("--style", "style"),
+    ("--subject", "subject"),
+    ("--mood", "mood"),
+    ("--lighting", "lighting"),
+    ("--camera", "camera"),
+    ("--genre", "genre"),
+    ("--tempo", "tempo"),
+    ("--instrumentation", "instrumentation"),
+    ("--delivery", "delivery"),
+)
+
+
+def add_prompt_var_args(parser: object) -> None:
+    """Add optional structured prompt variable flags to an argparse parser.
+
+    Args:
+        parser (object): ``argparse.ArgumentParser`` (or mutually exclusive group).
+
+    Examples:
+        >>> import argparse
+        >>> p = argparse.ArgumentParser()
+        >>> add_prompt_var_args(p)
+        >>> "--scene" in p.format_help()
+        True
+    """
+    import argparse
+
+    assert isinstance(parser, argparse.ArgumentParser)
+    for flag, dest in _PROMPT_VAR_FLAGS:
+        parser.add_argument(flag, default=None, dest=dest)
+
+
+def prompt_vars_from_args(args: object) -> dict[str, object]:
+    """Extract non-empty prompt variable fields from parsed argparse namespace.
+
+    Args:
+        args (object): ``argparse.Namespace``.
+
+    Returns:
+        dict[str, object]: Fields to merge into the media task JSON.
+
+    Examples:
+        >>> from types import SimpleNamespace
+        >>> prompt_vars_from_args(SimpleNamespace(scene="forest", style=None, mood=""))
+        {'scene': 'forest'}
+    """
+    out: dict[str, object] = {}
+    for _flag, dest in _PROMPT_VAR_FLAGS:
+        val = getattr(args, dest, None)
+        if isinstance(val, str) and val.strip():
+            out[dest] = val.strip()
+    return out
+
+
 def main_guard() -> None:
     """Ensure this helper module is not executed as a script entrypoint.
 

@@ -5,7 +5,6 @@
     "tier_b_skill_cap": 10
   },
   "capabilities_defaults": {
-    "extra.browser": true,
     "extra.browser_cdp": true,
     "extra.web_fetch": true,
     "extra.web_extract": true,

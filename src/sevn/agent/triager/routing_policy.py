@@ -19,8 +19,8 @@ Exports:
     is_identity_or_capability_message — informational → tier B detector.
     is_lcm_status_message — LCM status/contents intent detector.
     is_session_recall_message — past-session/conversation recall intent detector.
-    is_package_install_message — uv sync / playwright install / option-1 install detector.
-    is_playwright_browser_message — screenshot / playwright-browser automation detector.
+    is_package_install_message — uv sync / browser-cdp / option-1 install detector.
+    is_browser_tool_message — screenshot / browser-tool automation detector.
     is_live_factual_message — live scores, news, weather, schedules detector.
     is_workspace_file_intent_message — workspace markdown read/edit detector.
     is_file_search_intent_message — workspace file content search / grep intent detector (W3).
@@ -523,21 +523,17 @@ _LOG_PROVENANCE_TOOL_IDS: Final[tuple[str, ...]] = (
 
 _PACKAGE_INSTALL_PATTERNS: Final[tuple[re.Pattern[str], ...]] = (
     re.compile(r"\buv\s+sync\b", re.I),
-    re.compile(r"\bplaywright\s+install\b", re.I),
+    re.compile(r"\bbrowser-cdp\b", re.I),
     re.compile(r"\bpip\s+install\b", re.I),
     re.compile(r"\bnpm\s+install\b", re.I),
-    re.compile(r"\binstall\s+(playwright|chromium|browser\s+extra)\b", re.I),
+    re.compile(r"\binstall\s+(chromium|browser-cdp|browser\s+extra)\b", re.I),
     re.compile(r"\boption\s+1\b", re.I),
-    re.compile(r"\b(install|sync)\b.+\b(browser|playwright|chromium)\b", re.I),
+    re.compile(r"\b(install|sync)\b.+\b(browser|browser-cdp|chromium)\b", re.I),
 )
 
-_PLAYWRIGHT_BROWSER_PATTERNS: Final[tuple[re.Pattern[str], ...]] = (
-    re.compile(r"\bplaywright[- ]browser\b", re.I),
-    re.compile(r"\bplaywright\b.+\b(skill|script|screenshot|browser)\b", re.I),
+_BROWSER_TOOL_PATTERNS: Final[tuple[re.Pattern[str], ...]] = (
     re.compile(r"\bscreenshot\b.+\b(url|page|http|https)\b", re.I),
     re.compile(r"\b(take|get|capture)\b.+\bscreenshot\b", re.I),
-    re.compile(r"\brun_skill_script\b.+\b(capture|goto|screenshot)\b", re.I),
-    re.compile(r"\b(capture|screenshot)\.py\b", re.I),
     re.compile(r"\bsearch\s+\S+\.(?:com|org|net)\b", re.I),
     re.compile(r"\b(?:nba|espn)\.com\b", re.I),
 )
@@ -558,9 +554,9 @@ _LIVE_FACTUAL_PATTERNS: Final[tuple[re.Pattern[str], ...]] = (
 _LIVE_FACTUAL_TOOL_IDS: Final[tuple[str, ...]] = ("get_page_content", "serp")
 
 _PACKAGE_INSTALL_TOOL_IDS: Final[tuple[str, ...]] = ("process",)
-_PLAYWRIGHT_BROWSER_TOOL_IDS: Final[tuple[str, ...]] = (
-    "load_skill",
-    "run_skill_script",
+_BROWSER_TOOL_TOOL_IDS: Final[tuple[str, ...]] = (
+    "browser",
+    "load_tool",
     "send_file",
 )
 
@@ -1124,7 +1120,7 @@ def is_package_install_message(message: str) -> bool:
         message (str): Current user message.
 
     Returns:
-        bool: True for ``uv sync``, ``playwright install``, or similar.
+        bool: True for ``uv sync``, ``browser-cdp`` install, or similar.
 
     Examples:
         >>> is_package_install_message("do option 1")
@@ -1138,8 +1134,8 @@ def is_package_install_message(message: str) -> bool:
     return any(p.search(text) for p in _PACKAGE_INSTALL_PATTERNS)
 
 
-def is_playwright_browser_message(message: str) -> bool:
-    """Return True when the user wants playwright-browser automation or screenshots.
+def is_browser_tool_message(message: str) -> bool:
+    """Return True when the user wants browser-tool automation or screenshots.
 
     Args:
         message (str): Current user message.
@@ -1148,15 +1144,15 @@ def is_playwright_browser_message(message: str) -> bool:
         bool: True for screenshot/navigation intents via the browser skill.
 
     Examples:
-        >>> is_playwright_browser_message("get a screenshot of https://example.com")
+        >>> is_browser_tool_message("get a screenshot of https://example.com")
         True
-        >>> is_playwright_browser_message("hello")
+        >>> is_browser_tool_message("hello")
         False
     """
     text = message.strip()
     if not text:
         return False
-    return any(p.search(text) for p in _PLAYWRIGHT_BROWSER_PATTERNS)
+    return any(p.search(text) for p in _BROWSER_TOOL_PATTERNS)
 
 
 def is_live_factual_message(message: str) -> bool:
@@ -1220,11 +1216,11 @@ def _merge_package_install_tools(tools: list[str]) -> list[str]:
     return out
 
 
-def _merge_playwright_browser_surface(
+def _merge_browser_tool_surface(
     tools: list[str],
     skills: list[str],
 ) -> tuple[list[str], list[str]]:
-    """Replace tools with the playwright-browser surface for screenshot/navigation turns.
+    """Pin the native ``browser`` tool for screenshot/navigation turns.
 
     Args:
         tools (list[str]): Triager-selected tool ids (ignored except for doctest parity).
@@ -1234,15 +1230,12 @@ def _merge_playwright_browser_surface(
         tuple[list[str], list[str]]: Pinned ``(tools, skills)`` without ``terminal_run``.
 
     Examples:
-        >>> _merge_playwright_browser_surface(["terminal_run", "process"], [])
-        (['load_skill', 'run_skill_script', 'send_file'], ['playwright-browser'])
+        >>> _merge_browser_tool_surface(["terminal_run", "process"], ["canvas"])
+        (['browser', 'load_tool', 'send_file'], ['canvas'])
     """
     _ = tools
-    tool_out: list[str] = list(_PLAYWRIGHT_BROWSER_TOOL_IDS)
-    skill_out = list(skills)
-    if "playwright-browser" not in skill_out:
-        skill_out.append("playwright-browser")
-    return tool_out, skill_out
+    tool_out: list[str] = list(_BROWSER_TOOL_TOOL_IDS)
+    return tool_out, list(skills)
 
 
 def _merge_repo_file_ops_tools(tools: list[str]) -> list[str]:
@@ -2369,7 +2362,7 @@ def apply_routing_policy(
             router="is_log_provenance_intent_message",
         )
 
-    if is_live_factual_message(msg) and not is_playwright_browser_message(msg):
+    if is_live_factual_message(msg) and not is_browser_tool_message(msg):
         lf_updates: dict[str, object] = {
             "intent": Intent.NEW_REQUEST,
             "complexity": ComplexityTier.B,
@@ -2403,25 +2396,25 @@ def apply_routing_policy(
             router="is_registry_capability_intent_message",
         )
 
-    if is_playwright_browser_message(msg):
-        pw_tools, pw_skills = _merge_playwright_browser_surface(
+    if is_browser_tool_message(msg):
+        bt_tools, bt_skills = _merge_browser_tool_surface(
             tools=list(out.tools),
             skills=list(out.skills),
         )
         if is_live_factual_message(msg):
-            pw_tools = _merge_live_factual_tools(pw_tools)
-        pw_updates: dict[str, object] = {
+            bt_tools = _merge_live_factual_tools(bt_tools)
+        bt_updates: dict[str, object] = {
             "intent": Intent.NEW_REQUEST,
             "complexity": ComplexityTier.B,
-            "tools": pw_tools,
-            "skills": pw_skills,
+            "tools": bt_tools,
+            "skills": bt_skills,
         }
         if out.complexity == ComplexityTier.A or not out.first_message.strip():
-            pw_updates["first_message"] = default_early_ack(turn_id=turn_id)
+            bt_updates["first_message"] = default_early_ack(turn_id=turn_id)
         out = _apply_intent_router_update(
             out,
-            pw_updates,
-            router="is_playwright_browser_message",
+            bt_updates,
+            router="is_browser_tool_message",
         )
 
     if is_package_install_message(msg):

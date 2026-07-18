@@ -47,7 +47,6 @@ from sevn.agent.grounding import (
     steer_for_direct_tool_call,
     steer_for_fallback_tool,
     steer_for_meta_tool_call,
-    steer_for_playwright_cdp_probe_failure,
 )
 from sevn.agent.tracing.sink import checkpoint_snapshot
 from sevn.config.defaults import (
@@ -170,31 +169,6 @@ def should_block_shell_improvisation(
     if tool_name not in _SHELL_IMPROVISATION_TOOLS:
         return False
     return bool(bound_file_search_tools(triager_bound_tools))
-
-
-_PLAYWRIGHT_CDP_PROBE_SCRIPT_NAMES = frozenset({"cdp_probe.py", "session_status.py"})
-"""Probe scripts that may return ``CDP_UNREACHABLE`` before Chrome spawns (W6 / 5d)."""
-
-
-def _is_playwright_cdp_probe_script(script_path: str) -> bool:
-    """Return whether ``script_path`` is a pre-spawn CDP probe for playwright-browser.
-
-    Args:
-        script_path (str): ``run_skill_script`` script path or basename.
-
-    Returns:
-        bool: ``True`` for ``cdp_probe.py`` / ``session_status.py`` entries.
-
-    Examples:
-        >>> _is_playwright_cdp_probe_script("scripts/cdp_probe.py")
-        True
-        >>> _is_playwright_cdp_probe_script("scripts/capture.py")
-        False
-    """
-    normalized = script_path.replace("\\", "/").strip()
-    if not normalized:
-        return False
-    return normalized.split("/")[-1] in _PLAYWRIGHT_CDP_PROBE_SCRIPT_NAMES
 
 
 def eager_hydrate_tool_names(
@@ -890,25 +864,6 @@ async def _dispatch_tool(
                         tool=definition.name,
                         fallback=fallback_name,
                     )
-                if (
-                    definition.name == "run_skill_script"
-                    and code == "CDP_UNREACHABLE"
-                    and repeat_n == 1
-                ):
-                    skill = str(
-                        payload.get("skill") or payload.get("skill_name") or "",
-                    ).strip()
-                    script = str(
-                        payload.get("script_path") or payload.get("script") or "",
-                    ).strip()
-                    if skill == "playwright-browser" and _is_playwright_cdp_probe_script(
-                        script,
-                    ):
-                        steer = deps.steer_buffer
-                        if steer is not None:
-                            steer.inject_pending(
-                                steer_for_playwright_cdp_probe_failure(),
-                            )
                 fast_threshold = 2 if code == ToolResultCode.SKILL_IS_ACTUALLY_TOOL else 3
                 if repeat_n >= fast_threshold:
                     deps.escalation = EscalationRequest(

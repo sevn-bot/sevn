@@ -363,11 +363,11 @@ class OpenUIWorkspaceConfig(BaseModel):
     soft_cap_bytes: int = Field(default=DEFAULT_OPENUI_SOFT_CAP_BYTES, ge=1024)
     hard_cap_bytes: int = Field(default=DEFAULT_OPENUI_HARD_CAP_BYTES, ge=4096)
     allowed_asset_origins: list[str] = Field(default_factory=list)
-    rasteriser: Literal["weasyprint", "playwright"] = Field(default="weasyprint")
+    rasteriser: Literal["weasyprint"] = Field(default="weasyprint")
 
     @model_validator(mode="after")
     def _v1_rasteriser_only(self) -> OpenUIWorkspaceConfig:
-        """Reject reserved rasteriser backends until implemented (`specs/29-openui.md` §4.4).
+        """Validate OpenUI size caps (`specs/29-openui.md` §4.4).
 
         Returns:
             OpenUIWorkspaceConfig: Validated ``self``.
@@ -377,12 +377,6 @@ class OpenUIWorkspaceConfig(BaseModel):
             'weasyprint'
         """
 
-        if self.rasteriser == "playwright":
-            msg = (
-                "openui.rasteriser=playwright is reserved and not implemented in v1 "
-                "(specs/29-openui.md §4.4); use weasyprint or omit the key."
-            )
-            raise ValueError(msg)
         if self.soft_cap_bytes > self.hard_cap_bytes:
             msg = "openui.soft_cap_bytes must be <= openui.hard_cap_bytes"
             raise ValueError(msg)

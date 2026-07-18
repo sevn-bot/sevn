@@ -250,8 +250,8 @@
             },
             {
               "content_type": "playbooks",
-              "id": "playwright_browser",
-              "label": "Playwright Browser"
+              "id": "browser_tool",
+              "label": "Browser Tool"
             },
             {
               "content_type": "playbooks",
@@ -399,7 +399,7 @@
             "spill_recovery",
             "tool_economy",
             "process_install",
-            "playwright_browser",
+            "browser_tool",
             "bound_skill_playbook",
             "triager_bound_mandate",
             "memorize",

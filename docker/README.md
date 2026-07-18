@@ -34,7 +34,7 @@ All operator targets use `COMPOSE_FILE=docker/docker-compose.yml` and fail fast 
 Optional gateway variants swap Dockerfiles via profiles (mutually exclusive):
 
 ```bash
-# Browser skills (Brave + Playwright) — profile browser
+# Browser CDP gateway (Brave + browser-cdp) — profile browser
 docker compose -f docker/docker-compose.yml --profile browser up -d --build
 
 # Headed GUI gateway + noVNC — profile gui
@@ -77,7 +77,7 @@ the guard (dev-only).
 | `Dockerfile.gateway` | HTTP gateway image |
 | `Dockerfile.proxy` | Egress proxy image |
 | `Dockerfile.sandbox` | Tier-B sandbox image |
-| `Dockerfile.gateway.browser` | Gateway + Brave/Playwright (profile `browser`) |
+| `Dockerfile.gateway.browser` | Gateway + Brave/browser-cdp (profile `browser`) |
 | `Dockerfile.gateway.gui` | Gateway + noVNC (profile `gui`) |
 | `docker-compose.yml` | Operator local stack |
 | `docker-compose.ci.yml` | CI integration stack |

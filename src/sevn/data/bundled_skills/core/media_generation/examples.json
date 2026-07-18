@@ -1,6 +1,6 @@
 {
-  "version": "2.1.0",
-  "description": "Copy-paste task examples for media_generator. Pass short prompt + optional scene/style/mood variables.",
+  "version": "2.2.0",
+  "description": "Copy-paste task examples for media_generator. Pass short prompt + optional scene/style/mood variables. Voice speech_text/preview_text are spoken verbatim.",
   "variables": [
     "scene",
     "style",

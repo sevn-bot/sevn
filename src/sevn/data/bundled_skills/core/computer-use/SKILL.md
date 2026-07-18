@@ -3,7 +3,7 @@ name: computer-use
 description: >-
   Drive a computer via trycua/cua — host cua-driver MCP passthrough plus sandbox
   providers (docker/cloud/lume) through the cua CLI; opt-in; macOS-only
-see_also: [load_skill, run_skill_script, run_skill_runnable, playwright-browser, lume]
+see_also: [load_skill, run_skill_script, run_skill_runnable, lume]
 version: "2.0.0"
 requires:
   host_os: [darwin]

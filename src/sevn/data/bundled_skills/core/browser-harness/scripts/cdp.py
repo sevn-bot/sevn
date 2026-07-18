@@ -56,7 +56,7 @@ def main() -> int:
             session_id=session_id,
         )
     except RuntimeError as exc:
-        if "websocket-client" in str(exc):
+        if "websockets not installed" in str(exc) or "browser-cdp" in str(exc):
             write_error(code="DEPENDENCY_MISSING", error=str(exc))
             return 1
         write_error(code="CDP_FAILED", error=str(exc))

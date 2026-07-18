@@ -92,17 +92,17 @@ class CapabilityEntry(BaseModel):
 
         Examples:
             >>> CapabilityEntry(
-            ...     capability_id="skill.x_use",
+            ...     capability_id="skill.social_media_manager",
             ...     group="B",
-            ...     label="x-use",
+            ...     label="social_media_manager",
             ...     description="x",
-            ...     config_paths=["skills.x_use.enabled"],
+            ...     config_paths=["skills.social_media_manager.enabled"],
             ...     control="checkbox",
             ...     default=True,
             ...     profile_overridable=True,
             ...     install_actions=[],
             ... ).id
-            'skill.x_use'
+            'skill.social_media_manager'
         """
         return self.capability_id
 
@@ -343,7 +343,7 @@ def resolve_install_plan(
         ValueError: When an unknown id is selected or dependencies are cyclic.
 
     Examples:
-        >>> plan = resolve_install_plan(["extra.browser"])
+        >>> plan = resolve_install_plan(["extra.browser_cdp"])
         >>> plan[0].kind in ("uv_extra", "subprocess", "noop")
         True
     """

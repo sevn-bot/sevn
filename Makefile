@@ -18,7 +18,7 @@ PIP_AUDIT ?= $(UV) run pip-audit
 PIP_AUDIT_CACHE ?= $(CURDIR)/.cache/pip-audit
 PRE_COMMIT ?= $(UV) run pre-commit
 
-.PHONY: help setup install install-git-guards check-git-guards snapshot-local install-snapshot-timer install-cli install-cli-browser sync-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover stale-xfail-check md-links-check doctest security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage coderabbit-install review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-down compose-logs compose-restart log-explore telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-curate readme-curate-prompt readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate spec-check prd-check spec-sync prd-sync logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve
+.PHONY: help setup install install-git-guards check-git-guards snapshot-local install-snapshot-timer install-cli install-cli-browser sync-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover stale-xfail-check md-links-check doctest security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage coderabbit-install review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-down compose-logs compose-restart log-explore incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-curate readme-curate-prompt readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate spec-check prd-check spec-sync prd-sync logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve
 
 
 PROXY_ENV_FILE ?= .env.proxy
@@ -83,7 +83,7 @@ pdf-native-libs: ## Install WeasyPrint native libs (pango/cairo/gobject) for PDF
 	  echo "⚠️  Unknown OS ($$uname_s). Install pango/cairo/gobject native libs manually, then run 'sevn doctor'."; \
 	fi
 
-sync-cli: install-cli-browser ## Operator `sevn sync`: editable CLI + Playwright + browser-cdp (no pre-commit hooks)
+sync-cli: install-cli-browser ## Operator `sevn sync`: editable CLI + browser-cdp (no pre-commit hooks)
 
 install-cli: styles-build ## Install the `sevn` console script as a uv tool (on PATH via ~/.local/bin)
 	@$(UV) tool install --reinstall --force --editable . >/dev/null
@@ -96,13 +96,10 @@ install-cli: styles-build ## Install the `sevn` console script as a uv tool (on 
 	     echo "  Run 'uv tool update-shell' (or add the line above to your shell rc), open a new shell, then re-run 'sevn'."; ;; \
 	esac
 
-install-cli-browser: install-cli ## Gateway host: uv-tool `sevn` + Playwright + browser-cdp extras + Chromium
+install-cli-browser: install-cli ## Gateway host: uv-tool `sevn` + browser-cdp extra
 	@$(UV) sync --extra browser-cdp
 	@$(UV) tool install --reinstall --force --editable . \
-	  --with playwright==1.60.0 --with websocket-client==1.9.0 --with websockets>=12 >/dev/null
-	@pw="$$($(UV) tool dir)/sevn/bin/playwright"; \
-	echo "Installing Chromium for gateway tool env ($$pw)…"; \
-	PLAYWRIGHT_BROWSERS_PATH= "$$pw" install chromium
+	  --with websockets>=12 >/dev/null
 
 lockcheck: ## Fail if uv.lock is out of date
 	$(UV) lock --check
@@ -111,15 +108,15 @@ lint-imports: ## Import-layer contracts (`specs/01-system-overview.md` §2.3)
 	$(UV) run lint-imports
 
 lint: ## Ruff check + formatting + ADR docstring inventory + import-linter
-	$(RUFF) check src tests scripts tools/telegram-tester/src tools/telegram-tester/tests
-	$(RUFF) format --check src tests scripts tools/telegram-tester/src tools/telegram-tester/tests
+	$(RUFF) check src tests scripts
+	$(RUFF) format --check src tests scripts
 	$(UV) run python scripts/check_docstrings.py src/sevn scripts
 	$(UV) run python scripts/check_cli_help_no_spec_refs.py
 	$(UV) run python scripts/check_loguru_only.py
 	$(MAKE) lint-imports
 
 format: ## Auto-format with Ruff
-	$(RUFF) format src tests scripts tools/telegram-tester/src tools/telegram-tester/tests
+	$(RUFF) format src tests scripts
 
 typecheck: ## mypy strict + ADR type-hint script (public callables)
 	$(MYPY) src/sevn
@@ -134,14 +131,14 @@ pyright: ## Supplemental Pyright pass (`specs/25-cicd-full.md` §11)
 PYTEST_SPLIT := $(if $(SEVN_TEST_SPLITS),--splits $(SEVN_TEST_SPLITS) --group $(SEVN_TEST_GROUP) --splitting-algorithm least_duration,)
 
 test: styles-build ## Unit tests (parallel when SEVN_PYTEST_JOBS=auto; set 0 to disable)
-	$(PYTEST) tests tools/telegram-tester/tests -v --tb=short --strict-markers -m "not integration" $(PYTEST_XDIST) $(PYTEST_SPLIT) \
+	$(PYTEST) tests -v --tb=short --strict-markers -m "not integration" $(PYTEST_XDIST) $(PYTEST_SPLIT) \
 		--randomly-seed=$${SEVN_PYTEST_RANDOM_SEED:-424242}
 
 test-integration: ## Opt-in tests (``pytest -m integration``)
 	$(PYTEST) tests -v --tb=short --strict-markers -m integration
 
 coverage: styles-build ## Unit test coverage report (HTML + terminal; advisory baseline)
-	$(PYTEST) tests tools/telegram-tester/tests -v --tb=short --strict-markers -m "not integration" $(PYTEST_XDIST) \
+	$(PYTEST) tests -v --tb=short --strict-markers -m "not integration" $(PYTEST_XDIST) \
 		--cov=sevn --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml --cov-branch
 
 diff-cover: ## Fail when changed lines fall below DIFF_COVER_MIN (default 80%; ci-quality-coverage)
@@ -548,9 +545,6 @@ compose-restart: ## Restart operator compose services
 log-explore: ## Explore gateway.log (CMD=signal|turns|tools|errors|tool-usage|context-drift|failures [LOG=gateway.log])
 	$(UV) run python tools/explore_gateway_log.py $(CMD) $(or $(LOG),gateway.log)
 
-telegram-e2e: ## Telegram Playwright session suite (host; needs compose + TE-7 CLI)
-	$(UV) run sevn telegram-test run session --target local --json
-
 onboard-telegram-e2e: ## Onboarding Telegram CDP smoke (requires SEVN_ONBOARD_E2E=1)
 	@if [ "$$SEVN_ONBOARD_E2E" != "1" ]; then \
 	  echo "Set SEVN_ONBOARD_E2E=1 to run onboarding Telegram automation smoke"; \
@@ -610,102 +604,6 @@ find-stubs: ## Rebuild reports/stubs.{md,tsv} via scripts/find_stubs.py (`plan/s
 clean: ## Remove caches and build artifacts
 	rm -rf .pytest_cache .mypy_cache .ruff_cache .cache build dist .coverage htmlcov
 	find . \( -path './.venv' -prune \) -o \( -path './.git' -prune \) -o -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
-
-# ---------------------------------------------------------------------------
-# Wave J-code-3 — Playwright E2E (specs/25-cicd-full.md §10.4 + §3.2).
-#
-# These targets sit in a dedicated block (separate `.PHONY` below) to dodge
-# Wave J-code-1's storage Make edits at the top of this file. Node tool
-# invocations route through `make` for consistency with the Python-via-`uv`
-# convention in CLAUDE.md — no raw `npx playwright …` in CI.
-#
-# `e2e` is intentionally NOT wired into `make ci`: per specs/25-cicd-full.md
-# §4.2 + §4.4, Playwright runs as a parallel CI job (not a PR merge-gate).
-# Journey specs under `tests/e2e/` run via `make e2e` (local webServer or
-# `SEVN_E2E_BASE_URL` against `docker-compose.ci.yml` in CI).
-# ---------------------------------------------------------------------------
-NPM ?= npm
-NPX ?= npx
-
-.PHONY: e2e e2e-install e2e-onboarding e2e-onboarding-if-changed mc-e2e mc-e2e-install mc-e2e-headed mc-e2e-if-changed mc-e2e-seed mc-e2e-local mc-e2e-local-headed
-
-e2e-install: ## Install Node deps + Playwright browsers (specs/25-cicd-full.md §10.4)
-	$(NPM) ci
-	$(NPX) playwright install --with-deps
-
-e2e: ## Run Playwright E2E suite (artefact upload on failure per §3.2)
-	$(NPX) playwright test
-
-e2e-onboarding: ## Run Playwright onboarding journeys only (specs/22-onboarding.md §9)
-	$(NPX) playwright test --project=onboarding
-
-# Conditional: only run onboarding e2e when files touching the wizard changed.
-# CI sets SEVN_CI_BASE to the merge base; local dev defaults to origin/main.
-e2e-onboarding-if-changed: ## Run onboarding e2e only if onboarding-related files changed
-	@base="$${SEVN_CI_BASE:-origin/main}"; \
-	if git diff --name-only "$$base"...HEAD -- \
-	    'src/sevn/onboarding/**' \
-	    'src/sevn/cli/commands/onboard.py' \
-	    'src/sevn/data/onboarding_profiles/**' \
-	    'src/sevn/data/sevn_config_long_description.json' \
-	    'tests/e2e/onboarding*' \
-	    'specs/22-onboarding.md' \
-	    'playwright.config.ts' \
-	    | grep -q .; then \
-	  echo "[e2e-onboarding-if-changed] onboarding files changed — running Playwright"; \
-	  $(MAKE) e2e-onboarding; \
-	else \
-	  echo "[e2e-onboarding-if-changed] no onboarding changes — skipped"; \
-	fi
-
-# Optional `.env.mc-e2e` (see `.env.mc-e2e.example`) — loaded only by mc-e2e-local* targets.
-define mc_e2e_local_env
-set -a; \
-if [ -f .env.mc-e2e ]; then . ./.env.mc-e2e; fi; \
-export SEVN_MC_E2E_LOCAL=1; \
-set +a
-endef
-
-mc-e2e-seed: ## Seed trace + secrets fixtures for active MC E2E workspace (fixture or SEVN_MC_WORKSPACE)
-	uv run python scripts/seed_mc_e2e_workspace.py
-
-mc-e2e-install: e2e-install ## Install Playwright deps + seed MC E2E workspace fixtures
-	$(MAKE) mc-e2e-seed
-
-mc-e2e: mc-e2e-seed ## Run Mission Control Playwright E2E (headless; fixture workspace on :13004)
-	SEVN_MC_E2E_PROJECT=1 $(NPX) playwright test --project=mission-control
-
-mc-e2e-headed: mc-e2e-seed ## Run Mission Control Playwright E2E headed (debug; one shared browser)
-	SEVN_MC_E2E_PROJECT=1 SEVN_MC_E2E_SHARED_SESSION=1 $(NPX) playwright test --project=mission-control --headed --workers=1
-
-mc-e2e-local: ## Run MC E2E against `.env.mc-e2e` workspace (isolated gateway; see `.env.mc-e2e.example`)
-	@$(mc_e2e_local_env); \
-	uv run python scripts/seed_mc_e2e_workspace.py; \
-	SEVN_MC_E2E_PROJECT=1 $(NPX) playwright test --project=mission-control
-
-mc-e2e-local-headed: ## Headed MC E2E against `.env.mc-e2e` workspace (shared browser session)
-	@$(mc_e2e_local_env); \
-	uv run python scripts/seed_mc_e2e_workspace.py; \
-	export SEVN_MC_E2E_SUMMARY=1; \
-	export SEVN_MC_E2E_REPORT_PATH=reports/mc-e2e-local-run.json; \
-	SEVN_MC_E2E_PROJECT=1 SEVN_MC_E2E_SHARED_SESSION=1 $(NPX) playwright test --project=mission-control --headed --workers=1
-
-mc-e2e-if-changed: ## Run MC e2e only if dashboard / MC harness files changed (fixture workspace only)
-	@base="$${SEVN_CI_BASE:-origin/main}"; \
-	if git diff --name-only "$$base"...HEAD -- \
-	    'src/sevn/ui/dashboard/**' \
-	    'src/sevn/ui/spa/dashboard/**' \
-	    'infra/mission-control.schema.json' \
-	    'infra/e2e-mission-control-workspace/**' \
-	    'tests/e2e/mission-control/**' \
-	    'scripts/seed_mc_e2e_workspace.py' \
-	    'playwright.config.ts' \
-	    | grep -q .; then \
-	  echo "[mc-e2e-if-changed] mission-control files changed — running Playwright"; \
-	  $(MAKE) mc-e2e; \
-	else \
-	  echo "[mc-e2e-if-changed] no mission-control changes — skipped"; \
-	fi
 
 .PHONY: deploy-remote deploy-remote-check deploy-remote-dry-run deploy-remote-report-check
 

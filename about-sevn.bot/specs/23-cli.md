@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver the primary operator and automation surface for install, upgrades,
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
-last_updated: '2026-07-17'
-fingerprint: sha256:bc0109381b75986cc70be9882f94069a69f8b48701ce515fa2fdcbbf482d93e0
+last_updated: '2026-07-18'
+fingerprint: sha256:1df1627c54d4b7734d1f18146359ecbe137f9541ac7edb548e0a32263804a588
 related: []
 sources:
 - src/sevn/cli/**
@@ -167,9 +167,6 @@ interfaces:
   symbol: show_subagents_config
 - name: register
   file: src/sevn/cli/commands/sync_cmd.py
-  symbol: register
-- name: register
-  file: src/sevn/cli/commands/telegram_test.py
   symbol: register
 - name: register
   file: src/sevn/cli/commands/tools_cmd.py

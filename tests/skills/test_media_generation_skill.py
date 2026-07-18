@@ -152,6 +152,11 @@ class TestParseMediaTask:
         assert task.kind == "voice"
         assert task.source_audio == "sample.mp3"
 
+    def test_voice_shorthand_rejected(self) -> None:
+        """``voice:`` shorthand is rejected; JSON task required."""
+        with pytest.raises(ValueError, match="voice shorthand unsupported"):
+            parse_media_task("voice:hello there")
+
 
 class TestSkillSpecialistBinding:
     """W8.3 skill→specialist grant merge."""
@@ -385,18 +390,20 @@ class TestExtendedMediaKinds:
         assert "gentle wind" in str(trace["augmented_prompt"])
 
     @pytest.mark.asyncio
-    async def test_voice_speak_mocked(
+    async def test_voice_speak_uses_literal_speech_text(
         self,
         media_workspace: tuple[Path, sqlite3.Connection],
     ) -> None:
+        """TTS API receives literal speech_text; augmentation stays in trace."""
         workspace, conn = media_workspace
         audio_bytes = b"ID3fake"
+        synthesize = AsyncMock(return_value=audio_bytes)
 
         with (
             patch.dict(os.environ, {"MINIMAX_API_KEY": "sk-test-minimax"}),
             patch(
                 "sevn.agent.subagents.media_worker.synthesize_speech_bytes",
-                new=AsyncMock(return_value=audio_bytes),
+                new=synthesize,
             ),
         ):
             result = await execute_media_generator_task(
@@ -404,8 +411,11 @@ class TestExtendedMediaKinds:
                     {
                         "kind": "voice",
                         "prompt": "calm narrator",
+                        "template": "narration",
                         "voice_id": "English_expressive_narrator",
                         "speech_text": "Hello world",
+                        "delivery": "warm",
+                        "mood": "friendly",
                     },
                 ),
                 session_id="sess-voice",
@@ -416,7 +426,83 @@ class TestExtendedMediaKinds:
 
         assert result["kind"] == "voice"
         assert result["voice_id"] == "English_expressive_narrator"
-        assert "trace" in result
+        assert synthesize.await_args is not None
+        # Second positional arg is the spoken text — must be literal, not augmented.
+        assert synthesize.await_args.args[1] == "Hello world"
+        trace = result["trace"]
+        assert isinstance(trace, dict)
+        assert trace["spoken_text"] == "Hello world"
+        assert "voice_character_notes" in trace
+        assert "Hello world" not in str(trace["voice_character_notes"])
+
+    @pytest.mark.asyncio
+    async def test_unique_filenames_for_identical_prompts(
+        self,
+        media_workspace: tuple[Path, sqlite3.Connection],
+    ) -> None:
+        """Identical prompts produce distinct artifact paths and bytes."""
+        workspace, conn = media_workspace
+        image_a = b"\xff\xd8\xff aaa"
+        image_b = b"\xff\xd8\xff bbb"
+        gen = AsyncMock(side_effect=[image_a, image_b])
+
+        with (
+            patch.dict(os.environ, {"MINIMAX_API_KEY": "sk-test-minimax"}),
+            patch(
+                "sevn.agent.subagents.media_worker.generate_image_bytes",
+                new=gen,
+            ),
+        ):
+            first = await execute_media_generator_task(
+                '{"kind":"image","prompt":"same prompt"}',
+                session_id="sess-uniq",
+                content_root=workspace,
+                conn=conn,
+                subagents_cfg=_MEDIA_CFG,
+            )
+            second = await execute_media_generator_task(
+                '{"kind":"image","prompt":"same prompt"}',
+                session_id="sess-uniq",
+                content_root=workspace,
+                conn=conn,
+                subagents_cfg=_MEDIA_CFG,
+            )
+
+        assert first["artifact_path"] != second["artifact_path"]
+        path_a = workspace / str(first["artifact_path"])
+        path_b = workspace / str(second["artifact_path"])
+        assert path_a.read_bytes() == image_a
+        assert path_b.read_bytes() == image_b
+
+    @pytest.mark.asyncio
+    async def test_path_escape_rejected(
+        self,
+        media_workspace: tuple[Path, sqlite3.Connection],
+    ) -> None:
+        """Reference images outside content_root are rejected."""
+        from sevn.agent.subagents.media_minimax import MiniMaxMediaError
+
+        workspace, conn = media_workspace
+        outside = workspace.parent / "escape.jpg"
+        outside.write_bytes(b"\xff\xd8\xff x")
+
+        with (
+            patch.dict(os.environ, {"MINIMAX_API_KEY": "sk-test-minimax"}),
+            pytest.raises(MiniMaxMediaError, match="escapes workspace"),
+        ):
+            await execute_media_generator_task(
+                json.dumps(
+                    {
+                        "kind": "image_i2i",
+                        "prompt": "oil paint",
+                        "reference_image": str(outside),
+                    },
+                ),
+                session_id="sess-escape",
+                content_root=workspace,
+                conn=conn,
+                subagents_cfg=_MEDIA_CFG,
+            )
 
 
 @pytest.mark.skipif(

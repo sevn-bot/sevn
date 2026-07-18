@@ -1,7 +1,7 @@
-"""Social media platform helpers (medium resolution, allowed media).
+"""Social media platform helpers (medium resolution, allowed media, X ops facade).
 
 Module: sevn.integrations.social_media
-Depends: sevn.integrations.social_media.medium
+Depends: sevn.integrations.social_media.medium, sevn.integrations.social_media.x_ops
 """
 
 from sevn.integrations.social_media.medium import allowed_media_for_site

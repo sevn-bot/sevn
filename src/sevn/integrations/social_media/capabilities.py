@@ -24,12 +24,12 @@ from sevn.integrations.twexapi.client import TWEXAPI_OPS
 SOCIAL_MEDIA_MANAGER_SPECIALIST = "social_media_manager"
 
 _SITE_SKILL_HINTS: dict[str, tuple[str, ...]] = {
-    "x": ("x-use",),
-    "facebook": ("facebook-use",),
-    "linkedin": ("linkedin-use",),
-    "instagram": ("playwright-browser", "browser-harness"),
-    "reddit": ("playwright-browser", "browser-harness", "last30days"),
-    "tiktok": ("playwright-browser", "browser-harness", "yt-dlp"),
+    "x": ("social_media_manager",),
+    "facebook": ("social_media_manager",),
+    "linkedin": ("social_media_manager",),
+    "instagram": ("browser-harness",),
+    "reddit": ("browser-harness", "last30days"),
+    "tiktok": ("browser-harness", "yt-dlp"),
 }
 
 __all__ = ["SOCIAL_MEDIA_MANAGER_SPECIALIST", "build_capabilities_matrix", "site_skill_hints"]
@@ -46,9 +46,9 @@ def site_skill_hints(site: str) -> list[str]:
 
     Examples:
         >>> site_skill_hints("x")
-        ['x-use']
+        ['social_media_manager']
     """
-    return list(_SITE_SKILL_HINTS.get(site, ("playwright-browser", "browser-harness")))
+    return list(_SITE_SKILL_HINTS.get(site, ("social_media_manager", "browser-harness")))
 
 
 def build_capabilities_matrix(

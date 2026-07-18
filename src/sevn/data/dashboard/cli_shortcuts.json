@@ -2,7 +2,6 @@
   "shortcuts": [
     {"label": "Doctor (JSON)", "argv": ["doctor", "--json"]},
     {"label": "Config validate", "argv": ["config", "validate"]},
-    {"label": "Gateway status", "argv": ["gateway", "status"]},
-    {"label": "Telegram test help", "argv": ["telegram-test", "--help"]}
+    {"label": "Gateway status", "argv": ["gateway", "status"]}
   ]
 }

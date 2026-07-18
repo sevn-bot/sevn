@@ -18,7 +18,6 @@
     "secrets_backend",
     "webapp_https",
     "docker",
-    "browser_extra",
     "browser_cdp_engine",
     "skillspector",
     "pyodide_deno",

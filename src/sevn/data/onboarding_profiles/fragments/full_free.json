@@ -11,7 +11,6 @@
     "tier_b_skill_cap": 7
   },
   "capabilities_defaults": {
-    "extra.browser": false,
     "extra.web_fetch": true,
     "skill.printing_press_library": false,
     "memory.lcm": true

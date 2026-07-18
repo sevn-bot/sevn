@@ -339,6 +339,13 @@ def stamp_entry(
     """
     store = load_fingerprints(fingerprints_path)
     digest = compute_digest(repo_root, source_globs)
+    prior = store.get("entries", {}).get(slug) if isinstance(store.get("entries"), dict) else None
+    if (
+        isinstance(prior, dict)
+        and prior.get("digest") == digest
+        and list(prior.get("source_globs") or []) == list(source_globs)
+    ):
+        return
     upsert_entry(store, slug=slug, digest=digest, source_globs=source_globs)
     save_fingerprints(fingerprints_path, store)
 

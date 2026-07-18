@@ -36,6 +36,7 @@ from sevn.integrations.social_media.capabilities import (
     site_skill_hints,
 )
 from sevn.integrations.social_media.medium import resolve_social_medium
+from sevn.integrations.social_media.x_ops_dispatch import FACADE_OPS, run_op
 from sevn.integrations.twexapi.client import (
     TWEXAPI_ARRAY_BODY_OPS,
     TwexApiClient,
@@ -60,10 +61,6 @@ _MAX_RESULT_JSON_CHARS = 48_000
 
 DEFAULT_SOCIAL_MEDIA_MANAGER_SKILLS: tuple[str, ...] = (
     "social_media_manager",
-    "x-use",
-    "facebook-use",
-    "linkedin-use",
-    "playwright-browser",
     "browser-harness",
     "last30days",
     "yt-dlp",
@@ -84,6 +81,7 @@ DEFAULT_SOCIAL_MEDIA_MANAGER_TOOLS: tuple[str, ...] = (
 )
 
 SocialMedium = Literal["twexapi", "browser", "capabilities"]
+# ``None`` medium = omitted from task JSON → resolve via config defaults (D2).
 
 __all__ = [
     "DEFAULT_SOCIAL_MEDIA_MANAGER_SKILLS",
@@ -110,7 +108,7 @@ class SocialMediaManagerError(RuntimeError):
 class SocialMediaTask:
     """One social-media specialist request parsed from a spawn/skill task string."""
 
-    medium: SocialMedium
+    medium: SocialMedium | None
     op: str
     params: dict[str, Any]
     body: dict[str, Any]
@@ -162,8 +160,10 @@ def assigned_skills_for(specialist: SpecialistConfig) -> list[str]:
 
     Examples:
         >>> from sevn.config.sections.subagents import SpecialistConfig
-        >>> assigned_skills_for(SpecialistConfig(model="m", provider="p", skills=["x-use"]))
-        ['x-use']
+        >>> assigned_skills_for(
+        ...     SpecialistConfig(model="m", provider="p", skills=["social_media_manager"])
+        ... )
+        ['social_media_manager']
     """
     explicit = [s.strip() for s in specialist.skills if s.strip()]
     if explicit:
@@ -208,7 +208,7 @@ def _site_skill_hints(site: str) -> list[str]:
 
     Examples:
         >>> _site_skill_hints("x")
-        ['x-use']
+        ['social_media_manager']
     """
     return site_skill_hints(site)
 
@@ -229,7 +229,9 @@ def _task_dict_for_resolution(task: str, parsed: SocialMediaTask) -> dict[str, A
         'twexapi'
     """
     task_dict = _task_dict_from_string(task)
-    if "medium" not in task_dict and parsed.medium != "capabilities":
+    # Only inject an explicit medium when the task stated one — omitted medium
+    # must fall through to platforms.<site>.medium / default_medium (D2).
+    if "medium" not in task_dict and parsed.medium:
         task_dict = {**task_dict, "medium": parsed.medium}
     if parsed.site and "site" not in task_dict:
         task_dict = {**task_dict, "site": parsed.site}
@@ -263,10 +265,16 @@ def parse_social_media_task(task: str) -> SocialMediaTask:
         if not isinstance(raw, dict):
             msg = "social media task JSON must be an object"
             raise ValueError(msg)
-        medium = str(raw.get("medium") or "browser").strip().lower()
-        if medium not in ("twexapi", "browser", "capabilities"):
-            msg = "medium must be twexapi|browser|capabilities"
-            raise ValueError(msg)
+        raw_medium = raw.get("medium")
+        medium: SocialMedium | None
+        if raw_medium is None or (isinstance(raw_medium, str) and not raw_medium.strip()):
+            medium = None
+        else:
+            candidate = str(raw_medium).strip().lower()
+            if candidate not in ("twexapi", "browser", "capabilities"):
+                msg = "medium must be twexapi|browser|capabilities"
+                raise ValueError(msg)
+            medium = candidate  # type: ignore[assignment]
         path_params_raw = raw.get("path_params") or {}
         if not isinstance(path_params_raw, dict):
             msg = "path_params must be an object"
@@ -277,7 +285,7 @@ def parse_social_media_task(task: str) -> SocialMediaTask:
             msg = "params/body must be objects"
             raise ValueError(msg)
         return SocialMediaTask(
-            medium=medium,  # type: ignore[arg-type]
+            medium=medium,
             op=str(raw.get("op") or raw.get("action") or "").strip().lower(),
             params={str(k): v for k, v in params_raw.items()},
             body={str(k): v for k, v in body_raw.items()},
@@ -289,12 +297,12 @@ def parse_social_media_task(task: str) -> SocialMediaTask:
         )
     if ":" in text:
         head, _, tail = text.partition(":")
-        medium = head.strip().lower()
+        shorthand_medium = head.strip().lower()
         op = tail.strip().lower()
-        if medium in ("twexapi", "browser", "capabilities"):
+        if shorthand_medium in ("twexapi", "browser", "capabilities"):
             return SocialMediaTask(
-                medium=medium,  # type: ignore[arg-type]
-                op=op if medium != "capabilities" else "list",
+                medium=shorthand_medium,  # type: ignore[arg-type]
+                op=op if shorthand_medium != "capabilities" else "list",
                 params={},
                 body={},
                 path_params={},
@@ -402,8 +410,7 @@ def _normalize_twexapi_body(
 def _browser_plan(task: SocialMediaTask) -> dict[str, Any]:
     """Build a browser-medium plan that uses sevn's CDP ``browser`` tool (D7).
 
-    The L2 worker does not attach CDP itself. The plan tells the caller to
-    invoke the native ``browser`` tool with ``action=social``.
+    Used for non-facade / non-X browser tasks. X §4 ops route through ``x_ops``.
 
     Args:
         task (SocialMediaTask): Parsed browser request.
@@ -438,6 +445,146 @@ def _browser_plan(task: SocialMediaTask) -> dict[str, Any]:
             f"Load site skills: {', '.join(site_skills)}."
         ),
     }
+
+
+def _task_payload_for_x_ops(parsed: SocialMediaTask, *, content_root: Path) -> dict[str, Any]:
+    """Build an ``x_ops`` task dict from a parsed specialist task.
+
+    Args:
+        parsed (SocialMediaTask): Parsed spawn/skill task.
+        content_root (Path): Workspace content root.
+
+    Returns:
+        dict[str, Any]: Task payload for the X ops facade.
+
+    Examples:
+        >>> t = SocialMediaTask("browser", "like_tweet", {}, {}, {}, site="x")
+        >>> _task_payload_for_x_ops(t, content_root=Path("."))["op"]
+        'like_tweet'
+    """
+    # Merge untrusted task fields first; then pin trusted content_root so
+    # params/body cannot override the spawn workspace root (thermos i4 M1).
+    payload: dict[str, Any] = {
+        "op": parsed.op,
+        **dict(parsed.params),
+        **dict(parsed.body),
+        **{k: v for k, v in parsed.path_params.items()},
+    }
+    payload.pop("content_root", None)
+    payload["content_root"] = str(content_root)
+    if parsed.medium:
+        payload["medium"] = parsed.medium
+    if parsed.site:
+        payload["site"] = parsed.site
+    if parsed.query:
+        payload["query"] = parsed.query
+    if parsed.url:
+        payload["url"] = parsed.url
+    if parsed.text:
+        payload["text"] = parsed.text
+    return payload
+
+
+def _browser_tools_from_workspace(workspace_cfg: Any) -> dict[str, Any] | None:
+    """Extract ``tools.browser`` from a workspace config (dict or model).
+
+    ``WorkspaceConfig.tools`` is a ``JsonDict`` — attribute access via
+    ``getattr(tools, "browser")`` always misses; prefer ``.get("browser")``.
+
+    Args:
+        workspace_cfg (Any): Loaded workspace config (or stub).
+
+    Returns:
+        dict[str, Any] | None: Browser tools section, or ``None``.
+
+    Examples:
+        >>> class _Ws:
+        ...     tools = {"browser": {"social": {"x": {"allow_write": True}}}}
+        >>> _browser_tools_from_workspace(_Ws())["social"]["x"]["allow_write"]
+        True
+    """
+    tools_cfg = getattr(workspace_cfg, "tools", None)
+    if tools_cfg is None:
+        return None
+    if isinstance(tools_cfg, dict):
+        browser_cfg = tools_cfg.get("browser")
+    else:
+        browser_cfg = getattr(tools_cfg, "browser", None)
+    if browser_cfg is None:
+        return None
+    if hasattr(browser_cfg, "model_dump"):
+        dumped = browser_cfg.model_dump()
+        return dumped if isinstance(dumped, dict) else None
+    if isinstance(browser_cfg, dict):
+        return browser_cfg
+    return None
+
+
+def _wrap_x_ops_result(
+    envelope: dict[str, Any],
+    *,
+    skills: list[str],
+    tools: list[str],
+    twex_docs: str | None = None,
+) -> dict[str, Any]:
+    """Preserve specialist return shape around an ``x_ops`` envelope.
+
+    Args:
+        envelope (dict[str, Any]): Normalized ``{ok, medium, op, data, …}``.
+        skills (list[str]): Declared specialist skills.
+        tools (list[str]): Declared specialist tools.
+        twex_docs (str | None): Optional TwexAPI docs URL for twexapi medium.
+
+    Returns:
+        dict[str, Any]: Worker result with specialist/skills/tools.
+
+    Examples:
+        >>> out = _wrap_x_ops_result(
+        ...     {"ok": True, "medium": "browser", "op": "search", "data": {}},
+        ...     skills=["social_media_manager"],
+        ...     tools=["browser"],
+        ... )
+        >>> out["specialist"]
+        'social_media_manager'
+    """
+    facade_op = envelope.get("op")
+    base: dict[str, Any] = {
+        "specialist": SOCIAL_MEDIA_MANAGER_SPECIALIST,
+        "ok": envelope.get("ok"),
+        "medium": envelope.get("medium"),
+        "op": facade_op,
+        "skills": skills,
+        "tools": tools,
+    }
+    if envelope.get("error") is not None:
+        base["error"] = envelope["error"]
+    if envelope.get("code") is not None:
+        base["code"] = envelope["code"]
+    data = envelope.get("data") or {}
+    if envelope.get("medium") == "browser":
+        plan = data.get("browser_plan") if isinstance(data, dict) else None
+        plan = plan if isinstance(plan, dict) else {}
+        site = str(plan.get("site") or "x")
+        social_op = plan.get("op") or facade_op
+        return {
+            **base,
+            "op": social_op,
+            "facade_op": plan.get("facade_op") or facade_op,
+            "tool": "browser",
+            "engine": "cdp",
+            "action": plan.get("action", "social"),
+            "site": site,
+            "query": plan.get("query"),
+            "url": plan.get("url"),
+            "body": plan.get("body"),
+            "hint": plan.get("hint"),
+            "data": data,
+            "skills": list(dict.fromkeys([*_site_skill_hints(site), *skills])),
+        }
+    if twex_docs:
+        base["docs"] = twex_docs
+    base["data"] = _capped_data(data)
+    return base
 
 
 async def _execute_twexapi_path(
@@ -581,6 +728,31 @@ async def execute_social_media_manager_task(
     site = parsed.site or "x"
     task_dict = _task_dict_for_resolution(task, parsed)
     effective_medium = resolve_social_medium(task_dict, smm_cfg, site)
+
+    # X §4 facade ops: single owner is ``x_ops`` / ``run_op`` (browser plan or TwexAPI).
+    if site == "x" and parsed.op in FACADE_OPS:
+        if effective_medium == "browser" and "browser" not in tools:
+            raise SocialMediaManagerError(
+                "social_media_manager tools list does not include `browser` (CDP automator)"
+            )
+        cfg_stub: dict[str, Any] = {
+            "skills": {"social_media_manager": smm_cfg},
+        }
+        browser_cfg = _browser_tools_from_workspace(workspace_cfg)
+        if browser_cfg is not None:
+            cfg_stub["tools"] = {"browser": browser_cfg}
+        envelope = await run_op(
+            str(parsed.op),
+            _task_payload_for_x_ops(parsed, content_root=content_root),
+            cfg_stub,
+            site,
+        )
+        return _wrap_x_ops_result(
+            envelope,
+            skills=skills,
+            tools=tools,
+            twex_docs=getattr(twex_settings, "docs_url", None),
+        )
 
     if effective_medium == "browser":
         if "browser" not in tools:

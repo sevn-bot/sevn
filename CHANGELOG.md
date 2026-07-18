@@ -12,11 +12,12 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- [2026-07-16] Unified X ops facade (`sevn.integrations.social_media.x_ops`) exposes every X/Twitter endpoint as a callable over browser|twexapi with a normalized envelope, write-gates, cookie bridge, and `social_media_manager` skill scripts
+- [2026-07-16] Browser `social` X ops `timeline_collect` / `home_feed` / `read` return structured posts with status permalinks and tweet text instead of raw HTML noise
 - [2026-07-16] Bundled Obsidian second-brain skills from `kepano/obsidian-skills` (`defuddle`, `json-canvas`, `obsidian-bases`, `obsidian-cli`, `obsidian-markdown`) so sevn can load Obsidian-native markdown, Canvas, Bases, vault CLI, and web-to-markdown workflows out of the box
 - [2026-07-16] `gh-issues` authenticated read/watch/track via `gh` (`issue_view`/`issue_watch`/`issue_track`) with `.sevn/gh-watch/` state and a `gh-issue-watch` cron scope (~15 min) that notifies on issue changes via the `message` tool
 - [2026-07-16] `gh-issues` `issue_create` creates issues in one call via authenticated `gh` with `templates/{feature,bug,chore}.md` (default `feature`), defaults `--repo` from `my_sevn.repo_url`, returns `{url,number,repo}`, falls back to the egress proxy only when `gh` is absent, and maps failures to precise messages instead of bare `proxy status 404`
 - [2026-07-16] Bundled `proton-management` skill with Python `proton-cli` foundation (Pass read, session/SRP auth) and onboarding manifest registration
-
 - [2026-07-16] `make install-snapshot-timer` installs a launchd agent that runs the local gitignored-tree snapshot every 3 hours, so operator-only plans, specs, and agent config are protected on a schedule instead of only on `git push`
 - [2026-07-16] Local snapshot backup covers whole gitignored trees (`.ignorelocal`, `spec-kit-wave`, `build-plan-from-review`, `.cursor`, `.claude` agent config, `docs`) and excludes secrets and regenerable indexes (`.env`/`.env.*`, `graphify-out`, `MyCodeGraph`, `.venv`, caches) while keeping `.env.example` templates
 - [2026-07-15] PARA/Obsidian-native Second Brain vault layout via `second_brain.layout: "legacy" | "para"` with a configurable `second_brain.para` folder profile (Inbox, Projects, Areas, Resources, Archive, Templates) and non-destructive adoption of existing Obsidian vaults
@@ -44,9 +45,28 @@ are cut into a dated, versioned section at release time.
 - [2026-07-12] Logfire trace export: `tracing.sinks[]` logfire sink with secrets-managed token, `sevn tracing` / `sevn config tracing` CLI, Telegram `/config → Logs` toggle and token form, and Mission Control ops endpoints
 - [2026-07-12] Sub-agents orchestration with level-1 role runs, level-2 workers and specialists, `multi` queue mode, Mission Control and Telegram kill surfaces, and `media_generation` skill via the `media_generator` specialist
 
+### Fixed
+
+- [2026-07-18] Scrub residual Playwright wording from `browser.chrome` docs and triager classifier fixture text so the zero-driver repo grep stays clean after merging latest `pre-0.0.1`
+- [2026-07-16] Bump transitive `mcp` 1.27.1 → 1.28.1 to clear CVE-2026-52870 (missing authorization in experimental tasks API)
+- [2026-07-16] `social_media_manager` pins trusted `content_root` after merging task params/body (blocks override), leaves omitted JSON `medium` unset so `default_medium`/`platforms.<site>.medium` resolve, and X ops reject missing `tweet_id` with `TWEET_ID_REQUIRED` instead of path ``0``
+- [2026-07-16] X ops `fetch_article_markdown` and `get_users_by_usernames` reject `medium=browser` with `BROWSER_OP_UNSUPPORTED` instead of returning a false-success home scrape plan
+- [2026-07-16] `social_media_manager` worker forwards `tools.browser` from workspace `JsonDict` config (`.get("browser")`) so `allow_write=true` reaches the X ops write gate instead of always returning `WRITE_DISABLED`
+- [2026-07-16] Worker browser plans expose SocialRecipe `op` (e.g. `home_feed`/`post`) at the top level with facade name under `facade_op`, so `action=social` callers do not hit `unknown social op`
+- [2026-07-16] `browser-harness` WebSocket connects with `max_size=256MiB` matching core CDPConnection so large screenshots/DOM payloads do not fail
+- [2026-07-16] X ops facade resolves TwexAPI keys via `resolve_twexapi_api_key` (`KEY_MISSING` when absent), gates TwexAPI on workspace `settings.enabled`, rejects tweet-action/quote ops on `medium=browser` with `BROWSER_OP_UNSUPPORTED`, and puts thread `items`/`texts` into browser plans
+- [2026-07-16] `browser-harness` `browser_cdp` uses the `websockets` package from the `browser-cdp` extra (no `websocket-client`); profile lock cleanup only runs under `.sevn/browser-profiles/` (or `SEVN_BROWSER_PROFILE_DIR`)
+
 ### Changed
 
+- [2026-07-16] Social media manager defaults and per-site skill hints drop retired platform browser skills; package-install routing detects `browser-cdp` instead of the old driver install phrasing
+- [2026-07-16] Docs/prompt sync: `social_media_manager` X ops catalog finalized, onboarding/INDEX/`browser` tool docs drop removed social/Telegram-test skills, and residual Playwright wording scrubbed from operator docs
+- [2026-07-16] Remove the Playwright E2E harness and `telegram-tester`, replacing Telegram Web checks with the browser `telegram_web` recipe (+ Bot-API `getMe` helper); park webchat/onboarding/Mission Control journeys pending re-home (#37)
+- [2026-07-16] `computer-use` skill `see_also` drops the removed `playwright-browser` reference; docker gateway browser/gui images install `browser-cdp` only
+- [2026-07-16] Residual Playwright symbols renamed to browser_tool (routing/grounding), deprecated prompt aliases dropped, OpenUI rasteriser is weasyprint-only, and docker/.env install paths use `browser-cdp` without `playwright install`
+- [2026-07-18] `media_generation` v2.2.0 hardens `media_generator`: voice speaks literal `speech_text`/`preview_text`, unique artifact filenames, `file_id` int|str, lean prompts (fail unknown template), path containment, and S2V/FL2V skill scripts
 - [2026-07-15] Telegram `/config`, onboarding wizard, and Mission Control Knowledge view expose Second Brain layout selection and resolved PARA role paths instead of assuming legacy `wiki/raw/outputs` folders
+- [2026-07-16] Remove Playwright browser extra and Playwright-based skills (`playwright-browser`, `facebook-use`, `linkedin-use`, `x-use`); install/sync paths prefer `browser-cdp` only (WIP on `remove/playwright`)
 - [2026-07-14] The about-docs generator no longer writes `interfaces`, `depends_on`, or `build_phase` into `kind: prd` frontmatter (spec-only keys; aligns with `skw prd-validate`)
 - [2026-07-14] `make about-docs-check` chains `make spec-check` and `make prd-check` so CI catches doc regressions; about-docs check rejects specs with `status: done` over scaffold placeholder bodies
 - [2026-07-14] Changelog validator canonical implementation lives in `spec-kit-wave/src/skw/changelog_validate.py`; `scripts/changelog_validate.py` is a shim
@@ -77,6 +97,8 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-16] README fingerprint stamps skip rewriting `_fingerprints.json` when the source digest is unchanged, so curated pre-commit sync no longer loops on timestamp-only churn
+- [2026-07-16] Browser spawn defaults include AutomationControlled and hygiene flags so Google/X sign-in is not blocked; closing then reopening the same profile clears stale CDP port and Singleton locks and ignores outdated DevToolsActivePort files
 - [2026-07-16] Thermos iter6 residual: Brave-spawned browsers pass `pid_matches_sevn_chrome_profile` (close/reap/shutdown can kill and clear Singleton locks) while still requiring bounded `--user-data-dir=` equality
 - [2026-07-16] Thermos iter5: Chrome profile identity matches a bounded `--user-data-dir=` argv token (prefix profiles no longer cross-match); browser registry/spawn/CDP helpers live in `sevn.browser` so lifecycle/process no longer import skills; issue-watch cron seed no longer force-reenables a disabled job on every boot
 - [2026-07-16] Thermos iter4: `run_gh` times out hung `gh` (60s) so issue-watch/cron cannot pin the gateway; `spawn_chrome` returns Popen only (no fake `:0` CDP URL) with shared `await_cdp_after_spawn`; onboarding uses `clear_profile_singleton_locks` + that wait path; generic `pid_is_alive`/`terminate_pid` live in `sevn.util.process` (gateway teardown imports util; Chrome identity/reap stay in `browser.process`); drop thin `pid_*` re-exports from `browser_session`

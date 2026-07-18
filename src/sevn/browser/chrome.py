@@ -1,4 +1,4 @@
-"""Host Chrome discovery, CDP probes, and spawn (no Playwright).
+"""Host Chrome discovery, CDP probes, and spawn (CDP-only).
 
 Module: sevn.browser.chrome
 Depends: hashlib, os, pathlib, shutil, subprocess, sys, time, urllib,
@@ -53,6 +53,21 @@ if TYPE_CHECKING:
     from sevn.config.workspace_config import WorkspaceConfig
 
 _PROFILE_ENV: Final[str] = "SEVN_BROWSER_PROFILE_DIR"
+# Login-grade defaults: re-passed on every spawn; cookies live in the profile.
+_LOGIN_GRADE_CHROME_ARGS: Final[tuple[str, ...]] = (
+    "--remote-allow-origins=*",
+    "--no-service-autorun",
+    "--homepage=about:blank",
+    "--no-pings",
+    "--password-store=basic",
+    "--disable-infobars",
+    "--disable-breakpad",
+    "--disable-dev-shm-usage",
+    "--disable-session-crashed-bubble",
+    "--disable-search-engine-choice-screen",
+    "--disable-features=IsolateOrigins,site-per-process",
+    "--disable-blink-features=AutomationControlled",
+)
 _SAFE_SESSION_RE: Final[re.Pattern[str]] = re.compile(r"[^\w.-]+")
 
 
@@ -478,7 +493,7 @@ def resolve_browser_headless(cfg: WorkspaceConfig | None = None) -> bool:
 
     Headed on host when Chrome exists unless ``skills.browser.headless`` is true.
     ``SEVN_BROWSER_HEADLESS`` wins over config when set. When no Chrome binary
-    exists, headless is forced for Playwright fallback paths.
+    exists, headless is forced for CDP fallback paths.
 
     Args:
         cfg (WorkspaceConfig | None): Workspace config.
@@ -604,6 +619,7 @@ def spawn_chrome(
         f"--user-data-dir={profile_dir}",
         "--no-first-run",
         "--no-default-browser-check",
+        *_LOGIN_GRADE_CHROME_ARGS,
         *resolve_browser_extra_args(),
     ]
     if headless:

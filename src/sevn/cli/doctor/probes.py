@@ -619,34 +619,6 @@ def run_doctor_probes(
         )
         result.warnings.append(msg)
 
-    playwright_path = doc.shutil.which("playwright")
-    if playwright_path:
-        result.add(
-            DoctorCheck(
-                id="browser_extra",
-                section=section_for("browser_extra"),
-                title=title_for("browser_extra"),
-                ok=True,
-                detail=playwright_path,
-            ),
-        )
-    else:
-        detail = (
-            "playwright CLI not found — browser skills "
-            "(playwright-browser, x-use) are disabled. "
-            "Install with: uv sync --extra browser && playwright install chromium"
-        )
-        result.add(
-            DoctorCheck(
-                id="browser_extra",
-                section=section_for("browser_extra"),
-                title=title_for("browser_extra"),
-                ok=True,
-                detail=detail,
-            ),
-        )
-        result.warnings.append(detail)
-
     from sevn.skills.browser_session import browser_readiness_snapshot
 
     readiness = browser_readiness_snapshot(bw.layout.content_root, bw.config)

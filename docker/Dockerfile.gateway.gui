@@ -12,7 +12,7 @@ COPY src/sevn ./src/sevn
 COPY infra/sevn.schema.json ./infra/sevn.schema.json
 COPY infra/docker ./infra/docker
 
-RUN uv sync --frozen --no-dev --extra browser --extra browser-cdp
+RUN uv sync --frozen --no-dev --extra browser-cdp
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
@@ -37,7 +37,6 @@ RUN chmod +x /opt/sevn/infra/docker/install-brave.sh \
     && chmod +x /opt/sevn/infra/docker/gui/start-desktop.sh \
     && chmod +x /opt/sevn/infra/docker/gui/entrypoint.sh
 
-RUN /opt/sevn/.venv/bin/playwright install --with-deps chromium
 
 RUN useradd --create-home --uid 10002 --shell /bin/bash sevnoperator \
     && mkdir -p /var/log/supervisor /operator/workspace \

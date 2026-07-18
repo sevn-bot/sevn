@@ -128,9 +128,7 @@ Read gateway logs with `log_query` (supports tail, offset, line ranges, and patt
 
 **Search and fetch tools:** `serp` (DuckDuckGo, no key — prefer this), `web_search` (Brave via egress proxy — **needs Brave API key** in proxy secrets), `get_page_content` (URL → markdown via proxy), and `web_fetch` (full HTTP via egress proxy). In standard deployments the egress proxy is paired with the gateway; only `web_search` typically needs extra operator setup. See `docs/runbooks/tool-skill-readiness.md` for the full matrix.
 
-**Browser skills:** **`playwright-browser`** for headed or headless navigation, screenshots, and extraction — the session browser **persists across conversation turns** (profile + cookies under `.sevn/browser-profiles/<session_id>/`). Call **`playwright-browser` → `session_status`** before assuming login state; **`close_browser`** when done; **`restart_browser`** when stuck. **`browser-harness`** for open-ended CDP control with extendable helpers.
-
-**Social browser skills (opt-in):** **`x-use`** and **`facebook-use`** for logged-in session workflows when enabled in `sevn.json`. They share the same session browser model — use **`playwright-browser` → `close_browser` / `restart_browser`** for lifecycle control (no duplicate scripts in social skills).
+**Browser automation:** use the native **`browser`** tool (CDP engine; `uv sync --extra browser-cdp`) for navigation, screenshots, and extraction — session profiles persist under `.sevn/browser-profiles/<session_id>/`. **`browser-harness`** for open-ended CDP control with extendable helpers.
 
 **Multi-source research:** **`last30days`** for Reddit, Hacker News, Polymarket, GitHub, and optional X/YouTube/TikTok over the last 30 days. Workflow: `load_skill("last30days")` → pre-flight handle/repo resolution with **`serp`** or **`web_search`** → **`run_skill_script`** on `research` (read `data.stdout`). Do not substitute web-only synthesis for the engine. Reddit/HN/Polymarket/GitHub work without keys; optional `node`, `gh`, `yt-dlp`, and API keys unlock more sources. See `docs/runbooks/tool-skill-readiness.md`.
 
@@ -175,7 +173,7 @@ Cross-session coordination uses the **`sessions_management`** skill for list/his
 
 **Meta tools:** `load_skill`, `run_skill_script`, `run_skill_runnable`, `skill_create`, `promote_generated_skill`.
 
-**Bundled skills** (default registry): `browser-harness`, `canvas`, `code_graph_rag`, `computer-use`, `conventional_commit`, `cursor_cloud`, `email-management`, `facebook-use`, `gh-issues`, `gh-pr`, `github-manager`, `google-workspace`, `graphify`, `last30days`, `lcm`, `mycode`, `pdf`, `playwright-browser`, `roam_code`, `scheduling`, `second_brain`, `sessions_management`, `skill_management`, `telegram`, `telegram_test`, `x-use`, `yt-dlp`.
+**Bundled skills** (default registry): `browser-harness`, `canvas`, `code_graph_rag`, `computer-use`, `conventional_commit`, `cursor_cloud`, `email-management`, `gh-issues`, `gh-pr`, `github-manager`, `google-workspace`, `graphify`, `last30days`, `lcm`, `mycode`, `pdf`, `roam_code`, `scheduling`, `second_brain`, `sessions_management`, `skill_management`, `social_media_manager`, `telegram`, `yt-dlp`.
 
 Keep skill packages under `skills/core/`, `skills/user/`, or `skills/generated/` — not loose directories directly under `skills/`. Promote generated drafts with `promote_generated_skill` or the **`skill_management`** scripts.
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -24,20 +24,13 @@ from sevn.onboarding.web_app import create_onboarding_app
 def test_selected_capability_ids_from_merged_config() -> None:
     """Enabled extras map to manifest capability ids."""
     merged = {
-        "skills": {"browser": {"enabled": True}, "graphify": {"enabled": False}},
         "tools": {"browser": {"enabled": True}},
+        "code_understanding": {"graphify": {"enabled": False}},
     }
     ids = selected_capability_ids(merged)
-    assert "extra.browser" in ids
+    assert "extra.browser" not in ids
     assert "extra.browser_cdp" in ids
     assert "extra.graphify" not in ids
-
-
-def test_build_install_plan_orders_browser_before_playwright() -> None:
-    """``extra.browser.uv`` precedes ``extra.browser.cmd`` in the plan."""
-    plan = build_install_plan({"skills": {"browser": {"enabled": True}}})
-    action_ids = [step.action.id for step in plan.steps]
-    assert action_ids.index("extra.browser.uv") < action_ids.index("extra.browser.cmd")
 
 
 def test_build_install_plan_expands_graphify_dependency() -> None:
@@ -49,30 +42,6 @@ def test_build_install_plan_expands_graphify_dependency() -> None:
     assert "extra.graphify" in selected
     assert "code_understanding.graphify" in selected
     assert any(step.action.id == "extra.graphify.uv" for step in plan.steps)
-
-
-@pytest.mark.asyncio
-async def test_collect_install_run_skips_when_idempotent_check_passes() -> None:
-    """Playwright install is skipped when ``playwright --version`` succeeds."""
-    browser_cmd = InstallAction(
-        id="extra.browser.cmd",
-        kind="subprocess",
-        argv=["playwright", "install", "chromium"],
-        fatal=True,
-        idempotent_check="playwright --version",
-    )
-    plan = InstallPlan(
-        (InstallPlanStep("extra.browser", browser_cmd),),
-        1,
-        0,
-        ("extra.browser",),
-    )
-    with patch(
-        "sevn.onboarding.install_actions.executors.idempotent_check_satisfied",
-        new=AsyncMock(return_value=True),
-    ):
-        summary = await collect_install_run(plan, install_root=Path("."))
-    assert "extra.browser.cmd" in summary.skipped_action_ids
 
 
 @pytest.mark.asyncio
@@ -127,7 +96,7 @@ def test_api_install_plan_dry_run() -> None:
     """``POST /api/install-plan`` returns steps without executing subprocesses."""
     client = TestClient(create_onboarding_app("test-token"))
     body = {
-        "fields": {"skills.browser.enabled": True},
+        "fields": {"tools.browser.enabled": True},
     }
     res = client.post(
         "/api/install-plan",
@@ -139,7 +108,7 @@ def test_api_install_plan_dry_run() -> None:
     assert payload["ok"] is True
     assert payload["fatal_count"] >= 1
     ids = [step["action"]["id"] for step in payload["steps"]]
-    assert "extra.browser.uv" in ids
+    assert "extra.browser_cdp.uv" in ids
 
 
 def test_api_install_run_streams_ndjson() -> None:
