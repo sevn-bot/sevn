@@ -8,7 +8,7 @@ summary: Level-1 sub-agents (tracked, concurrent, killable role runs) that may s
   level-2 workers (incl. specialists); multi queue mode; limits, tracing, kill surfaces,
   media_generation skill.
 last_updated: '2026-07-18'
-fingerprint: sha256:e5cc41334be5840d8aa74c84bd99f510ded570abb07a055a18b2e9bfee6b0e27
+fingerprint: sha256:603ad0ba821d4bd6a573297969c083022e916953ad68b952d2f02258418fcfce
 related: []
 sources:
 - src/sevn/agent/subagents/**
@@ -240,7 +240,13 @@ interfaces:
   file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_video.py
   symbol: main
 - name: main
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_video_first_last.py
+  symbol: main
+- name: main
   file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_video_from_image.py
+  symbol: main
+- name: main
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_video_subject.py
   symbol: main
 - name: main
   file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_video_template.py
