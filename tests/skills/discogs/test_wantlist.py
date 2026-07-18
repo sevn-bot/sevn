@@ -8,8 +8,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from tests.skills.discogs.conftest import run_skill_script
 
-pytestmark = pytest.mark.xfail(reason="green after W6: discogs-wantlist scripts", strict=False)
-
 _SKILL_ID = "discogs-wantlist"
 _WRITE_SCRIPTS = (
     ("add_want.py", ["--release-id", "1", "--notes", "must have"]),
