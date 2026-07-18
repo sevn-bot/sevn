@@ -35,7 +35,9 @@ def generate(
         )
         voice_name = DEFAULT_VOICE
 
-    lang_code = (lang or os.environ.get("SEVN_SUPERTONIC_LANG") or DEFAULT_LANG).strip() or DEFAULT_LANG
+    lang_code = (
+        lang or os.environ.get("SEVN_SUPERTONIC_LANG") or DEFAULT_LANG
+    ).strip() or DEFAULT_LANG
     speed = max(0.7, min(2.0, float(speed)))
 
     tts = TTS(auto_download=True)

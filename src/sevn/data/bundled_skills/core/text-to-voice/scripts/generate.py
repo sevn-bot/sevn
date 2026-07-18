@@ -42,7 +42,9 @@ def main() -> None:
         help="Local TTS engine (default: SEVN_LOCAL_TTS_ENGINE or kokoro)",
     )
     parser.add_argument("--voice", "-v", default=None, help="Engine-specific voice id")
-    parser.add_argument("--lang", "-l", default=None, help="Language code (supertonic; e.g. en, na)")
+    parser.add_argument(
+        "--lang", "-l", default=None, help="Language code (supertonic; e.g. en, na)"
+    )
     parser.add_argument("--speed", "-s", type=float, default=None, help="Speech speed")
     parser.add_argument("--output", "-o", default=None, help="Output WAV path")
     parser.add_argument("--list-voices", action="store_true", help="List voices for --engine")

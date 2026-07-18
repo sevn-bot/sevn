@@ -113,10 +113,6 @@
       <td>Discover jobs across global + Europe boards, AI fit-score them against your resume, and optionally tailor a CV summary.</td>
     </tr>
     <tr>
-      <td><code>kokoro-tts</code></td>
-      <td>Local Kokoro ONNX text-to-speech engine backing the voice TTS pipeline (kokoro backend). Not a model-facing research skill.</td>
-    </tr>
-    <tr>
       <td><code>last30days</code></td>
       <td>Multi-source social research for the last 30 days (Reddit, X, YouTube, HN, Polymarket).</td>
     </tr>
@@ -197,6 +193,10 @@
       <td>Run host-side Playwright Telegram E2E (sevn telegram-test) while building sevn.bot. Use after gateway/menu/session/diagnostics changes. Not in gateway container.</td>
     </tr>
     <tr>
+      <td><code>text-to-voice</code></td>
+      <td>Unified local text-to-speech engines (Kokoro ONNX + Supertonic) backing the voice TTS pipeline (text_to_voice backend). Not a model-facing research skill.</td>
+    </tr>
+    <tr>
       <td><code>x-use</code></td>
       <td>X (Twitter) workflows via a logged-in browser profile or CDP attach (timeline, search).</td>
     </tr>
@@ -207,7 +207,7 @@
   </tbody>
 </table>
       <footer class="help-footer">
-        Generated 2026-07-17 from commit a9a7ad6.
+        Generated 2026-07-18 from commit 4fee27a.
         Edit <code>about-sevn.bot/_sources/skills.yaml</code> or templates — not the HTML directly.
       </footer>
     </main>

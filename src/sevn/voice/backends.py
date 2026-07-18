@@ -780,8 +780,7 @@ class TextToVoiceBackend:
         skill_dir = _find_text_to_voice_skill_dir(self._workspace_root)
         if skill_dir is None:
             msg = (
-                "text-to-voice skill not found "
-                "(install under workspace skills/core/text-to-voice)"
+                "text-to-voice skill not found (install under workspace skills/core/text-to-voice)"
             )
             raise RuntimeError(msg)
         script = skill_dir / "scripts" / "generate.py"
@@ -822,10 +821,7 @@ class TextToVoiceBackend:
             raise RuntimeError(msg) from None
         if proc.returncode != 0:
             err = (stderr or b"").decode("utf-8", errors="replace")[:500]
-            msg = (
-                f"text_to_voice ({self._engine}) synthesize failed "
-                f"rc={proc.returncode}: {err}"
-            )
+            msg = f"text_to_voice ({self._engine}) synthesize failed rc={proc.returncode}: {err}"
             raise RuntimeError(msg)
         if out_path.is_file() and out_path.stat().st_size > 0:
             return
