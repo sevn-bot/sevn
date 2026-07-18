@@ -100,6 +100,24 @@ source_globs = [
 specs = ["about-sevn.bot/specs/12-skills-system.md"]
 
 [[readme]]
+slug = "discogs"
+title = "Discogs skills"
+summary = "Opt-in Discogs API skill group — catalog, marketplace, collection, wantlist, identity; User-token and OAuth auth."
+profile = "guide"
+tier_owner = "skills"
+output = "docs/readmes/discogs.md"
+source_globs = [
+  "src/sevn/data/bundled_skills/core/discogs-*/**",
+  "src/sevn/skills/discogs.py",
+  "src/sevn/skills/discogs_secrets.py",
+  "src/sevn/config/sections/skills_discogs.py",
+  "src/sevn/gateway/menu/discogs_menu.py",
+  "src/sevn/integrations/discogs/**",
+]
+specs = ["about-sevn.bot/specs/12-skills-system.md"]
+curated = true
+
+[[readme]]
 slug = "ui-mission-control"
 title = "Mission Control UI"
 summary = "Dashboard SPA, tab registry, traces, ops surfaces, and OpenUI delivery."

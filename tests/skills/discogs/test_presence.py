@@ -7,11 +7,6 @@ import json
 import pytest
 from tests.skills.discogs.conftest import DISCOGS_SKILL_IDS, REPO_ROOT
 
-pytestmark = pytest.mark.xfail(
-    reason="green after W10: INDEX + onboarding + README",
-    strict=False,
-)
-
 INDEX_PATH = REPO_ROOT / "src" / "sevn" / "data" / "skills" / "INDEX.md"
 ONBOARDING_PATH = REPO_ROOT / "src" / "sevn" / "data" / "onboarding_capabilities.json"
 README_CANDIDATES = (

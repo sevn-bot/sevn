@@ -14,7 +14,7 @@ import pytest
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.data.bundled_skills import BUNDLED_SKILLS_ROOT
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 DISCOGS_SKILL_IDS: tuple[str, ...] = (
     "discogs-database",
