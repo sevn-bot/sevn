@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- [2026-07-18] Telegram config menu for Discogs skills — group and per-skill toggles, Setup submenu with user-token wizard, and whoami auth smoke-test
 - [2026-07-18] Discogs identity skill — whoami auth smoke-test, user profile, lists, search, and contributions subprocess scripts
 - [2026-07-18] Discogs wantlist skill — browse/search wantlist plus add, remove, and edit subprocess scripts with confirm-gated writes
 - [2026-07-18] Discogs collection skill — folder listing, collection search, value stats, and confirm-gated add/remove/move/rate subprocess scripts

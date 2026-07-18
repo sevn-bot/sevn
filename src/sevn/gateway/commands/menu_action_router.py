@@ -176,16 +176,24 @@ def infer_config_section_from_callback(data: str) -> ConfigSection:
         return "my_sevn_bot"
     if raw.startswith("act:sevn_bot:"):
         return "sevn_bot"
+    if raw.startswith("act:discogs:"):
+        return "skills:discogs:setup"
     if raw.startswith("cfg:cycle:"):
         path = raw.removeprefix("cfg:cycle:").rsplit(":", 1)[0]
         if path.startswith("skills.social_media_manager"):
             return "skills:social_media_manager"
+        if path.startswith("skills.discogs"):
+            return "skills:discogs"
         top = path.split(".", 1)[0]
         return _CONFIG_PATH_SECTION.get(top, "root")
     if raw.startswith("cfg:toggle:"):
         path = raw.removeprefix("cfg:toggle:").split(":", 1)[0]
         if path.startswith("skills.social_media_manager"):
             return "skills:social_media_manager"
+        if path.startswith("skills.discogs"):
+            if path.endswith(".enabled") and path.count(".") == 3:
+                return "skills:discogs"
+            return "skills:discogs"
         if path.startswith("agent.codemode"):
             return "codemode"
         if path.startswith("subagents"):
@@ -485,6 +493,8 @@ class MenuActionRouter:
                 return await self._handle_logs_action(msg, raw, target)
             if target.startswith("sevn_bot:"):
                 return await self._handle_sevn_bot_action(msg, raw, target)
+            if target == "discogs:whoami":
+                return await self._handle_discogs_whoami(msg, raw)
             if target.startswith("subagents:kill:"):
                 return await self._handle_subagents_kill(msg, raw, target)
             if target == "subagents:kill_all":
@@ -1482,6 +1492,52 @@ class MenuActionRouter:
                 lines.append(f"- `{row.id}` {row.title} ({row.state})")
             return "\n".join(lines)
         return "Unknown sevn.bot action."
+
+    async def _handle_discogs_whoami(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """Run ``discogs-identity/whoami`` and report the authed username or auth error.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Toast with the smoke-test result.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_discogs_whoami)
+            True
+        """
+        _ = callback_data
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        from sevn.skills.manager import SkillsManager
+        from sevn.workspace.layout import WorkspaceLayout
+
+        layout = WorkspaceLayout(self._sevn_json, self._content_root)
+        manager = SkillsManager.shared(
+            layout,
+            config=self._workspace,
+            layout=layout,
+        )
+        result = await manager.run_script("discogs-identity", "whoami.py")
+        if result.get("ok"):
+            data = result.get("data")
+            username = data.get("username") if isinstance(data, dict) else None
+            toast = f"Discogs connected as {username}" if username else "Discogs whoami succeeded."
+        else:
+            err = result.get("error")
+            if isinstance(err, dict):
+                toast = str(err.get("message") or err.get("code") or "Discogs auth failed.")
+            else:
+                toast = str(result.get("code") or "Discogs auth failed.")
+        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+        return None if answered else toast
 
     async def _handle_logs_action(
         self,

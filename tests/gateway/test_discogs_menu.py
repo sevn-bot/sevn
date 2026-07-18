@@ -24,11 +24,6 @@ from sevn.security.llm_guard_scanner import LLMGuardScanner
 from sevn.workspace.layout import WorkspaceLayout
 from tests.gateway.test_menu import _conn, _MenuCaptureTelegram, _workspace
 
-pytestmark = pytest.mark.xfail(
-    reason="green after W8: Discogs Telegram menu + user-token wizard",
-    strict=False,
-)
-
 _SECTION = "skills:discogs"
 _SETUP_SECTION = "skills:discogs:setup"
 

@@ -74,6 +74,12 @@ from sevn.config.model_resolution import (
 from sevn.config.workspace_config import TelegramQuickActionsConfig, WorkspaceConfig
 from sevn.gateway.commands.shortcuts_store import list_visible_shortcuts
 from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json
+from sevn.gateway.menu.discogs_menu import (
+    build_discogs_keyboard_rows,
+    build_discogs_setup_keyboard_rows,
+    discogs_menu_caption,
+    discogs_setup_caption,
+)
 from sevn.gateway.menu.menu_branding import (
     SEVN_BOT_ROOT_TILE_LABEL,
     config_sevn_bot_section_title,
@@ -123,6 +129,8 @@ ConfigSection = Literal[
     "secrets",
     "skills",
     "skills:social_media_manager",
+    "skills:discogs",
+    "skills:discogs:setup",
     "tools",
     "code",
     "security",
@@ -153,6 +161,8 @@ _CONFIG_SECTIONS: frozenset[str] = frozenset(
         "secrets",
         "skills",
         "skills:social_media_manager",
+        "skills:discogs",
+        "skills:discogs:setup",
         "tools",
         "code",
         "security",
@@ -2494,6 +2504,15 @@ def _build_skills_keyboard_rows(
                 },
             ],
         )
+    if _schema_has_config_path("skills.discogs"):
+        rows.append(
+            [
+                {
+                    "text": "📀 Discogs",
+                    "callback_data": "cfg:section:skills:discogs",
+                },
+            ],
+        )
     return rows
 
 
@@ -3448,6 +3467,10 @@ def build_config_menu_keyboard(
         rows_sec = _build_skills_keyboard_rows(workspace, content_root)
     elif section == "skills:social_media_manager":
         rows_sec = build_social_media_manager_keyboard_rows(workspace, content_root)
+    elif section == "skills:discogs":
+        rows_sec = build_discogs_keyboard_rows(workspace, content_root)
+    elif section == "skills:discogs:setup":
+        rows_sec = build_discogs_setup_keyboard_rows(workspace, content_root)
     elif section == "tools":
         rows_sec = _build_tools_keyboard_rows(workspace, content_root)
     elif section == "rlm":
@@ -3752,6 +3775,10 @@ def config_menu_message_text(
         return "\n".join(lines)
     if section == "skills:social_media_manager":
         return social_media_manager_menu_caption(workspace, content_root)
+    if section == "skills:discogs":
+        return discogs_menu_caption(workspace, content_root)
+    if section == "skills:discogs:setup":
+        return discogs_setup_caption(workspace, content_root)
     if section == "tools":
         tool_surface = _config_menu_tool_surface(workspace, content_root)
         native_n = len(tool_surface.native)

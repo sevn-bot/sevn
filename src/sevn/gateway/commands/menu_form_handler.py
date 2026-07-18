@@ -36,6 +36,7 @@ from sevn.gateway.dispatcher.dispatcher_state import (
     dispatcher_state_ttl_for_kind,
     insert_dispatcher_state,
 )
+from sevn.gateway.menu.discogs_menu import DISCOGS_USER_TOKEN_SECRET_ALIAS
 from sevn.gateway.menu.menu import (
     ConfigMenuRefreshContext,
     ConfigSection,
@@ -236,9 +237,12 @@ class MenuFormHandler:
         self._consume_active_forms(msg)
         kind = "secret_wizard" if target == "secret_wizard" else "form"
         if target == "secret_wizard":
-            section = (
-                "skills:social_media_manager" if preset_alias == TWEXAPI_SECRET_ALIAS else "secrets"
-            )
+            if preset_alias == TWEXAPI_SECRET_ALIAS:
+                section = "skills:social_media_manager"
+            elif preset_alias == DISCOGS_USER_TOKEN_SECRET_ALIAS:
+                section = "skills:discogs:setup"
+            else:
+                section = "secrets"
             step = "value" if preset_alias else "key"
         elif target == "agent_display_name":
             section = "agents"
@@ -1059,10 +1063,27 @@ class MenuFormHandler:
             except Exception as exc:
                 await self._send_chat(msg, f"Could not store secret: {exc}")
                 return
+            if alias == DISCOGS_USER_TOKEN_SECRET_ALIAS:
+
+                def _apply_discogs_user_token(doc: dict[str, Any]) -> None:
+                    _set_nested(doc, "skills.discogs.auth_method", "user_token")
+                    _set_nested(
+                        doc,
+                        "skills.discogs.user_token",
+                        f"${{SECRET:{DISCOGS_USER_TOKEN_SECRET_ALIAS}}}",
+                    )
+
+                mutate_sevn_json(self._sevn_json, _apply_discogs_user_token)
             self._consume_token(token)
             section = str(payload.get("section") or "secrets")
             await self._refresh_section(msg, section=section, toast=None)
             await self._send_chat(msg, f"✅ Secret `{alias}` stored.")
+            if alias == DISCOGS_USER_TOKEN_SECRET_ALIAS:
+                await self._send_chat(
+                    msg,
+                    "Auth method set to user_token. Tap Test connection to verify.",
+                )
+            return
 
     def _find_active_form(
         self,

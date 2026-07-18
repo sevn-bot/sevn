@@ -505,6 +505,119 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         implemented=True,
         notes="Secret wizard; store SEVN_SECRET_TWEXAPI",
     )
+    add(
+        "C7.8",
+        _exact("cfg:section:skills:discogs"),
+        "C",
+        "skills",
+        "Discogs submenu",
+        implemented=True,
+        notes="Schema-gated when skills.discogs declared",
+    )
+    add(
+        "C7.9",
+        _exact("cfg:section:skills:discogs:setup"),
+        "C",
+        "skills:discogs",
+        "Discogs Setup submenu",
+        implemented=True,
+        notes="User-token wizard and auth smoke-test",
+    )
+    add(
+        "C7.10",
+        _toggle("skills.discogs.enabled"),
+        "C",
+        "skills:discogs",
+        "Discogs group enabled toggle",
+        implemented=True,
+        notes="Off by default; gates all five bundled skills",
+    )
+    add(
+        "C7.11",
+        _toggle("skills.discogs.database.enabled"),
+        "C",
+        "skills:discogs",
+        "Discogs database skill toggle",
+        implemented=True,
+    )
+    add(
+        "C7.12",
+        _toggle("skills.discogs.marketplace.enabled"),
+        "C",
+        "skills:discogs",
+        "Discogs marketplace skill toggle",
+        implemented=True,
+    )
+    add(
+        "C7.13",
+        _toggle("skills.discogs.collection.enabled"),
+        "C",
+        "skills:discogs",
+        "Discogs collection skill toggle",
+        implemented=True,
+    )
+    add(
+        "C7.14",
+        _toggle("skills.discogs.wantlist.enabled"),
+        "C",
+        "skills:discogs",
+        "Discogs wantlist skill toggle",
+        implemented=True,
+    )
+    add(
+        "C7.15",
+        _toggle("skills.discogs.identity.enabled"),
+        "C",
+        "skills:discogs",
+        "Discogs identity skill toggle",
+        implemented=True,
+    )
+    add(
+        "C7.16",
+        r"^cfg:cycle:skills\.discogs\.auth_method:(?:user_token|oauth)$",
+        "C",
+        "skills:discogs",
+        "Discogs auth method cycle",
+        implemented=True,
+    )
+    add(
+        "C7.17",
+        _toggle("skills.discogs.confirm_writes"),
+        "C",
+        "skills:discogs",
+        "Discogs confirm_writes toggle",
+        implemented=True,
+    )
+    add(
+        "C7.18",
+        _exact("form:secret_wizard:discogs.user_token"),
+        "C",
+        "skills:discogs:setup",
+        "Set Discogs user token",
+        implemented=True,
+        owner_only=True,
+        notes="Preset-alias wizard; sets auth_method user_token",
+    )
+    add(
+        "C7.19",
+        _exact("form:discogs:oauth_start"),
+        "C",
+        "skills:discogs:setup",
+        "Discogs OAuth setup",
+        implemented=False,
+        owner_only=True,
+        notes="W9 OAuth 1.0a multi-step form",
+    )
+    add(
+        "C7.20",
+        _exact("act:discogs:whoami"),
+        "C",
+        "skills:discogs:setup",
+        "Discogs auth smoke-test",
+        implemented=True,
+        owner_only=True,
+        notes="Runs discogs-identity/whoami subprocess",
+    )
 
     # --- C8. Tools ---
     add(
