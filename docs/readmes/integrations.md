@@ -96,7 +96,7 @@ Working with [`__init__.py`](../../src/sevn/integrations/discogs/__init__.py): i
 Discogs OAuth 1.0a handshake helpers for Telegram setup (D20).
 
 Working with [`oauth.py`](../../src/sevn/integrations/discogs/oauth.py): inspect the public entry points below.
-Start with [`begin_oauth`](../../src/sevn/integrations/discogs/oauth.py#L54), then [`complete_oauth`](../../src/sevn/integrations/discogs/oauth.py#L113).
+Start with [`begin_oauth`](../../src/sevn/integrations/discogs/oauth.py#L54), then [`complete_oauth`](../../src/sevn/integrations/discogs/oauth.py#L110).
 
 GitHub bundled skill helpers — REST via integration_call proxy.
 
