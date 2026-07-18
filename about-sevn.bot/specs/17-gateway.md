@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-07-18'
-fingerprint: sha256:94324f19c6cab9d65508b0c359e03dbd94d4a88dd9161fa674c4d9642f15b134
+fingerprint: sha256:fd812000a8b1da2483129f19ebca13c81ce3fc3fd846de2b4288f6495e52027b
 related: []
 sources:
 - src/sevn/gateway/**
@@ -201,6 +201,15 @@ interfaces:
 - name: DiagnosticCommandHandler
   file: src/sevn/gateway/commands/diagnostic_commands.py
   symbol: DiagnosticCommandHandler
+- name: advance_discogs_oauth
+  file: src/sevn/gateway/commands/discogs_oauth_wizard.py
+  symbol: advance_discogs_oauth
+- name: cleanup_discogs_oauth_interim_secrets
+  file: src/sevn/gateway/commands/discogs_oauth_wizard.py
+  symbol: cleanup_discogs_oauth_interim_secrets
+- name: oauth_payload_has_no_secrets
+  file: src/sevn/gateway/commands/discogs_oauth_wizard.py
+  symbol: oauth_payload_has_no_secrets
 - name: CommandDispatcher
   file: src/sevn/gateway/commands/dispatcher.py
   symbol: CommandDispatcher
@@ -552,6 +561,9 @@ interfaces:
 - name: registry_implementation_counts
   file: src/sevn/gateway/menu/menu_registry.py
   symbol: registry_implementation_counts
+- name: register_discogs_menu_entries
+  file: src/sevn/gateway/menu/menu_registry_discogs.py
+  symbol: register_discogs_menu_entries
 - name: build_social_media_manager_keyboard_rows
   file: src/sevn/gateway/menu/social_media_manager_menu.py
   symbol: build_social_media_manager_keyboard_rows

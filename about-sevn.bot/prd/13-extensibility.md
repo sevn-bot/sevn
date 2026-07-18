@@ -7,7 +7,7 @@ owner: Alex
 summary: Built-in capabilities cover common paths; deployments need org glue—ticketing,
   LDAP, formatters, policy hooks—via plugins, skills, and hooks without forking core.
 last_updated: '2026-07-18'
-fingerprint: sha256:4358ba33c228f2668ec83aa7020ce3c233b4524cd6c6138a48868440e12fcdf4
+fingerprint: sha256:5f905950fbad7b12b570f048635b5bd51cd5dac1388b67426212bf884228d6b6
 related:
 - prd-03-trust-and-control
 - prd-07-mission-control
