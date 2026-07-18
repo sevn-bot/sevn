@@ -7,8 +7,8 @@ owner: Alex
 summary: Level-1 sub-agents (tracked, concurrent, killable role runs) that may spawn
   level-2 workers (incl. specialists); multi queue mode; limits, tracing, kill surfaces,
   media_generation skill.
-last_updated: '2026-07-16'
-fingerprint: sha256:1e9c50f1746b0218140b90a2086805711483ef22e52617fa8d6245e35f41dc43
+last_updated: '2026-07-18'
+fingerprint: sha256:b8e615248c95b4fe164de14364be00a6de632f67bea232b9a4cb7cb247d87be7
 related: []
 sources:
 - src/sevn/agent/subagents/**
@@ -212,12 +212,18 @@ interfaces:
 - name: resolve_limits
   file: src/sevn/config/sections/subagents.py
   symbol: resolve_limits
+- name: add_prompt_var_args
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/_common.py
+  symbol: add_prompt_var_args
 - name: content_root_from_env
   file: src/sevn/data/bundled_skills/core/media_generation/scripts/_common.py
   symbol: content_root_from_env
 - name: main_guard
   file: src/sevn/data/bundled_skills/core/media_generation/scripts/_common.py
   symbol: main_guard
+- name: prompt_vars_from_args
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/_common.py
+  symbol: prompt_vars_from_args
 - name: run_media_generation
   file: src/sevn/data/bundled_skills/core/media_generation/scripts/_common.py
   symbol: run_media_generation
@@ -234,7 +240,13 @@ interfaces:
   file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_video.py
   symbol: main
 - name: main
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_video_first_last.py
+  symbol: main
+- name: main
   file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_video_from_image.py
+  symbol: main
+- name: main
+  file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_video_subject.py
   symbol: main
 - name: main
   file: src/sevn/data/bundled_skills/core/media_generation/scripts/generate_video_template.py

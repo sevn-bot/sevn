@@ -45,6 +45,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- [2026-07-18] `media_generation` v2.2.0 hardens `media_generator`: voice speaks literal `speech_text`/`preview_text`, unique artifact filenames, `file_id` int|str, lean prompts (fail unknown template), path containment, and S2V/FL2V skill scripts
 - [2026-07-15] Telegram `/config`, onboarding wizard, and Mission Control Knowledge view expose Second Brain layout selection and resolved PARA role paths instead of assuming legacy `wiki/raw/outputs` folders
 - [2026-07-14] The about-docs generator no longer writes `interfaces`, `depends_on`, or `build_phase` into `kind: prd` frontmatter (spec-only keys; aligns with `skw prd-validate`)
 - [2026-07-14] `make about-docs-check` chains `make spec-check` and `make prd-check` so CI catches doc regressions; about-docs check rejects specs with `status: done` over scaffold placeholder bodies

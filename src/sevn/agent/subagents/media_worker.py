@@ -244,9 +244,17 @@ def parse_media_task(task: str) -> MediaTask:
         head, _, tail = text.partition(":")
         kind = head.strip().lower()
         prompt = tail.strip()
-        if kind in ("image", "video", "video_i2v", "music", "voice") and prompt:
+        if kind == "voice" and prompt:
+            msg = (
+                "voice shorthand unsupported — use JSON with "
+                "source_audio+preview_text|speech_text or voice_id+speech_text"
+            )
+            raise ValueError(msg)
+        if kind in ("image", "video", "video_i2v", "music") and prompt:
             return MediaTask(kind=kind, prompt=prompt)  # type: ignore[arg-type]
-    msg = "media task must be JSON or kind:prompt (image|video|video_i2v|music|voice)"
+    msg = (
+        "media task must be JSON or kind:prompt (image|video|video_i2v|music); voice requires JSON"
+    )
     raise ValueError(msg)
 
 
@@ -365,31 +373,32 @@ async def resolve_minimax_api_key(
 
 
 def _resolve_local_file(path_ref: str, *, content_root: Path) -> Path:
-    """Resolve a workspace-relative or absolute file path.
+    """Resolve a path that must stay under ``content_root``.
 
     Args:
-        path_ref (str): Path reference.
+        path_ref (str): Workspace-relative path (absolute paths allowed only if under root).
         content_root (Path): Workspace content root.
 
     Returns:
-        Path: Resolved existing file.
+        Path: Resolved existing file under ``content_root``.
 
     Raises:
-        MiniMaxMediaError: When the file is not found.
+        MiniMaxMediaError: When the file is not found or escapes the workspace.
 
     Examples:
         >>> import inspect
         >>> inspect.isfunction(_resolve_local_file)
         True
     """
+    from sevn.agent.subagents.media_minimax import _ensure_under_content_root
+
     ref = path_ref.strip()
     path = Path(ref).expanduser()
     if not path.is_absolute():
-        candidate = (content_root / ref).resolve()
-        if candidate.is_file():
-            return candidate
+        path = content_root / ref
+    path = _ensure_under_content_root(path, content_root)
     if path.is_file():
-        return path.resolve()
+        return path
     raise MiniMaxMediaError(f"file not found: {path_ref}")
 
 
@@ -420,7 +429,9 @@ def _read_audio_bytes(path_ref: str, *, content_root: Path) -> tuple[bytes, str]
 
 
 def _safe_filename(kind: MediaKind, prompt: str) -> str:
-    """Build a filesystem-safe artifact basename.
+    """Build a unique filesystem-safe artifact basename.
+
+    Includes an 8-char uuid suffix so identical prompts cannot collide.
 
     Args:
         kind (MediaKind): Media kind.
@@ -430,10 +441,12 @@ def _safe_filename(kind: MediaKind, prompt: str) -> str:
         str: Filename with extension.
 
     Examples:
-        >>> _safe_filename("image", "Hello World!")
-        'media-image-hello-world.jpg'
+        >>> name = _safe_filename("image", "Hello World!")
+        >>> name.startswith("media-image-hello-world-") and name.endswith(".jpg")
+        True
     """
-    stem = _FILENAME_SAFE.sub("-", prompt.strip().lower())[:48].strip("-") or "artifact"
+    stem = _FILENAME_SAFE.sub("-", prompt.strip().lower())[:40].strip("-") or "artifact"
+    unique = uuid.uuid4().hex[:8]
     ext = {
         "image": "jpg",
         "image_i2i": "jpg",
@@ -445,7 +458,7 @@ def _safe_filename(kind: MediaKind, prompt: str) -> str:
         "music": "mp3",
         "voice": "mp3",
     }[kind]
-    return f"media-{kind}-{stem}.{ext}"
+    return f"media-{kind}-{stem}-{unique}.{ext}"
 
 
 def _new_voice_id() -> str:
@@ -519,13 +532,24 @@ async def _persist_bytes(
         >>> inspect.iscoroutinefunction(_persist_bytes)
         True
     """
+    from sevn.agent.subagents.media_minimax import _ensure_under_content_root
+
     store = MediaStore(conn, content_root)
     encoded = base64.b64encode(data).decode("ascii")
     await store.persist_attachment_descriptors(
         session_id,
         [{"filename": filename, "data_base64": encoded}],
     )
-    return f"channel_files/{session_id}/{filename}"
+    rel_path = f"channel_files/{session_id}/{filename}"
+    written = _ensure_under_content_root(content_root / rel_path, content_root)
+    if not written.is_file() or written.stat().st_size != len(data):
+        # MediaStore skips existing names; unique filenames should prevent this.
+        # Fall back to a direct write so the returned path always matches bytes.
+        written.parent.mkdir(parents=True, exist_ok=True)
+        written.write_bytes(data)
+    if written.stat().st_size != len(data):
+        raise MiniMaxMediaError(f"failed to persist artifact: {rel_path}")
+    return rel_path
 
 
 async def execute_media_generator_task(
@@ -714,12 +738,18 @@ async def execute_media_generator_task(
             client=http_client,
         )
     else:
+        # Voice character notes go in trace only — spoken text is always literal.
         template_key, augmented, format_ctx = _augment_task("voice", media_task)
         api_model = DEFAULT_SPEECH_MODEL
         voice_id = media_task.voice_id
         cloned_voice_id: str | None = None
+        spoken = (media_task.preview_text or media_task.speech_text or "").strip()
 
         if media_task.source_audio:
+            if not spoken:
+                raise MiniMaxMediaError(
+                    "voice clone requires preview_text or speech_text (literal spoken text)",
+                )
             source_bytes, source_name = _read_audio_bytes(
                 media_task.source_audio,
                 content_root=content_root,
@@ -732,13 +762,12 @@ async def execute_media_generator_task(
                     media_task.prompt_audio,
                     content_root=content_root,
                 )
-            preview = media_task.preview_text or media_task.speech_text or augmented
             cloned_voice_id, preview_bytes = await clone_voice_bytes(
                 api_key,
                 source_bytes,
                 voice_id=assigned_voice,
                 source_filename=source_name,
-                preview_text=preview,
+                preview_text=spoken,
                 prompt_audio=prompt_audio_bytes,
                 prompt_text=media_task.prompt_text,
                 prompt_filename=prompt_name,
@@ -747,15 +776,13 @@ async def execute_media_generator_task(
             voice_id = cloned_voice_id
             trace_extra["cloned_voice_id"] = cloned_voice_id
             trace_extra["source_audio"] = media_task.source_audio
+            trace_extra["spoken_text"] = spoken
             if preview_bytes is not None:
                 data = preview_bytes
-            elif media_task.speech_text and voice_id:
-                _, speech_aug, _ = _augment_task(
-                    "voice", media_task, prompt_override=media_task.speech_text
-                )
+            elif voice_id:
                 data = await synthesize_speech_bytes(
                     api_key,
-                    speech_aug,
+                    spoken,
                     voice_id=voice_id,
                     client=http_client,
                 )
@@ -764,24 +791,23 @@ async def execute_media_generator_task(
                     "voice clone succeeded but no preview audio — set preview_text or speech_text",
                 )
         elif voice_id and media_task.speech_text:
-            speech_key, speech_augmented, speech_ctx = _augment_task(
-                "voice",
-                media_task,
-                prompt_override=media_task.speech_text,
-            )
-            trace_extra["speech_template_key"] = speech_key
-            trace_extra["speech_augmented_prompt"] = speech_augmented
-            trace_extra["speech_variables"] = speech_ctx
+            spoken = media_task.speech_text.strip()
+            if not spoken:
+                raise MiniMaxMediaError("voice TTS requires non-empty speech_text")
+            # Trace keeps delivery/mood notes; API hears literal speech_text only.
+            trace_extra["spoken_text"] = spoken
+            trace_extra["voice_character_notes"] = augmented
             data = await synthesize_speech_bytes(
                 api_key,
-                speech_augmented,
+                spoken,
                 voice_id=voice_id,
                 client=http_client,
             )
             trace_extra["voice_id"] = voice_id
         else:
             raise MiniMaxMediaError(
-                "voice requires source_audio (clone) or voice_id + speech_text (TTS)",
+                "voice requires source_audio + preview_text|speech_text (clone) "
+                "or voice_id + speech_text (TTS)",
             )
 
     filename = _safe_filename(

@@ -22,6 +22,7 @@ Examples:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -524,29 +525,29 @@ PROMPT_TEMPLATES: dict[MediaPromptKind, dict[str, str]] = {
     for kind, metas in _PROMPT_TEMPLATE_REGISTRY.items()
 }
 
-_DEFAULTS: dict[str, str] = {
-    "scene": "neutral environment",
-    "style": "realistic, polished",
-    "subject": "main subject",
-    "mood": "balanced",
-    "lighting": "natural soft light",
-    "camera": "steady medium shot",
-    "genre": "versatile",
-    "tempo": "moderate",
-    "instrumentation": "appropriate to genre",
-    "delivery": "clear and expressive",
-}
+_LABEL = r"Scene|Style|Subject|Mood|Lighting|Camera|Genre|Tempo|Instrumentation|Delivery"
+# Remove only empty slots: "Scene: ." / "Scene:." / "Scene:" before another label or EOS.
+# Sentinel for unset template slots — scrub only these, never user text.
+_UNSET = "\x1e"
+_EMPTY_CLAUSE_RE = re.compile(
+    rf"\s*(?:{_LABEL}):\s*{re.escape(_UNSET)}\.?",
+)
+_MULTI_SPACE_RE = re.compile(r"\s{2,}")
+_SPACE_BEFORE_DOT_RE = re.compile(r"\s+\.")
 
 
 def _normalize_template_key(kind: MediaPromptKind, template_key: str | None) -> str:
-    """Return a valid template slug for ``kind``, falling back to ``default``.
+    """Return a valid template slug for ``kind``.
 
     Args:
         kind (MediaPromptKind): Media family.
-        template_key (str | None): Requested template slug.
+        template_key (str | None): Requested template slug; ``None`` → ``default``.
 
     Returns:
         str: Resolved template slug.
+
+    Raises:
+        ValueError: When ``template_key`` is set but not in the catalog for ``kind``.
 
     Examples:
         >>> _normalize_template_key("image", None)
@@ -554,12 +555,18 @@ def _normalize_template_key(kind: MediaPromptKind, template_key: str | None) -> 
     """
     family = _PROMPT_TEMPLATE_REGISTRY.get(kind, ())
     slugs = {m.slug for m in family}
-    key = (template_key or _DEFAULT_TEMPLATE_KEY).strip().lower() or _DEFAULT_TEMPLATE_KEY
-    return key if key in slugs else _DEFAULT_TEMPLATE_KEY
+    if template_key is None or not str(template_key).strip():
+        return _DEFAULT_TEMPLATE_KEY
+    key = str(template_key).strip().lower()
+    if key not in slugs:
+        raise ValueError(f"unknown template {template_key!r} for kind {kind!r}")
+    return key
 
 
 def _build_format_context(user_request: str, vars: MediaPromptVars | None) -> dict[str, str]:
-    """Merge defaults, structured vars, and ``user_request`` for template formatting.
+    """Build format context from ``user_request`` and only explicitly set variables.
+
+    Unset slots use an internal sentinel so scrubbing never alters user text.
 
     Args:
         user_request (str): Short operator intent.
@@ -571,18 +578,47 @@ def _build_format_context(user_request: str, vars: MediaPromptVars | None) -> di
     Examples:
         >>> _build_format_context("fox", None)["user_request"]
         'fox'
+        >>> _build_format_context("fox", None)["scene"] == _UNSET
+        True
     """
     v = vars or MediaPromptVars()
-    ctx = dict(_DEFAULTS)
+    ctx = {name: _UNSET for name in PROMPT_VARIABLES}
     ctx["user_request"] = user_request.strip()
-    ctx["subject"] = (v.subject or user_request).strip()
     for name in PROMPT_VARIABLES:
-        if name in ("user_request", "subject"):
+        if name == "user_request":
             continue
         val = getattr(v, name, None)
         if isinstance(val, str) and val.strip():
             ctx[name] = val.strip()
     return ctx
+
+
+def _scrub_empty_clauses(text: str) -> str:
+    """Remove ``Label: <unset-sentinel>`` clauses left by unset variables.
+
+    Only generated unset slots (sentinel) are removed — user text like
+    ``Style:`` is preserved.
+
+    Args:
+        text (str): Formatted template string.
+
+    Returns:
+        str: Cleaned prompt.
+
+    Examples:
+        >>> _scrub_empty_clauses(f"Image. Scene: {_UNSET}. Style: watercolor. Details: fox.")
+        'Image. Style: watercolor. Details: fox.'
+        >>> "Style:" in _scrub_empty_clauses("Keep ending Style:")
+        True
+    """
+    cleaned = _EMPTY_CLAUSE_RE.sub("", text)
+    cleaned = cleaned.replace(_UNSET, "")
+    cleaned = _MULTI_SPACE_RE.sub(" ", cleaned)
+    cleaned = _SPACE_BEFORE_DOT_RE.sub(".", cleaned)
+    stripped = cleaned.strip(" .")
+    if not stripped:
+        return ""
+    return stripped if stripped.endswith(".") else f"{stripped}."
 
 
 def augment_prompt(
@@ -594,6 +630,9 @@ def augment_prompt(
 ) -> tuple[str, str, dict[str, str]]:
     """Augment a short user request into a provider-ready prompt.
 
+    Only explicitly set structured variables are injected; unset slots are omitted.
+    Unknown ``template_key`` values raise (no silent fallback).
+
     Args:
         kind (MediaPromptKind): Media family.
         user_request (str): Short operator intent.
@@ -604,7 +643,7 @@ def augment_prompt(
         tuple[str, str, dict[str, str]]: ``(template_key, augmented_prompt, format_context)``.
 
     Raises:
-        ValueError: When ``user_request`` is empty.
+        ValueError: When ``user_request`` is empty or ``template_key`` is unknown.
 
     Examples:
         >>> k, p, c = augment_prompt("image", "fox", vars=MediaPromptVars(scene="forest", style="watercolor"))
@@ -618,7 +657,8 @@ def augment_prompt(
     metas = {m.slug: m for m in _PROMPT_TEMPLATE_REGISTRY[kind]}
     pattern = metas[resolved_key].template
     ctx = _build_format_context(text, vars)
-    return resolved_key, pattern.format(**ctx), ctx
+    filled = pattern.format(**ctx)
+    return resolved_key, _scrub_empty_clauses(filled), ctx
 
 
 def list_prompt_templates(kind: MediaPromptKind | None = None) -> list[dict[str, object]]:

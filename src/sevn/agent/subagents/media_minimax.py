@@ -47,6 +47,7 @@ DEFAULT_SPEECH_MODEL = "speech-2.8-hd"
 _DEFAULT_HTTP_TIMEOUT_S = 120.0
 _DEFAULT_VIDEO_POLL_INTERVAL_S = 5.0
 _DEFAULT_VIDEO_MAX_POLLS = 120
+_MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024  # 100 MiB
 
 
 class MiniMaxMediaError(RuntimeError):
@@ -93,9 +94,11 @@ def _raise_for_status_payload(response: httpx.Response, *, context: str) -> dict
     try:
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
-        msg = f"{context}: HTTP {exc.response.status_code}"
-        raise MiniMaxMediaError(msg) from exc
-    payload = response.json()
+        raise MiniMaxMediaError(f"{context}: HTTP {exc.response.status_code}") from exc
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise MiniMaxMediaError(f"{context}: invalid JSON response") from exc
     if not isinstance(payload, dict):
         msg = f"{context}: expected JSON object"
         raise MiniMaxMediaError(msg)
@@ -133,18 +136,75 @@ def _image_to_data_url(path: Path) -> str:
     return f"data:{mime};base64,{encoded}"
 
 
+def _ensure_under_content_root(path: Path, content_root: Path) -> Path:
+    """Resolve ``path`` and require it stays under ``content_root``.
+
+    Args:
+        path (Path): Candidate path (may be relative).
+        content_root (Path): Workspace content root.
+
+    Returns:
+        Path: Resolved absolute path under ``content_root``.
+
+    Raises:
+        MiniMaxMediaError: When the path escapes the workspace root.
+
+    Examples:
+        >>> import tempfile
+        >>> root = Path(tempfile.mkdtemp())
+        >>> _ensure_under_content_root(root / "a.jpg", root) == (root / "a.jpg").resolve()
+        True
+    """
+    root = content_root.resolve()
+    resolved = path.resolve()
+    try:
+        resolved.relative_to(root)
+    except ValueError as exc:
+        raise MiniMaxMediaError(f"path escapes workspace: {path}") from exc
+    return resolved
+
+
+def _normalize_file_id(file_id: object) -> str:
+    """Normalize MiniMax ``file_id`` (int or str) to a non-empty string.
+
+    Args:
+        file_id (object): Value from API JSON.
+
+    Returns:
+        str: Normalized file id.
+
+    Raises:
+        MiniMaxMediaError: When missing or empty.
+
+    Examples:
+        >>> _normalize_file_id(12345)
+        '12345'
+        >>> _normalize_file_id("abc")
+        'abc'
+    """
+    if isinstance(file_id, bool) or file_id is None:
+        raise MiniMaxMediaError("query_video_generation: missing file_id")
+    if isinstance(file_id, int):
+        return str(file_id)
+    if isinstance(file_id, str) and file_id.strip():
+        return file_id.strip()
+    raise MiniMaxMediaError("query_video_generation: missing file_id")
+
+
 def _resolve_image_ref(image_ref: str, *, content_root: Path | None = None) -> str:
     """Resolve an image reference to a URL or data URL for MiniMax APIs.
 
+    Local paths must resolve under ``content_root`` when provided.
+
     Args:
-        image_ref (str): Public URL, data URL, or workspace-relative/local path.
-        content_root (Path | None, optional): Workspace root for relative paths.
+        image_ref (str): Public URL, data URL, or workspace-relative path.
+        content_root (Path | None, optional): Workspace root for local paths.
 
     Returns:
         str: URL or data URL accepted by MiniMax.
 
     Raises:
-        MiniMaxMediaError: When a local path cannot be resolved.
+        MiniMaxMediaError: When a local path cannot be resolved or escapes the workspace.
 
     Examples:
         >>> _resolve_image_ref("https://example.com/a.jpg").startswith("https://")
@@ -155,11 +215,12 @@ def _resolve_image_ref(image_ref: str, *, content_root: Path | None = None) -> s
         raise MiniMaxMediaError("image reference must be non-empty")
     if ref.startswith(("http://", "https://", "data:")):
         return ref
+    if content_root is None:
+        raise MiniMaxMediaError("local image paths require a workspace content_root")
     path = Path(ref).expanduser()
-    if not path.is_absolute() and content_root is not None:
-        candidate = (content_root / ref).resolve()
-        if candidate.is_file():
-            path = candidate
+    if not path.is_absolute():
+        path = content_root / ref
+    path = _ensure_under_content_root(path, content_root)
     if path.is_file():
         return _image_to_data_url(path)
     raise MiniMaxMediaError(f"image not found: {image_ref}")
@@ -550,10 +611,7 @@ async def _poll_video_file_id(
         payload = _raise_for_status_payload(response, context="query_video_generation")
         status = str(payload.get("status") or "").strip()
         if status == "Success":
-            file_id = payload.get("file_id")
-            if not isinstance(file_id, str) or not file_id.strip():
-                raise MiniMaxMediaError("query_video_generation: missing file_id")
-            return file_id.strip()
+            return _normalize_file_id(payload.get("file_id"))
         if status == "Fail":
             detail = payload.get("error_message") or payload.get("base_resp")
             raise MiniMaxMediaError(f"video_generation failed: {detail!s}")
@@ -625,7 +683,8 @@ async def _download_minimax_file(
         bytes: Downloaded file bytes.
 
     Raises:
-        MiniMaxMediaError: When retrieve or download fails.
+        MiniMaxMediaError: When retrieve or download fails, or the payload
+            exceeds ``_MAX_DOWNLOAD_BYTES``.
 
     Examples:
         >>> import inspect
@@ -644,13 +703,11 @@ async def _download_minimax_file(
     download_url = file_obj.get("download_url")
     if not isinstance(download_url, str) or not download_url.strip():
         raise MiniMaxMediaError("files_retrieve: missing download_url")
-    dl = await http.get(download_url.strip())
-    dl.raise_for_status()
-    return dl.content
+    return await _download_url(http, download_url.strip())
 
 
 async def _download_url(http: httpx.AsyncClient, url: str) -> bytes:
-    """Download bytes from a public URL.
+    """Download bytes from a public URL with a size cap.
 
     Args:
         http (httpx.AsyncClient): Shared async client.
@@ -660,7 +717,7 @@ async def _download_url(http: httpx.AsyncClient, url: str) -> bytes:
         bytes: File bytes.
 
     Raises:
-        MiniMaxMediaError: On HTTP failure.
+        MiniMaxMediaError: On HTTP failure or when the payload exceeds ``_MAX_DOWNLOAD_BYTES``.
 
     Examples:
         >>> import inspect
@@ -672,6 +729,15 @@ async def _download_url(http: httpx.AsyncClient, url: str) -> bytes:
         dl.raise_for_status()
     except httpx.HTTPStatusError as exc:
         raise MiniMaxMediaError(f"download failed: HTTP {exc.response.status_code}") from exc
+    content_length = dl.headers.get("Content-Length")
+    if content_length and content_length.isdigit() and int(content_length) > _MAX_DOWNLOAD_BYTES:
+        raise MiniMaxMediaError(
+            f"download exceeds size cap ({_MAX_DOWNLOAD_BYTES} bytes)",
+        )
+    if len(dl.content) > _MAX_DOWNLOAD_BYTES:
+        raise MiniMaxMediaError(
+            f"download exceeds size cap ({_MAX_DOWNLOAD_BYTES} bytes)",
+        )
     return dl.content
 
 
@@ -1079,9 +1145,7 @@ async def generate_music_bytes(
         audio_url = data.get("audio")
         if not isinstance(audio_url, str) or not audio_url.strip():
             raise MiniMaxMediaError("music_generation: missing audio url")
-        dl = await http.get(audio_url.strip())
-        dl.raise_for_status()
-        return dl.content
+        return await _download_url(http, audio_url.strip())
     finally:
         if owns:
             await http.aclose()
