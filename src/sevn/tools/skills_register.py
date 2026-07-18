@@ -64,7 +64,7 @@ _RUN_SKILL_SCRIPT_PARAMS: dict[str, Any] = {
     "properties": {
         "skill": {
             "type": "string",
-            "description": "Canonical skill id from load_skill (e.g. playwright-browser).",
+            "description": "Canonical skill id from load_skill (e.g. social_media_manager).",
         },
         "script": {
             "type": "string",

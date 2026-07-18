@@ -7,7 +7,6 @@
     }
   },
   "capabilities_defaults": {
-    "extra.browser": false,
     "extra.bedrock": false,
     "skill.printing_press_library": false,
     "memory.lcm": true,

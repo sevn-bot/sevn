@@ -40,7 +40,8 @@ def test_merged_capability_defaults_profile_override() -> None:
     """Profile ``capabilities_defaults`` overrides manifest defaults when allowed."""
     frag = load_profile_fragment("good_value_osx")
     defaults = merged_capability_defaults(profile_fragment=frag)
-    assert defaults["extra.browser"] is True
+    assert defaults["extra.browser_cdp"] is True
+    assert "extra.browser" not in defaults
     assert defaults["skill.printing_press_library"] is False
 
 

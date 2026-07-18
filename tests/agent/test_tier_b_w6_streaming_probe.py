@@ -1,25 +1,20 @@
-"""W6 — streaming/tool interleave mitigation + CDP probe steer (msg=7b8454, 62803d)."""
+"""W6 — streaming/tool interleave mitigation (msg=7b8454)."""
 
 from __future__ import annotations
 
-import json
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
-from sevn.agent.adapters.tier_b_tools import _dispatch_tool
 from sevn.agent.executors.b_harness import run_b_turn
-from sevn.agent.executors.b_types import BTierDeps, ResolvedTierBModel, SessionHandle, SteerInject
-from sevn.agent.grounding import steer_for_playwright_cdp_probe_failure
+from sevn.agent.executors.b_types import ResolvedTierBModel, SessionHandle
 from sevn.agent.providers.budget import BudgetRegime, ModelBudget
 from sevn.agent.providers.transport import ChatCompletionsTransport
 from sevn.agent.triager.models import ComplexityTier, Intent, TriageResult
 from sevn.config.workspace_config import SecurityWorkspaceConfig, WorkspaceConfig
-from sevn.prompts.tier_b import tier_b_bound_skill_playbook_prompt, tier_b_playwright_browser_prompt
-from sevn.tools.base import ToolDefinition, ToolExecutor
 from sevn.tools.cache import LoadedBodyCache
 from sevn.tools.context import ToolContext
 from sevn.tools.permissions import AllowAllPermissionPolicy
@@ -62,12 +57,6 @@ def _triage(*, tools: list[str] | None = None, skills: list[str] | None = None) 
         requires_vision=False,
         requires_document=False,
     )
-
-
-def _run_ctx(deps: BTierDeps) -> MagicMock:
-    ctx = MagicMock()
-    ctx.deps = deps
-    return ctx
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +145,7 @@ async def test_bound_skill_disables_streaming_proactively(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """msg=62803d: bound ``playwright-browser`` skill disables progressive streaming."""
+    """msg=62803d: bound ``browser-harness`` skill disables progressive streaming."""
     from tests.agent.test_b_harness import _make_tick_executor
 
     info_records: list[str] = []
@@ -185,7 +174,7 @@ async def test_bound_skill_disables_streaming_proactively(
         workspace=_workspace(tmp_path),
         session=SessionHandle(session_id="s-pw"),
         turn_id="t-pw",
-        triage=_triage(tools=["run_skill_script", "send_file"], skills=["playwright-browser"]),
+        triage=_triage(tools=["run_skill_script", "send_file"], skills=["browser-harness"]),
         incoming_text="screenshot example.com",
         tool_set=tool_set,
         body_cache=LoadedBodyCache(capacity=4),
@@ -208,118 +197,41 @@ async def test_bound_skill_disables_streaming_proactively(
 
     disabled = [m for m in info_records if "streaming_disabled" in m]
     assert any("reason=bound_tools_or_skills" in m for m in disabled)
-    assert any("playwright-browser" in m for m in disabled)
+    assert any("browser-harness" in m for m in disabled)
 
 
-# ---------------------------------------------------------------------------
-# W6.4 — prompt / playbook CDP guidance
-# ---------------------------------------------------------------------------
+# --- W1 RED (DP3): grounding + prompt alias drops (green after W5) ---
 
 
-def test_playwright_prompts_mention_cdp_unreachable_before_capture() -> None:
-    """W6.4: tier-B prompts steer past pre-spawn ``CDP_UNREACHABLE``."""
-    playbook = tier_b_bound_skill_playbook_prompt(["playwright-browser"])
-    browser = tier_b_playwright_browser_prompt()
-    assert "CDP_UNREACHABLE" in playbook
-    assert "capture.py" in playbook
-    assert "CDP_UNREACHABLE" in browser
-    assert "capture.py" in browser
+def test_steer_for_browser_cdp_probe_failure_renamed() -> None:
+    """DP3: grounding exports steer_for_browser_cdp_probe_failure; old name gone."""
+    import sevn.agent.grounding as grounding
+
+    _old = "steer_for_" + "play" + "wright" + "_cdp_probe_failure"
+    assert hasattr(grounding, "steer_for_browser_cdp_probe_failure")
+    assert "steer_for_browser_cdp_probe_failure" in grounding.__all__
+    assert not hasattr(grounding, _old)
+    assert _old not in grounding.__all__
+    msg = grounding.steer_for_browser_cdp_probe_failure()
+    assert isinstance(msg, str)
+    assert msg.strip()
+    assert "CDP_UNREACHABLE" in msg
 
 
-# ---------------------------------------------------------------------------
-# W6.5 / W6.6 — CDP probe failure steer (62803d)
-# ---------------------------------------------------------------------------
+def test_tier_b_browser_tool_prompt_alias_removed() -> None:
+    """DP3: deprecated tier_b browser-tool prompt alias is gone from module + __all__."""
+    import sevn.prompts.tier_b as tier_b
+
+    _old = "tier_b_" + "play" + "wright" + "_browser_prompt"
+    assert not hasattr(tier_b, _old)
+    assert _old not in tier_b.__all__
+    assert hasattr(tier_b, "tier_b_browser_tool_prompt")
 
 
-@pytest.mark.asyncio
-async def test_cdp_unreachable_probe_injects_capture_steer() -> None:
-    """msg=62803d: ``CDP_UNREACHABLE`` from probe scripts steers to ``capture.py``."""
-    steer = SteerInject()
-    ctx = ToolContext(
-        session_id="s",
-        workspace_path=Path("/tmp"),
-        workspace_id="w",
-        registry_version=1,
-        trace=None,
-        permissions=AllowAllPermissionPolicy(),
-    )
-    deps = BTierDeps(
-        tool_executor=ToolExecutor(),
-        tool_context_template=ctx,
-        workspace_path=Path("/tmp"),
-        registry_version=1,
-        steer_buffer=steer,
-    )
-    probe_envelope = json.dumps(
-        {
-            "ok": False,
-            "code": "CDP_UNREACHABLE",
-            "error": "CDP endpoint not reachable: http://127.0.0.1:9222",
-        },
-    )
-    deps.tool_executor.dispatch = AsyncMock(return_value=probe_envelope)  # type: ignore[method-assign]
-    run_ctx = _run_ctx(deps)
-    definition = ToolDefinition(
-        name="run_skill_script",
-        category="skills",
-        description="Run skill script",
-        parameters={"type": "object", "properties": {}},
-    )
-    await _dispatch_tool(
-        run_ctx,
-        definition,
-        {
-            "skill_name": "playwright-browser",
-            "script_path": "scripts/cdp_probe.py",
-            "args": [],
-        },
-    )
-    assert steer.pending_text is not None
-    assert "capture.py" in steer.pending_text
-    assert steer.pending_text == steer_for_playwright_cdp_probe_failure()
+def test_browser_tool_rule_alias_removed() -> None:
+    """DP3: retired browser-rule alias is removed; BROWSER_TOOL_RULE remains."""
+    import sevn.prompts.triager as triager
 
-
-@pytest.mark.asyncio
-async def test_cdp_unreachable_capture_script_does_not_inject_probe_steer() -> None:
-    """Real capture failures must not get the pre-spawn probe steer."""
-    steer = SteerInject()
-    ctx = ToolContext(
-        session_id="s",
-        workspace_path=Path("/tmp"),
-        workspace_id="w",
-        registry_version=1,
-        trace=None,
-        permissions=AllowAllPermissionPolicy(),
-    )
-    deps = BTierDeps(
-        tool_executor=ToolExecutor(),
-        tool_context_template=ctx,
-        workspace_path=Path("/tmp"),
-        registry_version=1,
-        steer_buffer=steer,
-    )
-    probe_envelope = json.dumps(
-        {
-            "ok": False,
-            "code": "CDP_UNREACHABLE",
-            "error": "CDP endpoint not reachable",
-        },
-    )
-    deps.tool_executor.dispatch = AsyncMock(return_value=probe_envelope)  # type: ignore[method-assign]
-    run_ctx = _run_ctx(deps)
-    definition = ToolDefinition(
-        name="run_skill_script",
-        category="skills",
-        description="Run skill script",
-        parameters={"type": "object", "properties": {}},
-    )
-    await _dispatch_tool(
-        run_ctx,
-        definition,
-        {
-            "skill_name": "playwright-browser",
-            "script_path": "scripts/capture.py",
-            "args": ["https://example.com"],
-        },
-    )
-    assert steer.pending_text is None
+    _old = "PLAY" + "WRIGHT" + "_BROWSER_RULE"
+    assert hasattr(triager, "BROWSER_TOOL_RULE")
+    assert not hasattr(triager, _old)

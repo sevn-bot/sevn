@@ -8,7 +8,7 @@ summary: 'Provide a single, testable configuration surface before storage, traci
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
 last_updated: '2026-07-18'
-fingerprint: sha256:cf55be978e0c45f6b5271c86acdd3d886229ed496bc79c57065332125b71154c
+fingerprint: sha256:2eea6beef0dc479e1d1e12e033619c8f134f4b3c1f96b870a647c7416232a3eb
 related: []
 sources:
 - src/sevn/config/**

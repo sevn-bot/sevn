@@ -6,8 +6,8 @@ status: scaffold
 owner: Alex
 summary: 'Own the provider-chain facades for speech-to-text and text-to-speech so
   the gateway can:'
-last_updated: '2026-07-18'
-fingerprint: sha256:715635240bd8d93efbe42647195d9e8fc95bc175017fe0df0594a062a9b83000
+last_updated: '2026-07-14'
+fingerprint: sha256:d86e09e3208ae192ad94bd266d4f8ca2d60ca1324c6652df8e90d9abf2ae784d
 related: []
 sources:
 - src/sevn/voice/**
@@ -36,9 +36,6 @@ interfaces:
 - name: TextToSpeechBackend
   file: src/sevn/voice/backends.py
   symbol: TextToSpeechBackend
-- name: TextToVoiceBackend
-  file: src/sevn/voice/backends.py
-  symbol: TextToVoiceBackend
 - name: TranscriptionResult
   file: src/sevn/voice/backends.py
   symbol: TranscriptionResult
@@ -159,7 +156,6 @@ Initial draft for **Public Interface** — grounded in extracted interfaces; con
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Public Interface — acceptance criteria and edge cases. -->
 
 - [`EdgeTtsBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
-- [`TextToVoiceBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
 - [`KokoroBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
 - [`SpeechToTextBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
 - [`SynthesisResult`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
@@ -179,7 +175,6 @@ Initial draft for **Data Model** — grounded in extracted interfaces; confirm n
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Data Model — acceptance criteria and edge cases. -->
 
 - [`EdgeTtsBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
-- [`TextToVoiceBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
 - [`KokoroBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
 - [`SpeechToTextBackend`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`
 - [`SynthesisResult`](src/sevn/voice/backends.py) — `src/sevn/voice/backends.py`

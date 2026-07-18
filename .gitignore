@@ -123,15 +123,13 @@ infra/e2e-webchat-home/*
 infra/e2e-mission-control-home/*
 !infra/e2e-mission-control-home/.gitkeep
 
-# --- Telegram Playwright tester ---
+# --- Retired Telegram Web tester (local leftovers) ---
 tools/telegram-tester/artifacts/
 tools/telegram-tester/.browser-profile/
 
-# --- Playwright / Node ---
+# --- Node ---
 node_modules/
 test-results/
-playwright-report/
-/playwright/.cache/
 
 # --- OS / editor noise ---
 .DS_Store

@@ -55,7 +55,7 @@ async def test_d15_unrelated_ask_not_absorbed_into_in_flight_summary() -> None:
     try:
         result = await classify_relatedness(
             workspace=WorkspaceConfig.minimal(),
-            inp=RelatednessInput("in-flight A", (), "Why playwright? Do not use it."),
+            inp=RelatednessInput("in-flight A", (), "Why browser-driver? Do not use it."),
             session_id="triager-d15b",
             turn_id="turn-d15b",
             timeout_s=0.05,

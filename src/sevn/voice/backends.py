@@ -10,8 +10,7 @@ Exports:
     TextToSpeechBackend — TTS protocol.
     TranscriptionResult — STT transcript payload.
     WhisperCppBackend — whisper.cpp subprocess backend.
-    TextToVoiceBackend — unified local TTS (kokoro / supertonic) via text-to-voice skill.
-    KokoroBackend — deprecated alias for TextToVoiceBackend (engine=kokoro).
+    KokoroBackend — local Kokoro TTS via workspace skill subprocess.
     validate_voice_backend_tags — validate configured tags.
     whisper_cpp_missing_prereqs — actionable list of missing whisper.cpp prerequisites.
     build_stt_backend — factory for STT.
@@ -45,8 +44,7 @@ KNOWN_STT_TAGS: frozenset[str] = frozenset(
 )
 KNOWN_TTS_TAGS: frozenset[str] = frozenset(
     {
-        "text_to_voice",
-        "kokoro",  # deprecated alias → text_to_voice (engine=kokoro)
+        "kokoro",
         "kitten_tts",
         "edge_tts",
         "openai_tts",
@@ -55,7 +53,6 @@ KNOWN_TTS_TAGS: frozenset[str] = frozenset(
         "google_gemini_tts",
     },
 )
-KNOWN_LOCAL_TTS_ENGINES: frozenset[str] = frozenset({"kokoro", "supertonic"})
 
 
 def validate_voice_backend_tags(stt: list[str], tts: list[str]) -> None:
@@ -69,7 +66,7 @@ def validate_voice_backend_tags(stt: list[str], tts: list[str]) -> None:
         ValueError: When any tag is unknown.
 
     Examples:
-        >>> validate_voice_backend_tags(["whisper_cpp"], ["text_to_voice"])
+        >>> validate_voice_backend_tags(["whisper_cpp"], ["kokoro"])
         >>> import pytest
         >>> with pytest.raises(ValueError):
         ...     validate_voice_backend_tags(["bogus"], [])
@@ -622,11 +619,8 @@ class _UnavailableLocalTTSBackend:
         raise RuntimeError(msg)
 
 
-def _find_text_to_voice_skill_dir(workspace_root: Path | None) -> Path | None:
-    """Locate ``text-to-voice`` (or legacy ``kokoro-tts``) skill scripts.
-
-    Discovery order: ``SEVN_TEXT_TO_VOICE_SKILL_DIR``, ``SEVN_KOKORO_SKILL_DIR`` (legacy),
-    then ``skills/{core,user}/text-to-voice``, then ``skills/{core,user}/kokoro-tts``.
+def _find_kokoro_skill_dir(workspace_root: Path | None) -> Path | None:
+    """Locate ``kokoro-tts`` skill scripts under workspace or env override.
 
     Args:
         workspace_root (Path | None): Workspace content root.
@@ -635,15 +629,14 @@ def _find_text_to_voice_skill_dir(workspace_root: Path | None) -> Path | None:
         Path | None: Skill directory containing ``scripts/generate.py``.
 
     Examples:
-        >>> _find_text_to_voice_skill_dir(None) is None or True
+        >>> _find_kokoro_skill_dir(None) is None or True
         True
     """
-    for env_key in ("SEVN_TEXT_TO_VOICE_SKILL_DIR", "SEVN_KOKORO_SKILL_DIR"):
-        env_raw = os.environ.get(env_key, "").strip()
-        if env_raw:
-            candidate = Path(env_raw).expanduser()
-            if (candidate / "scripts" / "generate.py").is_file():
-                return candidate
+    env_raw = os.environ.get("SEVN_KOKORO_SKILL_DIR", "").strip()
+    if env_raw:
+        candidate = Path(env_raw).expanduser()
+        if (candidate / "scripts" / "generate.py").is_file():
+            return candidate
     roots: list[Path] = []
     if workspace_root is not None:
         roots.append(workspace_root.expanduser().resolve())
@@ -657,117 +650,41 @@ def _find_text_to_voice_skill_dir(workspace_root: Path | None) -> Path | None:
             continue
         seen.add(key)
         for ns in ("core", "user"):
-            for skill_name in ("text-to-voice", "kokoro-tts"):
-                skill = root / "skills" / ns / skill_name
-                if (skill / "scripts" / "generate.py").is_file():
-                    return skill
+            skill = root / "skills" / ns / "kokoro-tts"
+            if (skill / "scripts" / "generate.py").is_file():
+                return skill
     return None
 
 
-# Backward-compatible alias used by older tests / imports.
-_find_kokoro_skill_dir = _find_text_to_voice_skill_dir
+class KokoroBackend:
+    """Local Kokoro TTS via ``kokoro-tts`` skill subprocess (pyclaww port)."""
 
+    id = "kokoro"
 
-def _normalise_local_tts_engine(engine: str | None) -> str:
-    """Return a known local TTS engine tag (default ``kokoro``).
-
-    Args:
-        engine (str | None): Configured or forced engine name.
-
-    Returns:
-        str: ``kokoro`` or ``supertonic``.
-
-    Examples:
-        >>> _normalise_local_tts_engine("supertonic")
-        'supertonic'
-        >>> _normalise_local_tts_engine(None)
-        'kokoro'
-    """
-    raw = (engine or "").strip().casefold()
-    if raw in KNOWN_LOCAL_TTS_ENGINES:
-        return raw
-    return "kokoro"
-
-
-def _requirements_file_for_engine(skill_dir: Path, engine: str) -> Path | None:
-    """Resolve the engine-specific requirements file under ``skill_dir``.
-
-    Prefers ``requirements-<engine>.txt``, then legacy ``requirements.txt``.
-
-    Args:
-        skill_dir (Path): Skill root.
-        engine (str): ``kokoro`` or ``supertonic``.
-
-    Returns:
-        Path | None: Requirements file when present.
-
-    Examples:
-        >>> from pathlib import Path
-        >>> _requirements_file_for_engine(Path("/nonexistent"), "kokoro") is None
-        True
-    """
-    specific = skill_dir / f"requirements-{engine}.txt"
-    if specific.is_file():
-        return specific
-    legacy = skill_dir / "requirements.txt"
-    return legacy if legacy.is_file() else None
-
-
-class TextToVoiceBackend:
-    """Unified local TTS via the ``text-to-voice`` skill (kokoro / supertonic engines)."""
-
-    id = "text_to_voice"
-
-    def __init__(
-        self,
-        *,
-        workspace_root: Path | None = None,
-        engine: str | None = None,
-        registry_id: str | None = None,
-    ) -> None:
-        """Store workspace root, resolved engine, and optional registry id override.
+    def __init__(self, *, workspace_root: Path | None = None) -> None:
+        """Store optional workspace root for skill discovery.
 
         Args:
             workspace_root (Path | None): Workspace content root.
-            engine (str | None): ``kokoro`` or ``supertonic`` (default ``kokoro``).
-            registry_id (str | None): Override ``id`` (used by deprecated ``kokoro`` alias).
 
         Examples:
-            >>> TextToVoiceBackend().id
-            'text_to_voice'
-            >>> TextToVoiceBackend(engine="supertonic").engine
-            'supertonic'
+            >>> KokoroBackend().id
+            'kokoro'
         """
         self._workspace_root = workspace_root
-        self._engine = _normalise_local_tts_engine(engine)
-        if registry_id:
-            self.id = registry_id
-
-    @property
-    def engine(self) -> str:
-        """Active local TTS engine (``kokoro`` or ``supertonic``).
-
-        Returns:
-            str: Resolved engine tag.
-
-        Examples:
-            >>> TextToVoiceBackend(engine="supertonic").engine
-            'supertonic'
-        """
-        return self._engine
 
     async def is_available(self) -> bool:
-        """Return whether the text-to-voice skill script is discoverable.
+        """Return whether the kokoro-tts skill script is discoverable.
 
         Returns:
             bool: ``True`` when ``scripts/generate.py`` exists.
 
         Examples:
             >>> import asyncio
-            >>> isinstance(asyncio.run(TextToVoiceBackend().is_available()), bool)
+            >>> isinstance(asyncio.run(KokoroBackend().is_available()), bool)
             True
         """
-        return _find_text_to_voice_skill_dir(self._workspace_root) is not None
+        return _find_kokoro_skill_dir(self._workspace_root) is not None
 
     async def synthesize(
         self,
@@ -776,53 +693,39 @@ class TextToVoiceBackend:
         voice_id: str | None,
         out_path: Path,
     ) -> None:
-        """Generate speech via ``uv run python generate.py --engine …``.
+        """Generate speech via ``uv run python generate.py`` and copy to ``out_path``.
 
         Args:
             text (str): Assistant reply to speak.
-            voice_id (str | None): Engine-specific voice id.
+            voice_id (str | None): Kokoro voice code (default ``af_heart``).
             out_path (Path): Destination media path (``.ogg`` or ``.wav``).
 
         Raises:
             RuntimeError: When the skill is missing or subprocess fails.
 
         Examples:
-            >>> TextToVoiceBackend.id
-            'text_to_voice'
+            >>> KokoroBackend.id
+            'kokoro'
         """
-        skill_dir = _find_text_to_voice_skill_dir(self._workspace_root)
+        skill_dir = _find_kokoro_skill_dir(self._workspace_root)
         if skill_dir is None:
-            msg = (
-                "text-to-voice skill not found (install under workspace skills/core/text-to-voice)"
-            )
+            msg = "kokoro-tts skill not found (install under workspace skills/core/kokoro-tts)"
             raise RuntimeError(msg)
         script = skill_dir / "scripts" / "generate.py"
-        req_file = _requirements_file_for_engine(skill_dir, self._engine)
+        req_file = skill_dir / "requirements.txt"
+        voice = voice_id or os.environ.get("SEVN_KOKORO_VOICE", "af_heart")
         cmd = ["uv", "run", "--python", "3.12"]
-        if req_file is not None:
+        if req_file.is_file():
             cmd.extend(["--with-requirements", str(req_file)])
-        cmd.extend(
-            [
-                "python",
-                str(script),
-                text,
-                "--engine",
-                self._engine,
-                "--output",
-                str(out_path),
-            ],
-        )
-        if voice_id:
-            cmd.extend(["--voice", voice_id])
+        cmd.extend(["python", str(script), text, "--voice", voice, "--output", str(out_path)])
         env = dict(os.environ)
-        env["SEVN_LOCAL_TTS_ENGINE"] = self._engine
         if self._workspace_root is not None:
             env["SEVN_WORKSPACE"] = str(self._workspace_root.resolve())
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            cwd=str(skill_dir / "scripts"),
+            cwd=str(skill_dir),
             env=env,
         )
         try:
@@ -830,11 +733,11 @@ class TextToVoiceBackend:
         except TimeoutError:
             proc.kill()
             await proc.wait()
-            msg = f"text_to_voice ({self._engine}) synthesize timed out"
+            msg = "kokoro synthesize timed out"
             raise RuntimeError(msg) from None
         if proc.returncode != 0:
             err = (stderr or b"").decode("utf-8", errors="replace")[:500]
-            msg = f"text_to_voice ({self._engine}) synthesize failed rc={proc.returncode}: {err}"
+            msg = f"kokoro synthesize failed rc={proc.returncode}: {err}"
             raise RuntimeError(msg)
         if out_path.is_file() and out_path.stat().st_size > 0:
             return
@@ -845,63 +748,39 @@ class TextToVoiceBackend:
                 if candidate.resolve() != out_path.resolve():
                     out_path.write_bytes(candidate.read_bytes())
                 return
-        msg = f"text_to_voice ({self._engine}) synthesize produced no audio"
+        msg = "kokoro synthesize produced no audio"
         raise RuntimeError(msg)
 
     async def warmup(self) -> None:
-        """Prime the configured engine's subprocess environment (best-effort).
+        """Prime the Kokoro subprocess environment ahead of the first real request.
 
-        Runs a throwaway one-word synthesis so ``uv run --with-requirements`` and
-        model download happen once in the background before a user-facing call.
+        Runs a throwaway one-word synthesis to a temp file so ``uv run
+        --with-requirements``'s venv resolve/download (the actual cold-start cost —
+        Kokoro's model weights + torch) happens once, in the background, before a
+        real user-facing ``tts`` call needs the result. Best-effort: this is a
+        latency optimization, not a correctness gate, so every failure is swallowed
+        and logged rather than raised.
 
         Returns:
             None: Always.
 
         Examples:
             >>> import asyncio
-            >>> asyncio.run(TextToVoiceBackend().warmup()) is None
+            >>> asyncio.run(KokoroBackend().warmup()) is None
             True
         """
-        skill_dir = _find_text_to_voice_skill_dir(self._workspace_root)
+        skill_dir = _find_kokoro_skill_dir(self._workspace_root)
         if skill_dir is None:
-            logger.debug("text_to_voice_warmup_skipped reason=skill_not_found")
+            logger.debug("kokoro_warmup_skipped reason=skill_not_found")
             return
-        with tempfile.TemporaryDirectory(prefix="sevn-text-to-voice-warmup-") as tmp:
-            out_path = Path(tmp) / "warmup.wav"
+        with tempfile.TemporaryDirectory(prefix="sevn-kokoro-warmup-") as tmp:
+            out_path = Path(tmp) / "warmup.ogg"
             try:
                 await self.synthesize(text="warm up", voice_id=None, out_path=out_path)
             except Exception as exc:  # best-effort warmup, never raises
-                logger.debug(
-                    "text_to_voice_warmup_failed engine={} error={}",
-                    self._engine,
-                    exc,
-                )
+                logger.debug("kokoro_warmup_failed error={}", exc)
                 return
-        logger.debug("text_to_voice_warmup_completed engine={}", self._engine)
-
-
-class KokoroBackend(TextToVoiceBackend):
-    """Deprecated alias for :class:`TextToVoiceBackend` with ``engine=kokoro``.
-
-    Prefer ``text_to_voice`` + ``voice.local_tts_engine``. Kept so older imports and
-    ``tts_providers: ["kokoro"]`` configs keep working.
-    """
-
-    id = "kokoro"
-
-    def __init__(self, *, workspace_root: Path | None = None) -> None:
-        """Construct a kokoro-forced text-to-voice backend.
-
-        Args:
-            workspace_root (Path | None): Workspace content root.
-
-        Examples:
-            >>> KokoroBackend().id
-            'kokoro'
-            >>> KokoroBackend().engine
-            'kokoro'
-        """
-        super().__init__(workspace_root=workspace_root, engine="kokoro", registry_id="kokoro")
+        logger.debug("kokoro_warmup_completed")
 
 
 class _HttpClosedTTSBackend:
@@ -1062,18 +941,12 @@ def build_stt_backend(tag: str) -> SpeechToTextBackend:
     raise ValueError(msg)
 
 
-def build_tts_backend(
-    tag: str,
-    *,
-    workspace_root: Path | None = None,
-    local_tts_engine: str | None = None,
-) -> TextToSpeechBackend:
+def build_tts_backend(tag: str, *, workspace_root: Path | None = None) -> TextToSpeechBackend:
     """Materialise one TTS backend.
 
     Args:
         tag (str): Registry tag.
         workspace_root (Path | None): Workspace root for local backends.
-        local_tts_engine (str | None): Engine for ``text_to_voice`` (``kokoro`` / ``supertonic``).
 
     Returns:
         TextToSpeechBackend: Concrete implementation.
@@ -1084,17 +957,10 @@ def build_tts_backend(
     Examples:
         >>> build_tts_backend("edge_tts").id
         'edge_tts'
-        >>> build_tts_backend("text_to_voice", local_tts_engine="supertonic").id
-        'text_to_voice'
     """
 
     if tag == "edge_tts":
         return EdgeTtsBackend()
-    if tag == "text_to_voice":
-        return TextToVoiceBackend(
-            workspace_root=workspace_root,
-            engine=local_tts_engine,
-        )
     if tag == "kokoro":
         return KokoroBackend(workspace_root=workspace_root)
     if tag == "kitten_tts":

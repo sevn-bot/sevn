@@ -7,7 +7,7 @@ owner: Alex
 summary: Local-first bots are judged in the first ten minutes—clone, three setup commands,
   and a Telegram reply, or the operator returns to a hosted assistant.
 last_updated: '2026-07-18'
-fingerprint: sha256:6e8d547e963e459715d5af5e5055260a1b6cb2a65cb64275769828493b6626b6
+fingerprint: sha256:8f73f672bb8deda9ad18b0e2f8345c21315d3088182f19f769dec7c92842bc35
 related:
 - prd-07-mission-control
 sources:
@@ -109,8 +109,9 @@ gives up and returns to a hosted assistant that "just works." Self-hosted produc
   vendor-managed funnel (see prd-00-main Non-Goals).
 - Replacing Mission Control for day-two observability—setup gets you running; prd-07-mission-control
   owns traces, provider panels, and ops surfaces.
-- Running Playwright Telegram E2E **inside** the default gateway container—host-side smoke stays
-  the developer path; Docker ships gateway + proxy, not headed browser automation by default.
+- Running headed Telegram Web E2E **inside** the default gateway container—host-side browser
+  `telegram_web` / `telegram_checks` smoke stays the developer path; Docker ships gateway + proxy,
+  not headed browser automation by default.
 - Enterprise fleet management (MDM, multi-tenant RBAC, org-wide billing)—v1 centers the **solo
   operator** workspace.
 - Hand-editing `sevn.json` as the recommended first-time path—advanced edits are supported, but

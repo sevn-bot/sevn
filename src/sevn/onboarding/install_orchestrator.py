@@ -67,8 +67,8 @@ def _capability_enabled(cap: CapabilityEntry, merged_config: dict[str, Any]) -> 
     Examples:
         >>> from sevn.onboarding.capabilities_manifest import load_manifest
         >>> m = load_manifest()
-        >>> row = next(c for c in m.capabilities if c.capability_id == "extra.browser")
-        >>> _capability_enabled(row, {"skills": {"browser": {"enabled": True}}})
+        >>> row = next(c for c in m.capabilities if c.capability_id == "extra.browser_cdp")
+        >>> _capability_enabled(row, {"tools": {"browser": {"enabled": True}}})
         True
     """
     path = cap.config_paths[0]
@@ -103,8 +103,8 @@ def selected_capability_ids(
         set[str]: Selected capability ids before dependency expansion.
 
     Examples:
-        >>> ids = selected_capability_ids({"skills": {"browser": {"enabled": True}}})
-        >>> "extra.browser" in ids
+        >>> ids = selected_capability_ids({"tools": {"browser": {"enabled": True}}})
+        >>> "extra.browser_cdp" in ids
         True
     """
     doc = manifest or load_manifest()

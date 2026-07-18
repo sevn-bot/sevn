@@ -1,13 +1,8 @@
 {
-  "name": "sevn-bot-e2e",
+  "name": "sevn-bot",
   "private": true,
   "version": "0.0.0",
-  "description": "Playwright E2E harness for sevn.bot Mission Control (specs/25-cicd-full.md §10.4). Not published; Python is the source of truth.",
-  "scripts": {
-    "test:e2e": "playwright test",
-    "test:e2e:install": "playwright install --with-deps"
-  },
-  "devDependencies": {
-    "@playwright/test": "1.49.1"
-  }
+  "description": "Node tooling stub for sevn.bot (Python is the source of truth).",
+  "scripts": {},
+  "devDependencies": {}
 }

@@ -28,7 +28,6 @@ from loguru import logger
 from sevn.agent.tracing.sink import TraceSink
 from sevn.config.defaults import (
     DEFAULT_VOICE_ENABLED,
-    DEFAULT_VOICE_LOCAL_TTS_ENGINE,
     DEFAULT_VOICE_MAX_MB,
     DEFAULT_VOICE_MAX_SECONDS,
     DEFAULT_VOICE_PRELOAD_LOCAL_TTS_ON_BOOT,
@@ -39,7 +38,7 @@ from sevn.config.defaults import (
     DEFAULT_VOICE_TTS_TEMP_TTL_DAYS,
 )
 from sevn.config.workspace_config import VoiceConfig, WorkspaceConfig
-from sevn.voice.backends import TextToVoiceBackend, build_stt_backend, build_tts_backend
+from sevn.voice.backends import KokoroBackend, build_stt_backend, build_tts_backend
 from sevn.voice.stt import SpeechToTextPipeline
 from sevn.voice.tts import TextToSpeechPipeline
 
@@ -58,7 +57,6 @@ class VoiceRuntimeSettings:
     preload_local_tts_on_boot: bool
     tts_mode: str
     tts_voice_id: str | None
-    local_tts_engine: str
     enabled: bool
 
 
@@ -172,9 +170,6 @@ def voice_runtime_settings(ws: WorkspaceConfig) -> VoiceRuntimeSettings:
     if v and v.tts_mode:
         mode = str(v.tts_mode).strip() or "off"
     voice_id = str(v.tts_voice_id).strip() if v and v.tts_voice_id else None
-    engine = DEFAULT_VOICE_LOCAL_TTS_ENGINE
-    if v and v.local_tts_engine:
-        engine = str(v.local_tts_engine).strip().casefold() or DEFAULT_VOICE_LOCAL_TTS_ENGINE
     enabled = voice_enabled(ws)
     return VoiceRuntimeSettings(
         stt_providers=stt,
@@ -187,7 +182,6 @@ def voice_runtime_settings(ws: WorkspaceConfig) -> VoiceRuntimeSettings:
         preload_local_tts_on_boot=preload,
         tts_mode=mode,
         tts_voice_id=voice_id,
-        local_tts_engine=engine,
         enabled=enabled,
     )
 
@@ -253,12 +247,7 @@ def build_tts_pipeline(
 
     settings = voice_runtime_settings(ws)
     backends = [
-        build_tts_backend(
-            tag,
-            workspace_root=content_root,
-            local_tts_engine=settings.local_tts_engine,
-        )
-        for tag in settings.tts_providers
+        build_tts_backend(tag, workspace_root=content_root) for tag in settings.tts_providers
     ]
     from sevn.workspace.artifact_output import normalise_output_dir_rel
 
@@ -345,13 +334,13 @@ def _log_tts_warmup_task_result(task: asyncio.Task[None]) -> None:
 async def maybe_preload_local_tts(ws: WorkspaceConfig) -> None:
     """Optional warm-up hook (`specs/20-voice.md` §4.1).
 
-    Preloads the first configured local TTS backend (``text_to_voice`` / ``kokoro`` /
-    ``kitten_tts``) when ``voice.tts_mode == all`` (v1 default) or
-    ``voice.preload_local_tts_on_boot`` is true. Checks ``is_available`` first (cheap, no
-    model weights loaded in CI); when available and the backend exposes an async
-    ``warmup()`` (e.g. :class:`TextToVoiceBackend`), that warmup runs as a
-    **fire-and-forget background task** — not awaited here — so a slow cold start
-    (first ``uv run --with-requirements`` + model download) cannot block gateway boot.
+    Preloads the first configured local TTS backend (``kokoro`` / ``kitten_tts``)
+    when ``voice.tts_mode == all`` (v1 default) or ``voice.preload_local_tts_on_boot``
+    is true. Checks ``is_available`` first (cheap, no model weights loaded in CI); when
+    available and the backend exposes an async ``warmup()`` (e.g. :class:`KokoroBackend`),
+    that warmup runs as a **fire-and-forget background task** — not awaited here — so a
+    slow cold start (e.g. Kokoro's first ``uv run --with-requirements`` venv resolve)
+    cannot block gateway boot.
 
     Args:
         ws (WorkspaceConfig): Parsed workspace document.
@@ -373,21 +362,18 @@ async def maybe_preload_local_tts(ws: WorkspaceConfig) -> None:
     should_preload = mode == "all" or settings.preload_local_tts_on_boot
     if not should_preload:
         return
-    local_tags = frozenset({"text_to_voice", "kokoro", "kitten_tts"})
+    local_tags = frozenset({"kokoro", "kitten_tts"})
     for tag in settings.tts_providers:
         if tag not in local_tags:
             continue
-        backend = build_tts_backend(
-            tag,
-            local_tts_engine=settings.local_tts_engine,
-        )
+        backend = build_tts_backend(tag)
         try:
             available = await backend.is_available()
         except Exception:
             return
         if not available:
             return
-        if isinstance(backend, TextToVoiceBackend):
+        if isinstance(backend, KokoroBackend):
             task = asyncio.ensure_future(backend.warmup())
             task.add_done_callback(_log_tts_warmup_task_result)
         return
@@ -425,11 +411,7 @@ async def probe_voice_backends(ws: WorkspaceConfig) -> dict[str, Any]:
             first_stt = tag
         stt_rows.append({"tag": tag, "available": ok})
     for tag in settings.tts_providers:
-        tts_backend = build_tts_backend(
-            tag,
-            workspace_root=None,
-            local_tts_engine=settings.local_tts_engine,
-        )
+        tts_backend = build_tts_backend(tag, workspace_root=None)
         ok = False
         try:
             ok = await tts_backend.is_available()
@@ -437,10 +419,7 @@ async def probe_voice_backends(ws: WorkspaceConfig) -> dict[str, Any]:
             ok = False
         if ok and first_tts is None:
             first_tts = tag
-        row: dict[str, Any] = {"tag": tag, "available": ok}
-        if isinstance(tts_backend, TextToVoiceBackend):
-            row["engine"] = tts_backend.engine
-        tts_rows.append(row)
+        tts_rows.append({"tag": tag, "available": ok})
     hints: list[str] = []
     if first_stt is None:
         from sevn.voice.backends import whisper_cpp_missing_prereqs
@@ -452,8 +431,7 @@ async def probe_voice_backends(ws: WorkspaceConfig) -> dict[str, Any]:
             hints.append("STT: no configured backend is available")
     if first_tts is None:
         hints.append(
-            "TTS: install text-to-voice under workspace skills/core/text-to-voice "
-            f"(engine={settings.local_tts_engine}) or edge-tts on PATH",
+            "TTS: install kokoro-tts under workspace skills/core/kokoro-tts or edge-tts on PATH",
         )
     return {
         "enabled": settings.enabled,

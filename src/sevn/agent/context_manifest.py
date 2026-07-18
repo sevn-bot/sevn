@@ -69,7 +69,7 @@ TIER_B_SYSTEM_BLOCK_IDS: tuple[str, ...] = (
     "spill_recovery",
     "tool_economy",
     "process_install",
-    "playwright_browser",
+    "browser_tool",
     "bound_skill_playbook",
     "triager_bound_mandate",
     "memorize",
@@ -119,7 +119,7 @@ _TIER_B_BUILDERS: dict[str, Callable[..., str]] = {
     "spill_recovery": lambda _cr: tier_b_prompts.tier_b_spill_recovery_prompt(),
     "tool_economy": lambda _cr: tier_b_prompts.tier_b_tool_economy_prompt(),
     "process_install": lambda _cr: tier_b_prompts.tier_b_process_install_prompt(),
-    "playwright_browser": lambda _cr: tier_b_prompts.tier_b_playwright_browser_prompt(),
+    "browser_tool": lambda _cr: tier_b_prompts.tier_b_browser_tool_prompt(),
     "memorize": lambda _cr: tier_b_prompts.tier_b_memorize_prompt(),
     "file_link": lambda _cr: tier_b_prompts.tier_b_file_link_prompt(),
 }

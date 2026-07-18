@@ -201,7 +201,8 @@ _BROWSER_PARAMS: Final[dict[str, Any]] = {
                 "gmail (list|read|search|compose|reply); maps (search|place|directions|reviews) "
                 '— e.g. action=maps, op=search, query="coffee near me"; '
                 "youtube (search|info|comments|read_replies|comment|reply); "
-                "social (read|post|reply|read_replies|search) with site param; "
+                "social (read|post|reply|read_replies|search|timeline_collect|home_feed) "
+                "with site param (X timeline_collect/home_feed/read return structured posts); "
                 "linkedin (staff|users|companies|connections). Required whenever action is "
                 "telegram/gmail/maps/youtube/social/linkedin — an empty op fails validation."
             ),
@@ -1026,7 +1027,7 @@ def set_eval_allowed(allowed: bool) -> None:
     parameters=_BROWSER_PARAMS,
     requires_human=False,
     large_result=True,
-    see_also=["playwright-browser", "get_page_content", "web_fetch"],
+    see_also=["browser-harness", "get_page_content", "web_fetch"],
     long_description_file="tools/browser.md",
 )
 async def browser_tool(

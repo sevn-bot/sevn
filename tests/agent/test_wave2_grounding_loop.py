@@ -63,10 +63,11 @@ def test_apply_live_factual_grounding_guard_passes_after_log_query() -> None:
     assert out == claim
 
 
-def test_steer_for_triager_bound_tools_unused_playwright_argv_hint() -> None:
-    steer = steer_for_triager_bound_tools_unused([], ["playwright-browser"])
-    assert "goto.py" in steer
-    assert "https" in steer
+def test_steer_for_triager_bound_tools_unused_browser_tool_hint() -> None:
+    """DP3 residue: unused-bound steer names the native browser tool."""
+    steer = steer_for_triager_bound_tools_unused(["browser"], [])
+    assert "browser" in steer
+    assert "do not" in steer.lower()
 
 
 def test_apply_file_delivery_grounding_guard_blocks_without_send_file() -> None:

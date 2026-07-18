@@ -7,7 +7,7 @@ Brave is the default Chromium-compatible browser in sevn Docker **browser** and 
 | Profile | Service | Use case |
 |---------|---------|----------|
 | (default) | `sevn-gateway` | Slim gateway, no browser |
-| `browser` | `sevn-gateway-browser` | Headless Brave + Playwright fallback |
+| `browser` | `sevn-gateway-browser` | Headless Brave + native CDP (`browser-cdp`) |
 | `gui` | `sevn-gateway-gui` | Headed Brave + noVNC (via gateway `/gui`) |
 
 Profiles **`browser`** and **`gui`** are mutually exclusive — do not enable both at once.

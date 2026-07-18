@@ -26,5 +26,5 @@ PR with embedded evidence. sevn.bot already has partial verification (`make ci-a
 ## Consequences
 
 - Operators run **verifier-setup once** (or when verification infra changes), then **`/verify`** per task before PRs.
-- Upstream `dev-local-setup`, `playwright-cli`, and `crabbox-setup` are **not** vendored; sevn reuses `compose-up`, existing MCP/skills, and local-only run mode by default.
+- Upstream `dev-local-setup`, browser-CLI adapters, and `crabbox-setup` are **not** vendored; sevn reuses `compose-up`, existing MCP/skills, and local-only run mode by default.
 - spec-kit-wave remains operator-private (gitignored); tracked repo carries ADR + `.cursor/agents/verifier-setup.md`.

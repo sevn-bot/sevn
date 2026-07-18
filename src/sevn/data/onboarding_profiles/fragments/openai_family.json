@@ -8,7 +8,6 @@
   },
   "capabilities_defaults": {
     "extra.web_fetch": true,
-    "extra.browser": false,
     "skill.printing_press_library": false,
     "memory.lcm": true
   }

@@ -40,8 +40,6 @@ RUFF_PATHS = (
     "src",
     "tests",
     "scripts",
-    "tools/telegram-tester/src",
-    "tools/telegram-tester/tests",
 )
 
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")

@@ -162,7 +162,6 @@ DEFAULT_SKILL_MANIFESTS: Final[dict[str, str]] = {
         "Gmail, Calendar, Drive, and Contacts via OAuth2 Google Workspace APIs "
         "(Sheets/Docs planned)."
     ),
-    "facebook-use": "Facebook workflows via a logged-in browser profile or CDP attach.",
     "gh-issues": "GitHub issue lifecycle — list, view, create, comment via integration_call.",
     "gh-pr": "Pull request lifecycle — list, view, create, merge, close via integration_call.",
     "github-manager": "Advanced GitHub — branches, Actions, secrets, envs via integration_call.",
@@ -173,14 +172,12 @@ DEFAULT_SKILL_MANIFESTS: Final[dict[str, str]] = {
     ),
     "last30days": "Multi-source social/web research engine (Reddit, X, YouTube, HN, Polymarket).",
     "lcm": "Lossless-context skill menu (grep, describe, expand, fetch, meta, summaries).",
-    "linkedin-use": "LinkedIn staff/company/connection scraping via logged-in browser + Voyager API.",
     "media_generation": (
         "MiniMax-backed image/video/music generation via the media_generator level-2 specialist."
     ),
     "mycode": "Deterministic repo scan + MYCODE.md generation (alias mycode_scan).",
     "openwiki": "LLM-generated agent wiki for a codebase (LangChain OpenWiki CLI).",
     "pdf": "PDF generate, read, and load helpers routed through skill runners.",
-    "playwright-browser": "Headless/automation Playwright scripts (navigate, screenshot, extract).",
     "printing-press-library": (
         "Starter-pack Printing Press CLIs — ESPN, flights, movies, recipes (host Go binaries)."
     ),
@@ -198,14 +195,10 @@ DEFAULT_SKILL_MANIFESTS: Final[dict[str, str]] = {
     "sessions_management": "Gateway sessions, history, spawn, yield, and status scripts.",
     "skill_management": "Authoring workflows for manifests and promotions.",
     "social_media_manager": (
-        "Monitor and interact with social media via TwexAPI, sevn CDP browser, "
-        "and assigned social skills (x-use, facebook-use, linkedin-use)."
+        "Monitor and interact with social media via TwexAPI and the sevn CDP "
+        "browser tool (unified X ops facade; six-site social recipes)."
     ),
     "telegram": "Telegram inline buttons and forum supergroup helpers.",
-    # telegram_test is host-only Playwright E2E (quarantined from the runtime skill index;
-    # W1.4 / tool-skill-readiness-matrix.md). Not in DEFAULT_SKILL_MANIFESTS so it is
-    # never surfaced via list_registry or load_skill in the gateway session.
-    "x-use": "X (Twitter) workflows via logged-in browser profile or CDP attach.",
     "yt-dlp": "Download video/audio and metadata with yt-dlp (allowlisted hosts).",
 }
 

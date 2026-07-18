@@ -64,7 +64,6 @@ ROOT_COMMAND_PANELS: dict[str, str] = {
     "subagents": "Agent",
     "sync": "Ops",
     "tools": "Agent",
-    "telegram-test": "Surfaces",
     "traces": "Observability",
     "tracing": "Observability",
     "tunnel": "Ops",

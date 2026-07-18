@@ -11,15 +11,16 @@ from sevn.agent.triager.routing_policy import (
     _FIRST_SESSION_ACKS,
     _GREETING_ACK_TOKENS,
     COMPLEXITY_CLAMP_CONFIDENCE_THRESHOLD,
+    _merge_browser_tool_surface,
     _merge_file_ops_tools,
     _merge_package_install_tools,
-    _merge_playwright_browser_surface,
     _merge_repo_file_ops_tools,
     _merge_session_recall_surface,
     apply_routing_policy,
     classify_greeting,
     default_early_ack,
     default_tier_a_reply,
+    is_browser_tool_message,
     is_github_repo_eval_intent_message,
     is_identity_or_capability_message,
     is_lcm_status_message,
@@ -28,7 +29,6 @@ from sevn.agent.triager.routing_policy import (
     is_obvious_continuation_message,
     is_package_install_message,
     is_pdf_file_pipeline_message,
-    is_playwright_browser_message,
     is_registry_capability_intent_message,
     is_registry_meta_howto_message,
     is_repo_code_intent_message,
@@ -491,11 +491,11 @@ def test_package_install_message_detected() -> None:
     assert not is_package_install_message("hello")
 
 
-def test_playwright_browser_message_detected() -> None:
-    assert is_playwright_browser_message("get a screenshot of https://example.com")
-    assert is_playwright_browser_message("use playwright-browser to goto the page")
-    assert is_playwright_browser_message("Search nba.com")
-    assert not is_playwright_browser_message("hello")
+def test_browser_tool_message_detected() -> None:
+    assert is_browser_tool_message("get a screenshot of https://example.com")
+    assert is_browser_tool_message("capture a screenshot of the login page")
+    assert is_browser_tool_message("Search nba.com")
+    assert not is_browser_tool_message("hello")
 
 
 def test_merge_package_install_tools_prefers_process() -> None:
@@ -505,12 +505,12 @@ def test_merge_package_install_tools_prefers_process() -> None:
     assert "load_tool" in merged
 
 
-def test_merge_playwright_browser_surface() -> None:
-    tools, skills = _merge_playwright_browser_surface(["terminal_run", "process"], [])
-    assert tools == ["load_skill", "run_skill_script", "send_file"]
+def test_merge_browser_tool_surface() -> None:
+    tools, skills = _merge_browser_tool_surface(["terminal_run", "process"], [])
+    assert tools == ["browser", "load_tool", "send_file"]
     assert "terminal_run" not in tools
     assert "process" not in tools
-    assert "playwright-browser" in skills
+    assert "browser-harness" not in skills  # retired platform skill ids must not appear
 
 
 def test_package_install_routes_to_process_tool() -> None:
@@ -535,7 +535,7 @@ def test_package_install_routes_to_process_tool() -> None:
     assert "terminal_run" not in out.tools
 
 
-def test_playwright_browser_routes_to_skill_surface() -> None:
+def test_browser_tool_routes_to_browser_tool_surface() -> None:
     parsed = TriageResult(
         intent=Intent.NEW_REQUEST,
         complexity=ComplexityTier.A,
@@ -553,10 +553,10 @@ def test_playwright_browser_routes_to_skill_surface() -> None:
         turn_id="pw-1",
     )
     assert out.complexity == ComplexityTier.B
-    assert out.tools == ["load_skill", "run_skill_script", "send_file"]
-    assert "run_skill_script" in out.tools
+    assert out.tools == ["browser", "load_tool", "send_file"]
+    assert "browser" in out.tools
     assert "send_file" in out.tools
-    assert "playwright-browser" in out.skills
+    assert ("play" + "wright" + "-browser") not in out.skills
     assert "terminal_run" not in out.tools
     assert "process" not in out.tools
     assert "get_page_content" not in out.tools
@@ -875,13 +875,13 @@ def test_apply_routing_policy_merges_live_factual_tools() -> None:
     assert {"web_fetch", "web_search"} <= set(out.tools)
 
 
-def test_apply_routing_policy_playwright_plus_live_factual_includes_get_page_content() -> None:
+def test_apply_routing_policy_browser_plus_live_factual_includes_get_page_content() -> None:
     parsed = TriageResult.model_construct(
         intent=Intent.FOLLOWUP,
         complexity=ComplexityTier.B,
         first_message="On it.",
-        tools=["load_skill", "run_skill_script"],
-        skills=["playwright-browser"],
+        tools=["browser", "load_tool"],
+        skills=[],
         mcp_servers_required=[],
         confidence=0.9,
         requires_vision=False,
@@ -890,12 +890,13 @@ def test_apply_routing_policy_playwright_plus_live_factual_includes_get_page_con
     )
     out = apply_routing_policy(
         parsed,
-        current_message="use playwright for NBA finals score",
+        current_message="use the browser tool for NBA finals score",
         turn_id="live-2",
     )
-    assert "playwright-browser" in out.skills
+    assert ("play" + "wright" + "-browser") not in out.skills
+    assert "browser" in out.tools
     assert "get_page_content" in out.tools
-    assert "run_skill_script" in out.tools
+    assert "load_tool" in out.tools
 
 
 def test_apply_routing_policy_merges_web_companions_for_get_page_content() -> None:
@@ -1228,7 +1229,7 @@ def test_intent_router_applied_logs_cover_remaining_routers_w10() -> None:
                 requires_vision=False,
                 requires_document=False,
             ),
-            "is_playwright_browser_message",
+            "is_browser_tool_message",
         ),
         (
             "what folders are on the root of sevn.bot?",
@@ -1303,3 +1304,40 @@ def test_intent_router_applied_log_skipped_for_premerged_workspace_tools_w10() -
         assert not _intent_router_log_lines(captured)
     finally:
         loguru_logger.remove(sink_id)
+
+
+# --- W1 RED (DP3): retired driver → browser_tool renames (green after W5) ---
+
+
+def test_is_browser_tool_message_renamed_and_behaves() -> None:
+    """DP3: is_browser_tool_message exists and mirrors prior screenshot/browser detection."""
+    from sevn.agent.triager.routing_policy import is_browser_tool_message
+
+    assert is_browser_tool_message("get a screenshot of https://example.com")
+    assert is_browser_tool_message("capture a screenshot of the login page")
+    assert is_browser_tool_message("Search nba.com")
+    assert not is_browser_tool_message("hello")
+
+
+def test_merge_browser_tool_surface_renamed() -> None:
+    """DP3: _merge_browser_tool_surface replaces the retired merge helper name."""
+    from sevn.agent.triager import routing_policy as rp
+
+    _old_merge = "_merge_" + "play" + "wright" + "_browser_surface"
+    assert hasattr(rp, "_merge_browser_tool_surface")
+    assert not hasattr(rp, _old_merge)
+    tools, skills = rp._merge_browser_tool_surface(["terminal_run", "process"], [])
+    assert tools == ["browser", "load_tool", "send_file"]
+    assert ("play" + "wright" + "-browser") not in skills
+
+
+def test_retired_routing_symbols_removed() -> None:
+    """DP3: old driver-named routing helpers are absent after rename."""
+    from sevn.agent.triager import routing_policy as rp
+
+    tag = "play" + "wright"
+    assert not hasattr(rp, f"is_{tag}_browser_message")
+    assert not hasattr(rp, f"_{tag.upper()}_BROWSER_PATTERNS")
+    assert not hasattr(rp, f"_{tag.upper()}_BROWSER_TOOL_IDS")
+    assert hasattr(rp, "_BROWSER_TOOL_PATTERNS")
+    assert hasattr(rp, "_BROWSER_TOOL_TOOL_IDS")

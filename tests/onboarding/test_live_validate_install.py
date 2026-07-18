@@ -39,21 +39,15 @@ async def test_probe_openwiki_validate_receives_content_root(tmp_path: Path) -> 
 
 
 @pytest.mark.asyncio
-async def test_probe_capability_install_status_browser_playwright() -> None:
-    """Browser capability reports playwright idempotent check row."""
-    merged = {"skills": {"browser": {"enabled": True}}}
-    with patch(
-        "sevn.onboarding.install_actions.executors.idempotent_check_satisfied",
-        new=AsyncMock(return_value=False),
-    ):
-        rows = await probe_capability_install_status(merged, install_root=Path("."))
-    cmd_rows = [r for r in rows if r.action_id == "extra.browser.cmd"]
-    assert cmd_rows
-    row = cmd_rows[0]
-    assert row.capability_id == "extra.browser"
+async def test_probe_capability_install_status_browser_cdp() -> None:
+    """Browser CDP capability reports uv extra install row."""
+    merged = {"tools": {"browser": {"enabled": True}}}
+    rows = await probe_capability_install_status(merged, install_root=Path("."))
+    uv_rows = [r for r in rows if r.action_id == "extra.browser_cdp.uv"]
+    assert uv_rows
+    row = uv_rows[0]
+    assert row.capability_id == "extra.browser_cdp"
     assert row.fatal is True
-    assert row.satisfied is False
-    assert row.severity == "warn"
 
 
 @pytest.mark.asyncio
@@ -74,8 +68,8 @@ async def test_probe_capability_install_status_optional_cli_warn_only() -> None:
 def test_install_status_to_dict_shape() -> None:
     """Install status rows serialize for validate-all JSON."""
     row = InstallStatusRow(
-        capability_id="extra.browser",
-        action_id="extra.browser.cmd",
+        capability_id="extra.browser_cdp",
+        action_id="extra.browser_cdp.uv",
         ok=False,
         severity="warn",
         detail="pending",
@@ -84,7 +78,7 @@ def test_install_status_to_dict_shape() -> None:
         hint="Run installs",
     )
     payload = install_status_to_dict(row)
-    assert payload["capability_id"] == "extra.browser"
+    assert payload["capability_id"] == "extra.browser_cdp"
     assert payload["fatal"] is True
     assert payload["satisfied"] is False
 

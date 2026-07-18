@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 CapStatus = Literal["ok", "soft_warn", "hard_reject"]
 OpenUIScope = Literal["render", "submit"]
-RasteriserName = Literal["weasyprint", "playwright"]
+RasteriserName = Literal["weasyprint"]
 OutputMode = Literal["live", "screenshot", "pdf"]
 
 

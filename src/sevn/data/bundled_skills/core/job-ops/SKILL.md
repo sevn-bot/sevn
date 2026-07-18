@@ -3,9 +3,9 @@ name: job-ops
 description: Discover jobs across global + Europe boards, AI fit-score them against your resume, and optionally tailor a CV summary.
 version: "0.1.0"
 see_also:
-  - linkedin-use
-  - last30days
   - browser
+  - last30days
+  - social_media_manager
 egress:
   - api.adzuna.com
   - hiring.cafe

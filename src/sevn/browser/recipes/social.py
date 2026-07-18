@@ -1,11 +1,13 @@
 """Social-site recipes — read/post/reply/search across major platforms.
 
 A :class:`SocialRecipe` dispatches per-site operations using selector maps and
-egress allowlists (reuses :mod:`sevn.skills.social_browser` constants where
-present). Write ops require ``tools.browser.social.<site>.allow_write=true``.
+egress allowlists. Write ops require ``tools.browser.social.<site>.allow_write=true``.
+X additionally exposes structured ``timeline_collect`` / ``home_feed`` / ``read``
+(via :mod:`sevn.browser.recipes.x_timeline`).
 
 Module: sevn.browser.recipes.social
-Depends: asyncio, re, dataclasses, urllib.parse, sevn.browser.auth, sevn.browser.recipes.base
+Depends: asyncio, re, dataclasses, urllib.parse, sevn.browser.auth,
+    sevn.browser.recipes.base, sevn.browser.recipes.x_timeline
 
 Exports:
     parse_post_html — parse a saved post/page HTML into text metadata.
@@ -29,7 +31,34 @@ from urllib.parse import quote_plus
 
 from sevn.browser.auth import login_state
 from sevn.browser.recipes.base import RecipeError, validate_egress
-from sevn.skills.social_browser import FACEBOOK_EGRESS_DOMAINS, X_EGRESS_DOMAINS
+from sevn.browser.recipes.x_timeline import (
+    collect_x_posts,
+    normalize_x_status_url,
+    parse_x_timeline_html,
+)
+from sevn.browser.recipes.x_timeline import home_feed as x_home_feed
+from sevn.browser.recipes.x_timeline import timeline_collect as x_timeline_collect
+
+X_EGRESS_DOMAINS: Final[tuple[str, ...]] = (
+    "x.com",
+    "twitter.com",
+    "twimg.com",
+    "abs.twimg.com",
+    "pbs.twimg.com",
+    "video.twimg.com",
+    "api.twitter.com",
+    "api.x.com",
+    "t.co",
+)
+
+FACEBOOK_EGRESS_DOMAINS: Final[tuple[str, ...]] = (
+    "facebook.com",
+    "fb.com",
+    "fbcdn.net",
+    "fbsbx.com",
+    "facebook.net",
+    "messenger.com",
+)
 
 if TYPE_CHECKING:
     from sevn.browser.element import Dom
@@ -315,7 +344,8 @@ class SocialRecipe:
 
         Args:
             site (str): ``x``, ``facebook``, ``instagram``, ``linkedin``, ``reddit``, ``tiktok``.
-            op (str): ``read``, ``post``, ``reply``, ``read_replies``, or ``search``.
+            op (str): ``read``, ``post``, ``reply``, ``read_replies``, ``search``,
+                or X-only ``timeline_collect`` / ``home_feed``.
             target (str): URL or post id for read/reply/read_replies.
             query (str): Search query for ``search``.
             text (str): Body for ``post`` / ``reply``.
@@ -336,6 +366,8 @@ class SocialRecipe:
         normalized = (op or "").strip().lower()
         if normalized == "read":
             return await self.read(site_key, cfg, target)
+        if normalized in {"timeline_collect", "home_feed"}:
+            return await self.timeline_collect(site_key, cfg, op=normalized)
         if normalized == "search":
             return await self.search(site_key, cfg, query or target)
         if normalized == "read_replies":
@@ -344,7 +376,10 @@ class SocialRecipe:
             return await self.post(site_key, cfg, text)
         if normalized == "reply":
             return await self.reply(site_key, cfg, target, text)
-        msg = f"unknown social op: {op!r} (read|post|reply|read_replies|search)"
+        msg = (
+            f"unknown social op: {op!r} "
+            "(read|post|reply|read_replies|search|timeline_collect|home_feed)"
+        )
         raise RecipeError(msg)
 
     async def _require_login(self, cfg: _SiteConfig) -> None:
@@ -376,13 +411,16 @@ class SocialRecipe:
     async def read(self, site_key: str, cfg: _SiteConfig, target: str) -> dict[str, Any]:
         """Read a post or feed page.
 
+        For ``site=x``, returns structured posts (DB5) instead of raw HTML text.
+        Other sites keep the coarse ``parse_post_html`` payload.
+
         Args:
             site_key (str): Site key (``x``, ``facebook``, …).
             cfg (_SiteConfig): Site configuration.
             target (str): URL to open; home feed when empty.
 
         Returns:
-            dict[str, Any]: Parsed post text payload.
+            dict[str, Any]: Parsed post text payload, or X ``{posts, count}``.
 
         Examples:
             >>> import inspect
@@ -394,10 +432,77 @@ class SocialRecipe:
             validate_egress(url, allowlist=cfg.egress)
         else:
             url = cfg.home_url
+        if site_key == "x":
+            return await collect_x_posts(self._page, url=url, op="read", egress=cfg.egress)
         await self._page.goto(url, wait_until="none")
         html = await self._page.extract_html()
         parsed = parse_post_html(html)
         return {"site": site_key, "op": "read", "url": url, **parsed}
+
+    async def timeline_collect(
+        self,
+        site_key: str,
+        cfg: _SiteConfig,
+        *,
+        op: str = "timeline_collect",
+    ) -> dict[str, Any]:
+        """Scroll the X home timeline and return structured posts (DB4).
+
+        ``home_feed`` is an alias with the same scrape. Non-X sites raise.
+        CDP orchestration lives in :mod:`sevn.browser.recipes.x_timeline`.
+
+        Args:
+            site_key (str): Must be ``x``.
+            cfg (_SiteConfig): Site configuration.
+            op (str): Result ``op`` label (``timeline_collect`` or ``home_feed``).
+
+        Returns:
+            dict[str, Any]: ``{site, op, url, posts, count}``.
+
+        Raises:
+            RecipeError: When ``site_key`` is not ``x``.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(SocialRecipe.timeline_collect)
+            True
+        """
+        if site_key != "x":
+            msg = f"{op} is only supported for site=x (got {site_key!r})"
+            raise RecipeError(msg)
+        return await x_timeline_collect(
+            self._page,
+            egress=cfg.egress,
+            home_url=cfg.home_url,
+            op=op,
+        )
+
+    async def home_feed(self, site_key: str, cfg: _SiteConfig) -> dict[str, Any]:
+        """Alias for :meth:`timeline_collect` with ``op=home_feed``.
+
+        Args:
+            site_key (str): Must be ``x``.
+            cfg (_SiteConfig): Site configuration.
+
+        Returns:
+            dict[str, Any]: Structured home-feed posts.
+
+        Raises:
+            RecipeError: When ``site_key`` is not ``x``.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(SocialRecipe.home_feed)
+            True
+        """
+        if site_key != "x":
+            msg = f"home_feed is only supported for site=x (got {site_key!r})"
+            raise RecipeError(msg)
+        return await x_home_feed(
+            self._page,
+            egress=cfg.egress,
+            home_url=cfg.home_url,
+        )
 
     async def search(self, site_key: str, cfg: _SiteConfig, query: str) -> dict[str, Any]:
         """Search the site for ``query``.
@@ -555,4 +660,11 @@ class SocialRecipe:
         return None
 
 
-__all__ = ["SocialRecipe", "parse_comments_html", "parse_post_html", "social_write_allowed"]
+__all__ = [
+    "SocialRecipe",
+    "normalize_x_status_url",
+    "parse_comments_html",
+    "parse_post_html",
+    "parse_x_timeline_html",
+    "social_write_allowed",
+]

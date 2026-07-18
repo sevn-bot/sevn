@@ -1,36 +1,9 @@
 {
   "version": "5",
   "specifiers": {
-    "npm:@playwright/test@1.49.1": "1.49.1",
     "npm:pyodide@0.26.4": "0.26.4"
   },
   "npm": {
-    "@playwright/test@1.49.1": {
-      "integrity": "sha512-Ky+BVzPz8pL6PQxHqNRW1k3mIyv933LML7HktS8uik0bUXNCdPhoS/kLihiO1tMf/egaJb4IutXd7UywvXEW+g==",
-      "dependencies": [
-        "playwright"
-      ],
-      "bin": true
-    },
-    "fsevents@2.3.2": {
-      "integrity": "sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==",
-      "os": ["darwin"],
-      "scripts": true
-    },
-    "playwright-core@1.49.1": {
-      "integrity": "sha512-BzmpVcs4kE2CH15rWfzpjzVGhWERJfmnXmniSyKeRZUs9Ws65m+RGIi7mjJK/euCegfn3i7jvqWeWyHe9y3Vgg==",
-      "bin": true
-    },
-    "playwright@1.49.1": {
-      "integrity": "sha512-VYL8zLoNTBxVOrJBbDuRgDWa3i+mfQgDTrL8Ah9QXZ7ax4Dsj0MSq5bYgytRnDVVe+njoKnfsYkH3HzqVj5UZA==",
-      "dependencies": [
-        "playwright-core"
-      ],
-      "optionalDependencies": [
-        "fsevents"
-      ],
-      "bin": true
-    },
     "pyodide@0.26.4": {
       "integrity": "sha512-z2CHsjVlhhJi5tYBF0AYAfNEPo3zq/z+xOpFtk1tweJkRaTqU4UK/7pLvo8DBU2VDPH31vB3pSI+8fnoqrVrFg==",
       "dependencies": [
@@ -43,9 +16,7 @@
   },
   "workspace": {
     "packageJson": {
-      "dependencies": [
-        "npm:@playwright/test@1.49.1"
-      ]
+      "dependencies": []
     }
   }
 }

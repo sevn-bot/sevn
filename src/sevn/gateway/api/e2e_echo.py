@@ -1,4 +1,4 @@
-"""E2E-only echo dispatch for Playwright (`plan/v1-tasks-ordered.md` Wave 6).
+"""E2E-only echo dispatch for local diagnostics / harness stacks.
 
 Module: sevn.gateway.api.e2e_echo
 Depends: asyncio, sevn.gateway.channel_router, sevn.gateway.session_manager
@@ -9,7 +9,8 @@ Exports:
 
 The module-level constant ``SEVN_E2E_ECHO_DELAY_ENV`` records the env var
 name read by the echo run-turn before sending the outbound reply (test stacks
-only — `specs/17-gateway.md` §2.9).
+only — `specs/17-gateway.md` §2.9). Gated by ``SEVN_E2E_ECHO_TURN`` in
+``http_server``; kept as a thin diagnostics echo after the TS E2E harness removal.
 """
 
 from __future__ import annotations

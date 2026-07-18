@@ -28,8 +28,6 @@ Implementation under [`src/sevn/voice/`](../../src/sevn/voice/). [`voice_enabled
 
 **`tts_mode`** (config) is normalised by [`resolve_effective_tts_mode`](../../src/sevn/voice/factory.py#L85) — controls whether replies are synthesized, skipped, or keyword-gated.
 
-**Local TTS:** the `text_to_voice` provider runs the bundled [`text-to-voice`](../../src/sevn/data/bundled_skills/core/text-to-voice/SKILL.md) skill. Switch engines with `voice.local_tts_engine` (`kokoro` default, or `supertonic`). The deprecated `kokoro` provider tag still works as an alias.
-
 **Keyword gating:** [`user_text_matches_voice_trigger`](../../src/sevn/voice/keywords.py#L37) + [`compile_voice_trigger_patterns`](../../src/sevn/voice/keywords.py#L81) match operator-configured trigger words before STT/TTS runs.
 
 Voice spans emit through [`emit_voice_event`](../../src/sevn/voice/trace_events.py#L20).

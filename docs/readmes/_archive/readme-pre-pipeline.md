@@ -74,11 +74,10 @@ sevn doctor --json
 
 ### Optional: Browser skills
 
-Playwright-based skills (`playwright-browser`, `x-use`, `facebook-use`) need
-the `browser` extra and a Chromium download:
+Browser automation uses the native CDP engine (`browser-cdp` extra):
 
 ```bash
-uv sync --extra browser && playwright install chromium
+uv sync --extra browser-cdp
 ```
 
 Host-first headed sessions on macOS. See `CLAUDE.md` → "Optional Python
@@ -148,7 +147,7 @@ For a local gateway + proxy stack in Docker (operator testing, Telegram E2E **lo
 
 Persistent volume layout (`SEVN_HOME=/operator`): `workspace/sevn.json`, `workspace/logs/gateway.log`, and `workspace/.sevn/traces.db` — aligned with `resolve_service_log_path` / gateway diagnostics.
 
-Playwright E2E (`make telegram-e2e`) runs on your **host**, not inside the container.
+Telegram Web checks run on the host via the browser ``telegram_web`` recipe, not inside the container.
 
 - **Building sevn.bot:** [`docs/telegram-e2e-developer-guide.md`](docs/telegram-e2e-developer-guide.md) — setup, daily loop, Cursor + Claude skills
 - **Operator runbook:** [`docs/runbooks/telegram-e2e.md`](docs/runbooks/telegram-e2e.md)

@@ -402,7 +402,7 @@ Some load-bearing trees intentionally have **no** manifest row. They are documen
 
 | Package | Rationale | Where to read |
 |---------|-----------|---------------|
-| `src/sevn/browser/` | Optional **`browser`** / **`browser-cdp`** extras; Playwright/CDP skills and recipes ship under bundled skills — not a core subsystem catalog entry. | `CLAUDE.md` optional extras; bundled skills (`playwright-browser`, `x-use`, …); `about-sevn.bot/specs/12-skills-system.md` |
+| `src/sevn/browser/` | Optional **`browser-cdp`** extra; native CDP engine + `browser` tool recipes (social, telegram_web, …) — not a core subsystem catalog entry. | `CLAUDE.md` optional extras; `social_media_manager` / `browser-harness` skills; `about-sevn.bot/specs/12-skills-system.md` |
 
 Adding a manifest row for an out-of-catalog package requires an operator decision at a catalog-coverage gate — default is the table above.
 

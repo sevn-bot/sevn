@@ -26,6 +26,9 @@ from sevn.prompts.triager import (
     BACK_REFERENCE_RULE as _BACK_REFERENCE_RULE,
 )
 from sevn.prompts.triager import (
+    BROWSER_TOOL_RULE as _BROWSER_TOOL_RULE,
+)
+from sevn.prompts.triager import (
     GROUP_TRIAGE_INSTRUCTION_V1,
     TRIAGER_PROMPT_VERSION,
 )
@@ -37,9 +40,6 @@ from sevn.prompts.triager import (
 )
 from sevn.prompts.triager import (
     NO_SILENT_SUBSTITUTION_RULE as _NO_SILENT_SUBSTITUTION_RULE,
-)
-from sevn.prompts.triager import (
-    PLAYWRIGHT_BROWSER_RULE as _PLAYWRIGHT_BROWSER_RULE,
 )
 from sevn.prompts.triager import (
     PROCESS_INSTALL_RULE as _PROCESS_INSTALL_RULE,
@@ -249,7 +249,7 @@ def _static_prefix() -> str:
             _TRUTHFUL_CITATION_RULE,
             _NO_SILENT_SUBSTITUTION_RULE,
             _PROCESS_INSTALL_RULE,
-            _PLAYWRIGHT_BROWSER_RULE,
+            _BROWSER_TOOL_RULE,
             _LIVE_FACTUAL_RULE,
             "",
             "[triage_schema]",

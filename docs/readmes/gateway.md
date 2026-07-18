@@ -307,7 +307,7 @@ dispatcher_state insert + expiry sweeper (about-sevn.bot/specs/17-gateway.md §3
 Working with [`dispatcher_state.py`](../../src/sevn/gateway/dispatcher/dispatcher_state.py): inspect the public entry points below.
 Start with [`dispatcher_state_ttl_for_kind`](../../src/sevn/gateway/dispatcher/dispatcher_state.py#L26), then [`insert_dispatcher_state`](../../src/sevn/gateway/dispatcher/dispatcher_state.py#L47), [`sweep_expired_dispatcher_state`](../../src/sevn/gateway/dispatcher/dispatcher_state.py#L110).
 
-E2E-only echo dispatch for Playwright (the design docs Wave 6).
+E2E-only echo dispatch for local diagnostics (gated by `SEVN_E2E_ECHO_TURN`).
 
 Working with [`e2e_echo.py`](../../src/sevn/gateway/api/e2e_echo.py): inspect the public entry points below.
 Start with [`build_echo_run_turn`](../../src/sevn/gateway/api/e2e_echo.py#L65).
