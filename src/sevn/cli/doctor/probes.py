@@ -703,6 +703,27 @@ def run_doctor_probes(
                 msg = f"{msg} — fix: {ow_row.hint}"
             result.warnings.append(msg)
 
+    from sevn.config.workspace_config import google_workspace_settings
+    from sevn.skills.google_workspace_doctor_check import probe_google_workspace_skill_warnings
+
+    google_workspace_warnings = probe_google_workspace_skill_warnings(
+        bw.config,
+        content_root=bw.layout.content_root,
+    )
+    if google_workspace_settings(bw.config).enabled:
+        result.add(
+            DoctorCheck(
+                id="google_workspace",
+                section=section_for("google_workspace"),
+                title=title_for("google_workspace"),
+                ok=not google_workspace_warnings,
+                severity="warn" if google_workspace_warnings else None,
+                detail="; ".join(google_workspace_warnings) or "google-workspace skill ready",
+            ),
+        )
+        for line in google_workspace_warnings:
+            result.warnings.append(line)
+
     from sevn.skills.security_scan import read_workspace_scan_summary, resolve_skillspector_command
 
     ss_cmd = resolve_skillspector_command()

@@ -63,14 +63,10 @@ def _capture_spawn_args(
         return _FakeProc()
 
     monkeypatch.setattr(
-        "sevn.skills.browser_session.resolve_chrome_executable",
+        "sevn.browser.chrome.resolve_chrome_executable",
         lambda *_a, **_k: "/usr/bin/google-chrome",
     )
-    monkeypatch.setattr(
-        "sevn.skills.browser_session.read_devtools_active_port",
-        lambda *_a, **_k: 9333,
-    )
-    monkeypatch.setattr("sevn.skills.browser_session.subprocess.Popen", _popen)
+    monkeypatch.setattr("sevn.browser.chrome.subprocess.Popen", _popen)
     if extra_env is None:
         monkeypatch.delenv("SEVN_BROWSER_EXTRA_ARGS", raising=False)
     else:
@@ -135,7 +131,12 @@ def test_close_browser_session_clears_profile_locks_for_sevn_pid(
             last_used_at=datetime.now(tz=UTC).isoformat(),
         ),
     )
-    monkeypatch.setattr("sevn.skills.browser_session._kill_pid", lambda _pid: True)
+    monkeypatch.setattr("sevn.skills.browser_session._kill_pid", lambda _pid, **_k: True)
+    monkeypatch.setattr(
+        "sevn.browser.process.pid_matches_sevn_chrome_profile",
+        lambda *_a, **_k: True,
+    )
+    monkeypatch.setattr("sevn.browser.process.pid_is_alive", lambda *_a, **_k: True)
     monkeypatch.delenv("SEVN_CDP_URL", raising=False)
     result = close_browser_session(tmp_path, "sevn")
     assert result.ok is True
@@ -166,7 +167,12 @@ def test_close_browser_session_leaves_foreign_profile_locks(
             last_used_at=datetime.now(tz=UTC).isoformat(),
         ),
     )
-    monkeypatch.setattr("sevn.skills.browser_session._kill_pid", lambda _pid: True)
+    monkeypatch.setattr("sevn.skills.browser_session._kill_pid", lambda _pid, **_k: True)
+    monkeypatch.setattr(
+        "sevn.browser.process.pid_matches_sevn_chrome_profile",
+        lambda *_a, **_k: True,
+    )
+    monkeypatch.setattr("sevn.browser.process.pid_is_alive", lambda *_a, **_k: True)
     monkeypatch.delenv("SEVN_CDP_URL", raising=False)
     close_browser_session(tmp_path, "sevn")
     assert (foreign_profile / "DevToolsActivePort").is_file()
@@ -186,7 +192,7 @@ def test_read_devtools_active_port_rejects_stale_mtime(tmp_path: Path) -> None:
     os.utime(port_file, (stale_mtime, stale_mtime))
     spawn_started_at = time.time() - 5.0
     # Contract: callers pass spawn start so stale files from a prior process are ignored.
-    port = read_devtools_active_port(profile, timeout=0.2, spawn_started_at=spawn_started_at)
+    port = read_devtools_active_port(profile, timeout=0.2, spawned_after=spawn_started_at)
     assert port is None
 
 
@@ -200,7 +206,7 @@ def test_read_devtools_active_port_accepts_fresh_mtime(tmp_path: Path) -> None:
     time.sleep(0.05)
     port_file = profile / "DevToolsActivePort"
     port_file.write_text("9333\n/devtools/browser/fresh\n", encoding="utf-8")
-    port = read_devtools_active_port(profile, timeout=0.5, spawn_started_at=spawn_started_at)
+    port = read_devtools_active_port(profile, timeout=0.5, spawned_after=spawn_started_at)
     assert port == 9333
 
 
@@ -208,7 +214,7 @@ def test_resolve_browser_headless_false_when_chrome_present(monkeypatch: MonkeyP
     """DB3: host with Chrome stays headed (headless=False) when env/config unset."""
     monkeypatch.delenv("SEVN_BROWSER_HEADLESS", raising=False)
     monkeypatch.setattr(
-        "sevn.skills.browser_session.resolve_chrome_executable",
+        "sevn.browser.chrome.resolve_chrome_executable",
         lambda *_a, **_k: "/usr/bin/google-chrome",
     )
     assert resolve_browser_headless(None) is False

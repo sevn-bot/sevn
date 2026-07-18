@@ -188,6 +188,9 @@ interfaces:
 - name: workspace_has_minimax_catalog_model
   file: src/sevn/config/model_resolution.py
   symbol: workspace_has_minimax_catalog_model
+- name: default_github_repo_slug
+  file: src/sevn/config/my_sevn.py
+  symbol: default_github_repo_slug
 - name: effective_my_sevn
   file: src/sevn/config/my_sevn.py
   symbol: effective_my_sevn
@@ -203,9 +206,15 @@ interfaces:
 - name: effective_my_sevn_sync
   file: src/sevn/config/my_sevn.py
   symbol: effective_my_sevn_sync
+- name: parse_github_repo_slug
+  file: src/sevn/config/my_sevn.py
+  symbol: parse_github_repo_slug
 - name: persist_my_sevn_repo_path
   file: src/sevn/config/my_sevn.py
   symbol: persist_my_sevn_repo_path
+- name: resolve_github_repo_slug
+  file: src/sevn/config/my_sevn.py
+  symbol: resolve_github_repo_slug
 - name: resolve_my_sevn_repo_path
   file: src/sevn/config/my_sevn.py
   symbol: resolve_my_sevn_repo_path
@@ -278,6 +287,9 @@ interfaces:
 - name: complexity_clamp_short_word_limit
   file: src/sevn/config/sections/accessors.py
   symbol: complexity_clamp_short_word_limit
+- name: google_workspace_settings
+  file: src/sevn/config/sections/accessors.py
+  symbol: google_workspace_settings
 - name: rlm_json_dict
   file: src/sevn/config/sections/accessors.py
   symbol: rlm_json_dict
@@ -647,6 +659,12 @@ interfaces:
 - name: SelfImproveWorkspaceConfig
   file: src/sevn/config/sections/self_improve.py
   symbol: SelfImproveWorkspaceConfig
+- name: GoogleWorkspaceSkillConfig
+  file: src/sevn/config/sections/skills_google_workspace.py
+  symbol: GoogleWorkspaceSkillConfig
+- name: google_workspace_settings
+  file: src/sevn/config/sections/skills_google_workspace.py
+  symbol: google_workspace_settings
 - name: PlatformMediumConfig
   file: src/sevn/config/sections/skills_social_media.py
   symbol: PlatformMediumConfig

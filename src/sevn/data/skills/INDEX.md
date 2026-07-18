@@ -25,16 +25,17 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | cua-agent | Autonomous GUI loop via cua-agent — model drives the screen toward a goal; requires computer-use enabled and explicit per-run operator approval (HITL). |
 | cursor_cloud | Delegate code+PR work to Cursor Cloud Agent; returns PR, dashboard, and artifact links. |
 | email-management | Multi-account IMAP and Gmail API mail read/search/send scripts. |
-| gh-issues | GitHub issue lifecycle — list, view, create, comment via integration_call. |
+| gh-issues | GitHub issue lifecycle — templated create via gh CLI, authenticated view/watch/track + cron notify, plus list/comment. |
 | gh-pr | Pull request lifecycle — list, view, create, merge, close, reviewers via integration_call. |
 | github-manager | Advanced GitHub operations — branches, Actions, CI/CD secrets, environments, deployments via integration_call. |
+| google-workspace | Gmail, Calendar, Drive, Contacts, Sheets, and Docs via OAuth2 Google Workspace APIs. |
 | graphify | Knowledge-graph orientation for code (`specs/28-code-understanding.md` §2.4). |
 | job-ops | Discover jobs across global + Europe boards, AI fit-score them against your resume, and optionally tailor a CV summary (JobOps port). |
 | kokoro-tts | Local Kokoro ONNX text-to-speech engine backing the voice TTS pipeline (kokoro backend). Not a model-facing research skill. |
 | last30days | Research any topic across Reddit, X, YouTube, HN, Polymarket, and the web from the last 30 days. |
 | lcm | Lossless context search, drill-back, and conversation index (`specs/15-memory-lcm.md`). |
 | lume | Apple-Silicon VM lifecycle via the lume CLI (run/stop/ls/pull); opt-in; also a computer-use sandbox target via `cua do switch lume` |
-| media_generation | Generate images, video, and music via the MiniMax-backed media_generator specialist (spec 36 D8). |
+| media_generation | MiniMax media generation — 9 API paths, scene/style variables, 40+ prompt templates, 16 video agent templates, voice, music — via media_generator L2 specialist. |
 | mycode | Deterministic repo scan + MYCODE.md write (`specs/28-code-understanding.md` §2.4). |
 | openwiki | LLM-generated agent wiki for a codebase (LangChain OpenWiki CLI). |
 | pdf | Render markdown/HTML to workspace PDFs; extract text/tables; structured load/chunk. |
@@ -48,3 +49,4 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | telegram | Telegram inline custom buttons and forum supergroup helpers (Bot API + allowlist/userbot hooks). |
 | sevn-diagnostics | sevn.bot operator repair playbooks for `sevn doctor --with-agent` (gateway, secrets, proxy, models, browser, voice). |
 | yt-dlp | Download video/audio and metadata with yt-dlp (YouTube, Vimeo, X, TikTok, and allowlisted hosts). |
+| proton-management | Proton suite CLI (Python port) — Pass, Mail, Drive, Calendar, Contacts, attachments, groups, RSVP. |

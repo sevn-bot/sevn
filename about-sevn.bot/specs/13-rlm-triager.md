@@ -326,6 +326,9 @@ interfaces:
 - name: install_tool_approval_bridge
   file: src/sevn/agent/adapters/tool_approval_bridge.py
   symbol: install_tool_approval_bridge
+- name: reset_tool_approval_bridge_for_tests
+  file: src/sevn/agent/adapters/tool_approval_bridge.py
+  symbol: reset_tool_approval_bridge_for_tests
 - name: summarize_tool_args
   file: src/sevn/agent/adapters/tool_approval_bridge.py
   symbol: summarize_tool_args
@@ -764,15 +767,63 @@ interfaces:
 - name: MiniMaxMediaError
   file: src/sevn/agent/subagents/media_minimax.py
   symbol: MiniMaxMediaError
+- name: clone_voice_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: clone_voice_bytes
 - name: generate_image_bytes
   file: src/sevn/agent/subagents/media_minimax.py
   symbol: generate_image_bytes
+- name: generate_image_from_reference_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_image_from_reference_bytes
 - name: generate_music_bytes
   file: src/sevn/agent/subagents/media_minimax.py
   symbol: generate_music_bytes
 - name: generate_video_bytes
   file: src/sevn/agent/subagents/media_minimax.py
   symbol: generate_video_bytes
+- name: generate_video_first_last_frame_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_video_first_last_frame_bytes
+- name: generate_video_from_image_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_video_from_image_bytes
+- name: generate_video_subject_reference_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_video_subject_reference_bytes
+- name: generate_video_template_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: generate_video_template_bytes
+- name: synthesize_speech_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: synthesize_speech_bytes
+- name: upload_file_bytes
+  file: src/sevn/agent/subagents/media_minimax.py
+  symbol: upload_file_bytes
+- name: MediaPromptVars
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: MediaPromptVars
+- name: PromptTemplateMeta
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: PromptTemplateMeta
+- name: VideoAgentTemplate
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: VideoAgentTemplate
+- name: augment_prompt
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: augment_prompt
+- name: build_media_trace
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: build_media_trace
+- name: list_prompt_templates
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: list_prompt_templates
+- name: list_video_agent_templates
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: list_video_agent_templates
+- name: resolve_video_agent_template
+  file: src/sevn/agent/subagents/media_prompts.py
+  symbol: resolve_video_agent_template
 - name: MediaTask
   file: src/sevn/agent/subagents/media_worker.py
   symbol: MediaTask

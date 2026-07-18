@@ -65,6 +65,10 @@ def _tool_result_succeeded(content: object) -> bool:
         True
         >>> _tool_result_succeeded('{"ok": false, "error": "denied"}')
         False
+        >>> _tool_result_succeeded("42")
+        False
+        >>> _tool_result_succeeded("null")
+        False
     """
     if isinstance(content, str):
         try:
@@ -74,6 +78,10 @@ def _tool_result_succeeded(content: object) -> bool:
     elif isinstance(content, dict):
         blob = content
     else:
+        return False
+    # Tool mirrors sometimes store bare JSON scalars/arrays (``"42"``, ``"null"``,
+    # ``[{...}]``). Those are not envelopes — never call ``.get`` on a non-dict.
+    if not isinstance(blob, dict):
         return False
     return bool(blob.get("ok"))
 

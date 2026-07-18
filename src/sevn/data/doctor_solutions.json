@@ -76,6 +76,20 @@
       "severity": "warn",
       "title": "OpenWiki credentials"
     },
+    "google_workspace": {
+      "auto_fixable": false,
+      "docs_url": "about-sevn.bot/google-workspace.html",
+      "explanation": "Google Workspace needs OAuth token, optional Python deps, and optionally gws on PATH when skills.google_workspace.enabled is true.",
+      "fix_command": "python src/sevn/data/bundled_skills/core/google-workspace/scripts/setup.py auth",
+      "remediation": [
+        "Run the bundled setup script to store client secret and complete OAuth.",
+        "Install optional deps: uv pip install 'sevn[google-workspace]'.",
+        "When prefer_gws is true, install the gws CLI and ensure it is on PATH.",
+        "Re-run `sevn doctor` after setup."
+      ],
+      "severity": "warn",
+      "title": "Google Workspace"
+    },
     "cua_driver_binary": {
       "auto_fixable": false,
       "docs_url": "specs/23-cli.md",

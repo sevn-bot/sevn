@@ -2083,6 +2083,40 @@
           },
           "$comment": "Maintainer: social-media-manager wave W2 — D1 skills.social_media_manager; D2 browser default; D13 twexapi.enabled default false."
         },
+        "google_workspace": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Google Workspace OAuth and backend preferences for the bundled google-workspace skill.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "When true, the google-workspace skill is available for Gmail, Calendar, Drive, Sheets, Docs, and Contacts tasks."
+            },
+            "prefer_gws": {
+              "type": "boolean",
+              "default": true,
+              "description": "Prefer the optional gws CLI bridge when it is installed; otherwise use the Python Google API fallback."
+            },
+            "default_services": {
+              "type": "string",
+              "enum": ["email", "calendar", "drive", "sheets", "docs", "contacts", "all"],
+              "default": "all",
+              "description": "Default service-scope bundle used by setup flows when the operator does not pick a narrower set."
+            },
+            "account_label": {
+              "type": "string",
+              "default": "Primary Google",
+              "description": "Operator-facing label for the authenticated Google account."
+            },
+            "dry_run": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, google-workspace scripts default to plan-only mode unless explicitly overridden."
+            }
+          },
+          "$comment": "Maintainer: google-workspace Phase 1 — auth/config defaults for OAuth setup and optional gws backend preference."
+        },
         "openwiki": {
           "type": "object",
           "additionalProperties": true,

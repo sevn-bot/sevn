@@ -315,7 +315,7 @@ about-docs-check: ## Validate about-docs + skw spec/prd folder gates
 
 spec-check: ## Validate+score every spec in about-sevn.bot/specs (skw docs validate)
 	@if [ -d spec-kit-wave ]; then \
-		$(MAKE) -C spec-kit-wave spec-check; \
+		$(MAKE) -C spec-kit-wave spec-check REPO_ROOT="$(CURDIR)"; \
 	else \
 		echo "spec-check: skipped (spec-kit-wave not present)"; \
 	fi
@@ -365,14 +365,14 @@ prd-sync: ## Refresh PRD frontmatter in about-sevn.bot/prd (skw docs sync)
 
 prd-check: ## Validate+score every PRD in about-sevn.bot/prd (skw docs validate)
 	@if [ -d spec-kit-wave ]; then \
-		$(MAKE) -C spec-kit-wave prd-check; \
+		$(MAKE) -C spec-kit-wave prd-check REPO_ROOT="$(CURDIR)"; \
 	else \
 		echo "prd-check: skipped (spec-kit-wave not present)"; \
 	fi
 
 spec-kit-wave-test: ## Run spec-kit-wave pytest suite (skw validators + sync contracts)
 	@if [ -d spec-kit-wave ]; then \
-		$(MAKE) -C spec-kit-wave test; \
+		$(MAKE) -C spec-kit-wave test REPO_ROOT="$(CURDIR)"; \
 	else \
 		echo "spec-kit-wave-test: skipped (spec-kit-wave not present)"; \
 	fi

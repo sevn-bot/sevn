@@ -82,6 +82,7 @@ USER_PAGES: tuple[str, ...] = (
     "telegram-menu.html",
     "tools.html",
     "skills.html",
+    "google-workspace.html",
     "config.html",
     "troubleshooting.html",
     "agent-context.html",
@@ -201,6 +202,7 @@ def _nav_pages() -> tuple[tuple[str, str], ...]:
         "telegram-menu": "Telegram settings",
         "tools": "Tools",
         "skills": "Skills",
+        "google-workspace": "Google Workspace",
         "config": "Settings",
         "troubleshooting": "Troubleshooting",
         "agent-context": "Agent context",
@@ -621,6 +623,27 @@ def _collect_agent_context() -> dict[str, Any]:
     }
 
 
+def _collect_google_workspace() -> dict[str, Any]:
+    """Load google-workspace function catalog for the help page.
+
+    Returns:
+        dict[str, Any]: Template context with ``services`` list.
+
+    Examples:
+        >>> data = _collect_google_workspace()
+        >>> isinstance(data.get("services"), list)
+        True
+    """
+    path = SOURCES / "google-workspace-functions.yaml"
+    if not path.is_file():
+        return {"services": []}
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        return {"services": []}
+    services = data.get("services") or []
+    return {"services": services if isinstance(services, list) else []}
+
+
 def _collect_config_fields() -> list[dict[str, str]]:
     """Return curated user-facing config field rows from ``_sources/config.yaml``.
 
@@ -719,6 +742,7 @@ def build_site(dest_root: Path | None = None) -> None:
         "telegram-menu": _collect_telegram_menu(),
         "tools": {"tools": _collect_tools()},
         "skills": {"skills": _collect_skills()},
+        "google-workspace": _collect_google_workspace(),
         "config": {"config_fields": _collect_config_fields()},
         "agent-context": _collect_agent_context(),
     }
@@ -731,6 +755,7 @@ def build_site(dest_root: Path | None = None) -> None:
         "telegram-menu",
         "tools",
         "skills",
+        "google-workspace",
         "config",
         "troubleshooting",
         "agent-context",

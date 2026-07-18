@@ -6,10 +6,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from sevn.config.workspace_config import WorkspaceConfig
-
 if TYPE_CHECKING:
-    from _pytest.monkeypatch import MonkeyPatch
+    import pytest
+
+from sevn.config.workspace_config import WorkspaceConfig
 from sevn.skills.browser_session import (
     EXTERNAL_CDP,
     BrowserSessionRegistry,
@@ -72,7 +72,7 @@ def test_registry_write_read_clear(tmp_path: Path) -> None:
     assert read_registry(tmp_path, "s1") is None
 
 
-def test_close_browser_skips_external_cdp(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+def test_close_browser_skips_external_cdp(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Close returns EXTERNAL_CDP for attach-only sessions unless force=True (D6)."""
     row = BrowserSessionRegistry(
         pid=99999,
@@ -111,7 +111,9 @@ def test_close_browser_skips_external_cdp(tmp_path: Path, monkeypatch: MonkeyPat
     assert op_result.code == EXTERNAL_CDP
 
 
-def test_browser_autoclose_default_respected(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+def test_browser_autoclose_default_respected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Browser skills default to keep-alive via merge_browser_proc_env (D4)."""
     env: dict[str, str] = {}
     merge_browser_proc_env(
@@ -159,7 +161,7 @@ def test_resolve_cdp_url_prefers_registry(tmp_path: Path) -> None:
     assert resolve_cdp_url(tmp_path, "sess-x", cfg=None) == "http://127.0.0.1:9400"
 
 
-def test_resolve_profile_config_precedence(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+def test_resolve_profile_config_precedence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Profile resolution honours env then skills.browser.profile_dir."""
     custom = tmp_path / "cfg-profile"
     custom.mkdir()
@@ -260,21 +262,21 @@ def test_session_status_not_seed_hint_with_registry(tmp_path: Path) -> None:
 
 def test_resolve_chrome_executable_env_wins(
     tmp_path: Path,
-    monkeypatch: MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """SEVN_CHROME_EXECUTABLE takes precedence over discovery."""
     exe = tmp_path / "custom-brave"
     exe.write_text("", encoding="utf-8")
     monkeypatch.setenv("SEVN_CHROME_EXECUTABLE", str(exe))
     monkeypatch.setattr(
-        "sevn.skills.browser_session.shutil.which", lambda _n: "/usr/bin/google-chrome-stable"
+        "sevn.browser.chrome.shutil.which", lambda _n: "/usr/bin/google-chrome-stable"
     )
     from sevn.skills.browser_session import resolve_chrome_executable
 
     assert resolve_chrome_executable() == str(exe)
 
 
-def test_resolve_chrome_executable_brave_on_path(monkeypatch: MonkeyPatch) -> None:
+def test_resolve_chrome_executable_brave_on_path(monkeypatch: pytest.MonkeyPatch) -> None:
     """Brave resolves from PATH when engine is brave."""
     monkeypatch.delenv("SEVN_CHROME_EXECUTABLE", raising=False)
     monkeypatch.setenv("SEVN_BROWSER_ENGINE", "brave")
@@ -284,7 +286,7 @@ def test_resolve_chrome_executable_brave_on_path(monkeypatch: MonkeyPatch) -> No
             return "/usr/bin/brave-browser"
         return None
 
-    monkeypatch.setattr("sevn.skills.browser_session.shutil.which", _which)
+    monkeypatch.setattr("sevn.browser.chrome.shutil.which", _which)
     from sevn.skills.browser_session import is_brave_executable, resolve_chrome_executable
 
     resolved = resolve_chrome_executable()
@@ -292,7 +294,7 @@ def test_resolve_chrome_executable_brave_on_path(monkeypatch: MonkeyPatch) -> No
     assert is_brave_executable(resolved)
 
 
-def test_resolve_chrome_executable_auto_prefers_chrome(monkeypatch: MonkeyPatch) -> None:
+def test_resolve_chrome_executable_auto_prefers_chrome(monkeypatch: pytest.MonkeyPatch) -> None:
     """Auto engine prefers Chrome/Chromium before Brave."""
     monkeypatch.delenv("SEVN_CHROME_EXECUTABLE", raising=False)
     monkeypatch.delenv("SEVN_BROWSER_ENGINE", raising=False)
@@ -305,10 +307,10 @@ def test_resolve_chrome_executable_auto_prefers_chrome(monkeypatch: MonkeyPatch)
         return None
 
     monkeypatch.setattr(
-        "sevn.skills.browser_session._first_existing_file",
+        "sevn.browser.chrome._first_existing_file",
         lambda _candidates: None,
     )
-    monkeypatch.setattr("sevn.skills.browser_session.shutil.which", _which)
+    monkeypatch.setattr("sevn.browser.chrome.shutil.which", _which)
     from sevn.skills.browser_session import resolve_chrome_executable
 
     assert resolve_chrome_executable() == "/usr/bin/google-chrome-stable"
@@ -330,7 +332,7 @@ def test_resolve_browser_engine_from_config() -> None:
 
 def test_spawn_chrome_appends_extra_args(
     tmp_path: Path,
-    monkeypatch: MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """SEVN_BROWSER_EXTRA_ARGS are appended to the spawn argv."""
     captured: list[list[str]] = []
@@ -353,14 +355,14 @@ def test_spawn_chrome_appends_extra_args(
 
     monkeypatch.setenv("SEVN_BROWSER_EXTRA_ARGS", "--no-sandbox --disable-dev-shm-usage")
     monkeypatch.setattr(
-        "sevn.skills.browser_session.resolve_chrome_executable",
+        "sevn.browser.chrome.resolve_chrome_executable",
         lambda *_a, **_k: "/usr/bin/brave-browser",
     )
     monkeypatch.setattr(
-        "sevn.skills.browser_session.read_devtools_active_port",
+        "sevn.browser.chrome.read_devtools_active_port",
         lambda *_a, **_k: 9333,
     )
-    monkeypatch.setattr("sevn.skills.browser_session.subprocess.Popen", _popen)
+    monkeypatch.setattr("sevn.browser.chrome.subprocess.Popen", _popen)
     from sevn.skills.browser_session import spawn_chrome
 
     spawn_chrome(tmp_path / "profile", headless=True)
@@ -372,7 +374,7 @@ def test_spawn_chrome_appends_extra_args(
 
 def test_spawn_chrome_respects_engine_config(
     tmp_path: Path,
-    monkeypatch: MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """spawn_chrome honors skills.browser.engine via cfg."""
     captured: list[list[str]] = []
@@ -394,13 +396,13 @@ def test_spawn_chrome_respects_engine_config(
             return "/usr/bin/brave-browser"
         return None
 
-    monkeypatch.setattr("sevn.skills.browser_session.shutil.which", _which)
+    monkeypatch.setattr("sevn.browser.chrome.shutil.which", _which)
     monkeypatch.setattr(
-        "sevn.skills.browser_session.read_devtools_active_port",
+        "sevn.browser.chrome.read_devtools_active_port",
         lambda *_a, **_k: 9333,
     )
     monkeypatch.setattr(
-        "sevn.skills.browser_session.subprocess.Popen",
+        "sevn.browser.chrome.subprocess.Popen",
         lambda args, **_kwargs: captured.append(args) or _Proc(),
     )
     cfg = WorkspaceConfig.model_validate(
@@ -416,11 +418,11 @@ def test_spawn_chrome_respects_engine_config(
     assert captured[0][0] == "/usr/bin/brave-browser"
 
 
-def test_resolve_browser_headless_env_overrides_config(monkeypatch: MonkeyPatch) -> None:
+def test_resolve_browser_headless_env_overrides_config(monkeypatch: pytest.MonkeyPatch) -> None:
     """SEVN_BROWSER_HEADLESS wins over skills.browser.headless when set."""
     monkeypatch.setenv("SEVN_BROWSER_HEADLESS", "0")
     monkeypatch.setattr(
-        "sevn.skills.browser_session.resolve_chrome_executable",
+        "sevn.browser.chrome.resolve_chrome_executable",
         lambda *_a, **_k: "/usr/bin/brave-browser",
     )
     cfg = WorkspaceConfig.model_validate(

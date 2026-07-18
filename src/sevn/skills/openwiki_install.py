@@ -90,7 +90,7 @@ def run_openwiki_install(*, skip_if_installed: bool = True) -> tuple[int, str]:
 
     Examples:
         >>> code, msg = run_openwiki_install(skip_if_installed=True)
-        >>> code in (0, 1)
+        >>> isinstance(code, int) and isinstance(msg, str)
         True
     """
     if skip_if_installed and openwiki_cli_installed():

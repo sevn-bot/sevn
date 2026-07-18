@@ -329,6 +329,7 @@ def _has_skill(skills_manager: SkillsManager, name: str) -> bool:
         True
     """
     resolved = resolve_skill_alias(name)
+    # Inventory is the SSOT shared with list_registry / load_skill (D14).
     return resolved in skills_manager.inventory_for_triager()
 
 

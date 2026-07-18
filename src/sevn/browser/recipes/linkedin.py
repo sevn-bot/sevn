@@ -286,7 +286,7 @@ async def _resolve_work_page(
     """
     from sevn.browser.element import Dom
     from sevn.browser.page import Page
-    from sevn.skills.browser_session import read_registry
+    from sevn.browser.registry import read_registry
 
     reg = read_registry(content_root, session_id)
     active_id = reg.active_target_id if reg is not None else None

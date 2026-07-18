@@ -21,6 +21,7 @@ import shutil
 import sys
 import time
 import uuid
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Final
@@ -73,12 +74,11 @@ from sevn.skills.social_media_manager import (
     SOCIAL_MEDIA_MANAGER_SKILL_ID,
     gate_social_media_manager_core_skill,
 )
+from sevn.workspace.layout import WorkspaceLayout
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
-
     from sevn.config.workspace_config import WorkspaceConfig
-    from sevn.workspace.layout import WorkspaceLayout
+
 _PROV_ORDER: Final[dict[ProvenanceKind, int]] = {
     "core": 0,
     "generated": 1,
@@ -586,10 +586,13 @@ def _load_flat_skill(
     md = skill_dir / "SKILL.md"
     if not md.is_file():
         if provenance == "user" and downgrade_user:
+            # Unloadable: quarantine so inventory/list_registry never advertise it
+            # as available (D14 skill-registry SSOT).
             m = SkillManifest(
                 name=skill_dir.name,
                 description=skill_dir.name,
                 version="0.0.0",
+                quarantine_flag=True,
             )
             return SkillRecord(
                 canonical_id=skill_dir.name,
@@ -828,7 +831,7 @@ class SkillsManager:
     @classmethod
     def shared(
         cls,
-        workspace_root: Path,
+        workspace_root: Path | WorkspaceLayout,
         skills_roots: Sequence[Path] | None = None,
         *,
         layout: WorkspaceLayout | None = None,
@@ -838,7 +841,9 @@ class SkillsManager:
         """Return the process-wide singleton for the resolved key.
         Key: ``(str(workspace_root.resolve()), tuple(str(r.resolve()) for r in skills_roots))``.
         Args:
-            workspace_root (Path): Workspace root (anchors the cache key).
+            workspace_root (Path | WorkspaceLayout): Workspace root (anchors the cache
+                key), or a :class:`~sevn.workspace.layout.WorkspaceLayout` whose
+                ``content_root`` is used (and which fills ``layout`` when omitted).
             skills_roots (Sequence[Path] | None): Optional skills roots; defaults to
                 ``workspace_root/"skills"``.
             layout (WorkspaceLayout | None): Optional layout passed through on creation.
@@ -851,7 +856,15 @@ class SkillsManager:
             >>> inspect.ismethod(SkillsManager.shared) or callable(SkillsManager.shared)
             True
         """
-        wr = workspace_root.expanduser().resolve()
+        layout_arg = layout
+        root: Path
+        if isinstance(workspace_root, WorkspaceLayout):
+            if layout_arg is None:
+                layout_arg = workspace_root
+            root = workspace_root.content_root
+        else:
+            root = workspace_root
+        wr = root.expanduser().resolve()
         if skills_roots is None:
             roots_list: list[Path] = [wr / "skills"]
             workspace_core = wr / "skills" / "core"
@@ -872,7 +885,7 @@ class SkillsManager:
         key = (str(wr), tuple(str(p.expanduser().resolve()) for p in roots))
         inst = cls._instances.get(key)
         if inst is None:
-            inst = cls(wr, roots, layout=layout, config=config, trace_sink=trace_sink)
+            inst = cls(wr, roots, layout=layout_arg, config=config, trace_sink=trace_sink)
             cls._instances[key] = inst
         return inst
 
@@ -974,7 +987,9 @@ class SkillsManager:
         """Return per-skill menu rows for triager prompt surfacing.
 
         Returns:
-            dict[str, dict[str, object]]: ``name -> {summary,scripts,runnables}`` map.
+            dict[str, dict[str, object]]: ``name -> {summary,scripts,runnables,quarantine}``
+                map. ``quarantine`` is the effective runtime gate so advertisers
+                (``list_registry``) and ``load_skill`` share one source of truth (D14).
 
         Examples:
             >>> import inspect
@@ -991,7 +1006,30 @@ class SkillsManager:
                 "summary": summary,
                 "scripts": scripts,
                 "runnables": runnables,
+                "quarantine": rec.manifest.effective_quarantine(rec.provenance),
             }
+        return out
+
+    def advertised_skill_descriptions(self) -> dict[str, str]:
+        """Return name → summary for skills safe to advertise via ``list_registry``.
+
+        Quarantined / unloadable skills are omitted so a subsequent ``load_skill``
+        on any listed name never returns ``SKILL_NOT_FOUND`` (D14).
+
+        Returns:
+            dict[str, str]: Non-quarantined skill id → one-line summary.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.isfunction(SkillsManager.advertised_skill_descriptions)
+            True
+        """
+        out: dict[str, str] = {}
+        for name, row in self.inventory_for_triager().items():
+            if row.get("quarantine"):
+                continue
+            summary = str(row.get("summary") or "").strip() or name
+            out[name] = summary
         return out
 
     def get_record(self, name: str) -> SkillRecord:

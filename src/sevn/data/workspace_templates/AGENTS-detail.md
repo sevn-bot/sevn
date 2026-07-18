@@ -173,7 +173,7 @@ Cross-session coordination uses the **`sessions_management`** skill for list/his
 
 **Meta tools:** `load_skill`, `run_skill_script`, `run_skill_runnable`, `skill_create`, `promote_generated_skill`.
 
-**Bundled skills** (default registry): `browser-harness`, `canvas`, `code_graph_rag`, `computer-use`, `conventional_commit`, `cursor_cloud`, `email-management`, `gh-issues`, `gh-pr`, `github-manager`, `graphify`, `last30days`, `lcm`, `mycode`, `pdf`, `roam_code`, `scheduling`, `second_brain`, `sessions_management`, `skill_management`, `telegram`, `yt-dlp`.
+**Bundled skills** (default registry): `browser-harness`, `canvas`, `code_graph_rag`, `computer-use`, `conventional_commit`, `cursor_cloud`, `email-management`, `gh-issues`, `gh-pr`, `github-manager`, `google-workspace`, `graphify`, `last30days`, `lcm`, `mycode`, `pdf`, `roam_code`, `scheduling`, `second_brain`, `sessions_management`, `skill_management`, `social_media_manager`, `telegram`, `yt-dlp`.
 
 Keep skill packages under `skills/core/`, `skills/user/`, or `skills/generated/` — not loose directories directly under `skills/`. Promote generated drafts with `promote_generated_skill` or the **`skill_management`** scripts.
 
@@ -193,9 +193,19 @@ Keep skill packages under `skills/core/`, `skills/user/`, or `skills/generated/`
 
 When Telegram is configured, the **`telegram`** skill covers inline custom buttons and forum supergroup helpers (Bot API + allowlist/userbot hooks).
 
-### 13. Email & desktop automation
+### 13. Email, Google Workspace & desktop automation
 
-**Mail:** the **`email-management`** skill supports multi-account IMAP/Gmail read, search, and send when configured.
+**Quick email and multi-provider mail:** the **`email-management`** skill is the default for fast email-only work, multi-account IMAP/SMTP, Gmail app-password setups, and non-Google providers.
+
+**Google Workspace:** the **`google-workspace`** skill is the primary route for Gmail API features (labels, threading, HTML send/reply), plus Calendar, Drive, Sheets, Docs, and Contacts intents.
+
+**Browser Gmail / Google web fallback:** use a logged-in browser session when OAuth is unavailable, the task is urgent and read-only, or the operator explicitly wants browser-driven Gmail work instead of API access.
+
+Routing rule of thumb:
+
+- **`email-management`** → "check my inbox", quick mail triage, cross-provider mail access, no Google Cloud project
+- **`google-workspace`** → Calendar, Drive, Sheets, Docs, Contacts, or Gmail API-specific workflows
+- **browser Gmail** → no OAuth yet, but a logged-in browser can unblock read/search or operator-guided web actions
 
 **Desktop GUI (macOS, opt-in):** the **`computer-use`** skill passthroughs to the Cua driver when `skills.computer_use.enabled` is true.
 
@@ -216,7 +226,11 @@ For every user request: **identify which core capabilities apply, then compose t
 - "Open a PR on my repo" → **`gh-pr`** skill or `integration_call` (GitHub) + confirm before mutating remotes
 - "Download this talk" → **`yt-dlp`** skill (allowlisted hosts)
 - "What's the community saying about X lately?" → **`last30days`** skill (`load_skill` → `run_skill_script` on `research`; synthesize from engine output)
-- "Check my inbox" → **`email-management`** skill when mail accounts are configured
+- "Check my inbox" → **`email-management`** skill for quick email-only access; use **`google-workspace`** when Gmail API labels/threading are required
+- "What's on my calendar tomorrow?" → **`google-workspace`** skill
+- "Find the latest project deck on Drive" → **`google-workspace`** skill
+- "Update this budget sheet" → **`google-workspace`** skill (ask first before writes)
+- "Append these notes to the team doc" → **`google-workspace`** skill (ask first before writes)
 - "Remind me Friday" → **`scheduling`** skill
 - "Show me a timeline of this incident" → read `logs/` + LCM summaries; Traces tab in the dashboard when tracing sinks are configured in `sevn.json`
 

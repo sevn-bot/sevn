@@ -122,6 +122,10 @@ from sevn.config.sections.self_improve import (
     SelfImproveSpecKitConfig,
     SelfImproveWorkspaceConfig,
 )
+from sevn.config.sections.skills_google_workspace import (
+    GoogleWorkspaceServiceSet,
+    GoogleWorkspaceSkillConfig,
+)
 from sevn.config.sections.skills_social_media import (
     PlatformMediumConfig,
     SocialMediaManagerSkillConfig,
@@ -146,6 +150,7 @@ rlm_json_dict = _accessors_section.rlm_json_dict
 tier_b_skill_cap = _accessors_section.tier_b_skill_cap
 tier_b_rounds = _accessors_section.tier_b_rounds
 browser_settings = _accessors_section.browser_settings
+google_workspace_settings = _accessors_section.google_workspace_settings
 social_media_manager_settings = _accessors_section.social_media_manager_settings
 tier_b_rounds_expanded = _accessors_section.tier_b_rounds_expanded
 tier_b_count_planning = _accessors_section.tier_b_count_planning
@@ -206,6 +211,8 @@ __all__ = [
     "GatewayRestartConfig",
     "GatewaySessionMirrorConfig",
     "GatewaySteerConfig",
+    "GoogleWorkspaceServiceSet",
+    "GoogleWorkspaceSkillConfig",
     "HarnessSnapshotSubConfig",
     "HarnessWorkspaceConfig",
     "JsonDict",
@@ -292,6 +299,7 @@ __all__ = [
     "complexity_clamp_confidence_threshold",
     "complexity_clamp_short_word_limit",
     "effective_encrypted_file_key_source",
+    "google_workspace_settings",
     "parse_workspace_config",
     "resolve_subagent_limits",
     "rlm_json_dict",

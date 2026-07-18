@@ -25,7 +25,7 @@ _DELETE_NOT_FOUND_MARKERS = (
 
 
 class ProtonPassCliBackend:
-    """Invoke a Proton Pass compatible CLI (``proton-pass`` by default)."""
+    """Invoke a Proton Pass compatible CLI (``proton-pass``, ``pass-cli``, or ``proton-cli``)."""
 
     def __init__(
         self,
@@ -80,11 +80,17 @@ class ProtonPassCliBackend:
         """
         return self._selector or key
 
-    def _vault_flags(self, *, pass_cli: bool) -> list[str]:
+    def _vault_flags(
+        self,
+        *,
+        pass_cli: bool = False,
+        proton_cli: bool = False,
+    ) -> list[str]:
         """Return vault selector argv for the active CLI dialect.
 
         Args:
             pass_cli (bool): When True, emit ``pass-cli`` ``--vault-name`` flags.
+            proton_cli (bool): When True, emit ``proton-cli`` ``--vault`` flags.
 
         Returns:
             list[str]: Vault flags, or empty when no vault is configured.
@@ -95,6 +101,8 @@ class ProtonPassCliBackend:
         """
         if not self._vault:
             return []
+        if proton_cli:
+            return ["--vault", self._vault]
         if pass_cli:
             return ["--vault-name", self._vault]
         return ["--vault", self._vault]
@@ -118,6 +126,25 @@ class ProtonPassCliBackend:
         base = Path(exe).name
         return base == "pass-cli" or base.endswith("-pass-cli")
 
+    @staticmethod
+    def _is_proton_cli(exe: str) -> bool:
+        """Return True when ``exe`` is the Python ``proton-cli`` port.
+
+        Args:
+            exe (str): Resolved CLI path.
+
+        Returns:
+            bool: True for ``proton-cli`` / ``*-proton-cli`` binary names.
+
+        Examples:
+            >>> ProtonPassCliBackend._is_proton_cli("/usr/bin/proton-cli")
+            True
+            >>> ProtonPassCliBackend._is_proton_cli("/usr/bin/proton-pass")
+            False
+        """
+        base = Path(exe).name
+        return base == "proton-cli" or base.endswith("-proton-cli")
+
     def _subprocess_env(self) -> dict[str, str]:
         """Build subprocess env with Proton Pass auth vars and passphrase bridge.
 
@@ -135,15 +162,24 @@ class ProtonPassCliBackend:
         """
         env = os.environ.copy()
         passphrase = env.get("SEVN_SECRETS_PASSPHRASE", "").strip()
-        if passphrase and not env.get("PROTON_PASS_PASSWORD", "").strip():
-            env["PROTON_PASS_PASSWORD"] = passphrase
+        if passphrase:
+            if not env.get("PROTON_PASS_PASSWORD", "").strip():
+                env["PROTON_PASS_PASSWORD"] = passphrase
+            if not env.get("PROTON_PASSWORD", "").strip():
+                env["PROTON_PASSWORD"] = passphrase
         return env
 
-    async def _run(self, args: list[str]) -> tuple[int, bytes, bytes]:
+    async def _run(
+        self,
+        args: list[str],
+        *,
+        stdin: bytes | None = None,
+    ) -> tuple[int, bytes, bytes]:
         """Run the CLI and return ``(returncode, stdout, stderr)``.
 
         Args:
             args (list[str]): Full argv including the executable path.
+            stdin (bytes | None): Optional bytes written to the child stdin.
 
         Returns:
             tuple[int, bytes, bytes]: Process exit code and captured streams.
@@ -157,13 +193,14 @@ class ProtonPassCliBackend:
             *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            stdin=asyncio.subprocess.PIPE if stdin is not None else None,
             env=self._subprocess_env(),
         )
-        out, err = await proc.communicate()
+        out, err = await proc.communicate(stdin)
         return proc.returncode or 0, out, err
 
     async def get(self, key: str) -> str | None:
-        """Return plaintext for ``key`` via ``proton-pass show`` or ``pass-cli item view``.
+        """Return plaintext for ``key`` via the configured Proton Pass CLI dialect.
 
         Args:
             key (str): Logical secret id (used as CLI argument when no selector set).
@@ -180,7 +217,9 @@ class ProtonPassCliBackend:
         if exe is None:
             return None
         label = self._item_label(key)
-        if self._is_pass_cli(exe):
+        if self._is_proton_cli(exe):
+            args = [exe, "pass", "secrets", "get", label, *self._vault_flags(proton_cli=True)]
+        elif self._is_pass_cli(exe):
             args = [exe, "item", "view", *self._vault_flags(pass_cli=True), "--item-title", label]
         else:
             args = [exe, *self._vault_flags(pass_cli=False), "show", label]
@@ -210,7 +249,18 @@ class ProtonPassCliBackend:
             msg = "proton pass CLI is not installed or not on PATH"
             raise SecretsBackendError(msg)
         label = self._item_label(key)
-        if self._is_pass_cli(exe):
+        if self._is_proton_cli(exe):
+            args = [
+                exe,
+                "pass",
+                "secrets",
+                "set",
+                label,
+                "-",
+                *self._vault_flags(proton_cli=True),
+            ]
+            code, _out, err = await self._run(args, stdin=value.encode("utf-8"))
+        elif self._is_pass_cli(exe):
             args = [
                 exe,
                 "item",
@@ -221,9 +271,10 @@ class ProtonPassCliBackend:
                 "--field",
                 f"password={value}",
             ]
+            code, _out, err = await self._run(args)
         else:
             args = [exe, *self._vault_flags(pass_cli=False), "set", label, value]
-        code, _out, err = await self._run(args)
+            code, _out, err = await self._run(args)
         if code != 0:
             detail = err.decode("utf-8", errors="replace").strip()
             msg = f"proton pass CLI set failed (exit {code}): {detail}"
@@ -248,7 +299,9 @@ class ProtonPassCliBackend:
             msg = "proton pass CLI is not installed or not on PATH"
             raise SecretsBackendError(msg)
         label = self._item_label(key)
-        if self._is_pass_cli(exe):
+        if self._is_proton_cli(exe):
+            args = [exe, "pass", "secrets", "delete", label, *self._vault_flags(proton_cli=True)]
+        elif self._is_pass_cli(exe):
             args = [
                 exe,
                 "item",

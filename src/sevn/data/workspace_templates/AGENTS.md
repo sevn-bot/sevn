@@ -40,7 +40,7 @@ If the entire message is a brief greeting (`hi`, `thanks`, `ok`, `bye`), reply i
 
 ## Core capabilities
 
-Building blocks: file system, logs, memory, web, code, GitHub, code execution, scheduling, skills, OpenUI, messaging, Telegram, email/desktop, security. Triager narrows which tools apply; tier-B loads schemas lazily via `load_tool`. Skills via `load_skill` → `run_skill_script` / `run_skill_runnable`. See `TOOLS.md` for the live catalog and `AGENTS-detail.md` § for per-capability depth.
+Building blocks: file system, logs, memory, web, code, GitHub, code execution, scheduling, skills, OpenUI, messaging, Telegram, email/google workspace/desktop, security. Triager narrows which tools apply; tier-B loads schemas lazily via `load_tool`. Skills via `load_skill` → `run_skill_script` / `run_skill_runnable`. See `TOOLS.md` for the live catalog and `AGENTS-detail.md` § for per-capability depth.
 
 - **§1 File system** — `read`, `write`, `edit`, `glob`, `search_in_file`, `list_dir`, `find_file`, `file_info`, `create_folder`, `move_file`, `copy_file`; `delete` requires approval; `source_code/` is read-only; **generated files go under `out/<session>/`** (not workspace root); bootstrap markdown uses `write_workspace_md` only
 - **§2 Logs** — `log_query` (tail, offset, filters); also `logs/` at content root
@@ -50,11 +50,11 @@ Building blocks: file system, logs, memory, web, code, GitHub, code execution, s
 - **§6 GitHub** — `integration_call`; bundled: **`github-manager`**, **`gh-pr`**, **`gh-issues`**
 - **§7 Code execution** — `sandbox_exec`; `process` for background jobs; `terminal_spawn`/`terminal_run`/`terminal_close` for interactive shells
 - **§8 Scheduling** — **`scheduling`** skill; **`sessions_management`** skill
-- **§9 Skills platform** — `load_skill`, `run_skill_script`, `run_skill_runnable`, `skill_create`, `promote_generated_skill`; bundled: `browser-harness`, `canvas`, `code_graph_rag`, `computer-use`, `conventional_commit`, `cursor_cloud`, `email-management`, `gh-issues`, `gh-pr`, `github-manager`, `graphify`, `last30days`, `lcm`, `mycode`, `pdf`, `roam_code`, `scheduling`, `second_brain`, `sessions_management`, `skill_management`, `telegram`, `yt-dlp`
+- **§9 Skills platform** — `load_skill`, `run_skill_script`, `run_skill_runnable`, `skill_create`, `promote_generated_skill`; bundled: `browser-harness`, `canvas`, `code_graph_rag`, `computer-use`, `conventional_commit`, `cursor_cloud`, `email-management`, `gh-issues`, `gh-pr`, `github-manager`, `google-workspace`, `graphify`, `last30days`, `lcm`, `mycode`, `pdf`, `roam_code`, `scheduling`, `second_brain`, `sessions_management`, `skill_management`, `social_media_manager`, `telegram`, `yt-dlp`
 - **§10 Rich UI** — `openui_render` + **`canvas`** skill
 - **§11 Messaging & media** — `message`, `send_file`, `tts`; **`pdf`** skill; **`yt-dlp`** skill
 - **§12 Telegram** — **`telegram`** skill (buttons, forum topics)
-- **§13 Email & desktop** — **`email-management`** skill; **`computer-use`** skill (macOS, opt-in)
+- **§13 Email, Google Workspace & desktop** — **`email-management`** skill; **`google-workspace`** skill; **`computer-use`** skill (macOS, opt-in)
 - **§14 Security** — `llm_guard_scan`
 
 ---
