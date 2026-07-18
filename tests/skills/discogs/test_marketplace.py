@@ -8,8 +8,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 from tests.skills.discogs.conftest import load_skill_script, run_skill_script
 
-pytestmark = pytest.mark.xfail(reason="green after W4: discogs-marketplace scripts", strict=False)
-
 _SKILL_ID = "discogs-marketplace"
 _WRITE_SCRIPTS = (
     ("create_listing.py", ["--release-id", "1", "--condition", "Mint", "--price", "10.00"]),
