@@ -6,8 +6,8 @@ status: scaffold
 owner: Alex
 summary: 'Own the provider-chain facades for speech-to-text and text-to-speech so
   the gateway can:'
-last_updated: '2026-07-14'
-fingerprint: sha256:d86e09e3208ae192ad94bd266d4f8ca2d60ca1324c6652df8e90d9abf2ae784d
+last_updated: '2026-07-18'
+fingerprint: sha256:715635240bd8d93efbe42647195d9e8fc95bc175017fe0df0594a062a9b83000
 related: []
 sources:
 - src/sevn/voice/**
@@ -24,9 +24,6 @@ interfaces:
 - name: EdgeTtsBackend
   file: src/sevn/voice/backends.py
   symbol: EdgeTtsBackend
-- name: TextToVoiceBackend
-  file: src/sevn/voice/backends.py
-  symbol: TextToVoiceBackend
 - name: KokoroBackend
   file: src/sevn/voice/backends.py
   symbol: KokoroBackend
@@ -39,6 +36,9 @@ interfaces:
 - name: TextToSpeechBackend
   file: src/sevn/voice/backends.py
   symbol: TextToSpeechBackend
+- name: TextToVoiceBackend
+  file: src/sevn/voice/backends.py
+  symbol: TextToVoiceBackend
 - name: TranscriptionResult
   file: src/sevn/voice/backends.py
   symbol: TranscriptionResult

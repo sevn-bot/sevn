@@ -7,8 +7,8 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
-last_updated: '2026-07-16'
-fingerprint: sha256:137743ddb50825f43de6342b538573219dce070902745e16e4b2e931c818f167
+last_updated: '2026-07-18'
+fingerprint: sha256:3c44ec257b0a94e7e7ffd61a1f48154d757534ca1882541076c01d8d8a98fc74
 related: []
 sources:
 - src/sevn/gateway/**
