@@ -60,6 +60,7 @@ from sevn.config.defaults import (
     DEFAULT_TRACE_REDACTION_ENABLED,
     DEFAULT_TRIAGER_TIER_B_SKILL_CAP,
     DEFAULT_TRIAGER_TIER_B_TOOL_CAP,
+    DEFAULT_VOICE_LOCAL_TTS_ENGINE,
     DEFAULT_VOICE_STT_PROVIDERS,
 )
 from sevn.config.model_resolution import (
@@ -549,11 +550,10 @@ def build_menu_keyboard(
                 {"text": "❓ /help", "callback_data": "menu:cmd:help"},
             ],
             [
-                {"text": "🎙 /voice", "callback_data": "menu:cmd:voice"},
                 {"text": "🧠 /model", "callback_data": "menu:cmd:model"},
+                {"text": "📊 /status", "callback_data": "menu:cmd:status"},
             ],
             [
-                {"text": "📊 /status", "callback_data": "menu:cmd:status"},
                 {"text": "⏹ /stop", "callback_data": "menu:cmd:stop"},
             ],
         ]
@@ -896,7 +896,7 @@ def _security_heuristic_only(workspace: WorkspaceConfig) -> bool:
 
 
 def _build_voice_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
-    """Build Voice section TTS mode buttons with active-state labels.
+    """Build Voice section TTS mode / engine / STT buttons with active-state labels.
 
     Args:
         workspace (WorkspaceConfig): Parsed workspace settings.
@@ -909,6 +909,10 @@ def _build_voice_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str
         >>> rows = _build_voice_keyboard_rows(WorkspaceConfig.minimal())
         >>> rows[0][0]["callback_data"]
         'cfg:voice:mode:off'
+        >>> rows[-1][0]["callback_data"]
+        'cfg:voice:stt:next'
+        >>> rows[-2][0]["callback_data"]
+        'cfg:voice:engine:next'
     """
     mode = _voice_tts_mode(workspace)
     rows: list[list[dict[str, Any]]] = []
@@ -918,9 +922,43 @@ def _build_voice_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str
             label = f"{label} ✅"
         rows.append([{"text": label, "callback_data": f"cfg:voice:mode:{candidate}"}])
     rows.append(
+        [
+            {
+                "text": f"TTS engine: {_voice_tts_engine(workspace)} 🔁",
+                "callback_data": "cfg:voice:engine:next",
+            }
+        ]
+    )
+    rows.append(
         [{"text": f"STT: {_voice_stt_active(workspace)} 🔁", "callback_data": "cfg:voice:stt:next"}]
     )
     return rows
+
+
+def _voice_tts_engine(workspace: WorkspaceConfig) -> str:
+    """Return the configured local TTS engine (``kokoro`` / ``supertonic``).
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        str: ``voice.local_tts_engine``, or :data:`DEFAULT_VOICE_LOCAL_TTS_ENGINE`.
+
+    Examples:
+        >>> from sevn.config.workspace_config import VoiceConfig, WorkspaceConfig
+        >>> _voice_tts_engine(WorkspaceConfig.minimal())
+        'kokoro'
+        >>> _voice_tts_engine(
+        ...     WorkspaceConfig.minimal(voice=VoiceConfig(local_tts_engine="supertonic"))
+        ... )
+        'supertonic'
+    """
+    if workspace.voice is not None and workspace.voice.local_tts_engine is not None:
+        return (
+            str(workspace.voice.local_tts_engine).strip().casefold()
+            or DEFAULT_VOICE_LOCAL_TTS_ENGINE
+        )
+    return DEFAULT_VOICE_LOCAL_TTS_ENGINE
 
 
 def _voice_stt_active(workspace: WorkspaceConfig) -> str:
@@ -3626,6 +3664,7 @@ def config_menu_message_text(
     if section == "voice":
         return (
             f"Voice\n\nGlobal TTS mode: {_voice_tts_mode(workspace)}\n"
+            f"Active TTS engine: {_voice_tts_engine(workspace)}\n"
             f"Active STT provider: {_voice_stt_active(workspace)}\n"
             "Per-chat override: /voice on|off|when_asked|reset"
         )

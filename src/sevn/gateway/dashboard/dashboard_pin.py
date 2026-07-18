@@ -317,7 +317,6 @@ def default_pin_keyboard() -> dict[str, Any]:
                 {"text": "📊 Status", "callback_data": "menu:cmd:status"},
             ],
             [
-                {"text": "🎙 Voice", "callback_data": "menu:cmd:voice"},
                 {"text": "🧠 Model", "callback_data": "menu:cmd:model"},
                 {"text": "⌨️ Shortcuts", "callback_data": "cfg:section:shortcuts"},
             ],
