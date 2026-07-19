@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-19] Persist subagent runs without spurious commit errors
 - [2026-07-18] Refresh readme fingerprints after gateway OAuth wizard and discogs-shared registry edits
 - [2026-07-18] Thermos close-out — bandit-clean OAuth wizard payload guard and interim-secret cleanup
 - [2026-07-18] Register ``discogs-shared`` in ``DEFAULT_SKILL_MANIFESTS`` for bundled-core parity
