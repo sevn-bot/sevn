@@ -34,6 +34,19 @@ def test_cap_attrs_json_records_truncated_field_names() -> None:
     assert obj.get("_truncated_keys") == ["tool_result"]
 
 
+def test_cap_attrs_json_marker_stays_under_cap() -> None:
+    """Marker with many long key names must still respect max_bytes."""
+    keys = {f"k{i}": 1 for i in range(500)}
+    keys["big"] = "x" * 256
+    payload = json.dumps(keys)
+    max_bytes = 128
+    out = cap_attrs_json(payload, max_bytes=max_bytes)
+    assert len(out.encode("utf-8")) <= max_bytes
+    obj = json.loads(out)
+    assert obj["_truncated"] is True
+    assert "_truncated_keys" not in obj
+
+
 async def test_stale_shell_reconcile_logs_info_not_warning(
     monkeypatch,
 ) -> None:

@@ -179,7 +179,9 @@ def persist_subagent_run(conn: sqlite3.Connection, run: SubAgentRun) -> None:
         )
         _commit_if_in_transaction(conn)
     except sqlite3.Error:
-        logger.exception("persist_subagent_run SQL failed")
+        logger.bind(subagent_id=run.id, session_id=run.session_id).exception(
+            "persist_subagent_run SQL failed"
+        )
 
 
 def sqlite_persist_hook(conn: sqlite3.Connection) -> PersistHook:

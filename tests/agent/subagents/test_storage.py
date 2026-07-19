@@ -17,7 +17,7 @@ from sevn.storage.migrate import apply_migrations
 
 if TYPE_CHECKING:
     import pytest
-    from loguru import Record
+    from loguru import Message
 
 
 def _migrated_conn() -> sqlite3.Connection:
@@ -52,7 +52,7 @@ def _capture_loguru(*, level: str = "ERROR") -> tuple[list[str], int]:
 
     captured: list[str] = []
 
-    def _sink(message: Record) -> None:
+    def _sink(message: Message) -> None:
         captured.append(str(message))
 
     sink_id = loguru_logger.add(_sink, level=level)
@@ -166,18 +166,22 @@ def test_persist_subagent_run_success_emits_no_error_log() -> None:
     assert captured == []
 
 
-def test_persist_subagent_run_sqlite_error_logged_once(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_persist_subagent_run_sqlite_error_logged_once() -> None:
     """D1: real SQL failures log once via ``sqlite3.Error`` — not bare ``Exception`` spam."""
+    from loguru import logger as loguru_logger
+
     conn = _migrated_conn()
-    exception_calls: list[str] = []
-
-    def _fake_exception(_msg: str, *args: object, **kwargs: object) -> None:
-        exception_calls.append(str(_msg))
-
-    monkeypatch.setattr("sevn.agent.subagents.storage.logger.exception", _fake_exception)
+    run = _sample_run()
+    captured, sink_id = _capture_loguru(level="ERROR")
     conn.close()
-    persist_subagent_run(conn, _sample_run())
-    assert len(exception_calls) == 1
+    try:
+        persist_subagent_run(conn, run)
+    finally:
+        loguru_logger.remove(sink_id)
+    assert len(captured) == 1
+    assert "persist_subagent_run SQL failed" in captured[0]
+    assert run.id in captured[0]
+    assert run.session_id in captured[0]
 
 
 def test_sweep_orphaned_skips_commit_outside_transaction(

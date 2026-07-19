@@ -179,7 +179,7 @@
     },
     "subagents": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-19T11:44:08Z",
+      "computed_at": "2026-07-19T14:12:10Z",
       "digest": "9bfeae54c8939d2e2607cf0c9c09795eac03d15cb7cb7fce7289da87091ffb3b",
       "source_globs": [
         "src/sevn/agent/subagents/**",

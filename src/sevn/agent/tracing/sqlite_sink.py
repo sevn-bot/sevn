@@ -69,7 +69,11 @@ def cap_attrs_json(payload: str, *, max_bytes: int = TRACE_ATTRS_JSON_MAX_BYTES)
     marker: dict[str, Any] = {"_truncated": True, "_original_bytes": original_bytes}
     if truncated_keys:
         marker["_truncated_keys"] = truncated_keys
-    return json.dumps(marker, separators=(",", ":"), ensure_ascii=False)
+    marker_json = json.dumps(marker, separators=(",", ":"), ensure_ascii=False)
+    if len(marker_json.encode("utf-8")) > max_bytes:
+        marker.pop("_truncated_keys", None)
+        marker_json = json.dumps(marker, separators=(",", ":"), ensure_ascii=False)
+    return marker_json
 
 
 def redact_trace_attrs(attrs: dict[str, Any]) -> dict[str, Any]:

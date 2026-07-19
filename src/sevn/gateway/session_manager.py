@@ -1157,10 +1157,11 @@ class SessionManager:
                     self._cancel_superseded_at[session_id] = time.monotonic()
                 while True:
                     try:
-                        q.get_nowait()
+                        drained_cid = q.get_nowait()
                     except asyncio.QueueEmpty:
                         break
                     else:
+                        clear_dispatch_routing(session_id, drained_cid)
                         q.task_done()
                 self._multi_queued_summaries.pop(session_id, None)
             await q.put(correlation_id)
