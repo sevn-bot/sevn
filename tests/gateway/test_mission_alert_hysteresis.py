@@ -31,7 +31,6 @@ def _critical_alerts(state: MissionControlState, rule_name: str) -> list[object]
     ]
 
 
-@pytest.mark.xfail(reason="green after W4: channel_down hysteresis", strict=False)
 def test_single_channel_down_breach_does_not_fire_critical() -> None:
     """D4: one transient ``channel_down`` breach must not page critical."""
     state = MissionControlState()
@@ -40,7 +39,6 @@ def test_single_channel_down_breach_does_not_fire_critical() -> None:
     assert _critical_alerts(state, "channel_down") == []
 
 
-@pytest.mark.xfail(reason="green after W4: channel_down hysteresis", strict=False)
 def test_sustained_channel_down_breaches_fire_critical() -> None:
     """D4: N consecutive ``channel_down`` breaches still escalate to critical."""
     state = MissionControlState()
@@ -53,7 +51,6 @@ def test_sustained_channel_down_breaches_fire_critical() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W4: graceful restart decoupled", strict=False)
 async def test_graceful_gateway_restart_does_not_fire_channel_down_critical() -> None:
     """D4: a graceful restart must not immediately flip ``channel_down`` critical."""
     state = MissionControlState()
@@ -63,7 +60,6 @@ async def test_graceful_gateway_restart_does_not_fire_channel_down_critical() ->
     assert _critical_alerts(state, "channel_down") == []
 
 
-@pytest.mark.xfail(reason="green after W4: high_error_rate hysteresis", strict=False)
 def test_single_error_rate_spike_does_not_fire_critical() -> None:
     """D4: one ``high_error_rate`` sample must not page critical."""
     state = MissionControlState()
@@ -71,7 +67,6 @@ def test_single_error_rate_spike_does_not_fire_critical() -> None:
     assert _critical_alerts(state, "high_error_rate") == []
 
 
-@pytest.mark.xfail(reason="green after W4: high_error_rate hysteresis", strict=False)
 def test_sustained_high_error_rate_fires_critical() -> None:
     """D4: sustained ``high_error_rate`` breaches still escalate to critical."""
     state = MissionControlState()
