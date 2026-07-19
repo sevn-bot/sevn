@@ -26,25 +26,12 @@
     },
     "config-workspace": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T21:27:20Z",
-      "digest": "09da54371351bb747da15272e1c59afb377afc4b0877571b59734b5a44135fc0",
+      "computed_at": "2026-07-18T13:31:36Z",
+      "digest": "332d8414b172e24381d64a7e279e2f34a9d6258c4b8bce36865562b344625605",
       "source_globs": [
         "src/sevn/config/**",
         "src/sevn/workspace/**",
         "infra/sevn.schema.json"
-      ]
-    },
-    "discogs": {
-      "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T19:38:21Z",
-      "digest": "2e4e15aa082c400d500210152283075e47762acb8a8ac7b8716d31bc813581d5",
-      "source_globs": [
-        "src/sevn/data/bundled_skills/core/discogs-*/**",
-        "src/sevn/skills/discogs.py",
-        "src/sevn/skills/discogs_secrets.py",
-        "src/sevn/config/sections/skills_discogs.py",
-        "src/sevn/gateway/menu/discogs_menu.py",
-        "src/sevn/integrations/discogs/**"
       ]
     },
     "evolution": {
@@ -57,8 +44,8 @@
     },
     "gateway": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T21:27:14Z",
-      "digest": "ffb067f4b0a165e4e476211ed5b309a3d90571f9ebdd770c478e6e79fefa31ea",
+      "computed_at": "2026-07-18T13:31:35Z",
+      "digest": "c7f03a9efddbff8a1a2a95bc46f686edb03256284d038e93354d13d147bf6e72",
       "source_globs": [
         "src/sevn/gateway/**"
       ]
@@ -73,8 +60,8 @@
     },
     "integrations": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T19:38:21Z",
-      "digest": "1374de9d249d1fb6588d478d4e445d680a03a1d157247bc6ff6becce6c044c32",
+      "computed_at": "2026-07-18T13:31:36Z",
+      "digest": "3fb2199482e9a93a5ed9df335adc9b12ede0bf3e14fe95171d4ac91b1a47d020",
       "source_globs": [
         "src/sevn/integrations/**"
       ]
@@ -116,8 +103,8 @@
     },
     "root": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T18:28:59Z",
-      "digest": "96512721bdf691b29c5500a5e8b9c9908f625db385abe92c3782eb0b27acf87e",
+      "computed_at": "2026-07-18T13:31:35Z",
+      "digest": "376577f78f256d1617d019802952b9cc894d78c69448544e0fdab23f58c4bfb2",
       "source_globs": [
         "pyproject.toml",
         "CLAUDE.md",
@@ -161,8 +148,8 @@
     },
     "skills": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T19:38:21Z",
-      "digest": "46b36c0ae845db06c0abf9aaf9b9f445a22043fe756b0443b1c22cacb31b128e",
+      "computed_at": "2026-07-18T15:21:18Z",
+      "digest": "053ae9cbf62e2304cd3957d8d7c85c3756cad7ced099b07aeacbe8f694fa7a17",
       "source_globs": [
         "src/sevn/skills/**",
         "src/sevn/data/bundled_skills/**",
@@ -193,8 +180,8 @@
     },
     "tools": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T19:38:20Z",
-      "digest": "048045f2e76de0bffecc5a8815d7a8156433bab62a87f8bd194a42f0aedff49f",
+      "computed_at": "2026-07-18T15:21:16Z",
+      "digest": "578d6c68ccb852e96fe66efe24df6b1598d65bc5e8785fcb7ad2d36c56cd5865",
       "source_globs": [
         "src/sevn/tools/**"
       ]
@@ -226,8 +213,8 @@
     },
     "voice": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T21:27:17Z",
-      "digest": "9b7613b2652f72a4a798a2e9f058566bd358d9869c9d58c46e91147297fb593f",
+      "computed_at": "2026-07-18T13:31:36Z",
+      "digest": "d86e09e3208ae192ad94bd266d4f8ca2d60ca1324c6652df8e90d9abf2ae784d",
       "source_globs": [
         "src/sevn/voice/**"
       ]

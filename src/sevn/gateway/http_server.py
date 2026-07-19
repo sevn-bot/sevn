@@ -73,6 +73,8 @@ from sevn.config.defaults import (
 )
 from sevn.config.loader import load_workspace, resolve_sevn_json_path
 from sevn.config.settings import ProcessSettings
+from sevn.config.sevn_repo import try_resolve_sevn_repo_root
+from sevn.config.version_id import ensure_version_id
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.evolution.cursor_poll_scheduler import CursorPollScheduler
 from sevn.evolution.repo_sync_scheduler import (
@@ -1234,6 +1236,12 @@ def create_app(
         # Persistent deployment id (`specs/17-gateway.md` §10.14 TE-1) — surfaced
         # via ``/status`` and the Logs section in `/config`.
         gateway_router._deployment_id = load_or_create_deployment_id(ly.content_root)
+        # Build identity in ``sevn.json`` (issue #30) — orthogonal to deployment_id (D1).
+        _repo_root = try_resolve_sevn_repo_root(ly.content_root) or ly.content_root
+        gateway_router._version_id = ensure_version_id(
+            ly.sevn_json_path,
+            repo_root=_repo_root,
+        )
         if os.environ.get("SEVN_E2E_ECHO_TURN", "").strip().lower() in ("1", "true", "yes"):
             gateway_router._run_turn = build_echo_run_turn(gateway_router, conn)
         else:

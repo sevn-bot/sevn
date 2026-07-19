@@ -298,6 +298,11 @@
       "description": "Workspace content root relative to sevn.json parent, or absolute (tilde expands).",
       "long_description": "Path relative to the directory containing `sevn.json` (default `.` — same folder as the config file) or an absolute path with `~` for the operator home directory. Anchors markdown soul files, `skills/`, `.sevn/` artefacts, and logs. Bound CLI installs keep `sevn.json` at `{SEVN_HOME}/workspace/sevn.json` with `.` so content lives alongside the config. Tools must expand tilde before joining paths so a literal `~` segment is never created under the workspace parent."
     },
+    "version_id": {
+      "type": "string",
+      "description": "Build/code identity stamp persisted at gateway boot (issue #30). Distinct from TE-1 deployment_id.",
+      "long_description": "Optional top-level string written by the gateway on boot when missing or when a fresh non-unknown build identity is resolved. Resolution order: non-empty SEVN_VERSION_ID env, then git short HEAD from a discoverable checkout, then installed package version, else unknown. Operators use this to confirm which sevn.bot build is running in Mission Control and Telegram Config → My sevn bot. Do not overload deployment_id (instance identity under .sevn/deployment_id.json)."
+    },
     "workspace": {
       "type": "object",
       "additionalProperties": true,

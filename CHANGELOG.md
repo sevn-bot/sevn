@@ -22,6 +22,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- [2026-07-19] Persist ``version_id`` build identity in ``sevn.json`` at gateway boot (env > git > package > unknown; distinct from deployment_id)
 - [2026-07-18] Telegram Voice config TTS engine cycle (``kokoro`` / ``supertonic``) via ``voice.local_tts_engine`` and unified ``text_to_voice`` backend
 - [2026-07-18] Discogs skills operator README with per-script examples and User-token + OAuth auth walkthroughs; skills INDEX polish, onboarding Group-B `skill.discogs` row, and `[discogs]` extra install action
 - [2026-07-18] Discogs OAuth 1.0a authorization flow from Telegram Setup — consumer key/secret capture, authorize URL + verifier exchange, and access-token storage with auth_method flip
