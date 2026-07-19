@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from typing import Any, Literal
 
 import httpx
@@ -27,6 +28,8 @@ _BOT_API = "https://api.telegram.org"
 _TELEGRAM_API_HOST = "api.telegram.org"
 _HTTP_READ_TIMEOUT_S = 60.0
 _MAX_SEND_RETRIES = 4
+# Match the gateway typing loop resend interval (`channel_router._schedule_telegram_typing`).
+_CHAT_ACTION_COALESCE_WINDOW_S = 4.0
 
 
 class TelegramApiMixin(TelegramSendHost):
@@ -152,6 +155,12 @@ class TelegramApiMixin(TelegramSendHost):
             >>> inspect.iscoroutinefunction(TelegramApiMixin.send_chat_action)
             True
         """
+        key = (chat_id, action, message_thread_id)
+        now = time.monotonic()
+        last_sent = self._chat_action_last_sent.get(key)
+        if last_sent is not None and (now - last_sent) < _CHAT_ACTION_COALESCE_WINDOW_S:
+            return
+        self._chat_action_last_sent[key] = now
         body: dict[str, Any] = {"chat_id": chat_id, "action": action}
         if message_thread_id is not None:
             body["message_thread_id"] = message_thread_id

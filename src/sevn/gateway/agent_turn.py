@@ -1386,6 +1386,9 @@ def build_agent_run_turn(
             sess.channel,
             sess.user_id,
         )
+        from sevn.gateway.session_manager import merge_dispatch_routing
+
+        route_meta = merge_dispatch_routing(route_meta, session_id, correlation_id)
         triage_ctx = triage_context_from_session(
             conn,
             session_id,
@@ -2621,6 +2624,9 @@ def build_agent_run_turn(
                 sess.channel,
                 sess.user_id,
             )
+            from sevn.gateway.session_manager import merge_dispatch_routing
+
+            route_meta = merge_dispatch_routing(route_meta, session_id, correlation_id)
             await _emit_no_answer_fallback(
                 router=router,
                 channel=sess.channel,
@@ -2712,6 +2718,9 @@ def build_agent_run_turn(
             sess.channel,
             sess.user_id,
         )
+        from sevn.gateway.session_manager import merge_dispatch_routing
+
+        route_meta = merge_dispatch_routing(route_meta, session_id, correlation_id)
         session_exe, session_tool_set = await asyncio.to_thread(
             build_session_registry,
             workspace_config=workspace_local,

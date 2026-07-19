@@ -12,7 +12,6 @@ from sevn.channels.telegram import TelegramAdapter, TelegramConfig
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W5: coalesce sendChatAction", strict=False)
 async def test_send_chat_action_coalesced_within_window() -> None:
     """D5: typing indicator is sent at most once per coalesce window per chat."""
     calls: list[tuple[str, dict[str, Any]]] = []
@@ -37,8 +36,8 @@ async def test_send_chat_action_coalesced_within_window() -> None:
 
 
 @pytest.mark.asyncio
-async def test_send_chat_action_still_reaches_api_today() -> None:
-    """Baseline: each call currently reaches the Bot API (pre-coalesce behavior)."""
+async def test_send_chat_action_still_reaches_api() -> None:
+    """Coalesced adapter still reaches the Bot API for the first call in a window."""
     calls: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -50,4 +49,4 @@ async def test_send_chat_action_still_reaches_api_today() -> None:
         adapter = TelegramAdapter(config=TelegramConfig(bot_token="tok"), http_client=client)
         await adapter.send_chat_action(chat_id=42)
         await adapter.send_chat_action(chat_id=42)
-    assert calls.count("sendChatAction") == 2
+    assert calls.count("sendChatAction") == 1

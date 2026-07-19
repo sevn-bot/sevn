@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-19] Preserve Telegram `chat_id` across queued/steer dispatch and classifier-timeout fallback; coalesce `sendChatAction` typing indicators per chat
 - [2026-07-19] Debounce `channel_down`/`high_error_rate` alerts so transient blips don't page critical
 - [2026-07-19] Retry truncated Codex proxy streams once and return a typed upstream-truncated error instead of a bare 502; attribute high-latency alerts to the stalling turn stage and emit a still-working progress signal before long-turn dead-air
 - [2026-07-19] Persist subagent runs without spurious commit errors

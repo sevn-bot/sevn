@@ -2,12 +2,24 @@
 
 from __future__ import annotations
 
+import sqlite3
 from typing import TYPE_CHECKING
 
 import pytest
 
+from sevn.gateway.session_manager import SessionManager
+from sevn.storage.migrate import apply_migrations
+
 if TYPE_CHECKING:
     from loguru import Record
+
+
+def _memory_conn() -> sqlite3.Connection:
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    apply_migrations(conn)
+    return conn
 
 
 def _capture_loguru(*, level: str) -> tuple[list[str], int]:
@@ -22,27 +34,43 @@ def _capture_loguru(*, level: str) -> tuple[list[str], int]:
     return captured, sink_id
 
 
-@pytest.mark.xfail(reason="green after W5: chat_id captured at enqueue", strict=False)
 async def test_enqueue_dispatch_rejects_missing_chat_id() -> None:
     """D6: missing Telegram identity fails loudly at enqueue — not at send."""
     from sevn.gateway.session_manager import validate_dispatch_routing_identity
 
     with pytest.raises(ValueError, match="chat_id"):
-        validate_dispatch_routing_identity(channel="telegram", chat_id=None)
+        validate_dispatch_routing_identity(
+            channel="telegram",
+            chat_id=None,
+            scope_key="telegram:4242",
+        )
 
 
-@pytest.mark.xfail(reason="green after W5: chat_id captured at enqueue", strict=False)
 async def test_queued_dispatch_carries_chat_id_to_outbound_send() -> None:
     """D6: steer/queued jobs carry ``chat_id`` through to ``telegram_outbound.send``."""
     from sevn.gateway.session_manager import dispatch_routing_for
 
-    routing = dispatch_routing_for(session_id="sess-1", correlation_id="corr-1")
-    assert routing["chat_id"] == 4242
-    assert routing["channel"] == "telegram"
+    async def noop(_sid: str, _cid: str) -> None:
+        return None
+
+    sessions = SessionManager(_memory_conn())
+    try:
+        await sessions.enqueue_dispatch(
+            "sess-1",
+            correlation_id="corr-1",
+            queue_mode="steer",
+            dispatch=noop,
+            channel="telegram",
+            chat_id=4242,
+        )
+        routing = dispatch_routing_for(session_id="sess-1", correlation_id="corr-1")
+        assert routing["chat_id"] == 4242
+        assert routing["channel"] == "telegram"
+    finally:
+        await sessions.drain()
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W5: classifier timeout keeps routing context", strict=False)
 async def test_classifier_timeout_preserves_chat_id_for_outbound_send() -> None:
     """D7: classifier timeout fallback must preserve ``chat_id``/channel routing context."""
     from sevn.agent.triager.relatedness import RelatednessResult, routing_context_from_relatedness

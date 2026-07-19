@@ -8,6 +8,7 @@ Exports:
     RelatednessResult — label plus whether a timeout/failure fallback was used.
     RelatednessDecision — pydantic structured-output row for the triager transport.
     classify_relatedness — async classifier with strict timeout and ``new_task`` fallback.
+    routing_context_from_relatedness — preserve routing keys on classifier timeout (D7).
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, Literal
+from typing import TYPE_CHECKING, Any, Final, Literal
 
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field
@@ -274,9 +275,40 @@ async def classify_relatedness(
         return RelatednessResult(label="new_task", fallback=True)
 
 
+def routing_context_from_relatedness(
+    result: RelatednessResult,
+    *,
+    chat_id: int,
+    channel: str,
+) -> dict[str, Any]:
+    """Build outbound routing context; preserved on classifier timeout fallback (D7).
+
+    Args:
+        result (RelatednessResult): Classifier output (``fallback=True`` on timeout).
+        chat_id (int): Platform chat id captured at enqueue.
+        channel (str): Channel key (``telegram``, …).
+
+    Returns:
+        dict[str, Any]: Routing keys safe to forward on outbound sends.
+
+    Examples:
+        >>> routing_context_from_relatedness(
+        ...     RelatednessResult(label="new_task", fallback=True),
+        ...     chat_id=1001,
+        ...     channel="telegram",
+        ... )
+        {'channel': 'telegram', 'chat_id': 1001, 'relatedness_classifier_fallback': True}
+    """
+    ctx: dict[str, Any] = {"channel": channel, "chat_id": chat_id}
+    if result.fallback:
+        ctx["relatedness_classifier_fallback"] = True
+    return ctx
+
+
 __all__ = [
     "RelatednessDecision",
     "RelatednessInput",
     "RelatednessResult",
     "classify_relatedness",
+    "routing_context_from_relatedness",
 ]

@@ -182,6 +182,8 @@ class TelegramAdapter(
         self._dispatch_gate = asyncio.Semaphore(_MAX_INFLIGHT_DISPATCH)
         self._pairing_store = pairing_store
         self._rich_capability: RichCapability | None = None
+        # D5: coalesce rapid sendChatAction calls per chat (typing loop + internal ticks).
+        self._chat_action_last_sent: dict[tuple[int, str, int | None], float] = {}
 
     @property
     def rich_capability(self) -> RichCapability:

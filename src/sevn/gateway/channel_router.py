@@ -631,7 +631,10 @@ class ChannelRouter:
             return MultiSpawnOutcome(str(outcome))
 
         async def _notify(session_id: str, line: str) -> None:
-            from sevn.gateway.session_manager import load_session_row
+            from sevn.gateway.session_manager import (
+                load_session_row,
+                outbound_routing_for_session,
+            )
 
             sess = load_session_row(self._sessions.connection, session_id)
             if sess is None or not line.strip():
@@ -643,7 +646,10 @@ class ChannelRouter:
                         user_id=sess.user_id,
                         text=line.strip(),
                         session_id=session_id,
-                        metadata={},
+                        metadata=outbound_routing_for_session(
+                            self._sessions.connection,
+                            session_id,
+                        ),
                     ),
                 )
             except Exception:
@@ -1969,6 +1975,8 @@ class ChannelRouter:
             new_message_text=user_text,
             task_summary=task_summary,
             in_flight_task_summary=in_flight_summary,
+            channel=msg.channel,
+            chat_id=user_meta.get("chat_id") if isinstance(user_meta.get("chat_id"), int) else None,
         )
         await self._emit(
             kind="gateway.route_incoming",
