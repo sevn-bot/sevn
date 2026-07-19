@@ -1,12 +1,10 @@
+# PR auto-run on pull_request disabled intentionally; trigger manually via Actions.
 # PullFrog PR review runs alongside CodeRabbit. When the review completes,
 # the enforce step fails the job if unresolved PullFrog threads remain.
 # If PullFrog cannot run (e.g. Claude session limit), the job passes.
 name: PullFrog
 
 on:
-  pull_request:
-    branches: [main, develop, test-pre, pre-0.0.1]
-    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
