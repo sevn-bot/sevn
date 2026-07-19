@@ -2584,6 +2584,13 @@ def build_agent_run_turn(
                                 _sess.user_id,
                             )
                         )
+                        from sevn.gateway.session_manager import merge_dispatch_routing
+
+                        _route_meta = merge_dispatch_routing(
+                            _route_meta,
+                            session_id,
+                            correlation_id,
+                        )
                         # W4.3: _emit_no_answer_fallback emits gateway.executor.no_answer span.
                         await asyncio.shield(
                             _emit_no_answer_fallback(
@@ -2702,130 +2709,143 @@ def build_agent_run_turn(
         subagent_id: str,
     ) -> str:
         """Execute one supervisor-spawned level-1 tier-B turn (D11 fresh budget)."""
-        sess = await asyncio.to_thread(load_session_row, conn, session_id)
-        if sess is None:
-            msg = f"missing session {session_id}"
-            raise RuntimeError(msg)
-        user_text = await asyncio.to_thread(
-            _user_message_text_for_turn,
-            conn,
-            session_id,
-            correlation_id,
-        )
-        if not user_text.strip():
-            return "No user message found for this sub-agent task."
-        workspace_local = router._workspace
-        budget = CascadeBudget(cascade_budget_s(workspace_local))
-        tier_b_timeout_s = tier_b_executor_timeout_s(workspace_local)
-        triage = passthrough_triage_result()
-        triage = triage.model_copy(update={"first_message": _l1_task_summary(triage, user_text)})
-        route_meta = await asyncio.to_thread(
-            _outbound_routing_metadata,
-            conn,
-            session_id,
-            sess.channel,
-            sess.user_id,
-        )
-        from sevn.gateway.session_manager import merge_dispatch_routing
-
-        route_meta = merge_dispatch_routing(route_meta, session_id, correlation_id)
-        session_exe, session_tool_set = await asyncio.to_thread(
-            build_session_registry,
-            workspace_config=workspace_local,
-            runtime_bindings=bindings,
-            extra_mcp=mcp_defs,
-            workspace_root=layout.content_root,
-            layout=layout,
-            trace_sink=trace,
-            include_bootstrap_tools=False,
-        )
-        exe = session_exe
-        if tier_b_bundle_factory is not None:
-            bundle = await tier_b_bundle_factory(workspace_local)
-        else:
-            bundle = _resolve_tier_b_bundle(workspace_local, process)
-        triage_ctx = triage_context_from_session(
-            conn,
-            session_id,
-            workspace_local,
-            user_text,
-            layout=layout,
-            turn_id=correlation_id,
-            channel=sess.channel,
-            user_id=sess.user_id,
-        )
-        steer_buffer = _steer_buffer_for(router, session_id)
-        turn_span_id = uuid.uuid4().hex
-        spawn_supervisor: SubAgentSupervisor | None = getattr(router, "_subagent_supervisor", None)
-        tool_context = _tool_context_for_turn(
-            session_id=session_id,
-            correlation_id=correlation_id,
-            workspace=workspace_local,
-            layout=layout,
-            trace=trace,
-            tool_set=session_tool_set,
-            channel=sess.channel,
-            channel_adapter=router.adapter_named(sess.channel),
-            channel_router=router,
-            outbound_user_id=sess.user_id,
-            outbound_metadata=route_meta,
-            runtime_bindings=bindings,
-            plugin_hooks=_plugin_hooks_from_router(router),
-            turn_span_id=turn_span_id,
-            subagent_supervisor=spawn_supervisor,
-            subagent_role="tier_b",
-            subagent_parent_id=subagent_id,
-            subagent_specialist_grants=frozenset(),
-            subagent_remaining_budget_s=budget.remaining_s,
-        )
-        outcome = await asyncio.wait_for(
-            run_b_turn(
-                workspace=workspace_local,
-                session=SessionHandle(session_id=session_id),
-                turn_id=correlation_id,
-                triage=triage,
-                incoming_text=user_text,
-                tool_set=session_tool_set,
-                body_cache=LoadedBodyCache(capacity=8),
-                tool_executor=exe,
-                transport_bundle=bundle,
-                trace=trace,
-                steer_buffer=steer_buffer,
-                tool_context=tool_context,
-                extra_instructions=tier_b_repo_access_prompt(workspace_local, layout.content_root),
-                max_rounds=tier_b_rounds_expanded(workspace_local),
-                transcript_turns=list(triage_ctx.transcript_turns),
-                transcript_rows=list(triage_ctx.transcript_rows),
-            ),
-            timeout=budget.clamp(tier_b_timeout_s),
-        )
-        texts = [
-            str(part.text).strip()
-            for part in outcome.final_messages
-            if getattr(part, "text", None) and str(part.text).strip()
-        ]
-        reply = "\n\n".join(texts) if texts else "Done."
-        from sevn.gateway.routing.routing_footer import telegram_show_routing_enabled
-
-        show_routing = sess.channel == "telegram" and telegram_show_routing_enabled(workspace_local)
-        if show_routing:
-            reply, _ = _apply_routing_footer_once(
-                reply,
-                triage=triage,
-                triager_ms=None,
-                enabled=True,
-                sent=False,
-                subagent_id=subagent_id,
+        try:
+            sess = await asyncio.to_thread(load_session_row, conn, session_id)
+            if sess is None:
+                msg = f"missing session {session_id}"
+                raise RuntimeError(msg)
+            user_text = await asyncio.to_thread(
+                _user_message_text_for_turn,
+                conn,
+                session_id,
+                correlation_id,
             )
-        await _route_assistant_text(
-            router,
-            sess.channel,
-            sess.user_id,
-            session_id,
-            reply,
-            metadata=route_meta,
-        )
-        return reply
+            if not user_text.strip():
+                return "No user message found for this sub-agent task."
+            workspace_local = router._workspace
+            budget = CascadeBudget(cascade_budget_s(workspace_local))
+            tier_b_timeout_s = tier_b_executor_timeout_s(workspace_local)
+            triage = passthrough_triage_result()
+            triage = triage.model_copy(
+                update={"first_message": _l1_task_summary(triage, user_text)}
+            )
+            route_meta = await asyncio.to_thread(
+                _outbound_routing_metadata,
+                conn,
+                session_id,
+                sess.channel,
+                sess.user_id,
+            )
+            from sevn.gateway.session_manager import merge_dispatch_routing
+
+            route_meta = merge_dispatch_routing(route_meta, session_id, correlation_id)
+            session_exe, session_tool_set = await asyncio.to_thread(
+                build_session_registry,
+                workspace_config=workspace_local,
+                runtime_bindings=bindings,
+                extra_mcp=mcp_defs,
+                workspace_root=layout.content_root,
+                layout=layout,
+                trace_sink=trace,
+                include_bootstrap_tools=False,
+            )
+            exe = session_exe
+            if tier_b_bundle_factory is not None:
+                bundle = await tier_b_bundle_factory(workspace_local)
+            else:
+                bundle = _resolve_tier_b_bundle(workspace_local, process)
+            triage_ctx = triage_context_from_session(
+                conn,
+                session_id,
+                workspace_local,
+                user_text,
+                layout=layout,
+                turn_id=correlation_id,
+                channel=sess.channel,
+                user_id=sess.user_id,
+            )
+            steer_buffer = _steer_buffer_for(router, session_id)
+            turn_span_id = uuid.uuid4().hex
+            spawn_supervisor: SubAgentSupervisor | None = getattr(
+                router, "_subagent_supervisor", None
+            )
+            tool_context = _tool_context_for_turn(
+                session_id=session_id,
+                correlation_id=correlation_id,
+                workspace=workspace_local,
+                layout=layout,
+                trace=trace,
+                tool_set=session_tool_set,
+                channel=sess.channel,
+                channel_adapter=router.adapter_named(sess.channel),
+                channel_router=router,
+                outbound_user_id=sess.user_id,
+                outbound_metadata=route_meta,
+                runtime_bindings=bindings,
+                plugin_hooks=_plugin_hooks_from_router(router),
+                turn_span_id=turn_span_id,
+                subagent_supervisor=spawn_supervisor,
+                subagent_role="tier_b",
+                subagent_parent_id=subagent_id,
+                subagent_specialist_grants=frozenset(),
+                subagent_remaining_budget_s=budget.remaining_s,
+            )
+            outcome = await asyncio.wait_for(
+                run_b_turn(
+                    workspace=workspace_local,
+                    session=SessionHandle(session_id=session_id),
+                    turn_id=correlation_id,
+                    triage=triage,
+                    incoming_text=user_text,
+                    tool_set=session_tool_set,
+                    body_cache=LoadedBodyCache(capacity=8),
+                    tool_executor=exe,
+                    transport_bundle=bundle,
+                    trace=trace,
+                    steer_buffer=steer_buffer,
+                    tool_context=tool_context,
+                    extra_instructions=tier_b_repo_access_prompt(
+                        workspace_local, layout.content_root
+                    ),
+                    max_rounds=tier_b_rounds_expanded(workspace_local),
+                    transcript_turns=list(triage_ctx.transcript_turns),
+                    transcript_rows=list(triage_ctx.transcript_rows),
+                ),
+                timeout=budget.clamp(tier_b_timeout_s),
+            )
+            texts = [
+                str(part.text).strip()
+                for part in outcome.final_messages
+                if getattr(part, "text", None) and str(part.text).strip()
+            ]
+            reply = "\n\n".join(texts) if texts else "Done."
+            from sevn.gateway.routing.routing_footer import telegram_show_routing_enabled
+
+            show_routing = sess.channel == "telegram" and telegram_show_routing_enabled(
+                workspace_local
+            )
+            if show_routing:
+                reply, _ = _apply_routing_footer_once(
+                    reply,
+                    triage=triage,
+                    triager_ms=None,
+                    enabled=True,
+                    sent=False,
+                    subagent_id=subagent_id,
+                )
+            await _route_assistant_text(
+                router,
+                sess.channel,
+                sess.user_id,
+                session_id,
+                reply,
+                metadata=route_meta,
+            )
+            return reply
+        finally:
+            from sevn.gateway.session_manager import clear_dispatch_routing
+
+            clear_dispatch_routing(session_id, correlation_id)
 
     async def _spawn_multi_l1_tier_b(session_id: str, correlation_id: str) -> MultiSpawnOutcome:
         """Spawn a concurrent level-1 tier-B run for ``multi`` ``new_task`` (D6/D11)."""

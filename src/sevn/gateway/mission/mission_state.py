@@ -545,7 +545,10 @@ class MissionControlState(MissionControlSnapshotsMixin):
         for stage, sample_ms in self._turn_stage_latencies_ms.items():
             if sample_ms == latency_ms:
                 return stage
-        return None
+        return max(
+            self._turn_stage_latencies_ms,
+            key=lambda name: self._turn_stage_latencies_ms[name],
+        )
 
     def register_channel(self, name: str, adapter_type: str = "") -> None:
         """Ensure ``name`` exists in the channel health map.
