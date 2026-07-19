@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import sqlite3
+from typing import TYPE_CHECKING
+
+import pytest
 
 from sevn.agent.subagents.models import SubAgentRun, SubAgentStatus
 from sevn.agent.subagents.registry import SubAgentRegistry
@@ -13,6 +16,9 @@ from sevn.agent.subagents.storage import (
     sweep_orphaned_subagent_runs,
 )
 from sevn.storage.migrate import apply_migrations
+
+if TYPE_CHECKING:
+    from loguru import Record
 
 
 def _migrated_conn() -> sqlite3.Connection:
@@ -40,6 +46,18 @@ def _sample_run(**overrides: object) -> SubAgentRun:
     }
     base.update(overrides)
     return SubAgentRun(**base)  # type: ignore[arg-type]
+
+
+def _capture_loguru(*, level: str = "ERROR") -> tuple[list[str], int]:
+    from loguru import logger as loguru_logger
+
+    captured: list[str] = []
+
+    def _sink(message: Record) -> None:
+        captured.append(str(message))
+
+    sink_id = loguru_logger.add(_sink, level=level)
+    return captured, sink_id
 
 
 def test_persist_subagent_run_inserts_row() -> None:
@@ -113,3 +131,84 @@ def test_prune_deletes_old_terminal_rows_only() -> None:
 
     remaining_ids = {r[0] for r in conn.execute("SELECT id FROM subagent_runs").fetchall()}
     assert remaining_ids == {"recent_done", "still_running"}
+
+
+@pytest.mark.xfail(reason="green after W2: safe commit on autocommit connection", strict=False)
+def test_persist_subagent_run_skips_commit_outside_transaction() -> None:
+    """D1: do not call ``conn.commit()`` when ``conn.in_transaction`` is false."""
+    conn = _migrated_conn()
+    commits: list[bool] = []
+    original_commit = conn.commit
+
+    def _tracked_commit() -> None:
+        commits.append(True)
+        original_commit()
+
+    conn.commit = _tracked_commit  # type: ignore[method-assign]
+    persist_subagent_run(conn, _sample_run())
+    assert commits == []
+
+
+@pytest.mark.xfail(reason="green after W2: persist success must not ERROR-log", strict=False)
+def test_persist_subagent_run_success_emits_no_error_log() -> None:
+    """D1: a normal write persists quietly — no ERROR/traceback."""
+    from loguru import logger as loguru_logger
+
+    conn = _migrated_conn()
+    captured, sink_id = _capture_loguru(level="ERROR")
+    try:
+        persist_subagent_run(conn, _sample_run())
+    finally:
+        loguru_logger.remove(sink_id)
+    assert captured == []
+
+
+@pytest.mark.xfail(reason="green after W2: genuine sqlite3.Error surfaces once", strict=False)
+def test_persist_subagent_run_sqlite_error_logged_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """D1: real SQL failures log once via ``sqlite3.Error`` — not bare ``Exception`` spam."""
+    conn = _migrated_conn()
+    exception_calls: list[str] = []
+
+    def _fake_exception(_msg: str, *args: object, **kwargs: object) -> None:
+        exception_calls.append(str(_msg))
+
+    monkeypatch.setattr("sevn.agent.subagents.storage.logger.exception", _fake_exception)
+    conn.close()
+    persist_subagent_run(conn, _sample_run())
+    assert len(exception_calls) == 1
+
+
+@pytest.mark.xfail(reason="green after W2: sibling sweep commit aligned", strict=False)
+def test_sweep_orphaned_skips_commit_outside_transaction() -> None:
+    """D1: ``sweep_orphaned_subagent_runs`` (:248) must not spuriously commit."""
+    conn = _migrated_conn()
+    persist_subagent_run(conn, _sample_run(id="run1", status=SubAgentStatus.RUNNING))
+    commits: list[bool] = []
+    original_commit = conn.commit
+
+    def _tracked_commit() -> None:
+        commits.append(True)
+        original_commit()
+
+    conn.commit = _tracked_commit  # type: ignore[method-assign]
+    sweep_orphaned_subagent_runs(conn, now_ns=100)
+    assert commits == []
+
+
+@pytest.mark.xfail(reason="green after W2: sibling prune commit aligned", strict=False)
+def test_prune_subagent_runs_skips_commit_outside_transaction() -> None:
+    """D1: ``prune_subagent_runs`` (:289) must not spuriously commit."""
+    conn = _migrated_conn()
+    persist_subagent_run(
+        conn, _sample_run(id="old_done", status=SubAgentStatus.DONE, finished_at=1)
+    )
+    commits: list[bool] = []
+    original_commit = conn.commit
+
+    def _tracked_commit() -> None:
+        commits.append(True)
+        original_commit()
+
+    conn.commit = _tracked_commit  # type: ignore[method-assign]
+    prune_subagent_runs(conn, max_age_ns=10, now_ns=100)
+    assert commits == []
