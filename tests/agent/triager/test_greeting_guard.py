@@ -17,7 +17,6 @@ from sevn.agent.triager.run import _apply_tier_a_scope_guard
         "helloo",
     ],
 )
-@pytest.mark.xfail(reason="green after W8: GREETING stays in strict-greeting scope", strict=False)
 def test_greeting_intent_yields_strict_first_message(message: str) -> None:
     """D14: GREETING intents produce a strict-greeting-shaped ``first_message``."""
     result = try_fast_greeting_triage(current_message=message, turn_id="turn-greet")
@@ -34,7 +33,6 @@ def test_greeting_intent_yields_strict_first_message(message: str) -> None:
         "helloo",
     ],
 )
-@pytest.mark.xfail(reason="green after W8: greeting guard no longer trips", strict=False)
 def test_greeting_path_does_not_trip_triager_overstepped(message: str) -> None:
     """D14: strict greeting replies must not fire ``triager_overstepped``."""
     result = try_fast_greeting_triage(current_message=message, turn_id="turn-scope")
@@ -48,6 +46,6 @@ def test_greeting_path_does_not_trip_triager_overstepped(message: str) -> None:
     assert is_strict_greeting_message(adjusted.first_message)
 
 
-def test_yoyoyyo_is_not_strict_greeting_today() -> None:
-    """Baseline from session analysis: ``yoyoyyo`` is not yet a strict greeting token."""
-    assert is_strict_greeting_message("yoyoyyo") is False
+def test_yoyoyyo_is_strict_greeting_after_w8() -> None:
+    """Playful yo-only elongations fast-path like ``yo`` (D14)."""
+    assert is_strict_greeting_message("yoyoyyo") is True

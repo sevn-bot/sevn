@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-19] Silence benign rich-capability probe + per-boot secrets reconcile, record trace truncation, and keep greetings in scope
 - [2026-07-19] Recover diverged ``my_sevn`` sync cron with ``--latest`` and reap leaked worker semaphores on gateway shutdown
 - [2026-07-19] Wait for egress proxy health before bringing channels up
 - [2026-07-19] Preserve Telegram `chat_id` across queued/steer dispatch and classifier-timeout fallback; coalesce `sendChatAction` typing indicators per chat

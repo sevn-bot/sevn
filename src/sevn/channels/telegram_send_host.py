@@ -76,7 +76,13 @@ class TelegramSendHost:
         @property
         def rich_capability(self) -> RichCapability: ...
 
-        async def _api(self, method: str, body: dict[str, Any]) -> dict[str, Any]: ...
+        async def _api(
+            self,
+            method: str,
+            body: dict[str, Any],
+            *,
+            probe: bool = False,
+        ) -> dict[str, Any]: ...
 
         async def _api_multipart(
             self,

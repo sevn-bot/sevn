@@ -35,7 +35,13 @@ _CHAT_ACTION_COALESCE_WINDOW_S = 4.0
 class TelegramApiMixin(TelegramSendHost):
     """Mixed into :class:`TelegramAdapter`."""
 
-    async def _api(self, method: str, body: dict[str, Any]) -> dict[str, Any]:
+    async def _api(
+        self,
+        method: str,
+        body: dict[str, Any],
+        *,
+        probe: bool = False,
+    ) -> dict[str, Any]:
         """Call one Bot API method with retry and rate-limit handling.
         Honours ``error_code=429`` / HTTP 429 by sleeping for the server-
         provided ``retry_after`` plus a small jitter and retrying. Network
@@ -45,6 +51,8 @@ class TelegramApiMixin(TelegramSendHost):
         Args:
             method (str): Bot API method name (e.g. ``sendMessage``).
             body (dict[str, Any]): JSON body for the request.
+            probe (bool, optional): When ``True``, expected probe failures such as
+                ``chat not found`` log at DEBUG instead of WARNING. Defaults to ``False``.
         Returns:
             dict[str, Any]: Decoded JSON response, or ``{}`` when the bot
             token is unset or the response is not a JSON object.
@@ -95,10 +103,18 @@ class TelegramApiMixin(TelegramSendHost):
                 # success and attach quick-action markup separately.
                 if r.status_code == 400 or err_code == 400:
                     desc_400 = str(data.get("description") or "")
-                    if "message is not modified" in desc_400.lower():
+                    desc_lower = desc_400.lower()
+                    if "message is not modified" in desc_lower:
                         logger.debug(
                             "telegram_400_not_modified method={} attempt={}",
                             method,
+                            attempt,
+                        )
+                    elif probe and "chat not found" in desc_lower:
+                        logger.debug(
+                            "telegram_400_probe method={} description={!r} attempt={}",
+                            method,
+                            data.get("description"),
                             attempt,
                         )
                     else:

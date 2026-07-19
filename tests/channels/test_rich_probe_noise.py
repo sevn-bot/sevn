@@ -27,7 +27,6 @@ def _capture_loguru(*, level: str) -> tuple[list[str], int]:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W8: rich probe 400 at DEBUG", strict=False)
 async def test_rich_probe_chat_not_found_logs_debug_not_warning() -> None:
     """D11: expected ``sendRichMessage`` probe 400 logs at DEBUG — not WARNING."""
     from loguru import logger as loguru_logger

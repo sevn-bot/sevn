@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-import pytest
-
 from sevn.agent.tracing.sqlite_sink import cap_attrs_json
 from sevn.config.defaults import TRACE_ATTRS_JSON_MAX_BYTES
 
@@ -26,7 +24,6 @@ def _capture_loguru(*, level: str) -> tuple[list[str], int]:
     return captured, sink_id
 
 
-@pytest.mark.xfail(reason="green after W8: trace attrs cap records truncated keys", strict=False)
 def test_cap_attrs_json_records_truncated_field_names() -> None:
     """D12: over-cap payloads record original size and which fields were truncated."""
     payload = json.dumps({"tool_result": "x" * (TRACE_ATTRS_JSON_MAX_BYTES + 64)})
@@ -37,9 +34,8 @@ def test_cap_attrs_json_records_truncated_field_names() -> None:
     assert obj.get("_truncated_keys") == ["tool_result"]
 
 
-@pytest.mark.xfail(reason="green after W8: stale-shell reconcile at INFO/DEBUG", strict=False)
 async def test_stale_shell_reconcile_logs_info_not_warning(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch,
 ) -> None:
     """D13: routine stale-shell reconciliation logs at INFO/DEBUG — not WARNING."""
     from loguru import logger as loguru_logger
@@ -66,7 +62,6 @@ async def test_stale_shell_reconcile_logs_info_not_warning(
     assert any("secrets_unlock_env_stale_replaced" in line for line in info)
 
 
-@pytest.mark.xfail(reason="green after W8: true conflict still WARNs", strict=False)
 async def test_unexpected_unlock_conflict_still_warns() -> None:
     """D13: only genuine unexpected conflicts remain at WARNING."""
     from loguru import logger as loguru_logger
