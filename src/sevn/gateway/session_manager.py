@@ -10,6 +10,7 @@ Exports:
     validate_dispatch_routing_identity — fail loudly when Telegram enqueue lacks ``chat_id``.
     dispatch_routing_for — routing identity captured at enqueue for steer/queued turns.
     merge_dispatch_routing — overlay enqueue-time routing onto outbound metadata.
+    clear_dispatch_routing — drop enqueue-time routing after a turn completes (D6).
     outbound_routing_for_session — best-effort session routing for operator notices.
     get_tts_mode_override — session-level TTS mode override reader.
     set_tts_mode_override — session-level TTS mode override writer.
@@ -162,8 +163,6 @@ def _resolve_dispatch_routing_identity(
     from_extras = _chat_id_from_latest_user_extras(conn, session_id)
     if from_extras is not None:
         return resolved_channel, from_extras
-    if row is not None and row.user_id.isdigit():
-        return resolved_channel, int(row.user_id)
     return resolved_channel, None
 
 
@@ -247,6 +246,42 @@ def dispatch_routing_for(session_id: str, correlation_id: str) -> dict[str, Any]
     return dict(_DISPATCH_ROUTING[(session_id, correlation_id)])
 
 
+def clear_dispatch_routing(session_id: str, correlation_id: str) -> None:
+    """Remove enqueue-time routing for one turn after dispatch completes (D6).
+
+    Args:
+        session_id (str): Gateway session id.
+        correlation_id (str): Per-turn correlation id from enqueue.
+
+    Examples:
+        >>> clear_dispatch_routing("s", "c") is None
+        True
+    """
+    _DISPATCH_ROUTING.pop((session_id, correlation_id), None)
+
+
+def _merge_dispatch_routing_extras(
+    session_id: str,
+    correlation_id: str,
+    extras: dict[str, Any],
+) -> None:
+    """Overlay extra routing keys onto an enqueued dispatch job when present.
+
+    Args:
+        session_id (str): Gateway session id.
+        correlation_id (str): Per-turn correlation id from enqueue.
+        extras (dict[str, Any]): Additional routing metadata to merge.
+
+    Examples:
+        >>> _merge_dispatch_routing_extras("s", "c", {"relatedness_classifier_fallback": True}) is None
+        True
+    """
+    key = (session_id, correlation_id)
+    if key not in _DISPATCH_ROUTING:
+        return
+    _DISPATCH_ROUTING[key].update(extras)
+
+
 def merge_dispatch_routing(
     route_meta: dict[str, Any],
     session_id: str,
@@ -271,7 +306,13 @@ def merge_dispatch_routing(
     except KeyError:
         return route_meta
     merged = dict(route_meta)
-    for key in ("chat_id", "channel", "topic_id", "telegram_thread_id"):
+    for key in (
+        "chat_id",
+        "channel",
+        "topic_id",
+        "telegram_thread_id",
+        "relatedness_classifier_fallback",
+    ):
         value = enqueued.get(key)
         if value is not None:
             merged[key] = value
@@ -1074,6 +1115,16 @@ class SessionManager:
                             correlation_id,
                         )
                         if classifier_fallback:
+                            if resolved_chat_id is not None:
+                                _merge_dispatch_routing_extras(
+                                    session_id,
+                                    correlation_id,
+                                    {
+                                        "channel": resolved_channel,
+                                        "chat_id": resolved_chat_id,
+                                        "relatedness_classifier_fallback": True,
+                                    },
+                                )
                             notice_line = (
                                 "Queue classifier timed out — queuing this message "
                                 "as its own turn instead."

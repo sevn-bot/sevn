@@ -513,6 +513,18 @@ class MissionControlState(MissionControlSnapshotsMixin):
             return
         self._turn_stage_latencies_ms[normalized] = float(latency_ms)
 
+    def clear_turn_stage_latencies_ms(self) -> None:
+        """Drop per-turn stage samples so alert attribution stays turn-scoped (D3).
+
+        Examples:
+            >>> st = MissionControlState()
+            >>> st.record_turn_stage_latency_ms("upstream", 1.0)
+            >>> st.clear_turn_stage_latencies_ms()
+            >>> st._turn_stage_latencies_ms
+            {}
+        """
+        self._turn_stage_latencies_ms.clear()
+
     def _stalling_stage_for_latency(self, latency_ms: float) -> str | None:
         """Return the stage name best matching a latency sample.
 
@@ -533,10 +545,7 @@ class MissionControlState(MissionControlSnapshotsMixin):
         for stage, sample_ms in self._turn_stage_latencies_ms.items():
             if sample_ms == latency_ms:
                 return stage
-        return max(
-            self._turn_stage_latencies_ms,
-            key=lambda name: self._turn_stage_latencies_ms[name],
-        )
+        return None
 
     def register_channel(self, name: str, adapter_type: str = "") -> None:
         """Ensure ``name`` exists in the channel health map.

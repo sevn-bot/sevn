@@ -610,7 +610,6 @@ def _specialist_grants_for_triage(
 
 
 _TURN_PROGRESS_SIGNAL_TEXT = "Still working…"
-_TURN_PROGRESS_DEAD_AIR_S = 8.0
 _TURN_PROGRESS_SIGNAL_DELAY_S = 5.0
 
 
@@ -2543,6 +2542,11 @@ def build_agent_run_turn(
         terminal_status = "ok"
         turn_wall_ns = time_ns()
         l1_state = _L1TurnState()
+        router._active_l1_turn_state = l1_state  # type: ignore[attr-defined]
+        mission_state = getattr(router, "_mission_control_state", None)
+        clear_stage_latencies = getattr(mission_state, "clear_turn_stage_latencies_ms", None)
+        if callable(clear_stage_latencies):
+            clear_stage_latencies()
         try:
             await _run(session_id, correlation_id, l1_state=l1_state)
         except asyncio.CancelledError:
@@ -2686,6 +2690,10 @@ def build_agent_run_turn(
                     turn_wall_ns=turn_wall_ns,
                 )
             )
+            from sevn.gateway.session_manager import clear_dispatch_routing
+
+            clear_dispatch_routing(session_id, correlation_id)
+            router._active_l1_turn_state = None  # type: ignore[attr-defined]
 
     async def _run_spawned_l1_tier_b_body(
         *,
@@ -4633,6 +4641,9 @@ async def _route_assistant_text(
         >>> inspect.iscoroutinefunction(_route_assistant_text)
         True
     """
+    active_l1 = getattr(router, "_active_l1_turn_state", None)
+    if active_l1 is not None and text.strip() != turn_progress_signal_text().strip():
+        _cancel_turn_progress_signal(active_l1)
     meta = dict(metadata or {})
     if outbound_phase and channel == "telegram":
         meta[GATEWAY_OUTBOUND_PHASE_KEY] = outbound_phase

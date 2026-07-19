@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-19] Thermos pass — evict enqueue-time dispatch routing after each turn, cancel progress signals once streaming starts, and scope Mission Control stage attribution to the active turn
 - [2026-07-19] Silence benign rich-capability probe + per-boot secrets reconcile, record trace truncation, and keep greetings in scope
 - [2026-07-19] Recover diverged ``my_sevn`` sync cron with ``--latest`` and reap leaked worker semaphores on gateway shutdown
 - [2026-07-19] Wait for egress proxy health before bringing channels up

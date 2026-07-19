@@ -1677,6 +1677,7 @@ def default_tier_a_reply(
     turn_id: str = "",
     operator_name: str | None = None,
     kind: GreetingKind = "hello",
+    strict: bool = False,
 ) -> str:
     """Return a canned tier-A greeting reply for the given category.
 
@@ -1685,6 +1686,7 @@ def default_tier_a_reply(
         operator_name (str | None): Preferred name from ``USER.md`` for ``{name}``
             templates (half the pool). When absent, only generic templates rotate.
         kind (GreetingKind): Greeting category (hello / thanks / bye).
+        strict (bool): When ``True``, use strict-greeting-shaped one-liners (D14).
 
     Returns:
         str: Friendly short reply.
@@ -1696,7 +1698,17 @@ def default_tier_a_reply(
         True
         >>> default_tier_a_reply(turn_id="bye-1", kind="bye").strip()
         'Bye — talk soon!'
+        >>> is_strict_greeting_message(default_tier_a_reply(turn_id="x", strict=True))
+        True
     """
+    if strict:
+        if kind == "bye":
+            pool = _STRICT_TIER_A_BYE_REPLIES
+        elif kind == "thanks":
+            pool = _STRICT_TIER_A_THANKS_REPLIES
+        else:
+            pool = _STRICT_TIER_A_HELLO_REPLIES
+        return _pick_rotated(pool, seed=f"{turn_id}:{kind}:strict")
     named = _normalize_operator_name(operator_name) is not None
     pool = _tier_a_pools_for_kind(kind, named=named)
     template = _pick_rotated(pool, seed=f"{turn_id}:{kind}")
@@ -1754,13 +1766,7 @@ def default_strict_tier_a_reply(
         >>> is_strict_greeting_message(default_strict_tier_a_reply(turn_id="x"))
         True
     """
-    if kind == "bye":
-        pool = _STRICT_TIER_A_BYE_REPLIES
-    elif kind == "thanks":
-        pool = _STRICT_TIER_A_THANKS_REPLIES
-    else:
-        pool = _STRICT_TIER_A_HELLO_REPLIES
-    return _pick_rotated(pool, seed=f"{turn_id}:{kind}:strict")
+    return default_tier_a_reply(turn_id=turn_id, kind=kind, strict=True)
 
 
 def is_obvious_continuation_message(message: str) -> bool:
