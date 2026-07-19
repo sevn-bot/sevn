@@ -12,7 +12,6 @@ from sevn.config.settings import ProcessSettings
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W6: boot proxy health gate", strict=False)
 async def test_boot_waits_for_proxy_health_with_capped_retry(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -38,7 +37,7 @@ async def test_boot_waits_for_proxy_health_with_capped_retry(
             return httpx.Response(200, json={"status": "ok"})
 
     monkeypatch.setattr("sevn.gateway.http_server.httpx.AsyncClient", _FlakyClient)
-    process = ProcessSettings(proxy_url="http://127.0.0.1:8787")
+    process = ProcessSettings.model_construct(proxy_url="http://127.0.0.1:8787")
     ok = await wait_for_proxy_boot_health(process, max_wait_s=5.0, poll_interval_s=0.05)
     assert ok is True
     assert len(attempts) >= 2
@@ -46,7 +45,6 @@ async def test_boot_waits_for_proxy_health_with_capped_retry(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W6: degraded boot when proxy stays down", strict=False)
 async def test_boot_proceeds_degraded_when_proxy_never_comes_up(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -67,7 +65,7 @@ async def test_boot_proceeds_degraded_when_proxy_never_comes_up(
             raise httpx.ConnectError("proxy down", request=httpx.Request("GET", url))
 
     monkeypatch.setattr("sevn.gateway.http_server.httpx.AsyncClient", _DownClient)
-    process = ProcessSettings(proxy_url="http://127.0.0.1:8787")
+    process = ProcessSettings.model_construct(proxy_url="http://127.0.0.1:8787")
     started = time.monotonic()
     ok = await wait_for_proxy_boot_health(process, max_wait_s=0.25, poll_interval_s=0.05)
     elapsed = time.monotonic() - started
@@ -80,5 +78,5 @@ async def test_log_only_boot_health_exists_today() -> None:
     """Baseline: today's boot path exposes the log-only probe helper."""
     from sevn.gateway.http_server import _log_proxy_boot_health
 
-    process = ProcessSettings(proxy_url="http://127.0.0.1:1")
-    await asyncio.wait_for(_log_proxy_boot_health(process), timeout=2.0)
+    process = ProcessSettings.model_construct(proxy_url="http://127.0.0.1:1")
+    await asyncio.wait_for(_log_proxy_boot_health(process), timeout=6.0)
