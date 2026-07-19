@@ -7,8 +7,8 @@ owner: Alex
 summary: Provide durable trace sinks that implement TraceSink without ever throwing
   through emit, so instrumentation stays off the critical path. SQLite layout matches
   Mission Control query patterns (prd-07-mi
-last_updated: '2026-07-14'
-fingerprint: sha256:6f3353b0715b4b124086cf9e20db1181c389c8da937dc6ddb651b3ee1a4a060d
+last_updated: '2026-07-19'
+fingerprint: sha256:f7f06f37bbb49219968e21066b68814eb6090a9229a2b7e31689458ee79a415c
 related: []
 sources:
 - src/sevn/agent/tracing/**
@@ -191,9 +191,6 @@ interfaces:
 - name: ensure_traces_db
   file: src/sevn/agent/tracing/traces_migrate.py
   symbol: ensure_traces_db
-specs: []
-personas: []
-prd_profile: null
 ---
 
 ## Purpose

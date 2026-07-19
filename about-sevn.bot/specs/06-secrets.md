@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver a single trust boundary for credentials: backend modules + TTL cache
   under src/sevn/security/, wired exclusively by the egress proxy (src/sevn/proxy/)
   so agent-facing processes never see raw k'
-last_updated: '2026-07-17'
-fingerprint: sha256:b9b13a843bf5c1898e696c6424933c3a3cb6da8f56914deabfa2bfb1f2431d31
+last_updated: '2026-07-19'
+fingerprint: sha256:9bc55fa915f549f8360cce43ab6c02e4c9966968e8ac98ab7283e92cc542294c
 related: []
 sources:
 - src/sevn/security/secrets/**
@@ -87,6 +87,9 @@ interfaces:
 - name: keychain_has_unlock_secret
   file: src/sevn/security/secrets/passphrase_prime.py
   symbol: keychain_has_unlock_secret
+- name: log_unlock_env_conflict
+  file: src/sevn/security/secrets/passphrase_prime.py
+  symbol: log_unlock_env_conflict
 - name: prime_unlock_env_from_keychain
   file: src/sevn/security/secrets/passphrase_prime.py
   symbol: prime_unlock_env_from_keychain

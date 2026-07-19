@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Tier B is the default “do work” executor for messages the Triager classifies
   as complexity == B (prd-04-getting-things-done §5.2): a single pydantic-ai Agent
   loop over the user’s incoming_text, with t'
-last_updated: '2026-07-18'
-fingerprint: sha256:aaeed8377da7461baea1122a7c1b9da23d093f94df5b270a5c6feb7e6b3e2e29
+last_updated: '2026-07-19'
+fingerprint: sha256:9c955d2d530ded15bd0893520e391245945b9224f58e5a50cb7e80a8458dc5c0
 related: []
 sources:
 - src/sevn/agent/**
@@ -1183,6 +1183,9 @@ interfaces:
 - name: classify_relatedness
   file: src/sevn/agent/triager/relatedness.py
   symbol: classify_relatedness
+- name: routing_context_from_relatedness
+  file: src/sevn/agent/triager/relatedness.py
+  symbol: routing_context_from_relatedness
 - name: apply_routing_policy
   file: src/sevn/agent/triager/routing_policy.py
   symbol: apply_routing_policy
@@ -1192,6 +1195,9 @@ interfaces:
 - name: default_early_ack
   file: src/sevn/agent/triager/routing_policy.py
   symbol: default_early_ack
+- name: default_strict_tier_a_reply
+  file: src/sevn/agent/triager/routing_policy.py
+  symbol: default_strict_tier_a_reply
 - name: default_tier_a_reply
   file: src/sevn/agent/triager/routing_policy.py
   symbol: default_tier_a_reply
