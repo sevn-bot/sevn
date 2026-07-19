@@ -69,6 +69,52 @@ def _semlock_names_from_gc() -> set[str]:
     return names
 
 
+def _semlock_names_from_resource_tracker() -> set[str]:
+    """Collect semaphore names still registered with ``resource_tracker``.
+
+    Optional dependencies (for example local TTS stacks) can register named
+    semaphores without keeping live wrapper objects reachable from ``gc``.
+
+    Returns:
+        set[str]: Tracked semaphore names.
+
+    Examples:
+        >>> isinstance(_semlock_names_from_resource_tracker(), set)
+        True
+    """
+    try:
+        from multiprocessing import resource_tracker
+    except ImportError:
+        return set()
+    registry = getattr(resource_tracker, "_registry", None)
+    if not isinstance(registry, dict):
+        return set()
+    return {
+        str(name)
+        for name, rtype in registry.items()
+        if rtype == "semaphore" and isinstance(name, str) and name
+    }
+
+
+def _close_live_multiprocessing_semaphores() -> None:
+    """Best-effort ``close()`` on live semaphore wrappers before unlinking names.
+
+    Examples:
+        >>> _close_live_multiprocessing_semaphores() is None
+        True
+    """
+    sem_types = _mp_semaphore_types()
+    if not sem_types:
+        return
+    for obj in gc.get_objects():
+        with contextlib.suppress(Exception):
+            if not isinstance(obj, sem_types):
+                continue
+            close = getattr(obj, "close", None)
+            if callable(close):
+                close()
+
+
 def release_leaked_multiprocessing_semaphores() -> None:
     """Unlink and unregister named semaphores still referenced at gateway shutdown.
 
@@ -89,8 +135,10 @@ def release_leaked_multiprocessing_semaphores() -> None:
     if not callable(cleanup):
         return
     cleanup_fn = cast("Callable[[str], None]", cleanup)
+    gc.collect()
+    _close_live_multiprocessing_semaphores()
     try:
-        names = _semlock_names_from_gc()
+        names = _semlock_names_from_gc() | _semlock_names_from_resource_tracker()
     except Exception as exc:
         logger.debug("multiprocessing semaphore scan skipped: {}", exc)
         return

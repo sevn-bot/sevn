@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import pytest
-
 from sevn.cli.repo_sync import RepoSyncError
 
 if TYPE_CHECKING:
+    import pytest
     from loguru import Record
 
 
@@ -24,7 +23,6 @@ def _capture_loguru(*, level: str) -> tuple[list[str], int]:
     return captured, sink_id
 
 
-@pytest.mark.xfail(reason="green after W7: cron divergence self-recovers", strict=False)
 def test_diverged_my_sevn_sync_self_recovers_with_latest() -> None:
     """D9: when cron owns the checkout, divergence auto-recovers instead of daily failure."""
     from sevn.evolution.repo_sync_scheduler import run_scheduled_repo_sync_with_recovery
@@ -34,7 +32,6 @@ def test_diverged_my_sevn_sync_self_recovers_with_latest() -> None:
     assert "failed" not in detail.lower()
 
 
-@pytest.mark.xfail(reason="green after W7: one actionable cron notice", strict=False)
 def test_diverged_my_sevn_sync_surfaces_single_actionable_notice(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -68,7 +65,6 @@ def test_diverged_my_sevn_sync_surfaces_single_actionable_notice(
     assert any("action" in line.lower() or "--latest" in line for line in actionable)
 
 
-@pytest.mark.xfail(reason="green after W7: no recurring cron WARNING spam", strict=False)
 def test_repo_sync_cron_failure_is_not_logged_every_run(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

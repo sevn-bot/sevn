@@ -5,6 +5,7 @@ Exports:
     create_app — ASGI factory.
     deferred_json — ``501`` response helper for deferred endpoints.
     DeferredGatewayOnboardingRoute — ``NotImplementedError`` subclass for ``/onboarding/*``.
+    handle_my_sevn_sync_cron_failure — deduplicated WARNING for cron sync failures.
     wait_for_proxy_boot_health — bounded egress proxy ``/healthz`` poll at gateway boot.
 """
 
@@ -80,7 +81,7 @@ from sevn.evolution.repo_sync_scheduler import (
     MY_SEVN_ISSUES_SYNC_CRON_JOB_ID,
     MY_SEVN_SYNC_CRON_JOB_ID,
     run_scheduled_issues_sync,
-    run_scheduled_repo_sync,
+    run_scheduled_repo_sync_with_recovery,
 )
 from sevn.evolution.stats import record_last_sync
 from sevn.gateway.admin.admin_secrets import register_admin_secrets_routes
@@ -1025,6 +1026,27 @@ class DeferredGatewayOnboardingRoute(NotImplementedError):
     """
 
 
+_last_my_sevn_sync_cron_failure_key: str | None = None
+
+
+def handle_my_sevn_sync_cron_failure(exc: RepoSyncError) -> None:
+    """Log a cron sync failure at most once per distinct error message.
+
+    Args:
+        exc (RepoSyncError): Failure after :func:`run_scheduled_repo_sync_with_recovery`.
+
+    Examples:
+        >>> handle_my_sevn_sync_cron_failure(RepoSyncError("git fetch failed")) is None
+        True
+    """
+    global _last_my_sevn_sync_cron_failure_key
+    key = str(exc)
+    if key == _last_my_sevn_sync_cron_failure_key:
+        return
+    _last_my_sevn_sync_cron_failure_key = key
+    logger.warning("my_sevn repo sync cron failed: {}", exc)
+
+
 def create_app(
     *,
     workspace: WorkspaceConfig | None = None,
@@ -1468,7 +1490,10 @@ def create_app(
                 proc = getattr(st, "process_settings", None)
                 home = proc.home if proc is not None and proc.home is not None else sevn_home_dir()
                 try:
-                    detail = await asyncio.to_thread(run_scheduled_repo_sync, home=home)
+                    detail = await asyncio.to_thread(
+                        run_scheduled_repo_sync_with_recovery,
+                        home=home,
+                    )
                     await asyncio.to_thread(
                         record_last_sync,
                         st.layout,
@@ -1476,7 +1501,7 @@ def create_app(
                         detail=detail,
                     )
                 except RepoSyncError as exc:
-                    logger.warning("my_sevn repo sync cron failed: {}", exc)
+                    await asyncio.to_thread(handle_my_sevn_sync_cron_failure, exc)
                     await asyncio.to_thread(
                         record_last_sync,
                         st.layout,
