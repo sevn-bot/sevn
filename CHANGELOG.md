@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-19] Retry truncated Codex proxy streams once and return a typed upstream-truncated error instead of a bare 502; attribute high-latency alerts to the stalling turn stage and emit a still-working progress signal before long-turn dead-air
 - [2026-07-19] Persist subagent runs without spurious commit errors
 - [2026-07-18] Refresh readme fingerprints after gateway OAuth wizard and discogs-shared registry edits
 - [2026-07-18] Thermos close-out — bandit-clean OAuth wizard payload guard and interim-secret cleanup

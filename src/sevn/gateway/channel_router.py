@@ -480,6 +480,7 @@ class ChannelRouter:
         # are unwired (most unit tests) — ``agent_turn.py`` reads it via ``getattr`` and
         # treats ``None`` as "no sub-agent tracking", preserving classic single-turn behavior.
         self._subagent_supervisor: SubAgentSupervisor | None = None
+        self._mission_control_state: Any | None = None
         self._plan_gate_registry: Any | None = None
         self._plan_gate_callback_handler: Any | None = None
         self._evolution_approval_registry: Any | None = None

@@ -89,7 +89,6 @@ def _capture_loguru(*, level: str) -> tuple[list[str], int]:
 
 
 @pytest.mark.anyio
-@pytest.mark.xfail(reason="green after W3: truncated Codex stream retried once", strict=False)
 async def test_truncated_codex_stream_retried_once_before_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -113,7 +112,6 @@ async def test_truncated_codex_stream_retried_once_before_failure(
 
 
 @pytest.mark.anyio
-@pytest.mark.xfail(reason="green after W3: typed upstream-truncated error", strict=False)
 async def test_persistent_truncated_stream_returns_typed_error_not_bare_502(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -144,7 +142,6 @@ async def test_persistent_truncated_stream_returns_typed_error_not_bare_502(
 
 
 @pytest.mark.anyio
-@pytest.mark.xfail(reason="green after W3: truncation logged once at WARNING", strict=False)
 async def test_truncated_codex_stream_logs_warning_without_error_stack(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -203,7 +200,6 @@ async def test_completed_codex_stream_aggregates_unchanged(
     assert payload["choices"][0]["message"]["content"] == "ok"
 
 
-@pytest.mark.xfail(reason="green after W3: high_latency names stalling stage", strict=False)
 def test_high_latency_alert_includes_stalling_stage() -> None:
     """D3: ``high_latency`` warning names the stalling stage (triager/tool/upstream)."""
     from sevn.gateway.mission.mission_state import MissionControlState
@@ -217,7 +213,6 @@ def test_high_latency_alert_includes_stalling_stage() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W3: progress signal before dead-air", strict=False)
 async def test_slow_turn_emits_still_working_progress_before_dead_air() -> None:
     """D3: user-visible progress signal is emitted before the dead-air window."""
     from sevn.gateway.agent_turn import turn_progress_signal_text

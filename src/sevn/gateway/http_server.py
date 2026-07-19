@@ -1550,6 +1550,7 @@ def create_app(
         # `build_agent_run_turn` constructor param, since both call sites of that
         # factory run *before* `run_boot_hooks` above.
         gateway_router._subagent_supervisor = getattr(app.state, "subagent_supervisor", None)
+        gateway_router._mission_control_state = mission_control_state
         yield
         await _emit_gateway_trace(trace, kind="gateway.shutdown", status="ok")
         cursor_sched = getattr(app.state, "cursor_poll_scheduler", None)

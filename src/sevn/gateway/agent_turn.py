@@ -7,6 +7,7 @@ Depends: sevn.agent.triager, sevn.agent.executors.b_harness, sevn.gateway.channe
 Exports:
     build_agent_run_turn — factory returning ``RunTurnFn`` for Triager + tier A/B/C/D.
     build_intro_extra_instructions — pure helper: ``extra_parts`` for first-session intro turns (D5).
+    turn_progress_signal_text — user-visible progress ping before long-turn dead-air (D3).
 """
 
 from __future__ import annotations
@@ -608,6 +609,144 @@ def _specialist_grants_for_triage(
     )
 
 
+_TURN_PROGRESS_SIGNAL_TEXT = "Still working…"
+_TURN_PROGRESS_DEAD_AIR_S = 8.0
+_TURN_PROGRESS_SIGNAL_DELAY_S = 5.0
+
+
+def turn_progress_signal_text() -> str:
+    """Return the user-visible progress ping before long-turn dead-air (D3).
+
+    Returns:
+        str: Short progress message suitable for outbound channels.
+
+    Examples:
+        >>> "still" in turn_progress_signal_text().lower()
+        True
+    """
+    return _TURN_PROGRESS_SIGNAL_TEXT
+
+
+def _build_turn_stage_latencies(
+    *,
+    triager_ms: int | None,
+    executor_ms: int | None,
+    rounds_used: int = 0,
+) -> dict[str, float]:
+    """Map a completed turn to per-stage latency samples for Mission Control (D3).
+
+    Args:
+        triager_ms (int | None): Triager wall time in milliseconds.
+        executor_ms (int | None): Tier-B/C/D executor wall time in milliseconds.
+        rounds_used (int): Tool-loop rounds reported by the executor outcome.
+
+    Returns:
+        dict[str, float]: Stage label → latency ms (``triager``, ``tool-loop``,
+        ``upstream``).
+
+    Examples:
+        >>> _build_turn_stage_latencies(triager_ms=120, executor_ms=4_000, rounds_used=2)
+        {'triager': 120.0, 'tool-loop': 4000.0}
+        >>> _build_turn_stage_latencies(triager_ms=50, executor_ms=90_000, rounds_used=0)
+        {'triager': 50.0, 'upstream': 90000.0}
+    """
+    timings: dict[str, float] = {}
+    if triager_ms is not None and triager_ms > 0:
+        timings["triager"] = float(triager_ms)
+    exec_ms = float(executor_ms or 0)
+    if exec_ms <= 0:
+        return timings
+    if rounds_used > 0:
+        timings["tool-loop"] = exec_ms
+    else:
+        timings["upstream"] = exec_ms
+    return timings
+
+
+def _record_turn_stage_latencies(router: ChannelRouter, latencies: dict[str, float]) -> None:
+    """Push per-stage samples into Mission Control when wired on the router (D3).
+
+    Args:
+        router (ChannelRouter): Gateway router (may carry ``_mission_control_state``).
+        latencies (dict[str, float]): Stage label → latency ms.
+
+    Examples:
+        >>> _record_turn_stage_latencies.__name__
+        '_record_turn_stage_latencies'
+    """
+    state = getattr(router, "_mission_control_state", None)
+    if state is None or not latencies:
+        return
+    record = getattr(state, "record_turn_stage_latency_ms", None)
+    if not callable(record):
+        return
+    for stage, latency_ms in latencies.items():
+        if latency_ms > 0:
+            record(stage, latency_ms)
+
+
+async def _schedule_turn_progress_signal(
+    *,
+    router: ChannelRouter,
+    channel: str,
+    user_id: str,
+    session_id: str,
+    route_meta: dict[str, Any],
+    l1_state: _L1TurnState,
+) -> None:
+    """Emit :func:`turn_progress_signal_text` before the dead-air window on slow turns (D3).
+
+    Args:
+        router (ChannelRouter): Outbound router.
+        channel (str): Channel id.
+        user_id (str): Operator user id.
+        session_id (str): Gateway session id.
+        route_meta (dict[str, Any]): Outbound routing metadata.
+        l1_state (_L1TurnState): Per-turn mutable state (stores the scheduled task).
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_schedule_turn_progress_signal)
+        True
+    """
+    _cancel_turn_progress_signal(l1_state)
+
+    async def _emit_after_delay() -> None:
+        try:
+            await asyncio.sleep(_TURN_PROGRESS_SIGNAL_DELAY_S)
+            await _route_assistant_text(
+                router,
+                channel,
+                user_id,
+                session_id,
+                turn_progress_signal_text(),
+                metadata=route_meta,
+                outbound_phase="persist",
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("agent_turn_progress_signal_failed session_id={}", session_id)
+
+    l1_state.progress_task = asyncio.create_task(_emit_after_delay())
+
+
+def _cancel_turn_progress_signal(l1_state: _L1TurnState) -> None:
+    """Cancel a pending progress-signal task when the turn finishes or sends output (D3).
+
+    Args:
+        l1_state (_L1TurnState): Per-turn mutable state.
+
+    Examples:
+        >>> _cancel_turn_progress_signal.__name__
+        '_cancel_turn_progress_signal'
+    """
+    task = l1_state.progress_task
+    if task is not None and not task.done():
+        task.cancel()
+    l1_state.progress_task = None
+
+
 def build_intro_extra_instructions(
     *,
     workspace: WorkspaceConfig,
@@ -675,6 +814,11 @@ class _L1TurnState:
     """
 
     run_id: str | None = None
+    triager_ms: int | None = None
+    executor_started_ns: int | None = None
+    executor_rounds_used: int = 0
+    stage_latencies_ms: dict[str, float] = dataclasses.field(default_factory=dict)
+    progress_task: asyncio.Task[None] | None = None
 
 
 def _l1_task_summary(triage: TriageResult | None, user_text: str) -> str:
@@ -1380,6 +1524,7 @@ def build_agent_run_turn(
                     turn_span_id=turn_span_id,
                 )
                 triager_ms = max(1, int((time_ns() - triage_started_ns) / 1_000_000))
+                l1_state.triager_ms = triager_ms
             except TriagerUnavailable:
                 if triager_run_id is not None and triager_registry is not None:
                     await triager_registry.mark_failed(triager_run_id)
@@ -1696,6 +1841,14 @@ def build_agent_run_turn(
         if first_task is not None:
             await first_task
         steer_buffer = _steer_buffer_for(router, session_id)
+        await _schedule_turn_progress_signal(
+            router=router,
+            channel=sess.channel,
+            user_id=sess.user_id,
+            session_id=session_id,
+            route_meta=route_meta,
+            l1_state=l1_state,
+        )
         channel_adapter = router.adapter_named(sess.channel)
         # Priority 2 (`PROBLEMS.md`): both ``stream`` and ``two_message_finally`` place a
         # "…" placeholder for the tier-B answer *before* the executor runs. Failure paths
@@ -1909,6 +2062,8 @@ def build_agent_run_turn(
         initial_max_rounds = tier_b_rounds_expanded(workspace) if prior_needed_expanded else None
         if prior_needed_expanded:
             router._sessions_needing_expanded_budget.discard(session_id)
+        executor_started_ns = time_ns()
+        l1_state.executor_started_ns = executor_started_ns
         outcome, no_answer_reason = await _execute_tier_b_pass(
             pass_kind="narrow",  # nosec B106
             reason_suffix="",
@@ -2157,6 +2312,8 @@ def build_agent_run_turn(
             session_id=session_id,
         ):
             intro_outbound_marked = True
+        raw_rounds = getattr(outcome, "rounds_used", 0)
+        l1_state.executor_rounds_used = int(raw_rounds) if isinstance(raw_rounds, int) else 0
         final_texts = [
             text
             for payload in outcome.final_messages
@@ -2500,6 +2657,18 @@ def build_agent_run_turn(
                             "agent_turn.l1_executor_finalize_failed run_id={}",
                             l1_executor_run_id,
                         )
+            _cancel_turn_progress_signal(l1_state)
+            if l1_state.executor_started_ns is not None:
+                executor_ms = max(
+                    1,
+                    int((time_ns() - l1_state.executor_started_ns) / 1_000_000),
+                )
+                l1_state.stage_latencies_ms = _build_turn_stage_latencies(
+                    triager_ms=l1_state.triager_ms,
+                    executor_ms=executor_ms,
+                    rounds_used=l1_state.executor_rounds_used,
+                )
+            _record_turn_stage_latencies(router, l1_state.stage_latencies_ms)
             await run_post_turn_hooks(
                 PostTurnContext(
                     router=router,

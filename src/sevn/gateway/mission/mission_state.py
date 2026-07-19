@@ -44,6 +44,9 @@ from sevn.gateway.mission.mission_trace_sink import (
 if TYPE_CHECKING:
     from sevn.agent.tracing.sink import TraceEvent
 
+HIGH_LATENCY_ALERT_THRESHOLD_MS = 30_000
+"""``high_latency`` alert threshold (ms); raised from 5 s to reduce log noise (D3)."""
+
 
 class MissionControlState(MissionControlSnapshotsMixin):
     """Centralized Mission Control state (providers, channels, gateway session metrics)."""
@@ -78,7 +81,12 @@ class MissionControlState(MissionControlSnapshotsMixin):
         self._max_alerts = max_alerts
         self._alert_rules: list[AlertRule] = [
             AlertRule("high_error_rate", "error_rate", threshold=0.1, severity="critical"),
-            AlertRule("high_latency", "latency", threshold=5000, severity="warning"),
+            AlertRule(
+                "high_latency",
+                "latency",
+                threshold=HIGH_LATENCY_ALERT_THRESHOLD_MS,
+                severity="warning",
+            ),
             AlertRule("channel_down", "channel_down", threshold=1, severity="critical"),
             AlertRule("provider_down", "provider_down", threshold=1, severity="critical"),
         ]
@@ -105,6 +113,7 @@ class MissionControlState(MissionControlSnapshotsMixin):
         self._gateway_disregards = 0
         self._subagent_running: dict[str, int] = {}
         self._subagent_total: dict[str, int] = {"done": 0, "failed": 0, "killed": 0}
+        self._turn_stage_latencies_ms: dict[str, float] = {}
 
     def _session(self, session_id: str) -> SessionMissionStats:
         """Return or create per-session mission stats.
@@ -468,6 +477,50 @@ class MissionControlState(MissionControlSnapshotsMixin):
             self._total_errors += 1
         self._check_alerts()
 
+    def record_turn_stage_latency_ms(self, stage: str, latency_ms: float) -> None:
+        """Record per-stage turn latency for ``high_latency`` attribution (D3).
+
+        Args:
+            stage (str): Turn stage label (for example ``triager``, ``tool-loop``,
+                ``upstream``).
+            latency_ms (float): Observed stage duration in milliseconds.
+
+        Examples:
+            >>> st = MissionControlState()
+            >>> st.record_turn_stage_latency_ms("upstream", 120_000.0)
+            >>> st._turn_stage_latencies_ms["upstream"]
+            120000.0
+        """
+        normalized = stage.strip()
+        if not normalized:
+            return
+        self._turn_stage_latencies_ms[normalized] = float(latency_ms)
+
+    def _stalling_stage_for_latency(self, latency_ms: float) -> str | None:
+        """Return the stage name best matching a latency sample.
+
+        Args:
+            latency_ms (float): Latest latency sample in milliseconds.
+
+        Returns:
+            str | None: Stage label when stage timings were recorded.
+
+        Examples:
+            >>> st = MissionControlState()
+            >>> st.record_turn_stage_latency_ms("upstream", 120_000.0)
+            >>> st._stalling_stage_for_latency(120_000.0)
+            'upstream'
+        """
+        if not self._turn_stage_latencies_ms:
+            return None
+        for stage, sample_ms in self._turn_stage_latencies_ms.items():
+            if sample_ms == latency_ms:
+                return stage
+        return max(
+            self._turn_stage_latencies_ms,
+            key=lambda name: self._turn_stage_latencies_ms[name],
+        )
+
     def register_channel(self, name: str, adapter_type: str = "") -> None:
         """Ensure ``name`` exists in the channel health map.
 
@@ -644,13 +697,18 @@ class MissionControlState(MissionControlSnapshotsMixin):
                     if a.rule_name == rule.name and time.time() - a.timestamp < rule.window_seconds
                 ]
                 if not recent:
+                    stage_suffix = ""
+                    if rule.name == "high_latency":
+                        stage = self._stalling_stage_for_latency(value)
+                        if stage:
+                            stage_suffix = f" (stalling stage: {stage})"
                     self._fire_alert(
                         Alert(
                             rule_name=rule.name,
                             severity=rule.severity,
                             message=(
                                 f"{rule.name}: {rule.metric} = {value:.2f} "
-                                f"(threshold: {rule.threshold})"
+                                f"(threshold: {rule.threshold}){stage_suffix}"
                             ),
                             timestamp=time.time(),
                         ),
