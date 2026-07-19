@@ -23,6 +23,7 @@ Examples:
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 import time
 from typing import TYPE_CHECKING
 
@@ -31,9 +32,23 @@ from loguru import logger
 from sevn.agent.subagents.models import SubAgentRun, SubAgentStatus
 
 if TYPE_CHECKING:
-    import sqlite3
-
     from sevn.agent.subagents.registry import PersistHook
+
+
+def _commit_if_in_transaction(conn: sqlite3.Connection) -> None:
+    """Commit only when an explicit transaction is open (skip autocommit no-ops).
+
+    Args:
+        conn (sqlite3.Connection): Open SQLite connection.
+
+    Examples:
+        >>> import sqlite3
+        >>> conn = sqlite3.connect(":memory:", isolation_level=None)
+        >>> _ = conn.execute("CREATE TABLE t(x)")
+        >>> _commit_if_in_transaction(conn)
+    """
+    if conn.in_transaction:
+        conn.commit()
 
 
 def list_recent_subagent_runs(
@@ -162,9 +177,11 @@ def persist_subagent_run(conn: sqlite3.Connection, run: SubAgentRun) -> None:
                 run.trace_id,
             ),
         )
-        conn.commit()
-    except Exception:
-        logger.bind(subagent_id=run.id).exception("persist_subagent_run SQL failed")
+        _commit_if_in_transaction(conn)
+    except sqlite3.Error:
+        logger.bind(subagent_id=run.id, session_id=run.session_id).exception(
+            "persist_subagent_run SQL failed"
+        )
 
 
 def sqlite_persist_hook(conn: sqlite3.Connection) -> PersistHook:
@@ -245,7 +262,7 @@ def sweep_orphaned_subagent_runs(conn: sqlite3.Connection, *, now_ns: int | None
         WHERE status IN ({",".join("?" * len(_STALE_STATUSES))})
     """  # nosec B608 — placeholders are bound status literals only
     conn.execute(sql, (clock, *_STALE_STATUSES))
-    conn.commit()
+    _commit_if_in_transaction(conn)
     return conn.total_changes - before
 
 
@@ -286,5 +303,5 @@ def prune_subagent_runs(
         AND finished_at_ns IS NOT NULL AND finished_at_ns < ?
     """  # nosec B608 — placeholders are bound status literals only
     conn.execute(sql, (*_TERMINAL_STATUSES, cutoff))
-    conn.commit()
+    _commit_if_in_transaction(conn)
     return conn.total_changes - before

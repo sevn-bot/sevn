@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / safebash
   (when routed through the execution sandbox), process when configured for sandbox
   routing, and skill subprocesses spawned b
-last_updated: '2026-07-17'
-fingerprint: sha256:c515c187999a17cbb0c3e46f470d2fbda448737e380deee6417b7145a4217375
+last_updated: '2026-07-19'
+fingerprint: sha256:a6ab99283d4c7cef37f0fbd24bc1d0b18e53d7eaa33dffcd4f53252d090fbab4
 related: []
 sources:
 - src/sevn/security/**
@@ -271,6 +271,9 @@ interfaces:
 - name: keychain_has_unlock_secret
   file: src/sevn/security/secrets/passphrase_prime.py
   symbol: keychain_has_unlock_secret
+- name: log_unlock_env_conflict
+  file: src/sevn/security/secrets/passphrase_prime.py
+  symbol: log_unlock_env_conflict
 - name: prime_unlock_env_from_keychain
   file: src/sevn/security/secrets/passphrase_prime.py
   symbol: prime_unlock_env_from_keychain

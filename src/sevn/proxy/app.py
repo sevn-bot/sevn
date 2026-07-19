@@ -17,6 +17,7 @@ Examples:
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -64,6 +65,70 @@ from sevn.proxy.settings import ProxySettings
 from sevn.proxy.web_forward import brave_search_json, web_fetch_json
 from sevn.security.secrets.cache import ResolvedSecretsCache
 from sevn.security.secrets.factory import secrets_chain_from_workspace
+
+_CODEX_TRUNCATED_RETRY_BACKOFF_S = 0.25
+_CODEX_TRUNCATED_MAX_ATTEMPTS = 2
+
+
+def _is_retryable_truncated_codex_stream(exc: BaseException) -> bool:
+    """Return whether ``exc`` indicates a Codex SSE stream ended without output.
+
+    Args:
+        exc (BaseException): Aggregation or translation error from Codex SSE.
+
+    Returns:
+        bool: True when the stream ended without assistant text or tool calls.
+
+    Examples:
+        >>> _is_retryable_truncated_codex_stream(
+        ...     ValueError("Responses body has no assistant text or tool calls")
+        ... )
+        True
+    """
+    if not isinstance(exc, ValueError):
+        return False
+    msg = str(exc)
+    return (
+        "no assistant text or tool calls" in msg
+        or "missing output messages" in msg
+        or "carried no terminal object or assistant text" in msg
+    )
+
+
+def _extract_codex_response_id(raw_sse: str) -> str | None:
+    """Best-effort ``response.id`` from a buffered Codex Responses SSE body.
+
+    Args:
+        raw_sse (str): Buffered upstream SSE payload.
+
+    Returns:
+        str | None: Response id when present in a ``response.*`` event.
+
+    Examples:
+        >>> _extract_codex_response_id(
+        ...     'data: {"type":"response.created","response":{"id":"resp_1"}}\\n\\n'
+        ... )
+        'resp_1'
+    """
+    for block in raw_sse.split("\n\n"):
+        for line in block.splitlines():
+            if not line.startswith("data:"):
+                continue
+            payload = line[5:].strip()
+            if payload == "[DONE]":
+                continue
+            try:
+                event = json.loads(payload)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(event, dict):
+                continue
+            response = event.get("response")
+            if isinstance(response, dict):
+                rid = response.get("id")
+                if isinstance(rid, str) and rid:
+                    return rid
+    return None
 
 
 def _bootstrap_from_operator_home() -> tuple[ProxySettings, WorkspaceConfig, Path] | None:
@@ -314,43 +379,76 @@ def create_app(
             # aggregate the terminal Responses object, then return a single
             # chat-completion JSON — the same shape the old post_json branch returned.
             body["stream"] = True
-            client, upstream = await post_sse_stream(url=url, headers=headers, body=body)
-            try:
-                if upstream.status_code >= 400:
-                    raw_error = await upstream.aread()
-                    ct = upstream.headers.get("content-type", "application/json")
-                    return Response(
-                        content=raw_error,
-                        status_code=upstream.status_code,
-                        media_type=ct,
+            raw_sse = ""
+            for attempt in range(_CODEX_TRUNCATED_MAX_ATTEMPTS):
+                if attempt > 0:
+                    await asyncio.sleep(_CODEX_TRUNCATED_RETRY_BACKOFF_S)
+                client, upstream = await post_sse_stream(url=url, headers=headers, body=body)
+                try:
+                    if upstream.status_code >= 400:
+                        raw_error = await upstream.aread()
+                        ct = upstream.headers.get("content-type", "application/json")
+                        return Response(
+                            content=raw_error,
+                            status_code=upstream.status_code,
+                            media_type=ct,
+                        )
+                    raw_sse = (await upstream.aread()).decode("utf-8", errors="replace")
+                finally:
+                    await upstream.aclose()
+                    await client.aclose()
+                try:
+                    responses_payload = aggregate_responses_sse(raw_sse)
+                    chat_payload = translate_responses_to_chat_completion(responses_payload)
+                except (ValueError, KeyError, TypeError) as exc:
+                    if (
+                        _is_retryable_truncated_codex_stream(exc)
+                        and attempt + 1 < _CODEX_TRUNCATED_MAX_ATTEMPTS
+                    ):
+                        continue
+                    if _is_retryable_truncated_codex_stream(exc):
+                        resp_id = _extract_codex_response_id(raw_sse)
+                        logger.warning(
+                            "proxy codex oauth non-stream truncated upstream stream "
+                            "(bytes={bytes} resp_id={resp_id})",
+                            bytes=len(raw_sse),
+                            resp_id=resp_id or "unknown",
+                        )
+                        return JSONResponse(
+                            {
+                                "detail": {
+                                    "code": "upstream_truncated",
+                                    "message": str(exc),
+                                    "resp_id": resp_id,
+                                },
+                            },
+                            status_code=503,
+                        )
+                    snippet = raw_sse[:300].replace("\n", "\\n")
+                    logger.warning(
+                        "proxy codex oauth non-stream aggregation failed "
+                        "(bytes={bytes} error={error_type}: {error}); "
+                        "raw_head={snippet!r}; returning 502",
+                        bytes=len(raw_sse),
+                        error_type=type(exc).__name__,
+                        error=str(exc),
+                        snippet=snippet,
                     )
-                raw_sse = (await upstream.aread()).decode("utf-8", errors="replace")
-            finally:
-                await upstream.aclose()
-                await client.aclose()
-            try:
-                responses_payload = aggregate_responses_sse(raw_sse)
-                chat_payload = translate_responses_to_chat_completion(responses_payload)
-            except (ValueError, KeyError, TypeError) as exc:
-                # The upstream SSE body carries no auth secrets (tokens live in the
-                # request headers, never the response stream), so a short head
-                # snippet is safe to log; truncate to keep it one line and avoid
-                # dumping large reasoning.encrypted_content blobs.
-                snippet = raw_sse[:300].replace("\n", "\\n")
-                logger.warning(
-                    "proxy codex oauth non-stream aggregation failed "
-                    "(bytes={bytes} error={error_type}: {error}); "
-                    "raw_head={snippet!r}; returning 502",
-                    bytes=len(raw_sse),
-                    error_type=type(exc).__name__,
-                    error=str(exc),
-                    snippet=snippet,
-                )
-                return JSONResponse(
-                    {"detail": "invalid upstream Responses stream"},
-                    status_code=502,
-                )
-            return JSONResponse(chat_payload)
+                    return JSONResponse(
+                        {"detail": "invalid upstream Responses stream"},
+                        status_code=502,
+                    )
+                else:
+                    return JSONResponse(chat_payload)
+            return JSONResponse(
+                {
+                    "detail": {
+                        "code": "upstream_truncated",
+                        "message": "Codex stream ended without assistant output",
+                    },
+                },
+                status_code=503,
+            )
 
         api_key, base_url = resolve_request_credential(
             workspace,

@@ -69,6 +69,25 @@ def _semlock_names_from_gc() -> set[str]:
     return names
 
 
+def _close_live_multiprocessing_semaphores() -> None:
+    """Best-effort ``close()`` on live semaphore wrappers before unlinking names.
+
+    Examples:
+        >>> _close_live_multiprocessing_semaphores() is None
+        True
+    """
+    sem_types = _mp_semaphore_types()
+    if not sem_types:
+        return
+    for obj in gc.get_objects():
+        with contextlib.suppress(Exception):
+            if not isinstance(obj, sem_types):
+                continue
+            close = getattr(obj, "close", None)
+            if callable(close):
+                close()
+
+
 def release_leaked_multiprocessing_semaphores() -> None:
     """Unlink and unregister named semaphores still referenced at gateway shutdown.
 
@@ -89,6 +108,8 @@ def release_leaked_multiprocessing_semaphores() -> None:
     if not callable(cleanup):
         return
     cleanup_fn = cast("Callable[[str], None]", cleanup)
+    gc.collect()
+    _close_live_multiprocessing_semaphores()
     try:
         names = _semlock_names_from_gc()
     except Exception as exc:

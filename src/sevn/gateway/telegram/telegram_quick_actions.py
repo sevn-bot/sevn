@@ -601,6 +601,8 @@ class QuickActionCallbackHandler:
                 correlation_id=str(platform_mid),
                 queue_mode=self._router._queue_mode,
                 dispatch=self._router._run_turn,
+                channel=msg.channel,
+                chat_id=int(chat_raw) if isinstance(chat_raw, int) else None,
             )
             return QA_REGEN_QUEUED_V1
         polarity_action: Literal["up", "down"] = "up" if action == "up" else "down"

@@ -7,7 +7,9 @@ Exports:
     reconcile_my_sevn_sync_cron_job — mirror ``my_sevn.sync.enabled`` into SQLite.
     reconcile_my_sevn_issues_sync_cron_job — mirror ``my_sevn.issues.sync_enabled`` into SQLite.
     run_scheduled_repo_sync — fetch and fast-forward the source checkout.
+    run_scheduled_repo_sync_with_recovery — cron-owned divergence auto-recovers with ``--latest``.
     run_scheduled_issues_sync — import GitHub issues into the local registry.
+    sync_source_tree — lazy delegate to ``sevn.cli.repo_sync.sync_source_tree``.
 """
 
 from __future__ import annotations
@@ -17,7 +19,6 @@ from typing import TYPE_CHECKING
 
 from loguru import logger
 
-from sevn.cli.repo_sync import resolve_sevn_repo_root, sync_source_tree
 from sevn.config.defaults import DEFAULT_MY_SEVN_ISSUES_SYNC_CRON, DEFAULT_MY_SEVN_SYNC_CRON
 from sevn.config.my_sevn import effective_my_sevn_issues, effective_my_sevn_sync
 from sevn.triggers.cron import compute_next_fire_ns
@@ -26,12 +27,49 @@ if TYPE_CHECKING:
     import sqlite3
     from pathlib import Path
 
+    from sevn.cli.repo_sync import RepoSyncError
+    from sevn.cli.repo_sync import SyncResult as RepoSyncResult
     from sevn.config.workspace_config import WorkspaceConfig
     from sevn.evolution.github_sync import SyncResult
     from sevn.workspace.layout import WorkspaceLayout
 
 MY_SEVN_SYNC_CRON_JOB_ID: str = "sevn_my_sevn_repo_sync"
 MY_SEVN_ISSUES_SYNC_CRON_JOB_ID: str = "sevn_my_sevn_issues_sync"
+
+
+def sync_source_tree(
+    *,
+    repo_root: Path,
+    latest: bool = False,
+    dry_run: bool = False,
+    restart_gateway: bool = True,
+    home: Path | None = None,
+) -> RepoSyncResult:
+    """Lazy delegate to :func:`sevn.cli.repo_sync.sync_source_tree` (monkeypatch-friendly).
+
+    Args:
+        repo_root (Path): sevn.bot checkout root.
+        latest (bool): Force sync to the remote tip.
+        dry_run (bool): Plan without mutating disk or services.
+        restart_gateway (bool): Restart gateway when its user unit is active.
+        home (Path | None): Operator home for service control.
+
+    Returns:
+        RepoSyncResult: Sync outcome from the checkout update.
+
+    Examples:
+        >>> sync_source_tree.__name__
+        'sync_source_tree'
+    """
+    from sevn.cli.repo_sync import sync_source_tree as _sync_source_tree
+
+    return _sync_source_tree(
+        repo_root=repo_root,
+        latest=latest,
+        dry_run=dry_run,
+        restart_gateway=restart_gateway,
+        home=home,
+    )
 
 
 def _resolve_sync_repo_root(*, home: Path | None = None) -> Path:
@@ -50,6 +88,7 @@ def _resolve_sync_repo_root(*, home: Path | None = None) -> Path:
         >>> _resolve_sync_repo_root.__name__
         '_resolve_sync_repo_root'
     """
+    from sevn.cli.errors import CliPreconditionError
     from sevn.cli.repo_sync import RepoSyncError
     from sevn.cli.workspace import load_bound_workspace
     from sevn.config.sevn_repo import resolve_sevn_checkout_for_workspace
@@ -63,9 +102,11 @@ def _resolve_sync_repo_root(*, home: Path | None = None) -> Path:
         )
         if configured is not None:
             return configured
-    except (OSError, ValueError):
+    except (CliPreconditionError, OSError, ValueError):
         pass
     try:
+        from sevn.cli.repo_sync import resolve_sevn_repo_root
+
         return resolve_sevn_repo_root()
     except Exception as exc:
         msg = (
@@ -222,6 +263,80 @@ async def run_scheduled_issues_sync(layout: WorkspaceLayout, ws: WorkspaceConfig
     return result
 
 
+def _repo_sync_error_is_diverged(exc: RepoSyncError) -> bool:
+    """Return True when ``exc`` is the expected fast-forward refusal on a diverged tip.
+
+    Args:
+        exc (RepoSyncError): Failure from :func:`run_scheduled_repo_sync` / ``sync_source_tree``.
+
+    Returns:
+        bool: True when the message indicates diverged local history.
+
+    Examples:
+        >>> from sevn.cli.repo_sync import RepoSyncError
+        >>> _repo_sync_error_is_diverged(RepoSyncError("local history diverged from origin/x"))
+        True
+        >>> _repo_sync_error_is_diverged(RepoSyncError("git fetch failed"))
+        False
+    """
+    return "diverged" in str(exc).casefold()
+
+
+def run_scheduled_repo_sync_with_recovery(
+    *, home: Path | None = None, dry_run: bool = False
+) -> str:
+    """Run scheduled sync; on cron-owned divergence reset to remote with ``--latest``.
+
+    The daily cron owns the configured ``my_sevn.repo_path`` checkout, so a refused
+    ``--ff-only`` sync is auto-recovered once per run instead of failing every morning.
+    Non-divergence failures propagate unchanged.
+
+    Args:
+        home (Path | None): Operator home for optional gateway restart.
+        dry_run (bool): Plan sync steps without mutating disk or services.
+
+    Returns:
+        str: Human-readable outcome for logs.
+
+    Raises:
+        RepoSyncError: When sync fails for reasons other than recoverable divergence.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.isfunction(run_scheduled_repo_sync_with_recovery)
+        True
+    """
+    from sevn.cli.repo_sync import RepoSyncError
+
+    try:
+        return run_scheduled_repo_sync(home=home, dry_run=dry_run)
+    except RepoSyncError as exc:
+        if not _repo_sync_error_is_diverged(exc):
+            raise
+        logger.warning(
+            "my_sevn repo sync cron: local checkout diverged from tracking branch; "
+            "auto-recovering with --latest (run `sevn sync --latest` manually if needed)",
+        )
+        repo_root = _resolve_sync_repo_root(home=home)
+        result = sync_source_tree(
+            repo_root=repo_root,
+            latest=True,
+            dry_run=dry_run,
+            restart_gateway=not dry_run,
+            home=home,
+        )
+        detail = result.detail
+        if not dry_run:
+            logger.info(
+                "my_sevn_repo_sync recovered after divergence updated={} local={} remote={} detail={}",
+                result.updated,
+                result.local_rev[:12],
+                result.remote_rev[:12],
+                detail,
+            )
+        return detail
+
+
 def run_scheduled_repo_sync(*, home: Path | None = None, dry_run: bool = False) -> str:
     """Run ``sync_source_tree`` for the resolved sevn.bot checkout.
 
@@ -266,4 +381,6 @@ __all__ = [
     "reconcile_my_sevn_sync_cron_job",
     "run_scheduled_issues_sync",
     "run_scheduled_repo_sync",
+    "run_scheduled_repo_sync_with_recovery",
+    "sync_source_tree",
 ]

@@ -7,8 +7,8 @@ owner: Alex
 summary: Normalize provider-shaped JSON over async HTTP to a single egress base URL
   (SEVN_PROXY_URL / ProcessSettings.proxy_url), so tier executors bind once per turn
   and never touch raw secrets. LiteLLM may r
-last_updated: '2026-07-12'
-fingerprint: sha256:9465260ed67219a5e1a5b5b4b554e76d0442bbaf53217506002b32769a55fd10
+last_updated: '2026-07-19'
+fingerprint: sha256:a2ad0d78b19ea74ccf88285824347327b48f3d7f88fd12bfa6dd108099244e81
 related: []
 sources:
 - src/sevn/proxy/**
@@ -123,11 +123,7 @@ interfaces:
 - name: web_fetch_json
   file: src/sevn/proxy/web_forward.py
   symbol: web_fetch_json
-specs: []
-personas: []
-prd_profile: null
 ---
-
 
 ## Purpose
 

@@ -1000,18 +1000,14 @@ def test_default_tier_a_reply_category_pools_w7() -> None:
     assert all("{name}" not in reply for reply in named_thanks + named_bye)
 
 
-def test_fast_greeting_triage_uses_category_pool_w7() -> None:
+def test_fast_greeting_triage_uses_strict_category_replies_w8() -> None:
     thanks = try_fast_greeting_triage(current_message="thanks", turn_id="ft-1")
     assert thanks is not None
-    assert thanks.first_message.lower().startswith(
-        ("anytime", "you got", "happy", "no problem", "glad", "my pleasure"),
-    )
+    assert is_strict_greeting_message(thanks.first_message)
 
     bye = try_fast_greeting_triage(current_message="bye", turn_id="fb-1")
     assert bye is not None
-    assert "👋" in bye.first_message or bye.first_message.lower().startswith(
-        ("see", "bye", "take", "goodbye", "later", "catch", "talk"),
-    )
+    assert is_strict_greeting_message(bye.first_message)
 
 
 def test_default_tier_a_reply_never_leaves_name_placeholder() -> None:

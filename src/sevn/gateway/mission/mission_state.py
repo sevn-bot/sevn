@@ -44,6 +44,12 @@ from sevn.gateway.mission.mission_trace_sink import (
 if TYPE_CHECKING:
     from sevn.agent.tracing.sink import TraceEvent
 
+HIGH_LATENCY_ALERT_THRESHOLD_MS = 30_000
+"""``high_latency`` alert threshold (ms); raised from 5 s to reduce log noise (D3)."""
+
+CRITICAL_ALERT_CONSECUTIVE_BREACHES = 3
+"""``channel_down`` / ``high_error_rate`` must breach this many times before paging critical (D4)."""
+
 
 class MissionControlState(MissionControlSnapshotsMixin):
     """Centralized Mission Control state (providers, channels, gateway session metrics)."""
@@ -77,9 +83,26 @@ class MissionControlState(MissionControlSnapshotsMixin):
         self._alerts: list[Alert] = []
         self._max_alerts = max_alerts
         self._alert_rules: list[AlertRule] = [
-            AlertRule("high_error_rate", "error_rate", threshold=0.1, severity="critical"),
-            AlertRule("high_latency", "latency", threshold=5000, severity="warning"),
-            AlertRule("channel_down", "channel_down", threshold=1, severity="critical"),
+            AlertRule(
+                "high_error_rate",
+                "error_rate",
+                threshold=0.1,
+                severity="critical",
+                consecutive_breaches=CRITICAL_ALERT_CONSECUTIVE_BREACHES,
+            ),
+            AlertRule(
+                "high_latency",
+                "latency",
+                threshold=HIGH_LATENCY_ALERT_THRESHOLD_MS,
+                severity="warning",
+            ),
+            AlertRule(
+                "channel_down",
+                "channel_down",
+                threshold=1,
+                severity="critical",
+                consecutive_breaches=CRITICAL_ALERT_CONSECUTIVE_BREACHES,
+            ),
             AlertRule("provider_down", "provider_down", threshold=1, severity="critical"),
         ]
         if token_budget_alerts:
@@ -105,6 +128,9 @@ class MissionControlState(MissionControlSnapshotsMixin):
         self._gateway_disregards = 0
         self._subagent_running: dict[str, int] = {}
         self._subagent_total: dict[str, int] = {"done": 0, "failed": 0, "killed": 0}
+        self._turn_stage_latencies_ms: dict[str, float] = {}
+        self._alert_breach_state: dict[str, tuple[int, float]] = {}
+        """Per-rule consecutive breach count and window start (monotonic seconds)."""
 
     def _session(self, session_id: str) -> SessionMissionStats:
         """Return or create per-session mission stats.
@@ -468,6 +494,62 @@ class MissionControlState(MissionControlSnapshotsMixin):
             self._total_errors += 1
         self._check_alerts()
 
+    def record_turn_stage_latency_ms(self, stage: str, latency_ms: float) -> None:
+        """Record per-stage turn latency for ``high_latency`` attribution (D3).
+
+        Args:
+            stage (str): Turn stage label (for example ``triager``, ``tool-loop``,
+                ``upstream``).
+            latency_ms (float): Observed stage duration in milliseconds.
+
+        Examples:
+            >>> st = MissionControlState()
+            >>> st.record_turn_stage_latency_ms("upstream", 120_000.0)
+            >>> st._turn_stage_latencies_ms["upstream"]
+            120000.0
+        """
+        normalized = stage.strip()
+        if not normalized:
+            return
+        self._turn_stage_latencies_ms[normalized] = float(latency_ms)
+
+    def clear_turn_stage_latencies_ms(self) -> None:
+        """Drop per-turn stage samples so alert attribution stays turn-scoped (D3).
+
+        Examples:
+            >>> st = MissionControlState()
+            >>> st.record_turn_stage_latency_ms("upstream", 1.0)
+            >>> st.clear_turn_stage_latencies_ms()
+            >>> st._turn_stage_latencies_ms
+            {}
+        """
+        self._turn_stage_latencies_ms.clear()
+
+    def _stalling_stage_for_latency(self, latency_ms: float) -> str | None:
+        """Return the stage name best matching a latency sample.
+
+        Args:
+            latency_ms (float): Latest latency sample in milliseconds.
+
+        Returns:
+            str | None: Stage label when stage timings were recorded.
+
+        Examples:
+            >>> st = MissionControlState()
+            >>> st.record_turn_stage_latency_ms("upstream", 120_000.0)
+            >>> st._stalling_stage_for_latency(120_000.0)
+            'upstream'
+        """
+        if not self._turn_stage_latencies_ms:
+            return None
+        for stage, sample_ms in self._turn_stage_latencies_ms.items():
+            if sample_ms == latency_ms:
+                return stage
+        return max(
+            self._turn_stage_latencies_ms,
+            key=lambda name: self._turn_stage_latencies_ms[name],
+        )
+
     def register_channel(self, name: str, adapter_type: str = "") -> None:
         """Ensure ``name`` exists in the channel health map.
 
@@ -625,6 +707,42 @@ class MissionControlState(MissionControlSnapshotsMixin):
         if source:
             self.update_provider(source, error=True)
 
+    def _record_alert_breach(self, rule: AlertRule, *, now_mono: float) -> int:
+        """Increment consecutive breach count for ``rule`` within its debounce window.
+
+        Args:
+            rule (AlertRule): Rule being evaluated.
+            now_mono (float): Monotonic clock sample.
+
+        Returns:
+            int: Consecutive breach count after this sample.
+        Examples:
+            >>> st = MissionControlState()
+            >>> rule = st._alert_rules[0]
+            >>> st._record_alert_breach(rule, now_mono=0.0)
+            1
+        """
+        count, window_start = self._alert_breach_state.get(rule.name, (0, now_mono))
+        if count == 0 or (now_mono - window_start) > rule.window_seconds:
+            count = 1
+            window_start = now_mono
+        else:
+            count += 1
+        self._alert_breach_state[rule.name] = (count, window_start)
+        return count
+
+    def _clear_alert_breach(self, rule_name: str) -> None:
+        """Reset consecutive breach tracking for ``rule_name``.
+
+        Args:
+            rule_name (str): Alert rule name.
+
+        Examples:
+            >>> st = MissionControlState()
+            >>> st._clear_alert_breach("channel_down")
+        """
+        self._alert_breach_state.pop(rule_name, None)
+
     def _check_alerts(self) -> None:
         """Evaluate alert rules against current metrics.
 
@@ -633,28 +751,41 @@ class MissionControlState(MissionControlSnapshotsMixin):
             True
         """
         now_mono = time.monotonic()
+        now_wall = time.time()
         for rule in self._alert_rules:
             if not rule.enabled or rule.silenced_until > now_mono:
                 continue
             value = self._get_metric(rule.metric)
-            if value is not None and value >= rule.threshold:
-                recent = [
-                    a
-                    for a in self._alerts
-                    if a.rule_name == rule.name and time.time() - a.timestamp < rule.window_seconds
-                ]
-                if not recent:
-                    self._fire_alert(
-                        Alert(
-                            rule_name=rule.name,
-                            severity=rule.severity,
-                            message=(
-                                f"{rule.name}: {rule.metric} = {value:.2f} "
-                                f"(threshold: {rule.threshold})"
-                            ),
-                            timestamp=time.time(),
+            if value is None:
+                continue
+            if value < rule.threshold:
+                self._clear_alert_breach(rule.name)
+                continue
+            breach_count = self._record_alert_breach(rule, now_mono=now_mono)
+            if breach_count < rule.consecutive_breaches:
+                continue
+            recent = [
+                a
+                for a in self._alerts
+                if a.rule_name == rule.name and now_wall - a.timestamp < rule.window_seconds
+            ]
+            if not recent:
+                stage_suffix = ""
+                if rule.name == "high_latency":
+                    stage = self._stalling_stage_for_latency(value)
+                    if stage:
+                        stage_suffix = f" (stalling stage: {stage})"
+                self._fire_alert(
+                    Alert(
+                        rule_name=rule.name,
+                        severity=rule.severity,
+                        message=(
+                            f"{rule.name}: {rule.metric} = {value:.2f} "
+                            f"(threshold: {rule.threshold}){stage_suffix}"
                         ),
-                    )
+                        timestamp=now_wall,
+                    ),
+                )
 
     def _get_metric(self, metric: str) -> float | None:
         """Resolve alert metric value.

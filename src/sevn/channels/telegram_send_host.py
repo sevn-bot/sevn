@@ -60,6 +60,7 @@ class TelegramSendHost:
         _dispatch_gate: asyncio.Semaphore
         _pairing_store: Any | None
         _rich_capability: RichCapability | None
+        _chat_action_last_sent: dict[tuple[int, str, int | None], float]
 
         async def _ensure_client(self) -> httpx.AsyncClient | None: ...
 
@@ -75,7 +76,13 @@ class TelegramSendHost:
         @property
         def rich_capability(self) -> RichCapability: ...
 
-        async def _api(self, method: str, body: dict[str, Any]) -> dict[str, Any]: ...
+        async def _api(
+            self,
+            method: str,
+            body: dict[str, Any],
+            *,
+            probe: bool = False,
+        ) -> dict[str, Any]: ...
 
         async def _api_multipart(
             self,
