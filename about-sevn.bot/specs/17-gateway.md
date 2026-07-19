@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-07-19'
-fingerprint: sha256:afba81e5593843ccee0e779b4042ebfa24d26e42145ddf38327e95182e76ddd3
+fingerprint: sha256:e3f4d808e5371eb09f55eb83292cb9b12473e974085caa1cd35db48b3b4df9bb
 related: []
 sources:
 - src/sevn/gateway/**
@@ -984,6 +984,9 @@ interfaces:
 - name: SessionRow
   file: src/sevn/gateway/session_manager.py
   symbol: SessionRow
+- name: clear_dispatch_routing
+  file: src/sevn/gateway/session_manager.py
+  symbol: clear_dispatch_routing
 - name: dispatch_routing_for
   file: src/sevn/gateway/session_manager.py
   symbol: dispatch_routing_for
