@@ -49,6 +49,7 @@ from sevn.config.model_resolution import (
     list_catalog_model_ids,
     resolve_model_slot,
 )
+from sevn.config.version_id import resolve_version_id
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.gateway.commands.shortcuts_store import (
     delete_shortcut,
@@ -1629,6 +1630,26 @@ class MenuActionRouter:
         if suffix == "deployment_id":
             dep_id = getattr(self._router, "_deployment_id", None) or "unset"
             toast = f"Deployment id: {dep_id}"
+            md = msg.metadata if isinstance(msg.metadata, dict) else {}
+            cq_id = md.get("callback_query_id")
+            cq_str = cq_id.strip() if isinstance(cq_id, str) else ""
+            adapter = self._router._adapters.get(msg.channel)
+            if adapter is not None and cq_str:
+                await _answer_callback(adapter, callback_query_id=cq_str, text=toast)
+                return None
+            return toast
+        if suffix == "version_id":
+            vid = getattr(self._router, "_version_id", None)
+            if not isinstance(vid, str) or not vid.strip():
+                doc = load_raw_sevn_json(self._sevn_json)
+                stored = doc.get("version_id")
+                if isinstance(stored, str) and stored.strip():
+                    vid = stored.strip()
+                else:
+                    vid = resolve_version_id(repo_root=self._content_root)
+            else:
+                vid = vid.strip()
+            toast = f"Version id: {vid}"
             md = msg.metadata if isinstance(msg.metadata, dict) else {}
             cq_id = md.get("callback_query_id")
             cq_str = cq_id.strip() if isinstance(cq_id, str) else ""

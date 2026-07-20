@@ -115,6 +115,7 @@ const providerHealthBadge = document.querySelector("#provider-health-badge");
 const approvalPendingBadge = document.querySelector("#approval-pending-badge");
 const systemMenuToggle = document.querySelector("#system-menu-toggle");
 const systemMenuPanel = document.querySelector("#system-menu-panel");
+const systemVersionId = document.querySelector("#system-version-id");
 const commandPalette = document.querySelector("#command-palette");
 const paletteQuery = document.querySelector("#palette-query");
 const paletteResults = document.querySelector("#palette-results");
@@ -4699,6 +4700,23 @@ function setSystemMenuOpen(open) {
   systemMenuToggle.setAttribute("aria-expanded", open ? "true" : "false");
 }
 
+async function refreshSystemVersionId() {
+  if (!(systemVersionId instanceof HTMLElement)) return;
+  try {
+    const cfg = await apiGet("/api/v1/config");
+    const vid = typeof cfg.version_id === "string" ? cfg.version_id.trim() : "";
+    if (!vid) {
+      systemVersionId.hidden = true;
+      systemVersionId.textContent = "Version id: —";
+      return;
+    }
+    systemVersionId.hidden = false;
+    systemVersionId.textContent = `Version id: ${vid}`;
+  } catch (_err) {
+    systemVersionId.hidden = true;
+  }
+}
+
 function openCommandPalette() {
   if (!commandPalette || !paletteQuery) return;
   commandPalette.hidden = false;
@@ -4954,6 +4972,7 @@ async function boot() {
   renderNav();
   if (!authRequired) {
     await refreshHealthBadges();
+    await refreshSystemVersionId();
     await refreshPendingToolApprovals();
     connectDashboardHealthWs();
     renderContent();

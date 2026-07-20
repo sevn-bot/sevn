@@ -1541,9 +1541,9 @@ def _build_my_sevn_bot_keyboard_rows(
 
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
-        >>> rows = _build_my_sevn_bot_keyboard_rows(WorkspaceConfig.minimal(), is_owner=True)
-        >>> rows[-1][0]["callback_data"]
-        'cfg:logs:deployment_id'
+        >>> rows = _build_my_sevn_bot_keyboard_rows(WorkspaceConfig.minimal(), is_owner=False)
+        >>> [btn["callback_data"] for row in rows for btn in row]
+        ['cfg:logs:deployment_id', 'cfg:logs:version_id']
     """
     _ = workspace
     rows: list[list[dict[str, Any]]] = []
@@ -1551,6 +1551,7 @@ def _build_my_sevn_bot_keyboard_rows(
         rows.append([{"text": "🔄 Restart gateway", "callback_data": "act:gateway:restart"}])
         rows.append([{"text": "🔄 Restart proxy", "callback_data": "act:proxy:restart"}])
     rows.append([{"text": "🆔 Deployment id", "callback_data": "cfg:logs:deployment_id"}])
+    rows.append([{"text": "🏷 Version id", "callback_data": "cfg:logs:version_id"}])
     return rows
 
 
@@ -2510,7 +2511,7 @@ def _build_skills_keyboard_rows(
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
         >>> _build_skills_keyboard_rows(WorkspaceConfig.minimal())
-        [[{'text': '📱 Social Media Manager', 'callback_data': 'cfg:section:skills:social_media_manager'}], [{'text': '📀 Discogs', 'callback_data': 'cfg:section:skills:discogs'}]]
+        [[{'text': '📱 Social Media Manager', 'callback_data': 'cfg:section:skills:social_media_manager'}]]
     """
     rows: list[list[dict[str, Any]]] = []
     url = _mission_control_url(workspace, fragment="skills")
@@ -3934,7 +3935,7 @@ def config_menu_message_text(
         lines = [
             "My sevn bot",
             "",
-            "This gateway instance: deployment id and owner service restarts.",
+            "This gateway instance: deployment id, version id, and owner service restarts.",
         ]
         if is_owner:
             lines.append("Restart gateway or proxy below (two-step confirm).")

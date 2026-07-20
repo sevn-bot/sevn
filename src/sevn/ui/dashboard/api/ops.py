@@ -52,6 +52,7 @@ from sevn.agent.tracing.logfire_config import (
 from sevn.cli.repo_sync import RepoSyncError, resolve_sevn_repo_root
 from sevn.cli.workspace_schema import load_workspace_json_schema
 from sevn.config.loader import load_workspace
+from sevn.config.version_id import resolve_version_id
 from sevn.config.workspace_config import (
     SecurityWorkspaceConfig,
     TriggersWorkspaceConfig,
@@ -262,6 +263,44 @@ def _redact_secret_refs_in_value(value: object) -> object:
     if isinstance(value, list):
         return [_redact_secret_refs_in_value(item) for item in value]
     return value
+
+
+def _config_version_id(
+    layout: WorkspaceLayout,
+    raw: dict[str, Any],
+    *,
+    request: Request | None = None,
+) -> str:
+    """Return the effective build ``version_id`` for Mission Control (D4).
+
+    Prefers the persisted ``sevn.json`` value, then a gateway router stash when
+    the dashboard shares a live gateway process, else :func:`resolve_version_id`.
+
+    Args:
+        layout (WorkspaceLayout): Active workspace layout.
+        raw (dict[str, Any]): Parsed ``sevn.json`` document (unredacted).
+        request (Request | None, optional): FastAPI request for router stash lookup.
+
+    Returns:
+        str: Non-empty build identity string for operators.
+
+    Examples:
+        >>> from pathlib import Path
+        >>> from sevn.workspace.layout import WorkspaceLayout
+        >>> lay = WorkspaceLayout(Path("/tmp/sevn.json"), Path("/tmp"))
+        >>> _config_version_id(lay, {"version_id": " build-1 "})
+        'build-1'
+    """
+    existing = raw.get("version_id")
+    if isinstance(existing, str) and existing.strip():
+        return existing.strip()
+    if request is not None:
+        router = getattr(request.app.state, "gateway_router", None)
+        if router is not None:
+            stashed = getattr(router, "_version_id", None)
+            if isinstance(stashed, str) and stashed.strip():
+                return stashed.strip()
+    return resolve_version_id(repo_root=layout.content_root)
 
 
 def _redact_config_document(doc: dict[str, Any]) -> dict[str, Any]:
@@ -687,6 +726,7 @@ async def config_get(
     return {
         "sevn_json": str(layout.sevn_json_path),
         "schema_version": ws.schema_version,
+        "version_id": _config_version_id(layout, raw, request=request),
         "document": _redact_config_document(raw),
     }
 

@@ -1122,6 +1122,15 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         implemented=True,
         notes="Shows gateway deployment id in chat",
     )
+    add(
+        "C20.7a",
+        _exact("cfg:logs:version_id"),
+        "C",
+        "my_sevn_bot",
+        "Version id",
+        implemented=True,
+        notes="Shows build version_id from sevn.json in chat",
+    )
 
     # --- C21. sevn.bot ---
     add(
