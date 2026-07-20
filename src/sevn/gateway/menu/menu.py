@@ -16,6 +16,7 @@ Exports:
     refresh_config_menu_message — re-edit caption + keyboard after config mutations.
     subagent_menu_snapshot_from_router — live L1/L2 counts for Sub-agents menu screens.
     format_running_agents_inventory — rich ``/agents`` running-run formatter (D6).
+    build_stop_l1_keyboard — ``/stop`` L1 kill picker inline keyboard (D7/D11).
     build_chat_menu_webapp_request — ``setChatMenuButton`` body for viewer launch (M2).
     sync_telegram_chat_menu_button — push or clear the chat menu Web App button (D12).
     MenuCallbackHandler — ``menu:*`` / ``nav:*`` edit-in-place handler (Wave B1).
@@ -3218,6 +3219,142 @@ def _build_subagents_keyboard_rows(
     return rows
 
 
+def _subagent_kill_button_label_config(row: dict[str, Any]) -> str:
+    """Label for Config→Sub-agents Running kill rows.
+
+    Args:
+        row (dict[str, Any]): Serialized running row (id/role/level).
+
+    Returns:
+        str: Telegram inline button label.
+
+    Examples:
+        >>> _subagent_kill_button_label_config(
+        ...     {"id": "a1", "role": "tier_b", "level": 1},
+        ... )
+        'Kill a1 L1 tier_b'
+    """
+    run_id = str(row.get("id", "")).strip()
+    role = str(row.get("role", "?"))
+    level = row.get("level", "?")
+    return f"Kill {run_id} L{level} {role}"
+
+
+def _stop_l1_button_label(row: dict[str, Any]) -> str:
+    """Label for ``/stop`` picker rows: short id + role + truncated task summary (D7).
+
+    Args:
+        row (dict[str, Any]): Serialized level-1 running row.
+
+    Returns:
+        str: Telegram inline button label.
+
+    Examples:
+        >>> _stop_l1_button_label(
+        ...     {"id": "a1", "role": "tier_b", "level": 1, "task_summary": "slow job"},
+        ... )
+        'a1 tier_b slow job'
+    """
+    run_id = str(row.get("id", "")).strip()
+    role = str(row.get("role", "?"))
+    summary = " ".join(str(row.get("task_summary", "")).split())
+    if len(summary) > 20:
+        summary = summary[:19].rstrip() + "…"
+    parts = [run_id, role]
+    if summary:
+        parts.append(summary)
+    return " ".join(parts)
+
+
+def _build_subagent_kill_keyboard_rows(
+    rows: Sequence[dict[str, Any]],
+    *,
+    is_owner: bool,
+    label_for_row: Callable[[dict[str, Any]], str],
+    kill_all_label: str,
+    max_buttons: int = 8,
+) -> list[list[dict[str, Any]]]:
+    """Build owner-only kill inline rows shared by Config Running and ``/stop`` (D7/D11).
+
+    Args:
+        rows (Sequence[dict[str, Any]]): Serialized running rows to expose as kill targets.
+        is_owner (bool): When ``False``, omit kill buttons.
+        label_for_row (Callable[[dict[str, Any]], str]): Per-row button label builder.
+        kill_all_label (str): Text for the ``act:subagents:kill_all`` button.
+        max_buttons (int): Maximum per-run kill buttons before the ALL row.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> _build_subagent_kill_keyboard_rows(
+        ...     ({"id": "a1", "role": "tier_b", "level": 1},),
+        ...     is_owner=True,
+        ...     label_for_row=_subagent_kill_button_label_config,
+        ...     kill_all_label="Kill all L1",
+        ... )[0][0]["callback_data"]
+        'act:subagents:kill:a1'
+    """
+    keyboard: list[list[dict[str, Any]]] = []
+    if rows and is_owner:
+        for row in rows[:max_buttons]:
+            run_id = str(row.get("id", "")).strip()
+            if not run_id:
+                continue
+            keyboard.append(
+                [
+                    {
+                        "text": label_for_row(row),
+                        "callback_data": f"act:subagents:kill:{run_id}",
+                    },
+                ],
+            )
+        keyboard.append(
+            [
+                {
+                    "text": kill_all_label,
+                    "callback_data": "act:subagents:kill_all",
+                },
+            ],
+        )
+    return keyboard
+
+
+def build_stop_l1_keyboard(
+    running_rows: Sequence[dict[str, Any]],
+    *,
+    is_owner: bool,
+) -> dict[str, Any]:
+    """Build ``/stop`` inline keyboard for active level-1 runs (D7/D11).
+
+    Args:
+        running_rows (Sequence[dict[str, Any]]): Serialized registry rows.
+        is_owner (bool): When ``False``, omit kill buttons.
+
+    Returns:
+        dict[str, Any]: ``reply_markup``-shaped dict for outbound metadata.
+
+    Examples:
+        >>> kb = build_stop_l1_keyboard(
+        ...     ({"id": "a1", "role": "tier_b", "level": 1, "task_summary": "slow"},),
+        ...     is_owner=True,
+        ... )
+        >>> kb["inline_keyboard"][-1][0]["callback_data"]
+        'act:subagents:kill_all'
+    """
+    l1_rows = sorted(
+        (row for row in running_rows if row.get("level") == 1),
+        key=lambda row: str(row.get("id", "")),
+    )
+    inline = _build_subagent_kill_keyboard_rows(
+        l1_rows,
+        is_owner=is_owner,
+        label_for_row=_stop_l1_button_label,
+        kill_all_label="ALL",
+    )
+    return {"inline_keyboard": inline}
+
+
 def _build_subagents_running_keyboard_rows(
     running_rows: tuple[dict[str, Any], ...],
     *,
@@ -3240,30 +3377,13 @@ def _build_subagents_running_keyboard_rows(
         >>> rows[0][0]["callback_data"]
         'act:subagents:kill:a1'
     """
-    rows: list[list[dict[str, Any]]] = []
-    if running_rows and is_owner:
-        for row in running_rows[:8]:
-            run_id = str(row.get("id", "")).strip()
-            if not run_id:
-                continue
-            role = str(row.get("role", "?"))
-            level = row.get("level", "?")
-            rows.append(
-                [
-                    {
-                        "text": f"Kill {run_id} L{level} {role}",
-                        "callback_data": f"act:subagents:kill:{run_id}",
-                    },
-                ],
-            )
-        rows.append(
-            [
-                {
-                    "text": "Kill all L1",
-                    "callback_data": "act:subagents:kill_all",
-                },
-            ],
-        )
+    kill_rows = _build_subagent_kill_keyboard_rows(
+        running_rows,
+        is_owner=is_owner,
+        label_for_row=_subagent_kill_button_label_config,
+        kill_all_label="Kill all L1",
+    )
+    rows: list[list[dict[str, Any]]] = list(kill_rows)
     rows.append([{"text": "⬅ Sub-agents", "callback_data": "cfg:section:subagents"}])
     return rows
 
@@ -5174,6 +5294,7 @@ __all__ = [
     "build_chat_menu_webapp_request",
     "build_config_menu_keyboard",
     "build_menu_keyboard",
+    "build_stop_l1_keyboard",
     "config_callback_matches",
     "config_menu_message_text",
     "config_menu_nav_clear",

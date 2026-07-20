@@ -22,6 +22,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- [2026-07-20] Telegram ``/stop`` shows per-L1 stop buttons plus ALL when level-1 sub-agents are running; empty path keeps session cancel (#27)
 - [2026-07-20] Telegram ``/agents`` slash command and menu shortcuts list running L1/L2 sub-agents with parent grouping (#28)
 - [2026-07-20] Show ``version_id`` in Mission Control System menu and Telegram Config → My sevn bot (alongside deployment id)
 - [2026-07-19] Persist ``version_id`` build identity in ``sevn.json`` at gateway boot (env > git > package > unknown; distinct from deployment_id)

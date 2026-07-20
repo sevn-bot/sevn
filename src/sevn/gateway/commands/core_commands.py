@@ -6,6 +6,8 @@ Depends: sevn.config.model_resolution, sevn.gateway.commands.ask_config,
 
 Exports:
     CoreCommandHandler — ``/start`` … ``/model`` + deep-link handoffs.
+    CoreCommandReply — slash reply with optional ``reply_markup`` (D9).
+    core_command_outbound — split handler result for Telegram send path.
 Examples:
     >>> from sevn.gateway.commands.core_commands import CoreCommandHandler
     >>> CoreCommandHandler.__name__
@@ -15,6 +17,7 @@ Examples:
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from sevn.config.model_resolution import ModelSlot, resolve_model_slot
@@ -37,11 +40,43 @@ _START_WELCOME = (
     "Open /config for the full menu."
 )
 _UNKNOWN_COMMAND = "Unknown command — try `/help`."
+_STOP_L1_PICKER_COPY = "Select a level-1 agent to stop, or ALL to stop every L1 run."
+_STOP_L1_OWNER_ONLY_COPY = "Running level-1 agents. Kill controls are owner-only."
 
 # Kokoro voice codes look like ``bf_emma`` / ``af_heart`` / ``am_michael`` (2-letter
 # lang+gender prefix, underscore, name). This never collides with the mode keywords
 # (``on``/``off``/``all``/``when_asked``/``reset``/``toggle``) since none match the shape.
 _VOICE_CODE_RE = re.compile(r"^[a-z]{2}_[a-z]+$")
+
+
+@dataclass(frozen=True, slots=True)
+class CoreCommandReply:
+    """Slash handler result with optional Telegram inline keyboard (D9)."""
+
+    text: str
+    reply_markup: dict[str, Any] | None = None
+
+
+def core_command_outbound(
+    reply: str | CoreCommandReply,
+) -> tuple[str, dict[str, Any] | None]:
+    """Split a core handler result into outbound text and optional ``reply_markup``.
+
+    Args:
+        reply (str | CoreCommandReply): Plain text or structured slash reply.
+
+    Returns:
+        tuple[str, dict[str, Any] | None]: Send text and optional inline keyboard.
+
+    Examples:
+        >>> core_command_outbound("Stopped.")
+        ('Stopped.', None)
+        >>> core_command_outbound(CoreCommandReply("Pick", reply_markup={"inline_keyboard": []}))
+        ('Pick', {'inline_keyboard': []})
+    """
+    if isinstance(reply, CoreCommandReply):
+        return reply.text, reply.reply_markup
+    return reply, None
 
 
 def _voice_mode_label(workspace: WorkspaceConfig) -> str:
@@ -130,7 +165,12 @@ class CoreCommandHandler:
         name = cmd.lstrip("/")
         return find_shortcut(self._content_root, name) is not None
 
-    async def handle(self, msg: IncomingMessage, *, session_id: str) -> str | None:
+    async def handle(
+        self,
+        msg: IncomingMessage,
+        *,
+        session_id: str,
+    ) -> str | CoreCommandReply | None:
         """Run the matching core command and return user-visible text.
 
         Args:
@@ -138,7 +178,8 @@ class CoreCommandHandler:
             session_id (str): Active gateway session id.
 
         Returns:
-            str | None: Reply text, or ``None`` when a submenu handler sends separately.
+            str | CoreCommandReply | None: Reply text (optionally with keyboard), or
+                ``None`` when a submenu handler sends separately.
 
         Examples:
             >>> import inspect
@@ -160,7 +201,7 @@ class CoreCommandHandler:
         if cmd == "/agents":
             return await self._handle_agents()
         if cmd == "/stop":
-            return await self._handle_stop(session_id)
+            return await self._handle_stop(msg, session_id)
         if cmd == "/config":
             return None  # ConfigMenuHandler opens keyboard separately
         if cmd == "/voice":
@@ -240,7 +281,7 @@ class CoreCommandHandler:
             "/new — new session\n"
             "/status — session status\n"
             "/agents — running sub-agents\n"
-            "/stop — cancel in-flight run\n"
+            "/stop — stop L1 agents or cancel in-flight run\n"
             "/config — configuration menu\n"
             "/voice — voice settings\n"
             "/model — model settings\n"
@@ -269,21 +310,53 @@ class CoreCommandHandler:
         short = new_id[:8] if len(new_id) >= 8 else new_id
         return f"Started a new session ({short}…). Previous in-flight work was cancelled."
 
-    async def _handle_stop(self, session_id: str) -> str:
-        """Cancel the active dispatch task for ``/stop``.
+    async def _handle_stop(
+        self,
+        msg_or_session_id: IncomingMessage | str,
+        session_id: str | None = None,
+    ) -> str | CoreCommandReply:
+        """Stop L1 sub-agents via inline picker, or cancel session dispatch (D7/D8).
+
+        When at least one level-1 run is active, do not auto-kill: return a picker
+        keyboard reusing Config→Sub-agents kill callbacks. When no L1 runs exist,
+        preserve the session ``cancel_active_dispatch`` path and ``\"Stopped.\"`` copy.
 
         Args:
-            session_id (str): Active gateway session id.
+            msg_or_session_id (IncomingMessage | str): Inbound slash/menu message, or
+                legacy unit-test call with session id only (no L1 picker path).
+            session_id (str | None): Active gateway session id when the first arg is
+                an :class:`IncomingMessage`.
 
         Returns:
-            str: Confirmation copy.
+            str | CoreCommandReply: Confirmation copy, or picker text with keyboard.
 
         Examples:
             >>> import inspect
             >>> inspect.iscoroutinefunction(CoreCommandHandler._handle_stop)
             True
         """
-        await self._sessions.cancel_active_dispatch(session_id)
+        from sevn.gateway.channel_router import IncomingMessage
+        from sevn.gateway.menu.menu import (
+            build_stop_l1_keyboard,
+            subagent_menu_snapshot_from_router,
+        )
+
+        if isinstance(msg_or_session_id, str):
+            msg = IncomingMessage(channel="telegram", user_id="", text="/stop")
+            sid = msg_or_session_id
+        else:
+            msg = msg_or_session_id
+            if session_id is None:
+                raise TypeError("session_id required when first argument is IncomingMessage")
+            sid = session_id
+
+        level1_count, _level2, rows = await subagent_menu_snapshot_from_router(self._router)
+        if level1_count >= 1:
+            is_owner = self._router._resolve_owner_flag(msg)
+            markup = build_stop_l1_keyboard(rows, is_owner=is_owner)
+            copy = _STOP_L1_PICKER_COPY if is_owner else _STOP_L1_OWNER_ONLY_COPY
+            return CoreCommandReply(text=copy, reply_markup=markup)
+        await self._sessions.cancel_active_dispatch(sid)
         return "Stopped."
 
     def _handle_status(self, session_id: str) -> str:
@@ -563,4 +636,4 @@ def _dashboard_url(workspace: WorkspaceConfig) -> str | None:
     return None
 
 
-__all__ = ["CoreCommandHandler"]
+__all__ = ["CoreCommandHandler", "CoreCommandReply", "core_command_outbound"]

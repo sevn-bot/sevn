@@ -53,7 +53,7 @@ def core_bot_commands() -> list[dict[str, str]]:
         {"command": "new", "description": "New session"},
         {"command": "status", "description": "Status"},
         {"command": "agents", "description": "Running sub-agents"},
-        {"command": "stop", "description": "Stop in-flight run"},
+        {"command": "stop", "description": "Stop L1 agents or in-flight run"},
         {"command": "config", "description": "Configuration menu"},
         {"command": "voice", "description": "Voice settings"},
         {"command": "model", "description": "Model settings"},
