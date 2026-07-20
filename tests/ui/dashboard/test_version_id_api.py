@@ -7,8 +7,12 @@ import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from starlette.testclient import TestClient
+
+if TYPE_CHECKING:
+    import pytest
 
 from sevn.config.workspace_config import (
     DashboardWorkspaceConfig,
@@ -66,8 +70,12 @@ def _login(client: TestClient) -> None:
     assert client.cookies.get(DASHBOARD_CSRF_COOKIE_NAME)
 
 
-def test_config_payload_includes_top_level_version_id(tmp_path: Path) -> None:
+def test_config_payload_includes_top_level_version_id(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """D4: system/config metadata JSON exposes ``version_id`` for System menu."""
+    monkeypatch.setenv("SEVN_VERSION_ID", "mc-build-7")
     with _client(tmp_path, version_id="mc-build-7") as client:
         _login(client)
         resp = client.get("/api/v1/config")

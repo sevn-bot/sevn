@@ -14,9 +14,7 @@ Exports:
     get_config_menu_nav — load per-message stack state.
     config_menu_nav_push_current — push without leaving screen (restart confirm).
     refresh_config_menu_message — re-edit caption + keyboard after config mutations.
-    subagent_menu_snapshot_from_router — live L1/L2 counts for Sub-agents menu screens.
-    format_running_agents_inventory — rich ``/agents`` running-run formatter (D6).
-    build_stop_l1_keyboard — ``/stop`` L1 kill picker inline keyboard (D7/D11).
+    is_registered_config_menu_host — whether a message hosts an active ``/config`` stack.
     build_chat_menu_webapp_request — ``setChatMenuButton`` body for viewer launch (M2).
     sync_telegram_chat_menu_button — push or clear the chat menu Web App button (D12).
     MenuCallbackHandler — ``menu:*`` / ``nav:*`` edit-in-place handler (Wave B1).
@@ -90,6 +88,13 @@ from sevn.gateway.menu.menu_branding import (
 from sevn.gateway.menu.social_media_manager_menu import (
     build_social_media_manager_keyboard_rows,
     social_media_manager_menu_caption,
+)
+from sevn.gateway.subagents.surfaces import (
+    build_stop_l1_keyboard,
+    build_subagent_kill_keyboard_rows,
+    format_running_agents_inventory,
+    subagent_kill_button_label_config,
+    subagent_menu_snapshot_from_router,
 )
 from sevn.onboarding.seed import resolve_agent_display_name
 from sevn.second_brain.paths import (
@@ -398,6 +403,34 @@ def config_menu_nav_clear(router: ChannelRouter, chat_id: int, message_id: int) 
         {}
     """
     router._config_menu_nav.pop(config_menu_nav_key(chat_id, message_id), None)
+
+
+def is_registered_config_menu_host(
+    router: ChannelRouter,
+    chat_id: int,
+    message_id: int,
+) -> bool:
+    """Return ``True`` when *message_id* hosts an active ``/config`` menu stack.
+
+    Slash ``/stop`` picker messages are not registered hosts; kill callbacks on
+    those messages must refresh the picker in place instead of re-editing as config.
+
+    Args:
+        router (ChannelRouter): Gateway router holding ``_config_menu_nav``.
+        chat_id (int): Telegram chat id.
+        message_id (int): Telegram message id.
+
+    Returns:
+        bool: Whether nav state exists for this message without creating it.
+
+    Examples:
+        >>> from sevn.gateway.channel_router import ChannelRouter
+        >>> r = ChannelRouter.__new__(ChannelRouter)
+        >>> r._config_menu_nav = {}
+        >>> is_registered_config_menu_host(r, 1, 2)
+        False
+    """
+    return config_menu_nav_key(chat_id, message_id) in router._config_menu_nav
 
 
 _SHORTCUTS_MENU_LIMIT = 8
@@ -3219,142 +3252,6 @@ def _build_subagents_keyboard_rows(
     return rows
 
 
-def _subagent_kill_button_label_config(row: dict[str, Any]) -> str:
-    """Label for Config→Sub-agents Running kill rows.
-
-    Args:
-        row (dict[str, Any]): Serialized running row (id/role/level).
-
-    Returns:
-        str: Telegram inline button label.
-
-    Examples:
-        >>> _subagent_kill_button_label_config(
-        ...     {"id": "a1", "role": "tier_b", "level": 1},
-        ... )
-        'Kill a1 L1 tier_b'
-    """
-    run_id = str(row.get("id", "")).strip()
-    role = str(row.get("role", "?"))
-    level = row.get("level", "?")
-    return f"Kill {run_id} L{level} {role}"
-
-
-def _stop_l1_button_label(row: dict[str, Any]) -> str:
-    """Label for ``/stop`` picker rows: short id + role + truncated task summary (D7).
-
-    Args:
-        row (dict[str, Any]): Serialized level-1 running row.
-
-    Returns:
-        str: Telegram inline button label.
-
-    Examples:
-        >>> _stop_l1_button_label(
-        ...     {"id": "a1", "role": "tier_b", "level": 1, "task_summary": "slow job"},
-        ... )
-        'a1 tier_b slow job'
-    """
-    run_id = str(row.get("id", "")).strip()
-    role = str(row.get("role", "?"))
-    summary = " ".join(str(row.get("task_summary", "")).split())
-    if len(summary) > 20:
-        summary = summary[:19].rstrip() + "…"
-    parts = [run_id, role]
-    if summary:
-        parts.append(summary)
-    return " ".join(parts)
-
-
-def _build_subagent_kill_keyboard_rows(
-    rows: Sequence[dict[str, Any]],
-    *,
-    is_owner: bool,
-    label_for_row: Callable[[dict[str, Any]], str],
-    kill_all_label: str,
-    max_buttons: int = 8,
-) -> list[list[dict[str, Any]]]:
-    """Build owner-only kill inline rows shared by Config Running and ``/stop`` (D7/D11).
-
-    Args:
-        rows (Sequence[dict[str, Any]]): Serialized running rows to expose as kill targets.
-        is_owner (bool): When ``False``, omit kill buttons.
-        label_for_row (Callable[[dict[str, Any]], str]): Per-row button label builder.
-        kill_all_label (str): Text for the ``act:subagents:kill_all`` button.
-        max_buttons (int): Maximum per-run kill buttons before the ALL row.
-
-    Returns:
-        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
-
-    Examples:
-        >>> _build_subagent_kill_keyboard_rows(
-        ...     ({"id": "a1", "role": "tier_b", "level": 1},),
-        ...     is_owner=True,
-        ...     label_for_row=_subagent_kill_button_label_config,
-        ...     kill_all_label="Kill all L1",
-        ... )[0][0]["callback_data"]
-        'act:subagents:kill:a1'
-    """
-    keyboard: list[list[dict[str, Any]]] = []
-    if rows and is_owner:
-        for row in rows[:max_buttons]:
-            run_id = str(row.get("id", "")).strip()
-            if not run_id:
-                continue
-            keyboard.append(
-                [
-                    {
-                        "text": label_for_row(row),
-                        "callback_data": f"act:subagents:kill:{run_id}",
-                    },
-                ],
-            )
-        keyboard.append(
-            [
-                {
-                    "text": kill_all_label,
-                    "callback_data": "act:subagents:kill_all",
-                },
-            ],
-        )
-    return keyboard
-
-
-def build_stop_l1_keyboard(
-    running_rows: Sequence[dict[str, Any]],
-    *,
-    is_owner: bool,
-) -> dict[str, Any]:
-    """Build ``/stop`` inline keyboard for active level-1 runs (D7/D11).
-
-    Args:
-        running_rows (Sequence[dict[str, Any]]): Serialized registry rows.
-        is_owner (bool): When ``False``, omit kill buttons.
-
-    Returns:
-        dict[str, Any]: ``reply_markup``-shaped dict for outbound metadata.
-
-    Examples:
-        >>> kb = build_stop_l1_keyboard(
-        ...     ({"id": "a1", "role": "tier_b", "level": 1, "task_summary": "slow"},),
-        ...     is_owner=True,
-        ... )
-        >>> kb["inline_keyboard"][-1][0]["callback_data"]
-        'act:subagents:kill_all'
-    """
-    l1_rows = sorted(
-        (row for row in running_rows if row.get("level") == 1),
-        key=lambda row: str(row.get("id", "")),
-    )
-    inline = _build_subagent_kill_keyboard_rows(
-        l1_rows,
-        is_owner=is_owner,
-        label_for_row=_stop_l1_button_label,
-        kill_all_label="ALL",
-    )
-    return {"inline_keyboard": inline}
-
-
 def _build_subagents_running_keyboard_rows(
     running_rows: tuple[dict[str, Any], ...],
     *,
@@ -3377,10 +3274,10 @@ def _build_subagents_running_keyboard_rows(
         >>> rows[0][0]["callback_data"]
         'act:subagents:kill:a1'
     """
-    kill_rows = _build_subagent_kill_keyboard_rows(
+    kill_rows = build_subagent_kill_keyboard_rows(
         running_rows,
         is_owner=is_owner,
-        label_for_row=_subagent_kill_button_label_config,
+        label_for_row=subagent_kill_button_label_config,
         kill_all_label="Kill all L1",
     )
     rows: list[list[dict[str, Any]]] = list(kill_rows)
@@ -3500,144 +3397,6 @@ def _config_chrome(*, include_back: bool = True) -> list[list[dict[str, Any]]]:
     row.append({"text": "🏠 Home", "callback_data": "cfg:nav:home"})
     row.append({"text": "❌ Close", "callback_data": "cfg:nav:close"})
     return [row]
-
-
-async def subagent_menu_snapshot_from_router(
-    router: ChannelRouter | None,
-) -> tuple[int, int, tuple[dict[str, Any], ...]]:
-    """Fetch live sub-agent counts and running rows for Telegram menu captions.
-
-    Args:
-        router (ChannelRouter | None): Gateway router (may lack supervisor when unwired).
-
-    Returns:
-        tuple[int, int, tuple[dict[str, Any], ...]]: ``(level1_count, level2_count, running_rows)``.
-
-    Examples:
-        >>> import asyncio
-        >>> asyncio.run(subagent_menu_snapshot_from_router(None))
-        (0, 0, ())
-    """
-    if router is None:
-        return 0, 0, ()
-    supervisor = getattr(router, "_subagent_supervisor", None)
-    if supervisor is None:
-        return 0, 0, ()
-    from sevn.gateway.mission.mission_subagents_snapshot import _serialize_subagent_run
-
-    counts_map = await supervisor.registry.counts()
-    level1 = sum(count for (level, _role), count in counts_map.items() if level == 1)
-    level2 = sum(count for (level, _role), count in counts_map.items() if level == 2)
-    runs = await supervisor.registry.running()
-    rows = tuple(
-        _serialize_subagent_run(run)
-        for run in sorted(runs, key=lambda row: (row.level, row.role, row.id))
-    )
-    return level1, level2, rows
-
-
-_AGENTS_EMPTY_COPY = "No agents running."
-_AGENTS_INVENTORY_DETAIL_CAP = 12
-
-
-def format_running_agents_inventory(
-    rows: Sequence[dict[str, Any]],
-    *,
-    max_detail: int = _AGENTS_INVENTORY_DETAIL_CAP,
-) -> str:
-    """Format live L1/L2 sub-agent runs for ``/agents`` and operator surfaces (D6).
-
-    Groups level-2 rows under their ``parent_id`` L1. Caps full detail blocks and
-    summarizes overflow when many runs are active.
-
-    Args:
-        rows (Sequence[dict[str, Any]]): Serialized registry rows (see
-            ``_serialize_subagent_run``).
-        max_detail (int): Maximum number of full per-run lines before overflow copy.
-
-    Returns:
-        str: Rich plain-text inventory, or :data:`_AGENTS_EMPTY_COPY` when empty.
-
-    Examples:
-        >>> format_running_agents_inventory(())
-        'No agents running.'
-        >>> body = format_running_agents_inventory([
-        ...     {"id": "a1", "level": 1, "role": "tier_b", "parent_id": None,
-        ...      "task_summary": "parent", "status": "running", "age_s": 1.0},
-        ...     {"id": "b2", "level": 2, "role": "tier_b", "parent_id": "a1",
-        ...      "task_summary": "child", "status": "running", "age_s": 0.5},
-        ... ])
-        >>> "a1" in body and body.index("a1") < body.index("b2")
-        True
-    """
-    if not rows:
-        return _AGENTS_EMPTY_COPY
-
-    cap = max(1, int(max_detail))
-    l1_rows = sorted(
-        (row for row in rows if row.get("level") == 1),
-        key=lambda row: str(row.get("id", "")),
-    )
-    l2_by_parent: dict[str, list[dict[str, Any]]] = {}
-    orphan_l2: list[dict[str, Any]] = []
-    for row in rows:
-        if row.get("level") != 2:
-            continue
-        parent_id = row.get("parent_id")
-        if isinstance(parent_id, str) and parent_id.strip():
-            l2_by_parent.setdefault(parent_id, []).append(row)
-        else:
-            orphan_l2.append(row)
-    for child_rows in l2_by_parent.values():
-        child_rows.sort(key=lambda row: str(row.get("id", "")))
-    orphan_l2.sort(key=lambda row: str(row.get("id", "")))
-
-    def _format_line(row: dict[str, Any], *, indent: str = "") -> str:
-        run_id = str(row.get("id", "?"))
-        level = row.get("level", "?")
-        status = row.get("status", "?")
-        role = row.get("role", "")
-        summary = row.get("task_summary", "")
-        age = row.get("age_s")
-        elapsed = f"{float(age):.0f}s" if isinstance(age, (int, float)) else "?"
-        return f"{indent}• {run_id} L{level} [{status}] {role} ({elapsed}) — {summary!r}"
-
-    lines = ["Running agents:", ""]
-    detail_count = 0
-    total = len(rows)
-    overflow = False
-
-    def _append_row(row: dict[str, Any], *, indent: str = "") -> None:
-        nonlocal detail_count, overflow
-        if detail_count >= cap:
-            overflow = True
-            return
-        lines.append(_format_line(row, indent=indent))
-        detail_count += 1
-
-    for l1 in l1_rows:
-        if detail_count >= cap:
-            overflow = True
-            break
-        _append_row(l1)
-        for l2 in l2_by_parent.get(str(l1.get("id")), ()):
-            if detail_count >= cap:
-                overflow = True
-                break
-            _append_row(l2, indent="  ↳ ")
-
-    for l2 in orphan_l2:
-        if detail_count >= cap:
-            overflow = True
-            break
-        _append_row(l2)
-
-    if overflow or detail_count < total:
-        remaining = total - detail_count
-        if remaining > 0:
-            lines.append(f"… and {remaining} more running agent(s).")
-
-    return "\n".join(lines)
 
 
 def build_config_menu_keyboard(
@@ -5305,6 +5064,7 @@ __all__ = [
     "format_running_agents_inventory",
     "get_config_menu_nav",
     "infer_budget_regime",
+    "is_registered_config_menu_host",
     "menu_callback_matches",
     "menu_message_text",
     "parse_config_callback_data",

@@ -52,7 +52,6 @@ from sevn.agent.tracing.logfire_config import (
 from sevn.cli.repo_sync import RepoSyncError, resolve_sevn_repo_root
 from sevn.cli.workspace_schema import load_workspace_json_schema
 from sevn.config.loader import load_workspace
-from sevn.config.version_id import resolve_version_id
 from sevn.config.workspace_config import (
     SecurityWorkspaceConfig,
     TriggersWorkspaceConfig,
@@ -291,16 +290,21 @@ def _config_version_id(
         >>> _config_version_id(lay, {"version_id": " build-1 "})
         'build-1'
     """
-    existing = raw.get("version_id")
-    if isinstance(existing, str) and existing.strip():
-        return existing.strip()
+    router_stash: str | None = None
     if request is not None:
         router = getattr(request.app.state, "gateway_router", None)
         if router is not None:
             stashed = getattr(router, "_version_id", None)
             if isinstance(stashed, str) and stashed.strip():
-                return stashed.strip()
-    return resolve_version_id(repo_root=layout.content_root)
+                router_stash = stashed.strip()
+    from sevn.config.version_id import effective_version_id
+
+    return effective_version_id(
+        raw_doc=raw,
+        sevn_json_path=layout.sevn_json_path,
+        repo_root=layout.content_root,
+        router_stash=router_stash,
+    )
 
 
 def _redact_config_document(doc: dict[str, Any]) -> dict[str, Any]:

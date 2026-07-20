@@ -1238,22 +1238,10 @@ def create_app(
         gateway_router._deployment_id = load_or_create_deployment_id(ly.content_root)
         # Build identity in ``sevn.json`` (issue #30) — orthogonal to deployment_id (D1).
         _repo_root = try_resolve_sevn_repo_root(ly.content_root) or ly.content_root
-        _stored_version_id: str | None = None
-        with contextlib.suppress(OSError, json.JSONDecodeError, ValueError):
-            _boot_doc = json.loads(ly.sevn_json_path.read_text(encoding="utf-8"))
-            if isinstance(_boot_doc, dict):
-                _existing_vid = _boot_doc.get("version_id")
-                if isinstance(_existing_vid, str) and _existing_vid.strip():
-                    _stored_version_id = _existing_vid.strip()
-        # Isolated workspaces (e.g. pytest tmp dirs) keep an explicit stored value;
-        # git-backed content roots still refresh via :func:`ensure_version_id` (D2).
-        if _stored_version_id and not (ly.content_root / ".git").exists():
-            gateway_router._version_id = _stored_version_id
-        else:
-            gateway_router._version_id = ensure_version_id(
-                ly.sevn_json_path,
-                repo_root=_repo_root,
-            )
+        gateway_router._version_id = ensure_version_id(
+            ly.sevn_json_path,
+            repo_root=_repo_root,
+        )
         if os.environ.get("SEVN_E2E_ECHO_TURN", "").strip().lower() in ("1", "true", "yes"):
             gateway_router._run_turn = build_echo_run_turn(gateway_router, conn)
         else:

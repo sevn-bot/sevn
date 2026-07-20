@@ -7,6 +7,7 @@ Depends: importlib.metadata (stdlib), json (stdlib), os (stdlib), pathlib (stdli
 Exports:
     resolve_version_id — env > git short SHA > package version > ``unknown``.
     ensure_version_id — resolve then persist into top-level ``version_id`` when needed.
+    effective_version_id — read-only effective value for operator surfaces.
 
 Examples:
     >>> from pathlib import Path
@@ -17,6 +18,7 @@ Examples:
 
 from __future__ import annotations
 
+import contextlib
 import importlib.metadata
 import json
 import os
@@ -176,6 +178,65 @@ def _persist_decision(stored: str | None, resolved: str) -> tuple[str, bool]:
     return stored, False
 
 
+def _freeze_stored_version_id() -> bool:
+    """Return ``True`` when tests pin an explicit stored ``version_id`` (no boot refresh).
+
+    Set ``SEVN_VERSION_ID_FREEZE=1`` in isolated pytest workspaces that pre-seed
+    ``sevn.json`` without a git tree. Production and git-backed workspaces never set this.
+
+    Returns:
+        bool: Whether to skip resolve/persist when a stored value already exists.
+
+    Examples:
+        >>> _freeze_stored_version_id()  # doctest: +SKIP
+        False
+    """
+    return os.environ.get("SEVN_VERSION_ID_FREEZE", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def effective_version_id(
+    *,
+    sevn_json_path: Path | None = None,
+    raw_doc: dict[str, Any] | None = None,
+    repo_root: Path | None = None,
+    router_stash: str | None = None,
+) -> str:
+    """Return the effective build ``version_id`` for read-only operator surfaces.
+
+    Prefers a persisted ``sevn.json`` value, then a gateway router stash, else
+    :func:`resolve_version_id`.
+
+    Args:
+        sevn_json_path (Path | None, optional): Workspace ``sevn.json`` path.
+        raw_doc (dict[str, Any] | None, optional): Pre-loaded ``sevn.json`` document.
+        repo_root (Path | None, optional): Git working tree for fallback resolution.
+        router_stash (str | None, optional): Boot-time value stashed on the router.
+
+    Returns:
+        str: Non-empty build identity string.
+
+    Examples:
+        >>> effective_version_id(raw_doc={"version_id": " build-1 "})
+        'build-1'
+    """
+    if raw_doc is not None:
+        stored = _stored_version_id(raw_doc)
+        if stored is not None:
+            return stored
+    if sevn_json_path is not None:
+        with contextlib.suppress(OSError, json.JSONDecodeError, ValueError):
+            stored = _stored_version_id(_load_sevn_doc(sevn_json_path.expanduser().resolve()))
+            if stored is not None:
+                return stored
+    if isinstance(router_stash, str) and router_stash.strip():
+        return router_stash.strip()
+    return resolve_version_id(repo_root=repo_root)
+
+
 def ensure_version_id(
     sevn_json_path: Path,
     *,
@@ -210,9 +271,11 @@ def ensure_version_id(
     """
     path = sevn_json_path.expanduser().resolve()
     git_root = path.parent if repo_root is None else repo_root.expanduser().resolve()
-    resolved = resolve_version_id(repo_root=git_root)
     doc = _load_sevn_doc(path)
     stored = _stored_version_id(doc)
+    if _freeze_stored_version_id() and stored is not None:
+        return stored
+    resolved = resolve_version_id(repo_root=git_root)
     effective, should_write = _persist_decision(stored, resolved)
     if not should_write:
         return effective
@@ -223,4 +286,4 @@ def ensure_version_id(
     return effective
 
 
-__all__ = ["ensure_version_id", "resolve_version_id"]
+__all__ = ["effective_version_id", "ensure_version_id", "resolve_version_id"]

@@ -40,8 +40,6 @@ _START_WELCOME = (
     "Open /config for the full menu."
 )
 _UNKNOWN_COMMAND = "Unknown command — try `/help`."
-_STOP_L1_PICKER_COPY = "Select a level-1 agent to stop, or ALL to stop every L1 run."
-_STOP_L1_OWNER_ONLY_COPY = "Running level-1 agents. Kill controls are owner-only."
 
 # Kokoro voice codes look like ``bf_emma`` / ``af_heart`` / ``am_michael`` (2-letter
 # lang+gender prefix, underscore, name). This never collides with the mode keywords
@@ -312,20 +310,19 @@ class CoreCommandHandler:
 
     async def _handle_stop(
         self,
-        msg_or_session_id: IncomingMessage | str,
-        session_id: str | None = None,
+        msg: IncomingMessage,
+        session_id: str,
     ) -> str | CoreCommandReply:
         """Stop L1 sub-agents via inline picker, or cancel session dispatch (D7/D8).
 
-        When at least one level-1 run is active, do not auto-kill: return a picker
-        keyboard reusing Config→Sub-agents kill callbacks. When no L1 runs exist,
-        preserve the session ``cancel_active_dispatch`` path and ``\"Stopped.\"`` copy.
+        When at least one level-1 run is active and the caller is the workspace owner,
+        return a picker keyboard reusing Config→Sub-agents kill callbacks. Non-owners
+        fall through to session cancel. When no L1 runs exist, preserve the session
+        ``cancel_active_dispatch`` path and ``\"Stopped.\"`` copy.
 
         Args:
-            msg_or_session_id (IncomingMessage | str): Inbound slash/menu message, or
-                legacy unit-test call with session id only (no L1 picker path).
-            session_id (str | None): Active gateway session id when the first arg is
-                an :class:`IncomingMessage`.
+            msg (IncomingMessage): Inbound slash/menu message.
+            session_id (str): Active gateway session id.
 
         Returns:
             str | CoreCommandReply: Confirmation copy, or picker text with keyboard.
@@ -335,28 +332,17 @@ class CoreCommandHandler:
             >>> inspect.iscoroutinefunction(CoreCommandHandler._handle_stop)
             True
         """
-        from sevn.gateway.channel_router import IncomingMessage
-        from sevn.gateway.menu.menu import (
+        from sevn.gateway.subagents.surfaces import (
+            STOP_L1_PICKER_COPY,
             build_stop_l1_keyboard,
             subagent_menu_snapshot_from_router,
         )
 
-        if isinstance(msg_or_session_id, str):
-            msg = IncomingMessage(channel="telegram", user_id="", text="/stop")
-            sid = msg_or_session_id
-        else:
-            msg = msg_or_session_id
-            if session_id is None:
-                raise TypeError("session_id required when first argument is IncomingMessage")
-            sid = session_id
-
         level1_count, _level2, rows = await subagent_menu_snapshot_from_router(self._router)
-        if level1_count >= 1:
-            is_owner = self._router._resolve_owner_flag(msg)
-            markup = build_stop_l1_keyboard(rows, is_owner=is_owner)
-            copy = _STOP_L1_PICKER_COPY if is_owner else _STOP_L1_OWNER_ONLY_COPY
-            return CoreCommandReply(text=copy, reply_markup=markup)
-        await self._sessions.cancel_active_dispatch(sid)
+        if level1_count >= 1 and self._router._resolve_owner_flag(msg):
+            markup = build_stop_l1_keyboard(rows, is_owner=True)
+            return CoreCommandReply(text=STOP_L1_PICKER_COPY, reply_markup=markup)
+        await self._sessions.cancel_active_dispatch(session_id)
         return "Stopped."
 
     def _handle_status(self, session_id: str) -> str:
@@ -436,7 +422,7 @@ class CoreCommandHandler:
             >>> inspect.iscoroutinefunction(CoreCommandHandler._handle_agents)
             True
         """
-        from sevn.gateway.menu.menu import (
+        from sevn.gateway.subagents.surfaces import (
             format_running_agents_inventory,
             subagent_menu_snapshot_from_router,
         )

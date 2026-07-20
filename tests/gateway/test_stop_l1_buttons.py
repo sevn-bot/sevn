@@ -125,7 +125,10 @@ async def test_stop_no_l1_cancels_dispatch_and_returns_stopped(tmp_path: Path) -
         router=router,  # type: ignore[arg-type]
         sessions=sessions,
     )
-    reply = await handler._handle_stop("sess-empty")
+    reply = await handler.handle(
+        IncomingMessage(channel="telegram", user_id="1", text="/stop"),
+        session_id="sess-empty",
+    )
     assert _reply_text(reply) == _STOPPED
     assert cancel_calls == ["sess-empty"]
     markup = _reply_markup(reply)
