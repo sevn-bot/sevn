@@ -310,7 +310,7 @@ clean clone.)
 | D10 | Persistence | New storage table `subagent_runs` mirroring registry fields (append/update), via `storage/migrate.py` migration; retention pruning with existing storage conventions. History powers Mission Control "recent" list and `sevn subagents list --all`. |
 | D11 | Budgets & timeouts | L2 spawns draw down the parent turn's `CascadeBudget`; per-sub-agent wall-clock timeout `subagents.timeout_s` (default: tier default). L1 spawned by `multi` gets its own fresh cascade budget (it is a new task). |
 | D12 | Tracing | Every sub-agent run = one OTel span (`sevn.subagent`, attrs: id/level/role/specialist/parent) child of the spawning span; mission telemetry kinds `subagent_spawned` / `subagent_finished` / `subagent_killed` added to `mission_state_models.py`; Prometheus gauge `sevn_subagents_running{level,role}` + counter `sevn_subagents_total{status}`. |
-| D13 | Kill surfaces | Mission Control (button per row + kill-all per role), Telegram `/config → Sub-agents → Running` (inline kill buttons, owner-only), CLI `sevn subagents kill <id> [--force]`. All route through supervisor kill (D4). |
+| D13 | Kill surfaces | Mission Control (button per row + kill-all per role), Telegram `/config → Sub-agents → Running` (inline kill buttons, owner-only), Telegram **`/stop`** slash (L1 picker + ALL when L1 runs; session cancel when empty), CLI `sevn subagents kill <id> [--force]`. All route through supervisor kill (D4). |
 | D14 | Deterministic chart | Single source-of-truth topology descriptor `about-sevn.bot/_sources/subagents-topology.json` → `scripts/gen_subagents_chart.py` renders a **deterministic** static SVG (sorted keys, fixed layout, no timestamps/randomness) embedded in new `about-sevn.bot/sub-agents.html`. `make about-site` regenerates; a `subagents-chart-check` Make step fails CI-docs when the committed SVG differs from a fresh render (byte-identical). |
 | D15 | Changelog skill | Changelog workflow: tracked `.claude/skills/changelog/SKILL.md` (local-only on clone) and in-tree [`src/sevn/data/standards/README.md`](src/sevn/data/standards/README.md) + `.cursor/skills/changelog-author/SKILL.md`. Maintains root `CHANGELOG.md` in **Keep a Changelog 1.1** format; invoked before releases and at plan Finals. |
 | D16 | Naming | Public name "sub-agents" everywhere (config key `subagents`, CLI `sevn subagents`, spec 36). Specialist ids are snake_case (`media_generator`); the operator-visible label for the example instance is `sub_agent_2_media_generator`. |
@@ -466,7 +466,8 @@ Public entrypoints: `execute_social_media_manager_task`, `parse_social_media_tas
 - **Reply attribution (D7)**: parallel L1 replies include short-id footer tags
   (`⋮a1f3` style) via `routing_footer.py`.
 - **Kill (D13)**: all surfaces route to `SubAgentSupervisor.kill`; Mission Control and
-  Telegram owner-only; CLI `sevn subagents kill <id>|--all [--role R]`.
+  Telegram kill controls owner-only; Telegram **`/agents`** lists running L1/L2 inventory
+  (visible to all; distinct from Config → Agents persona); CLI `sevn subagents kill <id>|--all [--role R]`.
 - **Budgets (D11)**: L2 draws parent `CascadeBudget`; `multi` spawns fresh L1 budget.
 
 ## Failure Modes

@@ -126,7 +126,8 @@ forensics.
 - **Operator controls:** Dashboard password and `dashboard.local_open` loopback policy; tab
   groups (Core, Observability, Agent, Knowledge, Self-improve, Evolution, Ops, Surfaces);
   in-dashboard webchat with stop/fork; CLI console for bounded `sevn` subcommands; provider
-  reauth; evolution approval actions where wired.
+  reauth; evolution approval actions where wired. **System** menu shows read-only **Version id**
+  from `GET /api/v1/config` (build identity persisted in `sevn.json`; orthogonal to deployment id).
 - **Degraded path:** Trace sink unavailable → panels show explicit empty or error states, not
   stale fabrications. Expired OAuth → Providers panel nudges reauth before hard turn failure.
   Proxy unhealthy → Egress panel shows paired-daemon status. Unwired tab → “coming soon” in live

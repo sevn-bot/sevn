@@ -126,6 +126,9 @@ gives up and returns to a hosted assistant that "just works." Self-hosted produc
   gateway container with shipped profile → curl `/ready` → first message via Telegram or Web UI.
 - **Operator controls:** Onboarding profile selection, capability toggles, daemon install opt-out,
   `--no-start-services`, export bundle for remote deploy, `sevn sync --latest` for manual upgrades.
+  Running gateway exposes **`version_id`** (build/code stamp in `sevn.json`, distinct from
+  instance `deployment_id`) in Mission Control and Telegram Config → My sevn bot so operators
+  can confirm which build is live after sync or deploy.
 - **Degraded path:** Missing API key or expired OAuth → doctor warning before chat embarrassment.
   Proxy not paired → clear doctor section, not a silent LLM timeout. Onboarding draft conflict →
   lock message with recovery steps. Docker without secrets → fail fast at compose with documented

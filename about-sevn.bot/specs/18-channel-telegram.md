@@ -499,6 +499,16 @@ Telegram `/config` gains **Sub-agents** section: limits, live L1/L2 counts, queu
 incl. `multi`, and **Running** kill submenu (owner-only). `busy_input_mode` may be
 `multi`. Documented in `about-sevn.bot/Telegram Menu.html` (D13).
 
+## Amendments (agent-control + version_id)
+
+Core slash commands via `core_bot_commands()` / `setMyCommands` include **`/agents`**
+(running L1/L2 inventory from `SubAgentRegistry`, grouped by `parent_id`) and an updated
+**`/stop`** (per-L1 inline kill buttons + **ALL** when level-1 runs exist; otherwise
+session `cancel_active_dispatch` with `"Stopped."`). Kill callbacks reuse
+`act:subagents:kill:*` / `kill_all` (owner-only). Config → **My sevn bot** exposes
+**Version id** (`cfg:logs:version_id`) alongside Deployment id. Config → **Agents** remains
+persona/display-name — not the run inventory.
+
 ## Implemented by
 
 - [`PlatformChannelConfig`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`

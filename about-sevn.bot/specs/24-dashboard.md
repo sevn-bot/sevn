@@ -1023,6 +1023,13 @@ Observability group gains **Sub-agents** tab: L1/L2 count chips, running table w
 kill actions, recent history, read-only limits. APIs:
 `GET /api/v1/mission/subagents`, `POST .../kill`, `POST .../kill_all` (D13).
 
+## Amendments (version_id)
+
+`GET /api/v1/config` includes top-level **`version_id`** (build/code identity from
+`sevn.json`, distinct from gateway `deployment_id`). Mission Control **System** menu
+renders a read-only **Version id** label from that payload (`#system-version-id` in
+`src/sevn/ui/spa/dashboard/`).
+
 ## Implemented by
 
 - [`register_dashboard_routes`](src/sevn/ui/dashboard/__init__.py) — `src/sevn/ui/dashboard/__init__.py`
