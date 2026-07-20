@@ -25,11 +25,6 @@ from sevn.security.llm_guard_scanner import LLMGuardScanner
 from sevn.workspace.layout import WorkspaceLayout
 from tests.gateway.test_menu import _conn, _MenuCaptureTelegram, _workspace
 
-_XFAIL_W4 = pytest.mark.xfail(
-    reason="green after W4: /agents running inventory (D6/D11)",
-    strict=False,
-)
-
 _EMPTY_COPY = "No agents running."
 
 
@@ -117,7 +112,6 @@ async def _spawn_l1_l2(
     return l1.id, l2.id
 
 
-@_XFAIL_W4
 def test_matches_slash_agents() -> None:
     """``/agents`` is recognized as a core slash command (D6)."""
     h = CoreCommandHandler.__new__(CoreCommandHandler)
@@ -126,7 +120,6 @@ def test_matches_slash_agents() -> None:
     )
 
 
-@_XFAIL_W4
 @pytest.mark.asyncio
 async def test_agents_empty_state_copy(tmp_path: Path) -> None:
     """Empty registry → clear empty-state copy (D6)."""
@@ -142,7 +135,6 @@ async def test_agents_empty_state_copy(tmp_path: Path) -> None:
     assert text == _EMPTY_COPY
 
 
-@_XFAIL_W4
 @pytest.mark.asyncio
 async def test_agents_groups_l2_under_parent_id(tmp_path: Path) -> None:
     """Rich inventory groups L2 under parent L1 via ``parent_id`` (D6)."""
@@ -184,7 +176,6 @@ async def test_agents_groups_l2_under_parent_id(tmp_path: Path) -> None:
     assert l2_id in body
 
 
-@_XFAIL_W4
 def test_agents_inventory_caps_overflow_detail() -> None:
     """Many rows: detail is capped / overflow summarized (D6)."""
     from sevn.gateway.menu.menu import format_running_agents_inventory
@@ -208,7 +199,6 @@ def test_agents_inventory_caps_overflow_detail() -> None:
     assert "more" in text.lower() or "…" in text or "..." in text or text.count("task-") <= 12
 
 
-@_XFAIL_W4
 @pytest.mark.asyncio
 async def test_agents_list_visible_to_non_owner(tmp_path: Path) -> None:
     """D11: inventory visible to non-owners (same as Config→Sub-agents Running)."""
@@ -231,7 +221,6 @@ async def test_agents_list_visible_to_non_owner(tmp_path: Path) -> None:
     _ = root
 
 
-@_XFAIL_W4
 def test_agents_registered_in_set_my_commands() -> None:
     """``setMyCommands`` / core command list includes ``agents`` (D6)."""
     from sevn.channels.telegram_poll import core_bot_commands
@@ -240,7 +229,6 @@ def test_agents_registered_in_set_my_commands() -> None:
     assert "agents" in names
 
 
-@_XFAIL_W4
 @pytest.mark.asyncio
 async def test_slash_agents_sends_inventory_via_agent_turn(tmp_path: Path) -> None:
     """End-to-end: once ``matches_slash`` accepts ``/agents``, slash path sends inventory.
