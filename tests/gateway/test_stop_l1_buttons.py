@@ -27,11 +27,6 @@ from sevn.security.llm_guard_scanner import LLMGuardScanner
 from sevn.workspace.layout import WorkspaceLayout
 from tests.gateway.test_menu import _conn, _MenuCaptureTelegram, _workspace
 
-_XFAIL_W5 = pytest.mark.xfail(
-    reason="green after W5: /stop L1 buttons + reply_markup (D7/D9)",
-    strict=False,
-)
-
 _STOPPED = "Stopped."
 
 
@@ -162,10 +157,9 @@ async def test_stop_no_l1_via_handle_returns_stopped(tmp_path: Path) -> None:
     assert _reply_text(reply) == _STOPPED
 
 
-# --- D7/D11: L1 picker (xfail W5) ---
+# --- D7/D11: L1 picker ---
 
 
-@_XFAIL_W5
 @pytest.mark.asyncio
 async def test_stop_with_l1_offers_per_id_and_all_buttons(tmp_path: Path) -> None:
     """D7: ≥1 L1 → do not auto-kill; inline buttons per L1 + ALL."""
@@ -216,7 +210,6 @@ async def test_stop_with_l1_offers_per_id_and_all_buttons(tmp_path: Path) -> Non
     assert "long running" in joined or "long runni" in joined
 
 
-@_XFAIL_W5
 def test_stop_l1_keyboard_omits_kill_for_non_owner() -> None:
     """D11: stop picker kill buttons are owner-only."""
     from sevn.gateway.menu.menu import build_stop_l1_keyboard
@@ -319,10 +312,9 @@ async def test_stop_kill_all_callback_kills_all_l1(tmp_path: Path) -> None:
         assert updated.status.value == "killed"
 
 
-# --- D9: slash path attaches reply_markup (xfail W5) ---
+# --- D9: slash path attaches reply_markup ---
 
 
-@_XFAIL_W5
 @pytest.mark.asyncio
 async def test_slash_stop_attaches_reply_markup_when_l1_running(tmp_path: Path) -> None:
     """D9: agent_turn slash send path attaches ``metadata['reply_markup']`` for /stop."""
@@ -362,7 +354,6 @@ async def test_slash_stop_attaches_reply_markup_when_l1_running(tmp_path: Path) 
     assert "act:subagents:kill_all" in cbs
 
 
-@_XFAIL_W5
 @pytest.mark.asyncio
 async def test_menu_cmd_stop_attaches_same_reply_markup(tmp_path: Path) -> None:
     """D9: pin/menu ``menu:cmd:stop`` gets the same L1 keyboard as slash /stop."""
