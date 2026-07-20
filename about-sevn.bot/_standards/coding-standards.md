@@ -1063,7 +1063,7 @@ jobs:
 
 **Advisory pre-commit (manual stage):** `codespell` and `vulture` hooks in `.pre-commit-config.yaml` (`stages: [manual]`) — run with `pre-commit run --hook-stage manual` when desired; they do not block ordinary commits.
 
-**Advisory PR review:** `make review` (CodeRabbit CLI + `CODERABBIT_API_KEY`) — never referenced by `ci` or `ci-quality`.
+**Advisory PR review:** `make review` (offline `pfpy diff-review` from [pullfrog-py](https://github.com/alexhawat/pullfrog-py) + `CLAUDE_CODE_OAUTH_TOKEN`) — never referenced by `ci` or `ci-quality`. The PullFrog GitHub Action (`.github/workflows/pullfrog.yml`) posts inline PR reviews and gates on the `pullfrog-approval` check.
 
 ### Additional enforcement (beyond Ruff, mypy, pytest, bandit)
 
