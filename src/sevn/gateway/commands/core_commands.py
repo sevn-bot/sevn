@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 _START_WELCOME = (
     "Welcome to sevn.\n\n"
-    "Core commands: /help /new /status /stop /config /voice /model\n"
+    "Core commands: /help /new /status /agents /stop /config /voice /model\n"
     "Open /config for the full menu."
 )
 _UNKNOWN_COMMAND = "Unknown command — try `/help`."
@@ -119,6 +119,7 @@ class CoreCommandHandler:
             "/help",
             "/new",
             "/status",
+            "/agents",
             "/stop",
             "/config",
             "/voice",
@@ -156,6 +157,8 @@ class CoreCommandHandler:
             return await self._handle_new(session_id)
         if cmd == "/status":
             return self._handle_status(session_id)
+        if cmd == "/agents":
+            return await self._handle_agents()
         if cmd == "/stop":
             return await self._handle_stop(session_id)
         if cmd == "/config":
@@ -236,6 +239,7 @@ class CoreCommandHandler:
             "/help — this message\n"
             "/new — new session\n"
             "/status — session status\n"
+            "/agents — running sub-agents\n"
             "/stop — cancel in-flight run\n"
             "/config — configuration menu\n"
             "/voice — voice settings\n"
@@ -344,6 +348,28 @@ class CoreCommandHandler:
         if isinstance(deployment_id, str) and deployment_id.strip():
             lines.append(f"Deployment id: {deployment_id}")
         return "\n".join(lines)
+
+    async def _handle_agents(self) -> str:
+        """Return a rich inventory of running L1/L2 sub-agents for ``/agents`` (D6/D11).
+
+        List visibility matches Config→Sub-agents Running: all users may read the
+        inventory; kill controls remain owner-only elsewhere.
+
+        Returns:
+            str: Formatted inventory or empty-state copy.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(CoreCommandHandler._handle_agents)
+            True
+        """
+        from sevn.gateway.menu.menu import (
+            format_running_agents_inventory,
+            subagent_menu_snapshot_from_router,
+        )
+
+        _l1, _l2, rows = await subagent_menu_snapshot_from_router(self._router)
+        return format_running_agents_inventory(rows)
 
     def _global_tts_voice_id(self) -> str | None:
         """Return the workspace ``voice.tts_voice_id`` when set.

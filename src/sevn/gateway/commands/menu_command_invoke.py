@@ -26,7 +26,9 @@ if TYPE_CHECKING:
 
 from sevn.gateway.channel_router import IncomingMessage, OutgoingMessage, _telegram_reply_metadata
 
-_MENU_COMMANDS = frozenset({"help", "menu", "new", "voice", "model", "status", "stop", "config"})
+_MENU_COMMANDS = frozenset(
+    {"help", "menu", "new", "voice", "model", "status", "agents", "stop", "config"},
+)
 
 
 def is_dashboard_pin_message(router: ChannelRouter, msg: IncomingMessage) -> bool:

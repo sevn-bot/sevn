@@ -5,6 +5,7 @@ Depends: asyncio, secrets, socket, sevn.gateway.telegram.telegram_inline
 
 Exports:
     TelegramPollMixin — ``start`` / ``stop`` / poll loop mixed into the adapter.
+    core_bot_commands — fixed core slash list for ``setMyCommands``.
 
 Examples:
     >>> import inspect
@@ -31,6 +32,34 @@ from sevn.config.defaults import TELEGRAM_SET_MY_COMMANDS_DEBOUNCE_S
 _POLL_BACKOFF_SCHEDULE_S = (1.0, 2.0, 5.0, 15.0, 30.0)
 _POLL_BACKOFF_CAP_S = 30.0
 _GET_UPDATES_TIMEOUT = 30
+
+
+def core_bot_commands() -> list[dict[str, str]]:
+    """Return the fixed core slash commands for Telegram ``setMyCommands`` (D6).
+
+    User shortcuts from ``shortcuts_store`` are appended separately by the poll mixin.
+
+    Returns:
+        list[dict[str, str]]: Bot API command descriptors (``command`` + ``description``).
+
+    Examples:
+        >>> names = {row["command"] for row in core_bot_commands()}
+        >>> "agents" in names and "stop" in names
+        True
+    """
+    return [
+        {"command": "start", "description": "Welcome and deep links"},
+        {"command": "help", "description": "Help"},
+        {"command": "new", "description": "New session"},
+        {"command": "status", "description": "Status"},
+        {"command": "agents", "description": "Running sub-agents"},
+        {"command": "stop", "description": "Stop in-flight run"},
+        {"command": "config", "description": "Configuration menu"},
+        {"command": "voice", "description": "Voice settings"},
+        {"command": "model", "description": "Model settings"},
+    ]
+
+
 # Cap on concurrently in-flight ``handle_webhook`` dispatches spawned by the
 # poll loop. The poll loop must not block on a slow turn dispatch (W2 / plan
 # D9): each update is dispatched as a background task so reading the next update
@@ -202,16 +231,7 @@ class TelegramPollMixin(TelegramSendHost):
         client = await self._ensure_client()
         if client is None:
             return
-        cmds = [
-            {"command": "start", "description": "Welcome and deep links"},
-            {"command": "help", "description": "Help"},
-            {"command": "new", "description": "New session"},
-            {"command": "status", "description": "Status"},
-            {"command": "stop", "description": "Stop in-flight run"},
-            {"command": "config", "description": "Configuration menu"},
-            {"command": "voice", "description": "Voice settings"},
-            {"command": "model", "description": "Model settings"},
-        ]
+        cmds = list(core_bot_commands())
         router = self._router
         if router is not None:
             content_root = getattr(router, "_content_root", None)

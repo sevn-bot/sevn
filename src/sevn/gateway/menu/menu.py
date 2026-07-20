@@ -15,6 +15,7 @@ Exports:
     config_menu_nav_push_current — push without leaving screen (restart confirm).
     refresh_config_menu_message — re-edit caption + keyboard after config mutations.
     subagent_menu_snapshot_from_router — live L1/L2 counts for Sub-agents menu screens.
+    format_running_agents_inventory — rich ``/agents`` running-run formatter (D6).
     build_chat_menu_webapp_request — ``setChatMenuButton`` body for viewer launch (M2).
     sync_telegram_chat_menu_button — push or clear the chat menu Web App button (D12).
     MenuCallbackHandler — ``menu:*`` / ``nav:*`` edit-in-place handler (Wave B1).
@@ -564,6 +565,7 @@ def build_menu_keyboard(
                 {"text": "📊 /status", "callback_data": "menu:cmd:status"},
             ],
             [
+                {"text": "🤖 /agents", "callback_data": "menu:cmd:agents"},
                 {"text": "⏹ /stop", "callback_data": "menu:cmd:stop"},
             ],
         ]
@@ -669,7 +671,7 @@ def parse_menu_callback_data(data: str) -> tuple[str, str | None] | None:
         return None
     if raw.startswith("menu:cmd:"):
         cmd = raw.removeprefix("menu:cmd:").strip().lower()
-        if cmd in {"new", "help", "voice", "model", "stop", "status"}:
+        if cmd in {"new", "help", "voice", "model", "stop", "status", "agents"}:
             return ("cmd", cmd)
         return None
     if raw.startswith(("menu:", "nav:")):
@@ -3414,6 +3416,110 @@ async def subagent_menu_snapshot_from_router(
     return level1, level2, rows
 
 
+_AGENTS_EMPTY_COPY = "No agents running."
+_AGENTS_INVENTORY_DETAIL_CAP = 12
+
+
+def format_running_agents_inventory(
+    rows: Sequence[dict[str, Any]],
+    *,
+    max_detail: int = _AGENTS_INVENTORY_DETAIL_CAP,
+) -> str:
+    """Format live L1/L2 sub-agent runs for ``/agents`` and operator surfaces (D6).
+
+    Groups level-2 rows under their ``parent_id`` L1. Caps full detail blocks and
+    summarizes overflow when many runs are active.
+
+    Args:
+        rows (Sequence[dict[str, Any]]): Serialized registry rows (see
+            ``_serialize_subagent_run``).
+        max_detail (int): Maximum number of full per-run lines before overflow copy.
+
+    Returns:
+        str: Rich plain-text inventory, or :data:`_AGENTS_EMPTY_COPY` when empty.
+
+    Examples:
+        >>> format_running_agents_inventory(())
+        'No agents running.'
+        >>> body = format_running_agents_inventory([
+        ...     {"id": "a1", "level": 1, "role": "tier_b", "parent_id": None,
+        ...      "task_summary": "parent", "status": "running", "age_s": 1.0},
+        ...     {"id": "b2", "level": 2, "role": "tier_b", "parent_id": "a1",
+        ...      "task_summary": "child", "status": "running", "age_s": 0.5},
+        ... ])
+        >>> "a1" in body and body.index("a1") < body.index("b2")
+        True
+    """
+    if not rows:
+        return _AGENTS_EMPTY_COPY
+
+    cap = max(1, int(max_detail))
+    l1_rows = sorted(
+        (row for row in rows if row.get("level") == 1),
+        key=lambda row: str(row.get("id", "")),
+    )
+    l2_by_parent: dict[str, list[dict[str, Any]]] = {}
+    orphan_l2: list[dict[str, Any]] = []
+    for row in rows:
+        if row.get("level") != 2:
+            continue
+        parent_id = row.get("parent_id")
+        if isinstance(parent_id, str) and parent_id.strip():
+            l2_by_parent.setdefault(parent_id, []).append(row)
+        else:
+            orphan_l2.append(row)
+    for child_rows in l2_by_parent.values():
+        child_rows.sort(key=lambda row: str(row.get("id", "")))
+    orphan_l2.sort(key=lambda row: str(row.get("id", "")))
+
+    def _format_line(row: dict[str, Any], *, indent: str = "") -> str:
+        run_id = str(row.get("id", "?"))
+        level = row.get("level", "?")
+        status = row.get("status", "?")
+        role = row.get("role", "")
+        summary = row.get("task_summary", "")
+        age = row.get("age_s")
+        elapsed = f"{float(age):.0f}s" if isinstance(age, (int, float)) else "?"
+        return f"{indent}• {run_id} L{level} [{status}] {role} ({elapsed}) — {summary!r}"
+
+    lines = ["Running agents:", ""]
+    detail_count = 0
+    total = len(rows)
+    overflow = False
+
+    def _append_row(row: dict[str, Any], *, indent: str = "") -> None:
+        nonlocal detail_count, overflow
+        if detail_count >= cap:
+            overflow = True
+            return
+        lines.append(_format_line(row, indent=indent))
+        detail_count += 1
+
+    for l1 in l1_rows:
+        if detail_count >= cap:
+            overflow = True
+            break
+        _append_row(l1)
+        for l2 in l2_by_parent.get(str(l1.get("id")), ()):
+            if detail_count >= cap:
+                overflow = True
+                break
+            _append_row(l2, indent="  ↳ ")
+
+    for l2 in orphan_l2:
+        if detail_count >= cap:
+            overflow = True
+            break
+        _append_row(l2)
+
+    if overflow or detail_count < total:
+        remaining = total - detail_count
+        if remaining > 0:
+            lines.append(f"… and {remaining} more running agent(s).")
+
+    return "\n".join(lines)
+
+
 def build_config_menu_keyboard(
     workspace: WorkspaceConfig,
     *,
@@ -5075,6 +5181,7 @@ __all__ = [
     "config_menu_nav_home",
     "config_menu_nav_pop",
     "config_menu_nav_push_current",
+    "format_running_agents_inventory",
     "get_config_menu_nav",
     "infer_budget_regime",
     "menu_callback_matches",
