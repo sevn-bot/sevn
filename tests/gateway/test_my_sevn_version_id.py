@@ -1,4 +1,4 @@
-"""RED suite — Telegram Config → My sevn bot exposes ``version_id`` (D5 / W3 / #30)."""
+"""Telegram Config → My sevn bot exposes ``version_id`` (D5 / W3 / #30)."""
 
 from __future__ import annotations
 
@@ -22,11 +22,6 @@ from sevn.gateway.session_manager import SessionManager
 from sevn.security.llm_guard_scanner import LLMGuardScanner
 from sevn.workspace.layout import WorkspaceLayout
 from tests.gateway.test_menu import _conn, _MenuCaptureTelegram, _workspace
-
-_XFAIL_W3 = pytest.mark.xfail(
-    reason="green after W3: Telegram My sevn bot version_id (D5)",
-    strict=False,
-)
 
 # D5 allows either peer of deployment_id.
 _VERSION_ID_CALLBACKS = frozenset({"cfg:logs:version_id", "cfg:my_sevn:version_id"})
@@ -97,7 +92,6 @@ def _callback(
     )
 
 
-@_XFAIL_W3
 def test_my_sevn_bot_keyboard_includes_version_id_and_deployment_id() -> None:
     """D1+D5: My sevn bot keeps Deployment id and adds a version_id row."""
     rows = _build_my_sevn_bot_keyboard_rows(_workspace(), is_owner=True)
@@ -106,7 +100,6 @@ def test_my_sevn_bot_keyboard_includes_version_id_and_deployment_id() -> None:
     assert _VERSION_ID_CALLBACKS.intersection(cbs), cbs
 
 
-@_XFAIL_W3
 def test_my_sevn_bot_section_keyboard_exposes_version_id() -> None:
     """Section keyboard (gated) includes the version_id callback."""
     kb = build_config_menu_keyboard(_workspace(), section="my_sevn_bot", is_owner=True)
@@ -115,7 +108,6 @@ def test_my_sevn_bot_section_keyboard_exposes_version_id() -> None:
     assert _VERSION_ID_CALLBACKS.intersection(cbs), cbs
 
 
-@_XFAIL_W3
 @pytest.mark.asyncio
 async def test_version_id_callback_toasts_current_value(tmp_path: Path) -> None:
     """Callback peer of deployment_id answers with the current ``version_id`` (D5)."""

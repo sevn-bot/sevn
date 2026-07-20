@@ -1,4 +1,4 @@
-"""RED suite — Mission Control exposes ``version_id`` (plan D4 / W3 / #30)."""
+"""Mission Control exposes ``version_id`` (plan D4 / W3 / #30)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-import pytest
 from starlette.testclient import TestClient
 
 from sevn.config.workspace_config import (
@@ -21,11 +20,6 @@ from sevn.gateway.http_server import create_app
 from sevn.storage.migrate import apply_migrations
 from sevn.ui.dashboard.services.auth import DASHBOARD_CSRF_COOKIE_NAME
 from sevn.workspace.layout import WorkspaceLayout
-
-_XFAIL_W3 = pytest.mark.xfail(
-    reason="green after W3: Mission Control surfaces version_id (D4)",
-    strict=False,
-)
 
 
 @contextmanager
@@ -72,7 +66,6 @@ def _login(client: TestClient) -> None:
     assert client.cookies.get(DASHBOARD_CSRF_COOKIE_NAME)
 
 
-@_XFAIL_W3
 def test_config_payload_includes_top_level_version_id(tmp_path: Path) -> None:
     """D4: system/config metadata JSON exposes ``version_id`` for System menu."""
     with _client(tmp_path, version_id="mc-build-7") as client:
@@ -85,7 +78,6 @@ def test_config_payload_includes_top_level_version_id(tmp_path: Path) -> None:
         assert body["document"].get("version_id") == "mc-build-7"
 
 
-@_XFAIL_W3
 def test_config_payload_version_id_when_missing_from_doc(tmp_path: Path) -> None:
     """When ``sevn.json`` lacks the key, payload still exposes a string (may be unknown)."""
     with _client(tmp_path, version_id=None) as client:
