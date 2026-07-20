@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Define the runtime ontology for Triager output and related labels across
   the agent core: canonical field names, closed enums, typing conventions, and how
   they compose with executor dispatch described '
-last_updated: '2026-07-18'
-fingerprint: sha256:983ce50e877b0ec2c177f01bf746be4d35e26e32262b5d434bc2cb86587d0266
+last_updated: '2026-07-20'
+fingerprint: sha256:cd10480602f96cddb87d2eae2ad97c410dc5f15a5d9b315c45367f23dcda2b76
 related: []
 sources:
 - src/sevn/config/**
@@ -740,6 +740,12 @@ interfaces:
 - name: try_resolve_sevn_repo_root
   file: src/sevn/config/sevn_repo.py
   symbol: try_resolve_sevn_repo_root
+- name: ensure_version_id
+  file: src/sevn/config/version_id.py
+  symbol: ensure_version_id
+- name: resolve_version_id
+  file: src/sevn/config/version_id.py
+  symbol: resolve_version_id
 - name: parse_workspace_config
   file: src/sevn/config/workspace_config.py
   symbol: parse_workspace_config

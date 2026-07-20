@@ -7,8 +7,8 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
-last_updated: '2026-07-18'
-fingerprint: sha256:ffb067f4b0a165e4e476211ed5b309a3d90571f9ebdd770c478e6e79fefa31ea
+last_updated: '2026-07-20'
+fingerprint: sha256:83fee7e069345d952a5a74afa4d10b6f5c552477c384321c8a46798e2cd46d12
 related: []
 sources:
 - src/sevn/gateway/**
@@ -198,6 +198,12 @@ interfaces:
 - name: CoreCommandHandler
   file: src/sevn/gateway/commands/core_commands.py
   symbol: CoreCommandHandler
+- name: CoreCommandReply
+  file: src/sevn/gateway/commands/core_commands.py
+  symbol: CoreCommandReply
+- name: core_command_outbound
+  file: src/sevn/gateway/commands/core_commands.py
+  symbol: core_command_outbound
 - name: DiagnosticCommandHandler
   file: src/sevn/gateway/commands/diagnostic_commands.py
   symbol: DiagnosticCommandHandler
@@ -465,6 +471,9 @@ interfaces:
 - name: build_service_restart_confirm_keyboard
   file: src/sevn/gateway/menu/menu.py
   symbol: build_service_restart_confirm_keyboard
+- name: build_stop_l1_keyboard
+  file: src/sevn/gateway/menu/menu.py
+  symbol: build_stop_l1_keyboard
 - name: config_callback_matches
   file: src/sevn/gateway/menu/menu.py
   symbol: config_callback_matches
@@ -489,6 +498,9 @@ interfaces:
 - name: config_menu_nav_push_current
   file: src/sevn/gateway/menu/menu.py
   symbol: config_menu_nav_push_current
+- name: format_running_agents_inventory
+  file: src/sevn/gateway/menu/menu.py
+  symbol: format_running_agents_inventory
 - name: get_config_menu_nav
   file: src/sevn/gateway/menu/menu.py
   symbol: get_config_menu_nav

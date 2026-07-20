@@ -20,7 +20,7 @@ from __future__ import annotations
 import importlib.metadata
 import json
 import os
-import subprocess
+import subprocess  # nosec B404 — fixed git argv only; no shell
 from importlib.metadata import PackageNotFoundError
 from typing import TYPE_CHECKING, Any
 
