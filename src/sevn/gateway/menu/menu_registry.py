@@ -142,7 +142,8 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         ("B2", "/help", True, None),
         ("B3", "/new", True, None),
         ("B4", "/status", True, "Add to Help + Diagnostics in TMF Wave 2"),
-        ("B5", "/stop", True, "Wire pin menu:cmd:stop in TMF Wave 2"),
+        ("B5", "/stop", True, "L1 picker + ALL when L1 runs; session cancel when empty (#27)"),
+        ("B12", "/agents", True, "Running L1/L2 inventory slash + pin (#28)"),
         ("B6", "/config", True, None),
         ("B7", "/voice", True, "PARTIAL; menu execute in TMF Wave 2"),
         ("B8", "/model", True, "PARTIAL; menu execute in TMF Wave 2"),
@@ -1122,6 +1123,15 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         implemented=True,
         notes="Shows gateway deployment id in chat",
     )
+    add(
+        "C20.7a",
+        _exact("cfg:logs:version_id"),
+        "C",
+        "my_sevn_bot",
+        "Version id",
+        implemented=True,
+        notes="Shows build version_id from sevn.json in chat",
+    )
 
     # --- C21. sevn.bot ---
     add(
@@ -1223,6 +1233,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         ("D2.4", "model"),
         ("D2.5", "status"),
         ("D2.6", "stop"),
+        ("D2.7", "agents"),
     ):
         add(
             spec_id,
@@ -1303,6 +1314,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         ("F1", "new"),
         ("F2", "stop"),
         ("F3", "status"),
+        ("F4", "agents"),
         ("F5", "model"),
     ):
         add(

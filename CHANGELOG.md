@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-20] Agent-control thermos pass — extract sub-agent slash surfaces module, centralize ``version_id`` lookup, refresh ``/stop`` picker after kill callbacks, and tell non-owners that L1 kill controls are owner-only
 - [2026-07-19] CodeRabbit review — bound trace attrs truncation markers, clear cancel-queue dispatch routing, structured subagent persist errors, and drop no-op resource-tracker semaphore scan
 - [2026-07-19] Thermos pass — evict enqueue-time dispatch routing after each turn (including multi-spawn bodies), cancel progress signals once streaming starts, and scope Mission Control stage attribution to the active turn
 - [2026-07-19] Silence benign rich-capability probe + per-boot secrets reconcile, record trace truncation, and keep greetings in scope
@@ -31,6 +32,10 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- [2026-07-20] Telegram ``/stop`` shows per-L1 stop buttons plus ALL when level-1 sub-agents are running; empty path keeps session cancel (#27)
+- [2026-07-20] Telegram ``/agents`` slash command and menu shortcuts list running L1/L2 sub-agents with parent grouping (#28)
+- [2026-07-20] Show ``version_id`` in Mission Control System menu and Telegram Config → My sevn bot (alongside deployment id)
+- [2026-07-19] Persist ``version_id`` build identity in ``sevn.json`` at gateway boot (env > git > package > unknown; distinct from deployment_id)
 - [2026-07-18] Telegram Voice config TTS engine cycle (``kokoro`` / ``supertonic``) via ``voice.local_tts_engine`` and unified ``text_to_voice`` backend
 - [2026-07-18] Discogs skills operator README with per-script examples and User-token + OAuth auth walkthroughs; skills INDEX polish, onboarding Group-B `skill.discogs` row, and `[discogs]` extra install action
 - [2026-07-18] Discogs OAuth 1.0a authorization flow from Telegram Setup — consumer key/secret capture, authorize URL + verifier exchange, and access-token storage with auth_method flip

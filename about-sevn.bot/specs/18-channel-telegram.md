@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the primary daily-driver channel for personal messaging: a ChannelAdapter
   implementation that normalises Telegram Updates into spec-17-gateway IncomingMessage
   / OutgoingMessage and implements '
-last_updated: '2026-07-19'
-fingerprint: sha256:d73f540c06b4130ecdfe4b9ce61c7d87253f6ba9876cf86621a96be4b16b8ffc
+last_updated: '2026-07-20'
+fingerprint: sha256:189e032c1fccef5c1a020a6dc272228a7e0b26e9e34c5bcdbf865586a0712065
 related: []
 sources:
 - src/sevn/channels/**
@@ -163,6 +163,9 @@ interfaces:
 - name: TelegramPollMixin
   file: src/sevn/channels/telegram_poll.py
   symbol: TelegramPollMixin
+- name: core_bot_commands
+  file: src/sevn/channels/telegram_poll.py
+  symbol: core_bot_commands
 - name: build_input_rich_message_markdown
   file: src/sevn/channels/telegram_rich.py
   symbol: build_input_rich_message_markdown
@@ -498,6 +501,16 @@ Document observable failure surfaces from the implementing modules (exceptions, 
 Telegram `/config` gains **Sub-agents** section: limits, live L1/L2 counts, queue mode
 incl. `multi`, and **Running** kill submenu (owner-only). `busy_input_mode` may be
 `multi`. Documented in `about-sevn.bot/Telegram Menu.html` (D13).
+
+## Amendments (agent-control + version_id)
+
+Core slash commands via `core_bot_commands()` / `setMyCommands` include **`/agents`**
+(running L1/L2 inventory from `SubAgentRegistry`, grouped by `parent_id`) and an updated
+**`/stop`** (per-L1 inline kill buttons + **ALL** when level-1 runs exist; otherwise
+session `cancel_active_dispatch` with `"Stopped."`). Kill callbacks reuse
+`act:subagents:kill:*` / `kill_all` (owner-only). Config → **My sevn bot** exposes
+**Version id** (`cfg:logs:version_id`) alongside Deployment id. Config → **Agents** remains
+persona/display-name — not the run inventory.
 
 ## Implemented by
 

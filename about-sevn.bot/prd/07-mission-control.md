@@ -6,8 +6,8 @@ status: ready
 owner: Alex
 summary: Operator dashboard for traces, spend, provider health, and in-flight runs—so
   a capable self-hosted bot stays livable instead of flying blind after each turn.
-last_updated: '2026-07-16'
-fingerprint: sha256:c44b7d50d9b0199c73ac949902aa1fa29b41df05a945c3ce9b66c23e72944cb5
+last_updated: '2026-07-20'
+fingerprint: sha256:e08b384f7e425c49a1f50b406ced80cd3eeeb531d8f1916da4a41064a6e89a57
 related:
 - prd-05-cost-and-providers
 sources:
@@ -126,7 +126,8 @@ forensics.
 - **Operator controls:** Dashboard password and `dashboard.local_open` loopback policy; tab
   groups (Core, Observability, Agent, Knowledge, Self-improve, Evolution, Ops, Surfaces);
   in-dashboard webchat with stop/fork; CLI console for bounded `sevn` subcommands; provider
-  reauth; evolution approval actions where wired.
+  reauth; evolution approval actions where wired. **System** menu shows read-only **Version id**
+  from `GET /api/v1/config` (build identity persisted in `sevn.json`; orthogonal to deployment id).
 - **Degraded path:** Trace sink unavailable → panels show explicit empty or error states, not
   stale fabrications. Expired OAuth → Providers panel nudges reauth before hard turn failure.
   Proxy unhealthy → Egress panel shows paired-daemon status. Unwired tab → “coming soon” in live

@@ -293,6 +293,7 @@ DEFAULT_COMMAND_SPECS: tuple[CommandSpec, ...] = (
     CommandSpec("help", _match_help),
     CommandSpec("new", _match_slash_command("/new")),
     CommandSpec("status", _match_slash_command("/status")),
+    CommandSpec("agents", _match_slash_command("/agents")),
     CommandSpec("stop", _match_slash_command("/stop")),
     CommandSpec("config", _match_slash_command("/config")),
     CommandSpec("ask_config", _match_ask_config),

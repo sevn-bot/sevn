@@ -1,5 +1,3 @@
-# README catalog
-
 <!-- generated: do not edit by hand; run `sevn readme update index` -->
 # README catalog
 
@@ -15,6 +13,7 @@
 | [channels](channels.md) | Channels | `subsystem` | Telegram, Web UI bridge, and channel adapter patterns. | fresh |
 | [tools](tools.md) | Tools registry | `subsystem` | Module inventory for the tools registry, adapters, and permission gates. | fresh |
 | [skills](skills.md) | Skills system | `catalog` | Curated inventory of bundled and workspace skills, loaders, and subprocess runners. | fresh |
+| [discogs](discogs.md) | Discogs skills | `guide` | Opt-in Discogs API skill group — catalog, marketplace, collection, wantlist, identity; User-token and OAuth auth. | fresh |
 | [ui-mission-control](ui-mission-control.md) | Mission Control UI | `subsystem` | Dashboard SPA, tab registry, traces, ops surfaces, and OpenUI delivery. | fresh |
 | [security](security.md) | Security scanner | `subsystem` | LLM Guard, .llmignore, block-and-notify, and channel security copy. | fresh |
 | [secrets](secrets.md) | Secrets | `subsystem` | Secrets backends, logical-key chain, TTL, and fingerprint confirmation. | fresh |

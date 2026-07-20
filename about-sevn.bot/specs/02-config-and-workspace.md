@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Provide a single, testable configuration surface before storage, tracing,
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
-last_updated: '2026-07-18'
-fingerprint: sha256:983ce50e877b0ec2c177f01bf746be4d35e26e32262b5d434bc2cb86587d0266
+last_updated: '2026-07-20'
+fingerprint: sha256:69d66922a5deba71caea2b7eb1ce589fa47b1fe92cf76a0dd045ccbaf95e37df
 related: []
 sources:
 - src/sevn/config/**
@@ -731,6 +731,15 @@ interfaces:
 - name: try_resolve_sevn_repo_root
   file: src/sevn/config/sevn_repo.py
   symbol: try_resolve_sevn_repo_root
+- name: effective_version_id
+  file: src/sevn/config/version_id.py
+  symbol: effective_version_id
+- name: ensure_version_id
+  file: src/sevn/config/version_id.py
+  symbol: ensure_version_id
+- name: resolve_version_id
+  file: src/sevn/config/version_id.py
+  symbol: resolve_version_id
 - name: parse_workspace_config
   file: src/sevn/config/workspace_config.py
   symbol: parse_workspace_config
@@ -802,6 +811,11 @@ via `x-sevn-process-settings-env` in the JSON Schema.
 3. **Field help** — `field_help_for` / `load_config_field_help` power Telegram config UX.
 4. **LLM params** — `resolve_llm_params`, reasoning/sampling helpers in `llm_params.py`.
 5. **Reload** — hot paths re-read specific sections; full reload on gateway restart or explicit CLI.
+6. **`version_id`** — optional top-level string in `sevn.json` (schema-validated). Gateway boot
+   resolves build identity via `ensure_version_id` (`src/sevn/config/version_id.py`): env
+   `SEVN_VERSION_ID` → git short SHA → installed package version → `"unknown"`. The resolved
+   value is persisted when missing or when boot finds a different non-`unknown` value. Distinct
+   from TE-1 `deployment_id` (instance id under `.sevn/deployment_id.json`).
 
 ## Failure Modes
 

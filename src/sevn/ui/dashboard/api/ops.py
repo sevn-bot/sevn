@@ -264,6 +264,49 @@ def _redact_secret_refs_in_value(value: object) -> object:
     return value
 
 
+def _config_version_id(
+    layout: WorkspaceLayout,
+    raw: dict[str, Any],
+    *,
+    request: Request | None = None,
+) -> str:
+    """Return the effective build ``version_id`` for Mission Control (D4).
+
+    Prefers the persisted ``sevn.json`` value, then a gateway router stash when
+    the dashboard shares a live gateway process, else :func:`resolve_version_id`.
+
+    Args:
+        layout (WorkspaceLayout): Active workspace layout.
+        raw (dict[str, Any]): Parsed ``sevn.json`` document (unredacted).
+        request (Request | None, optional): FastAPI request for router stash lookup.
+
+    Returns:
+        str: Non-empty build identity string for operators.
+
+    Examples:
+        >>> from pathlib import Path
+        >>> from sevn.workspace.layout import WorkspaceLayout
+        >>> lay = WorkspaceLayout(Path("/tmp/sevn.json"), Path("/tmp"))
+        >>> _config_version_id(lay, {"version_id": " build-1 "})
+        'build-1'
+    """
+    router_stash: str | None = None
+    if request is not None:
+        router = getattr(request.app.state, "gateway_router", None)
+        if router is not None:
+            stashed = getattr(router, "_version_id", None)
+            if isinstance(stashed, str) and stashed.strip():
+                router_stash = stashed.strip()
+    from sevn.config.version_id import effective_version_id
+
+    return effective_version_id(
+        raw_doc=raw,
+        sevn_json_path=layout.sevn_json_path,
+        repo_root=layout.content_root,
+        router_stash=router_stash,
+    )
+
+
 def _redact_config_document(doc: dict[str, Any]) -> dict[str, Any]:
     """Redact secret refs and sensitive keys for dashboard display.
 
@@ -687,6 +730,7 @@ async def config_get(
     return {
         "sevn_json": str(layout.sevn_json_path),
         "schema_version": ws.schema_version,
+        "version_id": _config_version_id(layout, raw, request=request),
         "document": _redact_config_document(raw),
     }
 

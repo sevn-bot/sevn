@@ -14,7 +14,7 @@ Exports:
     get_config_menu_nav — load per-message stack state.
     config_menu_nav_push_current — push without leaving screen (restart confirm).
     refresh_config_menu_message — re-edit caption + keyboard after config mutations.
-    subagent_menu_snapshot_from_router — live L1/L2 counts for Sub-agents menu screens.
+    is_registered_config_menu_host — whether a message hosts an active ``/config`` stack.
     build_chat_menu_webapp_request — ``setChatMenuButton`` body for viewer launch (M2).
     sync_telegram_chat_menu_button — push or clear the chat menu Web App button (D12).
     MenuCallbackHandler — ``menu:*`` / ``nav:*`` edit-in-place handler (Wave B1).
@@ -88,6 +88,13 @@ from sevn.gateway.menu.menu_branding import (
 from sevn.gateway.menu.social_media_manager_menu import (
     build_social_media_manager_keyboard_rows,
     social_media_manager_menu_caption,
+)
+from sevn.gateway.subagents.surfaces import (
+    build_stop_l1_keyboard,
+    build_subagent_kill_keyboard_rows,
+    format_running_agents_inventory,
+    subagent_kill_button_label_config,
+    subagent_menu_snapshot_from_router,
 )
 from sevn.onboarding.seed import resolve_agent_display_name
 from sevn.second_brain.paths import (
@@ -398,6 +405,34 @@ def config_menu_nav_clear(router: ChannelRouter, chat_id: int, message_id: int) 
     router._config_menu_nav.pop(config_menu_nav_key(chat_id, message_id), None)
 
 
+def is_registered_config_menu_host(
+    router: ChannelRouter,
+    chat_id: int,
+    message_id: int,
+) -> bool:
+    """Return ``True`` when *message_id* hosts an active ``/config`` menu stack.
+
+    Slash ``/stop`` picker messages are not registered hosts; kill callbacks on
+    those messages must refresh the picker in place instead of re-editing as config.
+
+    Args:
+        router (ChannelRouter): Gateway router holding ``_config_menu_nav``.
+        chat_id (int): Telegram chat id.
+        message_id (int): Telegram message id.
+
+    Returns:
+        bool: Whether nav state exists for this message without creating it.
+
+    Examples:
+        >>> from sevn.gateway.channel_router import ChannelRouter
+        >>> r = ChannelRouter.__new__(ChannelRouter)
+        >>> r._config_menu_nav = {}
+        >>> is_registered_config_menu_host(r, 1, 2)
+        False
+    """
+    return config_menu_nav_key(chat_id, message_id) in router._config_menu_nav
+
+
 _SHORTCUTS_MENU_LIMIT = 8
 _SKILLS_MENU_LIMIT = 6
 _TOOLS_PLUGIN_MENU_LIMIT = 6
@@ -564,6 +599,7 @@ def build_menu_keyboard(
                 {"text": "📊 /status", "callback_data": "menu:cmd:status"},
             ],
             [
+                {"text": "🤖 /agents", "callback_data": "menu:cmd:agents"},
                 {"text": "⏹ /stop", "callback_data": "menu:cmd:stop"},
             ],
         ]
@@ -669,7 +705,7 @@ def parse_menu_callback_data(data: str) -> tuple[str, str | None] | None:
         return None
     if raw.startswith("menu:cmd:"):
         cmd = raw.removeprefix("menu:cmd:").strip().lower()
-        if cmd in {"new", "help", "voice", "model", "stop", "status"}:
+        if cmd in {"new", "help", "voice", "model", "stop", "status", "agents"}:
             return ("cmd", cmd)
         return None
     if raw.startswith(("menu:", "nav:")):
@@ -1541,9 +1577,9 @@ def _build_my_sevn_bot_keyboard_rows(
 
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
-        >>> rows = _build_my_sevn_bot_keyboard_rows(WorkspaceConfig.minimal(), is_owner=True)
-        >>> rows[-1][0]["callback_data"]
-        'cfg:logs:deployment_id'
+        >>> rows = _build_my_sevn_bot_keyboard_rows(WorkspaceConfig.minimal(), is_owner=False)
+        >>> [btn["callback_data"] for row in rows for btn in row]
+        ['cfg:logs:deployment_id', 'cfg:logs:version_id']
     """
     _ = workspace
     rows: list[list[dict[str, Any]]] = []
@@ -1551,6 +1587,7 @@ def _build_my_sevn_bot_keyboard_rows(
         rows.append([{"text": "🔄 Restart gateway", "callback_data": "act:gateway:restart"}])
         rows.append([{"text": "🔄 Restart proxy", "callback_data": "act:proxy:restart"}])
     rows.append([{"text": "🆔 Deployment id", "callback_data": "cfg:logs:deployment_id"}])
+    rows.append([{"text": "🏷 Version id", "callback_data": "cfg:logs:version_id"}])
     return rows
 
 
@@ -2509,8 +2546,8 @@ def _build_skills_keyboard_rows(
 
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
-        >>> _build_skills_keyboard_rows(WorkspaceConfig.minimal())
-        [[{'text': '📱 Social Media Manager', 'callback_data': 'cfg:section:skills:social_media_manager'}], [{'text': '📀 Discogs', 'callback_data': 'cfg:section:skills:discogs'}]]
+        >>> _build_skills_keyboard_rows(WorkspaceConfig.minimal())  # doctest: +ELLIPSIS
+        [[{'text': '📱 Social Media Manager', 'callback_data': 'cfg:section:skills:social_media_manager'}], ...]
     """
     rows: list[list[dict[str, Any]]] = []
     url = _mission_control_url(workspace, fragment="skills")
@@ -3237,30 +3274,13 @@ def _build_subagents_running_keyboard_rows(
         >>> rows[0][0]["callback_data"]
         'act:subagents:kill:a1'
     """
-    rows: list[list[dict[str, Any]]] = []
-    if running_rows and is_owner:
-        for row in running_rows[:8]:
-            run_id = str(row.get("id", "")).strip()
-            if not run_id:
-                continue
-            role = str(row.get("role", "?"))
-            level = row.get("level", "?")
-            rows.append(
-                [
-                    {
-                        "text": f"Kill {run_id} L{level} {role}",
-                        "callback_data": f"act:subagents:kill:{run_id}",
-                    },
-                ],
-            )
-        rows.append(
-            [
-                {
-                    "text": "Kill all L1",
-                    "callback_data": "act:subagents:kill_all",
-                },
-            ],
-        )
+    kill_rows = build_subagent_kill_keyboard_rows(
+        running_rows,
+        is_owner=is_owner,
+        label_for_row=subagent_kill_button_label_config,
+        kill_all_label="Kill all L1",
+    )
+    rows: list[list[dict[str, Any]]] = list(kill_rows)
     rows.append([{"text": "⬅ Sub-agents", "callback_data": "cfg:section:subagents"}])
     return rows
 
@@ -3377,40 +3397,6 @@ def _config_chrome(*, include_back: bool = True) -> list[list[dict[str, Any]]]:
     row.append({"text": "🏠 Home", "callback_data": "cfg:nav:home"})
     row.append({"text": "❌ Close", "callback_data": "cfg:nav:close"})
     return [row]
-
-
-async def subagent_menu_snapshot_from_router(
-    router: ChannelRouter | None,
-) -> tuple[int, int, tuple[dict[str, Any], ...]]:
-    """Fetch live sub-agent counts and running rows for Telegram menu captions.
-
-    Args:
-        router (ChannelRouter | None): Gateway router (may lack supervisor when unwired).
-
-    Returns:
-        tuple[int, int, tuple[dict[str, Any], ...]]: ``(level1_count, level2_count, running_rows)``.
-
-    Examples:
-        >>> import asyncio
-        >>> asyncio.run(subagent_menu_snapshot_from_router(None))
-        (0, 0, ())
-    """
-    if router is None:
-        return 0, 0, ()
-    supervisor = getattr(router, "_subagent_supervisor", None)
-    if supervisor is None:
-        return 0, 0, ()
-    from sevn.gateway.mission.mission_subagents_snapshot import _serialize_subagent_run
-
-    counts_map = await supervisor.registry.counts()
-    level1 = sum(count for (level, _role), count in counts_map.items() if level == 1)
-    level2 = sum(count for (level, _role), count in counts_map.items() if level == 2)
-    runs = await supervisor.registry.running()
-    rows = tuple(
-        _serialize_subagent_run(run)
-        for run in sorted(runs, key=lambda row: (row.level, row.role, row.id))
-    )
-    return level1, level2, rows
 
 
 def build_config_menu_keyboard(
@@ -3934,7 +3920,7 @@ def config_menu_message_text(
         lines = [
             "My sevn bot",
             "",
-            "This gateway instance: deployment id and owner service restarts.",
+            "This gateway instance: deployment id, version id, and owner service restarts.",
         ]
         if is_owner:
             lines.append("Restart gateway or proxy below (two-step confirm).")
@@ -5067,6 +5053,7 @@ __all__ = [
     "build_chat_menu_webapp_request",
     "build_config_menu_keyboard",
     "build_menu_keyboard",
+    "build_stop_l1_keyboard",
     "config_callback_matches",
     "config_menu_message_text",
     "config_menu_nav_clear",
@@ -5074,8 +5061,10 @@ __all__ = [
     "config_menu_nav_home",
     "config_menu_nav_pop",
     "config_menu_nav_push_current",
+    "format_running_agents_inventory",
     "get_config_menu_nav",
     "infer_budget_regime",
+    "is_registered_config_menu_host",
     "menu_callback_matches",
     "menu_message_text",
     "parse_config_callback_data",

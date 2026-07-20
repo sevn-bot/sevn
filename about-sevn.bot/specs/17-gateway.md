@@ -7,8 +7,8 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
-last_updated: '2026-07-19'
-fingerprint: sha256:fb785badc38a05feb532cf367d045a7ba768474c184bf0be06b375897388cb56
+last_updated: '2026-07-20'
+fingerprint: sha256:e5afa58162e6d4ddd08cffae12161f3defded9343111671b664d9ff758c0b8e1
 related: []
 sources:
 - src/sevn/gateway/**
@@ -201,6 +201,12 @@ interfaces:
 - name: CoreCommandHandler
   file: src/sevn/gateway/commands/core_commands.py
   symbol: CoreCommandHandler
+- name: CoreCommandReply
+  file: src/sevn/gateway/commands/core_commands.py
+  symbol: CoreCommandReply
+- name: core_command_outbound
+  file: src/sevn/gateway/commands/core_commands.py
+  symbol: core_command_outbound
 - name: DiagnosticCommandHandler
   file: src/sevn/gateway/commands/diagnostic_commands.py
   symbol: DiagnosticCommandHandler
@@ -504,6 +510,9 @@ interfaces:
 - name: infer_budget_regime
   file: src/sevn/gateway/menu/menu.py
   symbol: infer_budget_regime
+- name: is_registered_config_menu_host
+  file: src/sevn/gateway/menu/menu.py
+  symbol: is_registered_config_menu_host
 - name: menu_callback_matches
   file: src/sevn/gateway/menu/menu.py
   symbol: menu_callback_matches
@@ -525,9 +534,6 @@ interfaces:
 - name: service_restart_confirm_message
   file: src/sevn/gateway/menu/menu.py
   symbol: service_restart_confirm_message
-- name: subagent_menu_snapshot_from_router
-  file: src/sevn/gateway/menu/menu.py
-  symbol: subagent_menu_snapshot_from_router
 - name: sync_telegram_chat_menu_button
   file: src/sevn/gateway/menu/menu.py
   symbol: sync_telegram_chat_menu_button
@@ -1023,6 +1029,24 @@ interfaces:
 - name: register_subagents_boot_hook
   file: src/sevn/gateway/subagents/subagents_boot.py
   symbol: register_subagents_boot_hook
+- name: build_stop_l1_keyboard
+  file: src/sevn/gateway/subagents/surfaces.py
+  symbol: build_stop_l1_keyboard
+- name: build_subagent_kill_keyboard_rows
+  file: src/sevn/gateway/subagents/surfaces.py
+  symbol: build_subagent_kill_keyboard_rows
+- name: format_running_agents_inventory
+  file: src/sevn/gateway/subagents/surfaces.py
+  symbol: format_running_agents_inventory
+- name: stop_l1_button_label
+  file: src/sevn/gateway/subagents/surfaces.py
+  symbol: stop_l1_button_label
+- name: subagent_kill_button_label_config
+  file: src/sevn/gateway/subagents/surfaces.py
+  symbol: subagent_kill_button_label_config
+- name: subagent_menu_snapshot_from_router
+  file: src/sevn/gateway/subagents/surfaces.py
+  symbol: subagent_menu_snapshot_from_router
 - name: dispatch_telegram_inline_query
   file: src/sevn/gateway/telegram/telegram_inline.py
   symbol: dispatch_telegram_inline_query

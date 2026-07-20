@@ -1236,24 +1236,28 @@ def build_agent_run_turn(
             if (msg.text or "").strip().startswith("/config"):
                 await config_menu_handler.handle_slash(msg, session_id=session_id)
                 return
-            reply = await core_handler.handle(msg, session_id=session_id)
-            if reply:
+            core_reply = await core_handler.handle(msg, session_id=session_id)
+            if core_reply:
                 adapter = router._adapters.get(msg.channel)
                 if adapter is not None:
                     from sevn.gateway.channel_router import (
                         OutgoingMessage,
                         _telegram_reply_metadata,
                     )
+                    from sevn.gateway.commands.core_commands import core_command_outbound
 
+                    reply_text, reply_markup = core_command_outbound(core_reply)
                     out_meta = dict(_telegram_reply_metadata(msg))
                     mid = msg.metadata.get("message_id") if isinstance(msg.metadata, dict) else None
                     if isinstance(mid, int):
                         out_meta["reply_to_message_id"] = mid
+                    if reply_markup is not None:
+                        out_meta["reply_markup"] = reply_markup
                     await adapter.send(
                         OutgoingMessage(
                             channel=msg.channel,
                             user_id=msg.user_id,
-                            text=reply,
+                            text=reply_text,
                             session_id=session_id,
                             metadata=out_meta,
                         ),

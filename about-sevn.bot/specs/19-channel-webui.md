@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the browser conversational surface required by prd-01-conversational-experience
   §5.1: owner-only WebSocket chat, static SPA shell, and session continuity with Telegram
   via the shared SessionMa'
-last_updated: '2026-07-19'
-fingerprint: sha256:d73f540c06b4130ecdfe4b9ce61c7d87253f6ba9876cf86621a96be4b16b8ffc
+last_updated: '2026-07-20'
+fingerprint: sha256:189e032c1fccef5c1a020a6dc272228a7e0b26e9e34c5bcdbf865586a0712065
 related: []
 sources:
 - src/sevn/channels/**
@@ -158,6 +158,9 @@ interfaces:
 - name: TelegramPollMixin
   file: src/sevn/channels/telegram_poll.py
   symbol: TelegramPollMixin
+- name: core_bot_commands
+  file: src/sevn/channels/telegram_poll.py
+  symbol: core_bot_commands
 - name: build_input_rich_message_markdown
   file: src/sevn/channels/telegram_rich.py
   symbol: build_input_rich_message_markdown

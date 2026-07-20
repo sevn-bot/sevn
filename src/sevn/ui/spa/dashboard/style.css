@@ -259,6 +259,14 @@
   width: 100%;
 }
 
+.mission-system-meta {
+  margin: 0;
+  padding: 0 var(--sevn-space-1);
+  font-size: var(--sevn-text-xs, 0.75rem);
+  line-height: 1.4;
+  user-select: all;
+}
+
 .mission-palette-input {
   width: 100%;
   margin-bottom: var(--sevn-space-3);

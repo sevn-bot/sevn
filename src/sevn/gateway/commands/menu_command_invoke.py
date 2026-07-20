@@ -26,7 +26,9 @@ if TYPE_CHECKING:
 
 from sevn.gateway.channel_router import IncomingMessage, OutgoingMessage, _telegram_reply_metadata
 
-_MENU_COMMANDS = frozenset({"help", "menu", "new", "voice", "model", "status", "stop", "config"})
+_MENU_COMMANDS = frozenset(
+    {"help", "menu", "new", "voice", "model", "status", "agents", "stop", "config"},
+)
 
 
 def is_dashboard_pin_message(router: ChannelRouter, msg: IncomingMessage) -> bool:
@@ -141,16 +143,21 @@ class MenuCommandInvoker:
         reply = await self._core_handler.handle(synth, session_id=session_id)
         if not reply:
             return
+        from sevn.gateway.commands.core_commands import core_command_outbound
+
+        reply_text, reply_markup = core_command_outbound(reply)
         out_meta = dict(_telegram_reply_metadata(msg))
         if not is_dashboard_pin_message(self._router, msg):
             mid = md.get("message_id")
             if isinstance(mid, int):
                 out_meta["reply_to_message_id"] = mid
+        if reply_markup is not None:
+            out_meta["reply_markup"] = reply_markup
         await adapter.send(
             OutgoingMessage(
                 channel=msg.channel,
                 user_id=msg.user_id,
-                text=reply,
+                text=reply_text,
                 session_id=session_id,
                 metadata=out_meta,
             ),

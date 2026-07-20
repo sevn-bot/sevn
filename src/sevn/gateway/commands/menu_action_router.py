@@ -49,6 +49,7 @@ from sevn.config.model_resolution import (
     list_catalog_model_ids,
     resolve_model_slot,
 )
+from sevn.config.version_id import effective_version_id
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.gateway.commands.shortcuts_store import (
     delete_shortcut,
@@ -65,16 +66,23 @@ from sevn.gateway.menu.menu import (
     ConfigMenuRefreshContext,
     ConfigSection,
     _config_chrome,
+    _edit_menu_message,
     _telegram_api_thread_id,
     _voice_tts_mode,
     build_service_restart_confirm_keyboard,
     config_menu_nav_pop,
     config_menu_nav_push_current,
     get_config_menu_nav,
+    is_registered_config_menu_host,
     parse_config_callback_data,
     parse_models_callback_data,
     refresh_config_menu_message,
     service_restart_confirm_message,
+)
+from sevn.gateway.subagents.surfaces import (
+    STOP_L1_PICKER_COPY,
+    build_stop_l1_keyboard,
+    subagent_menu_snapshot_from_router,
 )
 from sevn.onboarding.web_app import _get_nested, _set_nested
 from sevn.voice.backends import KNOWN_LOCAL_TTS_ENGINES
@@ -633,6 +641,126 @@ class MenuActionRouter:
             return True
         return False
 
+    async def _answer_logs_identity_toast(
+        self,
+        msg: IncomingMessage,
+        *,
+        label: str,
+        value: str,
+    ) -> str | None:
+        """Answer a read-only ``cfg:logs:*`` identity toast via callback query.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            label (str): Human label (e.g. ``Deployment id``).
+            value (str): Identity value to show.
+
+        Returns:
+            str | None: Fallback toast when adapter cannot answer inline.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._answer_logs_identity_toast)
+            True
+        """
+        toast = f"{label}: {value}"
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        cq_id = md.get("callback_query_id")
+        cq_str = cq_id.strip() if isinstance(cq_id, str) else ""
+        adapter = self._router._adapters.get(msg.channel)
+        if adapter is not None and cq_str:
+            await _answer_callback(adapter, callback_query_id=cq_str, text=toast)
+            return None
+        return toast
+
+    async def _refresh_stop_picker_after_kill(
+        self,
+        msg: IncomingMessage,
+        *,
+        toast: str | None,
+    ) -> bool:
+        """Re-edit a slash ``/stop`` picker message after a kill callback.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            toast (str | None): Optional toast for ``answerCallbackQuery``.
+
+        Returns:
+            bool: ``True`` when callback query was answered or message edited.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._refresh_stop_picker_after_kill)
+            True
+        """
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        chat_raw = md.get("chat_id")
+        message_raw = md.get("message_id")
+        if not isinstance(chat_raw, int) or not isinstance(message_raw, int) or message_raw <= 0:
+            return False
+        adapter = self._router._adapters.get(msg.channel)
+        if adapter is None:
+            return False
+        thread_id = _telegram_api_thread_id(md)
+        level1_count, _, rows = await subagent_menu_snapshot_from_router(self._router)
+        is_owner = self._router._resolve_owner_flag(msg)
+        if level1_count >= 1 and is_owner:
+            text = STOP_L1_PICKER_COPY
+            markup = build_stop_l1_keyboard(rows, is_owner=True)
+        else:
+            text = "Stopped."
+            markup = {"inline_keyboard": []}
+        await _edit_menu_message(
+            adapter,
+            chat_id=chat_raw,
+            message_id=message_raw,
+            text=text,
+            reply_markup=markup,
+            message_thread_id=thread_id,
+        )
+        cq_id = md.get("callback_query_id")
+        cq_str = cq_id.strip() if isinstance(cq_id, str) else ""
+        if cq_str:
+            await _answer_callback(adapter, callback_query_id=cq_str, text=toast)
+            return True
+        return False
+
+    async def _after_subagent_kill(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        *,
+        toast: str,
+    ) -> str | None:
+        """Refresh config or slash ``/stop`` host after a kill callback.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            toast (str): Kill result toast text.
+
+        Returns:
+            str | None: Residual toast when refresh did not answer inline.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._after_subagent_kill)
+            True
+        """
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        chat_raw = md.get("chat_id")
+        message_raw = md.get("message_id")
+        if (
+            isinstance(chat_raw, int)
+            and isinstance(message_raw, int)
+            and message_raw > 0
+            and is_registered_config_menu_host(self._router, chat_raw, message_raw)
+        ):
+            answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+            return None if answered else toast
+        answered = await self._refresh_stop_picker_after_kill(msg, toast=toast)
+        return None if answered else toast
+
     def _dashboard_pin_context(
         self,
         msg: IncomingMessage,
@@ -1135,8 +1263,7 @@ class MenuActionRouter:
             return f"Unknown sub-agent {run_id!r}."
         killed = await supervisor.kill(run_id, cascade=True)
         toast = f"Killed {run_id}." if killed else f"Could not kill {run_id}."
-        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
-        return None if answered else toast
+        return await self._after_subagent_kill(msg, callback_data, toast=toast)
 
     async def _handle_subagents_kill_all(
         self,
@@ -1165,8 +1292,7 @@ class MenuActionRouter:
             return "Sub-agent supervisor unavailable."
         count = await supervisor.kill_all(role=None)
         toast = f"Killed {count} sub-agent run(s)."
-        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
-        return None if answered else toast
+        return await self._after_subagent_kill(msg, callback_data, toast=toast)
 
     async def _handle_service_restart_action(
         self,
@@ -1628,15 +1754,22 @@ class MenuActionRouter:
         suffix = target.removeprefix("logs:")
         if suffix == "deployment_id":
             dep_id = getattr(self._router, "_deployment_id", None) or "unset"
-            toast = f"Deployment id: {dep_id}"
-            md = msg.metadata if isinstance(msg.metadata, dict) else {}
-            cq_id = md.get("callback_query_id")
-            cq_str = cq_id.strip() if isinstance(cq_id, str) else ""
-            adapter = self._router._adapters.get(msg.channel)
-            if adapter is not None and cq_str:
-                await _answer_callback(adapter, callback_query_id=cq_str, text=toast)
-                return None
-            return toast
+            return await self._answer_logs_identity_toast(
+                msg,
+                label="Deployment id",
+                value=str(dep_id),
+            )
+        if suffix == "version_id":
+            vid = effective_version_id(
+                sevn_json_path=self._sevn_json,
+                repo_root=self._content_root,
+                router_stash=getattr(self._router, "_version_id", None),
+            )
+            return await self._answer_logs_identity_toast(
+                msg,
+                label="Version id",
+                value=vid,
+            )
         if not self._router._resolve_owner_flag(msg):
             await self._answer_owner_only(msg)
             return None

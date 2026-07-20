@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver Mission Control: a same-process dashboard (prd-07-mission-control)
   so the owner can inspect traces, costs, provider health, in-flight runs, proxy status,
   and config without opening SQLite from'
-last_updated: '2026-07-16'
-fingerprint: sha256:c44b7d50d9b0199c73ac949902aa1fa29b41df05a945c3ce9b66c23e72944cb5
+last_updated: '2026-07-20'
+fingerprint: sha256:e08b384f7e425c49a1f50b406ced80cd3eeeb531d8f1916da4a41064a6e89a57
 related: []
 sources:
 - src/sevn/ui/**
@@ -1022,6 +1022,13 @@ Document observable failure surfaces from the implementing modules (exceptions, 
 Observability group gains **Sub-agents** tab: L1/L2 count chips, running table with
 kill actions, recent history, read-only limits. APIs:
 `GET /api/v1/mission/subagents`, `POST .../kill`, `POST .../kill_all` (D13).
+
+## Amendments (version_id)
+
+`GET /api/v1/config` includes top-level **`version_id`** (build/code identity from
+`sevn.json`, distinct from gateway `deployment_id`). Mission Control **System** menu
+renders a read-only **Version id** label from that payload (`#system-version-id` in
+`src/sevn/ui/spa/dashboard/`).
 
 ## Implemented by
 
