@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver src/sevn/evolution/ and the operator-facing Evolution surface so
   sevn.bot can evolve its own codebase as a first-class product pillar — not an optional
   add-on — spanning understand → file work
-last_updated: '2026-07-14'
-fingerprint: sha256:061ec4922dc42c711e2ccc36dd3bd6a8c49c083b52c572ba282a7b91b8c9204c
+last_updated: '2026-07-19'
+fingerprint: sha256:5d861c872064da2d57a613f098f5bec034b55609b9858fea362c45502cdc6e8a
 related: []
 sources:
 - src/sevn/evolution/**
@@ -178,6 +178,12 @@ interfaces:
 - name: run_scheduled_repo_sync
   file: src/sevn/evolution/repo_sync_scheduler.py
   symbol: run_scheduled_repo_sync
+- name: run_scheduled_repo_sync_with_recovery
+  file: src/sevn/evolution/repo_sync_scheduler.py
+  symbol: run_scheduled_repo_sync_with_recovery
+- name: sync_source_tree
+  file: src/sevn/evolution/repo_sync_scheduler.py
+  symbol: sync_source_tree
 - name: ExecutorBlockedError
   file: src/sevn/evolution/router.py
   symbol: ExecutorBlockedError

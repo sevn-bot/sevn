@@ -231,6 +231,43 @@ def test_stop_l1_keyboard_omits_kill_for_non_owner() -> None:
 
 
 @pytest.mark.asyncio
+async def test_stop_with_l1_non_owner_gets_owner_only_copy(tmp_path: Path) -> None:
+    """D11: non-owner ``/stop`` with L1 runs explains owner-only kill controls."""
+    from sevn.gateway.subagents.surfaces import STOP_L1_OWNER_ONLY_COPY
+
+    layout = _layout(tmp_path)
+    ws = WorkspaceConfig.minimal(subagents=SubAgentsWorkspaceConfig(enabled=True))
+    conn = _conn()
+    sessions = SessionManager(conn)
+    cancel_calls: list[str] = []
+
+    async def _track_cancel(session_id: str) -> bool:
+        cancel_calls.append(session_id)
+        return True
+
+    sessions.cancel_active_dispatch = _track_cancel  # type: ignore[method-assign]
+    registry = SubAgentRegistry()
+    supervisor = SubAgentSupervisor(registry=registry, config=SubAgentsWorkspaceConfig())
+    router = ChannelRouter.__new__(ChannelRouter)
+    router._subagent_supervisor = supervisor
+    router._resolve_owner_flag = lambda _msg: False  # type: ignore[method-assign]
+    handler = CoreCommandHandler(
+        workspace=ws,
+        layout=layout,
+        router=router,  # type: ignore[arg-type]
+        sessions=sessions,
+    )
+    await _spawn_l1(supervisor, summary="guest cannot kill")
+    reply = await handler.handle(
+        IncomingMessage(channel="telegram", user_id="guest", text="/stop"),
+        session_id="sess-guest",
+    )
+    assert cancel_calls == []
+    assert _reply_text(reply) == STOP_L1_OWNER_ONLY_COPY
+    assert _reply_markup(reply) is None
+
+
+@pytest.mark.asyncio
 async def test_stop_kill_callback_kills_individual_l1(tmp_path: Path) -> None:
     """Reuse ``act:subagents:kill:<id>`` — individual kill (existing path; D7)."""
     layout = _layout(tmp_path)
@@ -253,11 +290,6 @@ async def test_stop_kill_callback_kills_individual_l1(tmp_path: Path) -> None:
         content_root=layout.content_root,
         sevn_json_path=layout.sevn_json_path,
     )
-
-    async def _noop_refresh(*_a: Any, **_k: Any) -> bool:
-        return True
-
-    mar._refresh_config_menu_after_action = _noop_refresh  # type: ignore[method-assign]
 
     msg = IncomingMessage(
         channel="telegram",
@@ -297,11 +329,6 @@ async def test_stop_kill_all_callback_kills_all_l1(tmp_path: Path) -> None:
         sevn_json_path=layout.sevn_json_path,
     )
 
-    async def _noop_refresh(*_a: Any, **_k: Any) -> bool:
-        return True
-
-    mar._refresh_config_menu_after_action = _noop_refresh  # type: ignore[method-assign]
-
     msg = IncomingMessage(
         channel="telegram",
         user_id="1",
@@ -313,6 +340,61 @@ async def test_stop_kill_all_callback_kills_all_l1(tmp_path: Path) -> None:
         updated = await supervisor.registry.get(run_id)
         assert updated is not None
         assert updated.status.value == "killed"
+
+
+@pytest.mark.asyncio
+async def test_stop_kill_callback_refreshes_registered_config_menu(tmp_path: Path) -> None:
+    """Kill from a registered ``/config`` host refreshes the config menu, not ``/stop``."""
+    layout = _layout(tmp_path)
+    ws = WorkspaceConfig.minimal(subagents=SubAgentsWorkspaceConfig(enabled=True))
+    registry = SubAgentRegistry()
+    supervisor = SubAgentSupervisor(registry=registry, config=SubAgentsWorkspaceConfig())
+    run_id = await _spawn_l1(supervisor)
+
+    router = ChannelRouter.__new__(ChannelRouter)
+    router._adapters = {}
+    router._workspace = ws
+    router._resolve_owner_flag = lambda _msg: True  # type: ignore[method-assign]
+    router._config_menu_nav = {(42, 99): object()}
+    router._subagent_supervisor = supervisor
+
+    mar = MenuActionRouter(
+        workspace=ws,
+        router=router,
+        conn=sqlite3.connect(":memory:"),
+        content_root=layout.content_root,
+        sevn_json_path=layout.sevn_json_path,
+    )
+    config_calls: list[tuple[Any, ...]] = []
+    stop_calls: list[tuple[Any, ...]] = []
+
+    async def _track_config(*_a: Any, **_k: Any) -> bool:
+        config_calls.append((_a, _k))
+        return True
+
+    async def _track_stop(*_a: Any, **_k: Any) -> bool:
+        stop_calls.append((_a, _k))
+        return True
+
+    mar._refresh_config_menu_after_action = _track_config  # type: ignore[method-assign]
+    mar._refresh_stop_picker_after_kill = _track_stop  # type: ignore[method-assign]
+
+    msg = IncomingMessage(
+        channel="telegram",
+        user_id="1",
+        text="",
+        metadata={
+            "callback_data": f"act:subagents:kill:{run_id}",
+            "chat_id": 42,
+            "message_id": 99,
+        },
+    )
+    await mar.handle(msg, session_id="sess")
+    assert len(config_calls) == 1
+    assert stop_calls == []
+    updated = await supervisor.registry.get(run_id)
+    assert updated is not None
+    assert updated.status.value == "killed"
 
 
 # --- D9: slash path attaches reply_markup ---

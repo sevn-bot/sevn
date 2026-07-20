@@ -36,6 +36,7 @@ Exports:
     resolve_skill_status_target — map a status question to a registry skill id.
     default_early_ack — rotate canned tier B/C/D early ack lines.
     default_tier_a_reply — rotate canned tier-A greeting replies.
+    default_strict_tier_a_reply — strict-greeting-shaped tier-A replies (D14).
     first_message_passes_opener_rule — True when a first_message is a clean opener (W5.1).
 """
 
@@ -308,6 +309,9 @@ def _normalize_greeting_token(text: str) -> str:
         first_half = token[:half]
         if first_half == token[half:] and first_half in _GREETING_ACK_TOKENS:
             return first_half
+    # Playful "yo" elongations ("yoyo", "yoyoyyo") — letters y/o only.
+    if re.fullmatch(r"[yo]{2,12}", token):
+        return "yo"
     return token
 
 
@@ -1673,6 +1677,7 @@ def default_tier_a_reply(
     turn_id: str = "",
     operator_name: str | None = None,
     kind: GreetingKind = "hello",
+    strict: bool = False,
 ) -> str:
     """Return a canned tier-A greeting reply for the given category.
 
@@ -1681,6 +1686,7 @@ def default_tier_a_reply(
         operator_name (str | None): Preferred name from ``USER.md`` for ``{name}``
             templates (half the pool). When absent, only generic templates rotate.
         kind (GreetingKind): Greeting category (hello / thanks / bye).
+        strict (bool): When ``True``, use strict-greeting-shaped one-liners (D14).
 
     Returns:
         str: Friendly short reply.
@@ -1692,11 +1698,75 @@ def default_tier_a_reply(
         True
         >>> default_tier_a_reply(turn_id="bye-1", kind="bye").strip()
         'Bye — talk soon!'
+        >>> is_strict_greeting_message(default_tier_a_reply(turn_id="x", strict=True))
+        True
     """
+    if strict:
+        if kind == "bye":
+            pool = _STRICT_TIER_A_BYE_REPLIES
+        elif kind == "thanks":
+            pool = _STRICT_TIER_A_THANKS_REPLIES
+        else:
+            pool = _STRICT_TIER_A_HELLO_REPLIES
+        return _pick_rotated(pool, seed=f"{turn_id}:{kind}:strict")
     named = _normalize_operator_name(operator_name) is not None
     pool = _tier_a_pools_for_kind(kind, named=named)
     template = _pick_rotated(pool, seed=f"{turn_id}:{kind}")
     return _format_tier_a_reply(template, operator_name=operator_name)
+
+
+_STRICT_TIER_A_HELLO_REPLIES: Final[tuple[str, ...]] = (
+    "Hi!",
+    "Hey!",
+    "Hello!",
+    "Good morning!",
+    "Good afternoon!",
+    "Good evening!",
+    "Howdy!",
+    "Yo!",
+)
+_STRICT_TIER_A_THANKS_REPLIES: Final[tuple[str, ...]] = (
+    "Thanks!",
+    "Thank you!",
+    "Thx!",
+    "Ty!",
+    "Ok!",
+    "Okay!",
+    "Got it!",
+    "Noted!",
+)
+_STRICT_TIER_A_BYE_REPLIES: Final[tuple[str, ...]] = (
+    "Bye!",
+    "Goodbye!",
+    "See ya!",
+    "Cya!",
+)
+
+
+def default_strict_tier_a_reply(
+    *,
+    turn_id: str = "",
+    kind: GreetingKind = "hello",
+) -> str:
+    """Return a strict-greeting-shaped tier-A reply for scope-guard safety (D14).
+
+    Fast-path tier-A synthesis uses these short openers/closers so
+    ``is_strict_greeting_message`` passes on both the user utterance and the
+    canned ``first_message``. Conversational tier-A pools remain available via
+    :func:`default_tier_a_reply` for anti-echo replacement elsewhere.
+
+    Args:
+        turn_id (str): Correlation id for rotation.
+        kind (GreetingKind): Greeting category (hello / thanks / bye).
+
+    Returns:
+        str: One-line strict greeting reply.
+
+    Examples:
+        >>> is_strict_greeting_message(default_strict_tier_a_reply(turn_id="x"))
+        True
+    """
+    return default_tier_a_reply(turn_id=turn_id, kind=kind, strict=True)
 
 
 def is_obvious_continuation_message(message: str) -> bool:
@@ -1829,9 +1899,8 @@ def try_fast_greeting_triage(
     return TriageResult.model_construct(
         intent=Intent.GREETING,
         complexity=ComplexityTier.A,
-        first_message=default_tier_a_reply(
+        first_message=default_strict_tier_a_reply(
             turn_id=turn_id,
-            operator_name=operator_name,
             kind=kind,
         ),
         tools=[],

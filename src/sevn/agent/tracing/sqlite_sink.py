@@ -53,13 +53,27 @@ def cap_attrs_json(payload: str, *, max_bytes: int = TRACE_ATTRS_JSON_MAX_BYTES)
         True
     """
     encoded = payload.encode("utf-8")
-    if len(encoded) <= max_bytes:
+    original_bytes = len(encoded)
+    if original_bytes <= max_bytes:
         return payload
-    logger.bind(original_bytes=len(encoded), max_bytes=max_bytes).warning(
+    truncated_keys: list[str] = []
+    try:
+        parsed = json.loads(payload)
+        if isinstance(parsed, dict):
+            truncated_keys = [str(key) for key in parsed]
+    except json.JSONDecodeError:
+        pass
+    logger.bind(original_bytes=original_bytes, max_bytes=max_bytes).warning(
         "trace attrs_json exceeds size cap — truncating",
     )
-    marker = {"_truncated": True, "_original_bytes": len(encoded)}
-    return json.dumps(marker, separators=(",", ":"), ensure_ascii=False)
+    marker: dict[str, Any] = {"_truncated": True, "_original_bytes": original_bytes}
+    if truncated_keys:
+        marker["_truncated_keys"] = truncated_keys
+    marker_json = json.dumps(marker, separators=(",", ":"), ensure_ascii=False)
+    if len(marker_json.encode("utf-8")) > max_bytes:
+        marker.pop("_truncated_keys", None)
+        marker_json = json.dumps(marker, separators=(",", ":"), ensure_ascii=False)
+    return marker_json
 
 
 def redact_trace_attrs(attrs: dict[str, Any]) -> dict[str, Any]:

@@ -223,15 +223,14 @@ def effective_version_id(
         >>> effective_version_id(raw_doc={"version_id": " build-1 "})
         'build-1'
     """
+    stored = None
     if raw_doc is not None:
         stored = _stored_version_id(raw_doc)
-        if stored is not None:
-            return stored
-    if sevn_json_path is not None:
+    elif sevn_json_path is not None:
         with contextlib.suppress(OSError, json.JSONDecodeError, ValueError):
             stored = _stored_version_id(_load_sevn_doc(sevn_json_path.expanduser().resolve()))
-            if stored is not None:
-                return stored
+    if stored is not None:
+        return stored
     if isinstance(router_stash, str) and router_stash.strip():
         return router_stash.strip()
     return resolve_version_id(repo_root=repo_root)

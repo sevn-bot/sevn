@@ -153,6 +153,8 @@ class AlertRule:
     severity: str = "warning"
     enabled: bool = True
     silenced_until: float = 0.0
+    consecutive_breaches: int = 1
+    """Consecutive threshold breaches required within ``window_seconds`` before firing."""
 
 
 @dataclass

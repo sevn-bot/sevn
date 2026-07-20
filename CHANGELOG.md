@@ -12,7 +12,16 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
-- [2026-07-20] Agent-control thermos pass — extract sub-agent slash surfaces module, centralize ``version_id`` lookup, refresh ``/stop`` picker after kill callbacks, and let non-owners session-cancel when L1 runs exist
+- [2026-07-20] Agent-control thermos pass — extract sub-agent slash surfaces module, centralize ``version_id`` lookup, refresh ``/stop`` picker after kill callbacks, and tell non-owners that L1 kill controls are owner-only
+- [2026-07-19] CodeRabbit review — bound trace attrs truncation markers, clear cancel-queue dispatch routing, structured subagent persist errors, and drop no-op resource-tracker semaphore scan
+- [2026-07-19] Thermos pass — evict enqueue-time dispatch routing after each turn (including multi-spawn bodies), cancel progress signals once streaming starts, and scope Mission Control stage attribution to the active turn
+- [2026-07-19] Silence benign rich-capability probe + per-boot secrets reconcile, record trace truncation, and keep greetings in scope
+- [2026-07-19] Recover diverged ``my_sevn`` sync cron with ``--latest`` and reap leaked worker semaphores on gateway shutdown
+- [2026-07-19] Wait for egress proxy health before bringing channels up
+- [2026-07-19] Preserve Telegram `chat_id` across queued/steer dispatch and classifier-timeout fallback; coalesce `sendChatAction` typing indicators per chat
+- [2026-07-19] Debounce `channel_down`/`high_error_rate` alerts so transient blips don't page critical
+- [2026-07-19] Retry truncated Codex proxy streams once and return a typed upstream-truncated error instead of a bare 502; attribute high-latency alerts to the stalling turn stage and emit a still-working progress signal before long-turn dead-air
+- [2026-07-19] Persist subagent runs without spurious commit errors
 - [2026-07-18] Refresh readme fingerprints after gateway OAuth wizard and discogs-shared registry edits
 - [2026-07-18] Thermos close-out — bandit-clean OAuth wizard payload guard and interim-secret cleanup
 - [2026-07-18] Register ``discogs-shared`` in ``DEFAULT_SKILL_MANIFESTS`` for bundled-core parity

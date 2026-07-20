@@ -156,6 +156,11 @@ class TierBAnswerFinalizer:
             session_id=self.session_id,
             metadata=md,
         )
+        active_l1 = getattr(self.router, "_active_l1_turn_state", None)
+        if active_l1 is not None:
+            from sevn.gateway.agent_turn import _cancel_turn_progress_signal
+
+            _cancel_turn_progress_signal(active_l1)
         ids = await self.adapter.send(msg)
         if ids:
             self._placeholder_message_id = str(ids[0])

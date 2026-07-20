@@ -111,6 +111,7 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C20.5",
         "C20.6",
         "C20.7",
+        "C20.7a",
         "C20.8",
         "C20.9",
         # My sevn bot — service restarts (owner, 2-step)
@@ -291,8 +292,8 @@ _CONFIG_SECTION_CATALOG: tuple[tuple[str, str, str, MenuReadiness], ...] = (
     ),
     (
         "My sevn bot",
-        "Deployment id and owner gateway/proxy restart (two-step confirm).",
-        "Restart uses service manager; deployment id mirrors /status.",
+        "Deployment id, build version id, and owner gateway/proxy restart (two-step confirm).",
+        "Restart uses service manager; deployment id mirrors /status; version id is the sevn.json build stamp.",
         "Ready",
     ),
 )

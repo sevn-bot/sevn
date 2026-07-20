@@ -9,6 +9,7 @@ Exports:
     keychain_has_unlock_secret — whether the keychain holds the active unlock var.
     prime_unlock_env_from_keychain — set the unlock var from Keychain when unset.
     reconcile_unlock_env_with_keychain — prefer Keychain over stale session env.
+    log_unlock_env_conflict — log genuine unlock-env conflicts at WARNING (D13).
 
 Rationale (`specs/06-secrets.md`): the gateway/proxy run as a per-user LaunchAgent whose plist
 embeds no unlock secret. ``propagate_daemon_secret_env`` mirrors the shell passphrase into the
@@ -98,6 +99,42 @@ async def fetch_unlock_secret_from_keychain(
     return None
 
 
+def log_unlock_env_conflict(
+    *,
+    var: str,
+    env_value: str,
+    keychain_value: str,
+    reason: str,
+) -> None:
+    """Log a genuine unlock-env conflict at WARNING (D13).
+
+    Routine stale-shell replacement uses INFO via
+    :func:`reconcile_unlock_env_with_keychain`; call this only for unexpected
+    conflicts where both sources are set and disagree in a non-routine way.
+
+    Args:
+        var (str): Env var name (``SEVN_SECRETS_PASSPHRASE`` or ``SEVN_SECRETS_MASTER_KEY``).
+        env_value (str): Value currently in the process environment.
+        keychain_value (str): Value read from Keychain.
+        reason (str): Short classifier (e.g. ``unexpected_conflict``).
+
+    Examples:
+        >>> log_unlock_env_conflict(
+        ...     var="SEVN_SECRETS_PASSPHRASE",
+        ...     env_value="a",
+        ...     keychain_value="b",
+        ...     reason="unexpected_conflict",
+        ... )
+    """
+    logger.warning(
+        "secrets_unlock_env_conflict var={} reason={} env_len={} keychain_len={}",
+        var,
+        reason,
+        len(env_value),
+        len(keychain_value),
+    )
+
+
 async def reconcile_unlock_env_with_keychain(
     *, key_source: str, service: str | None = None
 ) -> bool:
@@ -129,7 +166,7 @@ async def reconcile_unlock_env_with_keychain(
     if env_val == kc_val:
         return False
     if env_val:
-        logger.warning(
+        logger.info(
             "secrets_unlock_env_stale_replaced var={} — shell/session value differed from "
             "keychain; using keychain unlock secret written during onboard",
             var,
@@ -172,6 +209,7 @@ async def prime_unlock_env_from_keychain(*, key_source: str, service: str | None
 __all__ = [
     "fetch_unlock_secret_from_keychain",
     "keychain_has_unlock_secret",
+    "log_unlock_env_conflict",
     "prime_unlock_env_from_keychain",
     "reconcile_unlock_env_with_keychain",
     "unlock_env_var_for",

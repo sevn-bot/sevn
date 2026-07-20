@@ -317,7 +317,8 @@ class CoreCommandHandler:
 
         When at least one level-1 run is active and the caller is the workspace owner,
         return a picker keyboard reusing Config→Sub-agents kill callbacks. Non-owners
-        fall through to session cancel. When no L1 runs exist, preserve the session
+        with active L1 runs receive ``STOP_L1_OWNER_ONLY_COPY`` (kill controls are
+        owner-only). When no L1 runs exist, preserve the session
         ``cancel_active_dispatch`` path and ``\"Stopped.\"`` copy.
 
         Args:
@@ -333,15 +334,18 @@ class CoreCommandHandler:
             True
         """
         from sevn.gateway.subagents.surfaces import (
+            STOP_L1_OWNER_ONLY_COPY,
             STOP_L1_PICKER_COPY,
             build_stop_l1_keyboard,
             subagent_menu_snapshot_from_router,
         )
 
         level1_count, _level2, rows = await subagent_menu_snapshot_from_router(self._router)
-        if level1_count >= 1 and self._router._resolve_owner_flag(msg):
-            markup = build_stop_l1_keyboard(rows, is_owner=True)
-            return CoreCommandReply(text=STOP_L1_PICKER_COPY, reply_markup=markup)
+        if level1_count >= 1:
+            if self._router._resolve_owner_flag(msg):
+                markup = build_stop_l1_keyboard(rows, is_owner=True)
+                return CoreCommandReply(text=STOP_L1_PICKER_COPY, reply_markup=markup)
+            return STOP_L1_OWNER_ONLY_COPY
         await self._sessions.cancel_active_dispatch(session_id)
         return "Stopped."
 

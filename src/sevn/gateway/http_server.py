@@ -5,6 +5,8 @@ Exports:
     create_app — ASGI factory.
     deferred_json — ``501`` response helper for deferred endpoints.
     DeferredGatewayOnboardingRoute — ``NotImplementedError`` subclass for ``/onboarding/*``.
+    handle_my_sevn_sync_cron_failure — deduplicated WARNING for cron sync failures.
+    wait_for_proxy_boot_health — bounded egress proxy ``/healthz`` poll at gateway boot.
 """
 
 from __future__ import annotations
@@ -81,7 +83,7 @@ from sevn.evolution.repo_sync_scheduler import (
     MY_SEVN_ISSUES_SYNC_CRON_JOB_ID,
     MY_SEVN_SYNC_CRON_JOB_ID,
     run_scheduled_issues_sync,
-    run_scheduled_repo_sync,
+    run_scheduled_repo_sync_with_recovery,
 )
 from sevn.evolution.stats import record_last_sync
 from sevn.gateway.admin.admin_secrets import register_admin_secrets_routes
@@ -434,8 +436,74 @@ def _effective_process_settings(
     return process.model_copy(update={"proxy_url": origin})
 
 
+_DEFAULT_PROXY_BOOT_HEALTH_MAX_WAIT_S = 5.0
+_DEFAULT_PROXY_BOOT_HEALTH_POLL_INTERVAL_S = 0.5
+
+
+async def wait_for_proxy_boot_health(
+    process: ProcessSettings,
+    *,
+    max_wait_s: float = _DEFAULT_PROXY_BOOT_HEALTH_MAX_WAIT_S,
+    poll_interval_s: float = _DEFAULT_PROXY_BOOT_HEALTH_POLL_INTERVAL_S,
+) -> bool:
+    """Poll egress proxy ``/healthz`` until healthy or ``max_wait_s`` elapses.
+
+    Args:
+        process (ProcessSettings): Process-level settings including ``proxy_url``.
+        max_wait_s (float): Upper bound on total wait time in seconds.
+        poll_interval_s (float): Delay between failed poll attempts.
+
+    Returns:
+        bool: ``True`` when the proxy responds with HTTP < 400; ``False`` when
+            the window expires without a healthy response.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(wait_for_proxy_boot_health)
+        True
+    """
+    proxy_url = (process.proxy_url or "").strip()
+    if not proxy_url:
+        return True
+    health_url = proxy_url.rstrip("/") + "/healthz"
+    deadline = time.monotonic() + max_wait_s
+    last_exc: httpx.HTTPError | None = None
+    last_status: int | None = None
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(health_url)
+        except httpx.HTTPError as exc:
+            last_exc = exc
+            last_status = None
+        else:
+            if response.status_code < 400:
+                return True
+            last_status = response.status_code
+            last_exc = None
+        if time.monotonic() >= deadline:
+            break
+        await asyncio.sleep(poll_interval_s)
+    if last_exc is not None:
+        logger.error(
+            "egress proxy unreachable at gateway boot ({}): {} — "
+            "run `sevn proxy start` or `sevn gateway start` to bring it up; "
+            "continuing degraded",
+            health_url,
+            last_exc,
+        )
+    elif last_status is not None:
+        logger.error(
+            "egress proxy health check failed at gateway boot: {} returned {} — "
+            "see logs/proxy.log under the workspace; continuing degraded",
+            health_url,
+            last_status,
+        )
+    return False
+
+
 async def _log_proxy_boot_health(process: ProcessSettings) -> None:
-    """Log when the configured egress proxy is unreachable at gateway boot.
+    """Wait briefly for egress proxy health before channels come up.
 
     Args:
         process (ProcessSettings): Process-level settings including ``proxy_url``.
@@ -445,28 +513,7 @@ async def _log_proxy_boot_health(process: ProcessSettings) -> None:
         >>> inspect.iscoroutinefunction(_log_proxy_boot_health)
         True
     """
-    proxy_url = (process.proxy_url or "").strip()
-    if not proxy_url:
-        return
-    health_url = proxy_url.rstrip("/") + "/healthz"
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(health_url)
-    except httpx.HTTPError as exc:
-        logger.error(
-            "egress proxy unreachable at gateway boot ({}): {} — "
-            "run `sevn proxy start` or `sevn gateway start` to bring it up",
-            health_url,
-            exc,
-        )
-        return
-    if response.status_code >= 400:
-        logger.error(
-            "egress proxy health check failed at gateway boot: {} returned {} — "
-            "see logs/proxy.log under the workspace",
-            health_url,
-            response.status_code,
-        )
+    await wait_for_proxy_boot_health(process)
 
 
 def _cached_gateway_token(request: Request) -> str | None:
@@ -981,6 +1028,27 @@ class DeferredGatewayOnboardingRoute(NotImplementedError):
     """
 
 
+_last_my_sevn_sync_cron_failure_key: str | None = None
+
+
+def handle_my_sevn_sync_cron_failure(exc: RepoSyncError) -> None:
+    """Log a cron sync failure at most once per distinct error message.
+
+    Args:
+        exc (RepoSyncError): Failure after :func:`run_scheduled_repo_sync_with_recovery`.
+
+    Examples:
+        >>> handle_my_sevn_sync_cron_failure(RepoSyncError("git fetch failed")) is None
+        True
+    """
+    global _last_my_sevn_sync_cron_failure_key
+    key = str(exc)
+    if key == _last_my_sevn_sync_cron_failure_key:
+        return
+    _last_my_sevn_sync_cron_failure_key = key
+    logger.warning("my_sevn repo sync cron failed: {}", exc)
+
+
 def create_app(
     *,
     workspace: WorkspaceConfig | None = None,
@@ -1238,7 +1306,8 @@ def create_app(
         gateway_router._deployment_id = load_or_create_deployment_id(ly.content_root)
         # Build identity in ``sevn.json`` (issue #30) — orthogonal to deployment_id (D1).
         _repo_root = try_resolve_sevn_repo_root(ly.content_root) or ly.content_root
-        gateway_router._version_id = ensure_version_id(
+        gateway_router._version_id = await asyncio.to_thread(
+            ensure_version_id,
             ly.sevn_json_path,
             repo_root=_repo_root,
         )
@@ -1265,6 +1334,7 @@ def create_app(
             process_settings=effective_process,
             content_root=ly.content_root,
         )
+        await _log_proxy_boot_health(effective_process)
         artifacts = await register_enabled_channel_adapters(boot_ctx)
         webchat_cfg = (
             artifacts.webchat_config if artifacts is not None else webchat_config_from_workspace(ws)
@@ -1429,7 +1499,10 @@ def create_app(
                 proc = getattr(st, "process_settings", None)
                 home = proc.home if proc is not None and proc.home is not None else sevn_home_dir()
                 try:
-                    detail = await asyncio.to_thread(run_scheduled_repo_sync, home=home)
+                    detail = await asyncio.to_thread(
+                        run_scheduled_repo_sync_with_recovery,
+                        home=home,
+                    )
                     await asyncio.to_thread(
                         record_last_sync,
                         st.layout,
@@ -1437,7 +1510,7 @@ def create_app(
                         detail=detail,
                     )
                 except RepoSyncError as exc:
-                    logger.warning("my_sevn repo sync cron failed: {}", exc)
+                    await asyncio.to_thread(handle_my_sevn_sync_cron_failure, exc)
                     await asyncio.to_thread(
                         record_last_sync,
                         st.layout,
@@ -1539,7 +1612,6 @@ def create_app(
 
         cron_task = asyncio.create_task(_cron_minute_loop(app))
         app.state.triggers_cron_task = cron_task
-        await _log_proxy_boot_health(effective_process)
         await run_boot_hooks(
             BootContext(
                 app=app,
@@ -1558,6 +1630,7 @@ def create_app(
         # `build_agent_run_turn` constructor param, since both call sites of that
         # factory run *before* `run_boot_hooks` above.
         gateway_router._subagent_supervisor = getattr(app.state, "subagent_supervisor", None)
+        gateway_router._mission_control_state = mission_control_state
         yield
         await _emit_gateway_trace(trace, kind="gateway.shutdown", status="ok")
         cursor_sched = getattr(app.state, "cursor_poll_scheduler", None)

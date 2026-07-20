@@ -6,8 +6,6 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock
 
-import pytest
-
 from sevn.agent.tracing.sink import NullTraceSink
 from sevn.gateway.agent_turn import build_agent_run_turn
 from sevn.gateway.channel_router import ChannelRouter, IncomingMessage
@@ -108,7 +106,6 @@ def test_my_sevn_bot_section_keyboard_exposes_version_id() -> None:
     assert _VERSION_ID_CALLBACKS.intersection(cbs), cbs
 
 
-@pytest.mark.asyncio
 async def test_version_id_callback_toasts_current_value(tmp_path: Path) -> None:
     """Callback peer of deployment_id answers with the current ``version_id`` (D5)."""
     router, cap, _root = _build_owner_router(tmp_path)

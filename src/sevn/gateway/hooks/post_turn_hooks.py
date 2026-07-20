@@ -95,12 +95,12 @@ async def run_post_turn_hooks(ctx: PostTurnContext) -> None:
     ctx.router.cancel_telegram_typing(ctx.session_id)
     elapsed_ms = max(1, int((time_ns() - ctx.turn_wall_ns) / 1_000_000))
     from sevn.gateway.agent_turn import _emit_gateway_span
+    from sevn.gateway.mission.mission_state import HIGH_LATENCY_ALERT_THRESHOLD_MS
 
     turn_attrs: dict[str, object] = {"elapsed_ms": elapsed_ms, "latency_ms": float(elapsed_ms)}
-    _HIGH_LATENCY_MS = 5000
-    if elapsed_ms >= _HIGH_LATENCY_MS:
+    if elapsed_ms >= HIGH_LATENCY_ALERT_THRESHOLD_MS:
         turn_attrs["high_latency"] = True
-        turn_attrs["high_latency_threshold_ms"] = _HIGH_LATENCY_MS
+        turn_attrs["high_latency_threshold_ms"] = HIGH_LATENCY_ALERT_THRESHOLD_MS
     await _emit_gateway_span(
         ctx.trace,
         kind="gateway.turn.complete",

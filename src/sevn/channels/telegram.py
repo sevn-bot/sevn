@@ -34,7 +34,11 @@ from typing import TYPE_CHECKING, Any
 
 from sevn.agent.tracing.sink import SYSTEM_TURN_ID, TraceEvent, TraceSink
 from sevn.channels.telegram_api import TelegramApiMixin
-from sevn.channels.telegram_capabilities import RichCapability, detect_rich_support
+from sevn.channels.telegram_capabilities import (
+    _RICH_PROBE_METHOD,
+    RichCapability,
+    detect_rich_support,
+)
 from sevn.channels.telegram_config import (
     DMPolicy as DMPolicy,
 )
@@ -182,6 +186,8 @@ class TelegramAdapter(
         self._dispatch_gate = asyncio.Semaphore(_MAX_INFLIGHT_DISPATCH)
         self._pairing_store = pairing_store
         self._rich_capability: RichCapability | None = None
+        # D5: coalesce rapid sendChatAction calls per chat (typing loop + internal ticks).
+        self._chat_action_last_sent: dict[tuple[int, str, int | None], float] = {}
 
     @property
     def rich_capability(self) -> RichCapability:
@@ -226,7 +232,11 @@ class TelegramAdapter(
         """
         if self._rich_capability is not None and not force:
             return self._rich_capability
-        verdict = await detect_rich_support(self._api)
+
+        async def _probing_api(method: str, body: dict[str, Any]) -> dict[str, Any]:
+            return await self._api(method, body, probe=(method == _RICH_PROBE_METHOD))
+
+        verdict = await detect_rich_support(_probing_api)
         self._rich_capability = verdict
         return verdict
 

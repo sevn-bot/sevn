@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-07-20'
-fingerprint: sha256:4344b88645089b41db8ac0b5d6cae87e630f95410d08dbf27a1a863598ca1254
+fingerprint: sha256:e5afa58162e6d4ddd08cffae12161f3defded9343111671b664d9ff758c0b8e1
 related: []
 sources:
 - src/sevn/gateway/**
@@ -66,6 +66,9 @@ interfaces:
 - name: build_intro_extra_instructions
   file: src/sevn/gateway/agent_turn.py
   symbol: build_intro_extra_instructions
+- name: turn_progress_signal_text
+  file: src/sevn/gateway/agent_turn.py
+  symbol: turn_progress_signal_text
 - name: build_echo_run_turn
   file: src/sevn/gateway/api/e2e_echo.py
   symbol: build_echo_run_turn
@@ -426,6 +429,12 @@ interfaces:
 - name: deferred_json
   file: src/sevn/gateway/http_server.py
   symbol: deferred_json
+- name: handle_my_sevn_sync_cron_failure
+  file: src/sevn/gateway/http_server.py
+  symbol: handle_my_sevn_sync_cron_failure
+- name: wait_for_proxy_boot_health
+  file: src/sevn/gateway/http_server.py
+  symbol: wait_for_proxy_boot_health
 - name: ingest_gateway_message_row
   file: src/sevn/gateway/lcm/lcm_ingest.py
   symbol: ingest_gateway_message_row
@@ -981,6 +990,12 @@ interfaces:
 - name: SessionRow
   file: src/sevn/gateway/session_manager.py
   symbol: SessionRow
+- name: clear_dispatch_routing
+  file: src/sevn/gateway/session_manager.py
+  symbol: clear_dispatch_routing
+- name: dispatch_routing_for
+  file: src/sevn/gateway/session_manager.py
+  symbol: dispatch_routing_for
 - name: format_lcm_status_lines
   file: src/sevn/gateway/session_manager.py
   symbol: format_lcm_status_lines
@@ -993,12 +1008,21 @@ interfaces:
 - name: load_session_row
   file: src/sevn/gateway/session_manager.py
   symbol: load_session_row
+- name: merge_dispatch_routing
+  file: src/sevn/gateway/session_manager.py
+  symbol: merge_dispatch_routing
+- name: outbound_routing_for_session
+  file: src/sevn/gateway/session_manager.py
+  symbol: outbound_routing_for_session
 - name: set_tts_mode_override
   file: src/sevn/gateway/session_manager.py
   symbol: set_tts_mode_override
 - name: unanswered_tail_message_id
   file: src/sevn/gateway/session_manager.py
   symbol: unanswered_tail_message_id
+- name: validate_dispatch_routing_identity
+  file: src/sevn/gateway/session_manager.py
+  symbol: validate_dispatch_routing_identity
 - name: build_announce_back_hook
   file: src/sevn/gateway/subagents/subagents_announce.py
   symbol: build_announce_back_hook

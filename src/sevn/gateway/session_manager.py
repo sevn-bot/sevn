@@ -7,6 +7,11 @@ Exports:
         per-session single-consumer dispatch queue (`specs/16-harness-discipline.md` §4.3);
         ``rotate_session`` archives prior scope row and mints a new ``session_id``.
     load_session_row — read-only session metadata fetch for tests/admin.
+    validate_dispatch_routing_identity — fail loudly when Telegram enqueue lacks ``chat_id``.
+    dispatch_routing_for — routing identity captured at enqueue for steer/queued turns.
+    merge_dispatch_routing — overlay enqueue-time routing onto outbound metadata.
+    clear_dispatch_routing — drop enqueue-time routing after a turn completes (D6).
+    outbound_routing_for_session — best-effort session routing for operator notices.
     get_tts_mode_override — session-level TTS mode override reader.
     set_tts_mode_override — session-level TTS mode override writer.
     format_lcm_status_lines — LCM ingest/compaction hints for ``/status``.
@@ -44,6 +49,303 @@ DispatchFn = Callable[[str, str], Coroutine[Any, Any, None]]
 # concurrent LLM turns. Default is intentionally large — it only bites under
 # pathological fan-out (`specs/17-gateway.md` §4.3, plan D9/W2.4).
 DEFAULT_MAX_CONCURRENT_TURNS = 16
+
+# Enqueue-time routing identity for steer/queued dispatches (D6).
+_DISPATCH_ROUTING: dict[tuple[str, str], dict[str, Any]] = {}
+
+
+def _telegram_chat_id_from_scope_key(scope_key: str) -> int | None:
+    """Parse a Telegram chat id from a gateway ``scope_key`` when present.
+
+    Args:
+        scope_key (str): Session scope key (``telegram:<chat>`` variants).
+
+    Returns:
+        int | None: Parsed chat id, or ``None`` when not a Telegram scope.
+
+    Examples:
+        >>> _telegram_chat_id_from_scope_key("telegram:4242:general")
+        4242
+    """
+    if not scope_key.startswith("telegram:"):
+        return None
+    parts = scope_key.split(":")
+    if len(parts) < 2:
+        return None
+    chat_part = parts[1]
+    if chat_part.lstrip("-").isdigit():
+        return int(chat_part)
+    return None
+
+
+def _chat_id_from_latest_user_extras(conn: sqlite3.Connection, session_id: str) -> int | None:
+    """Return ``chat_id`` from the newest user message ``extras_json`` when set.
+
+    Args:
+        conn (sqlite3.Connection): Gateway SQLite handle.
+        session_id (str): Owning session id.
+
+    Returns:
+        int | None: Parsed ``chat_id`` or ``None``.
+
+    Examples:
+        >>> import sqlite3
+        >>> from sevn.storage.migrate import apply_migrations
+        >>> c = sqlite3.connect(":memory:")
+        >>> apply_migrations(c)
+        >>> _chat_id_from_latest_user_extras(c, "missing") is None
+        True
+    """
+    row = conn.execute(
+        """
+        SELECT extras_json FROM gateway_messages
+        WHERE session_id = ? AND role = 'user' AND kind = 'message'
+        ORDER BY id DESC LIMIT 1
+        """,
+        (session_id,),
+    ).fetchone()
+    if row is None or not row[0]:
+        return None
+    try:
+        parsed = json.loads(str(row[0]))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    chat_raw = parsed.get("chat_id")
+    if isinstance(chat_raw, int):
+        return chat_raw
+    if isinstance(chat_raw, str) and chat_raw.lstrip("-").isdigit():
+        return int(chat_raw)
+    tg_raw = parsed.get("telegram_chat_id")
+    if isinstance(tg_raw, str) and tg_raw.lstrip("-").isdigit():
+        return int(tg_raw)
+    if isinstance(tg_raw, int):
+        return tg_raw
+    return None
+
+
+def _resolve_dispatch_routing_identity(
+    conn: sqlite3.Connection,
+    session_id: str,
+    *,
+    channel: str | None,
+    chat_id: int | None,
+) -> tuple[str, int | None]:
+    """Resolve channel + ``chat_id`` for enqueue when callers omit explicit values (D6).
+
+    Args:
+        conn (sqlite3.Connection): Gateway SQLite handle.
+        session_id (str): Target session id.
+        channel (str | None): Explicit channel when provided by caller.
+        chat_id (int | None): Explicit chat id when provided by caller.
+
+    Returns:
+        tuple[str, int | None]: Resolved ``(channel, chat_id)``.
+
+    Examples:
+        >>> import sqlite3
+        >>> from sevn.storage.migrate import apply_migrations
+        >>> c = sqlite3.connect(":memory:")
+        >>> apply_migrations(c)
+        >>> _resolve_dispatch_routing_identity(c, "missing", channel="webchat", chat_id=None)
+        ('webchat', None)
+    """
+    row = load_session_row(conn, session_id)
+    resolved_channel = (channel or (row.channel if row else "")).strip()
+    if chat_id is not None:
+        return resolved_channel, chat_id
+    if resolved_channel != "telegram":
+        return resolved_channel, None
+    from_scope = _telegram_chat_id_from_scope_key(row.scope_key) if row else None
+    if from_scope is not None:
+        return resolved_channel, from_scope
+    from_extras = _chat_id_from_latest_user_extras(conn, session_id)
+    if from_extras is not None:
+        return resolved_channel, from_extras
+    return resolved_channel, None
+
+
+def validate_dispatch_routing_identity(
+    *,
+    channel: str,
+    chat_id: int | None,
+    scope_key: str | None = None,
+) -> None:
+    """Fail loudly when a Telegram dispatch job would have no delivery target (D6).
+
+    Args:
+        channel (str): Channel key (``telegram``, ``webchat``, …).
+        chat_id (int | None): Platform chat id when known.
+        scope_key (str | None): Session scope key when available for shape checks.
+
+    Raises:
+        ValueError: When ``channel`` is ``telegram``, ``chat_id`` is missing, and
+            the scope key names a numeric Telegram chat (production shape).
+
+    Examples:
+        >>> validate_dispatch_routing_identity(channel="webchat", chat_id=None) is None
+        True
+        >>> validate_dispatch_routing_identity(
+        ...     channel="telegram",
+        ...     chat_id=None,
+        ...     scope_key="telegram:4242",
+        ... )  # doctest: +SKIP
+    """
+    if channel != "telegram" or chat_id is not None:
+        return
+    if scope_key is None or _telegram_chat_id_from_scope_key(scope_key) is None:
+        return
+    msg = "telegram enqueue requires chat_id"
+    raise ValueError(msg)
+
+
+def _record_dispatch_routing(
+    session_id: str,
+    correlation_id: str,
+    *,
+    channel: str,
+    chat_id: int | None,
+) -> None:
+    """Store routing identity keyed by ``(session_id, correlation_id)`` (D6).
+
+    Args:
+        session_id (str): Gateway session id.
+        correlation_id (str): Per-turn correlation id.
+        channel (str): Channel key captured at enqueue.
+        chat_id (int | None): Platform chat id when known.
+
+    Examples:
+        >>> _record_dispatch_routing("s", "c", channel="telegram", chat_id=1) is None
+        True
+        >>> dispatch_routing_for("s", "c")["chat_id"]
+        1
+    """
+    routing: dict[str, Any] = {"channel": channel}
+    if chat_id is not None:
+        routing["chat_id"] = chat_id
+    _DISPATCH_ROUTING[(session_id, correlation_id)] = routing
+
+
+def dispatch_routing_for(session_id: str, correlation_id: str) -> dict[str, Any]:
+    """Return routing identity captured at enqueue for one queued/steer job (D6).
+
+    Args:
+        session_id (str): Gateway session id.
+        correlation_id (str): Per-turn correlation id from enqueue.
+
+    Returns:
+        dict[str, Any]: ``channel`` plus ``chat_id`` when captured.
+
+    Raises:
+        KeyError: When no routing was recorded for the pair.
+
+    Examples:
+        >>> dispatch_routing_for("missing", "corr")  # doctest: +SKIP
+    """
+    return dict(_DISPATCH_ROUTING[(session_id, correlation_id)])
+
+
+def clear_dispatch_routing(session_id: str, correlation_id: str) -> None:
+    """Remove enqueue-time routing for one turn after dispatch completes (D6).
+
+    Args:
+        session_id (str): Gateway session id.
+        correlation_id (str): Per-turn correlation id from enqueue.
+
+    Examples:
+        >>> clear_dispatch_routing("s", "c") is None
+        True
+    """
+    _DISPATCH_ROUTING.pop((session_id, correlation_id), None)
+
+
+def _merge_dispatch_routing_extras(
+    session_id: str,
+    correlation_id: str,
+    extras: dict[str, Any],
+) -> None:
+    """Overlay extra routing keys onto an enqueued dispatch job when present.
+
+    Args:
+        session_id (str): Gateway session id.
+        correlation_id (str): Per-turn correlation id from enqueue.
+        extras (dict[str, Any]): Additional routing metadata to merge.
+
+    Examples:
+        >>> _merge_dispatch_routing_extras("s", "c", {"relatedness_classifier_fallback": True}) is None
+        True
+    """
+    key = (session_id, correlation_id)
+    if key not in _DISPATCH_ROUTING:
+        return
+    _DISPATCH_ROUTING[key].update(extras)
+
+
+def merge_dispatch_routing(
+    route_meta: dict[str, Any],
+    session_id: str,
+    correlation_id: str,
+) -> dict[str, Any]:
+    """Overlay enqueue-time routing onto outbound metadata when present (D6).
+
+    Args:
+        route_meta (dict[str, Any]): Baseline routing metadata for the turn.
+        session_id (str): Gateway session id.
+        correlation_id (str): Per-turn correlation id.
+
+    Returns:
+        dict[str, Any]: Merged metadata preferring enqueue-time ``chat_id``.
+
+    Examples:
+        >>> merge_dispatch_routing({"chat_id": 1}, "missing", "corr")
+        {'chat_id': 1}
+    """
+    try:
+        enqueued = dispatch_routing_for(session_id, correlation_id)
+    except KeyError:
+        return route_meta
+    merged = dict(route_meta)
+    for key in (
+        "chat_id",
+        "channel",
+        "topic_id",
+        "telegram_thread_id",
+        "relatedness_classifier_fallback",
+    ):
+        value = enqueued.get(key)
+        if value is not None:
+            merged[key] = value
+    return merged
+
+
+def outbound_routing_for_session(conn: sqlite3.Connection, session_id: str) -> dict[str, Any]:
+    """Best-effort outbound routing metadata for a session (operator notices, D6).
+
+    Args:
+        conn (sqlite3.Connection): Gateway SQLite handle.
+        session_id (str): Target session id.
+
+    Returns:
+        dict[str, Any]: ``channel`` plus ``chat_id`` when resolvable.
+
+    Examples:
+        >>> outbound_routing_for_session(sqlite3.connect(":memory:"), "missing")  # doctest: +SKIP
+        {}
+    """
+    row = load_session_row(conn, session_id)
+    if row is None:
+        return {}
+    _, chat_id = _resolve_dispatch_routing_identity(
+        conn,
+        session_id,
+        channel=row.channel,
+        chat_id=None,
+    )
+    meta: dict[str, Any] = {"channel": row.channel}
+    if chat_id is not None:
+        meta["chat_id"] = chat_id
+    return meta
 
 
 def _utc_now_iso() -> str:
@@ -737,6 +1039,8 @@ class SessionManager:
         new_message_text: str = "",
         task_summary: str = "",
         in_flight_task_summary: str = "",
+        channel: str | None = None,
+        chat_id: int | None = None,
     ) -> None:
         """Serialize ``dispatch(session_id, correlation_id)`` per ``session_id`` (`specs/17-gateway.md` §4.3).
         ``queue_mode`` ``cancel`` aborts an in-flight dispatch task for the session,
@@ -754,13 +1058,34 @@ class SessionManager:
             new_message_text (str): Raw inbound text for ``multi`` classification.
             task_summary (str): Short summary for the new message (queued-task ledger).
             in_flight_task_summary (str): Active L1 tier-B summary for classification.
+            channel (str | None): Channel identity captured at enqueue (D6).
+            chat_id (int | None): Platform chat id captured at enqueue (D6).
         Raises:
             RuntimeError: When ``dispatch`` differs between calls.
+            ValueError: When Telegram enqueue would have no ``chat_id`` (D6).
         Examples:
             >>> import inspect
             >>> inspect.iscoroutinefunction(SessionManager.enqueue_dispatch)
             True
         """
+        resolved_channel, resolved_chat_id = _resolve_dispatch_routing_identity(
+            self._conn,
+            session_id,
+            channel=channel,
+            chat_id=chat_id,
+        )
+        scope_key = row.scope_key if (row := load_session_row(self._conn, session_id)) else None
+        validate_dispatch_routing_identity(
+            channel=resolved_channel,
+            chat_id=resolved_chat_id,
+            scope_key=scope_key,
+        )
+        _record_dispatch_routing(
+            session_id,
+            correlation_id,
+            channel=resolved_channel,
+            chat_id=resolved_chat_id,
+        )
         if self._dispatch_fn is None:
             self._dispatch_fn = dispatch
         elif self._dispatch_fn is not dispatch:
@@ -790,6 +1115,16 @@ class SessionManager:
                             correlation_id,
                         )
                         if classifier_fallback:
+                            if resolved_chat_id is not None:
+                                _merge_dispatch_routing_extras(
+                                    session_id,
+                                    correlation_id,
+                                    {
+                                        "channel": resolved_channel,
+                                        "chat_id": resolved_chat_id,
+                                        "relatedness_classifier_fallback": True,
+                                    },
+                                )
                             notice_line = (
                                 "Queue classifier timed out — queuing this message "
                                 "as its own turn instead."
@@ -822,10 +1157,11 @@ class SessionManager:
                     self._cancel_superseded_at[session_id] = time.monotonic()
                 while True:
                     try:
-                        q.get_nowait()
+                        drained_cid = q.get_nowait()
                     except asyncio.QueueEmpty:
                         break
                     else:
+                        clear_dispatch_routing(session_id, drained_cid)
                         q.task_done()
                 self._multi_queued_summaries.pop(session_id, None)
             await q.put(correlation_id)

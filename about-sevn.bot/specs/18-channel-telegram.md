@@ -8,7 +8,7 @@ summary: 'Deliver the primary daily-driver channel for personal messaging: a Cha
   implementation that normalises Telegram Updates into spec-17-gateway IncomingMessage
   / OutgoingMessage and implements '
 last_updated: '2026-07-20'
-fingerprint: sha256:7f49473a9944480fbe0e1d2b0cba7f25e7a51323006c07b3f51705cf14d2768a
+fingerprint: sha256:189e032c1fccef5c1a020a6dc272228a7e0b26e9e34c5bcdbf865586a0712065
 related: []
 sources:
 - src/sevn/channels/**

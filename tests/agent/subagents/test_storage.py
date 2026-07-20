@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from typing import TYPE_CHECKING
 
 from sevn.agent.subagents.models import SubAgentRun, SubAgentStatus
 from sevn.agent.subagents.registry import SubAgentRegistry
@@ -13,6 +14,10 @@ from sevn.agent.subagents.storage import (
     sweep_orphaned_subagent_runs,
 )
 from sevn.storage.migrate import apply_migrations
+
+if TYPE_CHECKING:
+    import pytest
+    from loguru import Message
 
 
 def _migrated_conn() -> sqlite3.Connection:
@@ -40,6 +45,18 @@ def _sample_run(**overrides: object) -> SubAgentRun:
     }
     base.update(overrides)
     return SubAgentRun(**base)  # type: ignore[arg-type]
+
+
+def _capture_loguru(*, level: str = "ERROR") -> tuple[list[str], int]:
+    from loguru import logger as loguru_logger
+
+    captured: list[str] = []
+
+    def _sink(message: Message) -> None:
+        captured.append(str(message))
+
+    sink_id = loguru_logger.add(_sink, level=level)
+    return captured, sink_id
 
 
 def test_persist_subagent_run_inserts_row() -> None:
@@ -113,3 +130,101 @@ def test_prune_deletes_old_terminal_rows_only() -> None:
 
     remaining_ids = {r[0] for r in conn.execute("SELECT id FROM subagent_runs").fetchall()}
     assert remaining_ids == {"recent_done", "still_running"}
+
+
+def test_persist_subagent_run_skips_commit_outside_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """D1: do not call ``conn.commit()`` when ``conn.in_transaction`` is false."""
+    conn = sqlite3.connect(":memory:", check_same_thread=False, isolation_level=None)
+    apply_migrations(conn)
+    commits: list[bool] = []
+
+    def _tracked_commit(connection: sqlite3.Connection) -> None:
+        if connection.in_transaction:
+            commits.append(True)
+            connection.commit()
+
+    monkeypatch.setattr(
+        "sevn.agent.subagents.storage._commit_if_in_transaction",
+        _tracked_commit,
+    )
+    persist_subagent_run(conn, _sample_run())
+    assert commits == []
+
+
+def test_persist_subagent_run_success_emits_no_error_log() -> None:
+    """D1: a normal write persists quietly — no ERROR/traceback."""
+    from loguru import logger as loguru_logger
+
+    conn = _migrated_conn()
+    captured, sink_id = _capture_loguru(level="ERROR")
+    try:
+        persist_subagent_run(conn, _sample_run())
+    finally:
+        loguru_logger.remove(sink_id)
+    assert captured == []
+
+
+def test_persist_subagent_run_sqlite_error_logged_once() -> None:
+    """D1: real SQL failures log once via ``sqlite3.Error`` — not bare ``Exception`` spam."""
+    from loguru import logger as loguru_logger
+
+    conn = _migrated_conn()
+    run = _sample_run()
+    captured, sink_id = _capture_loguru(level="ERROR")
+    conn.close()
+    try:
+        persist_subagent_run(conn, run)
+    finally:
+        loguru_logger.remove(sink_id)
+    assert len(captured) == 1
+    assert "persist_subagent_run SQL failed" in captured[0]
+    assert run.id in captured[0]
+    assert run.session_id in captured[0]
+
+
+def test_sweep_orphaned_skips_commit_outside_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """D1: ``sweep_orphaned_subagent_runs`` (:248) must not spuriously commit."""
+    conn = sqlite3.connect(":memory:", check_same_thread=False, isolation_level=None)
+    apply_migrations(conn)
+    persist_subagent_run(conn, _sample_run(id="run1", status=SubAgentStatus.RUNNING))
+    commits: list[bool] = []
+
+    def _tracked_commit(connection: sqlite3.Connection) -> None:
+        if connection.in_transaction:
+            commits.append(True)
+            connection.commit()
+
+    monkeypatch.setattr(
+        "sevn.agent.subagents.storage._commit_if_in_transaction",
+        _tracked_commit,
+    )
+    sweep_orphaned_subagent_runs(conn, now_ns=100)
+    assert commits == []
+
+
+def test_prune_subagent_runs_skips_commit_outside_transaction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """D1: ``prune_subagent_runs`` (:289) must not spuriously commit."""
+    conn = sqlite3.connect(":memory:", check_same_thread=False, isolation_level=None)
+    apply_migrations(conn)
+    persist_subagent_run(
+        conn, _sample_run(id="old_done", status=SubAgentStatus.DONE, finished_at=1)
+    )
+    commits: list[bool] = []
+
+    def _tracked_commit(connection: sqlite3.Connection) -> None:
+        if connection.in_transaction:
+            commits.append(True)
+            connection.commit()
+
+    monkeypatch.setattr(
+        "sevn.agent.subagents.storage._commit_if_in_transaction",
+        _tracked_commit,
+    )
+    prune_subagent_runs(conn, max_age_ns=10, now_ns=100)
+    assert commits == []

@@ -60,7 +60,11 @@ def test_cap_attrs_json_truncates_with_marker() -> None:
     big = json.dumps({"x": "a" * (TRACE_ATTRS_JSON_MAX_BYTES + 1)})
     out = cap_attrs_json(big)
     obj = json.loads(out)
-    assert obj == {"_truncated": True, "_original_bytes": len(big.encode("utf-8"))}
+    assert obj == {
+        "_truncated": True,
+        "_original_bytes": len(big.encode("utf-8")),
+        "_truncated_keys": ["x"],
+    }
     assert len(out.encode("utf-8")) < TRACE_ATTRS_JSON_MAX_BYTES
 
 
