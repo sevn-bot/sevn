@@ -1,19 +1,46 @@
-# PR auto-run on pull_request disabled intentionally; trigger manually via Actions.
-# PullFrog PR review runs alongside CodeRabbit. When the review completes,
-# the enforce step fails the job if unresolved PullFrog threads remain.
-# If PullFrog cannot run (e.g. Claude session limit), the job passes.
-name: PullFrog
+# pullfrog-py PR review (BYOK; https://github.com/alexhawat/pullfrog-py).
+#
+# Replaces the upstream pullfrog/pullfrog action AND CodeRabbit. Auto-reviews PRs
+# on open / ready / new commits, posting inline comments + a summary as
+# github-actions[bot], plus opt-in `pullfrog` / `pullfrog-approval` check-runs.
+# The enforce step below fails the job when `pullfrog-approval` is "would not
+# approve" (outstanding review feedback). If the review cannot run (fork PR with
+# no secrets, Claude session limit, no approval posted), the job passes.
+#
+# pullfrog-py reads the native GITHUB_EVENT_PATH, so the workflow just passes a
+# prompt — no ~pullfrog JSON payload needed.
+#
+# Auth: only CLAUDE_CODE_OAUTH_TOKEN is required (Claude subscription); the job
+# skips gracefully when it is absent (e.g. fork PRs).
+#
+# To make this a hard merge gate, add the "pullfrog-py review" job (or the
+# `pullfrog-approval` check) to branch protection required checks.
+name: pullfrog-py
 
 on:
+  pull_request:
+    # `pre-*` glob keeps every release-staging branch (pre-0.0.1, pre-0.0.2, …)
+    # auto-reviewed without editing this list each cut (matches the old
+    # .coderabbit.yaml `pre-.*` coverage).
+    branches: [main, develop, test-pre, "pre-*"]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
+    inputs:
+      prompt:
+        description: Prompt for the agent (workflow_dispatch only)
+        required: false
+        type: string
 
 permissions:
   contents: read
-  # PullFrog uses OIDC to mint short-lived GitHub App installation tokens.
-  id-token: write
-  issues: write
+  # Post inline PR review + comments.
   pull-requests: write
+  issues: write
+  # Post pullfrog / pullfrog-approval check-runs.
+  checks: write
   statuses: write
+  # pullfrog-py can mint short-lived tokens via OIDC when configured.
+  id-token: write
 
 concurrency:
   group: pullfrog-${{ github.workflow }}-${{ github.ref }}
@@ -21,107 +48,98 @@ concurrency:
 
 jobs:
   review:
-    name: PullFrog review
+    name: pullfrog-py review
+    # Skip drafts (reviewed once marked ready); always allow manual dispatch.
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
       HAS_CLAUDE_CODE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
-      HAS_CODEX_AUTH: ${{ secrets.CODEX_AUTH_JSON != '' }}
 
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
-          fetch-depth: 1
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: PullFrog PR review (Claude subscription)
+      - name: Skip when Claude subscription auth is not configured
+        if: env.HAS_CLAUDE_CODE != 'true'
+        run: |
+          echo "::notice title=pullfrog-py skipped::Configure CLAUDE_CODE_OAUTH_TOKEN to enable pullfrog-py reviews (fork PRs run without secrets)."
+
+      - name: pullfrog-py PR review (Claude subscription)
         if: env.HAS_CLAUDE_CODE == 'true'
-        id: pullfrog_claude
+        id: pullfrog
         continue-on-error: true
-        uses: pullfrog/pullfrog@a809795406487e13f894c681ea09b4f96015284d # v0
+        # pullfrog-py, SHA-pinned to alexhawat/pullfrog-py main.
+        uses: alexhawat/pullfrog-py@dc98633049a6f473124e013ffd1e446d7e10b70a # main
         with:
+          # For pull_request events, name the PR number explicitly so the agent
+          # calls checkout_pr(<n>) instead of asking which PR to review.
+          prompt: >-
+            ${{ (github.event_name == 'pull_request' && format('Review pull request #{0}. Focus on correctness, security, regressions, missing tests, and maintainability. Leave concise, actionable comments only for issues that should be addressed before merge.', github.event.pull_request.number))
+                || (github.event_name == 'workflow_dispatch' && inputs.prompt != '' && inputs.prompt)
+                || 'Review the current pull request.' }}
           model: anthropic/claude-sonnet
           push: disabled
           shell: disabled
           status_checks: enabled
-          prompt: |
-            Review this pull request as an additional reviewer alongside CodeRabbit.
-            Focus on correctness, security, regressions, missing tests, and maintainability.
-            Leave concise, actionable comments only for issues that should be addressed before merge.
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
-      - name: PullFrog PR review (Codex/OpenAI subscription)
-        if: env.HAS_CLAUDE_CODE != 'true' && env.HAS_CODEX_AUTH == 'true'
-        id: pullfrog_codex
-        continue-on-error: true
-        uses: pullfrog/pullfrog@a809795406487e13f894c681ea09b4f96015284d # v0
-        with:
-          model: openai/gpt
-          push: disabled
-          shell: disabled
-          status_checks: enabled
-          prompt: |
-            Review this pull request as an additional reviewer alongside CodeRabbit.
-            Focus on correctness, security, regressions, missing tests, and maintainability.
-            Leave concise, actionable comments only for issues that should be addressed before merge.
-        env:
-          CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
-
-      - name: Skip PullFrog when subscription auth is not configured
-        if: env.HAS_CLAUDE_CODE != 'true' && env.HAS_CODEX_AUTH != 'true'
+      - name: pullfrog-py review incomplete (non-fatal)
+        if: env.HAS_CLAUDE_CODE == 'true' && steps.pullfrog.outcome != 'success'
         run: |
-          echo "::notice title=PullFrog skipped::Configure CLAUDE_CODE_OAUTH_TOKEN or CODEX_AUTH_JSON to enable PullFrog reviews."
+          echo "::notice title=pullfrog-py incomplete::Review step did not finish successfully (see its log — e.g. Claude session limit or a runtime error). Approval enforcement skipped."
 
-      - name: PullFrog review incomplete (non-fatal)
-        if: always() && ((env.HAS_CLAUDE_CODE == 'true' && steps.pullfrog_claude.outcome != 'success') || (env.HAS_CLAUDE_CODE != 'true' && env.HAS_CODEX_AUTH == 'true' && steps.pullfrog_codex.outcome != 'success'))
-        run: |
-          echo "::notice title=PullFrog skipped::Review did not complete (e.g. Claude session limit). Thread enforcement skipped."
-
-      - name: Fail when PullFrog requested changes
-        if: |
-          (env.HAS_CLAUDE_CODE == 'true' && steps.pullfrog_claude.outcome == 'success') ||
-          (env.HAS_CLAUDE_CODE != 'true' && env.HAS_CODEX_AUTH == 'true' && steps.pullfrog_codex.outcome == 'success')
+      - name: Fail when pullfrog-py would not approve
+        # Gate directly on the `pullfrog-approval` check-run, decoupled from the
+        # review step's own exit code (which can be non-zero on a benign output
+        # hiccup even when the review + approval check posted fine). Runs on every
+        # PR where auth is present.
+        if: >-
+          github.event_name == 'pull_request' &&
+          env.HAS_CLAUDE_CODE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPO_OWNER: ${{ github.repository_owner }}
-          REPO_NAME: ${{ github.event.repository.name }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          if [ -z "${PR_NUMBER:-}" ]; then
-            echo "::notice title=PullFrog thread enforcement skipped::No PR number available (e.g. workflow_dispatch event)."
+          # The action posts a `pullfrog-approval` check-run on the PR head SHA:
+          # conclusion=success => no outstanding feedback; failure => changes wanted.
+          # Retry so a transient API error is not mistaken for "no review ran"
+          # (which would silently mask a genuine "would not approve").
+          conclusion=""; queried=""
+          for attempt in $(seq 1 5); do
+            if conclusion="$(gh api "/repos/${REPO}/commits/${HEAD_SHA}/check-runs" \
+                --jq '[.check_runs[]? | select(.name == "pullfrog-approval")]
+                      | sort_by(.completed_at // .started_at) | last | .conclusion // ""')"; then
+              queried="yes"; break
+            fi
+            echo "check-runs query failed (attempt ${attempt}/5); retrying in 5s…" >&2
+            sleep 5
+          done
+          if [ -z "${queried}" ]; then
+            # DELIBERATE fail-open: if the check-runs API is unreachable even after
+            # retries, that's a GitHub-infra failure, not a review verdict. Blocking
+            # here (exit 1) would turn a GitHub API outage into a repo-wide merge
+            # freeze on every gated branch. We accept the small risk that a rare,
+            # sustained API outage lets one PR through unverified rather than halting
+            # all merges. (A genuine "would not approve" is handled below via the
+            # posted check-run, which does block.)
+            echo "::warning title=pullfrog-py approval unknown::Could not query check-runs for ${HEAD_SHA} after retries. Failing open (GitHub API issue) — approval state unverified."
             exit 0
           fi
-          query='query($owner: String!, $repo: String!, $number: Int!) {
-            repository(owner: $owner, name: $repo) {
-              pullRequest(number: $number) {
-                reviewThreads(first: 100) {
-                  nodes {
-                    isResolved
-                    comments(first: 1) { nodes { author { login } } }
-                  }
-                }
-              }
-            }
-          }'
-          for attempt in $(seq 1 30); do
-            open="$(gh api graphql -f query="$query" \
-              -f owner="$REPO_OWNER" -f repo="$REPO_NAME" -F number="$PR_NUMBER" \
-              --jq '[.data.repository.pullRequest.reviewThreads.nodes[]?
-                | select(.isResolved == false and ((.comments.nodes[0].author.login // "") | startswith("pullfrog")))] | length' \
-              2>/dev/null || echo "")"
-            if [ -n "$open" ] && [ "$open" != "0" ]; then
-              echo "::error title=PullFrog requested changes::${open} unresolved PullFrog review thread(s) remain."
+          case "${conclusion}" in
+            failure)
+              echo "::error title=pullfrog-py requested changes::pullfrog-approval check failed — address the review feedback on this PR."
               exit 1
-            fi
-            if [ "$open" = "0" ]; then
-              echo "PullFrog approval: no unresolved review threads"
-              exit 0
-            fi
-            echo "Waiting for PullFrog review threads (attempt ${attempt}/30)..."
-            sleep 10
-          done
-          echo "::error title=PullFrog review incomplete::Could not read PullFrog review threads for PR #${PR_NUMBER}."
-          exit 1
+              ;;
+            success)
+              echo "pullfrog-py approval: no outstanding review feedback."
+              ;;
+            *)
+              echo "::notice title=pullfrog-py approval not posted::No pullfrog-approval check on ${HEAD_SHA} (review found nothing to gate, or did not complete). Not blocking."
+              ;;
+          esac
