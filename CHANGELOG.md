@@ -33,6 +33,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- [2026-07-21] ``scripts/check_agents.py`` also validates skill packages under ``.claude/skills``, ``.cursor/skills`` and ``spec-kit-wave/skills`` — a directory without a ``SKILL.md`` (the residue of a partial restore) registers nothing, and the host gives no warning
 - [2026-07-21] ``scripts/check_agents.py`` (pre-commit ``sevn-check-agents``) fails the commit when an agent definition under ``.claude/agents``, ``.cursor/agents`` or ``spec-kit-wave/agents`` is silently inert — no YAML frontmatter, invalid YAML, a value orphaned from its key, ``name`` not matching the filename, a key the target host ignores, or a dead relative link. Body drift between the two IDE trees is reported but only fails under ``--strict``
 - [2026-07-21] ``scripts/destructive_fs_gate.sh`` holds the destructive-filesystem guard's rules in tracked, reviewable source; ``.cursor/hooks/destructive-fs-gate.sh`` is now a thin wrapper that delegates to it and denies if it is missing, so the guard is no longer confined to the gitignored tree it protects
 - [2026-07-21] ``scripts/test_destructive_fs_gate.sh`` pins the allow/deny behaviour of the Cursor ``beforeShellExecution`` hook that blocks agent commands capable of wiping gitignored operator trees (``rsync --delete``/``--del``, ``git clean -x/-X``, ``git stash --all``, recursive ``rm``/``mv``/``find -delete`` naming a protected root); skips cleanly when ``.cursor/`` is absent

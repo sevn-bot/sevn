@@ -6,7 +6,8 @@ Depends: pathlib, re, sys, yaml
 
 Exports:
     main — exit 1 when any agent file under ``.claude/agents``, ``.cursor/agents``
-        or ``spec-kit-wave/agents`` is structurally invalid or has a dead link.
+        or ``spec-kit-wave/agents``, or any skill package under the matching
+        ``*/skills`` trees, is structurally invalid or has a dead link.
 
 Why this exists: agent definitions are hand-copied between three trees, and every
 failure mode is silent. On 2026-07-21 an audit found 16 of 19 ``.claude`` agents had
@@ -15,6 +16,10 @@ installed while registering nothing. Four ``.cursor`` agents had invalid YAML (a
 unquoted ``: `` inside a single-line ``description``), two had the description value
 orphaned above its key, and 36 relative links were correct in their home tree but
 broken in the copies. None of it surfaced until an agent failed to fire.
+
+Skills rot the same way. Three installed skill packages held only a ``references/``
+file with no ``SKILL.md`` — the residue of a partial restore — so they read as
+installed and registered nothing.
 
 Errors (exit 1) are objective defects. Body drift between the two IDE trees is
 reported but does NOT fail, because some divergence is deliberate; pass ``--strict``
@@ -48,6 +53,8 @@ ALLOWED: dict[str, set[str]] = {
 }
 #: ``spec-kit-wave/agents`` is kit prose: no frontmatter expected, links still checked.
 KIT = "spec-kit-wave/agents"
+#: Skill packages. A directory without ``SKILL.md`` is inert — the host skips it.
+SKILL_TREES = (".claude/skills", ".cursor/skills", "spec-kit-wave/skills")
 VALID_MODELS = {"inherit", "sonnet", "opus", "haiku", "auto"}
 LINK = re.compile(r"\[[^\]]*\]\((?!https?:|#)([^)]+)\)")
 TOP_KEY = re.compile(r"^([A-Za-z_][\w-]*):", re.MULTILINE)
@@ -172,6 +179,42 @@ def _check_links(path: Path) -> list[str]:
     return problems
 
 
+def _check_skill_meta(dirname: str, text: str | None) -> list[str]:
+    """Validate one skill package's ``SKILL.md``.
+
+    Args:
+        dirname (str): Skill directory name; ``name`` must equal this.
+        text (str | None): ``SKILL.md`` contents, or ``None`` when the file is absent.
+
+    Returns:
+        list[str]: Human-readable problems; empty when the package is well formed.
+
+    Examples:
+        >>> _check_skill_meta("git-pr", None)
+        ['no SKILL.md — the host will not register this skill']
+        >>> ok = "---\\nname: git-pr\\ndescription: Draft PR titles.\\n---\\nbody"
+        >>> _check_skill_meta("git-pr", ok)
+        []
+        >>> _check_skill_meta("other", ok)
+        ["name 'git-pr' does not match directory 'other'"]
+    """
+    if text is None:
+        return ["no SKILL.md — the host will not register this skill"]
+    raw, _ = _split_frontmatter(text)
+    if raw is None:
+        return ["SKILL.md has no YAML frontmatter"]
+    try:
+        data = yaml.safe_load(raw) or {}
+    except yaml.YAMLError as exc:
+        return [f"SKILL.md invalid YAML: {str(exc).splitlines()[0]}"]
+    problems: list[str] = []
+    if data.get("name") != dirname:
+        problems.append(f"name {data.get('name')!r} does not match directory {dirname!r}")
+    if not (data.get("description") or "").strip():
+        problems.append("missing description — the host dispatches on this field")
+    return problems
+
+
 def _check_drift() -> list[str]:
     """Report agents whose body differs between the two IDE trees.
 
@@ -230,6 +273,25 @@ def main() -> int:
                 print(f"  {tree}/{path.name}: {problem}")
                 errors += 1
         print(f"check-agents: {tree} — {len(files)} file(s)")
+
+    # Skills fail the same silent way agents do: a package with no SKILL.md, or one
+    # restored piecemeal (references but no SKILL.md), is skipped without warning.
+    for tree in SKILL_TREES:
+        directory = REPO / tree
+        if not directory.is_dir():
+            print(f"check-agents: skip {tree} (absent — gitignored tree)")
+            continue
+        packages = sorted(p for p in directory.iterdir() if p.is_dir())
+        for package in packages:
+            skill_md = package / "SKILL.md"
+            text = skill_md.read_text() if skill_md.is_file() else None
+            problems = _check_skill_meta(package.name, text)
+            if text is not None:
+                problems += _check_links(skill_md)
+            for problem in problems:
+                print(f"  {tree}/{package.name}: {problem}")
+                errors += 1
+        print(f"check-agents: {tree} — {len(packages)} skill(s)")
 
     if drift := _check_drift():
         label = "ERROR" if strict else "note"
