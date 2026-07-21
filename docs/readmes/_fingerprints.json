@@ -57,8 +57,8 @@
     },
     "gateway": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-21T15:18:45Z",
-      "digest": "1d74b01c76a8f15b446e30b2f6feef5a99a487314f091d28b759549d001ec907",
+      "computed_at": "2026-07-21T15:40:57Z",
+      "digest": "fab50f86a549bb39cb11dc7f8668dce6f690abccc32e092052702f07fc55c816",
       "source_globs": [
         "src/sevn/gateway/**"
       ]
@@ -161,8 +161,8 @@
     },
     "skills": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-21T15:18:45Z",
-      "digest": "4f9b110b22c1cb3e7925d9bc729b82f3491312284c9d8ba47a74693f58c8597a",
+      "computed_at": "2026-07-21T15:40:58Z",
+      "digest": "9182686ee131b6984d2a45a1f705c482fff594a49913595293d34681695602b4",
       "source_globs": [
         "src/sevn/skills/**",
         "src/sevn/data/bundled_skills/**",
