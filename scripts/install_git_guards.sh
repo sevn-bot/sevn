@@ -51,14 +51,36 @@ else
 #!/usr/bin/env bash
 # sevn.bot pre-push: snapshot local-only gitignored trees before a push (e.g. before a
 # PR to test-pre). Installed by scripts/install_git_guards.sh. Never blocks a push.
-repo_root="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+# Always run the MAIN checkout's snapshot_local.sh (via git-common-dir), so linked
+# worktree pushes do not write empty snapshots that age out real backups.
 branch="$(git symbolic-ref --short HEAD 2>/dev/null || echo)"
 case "$branch" in
   test-pre|main|master) exit 0 ;;  # don't snapshot when pushing base branches themselves
 esac
-[[ -x "$repo_root/scripts/snapshot_local.sh" ]] && "$repo_root/scripts/snapshot_local.sh" || true
+common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || exit 0
+main_root="$(cd "$common/.." && pwd)"
+[[ -x "$main_root/scripts/snapshot_local.sh" ]] && "$main_root/scripts/snapshot_local.sh" || true
 exit 0
 HOOK
   chmod +x "$hook"
   echo "install-git-guards: pre-push snapshot hook installed (.git/hooks/pre-push)"
+fi
+
+# Refresh an already-installed pre-push hook that still uses show-toplevel (worktree bug).
+if [[ -f "$hook" ]] && grep -q 'show-toplevel' "$hook" 2>/dev/null && grep -q 'snapshot_local.sh' "$hook" 2>/dev/null; then
+  cat > "$hook" <<'HOOK'
+#!/usr/bin/env bash
+# sevn.bot pre-push: snapshot local-only gitignored trees before a push.
+# Always snapshot the MAIN checkout (git-common-dir), not a linked worktree.
+branch="$(git symbolic-ref --short HEAD 2>/dev/null || echo)"
+case "$branch" in
+  test-pre|main|master) exit 0 ;;
+esac
+common="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || exit 0
+main_root="$(cd "$common/.." && pwd)"
+[[ -x "$main_root/scripts/snapshot_local.sh" ]] && "$main_root/scripts/snapshot_local.sh" || true
+exit 0
+HOOK
+  chmod +x "$hook"
+  echo "install-git-guards: refreshed pre-push to use git-common-dir (main checkout)"
 fi

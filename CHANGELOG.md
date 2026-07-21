@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-21] Stop the local-only backup degrading silently: `pre-push` now snapshots the main checkout via `--git-common-dir` instead of the linked worktree it was pushed from, snapshot pruning keeps full and thin snapshots in separate pools so docs-only runs can no longer age out real backups, and `CLAUDE.md` + `wave-orchestrator/` join the snapshotted trees
 - [2026-07-20] Agent-control thermos pass — extract sub-agent slash surfaces module, centralize ``version_id`` lookup, refresh ``/stop`` picker after kill callbacks, and tell non-owners that L1 kill controls are owner-only
 - [2026-07-19] CodeRabbit review — bound trace attrs truncation markers, clear cancel-queue dispatch routing, structured subagent persist errors, and drop no-op resource-tracker semaphore scan
 - [2026-07-19] Thermos pass — evict enqueue-time dispatch routing after each turn (including multi-spawn bodies), cancel progress signals once streaming starts, and scope Mission Control stage attribution to the active turn
@@ -32,6 +33,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- [2026-07-21] ``scripts/test_destructive_fs_gate.sh`` pins the allow/deny behaviour of the Cursor ``beforeShellExecution`` hook that blocks agent commands capable of wiping gitignored operator trees (``rsync --delete``/``--del``, ``git clean -x/-X``, ``git stash --all``, recursive ``rm``/``mv``/``find -delete`` naming a protected root); skips cleanly when ``.cursor/`` is absent
 - [2026-07-20] Telegram ``/stop`` shows per-L1 stop buttons plus ALL when level-1 sub-agents are running; empty path keeps session cancel (#27)
 - [2026-07-20] Telegram ``/agents`` slash command and menu shortcuts list running L1/L2 sub-agents with parent grouping (#28)
 - [2026-07-20] Show ``version_id`` in Mission Control System menu and Telegram Config → My sevn bot (alongside deployment id)
