@@ -264,3 +264,44 @@ def test_drive_download_skips_hollow_gws_metadata_return(
         google_workspace_api.drive_download(str(tmp_path), "fid", output=tmp_path / "out.txt")
     assert called["gws"] is False
     assert called["build"] is True
+
+
+def test_drive_share_passes_explicit_notify_false(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """prefer_gws share must send sendNotificationEmail=false (not omit the flag)."""
+    _write_workspace(tmp_path, prefer_gws=True)
+    google_workspace = pytest.importorskip("sevn.skills.google_workspace")
+    google_workspace_api = pytest.importorskip("sevn.skills.google_workspace_api")
+
+    monkeypatch.setattr(google_workspace, "gws_binary", lambda: "/usr/bin/gws")
+    monkeypatch.setattr(google_workspace, "prefer_gws_enabled", lambda _ws: True)
+    called: dict[str, object] = {}
+
+    def _run_gws(
+        workspace: Path,
+        parts: list[str],
+        *,
+        params: object = None,
+        body: object = None,
+    ) -> dict[str, object]:
+        called["params"] = params
+        called["body"] = body
+        return {"id": "perm-1"}
+
+    monkeypatch.setattr(google_workspace, "run_gws", _run_gws)
+    result = google_workspace_api.drive_share(
+        str(tmp_path),
+        "file-1",
+        email="a@example.com",
+        notify=False,
+    )
+    params = called.get("params")
+    assert isinstance(params, dict)
+    assert params.get("sendNotificationEmail") == "false"
+    body = called.get("body")
+    assert isinstance(body, dict)
+    assert body.get("emailAddress") == "a@example.com"
+    assert result["status"] == "shared"
+    assert result["permissionId"] == "perm-1"

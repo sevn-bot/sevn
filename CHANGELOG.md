@@ -12,7 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
-- [2026-07-21] Thermos: Google Workspace ``prefer_gws`` handlers pass real ``params``/``body`` to ``run_gws`` (writes/searches no longer hollow); media download/upload and docs append stay on the Python client; TTS engine toast reads the first backend that exposes ``.engine``
+- [2026-07-21] Thermos: Google Workspace ``prefer_gws`` handlers pass real ``params``/``body`` to ``run_gws`` (writes/searches no longer hollow); media download/upload and docs append stay on the Python client; Drive share sends explicit ``sendNotificationEmail`` true/false for gws; TTS engine toast reads the first backend that exposes ``.engine``
 - [2026-07-21] Bandit B105 false positive on ``telegram_checks`` ``TELEGRAM_BOT_TOKEN`` env-name constant (nosec; Final ``make ci`` gate)
 - [2026-07-21] Telegram menu-action callbacks answer via production ``answer_callback`` (with ``_api`` fallback); Version id / Deployment id fall back to chat text when the inline answer fails; slash ``/stop`` kill re-edits the L1 picker and acks the callback
 - [2026-07-21] Gateway tooling (July-18 session failures): slow turns route a Still working… progress signal, classifier-timeout multi-spawn keeps Telegram `chat_id` on the production dispatch-routing path, and missing Mission Control stage-latency hooks log `agent_turn_stage_latency_unwired` instead of silent no-op

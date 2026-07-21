@@ -1416,10 +1416,15 @@ def drive_share(
             parameters=params,
             scopes=_drive_scopes(),
         )
+    # Pass explicit "true"/"false": _gws_params_argv drops Python False, and Drive
+    # defaults sendNotificationEmail to true (must match Python path notify=False).
     gws_payload = _gws_if_preferred(
         workspace,
         ["drive", "permissions", "create"],
-        params={"fileId": file_id, "sendNotificationEmail": notify},
+        params={
+            "fileId": file_id,
+            "sendNotificationEmail": "true" if notify else "false",
+        },
         body=permission,
     )
     if gws_payload is not None:
