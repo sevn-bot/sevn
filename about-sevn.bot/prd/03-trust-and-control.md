@@ -7,7 +7,7 @@ owner: Alex
 summary: Operators delegate real work only when prompt injection, secrets, sandbox,
   and approvals are bounded—scan hostile input, isolate credentials and egress, and
   gate risky tools.
-last_updated: '2026-07-19'
+last_updated: '2026-07-21'
 fingerprint: sha256:a40208e92b4bf6ab84447da857cde3614de1fe8696e686c557e31a2163640679
 related:
 - prd-07-mission-control
@@ -120,6 +120,9 @@ a black-box "safe mode."
 - **FR-007:** **Doctor** and **config validate** shall surface broken trust posture—unpaired
   proxy, missing secrets unlock, sandbox driver unavailable—**before** the first consequential
   failure when fixtures cover the misconfiguration.
+- **FR-008:** Optional **Proton Pass** secrets backend (`ProtonPassCliBackend`) shall surface
+  share-key / item decrypt failures as operator-visible warnings (not silent empty vault/item
+  lists) when listing via the bundled `proton-cli` Pass dialect.
 
 ## Non-Goals
 

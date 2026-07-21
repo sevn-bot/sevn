@@ -24,7 +24,6 @@ _SKILL_ROOT = BUNDLED_SKILLS_ROOT / "core" / PROTON_MANAGEMENT_SKILL_ID
 _SCRIPTS = _SKILL_ROOT / "scripts"
 
 
-@pytest.mark.xfail(reason="green after W4: module-mode profile argv order", strict=False)
 def test_cli_argv_module_mode_profile_before_subcommand_contract() -> None:
     """``python -m proton_cli --profile work pass …`` — profile before subcommand."""
     argv = cli_argv(["pass", "vaults", "list"], profile="work", module_mode=True)
@@ -32,24 +31,27 @@ def test_cli_argv_module_mode_profile_before_subcommand_contract() -> None:
     assert argv[4:] == ["pass", "vaults", "list"]
 
 
-@pytest.mark.xfail(reason="green after W4: run_proton_cli non-dry-run profile", strict=False)
 def test_run_proton_cli_uses_module_mode_profile_order() -> None:
+    def fake_which(name: str) -> str | None:
+        if name == "proton-cli":
+            return None
+        if name in ("python3", "python"):
+            return sys.executable
+        return None
+
+    proc = AsyncMock()
+    proc.returncode = 0
+    proc.communicate = AsyncMock(return_value=(b"[]", b""))
     with (
-        patch("sevn.skills.proton_management.shutil.which", return_value=None),
-        patch("sevn.skills.proton_management.subprocess.run") as mocked,
+        patch("sevn.skills.proton_management.shutil.which", side_effect=fake_which),
+        patch("asyncio.create_subprocess_exec", return_value=proc) as mocked,
     ):
-        mocked.return_value = subprocess.CompletedProcess(
-            args=[],
-            returncode=0,
-            stdout="[]",
-            stderr="",
-        )
         code, _out, _err = run_proton_cli(
             ["pass", "vaults", "list"],
             profile="work",
         )
     assert code == 0
-    cmd = list(mocked.call_args.args[0])
+    cmd = list(mocked.call_args.args)
     # Expect ``python -m proton_cli --profile work pass vaults list …``
     assert "-m" in cmd
     assert "proton_cli" in cmd

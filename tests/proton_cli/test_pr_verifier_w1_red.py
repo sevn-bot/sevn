@@ -23,83 +23,127 @@ runner = CliRunner()
 # --- W4 / PR #38 -----------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W4: pass vaults list behavioral", strict=False)
 def test_pass_vaults_list_mocked_client() -> None:
-    """``pass vaults list`` drives PassService and prints vault names."""
+    """``pass vaults list`` drives PassService and returns vault share ids."""
     from proton_cli.service.pass_service.service import PassService
 
     class FakeClient:
-        def decode(self, req: Any, out: dict[str, Any]) -> None:
+        def decode(self, req: Any, out: dict[str, Any] | None = None) -> None:
+            if out is None:
+                return
             out.clear()
-            out.update(
-                {
-                    "Shares": [
-                        {
-                            "ShareID": "share-1",
-                            "TargetType": 1,
-                            "Content": "",
-                            "ContentKeyRotation": 0,
-                        }
-                    ]
-                }
-            )
+            if req.path == "/pass/v1/share":
+                out.update(
+                    {
+                        "Shares": [
+                            {
+                                "ShareID": "share-1",
+                                "VaultID": "vault-1",
+                                "TargetType": 1,
+                                "Owner": True,
+                                "Shared": False,
+                                "TargetMembers": 1,
+                                "AddressID": "addr-1",
+                                "Content": "",
+                                "ContentKeyRotation": 0,
+                            }
+                        ]
+                    }
+                )
 
     svc = PassService(FakeClient())
-    unlocked = MagicMock()
-    with patch.object(
-        svc, "vaults_list", return_value=[MagicMock(name="Personal", share_id="share-1")]
-    ):
-        rows = svc.vaults_list(unlocked)
-    assert rows
+    rows = svc.vaults_list(MagicMock())
+    assert len(rows) == 1
     assert rows[0].share_id == "share-1"
+    assert rows[0].vault_id == "vault-1"
 
 
-@pytest.mark.xfail(reason="green after W4: pass items list behavioral", strict=False)
 def test_pass_items_list_mocked_client() -> None:
-    from proton_cli.service.pass_service.service import PassService
+    """``items_list`` decrypts share keys then fetches items per vault."""
+    from proton_cli.service.pass_service.service import Item, PassService, Vault
 
     svc = PassService(MagicMock())
     unlocked = MagicMock()
-    item = MagicMock()
-    item.name = "login-1"
-    item.item_id = "item-1"
-    with patch.object(svc, "items_list", return_value=[item]):
+    vault = Vault(share_id="share-1", vault_id="vault-1", name="Personal")
+    item = Item(share_id="share-1", item_id="item-1", name="login-1", type="login")
+    with (
+        patch.object(svc, "vaults_list", return_value=[vault]),
+        patch.object(svc, "_decrypt_share_keys", return_value={1: b"share-key"}) as decrypt,
+        patch.object(svc, "_fetch_items", return_value=[item]) as fetch,
+    ):
         rows = svc.items_list(unlocked)
     assert rows[0].name == "login-1"
+    decrypt.assert_called_once_with("share-1", unlocked)
+    fetch.assert_called_once_with("share-1", {1: b"share-key"})
 
 
-@pytest.mark.xfail(reason="green after W4: pass items get behavioral", strict=False)
 def test_pass_items_get_cli_invokes_service() -> None:
+    """``pass items get`` resolves + loads an item via PassService."""
     with patch("proton_cli.cli.pass_cmd._run") as run_app:
         app = MagicMock()
-        app.pass_svc.items_get.return_value = MagicMock(
+        app.pass_svc.resolve_item.return_value = ("share-1", "item-1")
+        app.pass_svc.item_get.return_value = MagicMock(
             name="login-1",
             item_id="item-1",
             type="login",
         )
         run_app.return_value = app
-        result = runner.invoke(root_app, ["pass", "items", "get", "login-1", "--output", "json"])
+        result = runner.invoke(
+            root_app,
+            ["--output", "json", "pass", "items", "get", "login-1"],
+        )
     assert result.exit_code == 0
+    app.pass_svc.resolve_item.assert_called_once()
+    app.pass_svc.item_get.assert_called_once_with(
+        app.unlock.return_value,
+        "share-1",
+        "item-1",
+    )
 
 
-@pytest.mark.xfail(reason="green after W4: share-key decrypt failure surfaced", strict=False)
 def test_pass_share_key_decrypt_failure_is_logged(caplog: pytest.LogCaptureFixture) -> None:
-    """Decrypt failure must not silently yield an empty vault list."""
+    """Share-key decrypt failure is logged; empty key map is not a silent skip."""
+    import base64
+
     from proton_cli.service.pass_service.service import PassService
 
-    svc = PassService(MagicMock())
+    class FakeClient:
+        def decode(self, req: Any, out: dict[str, Any] | None = None) -> None:
+            if out is None:
+                return
+            out.clear()
+            out.update(
+                {
+                    "ShareKeys": {
+                        "Keys": [
+                            {
+                                "Key": base64.b64encode(b"ciphertext").decode(),
+                                "KeyRotation": 1,
+                            }
+                        ]
+                    }
+                }
+            )
+
+    svc = PassService(FakeClient())
+    unlocked = MagicMock()
+    unlocked.user_keys = []
+    unlocked.addr_keys = {}
     with (
         caplog.at_level(logging.WARNING),
-        patch.object(svc, "_decrypt_share_keys", side_effect=RuntimeError("bad key")),
-        pytest.raises((RuntimeError, ValueError)) as exc_info,
+        patch(
+            "proton_cli.service.pass_service.service.decrypt_pgp_message",
+            side_effect=RuntimeError("bad key"),
+        ),
     ):
-        raise RuntimeError("bad key")
-    # Contract after W4: either raise or emit a warning mentioning decrypt/share.
-    msg = str(exc_info.value).lower()
+        keys = svc._decrypt_share_keys("share-1", unlocked)
+    assert keys == {}
     logged = any(
-        "decrypt" in r.message.lower() or "share" in r.message.lower() for r in caplog.records
+        ("decrypt" in r.message.lower() or "share" in r.message.lower())
+        and "bad key" in r.message.lower()
+        for r in caplog.records
     )
-    assert "bad key" in msg or logged
+    assert logged
 
 
 # --- W5 / PR #39 -----------------------------------------------------------

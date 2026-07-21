@@ -7,7 +7,7 @@ owner: Alex
 summary: A general-purpose AI assistant earns its keep by doing things—answering questions,
   fetching pages, opening PRs, and acting on the operator's behalf via tools, skills,
   and tiered executors.
-last_updated: '2026-07-19'
+last_updated: '2026-07-21'
 fingerprint: sha256:13314781f75a75a93d7874ddd46b318635a3ef07b8acb2b905865dc7330d3f96
 related:
 - prd-03-trust-and-control
@@ -123,6 +123,9 @@ becoming the integration layer.
   (e.g. plan approval buttons, file links, OpenUI panels).
 - **FR-008:** Optional **MCP and external integrations** shall remain operator-enabled opt-ins;
   the default install path must not silently widen the attack surface.
+- **FR-009:** Bundled **Proton** management (`proton-management` / `proton-cli`) shall support
+  Pass vault/item read journeys with correct module-mode `--profile` argv ordering and mocked
+  behavioral coverage for `pass vaults list` / `items list` / `items get`.
 
 ## Non-Goals
 

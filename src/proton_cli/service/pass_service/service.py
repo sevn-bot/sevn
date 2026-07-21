@@ -453,7 +453,13 @@ class PassService:
             try:
                 plain = decrypt_pgp_message(all_keys, kb)
                 out[rotation] = plain
-            except Exception:
+            except Exception as exc:
+                _logger.warning(
+                    "pass share-key decrypt failed share_id=%s rotation=%s: %s",
+                    share_id,
+                    rotation,
+                    exc,
+                )
                 continue
         return out
 
@@ -497,7 +503,12 @@ class PassService:
                     )
                     parsed = item_proto.decode_item_content(plain)
                 except (ValueError, json.JSONDecodeError, KeyError) as exc:
-                    _logger.debug("failed to decrypt pass item %s: %s", entry.get("ItemID"), exc)
+                    _logger.warning(
+                        "pass item decrypt failed share_id=%s item_id=%s: %s",
+                        share_id,
+                        entry.get("ItemID"),
+                        exc,
+                    )
                     parsed = {"type": "unknown", "name": ""}
                 out.append(
                     Item(

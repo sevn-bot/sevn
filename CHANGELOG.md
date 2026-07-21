@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-21] Proton Pass share-key / item decrypt failures log at warning (share/item id + reason) instead of silent empty or anonymized lists
 - [2026-07-21] Honour ``skills.obsidian_cli.enabled`` for the bundled ``obsidian-cli`` skill — scan/`load_skill` skip it unless the operator opts in (mirrors ``openwiki``)
 - [2026-07-21] Stop the local-only backup degrading silently: `pre-push` now snapshots the main checkout via `--git-common-dir` instead of the linked worktree it was pushed from, snapshot pruning keeps full and thin snapshots in separate pools so docs-only runs can no longer age out real backups, and `CLAUDE.md` + `wave-orchestrator/` join the snapshotted trees
 - [2026-07-20] Agent-control thermos pass — extract sub-agent slash surfaces module, centralize ``version_id`` lookup, refresh ``/stop`` picker after kill callbacks, and tell non-owners that L1 kill controls are owner-only
