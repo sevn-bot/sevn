@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 
 _BOT_API = "https://api.telegram.org"
 _GET_ME_TIMEOUT_S = 15.0
-_ENV_BOT_TOKEN = "TELEGRAM_BOT_TOKEN"
+_ENV_BOT_TOKEN = "TELEGRAM_BOT_TOKEN"  # nosec B105 — env var name, not a secret value
 
 
 class TelegramCheckError(AssertionError):

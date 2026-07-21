@@ -77,6 +77,7 @@
 | `manager` | [`../../src/sevn/skills/manager.py`](../../src/sevn/skills/manager.py) | Module `src/sevn/skills/manager.py`. |
 | `manifest` | [`../../src/sevn/skills/manifest.py`](../../src/sevn/skills/manifest.py) | Module `src/sevn/skills/manifest.py`. |
 | `models` | [`../../src/sevn/skills/models.py`](../../src/sevn/skills/models.py) | Module `src/sevn/skills/models.py`. |
+| `obsidian_cli` | [`../../src/sevn/skills/obsidian_cli.py`](../../src/sevn/skills/obsidian_cli.py) | Module `src/sevn/skills/obsidian_cli.py`. |
 | `openwiki` | [`../../src/sevn/skills/openwiki.py`](../../src/sevn/skills/openwiki.py) | Module `src/sevn/skills/openwiki.py`. |
 | `openwiki_doctor_check` | [`../../src/sevn/skills/openwiki_doctor_check.py`](../../src/sevn/skills/openwiki_doctor_check.py) | Module `src/sevn/skills/openwiki_doctor_check.py`. |
 | `openwiki_install` | [`../../src/sevn/skills/openwiki_install.py`](../../src/sevn/skills/openwiki_install.py) | Module `src/sevn/skills/openwiki_install.py`. |
