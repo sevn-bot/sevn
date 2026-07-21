@@ -85,6 +85,27 @@ async def test_classifier_timeout_preserves_chat_id_for_outbound_send() -> None:
     assert ctx["channel"] == "telegram"
 
 
+@pytest.mark.xfail(reason="green after W18: production D7 dispatch routing path", strict=False)
+def test_classifier_timeout_uses_production_dispatch_routing() -> None:
+    """PR #52: drive ``_record_dispatch_routing`` + ``_merge_dispatch_routing_extras``."""
+    from sevn.gateway.session_manager import (
+        _merge_dispatch_routing_extras,
+        _record_dispatch_routing,
+        dispatch_routing_for,
+    )
+
+    _record_dispatch_routing("sess-d7", "corr-d7", channel="telegram", chat_id=1001)
+    _merge_dispatch_routing_extras(
+        "sess-d7",
+        "corr-d7",
+        {"relatedness_classifier_fallback": True},
+    )
+    routing = dispatch_routing_for("sess-d7", "corr-d7")
+    assert routing["chat_id"] == 1001
+    assert routing["channel"] == "telegram"
+    assert routing.get("relatedness_classifier_fallback") is True
+
+
 @pytest.mark.asyncio
 async def test_send_without_chat_id_still_warns_today() -> None:
     """Baseline guard: missing ``chat_id`` at send time is still visible until W5 lands."""

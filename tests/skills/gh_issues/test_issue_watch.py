@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-import pytest  # noqa: TC002 — annotations for MonkeyPatch after W6 un-xfail
+import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _GH_ISSUES_ROOT = _REPO_ROOT / "src" / "sevn" / "data" / "bundled_skills" / "core" / "gh-issues"
@@ -179,3 +179,16 @@ def test_d13_cron_scope_registered_and_notifies_on_diff() -> None:
     with patch("sevn.triggers.operator_notify.deliver_operator_notify", _fake_message):
         notify(diffs=[{"repo": "sevn-bot/sevn", "number": 21, "changes": {"new_comment": "hi"}}])
     assert message_calls, "on diff, cron must deliver operator notify"
+
+
+@pytest.mark.xfail(reason="green after W12: cron_tick/_CRON_JOB_HANDLERS dispatch", strict=False)
+def test_issue_watch_registered_in_cron_job_handlers() -> None:
+    """PR #46: register + dispatch via ``_CRON_JOB_HANDLERS`` (not hasattr-only)."""
+    from sevn.triggers import cron as cron_mod
+    from sevn.triggers import issue_watch_cron as watch_cron_mod
+
+    watch_cron_mod.register_issue_watch_cron_handler()
+    job_id = watch_cron_mod.ISSUE_WATCH_CRON_JOB_ID
+    assert job_id in cron_mod._CRON_JOB_HANDLERS
+    handler = cron_mod._CRON_JOB_HANDLERS[job_id]
+    assert handler is watch_cron_mod.run_issue_watch_cron or callable(handler)

@@ -115,3 +115,22 @@ def test_driver_import_helper_detects_pattern() -> None:
     assert _IMPORT_RE.search(f"from {_DRIVER}.async_api import async_{_DRIVER}")
     assert _IMPORT_RE.search(f"import {_DRIVER}")
     assert not _IMPORT_RE.search("browser tool not driver-named here")
+
+
+@pytest.mark.asyncio
+@pytest.mark.xfail(
+    reason="green after W13: telegram_checks assert_send_receive upgrade", strict=False
+)
+async def test_telegram_web_replacement_send_receive_via_telegram_checks() -> None:
+    """PR #47: upgrade callable-only probe to drive ``assert_send_receive``."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    from sevn.browser.recipes import telegram_checks
+
+    tg = MagicMock()
+    tg.send = AsyncMock(return_value=None)
+    tg.read = AsyncMock(return_value="bot says ping-xyz")
+    out = await telegram_checks.assert_send_receive(tg, chat="Saved Messages", text="ping-xyz")
+    assert isinstance(out, dict)
+    assert out.get("sent") is True
+    assert "ping-xyz" in str(out.get("text", ""))
