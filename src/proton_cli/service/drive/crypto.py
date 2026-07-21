@@ -86,8 +86,8 @@ def unlock_share(
     addr_key = addr_keys[0]
     addr_email = ""
     for addr in addresses:
-        if getattr(addr, "id", "") == address_id:
-            addr_email = getattr(addr, "email", "")
+        if addr.id == address_id:
+            addr_email = addr.email
             break
     enc = PGPMessage.from_blob(str(share_payload.get("Passphrase", "")))
     with use_unlocked_key(addr_key):

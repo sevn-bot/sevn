@@ -427,46 +427,100 @@ def test_cli_hv_resolver_raises_when_unavailable(monkeypatch: pytest.MonkeyPatch
 # --- W8 / PR #42 -----------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W8: drive list_children behavioral", strict=False)
 def test_drive_list_children_mocked() -> None:
+    """``list_children`` decrypts names via mocked crypto (behavioral, not ``--help``)."""
+    from proton_cli.service.drive.crypto import Link
     from proton_cli.service.drive.service import DriveService
 
     svc = DriveService(MagicMock())
-    with patch.object(svc, "list_children", return_value=[MagicMock(name="readme.txt")]):
+    resolved = MagicMock(is_folder=True, share_id="s", link_id="r", node_key=MagicMock())
+    with (
+        patch.object(svc, "resolve_path", return_value=resolved),
+        patch.object(
+            svc,
+            "_list_raw_children",
+            return_value=[Link(link_id="c1", name="enc", type=2, size=1)],
+        ),
+        patch("proton_cli.service.drive.crypto.decrypt_name", return_value="readme.txt"),
+    ):
         rows = svc.list_children(MagicMock(), "/")
     assert rows[0].name == "readme.txt"
+    assert rows[0].link_id == "c1"
 
 
-@pytest.mark.xfail(reason="green after W8: drive resolve_path decrypt surface", strict=False)
 def test_drive_resolve_path_decrypt_failure_distinct_from_not_found(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """Decrypt/key mismatch on a path segment is logged before ``NotFound``."""
     from proton_cli.errors import NotFound
+    from proton_cli.service.drive.crypto import Link
     from proton_cli.service.drive.service import DriveService
 
     svc = DriveService(MagicMock())
+    dc = MagicMock()
+    dc.share_id = "share-1"
+    dc.root_link_id = "root-1"
+    dc.share_key = MagicMock()
+    dc.addr_key = MagicMock()
     with (
         caplog.at_level(logging.WARNING),
-        patch.object(svc, "resolve_path", side_effect=NotFound("path", "/x")),
+        patch.object(svc, "_get_link", return_value=Link(link_id="root-1", type=1)),
+        patch("proton_cli.service.drive.crypto.unlock_node", return_value=MagicMock()),
+        patch.object(
+            svc,
+            "_list_raw_children",
+            return_value=[Link(link_id="child-1", name="enc", type=2)],
+        ),
+        patch(
+            "proton_cli.service.drive.crypto.decrypt_name",
+            side_effect=RuntimeError("key mismatch"),
+        ),
         pytest.raises(NotFound),
     ):
-        svc.resolve_path(MagicMock(), "/x")
-    # After W8 decrypt errors must be logged before NotFound.
-    raise AssertionError("decrypt failure must be logged before NotFound (W8)")
+        svc.resolve_path(dc, "/x")
+    assert any(
+        "decrypt" in r.message.lower() and "key mismatch" in r.message.lower()
+        for r in caplog.records
+    )
 
 
-@pytest.mark.xfail(reason="green after W8: typed signature address", strict=False)
 def test_drive_unlock_share_uses_typed_address_fields() -> None:
+    """Upload/create payload carries a non-empty ``SignatureAddress`` from typed address."""
+    from proton_cli.account.keys import Address
     from proton_cli.service.drive import crypto as drive_crypto
+    from proton_cli.service.drive.crypto import Link
+    from proton_cli.service.drive.service import DriveService
 
-    addr = MagicMock()
-    addr.id = "addr-1"
-    addr.email = "a@proton.me"
-    # Prefer typed attrs over getattr defaults.
-    assert addr.id
-    assert addr.email
+    addr = Address(id="addr-1", email="a@proton.me")
+    assert addr.id == "addr-1"
+    assert addr.email == "a@proton.me"
     assert hasattr(drive_crypto, "unlock_share")
-    raise AssertionError("upload/create payload must carry non-empty SignatureAddress (W8)")
+
+    calls: list[Any] = []
+
+    class FakeClient:
+        def decode(self, req: Any, out: dict[str, Any] | None = None) -> None:
+            calls.append(req)
+
+    svc = DriveService(FakeClient())
+    dc = MagicMock()
+    dc.addr_email = addr.email
+    dc.addr_key = MagicMock()
+    parent = MagicMock(share_id="share-1", link_id="p1", node_key=MagicMock(), is_folder=True)
+    with (
+        patch.object(svc, "resolve_path", return_value=parent),
+        patch.object(svc, "_get_link", return_value=Link(link_id="p1", type=1)),
+        patch("proton_cli.service.drive.crypto.hash_key_of", return_value=b"\x00" * 32),
+        patch("proton_cli.service.drive.crypto.lookup_hash", return_value="digest"),
+        patch("proton_cli.service.drive.crypto.encrypt_name", return_value="enc"),
+        patch(
+            "proton_cli.service.drive.crypto.gen_node_keys",
+            return_value=("arm", "pass", "sig", MagicMock(), "phrase"),
+        ),
+        patch("proton_cli.service.drive.crypto.gen_node_hash_key", return_value="hk"),
+    ):
+        svc.create_folder(dc, "/Photos")
+    assert calls[0].body["SignatureAddress"] == "a@proton.me"
 
 
 # --- W9 / PR #43 -----------------------------------------------------------
