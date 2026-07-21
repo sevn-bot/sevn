@@ -12,6 +12,7 @@ Exports:
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import contextlib
 import json
 import os
@@ -1685,10 +1686,13 @@ def create_app(
             detach_mission_trace_sink(mission_sub)
         await trace.close()
         # Cancelled session workers do not abort in-flight ``asyncio.to_thread``
-        # SQLite work. Wait for the default executor before closing ``conn`` so
-        # orphaned turn teardown (e.g. ``record_turn_finished``) cannot SIGSEGV
-        # against a closed handle during TestClient lifespan exit.
-        await asyncio.get_running_loop().shutdown_default_executor()
+        # SQLite work. Drain the default executor before closing ``conn`` so
+        # orphaned turn teardown cannot SIGSEGV against a closed handle — then
+        # install a fresh executor so TestClient's shared portal loop (reused
+        # across pytest cases on one xdist worker) can still run ``to_thread``.
+        loop = asyncio.get_running_loop()
+        await loop.shutdown_default_executor()
+        loop.set_default_executor(concurrent.futures.ThreadPoolExecutor())
         conn.close()
         with suppress(Exception):
             release_leaked_multiprocessing_semaphores()
