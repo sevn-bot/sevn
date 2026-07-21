@@ -124,6 +124,7 @@ from sevn.gateway.onboarding.onboarding_mount import (
     resolve_gateway_onboarding_token,
 )
 from sevn.gateway.queue.steer_store import SessionSteerStore, owner_user_ids_from_workspace
+from sevn.gateway.replay.replay_worker import TurnReplayWorker
 from sevn.gateway.routing.outbound_sweep import sweep_outbound_retries
 from sevn.gateway.runtime.deployment_id import load_or_create_deployment_id
 from sevn.gateway.runtime.gateway_restart_ack import deliver_pending_gateway_restart_acks
@@ -1636,6 +1637,12 @@ def create_app(
         cursor_sched = getattr(app.state, "cursor_poll_scheduler", None)
         if isinstance(cursor_sched, CursorPollScheduler):
             await cursor_sched.stop()
+        # Stop replay before session drain / sqlite prune — otherwise the worker's
+        # ``asyncio.to_thread`` SQLite reads race teardown and can SIGSEGV the
+        # xdist worker (seen in ``test_traces_replay_endpoint_accepted_with_trace_seed``).
+        replay_worker = getattr(app.state, "replay_worker", None)
+        if isinstance(replay_worker, TurnReplayWorker):
+            await replay_worker.stop()
         improve_worker = getattr(app.state, "improve_job_worker", None)
         if isinstance(improve_worker, ImproveJobWorker):
             await improve_worker.stop()

@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-21] Gateway shutdown stops the dashboard turn-replay worker before session drain / SQLite prune so in-flight ``asyncio.to_thread`` reads cannot race teardown (CI xdist SIGSEGV in ``test_traces_replay_endpoint_accepted_with_trace_seed``)
 - [2026-07-21] Form-wizard Telegram callbacks answer via production ``answer_callback`` (same probe order as menu-action); ``answer_callback`` returns Bot API ``ok`` so stale-query failures trigger Version/Deployment id chat-text fallback; contacts ``pinned_keys_for`` soft-fails on decrypt so mail send falls through to the directory
 - [2026-07-21] Thermos: Google Workspace ``prefer_gws`` handlers pass real ``params``/``body`` to ``run_gws`` (writes/searches no longer hollow); media download/upload and docs append stay on the Python client; Drive share sends explicit ``sendNotificationEmail`` true/false for gws; TTS engine toast reads the first backend that exposes ``.engine``
 - [2026-07-21] Bandit B105 false positive on ``telegram_checks`` ``TELEGRAM_BOT_TOKEN`` env-name constant (nosec; Final ``make ci`` gate)
