@@ -2211,6 +2211,8 @@ async def _answer_callback(adapter: Any, *, callback_query_id: str, text: str | 
             )
         except Exception:
             return False
+        if isinstance(result, dict):
+            return bool(result.get("ok"))
         return result is not False
     answer_query = getattr(adapter, "answer_callback_query", None)
     if callable(answer_query):

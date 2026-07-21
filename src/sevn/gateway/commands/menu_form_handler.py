@@ -21,7 +21,6 @@ import re
 import secrets
 import sqlite3
 import time
-from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -1373,6 +1372,9 @@ class MenuFormHandler:
     async def _answer_callback(self, msg: IncomingMessage, *, text: str | None = None) -> None:
         """Acknowledge a Telegram callback query when present.
 
+        Prefers production ``answer_callback`` via the shared menu-action helper
+        (legacy ``answer_callback_query`` / ``_api`` fallbacks included).
+
         Args:
             msg (IncomingMessage): Inbound callback envelope.
             text (str | None): Optional toast body.
@@ -1382,6 +1384,10 @@ class MenuFormHandler:
             >>> inspect.iscoroutinefunction(MenuFormHandler._answer_callback)
             True
         """
+        from sevn.gateway.commands.menu_action_router import (
+            _answer_callback as answer_callback_helper,
+        )
+
         md = msg.metadata if isinstance(msg.metadata, dict) else {}
         cq_id = md.get("callback_query_id")
         if not isinstance(cq_id, str) or not cq_id.strip():
@@ -1389,12 +1395,11 @@ class MenuFormHandler:
         adapter = self._router._adapters.get(msg.channel)
         if adapter is None:
             return
-        answer_fn = getattr(adapter, "answer_callback_query", None)
-        if callable(answer_fn):
-            await cast("Callable[..., Awaitable[Any]]", answer_fn)(
-                callback_query_id=cq_id.strip(),
-                text=text,
-            )
+        await answer_callback_helper(
+            adapter,
+            callback_query_id=cq_id.strip(),
+            text=text,
+        )
 
     @staticmethod
     def _user_id_int(user_id: str) -> int:

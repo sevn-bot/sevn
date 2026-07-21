@@ -62,9 +62,15 @@ class _MenuCaptureTelegram(TelegramAdapter):
         self.sent.append((message.text, md))
         return ["501"]
 
-    async def answer_callback(self, callback_query_id: str, *, text: str = "") -> None:
+    async def answer_callback(
+        self,
+        callback_query_id: str,
+        *,
+        text: str = "",
+    ) -> dict[str, Any]:
         """Match production :meth:`TelegramAdapter.answer_callback`."""
         self.answered.append((callback_query_id, text or None))
+        return {"ok": True}
 
     async def answer_callback_query(
         self,
@@ -72,9 +78,14 @@ class _MenuCaptureTelegram(TelegramAdapter):
         callback_query_id: str,
         text: str | None = None,
     ) -> bool:
-        """Legacy probe name — delegates to :meth:`answer_callback`."""
-        await self.answer_callback(callback_query_id, text=text or "")
-        return True
+        """Legacy name for ``menu.py`` probes — delegates to :meth:`answer_callback`.
+
+        Form-handler coverage must use a production-only double (see
+        ``test_form_secret_wizard_acks_via_production_answer_callback``); this
+        shim must not be the sole path that makes form/menu tests green.
+        """
+        result = await self.answer_callback(callback_query_id, text=text or "")
+        return bool(result.get("ok"))
 
     async def edit_message_text(
         self,

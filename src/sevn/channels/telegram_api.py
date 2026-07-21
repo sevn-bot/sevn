@@ -132,11 +132,21 @@ class TelegramApiMixin(TelegramSendHost):
             raise last_err
         return {}
 
-    async def answer_callback(self, callback_query_id: str, *, text: str = "") -> None:
+    async def answer_callback(
+        self,
+        callback_query_id: str,
+        *,
+        text: str = "",
+    ) -> dict[str, Any]:
         """Answer an inline-button ``callback_query`` (gateway-owned per §2.2).
+
         Args:
             callback_query_id (str): Telegram ``callback_query.id`` string.
             text (str): Optional toast shown to the operator (≤ 200 chars).
+
+        Returns:
+            dict[str, Any]: Telegram Bot API response body (includes ``ok``).
+
         Examples:
             >>> import inspect
             >>> inspect.iscoroutinefunction(TelegramApiMixin.answer_callback)
@@ -144,12 +154,13 @@ class TelegramApiMixin(TelegramSendHost):
         """
         cqid = callback_query_id.strip()
         if not cqid:
-            return
+            return {"ok": False, "description": "empty callback_query_id"}
         body: dict[str, Any] = {"callback_query_id": cqid}
         toast = text.strip()
         if toast:
             body["text"] = toast[:200]
-        await self._api("answerCallbackQuery", body)
+        result = await self._api("answerCallbackQuery", body)
+        return result if isinstance(result, dict) else {"ok": bool(result)}
 
     async def send_chat_action(
         self,

@@ -45,8 +45,9 @@ class _ProductionAnswerTelegram(TelegramAdapter):
         self.sent.append((message.text, md))
         return ["501"]
 
-    async def answer_callback(self, callback_query_id: str, *, text: str = "") -> None:
+    async def answer_callback(self, callback_query_id: str, *, text: str = "") -> dict[str, Any]:
         self.answered.append((callback_query_id, text or None))
+        return {"ok": True}
 
     async def edit_message_text(self, **kwargs: Any) -> bool:
         self.edited.append(dict(kwargs))
@@ -123,6 +124,77 @@ async def test_version_id_fallback_toast_when_inline_answer_fails(tmp_path: Path
     cap.answer_callback = _fail_answer  # type: ignore[method-assign]
     await router.route_incoming(_callback("cfg:logs:version_id", callback_query_id="cq-fail"))
     assert any("tg-build-99" in (t or "") for t, _md in cap.sent)
+
+
+@pytest.mark.asyncio
+async def test_version_id_fallback_toast_when_answer_ok_false(tmp_path: Path) -> None:
+    """Telegram ``ok: false`` (e.g. query too old) must trigger chat-text fallback."""
+    router, cap, _root = _build_owner_router(tmp_path)
+    router._version_id = "tg-build-99"  # type: ignore[attr-defined]
+
+    async def _reject_answer(callback_query_id: str, *, text: str = "") -> dict[str, Any]:
+        return {"ok": False, "description": "Bad Request: query is too old"}
+
+    cap.answer_callback = _reject_answer  # type: ignore[method-assign]
+    await router.route_incoming(_callback("cfg:logs:version_id", callback_query_id="cq-old"))
+    assert any("tg-build-99" in (t or "") for t, _md in cap.sent)
+
+
+@pytest.mark.asyncio
+async def test_form_secret_wizard_acks_via_production_answer_callback(tmp_path: Path) -> None:
+    """Form callbacks must ack through ``answer_callback`` (not legacy-only probe)."""
+    root = tmp_path / "w"
+    root.mkdir()
+    sevn_json = root / "sevn.json"
+    sevn_json.write_text(
+        (
+            '{"schema_version":1,"workspace_root":".",'
+            '"gateway":{"host":"127.0.0.1","port":3001,"queue_mode":"cancel",'
+            '"token":"${SECRET:keychain:sevn.gateway.token}"},'
+            '"security":{"scanner":{"heuristic_only":true}},'
+            '"providers":{"use_main_model_for_all":false,'
+            '"tier_default":{"triager":"test/triager","B":"test/tier-b"}}}'
+        ),
+        encoding="utf-8",
+    )
+    ws = _workspace()
+    conn = _conn()
+    cap = _ProductionAnswerTelegram()
+    assert not hasattr(cap, "answer_callback_query")
+    router = ChannelRouter(
+        workspace=ws,
+        content_root=root,
+        sessions=SessionManager(conn),
+        dispatcher=CommandDispatcher(),
+        scanner=LLMGuardScanner(root, ws),
+        trace=NullTraceSink(),
+        rate=TokenBucketLimiter(capacity=50.0, refill_per_second=25.0),
+        media=MediaStore(conn, root),
+        run_turn=AsyncMock(),
+        owner_user_ids=frozenset({"owner1"}),
+    )
+    router.register_adapter(cap)
+    build_agent_run_turn(
+        router,
+        conn,
+        ws,
+        WorkspaceLayout(sevn_json, root),
+        NullTraceSink(),
+    )
+    await router.route_incoming(
+        IncomingMessage(
+            channel="telegram",
+            user_id="guest",
+            text="form:secret_wizard",
+            metadata={
+                "callback_data": "form:secret_wizard",
+                "callback_query_id": "cq-form-prod",
+                "chat_id": 42,
+                "message_id": 99,
+            },
+        ),
+    )
+    assert cap.answered == [("cq-form-prod", "Owner only.")]
 
 
 @pytest.mark.asyncio

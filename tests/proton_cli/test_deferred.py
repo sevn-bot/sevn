@@ -397,6 +397,35 @@ def test_classify_recipient_uses_pinned_keys() -> None:
     assert armored_clear == ""
 
 
+def test_classify_recipient_falls_back_when_pinned_keys_raises(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Pinned-key decrypt/network failures must not crash mail send classification."""
+    contacts = MagicMock(spec=ContactsService)
+    contacts.pinned_keys_for.side_effect = ValueError("unrecognized card type")
+    calls: list[str] = []
+
+    class FakeClient:
+        def decode(self, req: Any, out: dict[str, Any]) -> None:
+            calls.append(req.path)
+            out.clear()
+            out.update(
+                {
+                    "Address": {
+                        "Keys": [{"Flags": 0, "PublicKey": "directory-key"}],
+                    }
+                }
+            )
+
+    svc = MailService(FakeClient(), contacts=contacts)
+    with caplog.at_level(logging.WARNING):
+        scheme, armored = svc._classify_recipient(MagicMock(), "pin@x.com")
+    assert scheme == PKG_INTERNAL
+    assert armored == "directory-key"
+    assert calls == ["/core/v4/keys/all"]
+    assert any("mail_pinned_keys_lookup_failed" in r.message for r in caplog.records)
+
+
 def test_hv_helper_crash_logged(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
