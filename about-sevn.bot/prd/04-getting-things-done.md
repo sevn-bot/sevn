@@ -130,9 +130,11 @@ becoming the integration layer.
   delete/move and `labels list`), `mail_list`/`mail_read` dry-run scripts, stdin secret
   resolution, SRP HV retry / `PROTON_HV_TOKEN`, `run_proton_cli_async` argv/timeout, Drive
   CLI (`items` list/upload/download/trash/delete, `folders create`, `trash` list/restore/empty)
-  with decrypt/link failures surfaced at warning, and Calendar/Contacts
+  with decrypt/link failures surfaced at warning, Calendar/Contacts
   (`events` list/get/delete, `contacts` list/get/create/delete, card decrypt) with decrypt drops
-  logged, unrecognized card types raised, and empty create `Responses` failing loudly
+  logged, unrecognized card types raised, and empty create `Responses` failing loudly, and
+  polish CLI (`status` / `api` runnable without a nested subcommand, legacy `session.json`
+  fallback on `status`, `settings set <key>` rejecting a missing value before auth)
   (live Proton Calendar/Contacts/Drive E2E deferred without credentials).
 - **FR-010:** Bundled **Google Workspace** (`google-workspace`) shall honour
   `skills.google_workspace.prefer_gws` (§3.3): prefer the `gws` CLI via `use_gws_backend` /

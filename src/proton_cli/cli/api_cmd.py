@@ -13,7 +13,12 @@ from proton_cli.proton.errors import APIError
 if TYPE_CHECKING:
     from proton_cli.app import App
 
-app = typer.Typer(name="api", no_args_is_help=True, add_completion=False)
+app = typer.Typer(
+    name="api",
+    invoke_without_command=True,
+    no_args_is_help=False,
+    add_completion=False,
+)
 
 
 def _run(ctx: typer.Context) -> App:
@@ -22,7 +27,7 @@ def _run(ctx: typer.Context) -> App:
     return proton_app
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def api_main(
     ctx: typer.Context,
     method: str = typer.Argument(..., help="HTTP method (GET, POST, PUT, DELETE)"),

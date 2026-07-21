@@ -733,26 +733,25 @@ def test_contacts_list_logs_dropped_rows(caplog: pytest.LogCaptureFixture) -> No
 # --- W10 / PR #44 ----------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W10: status executes without --help", strict=False)
 def test_status_command_runs_not_missing_command() -> None:
-    result = runner.invoke(root_app, ["status", "--output", "json"])
+    result = runner.invoke(root_app, ["--output", "json", "status"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout or result.output or "{}")
     assert "version" in payload or "profile" in payload or "ok" in payload or payload
 
 
-@pytest.mark.xfail(reason="green after W10: api GET executes", strict=False)
 def test_api_get_runs_not_missing_command() -> None:
     with patch("proton_cli.cli.api_cmd._run") as run_app:
         app = MagicMock()
         app.api.do.return_value = MagicMock(body=b'{"Code":1000}')
+        app.renderer.json_body = MagicMock()
         run_app.return_value = app
         result = runner.invoke(root_app, ["api", "GET", "/core/v4/users"])
     assert result.exit_code != 2
     assert "Missing command" not in (result.output or "")
+    app.api.do.assert_called_once()
 
 
-@pytest.mark.xfail(reason="green after W10: legacy session fallback", strict=False)
 def test_status_session_exists_legacy_session_json(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -763,12 +762,15 @@ def test_status_session_exists_legacy_session_json(
     from proton_cli.account import session as session_store
 
     path = session_store.session_path("default")
-    assert path.exists() or legacy.exists()
-    # status_cmd must report session_exists true via session_store.session_path
-    raise AssertionError("status must honour legacy session.json via session_path (W10)")
+    assert path == legacy
+    assert path.is_file()
+    result = runner.invoke(root_app, ["--output", "json", "status"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout or result.output or "{}")
+    assert payload.get("session_exists") is True
+    assert str(legacy) in str(payload.get("session_file", ""))
 
 
-@pytest.mark.xfail(reason="green after W10: settings set empty-value guard", strict=False)
 def test_settings_set_rejects_missing_value() -> None:
     result = runner.invoke(root_app, ["settings", "set", "page-size"])
     assert result.exit_code != 0
