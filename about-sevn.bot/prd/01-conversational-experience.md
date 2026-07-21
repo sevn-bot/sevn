@@ -7,7 +7,7 @@ owner: Alex
 summary: The operator talks to sevn where they already chat—Telegram on phone, web/Mission
   Control on laptop—with shared sessions, voice, and one gateway turn spine.
 last_updated: '2026-07-21'
-fingerprint: sha256:27c4329aedcff0b3a593aa98ab640f23c9a721dfa9643256b34622f593a8f09f
+fingerprint: sha256:ee2c91116064ad2f1afe9df307684ec40fd7c42da3147ec84a5c52b160a36250
 related:
 - prd-07-mission-control
 - prd-10-generated-ui
@@ -95,6 +95,9 @@ to a self-hosted gateway fails when the bot is not where your thumb already is.
   channel-appropriate busy, steer, and cancel semantics while a turn is active.
 - **FR-005:** The product shall support **voice notes inbound** (STT) and **optional TTS
   outbound** on Telegram and webchat when voice is enabled and backends are configured.
+  Operators set the spoken voice via `/voice` with Kokoro ids or Supertonic `M1`–`F5`
+  codes (case preserved for Supertonic); `voice.local_tts_engine` selects the local
+  engine for the `text_to_voice` pipeline.
 - **FR-006:** Rich agent output (tables, forms, panels) shall **degrade gracefully** to
   plain text on each channel when rich or OpenUI delivery is unavailable or rejected.
 - **FR-007:** Telegram `/config`, reply keyboard, and inline menus shall expose

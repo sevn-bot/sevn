@@ -41,10 +41,43 @@ _START_WELCOME = (
 )
 _UNKNOWN_COMMAND = "Unknown command — try `/help`."
 
-# Kokoro voice codes look like ``bf_emma`` / ``af_heart`` / ``am_michael`` (2-letter
-# lang+gender prefix, underscore, name). This never collides with the mode keywords
-# (``on``/``off``/``all``/``when_asked``/``reset``/``toggle``) since none match the shape.
-_VOICE_CODE_RE = re.compile(r"^[a-z]{2}_[a-z]+$")
+# Kokoro: ``bf_emma`` / ``af_heart`` / ``am_michael``. Supertonic: ``M1``-``M5`` / ``F1``-``F5``
+# (case-insensitive match; persisted uppercase). Neither shape collides with mode keywords.
+_KOKORO_VOICE_CODE_RE = re.compile(r"^[a-z]{2}_[a-z]+$")
+_SUPERTONIC_VOICE_CODE_RE = re.compile(r"^[MF][1-5]$", re.IGNORECASE)
+# Backward-compatible alias (Kokoro-only shape) used by older imports/tests.
+_VOICE_CODE_RE = _KOKORO_VOICE_CODE_RE
+
+
+def _normalise_tts_voice_code(raw: str) -> str | None:
+    """Return a canonical TTS voice id, or ``None`` when ``raw`` is not a known code.
+
+    Kokoro codes are lowercased (``af_heart``). Supertonic codes are uppercased
+    (``F3``) so synthesis matches ``engines/supertonic.py`` ``_KNOWN_VOICES``.
+
+    Args:
+        raw (str): Operator argument after ``/voice``.
+
+    Returns:
+        str | None: Canonical code, or ``None`` when not a voice-code shape.
+
+    Examples:
+        >>> _normalise_tts_voice_code("F3")
+        'F3'
+        >>> _normalise_tts_voice_code("af_Heart")
+        'af_heart'
+        >>> _normalise_tts_voice_code("f9") is None
+        True
+    """
+    token = raw.strip()
+    if not token:
+        return None
+    if _SUPERTONIC_VOICE_CODE_RE.fullmatch(token):
+        return token.upper()
+    lower = token.casefold()
+    if _KOKORO_VOICE_CODE_RE.fullmatch(lower):
+        return lower
+    return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -470,28 +503,30 @@ class CoreCommandHandler:
             >>> h._handle_voice("", session_id="s").startswith("Voice:")
             True
         """
-        arg = args.strip().lower()
+        raw = args.strip()
+        arg = raw.casefold()
         if arg in {"", "picker"}:
-            current = self._global_tts_voice_id() or "default (af_heart)"
+            current = self._global_tts_voice_id() or "default (engine-dependent)"
             return (
                 f"Voice: {current}. Use /voice on|off|when_asked|reset to control replies, "
-                "or /voice <name> to pick a voice (e.g. bf_emma, af_heart, am_michael). "
+                "or /voice <name> to pick a voice (e.g. af_heart, M1). "
                 "See /voice voices for the full list."
             )
         if arg in {"voices", "list"}:
-            current = self._global_tts_voice_id() or "af_heart (default)"
+            current = self._global_tts_voice_id() or "engine default"
             return (
-                f"Current voice: {current}. Set with /voice <name> — e.g. bf_emma (British "
-                "female), af_heart (US female, warm), am_michael (US male), bf_isabella. "
-                "Full catalogue: kokoro-tts skill `--list-voices`."
+                f"Current voice: {current}. Set with /voice <name> - Kokoro: af_heart, "
+                "bf_emma, am_michael; Supertonic: M1-M5, F1-F5. Full catalogue: "
+                "text-to-voice skill `--list-voices --engine <kokoro|supertonic>`."
             )
-        if _VOICE_CODE_RE.match(arg):
+        voice_code = _normalise_tts_voice_code(raw)
+        if voice_code is not None:
             mutate_sevn_json(
                 self._sevn_json,
-                lambda d: _set_nested(d, "voice.tts_voice_id", arg),
+                lambda d: _set_nested(d, "voice.tts_voice_id", voice_code),
             )
             self._reload_workspace()
-            return f"Voice set to {arg} (applies to all chats)."
+            return f"Voice set to {voice_code} (applies to all chats)."
         if arg in {"on", "all"}:
             self._sessions.set_tts_mode_override(session_id, "all")
             return "Voice mode for this chat set to all."
@@ -513,6 +548,12 @@ class CoreCommandHandler:
             nxt = "off" if effective == "all" else "all"
             self._sessions.set_tts_mode_override(session_id, nxt)
             return f"Voice mode for this chat toggled to {nxt}."
+        # Lone token that looks like a voice attempt but is not a known code.
+        if raw and " " not in raw and re.fullmatch(r"[A-Za-z0-9_]+", raw):
+            return (
+                f"Unknown voice code {raw!r}. Use Kokoro ids (af_heart, bf_emma) or "
+                "Supertonic M1-M5 / F1-F5. See /voice voices."
+            )
         return "Open /config > Voice or use /voice on|off|when_asked|reset."
 
     def _handle_model(self, args: str) -> str:

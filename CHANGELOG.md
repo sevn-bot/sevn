@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-21] `/voice` keeps Supertonic codes uppercase (`F3`) and rejects unknown ids; legacy `kokoro-tts` synthesize omits `--engine`; `build_tts_pipeline` passes `voice.local_tts_engine` into the `text_to_voice` backend
 - [2026-07-21] MiniMax `media_generator` v2.2.0 audit coverage: S2V/FL2V skill CLIs, voice-clone literal `preview_text`, 100 MiB download cap, and `_persist_bytes` size-verify fallback are behaviorally tested (live MiniMax stays `SEVN_MEDIA_LIVE`-gated)
 - [2026-07-21] Host Telegram verification is runnable again via `make telegram-checks` (`telegram_checks` Bot-API `getMe` + `run_checks`/`assert_send_receive`); live X/CDP E2E stays deferred (#37)
 - [2026-07-21] Gateway shutdown logs browser-reap failures instead of swallowing them; issue-watch cron dispatches via registered handlers and operator notify reaches the owner Telegram sink when wired

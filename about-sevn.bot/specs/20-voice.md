@@ -6,8 +6,8 @@ status: scaffold
 owner: Alex
 summary: 'Own the provider-chain facades for speech-to-text and text-to-speech so
   the gateway can:'
-last_updated: '2026-07-18'
-fingerprint: sha256:9b7613b2652f72a4a798a2e9f058566bd358d9869c9d58c46e91147297fb593f
+last_updated: '2026-07-21'
+fingerprint: sha256:916311db59efc3e0d3bb410f8efb421399028f293a0f79f1c21a2e210f57fd3e
 related: []
 sources:
 - src/sevn/voice/**
@@ -195,21 +195,30 @@ Initial draft for **Data Model** — grounded in extracted interfaces; confirm n
 See **Implemented by** and [`src/sevn/voice`](src/sevn/voice/__init__.py).
 ## Behavior
 
-Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
+`build_tts_pipeline` passes `voice.local_tts_engine` into `build_tts_backend` so the
+`text_to_voice` backend's `.engine` matches config (`kokoro` / `supertonic`). Telegram
+`/voice <code>` accepts Kokoro ids (`af_heart`) and Supertonic codes (`M1`–`M5`, `F1`–`F5`);
+Supertonic codes are persisted uppercase so synthesis does not silently fall back to `M1`.
 
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
 
 Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/voice`](src/sevn/voice/__init__.py).
 ## Failure Modes
 
-Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
+Unknown `/voice` tokens that look like voice codes are rejected with an operator-visible
+message (no persist). Legacy workspace `kokoro-tts` scripts without `--engine` omit that
+flag during synthesize so `rc=2` does not break replies.
 
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
 
 Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
+`/voice` code normalisation + persist: `tests/gateway/test_voice.py`,
+`tests/voice/test_text_to_voice_backend_w1_red.py`. Pipeline engine wiring + legacy
+`--engine` omit: `tests/voice/test_text_to_voice_backend.py` /
+`test_text_to_voice_backend_w1_red.py`. Menu→reload→pipeline `.engine` (typed
+`VoiceRuntimeSettings.local_tts_engine`) remains W16.
 
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 

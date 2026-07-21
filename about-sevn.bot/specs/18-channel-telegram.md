@@ -489,6 +489,9 @@ Initial draft for **Behavior** — grounded in extracted interfaces; confirm nor
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
 
 Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/channels`](src/sevn/channels/__init__.py).
+
+Telegram `/voice <code>` persists Kokoro and Supertonic voice ids with correct case
+(see `core_commands._normalise_tts_voice_code`); unknown lone tokens are rejected.
 ## Failure Modes
 
 Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
@@ -496,6 +499,9 @@ Initial draft for **Failure Modes** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
 
 Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
+
+`/voice` unknown voice-code tokens return an operator-visible reject string and do not
+mutate `voice.tts_voice_id`.
 ## Amendments (spec-36-sub-agents)
 
 Telegram `/config` gains **Sub-agents** section: limits, live L1/L2 counts, queue mode
@@ -549,6 +555,9 @@ Host Telegram Bot-API / Web send-receive smoke: `make telegram-checks` →
 mocked coverage in `tests/browser/test_telegram_checks_w1_red.py` and
 `tests/browser/test_browser_removal_parity.py`. Live headed Web / X CDP E2E remains
 deferred (parked journeys, issue #37).
+
+`/voice` Supertonic/Kokoro code persist + reject: `tests/gateway/test_voice.py` and
+`tests/voice/test_text_to_voice_backend_w1_red.py`.
 
 ## Human-input needed
 

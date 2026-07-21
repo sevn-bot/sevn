@@ -13,7 +13,6 @@ from sevn.voice.backends import TextToVoiceBackend, build_tts_backend
 from sevn.voice.factory import build_tts_pipeline, voice_runtime_settings
 
 
-@pytest.mark.xfail(reason="green after W15: /voice Supertonic code case", strict=False)
 def test_handle_voice_preserves_supertonic_code_case(tmp_path: Path) -> None:
     """``/voice F3`` must persist uppercase Supertonic code, not lowercased ``f3``."""
     from sevn.gateway.commands.core_commands import CoreCommandHandler
@@ -43,7 +42,6 @@ def test_handle_voice_preserves_supertonic_code_case(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W15: legacy kokoro omit --engine", strict=False)
 async def test_legacy_kokoro_synthesize_omits_engine_flag(tmp_path: Path) -> None:
     skill = tmp_path / "skills" / "core" / "kokoro-tts" / "scripts"
     skill.mkdir(parents=True)
@@ -65,7 +63,6 @@ async def test_legacy_kokoro_synthesize_omits_engine_flag(tmp_path: Path) -> Non
     assert "--engine" not in cmd
 
 
-@pytest.mark.xfail(reason="green after W15: build_tts_pipeline engine wiring", strict=False)
 def test_build_tts_pipeline_passes_local_tts_engine(tmp_path: Path) -> None:
     ws = WorkspaceConfig.minimal(
         voice={"local_tts_engine": "supertonic", "tts_providers": ["text_to_voice"]},

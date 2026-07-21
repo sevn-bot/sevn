@@ -246,8 +246,16 @@ def build_tts_pipeline(
     """
 
     settings = voice_runtime_settings(ws)
+    # Thread voice.local_tts_engine into text_to_voice backends (W15). Typed seam on
+    # VoiceRuntimeSettings lands in W16 — read the config field directly here.
+    local_engine = ws.voice.local_tts_engine if ws.voice is not None else None
     backends = [
-        build_tts_backend(tag, workspace_root=content_root) for tag in settings.tts_providers
+        build_tts_backend(
+            tag,
+            workspace_root=content_root,
+            local_tts_engine=local_engine,
+        )
+        for tag in settings.tts_providers
     ]
     from sevn.workspace.artifact_output import normalise_output_dir_rel
 
