@@ -6,7 +6,7 @@ status: ready
 owner: Alex
 summary: Operator dashboard for traces, spend, provider health, and in-flight runs—so
   a capable self-hosted bot stays livable instead of flying blind after each turn.
-last_updated: '2026-07-20'
+last_updated: '2026-07-21'
 fingerprint: sha256:e08b384f7e425c49a1f50b406ced80cd3eeeb531d8f1916da4a41064a6e89a57
 related:
 - prd-05-cost-and-providers
@@ -103,6 +103,9 @@ forensics.
   Mission Control or CLI-aligned panels so restarts do not silently drop workspace state.
 - **FR-008:** Sensitive values shall be **redacted at query time** in trace and audit views—
   the dashboard must not become a secrets leak surface.
+- **FR-009:** Gateway **shutdown browser reap failures** and **issue-watch / cron operator
+  notify** shall be observable (logged reap errors; owner Telegram sink when wired at boot)
+  so session-tooling teardown and non-interactive alerts are not silent.
 
 ## Non-Goals
 

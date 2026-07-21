@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
-import logging
+from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
+from loguru import logger as loguru_logger
 from starlette.testclient import TestClient
 
 
-@pytest.mark.xfail(reason="green after W12: cron_tick dispatches issue-watch handler", strict=False)
 def test_issue_watch_cron_tick_dispatches_via_handlers() -> None:
-    """Exercise register + ``_CRON_JOB_HANDLERS`` — not hasattr-only."""
+    """Exercise register + ``cron_tick`` → ``_CRON_JOB_HANDLERS`` (not hasattr-only)."""
+    import asyncio
+
+    from sevn.agent.tracing.sink import NullTraceSink
+    from sevn.config.workspace_config import WorkspaceConfig
     from sevn.triggers import cron as cron_mod
     from sevn.triggers import issue_watch_cron as watch_cron_mod
 
@@ -21,43 +24,59 @@ def test_issue_watch_cron_tick_dispatches_via_handlers() -> None:
 
     called: list[Any] = []
 
-    def _handler(**kwargs: Any) -> None:
-        called.append(kwargs)
+    def _handler(*, workspace: Any) -> None:
+        called.append(workspace)
 
     cron_mod._CRON_JOB_HANDLERS[watch_cron_mod.ISSUE_WATCH_CRON_JOB_ID] = _handler
     row = MagicMock()
     row.job_id = watch_cron_mod.ISSUE_WATCH_CRON_JOB_ID
-    handler = cron_mod._CRON_JOB_HANDLERS.get(row.job_id)
-    assert callable(handler)
-    handler(workspace=MagicMock())
-    assert called, "issue-watch cron handler must run via _CRON_JOB_HANDLERS"
+    row.cron_expr = watch_cron_mod.ISSUE_WATCH_CRON_EXPR
+    row.timezone = "UTC"
+    store = MagicMock()
+    store.list_due.return_value = [row]
+
+    async def _dispatch(_req: Any) -> None:
+        raise AssertionError("registered handlers must not fall through to dispatch")
+
+    asyncio.run(
+        cron_mod.cron_tick(
+            cron_store=store,
+            workspace=WorkspaceConfig.minimal(),
+            content_root=Path("/tmp"),
+            trace=NullTraceSink(),
+            dispatch=_dispatch,
+        )
+    )
+    assert called, "issue-watch cron handler must run via cron_tick/_CRON_JOB_HANDLERS"
+    store.update_schedule.assert_called()
 
 
-@pytest.mark.xfail(reason="green after W12: shutdown reap failure logged", strict=False)
 def test_shutdown_reap_failure_is_logged(
     tmp_workspace: tuple[object, object],
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
     from sevn.gateway.http_server import create_app
 
     ws, layout = tmp_workspace
-    with (
-        caplog.at_level(logging.WARNING),
-        patch(
+    captured: list[str] = []
+    sink_id = loguru_logger.add(lambda rec: captured.append(str(rec)), level="ERROR")
+    try:
+        with patch(
             "sevn.browser.process.reap_sevn_browsers_on_shutdown",
             side_effect=RuntimeError("reap failed"),
-        ),
-    ):
-        app = create_app(workspace=ws, layout=layout)
-        with TestClient(app):
-            pass
-    assert any("reap" in r.message.lower() for r in caplog.records)
+        ):
+            app = create_app(workspace=ws, layout=layout)
+            with TestClient(app):
+                pass
+    finally:
+        loguru_logger.remove(sink_id)
+    assert any("reap" in line.lower() for line in captured)
 
 
-@pytest.mark.xfail(reason="green after W12: operator-notify sink wired", strict=False)
 def test_boot_wires_operator_notify_when_owner_configured(
     tmp_workspace: tuple[object, object],
 ) -> None:
+    import asyncio
+
     from sevn.gateway.http_server import create_app
     from sevn.triggers import operator_notify
 
@@ -70,3 +89,24 @@ def test_boot_wires_operator_notify_when_owner_configured(
             pass
     # Boot path must call wire_operator_notify (owner Telegram id may be empty).
     assert wire.called
+
+    # When an owner id is configured, the sink delivers via route_outgoing.
+    routed: list[Any] = []
+    router = MagicMock()
+    router.route_outgoing = AsyncMock(side_effect=lambda msg: routed.append(msg))
+
+    async def _prove_sink() -> None:
+        try:
+            wired = operator_notify.wire_operator_notify(
+                gateway_router=router,
+                owner_telegram_user_id="424242",
+            )
+            assert wired is True
+            operator_notify.deliver_operator_notify(text="issue-watch probe")
+            await asyncio.sleep(0.05)
+            assert routed, "operator-notify sink must reach gateway_router.route_outgoing"
+            assert "issue-watch probe" in routed[0].text
+        finally:
+            operator_notify.reset_operator_notify_for_tests()
+
+    asyncio.run(_prove_sink())

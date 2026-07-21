@@ -7,8 +7,8 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
-last_updated: '2026-07-20'
-fingerprint: sha256:e5afa58162e6d4ddd08cffae12161f3defded9343111671b664d9ff758c0b8e1
+last_updated: '2026-07-21'
+fingerprint: sha256:29e904fe32f7ea71534149304480401f0d1a3b5fcb9cf191e541f048f2cc69d0
 related: []
 sources:
 - src/sevn/gateway/**
@@ -1540,6 +1540,9 @@ Sub-agent L1 registration/finalize hooks in `_run_guarded` (spec-36).
 | Unhandled exception | `_run_guarded` catch-all fallback |
 | Tier B timeout / budget exhausted | `_emit_no_answer_fallback` |
 | CD dispatch failure | No-answer + optional re-triage |
+| Browser reap on shutdown raises | Log `browser_reap_on_shutdown_failed` (exception); do not swallow via `suppress` |
+
+**Operator notify (boot):** Gateway lifespan calls `wire_operator_notify` so issue-watch / cron notify can deliver via `ChannelRouter.route_outgoing` when an owner Telegram id is configured; otherwise LOG fallback under `.sevn/trigger_runs/`.
 
 ## Amendments (spec-36-sub-agents)
 
@@ -1559,4 +1562,5 @@ and may spawn concurrent L1 tier-B runs (`src/sevn/gateway/queue/queue_multi.py`
 | `tests/gateway/test_queue_steer.py`, `test_queue_multi.py` | Queue modes |
 | `tests/gateway/test_cascade_budget.py` | Retry budget |
 | `tests/gateway/test_no_answer_messages.py` | Fallback copy |
+| `tests/gateway/test_lifecycle.py`, `test_lifecycle_w1_red.py` | Boot/shutdown; browser reap failure log; operator-notify wiring |
 | `make telegram-e2e` | Host Telegram smoke |

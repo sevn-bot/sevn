@@ -1652,10 +1652,13 @@ def create_app(
         await sessions.drain(grace_period_s=_shutdown_timeout_s(ws))
         # Single shutdown owner for sevn Chrome (D6): registry-based reap with
         # TERM/wait/KILL — do not also call close_all_gateway_browsers (divergent).
-        with suppress(Exception):
+        # Log reap failures (do not swallow via suppress) so operators see them.
+        try:
             from sevn.browser.process import reap_sevn_browsers_on_shutdown
 
             await asyncio.to_thread(reap_sevn_browsers_on_shutdown, ly.content_root)
+        except Exception:
+            logger.exception("browser_reap_on_shutdown_failed")
         await asyncio.to_thread(
             prune_orphan_tool_result_dirs,
             content_root=ly.content_root,

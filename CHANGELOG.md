@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-21] Gateway shutdown logs browser-reap failures instead of swallowing them; issue-watch cron dispatches via registered handlers and operator notify reaches the owner Telegram sink when wired
 - [2026-07-21] Proton deferred surfaces (calendar events create/respond, contacts groups/pin-key, mail ``--attach`` + attachments list/download) are behaviorally covered; mail recipient classification consumes pinned contact keys; HV helper crashes log at warning (distinct from helper-not-installed); RSVP/attachment/HV-webview live E2E deferred without credentials
 - [2026-07-21] Proton ``status`` / ``api`` Typer groups execute at runtime (no more exit-2 ``Missing command``); ``status`` honours legacy ``session.json`` via ``session_path``; ``settings set <key>`` rejects a missing value before auth
 - [2026-07-21] Proton Calendar/Contacts card decrypt drops and unrecognized card types surface at warning/raise; ``create_contact`` empty ``Responses`` raises instead of false success; calendar ``resolve_event`` logs per-calendar list failures; Calendar/Contacts CLI + ``calendar_events_list``/``contacts_list`` dry-run are behaviorally covered
