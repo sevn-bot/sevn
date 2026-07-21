@@ -130,6 +130,9 @@ run a tool. These incidents were captured in session transcripts (message ids ci
 | Artifact spill outside session | msg 40; log P10 | Files written outside session tree | Artifact output confinement |
 | Silent browser reap on shutdown | PR #46 / gateway shutdown | Chrome/profile leftovers after restart with no log | Log `browser_reap_on_shutdown_failed`; do not `suppress` reap exceptions |
 | Issue-watch notify unwired | PR #46 / cron | Diffs detected but operator never notified | Boot `wire_operator_notify` → `route_outgoing`; LOG fallback when no owner |
+| Long-turn dead-air | PR #52 / July-18 tooling | Operator sees no progress for >5s on slow turns | Route `Still working…` via `_schedule_turn_progress_signal` |
+| Classifier-timeout lost chat_id | PR #52 / July-18 tooling | Multi-spawn reply missing Telegram chat | Preserve `chat_id` via `_record_dispatch_routing` + `_merge_dispatch_routing_extras` |
+| Silent MC latency drop | PR #52 / July-18 tooling | High-latency stage attribution missing with no log | Log `agent_turn_stage_latency_unwired` when MC hook missing |
 
 ## Success Metrics
 

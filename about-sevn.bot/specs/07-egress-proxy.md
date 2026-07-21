@@ -7,7 +7,7 @@ owner: Alex
 summary: Product pairing (v1). Deployment, paired daemon install, onboarding validation,
   and Mission Control management of the proxy are specified in prd-06-setup-and-operations
   and prd-07-mission-control §5.1
-last_updated: '2026-07-19'
+last_updated: '2026-07-21'
 fingerprint: sha256:a2ad0d78b19ea74ccf88285824347327b48f3d7f88fd12bfa6dd108099244e81
 related: []
 sources:
@@ -198,6 +198,11 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+| Tests | Focus |
+|-------|-------|
+| `tests/proxy/test_codex_aggregation.py` | Truncated-stream retry; high-latency stage naming; slow-turn Still working… route |
+| `tests/proxy/test_codex_aggregation_w1_red.py` | Turn-progress scheduler + MC stage-latency unwired log |
 
 ## Human-input needed
 

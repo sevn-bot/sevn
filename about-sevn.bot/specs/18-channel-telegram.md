@@ -500,6 +500,11 @@ Discogs Setup (`/config` → Skills → Discogs → Setup): `form:secret_wizard:
 matches Ready spec **C7.18** (exact match before the C6.1b scoped-wizard regex);
 `form:discogs:oauth_start` is Ready **C7.19**; storing a user token mutates sevn.json then
 reloads the workspace so `DISCOGS_USER_TOKEN` injects before `act:discogs:whoami`.
+
+Outbound routing (D6/D7): Telegram `chat_id` is captured at `enqueue_dispatch` via
+`_record_dispatch_routing` and remains available after relatedness classifier-timeout
+fallback through `_merge_dispatch_routing_extras` (`relatedness_classifier_fallback`), so
+spawned multi turns still route replies to the operator chat.
 ## Failure Modes
 
 Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.

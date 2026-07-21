@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-07-21'
-fingerprint: sha256:09d3efc2b308bf42b2485017b4aa07b172fb2bd95fab8f93a07cb2cba55aa691
+fingerprint: sha256:54fcd16f72bb2952d827fd3e6a01d1b52180d9d39567eaeb250b35c067c5db4c
 related: []
 sources:
 - src/sevn/gateway/**
@@ -1529,6 +1529,11 @@ Sub-agent L1 registration/finalize hooks in `_run_guarded` (spec-36).
 4. Tier B cascade: narrow → summarize retry → full-index retry → escalate to C.
 5. Grounding guard + `TierBAnswerFinalizer`; no-answer fallback on failures.
 6. **`multi` mode:** `classify_busy_relatedness` with timeout fallback to steer.
+7. **Slow turns:** `_schedule_turn_progress_signal` routes `turn_progress_signal_text()`
+   ("Still working…") after the progress delay so channels are not left in dead-air.
+8. **Stage latency:** `_record_turn_stage_latencies` pushes samples into Mission Control when
+   wired; when MC is missing it logs `agent_turn_stage_latency_unwired` (debug) instead of
+   silently dropping attribution.
 
 ## Failure Modes
 
@@ -1541,6 +1546,7 @@ Sub-agent L1 registration/finalize hooks in `_run_guarded` (spec-36).
 | Tier B timeout / budget exhausted | `_emit_no_answer_fallback` |
 | CD dispatch failure | No-answer + optional re-triage |
 | Browser reap on shutdown raises | Log `browser_reap_on_shutdown_failed` (exception); do not swallow via `suppress` |
+| Mission Control unwired on stage latency | Log `agent_turn_stage_latency_unwired`; continue without MC samples |
 
 **Operator notify (boot):** Gateway lifespan calls `wire_operator_notify` so issue-watch / cron notify can deliver via `ChannelRouter.route_outgoing` when an owner Telegram id is configured; otherwise LOG fallback under `.sevn/trigger_runs/`.
 
@@ -1563,4 +1569,6 @@ and may spawn concurrent L1 tier-B runs (`src/sevn/gateway/queue/queue_multi.py`
 | `tests/gateway/test_cascade_budget.py` | Retry budget |
 | `tests/gateway/test_no_answer_messages.py` | Fallback copy |
 | `tests/gateway/test_lifecycle.py`, `test_lifecycle_w1_red.py` | Boot/shutdown; browser reap failure log; operator-notify wiring |
+| `tests/proxy/test_codex_aggregation.py`, `test_codex_aggregation_w1_red.py` | Slow-turn Still working… route; MC stage-latency no-op log |
+| `tests/channels/test_telegram_outbound.py` | D6/D7 enqueue `chat_id` + classifier-timeout dispatch routing |
 | `make telegram-checks` | Host Telegram Bot-API smoke (`telegram_checks`; alias `make telegram-e2e`) |

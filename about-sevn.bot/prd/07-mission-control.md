@@ -106,6 +106,9 @@ forensics.
 - **FR-009:** Gateway **shutdown browser reap failures** and **issue-watch / cron operator
   notify** shall be observable (logged reap errors; owner Telegram sink when wired at boot)
   so session-tooling teardown and non-interactive alerts are not silent.
+- **FR-010:** **Turn-stage latency attribution** shall reach Mission Control when wired; when
+  the MC hook is missing, the gateway shall log the no-op (`agent_turn_stage_latency_unwired`)
+  so high-latency stage samples are not dropped invisibly.
 
 ## Non-Goals
 
