@@ -5,10 +5,11 @@ Appends behavioral coverage beyond dry-run/status in ``test_proton_management_sk
 
 from __future__ import annotations
 
+import asyncio
 import json
 import subprocess
 import sys
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -60,7 +61,6 @@ def test_run_proton_cli_uses_module_mode_profile_order() -> None:
     assert profile_idx < pass_idx
 
 
-@pytest.mark.xfail(reason="green after W7: mail_list dry-run", strict=False)
 def test_mail_list_dry_run() -> None:
     proc = subprocess.run(
         [sys.executable, str(_SCRIPTS / "mail_list.py"), "--dry-run"],
@@ -74,7 +74,6 @@ def test_mail_list_dry_run() -> None:
     assert "mail" in " ".join(map(str, data["data"]["command"]))
 
 
-@pytest.mark.xfail(reason="green after W7: mail_read dry-run", strict=False)
 def test_mail_read_dry_run() -> None:
     proc = subprocess.run(
         [sys.executable, str(_SCRIPTS / "mail_read.py"), "msg-1", "--dry-run"],
@@ -88,13 +87,19 @@ def test_mail_read_dry_run() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W7: run_proton_cli_async argv", strict=False)
 async def test_run_proton_cli_async_assembles_argv() -> None:
+    def fake_which(name: str) -> str | None:
+        if name == "proton-cli":
+            return None
+        if name in ("python3", "python"):
+            return sys.executable
+        return None
+
     proc = AsyncMock()
     proc.returncode = 0
     proc.communicate = AsyncMock(return_value=(b"ok", b""))
     with (
-        patch("sevn.skills.proton_management.shutil.which", return_value=None),
+        patch("sevn.skills.proton_management.shutil.which", side_effect=fake_which),
         patch("asyncio.create_subprocess_exec", return_value=proc) as mocked,
     ):
         code, out, _err = await run_proton_cli_async(
@@ -106,6 +111,37 @@ async def test_run_proton_cli_async_assembles_argv() -> None:
     argv = list(mocked.call_args.args)
     assert "--profile" in argv
     assert argv.index("--profile") < argv.index("pass")
+
+
+@pytest.mark.asyncio
+async def test_run_proton_cli_async_timeout() -> None:
+    def fake_which(name: str) -> str | None:
+        if name == "proton-cli":
+            return None
+        if name in ("python3", "python"):
+            return sys.executable
+        return None
+
+    proc = AsyncMock()
+    proc.kill = MagicMock()
+    proc.wait = AsyncMock(return_value=None)
+
+    async def _hang() -> tuple[bytes, bytes]:
+        await asyncio.sleep(60)
+        return b"", b""
+
+    proc.communicate = _hang
+    with (
+        patch("sevn.skills.proton_management.shutil.which", side_effect=fake_which),
+        patch("asyncio.create_subprocess_exec", return_value=proc),
+    ):
+        code, _out, err = await run_proton_cli_async(
+            ["pass", "vaults", "list"],
+            timeout_s=0.01,
+        )
+    assert code == 124
+    assert "timed out" in err
+    proc.kill.assert_called_once()
 
 
 @pytest.mark.xfail(reason="green after W9: calendar_events_list dry-run", strict=False)

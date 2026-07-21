@@ -323,24 +323,30 @@ def test_pass_item_decrypt_failure_logged_not_anonymized(
 # --- W7 / PR #41 -----------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W7: mail search CLI", strict=False)
 def test_mail_messages_search_mocked() -> None:
     with patch("proton_cli.cli.mail_cmd._run") as run_app:
         app = MagicMock()
         app.mail_svc.search_messages.return_value = ([], 0)
+        app.renderer.format.value = "text"
         run_app.return_value = app
-        result = runner.invoke(root_app, ["mail", "messages", "search", "hello"])
+        result = runner.invoke(root_app, ["mail", "messages", "search", "--keyword", "hello"])
     assert result.exit_code == 0
+    app.mail_svc.search_messages.assert_called_once()
+    opts = app.mail_svc.search_messages.call_args.args[0]
+    assert opts.keyword == "hello"
 
 
-@pytest.mark.xfail(reason="green after W7: mail read CLI", strict=False)
 def test_mail_messages_read_mocked() -> None:
     with patch("proton_cli.cli.mail_cmd._run") as run_app:
         app = MagicMock()
+        app.mail_svc.list_messages.return_value = ([], 0)
+        app.mail_svc.resolve_message.return_value = "msg-1"
         app.mail_svc.read_message.return_value = MagicMock(subject="Hi", body="body")
+        app.renderer.format.value = "json"
         run_app.return_value = app
         result = runner.invoke(root_app, ["mail", "messages", "read", "msg-1"])
     assert result.exit_code == 0
+    app.mail_svc.read_message.assert_called_once()
 
 
 @pytest.mark.parametrize(
@@ -348,19 +354,20 @@ def test_mail_messages_read_mocked() -> None:
     [
         ["mail", "messages", "trash", "msg-1"],
         ["mail", "messages", "delete", "msg-1"],
-        ["mail", "messages", "move", "msg-1", "archive"],
+        ["mail", "messages", "move", "msg-1", "--folder", "archive"],
         ["mail", "labels", "list"],
     ],
 )
-@pytest.mark.xfail(reason="green after W7: mail mutate/list CLI", strict=False)
 def test_mail_mutate_and_labels_cli(argv: list[str]) -> None:
     with patch("proton_cli.cli.mail_cmd._run") as run_app:
-        run_app.return_value = MagicMock()
+        app = MagicMock()
+        app.mail_svc.labels_list.return_value = ([], [])
+        app.renderer.format.value = "text"
+        run_app.return_value = app
         result = runner.invoke(root_app, argv)
     assert result.exit_code == 0
 
 
-@pytest.mark.xfail(reason="green after W7: stdin secret resolution", strict=False)
 def test_resolve_secret_value_from_stdin(monkeypatch: pytest.MonkeyPatch) -> None:
     from proton_cli.cli import pass_cmd
 
@@ -370,26 +377,51 @@ def test_resolve_secret_value_from_stdin(monkeypatch: pytest.MonkeyPatch) -> Non
     assert value == "from-stdin"
 
 
-@pytest.mark.xfail(reason="green after W7: HV retry on login", strict=False)
 def test_login_srp_retries_once_on_hv() -> None:
     from proton_cli.proton import auth
     from proton_cli.proton.errors import HumanVerificationError
 
     calls = {"n": 0}
 
-    def _login(*_a: Any, **_k: Any) -> Any:
+    def _once(*_a: Any, **_k: Any) -> Any:
         calls["n"] += 1
         if calls["n"] == 1:
             raise HumanVerificationError(token="t", web_url="https://hv")
-        return MagicMock()
+        return {"UID": "u", "AccessToken": "a", "RefreshToken": "r"}
 
-    with (
-        patch.object(auth, "_login_srp", side_effect=_login),
-        patch("proton_cli.hv.resolver.cli_hv_resolver", return_value=("tok", "captcha")),
-    ):
-        # Production path after W7 must retry once; pin call count contract.
-        assert calls["n"] == 0
-        raise AssertionError("login HV retry path not yet wired for test harness")
+    client = MagicMock()
+    client.get_hv_resolver.return_value = lambda _exc: ("tok", "captcha")
+    with patch.object(auth, "_login_srp_once", side_effect=_once):
+        result = auth._login_srp(client, "user", "pass", "", "")
+    assert calls["n"] == 2
+    assert result["UID"] == "u"
+    client.get_hv_resolver.assert_called()
+
+
+def test_cli_hv_resolver_uses_env_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    from proton_cli.hv.resolver import cli_hv_resolver
+    from proton_cli.proton.errors import HumanVerificationError
+
+    monkeypatch.setenv("PROTON_HV_TOKEN", "env-tok")
+    monkeypatch.setenv("PROTON_HV_TYPE", "captcha")
+    token, kind = cli_hv_resolver(HumanVerificationError(token="t", web_url="https://hv"))
+    assert token == "env-tok"
+    assert kind == "captcha"
+
+
+def test_cli_hv_resolver_raises_when_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    from proton_cli.hv.resolver import cli_hv_resolver
+    from proton_cli.proton.errors import ErrHVUnavailable, HumanVerificationError
+
+    def _boom(_token: str) -> str:
+        raise Exception("no helper")
+
+    monkeypatch.delenv("PROTON_HV_TOKEN", raising=False)
+    monkeypatch.setattr("proton_cli.hv.helper.resolve_with_helper", _boom)
+    with pytest.raises(ErrHVUnavailable):
+        cli_hv_resolver(
+            HumanVerificationError(token="t", methods=["captcha"], web_url="https://hv")
+        )
 
 
 # --- W8 / PR #42 -----------------------------------------------------------

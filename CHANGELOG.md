@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-21] Proton Mail CLI (search/read/send/trash/delete/move/labels), ``mail_list``/``mail_read`` dry-run scripts, Pass stdin secret resolution, SRP HV retry + ``PROTON_HV_TOKEN`` resolver, and ``run_proton_cli_async`` argv/timeout are behaviorally covered
 - [2026-07-21] Google Workspace Hermes API handlers honour ``prefer_gws`` (§3.3): route via ``use_gws_backend`` / ``run_gws`` when ``gws`` is on PATH, log Python fallback when it is not, and cover ``gws_bridge`` token-env injection
 - [2026-07-21] Proton Pass address-key unlock failures log at warning (key id + reason) instead of silent empty unlocked-key lists
 - [2026-07-21] Proton Pass share-key / item decrypt failures log at warning (share/item id + reason) instead of silent empty or anonymized lists
