@@ -96,7 +96,6 @@ class TestExtendedMediaKindsW3:
     """PR #36 — five execute paths lacking behavioral coverage."""
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="green after W3: image_i2i execute path", strict=False)
     async def test_image_i2i_returns_trace(
         self,
         media_workspace: tuple[Path, sqlite3.Connection],
@@ -132,7 +131,6 @@ class TestExtendedMediaKindsW3:
         assert artifact.read_bytes() == image_bytes
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="green after W3: video_s2v execute path", strict=False)
     async def test_video_s2v_returns_trace(
         self,
         media_workspace: tuple[Path, sqlite3.Connection],
@@ -165,7 +163,6 @@ class TestExtendedMediaKindsW3:
         assert (workspace / str(result["artifact_path"])).read_bytes() == video_bytes
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="green after W3: video_fl2v execute path", strict=False)
     async def test_video_fl2v_returns_trace(
         self,
         media_workspace: tuple[Path, sqlite3.Connection],
@@ -201,7 +198,6 @@ class TestExtendedMediaKindsW3:
         assert (workspace / str(result["artifact_path"])).read_bytes() == video_bytes
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="green after W3: video_template execute path", strict=False)
     async def test_video_template_returns_trace(
         self,
         media_workspace: tuple[Path, sqlite3.Connection],
@@ -234,7 +230,6 @@ class TestExtendedMediaKindsW3:
         assert (workspace / str(result["artifact_path"])).read_bytes() == video_bytes
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="green after W3: voice-clone execute path", strict=False)
     async def test_voice_clone_returns_trace(
         self,
         media_workspace: tuple[Path, sqlite3.Connection],
@@ -273,7 +268,6 @@ class TestExtendedMediaKindsW3:
 class TestMediaGenerationScriptsW3:
     """PR #36 — bundled scripts without subprocess coverage."""
 
-    @pytest.mark.xfail(reason="green after W3: generate_image_from_reference script", strict=False)
     def test_generate_image_from_reference_script_mocked(
         self,
         media_workspace: tuple[Path, sqlite3.Connection],
@@ -298,7 +292,6 @@ class TestMediaGenerationScriptsW3:
         mocked.assert_called_once()
         assert mocked.call_args.args[0] == "image_i2i"
 
-    @pytest.mark.xfail(reason="green after W3: generate_video_from_image script", strict=False)
     def test_generate_video_from_image_script_mocked(
         self,
         media_workspace: tuple[Path, sqlite3.Connection],
@@ -322,7 +315,6 @@ class TestMediaGenerationScriptsW3:
             assert mod.main() == 0
         mocked.assert_called_once()
 
-    @pytest.mark.xfail(reason="green after W3: generate_video_template script", strict=False)
     def test_generate_video_template_script_mocked(
         self,
         media_workspace: tuple[Path, sqlite3.Connection],
@@ -344,7 +336,6 @@ class TestMediaGenerationScriptsW3:
             assert mod.main() == 0
         mocked.assert_called_once()
 
-    @pytest.mark.xfail(reason="green after W3: replicate_voice script", strict=False)
     def test_replicate_voice_script_mocked(
         self,
         media_workspace: tuple[Path, sqlite3.Connection],
@@ -372,13 +363,11 @@ class TestMediaGenerationScriptsW3:
             assert mod.main() == 0
         mocked.assert_called_once()
 
-    @pytest.mark.xfail(reason="green after W3: list_prompt_templates script", strict=False)
     def test_list_prompt_templates_script(self) -> None:
         mod = _load_script("list_prompt_templates.py")
         with patch.object(sys, "argv", ["list_prompt_templates.py"]):
             assert mod.main() == 0
 
-    @pytest.mark.xfail(reason="green after W3: list_video_templates script", strict=False)
     def test_list_video_templates_script(self) -> None:
         mod = _load_script("list_video_templates.py")
         with patch.object(sys, "argv", ["list_video_templates.py"]):

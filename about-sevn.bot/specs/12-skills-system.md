@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own everything under workspace/skills/: how skills are discovered, validated,
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
-last_updated: '2026-07-18'
-fingerprint: sha256:15fe596409c99c3acf7b039d93d83342fdc0684131319f48c5bc4ffa59c7ab2a
+last_updated: '2026-07-21'
+fingerprint: sha256:5434f0014501a94eaa7e0232c7d8d270e9398c6eafafe035826476551a02595f
 related: []
 sources:
 - src/sevn/skills/**
@@ -458,18 +458,18 @@ interfaces:
 - name: SkillRecord
   file: src/sevn/skills/models.py
   symbol: SkillRecord
-- name: gate_openwiki_core_skill
-  file: src/sevn/skills/openwiki.py
-  symbol: gate_openwiki_core_skill
-- name: openwiki_config_enabled
-  file: src/sevn/skills/openwiki.py
-  symbol: openwiki_config_enabled
 - name: gate_obsidian_cli_core_skill
   file: src/sevn/skills/obsidian_cli.py
   symbol: gate_obsidian_cli_core_skill
 - name: obsidian_cli_config_enabled
   file: src/sevn/skills/obsidian_cli.py
   symbol: obsidian_cli_config_enabled
+- name: gate_openwiki_core_skill
+  file: src/sevn/skills/openwiki.py
+  symbol: gate_openwiki_core_skill
+- name: openwiki_config_enabled
+  file: src/sevn/skills/openwiki.py
+  symbol: openwiki_config_enabled
 - name: OpenwikiDoctorRow
   file: src/sevn/skills/openwiki_doctor_check.py
   symbol: OpenwikiDoctorRow
@@ -676,6 +676,8 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+**Bundled script coverage:** Each new operator-visible bundled script under a skill's `scripts/` directory must have ≥1 behavioral test (mocked transport or CLI `main()` with side-effect assert), not structural-only (`callable`/`--help`). For `media_generation`, see `tests/skills/test_media_generation_skill.py` and `tests/skills/test_media_generation_skill_w1_red.py` (execute kinds + script CLIs; live MiniMax gated by `SEVN_MEDIA_LIVE=1`).
 
 ## Human-input needed
 

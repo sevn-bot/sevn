@@ -7,7 +7,7 @@ owner: Alex
 summary: Level-1 sub-agents (tracked, concurrent, killable role runs) that may spawn
   level-2 workers (incl. specialists); multi queue mode; limits, tracing, kill surfaces,
   media_generation skill.
-last_updated: '2026-07-20'
+last_updated: '2026-07-21'
 fingerprint: sha256:99f5f915a859fe600718cdae777712488e7846cd042c5af6bb5d1d06bc25916b
 related: []
 sources:
@@ -420,7 +420,11 @@ Triager `specialist_grants[]` on `TriageResult` flows into tier-B `ToolContext` 
 granted specialists bypass `assigned_to` when `triager` is in `requestable_by`.
 
 First documented specialist: `media_generator` (MiniMax-3) bound to
-`media_generation` skill via `wait: true` spawn path.
+`media_generation` skill via `wait: true` spawn path. Execute kinds include
+`image`, `image_i2i`, `video` / `video_i2v` / `video_s2v` / `video_fl2v`,
+`video_template`, `music`, and `voice` (TTS + clone); bundled CLIs under
+`src/sevn/data/bundled_skills/core/media_generation/scripts/` drive the same
+worker. CI covers these with mocked MiniMax; live smoke requires `SEVN_MEDIA_LIVE=1`.
 
 Second documented specialist: `social_media_manager` — browser-first social
 monitoring across six platforms with per-site medium config under
@@ -495,7 +499,7 @@ Unit/harness tests only — no live LLM in CI:
 | Mission API | `tests/gateway/test_mission_subagents.py` |
 | Telegram menu | `tests/gateway/test_config_subagents_menu.py` |
 | CLI | `tests/cli/test_subagents_cmd.py` |
-| Media skill | `tests/skills/test_media_generation_skill.py` |
+| Media skill | `tests/skills/test_media_generation_skill.py`, `tests/skills/test_media_generation_skill_w1_red.py` — mocked execute paths for `image_i2i` / `video_s2v` / `video_fl2v` / `video_template` / voice-clone plus bundled script CLIs; live MiniMax only under `SEVN_MEDIA_LIVE=1` |
 | Social media specialist | `tests/agent/subagents/test_social_media_platform_medium.py`, `tests/skills/test_social_media_manager_skill.py`, `tests/gateway/test_social_media_manager_menu.py`, `tests/integrations/test_social_media_config.py`, `tests/integrations/test_twexapi_client.py` |
 
 Docs gate: `make subagents-chart-check` (deterministic SVG); `make ci-docs`.

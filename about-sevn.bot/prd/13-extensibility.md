@@ -6,8 +6,8 @@ status: ready
 owner: Alex
 summary: Built-in capabilities cover common paths; deployments need org glue—ticketing,
   LDAP, formatters, policy hooks—via plugins, skills, and hooks without forking core.
-last_updated: '2026-07-18'
-fingerprint: sha256:5f905950fbad7b12b570f048635b5bd51cd5dac1388b67426212bf884228d6b6
+last_updated: '2026-07-21'
+fingerprint: sha256:948730517e7c810bedbf8ff7192979ff250f8594bcfedbc14f77e61ffc85a833
 related:
 - prd-03-trust-and-control
 - prd-07-mission-control
@@ -111,6 +111,10 @@ gateway.
   executors, triggers) so plugins augment behavior rather than replacing gateway semantics.
 - **FR-007:** The product shall **fail closed on trust**: high-impact hook surfaces require
   explicit operator trust configuration; silent broad interception is not the default.
+- **FR-008:** Optional bundled skill groups (e.g. **`media_generation`** bound to the
+  `media_generator` MiniMax L2 specialist, Discogs, proton) shall remain first-class extension
+  surfaces — operator-visible scripts and specialist execute paths are covered by mocked
+  behavioral tests; live provider E2E stays opt-in (`SEVN_MEDIA_LIVE`, etc.).
 
 ## Non-Goals
 
