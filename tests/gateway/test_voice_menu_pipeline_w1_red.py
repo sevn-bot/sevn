@@ -12,7 +12,6 @@ from tests.gateway.test_config_menu_actions import _build_router, _config_callba
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W16: menu→reload→pipeline .engine", strict=False)
 async def test_tts_engine_round_trip_updates_router_tts_engine(tmp_path: Path) -> None:
     """Menu cycle must change the live pipeline backend ``.engine``, not only sevn.json."""
     router, cap, _ws = _build_router(tmp_path)

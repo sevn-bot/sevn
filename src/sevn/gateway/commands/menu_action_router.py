@@ -24,6 +24,8 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
+from loguru import logger
+
 from sevn.agent.tracing.logfire_config import (
     apply_logfire_export_to_sevn_doc,
     logfire_export_status_from_doc,
@@ -139,6 +141,26 @@ _CONFIG_PATH_SECTION: dict[str, ConfigSection] = {
     "integration": "integrations",
     "agent": "agents",
 }
+
+
+def _tts_pipeline_engine(tts: Any) -> str | None:
+    """Return the first TTS backend ``.engine``, or ``None`` when unavailable.
+
+    Args:
+        tts (Any): :class:`~sevn.voice.tts.TextToSpeechPipeline` or substitute.
+
+    Returns:
+        str | None: Normalised local TTS engine tag when present.
+
+    Examples:
+        >>> _tts_pipeline_engine(None) is None
+        True
+    """
+    backends = getattr(tts, "_backends", None) or getattr(tts, "backends", None)
+    if not backends:
+        return None
+    engine = getattr(backends[0], "engine", None)
+    return str(engine).strip().casefold() if engine else None
 
 
 def infer_config_section_from_callback(data: str) -> ConfigSection:
@@ -1142,7 +1164,16 @@ class MenuActionRouter:
 
         mutate_sevn_json(self._sevn_json, _apply)
         self._reload_workspace()
-        toast = f"TTS engine: {new_active}"
+        runtime_engine = _tts_pipeline_engine(getattr(self._router, "_tts", None))
+        if runtime_engine != new_active:
+            logger.warning(
+                "voice TTS engine cycle wrote {!r} but pipeline .engine is {!r}",
+                new_active,
+                runtime_engine,
+            )
+            toast = f"TTS engine: {new_active} (pipeline still {runtime_engine or 'unset'})"
+        else:
+            toast = f"TTS engine: {new_active}"
         answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
         return None if answered else toast
 

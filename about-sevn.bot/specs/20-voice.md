@@ -195,9 +195,11 @@ Initial draft for **Data Model** — grounded in extracted interfaces; confirm n
 See **Implemented by** and [`src/sevn/voice`](src/sevn/voice/__init__.py).
 ## Behavior
 
-`build_tts_pipeline` passes `voice.local_tts_engine` into `build_tts_backend` so the
+`build_tts_pipeline` reads `VoiceRuntimeSettings.local_tts_engine` (from
+`voice.local_tts_engine`) and passes it into `build_tts_backend` so the
 `text_to_voice` backend's `.engine` matches config (`kokoro` / `supertonic`). Telegram
-`/voice <code>` accepts Kokoro ids (`af_heart`) and Supertonic codes (`M1`–`M5`, `F1`–`F5`);
+`/config` → Voice engine cycle and `/voice <code>` both reload the workspace so the
+live pipeline picks up the selection without restart.
 Supertonic codes are persisted uppercase so synthesis does not silently fall back to `M1`.
 
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
@@ -217,8 +219,10 @@ Document observable failure surfaces from the implementing modules (exceptions, 
 `/voice` code normalisation + persist: `tests/gateway/test_voice.py`,
 `tests/voice/test_text_to_voice_backend_w1_red.py`. Pipeline engine wiring + legacy
 `--engine` omit: `tests/voice/test_text_to_voice_backend.py` /
-`test_text_to_voice_backend_w1_red.py`. Menu→reload→pipeline `.engine` (typed
-`VoiceRuntimeSettings.local_tts_engine`) remains W16.
+`test_text_to_voice_backend_w1_red.py`. Menu→reload→pipeline `.engine` via
+`VoiceRuntimeSettings.local_tts_engine`: `tests/gateway/test_voice_menu_pipeline_w1_red.py`.
+Live Telegram `/config → Voice` spoken-reply E2E remains deferred (no creds /
+`make telegram-e2e` not runnable here).
 
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 

@@ -74,18 +74,12 @@ def test_build_tts_pipeline_passes_local_tts_engine(tmp_path: Path) -> None:
     assert engine == "supertonic"
 
 
-@pytest.mark.xfail(
-    reason="green after W16: VoiceRuntimeSettings local_tts_engine field", strict=False
-)
 def test_voice_runtime_settings_exposes_local_tts_engine() -> None:
     ws = WorkspaceConfig.minimal(voice={"local_tts_engine": "supertonic"})
     settings = voice_runtime_settings(ws)
     assert getattr(settings, "local_tts_engine", None) == "supertonic"
 
 
-@pytest.mark.xfail(
-    reason="green after W16: build_tts_backend receives engine from pipeline", strict=False
-)
 def test_build_tts_backend_engine_from_runtime_settings(tmp_path: Path) -> None:
     backend = build_tts_backend(
         "text_to_voice", workspace_root=tmp_path, local_tts_engine="supertonic"

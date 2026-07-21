@@ -492,6 +492,9 @@ Trace control flow starting from the load-bearing symbols in **Implemented by** 
 
 Telegram `/voice <code>` persists Kokoro and Supertonic voice ids with correct case
 (see `core_commands._normalise_tts_voice_code`); unknown lone tokens are rejected.
+`/config` → Voice TTS engine cycle (`cfg:voice:engine:next`) writes
+`voice.local_tts_engine` and rebuilds the live TTS pipeline so spoken replies use the
+selected engine without a gateway restart.
 ## Failure Modes
 
 Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
@@ -557,7 +560,10 @@ mocked coverage in `tests/browser/test_telegram_checks_w1_red.py` and
 deferred (parked journeys, issue #37).
 
 `/voice` Supertonic/Kokoro code persist + reject: `tests/gateway/test_voice.py` and
-`tests/voice/test_text_to_voice_backend_w1_red.py`.
+`tests/voice/test_text_to_voice_backend_w1_red.py`. Menu engine cycle → pipeline
+`.engine`: `tests/gateway/test_voice_menu_pipeline_w1_red.py`. Live Telegram
+`/config → Voice` spoken-reply E2E remains deferred (no credentials /
+`make telegram-e2e` not runnable here).
 
 ## Human-input needed
 
