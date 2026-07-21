@@ -495,6 +495,11 @@ Telegram `/voice <code>` persists Kokoro and Supertonic voice ids with correct c
 `/config` → Voice TTS engine cycle (`cfg:voice:engine:next`) writes
 `voice.local_tts_engine` and rebuilds the live TTS pipeline so spoken replies use the
 selected engine without a gateway restart.
+
+Discogs Setup (`/config` → Skills → Discogs → Setup): `form:secret_wizard:discogs.user_token`
+matches Ready spec **C7.18** (exact match before the C6.1b scoped-wizard regex);
+`form:discogs:oauth_start` is Ready **C7.19**; storing a user token mutates sevn.json then
+reloads the workspace so `DISCOGS_USER_TOKEN` injects before `act:discogs:whoami`.
 ## Failure Modes
 
 Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
@@ -564,6 +569,9 @@ deferred (parked journeys, issue #37).
 `.engine`: `tests/gateway/test_voice_menu_pipeline_w1_red.py`. Live Telegram
 `/config → Voice` spoken-reply E2E remains deferred (no credentials /
 `make telegram-e2e` not runnable here).
+
+Discogs menu readiness + whoami: `tests/gateway/test_discogs_menu.py` and
+`tests/gateway/test_discogs_menu_w1_red.py` (C7.18/C7.19 Ready, wizard reload, whoami toast).
 
 ## Human-input needed
 

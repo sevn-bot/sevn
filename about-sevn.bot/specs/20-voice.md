@@ -7,7 +7,7 @@ owner: Alex
 summary: 'Own the provider-chain facades for speech-to-text and text-to-speech so
   the gateway can:'
 last_updated: '2026-07-21'
-fingerprint: sha256:916311db59efc3e0d3bb410f8efb421399028f293a0f79f1c21a2e210f57fd3e
+fingerprint: sha256:465a1380c5aaa0f2edc54b6811c494148cceec21d28164f20a432f026096487a
 related: []
 sources:
 - src/sevn/voice/**

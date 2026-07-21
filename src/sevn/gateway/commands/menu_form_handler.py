@@ -1144,6 +1144,10 @@ class MenuFormHandler:
                     )
 
                 mutate_sevn_json(self._sevn_json, _apply_discogs_user_token)
+                mar = self._router._menu_action_router
+                if mar is not None:
+                    mar._reload_workspace()
+                self._workspace = self._router._workspace
             self._consume_token(token)
             section = str(payload.get("section") or "secrets")
             await self._refresh_section(msg, section=section, toast=None)

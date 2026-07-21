@@ -145,6 +145,7 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C7.16",
         "C7.17",
         "C7.18",
+        "C7.19",
         "C7.20",
     },
 )

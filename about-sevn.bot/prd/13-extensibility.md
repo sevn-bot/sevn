@@ -115,7 +115,9 @@ gateway.
   `media_generator` MiniMax L2 specialist, Discogs, proton) shall remain first-class extension
   surfaces — operator-visible scripts (including S2V/FL2V CLIs) and specialist execute paths
   (literal voice-clone text, download size cap, persist size-verify) are covered by mocked
-  behavioral tests; live provider E2E stays opt-in (`SEVN_MEDIA_LIVE`, etc.).
+  behavioral tests; live provider E2E stays opt-in (`SEVN_MEDIA_LIVE`, etc.). Discogs Telegram
+  Setup (user-token C7.18 / OAuth C7.19 Ready, wizard workspace reload, whoami toast) is covered
+  by gateway menu tests.
 
 ## Non-Goals
 
