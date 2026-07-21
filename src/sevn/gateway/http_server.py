@@ -1684,6 +1684,11 @@ def create_app(
         if mission_sub is not None:
             detach_mission_trace_sink(mission_sub)
         await trace.close()
+        # Cancelled session workers do not abort in-flight ``asyncio.to_thread``
+        # SQLite work. Wait for the default executor before closing ``conn`` so
+        # orphaned turn teardown (e.g. ``record_turn_finished``) cannot SIGSEGV
+        # against a closed handle during TestClient lifespan exit.
+        await asyncio.get_running_loop().shutdown_default_executor()
         conn.close()
         with suppress(Exception):
             release_leaked_multiprocessing_semaphores()

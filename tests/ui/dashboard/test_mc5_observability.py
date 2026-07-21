@@ -6,6 +6,7 @@ import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import patch
 
 from starlette.testclient import TestClient
 
@@ -179,10 +180,20 @@ def test_traces_replay_endpoint_accepted_with_trace_seed(tmp_path: Path) -> None
             traces.commit()
         finally:
             traces.close()
-        resp = client.post(
-            "/api/v1/sessions/s1/turns/t1/replay",
-            json={"confirmed": True},
-            headers=headers,
-        )
+        # Queue acceptance only — do not dispatch a live agent turn under TestClient.
+        worker = getattr(client.app.state, "replay_worker", None)
+        if worker is not None:
+            with patch.object(worker, "schedule"):
+                resp = client.post(
+                    "/api/v1/sessions/s1/turns/t1/replay",
+                    json={"confirmed": True},
+                    headers=headers,
+                )
+        else:
+            resp = client.post(
+                "/api/v1/sessions/s1/turns/t1/replay",
+                json={"confirmed": True},
+                headers=headers,
+            )
         assert resp.status_code == 202
         assert resp.json()["replay_job_id"]
