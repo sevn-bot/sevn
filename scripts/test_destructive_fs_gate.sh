@@ -1,25 +1,24 @@
 #!/usr/bin/env bash
-# Regression suite for .cursor/hooks/destructive-fs-gate.sh — the beforeShellExecution
-# hook that blocks agent commands capable of wiping gitignored operator trees.
+# Regression suite for scripts/destructive_fs_gate.sh — the logic behind the Cursor
+# `beforeShellExecution` hook that blocks agent commands capable of wiping gitignored
+# operator trees.
 #
 # Why this exists: on 2026-07-20 an `rsync -a --delete` of a sparse tree onto
 # spec-kit-wave/ reaped 165 source files, and on 2026-06-17 a CI `git clean -fdx` wiped
 # .ignorelocal/. Neither was catchable by git. The gate is the only thing standing in
 # front of a third incident, so its allow/deny behaviour is pinned here.
 #
-# The hook lives under .cursor/ which is gitignored, so it may be absent on a fresh
-# checkout — in that case this script SKIPs rather than fails.
+# A note on why the suite earns its keep: while hardening the gate, a stray `--` passed to
+# an internal grep wrapper silently turned the rsync and find rules into no-ops — the two
+# rules the gate exists for. It looked fine; only these cases caught it.
 #
 # Run: bash scripts/test_destructive_fs_gate.sh
 set -uo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-gate="$repo_root/.cursor/hooks/destructive-fs-gate.sh"
+gate="$repo_root/scripts/destructive_fs_gate.sh"
 
-if [[ ! -x "$gate" ]]; then
-  echo "test-destructive-fs-gate: SKIP (no $gate — .cursor is gitignored)"
-  exit 0
-fi
+[[ -r "$gate" ]] || { echo "test-destructive-fs-gate: FAIL (missing $gate)"; exit 1; }
 command -v jq >/dev/null || { echo "test-destructive-fs-gate: SKIP (jq not installed)"; exit 0; }
 
 pass=0; fail=0
@@ -29,7 +28,7 @@ check() {
   local got
   got=$(printf '%s' "$1" \
     | python3 -c 'import json,sys; print(json.dumps({"command": sys.stdin.read()}))' \
-    | "$gate" 2>/dev/null | jq -r '.permission // "ERROR"')
+    | bash "$gate" 2>/dev/null | jq -r '.permission // "ERROR"')
   if [[ "$got" == "$2" ]]; then
     pass=$((pass + 1))
   else
@@ -76,6 +75,21 @@ check 'ls -la docs'                                    allow 'reading a protecte
 check 'cat .cursor/hooks.json'                         allow 'reading a protected path'
 check 'git status'                                     allow 'git status'
 check 'make ci'                                        allow 'make ci'
+
+# --- the .cursor wrapper must actually delegate here (it is gitignored, so may be absent) --
+hook="$repo_root/.cursor/hooks/destructive-fs-gate.sh"
+if [[ -x "$hook" ]]; then
+  got=$(printf '{"command":"rsync -a --delete src/ spec-kit-wave/"}' \
+    | "$hook" 2>/dev/null | jq -r '.permission // "ERROR"')
+  if [[ "$got" == "deny" ]]; then
+    pass=$((pass + 1))
+  else
+    fail=$((fail + 1))
+    printf '  FAIL  got=%-6s want=deny    .cursor hook delegates to tracked gate\n' "$got"
+  fi
+else
+  echo "test-destructive-fs-gate: note — .cursor/hooks/destructive-fs-gate.sh absent (gitignored); wrapper delegation not checked"
+fi
 
 echo "test-destructive-fs-gate: PASS=$pass FAIL=$fail"
 [[ $fail -eq 0 ]] || exit 1
