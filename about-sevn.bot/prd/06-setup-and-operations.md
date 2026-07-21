@@ -112,8 +112,10 @@ gives up and returns to a hosted assistant that "just works." Self-hosted produc
 - Replacing Mission Control for day-two observability—setup gets you running; prd-07-mission-control
   owns traces, provider panels, and ops surfaces.
 - Running headed Telegram Web E2E **inside** the default gateway container—host-side browser
-  `telegram_web` / `telegram_checks` smoke stays the developer path; Docker ships gateway + proxy,
-  not headed browser automation by default.
+  `telegram_web` / `telegram_checks` smoke stays the developer path (`make telegram-checks` /
+  `python -m sevn.browser.recipes.telegram_checks` for Bot-API `getMe`; Web send/receive via
+  `run_checks` + a bound CDP `TelegramWeb` recipe). Docker ships gateway + proxy, not headed
+  browser automation by default.
 - Enterprise fleet management (MDM, multi-tenant RBAC, org-wide billing)—v1 centers the **solo
   operator** workspace.
 - Hand-editing `sevn.json` as the recommended first-time path—advanced edits are supported, but

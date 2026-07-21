@@ -7,7 +7,7 @@ owner: Alex
 summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that every
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
-last_updated: '2026-07-18'
+last_updated: '2026-07-21'
 fingerprint: sha256:048045f2e76de0bffecc5a8815d7a8156433bab62a87f8bd194a42f0aedff49f
 related: []
 sources:
@@ -570,4 +570,6 @@ Path resolution for file tools: `src/sevn/tools/paths.py` (`source_code/` prefix
 | `tests/tools/` | Registry, dispatch, file ops, outbound |
 | `tests/agent/test_tier_b_*` | Harness + tool narrow pass |
 | `tests/gateway/test_triage_registry_wiring.py` | Gateway registry snapshot |
+| `tests/browser/test_telegram_checks_w1_red.py` | `telegram_checks.run_checks` / `assert_send_receive` (mocked) |
+| `make telegram-checks` | Host Bot-API `getMe` via `python -m sevn.browser.recipes.telegram_checks` |
 | `make skillspector-check` | Bundled skill inventory (CI skills tier) |

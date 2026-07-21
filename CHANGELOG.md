@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-21] Host Telegram verification is runnable again via `make telegram-checks` (`telegram_checks` Bot-API `getMe` + `run_checks`/`assert_send_receive`); live X/CDP E2E stays deferred (#37)
 - [2026-07-21] Gateway shutdown logs browser-reap failures instead of swallowing them; issue-watch cron dispatches via registered handlers and operator notify reaches the owner Telegram sink when wired
 - [2026-07-21] Proton deferred surfaces (calendar events create/respond, contacts groups/pin-key, mail ``--attach`` + attachments list/download) are behaviorally covered; mail recipient classification consumes pinned contact keys; HV helper crashes log at warning (distinct from helper-not-installed); RSVP/attachment/HV-webview live E2E deferred without credentials
 - [2026-07-21] Proton ``status`` / ``api`` Typer groups execute at runtime (no more exit-2 ``Missing command``); ``status`` honours legacy ``session.json`` via ``session_path``; ``settings set <key>`` rejects a missing value before auth

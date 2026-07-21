@@ -9,14 +9,13 @@ import pytest
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W13: assert_send_receive behavioral", strict=False)
 async def test_telegram_checks_assert_send_receive_transcript() -> None:
     """Upgrade callable-only probe: drive assert_send_receive and assert transcript."""
     from sevn.browser.recipes import telegram_checks
 
     tg = MagicMock()
-    tg.send = AsyncMock(return_value=None)
-    tg.read = AsyncMock(return_value="hello from bot\nping-123")
+    tg.send = AsyncMock(return_value={"chat": "Saved Messages", "sent": True})
+    tg.read = AsyncMock(return_value={"chat": "Saved Messages", "text": "hello from bot\nping-123"})
     out = await telegram_checks.assert_send_receive(tg, chat="Saved Messages", text="ping-123")
     assert isinstance(out, dict)
     assert out.get("sent") is True
@@ -24,7 +23,6 @@ async def test_telegram_checks_assert_send_receive_transcript() -> None:
     tg.send.assert_awaited()
 
 
-@pytest.mark.xfail(reason="green after W13: bot_api_get_me behavioral", strict=False)
 def test_telegram_checks_bot_api_get_me_mocked() -> None:
     from sevn.browser.recipes import telegram_checks
 
@@ -40,17 +38,26 @@ def test_telegram_checks_bot_api_get_me_mocked() -> None:
     assert result["result"]["username"] == "sevn_bot"
 
 
-@pytest.mark.xfail(reason="green after W13: telegram_checks operator entrypoint", strict=False)
-def test_telegram_checks_has_operator_entrypoint() -> None:
+@pytest.mark.asyncio
+async def test_telegram_checks_has_operator_entrypoint() -> None:
     """Replacement for removed ``telegram-e2e`` must expose a runnable path."""
     from sevn.browser.recipes import telegram_checks
 
-    # Either a CLI main, Make target consumer, or documented runner symbol.
     assert hasattr(telegram_checks, "main") or hasattr(telegram_checks, "run_checks")
+    assert callable(telegram_checks.run_checks)
+    assert callable(telegram_checks.main)
+
+    tg = MagicMock()
+    tg.send = AsyncMock(return_value={"chat": "Saved Messages", "sent": True})
+    tg.read = AsyncMock(return_value={"chat": "Saved Messages", "text": "ping-op"})
+    out = await telegram_checks.run_checks(tg=tg, chat="Saved Messages", text="ping-op")
+    assert out["ok"] is True
+    assert "assert_send_receive" in out["checks"]
+    assert out["checks"]["assert_send_receive"]["sent"] is True
+    tg.send.assert_awaited()
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W13: x_ops facade error envelope upgrade", strict=False)
 async def test_x_ops_facade_error_path_for_section4_ops() -> None:
     """Upgrade structural callable check: drive envelope/error path for covered ops."""
     from sevn.integrations.social_media import x_ops

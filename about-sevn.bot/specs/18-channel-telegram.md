@@ -7,7 +7,7 @@ owner: Alex
 summary: 'Deliver the primary daily-driver channel for personal messaging: a ChannelAdapter
   implementation that normalises Telegram Updates into spec-17-gateway IncomingMessage
   / OutgoingMessage and implements '
-last_updated: '2026-07-20'
+last_updated: '2026-07-21'
 fingerprint: sha256:189e032c1fccef5c1a020a6dc272228a7e0b26e9e34c5bcdbf865586a0712065
 related: []
 sources:
@@ -543,6 +543,12 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+Host Telegram Bot-API / Web send-receive smoke: `make telegram-checks` →
+`sevn.browser.recipes.telegram_checks` (`run_checks` / `assert_send_receive`);
+mocked coverage in `tests/browser/test_telegram_checks_w1_red.py` and
+`tests/browser/test_browser_removal_parity.py`. Live headed Web / X CDP E2E remains
+deferred (parked journeys, issue #37).
 
 ## Human-input needed
 

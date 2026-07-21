@@ -1563,4 +1563,4 @@ and may spawn concurrent L1 tier-B runs (`src/sevn/gateway/queue/queue_multi.py`
 | `tests/gateway/test_cascade_budget.py` | Retry budget |
 | `tests/gateway/test_no_answer_messages.py` | Fallback copy |
 | `tests/gateway/test_lifecycle.py`, `test_lifecycle_w1_red.py` | Boot/shutdown; browser reap failure log; operator-notify wiring |
-| `make telegram-e2e` | Host Telegram smoke |
+| `make telegram-checks` | Host Telegram Bot-API smoke (`telegram_checks`; alias `make telegram-e2e`) |
