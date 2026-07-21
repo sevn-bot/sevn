@@ -108,6 +108,9 @@ Obsidian-compatible files the operator can edit offline.
 - **FR-008:** Second Brain shall remain **separate from session memory** (LCM, `MEMORY.md`,
   dreaming)—curated wiki knowledge does not replace personality memory or cross into dreaming
   promotion rules.
+- **FR-009:** The bundled **`obsidian-cli`** skill (Obsidian app CLI for vault operations) shall
+  be **opt-in** via `skills.obsidian_cli.enabled` (onboarding default `false`). When disabled or
+  unset, the skill must not appear in skill discovery/`load_skill`.
 
 ## Non-Goals
 
@@ -138,7 +141,8 @@ Obsidian-compatible files the operator can edit offline.
   query sees the updated tree across content roots after lint passes.
 - **Operator controls:** Enable/disable Second Brain; per-scope roots; skill scripts for ingest,
   lint, and file-back; optional legacy ingest stub gated off by default; witchcraft semantic
-  mode when installed and allowed.
+  mode when installed and allowed; optional `obsidian-cli` skill via
+  `skills.obsidian_cli.enabled` (default off — vault CLI only when the operator opts in).
 - **Degraded path:** Second Brain disabled → tools absent, Mission Control shows disabled state,
   chat falls back to session memory only. Lint failures → operator-visible report, bot abstains
   from citing broken pages. Sync merge conflict → clear error with merge-needed guidance, not

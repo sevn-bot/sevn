@@ -464,6 +464,12 @@ interfaces:
 - name: openwiki_config_enabled
   file: src/sevn/skills/openwiki.py
   symbol: openwiki_config_enabled
+- name: gate_obsidian_cli_core_skill
+  file: src/sevn/skills/obsidian_cli.py
+  symbol: gate_obsidian_cli_core_skill
+- name: obsidian_cli_config_enabled
+  file: src/sevn/skills/obsidian_cli.py
+  symbol: obsidian_cli_config_enabled
 - name: OpenwikiDoctorRow
   file: src/sevn/skills/openwiki_doctor_check.py
   symbol: OpenwikiDoctorRow
@@ -622,6 +628,9 @@ Initial draft for **Behavior** — grounded in extracted interfaces; confirm nor
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
 
 Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/skills`](src/sevn/skills/__init__.py).
+
+**Opt-in core skill gates:** Bundled skills with onboarding `default: false` (e.g. `openwiki`, `obsidian-cli`) must not appear in `SkillsManager` scan/`load_skill` unless the matching `skills.<id>.enabled` config is true. Absent config → disabled. Gates live beside the skill (`gate_openwiki_core_skill`, `gate_obsidian_cli_core_skill`) and are consulted from `_scan_skills_tree`.
+
 ## Failure Modes
 
 Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
