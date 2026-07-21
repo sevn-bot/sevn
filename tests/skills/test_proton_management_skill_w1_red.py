@@ -144,7 +144,6 @@ async def test_run_proton_cli_async_timeout() -> None:
     proc.kill.assert_called_once()
 
 
-@pytest.mark.xfail(reason="green after W9: calendar_events_list dry-run", strict=False)
 def test_calendar_events_list_dry_run() -> None:
     proc = subprocess.run(
         [sys.executable, str(_SCRIPTS / "calendar_events_list.py"), "--dry-run"],
@@ -157,7 +156,6 @@ def test_calendar_events_list_dry_run() -> None:
     assert data["data"]["mode"] == "dry_run"
 
 
-@pytest.mark.xfail(reason="green after W9: contacts_list dry-run", strict=False)
 def test_contacts_list_dry_run() -> None:
     proc = subprocess.run(
         [sys.executable, str(_SCRIPTS / "contacts_list.py"), "--dry-run"],

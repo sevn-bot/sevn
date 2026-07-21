@@ -128,9 +128,12 @@ becoming the integration layer.
   mocked behavioral coverage for `pass vaults` / `items` / `secrets` (including create +
   `secrets get` → stdout credential emit), plus Mail CLI (`messages` search/read/send/trash/
   delete/move and `labels list`), `mail_list`/`mail_read` dry-run scripts, stdin secret
-  resolution, SRP HV retry / `PROTON_HV_TOKEN`, `run_proton_cli_async` argv/timeout, and Drive
+  resolution, SRP HV retry / `PROTON_HV_TOKEN`, `run_proton_cli_async` argv/timeout, Drive
   CLI (`items` list/upload/download/trash/delete, `folders create`, `trash` list/restore/empty)
-  with decrypt/link failures surfaced at warning (live Drive E2E deferred without credentials).
+  with decrypt/link failures surfaced at warning, and Calendar/Contacts
+  (`events` list/get/delete, `contacts` list/get/create/delete, card decrypt) with decrypt drops
+  logged, unrecognized card types raised, and empty create `Responses` failing loudly
+  (live Proton Calendar/Contacts/Drive E2E deferred without credentials).
 - **FR-010:** Bundled **Google Workspace** (`google-workspace`) shall honour
   `skills.google_workspace.prefer_gws` (§3.3): prefer the `gws` CLI via `use_gws_backend` /
   `run_gws` when on PATH, with an observable Python-client fallback and a behavioral

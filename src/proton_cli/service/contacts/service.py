@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -17,6 +18,8 @@ from proton_cli.ref import pick
 
 if TYPE_CHECKING:
     from proton_cli.account.keys import Unlocked
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -86,7 +89,12 @@ class ContactsService:
                     decrypted = card_crypto.decrypt_cards(card_rows, user_key, user_key)
                     contact = _contact_from_cards(cid, decrypted)
                     out.append(contact)
-                except Exception:
+                except Exception as exc:
+                    _logger.warning(
+                        "contact card decrypt failed contact_id=%s: %s",
+                        cid,
+                        exc,
+                    )
                     continue
             if len(rows) < 50:
                 break
@@ -142,9 +150,12 @@ class ContactsService:
             payload,
         )
         responses = payload.get("Responses") or []
-        if responses:
-            return str((responses[0].get("Response") or {}).get("Contact", {}).get("ID", ""))
-        return ""
+        if not responses:
+            raise ValueError("contact create returned empty Responses")
+        cid = str((responses[0].get("Response") or {}).get("Contact", {}).get("ID", ""))
+        if not cid:
+            raise ValueError("contact create returned no Contact ID")
+        return cid
 
     def delete_contacts(self, ids: list[str]) -> None:
         self._client.decode(

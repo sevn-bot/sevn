@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-21] Proton Calendar/Contacts card decrypt drops and unrecognized card types surface at warning/raise; ``create_contact`` empty ``Responses`` raises instead of false success; calendar ``resolve_event`` logs per-calendar list failures; Calendar/Contacts CLI + ``calendar_events_list``/``contacts_list`` dry-run are behaviorally covered
 - [2026-07-21] Proton Drive name/path decrypt and trash-link fetch failures log at warning (link id + reason); create/upload carries typed ``SignatureAddress``; Drive CLI list/upload/download/trash/folders flows are behaviorally covered (live Drive E2E deferred)
 - [2026-07-21] Proton Mail CLI (search/read/send/trash/delete/move/labels), ``mail_list``/``mail_read`` dry-run scripts, Pass stdin secret resolution, SRP HV retry + ``PROTON_HV_TOKEN`` resolver, and ``run_proton_cli_async`` argv/timeout are behaviorally covered
 - [2026-07-21] Google Workspace Hermes API handlers honour ``prefer_gws`` (§3.3): route via ``use_gws_backend`` / ``run_gws`` when ``gws`` is on PATH, log Python fallback when it is not, and cover ``gws_bridge`` token-env injection

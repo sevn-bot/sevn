@@ -526,35 +526,98 @@ def test_drive_unlock_share_uses_typed_address_fields() -> None:
 # --- W9 / PR #43 -----------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W9: contacts list decrypt", strict=False)
+def _w9_rsa_key() -> Any:
+    from pgpy import PGPUID, PGPKey
+    from pgpy.constants import (
+        CompressionAlgorithm,
+        HashAlgorithm,
+        KeyFlags,
+        PubKeyAlgorithm,
+        SymmetricKeyAlgorithm,
+    )
+
+    key = PGPKey.new(PubKeyAlgorithm.RSAEncryptOrSign, 2048)
+    uid = PGPUID.new("Test", email="t@example.com")
+    key.add_uid(
+        uid,
+        usage={KeyFlags.EncryptCommunications, KeyFlags.EncryptStorage, KeyFlags.Sign},
+        hashes=[HashAlgorithm.SHA256],
+        ciphers=[SymmetricKeyAlgorithm.AES256],
+        compression=[CompressionAlgorithm.ZLIB],
+    )
+    return key
+
+
 def test_contacts_list_decrypts_fields() -> None:
+    from proton_cli.crypto import cards as card_crypto
+    from proton_cli.crypto import vcard as vcard_crypto
     from proton_cli.service.contacts.service import ContactsService
 
-    svc = ContactsService(MagicMock())
-    contact = MagicMock()
-    contact.name = "Alice"
-    contact.emails = ["a@x.com"]
-    with patch.object(svc, "list_contacts", return_value=[contact]):
-        rows = svc.list_contacts(MagicMock())
+    key = _w9_rsa_key()
+    signed = vcard_crypto.signed_vcard("Alice", ["a@x.com"], "uid-1")
+
+    class FakeClient:
+        def decode(self, req: Any, out: dict[str, Any]) -> None:
+            out.clear()
+            out.update(
+                {
+                    "Contacts": [
+                        {
+                            "ID": "c1",
+                            "Cards": [
+                                {
+                                    "Type": card_crypto.CARD_SIGNED,
+                                    "Data": signed,
+                                    "Signature": "",
+                                }
+                            ],
+                        }
+                    ]
+                }
+            )
+
+    unlocked = MagicMock()
+    unlocked.user_keys = [key]
+    rows = ContactsService(FakeClient()).list_contacts(unlocked)
     assert rows[0].name == "Alice"
     assert rows[0].emails == ["a@x.com"]
 
 
-@pytest.mark.xfail(reason="green after W9: calendar events list/get/delete", strict=False)
 def test_calendar_events_list_get_delete() -> None:
-    from proton_cli.service.calendar.service import CalendarService
+    from datetime import UTC, datetime
 
-    svc = CalendarService(MagicMock())
-    with patch.object(svc, "events_list", return_value=[MagicMock(id="e1")]):
-        assert svc.events_list(MagicMock())[0].id == "e1"
-    with patch.object(svc, "event_get", return_value=MagicMock(id="e1")):
-        assert svc.event_get(MagicMock(), "e1").id == "e1"
-    with patch.object(svc, "event_delete") as delete:
-        delete(MagicMock(), "e1")
-        delete.assert_called_once()
+    from proton_cli.service.calendar.service import CalendarService, Event
+
+    calls: list[Any] = []
+    keys = MagicMock(member_id="m1")
+    event = Event(id="e1", calendar_id="cal-1", title="Standup")
+
+    class FakeClient:
+        def decode(self, req: Any, out: dict[str, Any] | None = None) -> None:
+            calls.append(req)
+            if out is None:
+                return
+            out.clear()
+            if req.method == "GET" and str(req.path).endswith("/events"):
+                out.update({"Events": [{"ID": "e1"}]})
+            elif req.method == "GET":
+                out.update({"Event": {"ID": "e1"}})
+
+    svc = CalendarService(FakeClient())
+    unlocked = MagicMock()
+    start = datetime(2026, 7, 1, tzinfo=UTC)
+    end = datetime(2026, 7, 31, tzinfo=UTC)
+    with (
+        patch.object(svc, "_unlock_calendar", return_value=keys),
+        patch.object(svc, "_event_from_raw", return_value=event),
+    ):
+        assert svc.events_list(unlocked, "cal-1", start, end)[0].id == "e1"
+        assert svc.event_get(unlocked, "cal-1", "e1").id == "e1"
+        svc.event_delete(unlocked, "cal-1", "e1")
+    delete_req = next(c for c in calls if c.method == "PUT")
+    assert delete_req.body == {"MemberID": "m1", "Events": [{"ID": "e1"}]}
 
 
-@pytest.mark.xfail(reason="green after W9: contacts create false-success", strict=False)
 def test_contacts_create_empty_response_not_success() -> None:
     from proton_cli.service.contacts.service import ContactsService, NewContact
 
@@ -563,40 +626,108 @@ def test_contacts_create_empty_response_not_success() -> None:
             out.clear()
             out.update({"Responses": []})
 
+    unlocked = MagicMock()
+    unlocked.user_keys = [_w9_rsa_key()]
     svc = ContactsService(FakeClient())
     nc = NewContact(name="Bob", emails=["b@x.com"])
-    with pytest.raises((ValueError, RuntimeError)):
-        svc.create_contact(MagicMock(), nc)
+    with pytest.raises((ValueError, RuntimeError), match="empty Responses"):
+        svc.create_contact(unlocked, nc)
 
 
-@pytest.mark.xfail(reason="green after W9: decrypt_cards encrypted types", strict=False)
 def test_decrypt_cards_encrypted_and_signed_types() -> None:
+    import base64
+
+    from pgpy import PGPMessage
+
     from proton_cli.crypto import cards as cards_mod
+    from proton_cli.service.drive import blocks
 
     assert hasattr(cards_mod, "decrypt_cards")
     assert cards_mod.CARD_ENCRYPTED == 1
     assert cards_mod.CARD_ENCRYPTED_SIGNED == 3
-    # Must cover CARD_ENCRYPTED / CARD_ENCRYPTED_SIGNED + session-key packet branch.
-    raise AssertionError("decrypt_cards encrypted branches uncovered (W9)")
+
+    key = _w9_rsa_key()
+    pub = key.pubkey
+    msg = PGPMessage.new("plain-encrypted")
+    enc = pub.encrypt(msg)
+    assert cards_mod.decrypt_cards(
+        [{"Type": cards_mod.CARD_ENCRYPTED, "Data": str(enc)}],
+        key,
+        key,
+    ) == ["plain-encrypted"]
+
+    signed_card = cards_mod.encrypt_and_sign_card("plain-signed", pub, key)
+    assert cards_mod.decrypt_cards([signed_card], key, key) == ["plain-signed"]
+
+    sk = blocks.make_session_key()
+    data_packet = blocks.encrypt_data_packet(b"SUMMARY:Meet\r\n", sk)
+    with (
+        patch(
+            "proton_cli.crypto.cards.blocks.decrypt_session_key_packet",
+            return_value=sk,
+        ),
+        patch(
+            "proton_cli.crypto.cards.blocks._packet_body",
+            wraps=blocks._packet_body,
+        ) as packet_body,
+    ):
+        out = cards_mod.decrypt_cards(
+            [
+                {
+                    "Type": cards_mod.CARD_ENCRYPTED_SIGNED,
+                    "Data": base64.b64encode(data_packet).decode(),
+                }
+            ],
+            key,
+            key,
+            key_packet=b"\x00fake",
+        )
+    assert out == ["SUMMARY:Meet\r\n"]
+    packet_body.assert_called()
 
 
-@pytest.mark.xfail(reason="green after W9: unknown card type surfaced", strict=False)
 def test_decrypt_cards_unknown_type_surfaced() -> None:
-    from pgpy import PGPKey
-    from pgpy.constants import EllipticCurveOID, PubKeyAlgorithm
-
     from proton_cli.crypto import cards as cards_mod
 
-    key = PGPKey.new(PubKeyAlgorithm.ECDH, EllipticCurveOID.Curve25519)
-    # Unknown Type must raise/log — currently silently appends raw data.
-    out = cards_mod.decrypt_cards([{"Type": 999, "Data": "raw"}], key, key)
-    assert out != ["raw"], "unknown card type silently passed through"
+    key = _w9_rsa_key()
+    with pytest.raises(ValueError, match="unrecognized card type"):
+        cards_mod.decrypt_cards([{"Type": 999, "Data": "raw"}], key, key)
 
 
-@pytest.mark.xfail(reason="green after W9: contacts decrypt drop logged", strict=False)
 def test_contacts_list_logs_dropped_rows(caplog: pytest.LogCaptureFixture) -> None:
+    from proton_cli.crypto import cards as card_crypto
+    from proton_cli.crypto import vcard as vcard_crypto
+    from proton_cli.service.contacts.service import ContactsService
+
+    key = _w9_rsa_key()
+
+    class FakeClient:
+        def decode(self, req: Any, out: dict[str, Any]) -> None:
+            out.clear()
+            out.update(
+                {
+                    "Contacts": [
+                        {"ID": "bad-1", "Cards": [{"Type": 1, "Data": "not-pgp"}]},
+                        {
+                            "ID": "ok-1",
+                            "Cards": [
+                                {
+                                    "Type": card_crypto.CARD_SIGNED,
+                                    "Data": vcard_crypto.signed_vcard("Ok", ["ok@x.com"], "uid-ok"),
+                                    "Signature": "",
+                                }
+                            ],
+                        },
+                    ]
+                }
+            )
+
+    unlocked = MagicMock()
+    unlocked.user_keys = [key]
     with caplog.at_level(logging.WARNING):
-        raise AssertionError("dropped contact decrypt rows must be logged (W9)")
+        rows = ContactsService(FakeClient()).list_contacts(unlocked)
+    assert [r.id for r in rows] == ["ok-1"]
+    assert any("bad-1" in r.message and "decrypt" in r.message.lower() for r in caplog.records)
 
 
 # --- W10 / PR #44 ----------------------------------------------------------
