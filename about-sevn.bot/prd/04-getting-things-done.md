@@ -127,6 +127,10 @@ becoming the integration layer.
   Pass vault/item read and write journeys with correct module-mode `--profile` argv ordering and
   mocked behavioral coverage for `pass vaults` / `items` / `secrets` (including create +
   `secrets get` → stdout credential emit).
+- **FR-010:** Bundled **Google Workspace** (`google-workspace`) shall honour
+  `skills.google_workspace.prefer_gws` (§3.3): prefer the `gws` CLI via `use_gws_backend` /
+  `run_gws` when on PATH, with an observable Python-client fallback and a behavioral
+  `gws_bridge` token-env test.
 
 ## Non-Goals
 

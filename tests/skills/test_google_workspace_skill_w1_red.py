@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
-import os
 import subprocess
-import sys
 from pathlib import Path
-from unittest.mock import patch
+from types import ModuleType
 
 import pytest
+from loguru import logger as loguru_logger
 
 from sevn.data.bundled_skills import BUNDLED_SKILLS_ROOT
 from sevn.skills.manager import SkillsManager
@@ -44,7 +44,15 @@ def _write_workspace(tmp_path: Path, *, prefer_gws: bool = True) -> None:
     (tmp_path / ".sevn").mkdir(parents=True, exist_ok=True)
 
 
-@pytest.mark.xfail(reason="green after W6: gws-first routing branch", strict=False)
+def _load_gws_bridge() -> ModuleType:
+    spec = importlib.util.spec_from_file_location("gws_bridge_under_test", _GWS_BRIDGE)
+    assert spec is not None
+    assert spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
 def test_gmail_search_prefers_gws_when_enabled_and_on_path(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -64,57 +72,61 @@ def test_gmail_search_prefers_gws_when_enabled_and_on_path(
         return {"messages": []}
 
     monkeypatch.setattr(google_workspace, "run_gws", _run_gws)
-    # Drive a live handler that today always uses build_service.
     result = google_workspace_api.gmail_search(str(tmp_path), "is:unread", max_results=5)
     assert "parts" in called
     assert result == [] or isinstance(result, list)
 
 
-@pytest.mark.xfail(reason="green after W6: prefer_gws fallback log", strict=False)
 def test_prefer_gws_fallback_logs_python_backend(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    import logging
-
     from sevn.skills import google_workspace
 
     _write_workspace(tmp_path, prefer_gws=True)
     monkeypatch.setattr(google_workspace, "gws_binary", lambda: None)
-    with caplog.at_level(logging.INFO):
+    messages: list[str] = []
+    sink_id = loguru_logger.add(lambda message: messages.append(str(message)), level="INFO")
+    try:
         assert google_workspace.prefer_gws_enabled(tmp_path) is True
-        # Routing must emit an observable fallback when gws is preferred but missing.
-        raise AssertionError("Python fallback path must log chosen backend (W6)")
+        assert google_workspace.use_gws_backend(tmp_path) is False
+    finally:
+        loguru_logger.remove(sink_id)
+    assert any("Python backend" in line for line in messages)
 
 
-@pytest.mark.xfail(reason="green after W6: gws_bridge subprocess", strict=False)
-def test_gws_bridge_subprocess_injects_token_env(tmp_path: Path) -> None:
+def test_gws_bridge_subprocess_injects_token_env(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     assert _GWS_BRIDGE.is_file()
     _write_workspace(tmp_path)
-    env = os.environ.copy()
-    env["SEVN_WORKSPACE"] = str(tmp_path)
-    env["SEVN_GOOGLE_ACCESS_TOKEN"] = "tok-test"
-    with patch("subprocess.run") as mocked:
-        mocked.return_value = subprocess.CompletedProcess(
-            args=[],
-            returncode=0,
-            stdout='{"ok":true}',
-            stderr="",
-        )
-        proc = subprocess.run(
-            [sys.executable, str(_GWS_BRIDGE), "gmail", "list"],
-            capture_output=True,
-            text=True,
-            env=env,
-            check=False,
-        )
-    # After W6 the bridge must forward token env into the gws child.
-    assert proc.returncode == 0 or mocked.called
-    raise AssertionError("gws_bridge must assert token env injection into child (W6)")
+    monkeypatch.setenv("SEVN_WORKSPACE", str(tmp_path))
+    mod = _load_gws_bridge()
+    monkeypatch.setattr(mod, "gws_binary", lambda: "/usr/bin/gws")
+    monkeypatch.setattr(mod, "get_valid_token_for_gws", lambda _ws: "tok-test")
+    captured: dict[str, object] = {}
+
+    def _fake_run(
+        command: list[str],
+        *,
+        env: dict[str, str] | None = None,
+        check: bool = False,
+        **_kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        captured["command"] = command
+        captured["env"] = env
+        return subprocess.CompletedProcess(args=command, returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(mod.subprocess, "run", _fake_run)
+    code = mod.main(["gmail", "list"])
+    assert code == 0
+    assert captured.get("command") == ["/usr/bin/gws", "gmail", "list"]
+    env = captured.get("env")
+    assert isinstance(env, dict)
+    assert env.get("GOOGLE_WORKSPACE_CLI_TOKEN") == "tok-test"
 
 
-@pytest.mark.xfail(reason="green after W6: manager load_skill side effect", strict=False)
 def test_manager_load_skill_google_workspace_validates_scripts(tmp_path: Path) -> None:
     """Upgrade structural membership check to get_record + script path side effects."""
     _write_workspace(tmp_path)
@@ -131,6 +143,8 @@ def test_manager_load_skill_google_workspace_validates_scripts(tmp_path: Path) -
     assert record.canonical_id == _SKILL_ID
     for path in (_SCRIPTS / "setup.py", _SCRIPTS / "google_api.py", _GWS_BRIDGE):
         assert path.is_file()
-    # Side effect: skill scripts are resolvable from the loaded record.
     assert record.skill_dir.is_dir()
     assert (_GWS_BRIDGE).is_file()
+    scripts = {entry.path for entry in record.manifest.scripts}
+    assert "scripts/gws_bridge.py" in scripts
+    assert "scripts/google_api.py" in scripts

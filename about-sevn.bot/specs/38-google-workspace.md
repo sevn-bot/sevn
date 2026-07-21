@@ -6,8 +6,8 @@ status: scaffold
 owner: Alex
 summary: Bundled google-workspace skill — OAuth2 Gmail, Calendar, Drive, Sheets, Docs,
   Contacts; optional gws CLI bridge.
-last_updated: '2026-07-18'
-fingerprint: sha256:1c7382e3fc07f38e95cd3cbf5ffb732428db7a165e873e049aef95eeccaade7e
+last_updated: '2026-07-21'
+fingerprint: sha256:91ad4c9b71cb1131729c96decdfc5b9f9cb8d53ecc9d216e39e8301e89e31917
 related:
 - spec-12-skills-system
 - spec-02-config-and-workspace
@@ -103,6 +103,9 @@ interfaces:
 - name: token_path
   file: src/sevn/skills/google_workspace.py
   symbol: token_path
+- name: use_gws_backend
+  file: src/sevn/skills/google_workspace.py
+  symbol: use_gws_backend
 ---
 
 # Google Workspace skill — Spec
@@ -113,7 +116,7 @@ Deliver Hermes Agent **google-workspace parity** as a bundled core skill coverin
 
 ## Public Interface
 
-Bundled scripts under `src/sevn/data/bundled_skills/core/google-workspace/scripts/` (`setup.py`, `google_api.py`, `gws_bridge.py`) plus `src/sevn/skills/google_workspace.py` helpers (`build_service`, `check_auth`, `get_auth_url`, `exchange_auth_code`, `run_gws`, …). Function inventory in **§4**; agent consumption in **§5**.
+Bundled scripts under `src/sevn/data/bundled_skills/core/google-workspace/scripts/` (`setup.py`, `google_api.py`, `gws_bridge.py`) plus `src/sevn/skills/google_workspace.py` helpers (`build_service`, `check_auth`, `get_auth_url`, `exchange_auth_code`, `use_gws_backend`, `run_gws`, …). Function inventory in **§4**; agent consumption in **§5**.
 
 ## Data Model
 
@@ -208,8 +211,8 @@ Env overrides (optional): `SEVN_GOOGLE_TOKEN_PATH`, `SEVN_GOOGLE_CLIENT_SECRET_P
 
 ### 3.3 Execution backend
 
-1. **Preferred:** [`gws`](https://github.com/googleworkspace/cli) when on PATH — `gws_bridge.py` injects refreshed token via `GOOGLE_WORKSPACE_CLI_TOKEN`.
-2. **Fallback:** bundled Python client (same JSON output contract as Hermes `google_api.py`).
+1. **Preferred:** [`gws`](https://github.com/googleworkspace/cli) when `skills.google_workspace.prefer_gws` is true **and** `gws` is on PATH — Hermes API handlers (`google_workspace_api`) call `use_gws_backend()` → `run_gws()` instead of `build_service()`. Operator raw CLI: `gws_bridge.py` injects a refreshed token via `GOOGLE_WORKSPACE_CLI_TOKEN`.
+2. **Fallback:** bundled Python client (same JSON output contract as Hermes `google_api.py`) when `prefer_gws` is false or `gws` is missing — `use_gws_backend()` logs the Python backend choice so the fallback is observable.
 3. **Degraded:** triager may still route Gmail reads to `browser` gmail recipe or `email-management` when skill reports `NOT_AUTHENTICATED`.
 
 ### 3.4 Config (`sevn.json`)
@@ -392,7 +395,8 @@ Full usage table: `about-sevn.bot/google-workspace.html`.
 |-------|----------|
 | Library | Mock HTTP / recorded responses |
 | Scripts | Subprocess argv → JSON envelope assertions |
-| gws bridge | Skip if gws absent; integration job optional |
+| gws bridge | Mocked-subprocess behavioral test for token env injection (`tests/skills/test_google_workspace_skill_w1_red.py`); live gws optional |
+| gws-first routing | `use_gws_backend` / `run_gws` branch covered when `prefer_gws` + binary present; Python fallback log when binary missing |
 | Agent E2E | `tests/agent/test_e2e_skill_execution.py` pattern with quarantine off for core |
 | Security | SkillSpector baseline update; no token leakage in stdout |
 

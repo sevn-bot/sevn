@@ -8,7 +8,7 @@ summary: 'Own everything under workspace/skills/: how skills are discovered, val
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
 last_updated: '2026-07-21'
-fingerprint: sha256:5434f0014501a94eaa7e0232c7d8d270e9398c6eafafe035826476551a02595f
+fingerprint: sha256:f2c86368e82066b2297a21e7e000531116a90dcfb767f461e74848aa40d406cb
 related: []
 sources:
 - src/sevn/skills/**
@@ -317,6 +317,9 @@ interfaces:
 - name: token_path
   file: src/sevn/skills/google_workspace.py
   symbol: token_path
+- name: use_gws_backend
+  file: src/sevn/skills/google_workspace.py
+  symbol: use_gws_backend
 - name: calendar_create
   file: src/sevn/skills/google_workspace_api.py
   symbol: calendar_create
@@ -677,7 +680,7 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
 
-**Bundled script coverage:** Each new operator-visible bundled script under a skill's `scripts/` directory must have ≥1 behavioral test (mocked transport or CLI `main()` with side-effect assert), not structural-only (`callable`/`--help`). For `media_generation`, see `tests/skills/test_media_generation_skill.py` and `tests/skills/test_media_generation_skill_w1_red.py` (execute kinds + script CLIs; live MiniMax gated by `SEVN_MEDIA_LIVE=1`). For `proton-management`, `cli_argv` / `run_proton_cli` must place `--profile` before the subcommand in module mode (`python -m proton_cli --profile <p> pass …`); see `tests/skills/test_proton_management_skill.py` and `tests/skills/test_proton_management_skill_w1_red.py`. Pass read/write CLI (`pass vaults` / `items` / `secrets`) and share-key / item-decrypt / address-key unlock surfacing live in `tests/proton_cli/test_pr_verifier_w1_red.py`.
+**Bundled script coverage:** Each new operator-visible bundled script under a skill's `scripts/` directory must have ≥1 behavioral test (mocked transport or CLI `main()` with side-effect assert), not structural-only (`callable`/`--help`). For `media_generation`, see `tests/skills/test_media_generation_skill.py` and `tests/skills/test_media_generation_skill_w1_red.py` (execute kinds + script CLIs; live MiniMax gated by `SEVN_MEDIA_LIVE=1`). For `proton-management`, `cli_argv` / `run_proton_cli` must place `--profile` before the subcommand in module mode (`python -m proton_cli --profile <p> pass …`); see `tests/skills/test_proton_management_skill.py` and `tests/skills/test_proton_management_skill_w1_red.py`. Pass read/write CLI (`pass vaults` / `items` / `secrets`) and share-key / item-decrypt / address-key unlock surfacing live in `tests/proton_cli/test_pr_verifier_w1_red.py`. For `google-workspace`, §3.3 gws-first routing (`use_gws_backend` / `run_gws`) and `gws_bridge.py` token-env injection are covered in `tests/skills/test_google_workspace_skill_w1_red.py`.
 
 ## Human-input needed
 

@@ -302,6 +302,58 @@ def _dry_run(
     }
 
 
+def _gws_if_preferred(
+    workspace: str | Path,
+    parts: list[str],
+    *,
+    params: Mapping[str, object] | None = None,
+    body: object | None = None,
+) -> dict[str, object] | None:
+    """Return ``run_gws`` payload when §3.3 prefers gws; otherwise ``None``.
+
+    Args:
+        workspace (str | Path): Workspace root.
+        parts (list[str]): gws argv segments after the binary.
+        params (Mapping[str, object] | None): Optional flag map for ``run_gws``.
+        body (object | None): Optional stdin JSON body for ``run_gws``.
+
+    Returns:
+        dict[str, object] | None: Parsed gws output, or ``None`` to use Python.
+
+    Examples:
+        >>> _gws_if_preferred  # doctest: +SKIP
+    """
+
+    ws = _workspace_path(workspace)
+    if not google_workspace.use_gws_backend(ws):
+        return None
+    return google_workspace.run_gws(ws, parts, params=params, body=body)
+
+
+def _gws_as_list(payload: dict[str, object], *keys: str) -> list[dict[str, object]]:
+    """Extract a list of dict rows from a gws JSON payload.
+
+    Args:
+        payload (dict[str, object]): Parsed gws output.
+        keys (str): Preferred top-level keys (e.g. ``messages``, ``files``).
+
+    Returns:
+        list[dict[str, object]]: Row list (possibly empty).
+
+    Examples:
+        >>> _gws_as_list  # doctest: +SKIP
+    """
+
+    for key in keys:
+        value = payload.get(key)
+        if isinstance(value, list):
+            return [row for row in value if isinstance(row, dict)]
+    data = payload.get("data")
+    if isinstance(data, list):
+        return [row for row in data if isinstance(row, dict)]
+    return []
+
+
 def _datetime_with_timezone(value: str | None) -> str | None:
     """Return ISO datetime with timezone info when missing.
 
@@ -414,6 +466,14 @@ def gmail_search(
             parameters=params,
             scopes=_gmail_required_scopes(),
         )
+    gws_payload = _gws_if_preferred(
+        workspace,
+        ["gmail", "users", "messages", "list"],
+        params={"userId": "me", "q": query, "maxResults": max(max_results, 0)},
+    )
+    if gws_payload is not None:
+        # gws may return summary rows or id stubs; both satisfy the list contract.
+        return _gws_as_list(gws_payload, "messages")
     service = google_workspace.build_service(_workspace_path(workspace), "gmail", "v1")
     results = (
         service.users()
@@ -468,6 +528,13 @@ def gmail_get(workspace: str, message_id: str) -> dict[str, object]:
             parameters=params,
             scopes=_gmail_required_scopes(),
         )
+    gws_payload = _gws_if_preferred(
+        workspace,
+        ["gmail", "users", "messages", "get"],
+        params={"userId": "me", "id": message_id, "format": "full"},
+    )
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "gmail", "v1")
     message = (
         service.users()
@@ -535,6 +602,13 @@ def gmail_send(
     if from_header:
         mime["From"] = from_header
     raw = base64.urlsafe_b64encode(mime.as_bytes()).decode("utf-8")
+    gws_payload = _gws_if_preferred(
+        workspace,
+        ["gmail", "users", "messages", "send"],
+        params={"userId": "me"},
+    )
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "gmail", "v1")
     result = (
         service.users()
@@ -586,6 +660,13 @@ def gmail_reply(
             parameters=params,
             scopes=_gmail_required_scopes(),
         )
+    gws_payload = _gws_if_preferred(
+        workspace,
+        ["gmail", "users", "messages", "send"],
+        params={"userId": "me"},
+    )
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "gmail", "v1")
     original = (
         service.users()
@@ -647,6 +728,13 @@ def gmail_labels(workspace: str) -> list[dict[str, object]] | dict[str, object]:
             parameters={},
             scopes=_gmail_required_scopes(),
         )
+    gws_payload = _gws_if_preferred(
+        workspace,
+        ["gmail", "users", "labels", "list"],
+        params={"userId": "me"},
+    )
+    if gws_payload is not None:
+        return _gws_as_list(gws_payload, "labels")
     service = google_workspace.build_service(_workspace_path(workspace), "gmail", "v1")
     results = service.users().labels().list(userId="me").execute()
     labels = results.get("labels", []) if isinstance(results, dict) else []
@@ -700,6 +788,13 @@ def gmail_modify(
         body_payload["addLabelIds"] = list(add_labels)
     if remove_labels:
         body_payload["removeLabelIds"] = list(remove_labels)
+    gws_payload = _gws_if_preferred(
+        workspace,
+        ["gmail", "users", "messages", "modify"],
+        params={"userId": "me", "id": message_id},
+    )
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "gmail", "v1")
     result = (
         service.users()
@@ -755,6 +850,13 @@ def calendar_list(
             parameters=params,
             scopes=_calendar_scopes(),
         )
+    gws_payload = _gws_if_preferred(
+        workspace,
+        ["calendar", "events", "list"],
+        params={"calendarId": "primary"},
+    )
+    if gws_payload is not None:
+        return _gws_as_list(gws_payload, "items", "events")
     service = google_workspace.build_service(_workspace_path(workspace), "calendar", "v3")
     results = (
         service.events()
@@ -836,6 +938,13 @@ def calendar_create(
         event["location"] = location
     if attendees:
         event["attendees"] = [{"email": attendee} for attendee in attendees if attendee.strip()]
+    gws_payload = _gws_if_preferred(
+        workspace,
+        ["calendar", "events", "insert"],
+        params={"calendarId": "primary"},
+    )
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "calendar", "v3")
     result = service.events().insert(calendarId="primary", body=event).execute()
     return {
@@ -869,6 +978,13 @@ def calendar_delete(workspace: str, event_id: str) -> dict[str, object]:
             parameters=params,
             scopes=_calendar_scopes(),
         )
+    gws_payload = _gws_if_preferred(
+        workspace,
+        ["calendar", "events", "delete"],
+        params={"calendarId": "primary", "eventId": event_id},
+    )
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "calendar", "v3")
     service.events().delete(calendarId="primary", eventId=event_id).execute()
     return {"status": "deleted", "eventId": event_id}
@@ -910,6 +1026,9 @@ def drive_search(
             parameters=params,
             scopes=_drive_scopes(),
         )
+    gws_payload = _gws_if_preferred(workspace, ["drive", "files", "list"])
+    if gws_payload is not None:
+        return _gws_as_list(gws_payload, "files")
     service = google_workspace.build_service(_workspace_path(workspace), "drive", "v3")
     results = (
         service.files()
@@ -957,6 +1076,13 @@ def drive_get(workspace: str, file_id: str) -> dict[str, object]:
             parameters=params,
             scopes=_drive_scopes(),
         )
+    gws_payload = _gws_if_preferred(
+        workspace,
+        ["drive", "files", "get"],
+        params={"fileId": file_id},
+    )
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "drive", "v3")
     result = (
         service.files()
@@ -1036,6 +1162,9 @@ def drive_upload(
     metadata: dict[str, object] = {"name": name or local_path.name}
     if parent:
         metadata["parents"] = [parent]
+    gws_payload = _gws_if_preferred(workspace, ["drive", "files", "create"])
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "drive", "v3")
     media = MediaFileUpload(str(local_path), mimetype=detected_mime, resumable=True)
     result = (
@@ -1093,6 +1222,13 @@ def drive_download(
         )
     from googleapiclient.http import MediaIoBaseDownload
 
+    gws_payload = _gws_if_preferred(
+        workspace,
+        ["drive", "files", "get"],
+        params={"fileId": file_id},
+    )
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "drive", "v3")
     metadata = service.files().get(fileId=file_id, fields="id, name, mimeType").execute()
     mime_type_value = str(metadata.get("mimeType", ""))
@@ -1163,6 +1299,9 @@ def drive_create_folder(
     }
     if parent:
         body["parents"] = [parent]
+    gws_payload = _gws_if_preferred(workspace, ["drive", "files", "create"])
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "drive", "v3")
     result = service.files().create(body=body, fields="id, name, webViewLink").execute()
     return {
@@ -1229,6 +1368,13 @@ def drive_share(
             parameters=params,
             scopes=_drive_scopes(),
         )
+    gws_payload = _gws_if_preferred(
+        workspace,
+        ["drive", "permissions", "create"],
+        params={"fileId": file_id},
+    )
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "drive", "v3")
     result = (
         service.permissions()
@@ -1275,6 +1421,13 @@ def drive_delete(
             parameters=params,
             scopes=_drive_scopes(),
         )
+    gws_payload = _gws_if_preferred(
+        workspace,
+        ["drive", "files", "delete"],
+        params={"fileId": file_id},
+    )
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "drive", "v3")
     if permanent:
         service.files().delete(fileId=file_id).execute()
@@ -1308,6 +1461,13 @@ def contacts_list(
             parameters=params,
             scopes=_contacts_scopes(),
         )
+    gws_payload = _gws_if_preferred(
+        workspace,
+        ["people", "people", "connections", "list"],
+        params={"resourceName": "people/me"},
+    )
+    if gws_payload is not None:
+        return _gws_as_list(gws_payload, "connections", "people")
     service = google_workspace.build_service(_workspace_path(workspace), "people", "v1")
     results = (
         service.people()
@@ -1376,6 +1536,9 @@ def sheets_get(
             parameters=params,
             scopes=_sheets_scopes(),
         )
+    gws_payload = _gws_if_preferred(workspace, ["sheets", "spreadsheets", "values", "get"])
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "sheets", "v4")
     result = (
         service.spreadsheets()
@@ -1424,6 +1587,9 @@ def sheets_update(
             parameters=params,
             scopes=_sheets_scopes(),
         )
+    gws_payload = _gws_if_preferred(workspace, ["sheets", "spreadsheets", "values", "update"])
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "sheets", "v4")
     result = (
         service.spreadsheets()
@@ -1476,6 +1642,9 @@ def sheets_append(
             parameters=params,
             scopes=_sheets_scopes(),
         )
+    gws_payload = _gws_if_preferred(workspace, ["sheets", "spreadsheets", "values", "append"])
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "sheets", "v4")
     result = (
         service.spreadsheets()
@@ -1525,6 +1694,9 @@ def sheets_create(
     body: dict[str, object] = {"properties": {"title": title}}
     if sheet_name:
         body["sheets"] = [{"properties": {"title": sheet_name}}]
+    gws_payload = _gws_if_preferred(workspace, ["sheets", "spreadsheets", "create"])
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "sheets", "v4")
     result = (
         service.spreadsheets()
@@ -1566,6 +1738,13 @@ def docs_get(workspace: str | Path, document_id: str) -> dict[str, object]:
             parameters=params,
             scopes=_docs_scopes(),
         )
+    gws_payload = _gws_if_preferred(
+        workspace,
+        ["docs", "documents", "get"],
+        params={"documentId": document_id},
+    )
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "docs", "v1")
     result = service.documents().get(documentId=document_id).execute()
     return {
@@ -1604,6 +1783,9 @@ def docs_create(
             parameters=params,
             scopes=_docs_scopes(),
         )
+    gws_payload = _gws_if_preferred(workspace, ["docs", "documents", "create"])
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "docs", "v1")
     result = service.documents().create(body={"title": title}).execute()
     document_id = str(result.get("documentId", ""))
@@ -1641,6 +1823,13 @@ def docs_append(workspace: str | Path, document_id: str, text: str) -> dict[str,
             parameters=params,
             scopes=_docs_scopes(),
         )
+    gws_payload = _gws_if_preferred(
+        workspace,
+        ["docs", "documents", "batchUpdate"],
+        params={"documentId": document_id},
+    )
+    if gws_payload is not None:
+        return gws_payload
     service = google_workspace.build_service(_workspace_path(workspace), "docs", "v1")
     document = service.documents().get(documentId=document_id).execute()
     body = document.get("body", {})

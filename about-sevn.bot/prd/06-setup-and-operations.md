@@ -6,7 +6,7 @@ status: ready
 owner: Alex
 summary: Local-first bots are judged in the first ten minutes—clone, three setup commands,
   and a Telegram reply, or the operator returns to a hosted assistant.
-last_updated: '2026-07-20'
+last_updated: '2026-07-21'
 fingerprint: sha256:d042517bb7e0d916c1eaecd45973d538df35156ff36fae4b9bc7b124d4df2140
 related:
 - prd-07-mission-control
@@ -94,6 +94,8 @@ gives up and returns to a hosted assistant that "just works." Self-hosted produc
   provider credentials) with human-readable output and optional `--json` for support threads.
 - **FR-005:** Doctor and config **validate** shall warn on misconfiguration **before** the first
   failed turn when probes can detect the issue; doctor `--fix` shall offer safe remediation paths.
+  For `google-workspace`, doctor shall warn when `prefer_gws=true` but `gws` is not on PATH
+  (Python fallback remains available and is logged at runtime).
 - **FR-006:** The **CLI** shall be the primary operator surface for install, upgrades, workspace
   lifecycle, gateway/proxy control, and scriptable inspection—not the in-harness agent tool API.
 - **FR-007:** A **Docker operator stack** (gateway + proxy, optional browser/gui profiles) shall
