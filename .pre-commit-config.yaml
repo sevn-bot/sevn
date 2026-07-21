@@ -126,6 +126,17 @@ repos:
         language: system
         stages: [commit-msg]
 
+      - id: sevn-check-agents
+        name: Agent definitions valid (.claude / .cursor / spec-kit-wave)
+        entry: uv run python scripts/check_agents.py
+        language: system
+        pass_filenames: false
+        # always_run: the agent trees are gitignored, so pre-commit never sees them
+        # in the staged set. A malformed agent is invisible to git and silent at
+        # runtime — the host skips it without warning — so check on every commit.
+        # Costs ~0.06s.
+        always_run: true
+
       - id: sevn-codespell-advisory
         name: codespell (advisory — manual stage)
         entry: uv run codespell
