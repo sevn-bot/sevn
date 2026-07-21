@@ -33,3 +33,14 @@ async def test_tts_engine_round_trip_updates_router_tts_engine(tmp_path: Path) -
     assert any("TTS engine" in (t or "") for _cq, t in cap.answered) or any(
         "engine" in edit.get("text", "").lower() for edit in cap.edited
     )
+
+
+def test_tts_pipeline_engine_skips_backends_without_engine() -> None:
+    """Toast helper must find .engine even when backends[0] is a remote provider."""
+    from types import SimpleNamespace
+
+    from sevn.gateway.commands.menu_action_router import _tts_pipeline_engine
+
+    pipe = SimpleNamespace(_backends=[SimpleNamespace(), SimpleNamespace(engine="supertonic")])
+    assert _tts_pipeline_engine(pipe) == "supertonic"
+    assert _tts_pipeline_engine(None) is None

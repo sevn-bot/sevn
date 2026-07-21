@@ -148,3 +148,119 @@ def test_manager_load_skill_google_workspace_validates_scripts(tmp_path: Path) -
     scripts = {entry.path for entry in record.manifest.scripts}
     assert "scripts/gws_bridge.py" in scripts
     assert "scripts/google_api.py" in scripts
+
+
+def test_gmail_send_passes_raw_body_to_run_gws(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """prefer_gws write path must forward the MIME raw body to run_gws."""
+    _write_workspace(tmp_path, prefer_gws=True)
+    google_workspace = pytest.importorskip("sevn.skills.google_workspace")
+    google_workspace_api = pytest.importorskip("sevn.skills.google_workspace_api")
+
+    monkeypatch.setattr(google_workspace, "gws_binary", lambda: "/usr/bin/gws")
+    monkeypatch.setattr(google_workspace, "prefer_gws_enabled", lambda _ws: True)
+    called: dict[str, object] = {}
+
+    def _run_gws(
+        workspace: Path,
+        parts: list[str],
+        *,
+        params: object = None,
+        body: object = None,
+    ) -> dict[str, object]:
+        called["parts"] = parts
+        called["params"] = params
+        called["body"] = body
+        return {"id": "msg-1", "threadId": "thr-1"}
+
+    monkeypatch.setattr(google_workspace, "run_gws", _run_gws)
+    result = google_workspace_api.gmail_send(
+        str(tmp_path),
+        to="a@example.com",
+        subject="hi",
+        body="hello",
+    )
+    assert called.get("parts") == ["gmail", "users", "messages", "send"]
+    body = called.get("body")
+    assert isinstance(body, dict)
+    raw = body.get("raw")
+    assert isinstance(raw, str)
+    assert raw
+    assert result["status"] == "sent"
+    assert result["id"] == "msg-1"
+
+
+def test_drive_search_passes_query_params_to_run_gws(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """prefer_gws list path must forward q/pageSize (not an unfiltered list)."""
+    _write_workspace(tmp_path, prefer_gws=True)
+    google_workspace = pytest.importorskip("sevn.skills.google_workspace")
+    google_workspace_api = pytest.importorskip("sevn.skills.google_workspace_api")
+
+    monkeypatch.setattr(google_workspace, "gws_binary", lambda: "/usr/bin/gws")
+    monkeypatch.setattr(google_workspace, "prefer_gws_enabled", lambda _ws: True)
+    called: dict[str, object] = {}
+
+    def _run_gws(
+        workspace: Path,
+        parts: list[str],
+        *,
+        params: object = None,
+        body: object = None,
+    ) -> dict[str, object]:
+        called["parts"] = parts
+        called["params"] = params
+        called["body"] = body
+        return {"files": [{"id": "f1", "name": "x"}]}
+
+    monkeypatch.setattr(google_workspace, "run_gws", _run_gws)
+    result = google_workspace_api.drive_search(str(tmp_path), "invoice", max_results=3)
+    params = called.get("params")
+    assert isinstance(params, dict)
+    assert params.get("q") == "fullText contains 'invoice'"
+    assert params.get("pageSize") == 3
+    assert called.get("body") is None
+    assert result == [{"id": "f1", "name": "x"}]
+
+
+def test_drive_download_skips_hollow_gws_metadata_return(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """prefer_gws must not short-circuit download with files.get metadata."""
+    import sys
+    import types
+
+    _write_workspace(tmp_path, prefer_gws=True)
+    google_workspace = pytest.importorskip("sevn.skills.google_workspace")
+    google_workspace_api = pytest.importorskip("sevn.skills.google_workspace_api")
+
+    # Stub optional Google client so the download path can reach build_service.
+    fake_http = types.ModuleType("googleapiclient.http")
+    fake_http.MediaIoBaseDownload = object  # type: ignore[attr-defined]
+    fake_root = types.ModuleType("googleapiclient")
+    monkeypatch.setitem(sys.modules, "googleapiclient", fake_root)
+    monkeypatch.setitem(sys.modules, "googleapiclient.http", fake_http)
+
+    monkeypatch.setattr(google_workspace, "gws_binary", lambda: "/usr/bin/gws")
+    monkeypatch.setattr(google_workspace, "prefer_gws_enabled", lambda _ws: True)
+    called = {"gws": False, "build": False}
+
+    def _run_gws(*_a: object, **_k: object) -> dict[str, object]:
+        called["gws"] = True
+        return {"id": "fid", "name": "note.txt", "mimeType": "text/plain"}
+
+    def _build(*_a: object, **_k: object) -> object:
+        called["build"] = True
+        raise RuntimeError("stop-after-build")
+
+    monkeypatch.setattr(google_workspace, "run_gws", _run_gws)
+    monkeypatch.setattr(google_workspace, "build_service", _build)
+    with pytest.raises(RuntimeError, match="stop-after-build"):
+        google_workspace_api.drive_download(str(tmp_path), "fid", output=tmp_path / "out.txt")
+    assert called["gws"] is False
+    assert called["build"] is True

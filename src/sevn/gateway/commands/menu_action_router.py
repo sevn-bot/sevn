@@ -144,7 +144,11 @@ _CONFIG_PATH_SECTION: dict[str, ConfigSection] = {
 
 
 def _tts_pipeline_engine(tts: Any) -> str | None:
-    """Return the first TTS backend ``.engine``, or ``None`` when unavailable.
+    """Return a TTS backend ``.engine`` when present, or ``None``.
+
+    Prefers the first backend that exposes a non-empty ``engine`` attribute so a
+    reordered ``tts_providers`` list (e.g. ``edge_tts`` first) does not miss the
+    local ``text_to_voice`` pipeline engine.
 
     Args:
         tts (Any): :class:`~sevn.voice.tts.TextToSpeechPipeline` or substitute.
@@ -159,8 +163,11 @@ def _tts_pipeline_engine(tts: Any) -> str | None:
     backends = getattr(tts, "_backends", None) or getattr(tts, "backends", None)
     if not backends:
         return None
-    engine = getattr(backends[0], "engine", None)
-    return str(engine).strip().casefold() if engine else None
+    for backend in backends:
+        engine = getattr(backend, "engine", None)
+        if engine:
+            return str(engine).strip().casefold()
+    return None
 
 
 def infer_config_section_from_callback(data: str) -> ConfigSection:
