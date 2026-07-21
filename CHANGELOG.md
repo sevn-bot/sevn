@@ -12,7 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
-- [2026-07-21] Form-wizard Telegram callbacks answer via production ``answer_callback`` (shared menu-action fallbacks); ``answer_callback`` returns Bot API ``ok`` so stale-query failures trigger Version/Deployment id chat-text fallback; mail send classification catches pinned-key lookup failures and falls through to the directory
+- [2026-07-21] Form-wizard Telegram callbacks answer via production ``answer_callback`` (same probe order as menu-action); ``answer_callback`` returns Bot API ``ok`` so stale-query failures trigger Version/Deployment id chat-text fallback; contacts ``pinned_keys_for`` soft-fails on decrypt so mail send falls through to the directory
 - [2026-07-21] Thermos: Google Workspace ``prefer_gws`` handlers pass real ``params``/``body`` to ``run_gws`` (writes/searches no longer hollow); media download/upload and docs append stay on the Python client; Drive share sends explicit ``sendNotificationEmail`` true/false for gws; TTS engine toast reads the first backend that exposes ``.engine``
 - [2026-07-21] Bandit B105 false positive on ``telegram_checks`` ``TELEGRAM_BOT_TOKEN`` env-name constant (nosec; Final ``make ci`` gate)
 - [2026-07-21] Telegram menu-action callbacks answer via production ``answer_callback`` (with ``_api`` fallback); Version id / Deployment id fall back to chat text when the inline answer fails; slash ``/stop`` kill re-edits the L1 picker and acks the callback

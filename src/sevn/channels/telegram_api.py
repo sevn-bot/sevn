@@ -159,8 +159,7 @@ class TelegramApiMixin(TelegramSendHost):
         toast = text.strip()
         if toast:
             body["text"] = toast[:200]
-        result = await self._api("answerCallbackQuery", body)
-        return result if isinstance(result, dict) else {"ok": bool(result)}
+        return await self._api("answerCallbackQuery", body)
 
     async def send_chat_action(
         self,

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import base64
-import logging
 import secrets
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -25,8 +24,6 @@ if TYPE_CHECKING:
 
 PKG_INTERNAL = 1
 PKG_CLEAR = 4
-
-_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -500,15 +497,7 @@ class MailService:
         # Prefer operator-pinned contact keys over the directory lookup so
         # ``contacts pin-key`` is a live read path during send classification.
         if self._contacts is not None:
-            try:
-                pinned = self._contacts.pinned_keys_for(unlocked, email)
-            except Exception as exc:
-                _logger.warning(
-                    "mail_pinned_keys_lookup_failed email=%s reason=%s",
-                    email,
-                    exc,
-                )
-                pinned = None
+            pinned = self._contacts.pinned_keys_for(unlocked, email)
             if pinned is not None and pinned.armored_keys:
                 if pinned.encrypt is False:
                     return PKG_CLEAR, ""

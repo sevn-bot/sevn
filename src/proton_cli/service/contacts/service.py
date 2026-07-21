@@ -222,15 +222,21 @@ class ContactsService:
             return None
         try:
             self.get_contact(unlocked, contact_id)
-        except Exception:
-            return None
-        joined = "\n".join(
-            card_crypto.decrypt_cards(
-                self._raw_contact_cards(contact_id),
-                unlocked.user_keys[0],
-                unlocked.user_keys[0],
+            joined = "\n".join(
+                card_crypto.decrypt_cards(
+                    self._raw_contact_cards(contact_id),
+                    unlocked.user_keys[0],
+                    unlocked.user_keys[0],
+                )
             )
-        )
+        except Exception as exc:
+            _logger.warning(
+                "contacts_pinned_keys_lookup_failed email=%s contact_id=%s reason=%s",
+                email,
+                contact_id,
+                exc,
+            )
+            return None
         group = ical_crypto.email_group(joined, email)
         if not group:
             return None

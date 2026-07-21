@@ -397,12 +397,10 @@ def test_classify_recipient_uses_pinned_keys() -> None:
     assert armored_clear == ""
 
 
-def test_classify_recipient_falls_back_when_pinned_keys_raises(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    """Pinned-key decrypt/network failures must not crash mail send classification."""
+def test_classify_recipient_falls_back_when_pinned_keys_unavailable() -> None:
+    """When pinned lookup soft-fails (``None``), classification uses the directory."""
     contacts = MagicMock(spec=ContactsService)
-    contacts.pinned_keys_for.side_effect = ValueError("unrecognized card type")
+    contacts.pinned_keys_for.return_value = None
     calls: list[str] = []
 
     class FakeClient:
@@ -418,12 +416,33 @@ def test_classify_recipient_falls_back_when_pinned_keys_raises(
             )
 
     svc = MailService(FakeClient(), contacts=contacts)
-    with caplog.at_level(logging.WARNING):
-        scheme, armored = svc._classify_recipient(MagicMock(), "pin@x.com")
+    scheme, armored = svc._classify_recipient(MagicMock(), "pin@x.com")
     assert scheme == PKG_INTERNAL
     assert armored == "directory-key"
     assert calls == ["/core/v4/keys/all"]
-    assert any("mail_pinned_keys_lookup_failed" in r.message for r in caplog.records)
+    contacts.pinned_keys_for.assert_called_once()
+
+
+def test_pinned_keys_for_soft_fails_on_decrypt_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Decrypt/network failures inside ``pinned_keys_for`` return ``None`` (no raise)."""
+    from proton_cli.crypto import cards as card_crypto
+
+    contacts = ContactsService.__new__(ContactsService)
+    contacts._contact_id_by_email = lambda email: ("c1", True)  # type: ignore[method-assign]
+    contacts.get_contact = MagicMock()  # type: ignore[method-assign]
+    contacts._raw_contact_cards = MagicMock(return_value=[{"Type": 2}])  # type: ignore[method-assign]
+    unlocked = MagicMock()
+    unlocked.user_keys = [MagicMock()]
+    with (
+        caplog.at_level(logging.WARNING),
+        patch.object(
+            card_crypto, "decrypt_cards", side_effect=ValueError("unrecognized card type")
+        ),
+    ):
+        assert contacts.pinned_keys_for(unlocked, "pin@x.com") is None
+    assert any("contacts_pinned_keys_lookup_failed" in r.message for r in caplog.records)
 
 
 def test_hv_helper_crash_logged(

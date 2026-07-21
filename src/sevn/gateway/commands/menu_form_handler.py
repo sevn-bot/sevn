@@ -21,6 +21,7 @@ import re
 import secrets
 import sqlite3
 import time
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -1372,8 +1373,8 @@ class MenuFormHandler:
     async def _answer_callback(self, msg: IncomingMessage, *, text: str | None = None) -> None:
         """Acknowledge a Telegram callback query when present.
 
-        Prefers production ``answer_callback`` via the shared menu-action helper
-        (legacy ``answer_callback_query`` / ``_api`` fallbacks included).
+        Prefers production ``answer_callback``, then legacy ``answer_callback_query``,
+        then raw ``_api("answerCallbackQuery", …)`` (same order as menu-action router).
 
         Args:
             msg (IncomingMessage): Inbound callback envelope.
@@ -1384,10 +1385,6 @@ class MenuFormHandler:
             >>> inspect.iscoroutinefunction(MenuFormHandler._answer_callback)
             True
         """
-        from sevn.gateway.commands.menu_action_router import (
-            _answer_callback as answer_callback_helper,
-        )
-
         md = msg.metadata if isinstance(msg.metadata, dict) else {}
         cq_id = md.get("callback_query_id")
         if not isinstance(cq_id, str) or not cq_id.strip():
@@ -1395,11 +1392,35 @@ class MenuFormHandler:
         adapter = self._router._adapters.get(msg.channel)
         if adapter is None:
             return
-        await answer_callback_helper(
-            adapter,
-            callback_query_id=cq_id.strip(),
-            text=text,
-        )
+        cq = cq_id.strip()
+        answer_fn = getattr(adapter, "answer_callback", None)
+        if callable(answer_fn):
+            try:
+                await cast("Callable[..., Awaitable[Any]]", answer_fn)(cq, text=text or "")
+            except Exception:
+                return
+            return
+        answer_query = getattr(adapter, "answer_callback_query", None)
+        if callable(answer_query):
+            try:
+                await cast("Callable[..., Awaitable[Any]]", answer_query)(
+                    callback_query_id=cq,
+                    text=text,
+                )
+            except Exception:
+                return
+            return
+        api = getattr(adapter, "_api", None)
+        if not callable(api):
+            return
+        body: dict[str, Any] = {"callback_query_id": cq}
+        if text:
+            body["text"] = text
+            body["show_alert"] = False
+        try:
+            await cast("Callable[..., Awaitable[Any]]", api)("answerCallbackQuery", body)
+        except Exception:
+            return
 
     @staticmethod
     def _user_id_int(user_id: str) -> int:
