@@ -9,6 +9,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from sevn.agent.subagents.registry import SubAgentRegistry
+from sevn.agent.subagents.supervisor import SubAgentSupervisor
 from sevn.agent.tracing.sink import NullTraceSink
 from sevn.channels.telegram import TelegramAdapter
 from sevn.config.sections.subagents import SubAgentsWorkspaceConfig
@@ -51,7 +53,6 @@ class _ProductionAnswerTelegram(TelegramAdapter):
         return True
 
 
-@pytest.mark.xfail(reason="green after W19: test double uses answer_callback", strict=False)
 def test_menu_capture_telegram_exposes_answer_callback() -> None:
     """Production TelegramAdapter defines ``answer_callback`` — doubles must match."""
     from tests.gateway import test_menu as menu_mod
@@ -64,7 +65,6 @@ def test_menu_capture_telegram_exposes_answer_callback() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W19: version_id toast via answer_callback", strict=False)
 async def test_version_id_toast_via_production_answer_callback(tmp_path: Path) -> None:
     root = tmp_path / "w"
     root.mkdir()
@@ -112,31 +112,21 @@ async def test_version_id_toast_via_production_answer_callback(tmp_path: Path) -
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W19: version_id fallback chat toast", strict=False)
 async def test_version_id_fallback_toast_when_inline_answer_fails(tmp_path: Path) -> None:
     router, cap, _root = _build_owner_router(tmp_path)
     router._version_id = "tg-build-99"  # type: ignore[attr-defined]
 
-    class _FailAnswer(type(cap)):
-        async def answer_callback_query(
-            self, *, callback_query_id: str, text: str | None = None
-        ) -> bool:
-            return False
+    async def _fail_answer(callback_query_id: str, *, text: str = "") -> None:
+        raise RuntimeError("inline answer failed")
 
-    # Force inline answer to no-op; fallback chat text must still appear.
-    cap.answer_callback_query = _FailAnswer.answer_callback_query.__get__(cap, type(cap))  # type: ignore[method-assign]
+    # Force production-shaped answer path to fail; fallback chat text must still appear.
+    cap.answer_callback = _fail_answer  # type: ignore[method-assign]
     await router.route_incoming(_callback("cfg:logs:version_id", callback_query_id="cq-fail"))
-    assert any("tg-build-99" in (t or "") for t, _md in cap.sent) or any(
-        "tg-build-99" in (t or "") for _cq, t in cap.answered
-    )
+    assert any("tg-build-99" in (t or "") for t, _md in cap.sent)
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W19: slash /stop picker refresh after kill", strict=False)
 async def test_slash_stop_kill_refreshes_stop_picker(tmp_path: Path) -> None:
-    from sevn.agent.subagents.registry import SubAgentRegistry
-    from sevn.agent.subagents.supervisor import SubAgentSupervisor
-
     layout = WorkspaceLayout(tmp_path / "sevn.json", tmp_path)
     (tmp_path / "sevn.json").write_text(
         '{"schema_version":1,"gateway":{"token":"t"}}', encoding="utf-8"

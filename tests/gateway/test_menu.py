@@ -62,13 +62,18 @@ class _MenuCaptureTelegram(TelegramAdapter):
         self.sent.append((message.text, md))
         return ["501"]
 
+    async def answer_callback(self, callback_query_id: str, *, text: str = "") -> None:
+        """Match production :meth:`TelegramAdapter.answer_callback`."""
+        self.answered.append((callback_query_id, text or None))
+
     async def answer_callback_query(
         self,
         *,
         callback_query_id: str,
         text: str | None = None,
     ) -> bool:
-        self.answered.append((callback_query_id, text))
+        """Legacy probe name — delegates to :meth:`answer_callback`."""
+        await self.answer_callback(callback_query_id, text=text or "")
         return True
 
     async def edit_message_text(

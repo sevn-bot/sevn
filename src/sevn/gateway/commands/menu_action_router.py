@@ -691,8 +691,13 @@ class MenuActionRouter:
         cq_str = cq_id.strip() if isinstance(cq_id, str) else ""
         adapter = self._router._adapters.get(msg.channel)
         if adapter is not None and cq_str:
-            await _answer_callback(adapter, callback_query_id=cq_str, text=toast)
-            return None
+            answered = await _answer_callback(
+                adapter,
+                callback_query_id=cq_str,
+                text=toast,
+            )
+            if answered:
+                return None
         return toast
 
     async def _refresh_stop_picker_after_kill(
@@ -2168,25 +2173,61 @@ async def _unpin_chat_message(
     return bool(res.get("ok"))
 
 
-async def _answer_callback(adapter: Any, *, callback_query_id: str, text: str | None) -> None:
+async def _answer_callback(adapter: Any, *, callback_query_id: str, text: str | None) -> bool:
     """Best-effort Telegram ``answerCallbackQuery`` helper.
 
+    Prefers production :meth:`TelegramAdapter.answer_callback`, then legacy
+    ``answer_callback_query``, then raw ``_api("answerCallbackQuery", …)``.
+
     Args:
-        adapter (object): Channel adapter exposing ``answer_callback_query``.
+        adapter (object): Channel adapter (``TelegramAdapter`` in production).
         callback_query_id (str): Telegram callback query id.
         text (str | None): Optional toast body.
+
+    Returns:
+        bool: ``True`` when an answer path reports success.
 
     Examples:
         >>> import inspect
         >>> inspect.iscoroutinefunction(_answer_callback)
         True
     """
-    answer_fn = getattr(adapter, "answer_callback_query", None)
+    cq = callback_query_id.strip()
+    if not cq:
+        return False
+    answer_fn = getattr(adapter, "answer_callback", None)
     if callable(answer_fn):
-        await cast("Callable[..., Awaitable[Any]]", answer_fn)(
-            callback_query_id=callback_query_id,
-            text=text,
-        )
+        try:
+            result = await cast("Callable[..., Awaitable[Any]]", answer_fn)(
+                cq,
+                text=text or "",
+            )
+        except Exception:
+            return False
+        return result is not False
+    answer_query = getattr(adapter, "answer_callback_query", None)
+    if callable(answer_query):
+        try:
+            return bool(
+                await cast("Callable[..., Awaitable[Any]]", answer_query)(
+                    callback_query_id=cq,
+                    text=text,
+                ),
+            )
+        except Exception:
+            return False
+    api = getattr(adapter, "_api", None)
+    if not callable(api):
+        return False
+    body: dict[str, Any] = {"callback_query_id": cq}
+    if text:
+        body["text"] = text
+        body["show_alert"] = False
+    try:
+        res = await cast("Callable[..., Awaitable[Any]]", api)("answerCallbackQuery", body)
+    except Exception:
+        return False
+    return bool(res.get("ok")) if isinstance(res, dict) else bool(res)
 
 
 __all__ = [

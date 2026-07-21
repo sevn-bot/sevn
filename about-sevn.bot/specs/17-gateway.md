@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-07-21'
-fingerprint: sha256:54fcd16f72bb2952d827fd3e6a01d1b52180d9d39567eaeb250b35c067c5db4c
+fingerprint: sha256:1d74b01c76a8f15b446e30b2f6feef5a99a487314f091d28b759549d001ec907
 related: []
 sources:
 - src/sevn/gateway/**
@@ -1534,6 +1534,9 @@ Sub-agent L1 registration/finalize hooks in `_run_guarded` (spec-36).
 8. **Stage latency:** `_record_turn_stage_latencies` pushes samples into Mission Control when
    wired; when MC is missing it logs `agent_turn_stage_latency_unwired` (debug) instead of
    silently dropping attribution.
+9. **Menu-action callbacks:** `MenuActionRouter._answer_callback` answers via production
+   `answer_callback` (legacy `answer_callback_query` / `_api` fallbacks); identity toasts
+   (`cfg:logs:version_id` / `deployment_id`) fall back to chat text when the inline answer fails.
 
 ## Failure Modes
 
@@ -1571,4 +1574,5 @@ and may spawn concurrent L1 tier-B runs (`src/sevn/gateway/queue/queue_multi.py`
 | `tests/gateway/test_lifecycle.py`, `test_lifecycle_w1_red.py` | Boot/shutdown; browser reap failure log; operator-notify wiring |
 | `tests/proxy/test_codex_aggregation.py`, `test_codex_aggregation_w1_red.py` | Slow-turn Still working… route; MC stage-latency no-op log |
 | `tests/channels/test_telegram_outbound.py` | D6/D7 enqueue `chat_id` + classifier-timeout dispatch routing |
+| `tests/gateway/test_version_id_control_w1_red.py`, `test_stop_l1_buttons.py` | Version-id `answer_callback` toast + fallback; `/stop` picker re-edit |
 | `make telegram-checks` | Host Telegram Bot-API smoke (`telegram_checks`; alias `make telegram-e2e`) |

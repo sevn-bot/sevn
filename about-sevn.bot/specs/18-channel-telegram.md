@@ -529,7 +529,10 @@ Core slash commands via `core_bot_commands()` / `setMyCommands` include **`/agen
 session `cancel_active_dispatch` with `"Stopped."`). Kill callbacks reuse
 `act:subagents:kill:*` / `kill_all` (owner-only). Config → **My sevn bot** exposes
 **Version id** (`cfg:logs:version_id`) alongside Deployment id. Config → **Agents** remains
-persona/display-name — not the run inventory.
+persona/display-name — not the run inventory. Menu-action callback toasts use production
+`TelegramAdapter.answer_callback` (with `_api("answerCallbackQuery")` fallback); when the
+inline answer fails, identity buttons (Version id / Deployment id) still emit chat fallback
+text. Slash `/stop` kill callbacks re-edit the picker message and ack the callback query.
 
 ## Implemented by
 
@@ -577,6 +580,10 @@ deferred (parked journeys, issue #37).
 
 Discogs menu readiness + whoami: `tests/gateway/test_discogs_menu.py` and
 `tests/gateway/test_discogs_menu_w1_red.py` (C7.18/C7.19 Ready, wizard reload, whoami toast).
+
+Version id / `/stop` kill callbacks: `tests/gateway/test_version_id_control_w1_red.py`,
+`tests/gateway/test_my_sevn_version_id.py`, `tests/gateway/test_stop_l1_buttons.py`
+(`answer_callback` toast + fallback chat text; slash `/stop` picker re-edit after kill).
 
 ## Human-input needed
 

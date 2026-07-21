@@ -475,6 +475,8 @@ Public entrypoints: `execute_social_media_manager_task`, `parse_social_media_tas
 - **Kill (D13)**: all surfaces route to `SubAgentSupervisor.kill`; Mission Control and
   Telegram kill controls owner-only; Telegram **`/agents`** lists running L1/L2 inventory
   (visible to all; distinct from Config → Agents persona); CLI `sevn subagents kill <id>|--all [--role R]`.
+  Slash `/stop` kill callbacks re-edit the L1 picker (or show `"Stopped."` when empty) and
+  answer the callback query via production `answer_callback`.
 - **Budgets (D11)**: L2 draws parent `CascadeBudget`; `multi` spawns fresh L1 budget.
 
 ## Failure Modes

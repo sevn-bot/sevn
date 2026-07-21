@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-21] Telegram menu-action callbacks answer via production ``answer_callback`` (with ``_api`` fallback); Version id / Deployment id fall back to chat text when the inline answer fails; slash ``/stop`` kill re-edits the L1 picker and acks the callback
 - [2026-07-21] Gateway tooling (July-18 session failures): slow turns route a Still working… progress signal, classifier-timeout multi-spawn keeps Telegram `chat_id` on the production dispatch-routing path, and missing Mission Control stage-latency hooks log `agent_turn_stage_latency_unwired` instead of silent no-op
 - [2026-07-21] Discogs Telegram Setup: `form:secret_wizard:discogs.user_token` resolves to Ready C7.18 (not C6.1b), OAuth start C7.19 is Ready, user-token wizard reloads workspace so whoami sees the injected token, and `act:discogs:whoami` is behaviorally covered
 - [2026-07-21] Telegram `/config` → Voice TTS engine cycle threads `voice.local_tts_engine` through `VoiceRuntimeSettings` into the live TTS pipeline; toast warns if the rebuilt backend `.engine` does not match (live spoken-reply E2E deferred)
