@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -15,6 +16,8 @@ CARD_CLEAR = 0
 CARD_ENCRYPTED = 1
 CARD_SIGNED = 2
 CARD_ENCRYPTED_SIGNED = 3
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -47,7 +50,8 @@ def decrypt_cards(
             plain = _decrypt_card_data(card.data, key_packet, decryption_key)
             out.append(plain)
         else:
-            out.append(card.data)
+            _logger.warning("unrecognized contact/calendar card type=%s", card.type)
+            raise ValueError(f"unrecognized card type: {card.type}")
     return out
 
 

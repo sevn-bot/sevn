@@ -214,10 +214,34 @@ def test_high_latency_alert_includes_stalling_stage() -> None:
 
 @pytest.mark.asyncio
 async def test_slow_turn_emits_still_working_progress_before_dead_air() -> None:
-    """D3: user-visible progress signal is emitted before the dead-air window."""
-    from sevn.gateway.agent_turn import turn_progress_signal_text
+    """D3: ``_schedule_turn_progress_signal`` routes Still working… on a slow turn."""
+    from typing import Any
+    from unittest.mock import MagicMock, patch
 
-    assert turn_progress_signal_text().strip()
-    # Shape-only contract: the helper exists and reads like a progress ping.
-    text = turn_progress_signal_text().lower()
-    assert "still" in text or "working" in text
+    from sevn.gateway import agent_turn
+
+    routed: list[str] = []
+
+    async def _route(*_a: Any, **_k: Any) -> None:
+        text = _a[4] if len(_a) > 4 else _k.get("text", "")
+        routed.append(str(text))
+
+    l1_state = MagicMock()
+    l1_state.progress_task = None
+    with (
+        patch.object(agent_turn, "_route_assistant_text", new=_route),
+        patch.object(agent_turn, "_TURN_PROGRESS_SIGNAL_DELAY_S", 0.01),
+        patch.object(agent_turn, "_cancel_turn_progress_signal", lambda _s: None),
+    ):
+        await agent_turn._schedule_turn_progress_signal(
+            router=MagicMock(),
+            channel="telegram",
+            user_id="1",
+            session_id="sess-progress",
+            route_meta={"chat_id": 1},
+            l1_state=l1_state,
+        )
+        task = getattr(l1_state, "progress_task", None)
+        assert task is not None
+        await task
+    assert any("still" in t.lower() or "working" in t.lower() for t in routed)

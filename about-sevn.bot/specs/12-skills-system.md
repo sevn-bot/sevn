@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own everything under workspace/skills/: how skills are discovered, validated,
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
-last_updated: '2026-07-18'
-fingerprint: sha256:15fe596409c99c3acf7b039d93d83342fdc0684131319f48c5bc4ffa59c7ab2a
+last_updated: '2026-07-21'
+fingerprint: sha256:720ea462c5b780097186fbb13aa5172e16d0109a60a3d4eb1bda072ea18ce04a
 related: []
 sources:
 - src/sevn/skills/**
@@ -317,6 +317,9 @@ interfaces:
 - name: token_path
   file: src/sevn/skills/google_workspace.py
   symbol: token_path
+- name: use_gws_backend
+  file: src/sevn/skills/google_workspace.py
+  symbol: use_gws_backend
 - name: calendar_create
   file: src/sevn/skills/google_workspace_api.py
   symbol: calendar_create
@@ -458,6 +461,12 @@ interfaces:
 - name: SkillRecord
   file: src/sevn/skills/models.py
   symbol: SkillRecord
+- name: gate_obsidian_cli_core_skill
+  file: src/sevn/skills/obsidian_cli.py
+  symbol: gate_obsidian_cli_core_skill
+- name: obsidian_cli_config_enabled
+  file: src/sevn/skills/obsidian_cli.py
+  symbol: obsidian_cli_config_enabled
 - name: gate_openwiki_core_skill
   file: src/sevn/skills/openwiki.py
   symbol: gate_openwiki_core_skill
@@ -622,6 +631,10 @@ Initial draft for **Behavior** — grounded in extracted interfaces; confirm nor
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
 
 Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/skills`](src/sevn/skills/__init__.py).
+
+**Opt-in core skill gates:** Bundled skills with onboarding `default: false` (e.g. `openwiki`, `obsidian-cli`) must not appear in `SkillsManager` scan/`load_skill` unless the matching `skills.<id>.enabled` config is true. Absent config → disabled. Gates live beside the skill (`gate_openwiki_core_skill`, `gate_obsidian_cli_core_skill`) and are consulted from `_scan_skills_tree`.
+
+**Discogs optional group:** Telegram Setup persists `skills.discogs.user_token` via the C7.18 secret wizard and reloads the workspace so `merge_discogs_proc_env` injects `DISCOGS_USER_TOKEN` for subsequent `discogs-identity/whoami` smoke tests; OAuth start is Ready C7.19.
 ## Failure Modes
 
 Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
@@ -629,6 +642,14 @@ Initial draft for **Failure Modes** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
 
 Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
+
+**Proton Drive (proton-cli):** Name decrypt failures in `list_children` and path-segment decrypt failures in `resolve_path` log at warning (link id + reason) before continuing / raising `NotFound`; `trash_list` logs when `_get_link` fails and still returns a bare `TrashEntry`. Create/upload bodies use typed `Address.id`/`Address.email` for non-empty `SignatureAddress`.
+
+**Proton Calendar / Contacts (proton-cli):** `list_contacts` logs card-decrypt failures (contact id + reason) and continues with remaining rows; `create_contact` raises on empty `Responses` / missing Contact ID (no false CLI success); `decrypt_cards` raises on unrecognized card `Type`; `resolve_event` logs per-calendar `events_list` failures before continuing.
+
+**Proton polish CLI (proton-cli):** `status` and `api` are runnable leaf groups (`invoke_without_command`); `status` reports `session_file` / `session_exists` via `session_store.session_path` (legacy `~/.config/proton-cli/session.json` for the default profile); `settings set <key>` rejects a missing value before authenticate.
+
+**Proton deferred surfaces (proton-cli):** Mail `_classify_recipient` consults `ContactsService.pinned_keys_for` before `/core/v4/keys/all`; unexpected HV-helper crashes in `cli_hv_resolver` log at warning (with detail) before falling back to `ErrHVUnavailable`, while `HVUnavailableError` (helper not installed) remains quiet. Calendar events create/respond, contacts groups/pin-key, and mail attach/attachments flows are covered by mocked behavioral tests (live RSVP/attachment/HV-webview E2E deferred without credentials).
 ## Amendments (spec-36-sub-agents)
 
 Bundled `media_generation` skill binds to the `media_generator` specialist via
@@ -667,6 +688,8 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+**Bundled script coverage:** Each new operator-visible bundled script under a skill's `scripts/` directory must have ≥1 behavioral test (mocked transport or CLI `main()` with side-effect assert), not structural-only (`callable`/`--help`). For `media_generation`, see `tests/skills/test_media_generation_skill.py` and `tests/skills/test_media_generation_skill_w1_red.py` (execute kinds + script CLIs including `generate_video_subject` / `generate_video_first_last`, voice-clone literal `preview_text`; live MiniMax gated by `SEVN_MEDIA_LIVE=1`) and `tests/agent/subagents/test_media_minimax_w1_red.py` (100 MiB download cap + `_persist_bytes` size-verify fallback). For `proton-management`, `cli_argv` / `run_proton_cli` / `run_proton_cli_async` must place `--profile` before the subcommand in module mode (`python -m proton_cli --profile <p> pass …`); see `tests/skills/test_proton_management_skill.py` and `tests/skills/test_proton_management_skill_w1_red.py` (including `mail_list` / `mail_read` / `calendar_events_list` / `contacts_list` dry-run). Pass read/write CLI (`pass vaults` / `items` / `secrets`), Mail CLI (`mail messages` / `labels`, send `--attach`, attachments list/download), Drive CLI (`drive items` / `folders` / `trash`), Calendar/Contacts (`calendar events` list/get/create/respond/delete, `contacts` list/get/create/delete/groups/pin-key, `decrypt_cards`), polish (`status` / `api GET` without `--help`, legacy `session.json` fallback, `settings set` empty-value guard), stdin secret resolution, SRP HV retry / `PROTON_HV_TOKEN` / HV-helper crash surfacing, pinned-key recipient classification, and share-key / item-decrypt / address-key unlock / Drive name-decrypt / path-decrypt / trash-link / contacts card-decrypt / create false-success / unrecognized card-type / calendar resolve_event surfacing live in `tests/proton_cli/test_mail.py`, `tests/proton_cli/test_drive.py`, `tests/proton_cli/test_calendar_contacts.py`, `tests/proton_cli/test_polish.py`, `tests/proton_cli/test_deferred.py` + `tests/proton_cli/test_pr_verifier_w1_red.py` (live Proton Calendar/Contacts/RSVP/attachment/HV-webview E2E deferred without credentials). For `google-workspace`, §3.3 gws-first routing (`use_gws_backend` / `run_gws`) and `gws_bridge.py` token-env injection are covered in `tests/skills/test_google_workspace_skill_w1_red.py`. For Discogs Setup menu + whoami, see `tests/gateway/test_discogs_menu.py` / `tests/gateway/test_discogs_menu_w1_red.py`.
 
 ## Human-input needed
 

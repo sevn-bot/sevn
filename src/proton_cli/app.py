@@ -125,15 +125,16 @@ def new_app(opts: Options) -> App:
             client.set_salted_key_pass(loaded.salted_key_pass)
 
     renderer = Renderer(opts.output, quiet=opts.quiet)
+    contacts_svc = ContactsService(client)
     app = App(
         profile=profile,
         creds=Credentials(user=user, password=password, totp=totp),
         api=client,
         pass_svc=PassService(client),
-        mail_svc=MailService(client),
+        mail_svc=MailService(client, contacts=contacts_svc),
         drive_svc=DriveService(client),
         calendar_svc=CalendarService(client),
-        contacts_svc=ContactsService(client),
+        contacts_svc=contacts_svc,
         renderer=renderer,
         dry_run=opts.dry_run,
         full_ids=opts.full_ids,

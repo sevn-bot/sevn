@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
@@ -20,13 +21,12 @@ from proton_cli.service.drive import blocks
 if TYPE_CHECKING:
     from proton_cli.account.keys import Unlocked
 
+_logger = logging.getLogger(__name__)
+
 PARTSTAT_NEEDS_ACTION = 0
 PARTSTAT_TENTATIVE = 1
 PARTSTAT_DECLINED = 2
 PARTSTAT_ACCEPTED = 3
-
-if TYPE_CHECKING:
-    from proton_cli.account.keys import Unlocked
 
 
 @dataclass
@@ -354,7 +354,12 @@ class CalendarService:
         for cal in self.calendars_list():
             try:
                 events = self.events_list(unlocked, cal.id, start, end)
-            except Exception:
+            except Exception as exc:
+                _logger.warning(
+                    "calendar resolve_event list failed calendar_id=%s: %s",
+                    cal.id,
+                    exc,
+                )
                 continue
             for ev in events:
                 if ev.title and needle.lower() in ev.title.lower():

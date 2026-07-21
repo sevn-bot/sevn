@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -13,11 +14,13 @@ from sevn.agent.tracing.sink import NullTraceSink
 from sevn.channels.telegram import TelegramAdapter
 from sevn.config.workspace_config import VoiceConfig, WorkspaceConfig
 from sevn.gateway.channel_router import ChannelRouter, IncomingMessage, OutgoingMessage
-from sevn.gateway.commands.core_commands import CoreCommandHandler
+from sevn.gateway.commands.core_commands import CoreCommandHandler, _normalise_tts_voice_code
 from sevn.gateway.commands.dispatcher import CommandDispatcher
+from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json
 from sevn.gateway.media.media_store import MediaStore
 from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
 from sevn.gateway.session_manager import SessionManager
+from sevn.onboarding.web_app import _get_nested
 from sevn.security.llm_guard_scanner import LLMGuardScanner, ScanResult
 from sevn.storage.migrate import apply_migrations
 from sevn.voice.factory import resolve_effective_tts_mode
@@ -161,6 +164,46 @@ async def test_route_outgoing_uses_session_override_and_voice_note_trigger(tmp_p
         if router is not None:
             await router.session_manager.drain()
         conn.close()
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("F3", "F3"),
+        ("f3", "F3"),
+        ("M1", "M1"),
+        ("af_heart", "af_heart"),
+        ("AF_Heart", "af_heart"),
+        ("F9", None),
+        ("on", None),
+    ],
+)
+def test_normalise_tts_voice_code(raw: str, expected: str | None) -> None:
+    assert _normalise_tts_voice_code(raw) == expected
+
+
+def test_handle_voice_persists_supertonic_and_kokoro_codes(tmp_path: Path) -> None:
+    """``/voice`` persists Supertonic uppercase + Kokoro lowercase; rejects unknowns."""
+    sevn_json = tmp_path / "sevn.json"
+    sevn_json.write_text(
+        json.dumps({"schema_version": 1, "gateway": {"token": "t"}, "voice": {}}),
+        encoding="utf-8",
+    )
+    handler = CoreCommandHandler.__new__(CoreCommandHandler)
+    handler._workspace = WorkspaceConfig.minimal()
+    handler._sevn_json = sevn_json
+    handler._sessions = type("S", (), {"set_tts_mode_override": lambda *_a, **_k: None})()
+    handler._reload_workspace = lambda: None  # type: ignore[method-assign]
+
+    assert "F3" in handler._handle_voice("f3", session_id="s")
+    assert _get_nested(load_raw_sevn_json(sevn_json), "voice.tts_voice_id") == "F3"
+
+    assert "af_heart" in handler._handle_voice("af_heart", session_id="s")
+    assert _get_nested(load_raw_sevn_json(sevn_json), "voice.tts_voice_id") == "af_heart"
+
+    reject = handler._handle_voice("F9", session_id="s")
+    assert "Unknown voice code" in reject
+    assert _get_nested(load_raw_sevn_json(sevn_json), "voice.tts_voice_id") == "af_heart"
 
 
 def test_voice_command_sets_session_override(tmp_path: Path) -> None:

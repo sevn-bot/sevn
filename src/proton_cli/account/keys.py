@@ -180,8 +180,9 @@ def _unlock_keys(
             pgp_key, _ = PGPKey.from_blob(key.private_key)
             persist_unlock(pgp_key, secret)
             unlocked.append(pgp_key)
-        except (ValueError, pgpy.errors.PGPError) as exc:
-            _logger.debug("failed to unlock key %s: %s", key.id, exc)
+        except Exception as exc:
+            # Partial unlock is allowed; empty addr_keys still raises in unlock().
+            _logger.warning("failed to unlock key id=%s: %s", key.id, exc)
             continue
     return unlocked
 

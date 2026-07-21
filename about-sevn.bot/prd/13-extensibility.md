@@ -6,8 +6,8 @@ status: ready
 owner: Alex
 summary: Built-in capabilities cover common paths; deployments need org glue—ticketing,
   LDAP, formatters, policy hooks—via plugins, skills, and hooks without forking core.
-last_updated: '2026-07-18'
-fingerprint: sha256:5f905950fbad7b12b570f048635b5bd51cd5dac1388b67426212bf884228d6b6
+last_updated: '2026-07-21'
+fingerprint: sha256:216180a22a9dce996c3ed1b4b25fcca50b98be4047c2079d1a39ba7e63330747
 related:
 - prd-03-trust-and-control
 - prd-07-mission-control
@@ -111,6 +111,13 @@ gateway.
   executors, triggers) so plugins augment behavior rather than replacing gateway semantics.
 - **FR-007:** The product shall **fail closed on trust**: high-impact hook surfaces require
   explicit operator trust configuration; silent broad interception is not the default.
+- **FR-008:** Optional bundled skill groups (e.g. **`media_generation`** bound to the
+  `media_generator` MiniMax L2 specialist, Discogs, proton) shall remain first-class extension
+  surfaces — operator-visible scripts (including S2V/FL2V CLIs) and specialist execute paths
+  (literal voice-clone text, download size cap, persist size-verify) are covered by mocked
+  behavioral tests; live provider E2E stays opt-in (`SEVN_MEDIA_LIVE`, etc.). Discogs Telegram
+  Setup (user-token C7.18 / OAuth C7.19 Ready, wizard workspace reload, whoami toast) is covered
+  by gateway menu tests.
 
 ## Non-Goals
 

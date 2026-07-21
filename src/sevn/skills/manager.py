@@ -70,6 +70,7 @@ from sevn.skills.manifest import (
     validate_script_paths,
 )
 from sevn.skills.models import ProvenanceKind, SkillRecord
+from sevn.skills.obsidian_cli import OBSIDIAN_CLI_SKILL_ID, gate_obsidian_cli_core_skill
 from sevn.skills.openwiki import OPENWIKI_SKILL_ID, gate_openwiki_core_skill
 from sevn.skills.openwiki_secrets import merge_openwiki_proc_env
 from sevn.skills.social_media_manager import (
@@ -751,6 +752,12 @@ def _scan_skills_tree(
                 sub == "core"
                 and child.name == OPENWIKI_SKILL_ID
                 and gate_openwiki_core_skill(cfg) == "skip"
+            ):
+                continue
+            if (
+                sub == "core"
+                and child.name == OBSIDIAN_CLI_SKILL_ID
+                and gate_obsidian_cli_core_skill(cfg) == "skip"
             ):
                 continue
             if sub == "core" and child.name in DISCOGS_SKILL_IDS:

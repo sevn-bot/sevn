@@ -673,11 +673,21 @@ def _record_turn_stage_latencies(router: ChannelRouter, latencies: dict[str, flo
         >>> _record_turn_stage_latencies.__name__
         '_record_turn_stage_latencies'
     """
+    if not latencies:
+        return
     state = getattr(router, "_mission_control_state", None)
-    if state is None or not latencies:
+    if state is None:
+        logger.debug(
+            "agent_turn_stage_latency_unwired reason=mission_control_missing stages={}",
+            sorted(latencies),
+        )
         return
     record = getattr(state, "record_turn_stage_latency_ms", None)
     if not callable(record):
+        logger.debug(
+            "agent_turn_stage_latency_unwired reason=record_hook_missing stages={}",
+            sorted(latencies),
+        )
         return
     for stage, latency_ms in latencies.items():
         if latency_ms > 0:

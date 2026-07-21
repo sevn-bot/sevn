@@ -1144,6 +1144,10 @@ class MenuFormHandler:
                     )
 
                 mutate_sevn_json(self._sevn_json, _apply_discogs_user_token)
+                mar = self._router._menu_action_router
+                if mar is not None:
+                    mar._reload_workspace()
+                self._workspace = self._router._workspace
             self._consume_token(token)
             section = str(payload.get("section") or "secrets")
             await self._refresh_section(msg, section=section, toast=None)
@@ -1369,6 +1373,9 @@ class MenuFormHandler:
     async def _answer_callback(self, msg: IncomingMessage, *, text: str | None = None) -> None:
         """Acknowledge a Telegram callback query when present.
 
+        Prefers production ``answer_callback``, then legacy ``answer_callback_query``,
+        then raw ``_api("answerCallbackQuery", …)`` (same order as menu-action router).
+
         Args:
             msg (IncomingMessage): Inbound callback envelope.
             text (str | None): Optional toast body.
@@ -1385,12 +1392,35 @@ class MenuFormHandler:
         adapter = self._router._adapters.get(msg.channel)
         if adapter is None:
             return
-        answer_fn = getattr(adapter, "answer_callback_query", None)
+        cq = cq_id.strip()
+        answer_fn = getattr(adapter, "answer_callback", None)
         if callable(answer_fn):
-            await cast("Callable[..., Awaitable[Any]]", answer_fn)(
-                callback_query_id=cq_id.strip(),
-                text=text,
-            )
+            try:
+                await cast("Callable[..., Awaitable[Any]]", answer_fn)(cq, text=text or "")
+            except Exception:
+                return
+            return
+        answer_query = getattr(adapter, "answer_callback_query", None)
+        if callable(answer_query):
+            try:
+                await cast("Callable[..., Awaitable[Any]]", answer_query)(
+                    callback_query_id=cq,
+                    text=text,
+                )
+            except Exception:
+                return
+            return
+        api = getattr(adapter, "_api", None)
+        if not callable(api):
+            return
+        body: dict[str, Any] = {"callback_query_id": cq}
+        if text:
+            body["text"] = text
+            body["show_alert"] = False
+        try:
+            await cast("Callable[..., Awaitable[Any]]", api)("answerCallbackQuery", body)
+        except Exception:
+            return
 
     @staticmethod
     def _user_id_int(user_id: str) -> int:

@@ -12,21 +12,21 @@ from proton_cli.account import session as session_store
 if TYPE_CHECKING:
     from proton_cli.app import App
 
-app = typer.Typer(name="status", no_args_is_help=False, add_completion=False)
+app = typer.Typer(
+    name="status",
+    invoke_without_command=True,
+    no_args_is_help=False,
+    add_completion=False,
+)
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def status_main(ctx: typer.Context) -> None:
     """Show proton-cli install and session status (no secrets)."""
     proton_app: App = ctx.obj
     uid, access, _refresh = proton_app.api.tokens()
     loaded = session_store.load(proton_app.profile)
-    import os
-    from pathlib import Path
-
-    base = os.environ.get("XDG_CONFIG_HOME")
-    root = Path(base) if base else Path.home() / ".config"
-    session_path = root / "proton-cli" / "sessions" / f"{proton_app.profile or 'default'}.json"
+    session_path = session_store.session_path(proton_app.profile or "default")
     payload = {
         "version": __version__,
         "profile": proton_app.profile,

@@ -27,6 +27,7 @@ Exports:
     get_valid_token_for_gws — exported symbol.
     run_gws — exported symbol.
     prefer_gws_enabled — exported symbol.
+    use_gws_backend — §3.3 gws-first routing decision (logs Python fallback).
 """
 
 from __future__ import annotations
@@ -831,6 +832,36 @@ def prefer_gws_enabled(workspace: Path) -> bool:
     return bool(getattr(settings, "prefer_gws", True))
 
 
+def use_gws_backend(workspace: Path) -> bool:
+    """Return True when §3.3 should route through ``gws`` (prefer_gws + on PATH).
+
+    When ``prefer_gws`` is set but ``gws`` is missing, logs that the Python client
+    backend is used so the fallback is observable to operators and tests.
+
+    Args:
+        workspace (Path): Workspace root with ``sevn.json``.
+
+    Returns:
+        bool: True when handlers should call ``run_gws`` instead of ``build_service``.
+
+    Examples:
+        >>> use_gws_backend  # doctest: +SKIP
+    """
+
+    prefer = prefer_gws_enabled(workspace)
+    binary = gws_binary()
+    if prefer and binary is not None:
+        logger.debug("google_workspace: execution backend=gws ({})", binary)
+        return True
+    if prefer:
+        logger.info(
+            "google_workspace: prefer_gws=true but gws not on PATH; using Python backend",
+        )
+    else:
+        logger.debug("google_workspace: execution backend=python (prefer_gws=false)")
+    return False
+
+
 def _dot_sevn_dir(workspace: Path) -> Path:
     """_dot_sevn_dir helper.
 
@@ -1321,4 +1352,5 @@ __all__ = [
     "run_gws",
     "store_client_secret",
     "token_path",
+    "use_gws_backend",
 ]

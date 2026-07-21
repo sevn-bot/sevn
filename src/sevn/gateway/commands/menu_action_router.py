@@ -24,6 +24,8 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
+from loguru import logger
+
 from sevn.agent.tracing.logfire_config import (
     apply_logfire_export_to_sevn_doc,
     logfire_export_status_from_doc,
@@ -139,6 +141,33 @@ _CONFIG_PATH_SECTION: dict[str, ConfigSection] = {
     "integration": "integrations",
     "agent": "agents",
 }
+
+
+def _tts_pipeline_engine(tts: Any) -> str | None:
+    """Return a TTS backend ``.engine`` when present, or ``None``.
+
+    Prefers the first backend that exposes a non-empty ``engine`` attribute so a
+    reordered ``tts_providers`` list (e.g. ``edge_tts`` first) does not miss the
+    local ``text_to_voice`` pipeline engine.
+
+    Args:
+        tts (Any): :class:`~sevn.voice.tts.TextToSpeechPipeline` or substitute.
+
+    Returns:
+        str | None: Normalised local TTS engine tag when present.
+
+    Examples:
+        >>> _tts_pipeline_engine(None) is None
+        True
+    """
+    backends = getattr(tts, "_backends", None) or getattr(tts, "backends", None)
+    if not backends:
+        return None
+    for backend in backends:
+        engine = getattr(backend, "engine", None)
+        if engine:
+            return str(engine).strip().casefold()
+    return None
 
 
 def infer_config_section_from_callback(data: str) -> ConfigSection:
@@ -669,8 +698,13 @@ class MenuActionRouter:
         cq_str = cq_id.strip() if isinstance(cq_id, str) else ""
         adapter = self._router._adapters.get(msg.channel)
         if adapter is not None and cq_str:
-            await _answer_callback(adapter, callback_query_id=cq_str, text=toast)
-            return None
+            answered = await _answer_callback(
+                adapter,
+                callback_query_id=cq_str,
+                text=toast,
+            )
+            if answered:
+                return None
         return toast
 
     async def _refresh_stop_picker_after_kill(
@@ -1142,7 +1176,16 @@ class MenuActionRouter:
 
         mutate_sevn_json(self._sevn_json, _apply)
         self._reload_workspace()
-        toast = f"TTS engine: {new_active}"
+        runtime_engine = _tts_pipeline_engine(getattr(self._router, "_tts", None))
+        if runtime_engine != new_active:
+            logger.warning(
+                "voice TTS engine cycle wrote {!r} but pipeline .engine is {!r}",
+                new_active,
+                runtime_engine,
+            )
+            toast = f"TTS engine: {new_active} (pipeline still {runtime_engine or 'unset'})"
+        else:
+            toast = f"TTS engine: {new_active}"
         answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
         return None if answered else toast
 
@@ -2137,25 +2180,63 @@ async def _unpin_chat_message(
     return bool(res.get("ok"))
 
 
-async def _answer_callback(adapter: Any, *, callback_query_id: str, text: str | None) -> None:
+async def _answer_callback(adapter: Any, *, callback_query_id: str, text: str | None) -> bool:
     """Best-effort Telegram ``answerCallbackQuery`` helper.
 
+    Prefers production :meth:`TelegramAdapter.answer_callback`, then legacy
+    ``answer_callback_query``, then raw ``_api("answerCallbackQuery", …)``.
+
     Args:
-        adapter (object): Channel adapter exposing ``answer_callback_query``.
+        adapter (object): Channel adapter (``TelegramAdapter`` in production).
         callback_query_id (str): Telegram callback query id.
         text (str | None): Optional toast body.
+
+    Returns:
+        bool: ``True`` when an answer path reports success.
 
     Examples:
         >>> import inspect
         >>> inspect.iscoroutinefunction(_answer_callback)
         True
     """
-    answer_fn = getattr(adapter, "answer_callback_query", None)
+    cq = callback_query_id.strip()
+    if not cq:
+        return False
+    answer_fn = getattr(adapter, "answer_callback", None)
     if callable(answer_fn):
-        await cast("Callable[..., Awaitable[Any]]", answer_fn)(
-            callback_query_id=callback_query_id,
-            text=text,
-        )
+        try:
+            result = await cast("Callable[..., Awaitable[Any]]", answer_fn)(
+                cq,
+                text=text or "",
+            )
+        except Exception:
+            return False
+        if isinstance(result, dict):
+            return bool(result.get("ok"))
+        return result is not False
+    answer_query = getattr(adapter, "answer_callback_query", None)
+    if callable(answer_query):
+        try:
+            return bool(
+                await cast("Callable[..., Awaitable[Any]]", answer_query)(
+                    callback_query_id=cq,
+                    text=text,
+                ),
+            )
+        except Exception:
+            return False
+    api = getattr(adapter, "_api", None)
+    if not callable(api):
+        return False
+    body: dict[str, Any] = {"callback_query_id": cq}
+    if text:
+        body["text"] = text
+        body["show_alert"] = False
+    try:
+        res = await cast("Callable[..., Awaitable[Any]]", api)("answerCallbackQuery", body)
+    except Exception:
+        return False
+    return bool(res.get("ok")) if isinstance(res, dict) else bool(res)
 
 
 __all__ = [

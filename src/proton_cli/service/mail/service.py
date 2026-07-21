@@ -20,6 +20,7 @@ from proton_cli.service.mail.folders import LABEL_STARRED, LABEL_TRASH, resolve_
 
 if TYPE_CHECKING:
     from proton_cli.account.keys import Unlocked
+    from proton_cli.service.contacts.service import ContactsService
 
 PKG_INTERNAL = 1
 PKG_CLEAR = 4
@@ -115,8 +116,9 @@ class SendOptions:
 
 
 class MailService:
-    def __init__(self, client: Client) -> None:
+    def __init__(self, client: Client, contacts: ContactsService | None = None) -> None:
         self._client = client
+        self._contacts = contacts
 
     def list_messages(self, opts: ListOptions) -> tuple[list[MessageSummary], int]:
         query = {
@@ -332,7 +334,7 @@ class MailService:
         plans: list[tuple[str, int, str]] = []
         clear_recipients: list[str] = []
         for email in _dedupe(opts.to + opts.cc + opts.bcc):
-            scheme, armored_key = self._classify_recipient(email)
+            scheme, armored_key = self._classify_recipient(unlocked, email)
             plans.append((email, scheme, armored_key))
             if scheme == PKG_CLEAR:
                 clear_recipients.append(email)
@@ -491,7 +493,16 @@ class MailService:
         att_id = str((payload.get("Attachment") or {}).get("ID", ""))
         return UploadedAttachment(id=att_id, session_key=sk)
 
-    def _classify_recipient(self, email: str) -> tuple[int, str]:
+    def _classify_recipient(self, unlocked: Unlocked, email: str) -> tuple[int, str]:
+        # Prefer operator-pinned contact keys over the directory lookup so
+        # ``contacts pin-key`` is a live read path during send classification.
+        if self._contacts is not None:
+            pinned = self._contacts.pinned_keys_for(unlocked, email)
+            if pinned is not None and pinned.armored_keys:
+                if pinned.encrypt is False:
+                    return PKG_CLEAR, ""
+                return PKG_INTERNAL, pinned.armored_keys[0]
+
         payload: dict = {}
         self._client.decode(
             Request(

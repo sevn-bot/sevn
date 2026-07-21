@@ -397,6 +397,57 @@ async def test_stop_kill_callback_refreshes_registered_config_menu(tmp_path: Pat
     assert updated.status.value == "killed"
 
 
+@pytest.mark.asyncio
+async def test_slash_stop_kill_reedits_picker_and_acks_callback(tmp_path: Path) -> None:
+    """Kill from an unregistered (slash ``/stop``) host re-edits picker + answers callback."""
+    layout = _layout(tmp_path)
+    ws = WorkspaceConfig.minimal(subagents=SubAgentsWorkspaceConfig(enabled=True))
+    registry = SubAgentRegistry()
+    supervisor = SubAgentSupervisor(registry=registry, config=SubAgentsWorkspaceConfig())
+    run_id = await _spawn_l1(supervisor)
+
+    cap = _MenuCaptureTelegram()
+    router = ChannelRouter.__new__(ChannelRouter)
+    router._adapters = {"telegram": cap}
+    router._workspace = ws
+    router._resolve_owner_flag = lambda _msg: True  # type: ignore[method-assign]
+    router._config_menu_nav = {}  # unregistered → slash /stop picker path
+    router._subagent_supervisor = supervisor
+
+    mar = MenuActionRouter(
+        workspace=ws,
+        router=router,
+        conn=sqlite3.connect(":memory:"),
+        content_root=layout.content_root,
+        sevn_json_path=layout.sevn_json_path,
+    )
+
+    msg = IncomingMessage(
+        channel="telegram",
+        user_id="1",
+        text="",
+        metadata={
+            "callback_data": f"act:subagents:kill:{run_id}",
+            "chat_id": 42,
+            "message_id": 99,
+            "callback_query_id": "cq-stop-kill",
+        },
+    )
+    await mar.handle(msg, session_id="sess")
+    updated = await supervisor.registry.get(run_id)
+    assert updated is not None
+    assert updated.status.value == "killed"
+    assert cap.edited, "slash /stop kill must re-edit the picker message"
+    edited = cap.edited[-1]
+    assert edited["chat_id"] == 42
+    assert edited["message_id"] == 99
+    assert edited["text"] == _STOPPED
+    assert edited["reply_markup"] == {"inline_keyboard": []}
+    answers = dict(cap.answered)
+    assert "cq-stop-kill" in answers
+    assert "Killed" in (answers["cq-stop-kill"] or "")
+
+
 # --- D9: slash path attaches reply_markup ---
 
 

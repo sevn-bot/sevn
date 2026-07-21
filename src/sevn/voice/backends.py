@@ -689,6 +689,35 @@ def _normalise_local_tts_engine(engine: str | None) -> str:
     return "kokoro"
 
 
+def _script_supports_engine_flag(script: Path, *, skill_dir: Path) -> bool:
+    """Return whether ``generate.py`` accepts a ``--engine`` CLI flag.
+
+    Legacy workspace ``kokoro-tts`` scripts predate the unified text-to-voice CLI and
+    exit non-zero when ``--engine`` is passed. Prefer the skill directory name; fall
+    back to an argparse-style ``"--engine"`` literal in the script source (avoids
+    matching runtime ``'--engine' in sys.argv`` guards in stubs).
+
+    Args:
+        script (Path): Path to ``scripts/generate.py``.
+        skill_dir (Path): Skill root (``text-to-voice`` or ``kokoro-tts``).
+
+    Returns:
+        bool: ``True`` when the unified ``--engine`` flag should be passed.
+
+    Examples:
+        >>> from pathlib import Path
+        >>> _script_supports_engine_flag(Path("/n/generate.py"), skill_dir=Path("/n/kokoro-tts"))
+        False
+    """
+    if skill_dir.name == "kokoro-tts":
+        return False
+    try:
+        text = script.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    return '"--engine"' in text
+
+
 def _requirements_file_for_engine(skill_dir: Path, engine: str) -> Path | None:
     """Resolve the engine-specific requirements file under ``skill_dir``.
 
@@ -776,7 +805,10 @@ class TextToVoiceBackend:
         voice_id: str | None,
         out_path: Path,
     ) -> None:
-        """Generate speech via ``uv run python generate.py --engine …``.
+        """Generate speech via ``uv run python generate.py`` (``--engine`` when supported).
+
+        Legacy ``kokoro-tts`` ``generate.py`` scripts that do not advertise ``--engine``
+        omit the flag so synthesis does not fail with ``rc=2``.
 
         Args:
             text (str): Assistant reply to speak.
@@ -798,20 +830,14 @@ class TextToVoiceBackend:
             raise RuntimeError(msg)
         script = skill_dir / "scripts" / "generate.py"
         req_file = _requirements_file_for_engine(skill_dir, self._engine)
+        supports_engine = _script_supports_engine_flag(script, skill_dir=skill_dir)
         cmd = ["uv", "run", "--python", "3.12"]
         if req_file is not None:
             cmd.extend(["--with-requirements", str(req_file)])
-        cmd.extend(
-            [
-                "python",
-                str(script),
-                text,
-                "--engine",
-                self._engine,
-                "--output",
-                str(out_path),
-            ],
-        )
+        cmd.extend(["python", str(script), text])
+        if supports_engine:
+            cmd.extend(["--engine", self._engine])
+        cmd.extend(["--output", str(out_path)])
         if voice_id:
             cmd.extend(["--voice", voice_id])
         env = dict(os.environ)

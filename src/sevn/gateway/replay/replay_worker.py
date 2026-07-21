@@ -127,6 +127,7 @@ class TurnReplayWorker:
             >>> inspect.iscoroutinefunction(TurnReplayWorker.stop)
             True
         """
+        self._queue.clear()
         task = self._task
         if task is None:
             return

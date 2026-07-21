@@ -6,7 +6,7 @@ status: draft
 owner: Alex
 summary: Catalog of real operator-session failures—grounding loops, PDF degradation,
   tool/skill routing—and the product fixes that stop silent hangs and fabricated answers.
-last_updated: '2026-07-14'
+last_updated: '2026-07-21'
 fingerprint: sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 related: []
 sources: []
@@ -128,6 +128,11 @@ run a tool. These incidents were captured in session transcripts (message ids ci
 | Identity label vs name | msg 5 | Inconsistent "who are you?" answers | Deterministic IDENTITY.md reply |
 | Eager hydration SERP repeat | msg 33 | Duplicate search hydration across turns | Intro prompt / hydration recurrence guard |
 | Artifact spill outside session | msg 40; log P10 | Files written outside session tree | Artifact output confinement |
+| Silent browser reap on shutdown | PR #46 / gateway shutdown | Chrome/profile leftovers after restart with no log | Log `browser_reap_on_shutdown_failed`; do not `suppress` reap exceptions |
+| Issue-watch notify unwired | PR #46 / cron | Diffs detected but operator never notified | Boot `wire_operator_notify` → `route_outgoing`; LOG fallback when no owner |
+| Long-turn dead-air | PR #52 / July-18 tooling | Operator sees no progress for >5s on slow turns | Route `Still working…` via `_schedule_turn_progress_signal` |
+| Classifier-timeout lost chat_id | PR #52 / July-18 tooling | Multi-spawn reply missing Telegram chat | Preserve `chat_id` via `_record_dispatch_routing` + `_merge_dispatch_routing_extras` |
+| Silent MC latency drop | PR #52 / July-18 tooling | High-latency stage attribution missing with no log | Log `agent_turn_stage_latency_unwired` when MC hook missing |
 
 ## Success Metrics
 

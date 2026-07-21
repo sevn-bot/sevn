@@ -12,6 +12,7 @@ Exports:
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import contextlib
 import json
 import os
@@ -124,6 +125,7 @@ from sevn.gateway.onboarding.onboarding_mount import (
     resolve_gateway_onboarding_token,
 )
 from sevn.gateway.queue.steer_store import SessionSteerStore, owner_user_ids_from_workspace
+from sevn.gateway.replay.replay_worker import TurnReplayWorker
 from sevn.gateway.routing.outbound_sweep import sweep_outbound_retries
 from sevn.gateway.runtime.deployment_id import load_or_create_deployment_id
 from sevn.gateway.runtime.gateway_restart_ack import deliver_pending_gateway_restart_acks
@@ -1636,6 +1638,12 @@ def create_app(
         cursor_sched = getattr(app.state, "cursor_poll_scheduler", None)
         if isinstance(cursor_sched, CursorPollScheduler):
             await cursor_sched.stop()
+        # Stop replay before session drain / sqlite prune — otherwise the worker's
+        # ``asyncio.to_thread`` SQLite reads race teardown and can SIGSEGV the
+        # xdist worker (seen in ``test_traces_replay_endpoint_accepted_with_trace_seed``).
+        replay_worker = getattr(app.state, "replay_worker", None)
+        if isinstance(replay_worker, TurnReplayWorker):
+            await replay_worker.stop()
         improve_worker = getattr(app.state, "improve_job_worker", None)
         if isinstance(improve_worker, ImproveJobWorker):
             await improve_worker.stop()
@@ -1652,10 +1660,13 @@ def create_app(
         await sessions.drain(grace_period_s=_shutdown_timeout_s(ws))
         # Single shutdown owner for sevn Chrome (D6): registry-based reap with
         # TERM/wait/KILL — do not also call close_all_gateway_browsers (divergent).
-        with suppress(Exception):
+        # Log reap failures (do not swallow via suppress) so operators see them.
+        try:
             from sevn.browser.process import reap_sevn_browsers_on_shutdown
 
             await asyncio.to_thread(reap_sevn_browsers_on_shutdown, ly.content_root)
+        except Exception:
+            logger.exception("browser_reap_on_shutdown_failed")
         await asyncio.to_thread(
             prune_orphan_tool_result_dirs,
             content_root=ly.content_root,
@@ -1674,6 +1685,14 @@ def create_app(
         if mission_sub is not None:
             detach_mission_trace_sink(mission_sub)
         await trace.close()
+        # Cancelled session workers do not abort in-flight ``asyncio.to_thread``
+        # SQLite work. Drain the default executor before closing ``conn`` so
+        # orphaned turn teardown cannot SIGSEGV against a closed handle — then
+        # install a fresh executor so TestClient's shared portal loop (reused
+        # across pytest cases on one xdist worker) can still run ``to_thread``.
+        loop = asyncio.get_running_loop()
+        await loop.shutdown_default_executor()
+        loop.set_default_executor(concurrent.futures.ThreadPoolExecutor())
         conn.close()
         with suppress(Exception):
             release_leaked_multiprocessing_semaphores()

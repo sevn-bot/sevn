@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, BinaryIO
 
@@ -17,6 +18,8 @@ from proton_cli.service.drive import blocks, crypto, paths
 
 if TYPE_CHECKING:
     from proton_cli.account.keys import Unlocked
+
+_logger = logging.getLogger(__name__)
 
 BLOCK_SIZE = 4 * 1024 * 1024
 
@@ -103,7 +106,12 @@ class DriveService:
         for item in raw:
             try:
                 name = crypto.decrypt_name(item.name, resolved.node_key)
-            except Exception:
+            except Exception as exc:
+                _logger.warning(
+                    "drive name decrypt failed link_id=%s: %s",
+                    item.link_id,
+                    exc,
+                )
                 name = "(decrypt failed)"
             out.append(
                 Child(
@@ -140,7 +148,13 @@ class DriveService:
             for ch in children:
                 try:
                     name = crypto.decrypt_name(ch.name, current_key)
-                except Exception:
+                except Exception as exc:
+                    _logger.warning(
+                        "drive path segment decrypt failed link_id=%s segment=%s: %s",
+                        ch.link_id,
+                        part,
+                        exc,
+                    )
                     continue
                 if name == part:
                     found = ch
@@ -372,7 +386,13 @@ class DriveService:
                             size=link.size,
                         )
                     )
-                except Exception:
+                except Exception as exc:
+                    _logger.warning(
+                        "drive trash link fetch failed share_id=%s link_id=%s: %s",
+                        share_id,
+                        link_id,
+                        exc,
+                    )
                     out.append(TrashEntry(share_id=share_id, link_id=str(link_id)))
         return out
 

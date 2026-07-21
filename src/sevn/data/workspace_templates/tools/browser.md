@@ -37,7 +37,7 @@ and cookies persist across runs via that profile. Operator Chrome is never force
 | `dismiss_blockers` | — | best-effort accept/close cookie + consent banners |
 | `get_cookies` / `set_cookies` | `cookies?` | read / write cookies (login portability) |
 | `eval` | `expression` | **gated** — only when `tools.browser.allow_eval=true` |
-| `telegram` | `op`, `chat?`, `value?`, `query?` | Telegram Web recipe — `op`: `login` (QR/code human-handoff) · `chats` · `read` · `send` · `reply` · `search` · `botfather` (read a bot token). Host E2E / send-receive checks use `sevn.browser.recipes.telegram_checks` on this recipe (the old `telegram_test` CLI/harness is removed). |
+| `telegram` | `op`, `chat?`, `value?`, `query?` | Telegram Web recipe — `op`: `login` (QR/code human-handoff) · `chats` · `read` · `send` · `reply` · `search` · `botfather` (read a bot token). Host E2E / send-receive checks: `make telegram-checks` → `sevn.browser.recipes.telegram_checks` (`run_checks` / `assert_send_receive` on this recipe; Bot-API `getMe` via `--token` / `TELEGRAM_BOT_TOKEN`). The old `telegram_test` CLI/harness is removed. |
 | `google_search` | `query`, `mode?` | Google Search — `mode`: `results` (organic + People-Also-Ask) or `ask` (AI Overview, Gemini fallback) |
 | `gmail` | `op`, `query?`, `message_id?`, `to?`, `subject?`, `body?` | Gmail — `op`: `list` · `read` · `search` · `compose` · `reply` (writes require `tools.browser.gmail.allow_write=true`) |
 | `maps` | `op`, `query?`, `place?`, `origin?`, `destination?` | Google Maps — `op`: `search` · `place` · `directions` · `reviews` |
