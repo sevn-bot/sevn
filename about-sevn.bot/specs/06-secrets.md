@@ -175,7 +175,7 @@ Initial draft for **Failure Modes** — grounded in extracted interfaces; confir
 
 Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 
-**Proton Pass CLI dialect:** `ProtonPassCliBackend` routes get/set/delete through `pass secrets …` via `run_proton_cli`. Share-key and item decrypt failures in `PassService` (`_decrypt_share_keys`, `_fetch_items`) must log at **warning** with share/item ids and reason — partial lists may continue, but must not be indistinguishable silent empties (see `tests/proton_cli/test_pr_verifier_w1_red.py`).
+**Proton Pass CLI dialect:** `ProtonPassCliBackend` routes get/set/delete through `pass secrets …` via `run_proton_cli`. Share-key and item decrypt failures in `PassService` (`_decrypt_share_keys`, `_fetch_items`) must log at **warning** with share/item ids and reason — partial lists may continue, but must not be indistinguishable silent empties (see `tests/proton_cli/test_pr_verifier_w1_red.py`). Address-key unlock failures in `account/keys.py` (`_unlock_keys`) must likewise log at **warning** (partial unlock may continue; `unlock()` still raises when no address keys unlock).
 
 ## Test Strategy
 
@@ -185,7 +185,7 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
 
-Pass foundation reads: mocked `PassService` / Typer paths in `tests/proton_cli/test_pr_verifier_w1_red.py`; skill bridge argv in `tests/skills/test_proton_management_skill*.py`; backend seam in `tests/security/secrets/test_proton_pass_backend.py`.
+Pass foundation reads + write paths: mocked `PassService` / Typer paths in `tests/proton_cli/test_pr_verifier_w1_red.py` (item/vault create, `pass secrets get`, unlock + item-decrypt surfacing); skill bridge argv in `tests/skills/test_proton_management_skill*.py`; backend seam in `tests/security/secrets/test_proton_pass_backend.py`.
 
 ## Human-input needed
 

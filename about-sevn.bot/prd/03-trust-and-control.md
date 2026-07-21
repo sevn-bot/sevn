@@ -121,8 +121,9 @@ a black-box "safe mode."
   proxy, missing secrets unlock, sandbox driver unavailable—**before** the first consequential
   failure when fixtures cover the misconfiguration.
 - **FR-008:** Optional **Proton Pass** secrets backend (`ProtonPassCliBackend`) shall surface
-  share-key / item decrypt failures as operator-visible warnings (not silent empty vault/item
-  lists) when listing via the bundled `proton-cli` Pass dialect.
+  share-key / item decrypt failures and address-key unlock failures as operator-visible
+  warnings (not silent empty vault/item/key lists) when listing or writing via the bundled
+  `proton-cli` Pass dialect.
 
 ## Non-Goals
 

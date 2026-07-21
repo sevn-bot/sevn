@@ -149,8 +149,8 @@ def test_pass_share_key_decrypt_failure_is_logged(caplog: pytest.LogCaptureFixtu
 # --- W5 / PR #39 -----------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W5: pass write item_create side effect", strict=False)
 def test_pass_item_create_posts_to_api() -> None:
+    """``item_create`` POSTs an encrypted login item and returns ItemID."""
     from proton_cli.service.pass_service.service import NewItem, PassService
 
     calls: list[Any] = []
@@ -164,16 +164,73 @@ def test_pass_item_create_posts_to_api() -> None:
 
     svc = PassService(FakeClient())
     unlocked = MagicMock()
-    with patch.object(svc, "item_create", wraps=None) as create:
-        create.return_value = "new-1"
-        item_id = create(unlocked, "share-1", NewItem(name="x", password="p"))
+    with patch.object(svc, "_decrypt_share_keys", return_value={1: b"\x00" * 32}):
+        item_id = svc.item_create(unlocked, "share-1", NewItem(name="x", password="p"))
     assert item_id == "new-1"
+    assert len(calls) == 1
+    assert calls[0].method == "POST"
+    assert calls[0].path == "/pass/v1/share/share-1/item"
+    assert "Content" in (calls[0].body or {})
+    assert "ItemKey" in (calls[0].body or {})
+
+
+def test_pass_vault_create_and_delete_side_effects() -> None:
+    """``vault_create`` POSTs /pass/v1/vault; ``vault_delete`` DELETEs the share."""
+    from proton_cli.service.pass_service.service import PassService
+
+    calls: list[Any] = []
+
+    class FakeClient:
+        def decode(self, req: Any, out: dict[str, Any] | None = None) -> None:
+            calls.append(req)
+            if out is not None and req.method == "POST":
+                out.clear()
+                out.update({"Share": {"ShareID": "vault-share-1"}})
+
+    svc = PassService(FakeClient())
+    unlocked = MagicMock()
+    unlocked.primary_addr.return_value = ([MagicMock()], "addr-1", "a@proton.me")
+    with patch(
+        "proton_cli.service.pass_service.service._encrypt_binary",
+        return_value=b"enc-key",
+    ):
+        share_id = svc.vault_create(unlocked, "Personal")
+    assert share_id == "vault-share-1"
+    assert calls[0].method == "POST"
+    assert calls[0].path == "/pass/v1/vault"
+
+    calls.clear()
+    svc.vault_delete("vault-share-1")
+    assert calls[0].method == "DELETE"
+    assert calls[0].path == "/pass/v1/vault/vault-share-1"
+
+
+def test_pass_upsert_login_password_creates_when_missing() -> None:
+    """``upsert_login_password`` creates a login when no matching item exists."""
+    from proton_cli.service.pass_service.service import PassService
+
+    svc = PassService(MagicMock())
+    unlocked = MagicMock()
+    with (
+        patch.object(svc, "find_login_by_name", return_value=None),
+        patch.object(svc, "resolve_vault", return_value="share-1"),
+        patch.object(svc, "item_create", return_value="created-1") as create,
+    ):
+        item_id = svc.upsert_login_password(unlocked, name="sevn", password="p")
+    assert item_id == "created-1"
     create.assert_called_once()
 
 
-@pytest.mark.xfail(reason="green after W5: pass secrets get CLI", strict=False)
 def test_pass_secrets_get_emits_credential() -> None:
-    with patch("proton_cli.cli.pass_cmd._run") as run_app:
+    """``pass secrets get`` resolves a login and emits the password via stdout helper."""
+    emitted: list[str] = []
+    with (
+        patch("proton_cli.cli.pass_cmd._run") as run_app,
+        patch(
+            "proton_cli.cli.pass_cmd._emit_credential_stdout",
+            side_effect=lambda value: emitted.append(value),
+        ),
+    ):
         app = MagicMock()
         app.pass_svc.find_login_by_name.return_value = MagicMock(
             name="sevn",
@@ -183,29 +240,84 @@ def test_pass_secrets_get_emits_credential() -> None:
         run_app.return_value = app
         result = runner.invoke(root_app, ["pass", "secrets", "get", "sevn"])
     assert result.exit_code == 0
-    assert "secret" in (result.stdout or result.output)
+    assert emitted == ["secret"]
+    app.pass_svc.find_login_by_name.assert_called_once()
 
 
-@pytest.mark.xfail(reason="green after W5: address-key unlock failure surfaced", strict=False)
+def test_pass_items_create_and_vaults_create_cli() -> None:
+    """``pass items create`` / ``pass vaults create`` drive PassService write methods."""
+    with patch("proton_cli.cli.pass_cmd._run") as run_app:
+        app = MagicMock()
+        app.dry_run = False
+        app.pass_svc.resolve_vault.return_value = "share-1"
+        app.pass_svc.item_create.return_value = "item-1"
+        app.pass_svc.vault_create.return_value = "share-new"
+        run_app.return_value = app
+        created = runner.invoke(
+            root_app,
+            ["pass", "items", "create", "--name", "n", "--password", "p"],
+        )
+        vaulted = runner.invoke(root_app, ["pass", "vaults", "create", "--name", "Team"])
+    assert created.exit_code == 0
+    assert vaulted.exit_code == 0
+    app.pass_svc.item_create.assert_called_once()
+    app.pass_svc.vault_create.assert_called_once()
+
+
 def test_address_key_unlock_failure_is_visible(caplog: pytest.LogCaptureFixture) -> None:
-    from proton_cli.account import keys as keys_mod
+    """Address-key unlock failures log at warning instead of silent empty lists."""
+    from proton_cli.account.keys import Key, _unlock_keys
 
-    with (
-        caplog.at_level(logging.WARNING),
-        patch.object(keys_mod, "unlock_keys", side_effect=RuntimeError("unlock failed")),
-        pytest.raises(RuntimeError, match="unlock"),
-    ):
-        raise RuntimeError("unlock failed")
-    # After W5 the production unlock path must log or raise — pin the message contract.
-    assert True  # placeholder replaced by impl-wave un-xfail with real call
-
-
-@pytest.mark.xfail(reason="green after W5: item decrypt anonymize logged", strict=False)
-def test_pass_item_decrypt_failure_logged_not_anonymized(caplog: pytest.LogCaptureFixture) -> None:
+    bad = Key(id="addr-key-1", private_key="not-a-valid-pgp-blob", active=1)
     with caplog.at_level(logging.WARNING):
-        assert any(True for _ in ()) or True
-    # Concrete: when _fetch_items hits decrypt error it must log, not return type=unknown silently.
-    raise AssertionError("item decrypt failure must be logged (W5)")
+        unlocked = _unlock_keys([bad], b"passphrase", None)
+    assert unlocked == []
+    logged = any(
+        "unlock" in r.message.lower() and "addr-key-1" in r.message for r in caplog.records
+    )
+    assert logged
+
+
+def test_pass_item_decrypt_failure_logged_not_anonymized(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """``_fetch_items`` logs item decrypt failures; placeholder type=unknown is not silent."""
+    import base64
+
+    from proton_cli.service.pass_service.service import PassService
+
+    class FakeClient:
+        def decode(self, req: Any, out: dict[str, Any] | None = None) -> None:
+            if out is None:
+                return
+            out.clear()
+            out.update(
+                {
+                    "Items": {
+                        "RevisionsData": [
+                            {
+                                "ItemID": "item-bad",
+                                "State": 1,
+                                "ContentKeyRotation": 1,
+                                "ItemKey": base64.b64encode(b"short").decode(),
+                                "Content": base64.b64encode(b"x").decode(),
+                                "Revision": 1,
+                            }
+                        ],
+                        "LastToken": "",
+                    }
+                }
+            )
+
+    svc = PassService(FakeClient())
+    with caplog.at_level(logging.WARNING):
+        items = svc._fetch_items("share-1", {1: b"\x00" * 32})
+    assert len(items) == 1
+    assert items[0].type == "unknown"
+    logged = any(
+        "item decrypt" in r.message.lower() and "item-bad" in r.message for r in caplog.records
+    )
+    assert logged
 
 
 # --- W7 / PR #41 -----------------------------------------------------------

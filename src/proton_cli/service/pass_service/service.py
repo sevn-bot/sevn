@@ -502,7 +502,7 @@ class PassService:
                         aead.TAG_ITEM_CONTENT,
                     )
                     parsed = item_proto.decode_item_content(plain)
-                except (ValueError, json.JSONDecodeError, KeyError) as exc:
+                except Exception as exc:
                     _logger.warning(
                         "pass item decrypt failed share_id=%s item_id=%s: %s",
                         share_id,

@@ -124,8 +124,9 @@ becoming the integration layer.
 - **FR-008:** Optional **MCP and external integrations** shall remain operator-enabled opt-ins;
   the default install path must not silently widen the attack surface.
 - **FR-009:** Bundled **Proton** management (`proton-management` / `proton-cli`) shall support
-  Pass vault/item read journeys with correct module-mode `--profile` argv ordering and mocked
-  behavioral coverage for `pass vaults list` / `items list` / `items get`.
+  Pass vault/item read and write journeys with correct module-mode `--profile` argv ordering and
+  mocked behavioral coverage for `pass vaults` / `items` / `secrets` (including create +
+  `secrets get` → stdout credential emit).
 
 ## Non-Goals
 
