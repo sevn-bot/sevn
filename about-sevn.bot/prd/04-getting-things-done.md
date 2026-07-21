@@ -134,8 +134,10 @@ becoming the integration layer.
   (`events` list/get/delete, `contacts` list/get/create/delete, card decrypt) with decrypt drops
   logged, unrecognized card types raised, and empty create `Responses` failing loudly, and
   polish CLI (`status` / `api` runnable without a nested subcommand, legacy `session.json`
-  fallback on `status`, `settings set <key>` rejecting a missing value before auth)
-  (live Proton Calendar/Contacts/Drive E2E deferred without credentials).
+  fallback on `status`, `settings set <key>` rejecting a missing value before auth), and
+  deferred surfaces (`events` create/respond, `contacts` groups/pin-key, mail `--attach` +
+  attachments list/download, pinned-key recipient classification, HV-helper crash logging)
+  (live Proton Calendar/Contacts/Drive/RSVP/attachment/HV-webview E2E deferred without credentials).
 - **FR-010:** Bundled **Google Workspace** (`google-workspace`) shall honour
   `skills.google_workspace.prefer_gws` (§3.3): prefer the `gws` CLI via `use_gws_backend` /
   `run_gws` when on PATH, with an observable Python-client fallback and a behavioral

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 
 from proton_cli.hv import helper as hv_helper
 from proton_cli.proton.errors import ErrHVUnavailable, HumanVerificationError
+
+_logger = logging.getLogger(__name__)
 
 
 def cli_hv_resolver(hv_err: HumanVerificationError) -> tuple[str, str]:
@@ -33,9 +36,12 @@ def cli_hv_resolver(hv_err: HumanVerificationError) -> tuple[str, str]:
         except hv_helper.HVCancelledError as exc:
             raise ErrHVUnavailable(str(exc)) from exc
         except hv_helper.HVUnavailableError:
+            # Helper not installed / webview unavailable — fall through quietly.
             pass
-        except Exception:
-            pass
+        except Exception as exc:
+            # Unexpected helper crash: log before falling back so operators can
+            # distinguish "not installed" from a broken helper process.
+            _logger.warning("HV helper crashed: %s", exc, exc_info=True)
 
     if "captcha" in methods and hv_err.web_url:
         sys.stderr.write(f"Complete verification at {hv_err.web_url}, then set PROTON_HV_TOKEN.\n")

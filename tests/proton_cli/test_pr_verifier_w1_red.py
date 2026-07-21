@@ -780,39 +780,169 @@ def test_settings_set_rejects_missing_value() -> None:
 # --- W11 / PR #45 ----------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W11: calendar events create/respond", strict=False)
 def test_calendar_events_create_and_respond() -> None:
-    result_create = runner.invoke(
-        root_app,
-        ["calendar", "events", "create", "--help"],
-    )
-    assert result_create.exit_code == 0
-    # Behavioral (not --help) after W11:
-    raise AssertionError("events create/respond need mocked side-effect tests (W11)")
+    """``calendar events create|respond`` drive service side effects (not --help)."""
+    from proton_cli.service.calendar.service import EventResult, RespondResult
+
+    with patch("proton_cli.cli.calendar_cmd._run") as run_app:
+        app = MagicMock()
+        app.dry_run = False
+        app.unlock.return_value = MagicMock()
+        app.calendar_svc.resolve_calendar_id.return_value = "cal-1"
+        app.calendar_svc.event_create.return_value = EventResult(id="ev-1")
+        app.renderer.format.value = "text"
+        run_app.return_value = app
+        created = runner.invoke(
+            root_app,
+            [
+                "calendar",
+                "events",
+                "create",
+                "--title",
+                "Standup",
+                "--start",
+                "2026-07-21T10:00:00Z",
+                "--calendar",
+                "cal-1",
+            ],
+        )
+    assert created.exit_code == 0
+    app.calendar_svc.event_create.assert_called_once()
+
+    with patch("proton_cli.cli.calendar_cmd._run") as run_app:
+        app = MagicMock()
+        app.dry_run = False
+        app.unlock.return_value = MagicMock()
+        app.calendar_svc.resolve_event.return_value = ("cal-1", "ev-1")
+        app.calendar_svc.event_respond.return_value = RespondResult(
+            status="ACCEPTED",
+            title="Standup",
+        )
+        app.renderer.format.value = "text"
+        run_app.return_value = app
+        responded = runner.invoke(
+            root_app,
+            ["calendar", "events", "respond", "cal-1", "ev-1", "--status", "accept"],
+        )
+    assert responded.exit_code == 0
+    app.calendar_svc.event_respond.assert_called_once()
 
 
-@pytest.mark.xfail(reason="green after W11: contacts groups and pin-key", strict=False)
 def test_contacts_groups_and_pin_key_cli() -> None:
-    raise AssertionError("contacts groups/pin-key behavioral coverage missing (W11)")
+    """``contacts groups *`` and pin-key/unpin-key invoke service mutators."""
+    from proton_cli.service.contacts.service import Group
+
+    with patch("proton_cli.cli.contacts_cmd._run") as run_app:
+        app = MagicMock()
+        app.dry_run = False
+        app.unlock.return_value = MagicMock()
+        app.contacts_svc.groups_list.return_value = [Group(id="g1", name="Friends")]
+        app.contacts_svc.resolve_contact.return_value = "c1"
+        app.contacts_svc.get_contact.return_value = MagicMock(email="a@x.com")
+        app.renderer.format.value = "text"
+        run_app.return_value = app
+        assert runner.invoke(root_app, ["contacts", "groups", "list"]).exit_code == 0
+        assert runner.invoke(root_app, ["contacts", "groups", "create", "Work"]).exit_code == 0
+        app.contacts_svc.group_create.assert_called_once()
+        with patch("proton_cli.cli.contacts_cmd.Path") as path_cls:
+            path_cls.return_value.read_text.return_value = "-----BEGIN PGP PUBLIC KEY BLOCK-----\n"
+            assert (
+                runner.invoke(
+                    root_app,
+                    ["contacts", "pin-key", "c1", "--key", "/tmp/key.asc"],
+                ).exit_code
+                == 0
+            )
+        app.contacts_svc.pin_key.assert_called_once()
+        assert runner.invoke(root_app, ["contacts", "unpin-key", "c1"]).exit_code == 0
+        app.contacts_svc.unpin_key.assert_called_once()
 
 
-@pytest.mark.xfail(reason="green after W11: mail attach + attachments", strict=False)
-def test_mail_send_attach_and_attachments() -> None:
-    raise AssertionError("mail send --attach + attachments list/download uncovered (W11)")
+def test_mail_send_attach_and_attachments(tmp_path: Path) -> None:
+    """``mail messages send --attach`` + attachments list/download hit the service."""
+    from proton_cli.service.mail.service import Attachment
+
+    attach = tmp_path / "note.txt"
+    attach.write_text("hello", encoding="utf-8")
+    with patch("proton_cli.cli.mail_cmd._run") as run_app:
+        app = MagicMock()
+        app.dry_run = False
+        app.unlock.return_value = MagicMock()
+        app.mail_svc.send.return_value = "msg-sent"
+        app.mail_svc.attachments_list.return_value = [
+            Attachment(id="att-1", name="note.txt", size=5, mime_type="text/plain"),
+        ]
+        app.mail_svc.attachment_download.return_value = (b"hello", "note.txt")
+        app.renderer.format.value = "text"
+        run_app.return_value = app
+        sent = runner.invoke(
+            root_app,
+            [
+                "mail",
+                "messages",
+                "send",
+                "--to",
+                "b@x.com",
+                "--subject",
+                "Hi",
+                "--body",
+                "body",
+                "--attach",
+                str(attach),
+            ],
+        )
+        assert sent.exit_code == 0
+        assert app.mail_svc.send.call_args.args[1].attachments == [str(attach)]
+        assert (
+            runner.invoke(root_app, ["mail", "messages", "attachments", "list", "msg-1"]).exit_code
+            == 0
+        )
+        out = tmp_path / "out.bin"
+        assert (
+            runner.invoke(
+                root_app,
+                [
+                    "mail",
+                    "messages",
+                    "attachments",
+                    "download",
+                    "msg-1",
+                    "att-1",
+                    "--output",
+                    str(out),
+                ],
+            ).exit_code
+            == 0
+        )
+        assert out.read_bytes() == b"hello"
 
 
-@pytest.mark.xfail(reason="green after W11: pinned_keys_for consumed", strict=False)
 def test_pinned_keys_for_used_in_recipient_classification() -> None:
-    from proton_cli.service.contacts import service as contacts_svc
-    from proton_cli.service.mail import service as mail_svc
+    from proton_cli.service.contacts.service import ContactCrypto, ContactsService
+    from proton_cli.service.mail.service import PKG_INTERNAL, MailService
 
-    assert hasattr(contacts_svc.ContactsService, "pinned_keys_for")
-    # Mail classification must consult pinned keys, not only /core/v4/keys/all.
-    source = Path(mail_svc.__file__).read_text(encoding="utf-8")
-    assert "pinned_keys_for" in source
+    contacts = MagicMock(spec=ContactsService)
+    contacts.pinned_keys_for.return_value = ContactCrypto(
+        armored_keys=["-----BEGIN PGP PUBLIC KEY BLOCK-----\npinned\n"],
+        encrypt=True,
+    )
+    calls: list[str] = []
+
+    class FakeClient:
+        def decode(self, req: Any, out: dict[str, Any]) -> None:
+            calls.append(req.path)
+            out.clear()
+
+    scheme, armored = MailService(FakeClient(), contacts=contacts)._classify_recipient(
+        MagicMock(),
+        "pin@x.com",
+    )
+    assert scheme == PKG_INTERNAL
+    assert "pinned" in armored
+    assert calls == []
+    contacts.pinned_keys_for.assert_called_once()
 
 
-@pytest.mark.xfail(reason="green after W11: HV helper crash distinguishable", strict=False)
 def test_hv_helper_crash_distinct_from_unavailable(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
