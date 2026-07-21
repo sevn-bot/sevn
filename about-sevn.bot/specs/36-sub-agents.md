@@ -422,9 +422,12 @@ granted specialists bypass `assigned_to` when `triager` is in `requestable_by`.
 First documented specialist: `media_generator` (MiniMax-3) bound to
 `media_generation` skill via `wait: true` spawn path. Execute kinds include
 `image`, `image_i2i`, `video` / `video_i2v` / `video_s2v` / `video_fl2v`,
-`video_template`, `music`, and `voice` (TTS + clone); bundled CLIs under
-`src/sevn/data/bundled_skills/core/media_generation/scripts/` drive the same
-worker. CI covers these with mocked MiniMax; live smoke requires `SEVN_MEDIA_LIVE=1`.
+`video_template`, `music`, and `voice` (TTS + clone); voice clone passes literal
+`preview_text`/`speech_text` (not the template-augmented prompt). Bundled CLIs under
+`src/sevn/data/bundled_skills/core/media_generation/scripts/` (including S2V/FL2V)
+drive the same worker. Downloads are capped at 100 MiB; `_persist_bytes` size-verifies
+with a direct `write_bytes` fallback. CI covers these with mocked MiniMax; live smoke
+requires `SEVN_MEDIA_LIVE=1`.
 
 Second documented specialist: `social_media_manager` — browser-first social
 monitoring across six platforms with per-site medium config under
@@ -499,7 +502,7 @@ Unit/harness tests only — no live LLM in CI:
 | Mission API | `tests/gateway/test_mission_subagents.py` |
 | Telegram menu | `tests/gateway/test_config_subagents_menu.py` |
 | CLI | `tests/cli/test_subagents_cmd.py` |
-| Media skill | `tests/skills/test_media_generation_skill.py`, `tests/skills/test_media_generation_skill_w1_red.py` — mocked execute paths for `image_i2i` / `video_s2v` / `video_fl2v` / `video_template` / voice-clone plus bundled script CLIs; live MiniMax only under `SEVN_MEDIA_LIVE=1` |
+| Media skill | `tests/skills/test_media_generation_skill.py`, `tests/skills/test_media_generation_skill_w1_red.py` — mocked execute paths for `image_i2i` / `video_s2v` / `video_fl2v` / `video_template` / voice-clone (literal `preview_text`) plus bundled script CLIs including S2V/FL2V; `tests/agent/subagents/test_media_minimax_w1_red.py` — download size cap + `_persist_bytes` fallback; live MiniMax only under `SEVN_MEDIA_LIVE=1` |
 | Social media specialist | `tests/agent/subagents/test_social_media_platform_medium.py`, `tests/skills/test_social_media_manager_skill.py`, `tests/gateway/test_social_media_manager_menu.py`, `tests/integrations/test_social_media_config.py`, `tests/integrations/test_twexapi_client.py` |
 
 Docs gate: `make subagents-chart-check` (deterministic SVG); `make ci-docs`.

@@ -8,14 +8,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from sevn.agent.subagents.media_minimax import _MAX_DOWNLOAD_BYTES, MiniMaxMediaError, _download_url
+from sevn.agent.subagents.media_minimax import (
+    _MAX_DOWNLOAD_BYTES,
+    MiniMaxMediaError,
+    _download_url,
+)
 from sevn.agent.subagents.media_worker import _persist_bytes
 from sevn.storage.migrate import apply_migrations
 from sevn.storage.paths import sevn_db_path
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W14: download size cap", strict=False)
 async def test_download_url_rejects_oversized_content_length() -> None:
     http = MagicMock()
     resp = MagicMock()
@@ -28,7 +31,6 @@ async def test_download_url_rejects_oversized_content_length() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W14: download size cap body", strict=False)
 async def test_download_url_rejects_oversized_body() -> None:
     http = MagicMock()
     resp = MagicMock()
@@ -41,7 +43,6 @@ async def test_download_url_rejects_oversized_body() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W14: persist_bytes size mismatch fallback", strict=False)
 async def test_persist_bytes_falls_back_on_size_mismatch(tmp_path: Path) -> None:
     dot = tmp_path / ".sevn"
     dot.mkdir()
@@ -66,3 +67,36 @@ async def test_persist_bytes_falls_back_on_size_mismatch(tmp_path: Path) -> None
         )
     written = tmp_path / rel
     assert written.read_bytes() == data
+
+
+@pytest.mark.asyncio
+async def test_persist_bytes_raises_when_fallback_still_mismatches(tmp_path: Path) -> None:
+    """W14.4 — persistent size mismatch after write_bytes fallback raises."""
+    dot = tmp_path / ".sevn"
+    dot.mkdir()
+    conn = sqlite3.connect(str(sevn_db_path(dot)))
+    apply_migrations(conn)
+    data = b"artifact-bytes"
+    target = tmp_path / "channel_files" / "sess-p" / "out.bin"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"short")
+
+    def _noop_write(self: Path, _data: bytes) -> None:
+        # Leave the pre-existing wrong-sized file in place.
+        return None
+
+    with (
+        patch(
+            "sevn.gateway.media.media_store.MediaStore.persist_attachment_descriptors",
+            new=AsyncMock(return_value=None),
+        ),
+        patch.object(Path, "write_bytes", _noop_write),
+        pytest.raises(MiniMaxMediaError, match="failed to persist"),
+    ):
+        await _persist_bytes(
+            conn=conn,
+            content_root=tmp_path,
+            session_id="sess-p",
+            filename="out.bin",
+            data=data,
+        )

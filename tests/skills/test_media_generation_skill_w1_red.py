@@ -377,7 +377,6 @@ class TestMediaGenerationScriptsW3:
 class TestMediaGenerationScriptsW14:
     """PR #48 — S2V / FL2V CLIs + voice-clone literal text."""
 
-    @pytest.mark.xfail(reason="green after W14: generate_video_subject script", strict=False)
     def test_generate_video_subject_script_mocked(
         self,
         media_workspace: tuple[Path, sqlite3.Connection],
@@ -405,7 +404,6 @@ class TestMediaGenerationScriptsW14:
             assert mod.main() == 0
         assert mocked.call_args.args[0] == "video_s2v"
 
-    @pytest.mark.xfail(reason="green after W14: generate_video_first_last script", strict=False)
     def test_generate_video_first_last_script_mocked(
         self,
         media_workspace: tuple[Path, sqlite3.Connection],
@@ -436,7 +434,6 @@ class TestMediaGenerationScriptsW14:
         assert mocked.call_args.args[0] == "video_fl2v"
 
     @pytest.mark.asyncio
-    @pytest.mark.xfail(reason="green after W14: voice-clone literal preview_text", strict=False)
     async def test_voice_clone_passes_literal_preview_text(
         self,
         media_workspace: tuple[Path, sqlite3.Connection],

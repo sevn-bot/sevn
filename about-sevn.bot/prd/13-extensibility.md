@@ -113,7 +113,8 @@ gateway.
   explicit operator trust configuration; silent broad interception is not the default.
 - **FR-008:** Optional bundled skill groups (e.g. **`media_generation`** bound to the
   `media_generator` MiniMax L2 specialist, Discogs, proton) shall remain first-class extension
-  surfaces — operator-visible scripts and specialist execute paths are covered by mocked
+  surfaces — operator-visible scripts (including S2V/FL2V CLIs) and specialist execute paths
+  (literal voice-clone text, download size cap, persist size-verify) are covered by mocked
   behavioral tests; live provider E2E stays opt-in (`SEVN_MEDIA_LIVE`, etc.).
 
 ## Non-Goals
