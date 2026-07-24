@@ -1294,7 +1294,8 @@ def create_app(
         # Persistent tunnel: when the operator turned it on from the Telegram menu
         # (``infrastructure.tunnel.autostart``), re-launch it here so it survives host
         # restart alongside the gateway daemon. Best-effort — a missing cloudflared
-        # binary or unresolved secret must not block boot.
+        # binary, unresolved secret, or a provider spawn that exceeds the start timeout
+        # is logged and skipped, never fatal to boot.
         from sevn.infrastructure.tunnel_autostart import autostart_tunnel_if_enabled
         from sevn.infrastructure.tunnel_config import tunnel_cfg_from_disk
 

@@ -31,6 +31,11 @@ if TYPE_CHECKING:
     from sevn.config.workspace_config import SecretsBackendSectionConfig
     from sevn.infrastructure.tunnel_manager import TunnelManager, TunnelStatus
 
+#: Upper bound on a single tunnel spawn. ``cloudflare_quick`` self-bounds its URL read
+#: (~45s), but a ``tailscale`` CLI can hang with no subprocess timeout (daemon down /
+#: pending auth); wrapping the spawn keeps a stuck provider from stalling gateway boot.
+TUNNEL_START_TIMEOUT_S: float = 60.0
+
 
 def tunnel_autostart_enabled(tunnel_config: dict[str, Any]) -> bool:
     """Return whether the tunnel should auto-start at gateway boot.
@@ -79,7 +84,8 @@ async def start_configured_tunnel(
         TunnelStatus: State after the spawn attempt.
 
     Raises:
-        RuntimeError: When the provider binary is missing or credentials are absent.
+        RuntimeError: When the provider binary is missing, credentials are absent, or the
+            spawn does not complete within :data:`TUNNEL_START_TIMEOUT_S`.
         ValueError: When the configured mode is not runnable.
 
     Examples:
@@ -93,7 +99,15 @@ async def start_configured_tunnel(
         content_root=content_root,
         secrets_backend=secrets_backend,
     )
-    return await asyncio.to_thread(manager.start, runtime_cfg, confirm=True)
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(manager.start, runtime_cfg, confirm=True),
+            timeout=TUNNEL_START_TIMEOUT_S,
+        )
+    except TimeoutError as exc:
+        raise RuntimeError(
+            f"tunnel provider did not start within {TUNNEL_START_TIMEOUT_S:.0f}s",
+        ) from exc
 
 
 async def autostart_tunnel_if_enabled(

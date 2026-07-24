@@ -160,6 +160,50 @@ async def test_tunnel_off_clears_autostart_and_stops(
 
 
 @pytest.mark.asyncio
+async def test_tunnel_on_failed_start_does_not_persist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A raising start reports failure and leaves ``autostart`` unset (boot won't retry)."""
+    router, cap, root = _build_owner_router(tmp_path)
+    _set_tunnel_mode(root, "cloudflare_quick")
+
+    async def _fake_start(**_kwargs: Any) -> TunnelStatus:
+        raise RuntimeError("cloudflared binary not found on PATH")
+
+    monkeypatch.setattr("sevn.infrastructure.tunnel_autostart.start_configured_tunnel", _fake_start)
+
+    await router.route_incoming(_callback("act:tunnel:on", callback_query_id="cq-fail"))
+
+    assert "autostart" not in _read_tunnel(root)
+    assert any("Tunnel start failed" in (t or "") for _cq, t in cap.answered)
+
+
+@pytest.mark.asyncio
+async def test_tunnel_on_unhealthy_start_does_not_persist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unhealthy start reports failure and leaves ``autostart`` unset."""
+    router, cap, root = _build_owner_router(tmp_path)
+    _set_tunnel_mode(root, "cloudflare_quick")
+
+    async def _fake_start(**_kwargs: Any) -> TunnelStatus:
+        return TunnelStatus(
+            mode="cloudflare_quick",
+            pid=None,
+            healthy=False,
+            public_url=None,
+            error="exited with code 1",
+        )
+
+    monkeypatch.setattr("sevn.infrastructure.tunnel_autostart.start_configured_tunnel", _fake_start)
+
+    await router.route_incoming(_callback("act:tunnel:on", callback_query_id="cq-unhealthy"))
+
+    assert "autostart" not in _read_tunnel(root)
+    assert any("Tunnel start failed" in (t or "") for _cq, t in cap.answered)
+
+
+@pytest.mark.asyncio
 async def test_tunnel_on_unconfigured_mode_does_not_start(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

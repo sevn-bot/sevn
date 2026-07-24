@@ -108,3 +108,44 @@ async def test_autostart_swallows_provider_error(tmp_path: Path) -> None:
     )
     assert result is None
     assert len(mgr.started) == 1
+
+
+class _HangingManager:
+    """``start`` blocks past the timeout (models a stuck tailscale CLI spawn)."""
+
+    def start(self, tunnel_config: dict[str, Any], *, confirm: bool) -> TunnelStatus:
+        import time
+
+        # Outlive the (patched) timeout without stalling teardown for long.
+        time.sleep(1.0)
+        return _healthy()
+
+
+@pytest.mark.asyncio
+async def test_start_configured_tunnel_times_out(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A hung provider spawn raises RuntimeError instead of blocking forever."""
+    monkeypatch.setattr("sevn.infrastructure.tunnel_autostart.TUNNEL_START_TIMEOUT_S", 0.05)
+    with pytest.raises(RuntimeError, match="did not start within"):
+        await start_configured_tunnel(
+            tunnel_config={"mode": "cloudflare_quick"},
+            gateway_port=3001,
+            content_root=tmp_path,
+            secrets_backend=None,
+            manager=_HangingManager(),  # type: ignore[arg-type]
+        )
+
+
+@pytest.mark.asyncio
+async def test_autostart_swallows_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A boot-time spawn timeout is logged and skipped, never fatal."""
+    monkeypatch.setattr("sevn.infrastructure.tunnel_autostart.TUNNEL_START_TIMEOUT_S", 0.05)
+    result = await autostart_tunnel_if_enabled(
+        tunnel_config={"mode": "cloudflare_quick", "autostart": True},
+        gateway_port=3001,
+        content_root=tmp_path,
+        secrets_backend=None,
+        manager=_HangingManager(),  # type: ignore[arg-type]
+    )
+    assert result is None

@@ -1403,13 +1403,12 @@ class MenuActionRouter:
             return None if answered else toast
         gateway_port = self._workspace.gateway.port if self._workspace.gateway else None
         if turn_on:
-            mutate_sevn_json(
-                self._sevn_json,
-                lambda d: _set_nested(d, "infrastructure.tunnel.autostart", True),
-            )
-            self._reload_workspace()
             from sevn.infrastructure.tunnel_autostart import start_configured_tunnel
 
+            # Start first; only persist ``autostart`` once the provider is confirmed
+            # healthy. Persisting before that would leave the flag (and the redrawn
+            # "Turn tunnel off" button) claiming "on" for a tunnel that never came up,
+            # and every gateway boot would keep retrying the broken config.
             try:
                 status = await start_configured_tunnel(
                     tunnel_config=tunnel_cfg,
@@ -1424,11 +1423,19 @@ class MenuActionRouter:
                     msg, callback_data, toast=toast
                 )
                 return None if answered else toast
-            if status.healthy:
-                url = status.mission_control_url or status.public_url
-                toast = "Tunnel on." + (f" {url}" if url else "") + self._tunnel_persistence_hint()
-            else:
+            if not status.healthy:
                 toast = f"Tunnel start failed: {status.error or 'not healthy'}"
+                answered = await self._refresh_config_menu_after_action(
+                    msg, callback_data, toast=toast
+                )
+                return None if answered else toast
+            mutate_sevn_json(
+                self._sevn_json,
+                lambda d: _set_nested(d, "infrastructure.tunnel.autostart", True),
+            )
+            self._reload_workspace()
+            url = status.mission_control_url or status.public_url
+            toast = "Tunnel on." + (f" {url}" if url else "") + self._tunnel_persistence_hint()
         else:
             mutate_sevn_json(
                 self._sevn_json,
