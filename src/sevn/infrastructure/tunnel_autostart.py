@@ -93,21 +93,25 @@ async def start_configured_tunnel(
         >>> inspect.iscoroutinefunction(start_configured_tunnel)
         True
     """
-    runtime_cfg = await prepare_tunnel_runtime_cfg(
-        tunnel_config,
-        gateway_port=gateway_port,
-        content_root=content_root,
-        secrets_backend=secrets_backend,
-    )
-    try:
-        return await asyncio.wait_for(
-            asyncio.to_thread(manager.start, runtime_cfg, confirm=True),
-            timeout=TUNNEL_START_TIMEOUT_S,
+    # Hold the manager lock across secret resolution *and* the spawn so an operator
+    # ``stop`` (Telegram toggle) can't interleave with a boot autostart still in flight
+    # and leak a process the user asked to stop (TunnelManager has no internal lock).
+    async with manager.lifecycle_lock:
+        runtime_cfg = await prepare_tunnel_runtime_cfg(
+            tunnel_config,
+            gateway_port=gateway_port,
+            content_root=content_root,
+            secrets_backend=secrets_backend,
         )
-    except TimeoutError as exc:
-        raise RuntimeError(
-            f"tunnel provider did not start within {TUNNEL_START_TIMEOUT_S:.0f}s",
-        ) from exc
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(manager.start, runtime_cfg, confirm=True),
+                timeout=TUNNEL_START_TIMEOUT_S,
+            )
+        except TimeoutError as exc:
+            raise RuntimeError(
+                f"tunnel provider did not start within {TUNNEL_START_TIMEOUT_S:.0f}s",
+            ) from exc
 
 
 async def autostart_tunnel_if_enabled(

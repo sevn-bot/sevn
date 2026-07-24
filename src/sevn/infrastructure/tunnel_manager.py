@@ -22,6 +22,7 @@ invocations (``sevn tunnel start`` / ``sevn tunnel stop``).
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
 import os
@@ -239,6 +240,28 @@ class TunnelManager:
         self._process: subprocess.Popen[bytes] | None = None
         self._pid_file = pid_file
         self._started_mode: str | None = None
+        self._lifecycle_lock = asyncio.Lock()
+
+    @property
+    def lifecycle_lock(self) -> asyncio.Lock:
+        """Async lock serialising ``start``/``stop`` across concurrent async callers.
+
+        ``start`` and ``stop`` mutate ``_process``/``_started_mode`` without a thread
+        lock, so the gateway's fire-and-forget boot autostart and an operator-initiated
+        Telegram toggle (both driving this shared singleton via ``asyncio.to_thread``)
+        must not run concurrently. Callers hold this lock across the whole start/stop
+        operation — including secret resolution — so a boot spawn still in flight is
+        fully observed before a ``stop`` runs.
+
+        Returns:
+            asyncio.Lock: The per-manager start/stop serialisation lock.
+
+        Examples:
+            >>> import asyncio
+            >>> isinstance(TunnelManager().lifecycle_lock, asyncio.Lock)
+            True
+        """
+        return self._lifecycle_lock
 
     def attach_pid_file(self, pid_file: Path) -> None:
         """Bind this manager to a shared pid file (idempotent).

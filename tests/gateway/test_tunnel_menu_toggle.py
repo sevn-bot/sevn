@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from sevn.config.workspace_config import WorkspaceConfig
+from sevn.gateway.commands.menu_action_router import MenuActionRouter
 from sevn.gateway.menu.menu import (
     _build_my_sevn_bot_keyboard_rows,
     _tunnel_toggle_row,
@@ -78,6 +79,31 @@ def test_non_owner_never_sees_tunnel_toggle() -> None:
     )
     cbs = [btn["callback_data"] for row in rows for btn in row]
     assert not any(c.startswith("act:tunnel:") for c in cbs)
+
+
+# --- persistence hint -----------------------------------------------------
+
+
+def test_tunnel_persistence_hint_empty_when_gateway_daemon_installed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "sevn.gateway.commands.menu_action_router.unit_file_exists",
+        lambda **_kwargs: True,
+    )
+    router = MenuActionRouter.__new__(MenuActionRouter)
+    assert router._tunnel_persistence_hint() == ""
+
+
+def test_tunnel_persistence_hint_warns_when_gateway_daemon_absent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "sevn.gateway.commands.menu_action_router.unit_file_exists",
+        lambda **_kwargs: False,
+    )
+    router = MenuActionRouter.__new__(MenuActionRouter)
+    assert "Install the gateway daemon" in router._tunnel_persistence_hint()
 
 
 # --- action router --------------------------------------------------------

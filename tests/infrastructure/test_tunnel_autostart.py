@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,7 @@ class _FakeManager:
         self.status = status
         self.exc = exc
         self.started: list[dict[str, Any]] = []
+        self.lifecycle_lock = asyncio.Lock()
 
     def start(self, tunnel_config: dict[str, Any], *, confirm: bool) -> TunnelStatus:
         self.started.append({"cfg": tunnel_config, "confirm": confirm})
@@ -127,6 +129,9 @@ async def test_autostart_swallows_os_error(tmp_path: Path) -> None:
 
 class _HangingManager:
     """``start`` blocks past the timeout (models a stuck tailscale CLI spawn)."""
+
+    def __init__(self) -> None:
+        self.lifecycle_lock = asyncio.Lock()
 
     def start(self, tunnel_config: dict[str, Any], *, confirm: bool) -> TunnelStatus:
         import time

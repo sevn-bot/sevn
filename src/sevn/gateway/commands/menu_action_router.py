@@ -1443,7 +1443,10 @@ class MenuActionRouter:
             )
             self._reload_workspace()
             try:
-                await asyncio.to_thread(default_manager.stop, tunnel_cfg, confirm=True)
+                # Serialise with the boot autostart task (same default_manager singleton)
+                # so a stop can't race a still-resolving start (see TunnelManager lock).
+                async with default_manager.lifecycle_lock:
+                    await asyncio.to_thread(default_manager.stop, tunnel_cfg, confirm=True)
             except (OSError, RuntimeError, ValueError) as exc:
                 toast = f"Tunnel stop failed: {exc}"
                 answered = await self._refresh_config_menu_after_action(

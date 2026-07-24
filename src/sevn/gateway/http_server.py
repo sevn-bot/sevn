@@ -1676,6 +1676,14 @@ def create_app(
         cron_task.cancel()
         with suppress(asyncio.CancelledError):
             await cron_task
+        # Cancel the fire-and-forget tunnel autostart so a spawn still in flight
+        # (bounded by TUNNEL_START_TIMEOUT_S) can't dangle or write a pid file into
+        # an already-torn-down content_root on a fast shutdown/restart.
+        tunnel_task = getattr(app.state, "tunnel_autostart_task", None)
+        if isinstance(tunnel_task, asyncio.Task):
+            tunnel_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await tunnel_task
         from sevn.triggers.operator_notify import unwire_operator_notify
 
         unwire_operator_notify()
