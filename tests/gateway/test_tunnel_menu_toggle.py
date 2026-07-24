@@ -1,0 +1,203 @@
+"""Telegram Config → My sevn bot persistent-tunnel on/off toggle (owner-only)."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from sevn.config.workspace_config import WorkspaceConfig
+from sevn.gateway.menu.menu import (
+    _build_my_sevn_bot_keyboard_rows,
+    _tunnel_toggle_row,
+)
+from sevn.gateway.menu.menu_readiness import readiness_for_callback
+from sevn.gateway.menu.menu_registry import match_menu_button_spec
+from sevn.infrastructure.tunnel_manager import TunnelStatus
+from tests.gateway.test_my_sevn_version_id import _build_owner_router, _callback
+
+# --- registry + readiness -------------------------------------------------
+
+
+def test_tunnel_callbacks_registered_owner_only_and_ready() -> None:
+    on = match_menu_button_spec("act:tunnel:on")
+    off = match_menu_button_spec("act:tunnel:off")
+    assert on is not None
+    assert off is not None
+    assert on.spec_id == "C22.1"
+    assert off.spec_id == "C22.2"
+    for spec in (on, off):
+        assert spec.section == "my_sevn_bot"
+        assert spec.owner_only is True
+        assert spec.implemented is True
+    # Pressable (not locked behind cfg:disabled:*).
+    assert readiness_for_callback("act:tunnel:on") == "Ready"
+    assert readiness_for_callback("act:tunnel:off") == "Ready"
+
+
+# --- renderer -------------------------------------------------------------
+
+
+def test_tunnel_toggle_row_reflects_state() -> None:
+    assert _tunnel_toggle_row({"mode": "none"}) is None
+    assert _tunnel_toggle_row({"mode": "cloudflare"})[0]["callback_data"] == "act:tunnel:on"
+    assert (
+        _tunnel_toggle_row({"mode": "cloudflare", "autostart": True})[0]["callback_data"]
+        == "act:tunnel:off"
+    )
+
+
+def test_my_sevn_bot_rows_include_tunnel_toggle_for_owner() -> None:
+    rows = _build_my_sevn_bot_keyboard_rows(
+        WorkspaceConfig.minimal(),
+        is_owner=True,
+        tunnel_cfg={"mode": "cloudflare_quick", "autostart": False},
+    )
+    cbs = [btn["callback_data"] for row in rows for btn in row]
+    assert "act:tunnel:on" in cbs
+    assert "cfg:logs:deployment_id" in cbs
+
+
+def test_my_sevn_bot_rows_omit_tunnel_when_unconfigured() -> None:
+    rows = _build_my_sevn_bot_keyboard_rows(
+        WorkspaceConfig.minimal(),
+        is_owner=True,
+        tunnel_cfg={"mode": "none"},
+    )
+    cbs = [btn["callback_data"] for row in rows for btn in row]
+    assert not any(c.startswith("act:tunnel:") for c in cbs)
+
+
+def test_non_owner_never_sees_tunnel_toggle() -> None:
+    rows = _build_my_sevn_bot_keyboard_rows(
+        WorkspaceConfig.minimal(),
+        is_owner=False,
+        tunnel_cfg={"mode": "cloudflare_quick", "autostart": True},
+    )
+    cbs = [btn["callback_data"] for row in rows for btn in row]
+    assert not any(c.startswith("act:tunnel:") for c in cbs)
+
+
+# --- action router --------------------------------------------------------
+
+
+def _set_tunnel_mode(root: Path, mode: str, *, autostart: bool | None = None) -> None:
+    sevn_json = root / "sevn.json"
+    doc = json.loads(sevn_json.read_text(encoding="utf-8"))
+    tunnel: dict[str, Any] = {"mode": mode}
+    if autostart is not None:
+        tunnel["autostart"] = autostart
+    doc.setdefault("infrastructure", {})["tunnel"] = tunnel
+    sevn_json.write_text(json.dumps(doc), encoding="utf-8")
+
+
+def _read_tunnel(root: Path) -> dict[str, Any]:
+    doc = json.loads((root / "sevn.json").read_text(encoding="utf-8"))
+    infra = doc.get("infrastructure")
+    tunnel = infra.get("tunnel") if isinstance(infra, dict) else None
+    return tunnel if isinstance(tunnel, dict) else {}
+
+
+def _healthy(mode: str = "cloudflare_quick") -> TunnelStatus:
+    return TunnelStatus(
+        mode=mode,
+        pid=555,
+        healthy=True,
+        public_url="https://x.trycloudflare.com",
+        error=None,
+        mission_control_url="https://x.trycloudflare.com",
+    )
+
+
+@pytest.mark.asyncio
+async def test_tunnel_on_sets_autostart_and_starts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    router, cap, root = _build_owner_router(tmp_path)
+    _set_tunnel_mode(root, "cloudflare_quick")
+
+    calls: list[dict[str, Any]] = []
+
+    async def _fake_start(**kwargs: Any) -> TunnelStatus:
+        calls.append(kwargs)
+        return _healthy()
+
+    monkeypatch.setattr("sevn.infrastructure.tunnel_autostart.start_configured_tunnel", _fake_start)
+
+    await router.route_incoming(_callback("act:tunnel:on", callback_query_id="cq-on"))
+
+    assert _read_tunnel(root).get("autostart") is True
+    assert len(calls) == 1
+    assert any("Tunnel on" in (t or "") for _cq, t in cap.answered)
+
+
+@pytest.mark.asyncio
+async def test_tunnel_off_clears_autostart_and_stops(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    router, cap, root = _build_owner_router(tmp_path)
+    _set_tunnel_mode(root, "cloudflare_quick", autostart=True)
+
+    stopped: list[Any] = []
+
+    def _fake_stop(cfg: dict[str, Any], *, confirm: bool) -> TunnelStatus:
+        stopped.append((cfg, confirm))
+        return TunnelStatus(
+            mode="cloudflare_quick", pid=None, healthy=False, public_url=None, error=None
+        )
+
+    from sevn.infrastructure.tunnel_manager import default_manager
+
+    monkeypatch.setattr(default_manager, "stop", _fake_stop)
+
+    await router.route_incoming(_callback("act:tunnel:off", callback_query_id="cq-off"))
+
+    assert _read_tunnel(root).get("autostart") is False
+    assert len(stopped) == 1
+    assert any("Tunnel off" in (t or "") for _cq, t in cap.answered)
+
+
+@pytest.mark.asyncio
+async def test_tunnel_on_unconfigured_mode_does_not_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    router, cap, root = _build_owner_router(tmp_path)  # no infrastructure.tunnel
+
+    started: list[Any] = []
+
+    async def _fake_start(**kwargs: Any) -> TunnelStatus:
+        started.append(kwargs)
+        return _healthy()
+
+    monkeypatch.setattr("sevn.infrastructure.tunnel_autostart.start_configured_tunnel", _fake_start)
+
+    await router.route_incoming(_callback("act:tunnel:on", callback_query_id="cq-none"))
+
+    assert started == []
+    assert _read_tunnel(root).get("autostart") is None
+    assert any("No tunnel configured" in (t or "") for _cq, t in cap.answered)
+
+
+@pytest.mark.asyncio
+async def test_tunnel_on_denied_for_non_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    router, _cap, root = _build_owner_router(tmp_path)
+    _set_tunnel_mode(root, "cloudflare_quick")
+
+    started: list[Any] = []
+
+    async def _fake_start(**kwargs: Any) -> TunnelStatus:
+        started.append(kwargs)
+        return _healthy()
+
+    monkeypatch.setattr("sevn.infrastructure.tunnel_autostart.start_configured_tunnel", _fake_start)
+
+    await router.route_incoming(
+        _callback("act:tunnel:on", user_id="intruder", callback_query_id="cq-deny")
+    )
+
+    assert started == []
+    assert "autostart" not in _read_tunnel(root)

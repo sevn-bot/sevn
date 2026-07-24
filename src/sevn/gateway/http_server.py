@@ -1291,6 +1291,20 @@ def create_app(
         from sevn.infrastructure.tunnel_manager import default_manager, tunnel_pid_file
 
         default_manager.attach_pid_file(tunnel_pid_file(ly.content_root))
+        # Persistent tunnel: when the operator turned it on from the Telegram menu
+        # (``infrastructure.tunnel.autostart``), re-launch it here so it survives host
+        # restart alongside the gateway daemon. Best-effort — a missing cloudflared
+        # binary or unresolved secret must not block boot.
+        from sevn.infrastructure.tunnel_autostart import autostart_tunnel_if_enabled
+        from sevn.infrastructure.tunnel_config import tunnel_cfg_from_disk
+
+        await autostart_tunnel_if_enabled(
+            tunnel_config=tunnel_cfg_from_disk(ws, sevn_json=ly.sevn_json_path),
+            gateway_port=ws.gateway.port if ws.gateway else None,
+            content_root=ly.content_root,
+            secrets_backend=ws.secrets_backend,
+            manager=default_manager,
+        )
         # W3: single RuntimeToolBindings factory (integration W2, sandbox W3, MCP W6).
         _mcp_servers_map = build_effective_mcp_servers(ws, ly.content_root)
         _mcp_tool_defs = await discover_mcp_tool_definitions(_mcp_servers_map)

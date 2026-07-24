@@ -201,6 +201,8 @@ def infer_config_section_from_callback(data: str) -> ConfigSection:
         'models'
         >>> infer_config_section_from_callback("act:gateway:restart")
         'my_sevn_bot'
+        >>> infer_config_section_from_callback("act:tunnel:on")
+        'my_sevn_bot'
         >>> infer_config_section_from_callback("act:sevn_bot:sync")
         'sevn_bot'
         >>> infer_config_section_from_callback("cfg:logs:toggle_redaction")
@@ -211,7 +213,7 @@ def infer_config_section_from_callback(data: str) -> ConfigSection:
         return "logs"
     if raw.startswith("cfg:models:"):
         return "models"
-    if raw.startswith(("act:gateway:", "act:proxy:")):
+    if raw.startswith(("act:gateway:", "act:proxy:", "act:tunnel:")):
         return "my_sevn_bot"
     if raw.startswith("act:sevn_bot:"):
         return "sevn_bot"
@@ -538,6 +540,8 @@ class MenuActionRouter:
                 return await self._handle_logs_action(msg, raw, target)
             if target.startswith("sevn_bot:"):
                 return await self._handle_sevn_bot_action(msg, raw, target)
+            if target.startswith("tunnel:"):
+                return await self._handle_tunnel_action(msg, raw, target)
             if target == "discogs:whoami":
                 return await self._handle_discogs_whoami(msg, raw)
             if target.startswith("subagents:kill:"):
@@ -1337,6 +1341,111 @@ class MenuActionRouter:
         count = await supervisor.kill_all(role=None)
         toast = f"Killed {count} sub-agent run(s)."
         return await self._after_subagent_kill(msg, callback_data, toast=toast)
+
+    def _tunnel_persistence_hint(self) -> str:
+        """Return a caveat when the gateway daemon is absent (no host-restart survival).
+
+        Autostart re-launches the tunnel on gateway boot; that only survives a host
+        restart when the gateway itself is installed as a launchd/systemd daemon.
+
+        Returns:
+            str: Trailing hint text, or ``""`` when the gateway daemon is installed.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.isfunction(MenuActionRouter._tunnel_persistence_hint)
+            True
+        """
+        try:
+            if unit_file_exists(home=Path.home(), service="gateway"):
+                return ""
+        except (OSError, ServiceManagerError):
+            return ""
+        return " Install the gateway daemon so it survives host restart."
+
+    async def _handle_tunnel_action(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        target: str,
+    ) -> str | None:
+        """Turn the persistent tunnel on/off from the My sevn bot menu (owner-only).
+
+        ``tunnel:on`` stamps ``infrastructure.tunnel.autostart`` in ``sevn.json`` and
+        starts the configured provider now; the gateway boot hook re-launches it after a
+        host restart. ``tunnel:off`` clears the flag and stops the running provider.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed action target (``tunnel:on`` or ``tunnel:off``).
+
+        Returns:
+            str | None: Toast text when refresh did not answer inline; ``None`` otherwise.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_tunnel_action)
+            True
+        """
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        from sevn.infrastructure.tunnel_config import RUNNABLE_MODES, tunnel_cfg_from_disk
+        from sevn.infrastructure.tunnel_manager import default_manager
+
+        turn_on = target == "tunnel:on"
+        tunnel_cfg = tunnel_cfg_from_disk(self._workspace, sevn_json=self._sevn_json)
+        mode = str(tunnel_cfg.get("mode") or "none")
+        if mode not in RUNNABLE_MODES:
+            toast = "No tunnel configured — run `sevn tunnel setup` first."
+            answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+            return None if answered else toast
+        gateway_port = self._workspace.gateway.port if self._workspace.gateway else None
+        if turn_on:
+            mutate_sevn_json(
+                self._sevn_json,
+                lambda d: _set_nested(d, "infrastructure.tunnel.autostart", True),
+            )
+            self._reload_workspace()
+            from sevn.infrastructure.tunnel_autostart import start_configured_tunnel
+
+            try:
+                status = await start_configured_tunnel(
+                    tunnel_config=tunnel_cfg,
+                    gateway_port=gateway_port,
+                    content_root=self._content_root,
+                    secrets_backend=self._workspace.secrets_backend,
+                    manager=default_manager,
+                )
+            except (RuntimeError, ValueError) as exc:
+                toast = f"Tunnel start failed: {exc}"
+                answered = await self._refresh_config_menu_after_action(
+                    msg, callback_data, toast=toast
+                )
+                return None if answered else toast
+            if status.healthy:
+                url = status.mission_control_url or status.public_url
+                toast = "Tunnel on." + (f" {url}" if url else "") + self._tunnel_persistence_hint()
+            else:
+                toast = f"Tunnel start failed: {status.error or 'not healthy'}"
+        else:
+            mutate_sevn_json(
+                self._sevn_json,
+                lambda d: _set_nested(d, "infrastructure.tunnel.autostart", False),
+            )
+            self._reload_workspace()
+            try:
+                await asyncio.to_thread(default_manager.stop, tunnel_cfg, confirm=True)
+            except (RuntimeError, ValueError) as exc:
+                toast = f"Tunnel stop failed: {exc}"
+                answered = await self._refresh_config_menu_after_action(
+                    msg, callback_data, toast=toast
+                )
+                return None if answered else toast
+            toast = "Tunnel off."
+        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+        return None if answered else toast
 
     async def _handle_service_restart_action(
         self,

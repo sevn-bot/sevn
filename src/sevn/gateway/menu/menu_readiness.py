@@ -117,6 +117,9 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         # My sevn bot — service restarts (owner, 2-step)
         "C18.4",
         "C18.5",
+        # My sevn bot — persistent tunnel on/off (owner)
+        "C22.1",
+        "C22.2",
         # CodeMode tier-B toggle (W8 operator surface)
         "C24.1",
         # Sub-agents (W7)
@@ -293,8 +296,8 @@ _CONFIG_SECTION_CATALOG: tuple[tuple[str, str, str, MenuReadiness], ...] = (
     ),
     (
         "My sevn bot",
-        "Deployment id, build version id, and owner gateway/proxy restart (two-step confirm).",
-        "Restart uses service manager; deployment id mirrors /status; version id is the sevn.json build stamp.",
+        "Deployment id, build version id, owner gateway/proxy restart (two-step confirm), and persistent tunnel on/off.",
+        "Restart uses service manager; tunnel on sets autostart and starts now, re-launched on every gateway boot so it survives host restart; deployment id mirrors /status; version id is the sevn.json build stamp.",
         "Ready",
     ),
 )

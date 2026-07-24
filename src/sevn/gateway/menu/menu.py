@@ -1561,16 +1561,49 @@ def _build_sevn_bot_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[
     ]
 
 
+def _tunnel_toggle_row(tunnel_cfg: dict[str, Any]) -> list[dict[str, Any]] | None:
+    """Build the owner-only persistent-tunnel on/off row for a configured mode.
+
+    Args:
+        tunnel_cfg (dict[str, Any]): ``infrastructure.tunnel`` sub-dict.
+
+    Returns:
+        list[dict[str, Any]] | None: One inline-button row, or ``None`` when no
+        runnable tunnel mode is configured.
+
+    Examples:
+        >>> _tunnel_toggle_row({"mode": "none"}) is None
+        True
+        >>> _tunnel_toggle_row({"mode": "cloudflare", "autostart": True})[0]["callback_data"]
+        'act:tunnel:off'
+        >>> _tunnel_toggle_row({"mode": "cloudflare"})[0]["callback_data"]
+        'act:tunnel:on'
+    """
+    from sevn.infrastructure.tunnel_config import RUNNABLE_MODES
+
+    mode = str(tunnel_cfg.get("mode") or "none")
+    if mode not in RUNNABLE_MODES:
+        return None
+    if bool(tunnel_cfg.get("autostart")):
+        return [{"text": "🌐 Tunnel: on — turn off", "callback_data": "act:tunnel:off"}]
+    return [{"text": "🌐 Tunnel: off — turn on", "callback_data": "act:tunnel:on"}]
+
+
 def _build_my_sevn_bot_keyboard_rows(
     workspace: WorkspaceConfig,
     *,
     is_owner: bool = False,
+    tunnel_cfg: dict[str, Any] | None = None,
 ) -> list[list[dict[str, Any]]]:
-    """Build My Sevn.bot operator rows (restart, deployment id).
+    """Build My Sevn.bot operator rows (restart, tunnel on/off, deployment id).
 
     Args:
         workspace (WorkspaceConfig): Parsed workspace settings.
-        is_owner (bool): When ``True``, render gateway/proxy restart buttons.
+        is_owner (bool): When ``True``, render gateway/proxy restart and tunnel rows.
+        tunnel_cfg (dict[str, Any] | None): ``infrastructure.tunnel`` sub-dict; taken
+            from the workspace document when ``None``. The action router reloads
+            ``self._workspace`` after toggling so the button flips live; a ``sevn tunnel
+            setup`` done after boot appears once the gateway reloads/restarts.
 
     Returns:
         list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
@@ -1580,12 +1613,25 @@ def _build_my_sevn_bot_keyboard_rows(
         >>> rows = _build_my_sevn_bot_keyboard_rows(WorkspaceConfig.minimal(), is_owner=False)
         >>> [btn["callback_data"] for row in rows for btn in row]
         ['cfg:logs:deployment_id', 'cfg:logs:version_id']
+        >>> rows = _build_my_sevn_bot_keyboard_rows(
+        ...     WorkspaceConfig.minimal(),
+        ...     is_owner=True,
+        ...     tunnel_cfg={"mode": "cloudflare", "autostart": True},
+        ... )
+        >>> [btn["callback_data"] for row in rows for btn in row]
+        ['act:gateway:restart', 'act:proxy:restart', 'act:tunnel:off', 'cfg:logs:deployment_id', 'cfg:logs:version_id']
     """
-    _ = workspace
     rows: list[list[dict[str, Any]]] = []
     if is_owner:
         rows.append([{"text": "🔄 Restart gateway", "callback_data": "act:gateway:restart"}])
         rows.append([{"text": "🔄 Restart proxy", "callback_data": "act:proxy:restart"}])
+        if tunnel_cfg is None:
+            from sevn.infrastructure.tunnel_config import tunnel_cfg_from_workspace
+
+            tunnel_cfg = tunnel_cfg_from_workspace(workspace)
+        tunnel_row = _tunnel_toggle_row(tunnel_cfg)
+        if tunnel_row is not None:
+            rows.append(tunnel_row)
     rows.append([{"text": "🆔 Deployment id", "callback_data": "cfg:logs:deployment_id"}])
     rows.append([{"text": "🏷 Version id", "callback_data": "cfg:logs:version_id"}])
     return rows
