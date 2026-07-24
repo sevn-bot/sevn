@@ -6,8 +6,8 @@ status: ready
 owner: Alex
 summary: The operator talks to sevn where they already chat—Telegram on phone, web/Mission
   Control on laptop—with shared sessions, voice, and one gateway turn spine.
-last_updated: '2026-07-20'
-fingerprint: sha256:2e0292e2ee4bed98f2ffb5d2e3a57e904ffb60ee0981df15be99ca953bb92de5
+last_updated: '2026-07-21'
+fingerprint: sha256:193ead4eeb9fd1aba413ce8c5e80a3178b115d9a18430a6bb28fa1d92a98ce89
 related:
 - prd-07-mission-control
 - prd-10-generated-ui
@@ -95,11 +95,15 @@ to a self-hosted gateway fails when the bot is not where your thumb already is.
   channel-appropriate busy, steer, and cancel semantics while a turn is active.
 - **FR-005:** The product shall support **voice notes inbound** (STT) and **optional TTS
   outbound** on Telegram and webchat when voice is enabled and backends are configured.
+  Operators set the spoken voice via `/voice` with Kokoro ids or Supertonic `M1`–`F5`
+  codes (case preserved for Supertonic); `voice.local_tts_engine` selects the local
+  engine for the `text_to_voice` pipeline. Telegram `/config` → Voice engine cycle
+  persists that selection and rebuilds the live pipeline without restart.
 - **FR-006:** Rich agent output (tables, forms, panels) shall **degrade gracefully** to
   plain text on each channel when rich or OpenUI delivery is unavailable or rejected.
 - **FR-007:** Telegram `/config`, reply keyboard, and inline menus shall expose
-  conversational controls (session, models, voice mode, quick actions) without requiring
-  file edits.
+  conversational controls (session, models, voice mode / local TTS engine, quick actions)
+  without requiring file edits.
 
 ## Non-Goals
 

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import sqlite3
 from typing import TYPE_CHECKING
 
 import pytest
 
-from sevn.gateway.session_manager import SessionManager
+from sevn.gateway.queue.queue_multi import MultiDispatchHooks, MultiSpawnOutcome
+from sevn.gateway.session_manager import SessionManager, dispatch_routing_for
 from sevn.storage.migrate import apply_migrations
 
 if TYPE_CHECKING:
@@ -48,7 +50,6 @@ async def test_enqueue_dispatch_rejects_missing_chat_id() -> None:
 
 async def test_queued_dispatch_carries_chat_id_to_outbound_send() -> None:
     """D6: steer/queued jobs carry ``chat_id`` through to ``telegram_outbound.send``."""
-    from sevn.gateway.session_manager import dispatch_routing_for
 
     async def noop(_sid: str, _cid: str) -> None:
         return None
@@ -72,17 +73,81 @@ async def test_queued_dispatch_carries_chat_id_to_outbound_send() -> None:
 
 @pytest.mark.asyncio
 async def test_classifier_timeout_preserves_chat_id_for_outbound_send() -> None:
-    """D7: classifier timeout fallback must preserve ``chat_id``/channel routing context."""
-    from sevn.agent.triager.relatedness import RelatednessResult, routing_context_from_relatedness
+    """D7: classifier-timeout spawn preserves ``chat_id`` via production dispatch routing."""
+    started = asyncio.Event()
+    release = asyncio.Event()
+    notices: list[str] = []
 
-    result = RelatednessResult(label="new_task", fallback=True)
-    ctx = routing_context_from_relatedness(
-        result,
-        chat_id=1001,
-        channel="telegram",
+    async def busy_dispatch(_sid: str, _cid: str) -> None:
+        started.set()
+        await release.wait()
+
+    async def classify_busy(
+        _in_flight: str,
+        _queued: tuple[str, ...],
+        _new: str,
+    ) -> tuple[str, bool]:
+        return "new_task", True
+
+    async def spawn(_sid: str, _cid: str) -> MultiSpawnOutcome:
+        return MultiSpawnOutcome.SPAWNED
+
+    async def notify(_sid: str, line: str) -> None:
+        notices.append(line)
+
+    hooks = MultiDispatchHooks(
+        classify_busy=classify_busy,
+        spawn_new_task=spawn,
+        notify_operator=notify,
     )
-    assert ctx["chat_id"] == 1001
-    assert ctx["channel"] == "telegram"
+    sessions = SessionManager(_memory_conn())
+    try:
+        await sessions.enqueue_dispatch(
+            "sess-d7",
+            correlation_id="corr-busy",
+            queue_mode="steer",
+            dispatch=busy_dispatch,
+            channel="telegram",
+            chat_id=1001,
+        )
+        await asyncio.wait_for(started.wait(), timeout=2.0)
+        await sessions.enqueue_dispatch(
+            "sess-d7",
+            correlation_id="corr-fallback",
+            queue_mode="multi",
+            dispatch=busy_dispatch,
+            multi_hooks=hooks,
+            new_message_text="follow-up",
+            channel="telegram",
+            chat_id=1001,
+        )
+        routing = dispatch_routing_for("sess-d7", "corr-fallback")
+        assert routing["chat_id"] == 1001
+        assert routing["channel"] == "telegram"
+        assert routing.get("relatedness_classifier_fallback") is True
+        assert any("timed out" in n.lower() for n in notices)
+    finally:
+        release.set()
+        await sessions.drain()
+
+
+def test_classifier_timeout_uses_production_dispatch_routing() -> None:
+    """PR #52: drive ``_record_dispatch_routing`` + ``_merge_dispatch_routing_extras``."""
+    from sevn.gateway.session_manager import (
+        _merge_dispatch_routing_extras,
+        _record_dispatch_routing,
+    )
+
+    _record_dispatch_routing("sess-d7-helpers", "corr-d7", channel="telegram", chat_id=1001)
+    _merge_dispatch_routing_extras(
+        "sess-d7-helpers",
+        "corr-d7",
+        {"relatedness_classifier_fallback": True},
+    )
+    routing = dispatch_routing_for("sess-d7-helpers", "corr-d7")
+    assert routing["chat_id"] == 1001
+    assert routing["channel"] == "telegram"
+    assert routing.get("relatedness_classifier_fallback") is True
 
 
 @pytest.mark.asyncio

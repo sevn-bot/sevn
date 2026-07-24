@@ -384,6 +384,9 @@ Initial draft for **Behavior** — grounded in extracted interfaces; confirm nor
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
 
 Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/second_brain`](src/sevn/second_brain/__init__.py).
+
+**Bundled Obsidian CLI skill:** The `obsidian-cli` core skill (vault CLI via a running Obsidian app) is **opt-in**. Onboarding capability `skill.obsidian_cli` writes `skills.obsidian_cli.enabled` with `default: false`. `SkillsManager` consults `gate_obsidian_cli_core_skill` during scan so the skill is absent from discovery/`load_skill` unless the operator enables it (mirrors `openwiki`). Other Obsidian-flavored bundled skills (`obsidian-markdown`, `obsidian-bases`, …) are independent of this gate.
+
 ## Failure Modes
 
 Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.

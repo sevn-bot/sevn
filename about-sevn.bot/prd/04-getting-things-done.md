@@ -7,7 +7,7 @@ owner: Alex
 summary: A general-purpose AI assistant earns its keep by doing things—answering questions,
   fetching pages, opening PRs, and acting on the operator's behalf via tools, skills,
   and tiered executors.
-last_updated: '2026-07-19'
+last_updated: '2026-07-21'
 fingerprint: sha256:13314781f75a75a93d7874ddd46b318635a3ef07b8acb2b905865dc7330d3f96
 related:
 - prd-03-trust-and-control
@@ -123,6 +123,25 @@ becoming the integration layer.
   (e.g. plan approval buttons, file links, OpenUI panels).
 - **FR-008:** Optional **MCP and external integrations** shall remain operator-enabled opt-ins;
   the default install path must not silently widen the attack surface.
+- **FR-009:** Bundled **Proton** management (`proton-management` / `proton-cli`) shall support
+  Pass vault/item read and write journeys with correct module-mode `--profile` argv ordering and
+  mocked behavioral coverage for `pass vaults` / `items` / `secrets` (including create +
+  `secrets get` → stdout credential emit), plus Mail CLI (`messages` search/read/send/trash/
+  delete/move and `labels list`), `mail_list`/`mail_read` dry-run scripts, stdin secret
+  resolution, SRP HV retry / `PROTON_HV_TOKEN`, `run_proton_cli_async` argv/timeout, Drive
+  CLI (`items` list/upload/download/trash/delete, `folders create`, `trash` list/restore/empty)
+  with decrypt/link failures surfaced at warning, Calendar/Contacts
+  (`events` list/get/delete, `contacts` list/get/create/delete, card decrypt) with decrypt drops
+  logged, unrecognized card types raised, and empty create `Responses` failing loudly, and
+  polish CLI (`status` / `api` runnable without a nested subcommand, legacy `session.json`
+  fallback on `status`, `settings set <key>` rejecting a missing value before auth), and
+  deferred surfaces (`events` create/respond, `contacts` groups/pin-key, mail `--attach` +
+  attachments list/download, pinned-key recipient classification, HV-helper crash logging)
+  (live Proton Calendar/Contacts/Drive/RSVP/attachment/HV-webview E2E deferred without credentials).
+- **FR-010:** Bundled **Google Workspace** (`google-workspace`) shall honour
+  `skills.google_workspace.prefer_gws` (§3.3): prefer the `gws` CLI via `use_gws_backend` /
+  `run_gws` when on PATH, with an observable Python-client fallback and a behavioral
+  `gws_bridge` token-env test.
 
 ## Non-Goals
 

@@ -22,11 +22,13 @@ def test_find_text_to_voice_skill_dir_missing() -> None:
 
 @pytest.mark.asyncio
 async def test_text_to_voice_is_available_when_skill_present(tmp_path: Path) -> None:
+    """Skill discovery + engine tag; synthesize CLI routing covered in sibling tests."""
     skill = tmp_path / "skills" / "core" / "text-to-voice" / "scripts"
     skill.mkdir(parents=True)
-    (skill / "generate.py").write_text("print('ok')", encoding="utf-8")
-    backend = TextToVoiceBackend(workspace_root=tmp_path)
+    (skill / "generate.py").write_text("print('ok')\n# --engine\n", encoding="utf-8")
+    backend = TextToVoiceBackend(workspace_root=tmp_path, engine="supertonic")
     assert await backend.is_available()
+    assert backend.engine == "supertonic"
 
 
 @pytest.mark.asyncio
@@ -37,13 +39,25 @@ async def test_legacy_kokoro_tts_skill_path_still_discovered(tmp_path: Path) -> 
     assert _find_text_to_voice_skill_dir(tmp_path) == skill.parent
     backend = TextToVoiceBackend(workspace_root=tmp_path, engine="kokoro")
     assert await backend.is_available()
+    # Legacy scripts lack ``--engine``; synthesize must omit the flag (W15.2).
+    out = tmp_path / "legacy.wav"
+    out.write_bytes(b"wav")
+    proc = AsyncMock()
+    proc.returncode = 0
+    proc.communicate = AsyncMock(return_value=(str(out).encode(), b""))
+    with patch("sevn.voice.backends.asyncio.create_subprocess_exec", return_value=proc) as mocked:
+        await backend.synthesize(text="hi", voice_id="af_heart", out_path=out)
+    assert "--engine" not in mocked.call_args.args
 
 
 @pytest.mark.asyncio
 async def test_text_to_voice_synthesize_passes_engine(tmp_path: Path) -> None:
     skill = tmp_path / "skills" / "core" / "text-to-voice" / "scripts"
     skill.mkdir(parents=True)
-    (skill / "generate.py").write_text("print('ok')", encoding="utf-8")
+    (skill / "generate.py").write_text(
+        'print("ok")  # argparse: "--engine"\n',
+        encoding="utf-8",
+    )
     (tmp_path / "skills" / "core" / "text-to-voice" / "requirements-supertonic.txt").write_text(
         "supertonic\n",
         encoding="utf-8",

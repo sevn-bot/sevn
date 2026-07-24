@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the primary daily-driver channel for personal messaging: a ChannelAdapter
   implementation that normalises Telegram Updates into spec-17-gateway IncomingMessage
   / OutgoingMessage and implements '
-last_updated: '2026-07-20'
-fingerprint: sha256:189e032c1fccef5c1a020a6dc272228a7e0b26e9e34c5bcdbf865586a0712065
+last_updated: '2026-07-21'
+fingerprint: sha256:e5914201618f087b26a6fb6edacbf26afae2602613418203c35dd7cdf4fad810
 related: []
 sources:
 - src/sevn/channels/**
@@ -489,6 +489,22 @@ Initial draft for **Behavior** — grounded in extracted interfaces; confirm nor
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
 
 Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/channels`](src/sevn/channels/__init__.py).
+
+Telegram `/voice <code>` persists Kokoro and Supertonic voice ids with correct case
+(see `core_commands._normalise_tts_voice_code`); unknown lone tokens are rejected.
+`/config` → Voice TTS engine cycle (`cfg:voice:engine:next`) writes
+`voice.local_tts_engine` and rebuilds the live TTS pipeline so spoken replies use the
+selected engine without a gateway restart.
+
+Discogs Setup (`/config` → Skills → Discogs → Setup): `form:secret_wizard:discogs.user_token`
+matches Ready spec **C7.18** (exact match before the C6.1b scoped-wizard regex);
+`form:discogs:oauth_start` is Ready **C7.19**; storing a user token mutates sevn.json then
+reloads the workspace so `DISCOGS_USER_TOKEN` injects before `act:discogs:whoami`.
+
+Outbound routing (D6/D7): Telegram `chat_id` is captured at `enqueue_dispatch` via
+`_record_dispatch_routing` and remains available after relatedness classifier-timeout
+fallback through `_merge_dispatch_routing_extras` (`relatedness_classifier_fallback`), so
+spawned multi turns still route replies to the operator chat.
 ## Failure Modes
 
 Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
@@ -496,6 +512,9 @@ Initial draft for **Failure Modes** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
 
 Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
+
+`/voice` unknown voice-code tokens return an operator-visible reject string and do not
+mutate `voice.tts_voice_id`.
 ## Amendments (spec-36-sub-agents)
 
 Telegram `/config` gains **Sub-agents** section: limits, live L1/L2 counts, queue mode
@@ -510,7 +529,10 @@ Core slash commands via `core_bot_commands()` / `setMyCommands` include **`/agen
 session `cancel_active_dispatch` with `"Stopped."`). Kill callbacks reuse
 `act:subagents:kill:*` / `kill_all` (owner-only). Config → **My sevn bot** exposes
 **Version id** (`cfg:logs:version_id`) alongside Deployment id. Config → **Agents** remains
-persona/display-name — not the run inventory.
+persona/display-name — not the run inventory. Menu-action callback toasts use production
+`TelegramAdapter.answer_callback` (with `_api("answerCallbackQuery")` fallback); when the
+inline answer fails, identity buttons (Version id / Deployment id) still emit chat fallback
+text. Slash `/stop` kill callbacks re-edit the picker message and ack the callback query.
 
 ## Implemented by
 
@@ -543,6 +565,25 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+Host Telegram Bot-API / Web send-receive smoke: `make telegram-checks` →
+`sevn.browser.recipes.telegram_checks` (`run_checks` / `assert_send_receive`);
+mocked coverage in `tests/browser/test_telegram_checks_w1_red.py` and
+`tests/browser/test_browser_removal_parity.py`. Live headed Web / X CDP E2E remains
+deferred (parked journeys, issue #37).
+
+`/voice` Supertonic/Kokoro code persist + reject: `tests/gateway/test_voice.py` and
+`tests/voice/test_text_to_voice_backend_w1_red.py`. Menu engine cycle → pipeline
+`.engine`: `tests/gateway/test_voice_menu_pipeline_w1_red.py`. Live Telegram
+`/config → Voice` spoken-reply E2E remains deferred (no credentials /
+`make telegram-e2e` not runnable here).
+
+Discogs menu readiness + whoami: `tests/gateway/test_discogs_menu.py` and
+`tests/gateway/test_discogs_menu_w1_red.py` (C7.18/C7.19 Ready, wizard reload, whoami toast).
+
+Version id / `/stop` kill callbacks: `tests/gateway/test_version_id_control_w1_red.py`,
+`tests/gateway/test_my_sevn_version_id.py`, `tests/gateway/test_stop_l1_buttons.py`
+(`answer_callback` toast + fallback chat text; slash `/stop` picker re-edit after kill).
 
 ## Human-input needed
 

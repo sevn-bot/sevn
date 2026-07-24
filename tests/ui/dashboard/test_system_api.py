@@ -242,16 +242,32 @@ def test_replay_turn_happy_path_with_trace_seed(tmp_path: Path) -> None:
             conn.commit()
         finally:
             conn.close()
-        first = client.post(
-            "/api/v1/sessions/s1/turns/t1/replay",
-            json={"confirmed": True},
-            headers=headers,
-        )
-        second = client.post(
-            "/api/v1/sessions/s1/turns/t1/replay",
-            json={"confirmed": True},
-            headers=headers,
-        )
+        # Queue acceptance only — do not run a live agent turn (avoids xdist
+        # SIGSEGV from concurrent SQLite teardown during TestClient exit).
+        worker = getattr(client.app.state, "replay_worker", None)
+        if worker is not None:
+            with patch.object(worker, "schedule"):
+                first = client.post(
+                    "/api/v1/sessions/s1/turns/t1/replay",
+                    json={"confirmed": True},
+                    headers=headers,
+                )
+                second = client.post(
+                    "/api/v1/sessions/s1/turns/t1/replay",
+                    json={"confirmed": True},
+                    headers=headers,
+                )
+        else:
+            first = client.post(
+                "/api/v1/sessions/s1/turns/t1/replay",
+                json={"confirmed": True},
+                headers=headers,
+            )
+            second = client.post(
+                "/api/v1/sessions/s1/turns/t1/replay",
+                json={"confirmed": True},
+                headers=headers,
+            )
         assert first.status_code == 202
         assert second.status_code == 202
         assert first.json()["replay_job_id"] == second.json()["replay_job_id"]

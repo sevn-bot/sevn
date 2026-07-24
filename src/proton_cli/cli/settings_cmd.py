@@ -84,6 +84,11 @@ def settings_set(
     value: str = typer.Argument("", help="New value"),
 ) -> None:
     """Update a mail setting (run without args to list keys)."""
+    if key and value == "":
+        raise typer.BadParameter(
+            "missing value; provide a value after the setting key "
+            "(or run `settings set` with no args to list keys)"
+        )
     proton_app = _run(ctx)
     if not key:
         rows = sorted((k, spec[3]) for k, spec in MAIL_SETTINGS.items())

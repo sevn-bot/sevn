@@ -429,7 +429,8 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
     )
     add(
         "C6.1b",
-        r"^form:secret_wizard:[a-zA-Z0-9._-]+$",
+        # Exclude discogs.user_token so exact C7.18 wins (first-match registry).
+        r"^form:secret_wizard:(?!discogs\.user_token$)[a-zA-Z0-9._-]+$",
         "C",
         "skills:social_media_manager",
         "Set TwexAPI key (scoped wizard)",

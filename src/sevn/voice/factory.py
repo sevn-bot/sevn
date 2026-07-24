@@ -57,6 +57,7 @@ class VoiceRuntimeSettings:
     preload_local_tts_on_boot: bool
     tts_mode: str
     tts_voice_id: str | None
+    local_tts_engine: str | None
     enabled: bool
 
 
@@ -170,6 +171,7 @@ def voice_runtime_settings(ws: WorkspaceConfig) -> VoiceRuntimeSettings:
     if v and v.tts_mode:
         mode = str(v.tts_mode).strip() or "off"
     voice_id = str(v.tts_voice_id).strip() if v and v.tts_voice_id else None
+    local_engine = str(v.local_tts_engine).strip() if v and v.local_tts_engine else None
     enabled = voice_enabled(ws)
     return VoiceRuntimeSettings(
         stt_providers=stt,
@@ -182,6 +184,7 @@ def voice_runtime_settings(ws: WorkspaceConfig) -> VoiceRuntimeSettings:
         preload_local_tts_on_boot=preload,
         tts_mode=mode,
         tts_voice_id=voice_id,
+        local_tts_engine=local_engine,
         enabled=enabled,
     )
 
@@ -247,7 +250,12 @@ def build_tts_pipeline(
 
     settings = voice_runtime_settings(ws)
     backends = [
-        build_tts_backend(tag, workspace_root=content_root) for tag in settings.tts_providers
+        build_tts_backend(
+            tag,
+            workspace_root=content_root,
+            local_tts_engine=settings.local_tts_engine,
+        )
+        for tag in settings.tts_providers
     ]
     from sevn.workspace.artifact_output import normalise_output_dir_rel
 

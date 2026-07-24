@@ -88,6 +88,7 @@ def _build_router(tmp_path: Path) -> tuple[ChannelRouter, _MenuCaptureTelegram, 
         rate=TokenBucketLimiter(capacity=50.0, refill_per_second=25.0),
         media=MediaStore(conn, root),
         run_turn=AsyncMock(),
+        owner_user_ids=frozenset({"owner"}),
     )
     router.register_adapter(cap)
     build_agent_run_turn(
@@ -148,6 +149,8 @@ def test_menu_registry_covers_discogs_callbacks(callback: str) -> None:
     spec = match_menu_button_spec(callback)
     assert spec is not None
     assert spec.implemented is True
+    if callback == "form:secret_wizard:discogs.user_token":
+        assert spec.spec_id == "C7.18"
 
 
 def test_discogs_section_caption_mentions_auth() -> None:

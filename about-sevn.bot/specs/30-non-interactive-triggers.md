@@ -7,7 +7,7 @@ owner: Alex
 summary: 'Deliver non-interactive dispatch: external events (“something happened”)
   and schedules (“tick”) compile to DispatchRequest, optionally pass through notify_only
   (zero LLM, zero sandbox boot), otherwise'
-last_updated: '2026-07-16'
+last_updated: '2026-07-21'
 fingerprint: sha256:cba9dff781c745b124968af4cd49ca19317fbd0d15090408648dccc08517e6b6
 related: []
 sources:
@@ -259,24 +259,28 @@ Initial draft for **Data Model** — grounded in extracted interfaces; confirm n
 See **Implemented by** and [`src/sevn/triggers`](src/sevn/triggers/__init__.py).
 ## Behavior
 
-Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
-
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+Built-in **GitHub issue-watch** cron (`gh-issue-watch`, ~15 min) is registered at boot via
+`register_issue_watch_cron_handler` → `_CRON_JOB_HANDLERS`. `cron_tick` dispatches that handler
+(off the event loop) rather than falling through to LLM dispatch. Diffs notify via
+`notify_issue_watch_diff` → `deliver_operator_notify` (Telegram owner sink when wired at gateway
+boot; LOG artefact otherwise).
 
 Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/triggers`](src/sevn/triggers/__init__.py).
+
 ## Failure Modes
 
-Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.
+| Condition | Handling |
+|-----------|----------|
+| Issue-watch handler exception | `cron_handler_failed` log; schedule bumped with `error` status |
+| Operator notify unwired / no owner | Persist LOG under `.sevn/trigger_runs/` (never fake success) |
+| Per-issue `gh` failure | Logged; watch continues remaining tracked issues |
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
-
-Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
 ## Test Strategy
 
-Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.
-
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
-
+| Tests | Focus |
+|-------|-------|
+| `tests/skills/gh_issues/test_issue_watch.py` | Track/watch diffs + cron handler registration |
+| `tests/gateway/test_lifecycle_w1_red.py` | `cron_tick` → `_CRON_JOB_HANDLERS` + operator-notify → `route_outgoing` |
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
 
 ## Human-input needed

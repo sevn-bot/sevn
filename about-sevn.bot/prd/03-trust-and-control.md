@@ -7,7 +7,7 @@ owner: Alex
 summary: Operators delegate real work only when prompt injection, secrets, sandbox,
   and approvals are bounded—scan hostile input, isolate credentials and egress, and
   gate risky tools.
-last_updated: '2026-07-19'
+last_updated: '2026-07-21'
 fingerprint: sha256:a40208e92b4bf6ab84447da857cde3614de1fe8696e686c557e31a2163640679
 related:
 - prd-07-mission-control
@@ -116,10 +116,17 @@ a black-box "safe mode."
   Mission Control surfaces.
 - **FR-006:** The product shall expose **operator kill switches**: steer/stop during active
   turns, owner-only maintenance commands on Telegram, and configurable scanner or automation
-  disable paths that fail closed on high-risk actions when disabled.
+  disable paths that fail closed on high-risk actions when disabled. Telegram slash `/stop`
+  L1 kill callbacks must re-edit the picker and ack the callback; Config identity buttons
+  (Version id / Deployment id) must toast via production `answer_callback` or fall back to
+  chat text when the inline answer fails.
 - **FR-007:** **Doctor** and **config validate** shall surface broken trust posture—unpaired
   proxy, missing secrets unlock, sandbox driver unavailable—**before** the first consequential
   failure when fixtures cover the misconfiguration.
+- **FR-008:** Optional **Proton Pass** secrets backend (`ProtonPassCliBackend`) shall surface
+  share-key / item decrypt failures and address-key unlock failures as operator-visible
+  warnings (not silent empty vault/item/key lists) when listing or writing via the bundled
+  `proton-cli` Pass dialect.
 
 ## Non-Goals
 
