@@ -1417,7 +1417,7 @@ class MenuActionRouter:
                     secrets_backend=self._workspace.secrets_backend,
                     manager=default_manager,
                 )
-            except (RuntimeError, ValueError) as exc:
+            except (OSError, RuntimeError, ValueError) as exc:
                 toast = f"Tunnel start failed: {exc}"
                 answered = await self._refresh_config_menu_after_action(
                     msg, callback_data, toast=toast
@@ -1444,7 +1444,7 @@ class MenuActionRouter:
             self._reload_workspace()
             try:
                 await asyncio.to_thread(default_manager.stop, tunnel_cfg, confirm=True)
-            except (RuntimeError, ValueError) as exc:
+            except (OSError, RuntimeError, ValueError) as exc:
                 toast = f"Tunnel stop failed: {exc}"
                 answered = await self._refresh_config_menu_after_action(
                     msg, callback_data, toast=toast

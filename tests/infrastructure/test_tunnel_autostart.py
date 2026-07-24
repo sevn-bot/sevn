@@ -110,6 +110,21 @@ async def test_autostart_swallows_provider_error(tmp_path: Path) -> None:
     assert len(mgr.started) == 1
 
 
+@pytest.mark.asyncio
+async def test_autostart_swallows_os_error(tmp_path: Path) -> None:
+    """A failed subprocess spawn (OSError) must never crash boot."""
+    mgr = _FakeManager(exc=OSError("exec format error"))
+    result = await autostart_tunnel_if_enabled(
+        tunnel_config={"mode": "cloudflare_quick", "autostart": True},
+        gateway_port=3001,
+        content_root=tmp_path,
+        secrets_backend=None,
+        manager=mgr,  # type: ignore[arg-type]
+    )
+    assert result is None
+    assert len(mgr.started) == 1
+
+
 class _HangingManager:
     """``start`` blocks past the timeout (models a stuck tailscale CLI spawn)."""
 

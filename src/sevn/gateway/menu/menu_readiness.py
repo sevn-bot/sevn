@@ -297,7 +297,7 @@ _CONFIG_SECTION_CATALOG: tuple[tuple[str, str, str, MenuReadiness], ...] = (
     (
         "My sevn bot",
         "Deployment id, build version id, owner gateway/proxy restart (two-step confirm), and persistent tunnel on/off.",
-        "Restart uses service manager; tunnel on sets autostart and starts now, re-launched on every gateway boot so it survives host restart; deployment id mirrors /status; version id is the sevn.json build stamp.",
+        "Restart uses service manager; tunnel on starts the provider now and, once healthy, is re-launched on every gateway boot (surviving host restart only when the gateway itself runs as a daemon); deployment id mirrors /status; version id is the sevn.json build stamp.",
         "Ready",
     ),
 )

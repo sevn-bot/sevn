@@ -1292,19 +1292,22 @@ def create_app(
 
         default_manager.attach_pid_file(tunnel_pid_file(ly.content_root))
         # Persistent tunnel: when the operator turned it on from the Telegram menu
-        # (``infrastructure.tunnel.autostart``), re-launch it here so it survives host
-        # restart alongside the gateway daemon. Best-effort — a missing cloudflared
-        # binary, unresolved secret, or a provider spawn that exceeds the start timeout
-        # is logged and skipped, never fatal to boot.
+        # (``infrastructure.tunnel.autostart``), re-launch it so it survives host restart
+        # alongside the gateway daemon. Fire-and-forget so a slow or hung provider spawn
+        # never delays gateway readiness — the coroutine is best-effort and self-bounds
+        # via TUNNEL_START_TIMEOUT_S, and the task ref is kept on app.state so it is not
+        # garbage-collected mid-flight.
         from sevn.infrastructure.tunnel_autostart import autostart_tunnel_if_enabled
         from sevn.infrastructure.tunnel_config import tunnel_cfg_from_disk
 
-        await autostart_tunnel_if_enabled(
-            tunnel_config=tunnel_cfg_from_disk(ws, sevn_json=ly.sevn_json_path),
-            gateway_port=ws.gateway.port if ws.gateway else None,
-            content_root=ly.content_root,
-            secrets_backend=ws.secrets_backend,
-            manager=default_manager,
+        app.state.tunnel_autostart_task = asyncio.create_task(
+            autostart_tunnel_if_enabled(
+                tunnel_config=tunnel_cfg_from_disk(ws, sevn_json=ly.sevn_json_path),
+                gateway_port=ws.gateway.port if ws.gateway else None,
+                content_root=ly.content_root,
+                secrets_backend=ws.secrets_backend,
+                manager=default_manager,
+            ),
         )
         # W3: single RuntimeToolBindings factory (integration W2, sandbox W3, MCP W6).
         _mcp_servers_map = build_effective_mcp_servers(ws, ly.content_root)

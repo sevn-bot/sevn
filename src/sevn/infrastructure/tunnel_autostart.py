@@ -149,7 +149,9 @@ async def autostart_tunnel_if_enabled(
             secrets_backend=secrets_backend,
             manager=manager,
         )
-    except (RuntimeError, ValueError) as exc:
+    except (OSError, RuntimeError, ValueError) as exc:
+        # OSError covers a failed subprocess spawn (e.g. binary vanished between the
+        # PATH check and exec); RuntimeError covers the start timeout / missing creds.
         logger.warning("tunnel autostart skipped: {}", exc)
         return None
     if status.healthy:
