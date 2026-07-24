@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-24] Build ``version_id`` resolves from the code checkout (branch/tag + short SHA, e.g. ``pre-0.0.1_393f918b``) instead of falling back to the package version ``0.0.1`` when the operator workspace is not a git tree; the resolved id is persisted into workspace ``sevn.json`` at boot so the ``/config`` button and Mission Control read a real build identity
 - [2026-07-21] Gateway shutdown drains the default executor before closing SQLite (then restores a fresh executor so TestClient's shared loop keeps ``to_thread``); dashboard replay queue tests stub ``schedule``; CI skips flaky local-open PTY terminal WS smoke under xdist
 - [2026-07-21] Form-wizard Telegram callbacks answer via production ``answer_callback`` (same probe order as menu-action); ``answer_callback`` returns Bot API ``ok`` so stale-query failures trigger Version/Deployment id chat-text fallback; contacts ``pinned_keys_for`` soft-fails on decrypt so mail send falls through to the directory
 - [2026-07-21] Thermos: Google Workspace ``prefer_gws`` handlers pass real ``params``/``body`` to ``run_gws`` (writes/searches no longer hollow); media download/upload and docs append stay on the Python client; Drive share sends explicit ``sendNotificationEmail`` true/false for gws; TTS engine toast reads the first backend that exposes ``.engine``
@@ -119,6 +120,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- [2026-07-24] Telegram ``/config`` Version id and Deployment id buttons post the value as a persistent, tap-to-copy ``<code>`` chat message (with a short toast ack) instead of an ephemeral toast, so operators can copy the identifier
 - [2026-07-16] Social media manager defaults and per-site skill hints drop retired platform browser skills; package-install routing detects `browser-cdp` instead of the old driver install phrasing
 - [2026-07-16] Docs/prompt sync: `social_media_manager` X ops catalog finalized, onboarding/INDEX/`browser` tool docs drop removed social/Telegram-test skills, and residual Playwright wording scrubbed from operator docs
 - [2026-07-16] Remove the Playwright E2E harness and `telegram-tester`, replacing Telegram Web checks with the browser `telegram_web` recipe (+ Bot-API `getMe` helper); park webchat/onboarding/Mission Control journeys pending re-home (#37)
