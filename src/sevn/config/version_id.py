@@ -24,8 +24,10 @@ import json
 import os
 import subprocess  # nosec B404 — fixed git argv only; no shell
 from importlib.metadata import PackageNotFoundError
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _PACKAGE_NAME = "sevn"
 
@@ -93,31 +95,6 @@ def _resolve_git_build_id(repo_root: Path) -> str:
     return f"{ref}_{short_sha}"
 
 
-def _package_repo_root() -> Path | None:
-    """Return the sevn.bot checkout the running package lives in, or ``None``.
-
-    Walks up from this module to the first ancestor that is a sevn git checkout
-    (``.git`` + ``pyproject.toml`` naming ``sevn``). Lets build-id resolution
-    succeed when a caller passes no ``repo_root`` (e.g. the operator workspace is
-    not itself a git tree). Returns ``None`` for wheel installs (no checkout).
-
-    Returns:
-        Path | None: Absolute checkout root, or ``None`` when not found.
-
-    Examples:
-        >>> from sevn.config.version_id import _package_repo_root
-        >>> _package_repo_root() is None or _package_repo_root().is_dir()
-        True
-    """
-    from sevn.config.sevn_repo import is_sevn_repo
-
-    here = Path(__file__).resolve()
-    for parent in here.parents:
-        if is_sevn_repo(parent):
-            return parent
-    return None
-
-
 def resolve_version_id(*, repo_root: Path | None = None) -> str:
     """Resolve the running bot build identity (D2).
 
@@ -125,20 +102,20 @@ def resolve_version_id(*, repo_root: Path | None = None) -> str:
 
     1. Non-empty ``SEVN_VERSION_ID`` environment variable.
     2. ``<branch|tag>_<short-sha>`` from *repo_root* when git succeeds.
-    3. ``<branch|tag>_<short-sha>`` from the running package's own checkout,
-       when *repo_root* is ``None`` (e.g. the caller only has a non-git workspace).
-    4. ``importlib.metadata.version("sevn")``.
-    5. ``"unknown"``.
+    3. ``importlib.metadata.version("sevn")``.
+    4. ``"unknown"``.
 
     Args:
         repo_root (Path | None, optional): Git working tree for step (2). When
-            ``None``, step (2) is skipped and step (3) is attempted instead.
+            ``None``, step (2) is skipped. Gateway boot resolves the real code
+            checkout (not the operator workspace) and passes it here.
 
     Returns:
         str: Resolved build identity string.
 
     Examples:
-        >>> resolve_version_id(repo_root=None)  # doctest: +SKIP
+        >>> from pathlib import Path
+        >>> resolve_version_id(repo_root=Path("/path/to/checkout"))  # doctest: +SKIP
         'pre-0.0.1_393f918b'
     """
     env_val = os.environ.get("SEVN_VERSION_ID", "")
@@ -149,12 +126,6 @@ def resolve_version_id(*, repo_root: Path | None = None) -> str:
         build_id = _resolve_git_build_id(repo_root.expanduser().resolve())
         if build_id != "unknown":
             return build_id
-    else:
-        package_root = _package_repo_root()
-        if package_root is not None:
-            build_id = _resolve_git_build_id(package_root)
-            if build_id != "unknown":
-                return build_id
 
     try:
         return importlib.metadata.version(_PACKAGE_NAME)
