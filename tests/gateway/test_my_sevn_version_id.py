@@ -106,8 +106,12 @@ def test_my_sevn_bot_section_keyboard_exposes_version_id() -> None:
     assert _VERSION_ID_CALLBACKS.intersection(cbs), cbs
 
 
-async def test_version_id_callback_toasts_current_value(tmp_path: Path) -> None:
-    """Callback peer of deployment_id answers with the current ``version_id`` (D5)."""
+async def test_version_id_callback_posts_current_value(tmp_path: Path) -> None:
+    """Callback peer of deployment_id posts the current ``version_id`` as a message (D5).
+
+    The value is sent as a persistent, tap-to-copy chat message (not an ephemeral
+    toast) so the operator can copy it; the button press is still acked.
+    """
     router, cap, _root = _build_owner_router(tmp_path)
     # Prefer router-stashed value when present (mirrors deployment_id pattern).
     router._version_id = "tg-build-99"  # type: ignore[attr-defined]
@@ -118,7 +122,8 @@ async def test_version_id_callback_toasts_current_value(tmp_path: Path) -> None:
     chosen = next(iter(_VERSION_ID_CALLBACKS.intersection(cbs)), "cfg:logs:version_id")
 
     await router.route_incoming(_callback(chosen, callback_query_id="cq-vid"))
-    answers = dict(cap.answered)
-    assert "cq-vid" in answers
-    toast = answers["cq-vid"] or ""
-    assert "tg-build-99" in toast
+    # Value lands in a persistent chat message, wrapped in <code> for tap-to-copy.
+    assert any("tg-build-99" in (text or "") for text, _md in cap.sent)
+    assert any("<code>" in (text or "") for text, _md in cap.sent)
+    # Button press still acked via the callback query.
+    assert "cq-vid" in dict(cap.answered)

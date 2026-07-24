@@ -107,28 +107,30 @@ async def test_version_id_toast_via_production_answer_callback(tmp_path: Path) -
     )
     router._version_id = "tg-build-99"  # type: ignore[attr-defined]
     await router.route_incoming(_callback("cfg:logs:version_id", callback_query_id="cq-vid"))
-    answers = dict(cap.answered)
-    assert "cq-vid" in answers
-    assert "tg-build-99" in (answers["cq-vid"] or "")
+    # Value is posted as a persistent chat message; the callback is acked via the
+    # production ``answer_callback`` path (not legacy ``answer_callback_query``).
+    assert any("tg-build-99" in (t or "") for t, _md in cap.sent)
+    assert "cq-vid" in dict(cap.answered)
 
 
 @pytest.mark.asyncio
-async def test_version_id_fallback_toast_when_inline_answer_fails(tmp_path: Path) -> None:
+async def test_version_id_message_posted_even_when_inline_answer_fails(tmp_path: Path) -> None:
+    """The copyable chat message is posted before the ack, so a failing ack cannot drop it."""
     router, cap, _root = _build_owner_router(tmp_path)
     router._version_id = "tg-build-99"  # type: ignore[attr-defined]
 
     async def _fail_answer(callback_query_id: str, *, text: str = "") -> None:
         raise RuntimeError("inline answer failed")
 
-    # Force production-shaped answer path to fail; fallback chat text must still appear.
+    # Force the production-shaped ack to raise; the chat message must still appear.
     cap.answer_callback = _fail_answer  # type: ignore[method-assign]
     await router.route_incoming(_callback("cfg:logs:version_id", callback_query_id="cq-fail"))
     assert any("tg-build-99" in (t or "") for t, _md in cap.sent)
 
 
 @pytest.mark.asyncio
-async def test_version_id_fallback_toast_when_answer_ok_false(tmp_path: Path) -> None:
-    """Telegram ``ok: false`` (e.g. query too old) must trigger chat-text fallback."""
+async def test_version_id_message_posted_even_when_answer_ok_false(tmp_path: Path) -> None:
+    """Telegram ``ok: false`` (e.g. query too old) still leaves the value in the chat message."""
     router, cap, _root = _build_owner_router(tmp_path)
     router._version_id = "tg-build-99"  # type: ignore[attr-defined]
 

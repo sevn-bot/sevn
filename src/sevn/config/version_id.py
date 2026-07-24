@@ -5,7 +5,7 @@ Depends: importlib.metadata (stdlib), json (stdlib), os (stdlib), pathlib (stdli
     subprocess (stdlib)
 
 Exports:
-    resolve_version_id — env > git short SHA > package version > ``unknown``.
+    resolve_version_id — env > git ``<branch|tag>_<short-sha>`` > package version > ``unknown``.
     ensure_version_id — resolve then persist into top-level ``version_id`` when needed.
     effective_version_id — read-only effective value for operator surfaces.
 
@@ -24,45 +24,98 @@ import json
 import os
 import subprocess  # nosec B404 — fixed git argv only; no shell
 from importlib.metadata import PackageNotFoundError
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from pathlib import Path
+from typing import Any
 
 _PACKAGE_NAME = "sevn"
 
 
-def _resolve_git_short_head(repo_root: Path) -> str:
-    """Return ``git rev-parse --short HEAD`` for *repo_root*, or ``unknown``.
-
-    Mirrors the probe style in :func:`sevn.agent.context_manifest._resolve_git_commit`
-    without importing agent-context code.
+def _run_git(args: list[str], repo_root: Path) -> str | None:
+    """Return trimmed stdout of ``git *args`` in *repo_root*, or ``None`` on failure.
 
     Args:
-        repo_root (Path): Directory passed as ``git`` working tree (typically a checkout).
+        args (list[str]): Git subcommand argv after ``git`` (fixed, no shell).
+        repo_root (Path): Directory used as the git working tree.
 
     Returns:
-        str: Short commit hash, or ``"unknown"`` when git is unavailable.
+        str | None: Trimmed stdout when git exits ``0`` with output, else ``None``.
 
     Examples:
         >>> from pathlib import Path
-        >>> _resolve_git_short_head(Path("/nonexistent-path-for-doctest"))
-        'unknown'
+        >>> _run_git(["rev-parse", "HEAD"], Path("/nonexistent-path-for-doctest")) is None
+        True
     """
     try:
         out = subprocess.run(  # nosec B603 B607
-            ["git", "rev-parse", "--short", "HEAD"],
+            ["git", *args],
             cwd=repo_root,
             capture_output=True,
             text=True,
             check=False,
             timeout=5,
         )
-        if out.returncode == 0 and out.stdout.strip():
-            return out.stdout.strip()
     except (OSError, subprocess.TimeoutExpired):
-        pass
-    return "unknown"
+        return None
+    if out.returncode == 0 and out.stdout.strip():
+        return out.stdout.strip()
+    return None
+
+
+def _resolve_git_build_id(repo_root: Path) -> str:
+    """Return a ``<ref>_<short-sha>`` build identity for *repo_root*, or ``unknown``.
+
+    ``ref`` is the exact release tag when HEAD points at one (release builds),
+    otherwise the current branch name (dev builds). A detached HEAD with no tag
+    yields the short sha alone.
+
+    Args:
+        repo_root (Path): Directory passed as the ``git`` working tree (a checkout).
+
+    Returns:
+        str: e.g. ``"pre-0.0.1_393f918b"`` (branch) or ``"v0.0.1_393f918b"`` (tag),
+        or ``"unknown"`` when git is unavailable.
+
+    Examples:
+        >>> from pathlib import Path
+        >>> _resolve_git_build_id(Path("/nonexistent-path-for-doctest"))
+        'unknown'
+    """
+    short_sha = _run_git(["rev-parse", "--short=8", "HEAD"], repo_root)
+    if not short_sha:
+        return "unknown"
+    ref = _run_git(["describe", "--tags", "--exact-match", "HEAD"], repo_root)
+    if not ref:
+        branch = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], repo_root)
+        if branch and branch != "HEAD":
+            ref = branch
+    if not ref:
+        return short_sha
+    return f"{ref}_{short_sha}"
+
+
+def _package_repo_root() -> Path | None:
+    """Return the sevn.bot checkout the running package lives in, or ``None``.
+
+    Walks up from this module to the first ancestor that is a sevn git checkout
+    (``.git`` + ``pyproject.toml`` naming ``sevn``). Lets build-id resolution
+    succeed when a caller passes no ``repo_root`` (e.g. the operator workspace is
+    not itself a git tree). Returns ``None`` for wheel installs (no checkout).
+
+    Returns:
+        Path | None: Absolute checkout root, or ``None`` when not found.
+
+    Examples:
+        >>> from sevn.config.version_id import _package_repo_root
+        >>> _package_repo_root() is None or _package_repo_root().is_dir()
+        True
+    """
+    from sevn.config.sevn_repo import is_sevn_repo
+
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        if is_sevn_repo(parent):
+            return parent
+    return None
 
 
 def resolve_version_id(*, repo_root: Path | None = None) -> str:
@@ -71,29 +124,37 @@ def resolve_version_id(*, repo_root: Path | None = None) -> str:
     Resolution order:
 
     1. Non-empty ``SEVN_VERSION_ID`` environment variable.
-    2. ``git rev-parse --short HEAD`` from *repo_root* when git succeeds.
-    3. ``importlib.metadata.version("sevn")``.
-    4. ``"unknown"``.
+    2. ``<branch|tag>_<short-sha>`` from *repo_root* when git succeeds.
+    3. ``<branch|tag>_<short-sha>`` from the running package's own checkout,
+       when *repo_root* is ``None`` (e.g. the caller only has a non-git workspace).
+    4. ``importlib.metadata.version("sevn")``.
+    5. ``"unknown"``.
 
     Args:
         repo_root (Path | None, optional): Git working tree for step (2). When
-            ``None``, step (2) is skipped.
+            ``None``, step (2) is skipped and step (3) is attempted instead.
 
     Returns:
         str: Resolved build identity string.
 
     Examples:
         >>> resolve_version_id(repo_root=None)  # doctest: +SKIP
-        'abc1234'
+        'pre-0.0.1_393f918b'
     """
     env_val = os.environ.get("SEVN_VERSION_ID", "")
     if env_val.strip():
         return env_val.strip()
 
     if repo_root is not None:
-        git_sha = _resolve_git_short_head(repo_root.expanduser().resolve())
-        if git_sha != "unknown":
-            return git_sha
+        build_id = _resolve_git_build_id(repo_root.expanduser().resolve())
+        if build_id != "unknown":
+            return build_id
+    else:
+        package_root = _package_repo_root()
+        if package_root is not None:
+            build_id = _resolve_git_build_id(package_root)
+            if build_id != "unknown":
+                return build_id
 
     try:
         return importlib.metadata.version(_PACKAGE_NAME)
