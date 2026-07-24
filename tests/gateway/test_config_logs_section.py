@@ -340,8 +340,12 @@ async def test_logs_toggle_redaction_syncs_deny_keys_both_directions(tmp_path: P
 
 
 @pytest.mark.asyncio
-async def test_logs_deployment_id_button_returns_toast(tmp_path: Path) -> None:
-    """Deployment id button surfaces the router's `_deployment_id` as a toast."""
+async def test_logs_deployment_id_button_posts_copyable_message(tmp_path: Path) -> None:
+    """Deployment id button posts `_deployment_id` as a persistent, tap-to-copy message.
+
+    The value is sent as a `<code>`-wrapped chat message (not an ephemeral toast)
+    so operators can copy it; the button press is still acked.
+    """
     router, cap, _root = _build_owner_router(tmp_path)
     router._deployment_id = "test-deployment-abc123"
     msg = _logs_callback(
@@ -350,7 +354,6 @@ async def test_logs_deployment_id_button_returns_toast(tmp_path: Path) -> None:
         callback_query_id="cq-dep",
     )
     await router.route_incoming(msg)
-    answers = dict(cap.answered)
-    assert "cq-dep" in answers
-    toast = answers["cq-dep"] or ""
-    assert "test-deployment-abc123" in toast
+    assert any("test-deployment-abc123" in (text or "") for text, _md in cap.sent)
+    assert any("<code>" in (text or "") for text, _md in cap.sent)
+    assert "cq-dep" in dict(cap.answered)

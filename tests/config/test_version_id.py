@@ -2,7 +2,7 @@
 
 Pins ``sevn.config.version_id`` public API:
 
-- :func:`resolve_version_id` — env ``SEVN_VERSION_ID`` > git short SHA >
+- :func:`resolve_version_id` — env ``SEVN_VERSION_ID`` > git ``<branch|tag>_<short-sha>`` >
   ``importlib.metadata.version("sevn")`` > ``"unknown"``
 - :func:`ensure_version_id` — resolve then persist into ``sevn.json`` top-level
   ``"version_id"`` when missing or when boot resolves a different non-``unknown``
@@ -60,7 +60,7 @@ def _init_git_repo(root: Path, *, commit_message: str = "init") -> str:
         capture_output=True,
     )
     proc = subprocess.run(
-        ["git", "rev-parse", "--short", "HEAD"],
+        ["git", "rev-parse", "--short=8", "HEAD"],
         cwd=root,
         check=True,
         capture_output=True,
@@ -84,19 +84,48 @@ def test_resolve_prefers_nonempty_env_over_git_and_package(
         assert resolve_version_id(repo_root=repo) == "env-build-42"
 
 
-def test_resolve_ignores_empty_env_and_uses_git(
+def _git_branch(root: Path) -> str:
+    """Return the current branch name for a git *root* (helper for build-id assertions)."""
+    proc = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return proc.stdout.strip()
+
+
+def test_resolve_ignores_empty_env_and_uses_git_branch_and_short_sha(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """D2 step (1)/(2): empty env falls through to ``git rev-parse --short HEAD``."""
+    """D2 step (1)/(2): empty env falls through to ``<branch>_<short-sha>``."""
     from sevn.config.version_id import resolve_version_id
 
     repo = tmp_path / "repo"
     repo.mkdir()
     short = _init_git_repo(repo)
+    branch = _git_branch(repo)
     monkeypatch.setenv("SEVN_VERSION_ID", "")
     with patch("importlib.metadata.version", return_value="9.9.9"):
-        assert resolve_version_id(repo_root=repo) == short
+        assert resolve_version_id(repo_root=repo) == f"{branch}_{short}"
+
+
+def test_resolve_uses_exact_tag_as_ref_over_branch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A release tag on HEAD becomes the ref: ``<tag>_<short-sha>`` (release build)."""
+    from sevn.config.version_id import resolve_version_id
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    short = _init_git_repo(repo)
+    subprocess.run(["git", "tag", "v9.9.9"], cwd=repo, check=True, capture_output=True)
+    monkeypatch.setenv("SEVN_VERSION_ID", "")
+    with patch("importlib.metadata.version", return_value="0.0.0"):
+        assert resolve_version_id(repo_root=repo) == f"v9.9.9_{short}"
 
 
 def test_resolve_falls_back_to_package_version_when_git_unavailable(

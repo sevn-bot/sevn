@@ -1307,7 +1307,15 @@ def create_app(
         # via ``/status`` and the Logs section in `/config`.
         gateway_router._deployment_id = load_or_create_deployment_id(ly.content_root)
         # Build identity in ``sevn.json`` (issue #30) — orthogonal to deployment_id (D1).
-        _repo_root = try_resolve_sevn_repo_root(ly.content_root) or ly.content_root
+        # Resolve the code checkout (not the operator workspace, which is not a git
+        # tree) so the git ``<branch>_<short-sha>`` build id resolves and persists.
+        from sevn.config.sevn_repo import resolve_sevn_checkout_for_workspace
+
+        _repo_root = (
+            resolve_sevn_checkout_for_workspace(ws, content_root=ly.content_root)
+            or try_resolve_sevn_repo_root(ly.content_root)
+            or ly.content_root
+        )
         gateway_router._version_id = await asyncio.to_thread(
             ensure_version_id,
             ly.sevn_json_path,

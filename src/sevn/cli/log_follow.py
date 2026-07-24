@@ -463,17 +463,21 @@ def collect_merged_log_entries(
 
     Examples:
         >>> import tempfile
+        >>> from datetime import timedelta
         >>> from pathlib import Path
         >>> td = Path(tempfile.mkdtemp())
         >>> gw = td / "gateway.log"
         >>> cli = td / "cli.log"
+        >>> base = datetime.now(UTC) - timedelta(hours=1)  # within the since="30d" window
+        >>> def _ts(offset_s):
+        ...     return (base + timedelta(seconds=offset_s)).isoformat(sep=" ")
         >>> _ = gw.write_text(
-        ...     "2026-06-23 10:00:00.000+00:00 | INFO | - | - | early\\n"
-        ...     "2026-06-23 10:00:01.000+00:00 | ERROR | - | - | boom\\n",
+        ...     f"{_ts(0)} | INFO | - | - | early\\n"
+        ...     f"{_ts(1)} | ERROR | - | - | boom\\n",
         ...     encoding="utf-8",
         ... )
         >>> _ = cli.write_text(
-        ...     "2026-06-23 10:00:00.500+00:00 | INFO | [cli] | mid\\n",
+        ...     f"{_ts(0.5)} | INFO | [cli] | mid\\n",
         ...     encoding="utf-8",
         ... )
         >>> entries = collect_merged_log_entries(

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import html
 import json
 import secrets
 import sqlite3
@@ -670,42 +671,42 @@ class MenuActionRouter:
             return True
         return False
 
-    async def _answer_logs_identity_toast(
+    async def _send_identity_message(
         self,
         msg: IncomingMessage,
         *,
         label: str,
         value: str,
-    ) -> str | None:
-        """Answer a read-only ``cfg:logs:*`` identity toast via callback query.
+    ) -> None:
+        """Post a read-only ``cfg:logs:*`` identity value as a persistent chat message.
+
+        Unlike an ``answerCallbackQuery`` toast (which appears then disappears),
+        the value is sent as a normal chat message wrapped in a ``<code>`` span,
+        so it stays in the chat and operators can tap-to-copy it. A short toast
+        acks the button press when the adapter can answer inline.
 
         Args:
             msg (IncomingMessage): Inbound callback envelope.
-            label (str): Human label (e.g. ``Deployment id``).
-            value (str): Identity value to show.
-
-        Returns:
-            str | None: Fallback toast when adapter cannot answer inline.
+            label (str): Human label (e.g. ``Version id``).
+            value (str): Identity value to show and copy.
 
         Examples:
             >>> import inspect
-            >>> inspect.iscoroutinefunction(MenuActionRouter._answer_logs_identity_toast)
+            >>> inspect.iscoroutinefunction(MenuActionRouter._send_identity_message)
             True
         """
-        toast = f"{label}: {value}"
+        text = f"{html.escape(label)}:\n<code>{html.escape(value)}</code>"
+        await self._send_logs_chunks(msg, [text])
         md = msg.metadata if isinstance(msg.metadata, dict) else {}
         cq_id = md.get("callback_query_id")
         cq_str = cq_id.strip() if isinstance(cq_id, str) else ""
         adapter = self._router._adapters.get(msg.channel)
         if adapter is not None and cq_str:
-            answered = await _answer_callback(
+            await _answer_callback(
                 adapter,
                 callback_query_id=cq_str,
-                text=toast,
+                text=f"{label} sent to chat",
             )
-            if answered:
-                return None
-        return toast
 
     async def _refresh_stop_picker_after_kill(
         self,
@@ -1797,22 +1798,24 @@ class MenuActionRouter:
         suffix = target.removeprefix("logs:")
         if suffix == "deployment_id":
             dep_id = getattr(self._router, "_deployment_id", None) or "unset"
-            return await self._answer_logs_identity_toast(
+            await self._send_identity_message(
                 msg,
                 label="Deployment id",
                 value=str(dep_id),
             )
+            return None
         if suffix == "version_id":
             vid = effective_version_id(
                 sevn_json_path=self._sevn_json,
                 repo_root=self._content_root,
                 router_stash=getattr(self._router, "_version_id", None),
             )
-            return await self._answer_logs_identity_toast(
+            await self._send_identity_message(
                 msg,
                 label="Version id",
                 value=vid,
             )
+            return None
         if not self._router._resolve_owner_flag(msg):
             await self._answer_owner_only(msg)
             return None
