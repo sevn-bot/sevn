@@ -203,6 +203,62 @@ def test_tunnels_status_does_not_apply_workspace(tmp_path: Path) -> None:
         apply.assert_not_called()
 
 
+def test_tunnels_start_holds_lifecycle_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Mission Control ``/tunnels/start`` must hold ``lifecycle_lock`` during the spawn.
+
+    The lock serialises this endpoint against the boot autostart task and the Telegram
+    toggle (shared ``default_manager`` singleton, no internal thread safety).
+    """
+    from sevn.infrastructure.tunnel_manager import TunnelStatus, default_manager
+
+    observed: dict[str, bool] = {}
+
+    def _fake_start(runtime_cfg: object, *, confirm: bool) -> TunnelStatus:
+        observed["locked"] = default_manager.lifecycle_lock.locked()
+        return TunnelStatus(
+            mode="cloudflare_quick", pid=1, healthy=True, public_url="https://x", error=None
+        )
+
+    async def _fake_prepare(*_a: object, **_k: object) -> dict[str, str]:
+        return {"mode": "cloudflare_quick"}
+
+    with _client(tmp_path) as client:
+        login = client.post("/api/v1/auth/login", json={"password": "pw", "totp": "000000"})
+        assert login.status_code == 200
+        monkeypatch.setattr("sevn.ui.dashboard.api.ops.prepare_tunnel_runtime_cfg", _fake_prepare)
+        monkeypatch.setattr(default_manager, "start", _fake_start)
+        resp = client.post(
+            "/api/v1/tunnels/start", json={"confirm": True}, headers=_csrf_headers(client)
+        )
+    assert resp.status_code in (200, 502)
+    assert observed.get("locked") is True
+
+
+def test_tunnels_stop_holds_lifecycle_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Mission Control ``/tunnels/stop`` must hold ``lifecycle_lock`` during the stop."""
+    from sevn.infrastructure.tunnel_manager import TunnelStatus, default_manager
+
+    observed: dict[str, bool] = {}
+
+    def _fake_stop(tunnel_cfg: object, *, confirm: bool) -> TunnelStatus:
+        observed["locked"] = default_manager.lifecycle_lock.locked()
+        return TunnelStatus(
+            mode="cloudflare_quick", pid=None, healthy=False, public_url=None, error=None
+        )
+
+    with _client(tmp_path) as client:
+        login = client.post("/api/v1/auth/login", json={"password": "pw", "totp": "000000"})
+        assert login.status_code == 200
+        monkeypatch.setattr(default_manager, "stop", _fake_stop)
+        resp = client.post(
+            "/api/v1/tunnels/stop", json={"confirm": True}, headers=_csrf_headers(client)
+        )
+    assert resp.status_code == 200
+    assert observed.get("locked") is True
+
+
 def test_tunnels_status_tunnel_flags_match_layout_sevn_json(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

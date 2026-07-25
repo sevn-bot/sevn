@@ -24,6 +24,8 @@ Exports:
     build_config_menu_keyboard — 18-tile inline keyboard for ``/config``.
     build_service_restart_confirm_keyboard — Confirm/Cancel rows for service restart.
     service_restart_confirm_message — caption for restart confirmation screen.
+    build_tunnel_on_confirm_keyboard — Confirm/Cancel rows for turning the tunnel on.
+    tunnel_on_confirm_message — caption for the turn-tunnel-on confirmation screen.
     menu_message_text — caption text paired with each menu screen.
     config_menu_message_text — caption text for ``/config`` screens.
     parse_menu_callback_data — parse ``menu:*`` / ``nav:*`` callback payloads.
@@ -1561,16 +1563,49 @@ def _build_sevn_bot_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[
     ]
 
 
+def _tunnel_toggle_row(tunnel_cfg: dict[str, Any]) -> list[dict[str, Any]] | None:
+    """Build the owner-only persistent-tunnel on/off row for a configured mode.
+
+    Args:
+        tunnel_cfg (dict[str, Any]): ``infrastructure.tunnel`` sub-dict.
+
+    Returns:
+        list[dict[str, Any]] | None: One inline-button row, or ``None`` when no
+        runnable tunnel mode is configured.
+
+    Examples:
+        >>> _tunnel_toggle_row({"mode": "none"}) is None
+        True
+        >>> _tunnel_toggle_row({"mode": "cloudflare", "autostart": True})[0]["callback_data"]
+        'act:tunnel:off'
+        >>> _tunnel_toggle_row({"mode": "cloudflare"})[0]["callback_data"]
+        'act:tunnel:on'
+    """
+    from sevn.infrastructure.tunnel_config import RUNNABLE_MODES
+
+    mode = str(tunnel_cfg.get("mode") or "none")
+    if mode not in RUNNABLE_MODES:
+        return None
+    if bool(tunnel_cfg.get("autostart")):
+        return [{"text": "🌐 Tunnel: on — turn off", "callback_data": "act:tunnel:off"}]
+    return [{"text": "🌐 Tunnel: off — turn on", "callback_data": "act:tunnel:on"}]
+
+
 def _build_my_sevn_bot_keyboard_rows(
     workspace: WorkspaceConfig,
     *,
     is_owner: bool = False,
+    tunnel_cfg: dict[str, Any] | None = None,
 ) -> list[list[dict[str, Any]]]:
-    """Build My Sevn.bot operator rows (restart, deployment id).
+    """Build My Sevn.bot operator rows (restart, tunnel on/off, deployment id).
 
     Args:
         workspace (WorkspaceConfig): Parsed workspace settings.
-        is_owner (bool): When ``True``, render gateway/proxy restart buttons.
+        is_owner (bool): When ``True``, render gateway/proxy restart and tunnel rows.
+        tunnel_cfg (dict[str, Any] | None): ``infrastructure.tunnel`` sub-dict; taken
+            from the workspace document when ``None``. The action router reloads
+            ``self._workspace`` after toggling so the button flips live; a ``sevn tunnel
+            setup`` done after boot appears once the gateway reloads/restarts.
 
     Returns:
         list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
@@ -1580,12 +1615,25 @@ def _build_my_sevn_bot_keyboard_rows(
         >>> rows = _build_my_sevn_bot_keyboard_rows(WorkspaceConfig.minimal(), is_owner=False)
         >>> [btn["callback_data"] for row in rows for btn in row]
         ['cfg:logs:deployment_id', 'cfg:logs:version_id']
+        >>> rows = _build_my_sevn_bot_keyboard_rows(
+        ...     WorkspaceConfig.minimal(),
+        ...     is_owner=True,
+        ...     tunnel_cfg={"mode": "cloudflare", "autostart": True},
+        ... )
+        >>> [btn["callback_data"] for row in rows for btn in row]
+        ['act:gateway:restart', 'act:proxy:restart', 'act:tunnel:off', 'cfg:logs:deployment_id', 'cfg:logs:version_id']
     """
-    _ = workspace
     rows: list[list[dict[str, Any]]] = []
     if is_owner:
         rows.append([{"text": "🔄 Restart gateway", "callback_data": "act:gateway:restart"}])
         rows.append([{"text": "🔄 Restart proxy", "callback_data": "act:proxy:restart"}])
+        if tunnel_cfg is None:
+            from sevn.infrastructure.tunnel_config import tunnel_cfg_from_workspace
+
+            tunnel_cfg = tunnel_cfg_from_workspace(workspace)
+        tunnel_row = _tunnel_toggle_row(tunnel_cfg)
+        if tunnel_row is not None:
+            rows.append(tunnel_row)
     rows.append([{"text": "🆔 Deployment id", "callback_data": "cfg:logs:deployment_id"}])
     rows.append([{"text": "🏷 Version id", "callback_data": "cfg:logs:version_id"}])
     return rows
@@ -1703,6 +1751,54 @@ def service_restart_confirm_message(service: Literal["gateway", "proxy"]) -> str
     else:
         detail = "Outbound provider traffic may pause while the proxy restarts."
     return f"My sevn bot\n\nRestart {label}?\n{detail}\nTap Confirm to proceed."
+
+
+def build_tunnel_on_confirm_keyboard() -> list[list[dict[str, Any]]]:
+    """Build Confirm/Cancel rows for the two-step "Turn tunnel on" prompt.
+
+    Turning the tunnel *on* stands up a public URL to the gateway, so it goes
+    through the same confirm gate as gateway/proxy restart. Turning off needs no
+    prompt — it only reduces exposure.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = build_tunnel_on_confirm_keyboard()
+        >>> rows[0][0]["callback_data"]
+        'act:tunnel:on:confirm'
+        >>> rows[0][1]["callback_data"]
+        'act:tunnel:on:cancel'
+    """
+    return [
+        [
+            {
+                "text": "✅ Confirm turn on",
+                "callback_data": "act:tunnel:on:confirm",
+            },
+            {
+                "text": "Cancel",
+                "callback_data": "act:tunnel:on:cancel",
+            },
+        ],
+    ]
+
+
+def tunnel_on_confirm_message() -> str:
+    """Return caption text for the "Turn tunnel on" confirmation screen.
+
+    Returns:
+        str: Human-readable confirmation prompt.
+
+    Examples:
+        >>> "Turn tunnel on" in tunnel_on_confirm_message()
+        True
+    """
+    return (
+        "My sevn bot\n\nTurn tunnel on?\n"
+        "This starts the configured tunnel and exposes the gateway on a public URL.\n"
+        "Tap Confirm to proceed."
+    )
 
 
 def _build_models_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:

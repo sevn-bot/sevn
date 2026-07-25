@@ -1133,6 +1133,26 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         implemented=True,
         notes="Shows build version_id from sevn.json in chat",
     )
+    add(
+        "C22.1",
+        r"^act:tunnel:on(:confirm|:cancel)?$",
+        "C",
+        "my_sevn_bot",
+        "Turn tunnel on",
+        implemented=True,
+        owner_only=True,
+        notes="2-step confirm; sets infrastructure.tunnel.autostart + starts now; survives host restart via gateway boot",
+    )
+    add(
+        "C22.2",
+        _exact("act:tunnel:off"),
+        "C",
+        "my_sevn_bot",
+        "Turn tunnel off",
+        implemented=True,
+        owner_only=True,
+        notes="Clears autostart + stops the running tunnel",
+    )
 
     # --- C21. sevn.bot ---
     add(

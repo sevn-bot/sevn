@@ -1291,6 +1291,24 @@ def create_app(
         from sevn.infrastructure.tunnel_manager import default_manager, tunnel_pid_file
 
         default_manager.attach_pid_file(tunnel_pid_file(ly.content_root))
+        # Persistent tunnel: when the operator turned it on from the Telegram menu
+        # (``infrastructure.tunnel.autostart``), re-launch it so it survives host restart
+        # alongside the gateway daemon. Fire-and-forget so a slow or hung provider spawn
+        # never delays gateway readiness — the coroutine is best-effort and self-bounds
+        # via TUNNEL_START_TIMEOUT_S, and the task ref is kept on app.state so it is not
+        # garbage-collected mid-flight.
+        from sevn.infrastructure.tunnel_autostart import autostart_tunnel_if_enabled
+        from sevn.infrastructure.tunnel_config import tunnel_cfg_from_disk
+
+        app.state.tunnel_autostart_task = asyncio.create_task(
+            autostart_tunnel_if_enabled(
+                tunnel_config=tunnel_cfg_from_disk(ws, sevn_json=ly.sevn_json_path),
+                gateway_port=ws.gateway.port if ws.gateway else None,
+                content_root=ly.content_root,
+                secrets_backend=ws.secrets_backend,
+                manager=default_manager,
+            ),
+        )
         # W3: single RuntimeToolBindings factory (integration W2, sandbox W3, MCP W6).
         _mcp_servers_map = build_effective_mcp_servers(ws, ly.content_root)
         _mcp_tool_defs = await discover_mcp_tool_definitions(_mcp_servers_map)
@@ -1658,6 +1676,17 @@ def create_app(
         cron_task.cancel()
         with suppress(asyncio.CancelledError):
             await cron_task
+        # Cancel the fire-and-forget tunnel autostart on shutdown. Best-effort only:
+        # cancelling reclaims the awaiting coroutine, but a ``manager.start`` already
+        # running inside the ``asyncio.to_thread`` executor cannot be preempted, so on a
+        # fast shutdown/restart it may still finish spawning (up to TUNNEL_START_TIMEOUT_S)
+        # and write a pid file after content_root teardown. We accept that narrow window
+        # rather than block shutdown on the spawn; the next boot reconciles the pid file.
+        tunnel_task = getattr(app.state, "tunnel_autostart_task", None)
+        if isinstance(tunnel_task, asyncio.Task):
+            tunnel_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await tunnel_task
         from sevn.triggers.operator_notify import unwire_operator_notify
 
         unwire_operator_notify()

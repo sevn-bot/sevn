@@ -1342,13 +1342,19 @@ async def tunnels_start(
     layout: WorkspaceLayout = request.app.state.layout
     tunnel_cfg = tunnel_cfg_from_workspace(ws)
     try:
-        runtime_cfg = await prepare_tunnel_runtime_cfg(
-            tunnel_cfg,
-            gateway_port=(ws.gateway.port if ws.gateway else None),
-            content_root=layout.content_root,
-            secrets_backend=ws.secrets_backend,
-        )
-        ts = await asyncio.to_thread(default_manager.start, runtime_cfg, confirm=True)
+        # Serialise with the boot autostart task and the Telegram tunnel toggle: all
+        # three share the ``default_manager`` singleton, which mutates ``_process`` /
+        # ``_started_mode`` with no internal lock. Hold the lock across secret
+        # resolution *and* the spawn so a Mission Control "Start" can't race an
+        # in-flight boot autostart (mirrors ``start_configured_tunnel``).
+        async with default_manager.lifecycle_lock:
+            runtime_cfg = await prepare_tunnel_runtime_cfg(
+                tunnel_cfg,
+                gateway_port=(ws.gateway.port if ws.gateway else None),
+                content_root=layout.content_root,
+                secrets_backend=ws.secrets_backend,
+            )
+            ts = await asyncio.to_thread(default_manager.start, runtime_cfg, confirm=True)
     except (RuntimeError, ValueError) as exc:
         return _error_response("tunnel_start_failed", str(exc), status_code=400)
     await emit_mission_audit(
@@ -1396,7 +1402,11 @@ async def tunnels_stop(
     ws = _tunnel_workspace_from_disk(request)
     tunnel_cfg = tunnel_cfg_from_workspace(ws)
     try:
-        ts = await asyncio.to_thread(default_manager.stop, tunnel_cfg, confirm=True)
+        # Serialise with the boot autostart task / Telegram toggle (shared
+        # ``default_manager`` singleton, no internal lock) so a Mission Control "Stop"
+        # can't race an in-flight start and leak or clobber the tunnel process.
+        async with default_manager.lifecycle_lock:
+            ts = await asyncio.to_thread(default_manager.stop, tunnel_cfg, confirm=True)
     except (RuntimeError, ValueError) as exc:
         return _error_response("tunnel_stop_failed", str(exc), status_code=400)
     await emit_mission_audit(

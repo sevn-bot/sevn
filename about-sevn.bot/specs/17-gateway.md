@@ -7,8 +7,8 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
-last_updated: '2026-07-24'
-fingerprint: sha256:327e8d1ad3df7b22868e9681383ade522ecd6d8a91886dff9a7294b9ecd6ecf0
+last_updated: '2026-07-25'
+fingerprint: sha256:14ce8e20eb3f25376b68df0549c5a2966bd654d979c1aa74a440455aca66e6e4
 related: []
 sources:
 - src/sevn/gateway/**
@@ -480,6 +480,9 @@ interfaces:
 - name: build_service_restart_confirm_keyboard
   file: src/sevn/gateway/menu/menu.py
   symbol: build_service_restart_confirm_keyboard
+- name: build_tunnel_on_confirm_keyboard
+  file: src/sevn/gateway/menu/menu.py
+  symbol: build_tunnel_on_confirm_keyboard
 - name: config_callback_matches
   file: src/sevn/gateway/menu/menu.py
   symbol: config_callback_matches
@@ -537,6 +540,9 @@ interfaces:
 - name: sync_telegram_chat_menu_button
   file: src/sevn/gateway/menu/menu.py
   symbol: sync_telegram_chat_menu_button
+- name: tunnel_on_confirm_message
+  file: src/sevn/gateway/menu/menu.py
+  symbol: tunnel_on_confirm_message
 - name: web_ui_url_from_workspace
   file: src/sevn/gateway/menu/menu.py
   symbol: web_ui_url_from_workspace

@@ -73,6 +73,7 @@ from sevn.gateway.menu.menu import (
     _telegram_api_thread_id,
     _voice_tts_mode,
     build_service_restart_confirm_keyboard,
+    build_tunnel_on_confirm_keyboard,
     config_menu_nav_pop,
     config_menu_nav_push_current,
     get_config_menu_nav,
@@ -81,6 +82,7 @@ from sevn.gateway.menu.menu import (
     parse_models_callback_data,
     refresh_config_menu_message,
     service_restart_confirm_message,
+    tunnel_on_confirm_message,
 )
 from sevn.gateway.subagents.surfaces import (
     STOP_L1_PICKER_COPY,
@@ -201,6 +203,8 @@ def infer_config_section_from_callback(data: str) -> ConfigSection:
         'models'
         >>> infer_config_section_from_callback("act:gateway:restart")
         'my_sevn_bot'
+        >>> infer_config_section_from_callback("act:tunnel:on")
+        'my_sevn_bot'
         >>> infer_config_section_from_callback("act:sevn_bot:sync")
         'sevn_bot'
         >>> infer_config_section_from_callback("cfg:logs:toggle_redaction")
@@ -211,7 +215,7 @@ def infer_config_section_from_callback(data: str) -> ConfigSection:
         return "logs"
     if raw.startswith("cfg:models:"):
         return "models"
-    if raw.startswith(("act:gateway:", "act:proxy:")):
+    if raw.startswith(("act:gateway:", "act:proxy:", "act:tunnel:")):
         return "my_sevn_bot"
     if raw.startswith("act:sevn_bot:"):
         return "sevn_bot"
@@ -538,6 +542,8 @@ class MenuActionRouter:
                 return await self._handle_logs_action(msg, raw, target)
             if target.startswith("sevn_bot:"):
                 return await self._handle_sevn_bot_action(msg, raw, target)
+            if target.startswith("tunnel:"):
+                return await self._handle_tunnel_action(msg, raw, target)
             if target == "discogs:whoami":
                 return await self._handle_discogs_whoami(msg, raw)
             if target.startswith("subagents:kill:"):
@@ -1337,6 +1343,259 @@ class MenuActionRouter:
         count = await supervisor.kill_all(role=None)
         toast = f"Killed {count} sub-agent run(s)."
         return await self._after_subagent_kill(msg, callback_data, toast=toast)
+
+    def _tunnel_persistence_hint(self) -> str:
+        """Return a caveat when the gateway daemon is absent (no host-restart survival).
+
+        Autostart re-launches the tunnel on gateway boot; that only survives a host
+        restart when the gateway itself is installed as a launchd/systemd daemon.
+
+        Returns:
+            str: Trailing hint text, or ``""`` when the gateway daemon is installed.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.isfunction(MenuActionRouter._tunnel_persistence_hint)
+            True
+        """
+        try:
+            if unit_file_exists(home=Path.home(), service="gateway"):
+                return ""
+        except (OSError, ServiceManagerError):
+            return ""
+        return " Install the gateway daemon so it survives host restart."
+
+    async def _handle_tunnel_action(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        target: str,
+    ) -> str | None:
+        """Turn the persistent tunnel on/off from the My sevn bot menu (owner-only).
+
+        Turning *on* stands up a public URL to the gateway, so ``tunnel:on`` shows a
+        two-step confirm first (like gateway/proxy restart); ``tunnel:on:confirm``
+        stamps ``infrastructure.tunnel.autostart`` in ``sevn.json`` and starts the
+        configured provider now (the gateway boot hook re-launches it after a host
+        restart), and ``tunnel:on:cancel`` returns to the menu. ``tunnel:off`` stays
+        one-tap — clearing the flag and stopping the provider only reduces exposure.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed action target (``tunnel:on``, ``tunnel:on:confirm``,
+                ``tunnel:on:cancel`` or ``tunnel:off``).
+
+        Returns:
+            str | None: Toast text when refresh did not answer inline; ``None`` otherwise.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_tunnel_action)
+            True
+        """
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        if target == "tunnel:on:cancel":
+            return await self._handle_tunnel_on_cancel(msg, callback_data)
+        # Enumerate the valid targets explicitly (like _handle_service_restart_action) so
+        # an unexpected ``tunnel:*`` callback is a no-op rather than falling through to the
+        # "stop" branch below and silently tearing down a live tunnel.
+        if target not in {"tunnel:on", "tunnel:on:confirm", "tunnel:off"}:
+            return None
+        from sevn.infrastructure.tunnel_config import RUNNABLE_MODES, tunnel_cfg_from_disk
+        from sevn.infrastructure.tunnel_manager import default_manager
+
+        tunnel_cfg = tunnel_cfg_from_disk(self._workspace, sevn_json=self._sevn_json)
+        mode = str(tunnel_cfg.get("mode") or "none")
+        if mode not in RUNNABLE_MODES:
+            # Stale-button guard: the toggle only renders for a runnable mode, but a
+            # button left in an old message could still be tapped. Toast rather than
+            # prompt/spawn for an impossible action.
+            toast = "No tunnel configured — run `sevn tunnel setup` first."
+            answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+            return None if answered else toast
+        if target == "tunnel:on":
+            return await self._edit_tunnel_on_confirm(msg, callback_data)
+        turn_on = target == "tunnel:on:confirm"
+        gateway_port = self._workspace.gateway.port if self._workspace.gateway else None
+        if turn_on:
+            from sevn.infrastructure.tunnel_autostart import start_configured_tunnel
+
+            # Hold ``lifecycle_lock`` across the spawn *and* the ``autostart`` persist so a
+            # concurrent Mission Control stop can't slip in between them and leave the
+            # persisted flag out of sync with the live process. Start first; only persist
+            # once the provider is confirmed healthy (a failed/unhealthy start persists
+            # nothing, so a later gateway boot never retries a broken config).
+            started_ok = False
+            start_error: str | None = None
+            tunnel_url: str | None = None
+            async with default_manager.lifecycle_lock:
+                try:
+                    status = await start_configured_tunnel(
+                        tunnel_config=tunnel_cfg,
+                        gateway_port=gateway_port,
+                        content_root=self._content_root,
+                        secrets_backend=self._workspace.secrets_backend,
+                        manager=default_manager,
+                        lock_held=True,
+                    )
+                except (OSError, RuntimeError, ValueError) as exc:
+                    start_error = f"Tunnel start failed: {exc}"
+                else:
+                    if status.healthy:
+                        mutate_sevn_json(
+                            self._sevn_json,
+                            lambda d: _set_nested(d, "infrastructure.tunnel.autostart", True),
+                        )
+                        self._reload_workspace()
+                        started_ok = True
+                        tunnel_url = status.mission_control_url or status.public_url
+                    else:
+                        start_error = f"Tunnel start failed: {status.error or 'not healthy'}"
+            if not started_ok:
+                toast = start_error or "Tunnel start failed."
+                answered = await self._refresh_config_menu_after_action(
+                    msg, callback_data, toast=toast
+                )
+                return None if answered else toast
+            toast = (
+                "Tunnel on."
+                + (f" {tunnel_url}" if tunnel_url else "")
+                + self._tunnel_persistence_hint()
+            )
+        else:
+            # Stop first, then clear ``autostart`` — both under ``lifecycle_lock`` so a
+            # concurrent Mission Control start can't race the flag persist, and so a stale
+            # "off" is never shown for a still-running provider. A failed stop leaves the
+            # flag/button "on" (the provider may still be exposing the gateway).
+            stop_error: str | None = None
+            async with default_manager.lifecycle_lock:
+                try:
+                    await asyncio.to_thread(default_manager.stop, tunnel_cfg, confirm=True)
+                except (OSError, RuntimeError, ValueError) as exc:
+                    stop_error = f"Tunnel stop failed: {exc}"
+                else:
+                    mutate_sevn_json(
+                        self._sevn_json,
+                        lambda d: _set_nested(d, "infrastructure.tunnel.autostart", False),
+                    )
+                    self._reload_workspace()
+            if stop_error is not None:
+                answered = await self._refresh_config_menu_after_action(
+                    msg, callback_data, toast=stop_error
+                )
+                return None if answered else stop_error
+            toast = "Tunnel off."
+        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+        return None if answered else toast
+
+    async def _edit_tunnel_on_confirm(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """Edit the ``/config`` message to the "Turn tunnel on" confirmation screen.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Toast when the confirm screen could not be shown; ``None`` on success.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._edit_tunnel_on_confirm)
+            True
+        """
+        _ = callback_data
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        chat_raw = md.get("chat_id")
+        message_raw = md.get("message_id")
+        if not isinstance(chat_raw, int) or not isinstance(message_raw, int):
+            return "Could not show tunnel confirm."
+        config_menu_nav_push_current(self._router, chat_raw, message_raw)
+        adapter = self._router._adapters.get(msg.channel)
+        if adapter is None:
+            return "Could not show tunnel confirm."
+        thread_id = _telegram_api_thread_id(md)
+        rows = build_tunnel_on_confirm_keyboard()
+        rows.extend(_config_chrome())
+        edit_text = getattr(adapter, "edit_message_text", None)
+        if not callable(edit_text):
+            return "Could not show tunnel confirm."
+        body: dict[str, Any] = {
+            "chat_id": chat_raw,
+            "message_id": message_raw,
+            "text": tunnel_on_confirm_message(),
+            "reply_markup": {"inline_keyboard": rows},
+        }
+        if thread_id is not None:
+            body["message_thread_id"] = thread_id
+        edited = bool(await cast("Callable[..., Awaitable[Any]]", edit_text)(**body))
+        if not edited:
+            return "Could not show tunnel confirm."
+        cq_id = md.get("callback_query_id")
+        cq_str = cq_id.strip() if isinstance(cq_id, str) else ""
+        if cq_str:
+            await _answer_callback(adapter, callback_query_id=cq_str, text="Turn tunnel on?")
+        return None
+
+    async def _handle_tunnel_on_cancel(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """Return the My sevn bot section after cancelling the tunnel-on prompt.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Toast when refresh was skipped; ``None`` when answered inline.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_tunnel_on_cancel)
+            True
+        """
+        _ = callback_data
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        chat_raw = md.get("chat_id")
+        message_raw = md.get("message_id")
+        if not isinstance(chat_raw, int) or not isinstance(message_raw, int):
+            return "Cancelled."
+        frame = config_menu_nav_pop(self._router, chat_raw, message_raw)
+        adapter = self._router._adapters.get(msg.channel)
+        if adapter is None:
+            return "Cancelled."
+        thread_id = _telegram_api_thread_id(md)
+        ctx = ConfigMenuRefreshContext(
+            chat_id=chat_raw,
+            message_id=message_raw,
+            topic_id=thread_id,
+            section=frame.section,
+            models_picker_slot=frame.models_picker_slot,
+            models_picker_page=frame.models_picker_page,
+        )
+        await refresh_config_menu_message(
+            adapter,
+            ctx,
+            self._workspace,
+            content_root=self._content_root,
+            user_id=msg.user_id,
+            is_owner=self._router._resolve_owner_flag(msg),
+            router=self._router,
+        )
+        cq_id = md.get("callback_query_id")
+        cq_str = cq_id.strip() if isinstance(cq_id, str) else ""
+        if cq_str:
+            await _answer_callback(adapter, callback_query_id=cq_str, text="Cancelled.")
+            return None
+        return "Cancelled."
 
     async def _handle_service_restart_action(
         self,

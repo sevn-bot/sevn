@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import sqlite3
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from starlette.testclient import TestClient
 
@@ -19,6 +21,9 @@ from sevn.storage.migrate import apply_migrations
 from sevn.ui.openui.store import OpenUIRecord
 from sevn.ui.openui.tokens import sign_token
 from sevn.workspace.layout import WorkspaceLayout
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def _app_client(tmp_path: Path, *, cfg: WorkspaceConfig | None = None) -> TestClient:
@@ -92,6 +97,35 @@ def test_gateway_lifespan_prunes_stale_tts_files(tmp_path: Path) -> None:
     with _app_client(tmp_path) as client:
         client.get("/health")
     assert not stale.exists()
+
+
+def test_gateway_lifespan_starts_and_cancels_tunnel_autostart(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Boot creates the fire-and-forget tunnel-autostart task; shutdown cancels it cleanly.
+
+    This is the integration seam that delivers the PR's core promise (the tunnel comes
+    back on gateway boot): the lifespan must spawn ``app.state.tunnel_autostart_task`` on
+    startup and, on shutdown, cancel it without hanging even while a start is in flight.
+    """
+    import sevn.infrastructure.tunnel_autostart as autostart_mod
+
+    calls: list[str] = []
+
+    async def _fake_autostart(**_kwargs: Any) -> None:
+        # Stay in flight so shutdown must cancel us (a real spawn would still be running).
+        calls.append("called")
+        await asyncio.sleep(30)
+
+    monkeypatch.setattr(autostart_mod, "autostart_tunnel_if_enabled", _fake_autostart)
+
+    with _app_client(tmp_path) as client:
+        task = client.app.state.tunnel_autostart_task
+        assert isinstance(task, asyncio.Task)
+    # Context exit ran shutdown: the task must be finished (cancelled), not left dangling,
+    # and shutdown returned without hanging or raising.
+    assert task.done()
+    assert calls == ["called"]
 
 
 def test_metrics_phase3_stub(tmp_path: Path) -> None:
