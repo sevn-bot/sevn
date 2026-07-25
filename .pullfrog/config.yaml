@@ -5,9 +5,11 @@
 # over this file (`shell` resolves to the stricter of the two), so nothing here
 # can loosen the reviewer's permissions.
 #
-# Sibling files in this directory: `learnings.md` — durable review memory,
-# including the `## Withdrawn review findings (known non-issues)` section a
-# reviewer consults before re-raising a finding the author already refuted.
+# A sibling `learnings.md` holds durable review memory, including the
+# `## Withdrawn review findings (known non-issues)` section a reviewer consults
+# before re-raising a finding the author already refuted. It is deliberately not
+# committed here: the reviewer writes it when it first accepts a pushback, and
+# until then its absence simply reads as empty memory.
 
 # Mechanical gates the reviewer runs over a PR's changed files, so a convention
 # violation is reported as a named failing command instead of a style opinion.
