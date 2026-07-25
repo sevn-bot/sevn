@@ -244,6 +244,31 @@ async def test_tunnel_off_clears_autostart_and_stops(
 
 
 @pytest.mark.asyncio
+async def test_tunnel_off_failed_stop_preserves_autostart(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A raising stop reports failure and leaves ``autostart=True`` (button stays "on").
+
+    The provider may still be alive and publicly exposing the gateway, so the menu must
+    not claim "off" — mirror of the confirmed-healthy ordering on the "on" path.
+    """
+    router, cap, root = _build_owner_router(tmp_path)
+    _set_tunnel_mode(root, "cloudflare_quick", autostart=True)
+
+    def _fake_stop(cfg: dict[str, Any], *, confirm: bool) -> TunnelStatus:
+        raise RuntimeError("cloudflared refused to terminate")
+
+    from sevn.infrastructure.tunnel_manager import default_manager
+
+    monkeypatch.setattr(default_manager, "stop", _fake_stop)
+
+    await router.route_incoming(_callback("act:tunnel:off", callback_query_id="cq-off-fail"))
+
+    assert _read_tunnel(root).get("autostart") is True
+    assert any("Tunnel stop failed" in (t or "") for _cq, t in cap.answered)
+
+
+@pytest.mark.asyncio
 async def test_tunnel_on_failed_start_does_not_persist(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

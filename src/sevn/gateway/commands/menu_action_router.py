@@ -1450,22 +1450,27 @@ class MenuActionRouter:
             url = status.mission_control_url or status.public_url
             toast = "Tunnel on." + (f" {url}" if url else "") + self._tunnel_persistence_hint()
         else:
-            mutate_sevn_json(
-                self._sevn_json,
-                lambda d: _set_nested(d, "infrastructure.tunnel.autostart", False),
-            )
-            self._reload_workspace()
+            # Stop first; only clear ``autostart`` (and redraw "off") once the provider
+            # is actually down. Mirror of the "on" path: persisting off before a failed
+            # stop would show "Tunnel: off" while the provider may still be alive and
+            # publicly exposing the gateway, with no signal to retry.
             try:
                 # Serialise with the boot autostart task (same default_manager singleton)
                 # so a stop can't race a still-resolving start (see TunnelManager lock).
                 async with default_manager.lifecycle_lock:
                     await asyncio.to_thread(default_manager.stop, tunnel_cfg, confirm=True)
             except (OSError, RuntimeError, ValueError) as exc:
+                # Leave the flag/button as "on" so the operator sees it isn't off yet.
                 toast = f"Tunnel stop failed: {exc}"
                 answered = await self._refresh_config_menu_after_action(
                     msg, callback_data, toast=toast
                 )
                 return None if answered else toast
+            mutate_sevn_json(
+                self._sevn_json,
+                lambda d: _set_nested(d, "infrastructure.tunnel.autostart", False),
+            )
+            self._reload_workspace()
             toast = "Tunnel off."
         answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
         return None if answered else toast

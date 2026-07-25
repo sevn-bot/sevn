@@ -109,6 +109,12 @@ async def start_configured_tunnel(
                 timeout=TUNNEL_START_TIMEOUT_S,
             )
         except TimeoutError as exc:
+            # Best-effort bound: wait_for cancels the awaitable, but the OS thread
+            # running ``manager.start`` can't be preempted, so it may still finish and
+            # mutate TunnelManager state *after* we release the lock here. TUNNEL_START_
+            # TIMEOUT_S (60s) makes the window narrow; a subsequent start/stop that
+            # re-takes the lock could still race that delayed first start. Accepted over
+            # blocking boot on a hung provider CLI; the next start/stop reconciles state.
             raise RuntimeError(
                 f"tunnel provider did not start within {TUNNEL_START_TIMEOUT_S:.0f}s",
             ) from exc
