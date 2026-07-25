@@ -63,7 +63,7 @@ def tunnel_autostart_enabled(tunnel_config: dict[str, Any]) -> bool:
     return str(tunnel_config.get("mode") or "none") in RUNNABLE_MODES
 
 
-async def start_configured_tunnel(
+async def _start_configured_tunnel_locked(
     *,
     tunnel_config: dict[str, Any],
     gateway_port: int | None,
@@ -71,7 +71,7 @@ async def start_configured_tunnel(
     secrets_backend: SecretsBackendSectionConfig | None,
     manager: TunnelManager,
 ) -> TunnelStatus:
-    """Expand secrets and spawn the configured tunnel provider.
+    """Expand secrets and spawn the provider — caller must already hold the lock.
 
     Args:
         tunnel_config (dict[str, Any]): Raw ``infrastructure.tunnel`` sub-dict.
@@ -90,34 +90,89 @@ async def start_configured_tunnel(
 
     Examples:
         >>> import inspect
+        >>> inspect.iscoroutinefunction(_start_configured_tunnel_locked)
+        True
+    """
+    runtime_cfg = await prepare_tunnel_runtime_cfg(
+        tunnel_config,
+        gateway_port=gateway_port,
+        content_root=content_root,
+        secrets_backend=secrets_backend,
+    )
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(manager.start, runtime_cfg, confirm=True),
+            timeout=TUNNEL_START_TIMEOUT_S,
+        )
+    except TimeoutError as exc:
+        # Best-effort bound: wait_for cancels the awaitable, but the OS thread
+        # running ``manager.start`` can't be preempted, so it may still finish and
+        # mutate TunnelManager state *after* we release the lock here. TUNNEL_START_
+        # TIMEOUT_S (60s) makes the window narrow; a subsequent start/stop that
+        # re-takes the lock could still race that delayed first start. Accepted over
+        # blocking boot on a hung provider CLI; the next start/stop reconciles state.
+        raise RuntimeError(
+            f"tunnel provider did not start within {TUNNEL_START_TIMEOUT_S:.0f}s",
+        ) from exc
+
+
+async def start_configured_tunnel(
+    *,
+    tunnel_config: dict[str, Any],
+    gateway_port: int | None,
+    content_root: Path,
+    secrets_backend: SecretsBackendSectionConfig | None,
+    manager: TunnelManager,
+    lock_held: bool = False,
+) -> TunnelStatus:
+    """Expand secrets and spawn the configured tunnel provider.
+
+    Holds ``manager.lifecycle_lock`` across secret resolution *and* the spawn so an
+    operator ``stop`` (Telegram toggle / Mission Control) can't interleave with a boot
+    autostart still in flight and leak a process the user asked to stop (TunnelManager
+    has no internal lock). Callers that need to keep the lock held across a *following*
+    step — e.g. the Telegram handler persisting ``autostart`` atomically with the spawn
+    — acquire the lock themselves and pass ``lock_held=True`` to avoid re-entering the
+    non-reentrant :class:`asyncio.Lock`.
+
+    Args:
+        tunnel_config (dict[str, Any]): Raw ``infrastructure.tunnel`` sub-dict.
+        gateway_port (int | None): Gateway listen port (default local forward port).
+        content_root (Path): Workspace content root for encrypted-file backends.
+        secrets_backend (SecretsBackendSectionConfig | None): Parsed ``secrets_backend``.
+        manager (TunnelManager): Manager bound to the shared tunnel pid file.
+        lock_held (bool): When ``True`` the caller already holds ``lifecycle_lock``; skip
+            acquiring it (default ``False`` acquires it).
+
+    Returns:
+        TunnelStatus: State after the spawn attempt.
+
+    Raises:
+        RuntimeError: When the provider binary is missing, credentials are absent, or the
+            spawn does not complete within :data:`TUNNEL_START_TIMEOUT_S`.
+        ValueError: When the configured mode is not runnable.
+
+    Examples:
+        >>> import inspect
         >>> inspect.iscoroutinefunction(start_configured_tunnel)
         True
     """
-    # Hold the manager lock across secret resolution *and* the spawn so an operator
-    # ``stop`` (Telegram toggle) can't interleave with a boot autostart still in flight
-    # and leak a process the user asked to stop (TunnelManager has no internal lock).
-    async with manager.lifecycle_lock:
-        runtime_cfg = await prepare_tunnel_runtime_cfg(
-            tunnel_config,
+    if lock_held:
+        return await _start_configured_tunnel_locked(
+            tunnel_config=tunnel_config,
             gateway_port=gateway_port,
             content_root=content_root,
             secrets_backend=secrets_backend,
+            manager=manager,
         )
-        try:
-            return await asyncio.wait_for(
-                asyncio.to_thread(manager.start, runtime_cfg, confirm=True),
-                timeout=TUNNEL_START_TIMEOUT_S,
-            )
-        except TimeoutError as exc:
-            # Best-effort bound: wait_for cancels the awaitable, but the OS thread
-            # running ``manager.start`` can't be preempted, so it may still finish and
-            # mutate TunnelManager state *after* we release the lock here. TUNNEL_START_
-            # TIMEOUT_S (60s) makes the window narrow; a subsequent start/stop that
-            # re-takes the lock could still race that delayed first start. Accepted over
-            # blocking boot on a hung provider CLI; the next start/stop reconciles state.
-            raise RuntimeError(
-                f"tunnel provider did not start within {TUNNEL_START_TIMEOUT_S:.0f}s",
-            ) from exc
+    async with manager.lifecycle_lock:
+        return await _start_configured_tunnel_locked(
+            tunnel_config=tunnel_config,
+            gateway_port=gateway_port,
+            content_root=content_root,
+            secrets_backend=secrets_backend,
+            manager=manager,
+        )
 
 
 async def autostart_tunnel_if_enabled(

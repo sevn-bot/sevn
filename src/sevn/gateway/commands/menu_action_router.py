@@ -1423,59 +1423,70 @@ class MenuActionRouter:
         if turn_on:
             from sevn.infrastructure.tunnel_autostart import start_configured_tunnel
 
-            # Start first; only persist ``autostart`` once the provider is confirmed
-            # healthy. Persisting before that would leave the flag (and the redrawn
-            # "Turn tunnel off" button) claiming "on" for a tunnel that never came up,
-            # and every gateway boot would keep retrying the broken config.
-            try:
-                status = await start_configured_tunnel(
-                    tunnel_config=tunnel_cfg,
-                    gateway_port=gateway_port,
-                    content_root=self._content_root,
-                    secrets_backend=self._workspace.secrets_backend,
-                    manager=default_manager,
-                )
-            except (OSError, RuntimeError, ValueError) as exc:
-                toast = f"Tunnel start failed: {exc}"
+            # Hold ``lifecycle_lock`` across the spawn *and* the ``autostart`` persist so a
+            # concurrent Mission Control stop can't slip in between them and leave the
+            # persisted flag out of sync with the live process. Start first; only persist
+            # once the provider is confirmed healthy (a failed/unhealthy start persists
+            # nothing, so a later gateway boot never retries a broken config).
+            started_ok = False
+            start_error: str | None = None
+            tunnel_url: str | None = None
+            async with default_manager.lifecycle_lock:
+                try:
+                    status = await start_configured_tunnel(
+                        tunnel_config=tunnel_cfg,
+                        gateway_port=gateway_port,
+                        content_root=self._content_root,
+                        secrets_backend=self._workspace.secrets_backend,
+                        manager=default_manager,
+                        lock_held=True,
+                    )
+                except (OSError, RuntimeError, ValueError) as exc:
+                    start_error = f"Tunnel start failed: {exc}"
+                else:
+                    if status.healthy:
+                        mutate_sevn_json(
+                            self._sevn_json,
+                            lambda d: _set_nested(d, "infrastructure.tunnel.autostart", True),
+                        )
+                        self._reload_workspace()
+                        started_ok = True
+                        tunnel_url = status.mission_control_url or status.public_url
+                    else:
+                        start_error = f"Tunnel start failed: {status.error or 'not healthy'}"
+            if not started_ok:
+                toast = start_error or "Tunnel start failed."
                 answered = await self._refresh_config_menu_after_action(
                     msg, callback_data, toast=toast
                 )
                 return None if answered else toast
-            if not status.healthy:
-                toast = f"Tunnel start failed: {status.error or 'not healthy'}"
-                answered = await self._refresh_config_menu_after_action(
-                    msg, callback_data, toast=toast
-                )
-                return None if answered else toast
-            mutate_sevn_json(
-                self._sevn_json,
-                lambda d: _set_nested(d, "infrastructure.tunnel.autostart", True),
+            toast = (
+                "Tunnel on."
+                + (f" {tunnel_url}" if tunnel_url else "")
+                + self._tunnel_persistence_hint()
             )
-            self._reload_workspace()
-            url = status.mission_control_url or status.public_url
-            toast = "Tunnel on." + (f" {url}" if url else "") + self._tunnel_persistence_hint()
         else:
-            # Stop first; only clear ``autostart`` (and redraw "off") once the provider
-            # is actually down. Mirror of the "on" path: persisting off before a failed
-            # stop would show "Tunnel: off" while the provider may still be alive and
-            # publicly exposing the gateway, with no signal to retry.
-            try:
-                # Serialise with the boot autostart task (same default_manager singleton)
-                # so a stop can't race a still-resolving start (see TunnelManager lock).
-                async with default_manager.lifecycle_lock:
+            # Stop first, then clear ``autostart`` — both under ``lifecycle_lock`` so a
+            # concurrent Mission Control start can't race the flag persist, and so a stale
+            # "off" is never shown for a still-running provider. A failed stop leaves the
+            # flag/button "on" (the provider may still be exposing the gateway).
+            stop_error: str | None = None
+            async with default_manager.lifecycle_lock:
+                try:
                     await asyncio.to_thread(default_manager.stop, tunnel_cfg, confirm=True)
-            except (OSError, RuntimeError, ValueError) as exc:
-                # Leave the flag/button as "on" so the operator sees it isn't off yet.
-                toast = f"Tunnel stop failed: {exc}"
+                except (OSError, RuntimeError, ValueError) as exc:
+                    stop_error = f"Tunnel stop failed: {exc}"
+                else:
+                    mutate_sevn_json(
+                        self._sevn_json,
+                        lambda d: _set_nested(d, "infrastructure.tunnel.autostart", False),
+                    )
+                    self._reload_workspace()
+            if stop_error is not None:
                 answered = await self._refresh_config_menu_after_action(
-                    msg, callback_data, toast=toast
+                    msg, callback_data, toast=stop_error
                 )
-                return None if answered else toast
-            mutate_sevn_json(
-                self._sevn_json,
-                lambda d: _set_nested(d, "infrastructure.tunnel.autostart", False),
-            )
-            self._reload_workspace()
+                return None if answered else stop_error
             toast = "Tunnel off."
         answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
         return None if answered else toast
