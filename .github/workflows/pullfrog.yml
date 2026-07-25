@@ -60,7 +60,13 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           fetch-depth: 0
-          persist-credentials: false
+          # Persist the checkout token so the pullfrog-py action's own git layer
+          # (checkout_pr / git_fetch) can authenticate. Without it those git ops
+          # fail and the action marks its `pullfrog` self-status check red even
+          # though the review completes via the GitHub API. Read-only escalation
+          # only: the action already sets ``push: disabled`` / ``shell: disabled``
+          # below, so a persisted token cannot be used to push.
+          persist-credentials: true
 
       - name: Skip when Claude subscription auth is not configured
         if: env.HAS_CLAUDE_CODE != 'true'
