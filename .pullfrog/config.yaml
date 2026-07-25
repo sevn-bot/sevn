@@ -1,0 +1,24 @@
+# pullfrog-py per-repo settings (https://github.com/alexhawat/pullfrog-py).
+#
+# Only keys with no action-input equivalent belong here. `model`, `push`,
+# `shell`, and `status_checks` are set in .github/workflows/pullfrog.yml and win
+# over this file (`shell` resolves to the stricter of the two), so nothing here
+# can loosen the reviewer's permissions.
+#
+# Sibling files in this directory: `learnings.md` — durable review memory,
+# including the `## Withdrawn review findings (known non-issues)` section a
+# reviewer consults before re-raising a finding the author already refuted.
+
+# Mechanical gates the reviewer runs over a PR's changed files, so a convention
+# violation is reported as a named failing command instead of a style opinion.
+#
+# Declared explicitly because the fallback discovers every gate-like target in
+# the Makefile and runs all of them — here `lint`, `typecheck`, and `ci-static`,
+# where `ci-static` already runs the first two plus pyright, doctest, and build.
+#
+# Runs on the host path (`make review`). The containerized Action reports it as
+# a failed gate rather than skipped, because that image ships neither `make` nor
+# sevn's synced venv; see the note in PR #59.
+staticChecks:
+  - name: lint
+    command: make lint
