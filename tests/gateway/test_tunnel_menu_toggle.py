@@ -33,6 +33,11 @@ def test_tunnel_callbacks_registered_owner_only_and_ready() -> None:
         assert spec.section == "my_sevn_bot"
         assert spec.owner_only is True
         assert spec.implemented is True
+    # The two-step confirm/cancel sub-callbacks resolve to the same C22.1 spec.
+    for sub in ("act:tunnel:on:confirm", "act:tunnel:on:cancel"):
+        spec = match_menu_button_spec(sub)
+        assert spec is not None, sub
+        assert spec.spec_id == "C22.1", sub
     # Pressable (not locked behind cfg:disabled:*).
     assert readiness_for_callback("act:tunnel:on") == "Ready"
     assert readiness_for_callback("act:tunnel:off") == "Ready"
@@ -138,7 +143,38 @@ def _healthy(mode: str = "cloudflare_quick") -> TunnelStatus:
 
 
 @pytest.mark.asyncio
-async def test_tunnel_on_sets_autostart_and_starts(
+async def test_tunnel_on_shows_confirm_prompt_without_starting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``tunnel:on`` opens a two-step confirm — it must not start or persist yet."""
+    router, cap, root = _build_owner_router(tmp_path)
+    _set_tunnel_mode(root, "cloudflare_quick")
+
+    started: list[Any] = []
+
+    async def _fake_start(**kwargs: Any) -> TunnelStatus:
+        started.append(kwargs)
+        return _healthy()
+
+    monkeypatch.setattr("sevn.infrastructure.tunnel_autostart.start_configured_tunnel", _fake_start)
+
+    await router.route_incoming(_callback("act:tunnel:on", callback_query_id="cq-prompt"))
+
+    assert started == []
+    assert "autostart" not in _read_tunnel(root)
+    # The message is edited to the confirm screen exposing the confirm callback.
+    confirm_cbs = [
+        btn["callback_data"]
+        for edit in cap.edited
+        for row in edit.get("reply_markup", {}).get("inline_keyboard", [])
+        for btn in row
+    ]
+    assert "act:tunnel:on:confirm" in confirm_cbs
+    assert any("Turn tunnel on" in (edit.get("text") or "") for edit in cap.edited)
+
+
+@pytest.mark.asyncio
+async def test_tunnel_on_confirm_sets_autostart_and_starts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     router, cap, root = _build_owner_router(tmp_path)
@@ -152,11 +188,33 @@ async def test_tunnel_on_sets_autostart_and_starts(
 
     monkeypatch.setattr("sevn.infrastructure.tunnel_autostart.start_configured_tunnel", _fake_start)
 
-    await router.route_incoming(_callback("act:tunnel:on", callback_query_id="cq-on"))
+    await router.route_incoming(_callback("act:tunnel:on:confirm", callback_query_id="cq-on"))
 
     assert _read_tunnel(root).get("autostart") is True
     assert len(calls) == 1
     assert any("Tunnel on" in (t or "") for _cq, t in cap.answered)
+
+
+@pytest.mark.asyncio
+async def test_tunnel_on_cancel_returns_to_menu_without_starting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    router, cap, root = _build_owner_router(tmp_path)
+    _set_tunnel_mode(root, "cloudflare_quick")
+
+    started: list[Any] = []
+
+    async def _fake_start(**kwargs: Any) -> TunnelStatus:
+        started.append(kwargs)
+        return _healthy()
+
+    monkeypatch.setattr("sevn.infrastructure.tunnel_autostart.start_configured_tunnel", _fake_start)
+
+    await router.route_incoming(_callback("act:tunnel:on:cancel", callback_query_id="cq-cancel"))
+
+    assert started == []
+    assert "autostart" not in _read_tunnel(root)
+    assert any("Cancelled" in (t or "") for _cq, t in cap.answered)
 
 
 @pytest.mark.asyncio
@@ -198,7 +256,7 @@ async def test_tunnel_on_failed_start_does_not_persist(
 
     monkeypatch.setattr("sevn.infrastructure.tunnel_autostart.start_configured_tunnel", _fake_start)
 
-    await router.route_incoming(_callback("act:tunnel:on", callback_query_id="cq-fail"))
+    await router.route_incoming(_callback("act:tunnel:on:confirm", callback_query_id="cq-fail"))
 
     assert "autostart" not in _read_tunnel(root)
     assert any("Tunnel start failed" in (t or "") for _cq, t in cap.answered)
@@ -223,7 +281,9 @@ async def test_tunnel_on_unhealthy_start_does_not_persist(
 
     monkeypatch.setattr("sevn.infrastructure.tunnel_autostart.start_configured_tunnel", _fake_start)
 
-    await router.route_incoming(_callback("act:tunnel:on", callback_query_id="cq-unhealthy"))
+    await router.route_incoming(
+        _callback("act:tunnel:on:confirm", callback_query_id="cq-unhealthy")
+    )
 
     assert "autostart" not in _read_tunnel(root)
     assert any("Tunnel start failed" in (t or "") for _cq, t in cap.answered)

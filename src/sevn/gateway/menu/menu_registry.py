@@ -1135,13 +1135,13 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
     )
     add(
         "C22.1",
-        _exact("act:tunnel:on"),
+        r"^act:tunnel:on(:confirm|:cancel)?$",
         "C",
         "my_sevn_bot",
         "Turn tunnel on",
         implemented=True,
         owner_only=True,
-        notes="Sets infrastructure.tunnel.autostart + starts now; survives host restart via gateway boot",
+        notes="2-step confirm; sets infrastructure.tunnel.autostart + starts now; survives host restart via gateway boot",
     )
     add(
         "C22.2",

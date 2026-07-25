@@ -73,6 +73,7 @@ from sevn.gateway.menu.menu import (
     _telegram_api_thread_id,
     _voice_tts_mode,
     build_service_restart_confirm_keyboard,
+    build_tunnel_on_confirm_keyboard,
     config_menu_nav_pop,
     config_menu_nav_push_current,
     get_config_menu_nav,
@@ -81,6 +82,7 @@ from sevn.gateway.menu.menu import (
     parse_models_callback_data,
     refresh_config_menu_message,
     service_restart_confirm_message,
+    tunnel_on_confirm_message,
 )
 from sevn.gateway.subagents.surfaces import (
     STOP_L1_PICKER_COPY,
@@ -1371,14 +1373,18 @@ class MenuActionRouter:
     ) -> str | None:
         """Turn the persistent tunnel on/off from the My sevn bot menu (owner-only).
 
-        ``tunnel:on`` stamps ``infrastructure.tunnel.autostart`` in ``sevn.json`` and
-        starts the configured provider now; the gateway boot hook re-launches it after a
-        host restart. ``tunnel:off`` clears the flag and stops the running provider.
+        Turning *on* stands up a public URL to the gateway, so ``tunnel:on`` shows a
+        two-step confirm first (like gateway/proxy restart); ``tunnel:on:confirm``
+        stamps ``infrastructure.tunnel.autostart`` in ``sevn.json`` and starts the
+        configured provider now (the gateway boot hook re-launches it after a host
+        restart), and ``tunnel:on:cancel`` returns to the menu. ``tunnel:off`` stays
+        one-tap — clearing the flag and stopping the provider only reduces exposure.
 
         Args:
             msg (IncomingMessage): Inbound callback envelope.
             callback_data (str): Raw ``callback_data`` string.
-            target (str): Parsed action target (``tunnel:on`` or ``tunnel:off``).
+            target (str): Parsed action target (``tunnel:on``, ``tunnel:on:confirm``,
+                ``tunnel:on:cancel`` or ``tunnel:off``).
 
         Returns:
             str | None: Toast text when refresh did not answer inline; ``None`` otherwise.
@@ -1391,16 +1397,23 @@ class MenuActionRouter:
         if not self._router._resolve_owner_flag(msg):
             await self._answer_owner_only(msg)
             return None
+        if target == "tunnel:on:cancel":
+            return await self._handle_tunnel_on_cancel(msg, callback_data)
         from sevn.infrastructure.tunnel_config import RUNNABLE_MODES, tunnel_cfg_from_disk
         from sevn.infrastructure.tunnel_manager import default_manager
 
-        turn_on = target == "tunnel:on"
         tunnel_cfg = tunnel_cfg_from_disk(self._workspace, sevn_json=self._sevn_json)
         mode = str(tunnel_cfg.get("mode") or "none")
         if mode not in RUNNABLE_MODES:
+            # Stale-button guard: the toggle only renders for a runnable mode, but a
+            # button left in an old message could still be tapped. Toast rather than
+            # prompt/spawn for an impossible action.
             toast = "No tunnel configured — run `sevn tunnel setup` first."
             answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
             return None if answered else toast
+        if target == "tunnel:on":
+            return await self._edit_tunnel_on_confirm(msg, callback_data)
+        turn_on = target == "tunnel:on:confirm"
         gateway_port = self._workspace.gateway.port if self._workspace.gateway else None
         if turn_on:
             from sevn.infrastructure.tunnel_autostart import start_configured_tunnel
@@ -1456,6 +1469,112 @@ class MenuActionRouter:
             toast = "Tunnel off."
         answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
         return None if answered else toast
+
+    async def _edit_tunnel_on_confirm(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """Edit the ``/config`` message to the "Turn tunnel on" confirmation screen.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Toast when the confirm screen could not be shown; ``None`` on success.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._edit_tunnel_on_confirm)
+            True
+        """
+        _ = callback_data
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        chat_raw = md.get("chat_id")
+        message_raw = md.get("message_id")
+        if not isinstance(chat_raw, int) or not isinstance(message_raw, int):
+            return "Could not show tunnel confirm."
+        config_menu_nav_push_current(self._router, chat_raw, message_raw)
+        adapter = self._router._adapters.get(msg.channel)
+        if adapter is None:
+            return "Could not show tunnel confirm."
+        thread_id = _telegram_api_thread_id(md)
+        rows = build_tunnel_on_confirm_keyboard()
+        rows.extend(_config_chrome())
+        edit_text = getattr(adapter, "edit_message_text", None)
+        if not callable(edit_text):
+            return "Could not show tunnel confirm."
+        body: dict[str, Any] = {
+            "chat_id": chat_raw,
+            "message_id": message_raw,
+            "text": tunnel_on_confirm_message(),
+            "reply_markup": {"inline_keyboard": rows},
+        }
+        if thread_id is not None:
+            body["message_thread_id"] = thread_id
+        edited = bool(await cast("Callable[..., Awaitable[Any]]", edit_text)(**body))
+        if not edited:
+            return "Could not show tunnel confirm."
+        cq_id = md.get("callback_query_id")
+        cq_str = cq_id.strip() if isinstance(cq_id, str) else ""
+        if cq_str:
+            await _answer_callback(adapter, callback_query_id=cq_str, text="Turn tunnel on?")
+        return None
+
+    async def _handle_tunnel_on_cancel(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """Return the My sevn bot section after cancelling the tunnel-on prompt.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Toast when refresh was skipped; ``None`` when answered inline.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_tunnel_on_cancel)
+            True
+        """
+        _ = callback_data
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        chat_raw = md.get("chat_id")
+        message_raw = md.get("message_id")
+        if not isinstance(chat_raw, int) or not isinstance(message_raw, int):
+            return "Cancelled."
+        frame = config_menu_nav_pop(self._router, chat_raw, message_raw)
+        adapter = self._router._adapters.get(msg.channel)
+        if adapter is None:
+            return "Cancelled."
+        thread_id = _telegram_api_thread_id(md)
+        ctx = ConfigMenuRefreshContext(
+            chat_id=chat_raw,
+            message_id=message_raw,
+            topic_id=thread_id,
+            section=frame.section,
+            models_picker_slot=frame.models_picker_slot,
+            models_picker_page=frame.models_picker_page,
+        )
+        await refresh_config_menu_message(
+            adapter,
+            ctx,
+            self._workspace,
+            content_root=self._content_root,
+            user_id=msg.user_id,
+            is_owner=self._router._resolve_owner_flag(msg),
+            router=self._router,
+        )
+        cq_id = md.get("callback_query_id")
+        cq_str = cq_id.strip() if isinstance(cq_id, str) else ""
+        if cq_str:
+            await _answer_callback(adapter, callback_query_id=cq_str, text="Cancelled.")
+            return None
+        return "Cancelled."
 
     async def _handle_service_restart_action(
         self,

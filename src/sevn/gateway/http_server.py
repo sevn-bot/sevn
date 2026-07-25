@@ -1676,9 +1676,12 @@ def create_app(
         cron_task.cancel()
         with suppress(asyncio.CancelledError):
             await cron_task
-        # Cancel the fire-and-forget tunnel autostart so a spawn still in flight
-        # (bounded by TUNNEL_START_TIMEOUT_S) can't dangle or write a pid file into
-        # an already-torn-down content_root on a fast shutdown/restart.
+        # Cancel the fire-and-forget tunnel autostart on shutdown. Best-effort only:
+        # cancelling reclaims the awaiting coroutine, but a ``manager.start`` already
+        # running inside the ``asyncio.to_thread`` executor cannot be preempted, so on a
+        # fast shutdown/restart it may still finish spawning (up to TUNNEL_START_TIMEOUT_S)
+        # and write a pid file after content_root teardown. We accept that narrow window
+        # rather than block shutdown on the spawn; the next boot reconciles the pid file.
         tunnel_task = getattr(app.state, "tunnel_autostart_task", None)
         if isinstance(tunnel_task, asyncio.Task):
             tunnel_task.cancel()

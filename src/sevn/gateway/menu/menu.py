@@ -24,6 +24,8 @@ Exports:
     build_config_menu_keyboard — 18-tile inline keyboard for ``/config``.
     build_service_restart_confirm_keyboard — Confirm/Cancel rows for service restart.
     service_restart_confirm_message — caption for restart confirmation screen.
+    build_tunnel_on_confirm_keyboard — Confirm/Cancel rows for turning the tunnel on.
+    tunnel_on_confirm_message — caption for the turn-tunnel-on confirmation screen.
     menu_message_text — caption text paired with each menu screen.
     config_menu_message_text — caption text for ``/config`` screens.
     parse_menu_callback_data — parse ``menu:*`` / ``nav:*`` callback payloads.
@@ -1749,6 +1751,54 @@ def service_restart_confirm_message(service: Literal["gateway", "proxy"]) -> str
     else:
         detail = "Outbound provider traffic may pause while the proxy restarts."
     return f"My sevn bot\n\nRestart {label}?\n{detail}\nTap Confirm to proceed."
+
+
+def build_tunnel_on_confirm_keyboard() -> list[list[dict[str, Any]]]:
+    """Build Confirm/Cancel rows for the two-step "Turn tunnel on" prompt.
+
+    Turning the tunnel *on* stands up a public URL to the gateway, so it goes
+    through the same confirm gate as gateway/proxy restart. Turning off needs no
+    prompt — it only reduces exposure.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = build_tunnel_on_confirm_keyboard()
+        >>> rows[0][0]["callback_data"]
+        'act:tunnel:on:confirm'
+        >>> rows[0][1]["callback_data"]
+        'act:tunnel:on:cancel'
+    """
+    return [
+        [
+            {
+                "text": "✅ Confirm turn on",
+                "callback_data": "act:tunnel:on:confirm",
+            },
+            {
+                "text": "Cancel",
+                "callback_data": "act:tunnel:on:cancel",
+            },
+        ],
+    ]
+
+
+def tunnel_on_confirm_message() -> str:
+    """Return caption text for the "Turn tunnel on" confirmation screen.
+
+    Returns:
+        str: Human-readable confirmation prompt.
+
+    Examples:
+        >>> "Turn tunnel on" in tunnel_on_confirm_message()
+        True
+    """
+    return (
+        "My sevn bot\n\nTurn tunnel on?\n"
+        "This starts the configured tunnel and exposes the gateway on a public URL.\n"
+        "Tap Confirm to proceed."
+    )
 
 
 def _build_models_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
