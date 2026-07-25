@@ -16,9 +16,11 @@
 # the Makefile and runs all of them — here `lint`, `typecheck`, and `ci-static`,
 # where `ci-static` already runs the first two plus pyright, doctest, and build.
 #
-# Runs on the host path (`make review`). The containerized Action reports it as
-# a failed gate rather than skipped, because that image ships neither `make` nor
-# sevn's synced venv; see the note in PR #59.
+# Only takes effect on the host path (`make review`). The workflow sets
+# `shell: disabled`, which withholds the gate runner entirely: a PR can edit this
+# file in its own head commit, so running what it names would execute commands the
+# author controls. The Action reports the gate row as skipped and could not run it
+# anyway — that image ships neither `make` nor sevn's synced venv.
 staticChecks:
   - name: lint
     command: make lint
