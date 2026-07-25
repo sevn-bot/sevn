@@ -269,6 +269,32 @@ async def test_tunnel_off_failed_stop_preserves_autostart(
 
 
 @pytest.mark.asyncio
+async def test_tunnel_unknown_target_is_noop_and_does_not_stop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unexpected ``tunnel:*`` callback must no-op, not tear down a live tunnel."""
+    router, _cap, root = _build_owner_router(tmp_path)
+    _set_tunnel_mode(root, "cloudflare_quick", autostart=True)
+
+    stopped: list[Any] = []
+
+    def _fake_stop(cfg: dict[str, Any], *, confirm: bool) -> TunnelStatus:
+        stopped.append((cfg, confirm))
+        return TunnelStatus(
+            mode="cloudflare_quick", pid=None, healthy=False, public_url=None, error=None
+        )
+
+    from sevn.infrastructure.tunnel_manager import default_manager
+
+    monkeypatch.setattr(default_manager, "stop", _fake_stop)
+
+    await router.route_incoming(_callback("act:tunnel:bogus", callback_query_id="cq-bogus"))
+
+    assert stopped == []
+    assert _read_tunnel(root).get("autostart") is True
+
+
+@pytest.mark.asyncio
 async def test_tunnel_on_failed_start_does_not_persist(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

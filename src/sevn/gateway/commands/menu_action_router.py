@@ -1399,6 +1399,11 @@ class MenuActionRouter:
             return None
         if target == "tunnel:on:cancel":
             return await self._handle_tunnel_on_cancel(msg, callback_data)
+        # Enumerate the valid targets explicitly (like _handle_service_restart_action) so
+        # an unexpected ``tunnel:*`` callback is a no-op rather than falling through to the
+        # "stop" branch below and silently tearing down a live tunnel.
+        if target not in {"tunnel:on", "tunnel:on:confirm", "tunnel:off"}:
+            return None
         from sevn.infrastructure.tunnel_config import RUNNABLE_MODES, tunnel_cfg_from_disk
         from sevn.infrastructure.tunnel_manager import default_manager
 
