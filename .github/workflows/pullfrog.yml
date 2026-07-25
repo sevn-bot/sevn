@@ -78,7 +78,7 @@ jobs:
         id: pullfrog
         continue-on-error: true
         # pullfrog-py, SHA-pinned to alexhawat/pullfrog-py main.
-        uses: alexhawat/pullfrog-py@dc98633049a6f473124e013ffd1e446d7e10b70a # main
+        uses: alexhawat/pullfrog-py@0d40626097fd92976425f7eacd2e213ee1f6d5d5 # main
         with:
           # For pull_request events, name the PR number explicitly so the agent
           # calls checkout_pr(<n>) instead of asking which PR to review.
