@@ -241,12 +241,14 @@ def infer_config_section_from_callback(data: str) -> ConfigSection:
             return "codemode"
         if path.startswith("subagents"):
             return "subagents"
-        if "quick_actions" in path or path.startswith("gateway.queue_mode"):
-            return "session"
+        if "quick_actions" in path:
+            return "chat_qa"
+        if path.startswith("gateway.queue_mode"):
+            return "chat"
         if path.startswith("gateway.restart"):
-            return "advanced"
+            return "deployment"
         if path.startswith("tracing."):
-            return "advanced"
+            return "health_tracing"
         if "telegram_notify_policy" in path:
             return "notifications"
         if path.startswith("channels.telegram."):

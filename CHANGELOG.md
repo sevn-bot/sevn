@@ -15,6 +15,10 @@ are cut into a dated, versioned section at release time.
 - [2026-07-26] Telegram ``/config`` root regrouped into eight intent tiles (Chat, Agent, Skills & Tools, Memory, Access, Health, Deployment, Help) with ``owner_only`` gating (non-owners see four tiles); legacy section callbacks unchanged; nav shells re-parent existing rows
 - [2026-07-26] Telegram ``/config`` menu E2E harness: ``TelegramMenuWalker`` recipe, ``make telegram-menu-e2e`` (``SEVN_TELEGRAM_MENU_E2E=1``), inline-keyboard primitives on ``TelegramWeb``, and per-row verdict + spec-id coverage reports under ``evidence/telegram-menu-e2e/``
 
+### Changed
+
+- [2026-07-26] Telegram ``/config`` Advanced section dissolved: auto-resume tier B on Deployment, trace redaction de-duplicated to Health > Trace export (``C20.6``), queue mode only on Chat, RLM/CodeMode/Self-Improve under Agent > Lab, Second Brain under Memory, Sub-agents under Agent; stale ``cfg:section:advanced`` answers a moved toast
+
 ### Fixed
 
 - [2026-07-26] Telegram ``/config`` readiness allow-list: 23 previously gated WIP rows (models, channels, secrets, skills, RLM, code, security, self-improve, second brain, integrations, dashboard pin, shortcuts, notify policy, auto-resume tier B, agent display name) are pressable; Advanced trace-redaction duplicate ``C18.2`` stays gated until W5 (branch/tag + short SHA, e.g. ``pre-0.0.1_393f918b``) instead of falling back to the package version ``0.0.1`` when the operator workspace is not a git tree; the resolved id is persisted into workspace ``sevn.json`` at boot so the ``/config`` button and Mission Control read a real build identity

@@ -47,16 +47,7 @@ _SLUG_MENU_SECTIONS: dict[str, tuple[str, ...]] = {
     "dashboard": ("dashboard",),
     "shortcuts": ("shortcuts",),
     "notifications": ("notifications",),
-    "advanced": (
-        "advanced",
-        "codemode",
-        "rlm",
-        "self_improve",
-        "second_brain",
-        "subagents",
-        "subagents_running",
-    ),
-    "logs": ("logs",),
+    "logs": ("logs", "health_tracing"),
     "help": ("help",),
     "sevn_bot": ("sevn_bot",),
     "my_sevn_bot": ("my_sevn_bot",),
@@ -73,7 +64,10 @@ _EXTRA_DOT_PATHS: dict[str, tuple[str, ...]] = {
     ),
     "voice": ("channels.telegram.tts_mode",),
     "dashboard": ("channels.telegram.pinned_status",),
-    "advanced": (
+    "deployment": ("gateway.restart.auto_resume_b",),
+    "health_tracing": ("tracing.redaction.enabled",),
+    "chat": ("gateway.queue_mode",),
+    "memory": (
         "second_brain.paths.vault",
         "second_brain.layout",
         "second_brain.para.inbox",
@@ -84,8 +78,6 @@ _EXTRA_DOT_PATHS: dict[str, tuple[str, ...]] = {
         "second_brain.para.templates",
         "second_brain.para.sources_subdir",
         "second_brain.para.outputs_subdir",
-        "gateway.restart.auto_resume_b",
-        "tracing.redaction.enabled",
     ),
     "subagents": (
         "subagents.enabled",
@@ -93,7 +85,6 @@ _EXTRA_DOT_PATHS: dict[str, tuple[str, ...]] = {
         "subagents.max_level2_default",
         "subagents.max_override",
         "subagents.timeout_s",
-        "gateway.queue_mode",
     ),
     "logs": ("tracing.sinks",),
 }
@@ -174,7 +165,7 @@ def _dot_paths_for_slug(slug: str) -> tuple[str, ...]:
         tuple[str, ...]: Sorted unique dot paths.
 
     Examples:
-        >>> "gateway.queue_mode" in _dot_paths_for_slug("session")
+        >>> "gateway.queue_mode" in _dot_paths_for_slug("chat")
         True
     """
     menu_sections = _SLUG_MENU_SECTIONS.get(slug, (slug,))

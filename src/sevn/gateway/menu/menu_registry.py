@@ -194,7 +194,6 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         ("C0.15", "Dashboard", "dashboard", "health"),
         ("C0.16", "Shortcuts", "shortcuts", "chat"),
         ("C0.17", "Notifications", "notifications", "chat"),
-        ("C0.18", "Advanced", "advanced", "agent"),
         ("C0.22", "sevn.bot", "sevn_bot", "help"),
         ("C0.9", "Code", "code", "memory"),
         ("C0.12", "Secrets", "secrets", "access"),
@@ -250,10 +249,10 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "C1.6",
         _toggle("gateway.queue_mode"),
         "C",
-        "session",
+        "chat",
         "Queue cancel↔steer↔multi",
         implemented=True,
-        notes="JSON; cycles cancel/steer/multi (W4/W7)",
+        notes="JSON; cycles cancel/steer/multi on Chat root (W5)",
     )
 
     # --- C2. Help ---
@@ -843,10 +842,10 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "C25.8",
         _exact("cfg:section:subagents"),
         "C",
-        "advanced",
+        "agent",
         "Open Sub-agents",
         implemented=True,
-        notes="Nested section under Advanced (W7)",
+        notes="Nav from Agent root (W5)",
     )
 
     # --- C14. Integrations ---
@@ -951,34 +950,25 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         notes="Notify policy cycle verified TMF Wave 7",
     )
 
-    # --- C18. Advanced ---
+    # --- C18. Deployment / Lab (Advanced dissolved W5) ---
     add(
         "C18.1",
         _toggle("gateway.restart.auto_resume_b"),
         "C",
-        "advanced",
+        "deployment",
         "Auto-resume tier B",
         implemented=True,
-        notes="JSON",
-    )
-    add(
-        "C18.2",
-        _toggle("tracing.redaction.enabled"),
-        "C",
-        "advanced",
-        "Trace redaction",
-        implemented=True,
-        notes="JSON",
+        notes="JSON; moved from Advanced to Deployment (W5)",
     )
     add(
         "C18.3",
         r"^https?://",
         "C",
-        "advanced",
+        "agent_lab",
         "Open Mission Control",
         implemented=True,
         requires_web_ui=True,
-        notes="URL when web_ui.url set",
+        notes="URL when web_ui.url set; Agent Lab (W5)",
     )
     add(
         "C18.4",
@@ -1004,7 +994,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "C18.6",
         r"^https?://.*#config$",
         "C",
-        "advanced",
+        "deployment",
         "Validate config",
         implemented=False,
         requires_web_ui=True,
@@ -1014,37 +1004,37 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "C18.7",
         _exact("cfg:section:rlm"),
         "C",
-        "advanced",
+        "agent_lab",
         "Open RLM",
         implemented=True,
-        notes="Nested section; moved from root C0.9",
+        notes="Agent Lab nav (W5)",
     )
     add(
         "C18.8",
         _exact("cfg:section:self_improve"),
         "C",
-        "advanced",
+        "agent_lab",
         "Open Self-Improve",
         implemented=True,
-        notes="Nested section; moved from root C0.12",
+        notes="Agent Lab nav (W5)",
     )
     add(
         "C18.9",
         _exact("cfg:section:second_brain"),
         "C",
-        "advanced",
+        "memory",
         "Open Second Brain",
         implemented=True,
-        notes="Nested section; moved from root C0.13",
+        notes="Memory root nav (W5)",
     )
     add(
         "C18.10",
         _exact("cfg:section:codemode"),
         "C",
-        "advanced",
+        "agent_lab",
         "Open CodeMode",
         implemented=True,
-        notes="Nested CodeMode submenu (W8 operator toggle)",
+        notes="Agent Lab nav (W5)",
     )
 
     # --- C24. CodeMode (Advanced nested) ---
@@ -1108,10 +1098,11 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "C20.6",
         _exact("cfg:logs:toggle_redaction"),
         "C",
-        "logs",
+        "health_tracing",
         "Toggle redaction",
         implemented=True,
         owner_only=True,
+        notes="Single trace-redaction home on Health > Trace export (W5)",
     )
     add(
         "C20.8",

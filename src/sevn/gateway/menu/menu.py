@@ -30,6 +30,7 @@ Exports:
     config_menu_message_text — caption text for ``/config`` screens.
     parse_menu_callback_data — parse ``menu:*`` / ``nav:*`` callback payloads.
     parse_config_callback_data — parse ``cfg:nav:*`` / ``cfg:section:*`` payloads.
+    resolve_config_section_alias — map retired section ids (W6 expands alias table).
     parse_models_callback_data — parse ``cfg:models:*`` picker callbacks.
     menu_callback_matches — match inbound menu callbacks and ``/menu``.
     config_callback_matches — match inbound ``/config`` callbacks and slash.
@@ -171,7 +172,6 @@ ConfigSection = Literal[
     "dashboard",
     "shortcuts",
     "notifications",
-    "advanced",
     "logs",
     "help",
     "sevn_bot",
@@ -220,13 +220,59 @@ _CONFIG_SECTIONS: frozenset[str] = frozenset(
         "dashboard",
         "shortcuts",
         "notifications",
-        "advanced",
         "logs",
         "help",
         "sevn_bot",
         "my_sevn_bot",
     },
 )
+
+# Retired section ids → new home (W6 expands; W5 registers ``advanced`` only — D14).
+_SECTION_ALIASES: dict[str, str] = {
+    "advanced": "",
+}
+
+
+def resolve_config_section_alias(section_id: str) -> str | None:
+    """Resolve a retired ``cfg:section:*`` id to its new home (W6 expands the table).
+
+    Args:
+        section_id (str): Raw section slug from callback data.
+
+    Returns:
+        str | None: Canonical section when known; ``None`` when dissolved or unknown.
+
+    Examples:
+        >>> resolve_config_section_alias("advanced") is None
+        True
+        >>> resolve_config_section_alias("chat")
+        'chat'
+    """
+    key = section_id.strip().lower()
+    if key in _CONFIG_SECTIONS:
+        return key
+    if key in _SECTION_ALIASES:
+        target = _SECTION_ALIASES[key]
+        return target if target else None
+    return None
+
+
+def _retired_section_toast(section_id: str) -> str:
+    """Return a graceful toast for a dissolved or moved section id.
+
+    Args:
+        section_id (str): Retired ``cfg:section:*`` slug.
+
+    Returns:
+        str: Short operator-facing toast (never raises).
+
+    Examples:
+        >>> _retired_section_toast("advanced")
+        'Advanced was dissolved — use Agent > Lab, Memory, or Deployment.'
+    """
+    if section_id == "advanced":
+        return "Advanced was dissolved — use Agent > Lab, Memory, or Deployment."
+    return f"Section “{section_id}” moved — open /config from Home."
 
 
 @dataclass(frozen=True)
@@ -869,7 +915,7 @@ def _config_bool_toggle_button(
 
 
 def _build_session_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
-    """Build Session section toggles for QA bar buttons and queue mode.
+    """Build Session section toggles for QA bar buttons (queue mode lives on Chat).
 
     Args:
         workspace (WorkspaceConfig): Parsed workspace settings.
@@ -882,41 +928,10 @@ def _build_session_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[s
         >>> rows = _build_session_keyboard_rows(WorkspaceConfig.minimal())
         >>> rows[0][0]["callback_data"].startswith("cfg:toggle:channels.telegram.quick_actions.")
         True
+        >>> all("gateway.queue_mode" not in btn.get("callback_data", "") for row in rows for btn in row)
+        True
     """
-    qa = _quick_actions_config(workspace)
-    specs: tuple[tuple[str, str, bool], ...] = (
-        ("Regen", "show_regen", qa.show_regen),
-        ("👍 Up", "show_thumbs_up", qa.show_thumbs_up),
-        ("👎 Down", "show_thumbs_down", qa.show_thumbs_down),
-        ("Share", "show_share", qa.show_share),
-        ("Feedback", "show_feedback", qa.show_feedback),
-    )
-    rows: list[list[dict[str, Any]]] = []
-    pair: list[dict[str, Any]] = []
-    for label, qa_field, enabled in specs:
-        pair.append(
-            _config_bool_toggle_button(
-                label,
-                f"channels.telegram.quick_actions.{qa_field}",
-                enabled=enabled,
-            ),
-        )
-        if len(pair) == 2:
-            rows.append(pair)
-            pair = []
-    if pair:
-        rows.append(pair)
-    current = _gateway_queue_mode(workspace)
-    nxt = _next_queue_mode(current)
-    rows.append(
-        [
-            {
-                "text": f"Queue: {current} (-> {nxt})",
-                "callback_data": f"cfg:toggle:gateway.queue_mode:{nxt}",
-            },
-        ],
-    )
-    return rows
+    return _build_session_qa_only_rows(workspace)
 
 
 def _voice_tts_mode(workspace: WorkspaceConfig) -> str:
@@ -1462,71 +1477,8 @@ def _build_notifications_keyboard_rows(workspace: WorkspaceConfig) -> list[list[
     ]
 
 
-_ADVANCED_SECTION_TILES: tuple[tuple[str, str], ...] = (
-    ("🧭 RLM", "rlm"),
-    ("📈 Self-Improve", "self_improve"),
-    ("📚 Second Brain", "second_brain"),
-    ("🤖 Sub-agents", "subagents"),
-    ("🧪 CodeMode", "codemode"),
-)
-
 _SUBAGENT_ROLES: tuple[str, ...] = ("triager", "tier_b", "tier_c", "tier_d")
 _QUEUE_MODE_CYCLE: tuple[str, ...] = ("cancel", "steer", "multi")
-
-
-def _build_advanced_keyboard_rows(
-    workspace: WorkspaceConfig,
-    *,
-    is_owner: bool = False,
-) -> list[list[dict[str, Any]]]:
-    """Build Advanced section toggles, nested section links, and Mission Control.
-
-    Args:
-        workspace (WorkspaceConfig): Parsed workspace settings.
-        is_owner (bool): When ``True``, render gateway/proxy restart buttons.
-
-    Returns:
-        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
-
-    Examples:
-        >>> from sevn.config.workspace_config import WorkspaceConfig
-        >>> rows = _build_advanced_keyboard_rows(WorkspaceConfig.minimal())
-        >>> rows[0][0]["callback_data"].startswith("cfg:toggle:gateway.restart.auto_resume_b:")
-        True
-        >>> any(btn["callback_data"] == "cfg:section:codemode" for row in rows for btn in row)
-        True
-    """
-    _ = is_owner
-    auto_resume = _gateway_auto_resume_b(workspace)
-    redaction = _tracing_redaction_enabled(workspace)
-    rows: list[list[dict[str, Any]]] = [
-        [
-            _config_bool_toggle_button(
-                "Auto-resume tier B",
-                "gateway.restart.auto_resume_b",
-                enabled=auto_resume,
-            ),
-        ],
-        [
-            _config_bool_toggle_button(
-                "Trace redaction",
-                "tracing.redaction.enabled",
-                enabled=redaction,
-            ),
-        ],
-    ]
-    pair_row: list[dict[str, Any]] = []
-    for label, sid in _ADVANCED_SECTION_TILES:
-        pair_row.append({"text": label, "callback_data": f"cfg:section:{sid}"})
-        if len(pair_row) == 2:
-            rows.append(pair_row)
-            pair_row = []
-    if pair_row:
-        rows.append(pair_row)
-    url = web_ui_url_from_workspace(workspace)
-    if url:
-        rows.append([{"text": "🌐 Open Mission Control", "url": url}])
-    return rows
 
 
 def _build_codemode_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
@@ -1683,10 +1635,9 @@ def _build_logs_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str,
         >>> rows = _build_logs_keyboard_rows(WorkspaceConfig.minimal())
         >>> rows[0][0]["callback_data"]
         'cfg:logs:tail:gateway:0'
-        >>> rows[-1][0]["callback_data"].startswith("cfg:logs:")
-        True
+        >>> rows[-1][0]["callback_data"]
+        'form:logs:logfire_token'
     """
-    redaction = _tracing_redaction_enabled(workspace)
     logfire = _logfire_export_enabled(workspace)
     return [
         [
@@ -1708,12 +1659,6 @@ def _build_logs_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str,
         ],
         [
             {"text": "🔑 Set Logfire token", "callback_data": "form:logs:logfire_token"},
-        ],
-        [
-            {
-                "text": f"Trace redaction: {'on' if redaction else 'off'} (toggle)",
-                "callback_data": "cfg:logs:toggle_redaction",
-            },
         ],
     ]
 
@@ -3342,16 +3287,6 @@ def _build_subagents_keyboard_rows(
             },
         ],
     ]
-    mode = _gateway_queue_mode(workspace)
-    nxt = _next_queue_mode(mode)
-    rows.append(
-        [
-            {
-                "text": f"Queue: {mode} (-> {nxt})",
-                "callback_data": f"cfg:toggle:gateway.queue_mode:{nxt}",
-            },
-        ],
-    )
     pair: list[dict[str, Any]] = []
     for role in _SUBAGENT_ROLES:
         pair.append(
@@ -3812,7 +3747,6 @@ def _build_agent_lab_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict
             ("🧭 RLM", "rlm"),
             ("🧪 CodeMode", "codemode"),
             ("📈 Self-Improve", "self_improve"),
-            ("⚙️ Advanced", "advanced"),
         ),
     )
     url = web_ui_url_from_workspace(workspace)
@@ -4276,8 +4210,6 @@ def build_config_menu_keyboard(
         rows_sec = _build_channels_keyboard_rows(workspace)
     elif section == "notifications":
         rows_sec = _build_notifications_keyboard_rows(workspace)
-    elif section == "advanced":
-        rows_sec = _build_advanced_keyboard_rows(workspace, is_owner=is_owner)
     elif section == "codemode":
         rows_sec = _build_codemode_keyboard_rows(workspace)
     elif section == "logs":
@@ -4686,23 +4618,6 @@ def config_menu_message_text(
         return (
             f"Notifications\n\nTelegram notify policy: {policy}\nTap to cycle all → errors → none."
         )
-    if section == "advanced":
-        auto_resume = _gateway_auto_resume_b(workspace)
-        redaction = _tracing_redaction_enabled(workspace)
-        lines = [
-            "Advanced",
-            "",
-            f"Auto-resume tier B on restart: {'on' if auto_resume else 'off'}",
-            f"Trace redaction: {'on' if redaction else 'off'}",
-            "",
-            "Nested sections: RLM, Self-Improve, Second Brain, Sub-agents, CodeMode.",
-        ]
-        url = web_ui_url_from_workspace(workspace)
-        if url:
-            lines.append(f"Full config validation: {url}")
-        else:
-            lines.append("Configure web_ui.url for Mission Control deep links.")
-        return "\n".join(lines)
     if section == "codemode":
         enabled = codemode_enabled(workspace)
         lines = [
@@ -4944,6 +4859,8 @@ def parse_config_callback_data(data: str) -> tuple[str, str | None] | None:
         name = raw.removeprefix("cfg:section:").strip().lower()
         if name in _CONFIG_SECTIONS:
             return ("section", name)
+        if name in _SECTION_ALIASES:
+            return ("retired_section", name)
     if raw.startswith("cfg:help:cmd:"):
         cmd = raw.removeprefix("cfg:help:cmd:").strip().lower()
         if cmd in {"help", "menu", "new", "voice", "model", "config", "stop", "status"}:
@@ -5170,6 +5087,33 @@ class ConfigMenuHandler:
                     adapter,
                     callback_query_id=cq_str,
                     text="Not active yet — see /config → Help for status.",
+                )
+            return
+        if kind == "retired_section" and value is not None:
+            alias_target = _SECTION_ALIASES.get(value, "")
+            if alias_target and alias_target in _CONFIG_SECTIONS:
+                frame = ConfigMenuNavFrame(section=alias_target)  # type: ignore[arg-type]
+                chat_raw = md.get("chat_id")
+                message_raw = md.get("message_id")
+                if isinstance(chat_raw, int) and isinstance(message_raw, int) and message_raw > 0:
+                    config_menu_nav_go(self._router, chat_raw, message_raw, frame)
+                    thread_id = _telegram_api_thread_id(md)
+                    await self._render_config_nav_frame(
+                        msg,
+                        frame,
+                        adapter=adapter,
+                        chat_id=chat_raw,
+                        message_id=message_raw,
+                        message_thread_id=thread_id,
+                    )
+                elif cq_str:
+                    await _answer_callback_query(adapter, callback_query_id=cq_str)
+                return
+            if cq_str:
+                await _answer_callback_query(
+                    adapter,
+                    callback_query_id=cq_str,
+                    text=_retired_section_toast(value),
                 )
             return
         if kind == "help":

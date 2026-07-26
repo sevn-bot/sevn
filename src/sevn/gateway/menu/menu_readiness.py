@@ -70,7 +70,6 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C0.15",
         "C0.16",
         "C0.17",
-        "C0.18",
         "C0.19",
         "C0.20",
         "C0.21",
@@ -135,7 +134,7 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C16.2",
         # Telegram notify policy cycle
         "C17.1",
-        # Advanced auto-resume tier B (duplicate trace-redaction C18.2 stays gated until W5)
+        # Auto-resume tier B on Deployment (Advanced dissolved W5)
         "C18.1",
         # Agent display name form
         "C19.2",
@@ -301,12 +300,6 @@ _CONFIG_SECTION_CATALOG: tuple[tuple[str, str, str, MenuReadiness], ...] = (
         "WIP",
     ),
     (
-        "Advanced",
-        "Auto-resume tier B, trace redaction, nested RLM / Self-Improve / Second Brain / CodeMode, Mission Control.",
-        "RLM, Self-Improve, and Second Brain moved from root; gateway/proxy restart under My sevn bot.",
-        "WIP",
-    ),
-    (
         "CodeMode",
         "Tier-B CodeMode (Monty run_code over triager-listed tools); default off.",
         "Writes agent.codemode.enabled; flat tool path when disabled.",
@@ -314,8 +307,8 @@ _CONFIG_SECTION_CATALOG: tuple[tuple[str, str, str, MenuReadiness], ...] = (
     ),
     (
         "Logs",
-        "Tail gateway/proxy logs, grep, traces, trace-redaction toggle.",
-        "Owner-only diagnostics; deployment id is under My sevn bot.",
+        "Tail gateway/proxy logs, grep, and traces.",
+        "Owner-only diagnostics; trace redaction under Health > Trace export.",
         "Ready",
     ),
     (
@@ -571,7 +564,6 @@ def config_menu_level_help_text(
             "dashboard": "Dashboard",
             "shortcuts": "Shortcuts",
             "notifications": "Notifications",
-            "advanced": "Advanced",
             "codemode": "CodeMode",
             "logs": "Logs",
             "help": "Slash help",
