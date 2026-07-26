@@ -213,6 +213,11 @@ ignore_imports = [
     # TODO(ci-quality): burn down — outbound tool reaches channel layer directly and via gateway
     "sevn.tools.outbound -> sevn.channels.telegram",
     "sevn.tools.outbound -> sevn.gateway.channel_router",
+    # W2 (D1): menu walker derives expected tree from gateway menu builders at runtime
+    "sevn.browser.recipes.telegram_menu -> sevn.gateway.menu.menu",
+    "sevn.browser.recipes.telegram_menu -> sevn.gateway.menu.menu_readiness",
+    "sevn.browser.recipes.telegram_menu -> sevn.gateway.menu.menu_registry",
+    "sevn.tools.browser -> sevn.browser.recipes.telegram_menu",
 ]
 
 [tool.ruff]
@@ -377,6 +382,7 @@ markers = [
     "integration: optional network/proxy-heavy tests excluded from default ``make test`` (specs/13-rlm-triager.md §10.4)",
     "golden_llm: opt-in live-LLM golden corpus tests (skipped unless SEVN_GOLDEN_LLM=1; replay subset runs tokenless)",
     "onboard_e2e: optional onboarding Telegram CDP smoke (skipped unless SEVN_ONBOARD_E2E=1)",
+    "telegram_menu_e2e: optional Telegram /config menu walker (skipped unless SEVN_TELEGRAM_MENU_E2E=1)",
     "no_cloudflare_api_stub: disable autouse Cloudflare API stub in tunnel CLI tests",
     "xdist_group(name): serialise tests sharing a group on one xdist worker",
 ]

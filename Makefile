@@ -553,6 +553,13 @@ onboard-telegram-e2e: ## Onboarding Telegram CDP smoke (requires SEVN_ONBOARD_E2
 	fi
 	$(PYTEST) tests/onboarding/test_telegram_onboarding.py -m onboard_e2e -v --tb=short --strict-markers
 
+telegram-menu-e2e: ## Telegram /config menu walker (requires SEVN_TELEGRAM_MENU_E2E=1)
+	@if [ "$$SEVN_TELEGRAM_MENU_E2E" != "1" ]; then \
+	  echo "Set SEVN_TELEGRAM_MENU_E2E=1 to run Telegram /config menu E2E walk"; \
+	  exit 0; \
+	fi
+	$(UV) run python -m sevn.browser.recipes.telegram_menu_walk --chat "$${SEVN_TELEGRAM_MENU_E2E_CHAT:-alexstestee_bot}" --json $(ARGS)
+
 improve-evals: ## Docker-first improve eval graph (`specs/33-self-improvement.md` §10.5)
 	@if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
 		$(MAKE) improve-evals-docker; \

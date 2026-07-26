@@ -10,6 +10,10 @@ are cut into a dated, versioned section at release time.
 
 ## [Unreleased]
 
+### Added
+
+- [2026-07-26] Telegram ``/config`` menu E2E harness: ``TelegramMenuWalker`` recipe, ``make telegram-menu-e2e`` (``SEVN_TELEGRAM_MENU_E2E=1``), inline-keyboard primitives on ``TelegramWeb``, and per-row verdict + spec-id coverage reports under ``evidence/telegram-menu-e2e/``
+
 ### Fixed
 
 - [2026-07-24] Build ``version_id`` resolves from the code checkout (branch/tag + short SHA, e.g. ``pre-0.0.1_393f918b``) instead of falling back to the package version ``0.0.1`` when the operator workspace is not a git tree; the resolved id is persisted into workspace ``sevn.json`` at boot so the ``/config`` button and Mission Control read a real build identity

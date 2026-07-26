@@ -24,7 +24,11 @@ _INLINE_KEYBOARD_MATRIX: list[list[dict[str, Any]]] = [
 
 
 def _eval_inline_dom(_msg: dict[str, Any]) -> dict[str, Any]:
-    return {"result": {"value": _INLINE_KEYBOARD_MATRIX}}
+    flat: list[dict[str, Any]] = []
+    for row in _INLINE_KEYBOARD_MATRIX:
+        for btn in row:
+            flat.append(btn)
+    return {"result": {"value": flat}}
 
 
 def _eval_signature(_msg: dict[str, Any]) -> dict[str, Any]:
@@ -36,7 +40,6 @@ def _eval_toast(_msg: dict[str, Any]) -> dict[str, Any]:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W2: inline_buttons enumeration", strict=False)
 async def test_inline_buttons_enumerates_rows_and_labels(fake_cdp: FakeCDPServer) -> None:
     """W1.1 — inline keyboard matrix exposes row/col/text/url metadata."""
     from sevn.browser.cdp import CDPConnection, CDPSession
@@ -60,7 +63,6 @@ async def test_inline_buttons_enumerates_rows_and_labels(fake_cdp: FakeCDPServer
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W2: tap_inline by label", strict=False)
 async def test_tap_inline_by_label_returns_tap_outcome(fake_cdp: FakeCDPServer) -> None:
     """W1.1 — tap-by-label settles edit-in-place and captures toast."""
     from sevn.browser.cdp import CDPConnection, CDPSession
@@ -68,7 +70,22 @@ async def test_tap_inline_by_label_returns_tap_outcome(fake_cdp: FakeCDPServer) 
     from sevn.browser.page import Page
     from sevn.browser.recipes.telegram_web import TelegramWeb
 
-    fake_cdp.on_command("Runtime.evaluate", _eval_inline_dom)
+    sig_state = {"sig_calls": 0}
+
+    def _eval_runtime(msg: dict[str, Any]) -> dict[str, Any]:
+        expr = str(msg.get("params", {}).get("expression", ""))
+        if "labels.join" in expr or "labels.push" in expr:
+            sig_state["sig_calls"] += 1
+            if sig_state["sig_calls"] > 1:
+                return {"result": {"value": "sig-after-tap"}}
+            return {"result": {"value": "sig-before"}}
+        if ".toast" in expr:
+            return {"result": {"value": None}}
+        if expr.strip().startswith("document.querySelectorAll") and ".length" in expr:
+            return {"result": {"value": 1}}
+        return _eval_inline_dom(msg)
+
+    fake_cdp.on_command("Runtime.evaluate", _eval_runtime)
     fake_cdp.set_result("DOM.getDocument", {"root": {"nodeId": 1}})
     fake_cdp.set_result("DOM.querySelector", {"nodeId": 2})
     fake_cdp.set_result("DOM.scrollIntoViewIfNeeded", {})
@@ -87,7 +104,6 @@ async def test_tap_inline_by_label_returns_tap_outcome(fake_cdp: FakeCDPServer) 
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W2: screen_signature settle primitive", strict=False)
 async def test_screen_signature_stable_hash(fake_cdp: FakeCDPServer) -> None:
     """W1.1 — screen_signature hashes caption + button matrix."""
     from sevn.browser.cdp import CDPConnection, CDPSession
@@ -108,7 +124,6 @@ async def test_screen_signature_stable_hash(fake_cdp: FakeCDPServer) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W2: read_toast capture", strict=False)
 async def test_read_toast_returns_popup_text(fake_cdp: FakeCDPServer) -> None:
     """W1.1 — toast reader captures answerCallbackQuery text."""
     from sevn.browser.cdp import CDPConnection, CDPSession
@@ -128,7 +143,6 @@ async def test_read_toast_returns_popup_text(fake_cdp: FakeCDPServer) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W2: press_back navigation", strict=False)
 async def test_press_back_taps_nav_row(fake_cdp: FakeCDPServer) -> None:
     """W1.1 — back navigation uses cfg:nav callback family, not emoji heuristics."""
     from sevn.browser.cdp import CDPConnection, CDPSession
@@ -193,7 +207,6 @@ async def test_press_back_taps_nav_row(fake_cdp: FakeCDPServer) -> None:
         ),
     ],
 )
-@pytest.mark.xfail(reason="green after W2: classify_outcome verdict table (D5)", strict=False)
 def test_classify_outcome_verdict_table(
     before: dict[str, Any],
     after: dict[str, Any],
@@ -208,7 +221,6 @@ def test_classify_outcome_verdict_table(
     assert verdict.value == expected
 
 
-@pytest.mark.xfail(reason="green after W2: expected_tree DFS order", strict=False)
 def test_walker_dfs_order_from_live_keyboard() -> None:
     """W1.2 — walker plan follows depth-first order with Back tracking."""
     from sevn.browser.recipes.telegram_menu import expected_tree
@@ -231,7 +243,6 @@ def test_walker_dfs_order_from_live_keyboard() -> None:
         "act:deploy:remote",
     ],
 )
-@pytest.mark.xfail(reason="green after W2: destructive deny-list (D6)", strict=False)
 def test_deny_list_marks_destructive_callbacks_skipped(callback: str) -> None:
     """W1.2 — deny-listed callbacks report skipped(destructive), never execute."""
     from sevn.browser.recipes.telegram_menu import DEFAULT_DENY, classify_row, row_verdict_for_skip
@@ -241,9 +252,6 @@ def test_deny_list_marks_destructive_callbacks_skipped(callback: str) -> None:
     assert row_verdict_for_skip(row) == "skipped"
 
 
-@pytest.mark.xfail(
-    reason="green after W2: --mutate guard requires env + throwaway ws (D7)", strict=False
-)
 def test_mutate_mode_refuses_without_dual_guard(monkeypatch: pytest.MonkeyPatch) -> None:
     """W1.2 — mutate refuses unless SEVN_TELEGRAM_MENU_E2E_MUTATE=1 and non-default workspace."""
     from sevn.browser.recipes.telegram_menu import validate_mutate_guards
@@ -253,7 +261,6 @@ def test_mutate_mode_refuses_without_dual_guard(monkeypatch: pytest.MonkeyPatch)
         validate_mutate_guards(safe=False, workspace_root="/Users/alex/.sevn/workspace")
 
 
-@pytest.mark.xfail(reason="green after W2: coverage accounting fails on miss (D9)", strict=False)
 def test_walk_fails_when_spec_id_not_visited_or_denylisted() -> None:
     """W1.3 — coverage report fails when a spec id is neither visited nor skipped."""
     from sevn.browser.recipes.telegram_menu import assert_spec_coverage
@@ -271,9 +278,6 @@ def test_walk_fails_when_spec_id_not_visited_or_denylisted() -> None:
     os.environ.get("SEVN_TELEGRAM_MENU_E2E") != "1",
     reason="Set SEVN_TELEGRAM_MENU_E2E=1 for live Telegram menu walk smoke",
 )
-@pytest.mark.xfail(
-    reason="green after W2: live menu walk reaches root with zero dead", strict=False
-)
 def test_live_menu_walk_smoke_returns_report_without_dead() -> None:
     """W1.4 / D11 — optional live smoke: open /config and assert zero dead verdicts."""
     from sevn.browser.recipes.telegram_menu_walk import run_walk_cli
@@ -281,7 +285,7 @@ def test_live_menu_walk_smoke_returns_report_without_dead() -> None:
     out = run_walk_cli(
         chat=os.environ.get("SEVN_TELEGRAM_MENU_E2E_CHAT", "alexstestee_bot"),
         safe=True,
-        json=True,
+        as_json=True,
     )
     payload = json.loads(out)
     assert payload["summary"]["dead"] == 0
