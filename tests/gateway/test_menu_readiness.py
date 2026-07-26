@@ -21,6 +21,11 @@ from sevn.gateway.menu.menu_readiness import (
     gate_config_keyboard_rows,
     readiness_for_callback,
 )
+from sevn.gateway.menu.menu_registry import match_menu_button_spec
+from tests.gateway.telegram_menu_redesign_helpers import (
+    iter_rendered_buttons,
+    load_baseline_wip_spec_ids,
+)
 
 
 def test_load_workspace_json_schema_without_repo_root() -> None:
@@ -110,3 +115,45 @@ async def test_build_tools_keyboard_without_repo_sync_error(tmp_path: Path) -> N
     ):
         kb = build_config_menu_keyboard(ws, section="tools", content_root=tmp_path)
     assert "inline_keyboard" in kb
+
+
+def _callbacks_for_spec_id(spec_id: str) -> list[str]:
+    hits: list[str] = []
+    for _section, _label, cb in iter_rendered_buttons():
+        spec = match_menu_button_spec(cb)
+        if spec is not None and spec.spec_id == spec_id:
+            hits.append(cb)
+    return hits
+
+
+@pytest.mark.parametrize("spec_id", sorted(load_baseline_wip_spec_ids()))
+@pytest.mark.xfail(reason="green after W4: WIP backlog cleared to Ready", strict=False)
+def test_wip_spec_id_becomes_ready(spec_id: str) -> None:
+    """W1.7 — each W0 WIP id is allow-listed and resolves to Ready."""
+    callbacks = _callbacks_for_spec_id(spec_id)
+    assert callbacks, f"no callback rendered for {spec_id}"
+    for cb in callbacks:
+        assert readiness_for_callback(cb) == "Ready"
+
+
+@pytest.mark.xfail(
+    reason="green after W4: non-Ready rows still toast via cfg:disabled", strict=False
+)
+def test_non_ready_disabled_callbacks_still_prefixed_and_toast() -> None:
+    """W1.7 — anything left non-Ready keeps 🚧 prefix and cfg:disabled:* answers."""
+    from sevn.gateway.menu.menu_readiness import DISABLED_CALLBACK_PREFIX, gate_config_keyboard_rows
+
+    rows = [
+        [
+            {
+                "text": "WIP row",
+                "callback_data": "cfg:toggle:channels.telegram.telegram_notify_policy:all",
+            }
+        ]
+    ]
+    gated = gate_config_keyboard_rows(rows)
+    cb = gated[0][0]["callback_data"]
+    assert cb.startswith(DISABLED_CALLBACK_PREFIX)
+    assert (
+        readiness_for_callback("cfg:toggle:channels.telegram.telegram_notify_policy:all") != "Ready"
+    )
