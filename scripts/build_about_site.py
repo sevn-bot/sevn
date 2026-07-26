@@ -275,7 +275,7 @@ def _collect_telegram_menu() -> dict[str, Any]:
     live = collect_live_config_menu(ws)
     sections: list[dict[str, Any]] = []
 
-    for label, section_id, _cb in _CONFIG_ROOT_TILES:
+    for label, section_id, _cb, _owner in _CONFIG_ROOT_TILES:
         dev_sec = dev_catalog.get(section_id, {})
         title = str(dev_sec.get("title") or label.split(" ", 1)[-1])
         short = str(dev_sec.get("short") or f"Settings for {title}.")
@@ -326,7 +326,7 @@ def _collect_telegram_menu() -> dict[str, Any]:
         )
 
     root_tiles = []
-    for tile_label, section_id, _cb in _CONFIG_ROOT_TILES:
+    for tile_label, section_id, _cb, _owner in _CONFIG_ROOT_TILES:
         dev_sec = dev_catalog.get(section_id, {})
         root_tiles.append(
             {

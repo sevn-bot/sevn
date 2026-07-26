@@ -341,7 +341,8 @@ def test_help_keyboard_includes_status_and_stop() -> None:
         for btn in row
         if "callback_data" in btn
     ]
-    assert all(str(cb).startswith("cfg:nav:") for cb in callbacks)
+    assert any(str(cb).startswith("act:sevn_bot:") for cb in callbacks)
+    assert any(str(cb).startswith("cfg:nav:") for cb in callbacks)
 
 
 def test_menu_quick_and_diagnostics_include_status_stop() -> None:

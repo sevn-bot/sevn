@@ -18,13 +18,13 @@ from sevn.gateway.menu.menu_registry import MENU_BUTTON_SPECS
 
 def test_menu_registry_root_slugs_count() -> None:
     slugs = menu_registry_root_slugs()
-    assert len(slugs) == 19
-    assert slugs[0] == "session"
+    assert len(slugs) == 8
+    assert slugs[0] == "chat"
 
 
 def test_config_paths_match_registry_labels() -> None:
     sections = iter_config_sections()
-    assert len(sections) == 19
+    assert len(sections) == 8
     root_labels = {
         spec.label
         for spec in MENU_BUTTON_SPECS
@@ -37,18 +37,22 @@ def test_section_callback_format() -> None:
     assert section_callback("voice") == "cfg:section:voice"
 
 
-def test_session_section_has_queue_mode_path() -> None:
-    session = section_by_slug("session")
-    assert session is not None
-    assert "gateway.queue_mode" in session.dot_paths
+def test_chat_root_section_exists() -> None:
+    chat = section_by_slug("chat")
+    assert chat is not None
+    assert chat.slug == "chat"
+
+
+def test_legacy_session_slug_not_in_root_cli() -> None:
+    assert section_by_slug("session") is None
 
 
 def test_sevn_config_sections_lists_slugs() -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["config", "sections"], env={"NO_COLOR": "1"})
     assert result.exit_code == 0
-    assert "session" in result.stdout
-    assert "voice" in result.stdout
+    assert "chat" in result.stdout
+    assert "help" in result.stdout
 
 
 def test_sevn_config_sections_json() -> None:
@@ -57,7 +61,7 @@ def test_sevn_config_sections_json() -> None:
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
     assert payload["ok"] is True
-    assert len(payload["data"]["sections"]) == 19
+    assert len(payload["data"]["sections"]) == 8
 
 
 def test_sevn_config_no_args_shows_help_when_non_tty() -> None:

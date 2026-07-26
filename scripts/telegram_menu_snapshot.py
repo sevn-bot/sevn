@@ -98,7 +98,7 @@ def collect_live_config_menu(
 
     ws = workspace if workspace is not None else default_docs_workspace()
     out: dict[str, LiveSection] = {}
-    for tile_label, section_id, section_cb in _CONFIG_ROOT_TILES:
+    for tile_label, section_id, section_cb, _owner in _CONFIG_ROOT_TILES:
         kb = build_config_menu_keyboard(ws, section=section_id)  # type: ignore[arg-type]
         buttons: list[LiveButton] = []
         for row in kb.get("inline_keyboard", []):

@@ -288,7 +288,8 @@ async def test_help_section_navigation(tmp_path: Path) -> None:
         for btn in row
         if "callback_data" in btn
     ]
-    assert all(str(cb).startswith("cfg:nav:") for cb in callbacks)
+    assert any(str(cb).startswith("act:sevn_bot:") for cb in callbacks)
+    assert any(str(cb).startswith("cfg:nav:") for cb in callbacks)
 
 
 @pytest.mark.asyncio

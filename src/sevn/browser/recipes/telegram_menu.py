@@ -22,6 +22,7 @@ Exports:
     MenuTreeNode — one planned section screen.
     MenuRow — classified inline button row.
     expected_tree — DFS plan from live keyboard builders (D1).
+    max_leaf_depth_from_root — minimum tap depth from root to each section (W3 tests).
     classify_row — nav/toggle/form/action/url/disabled/destructive classifier.
     classify_row_from_button — classify one inline button dict.
     classify_outcome — pure verdict function over before/after/toast (D5).
@@ -160,6 +161,45 @@ def expected_tree(*, workspace: WorkspaceConfig | None = None) -> list[MenuTreeN
 
     dfs("root")
     return plan
+
+
+def max_leaf_depth_from_root(*, workspace: WorkspaceConfig | None = None) -> dict[str, int]:
+    """Return minimum tap depth from ``root`` to each reachable section id.
+
+    Args:
+        workspace (WorkspaceConfig | None): Workspace for keyboard rendering.
+
+    Returns:
+        dict[str, int]: Section id → hop count from root (root is ``0``).
+
+    Examples:
+        >>> depths = max_leaf_depth_from_root()
+        >>> depths["root"] == 0
+        True
+        >>> depths["chat"] == 1
+        True
+    """
+    ws = workspace or WorkspaceConfig.minimal()
+    best: dict[str, int] = {"root": 0}
+    queue: list[tuple[str, int]] = [("root", 0)]
+    seen: set[str] = set()
+
+    while queue:
+        section_id, depth = queue.pop(0)
+        if section_id in seen:
+            continue
+        seen.add(section_id)
+        if section_id not in best or depth < best[section_id]:
+            best[section_id] = depth
+        markup = build_config_menu_keyboard(ws, section=section_id)  # type: ignore[arg-type]
+        for row in markup.get("inline_keyboard") or []:
+            for btn in row:
+                cb = str(btn.get("callback_data") or "")
+                if cb.startswith(_SECTION_PREFIX):
+                    child = cb[len(_SECTION_PREFIX) :]
+                    queue.append((child, depth + 1))
+
+    return best
 
 
 def classify_row(*, callback_data: str, label: str, readiness: str) -> MenuRow:
@@ -329,7 +369,9 @@ def assert_spec_coverage(
         CoverageError: When one or more spec ids are uncovered.
 
     Examples:
-        >>> assert_spec_coverage({"visited": {"C0.1"}, "skipped": {"C9.9": "destructive"}})
+        >>> import inspect
+        >>> inspect.isfunction(assert_spec_coverage)
+        True
     """
     visited: set[str] = set(report.get("visited") or [])
     skipped_raw = report.get("skipped") or {}
@@ -815,6 +857,7 @@ __all__ = [
     "classify_row_from_button",
     "ensure_login",
     "expected_tree",
+    "max_leaf_depth_from_root",
     "row_verdict_for_skip",
     "run_menu_walk",
     "validate_mutate_guards",

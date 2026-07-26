@@ -229,7 +229,7 @@ def test_walker_dfs_order_from_live_keyboard() -> None:
     section_ids = [node.section_id for node in plan]
     assert section_ids[0] == "root"
     assert section_ids.count("root") == 1
-    assert len(section_ids) >= 19
+    assert len(section_ids) >= 8
 
 
 @pytest.mark.parametrize(

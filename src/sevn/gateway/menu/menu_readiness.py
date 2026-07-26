@@ -542,7 +542,7 @@ def config_menu_level_help_text(
             "sevn_bot": "sevn.bot",
             "my_sevn_bot": "My sevn bot",
         }
-        for label, sid, _cb in _CONFIG_ROOT_TILES:
+        for label, sid, _cb, _owner in _CONFIG_ROOT_TILES:
             cat = catalog_by_title.get(section_titles.get(sid, ""))
             lines.append(f"▸ {label} [Ready]")
             if cat is not None:

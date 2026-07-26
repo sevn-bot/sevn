@@ -1,4 +1,4 @@
-"""W1 RED: ``sevn config`` CLI surface after eight-slug redesign (green after W6)."""
+"""W1 RED: ``sevn config`` CLI surface after eight-slug redesign (green after W3/W6)."""
 
 from __future__ import annotations
 
@@ -22,18 +22,12 @@ REDESIGN_ROOT_SLUGS: tuple[str, ...] = (
 )
 
 
-@pytest.mark.xfail(
-    reason="green after W6: menu_registry_root_slugs returns eight slugs", strict=False
-)
 def test_menu_registry_root_slugs_returns_eight() -> None:
     """W1.10 — CLI SSOT derives eight root slugs from the redesigned registry."""
     slugs = menu_registry_root_slugs()
     assert slugs == REDESIGN_ROOT_SLUGS
 
 
-@pytest.mark.xfail(
-    reason="green after W6: iter_config_sections returns eight sections", strict=False
-)
 def test_iter_config_sections_returns_eight() -> None:
     """W1.10 — ``sevn config sections`` lists the eight menu groups."""
     sections = iter_config_sections()
@@ -41,9 +35,6 @@ def test_iter_config_sections_returns_eight() -> None:
     assert [s.slug for s in sections] == list(REDESIGN_ROOT_SLUGS)
 
 
-@pytest.mark.xfail(
-    reason="green after W6: sevn config sections CLI lists eight slugs", strict=False
-)
 def test_sevn_config_sections_lists_eight_slugs() -> None:
     """W1.10 — operator-facing ``sevn config sections`` matches the new tree."""
     runner = CliRunner()
@@ -53,7 +44,6 @@ def test_sevn_config_sections_lists_eight_slugs() -> None:
         assert slug in result.stdout
 
 
-@pytest.mark.xfail(reason="green after W6: sevn config sections --json payload", strict=False)
 def test_sevn_config_sections_json_lists_eight() -> None:
     """W1.10 — JSON sections payload carries eight redesigned groups."""
     runner = CliRunner()
@@ -75,7 +65,6 @@ def test_sevn_config_section_slug_accepted(slug: str) -> None:
     assert result.exit_code == 0
 
 
-@pytest.mark.xfail(reason="green after W6: config_paths doctest len(slugs)==8", strict=False)
 def test_config_paths_doctest_slug_count() -> None:
     """W1.10 — doctest anchor moves from 19 → 8 root slugs."""
     import doctest

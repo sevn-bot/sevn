@@ -50,7 +50,7 @@ def test_help_section_catalog_not_command_submenu() -> None:
     assert config_menu_help_catalog_text() == text
 
 
-def test_help_keyboard_has_no_action_rows() -> None:
+def test_help_keyboard_includes_sevn_bot_actions() -> None:
     kb = build_config_menu_keyboard(
         WorkspaceConfig(
             schema_version=1, gateway={"token": "${SECRET:keychain:sevn.gateway.token}"}
@@ -58,8 +58,10 @@ def test_help_keyboard_has_no_action_rows() -> None:
         section="help",
     )
     rows = kb["inline_keyboard"]
-    assert len(rows) == 1
-    assert rows[0][0]["callback_data"] == "cfg:nav:back"
+    callbacks = [btn["callback_data"] for row in rows for btn in row]
+    assert any(cb.startswith("act:sevn_bot:") for cb in callbacks)
+    assert "cfg:section:sevn_bot" in callbacks
+    assert any(cb.startswith("cfg:nav:") for cb in callbacks)
 
 
 def test_readiness_allows_voice_tts_toggle() -> None:

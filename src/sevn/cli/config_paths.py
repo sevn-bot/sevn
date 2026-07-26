@@ -130,7 +130,7 @@ def menu_registry_root_slugs() -> tuple[str, ...]:
 
     Examples:
         >>> slugs = menu_registry_root_slugs()
-        >>> "session" in slugs and len(slugs) == 19
+        >>> "chat" in slugs and len(slugs) == 8
         True
     """
     slugs: list[str] = []
@@ -151,7 +151,7 @@ def _labels_by_slug() -> dict[str, str]:
 
     Examples:
         >>> labels = _labels_by_slug()
-        >>> labels.get("session") == "Session"
+        >>> labels.get("chat") == "Chat"
         True
     """
     labels: dict[str, str] = {}
@@ -196,7 +196,7 @@ def iter_config_sections() -> tuple[ConfigSection, ...]:
 
     Examples:
         >>> sections = iter_config_sections()
-        >>> sections[0].slug == "session"
+        >>> sections[0].slug == "chat"
         True
     """
     labels = _labels_by_slug()
@@ -223,7 +223,7 @@ def section_by_slug(slug: str) -> ConfigSection | None:
         ConfigSection | None: Matching section or None.
 
     Examples:
-        >>> section_by_slug("session") is not None
+        >>> section_by_slug("chat") is not None
         True
         >>> section_by_slug("missing") is None
         True

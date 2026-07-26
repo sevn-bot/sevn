@@ -79,8 +79,8 @@ def test_surfaces_telegram_menu_snapshot(tmp_path: Path) -> None:
         assert resp.status_code == 200
         body = resp.json()
         assert body["docs_url"].endswith("telegram-menu.html")
-        assert body["section_count"] >= 1
-        assert any(s["section_id"] == "session" for s in body["sections"])
+        assert body["section_count"] == 8
+        assert any(s["section_id"] == "chat" for s in body["sections"])
         assert body["mission_control_url"].endswith("/mission/telegram-menu")
 
 

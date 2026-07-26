@@ -11,7 +11,7 @@ Exports:
     registry_implementation_counts — implemented vs not-implemented totals.
 
 Examples:
-    >>> spec = match_menu_button_spec("cfg:section:session")
+    >>> spec = match_menu_button_spec("cfg:section:chat")
     >>> spec is not None and spec.spec_id == "C0.1"
     True
     >>> counts = registry_implementation_counts()
@@ -163,29 +163,17 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         )
 
     # --- C0. /config root tiles + chrome ---
-    # NOTE: C0.19 is the **Logs** tile per `specs/18-channel-telegram.md` §4.7
-    # (TE-4). Help moved to C0.20 and Close to C0.21 to keep numbering monotonic.
-    # C0.19 and C20.* flipped Ready in Wave TE-9 (`menu_readiness._READY_SPEC_IDS`).
+    # W3 redesign: eight intent tiles (D16). Demoted root slugs stay registered under
+    # their parent section so W1.6 Ready snapshots still find every legacy callback.
     config_root: tuple[tuple[str, str, str], ...] = (
-        ("C0.1", "Session", "session"),
-        ("C0.2", "Agents", "agents"),
-        ("C0.3", "Models", "models"),
-        ("C0.4", "Voice", "voice"),
-        ("C0.5", "Channels", "channels"),
-        ("C0.6", "Secrets", "secrets"),
-        ("C0.7", "Skills", "skills"),
-        ("C0.8", "Tools", "tools"),
-        ("C0.10", "Code", "code"),
-        ("C0.11", "Security", "security"),
-        ("C0.14", "Integrations", "integrations"),
-        ("C0.15", "Dashboard", "dashboard"),
-        ("C0.16", "Shortcuts", "shortcuts"),
-        ("C0.17", "Notifications", "notifications"),
-        ("C0.18", "Advanced", "advanced"),
-        ("C0.19", "Logs", "logs"),
-        ("C0.20", "Slash help", "help"),
-        ("C0.22", "sevn.bot", "sevn_bot"),
-        ("C0.23", "My sevn bot", "my_sevn_bot"),
+        ("C0.1", "Chat", "chat"),
+        ("C0.2", "Agent", "agent"),
+        ("C0.7", "Skills & Tools", "skills"),
+        ("C0.10", "Memory", "memory"),
+        ("C0.6", "Access", "access"),
+        ("C0.19", "Health", "health"),
+        ("C0.23", "Deployment", "deployment"),
+        ("C0.20", "Help", "help"),
     )
     for spec_id, label, sid in config_root:
         add(
@@ -193,6 +181,34 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
             _exact(f"cfg:section:{sid}"),
             "C",
             "root",
+            label,
+            implemented=True,
+        )
+    config_root_demoted: tuple[tuple[str, str, str, str], ...] = (
+        ("C0.3", "Models", "models", "agent"),
+        ("C0.4", "Voice", "voice", "chat"),
+        ("C0.5", "Channels", "channels", "chat"),
+        ("C0.8", "Tools", "tools", "skills"),
+        ("C0.11", "Security", "security", "access"),
+        ("C0.14", "Integrations", "integrations", "skills"),
+        ("C0.15", "Dashboard", "dashboard", "health"),
+        ("C0.16", "Shortcuts", "shortcuts", "chat"),
+        ("C0.17", "Notifications", "notifications", "chat"),
+        ("C0.18", "Advanced", "advanced", "agent"),
+        ("C0.22", "sevn.bot", "sevn_bot", "help"),
+        ("C0.9", "Code", "code", "memory"),
+        ("C0.12", "Secrets", "secrets", "access"),
+        ("C0.13", "Agents", "agents", "agent"),
+        ("C0.27", "Session", "session", "chat"),
+        ("C0.28", "Logs", "logs", "health"),
+        ("C0.29", "My sevn bot", "my_sevn_bot", "deployment"),
+    )
+    for spec_id, label, sid, parent in config_root_demoted:
+        add(
+            spec_id,
+            _exact(f"cfg:section:{sid}"),
+            "C",
+            parent,
             label,
             implemented=True,
         )

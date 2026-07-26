@@ -421,20 +421,24 @@ async def test_menu_open_config_edits_to_config_root(tmp_path: Path) -> None:
     labels = [
         btn["text"] for row in cap.edited[0]["reply_markup"]["inline_keyboard"] for btn in row
     ]
-    assert "📦 Session" in labels
+    assert "💬 Chat" in labels
     assert cap.sent == []
     assert parse_menu_callback_data("menu:open_config") == ("open_config", None)
 
 
-def test_build_config_menu_keyboard_has_22_tiles() -> None:
+def test_build_config_menu_keyboard_has_eight_root_tiles() -> None:
     ws = _workspace()
     kb = build_config_menu_keyboard(ws, section="root")
     labels = [btn["text"] for row in kb["inline_keyboard"] for btn in row]
-    section_labels = [label for label in labels if label.startswith(("📦", "🤖", "📜"))]
-    assert len(section_labels) >= 2
-    assert "📊 Dashboard" in labels
-    assert "⌨️ Shortcuts" in labels
-    assert "📜 Logs" in labels
+    for expected in ("💬 Chat", "🧠 Agent", "🧩 Skills & Tools", "❓ Help"):
+        assert expected in labels
+    section_callbacks = [
+        btn["callback_data"]
+        for row in kb["inline_keyboard"]
+        for btn in row
+        if str(btn.get("callback_data", "")).startswith("cfg:section:")
+    ]
+    assert len(section_callbacks) == 8
 
 
 def test_parse_action_callback_excludes_config_nav() -> None:
