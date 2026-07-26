@@ -324,7 +324,7 @@ _CONFIG_SECTION_CATALOG: tuple[tuple[str, str, str, MenuReadiness], ...] = (
         "Ready",
     ),
     (
-        "My sevn bot",
+        "Deployment",
         "Deployment id, build version id, owner gateway/proxy restart (two-step confirm), and persistent tunnel on/off.",
         "Restart uses service manager; tunnel on starts the provider now and, once healthy, is re-launched on every gateway boot (surviving host restart only when the gateway itself runs as a daemon); deployment id mirrors /status; version id is the sevn.json build stamp.",
         "Ready",
@@ -534,8 +534,8 @@ def config_menu_level_help_text(
         title = "/config root"
     elif section == "sevn_bot":
         title = "sevn.bot"
-    elif section == "my_sevn_bot":
-        title = "My sevn bot"
+    elif section == "deployment":
+        title = "Deployment"
     lines = [f"Help — {title}", ""]
     body_rows: list[list[dict[str, Any]]] = []
     if isinstance(markup, dict):
@@ -547,28 +547,14 @@ def config_menu_level_help_text(
 
         catalog_by_title = {row[0]: row for row in _CONFIG_SECTION_CATALOG}
         section_titles = {
-            "session": "Session",
-            "agents": "Agents",
-            "models": "Models",
-            "voice": "Voice",
-            "channels": "Channels",
-            "secrets": "Secrets",
-            "skills": "Skills",
-            "tools": "Tools",
-            "rlm": "RLM",
-            "code": "Code",
-            "security": "Security",
-            "self_improve": "Self-Improve",
-            "second_brain": "Second Brain",
-            "integrations": "Integrations",
-            "dashboard": "Dashboard",
-            "shortcuts": "Shortcuts",
-            "notifications": "Notifications",
-            "codemode": "CodeMode",
-            "logs": "Logs",
-            "help": "Slash help",
-            "sevn_bot": "sevn.bot",
-            "my_sevn_bot": "My sevn bot",
+            "chat": "Chat",
+            "agent": "Agent",
+            "skills": "Skills & Tools",
+            "memory": "Memory",
+            "access": "Access",
+            "health": "Health",
+            "deployment": "Deployment",
+            "help": "Help",
         }
         for label, sid, _cb, _owner in _CONFIG_ROOT_TILES:
             cat = catalog_by_title.get(section_titles.get(sid, ""))

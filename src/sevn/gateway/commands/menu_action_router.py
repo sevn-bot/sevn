@@ -116,33 +116,33 @@ _CFG_ACTION_KEYS: frozenset[str] = frozenset(
 )
 
 _CALLBACK_SECTION_PREFIXES: tuple[tuple[str, ConfigSection], ...] = (
-    ("voice:", "voice"),
-    ("security:", "security"),
-    ("dashboard:", "dashboard"),
-    ("shortcuts:", "shortcuts"),
+    ("voice:", "chat_voice"),
+    ("security:", "access_guard"),
+    ("dashboard:", "health_pin"),
+    ("shortcuts:", "chat_shortcuts"),
     ("skills:", "skills"),
-    ("integrations:", "integrations"),
-    ("logs:", "logs"),
+    ("integrations:", "skills_integrations"),
+    ("logs:", "health"),
 )
 
 _CONFIG_PATH_SECTION: dict[str, ConfigSection] = {
-    "voice": "voice",
-    "security": "security",
-    "webchat": "session",
-    "providers": "models",
-    "channels": "channels",
-    "gateway": "session",
-    "executors": "rlm",
-    "rlm": "rlm",
-    "code_understanding": "code",
-    "code_review_graph": "code",
-    "self_improve": "self_improve",
-    "second_brain": "second_brain",
-    "subagents": "subagents",
+    "voice": "chat_voice",
+    "security": "access_guard",
+    "webchat": "chat_channels",
+    "providers": "agent",
+    "channels": "chat_channels",
+    "gateway": "chat",
+    "executors": "agent_lab",
+    "rlm": "agent_lab",
+    "code_understanding": "memory_code",
+    "code_review_graph": "memory_code",
+    "self_improve": "agent_lab",
+    "second_brain": "memory_sb",
+    "subagents": "agent_subagents",
     "skills": "skills",
-    "tools": "tools",
-    "integration": "integrations",
-    "agent": "agents",
+    "tools": "skills_tools",
+    "integration": "skills_integrations",
+    "agent": "agent_identity",
 }
 
 
@@ -184,41 +184,43 @@ def infer_config_section_from_callback(data: str) -> ConfigSection:
 
     Examples:
         >>> infer_config_section_from_callback("cfg:voice:mode:all")
-        'voice'
+        'chat_voice'
         >>> infer_config_section_from_callback("cfg:toggle:providers.use_main_model_for_all:false")
-        'models'
+        'agent'
         >>> infer_config_section_from_callback(
         ...     "cfg:toggle:security.scanner.heuristic_only:true",
         ... )
-        'security'
+        'access_guard'
         >>> infer_config_section_from_callback(
         ...     "cfg:toggle:executors.tier_cd.lambda_rlm.enabled:true",
         ... )
-        'rlm'
+        'agent_lab'
         >>> infer_config_section_from_callback(
         ...     "cfg:toggle:code_understanding.mycode.enabled:false",
         ... )
-        'code'
+        'memory_code'
         >>> infer_config_section_from_callback("cfg:models:pick:tier_b:0")
-        'models'
+        'agent'
         >>> infer_config_section_from_callback("act:gateway:restart")
-        'my_sevn_bot'
+        'deployment'
         >>> infer_config_section_from_callback("act:tunnel:on")
-        'my_sevn_bot'
+        'deployment'
         >>> infer_config_section_from_callback("act:sevn_bot:sync")
-        'sevn_bot'
+        'help'
         >>> infer_config_section_from_callback("cfg:logs:toggle_redaction")
-        'logs'
+        'health_tracing'
     """
     raw = data.strip()
     if raw.startswith("cfg:logs:"):
-        return "logs"
+        if "toggle_redaction" in raw or "logfire" in raw or "logfire_token" in raw:
+            return "health_tracing"
+        return "health"
     if raw.startswith("cfg:models:"):
-        return "models"
+        return "agent"
     if raw.startswith(("act:gateway:", "act:proxy:", "act:tunnel:")):
-        return "my_sevn_bot"
+        return "deployment"
     if raw.startswith("act:sevn_bot:"):
-        return "sevn_bot"
+        return "help"
     if raw.startswith("act:discogs:"):
         return "skills:discogs:setup"
     if raw.startswith("cfg:cycle:"):
@@ -238,9 +240,9 @@ def infer_config_section_from_callback(data: str) -> ConfigSection:
                 return "skills:discogs"
             return "skills:discogs"
         if path.startswith("agent.codemode"):
-            return "codemode"
+            return "agent_lab"
         if path.startswith("subagents"):
-            return "subagents"
+            return "agent_subagents"
         if "quick_actions" in path:
             return "chat_qa"
         if path.startswith("gateway.queue_mode"):
@@ -250,9 +252,9 @@ def infer_config_section_from_callback(data: str) -> ConfigSection:
         if path.startswith("tracing."):
             return "health_tracing"
         if "telegram_notify_policy" in path:
-            return "notifications"
+            return "chat"
         if path.startswith("channels.telegram."):
-            return "channels"
+            return "chat_channels"
         top = path.split(".", 1)[0]
         return _CONFIG_PATH_SECTION.get(top, "root")
     if raw.startswith("cfg:"):
@@ -1241,7 +1243,7 @@ class MenuActionRouter:
         message_raw = md.get("message_id")
         if isinstance(chat_raw, int) and isinstance(message_raw, int):
             get_config_menu_nav(self._router, chat_raw, message_raw).current = ConfigMenuNavFrame(
-                section="models",
+                section="agent",
             )
         toast = f"Model set to {model_id}."
         answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
