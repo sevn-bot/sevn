@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from sevn.gateway.menu.menu import _CONFIG_SECTIONS, build_config_menu_keyboard
 from tests.gateway.telegram_menu_redesign_helpers import (
     DEFAULT_DOCS_WORKSPACE,
@@ -12,13 +10,11 @@ from tests.gateway.telegram_menu_redesign_helpers import (
 )
 
 
-@pytest.mark.xfail(reason="green after W5: advanced section id removed", strict=False)
 def test_advanced_section_id_absent() -> None:
     """W1.8 — Advanced tile is dissolved; section id must not remain."""
     assert "advanced" not in _CONFIG_SECTIONS
 
 
-@pytest.mark.xfail(reason="green after W5: auto_resume_b lives under Deployment", strict=False)
 def test_auto_resume_b_reachable_from_deployment() -> None:
     """W1.8 — gateway.restart.auto_resume_b moved next to Deployment restart rows."""
     kb = build_config_menu_keyboard(DEFAULT_DOCS_WORKSPACE, section="deployment")  # type: ignore[arg-type]
@@ -31,15 +27,11 @@ def test_auto_resume_b_reachable_from_deployment() -> None:
     assert any("gateway.restart.auto_resume_b" in cb for cb in callbacks)
 
 
-@pytest.mark.xfail(
-    reason="green after W5: exactly one trace-redaction control (C20.6)", strict=False
-)
 def test_exactly_one_trace_redaction_control() -> None:
     """W1.8 — duplicate Advanced trace-redaction row (C18.2) is removed."""
     assert trace_redaction_callback_count() == 1
 
 
-@pytest.mark.xfail(reason="green after W5: exactly one queue-mode control on Chat", strict=False)
 def test_exactly_one_queue_mode_control_on_chat() -> None:
     """W1.8 — queue mode lives on Chat; Sub-agents duplicate removed."""
     assert queue_mode_callback_count() == 1

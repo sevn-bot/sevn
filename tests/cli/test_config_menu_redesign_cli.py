@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
@@ -55,14 +56,28 @@ def test_sevn_config_sections_json_lists_eight() -> None:
 
 
 @pytest.mark.parametrize("slug", REDESIGN_ROOT_SLUGS)
-@pytest.mark.xfail(
-    reason="green after W6: sevn config <slug> accepts redesigned slugs", strict=False
-)
-def test_sevn_config_section_slug_accepted(slug: str) -> None:
+def test_sevn_config_section_slug_accepted(
+    slug: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
     """W1.10 — each redesigned slug is a valid ``sevn config`` target."""
+    home = tmp_path / "sevnhome"
+    ws = home / "workspace"
+    ws.mkdir(parents=True)
+    doc = {
+        "schema_version": 1,
+        "workspace_root": ".",
+        "gateway": {"token": "${SECRET:keychain:sevn.gateway.token}"},
+    }
+    (ws / "sevn.json").write_text(json.dumps(doc), encoding="utf-8")
+    monkeypatch.setenv("SEVN_HOME", str(home))
     runner = CliRunner()
     result = runner.invoke(app, ["config", slug, "--json"], env={"NO_COLOR": "1"})
     assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["data"]["slug"] == slug
 
 
 def test_config_paths_doctest_slug_count() -> None:

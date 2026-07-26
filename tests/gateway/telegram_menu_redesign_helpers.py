@@ -154,7 +154,40 @@ def callbacks_matching_pattern(pattern: str) -> list[str]:
 
 def trace_redaction_callback_count() -> int:
     """Count live trace-redaction toggle rows (W5 de-dup target)."""
-    return len(callbacks_matching_pattern("tracing.redaction.enabled"))
+    return len(callbacks_matching_pattern("toggle_redaction"))
+
+
+# Legacy section ids → canonical nested section for keyboard/caption tests (W6).
+LEGACY_TO_CANONICAL_SECTION: dict[str, str] = {
+    "session": "chat_qa",
+    "voice": "chat_voice",
+    "channels": "chat_channels",
+    "notifications": "chat",
+    "shortcuts": "chat_shortcuts",
+    "models": "agent",
+    "agents": "agent_identity",
+    "rlm": "agent_lab",
+    "codemode": "agent_lab",
+    "self_improve": "agent_lab",
+    "subagents": "agent_subagents",
+    "subagents_running": "agent_subagents_running",
+    "tools": "skills_tools",
+    "integrations": "skills_integrations",
+    "code": "memory_code",
+    "second_brain": "memory_sb",
+    "secrets": "access_secrets",
+    "security": "access_guard",
+    "logs": "health",
+    "dashboard": "health",
+    "my_sevn_bot": "deployment",
+    "sevn_bot": "help",
+}
+
+
+def canonical_section(legacy_or_current: str) -> str:
+    """Map a retired section id to its canonical nested section when applicable."""
+    key = legacy_or_current.strip().lower()
+    return LEGACY_TO_CANONICAL_SECTION.get(key, key)
 
 
 def queue_mode_callback_count() -> int:

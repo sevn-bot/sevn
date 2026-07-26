@@ -30,7 +30,7 @@ def test_tunnel_callbacks_registered_owner_only_and_ready() -> None:
     assert on.spec_id == "C22.1"
     assert off.spec_id == "C22.2"
     for spec in (on, off):
-        assert spec.section == "my_sevn_bot"
+        assert spec.section == "deployment"
         assert spec.owner_only is True
         assert spec.implemented is True
     # The two-step confirm/cancel sub-callbacks resolve to the same C22.1 spec.

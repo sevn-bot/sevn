@@ -100,7 +100,7 @@ def test_my_sevn_bot_keyboard_includes_version_id_and_deployment_id() -> None:
 
 def test_my_sevn_bot_section_keyboard_exposes_version_id() -> None:
     """Section keyboard (gated) includes the version_id callback."""
-    kb = build_config_menu_keyboard(_workspace(), section="my_sevn_bot", is_owner=True)
+    kb = build_config_menu_keyboard(_workspace(), section="deployment", is_owner=True)
     cbs = [btn.get("callback_data", "") for row in kb["inline_keyboard"] for btn in row]
     assert "cfg:logs:deployment_id" in cbs
     assert _VERSION_ID_CALLBACKS.intersection(cbs), cbs

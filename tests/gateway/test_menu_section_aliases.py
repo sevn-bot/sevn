@@ -11,9 +11,6 @@ from tests.gateway.telegram_menu_redesign_helpers import RETIRED_SECTION_ALIASES
     ("retired_id", "expected_target"),
     sorted(RETIRED_SECTION_ALIASES.items()),
 )
-@pytest.mark.xfail(
-    reason="green after W6: retired section ids resolve via alias table", strict=False
-)
 def test_retired_section_alias_resolves(retired_id: str, expected_target: str) -> None:
     """W1.9 / D14 — stale ``cfg:section:{retired}`` callbacks never 500."""
     from sevn.gateway.menu.menu import resolve_config_section_alias
@@ -26,9 +23,6 @@ def test_retired_section_alias_resolves(retired_id: str, expected_target: str) -
 
 
 @pytest.mark.parametrize("unknown_id", ["not-a-section", "legacy_tile", ""])
-@pytest.mark.xfail(
-    reason="green after W6: unknown section ids rejected gracefully (D15)", strict=False
-)
 def test_unknown_section_id_never_raises(unknown_id: str) -> None:
     """W1.9 — unknown ids answer an explicit toast; dispatch must not raise."""
     from sevn.gateway.menu.menu import resolve_config_section_alias

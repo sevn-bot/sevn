@@ -29,7 +29,6 @@ def test_subagents_keyboard_rows_include_toggle_limits_and_running() -> None:
     assert "cfg:section:subagents_running" in callbacks
     assert "form:subagents_max_override" in callbacks
     assert any(cb.startswith("form:subagents_limits:") for cb in callbacks)
-    assert any(cb.startswith("cfg:toggle:gateway.queue_mode:") for cb in callbacks)
 
 
 def test_subagents_running_keyboard_owner_kill_buttons() -> None:
@@ -54,7 +53,7 @@ def test_subagents_caption_shows_live_counts_and_limits() -> None:
     )
     text = config_menu_message_text(
         ws,
-        section="subagents",
+        section="agent_subagents",
         subagent_level1_count=3,
         subagent_level2_count=2,
     )
@@ -77,7 +76,9 @@ def test_kill_action_callback_parsing() -> None:
 def test_infer_config_section_subagents_toggle() -> None:
     from sevn.gateway.commands.menu_action_router import infer_config_section_from_callback
 
-    assert infer_config_section_from_callback("cfg:toggle:subagents.enabled:true") == "subagents"
+    assert (
+        infer_config_section_from_callback("cfg:toggle:subagents.enabled:true") == "agent_subagents"
+    )
 
 
 @pytest.mark.asyncio
@@ -139,7 +140,7 @@ def test_build_config_menu_keyboard_subagents_section() -> None:
     ws = WorkspaceConfig.minimal()
     kb = build_config_menu_keyboard(
         ws,
-        section="subagents",
+        section="agent_subagents",
         subagent_level1_count=1,
         subagent_level2_count=0,
     )

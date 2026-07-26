@@ -96,16 +96,15 @@ def test_build_logs_keyboard_rows_includes_all_actions() -> None:
     assert "form:logs:span_id" in callbacks
     assert "cfg:logs:toggle_logfire" in callbacks
     assert "form:logs:logfire_token" in callbacks
-    assert "cfg:logs:toggle_redaction" in callbacks
+    assert "cfg:logs:toggle_redaction" not in callbacks
     assert "cfg:logs:deployment_id" not in callbacks
 
 
 def test_logs_section_caption_text() -> None:
-    """`section == "logs"` produces a Logs caption with redaction state."""
-    text = config_menu_message_text(_workspace(), section="logs")
-    assert text.startswith("Logs")
-    assert "Logfire export:" in text
-    assert "Trace redaction:" in text
+    """``health`` root tile carries log/trace summary fields."""
+    text = config_menu_message_text(_workspace(), section="health")
+    assert text.startswith("Health")
+    assert "tracing.redaction.enabled" in text
 
 
 # --- Readiness gating ---------------------------------------------------------
@@ -134,7 +133,7 @@ def test_logs_action_callbacks_report_ready_readiness() -> None:
 def test_logs_section_keyboard_exposes_action_callbacks() -> None:
     """The gated section keyboard keeps concrete ``cfg:logs:*`` callbacks pressable."""
     ws = _workspace()
-    kb = build_config_menu_keyboard(ws, section="logs")
+    kb = build_config_menu_keyboard(ws, section="health")
     from sevn.gateway.menu.menu_readiness import gate_config_keyboard_rows
 
     rows = kb["inline_keyboard"]
@@ -194,8 +193,9 @@ def test_parse_form_callback_logs_targets() -> None:
 
 
 def test_infer_config_section_from_callback_logs() -> None:
-    """`cfg:logs:*` infers the `logs` config section for menu refresh."""
-    assert infer_config_section_from_callback("cfg:logs:toggle_redaction") == "logs"
+    """``cfg:logs:toggle_redaction`` infers ``health_tracing`` for menu refresh."""
+    assert infer_config_section_from_callback("cfg:logs:toggle_redaction") == "health_tracing"
+    assert infer_config_section_from_callback("cfg:logs:tail:gateway:0") == "health"
 
 
 # --- Owner / non-owner runtime ------------------------------------------------
@@ -269,11 +269,11 @@ def _logs_callback(
 async def test_logs_section_navigation_owner(tmp_path: Path) -> None:
     """Opening the Logs section edits the host message with pressable action rows."""
     router, cap, _root = _build_owner_router(tmp_path)
-    await router.route_incoming(_logs_callback("cfg:section:logs"))
+    await router.route_incoming(_logs_callback("cfg:section:health"))
     assert len(cap.edited) == 1
     edit = cap.edited[0]
     assert edit["message_id"] == 99
-    assert "Logs" in edit["text"]
+    assert "Health" in edit["text"]
     body_callbacks = [
         btn.get("callback_data", "")
         for row in edit["reply_markup"]["inline_keyboard"]
