@@ -96,13 +96,49 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C3.3",
         "C3.4",
         "C3.5",
-        # Channels (routing footer + reply keyboard)
+        # Channels (routing footer + reply keyboard + DM policy)
         "C5.1",
         "C5.2",
-        # Security (owner LLM-guard kill-switches)
+        "C5.3",
+        # Models (unified toggle + swap last model)
+        "C4.1",
+        "C4.5",
+        # Secrets (+ scoped wizard aliases e.g. TwexAPI)
+        "C6.1",
+        "C6.1b",
+        # Per-skill enable toggle (``cfg:toggle:skills.*.enabled``)
+        "C7.2",
+        # RLM λ toggle
+        "C9.1",
+        # Code understanding toggles
+        "C10.1",
+        "C10.2",
+        # Security (heuristic-only + owner LLM-guard kill-switches)
+        "C11.1",
         "C11.3",
         "C11.4",
         "C11.5",
+        # Self-improve toggle
+        "C12.1",
+        # Second Brain (enable + vault path/browse forms + layout cycle)
+        "C13.1",
+        "C13.4",
+        "C13.5",
+        "C13.6",
+        # Integrations refresh
+        "C14.3",
+        # Dashboard status pin
+        "C15.1",
+        "C15.3",
+        "C15.4",
+        # Shortcuts add wizard
+        "C16.2",
+        # Telegram notify policy cycle
+        "C17.1",
+        # Advanced auto-resume tier B (duplicate trace-redaction C18.2 stays gated until W5)
+        "C18.1",
+        # Agent display name form
+        "C19.2",
         # Logs section (Wave TE-9)
         "C20.1",
         "C20.2",
