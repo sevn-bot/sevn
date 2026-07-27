@@ -120,6 +120,13 @@ W7D_ACTION_CALLBACKS: tuple[str, ...] = (
     "act:tracing:config",
 )
 
+W7E_ACTION_CALLBACKS: tuple[str, ...] = (
+    "act:services:gateway:status",
+    "act:tunnel:status",
+    "act:config:show",
+    "act:guides:list",
+)
+
 
 def _specs_matching(pattern: str) -> list[object]:
     """Return registry rows whose callback regex equals the family pattern."""
@@ -135,11 +142,7 @@ def _specs_matching(pattern: str) -> list[object]:
 def test_new_leaf_family_registered(wave: str, family: str, pattern: str) -> None:
     """W1.11 — each new leaf family has a registry row once wired."""
     matches = _specs_matching(pattern)
-    if wave in ("W7a", "W7b", "W7c", "W7d"):
-        assert matches, f"{family} missing registry row matching {pattern!r}"
-        return
-    if not matches:
-        pytest.xfail(f"green after {wave}: {family} registry row")
+    assert matches, f"{family} missing registry row matching {pattern!r}"
 
 
 @pytest.mark.parametrize("callback", W7A_ACTION_CALLBACKS)
@@ -206,19 +209,17 @@ async def test_w7d_leaf_handler_returns_non_empty_answer(tmp_path: Path, callbac
         assert any(text for _cq, text in cap.answered if text)
 
 
-@pytest.mark.parametrize(
-    ("wave", "callback"),
-    [
-        ("W7e", "act:config:show"),
-    ],
-)
+@pytest.mark.parametrize("callback", W7E_ACTION_CALLBACKS)
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W7e: callback invokes non-empty answer", strict=False)
-async def test_new_leaf_handler_returns_non_empty_answer(wave: str, callback: str) -> None:
-    """W1.11 — wired rows must post a non-empty answer (never silent no-op)."""
-    from sevn.gateway.commands.menu_action_router import MenuActionRouter
-    from sevn.gateway.menu.menu_registry import match_menu_button_spec
+async def test_w7e_leaf_handler_returns_non_empty_answer(tmp_path: Path, callback: str) -> None:
+    """W1.11 — W7e wired act:* rows must post a non-empty answer (never silent no-op)."""
+    from tests.gateway.test_menu import _build_config_router, _config_callback
 
-    assert match_menu_button_spec(callback) is not None
-    assert hasattr(MenuActionRouter, "handle")
-    _ = wave
+    router, cap, _ = _build_config_router(tmp_path)
+    msg = _config_callback(callback, callback_query_id=f"cq-{callback.replace(':', '-')}")
+    await router.route_incoming(msg)
+    assert cap.answered or cap.sent or cap.edited, f"{callback} silent no-op"
+    if cap.sent:
+        assert str(cap.sent[0][0]).strip()
+    elif cap.answered:
+        assert any(text for _cq, text in cap.answered if text)
