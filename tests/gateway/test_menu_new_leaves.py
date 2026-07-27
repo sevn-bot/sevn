@@ -22,10 +22,17 @@ NEW_LEAF_FAMILIES: tuple[tuple[str, str, str], ...] = (
     ("W7a", "chat_sessions_history", r"^form:sessions:history$"),
     ("W7a", "chat_sessions_send", r"^form:sessions:send$"),
     ("W7a", "chat_notify_policy", r"^cfg:cycle:channels\.telegram\.telegram_notify_policy:.+$"),
-    # W7b — Agent
-    ("W7b", "agent_sampling_show", r"^act:agent:sampling:show$"),
+    # W7b - Agent (C27.1-8 + sub-agent kill act:*)
     ("W7b", "agent_active_runs", r"^act:agent:status$"),
+    ("W7b", "agent_sampling_show", r"^act:agent:sampling:show$"),
+    ("W7b", "agent_sampling_set_tokens", r"^form:models:set_max_output_tokens$"),
+    ("W7b", "agent_identity_config", r"^act:agent:config$"),
     ("W7b", "agent_lab_improve_doctor", r"^act:self_improve:doctor$"),
+    ("W7b", "agent_lab_record_lesson", r"^form:improve:learn$"),
+    ("W7b", "agent_lab_replay_sampler", r"^act:self_improve:replay_sampler$"),
+    ("W7b", "agent_subagents_kill_form", r"^form:subagents:kill$"),
+    ("W7b", "agent_subagents_kill_one", r"^act:subagents:kill:[a-z0-9]+$"),
+    ("W7b", "agent_subagents_kill_all", r"^act:subagents:kill_all$"),
     # W7c — Skills & Tools + Memory
     ("W7c", "skills_list", r"^act:skills:list$"),
     ("W7c", "tools_health", r"^act:tools:health$"),
@@ -53,6 +60,14 @@ W7A_ACTION_CALLBACKS: tuple[str, ...] = (
     "act:sessions:list",
 )
 
+W7B_ACTION_CALLBACKS: tuple[str, ...] = (
+    "act:agent:status",
+    "act:agent:sampling:show",
+    "act:agent:config",
+    "act:self_improve:doctor",
+    "act:self_improve:replay_sampler",
+)
+
 
 def _specs_matching(pattern: str) -> list[object]:
     """Return registry rows whose callback regex equals the family pattern."""
@@ -68,7 +83,7 @@ def _specs_matching(pattern: str) -> list[object]:
 def test_new_leaf_family_registered(wave: str, family: str, pattern: str) -> None:
     """W1.11 — each new leaf family has a registry row once wired."""
     matches = _specs_matching(pattern)
-    if wave == "W7a":
+    if wave in ("W7a", "W7b"):
         assert matches, f"{family} missing registry row matching {pattern!r}"
         return
     if not matches:
@@ -91,10 +106,25 @@ async def test_w7a_leaf_handler_returns_non_empty_answer(tmp_path: Path, callbac
         assert any(text for _cq, text in cap.answered if text)
 
 
+@pytest.mark.parametrize("callback", W7B_ACTION_CALLBACKS)
+@pytest.mark.asyncio
+async def test_w7b_leaf_handler_returns_non_empty_answer(tmp_path: Path, callback: str) -> None:
+    """W1.11 — W7b wired act:* rows must post a non-empty answer (never silent no-op)."""
+    from tests.gateway.test_menu import _build_config_router, _config_callback
+
+    router, cap, _ = _build_config_router(tmp_path)
+    msg = _config_callback(callback, callback_query_id=f"cq-{callback.replace(':', '-')}")
+    await router.route_incoming(msg)
+    assert cap.answered or cap.sent or cap.edited, f"{callback} silent no-op"
+    if cap.sent:
+        assert str(cap.sent[0][0]).strip()
+    elif cap.answered:
+        assert any(text for _cq, text in cap.answered if text)
+
+
 @pytest.mark.parametrize(
     ("wave", "callback"),
     [
-        ("W7b", "act:agent:status"),
         ("W7c", "act:tools:health"),
         ("W7d", "act:doctor:run"),
         ("W7e", "act:config:show"),
