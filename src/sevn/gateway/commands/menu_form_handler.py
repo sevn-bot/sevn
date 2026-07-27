@@ -70,6 +70,9 @@ FORM_TARGETS: frozenset[str] = frozenset(
         "discogs:oauth_start",
         "sessions:history",
         "sessions:send",
+        "models:set_max_output_tokens",
+        "improve:learn",
+        "subagents:kill",
     },
 )
 _SECRET_ALIAS_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
@@ -111,6 +114,12 @@ def parse_form_callback(data: str) -> str | None:
         return "sessions:history"
     if raw == "form:sessions:send":
         return "sessions:send"
+    if raw == "form:models:set_max_output_tokens":
+        return "models:set_max_output_tokens"
+    if raw == "form:improve:learn":
+        return "improve:learn"
+    if raw == "form:subagents:kill":
+        return "subagents:kill"
     if raw.startswith("form:secret_wizard:"):
         alias = raw.removeprefix("form:secret_wizard:").strip()
         if alias and _SECRET_ALIAS_RE.match(alias):
@@ -254,6 +263,9 @@ class MenuFormHandler:
             "logs_span_id",
             "logs_logfire_token",
             "discogs:oauth_start",
+            "subagents:kill",
+            "models:set_max_output_tokens",
+            "improve:learn",
         } and not self._router._resolve_owner_flag(msg):
             await self._answer_callback(msg, text="Owner only.")
             return
@@ -294,6 +306,15 @@ class MenuFormHandler:
         elif target in {"sessions:history", "sessions:send"}:
             section = "chat_sessions"
             step = "session_id"
+        elif target == "models:set_max_output_tokens":
+            section = "agent_sampling"
+            step = "agent"
+        elif target == "improve:learn":
+            section = "agent_lab"
+            step = "claim"
+        elif target == "subagents:kill":
+            section = "agent_subagents_running"
+            step = "run_id"
         elif target == "discogs:oauth_start":
             section = "skills:discogs:setup"
             step = "consumer_key"
@@ -360,6 +381,14 @@ class MenuFormHandler:
             prompt = "Send the gateway session id for history:"
         elif target == "sessions:send":
             prompt = "Send the target gateway session id:"
+        elif target == "models:set_max_output_tokens":
+            from sevn.config.llm_params import AGENT_NAMES
+
+            prompt = f"Send agent name ({', '.join(AGENT_NAMES)}):"
+        elif target == "improve:learn":
+            prompt = "Send the lesson claim (one short sentence):"
+        elif target == "subagents:kill":
+            prompt = "Send the sub-agent run id to kill (e.g. a1f3):"
         elif target == "discogs:oauth_start":
             prompt = "Send your Discogs OAuth consumer key:"
         elif target == "second_brain_vault_path":
@@ -417,6 +446,21 @@ class MenuFormHandler:
             return
         if target == "sessions:send":
             await self._advance_sessions_send(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "models:set_max_output_tokens":
+            await self._advance_models_set_max_output_tokens(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "improve:learn":
+            await self._advance_improve_learn(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "subagents:kill":
+            await self._advance_subagents_kill_form(
                 msg, token=token, step=step, text=text, payload=payload
             )
             return
@@ -1024,6 +1068,184 @@ class MenuFormHandler:
                 return
             self._consume_token(token)
             await self._send_chat(msg, f"✅ Message queued for {target}: {result!r}")
+
+    async def _advance_models_set_max_output_tokens(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Handle the two-step max-output-tokens wizard (W7b).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_models_set_max_output_tokens)
+            True
+        """
+        from sevn.config.llm_params import AGENT_NAMES, set_agent_model_max_output_tokens
+
+        if step == "agent":
+            agent = text.strip()
+            if agent not in AGENT_NAMES:
+                await self._send_chat(
+                    msg,
+                    f"Unknown agent {agent!r}. Expected one of: {', '.join(AGENT_NAMES)}",
+                )
+                return
+            payload["step"] = "tokens"
+            payload["agent"] = agent
+            self._update_payload(token, payload)
+            await self._send_chat(msg, "Send max_output_tokens (positive integer):")
+            return
+        if step == "tokens":
+            agent = str(payload.get("agent") or "").strip()
+            if not agent:
+                self._consume_token(token)
+                await self._send_chat(msg, "Wizard expired — start again from /config → Sampling.")
+                return
+            try:
+                max_tokens = int(text.strip())
+            except ValueError:
+                await self._send_chat(msg, "Send a positive integer for max_output_tokens.")
+                return
+            if max_tokens < 1:
+                await self._send_chat(msg, "max_output_tokens must be at least 1.")
+                return
+            try:
+                path = set_agent_model_max_output_tokens(
+                    self._content_root,
+                    agent=agent,
+                    max_output_tokens=max_tokens,
+                    model_id=None,
+                )
+            except ValueError as exc:
+                await self._send_chat(msg, str(exc))
+                return
+            self._consume_token(token)
+            await self._refresh_section(
+                msg,
+                section="agent_sampling",
+                toast="✅ Updated max_output_tokens (restart gateway).",
+            )
+            await self._send_chat(
+                msg,
+                f"Updated {agent} max_output_tokens={max_tokens} in {path}. Restart the gateway.",
+            )
+
+    async def _advance_improve_learn(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Handle the two-step record-lesson wizard (W7b).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_improve_learn)
+            True
+        """
+        from datetime import UTC, datetime
+
+        from sevn.self_improve.lessons.io import append_jsonl_locked
+        from sevn.self_improve.paths import improve_root
+        from sevn.workspace.layout import WorkspaceLayout
+
+        if step == "claim":
+            claim = text.strip()
+            if not claim:
+                await self._send_chat(msg, "Claim cannot be empty.")
+                return
+            payload["step"] = "rationale"
+            payload["claim"] = claim
+            self._update_payload(token, payload)
+            await self._send_chat(msg, "Send the rationale for this lesson:")
+            return
+        if step == "rationale":
+            claim = str(payload.get("claim") or "").strip()
+            if not claim:
+                self._consume_token(token)
+                await self._send_chat(msg, "Wizard expired — start again from /config → Lab.")
+                return
+            rationale = text.strip()
+            if not rationale:
+                await self._send_chat(msg, "Rationale cannot be empty.")
+                return
+            root = improve_root(WorkspaceLayout(self._sevn_json, self._content_root))
+            append_jsonl_locked(
+                root / "candidate_lessons.jsonl",
+                {
+                    "claim": claim,
+                    "rationale": rationale,
+                    "created_at": datetime.now(tz=UTC).isoformat(),
+                    "schema_version": 1,
+                },
+            )
+            self._consume_token(token)
+            await self._refresh_section(msg, section="agent_lab", toast="✅ Lesson recorded.")
+            await self._send_chat(msg, "appended candidate_lessons.jsonl")
+
+    async def _advance_subagents_kill_form(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Handle kill-by-id form on Sub-agents > Running (W7b).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_subagents_kill_form)
+            True
+        """
+        _ = step, payload
+        run_id = text.strip()
+        if not run_id:
+            await self._send_chat(msg, "Run id cannot be empty.")
+            return
+        mar = self._router._menu_action_router
+        if mar is None:
+            self._consume_token(token)
+            await self._send_chat(msg, "Kill unavailable — supervisor not wired.")
+            return
+        result = await mar._handle_subagents_kill(
+            msg,
+            f"act:subagents:kill:{run_id}",
+            f"subagents:kill:{run_id}",
+        )
+        self._consume_token(token)
+        if result:
+            await self._send_chat(msg, result)
 
     async def _advance_agent_display_name(
         self,

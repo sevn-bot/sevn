@@ -2593,6 +2593,34 @@ def _code_review_graph_enabled(workspace: WorkspaceConfig) -> bool:
     return False
 
 
+def _build_agent_sampling_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Agent > Sampling — LLM params show and max-output-tokens form (W7b).
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_agent_sampling_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"]
+        'act:agent:sampling:show'
+    """
+    _ = workspace
+    return [
+        [{"text": "📋 Show params", "callback_data": "act:agent:sampling:show"}],
+        [
+            {
+                "text": "🔢 Set max output tokens",
+                "callback_data": "form:models:set_max_output_tokens",
+            }
+        ],
+        [{"text": "⬅ Agent", "callback_data": "cfg:section:agent"}],
+    ]
+
+
 def _build_agents_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
     """Build Agents section display-name form and dashboard links (no Advanced fallback).
 
@@ -3351,15 +3379,20 @@ def _build_subagents_running_keyboard_rows(
         ...     is_owner=True,
         ... )
         >>> rows[0][0]["callback_data"]
+        'form:subagents:kill'
+        >>> rows[1][0]["callback_data"]
         'act:subagents:kill:a1'
     """
+    rows: list[list[dict[str, Any]]] = []
+    if is_owner:
+        rows.append([{"text": "🛑 Kill one", "callback_data": "form:subagents:kill"}])
     kill_rows = build_subagent_kill_keyboard_rows(
         running_rows,
         is_owner=is_owner,
         label_for_row=subagent_kill_button_label_config,
-        kill_all_label="Kill all L1",
+        kill_all_label="🛑 Kill all",
     )
-    rows: list[list[dict[str, Any]]] = list(kill_rows)
+    rows.extend(kill_rows)
     rows.append([{"text": "⬅ Sub-agents", "callback_data": "cfg:section:agent_subagents"}])
     return rows
 
@@ -3786,14 +3819,21 @@ def _build_agent_identity_keyboard_rows(workspace: WorkspaceConfig) -> list[list
         >>> _build_agent_identity_keyboard_rows(WorkspaceConfig.minimal())[0][0]["callback_data"]
         'form:agent:display_name'
     """
-    return _build_agents_keyboard_rows(workspace)
+    rows = _build_agents_keyboard_rows(workspace)
+    rows.append([{"text": "📋 Resolved slots", "callback_data": "act:agent:config"}])
+    return rows
 
 
-def _build_agent_lab_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
-    """Agent > Lab — RLM, CodeMode, and Self-Improve nav (Advanced re-parent).
+def _build_agent_lab_keyboard_rows(
+    workspace: WorkspaceConfig,
+    *,
+    is_owner: bool = False,
+) -> list[list[dict[str, Any]]]:
+    """Agent > Lab — inline RLM/CodeMode/Self-Improve toggles and improve actions (W7b).
 
     Args:
         workspace (WorkspaceConfig): Parsed workspace settings.
+        is_owner (bool): When ``True``, include owner-gated replay sampler row.
 
     Returns:
         list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
@@ -3801,24 +3841,47 @@ def _build_agent_lab_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
         >>> rows = _build_agent_lab_keyboard_rows(WorkspaceConfig.minimal())
-        >>> any(r["callback_data"] == "cfg:section:rlm" for row in rows for r in row)
+        >>> any(
+        ...     btn["callback_data"] == "act:self_improve:doctor" for row in rows for btn in row
+        ... )
         True
     """
     rows: list[list[dict[str, Any]]] = []
-    rows.extend(_build_rlm_keyboard_rows(workspace))
+    if _schema_has_config_path("executors.tier_cd.lambda_rlm.enabled"):
+        rows.append(
+            [
+                _config_bool_toggle_button(
+                    "λ-RLM",
+                    "executors.tier_cd.lambda_rlm.enabled",
+                    enabled=_lambda_rlm_enabled(workspace),
+                ),
+            ],
+        )
     rows.extend(_build_codemode_keyboard_rows(workspace))
-    rows.extend(_build_self_improve_keyboard_rows(workspace))
-    _append_nav_section_rows(
-        rows,
-        (
-            ("🧭 RLM (legacy)", "rlm"),
-            ("🧪 CodeMode (legacy)", "codemode"),
-            ("📈 Self-Improve (legacy)", "self_improve"),
-        ),
+    rows.append(
+        [
+            _config_bool_toggle_button(
+                "Self-improve",
+                "self_improve.enabled",
+                enabled=_self_improve_enabled(workspace),
+            ),
+        ],
     )
-    url = web_ui_url_from_workspace(workspace)
-    if url:
-        rows.append([{"text": "🌐 Open Mission Control", "url": url}])
+    rows.append([{"text": "🩺 Improve doctor", "callback_data": "act:self_improve:doctor"}])
+    rows.append([{"text": "📝 Record lesson", "callback_data": "form:improve:learn"}])
+    if is_owner:
+        rows.append(
+            [{"text": "🎞 Replay sampler", "callback_data": "act:self_improve:replay_sampler"}]
+        )
+    rlm_url = _mission_control_url(workspace, fragment="rlm")
+    traces_url = _mission_control_url(workspace, fragment="traces")
+    url_pair: list[dict[str, Any]] = []
+    if rlm_url:
+        url_pair.append({"text": "🌐 Open RLM tab", "url": rlm_url})
+    if traces_url:
+        url_pair.append({"text": "📈 View jobs / Traces", "url": traces_url})
+    if url_pair:
+        rows.append(url_pair)
     return rows
 
 
@@ -3842,10 +3905,12 @@ def _build_agent_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str
         rows,
         (
             ("✏️ Identity", "agent_identity"),
+            ("🎚 Sampling", "agent_sampling"),
             ("🤖 Sub-agents", "agent_subagents"),
             ("🔬 Lab", "agent_lab"),
         ),
     )
+    rows.append([{"text": "📋 Active runs", "callback_data": "act:agent:status"}])
     _append_nav_section_rows(
         rows,
         (
@@ -4252,8 +4317,10 @@ def build_config_menu_keyboard(
             rows_sec = _build_agent_keyboard_rows(workspace)
     elif section == "agent_identity":
         rows_sec = _build_agent_identity_keyboard_rows(workspace)
+    elif section == "agent_sampling":
+        rows_sec = _build_agent_sampling_keyboard_rows(workspace)
     elif section == "agent_lab":
-        rows_sec = _build_agent_lab_keyboard_rows(workspace)
+        rows_sec = _build_agent_lab_keyboard_rows(workspace, is_owner=is_owner)
     elif section == "agent_subagents":
         rows_sec = _build_subagents_keyboard_rows(
             workspace,
@@ -4606,6 +4673,24 @@ def config_menu_message_text(
         else:
             lines.append("Configure persona files in workspace (IDENTITY.md, SOUL.md, USER.md).")
         lines.append("Tap Edit display name to change the bot name in sevn.json.")
+        return "\n".join(lines)
+    if section == "agent_sampling":
+        from sevn.config.llm_params import load_or_create_llm_params_doc
+
+        doc: dict[str, Any] = (
+            load_or_create_llm_params_doc(content_root) if content_root is not None else {}
+        )
+        triager_raw = doc.get("triager")
+        triager_params = triager_raw if isinstance(triager_raw, dict) else {}
+        temp = triager_params.get("temperature", "—")
+        max_out = triager_params.get("max_output_tokens", "—")
+        lines = [
+            "Sampling",
+            "",
+            "LLM_params_config.json overrides (gateway restart required after edits).",
+            f"temperature: {temp}",
+            f"max_output_tokens: {max_out}",
+        ]
         return "\n".join(lines)
     if section == "skills":
         tool_surface = _config_menu_tool_surface(workspace, content_root)

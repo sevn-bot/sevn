@@ -913,6 +913,82 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         notes="Form → send_to_session (W7a)",
     )
 
+    # --- C27. Agent leaves (W7b) ---
+    add(
+        "C27.1",
+        _exact("act:agent:status"),
+        "C",
+        "agent",
+        "Active runs",
+        implemented=True,
+        notes="Gateway run snapshots (W7b)",
+    )
+    add(
+        "C27.2",
+        _exact("act:agent:sampling:show"),
+        "C",
+        "agent_sampling",
+        "Show params",
+        implemented=True,
+        notes="LLM_params_config.json dump (W7b)",
+    )
+    add(
+        "C27.3",
+        _exact("form:models:set_max_output_tokens"),
+        "C",
+        "agent_sampling",
+        "Set max output tokens",
+        implemented=True,
+        notes="Form → set_agent_model_max_output_tokens (W7b)",
+    )
+    add(
+        "C27.4",
+        _exact("act:agent:config"),
+        "C",
+        "agent_identity",
+        "Resolved slots",
+        implemented=True,
+        notes="Resolved model slots (W7b)",
+    )
+    add(
+        "C27.5",
+        _exact("act:self_improve:doctor"),
+        "C",
+        "agent_lab",
+        "Improve doctor",
+        implemented=True,
+        notes="Self-improve config posture (W7b)",
+    )
+    add(
+        "C27.6",
+        _exact("form:improve:learn"),
+        "C",
+        "agent_lab",
+        "Record lesson",
+        implemented=True,
+        notes="Append candidate_lessons.jsonl (W7b)",
+    )
+    add(
+        "C27.7",
+        _exact("act:self_improve:replay_sampler"),
+        "C",
+        "agent_lab",
+        "Replay sampler",
+        implemented=True,
+        owner_only=True,
+        notes="Developer replay-sampler aid (W7b)",
+    )
+    add(
+        "C27.8",
+        _exact("form:subagents:kill"),
+        "C",
+        "agent_subagents_running",
+        "Kill one (form)",
+        implemented=True,
+        owner_only=True,
+        notes="Form → subagents kill by id (W7b)",
+    )
+
     # --- C14. Integrations ---
     add(
         "C14.1",

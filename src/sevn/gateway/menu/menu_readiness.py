@@ -177,6 +177,15 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C26.1",
         "C26.2",
         "C26.3",
+        # Agent leaves (W7b)
+        "C27.1",
+        "C27.2",
+        "C27.3",
+        "C27.4",
+        "C27.5",
+        "C27.6",
+        "C27.7",
+        "C27.8",
         # Social Media Manager (W3)
         "C7.4",
         "C7.5",

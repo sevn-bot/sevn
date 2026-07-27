@@ -122,6 +122,8 @@ _CALLBACK_SECTION_PREFIXES: tuple[tuple[str, ConfigSection], ...] = (
     ("shortcuts:", "chat_shortcuts"),
     ("sessions:", "chat_sessions"),
     ("channels:", "chat_channels"),
+    ("agent:", "agent"),
+    ("self_improve:", "agent_lab"),
     ("skills:", "skills"),
     ("integrations:", "skills_integrations"),
     ("logs:", "health"),
@@ -537,6 +539,16 @@ class MenuActionRouter:
                 return await self._handle_channels_config(msg, raw)
             if target == "sessions:list":
                 return await self._handle_sessions_list(msg, raw, session_id=session_id)
+            if target == "agent:status":
+                return await self._handle_agent_status(msg, raw)
+            if target == "agent:config":
+                return await self._handle_agent_config(msg, raw)
+            if target == "agent:sampling:show":
+                return await self._handle_agent_sampling_show(msg, raw)
+            if target == "self_improve:doctor":
+                return await self._handle_self_improve_doctor(msg, raw)
+            if target == "self_improve:replay_sampler":
+                return await self._handle_self_improve_replay_sampler(msg, raw)
             if target in {"skills:refresh", "integrations:refresh"}:
                 answered = await self._refresh_config_menu_after_action(
                     msg,
@@ -1328,6 +1340,227 @@ class MenuActionRouter:
             body = "\n".join(lines)
         await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
         await self._answer_chat_action(msg, "Sessions sent")
+        return None
+
+    async def _handle_agent_status(self, msg: IncomingMessage, callback_data: str) -> str | None:
+        """Post active gateway run snapshots (``sevn agent status`` parity).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_agent_status)
+            True
+        """
+        _ = callback_data
+        from sevn.cli.commands.agent_cmd import _format_run_snapshots
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.ui.dashboard.query import list_active_run_snapshots
+
+        body_dict = list_active_run_snapshots(self._conn, limit=50)
+        body = _format_run_snapshots(body_dict)
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Active runs sent")
+        return None
+
+    async def _handle_agent_config(self, msg: IncomingMessage, callback_data: str) -> str | None:
+        """Post resolved model slots (``sevn agent config`` / ``sevn models show`` parity).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_agent_config)
+            True
+        """
+        _ = callback_data
+        from sevn.cli.commands.agent_cmd import _format_agent_config
+        from sevn.config.model_resolution import (
+            resolve_main_model_id,
+            resolve_model_slot,
+            use_main_model_for_all,
+        )
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.ui.dashboard.api.agent import _AGENT_CONFIG_SLOTS, _model_warnings
+
+        workspace = self._workspace
+        unified = use_main_model_for_all(workspace)
+        try:
+            main_model = resolve_main_model_id(workspace)
+        except Exception as exc:
+            return f"Could not resolve main model: {exc}"
+        slots: list[dict[str, object]] = []
+        for key, slot in _AGENT_CONFIG_SLOTS:
+            try:
+                resolved = resolve_model_slot(workspace, slot)
+            except Exception:
+                resolved = main_model
+            slots.append(
+                {"slot": key, "resolved": resolved, "editable": not unified or key == "triager"},
+            )
+        body = _format_agent_config(
+            {
+                "use_main_model_for_all": unified,
+                "main_model": main_model,
+                "slots": slots,
+                "warnings": _model_warnings(workspace),
+            },
+        )
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Resolved slots sent")
+        return None
+
+    async def _handle_agent_sampling_show(
+        self, msg: IncomingMessage, callback_data: str
+    ) -> str | None:
+        """Post workspace LLM sampling params (``sevn models params`` parity).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_agent_sampling_show)
+            True
+        """
+        _ = callback_data
+        from sevn.cli.commands.models_cmd import _format_llm_params
+        from sevn.config.llm_params import LLM_PARAMS_FILENAME, load_or_create_llm_params_doc
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+
+        path = self._content_root / LLM_PARAMS_FILENAME
+        source = "workspace" if path.is_file() else "builtin"
+        body = _format_llm_params(
+            {
+                "source": source,
+                "path": str(path),
+                "doc": load_or_create_llm_params_doc(self._content_root),
+                "restart_required": True,
+            },
+        )
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Sampling params sent")
+        return None
+
+    async def _handle_self_improve_doctor(
+        self, msg: IncomingMessage, callback_data: str
+    ) -> str | None:
+        """Post self-improve config posture (``sevn improve doctor`` parity).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_self_improve_doctor)
+            True
+        """
+        _ = callback_data
+        import os
+
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.self_improve.effective import effective_self_improve_enabled
+
+        ws = self._workspace
+        si = ws.self_improve
+        hub_repo = (si.hub.repo or "").strip() if si and si.hub else ""
+        preset = si.preset if si else "A"
+        hub_ok = True
+        if si and si.enabled and preset in ("B", "C"):
+            hub_ok = bool(hub_repo)
+        payload = {
+            "effective_enabled": effective_self_improve_enabled(ws),
+            "config_enabled": bool(si and si.enabled),
+            "preset": preset,
+            "hub_repo_configured": hub_ok,
+            "hub_repo_non_empty": bool(hub_repo),
+            "env_disable_self_improve": os.environ.get("SEVN_DISABLE_SELF_IMPROVE", "").strip()
+            == "1",
+        }
+        body = "\n".join(f"{key}: {payload[key]}" for key in sorted(payload))
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Improve doctor sent")
+        return None
+
+    async def _handle_self_improve_replay_sampler(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """Replay the bundled sampler fixture (``sevn improve replay-sampler`` parity).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_self_improve_replay_sampler)
+            True
+        """
+        _ = callback_data
+        if not self._router._resolve_owner_flag(msg):
+            return "Owner only."
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.self_improve.sampler import ShortlistCandidate, allocate_shortlist
+
+        cands = [
+            ShortlistCandidate(
+                turn_id="exp-a",
+                bucket="explicit_feedback",
+                channel="web",
+                intent=None,
+                complexity_tier=None,
+                score=0.0,
+                signals=None,
+            ),
+            ShortlistCandidate(
+                turn_id="ctrl-b",
+                bucket="control_random_sample",
+                channel="telegram",
+                intent=None,
+                complexity_tier=None,
+                score=0.0,
+                signals=None,
+            ),
+        ]
+        selected, diagnostics = allocate_shortlist(
+            candidates=cands,
+            max_candidates=12,
+            explicit_feedback_floor_pct=0.25,
+            per_channel_pct_max=0.6,
+            per_intent_pct_max=0.6,
+            per_tier_pct_max=0.6,
+            per_channel_pct_min=None,
+        )
+        body = (
+            f"shortlist_turn_ids: {[c.turn_id for c in selected]}\n"
+            f"count: {len(selected)}\n"
+            f"diagnostics: {diagnostics}"
+        )
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Replay sampler sent")
         return None
 
     async def _answer_chat_action(self, msg: IncomingMessage, text: str) -> None:
