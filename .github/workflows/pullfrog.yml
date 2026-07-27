@@ -86,8 +86,8 @@ jobs:
         if: env.HAS_CLAUDE_CODE == 'true'
         id: pullfrog
         continue-on-error: true
-        # pullfrog-py, SHA-pinned to alexhawat/pullfrog-py main.
-        uses: alexhawat/pullfrog-py@4673ba4 # fix/checkout-pr-base-branch-alias
+        # pullfrog-py — full SHA pinned to alexhawat/pullfrog-py main (org policy).
+        uses: alexhawat/pullfrog-py@416020af9e1e3e051b4ba185708b1334e5277136 # main
         with:
           # For pull_request events, name the PR number explicitly so the agent
           # calls checkout_pr(<n>) instead of asking which PR to review.
