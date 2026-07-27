@@ -30,6 +30,7 @@ Exports:
     config_menu_message_text — caption text for ``/config`` screens.
     parse_menu_callback_data — parse ``menu:*`` / ``nav:*`` callback payloads.
     parse_config_callback_data — parse ``cfg:nav:*`` / ``cfg:section:*`` payloads.
+    resolve_config_section_alias — map retired section ids (W6 expands alias table).
     parse_models_callback_data — parse ``cfg:models:*`` picker callbacks.
     menu_callback_matches — match inbound menu callbacks and ``/menu``.
     config_callback_matches — match inbound ``/config`` callbacks and slash.
@@ -83,10 +84,6 @@ from sevn.gateway.menu.discogs_menu import (
     discogs_menu_caption,
     discogs_setup_caption,
 )
-from sevn.gateway.menu.menu_branding import (
-    SEVN_BOT_ROOT_TILE_LABEL,
-    config_sevn_bot_section_title,
-)
 from sevn.gateway.menu.social_media_manager_menu import (
     build_social_media_manager_keyboard_rows,
     social_media_manager_menu_caption,
@@ -131,68 +128,172 @@ MenuSection = Literal["root", "identity", "quick", "workspace", "diagnostics"]
 
 ConfigSection = Literal[
     "root",
-    "session",
-    "agents",
-    "models",
-    "voice",
-    "channels",
-    "secrets",
+    "chat",
+    "chat_qa",
+    "chat_shortcuts",
+    "chat_voice",
+    "chat_channels",
+    "chat_sessions",
+    "agent",
+    "agent_identity",
+    "agent_sampling",
+    "agent_subagents",
+    "agent_subagents_running",
+    "agent_lab",
     "skills",
     "skills:social_media_manager",
     "skills:discogs",
     "skills:discogs:setup",
-    "tools",
-    "code",
-    "security",
-    "rlm",
-    "self_improve",
-    "second_brain",
-    "subagents",
-    "subagents_running",
-    "codemode",
-    "integrations",
-    "dashboard",
-    "shortcuts",
-    "notifications",
-    "advanced",
-    "logs",
+    "skills_tools",
+    "skills_integrations",
+    "memory",
+    "memory_sb",
+    "memory_dreaming",
+    "memory_code",
+    "memory_openwiki",
+    "access",
+    "access_secrets",
+    "access_providers",
+    "access_guard",
+    "access_pairing",
+    "health",
+    "health_bundles",
+    "health_tracing",
+    "health_pin",
+    "deployment",
+    "deployment_services",
+    "deployment_tunnel",
+    "deployment_config",
+    "deployment_update",
+    "deployment_deploy",
+    "deployment_host",
     "help",
-    "sevn_bot",
-    "my_sevn_bot",
+    "help_guides",
+    "help_dev",
 ]
 
-_CONFIG_SECTIONS: frozenset[str] = frozenset(
-    {
-        "session",
-        "agents",
-        "models",
-        "voice",
-        "channels",
-        "secrets",
-        "skills",
-        "skills:social_media_manager",
-        "skills:discogs",
-        "skills:discogs:setup",
-        "tools",
-        "code",
-        "security",
-        "rlm",
-        "self_improve",
-        "second_brain",
-        "subagents",
-        "subagents_running",
-        "codemode",
-        "integrations",
-        "dashboard",
-        "shortcuts",
-        "notifications",
-        "advanced",
-        "logs",
-        "help",
-        "sevn_bot",
-        "my_sevn_bot",
-    },
+# Redesign non-root section ids (W6); ``root`` is separate in :class:`ConfigSection`.
+_REDESIGN_SECTION_IDS: tuple[str, ...] = (
+    "chat",
+    "chat_qa",
+    "chat_shortcuts",
+    "chat_voice",
+    "chat_channels",
+    "chat_sessions",
+    "agent",
+    "agent_identity",
+    "agent_sampling",
+    "agent_subagents",
+    "agent_subagents_running",
+    "agent_lab",
+    "skills",
+    "skills:social_media_manager",
+    "skills:discogs",
+    "skills:discogs:setup",
+    "skills_tools",
+    "skills_integrations",
+    "memory",
+    "memory_sb",
+    "memory_dreaming",
+    "memory_code",
+    "memory_openwiki",
+    "access",
+    "access_secrets",
+    "access_providers",
+    "access_guard",
+    "access_pairing",
+    "health",
+    "health_bundles",
+    "health_tracing",
+    "health_pin",
+    "deployment",
+    "deployment_services",
+    "deployment_tunnel",
+    "deployment_config",
+    "deployment_update",
+    "deployment_deploy",
+    "deployment_host",
+    "help",
+    "help_guides",
+    "help_dev",
 )
+
+_CONFIG_SECTIONS: frozenset[str] = frozenset(_REDESIGN_SECTION_IDS)
+
+# Retired section ids → new home (D14). Empty value = dissolved; toast only.
+_SECTION_ALIASES: dict[str, str] = {
+    "session": "chat",
+    "channels": "chat",
+    "notifications": "chat",
+    "shortcuts": "chat",
+    "voice": "chat",
+    "agents": "agent",
+    "models": "agent",
+    "rlm": "agent",
+    "codemode": "agent",
+    "self_improve": "agent",
+    "subagents": "agent",
+    # Stale taps from messages rendered before the rename land on the real
+    # Running submenu, not one level up on the Agent root tile.
+    "subagents_running": "agent_subagents_running",
+    "tools": "skills",
+    "integrations": "skills",
+    "code": "memory",
+    "second_brain": "memory",
+    "secrets": "access",
+    "security": "access",
+    "logs": "health",
+    "dashboard": "health",
+    "my_sevn_bot": "deployment",
+    "sevn_bot": "help",
+    "advanced": "",
+}
+
+
+def resolve_config_section_alias(section_id: str) -> str | None:
+    """Resolve a retired ``cfg:section:*`` id to its new home (W6 expands the table).
+
+    Args:
+        section_id (str): Raw section slug from callback data.
+
+    Returns:
+        str | None: Canonical section when known; ``None`` when dissolved or unknown.
+
+    Examples:
+        >>> resolve_config_section_alias("advanced") is None
+        True
+        >>> resolve_config_section_alias("chat")
+        'chat'
+    """
+    key = section_id.strip().lower()
+    if key in _CONFIG_SECTIONS:
+        return key
+    if key in _SECTION_ALIASES:
+        target = _SECTION_ALIASES[key]
+        return target if target else None
+    return None
+
+
+def _retired_section_toast(section_id: str) -> str:
+    """Return a graceful toast for a dissolved or moved section id.
+
+    Args:
+        section_id (str): Retired ``cfg:section:*`` slug.
+
+    Returns:
+        str: Short operator-facing toast (never raises).
+
+    Examples:
+        >>> _retired_section_toast("advanced")
+        'Advanced was dissolved — use Agent > Lab, Memory, or Deployment.'
+    """
+    target = _SECTION_ALIASES.get(section_id)
+    if target:
+        label = target.replace("_", " ").replace(":", " > ").title()
+        return f"Section moved to {label} — tap again or open /config from Home."
+    if section_id == "advanced":
+        return "Advanced was dissolved — use Agent > Lab, Memory, or Deployment."
+    return f"Unknown section “{section_id}” — open /config from Home."
 
 
 @dataclass(frozen=True)
@@ -447,27 +548,80 @@ _MODEL_PICKER_SLOT_LABELS: dict[str, str] = {
     "tier_cd": "Tier C/D",
 }
 
-_CONFIG_ROOT_TILES: tuple[tuple[str, str, str], ...] = (
-    ("📦 Session", "session", "cfg:section:session"),
-    ("🤖 Agents", "agents", "cfg:section:agents"),
-    ("🧠 Models", "models", "cfg:section:models"),
-    ("🎙 Voice", "voice", "cfg:section:voice"),
-    ("🔌 Channels", "channels", "cfg:section:channels"),
-    ("🔐 Secrets", "secrets", "cfg:section:secrets"),
-    ("🧩 Skills", "skills", "cfg:section:skills"),
-    ("🛠 Tools", "tools", "cfg:section:tools"),
-    ("💻 Code", "code", "cfg:section:code"),
-    ("🛡 Security", "security", "cfg:section:security"),
-    ("🌐 Integrations", "integrations", "cfg:section:integrations"),
-    ("📊 Dashboard", "dashboard", "cfg:section:dashboard"),
-    ("⌨️ Shortcuts", "shortcuts", "cfg:section:shortcuts"),
-    ("🔔 Notifications", "notifications", "cfg:section:notifications"),
-    ("⚙️ Advanced", "advanced", "cfg:section:advanced"),
-    ("📜 Logs", "logs", "cfg:section:logs"),
-    ("❓ Commands", "help", "cfg:section:help"),
-    (SEVN_BOT_ROOT_TILE_LABEL, "sevn_bot", "cfg:section:sevn_bot"),
-    ("🤖 My sevn bot", "my_sevn_bot", "cfg:section:my_sevn_bot"),
+_CONFIG_ROOT_TILES: tuple[tuple[str, str, str, bool], ...] = (
+    ("💬 Chat", "chat", "cfg:section:chat", False),
+    ("🧠 Agent", "agent", "cfg:section:agent", False),
+    ("🧩 Skills & Tools", "skills", "cfg:section:skills", False),
+    ("📚 Memory", "memory", "cfg:section:memory", True),
+    ("🔐 Access", "access", "cfg:section:access", True),
+    ("📊 Health", "health", "cfg:section:health", True),
+    ("🖥 Deployment", "deployment", "cfg:section:deployment", True),
+    ("❓ Help", "help", "cfg:section:help", False),
 )
+
+_OWNER_ONLY_ROOT_SECTIONS: frozenset[str] = frozenset(
+    sid for _label, sid, _cb, owner_only in _CONFIG_ROOT_TILES if owner_only
+)
+
+
+def _owning_root_section(section_id: str) -> str | None:
+    """Return the root tile a section belongs to, by id prefix.
+
+    Child sections are named ``<root>_<leaf>`` (``access_secrets``) or
+    ``<root>:<path>`` (``skills:discogs:setup``), so the owning root is
+    recoverable from the id alone.
+
+    Args:
+        section_id (str): Section id from ``_CONFIG_SECTIONS``.
+
+    Returns:
+        str | None: Owning root section id, or ``None`` when unrecognised.
+
+    Examples:
+        >>> _owning_root_section("access_secrets")
+        'access'
+        >>> _owning_root_section("skills:discogs:setup")
+        'skills'
+        >>> _owning_root_section("chat") is None
+        False
+    """
+    for _label, root_id, _cb, _owner_only in _CONFIG_ROOT_TILES:
+        if section_id == root_id or section_id.startswith((f"{root_id}_", f"{root_id}:")):
+            return root_id
+    return None
+
+
+# Every section under an owner-gated root tile, not just the tile itself. Entering
+# `cfg:section:access_secrets` directly must hit the same gate as tapping 🔐 Access,
+# otherwise the nav check is bypassable by anyone holding a stale callback string.
+_OWNER_ONLY_SECTIONS: frozenset[str] = frozenset(
+    sid
+    for sid in _CONFIG_SECTIONS
+    if (_owning_root_section(sid) or "") in _OWNER_ONLY_ROOT_SECTIONS
+)
+
+
+def _section_requires_owner(section_id: str) -> bool:
+    """Return whether entering ``section_id`` requires the owner flag.
+
+    Unknown ids fail closed when they resolve to an owner-gated root prefix.
+
+    Args:
+        section_id (str): Section id from a ``cfg:section:*`` callback.
+
+    Returns:
+        bool: ``True`` when only the owner may open the section.
+
+    Examples:
+        >>> _section_requires_owner("access_secrets")
+        True
+        >>> _section_requires_owner("chat_voice")
+        False
+    """
+    if section_id in _OWNER_ONLY_SECTIONS:
+        return True
+    return (_owning_root_section(section_id) or "") in _OWNER_ONLY_ROOT_SECTIONS
+
 
 _MENU_SECTIONS: frozenset[str] = frozenset({"identity", "quick", "workspace", "diagnostics"})
 
@@ -846,7 +1000,7 @@ def _config_bool_toggle_button(
 
 
 def _build_session_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
-    """Build Session section toggles for QA bar buttons and queue mode.
+    """Build Session section toggles for QA bar buttons (queue mode lives on Chat).
 
     Args:
         workspace (WorkspaceConfig): Parsed workspace settings.
@@ -859,41 +1013,10 @@ def _build_session_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[s
         >>> rows = _build_session_keyboard_rows(WorkspaceConfig.minimal())
         >>> rows[0][0]["callback_data"].startswith("cfg:toggle:channels.telegram.quick_actions.")
         True
+        >>> all("gateway.queue_mode" not in btn.get("callback_data", "") for row in rows for btn in row)
+        True
     """
-    qa = _quick_actions_config(workspace)
-    specs: tuple[tuple[str, str, bool], ...] = (
-        ("Regen", "show_regen", qa.show_regen),
-        ("👍 Up", "show_thumbs_up", qa.show_thumbs_up),
-        ("👎 Down", "show_thumbs_down", qa.show_thumbs_down),
-        ("Share", "show_share", qa.show_share),
-        ("Feedback", "show_feedback", qa.show_feedback),
-    )
-    rows: list[list[dict[str, Any]]] = []
-    pair: list[dict[str, Any]] = []
-    for label, qa_field, enabled in specs:
-        pair.append(
-            _config_bool_toggle_button(
-                label,
-                f"channels.telegram.quick_actions.{qa_field}",
-                enabled=enabled,
-            ),
-        )
-        if len(pair) == 2:
-            rows.append(pair)
-            pair = []
-    if pair:
-        rows.append(pair)
-    current = _gateway_queue_mode(workspace)
-    nxt = _next_queue_mode(current)
-    rows.append(
-        [
-            {
-                "text": f"Queue: {current} (-> {nxt})",
-                "callback_data": f"cfg:toggle:gateway.queue_mode:{nxt}",
-            },
-        ],
-    )
-    return rows
+    return _build_session_qa_only_rows(workspace)
 
 
 def _voice_tts_mode(workspace: WorkspaceConfig) -> str:
@@ -958,9 +1081,11 @@ def _build_voice_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str
         >>> rows[0][0]["callback_data"]
         'cfg:voice:mode:off'
         >>> rows[-1][0]["callback_data"]
-        'cfg:voice:stt:next'
+        'act:voice:show'
         >>> rows[-2][0]["callback_data"]
-        'cfg:voice:engine:next'
+        'act:voice:status'
+        >>> rows[-3][0]["callback_data"]
+        'cfg:voice:stt:next'
     """
     mode = _voice_tts_mode(workspace)
     rows: list[list[dict[str, Any]]] = []
@@ -980,6 +1105,8 @@ def _build_voice_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str
     rows.append(
         [{"text": f"STT: {_voice_stt_active(workspace)} 🔁", "callback_data": "cfg:voice:stt:next"}]
     )
+    rows.append([{"text": "🔊 Probe backends", "callback_data": "act:voice:status"}])
+    rows.append([{"text": "📋 Voice settings", "callback_data": "act:voice:show"}])
     return rows
 
 
@@ -1432,78 +1559,15 @@ def _build_notifications_keyboard_rows(workspace: WorkspaceConfig) -> list[list[
     return [
         [
             {
-                "text": f"Notify policy: {current} (→{nxt})",
+                "text": f"🔔 Notify: {current} (→{nxt})",
                 "callback_data": f"cfg:toggle:channels.telegram.telegram_notify_policy:{nxt}",
             },
         ],
     ]
 
 
-_ADVANCED_SECTION_TILES: tuple[tuple[str, str], ...] = (
-    ("🧭 RLM", "rlm"),
-    ("📈 Self-Improve", "self_improve"),
-    ("📚 Second Brain", "second_brain"),
-    ("🤖 Sub-agents", "subagents"),
-    ("🧪 CodeMode", "codemode"),
-)
-
 _SUBAGENT_ROLES: tuple[str, ...] = ("triager", "tier_b", "tier_c", "tier_d")
 _QUEUE_MODE_CYCLE: tuple[str, ...] = ("cancel", "steer", "multi")
-
-
-def _build_advanced_keyboard_rows(
-    workspace: WorkspaceConfig,
-    *,
-    is_owner: bool = False,
-) -> list[list[dict[str, Any]]]:
-    """Build Advanced section toggles, nested section links, and Mission Control.
-
-    Args:
-        workspace (WorkspaceConfig): Parsed workspace settings.
-        is_owner (bool): When ``True``, render gateway/proxy restart buttons.
-
-    Returns:
-        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
-
-    Examples:
-        >>> from sevn.config.workspace_config import WorkspaceConfig
-        >>> rows = _build_advanced_keyboard_rows(WorkspaceConfig.minimal())
-        >>> rows[0][0]["callback_data"].startswith("cfg:toggle:gateway.restart.auto_resume_b:")
-        True
-        >>> any(btn["callback_data"] == "cfg:section:codemode" for row in rows for btn in row)
-        True
-    """
-    _ = is_owner
-    auto_resume = _gateway_auto_resume_b(workspace)
-    redaction = _tracing_redaction_enabled(workspace)
-    rows: list[list[dict[str, Any]]] = [
-        [
-            _config_bool_toggle_button(
-                "Auto-resume tier B",
-                "gateway.restart.auto_resume_b",
-                enabled=auto_resume,
-            ),
-        ],
-        [
-            _config_bool_toggle_button(
-                "Trace redaction",
-                "tracing.redaction.enabled",
-                enabled=redaction,
-            ),
-        ],
-    ]
-    pair_row: list[dict[str, Any]] = []
-    for label, sid in _ADVANCED_SECTION_TILES:
-        pair_row.append({"text": label, "callback_data": f"cfg:section:{sid}"})
-        if len(pair_row) == 2:
-            rows.append(pair_row)
-            pair_row = []
-    if pair_row:
-        rows.append(pair_row)
-    url = web_ui_url_from_workspace(workspace)
-    if url:
-        rows.append([{"text": "🌐 Open Mission Control", "url": url}])
-    return rows
 
 
 def _build_codemode_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
@@ -1660,10 +1724,9 @@ def _build_logs_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str,
         >>> rows = _build_logs_keyboard_rows(WorkspaceConfig.minimal())
         >>> rows[0][0]["callback_data"]
         'cfg:logs:tail:gateway:0'
-        >>> rows[-1][0]["callback_data"].startswith("cfg:logs:")
-        True
+        >>> rows[-1][0]["callback_data"]
+        'form:logs:logfire_token'
     """
-    redaction = _tracing_redaction_enabled(workspace)
     logfire = _logfire_export_enabled(workspace)
     return [
         [
@@ -1685,12 +1748,6 @@ def _build_logs_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str,
         ],
         [
             {"text": "🔑 Set Logfire token", "callback_data": "form:logs:logfire_token"},
-        ],
-        [
-            {
-                "text": f"Trace redaction: {'on' if redaction else 'off'} (toggle)",
-                "callback_data": "cfg:logs:toggle_redaction",
-            },
         ],
     ]
 
@@ -1921,7 +1978,7 @@ def _build_models_picker_keyboard_rows(
     """
     catalog = list_catalog_model_ids(workspace)
     if not catalog:
-        return [[{"text": "⬅ Models", "callback_data": "cfg:section:models"}]]
+        return [[{"text": "⬅ Agent", "callback_data": "cfg:section:agent"}]]
     page_size = MODELS_PICKER_PAGE_SIZE
     total_pages = max(1, (len(catalog) + page_size - 1) // page_size)
     safe_page = max(0, min(page, total_pages - 1))
@@ -1957,7 +2014,7 @@ def _build_models_picker_keyboard_rows(
         )
     if nav:
         rows.append(nav)
-    rows.append([{"text": "⬅ Models", "callback_data": "cfg:section:models"}])
+    rows.append([{"text": "⬅ Agent", "callback_data": "cfg:section:agent"}])
     return rows
 
 
@@ -1980,6 +2037,12 @@ def _build_dashboard_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict
         [{"text": "📌 Create/update pin", "callback_data": "cfg:dashboard:create_pin"}],
         [{"text": "🔄 Refresh pin", "callback_data": "cfg:dashboard:refresh_pin"}],
         [{"text": "📤 Unpin", "callback_data": "cfg:dashboard:unpin"}],
+        [
+            {
+                "text": "🔐 Set dashboard password (host)",
+                "callback_data": "act:host:dashboard-password",
+            },
+        ],
     ]
     url = web_ui_url_from_workspace(workspace)
     if url:
@@ -2011,7 +2074,7 @@ def _build_shortcuts_keyboard_rows(
         ...     user_id="1",
         ... )
         >>> rows[-1][0]["callback_data"]
-        'form:shortcut_add'
+        'form:shortcut_remove'
     """
     rows: list[list[dict[str, Any]]] = []
     for row in list_visible_shortcuts(content_root, user_id=user_id, is_owner=is_owner)[
@@ -2024,6 +2087,8 @@ def _build_shortcuts_keyboard_rows(
             [{"text": f"🗑 /{name}", "callback_data": f"act:shortcut_delete:{name}"}],
         )
     rows.append([{"text": "+ Add shortcut", "callback_data": "form:shortcut_add"}])
+    rows.append([{"text": "📋 List shortcuts", "callback_data": "act:shortcuts:list"}])
+    rows.append([{"text": "🗑 Remove shortcut", "callback_data": "form:shortcut_remove"}])
     return rows
 
 
@@ -2600,6 +2665,34 @@ def _code_review_graph_enabled(workspace: WorkspaceConfig) -> bool:
     return False
 
 
+def _build_agent_sampling_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Agent > Sampling — LLM params show and max-output-tokens form (W7b).
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_agent_sampling_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"]
+        'act:agent:sampling:show'
+    """
+    _ = workspace
+    return [
+        [{"text": "📋 Show params", "callback_data": "act:agent:sampling:show"}],
+        [
+            {
+                "text": "🔢 Set max output tokens",
+                "callback_data": "form:models:set_max_output_tokens",
+            }
+        ],
+        [{"text": "⬅ Agent", "callback_data": "cfg:section:agent"}],
+    ]
+
+
 def _build_agents_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
     """Build Agents section display-name form and dashboard links (no Advanced fallback).
 
@@ -2702,11 +2795,14 @@ def _build_tools_keyboard_rows(
 
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
-        >>> _build_tools_keyboard_rows(WorkspaceConfig.minimal())
-        []
+        >>> rows = _build_tools_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"]
+        'act:tools:health'
     """
     _ = content_root
-    rows: list[list[dict[str, Any]]] = []
+    rows: list[list[dict[str, Any]]] = [
+        [{"text": "🩺 Tool health", "callback_data": "act:tools:health"}],
+    ]
     url = _mission_control_url(workspace, fragment="tools")
     if url:
         rows.append([{"text": "🌐 Open Tools tab", "url": url}])
@@ -3146,7 +3242,7 @@ def _configured_integration_ids(
 
 
 def _build_secrets_keyboard_rows() -> list[list[dict[str, Any]]]:
-    """Build Secrets section form launcher (no secret values).
+    """Build Secrets section rows (aliases only — never values).
 
     Returns:
         list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
@@ -3156,7 +3252,13 @@ def _build_secrets_keyboard_rows() -> list[list[dict[str, Any]]]:
         >>> rows[0][0]["callback_data"]
         'form:secret_wizard'
     """
-    return [[{"text": "+ Add secret", "callback_data": "form:secret_wizard"}]]
+    return [
+        [{"text": "+ Add secret", "callback_data": "form:secret_wizard"}],
+        [{"text": "📋 List aliases", "callback_data": "act:secrets:list"}],
+        [{"text": "🗑 Remove secret", "callback_data": "form:secrets:rm"}],
+        [{"text": "🔓 Unlock status", "callback_data": "act:secrets:check-unlock"}],
+        [{"text": "📤 Export .env bundle", "callback_data": "act:secrets:export-secrets"}],
+    ]
 
 
 def _build_self_improve_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
@@ -3226,6 +3328,8 @@ def _build_second_brain_keyboard_rows(workspace: WorkspaceConfig) -> list[list[d
             {"text": "📁 Set vault path", "callback_data": "form:second_brain_vault_path"},
             {"text": "🗂️ Browse folders", "callback_data": "form:second_brain_vault_browse"},
         ],
+        [{"text": "🔄 Reindex vault", "callback_data": "act:second_brain:reindex"}],
+        [{"text": "⚙ Bootstrap layout", "callback_data": "act:second_brain:setup"}],
     ]
     url = _mission_control_url(workspace, fragment="second_brain")
     if url:
@@ -3309,7 +3413,7 @@ def _build_subagents_keyboard_rows(
         [
             {
                 "text": f"Running L1:{level1_count} L2:{level2_count}",
-                "callback_data": "cfg:section:subagents_running",
+                "callback_data": "cfg:section:agent_subagents_running",
             },
         ],
         [
@@ -3319,16 +3423,6 @@ def _build_subagents_keyboard_rows(
             },
         ],
     ]
-    mode = _gateway_queue_mode(workspace)
-    nxt = _next_queue_mode(mode)
-    rows.append(
-        [
-            {
-                "text": f"Queue: {mode} (-> {nxt})",
-                "callback_data": f"cfg:toggle:gateway.queue_mode:{nxt}",
-            },
-        ],
-    )
     pair: list[dict[str, Any]] = []
     for role in _SUBAGENT_ROLES:
         pair.append(
@@ -3368,16 +3462,21 @@ def _build_subagents_running_keyboard_rows(
         ...     is_owner=True,
         ... )
         >>> rows[0][0]["callback_data"]
+        'form:subagents:kill'
+        >>> rows[1][0]["callback_data"]
         'act:subagents:kill:a1'
     """
+    rows: list[list[dict[str, Any]]] = []
+    if is_owner:
+        rows.append([{"text": "🛑 Kill one", "callback_data": "form:subagents:kill"}])
     kill_rows = build_subagent_kill_keyboard_rows(
         running_rows,
         is_owner=is_owner,
         label_for_row=subagent_kill_button_label_config,
-        kill_all_label="Kill all L1",
+        kill_all_label="🛑 Kill all",
     )
-    rows: list[list[dict[str, Any]]] = list(kill_rows)
-    rows.append([{"text": "⬅ Sub-agents", "callback_data": "cfg:section:subagents"}])
+    rows.extend(kill_rows)
+    rows.append([{"text": "⬅ Sub-agents", "callback_data": "cfg:section:agent_subagents"}])
     return rows
 
 
@@ -3397,8 +3496,10 @@ def _build_integrations_keyboard_rows(
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
         >>> rows = _build_integrations_keyboard_rows(WorkspaceConfig.minimal())
-        >>> rows[0][0]["callback_data"]
+        >>> rows[-1][0]["callback_data"]
         'cfg:integrations:refresh'
+        >>> rows[-2][0]["callback_data"]
+        'act:integrations:status'
     """
     rows: list[list[dict[str, Any]]] = []
     url = _mission_control_url(workspace, fragment="integrations")
@@ -3424,6 +3525,7 @@ def _build_integrations_keyboard_rows(
                 ),
             ],
         )
+    rows.append([{"text": "📋 Integration status", "callback_data": "act:integrations:status"}])
     rows.append([{"text": "🔄 Refresh list", "callback_data": "cfg:integrations:refresh"}])
     return rows
 
@@ -3470,6 +3572,1075 @@ def _build_code_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str,
     url = _mission_control_url(workspace, fragment="code")
     if url:
         rows.append([{"text": "🌐 Open Code tab", "url": url}])
+    return rows
+
+
+def _nav_section_button(label: str, section_id: str) -> dict[str, Any]:
+    """Return one inline nav button targeting a ``/config`` section id.
+
+    Args:
+        label (str): Button label shown in Telegram.
+        section_id (str): Target section slug for ``cfg:section:*``.
+
+    Returns:
+        dict[str, Any]: Single inline keyboard button dict.
+
+    Examples:
+        >>> _nav_section_button("Chat", "chat")["callback_data"]
+        'cfg:section:chat'
+    """
+    return {"text": label, "callback_data": f"cfg:section:{section_id}"}
+
+
+def _append_nav_section_rows(
+    rows: list[list[dict[str, Any]]],
+    tiles: tuple[tuple[str, str], ...],
+) -> None:
+    """Append paired nav rows from ``(label, section_id)`` tuples.
+
+    Args:
+        rows (list[list[dict[str, Any]]]): Keyboard rows to extend in place.
+        tiles (tuple[tuple[str, str], ...]): ``(label, section_id)`` pairs.
+
+    Examples:
+        >>> out: list[list[dict[str, Any]]] = []
+        >>> _append_nav_section_rows(out, (("A", "chat"), ("B", "agent")))
+        >>> len(out)
+        1
+    """
+    pair: list[dict[str, Any]] = []
+    for label, sid in tiles:
+        pair.append(_nav_section_button(label, sid))
+        if len(pair) == 2:
+            rows.append(pair)
+            pair = []
+    if pair:
+        rows.append(pair)
+
+
+def _build_session_qa_only_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Build Session quick-action toggles without the queue-mode row.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_session_qa_only_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"].startswith("cfg:toggle:")
+        True
+    """
+    qa = _quick_actions_config(workspace)
+    specs: tuple[tuple[str, str, bool], ...] = (
+        ("Regen", "show_regen", qa.show_regen),
+        ("👍 Up", "show_thumbs_up", qa.show_thumbs_up),
+        ("👎 Down", "show_thumbs_down", qa.show_thumbs_down),
+        ("Share", "show_share", qa.show_share),
+        ("Feedback", "show_feedback", qa.show_feedback),
+    )
+    rows: list[list[dict[str, Any]]] = []
+    pair: list[dict[str, Any]] = []
+    for label, qa_field, enabled in specs:
+        pair.append(
+            _config_bool_toggle_button(
+                label,
+                f"channels.telegram.quick_actions.{qa_field}",
+                enabled=enabled,
+            ),
+        )
+        if len(pair) == 2:
+            rows.append(pair)
+            pair = []
+    if pair:
+        rows.append(pair)
+    return rows
+
+
+def _build_channels_chat_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Channels rows for Chat (reply keyboard + routing; DM policy lives under Access).
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_channels_chat_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["text"].startswith("Reply keyboard")
+        True
+    """
+    rk = _telegram_reply_keyboard_enabled(workspace)
+    routing = _telegram_show_routing(workspace)
+    rows: list[list[dict[str, Any]]] = [
+        [
+            _config_bool_toggle_button(
+                "Reply keyboard",
+                "channels.telegram.reply_keyboard.enabled",
+                enabled=rk,
+            ),
+        ],
+        [
+            _config_bool_toggle_button(
+                "Show routing",
+                "channels.telegram.show_routing",
+                enabled=routing,
+            ),
+        ],
+    ]
+    if _schema_has_config_path("channels.webchat.tts_inline"):
+        wc_tts = _webchat_tts_inline_enabled(workspace)
+        rows.append(
+            [
+                _config_bool_toggle_button(
+                    "Webchat TTS inline",
+                    "channels.webchat.tts_inline",
+                    enabled=wc_tts,
+                ),
+            ],
+        )
+    return rows
+
+
+def _build_chat_qa_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Chat > Quick actions — the five Session QA toggles (callback-stable).
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> len(_build_chat_qa_keyboard_rows(WorkspaceConfig.minimal())) >= 2
+        True
+    """
+    return _build_session_qa_only_rows(workspace)
+
+
+def _build_chat_shortcuts_keyboard_rows(
+    workspace: WorkspaceConfig,
+    content_root: Path | None,
+    *,
+    user_id: str = "",
+    is_owner: bool = True,
+) -> list[list[dict[str, Any]]]:
+    """Chat > Shortcuts — re-parent of the Shortcuts section.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+        content_root (Path | None): Workspace content root for shortcut listing.
+        user_id (str): Telegram user id for per-user shortcuts.
+        is_owner (bool): Whether the viewer is the workspace owner.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_chat_shortcuts_keyboard_rows(WorkspaceConfig.minimal(), None)
+        >>> rows[0][0]["callback_data"]
+        'form:shortcut_add'
+    """
+    _ = workspace
+    if content_root is not None:
+        rows = _build_shortcuts_keyboard_rows(content_root, user_id=user_id, is_owner=is_owner)
+    else:
+        rows = [[{"text": "+ Add shortcut", "callback_data": "form:shortcut_add"}]]
+    if not any(btn.get("callback_data") == "act:shortcuts:list" for row in rows for btn in row):
+        rows.append([{"text": "📋 List shortcuts", "callback_data": "act:shortcuts:list"}])
+        rows.append([{"text": "🗑 Remove shortcut", "callback_data": "form:shortcut_remove"}])
+    return rows
+
+
+def _build_chat_voice_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Chat > Voice — re-parent of the Voice section.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> len(_build_chat_voice_keyboard_rows(WorkspaceConfig.minimal())) >= 1
+        True
+    """
+    return _build_voice_keyboard_rows(workspace)
+
+
+def _build_chat_channels_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Chat > Channels — channel toggles plus cross-link to Access pairing.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_chat_channels_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[-1][0]["callback_data"]
+        'cfg:section:access'
+    """
+    rows: list[list[dict[str, Any]]] = [
+        [{"text": "📶 Channel status", "callback_data": "act:channels:status"}],
+        [{"text": "📋 Channel config", "callback_data": "act:channels:config"}],
+    ]
+    rows.extend(_build_channels_chat_rows(workspace))
+    rows.append([_nav_section_button("👥 Who can DM →", "access")])
+    return rows
+
+
+def _build_chat_sessions_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Chat > Sessions — list/history/send plus ``/new`` and ``/stop`` command rows.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_chat_sessions_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"]
+        'act:sessions:list'
+    """
+    _ = workspace
+    return [
+        [{"text": "📋 List sessions", "callback_data": "act:sessions:list"}],
+        [{"text": "🕘 Session history", "callback_data": "form:sessions:history"}],
+        [{"text": "✉️ Send to another session", "callback_data": "form:sessions:send"}],
+        [{"text": "🆕 New session", "callback_data": "menu:cmd:new"}],
+        [{"text": "⏹ Stop current run", "callback_data": "menu:cmd:stop"}],
+    ]
+
+
+def _build_chat_keyboard_rows(
+    workspace: WorkspaceConfig,
+    content_root: Path | None = None,
+    *,
+    user_id: str = "",
+    is_owner: bool = True,
+) -> list[list[dict[str, Any]]]:
+    """Chat root tile — queue mode, channel toggles, and nav to re-parented sections.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+        content_root (Path | None): Workspace content root (unused on root screen).
+        user_id (str): Telegram user id (unused on root screen).
+        is_owner (bool): Whether the viewer is the workspace owner.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_chat_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"]
+        'cfg:section:chat_qa'
+    """
+    _ = is_owner
+    rows: list[list[dict[str, Any]]] = [
+        [_nav_section_button("⚡ Quick actions", "chat_qa")],
+    ]
+    current = _gateway_queue_mode(workspace)
+    nxt = _next_queue_mode(current)
+    rows.append(
+        [
+            {
+                "text": f"Queue: {current} (-> {nxt})",
+                "callback_data": f"cfg:toggle:gateway.queue_mode:{nxt}",
+            },
+        ],
+    )
+    rows.extend(_build_channels_chat_rows(workspace))
+    rows.extend(_build_notifications_keyboard_rows(workspace))
+    _append_nav_section_rows(
+        rows,
+        (
+            ("⌨️ Shortcuts", "chat_shortcuts"),
+            ("🎙 Voice", "chat_voice"),
+            ("🔌 Channels", "chat_channels"),
+            ("🧾 Sessions", "chat_sessions"),
+        ),
+    )
+    # Demoted root callbacks (W3/W6) — keep in tree for W1.6; stale taps alias (D14).
+    _append_nav_section_rows(
+        rows,
+        (
+            ("📦 Session (legacy)", "session"),
+            ("🎙 Voice (legacy)", "voice"),
+            ("🔌 Channels (legacy)", "channels"),
+            ("⌨️ Shortcuts (legacy)", "shortcuts"),
+            ("🔔 Notifications (legacy)", "notifications"),
+        ),
+    )
+    url = _mission_control_url(workspace, fragment="chat")
+    if url:
+        rows.append([{"text": "🌐 Open Chat settings", "url": url}])
+    _ = content_root, user_id
+    return rows
+
+
+def _build_agent_identity_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Agent > Identity — re-parent of the Agents section.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> _build_agent_identity_keyboard_rows(WorkspaceConfig.minimal())[0][0]["callback_data"]
+        'form:agent:display_name'
+    """
+    rows = _build_agents_keyboard_rows(workspace)
+    rows.append([{"text": "📋 Resolved slots", "callback_data": "act:agent:config"}])
+    return rows
+
+
+def _build_agent_lab_keyboard_rows(
+    workspace: WorkspaceConfig,
+    *,
+    is_owner: bool = False,
+) -> list[list[dict[str, Any]]]:
+    """Agent > Lab — inline RLM/CodeMode/Self-Improve toggles and improve actions (W7b).
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+        is_owner (bool): When ``True``, include owner-gated replay sampler row.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_agent_lab_keyboard_rows(WorkspaceConfig.minimal())
+        >>> any(
+        ...     btn["callback_data"] == "act:self_improve:doctor" for row in rows for btn in row
+        ... )
+        True
+    """
+    rows: list[list[dict[str, Any]]] = []
+    if _schema_has_config_path("executors.tier_cd.lambda_rlm.enabled"):
+        rows.append(
+            [
+                _config_bool_toggle_button(
+                    "λ-RLM",
+                    "executors.tier_cd.lambda_rlm.enabled",
+                    enabled=_lambda_rlm_enabled(workspace),
+                ),
+            ],
+        )
+    rows.extend(_build_codemode_keyboard_rows(workspace))
+    rows.append(
+        [
+            _config_bool_toggle_button(
+                "Self-improve",
+                "self_improve.enabled",
+                enabled=_self_improve_enabled(workspace),
+            ),
+        ],
+    )
+    rows.append([{"text": "🩺 Improve doctor", "callback_data": "act:self_improve:doctor"}])
+    rows.append([{"text": "📝 Record lesson", "callback_data": "form:improve:learn"}])
+    if is_owner:
+        rows.append(
+            [{"text": "🎞 Replay sampler", "callback_data": "act:self_improve:replay_sampler"}]
+        )
+    rlm_url = _mission_control_url(workspace, fragment="rlm")
+    traces_url = _mission_control_url(workspace, fragment="traces")
+    url_pair: list[dict[str, Any]] = []
+    if rlm_url:
+        url_pair.append({"text": "🌐 Open RLM tab", "url": rlm_url})
+    if traces_url:
+        url_pair.append({"text": "📈 View jobs / Traces", "url": traces_url})
+    if url_pair:
+        rows.append(url_pair)
+    _append_nav_section_rows(
+        rows,
+        (
+            ("🧭 RLM (legacy)", "rlm"),
+            ("🧪 CodeMode (legacy)", "codemode"),
+            ("📈 Self-Improve (legacy)", "self_improve"),
+        ),
+    )
+    return rows
+
+
+def _build_agent_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Agent root tile — Models controls plus nav to identity, lab, and sub-agents.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_agent_keyboard_rows(WorkspaceConfig.minimal())
+        >>> any(r["callback_data"] == "cfg:section:agent_identity" for row in rows for r in row)
+        True
+    """
+    rows = _build_models_keyboard_rows(workspace)
+    _append_nav_section_rows(
+        rows,
+        (
+            ("✏️ Identity", "agent_identity"),
+            ("🎚 Sampling", "agent_sampling"),
+            ("🤖 Sub-agents", "agent_subagents"),
+            ("🔬 Lab", "agent_lab"),
+        ),
+    )
+    rows.append([{"text": "📋 Active runs", "callback_data": "act:agent:status"}])
+    _append_nav_section_rows(
+        rows,
+        (
+            ("🧠 Models (legacy)", "models"),
+            ("🤖 Agents (legacy)", "agents"),
+            ("🤖 Sub-agents (legacy)", "subagents"),
+        ),
+    )
+    return rows
+
+
+def _build_memory_code_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Memory > Code understanding — re-parent of the Code section.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> _build_memory_code_keyboard_rows(WorkspaceConfig.minimal())[0][0]["callback_data"].startswith("cfg:toggle:")
+        True
+    """
+    return _build_code_keyboard_rows(workspace)
+
+
+def _build_memory_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Memory root tile — Second Brain and Code nav shells.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_memory_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"]
+        'cfg:section:memory_sb'
+    """
+    rows: list[list[dict[str, Any]]] = []
+    _append_nav_section_rows(
+        rows,
+        (
+            ("📚 Second Brain", "memory_sb"),
+            ("💤 Dreaming", "memory_dreaming"),
+            ("💻 Code understanding", "memory_code"),
+            ("📖 OpenWiki", "memory_openwiki"),
+            ("📚 Second Brain (legacy)", "second_brain"),
+            ("💻 Code (legacy)", "code"),
+        ),
+    )
+    rows.append([{"text": "🔎 Search memory", "callback_data": "act:memory:search"}])
+    rows.append([{"text": "🗂 Rebuild index", "callback_data": "act:memory:index"}])
+    url = _mission_control_url(workspace, fragment="second-brain")
+    if url:
+        rows.append([{"text": "🌐 Open Second Brain tab", "url": url}])
+    return rows
+
+
+def _build_memory_dreaming_keyboard_rows(
+    workspace: WorkspaceConfig,
+) -> list[list[dict[str, Any]]]:
+    """Memory > Dreaming — status, backfill, undo, and cron reconcile (W7c).
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_memory_dreaming_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"]
+        'act:dreaming:status'
+    """
+    _ = workspace
+    return [
+        [{"text": "📋 Dreaming status", "callback_data": "act:dreaming:status"}],
+        [{"text": "🕰 Backfill window", "callback_data": "form:memory:backfill"}],
+        [{"text": "↩️ Undo last batch", "callback_data": "act:dreaming:undo"}],
+        [{"text": "🔁 Reconcile cron", "callback_data": "act:dreaming:reconcile_cron"}],
+    ]
+
+
+def _build_memory_openwiki_keyboard_rows(
+    workspace: WorkspaceConfig,
+) -> list[list[dict[str, Any]]]:
+    """Memory > OpenWiki — install/configure rows hidden until CLI is on PATH (W7c).
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_memory_openwiki_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"].startswith(("act:openui:", "form:openui:"))
+        True
+    """
+    _ = workspace
+    from sevn.skills.openwiki_install import openwiki_cli_installed
+
+    rows: list[list[dict[str, Any]]] = []
+    if not openwiki_cli_installed():
+        rows.append([{"text": "⬇️ Install CLI", "callback_data": "act:openui:install"}])
+        return rows
+    rows.append([{"text": "🔑 Configure LLM key", "callback_data": "form:openui:configure"}])
+    rows.append([{"text": "⚙ Install + key", "callback_data": "act:openui:setup"}])
+    return rows
+
+
+def _build_access_secrets_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Access > Secrets — list/rm/unlock plus add-secret wizard.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_access_secrets_keyboard_rows()
+        >>> rows[1][0]["callback_data"]
+        'act:secrets:list'
+    """
+    return _build_secrets_keyboard_rows()
+
+
+def _build_access_providers_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Access > Provider logins — OAuth status and link/unlink forms.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_access_providers_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:providers:oauth:status'
+    """
+    return [
+        [{"text": "📋 OAuth status", "callback_data": "act:providers:oauth:status"}],
+        [{"text": "🔗 Link provider", "callback_data": "form:providers:oauth:login"}],
+        [{"text": "🔌 Unlink provider", "callback_data": "form:providers:oauth:logout"}],
+    ]
+
+
+def _build_access_pairing_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Access > DM policy and pairing — policy cycle plus approve/pending rows.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_access_pairing_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"].startswith("cfg:toggle:channels.telegram.dm_policy:")
+        True
+    """
+    return [
+        _build_dm_policy_cycle_row(workspace),
+        [{"text": "✅ Approve pairing code", "callback_data": "form:pairing:approve"}],
+        [{"text": "📋 Pending requests", "callback_data": "act:pairing:pending"}],
+    ]
+
+
+def _build_health_bundles_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Health > Turn bundles — export/refresh and view-by-id form.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_health_bundles_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:turn_bundles:export'
+    """
+    return [
+        [{"text": "📦 Export / refresh", "callback_data": "act:turn_bundles:export"}],
+        [{"text": "🔎 View a turn", "callback_data": "form:turn_bundles:view"}],
+    ]
+
+
+def _build_access_guard_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Access > Guard rails — re-parent of the Security section.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> _build_access_guard_keyboard_rows(WorkspaceConfig.minimal())[0][0]["callback_data"].startswith("cfg:toggle:")
+        True
+    """
+    return _build_security_keyboard_rows(workspace)
+
+
+def _build_access_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Access root tile — secrets, guard rails, and legacy section nav.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_access_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"]
+        'form:secret_wizard'
+    """
+    rows: list[list[dict[str, Any]]] = [
+        [{"text": "+ Add secret", "callback_data": "form:secret_wizard"}],
+    ]
+    _append_nav_section_rows(
+        rows,
+        (
+            ("🔐 Secrets", "access_secrets"),
+            ("🪪 Provider logins", "access_providers"),
+            ("🛡 Guard rails", "access_guard"),
+            ("🔐 Secrets (legacy)", "secrets"),
+            ("🛡 Security (legacy)", "security"),
+        ),
+    )
+    rows.append([{"text": "🐙 GitHub token", "callback_data": "form:gh:github_token"}])
+    rows.append([_nav_section_button("👥 DM policy & pairing", "access_pairing")])
+    url = _mission_control_url(workspace, fragment="security")
+    if url:
+        rows.append([{"text": "🌐 Open Security tab", "url": url}])
+    return rows
+
+
+def _build_health_pin_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Health > Status pin — re-parent of the Dashboard section.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> _build_health_pin_keyboard_rows(WorkspaceConfig.minimal())[0][0]["callback_data"]
+        'cfg:dashboard:create_pin'
+    """
+    return _build_dashboard_keyboard_rows(workspace)
+
+
+def _build_health_tracing_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Health > Trace export — Logfire, token, and redaction rows from Logs.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_health_tracing_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"]
+        'cfg:logs:toggle_logfire'
+    """
+    redaction = _tracing_redaction_enabled(workspace)
+    logfire = _logfire_export_enabled(workspace)
+    return [
+        [
+            {
+                "text": f"Logfire export: {'on' if logfire else 'off'} (toggle)",
+                "callback_data": "cfg:logs:toggle_logfire",
+            },
+        ],
+        [
+            {"text": "🔑 Set Logfire token", "callback_data": "form:logs:logfire_token"},
+        ],
+        [
+            {
+                "text": f"Trace redaction: {'on' if redaction else 'off'} (toggle)",
+                "callback_data": "cfg:logs:toggle_redaction",
+            },
+        ],
+        [{"text": "📋 Tracing config", "callback_data": "act:tracing:config"}],
+    ]
+
+
+def _build_health_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Health root tile — log tail actions plus status pin and trace export nav.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_health_keyboard_rows(WorkspaceConfig.minimal())
+        >>> any(r["callback_data"] == "cfg:section:health_pin" for row in rows for r in row)
+        True
+    """
+    rows = _build_logs_keyboard_rows(workspace)
+    rows.insert(0, [{"text": "🩺 Run doctor", "callback_data": "act:doctor:run"}])
+    rows.append([_nav_section_button("📦 Turn bundles", "health_bundles")])
+    rows.append([{"text": "💰 Usage & budget", "callback_data": "act:usage:show"}])
+    _append_nav_section_rows(
+        rows,
+        (
+            ("📌 Status pin", "health_pin"),
+            ("📡 Trace export", "health_tracing"),
+            ("📜 Logs (legacy)", "logs"),
+            ("📊 Dashboard (legacy)", "dashboard"),
+        ),
+    )
+    url = web_ui_url_from_workspace(workspace)
+    if url:
+        rows.append([{"text": "🌐 Open Mission Control", "url": url}])
+    return rows
+
+
+def _build_deployment_services_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Deployment > Services — start/stop/status/logs (W7e).
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_deployment_services_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:services:gateway:start'
+    """
+    return [
+        [
+            {"text": "▶ Start gateway", "callback_data": "act:services:gateway:start"},
+            {"text": "⏹ Stop gateway", "callback_data": "act:services:gateway:stop"},
+        ],
+        [
+            {"text": "📊 Gateway status", "callback_data": "act:services:gateway:status"},
+            {"text": "📄 Gateway logs", "callback_data": "act:services:gateway:logs"},
+        ],
+        [
+            {"text": "▶ Start proxy", "callback_data": "act:services:proxy:start"},
+            {"text": "⏹ Stop proxy", "callback_data": "act:services:proxy:stop"},
+        ],
+        [
+            {"text": "📊 Proxy status", "callback_data": "act:services:proxy:status"},
+            {"text": "📄 Proxy logs", "callback_data": "act:services:proxy:logs"},
+        ],
+    ]
+
+
+def _build_deployment_tunnel_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Deployment > Tunnel setup — one-shot control (W7e).
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_deployment_tunnel_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:tunnel:status'
+    """
+    return [
+        [{"text": "📊 Tunnel status", "callback_data": "act:tunnel:status"}],
+        [
+            {"text": "▶ Start now (this boot)", "callback_data": "act:tunnel:start"},
+            {"text": "⏹ Stop now (this boot)", "callback_data": "act:tunnel:stop"},
+        ],
+        [{"text": "⚙ Setup / change provider", "callback_data": "form:tunnel:setup"}],
+    ]
+
+
+def _build_deployment_config_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Deployment > Config file (W7e).
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_deployment_config_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:config:show'
+    """
+    return [
+        [{"text": "📋 Show sevn.json", "callback_data": "act:config:show"}],
+        [{"text": "✅ Validate", "callback_data": "act:config:validate"}],
+        [{"text": "✏ Set a key", "callback_data": "form:config:set"}],
+        [{"text": "🗂 Sections & SSOT paths", "callback_data": "act:config:sections"}],
+    ]
+
+
+def _build_deployment_update_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Deployment > Update & migrate (W7e).
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_deployment_update_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:update:cli'
+    """
+    return [
+        [{"text": "⬆ Update CLI", "callback_data": "act:update:cli"}],
+        [{"text": "🔀 Sync checkout", "callback_data": "act:sevn_bot:sync"}],
+        [{"text": "🧬 Schema posture", "callback_data": "act:update:schema"}],
+        [{"text": "🚚 Migrate / import", "callback_data": "form:migrate:import"}],
+    ]
+
+
+def _build_deployment_deploy_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Deployment > Deploy to host (W7e).
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_deployment_deploy_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'form:deploy:check'
+    """
+    return [
+        [{"text": "🔌 Check SSH host", "callback_data": "form:deploy:check"}],
+        [{"text": "🚀 Deploy to remote", "callback_data": "form:deploy:remote"}],
+        [_nav_section_button("📤 Build export bundle →", "access_secrets")],
+    ]
+
+
+def _build_deployment_host_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Deployment > Host-only commands — copy-paste cards only (D17, W8).
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_deployment_host_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:host:onboard'
+    """
+    return [
+        [{"text": "🧭 Onboard wizard", "callback_data": "act:host:onboard"}],
+        [{"text": "⌨️ Shell completion", "callback_data": "act:host:completion"}],
+        [{"text": "🕵️ Shell-history hook", "callback_data": "act:host:shell-history"}],
+        [{"text": "🔑 Set gateway token", "callback_data": "act:host:gateway-token"}],
+        [{"text": "🔐 Set dashboard password", "callback_data": "act:host:dashboard-password"}],
+        [{"text": "🗝 Store passphrase", "callback_data": "act:host:store-passphrase"}],
+        [{"text": "☠️ Uninstall sevn", "callback_data": "act:host:uninstall"}],
+    ]
+
+
+def _build_help_dev_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Help > Developer — repo-only copy-paste cards (W8, checkout-gated).
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_help_dev_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:dev:readme'
+    """
+    return [
+        [{"text": "📘 README pipeline", "callback_data": "act:dev:readme"}],
+        [{"text": "📗 About-docs", "callback_data": "act:dev:about-docs"}],
+        [{"text": "🖥 GUI migration notes", "callback_data": "act:dev:gui-migrate"}],
+    ]
+
+
+def _build_help_guides_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Help > Guides (W7e).
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_help_guides_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:guides:list'
+    """
+    return [
+        [{"text": "📋 List guides", "callback_data": "act:guides:list"}],
+        [{"text": "📖 Read a guide", "callback_data": "form:guides:read"}],
+    ]
+
+
+def _build_deployment_keyboard_rows(
+    workspace: WorkspaceConfig,
+    *,
+    is_owner: bool = True,
+) -> list[list[dict[str, Any]]]:
+    """Deployment root tile — services, tunnel, config, upgrade (W7e).
+
+    Args:
+        workspace (WorkspaceConfig): Loaded workspace settings.
+        is_owner (bool): When ``False``, hide owner-only restart/tunnel rows.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_deployment_keyboard_rows(WorkspaceConfig.minimal())
+        >>> any(r[0]["callback_data"] == "cfg:section:deployment_services" for r in rows)
+        True
+    """
+    rows: list[list[dict[str, Any]]] = []
+    if is_owner:
+        rows.append([{"text": "🔄 Restart gateway", "callback_data": "act:gateway:restart"}])
+        rows.append([{"text": "🔄 Restart proxy", "callback_data": "act:proxy:restart"}])
+        from sevn.infrastructure.tunnel_config import tunnel_cfg_from_workspace
+
+        tunnel_row = _tunnel_toggle_row(tunnel_cfg_from_workspace(workspace))
+        if tunnel_row is not None:
+            rows.append(tunnel_row)
+    _append_nav_section_rows(
+        rows,
+        (
+            ("⚙️ Services", "deployment_services"),
+            ("🌍 Tunnel setup", "deployment_tunnel"),
+        ),
+    )
+    rows.append([{"text": "🆔 Deployment id", "callback_data": "cfg:logs:deployment_id"}])
+    rows.append([{"text": "🏷 Version id", "callback_data": "cfg:logs:version_id"}])
+    _append_nav_section_rows(
+        rows,
+        (
+            ("📄 Config file", "deployment_config"),
+            ("⬆ Update & migrate", "deployment_update"),
+            ("🚀 Deploy to host", "deployment_deploy"),
+        ),
+    )
+    if is_owner:
+        _append_nav_section_rows(rows, (("🖥 Host-only commands", "deployment_host"),))
+        auto_resume = _gateway_auto_resume_b(workspace)
+        rows.append(
+            [
+                _config_bool_toggle_button(
+                    "Auto-resume tier B",
+                    "gateway.restart.auto_resume_b",
+                    enabled=auto_resume,
+                ),
+            ],
+        )
+    _append_nav_section_rows(rows, (("🖥 My sevn bot (legacy)", "my_sevn_bot"),))
+    url = web_ui_url_from_workspace(workspace)
+    if url:
+        rows.append([{"text": "🌐 Open Mission Control", "url": url}])
+    return rows
+
+
+def _build_skills_tools_keyboard_rows(
+    workspace: WorkspaceConfig,
+    content_root: Path | None = None,
+) -> list[list[dict[str, Any]]]:
+    """Skills & Tools root tile — skills hub plus Tools and Integrations nav.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+        content_root (Path | None): Workspace content root for skill listing.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_skills_tools_keyboard_rows(WorkspaceConfig.minimal(), None)
+        >>> any(r["callback_data"] == "cfg:section:tools" for row in rows for r in row)
+        True
+    """
+    rows: list[list[dict[str, Any]]] = [
+        [{"text": "📋 Skills list", "callback_data": "act:skills:list"}],
+        [{"text": "🔄 Sync skills index", "callback_data": "act:skills:sync"}],
+        [{"text": "🛡 Security scan", "callback_data": "act:skills:security-scan"}],
+    ]
+    rows.extend(_build_skills_keyboard_rows(workspace, content_root))
+    _append_nav_section_rows(
+        rows,
+        (
+            ("🛠 Tools", "skills_tools"),
+            ("🌐 Integrations", "skills_integrations"),
+            ("🛠 Tools (legacy)", "tools"),
+            ("🌐 Integrations (legacy)", "integrations"),
+        ),
+    )
+    return rows
+
+
+def _build_help_redesign_keyboard_rows(
+    workspace: WorkspaceConfig,
+    *,
+    content_root: Path | None = None,
+    is_owner: bool = True,
+) -> list[list[dict[str, Any]]]:
+    """Help root tile — slash catalog body plus sevn.bot upstream rows.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+        content_root (Path | None): Workspace content root for checkout guard.
+        is_owner (bool): When ``False``, hide owner-only Developer nav.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_help_redesign_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[-1][0]["callback_data"]
+        'cfg:section:sevn_bot'
+    """
+    from sevn.gateway.menu.host_command_cards import has_bound_source_checkout
+
+    _ = workspace
+    rows: list[list[dict[str, Any]]] = [
+        [{"text": "📖 Slash commands", "callback_data": "act:help:slash"}],
+        [_nav_section_button("📚 Guides", "help_guides")],
+        [{"text": "🔄 Sync sevn.bot (latest)", "callback_data": "act:sevn_bot:sync"}],
+        [
+            {"text": "🐛 Bugs", "callback_data": "act:sevn_bot:bugs"},
+            {"text": "✨ Features", "callback_data": "act:sevn_bot:features"},
+        ],
+        [{"text": "🏷 CLI version", "callback_data": "act:help:version"}],
+        [{"text": "🌐 about.sevn.bot", "callback_data": "act:help:about"}],
+    ]
+    if is_owner and has_bound_source_checkout(workspace, content_root):
+        rows.insert(-1, [_nav_section_button("🧑‍💻 Developer", "help_dev")])
+    rows.append([_nav_section_button("sevn.bot (legacy)", "sevn_bot")])
     return rows
 
 
@@ -3534,7 +4705,9 @@ def build_config_menu_keyboard(
     if section == "root":
         rows: list[list[dict[str, Any]]] = []
         pair_row: list[dict[str, Any]] = []
-        for label, _sid, cb in _CONFIG_ROOT_TILES:
+        for label, _sid, cb, owner_only in _CONFIG_ROOT_TILES:
+            if owner_only and not is_owner:
+                continue
             pair_row.append({"text": label, "callback_data": cb})
             if len(pair_row) == 2:
                 rows.append(pair_row)
@@ -3543,15 +4716,29 @@ def build_config_menu_keyboard(
             rows.append(pair_row)
         rows.extend(_config_chrome(include_back=False))
         return {"inline_keyboard": rows}
-    if section == "session":
-        rows_sec = _build_session_keyboard_rows(workspace)
-    elif section == "help":
-        rows_sec = _build_help_keyboard_rows()
-    elif section == "voice":
-        rows_sec = _build_voice_keyboard_rows(workspace)
-    elif section == "security":
-        rows_sec = _build_security_keyboard_rows(workspace)
-    elif section == "models":
+    if section == "chat":
+        rows_sec = _build_chat_keyboard_rows(
+            workspace,
+            content_root,
+            user_id=user_id or "",
+            is_owner=is_owner,
+        )
+    elif section == "chat_qa":
+        rows_sec = _build_chat_qa_keyboard_rows(workspace)
+    elif section == "chat_shortcuts":
+        rows_sec = _build_chat_shortcuts_keyboard_rows(
+            workspace,
+            content_root,
+            user_id=user_id or "",
+            is_owner=is_owner,
+        )
+    elif section == "chat_voice":
+        rows_sec = _build_chat_voice_keyboard_rows(workspace)
+    elif section == "chat_channels":
+        rows_sec = _build_chat_channels_keyboard_rows(workspace)
+    elif section == "chat_sessions":
+        rows_sec = _build_chat_sessions_keyboard_rows(workspace)
+    elif section == "agent":
         if models_picker_slot and model_picker_slots_for_key(models_picker_slot):
             rows_sec = _build_models_picker_keyboard_rows(
                 workspace,
@@ -3559,67 +4746,88 @@ def build_config_menu_keyboard(
                 models_picker_page,
             )
         else:
-            rows_sec = _build_models_keyboard_rows(workspace)
-    elif section == "dashboard":
-        rows_sec = _build_dashboard_keyboard_rows(workspace)
-    elif section == "channels":
-        rows_sec = _build_channels_keyboard_rows(workspace)
-    elif section == "notifications":
-        rows_sec = _build_notifications_keyboard_rows(workspace)
-    elif section == "advanced":
-        rows_sec = _build_advanced_keyboard_rows(workspace, is_owner=is_owner)
-    elif section == "codemode":
-        rows_sec = _build_codemode_keyboard_rows(workspace)
-    elif section == "logs":
-        rows_sec = _build_logs_keyboard_rows(workspace)
-    elif section == "shortcuts":
-        if content_root is not None:
-            rows_sec = _build_shortcuts_keyboard_rows(
-                content_root,
-                user_id=user_id or "",
-                is_owner=is_owner,
-            )
-        else:
-            rows_sec = [[{"text": "+ Add shortcut", "callback_data": "form:shortcut_add"}]]
-    elif section == "agents":
-        rows_sec = _build_agents_keyboard_rows(workspace)
+            rows_sec = _build_agent_keyboard_rows(workspace)
+    elif section == "agent_identity":
+        rows_sec = _build_agent_identity_keyboard_rows(workspace)
+    elif section == "agent_sampling":
+        rows_sec = _build_agent_sampling_keyboard_rows(workspace)
+    elif section == "agent_lab":
+        rows_sec = _build_agent_lab_keyboard_rows(workspace, is_owner=is_owner)
+    elif section == "agent_subagents":
+        rows_sec = _build_subagents_keyboard_rows(
+            workspace,
+            level1_count=subagent_level1_count,
+            level2_count=subagent_level2_count,
+        )
+    elif section == "agent_subagents_running":
+        rows_sec = _build_subagents_running_keyboard_rows(
+            subagent_running_rows,
+            is_owner=is_owner,
+        )
+    elif section == "memory":
+        rows_sec = _build_memory_keyboard_rows(workspace)
+    elif section == "memory_code":
+        rows_sec = _build_memory_code_keyboard_rows(workspace)
+    elif section == "memory_sb":
+        rows_sec = _build_second_brain_keyboard_rows(workspace)
+    elif section == "memory_dreaming":
+        rows_sec = _build_memory_dreaming_keyboard_rows(workspace)
+    elif section == "memory_openwiki":
+        rows_sec = _build_memory_openwiki_keyboard_rows(workspace)
+    elif section == "access":
+        rows_sec = _build_access_keyboard_rows(workspace)
+    elif section == "access_secrets":
+        rows_sec = _build_access_secrets_keyboard_rows()
+    elif section == "access_providers":
+        rows_sec = _build_access_providers_keyboard_rows()
+    elif section == "access_pairing":
+        rows_sec = _build_access_pairing_keyboard_rows(workspace)
+    elif section == "access_guard":
+        rows_sec = _build_access_guard_keyboard_rows(workspace)
+    elif section == "health":
+        rows_sec = _build_health_keyboard_rows(workspace)
+    elif section == "health_pin":
+        rows_sec = _build_health_pin_keyboard_rows(workspace)
+    elif section == "health_tracing":
+        rows_sec = _build_health_tracing_keyboard_rows(workspace)
+    elif section == "health_bundles":
+        rows_sec = _build_health_bundles_keyboard_rows()
+    elif section == "deployment":
+        rows_sec = _build_deployment_keyboard_rows(workspace, is_owner=is_owner)
+    elif section == "deployment_services":
+        rows_sec = _build_deployment_services_keyboard_rows()
+    elif section == "deployment_tunnel":
+        rows_sec = _build_deployment_tunnel_keyboard_rows()
+    elif section == "deployment_config":
+        rows_sec = _build_deployment_config_keyboard_rows()
+    elif section == "deployment_update":
+        rows_sec = _build_deployment_update_keyboard_rows()
+    elif section == "deployment_deploy":
+        rows_sec = _build_deployment_deploy_keyboard_rows()
+    elif section == "deployment_host":
+        rows_sec = _build_deployment_host_keyboard_rows()
+    elif section == "help_guides":
+        rows_sec = _build_help_guides_keyboard_rows()
+    elif section == "help_dev":
+        rows_sec = _build_help_dev_keyboard_rows()
+    elif section == "skills_tools":
+        rows_sec = _build_tools_keyboard_rows(workspace, content_root)
+    elif section == "skills_integrations":
+        rows_sec = _build_integrations_keyboard_rows(workspace, content_root)
+    elif section == "help":
+        rows_sec = _build_help_redesign_keyboard_rows(
+            workspace,
+            content_root=content_root,
+            is_owner=is_owner,
+        )
     elif section == "skills":
-        rows_sec = _build_skills_keyboard_rows(workspace, content_root)
+        rows_sec = _build_skills_tools_keyboard_rows(workspace, content_root)
     elif section == "skills:social_media_manager":
         rows_sec = build_social_media_manager_keyboard_rows(workspace, content_root)
     elif section == "skills:discogs":
         rows_sec = build_discogs_keyboard_rows(workspace, content_root)
     elif section == "skills:discogs:setup":
         rows_sec = build_discogs_setup_keyboard_rows(workspace, content_root)
-    elif section == "tools":
-        rows_sec = _build_tools_keyboard_rows(workspace, content_root)
-    elif section == "rlm":
-        rows_sec = _build_rlm_keyboard_rows(workspace)
-    elif section == "code":
-        rows_sec = _build_code_keyboard_rows(workspace)
-    elif section == "secrets":
-        rows_sec = _build_secrets_keyboard_rows()
-    elif section == "self_improve":
-        rows_sec = _build_self_improve_keyboard_rows(workspace)
-    elif section == "second_brain":
-        rows_sec = _build_second_brain_keyboard_rows(workspace)
-    elif section == "subagents":
-        rows_sec = _build_subagents_keyboard_rows(
-            workspace,
-            level1_count=subagent_level1_count,
-            level2_count=subagent_level2_count,
-        )
-    elif section == "subagents_running":
-        rows_sec = _build_subagents_running_keyboard_rows(
-            subagent_running_rows,
-            is_owner=is_owner,
-        )
-    elif section == "integrations":
-        rows_sec = _build_integrations_keyboard_rows(workspace, content_root)
-    elif section == "sevn_bot":
-        rows_sec = _build_sevn_bot_keyboard_rows(workspace)
-    elif section == "my_sevn_bot":
-        rows_sec = _build_my_sevn_bot_keyboard_rows(workspace, is_owner=is_owner)
     else:
         rows_sec = [[{"text": "Coming soon", "callback_data": f"cfg:section:{section}"}]]
     rows_sec.extend(_config_chrome())
@@ -3693,7 +4901,7 @@ async def refresh_config_menu_message(
     l1_count = 0
     l2_count = 0
     running_rows: tuple[dict[str, Any], ...] = ()
-    if active in {"subagents", "subagents_running"}:
+    if active in {"agent_subagents", "agent_subagents_running"}:
         l1_count, l2_count, running_rows = await subagent_menu_snapshot_from_router(router)
     return await _edit_menu_message(
         adapter,
@@ -3727,6 +4935,42 @@ async def refresh_config_menu_message(
         ),
         message_thread_id=ctx.topic_id,
     )
+
+
+def _telegram_root_config_caption(
+    slug: str, workspace: WorkspaceConfig, content_root: Path | None
+) -> str | None:
+    """Render a Telegram caption from the same dot-paths as ``sevn config <slug>`` (W6.4).
+
+    Args:
+        slug (str): One of the eight redesign root slugs.
+        workspace (WorkspaceConfig): Parsed workspace settings.
+        content_root (Path | None): Bound workspace content root for raw ``sevn.json``.
+
+    Returns:
+        str | None: Caption text when *slug* is a CLI root section; else ``None``.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> cap = _telegram_root_config_caption("chat", WorkspaceConfig.minimal(), None)
+        >>> cap is not None and cap.startswith("Chat")
+        True
+    """
+    from sevn.cli.config_paths import section_by_slug
+    from sevn.cli.config_sections import nested_get
+
+    sec = section_by_slug(slug)
+    if sec is None:
+        return None
+    raw_doc = _raw_sevn_doc(content_root) or {}
+    lines = [sec.label, ""]
+    if not sec.dot_paths:
+        lines.append("(no toggle paths registered for this section yet)")
+    else:
+        for path in sec.dot_paths:
+            value = nested_get(raw_doc, path)
+            lines.append(f"{path}: {value!r}")
+    return "\n".join(lines)
 
 
 def config_menu_message_text(
@@ -3766,39 +5010,47 @@ def config_menu_message_text(
     """
     if section == "root":
         return "sevn — /config"
-    if section == "voice":
+    root_caption = _telegram_root_config_caption(section, workspace, content_root)
+    if root_caption is not None:
+        return root_caption
+    if section == "chat":
+        qa = _quick_actions_config(workspace)
+        mode = _gateway_queue_mode(workspace)
+        rk = _telegram_reply_keyboard_enabled(workspace)
+        policy = _telegram_notify_policy(workspace)
         return (
-            f"Voice\n\nGlobal TTS mode: {_voice_tts_mode(workspace)}\n"
-            f"Active TTS engine: {_voice_tts_engine(workspace)}\n"
-            f"Active STT provider: {_voice_stt_active(workspace)}\n"
-            "Per-chat override: /voice on|off|when_asked|reset"
+            "Chat\n\n"
+            f"Queue mode: {mode}\n"
+            f"Reply keyboard: {'on' if rk else 'off'}\n"
+            f"Notify policy: {policy}\n"
+            f"Quick actions — Regen: {'on' if qa.show_regen else 'off'}"
         )
-    if section == "models":
-        if models_picker_slot and model_picker_slots_for_key(models_picker_slot):
-            label = _MODEL_PICKER_SLOT_LABELS.get(models_picker_slot, models_picker_slot)
-            catalog = list_catalog_model_ids(workspace)
-            page_size = MODELS_PICKER_PAGE_SIZE
-            total_pages = max(1, (len(catalog) + page_size - 1) // page_size)
-            safe_page = max(0, min(models_picker_page, total_pages - 1))
-            current = _resolved_model_for_picker_slot(workspace, models_picker_slot)
-            lines = [
-                "Models",
-                "",
-                f"Pick {label}",
-                f"Current: {current or 'unset'}",
-            ]
-            if catalog:
-                lines.append(f"Page {safe_page + 1}/{total_pages}")
-            else:
-                lines.append("No models in catalog.")
-            return "\n".join(lines)
+    if section == "agent" and models_picker_slot and model_picker_slots_for_key(models_picker_slot):
+        label = _MODEL_PICKER_SLOT_LABELS.get(models_picker_slot, models_picker_slot)
+        catalog = list_catalog_model_ids(workspace)
+        page_size = MODELS_PICKER_PAGE_SIZE
+        total_pages = max(1, (len(catalog) + page_size - 1) // page_size)
+        safe_page = max(0, min(models_picker_page, total_pages - 1))
+        current = _resolved_model_for_picker_slot(workspace, models_picker_slot)
+        lines = [
+            "Agent",
+            "",
+            f"Pick {label}",
+            f"Current: {current or 'unset'}",
+        ]
+        if catalog:
+            lines.append(f"Page {safe_page + 1}/{total_pages}")
+        else:
+            lines.append("No models in catalog.")
+        return "\n".join(lines)
+    if section == "agent":
         unified = use_main_model_for_all(workspace)
         triager = resolve_model_slot(workspace, ModelSlot.triager)
         tier_b = resolve_model_slot(workspace, ModelSlot.tier_b)
         tier_c = resolve_model_slot(workspace, ModelSlot.tier_c)
         tier_d = resolve_model_slot(workspace, ModelSlot.tier_d)
         lines = [
-            "Models",
+            "Agent",
             "",
             f"Unified model: {'on' if unified else 'off'}",
             f"Triager: {triager}",
@@ -3807,11 +5059,30 @@ def config_menu_message_text(
         if not unified:
             lines.append(f"Tier C: {tier_c}")
             lines.append(f"Tier D: {tier_d}")
+        lines.append(f"Sub-agents: {'on' if _subagents_enabled(workspace) else 'off'}")
         return "\n".join(lines)
-    if section == "security":
+    if section == "chat_voice":
+        return (
+            f"Voice\n\nGlobal TTS mode: {_voice_tts_mode(workspace)}\n"
+            f"Active TTS engine: {_voice_tts_engine(workspace)}\n"
+            f"Active STT provider: {_voice_stt_active(workspace)}\n"
+            "Per-chat override: /voice on|off|when_asked|reset"
+        )
+    if section == "chat_qa":
+        qa = _quick_actions_config(workspace)
+        return (
+            "Quick actions\n\n"
+            "Buttons attached to each assistant reply.\n\n"
+            f"Regen: {'on' if qa.show_regen else 'off'}\n"
+            f"Thumbs up: {'on' if qa.show_thumbs_up else 'off'}\n"
+            f"Thumbs down: {'on' if qa.show_thumbs_down else 'off'}\n"
+            f"Share: {'on' if qa.show_share else 'off'}\n"
+            f"Feedback: {'on' if qa.show_feedback else 'off'}"
+        )
+    if section == "access_guard":
         heuristic = _security_heuristic_only(workspace)
         lines = [
-            "Security",
+            "Guard rails",
             "",
             f"Heuristic-only scanner: {'on' if heuristic else 'off'}",
         ]
@@ -3821,24 +5092,11 @@ def config_menu_message_text(
         else:
             lines.append("Configure web_ui.url for Mission Control Security tab.")
         return "\n".join(lines)
-    if section == "session":
-        qa = _quick_actions_config(workspace)
-        mode = _gateway_queue_mode(workspace)
-        return (
-            "Session\n\n"
-            "Quick-action bar on final Telegram replies and per-session queue policy.\n\n"
-            f"Queue mode: {mode}\n"
-            f"Regen: {'on' if qa.show_regen else 'off'}\n"
-            f"Thumbs up: {'on' if qa.show_thumbs_up else 'off'}\n"
-            f"Thumbs down: {'on' if qa.show_thumbs_down else 'off'}\n"
-            f"Share: {'on' if qa.show_share else 'off'}\n"
-            f"Feedback: {'on' if qa.show_feedback else 'off'}"
-        )
     if section == "help":
         from sevn.gateway.menu.menu_readiness import config_menu_help_catalog_text
 
         return config_menu_help_catalog_text()
-    if section == "dashboard":
+    if section == "health_pin":
         url = web_ui_url_from_workspace(workspace)
         lines = [
             "Dashboard",
@@ -3849,7 +5107,7 @@ def config_menu_message_text(
         if url:
             lines.append(f"Mission Control: {url}")
         return "\n".join(lines)
-    if section == "shortcuts":
+    if section == "chat_shortcuts":
         if content_root is not None:
             names = [
                 str(row.get("name", ""))
@@ -3863,10 +5121,10 @@ def config_menu_message_text(
                 listed = "\n".join(f"/{n}" for n in names)
                 return f"Shortcuts\n\nVisible commands ({len(names)}):\n{listed}"
         return "Shortcuts\n\nNo custom shortcuts yet. Tap Add to create one."
-    if section == "agents":
+    if section == "agent_identity":
         name = _agent_display_name(workspace, content_root)
         lines = [
-            "Agents",
+            "Identity",
             "",
             f"Display name: {name}",
             "Persona files: IDENTITY.md, SOUL.md, USER.md",
@@ -3877,6 +5135,24 @@ def config_menu_message_text(
         else:
             lines.append("Configure persona files in workspace (IDENTITY.md, SOUL.md, USER.md).")
         lines.append("Tap Edit display name to change the bot name in sevn.json.")
+        return "\n".join(lines)
+    if section == "agent_sampling":
+        from sevn.config.llm_params import load_or_create_llm_params_doc
+
+        doc: dict[str, Any] = (
+            load_or_create_llm_params_doc(content_root) if content_root is not None else {}
+        )
+        triager_raw = doc.get("triager")
+        triager_params = triager_raw if isinstance(triager_raw, dict) else {}
+        temp = triager_params.get("temperature", "—")
+        max_out = triager_params.get("max_output_tokens", "—")
+        lines = [
+            "Sampling",
+            "",
+            "LLM_params_config.json overrides (gateway restart required after edits).",
+            f"temperature: {temp}",
+            f"max_output_tokens: {max_out}",
+        ]
         return "\n".join(lines)
     if section == "skills":
         tool_surface = _config_menu_tool_surface(workspace, content_root)
@@ -3900,7 +5176,7 @@ def config_menu_message_text(
         return discogs_menu_caption(workspace, content_root)
     if section == "skills:discogs:setup":
         return discogs_setup_caption(workspace, content_root)
-    if section == "tools":
+    if section == "skills_tools":
         tool_surface = _config_menu_tool_surface(workspace, content_root)
         native_n = len(tool_surface.native)
         lines = [
@@ -3916,31 +5192,62 @@ def config_menu_message_text(
             lines.append("Configure tool plugins in sevn.json (tools.*.enabled).")
             lines.append("MCP servers: configure web_ui.url for Mission Control links.")
         return "\n".join(lines)
-    if section == "rlm":
-        tool_cap, skill_cap = _triager_tier_b_caps(workspace)
-        backend = _rlm_c_d_backend(workspace)
+    if section == "agent_lab":
         lambda_on = _lambda_rlm_enabled(workspace)
+        codemode_on = codemode_enabled(workspace)
+        si_on = _self_improve_enabled(workspace)
         lines = [
-            "RLM",
+            "Lab",
             "",
-            f"C/D backend: {backend}",
-            f"λ-RLM opt-in: {'on' if lambda_on else 'off'}",
-            f"REPL lifetime: {_rlm_repl_lifetime(workspace)}",
-            f"Default complexity caps — tools: {tool_cap}, skills: {skill_cap}",
+            f"λ-RLM: {'on' if lambda_on else 'off'}",
+            f"CodeMode: {'on' if codemode_on else 'off'}",
+            f"Self-improve: {'on' if si_on else 'off'}",
         ]
         url = web_ui_url_from_workspace(workspace)
         if url:
-            lines.append(f"Mission Control: {url}#rlm")
-        else:
-            lines.append("Configure web_ui.url for Mission Control RLM tab.")
-        if (
-            _lambda_rlm_enabled(workspace)
-            and not _rlm_lambda_tool_allowlist(workspace)
-            and _schema_has_config_path("rlm.c_d_backend")
-        ):
-            lines.append("C/D backend cycle needs rlm.lambda_tool_allowlist before λ-RLM.")
+            lines.append(f"Mission Control: {url}")
         return "\n".join(lines)
-    if section == "code":
+    if section == "memory":
+        sb_on = _second_brain_enabled(workspace)
+        from sevn.memory.dreaming.scheduler import effective_dreaming
+
+        dreaming = effective_dreaming(workspace)
+        mycode = _mycode_enabled(workspace)
+        lines = [
+            "Memory",
+            "",
+            f"Second Brain: {'on' if sb_on else 'off'} ({_second_brain_layout(workspace)})",
+            f"Dreaming: {'on' if dreaming.enabled else 'off'}",
+            f"MYCODE: {'on' if mycode else 'off'}",
+        ]
+        if content_root is not None:
+            lines.append(f"Vault: {_second_brain_vault_display(content_root, workspace)}")
+        return "\n".join(lines)
+    if section == "memory_dreaming":
+        from sevn.memory.dreaming.scheduler import effective_dreaming
+
+        dreaming = effective_dreaming(workspace)
+        lines = [
+            "Dreaming",
+            "",
+            f"Enabled: {'on' if dreaming.enabled else 'off'}",
+            f"Cron: {dreaming.cron or '—'}",
+            f"Threshold: {dreaming.threshold}",
+            f"Max promotions/run: {dreaming.max_promotions_per_run}",
+        ]
+        return "\n".join(lines)
+    if section == "memory_openwiki":
+        from sevn.skills.openwiki_install import openwiki_cli_installed
+
+        installed = openwiki_cli_installed()
+        lines = [
+            "OpenWiki",
+            "",
+            f"CLI: {'installed' if installed else 'not installed'}",
+            "LLM key: configure after install (integration.openwiki.llm_api_key).",
+        ]
+        return "\n".join(lines)
+    if section == "memory_code":
         mycode = _mycode_enabled(workspace)
         review = _code_review_graph_enabled(workspace)
         lines = [
@@ -3955,7 +5262,7 @@ def config_menu_message_text(
         else:
             lines.append("Configure web_ui.url for Mission Control Code tab.")
         return "\n".join(lines)
-    if section == "channels":
+    if section == "chat_channels":
         rk = _telegram_reply_keyboard_enabled(workspace)
         routing = _telegram_show_routing(workspace)
         wc_tts = _webchat_tts_inline_enabled(workspace)
@@ -3971,59 +5278,66 @@ def config_menu_message_text(
         if not _schema_has_config_path("channels.webchat.tts_inline"):
             lines.append("Webchat TTS inline is caption-only (no schema toggle path).")
         return "\n".join(lines)
-    if section == "notifications":
-        policy = _telegram_notify_policy(workspace)
-        return (
-            f"Notifications\n\nTelegram notify policy: {policy}\nTap to cycle all → errors → none."
-        )
-    if section == "advanced":
-        auto_resume = _gateway_auto_resume_b(workspace)
-        redaction = _tracing_redaction_enabled(workspace)
+    if section == "chat_sessions":
+        return "Sessions\n\nList sessions, open history, or send to another session.\n/new and /stop are one tap below."
+    if section == "deployment":
+        from sevn.infrastructure.tunnel_config import tunnel_cfg_from_workspace
+
+        tunnel_cfg = tunnel_cfg_from_workspace(workspace)
+        mode = str(tunnel_cfg.get("mode") or "none")
+        persistent = "on" if tunnel_cfg.get("autostart") else "off"
         lines = [
-            "Advanced",
+            "Deployment",
             "",
-            f"Auto-resume tier B on restart: {'on' if auto_resume else 'off'}",
-            f"Trace redaction: {'on' if redaction else 'off'}",
-            "",
-            "Nested sections: RLM, Self-Improve, Second Brain, Sub-agents, CodeMode.",
-        ]
-        url = web_ui_url_from_workspace(workspace)
-        if url:
-            lines.append(f"Full config validation: {url}")
-        else:
-            lines.append("Configure web_ui.url for Mission Control deep links.")
-        return "\n".join(lines)
-    if section == "codemode":
-        enabled = codemode_enabled(workspace)
-        lines = [
-            "CodeMode",
-            "",
-            f"Tier-B CodeMode: {'on' if enabled else 'off'}",
-            "When on, triager-listed tools may run inside Monty run_code composites.",
-            "Default off — flat pydantic-ai tool calls when disabled.",
-        ]
-        if enabled:
-            lines.append(
-                "Sandbox path skips permission hook; enable only for trusted workloads.",
-            )
-        return "\n".join(lines)
-    if section == "sevn_bot":
-        return (
-            f"{config_sevn_bot_section_title()}\n\n"
-            "Upstream sevn.bot checkout: sync from GitHub, list bug/feature evolution issues."
-        )
-    if section == "my_sevn_bot":
-        lines = [
-            "My sevn bot",
-            "",
-            "This gateway instance: deployment id, version id, and owner service restarts.",
+            f"Tunnel: {mode} · persistent: {persistent}",
+            "Restart gateway/proxy on this screen; one-shot tunnel control lives under Tunnel setup.",
         ]
         if is_owner:
-            lines.append("Restart gateway or proxy below (two-step confirm).")
+            lines.append("Owner-only: services, config file, upgrade, and remote deploy below.")
         else:
-            lines.append("Restart actions are owner-only.")
+            lines.append("Owner-only rows are hidden for paired users.")
         return "\n".join(lines)
-    if section == "logs":
+    if section == "deployment_services":
+        return "Services\n\nStart, stop, status, and logs for gateway and proxy user units."
+    if section == "deployment_tunnel":
+        from sevn.infrastructure.tunnel_config import tunnel_cfg_from_workspace
+
+        tunnel_cfg = tunnel_cfg_from_workspace(workspace)
+        mode = str(tunnel_cfg.get("mode") or "none")
+        persistent = "on" if tunnel_cfg.get("autostart") else "off"
+        return (
+            f"Tunnel setup\n\nMode: {mode}\n"
+            f"Persistent: {persistent} (switch is on the Deployment screen)\n"
+            "Start/stop here affects this boot only."
+        )
+    if section == "deployment_config":
+        path = content_root / "sevn.json" if content_root is not None else "sevn.json"
+        return (
+            f"Config file\n\nBound workspace config at {path}\nShow, validate, or set keys below."
+        )
+    if section == "deployment_update":
+        return "Update & migrate\n\nCLI upgrade hints, checkout sync, schema posture, and import."
+    if section == "deployment_deploy":
+        return "Deploy to host\n\nCheck SSH inventory hosts and deploy from an export bundle."
+    if section == "deployment_host":
+        return (
+            "Host-only commands\n\n"
+            "These run in your shell, not through the gateway.\n"
+            "Tap one to get a copy-paste block."
+        )
+    if section == "help_dev":
+        return (
+            "Developer — source checkout bound\n\n"
+            "These only work inside a sevn.bot git checkout.\n"
+            "Each row posts the exact command to paste."
+        )
+    if section == "help_guides":
+        from sevn.cli.help.guide import list_guide_topics
+
+        topics = list_guide_topics()
+        listed = " · ".join(topics[:8]) if topics else "none bundled"
+        return f"Guides\n\nBundled topics: {listed}"
+    if section == "health":
         from sevn.gateway.webapp.webapp_qa import (
             resolve_webapp_public_base,
             webapp_https_disabled_notice,
@@ -4032,12 +5346,9 @@ def config_menu_message_text(
         redaction = _tracing_redaction_enabled(workspace)
         logfire = _logfire_export_enabled(workspace)
         lines = [
-            "Logs",
+            "Health",
             "",
             "Owner-only operator diagnostics (mirrors /logs + /traces).",
-            "",
-            "Tail service logs, browse recent traces, grep by pattern,",
-            "configure Logfire export, or flip trace redaction.",
             "",
             f"Logfire export: {'on' if logfire else 'off'}",
             f"Trace redaction: {'on' if redaction else 'off'}",
@@ -4046,40 +5357,7 @@ def config_menu_message_text(
         if webapp_notice is not None:
             lines.extend(["", webapp_notice])
         return "\n".join(lines)
-    if section == "secrets":
-        raw_doc = _raw_sevn_doc(content_root)
-        ref_keys = _list_secret_ref_keys(raw_doc)
-        lines = [
-            "Secrets",
-            "",
-            f"Configured secret refs: {len(ref_keys)}",
-        ]
-        if ref_keys:
-            lines.append("Referenced keys:")
-            for key in ref_keys[:20]:
-                lines.append(f"• {key}")
-            if len(ref_keys) > 20:
-                lines.append(f"… and {len(ref_keys) - 20} more")
-        lines.append("Values are never shown in Telegram. Tap Add to open the secret wizard.")
-        return "\n".join(lines)
-    if section == "self_improve":
-        enabled = _self_improve_enabled(workspace)
-        preset = "A"
-        if workspace.self_improve is not None:
-            preset = str(workspace.self_improve.preset)
-        lines = [
-            "Self-Improve",
-            "",
-            f"Enabled: {'on' if enabled else 'off'}",
-            f"Preset: {preset}",
-        ]
-        url = web_ui_url_from_workspace(workspace)
-        if url:
-            lines.append(f"Jobs and traces: {url}#traces")
-        else:
-            lines.append("Configure web_ui.url for Mission Control traces.")
-        return "\n".join(lines)
-    if section == "second_brain":
+    if section == "memory_sb":
         enabled = _second_brain_enabled(workspace)
         ingest = _second_brain_ingest_mode(workspace)
         layout_name = _second_brain_layout(workspace)
@@ -4102,7 +5380,33 @@ def config_menu_message_text(
         if not _schema_has_config_path("second_brain.ingest_batch_cron"):
             lines.append("Ingest schedule is caption-only (not in workspace schema).")
         return "\n".join(lines)
-    if section == "subagents":
+    if section == "access_secrets":
+        raw_doc = _raw_sevn_doc(content_root)
+        ref_keys = _list_secret_ref_keys(raw_doc)
+        lines = [
+            "Secrets",
+            "",
+            f"Configured secret refs: {len(ref_keys)}",
+        ]
+        if ref_keys:
+            lines.append("Referenced keys:")
+            for key in ref_keys[:20]:
+                lines.append(f"• {key}")
+            if len(ref_keys) > 20:
+                lines.append(f"… and {len(ref_keys) - 20} more")
+        lines.append("Values are never shown in Telegram. Tap Add to open the secret wizard.")
+        return "\n".join(lines)
+    if section == "access_providers":
+        return "Provider logins\n\nOAuth tokens for LLM providers. Status lists paired secrets; link/unlink runs provider OAuth handoffs."
+    if section == "access_pairing":
+        return (
+            f"DM policy & pairing\n\n"
+            f"DM policy: {_telegram_dm_policy(workspace)}\n"
+            "Approve inbound pairing codes and review pending requests."
+        )
+    if section == "health_bundles":
+        return "Turn bundles\n\nPer-turn diagnostic JSONL under `.sevn/turns/`. Export refreshes bundles; view explores one turn id."
+    if section == "agent_subagents":
         from sevn.config.sections.subagents import SubAgentsWorkspaceConfig, resolve_limits
 
         cfg = workspace.subagents or SubAgentsWorkspaceConfig()
@@ -4124,7 +5428,7 @@ def config_menu_message_text(
         if url:
             lines.append(f"Mission Control: {url}#subagents")
         return "\n".join(lines)
-    if section == "subagents_running":
+    if section == "agent_subagents_running":
         lines = [
             "Sub-agents — Running",
             "",
@@ -4141,8 +5445,8 @@ def config_menu_message_text(
         if not is_owner:
             lines.append("Kill controls are owner-only.")
         return "\n".join(lines)
-    if section == "integrations":
-        raw_doc = _raw_sevn_doc(content_root)
+    if section == "skills_integrations":
+        raw_doc = _raw_sevn_doc(content_root) or {}
         ids = _configured_integration_ids(workspace, raw_doc=raw_doc)
         lines = ["Integrations", ""]
         if ids:
@@ -4215,7 +5519,7 @@ def parse_config_callback_data(data: str) -> tuple[str, str | None] | None:
 
     Examples:
         >>> parse_config_callback_data("cfg:section:voice")
-        ('section', 'voice')
+        ('retired_section', 'voice')
         >>> parse_config_callback_data("cfg:voice:mode:off") is None
         True
     """
@@ -4234,6 +5538,7 @@ def parse_config_callback_data(data: str) -> tuple[str, str | None] | None:
         name = raw.removeprefix("cfg:section:").strip().lower()
         if name in _CONFIG_SECTIONS:
             return ("section", name)
+        return ("retired_section", name)
     if raw.startswith("cfg:help:cmd:"):
         cmd = raw.removeprefix("cfg:help:cmd:").strip().lower()
         if cmd in {"help", "menu", "new", "voice", "model", "config", "stop", "status"}:
@@ -4431,7 +5736,7 @@ class ConfigMenuHandler:
             thread_id = _telegram_api_thread_id(md)
             _kind, slot_key, page = models_parsed
             target = ConfigMenuNavFrame(
-                section="models",
+                section="agent",
                 models_picker_slot=slot_key,
                 models_picker_page=page,
             )
@@ -4460,6 +5765,41 @@ class ConfigMenuHandler:
                     adapter,
                     callback_query_id=cq_str,
                     text="Not active yet — see /config → Help for status.",
+                )
+            return
+        if kind == "retired_section" and value is not None:
+            alias_target = _SECTION_ALIASES.get(value, "")
+            if alias_target and alias_target in _CONFIG_SECTIONS:
+                if _section_requires_owner(alias_target) and not self._router._resolve_owner_flag(
+                    msg
+                ):
+                    if cq_str:
+                        await _answer_callback_query(
+                            adapter, callback_query_id=cq_str, text="Owner only."
+                        )
+                    return
+                frame = ConfigMenuNavFrame(section=alias_target)  # type: ignore[arg-type]
+                chat_raw = md.get("chat_id")
+                message_raw = md.get("message_id")
+                if isinstance(chat_raw, int) and isinstance(message_raw, int) and message_raw > 0:
+                    config_menu_nav_go(self._router, chat_raw, message_raw, frame)
+                    thread_id = _telegram_api_thread_id(md)
+                    await self._render_config_nav_frame(
+                        msg,
+                        frame,
+                        adapter=adapter,
+                        chat_id=chat_raw,
+                        message_id=message_raw,
+                        message_thread_id=thread_id,
+                    )
+                elif cq_str:
+                    await _answer_callback_query(adapter, callback_query_id=cq_str)
+                return
+            if cq_str:
+                await _answer_callback_query(
+                    adapter,
+                    callback_query_id=cq_str,
+                    text=_retired_section_toast(value),
                 )
             return
         if kind == "help":
@@ -4538,6 +5878,12 @@ class ConfigMenuHandler:
         elif kind == "back":
             frame = config_menu_nav_pop(self._router, chat_raw, message_raw)
         elif kind == "section" and value in _CONFIG_SECTIONS:
+            if _section_requires_owner(value) and not self._router._resolve_owner_flag(msg):
+                if cq_str:
+                    await _answer_callback_query(
+                        adapter, callback_query_id=cq_str, text="Owner only."
+                    )
+                return
             frame = ConfigMenuNavFrame(section=value)  # type: ignore[arg-type]
             config_menu_nav_go(self._router, chat_raw, message_raw, frame)
         else:
@@ -4617,7 +5963,7 @@ class ConfigMenuHandler:
         l1_count = 0
         l2_count = 0
         running_rows: tuple[dict[str, Any], ...] = ()
-        if frame.section in {"subagents", "subagents_running"}:
+        if frame.section in {"agent_subagents", "agent_subagents_running"}:
             l1_count, l2_count, running_rows = await subagent_menu_snapshot_from_router(
                 self._router,
             )

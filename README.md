@@ -90,6 +90,7 @@ See [README catalog](docs/readmes/INDEX.md) and [Architecture](about-sevn.bot/AR
 | [Channels](docs/readmes/channels.md) | `subsystem` | Telegram, Web UI bridge, and channel adapter patterns. |
 | [Tools registry](docs/readmes/tools.md) | `subsystem` | Module inventory for the tools registry, adapters, and permission gates. |
 | [Skills system](docs/readmes/skills.md) | `catalog` | Curated inventory of bundled and workspace skills, loaders, and subprocess runners. |
+| [Discogs skills](docs/readmes/discogs.md) | `guide` | Opt-in Discogs API skill group — catalog, marketplace, collection, wantlist, identity; User-token and OAuth auth. |
 | [Mission Control UI](docs/readmes/ui-mission-control.md) | `subsystem` | Dashboard SPA, tab registry, traces, ops surfaces, and OpenUI delivery. |
 | [Security scanner](docs/readmes/security.md) | `subsystem` | LLM Guard, .llmignore, block-and-notify, and channel security copy. |
 | [Secrets](docs/readmes/secrets.md) | `subsystem` | Secrets backends, logical-key chain, TTL, and fingerprint confirmation. |

@@ -31,6 +31,9 @@ DispatcherKind = Literal[
     "webapp_share",
     "webapp_feedback",
     "webapp_viewer",
+    "secrets_rm",
+    "secrets_export",
+    "deploy_remote",
 ]
 
 ALL_DISPATCHER_KINDS: frozenset[str] = frozenset(
@@ -48,6 +51,9 @@ ALL_DISPATCHER_KINDS: frozenset[str] = frozenset(
         "webapp_share",
         "webapp_feedback",
         "webapp_viewer",
+        "secrets_rm",
+        "secrets_export",
+        "deploy_remote",
     }
 )
 

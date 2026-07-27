@@ -13,6 +13,7 @@ Depends: asyncio, re, sevn.browser.element, sevn.browser.page, sevn.browser.reci
 
 Exports:
     TelegramWeb — Telegram Web operations over a page/dom pair.
+    TapOutcome — settle metadata from :meth:`TelegramWeb.tap_inline`.
     extract_bot_token — pull a bot token out of free text.
 
 Examples:
@@ -23,8 +24,11 @@ Examples:
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import re
-from typing import TYPE_CHECKING, Any, Final
+import time
+from typing import TYPE_CHECKING, Any, Final, TypedDict
 
 from sevn.browser.recipes.base import RecipeError, human_required
 
@@ -53,8 +57,40 @@ _SEARCH_SELECTORS: Final[tuple[str, ...]] = (
 _CHAT_ITEM_SELECTOR: Final[str] = "ul.chatlist > a.chatlist-chat, .chatlist .chatlist-chat"
 _LOGGED_IN_MARKERS: Final[tuple[str, ...]] = ("#column-left", ".chatlist", ".sidebar-header")
 _LOGIN_MARKERS: Final[tuple[str, ...]] = (".qr-container", ".login-page", "[data-qr]")
+# Inline-keyboard selectors (Telegram Web K — tune live; see module docstring D12).
+_INLINE_MARKUP_SELECTORS: Final[tuple[str, ...]] = (
+    ".reply-markup",
+    ".reply-markup-row",
+)
+_INLINE_BUTTON_SELECTORS: Final[tuple[str, ...]] = (
+    ".reply-markup-button",
+    ".reply-markup .reply-markup-button",
+)
+_LAST_BUBBLE_SELECTORS: Final[tuple[str, ...]] = (
+    ".bubbles .bubble:last-of-type",
+    ".bubbles-group:last-child .bubble",
+    ".bubbles-inner .bubble:last-child",
+)
+_TOAST_SELECTORS: Final[tuple[str, ...]] = (
+    ".toast",
+    ".popup-alert",
+    ".error-message",
+    ".Toast",
+)
+_NAV_BACK_CALLBACK_PREFIX: Final[str] = "cfg:nav:back"
+_SETTLE_POLL_S: Final[float] = 0.25
 
 _TYPE_PAUSE_S: Final[float] = 0.2
+
+
+class TapOutcome(TypedDict, total=False):
+    """Result of :meth:`TelegramWeb.tap_inline` — timeout is data, not an exception."""
+
+    changed: bool
+    new_signature: str
+    toast: str | None
+    new_message: bool
+    elapsed_s: float
 
 
 def extract_bot_token(text: str) -> str | None:
@@ -337,6 +373,306 @@ class TelegramWeb:
             return {"token": token}
         return {"text": text[:2000], "found": False}
 
+    async def inline_buttons(self, *, message: str = "last") -> list[dict[str, Any]]:
+        """Return inline-keyboard buttons for ``message`` (rows x cols metadata).
+
+        One ``page.evaluate`` pass extracts ``{row, col, text, has_url, url}`` entries
+        from the target bubble's reply markup.
+
+        Args:
+            message (str): ``"last"`` for the newest bot bubble (default).
+
+        Returns:
+            list[dict[str, Any]]: Flat button list with row/col indices.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(TelegramWeb.inline_buttons)
+            True
+        """
+        _ = message  # v1: only ``last`` is supported
+        script = _INLINE_BUTTONS_JS.format(
+            bubble_selectors=json.dumps(list(_LAST_BUBBLE_SELECTORS)),
+            markup_selectors=json.dumps(list(_INLINE_MARKUP_SELECTORS)),
+            button_selectors=json.dumps(list(_INLINE_BUTTON_SELECTORS)),
+        )
+        raw = await self._page.evaluate(script)
+        if not isinstance(raw, list):
+            return []
+        out: list[dict[str, Any]] = []
+        for item in raw:
+            if isinstance(item, dict):
+                out.append(dict(item))
+        return out
+
+    async def screen_signature(self) -> str:
+        """Stable hash of caption text + inline button label matrix for settle detection.
+
+        Returns:
+            str: Signature string (hash) for the current menu message.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(TelegramWeb.screen_signature)
+            True
+        """
+        script = _SCREEN_SIGNATURE_JS.format(
+            bubble_selectors=json.dumps(list(_LAST_BUBBLE_SELECTORS)),
+            markup_selectors=json.dumps(list(_INLINE_MARKUP_SELECTORS)),
+            button_selectors=json.dumps(list(_INLINE_BUTTON_SELECTORS)),
+        )
+        raw = await self._page.evaluate(script)
+        if isinstance(raw, str) and raw:
+            return raw
+        payload = json.dumps(raw, sort_keys=True, default=str)
+        return hashlib.sha256(payload.encode()).hexdigest()[:16]
+
+    async def tap_inline(
+        self,
+        label: str | None = None,
+        row: int | None = None,
+        col: int | None = None,
+        *,
+        settle_timeout: float = 6.0,
+    ) -> TapOutcome:
+        """Tap an inline button by ``label`` or ``(row, col)`` and wait for a settle signal.
+
+        Polls ``screen_signature()``, message count, and toast until one changes or
+        ``settle_timeout`` expires. A timeout yields ``changed=False`` (feeds ``dead``).
+
+        Args:
+            label (str | None): Visible button label (preferred).
+            row (int | None): Zero-based row when using coordinates.
+            col (int | None): Zero-based column when using coordinates.
+            settle_timeout (float): Seconds to wait for a settle signal.
+
+        Returns:
+            TapOutcome: Settle metadata; ``changed`` is ``False`` on timeout.
+
+        Raises:
+            RecipeError: When the target button cannot be found.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(TelegramWeb.tap_inline)
+            True
+        """
+        if label is None and (row is None or col is None):
+            msg = "tap_inline requires label or (row, col)"
+            raise RecipeError(msg)
+        before_sig = await self.screen_signature()
+        before_count = await self._message_count()
+        element = await self._resolve_inline_button(label=label, row=row, col=col)
+        if element is None:
+            target = label if label is not None else f"({row},{col})"
+            msg = f"inline button not found: {target!r}"
+            raise RecipeError(msg)
+        started = time.monotonic()
+        await element.click()
+        deadline = started + settle_timeout
+        toast: str | None = None
+        changed = False
+        new_sig = before_sig
+        new_message = False
+        while time.monotonic() < deadline:
+            toast = await self.read_toast(timeout=0.05)
+            if toast:
+                changed = True
+                break
+            new_sig = await self.screen_signature()
+            if new_sig != before_sig:
+                changed = True
+                break
+            count = await self._message_count()
+            if count > before_count:
+                new_message = True
+                changed = True
+                break
+            await asyncio.sleep(_SETTLE_POLL_S)
+        if not changed:
+            new_sig = await self.screen_signature()
+        return TapOutcome(
+            changed=changed,
+            new_signature=new_sig,
+            toast=toast,
+            new_message=new_message,
+            elapsed_s=time.monotonic() - started,
+        )
+
+    async def read_toast(self, *, timeout: float = 3.0) -> str | None:
+        """Capture a Telegram Web toast/alert before it auto-dismisses.
+
+        Args:
+            timeout (float): Seconds to poll for visible toast text.
+
+        Returns:
+            str | None: Toast text when found, else ``None``.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(TelegramWeb.read_toast)
+            True
+        """
+        deadline = time.monotonic() + timeout
+        selectors_json = json.dumps(list(_TOAST_SELECTORS))
+        while time.monotonic() < deadline:
+            text = await self._page.evaluate(
+                f"(() => {{"
+                f"  for (const sel of {selectors_json}) {{"
+                f"    const el = document.querySelector(sel);"
+                f"    if (el) {{"
+                f"      const t = (el.innerText || el.textContent || '').trim();"
+                f"      if (t) return t;"
+                f"    }}"
+                f"  }}"
+                f"  return null;"
+                f"}})()"
+            )
+            if isinstance(text, str) and text.strip():
+                return text.strip()
+            await asyncio.sleep(_SETTLE_POLL_S)
+        return None
+
+    async def press_back(self) -> dict[str, Any]:
+        """Tap the section ⬅ Back row (``cfg:nav:back`` family, not emoji heuristics alone).
+
+        Returns:
+            dict[str, Any]: ``{pressed: True}`` when a back control was tapped.
+
+        Raises:
+            RecipeError: When no back button is found.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(TelegramWeb.press_back)
+            True
+        """
+        buttons = await self.inline_buttons(message="last")
+        for btn in buttons:
+            text = str(btn.get("text") or "")
+            cb = str(btn.get("callback_data") or "")
+            if cb.startswith(_NAV_BACK_CALLBACK_PREFIX) or text.strip().startswith("⬅"):
+                outcome = await self.tap_inline(text, settle_timeout=4.0)
+                return {"pressed": True, "outcome": dict(outcome)}
+        element = await self._dom.find_by_text("Back")
+        if element is not None:
+            await element.click()
+            return {"pressed": True}
+        msg = "back button not found (cfg:nav:back)"
+        raise RecipeError(msg)
+
+    async def open_menu(self, command: str = "/config") -> dict[str, Any]:
+        """Send ``command`` and wait for the root inline keyboard to render.
+
+        Args:
+            command (str): Slash command to open the menu (default ``/config``).
+
+        Returns:
+            dict[str, Any]: ``{command, buttons}`` with enumerated inline rows.
+
+        Raises:
+            RecipeError: When the composer is missing or no keyboard appears.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(TelegramWeb.open_menu)
+            True
+        """
+        composer = await self._first(_COMPOSER_SELECTORS)
+        if composer is None:
+            msg = "message composer not found (selectors may need tuning)"
+            raise RecipeError(msg)
+        await composer.type(command)
+        await asyncio.sleep(_TYPE_PAUSE_S)
+        await composer.press_key("Enter")
+        deadline = time.monotonic() + 12.0
+        buttons: list[dict[str, Any]] = []
+        while time.monotonic() < deadline:
+            await asyncio.sleep(_SETTLE_POLL_S)
+            buttons = await self.inline_buttons(message="last")
+            if buttons:
+                return {"command": command, "buttons": buttons}
+        msg = f"menu keyboard did not render after {command!r}"
+        raise RecipeError(msg)
+
+    async def _message_count(self) -> int:
+        """Return a best-effort count of visible chat bubbles.
+
+        Returns:
+            int: Bubble count in the active chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(TelegramWeb._message_count)
+            True
+        """
+        count = await self._page.evaluate(
+            "document.querySelectorAll('.bubbles .bubble, .bubbles-group .bubble').length"
+        )
+        return int(count) if isinstance(count, (int, float)) else 0
+
+    async def _resolve_inline_button(
+        self,
+        *,
+        label: str | None,
+        row: int | None,
+        col: int | None,
+    ) -> Any:
+        """Locate one inline button by label or grid coordinates.
+
+        Args:
+            label (str | None): Visible button label.
+            row (int | None): Zero-based row index.
+            col (int | None): Zero-based column index.
+
+        Returns:
+            Any: Element handle when found, else ``None``.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(TelegramWeb._resolve_inline_button)
+            True
+        """
+        buttons = await self.inline_buttons(message="last")
+        for btn in buttons:
+            text = str(btn.get("text") or "")
+            if label is not None and text.strip() == label.strip():
+                sel = str(btn.get("selector") or "")
+                if sel:
+                    hit = await self._dom.query(sel)
+                    if hit is not None:
+                        return hit
+                for selector in _INLINE_BUTTON_SELECTORS:
+                    hit = await self._dom.query(selector)
+                    if hit is not None:
+                        return hit
+            if (
+                row is not None
+                and col is not None
+                and int(btn.get("row", -1)) == row
+                and int(btn.get("col", -1)) == col
+            ):
+                sel = str(btn.get("selector") or "")
+                if sel:
+                    hit = await self._dom.query(sel)
+                    if hit is not None:
+                        return hit
+                for selector in _INLINE_BUTTON_SELECTORS:
+                    hit = await self._dom.query(selector)
+                    if hit is not None:
+                        return hit
+        if label:
+            element = await self._dom.find_by_text(label, best_match=True)
+            if element is not None:
+                return element
+            for selector in _INLINE_BUTTON_SELECTORS:
+                handles = await self._dom.query_all(selector)
+                for handle in handles:
+                    btn_text = await handle.text()
+                    if btn_text and label.strip() in btn_text.strip():
+                        return handle
+        return None
+
     async def _first(self, selectors: tuple[str, ...]) -> Any:
         """Return the first element matching any of ``selectors``.
 
@@ -358,4 +694,79 @@ class TelegramWeb:
         return None
 
 
-__all__ = ["BOT_TOKEN_RE", "TELEGRAM_EGRESS", "TelegramWeb", "extract_bot_token"]
+_INLINE_BUTTONS_JS: Final[str] = """
+(() => {{
+  const bubbleSels = {bubble_selectors};
+  const markupSels = {markup_selectors};
+  const buttonSels = {button_selectors};
+  let bubble = null;
+  for (const sel of bubbleSels) {{
+    bubble = document.querySelector(sel);
+    if (bubble) break;
+  }}
+  if (!bubble) return [];
+  let markup = null;
+  for (const sel of markupSels) {{
+    markup = bubble.querySelector(sel);
+    if (markup) break;
+  }}
+  if (!markup) markup = bubble;
+  const rows = markup.querySelectorAll('.reply-markup-row, .reply-markup > .reply-markup-row');
+  const container = rows.length ? rows : [markup];
+  const out = [];
+  container.forEach((rowEl, rowIdx) => {{
+    const btns = rowEl.querySelectorAll('.reply-markup-button, button');
+    btns.forEach((btn, colIdx) => {{
+      const text = (btn.innerText || btn.textContent || '').trim();
+      const href = btn.getAttribute('href') || btn.dataset?.url || '';
+      const cb = btn.dataset?.callbackData || btn.getAttribute('data-callback-data') || '';
+      out.push({{
+        row: rowIdx,
+        col: colIdx,
+        text,
+        has_url: Boolean(href),
+        url: href || null,
+        callback_data: cb || null,
+        selector: btn.id ? `#${{btn.id}}` : null,
+      }});
+    }});
+  }});
+  return out;
+}})()
+"""
+
+_SCREEN_SIGNATURE_JS: Final[str] = """
+(() => {{
+  const bubbleSels = {bubble_selectors};
+  const markupSels = {markup_selectors};
+  const buttonSels = {button_selectors};
+  let bubble = null;
+  for (const sel of bubbleSels) {{
+    bubble = document.querySelector(sel);
+    if (bubble) break;
+  }}
+  if (!bubble) return 'empty';
+  const caption = (bubble.querySelector('.message, .text-content')?.innerText || bubble.innerText || '').trim();
+  let markup = null;
+  for (const sel of markupSels) {{
+    markup = bubble.querySelector(sel);
+    if (markup) break;
+  }}
+  const labels = [];
+  if (markup) {{
+    markup.querySelectorAll('.reply-markup-button, button').forEach(btn => {{
+      labels.push((btn.innerText || btn.textContent || '').trim());
+    }});
+  }}
+  return caption + '||' + labels.join('|');
+}})()
+"""
+
+
+__all__ = [
+    "BOT_TOKEN_RE",
+    "TELEGRAM_EGRESS",
+    "TapOutcome",
+    "TelegramWeb",
+    "extract_bot_token",
+]

@@ -534,7 +534,14 @@ persona/display-name — not the run inventory. Menu-action callback toasts use 
 inline answer fails, identity buttons (Version id / Deployment id) still emit chat fallback
 text. Slash `/stop` kill callbacks re-edit the picker message and ack the callback query.
 
-## Implemented by
+## Amendments (telegram-menu-redesign W9)
+
+Telegram `/config` ships an eight-tile root keyboard (Chat, Agent, Skills & Tools, Memory,
+Access, Health, Deployment, Help) with `owner_only` gating (non-owners see four tiles).
+Legacy section ids resolve through `_SECTION_ALIASES`; the live catalog is
+`about-sevn.bot/Telegram Menu.html` (`make telegram-menu-docs-check`). Host-only CLI leaves
+render copy-paste cards (D17); destructive rows use two-step confirm gates. Menu E2E:
+`make telegram-menu-e2e` when `SEVN_TELEGRAM_MENU_E2E=1`.
 
 - [`PlatformChannelConfig`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
 - [`busy_input_mode_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`

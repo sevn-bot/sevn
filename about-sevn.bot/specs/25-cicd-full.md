@@ -478,6 +478,14 @@ Wave agents: mid-wave **`make ci-affected`** only; wave boundary **`make ci`** o
 | Doc regression | `make about-docs-check`, `make spec-check`, `make prd-check`, or `make readme-check` fails |
 | Git guard missing | `make check-git-guards` fails (blocks destructive clean) |
 
+## Amendments (telegram-menu-redesign W9)
+
+``make ci-docs`` includes ``telegram-menu-docs-check`` (structural sync of
+``about-sevn.bot/Telegram Menu.html`` vs live keyboards),
+``telegram-menu-docs-scaffold`` (WIP stub insertion), and ``cli-help-docs-check``
+(root CLI panels vs ``PANEL_ORDER``). ``make telegram-menu-e2e`` is live-gated
+(``SEVN_TELEGRAM_MENU_E2E=1``) and is not part of ``make ci``.
+
 ## Test Strategy
 
 | Gate | Validates |

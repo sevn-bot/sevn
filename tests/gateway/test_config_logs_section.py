@@ -42,19 +42,20 @@ from tests.gateway.test_menu import _conn, _MenuCaptureTelegram, _workspace
 # --- Static structure ---------------------------------------------------------
 
 
-def test_logs_tile_appended_to_config_root_tiles() -> None:
-    """Logs is followed by sevn.bot and My sevn bot root tiles."""
-    sids = [sid for _label, sid, _cb in _CONFIG_ROOT_TILES]
-    assert "logs" in sids
-    assert sids[-2:] == ["sevn_bot", "my_sevn_bot"]
-    assert len(_CONFIG_ROOT_TILES) == 19
-    logs_idx = sids.index("logs")
-    _label, _, last_cb = _CONFIG_ROOT_TILES[logs_idx]
-    assert last_cb == "cfg:section:logs"
+def test_health_root_tile_includes_logs_nav() -> None:
+    """Health root tile replaces the former Logs root tile (W3 redesign)."""
+    sids = [sid for _label, sid, _cb, _owner in _CONFIG_ROOT_TILES]
+    assert "health" in sids
+    assert "logs" not in sids
+    assert len(_CONFIG_ROOT_TILES) == 8
+    health_idx = sids.index("health")
+    _label, sid, cb, _owner = _CONFIG_ROOT_TILES[health_idx]
+    assert sid == "health"
+    assert cb == "cfg:section:health"
 
 
-def test_config_logs_tile_renders_in_root() -> None:
-    """`/config` keyboard exposes 19 root tiles and nav chrome (Help/Home/Close)."""
+def test_config_root_renders_eight_intent_tiles() -> None:
+    """`/config` keyboard exposes eight root tiles and nav chrome (Help/Home/Close)."""
     ws = _workspace()
     kb = build_config_menu_keyboard(ws, section="root")
     rows = kb["inline_keyboard"]
@@ -65,17 +66,23 @@ def test_config_logs_tile_renders_in_root() -> None:
         for btn in row
         if btn.get("callback_data", "").startswith("cfg:section:")
     ]
-    assert len(body_section_callbacks) == 19
-    assert "cfg:section:rlm" not in body_section_callbacks
-    assert "cfg:section:advanced" in body_section_callbacks
-    assert "cfg:section:logs" in body_section_callbacks
-    assert "cfg:section:sevn_bot" in body_section_callbacks
-    assert "cfg:section:my_sevn_bot" in body_section_callbacks
+    assert len(body_section_callbacks) == 8
+    assert "cfg:section:health" in body_section_callbacks
+    assert "cfg:section:chat" in body_section_callbacks
+    assert "cfg:section:logs" not in body_section_callbacks
     chrome = rows[-1]
     chrome_callbacks = [btn["callback_data"] for btn in chrome]
     assert "cfg:nav:help" in chrome_callbacks
     assert "cfg:nav:home" in chrome_callbacks
     assert "cfg:nav:close" in chrome_callbacks
+    health_kb = build_config_menu_keyboard(ws, section="health")
+    health_nav = [
+        btn["callback_data"]
+        for row in health_kb["inline_keyboard"]
+        for btn in row
+        if btn.get("callback_data") == "cfg:section:logs"
+    ]
+    assert health_nav == ["cfg:section:logs"]
 
 
 def test_build_logs_keyboard_rows_includes_all_actions() -> None:
@@ -89,16 +96,15 @@ def test_build_logs_keyboard_rows_includes_all_actions() -> None:
     assert "form:logs:span_id" in callbacks
     assert "cfg:logs:toggle_logfire" in callbacks
     assert "form:logs:logfire_token" in callbacks
-    assert "cfg:logs:toggle_redaction" in callbacks
+    assert "cfg:logs:toggle_redaction" not in callbacks
     assert "cfg:logs:deployment_id" not in callbacks
 
 
 def test_logs_section_caption_text() -> None:
-    """`section == "logs"` produces a Logs caption with redaction state."""
-    text = config_menu_message_text(_workspace(), section="logs")
-    assert text.startswith("Logs")
-    assert "Logfire export:" in text
-    assert "Trace redaction:" in text
+    """``health`` root tile carries log/trace summary fields."""
+    text = config_menu_message_text(_workspace(), section="health")
+    assert text.startswith("Health")
+    assert "tracing.redaction.enabled" in text
 
 
 # --- Readiness gating ---------------------------------------------------------
@@ -127,7 +133,7 @@ def test_logs_action_callbacks_report_ready_readiness() -> None:
 def test_logs_section_keyboard_exposes_action_callbacks() -> None:
     """The gated section keyboard keeps concrete ``cfg:logs:*`` callbacks pressable."""
     ws = _workspace()
-    kb = build_config_menu_keyboard(ws, section="logs")
+    kb = build_config_menu_keyboard(ws, section="health")
     from sevn.gateway.menu.menu_readiness import gate_config_keyboard_rows
 
     rows = kb["inline_keyboard"]
@@ -187,8 +193,9 @@ def test_parse_form_callback_logs_targets() -> None:
 
 
 def test_infer_config_section_from_callback_logs() -> None:
-    """`cfg:logs:*` infers the `logs` config section for menu refresh."""
-    assert infer_config_section_from_callback("cfg:logs:toggle_redaction") == "logs"
+    """``cfg:logs:toggle_redaction`` infers ``health_tracing`` for menu refresh."""
+    assert infer_config_section_from_callback("cfg:logs:toggle_redaction") == "health_tracing"
+    assert infer_config_section_from_callback("cfg:logs:tail:gateway:0") == "health"
 
 
 # --- Owner / non-owner runtime ------------------------------------------------
@@ -262,11 +269,11 @@ def _logs_callback(
 async def test_logs_section_navigation_owner(tmp_path: Path) -> None:
     """Opening the Logs section edits the host message with pressable action rows."""
     router, cap, _root = _build_owner_router(tmp_path)
-    await router.route_incoming(_logs_callback("cfg:section:logs"))
+    await router.route_incoming(_logs_callback("cfg:section:health"))
     assert len(cap.edited) == 1
     edit = cap.edited[0]
     assert edit["message_id"] == 99
-    assert "Logs" in edit["text"]
+    assert "Health" in edit["text"]
     body_callbacks = [
         btn.get("callback_data", "")
         for row in edit["reply_markup"]["inline_keyboard"]

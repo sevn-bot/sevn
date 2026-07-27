@@ -5,6 +5,7 @@ Depends: dataclasses, re, sevn.gateway.menu.menu_registry
 
 Exports:
     ConfigSection — one ``/config`` root section and its schema dot-paths.
+    iter_config_slug_aliases — retired CLI slug → canonical slug pairs.
     iter_config_sections — canonical section order from ``menu_registry``.
     section_by_slug — lookup by section slug.
     section_callback — ``cfg:section:{slug}`` callback string.
@@ -31,49 +32,113 @@ class ConfigSection:
     dot_paths: tuple[str, ...]
 
 
-# Menu-registry ``section`` field(s) whose ``cfg:toggle:*`` paths belong to a root slug.
+# Menu-registry ``section`` field(s) whose ``cfg:toggle:*`` paths belong to a root slug (W6).
 _SLUG_MENU_SECTIONS: dict[str, tuple[str, ...]] = {
-    "session": ("session",),
-    "agents": ("agents",),
-    "models": ("models",),
-    "voice": ("voice",),
-    "channels": ("channels",),
-    "secrets": ("secrets",),
-    "skills": ("skills",),
-    "tools": ("tools",),
-    "code": ("code",),
-    "security": ("security",),
-    "integrations": ("integrations",),
-    "dashboard": ("dashboard",),
-    "shortcuts": ("shortcuts",),
-    "notifications": ("notifications",),
-    "advanced": (
-        "advanced",
-        "codemode",
+    "chat": (
+        "chat",
+        "chat_qa",
+        "chat_shortcuts",
+        "chat_voice",
+        "chat_channels",
+        "chat_sessions",
+        "session",
+        "voice",
+        "channels",
+        "shortcuts",
+        "notifications",
+    ),
+    "agent": (
+        "agent",
+        "agent_identity",
+        "agent_sampling",
+        "agent_subagents",
+        "agent_subagents_running",
+        "agent_lab",
+        "agents",
+        "models",
         "rlm",
+        "codemode",
         "self_improve",
-        "second_brain",
         "subagents",
         "subagents_running",
     ),
-    "logs": ("logs",),
-    "help": ("help",),
-    "sevn_bot": ("sevn_bot",),
-    "my_sevn_bot": ("my_sevn_bot",),
+    "skills": (
+        "skills",
+        "skills:social_media_manager",
+        "skills:discogs",
+        "skills:discogs:setup",
+        "skills_tools",
+        "skills_integrations",
+        "tools",
+        "integrations",
+    ),
+    "memory": (
+        "memory",
+        "memory_sb",
+        "memory_dreaming",
+        "memory_code",
+        "memory_openwiki",
+        "code",
+        "second_brain",
+    ),
+    "access": (
+        "access",
+        "access_secrets",
+        "access_providers",
+        "access_guard",
+        "access_pairing",
+        "secrets",
+        "security",
+    ),
+    "health": (
+        "health",
+        "health_bundles",
+        "health_tracing",
+        "health_pin",
+        "logs",
+        "dashboard",
+    ),
+    "deployment": (
+        "deployment",
+        "deployment_services",
+        "deployment_tunnel",
+        "deployment_config",
+        "deployment_update",
+        "deployment_deploy",
+        "deployment_host",
+        "my_sevn_bot",
+    ),
+    "help": ("help", "help_guides", "help_dev", "sevn_bot"),
 }
 
 # Non-toggle schema keys surfaced in a section (forms / Mission Control parity).
 _EXTRA_DOT_PATHS: dict[str, tuple[str, ...]] = {
-    "agents": ("agent.display_name",),
-    "models": (
+    "chat": (
+        "gateway.queue_mode",
+        "channels.telegram.reply_keyboard.enabled",
+        "channels.telegram.show_routing",
+        "channels.telegram.telegram_notify_policy",
+        "channels.telegram.quick_actions.show_regen",
+        "channels.telegram.quick_actions.show_thumbs_up",
+        "channels.telegram.quick_actions.show_thumbs_down",
+        "channels.telegram.quick_actions.show_share",
+        "channels.telegram.quick_actions.show_feedback",
+        "channels.telegram.tts_mode",
+    ),
+    "agent": (
+        "agent.display_name",
         "agent.triager.model",
         "agent.tier_b.model",
         "agent.tier_cd.model",
         "agent.unified_model.enabled",
+        "providers.use_main_model_for_all",
+        "subagents.enabled",
+        "agent.codemode.enabled",
+        "self_improve.enabled",
+        "executors.tier_cd.lambda_rlm.enabled",
     ),
-    "voice": ("channels.telegram.tts_mode",),
-    "dashboard": ("channels.telegram.pinned_status",),
-    "advanced": (
+    "skills": (),
+    "memory": (
         "second_brain.paths.vault",
         "second_brain.layout",
         "second_brain.para.inbox",
@@ -84,19 +149,68 @@ _EXTRA_DOT_PATHS: dict[str, tuple[str, ...]] = {
         "second_brain.para.templates",
         "second_brain.para.sources_subdir",
         "second_brain.para.outputs_subdir",
-        "gateway.restart.auto_resume_b",
+        "code_understanding.mycode.enabled",
+        "code_understanding.code_review_graph.enabled",
+    ),
+    "access": (
+        "security.scanner.heuristic_only",
+        "channels.telegram.owner_scanner_overrides.disable_text",
+        "channels.telegram.owner_scanner_overrides.disable_links",
+        "channels.telegram.owner_scanner_overrides.disable_documents",
+    ),
+    "health": (
+        "tracing.sinks",
         "tracing.redaction.enabled",
+        "channels.telegram.pinned_status",
     ),
-    "subagents": (
-        "subagents.enabled",
-        "subagents.max_level1_default",
-        "subagents.max_level2_default",
-        "subagents.max_override",
-        "subagents.timeout_s",
-        "gateway.queue_mode",
-    ),
-    "logs": ("tracing.sinks",),
+    "deployment": ("gateway.restart.auto_resume_b",),
+    "help": (),
+    "health_tracing": ("tracing.redaction.enabled",),
 }
+
+# Retired CLI slugs → redesign root slugs (parity with ``menu._SECTION_ALIASES``).
+_CLI_SLUG_ALIASES: dict[str, str] = {
+    "session": "chat",
+    "voice": "chat",
+    "channels": "chat",
+    "shortcuts": "chat",
+    "notifications": "chat",
+    "agents": "agent",
+    "models": "agent",
+    "rlm": "agent",
+    "codemode": "agent",
+    "self_improve": "agent",
+    "subagents": "agent",
+    "subagents_running": "agent",
+    "tools": "skills",
+    "integrations": "skills",
+    "code": "memory",
+    "second_brain": "memory",
+    "secrets": "access",
+    "security": "access",
+    "logs": "health",
+    "dashboard": "health",
+    "my_sevn_bot": "deployment",
+    "sevn_bot": "help",
+}
+
+
+def iter_config_slug_aliases() -> tuple[tuple[str, str], ...]:
+    """Return ``(retired_slug, canonical_slug)`` pairs for the CLI section surface.
+
+    ``section_by_slug`` has always resolved these, but the resolution was only
+    reachable from non-CLI callers (the Textual picker); ``sevn config voice``
+    still exited with Typer's "No such command". ``config_cmd.register`` uses
+    this to register each retired slug as a hidden alias subcommand.
+
+    Returns:
+        tuple[tuple[str, str], ...]: Sorted ``(alias, canonical)`` pairs.
+
+    Examples:
+        >>> ("voice", "chat") in iter_config_slug_aliases()
+        True
+    """
+    return tuple(sorted(_CLI_SLUG_ALIASES.items()))
 
 
 def _dot_path_from_toggle_pattern(pattern: str) -> str | None:
@@ -130,7 +244,7 @@ def menu_registry_root_slugs() -> tuple[str, ...]:
 
     Examples:
         >>> slugs = menu_registry_root_slugs()
-        >>> "session" in slugs and len(slugs) == 19
+        >>> "chat" in slugs and len(slugs) == 8
         True
     """
     slugs: list[str] = []
@@ -151,7 +265,7 @@ def _labels_by_slug() -> dict[str, str]:
 
     Examples:
         >>> labels = _labels_by_slug()
-        >>> labels.get("session") == "Session"
+        >>> labels.get("chat") == "Chat"
         True
     """
     labels: dict[str, str] = {}
@@ -174,7 +288,7 @@ def _dot_paths_for_slug(slug: str) -> tuple[str, ...]:
         tuple[str, ...]: Sorted unique dot paths.
 
     Examples:
-        >>> "gateway.queue_mode" in _dot_paths_for_slug("session")
+        >>> "gateway.queue_mode" in _dot_paths_for_slug("chat")
         True
     """
     menu_sections = _SLUG_MENU_SECTIONS.get(slug, (slug,))
@@ -196,7 +310,7 @@ def iter_config_sections() -> tuple[ConfigSection, ...]:
 
     Examples:
         >>> sections = iter_config_sections()
-        >>> sections[0].slug == "session"
+        >>> sections[0].slug == "chat"
         True
     """
     labels = _labels_by_slug()
@@ -217,20 +331,21 @@ def section_by_slug(slug: str) -> ConfigSection | None:
     """Look up a config section by slug.
 
     Args:
-        slug (str): Section slug (e.g. ``session``).
+        slug (str): Section slug (e.g. ``chat``).
 
     Returns:
         ConfigSection | None: Matching section or None.
 
     Examples:
-        >>> section_by_slug("session") is not None
+        >>> section_by_slug("chat") is not None
         True
         >>> section_by_slug("missing") is None
         True
     """
     normalized = slug.strip().lower().replace("-", "_")
+    canonical = _CLI_SLUG_ALIASES.get(normalized, normalized)
     for section in iter_config_sections():
-        if section.slug == normalized:
+        if section.slug == canonical:
             return section
     return None
 
@@ -245,7 +360,7 @@ def section_callback(slug: str) -> str:
         str: Callback string.
 
     Examples:
-        >>> section_callback("voice")
-        'cfg:section:voice'
+        >>> section_callback("chat")
+        'cfg:section:chat'
     """
     return f"cfg:section:{slug}"

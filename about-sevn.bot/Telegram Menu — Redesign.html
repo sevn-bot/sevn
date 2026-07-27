@@ -1,0 +1,1243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>sevn.bot — Telegram /config menu redesign (proposal)</title>
+  <style>
+    :root {
+      --tg-bg: #0e1621; --tg-panel: #17212b; --tg-bubble: #182533; --tg-accent: #2b5278;
+      --tg-text: #f5f5f5; --tg-muted: #8b9bab; --tg-btn: #2b5278; --tg-btn-hover: #3d6a99;
+      --live: #4caf50; --gated: #ff9800; --wire: #42a5f5; --build: #9e9e9e;
+      --kept: #4caf50; --moved: #42a5f5; --merged: #ab47bc; --new: #ff9800; --gone: #ef5350;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #0a1018; color: var(--tg-text); line-height: 1.5; }
+    a { color: #6ab0f3; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; background: #101a26; padding: 0.05rem 0.3rem; border-radius: 4px; }
+    header { padding: 1.25rem 1.5rem; border-bottom: 1px solid #243447; background: var(--tg-panel); }
+    header h1 { margin: 0 0 0.4rem; font-size: 1.3rem; }
+    header p { margin: 0 0 0.4rem; color: var(--tg-muted); font-size: 0.9rem; max-width: 76rem; }
+    header p:last-of-type { margin-bottom: 0; }
+    .stats { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.9rem; }
+    .stat { background: #101a26; border: 1px solid #243447; border-radius: 8px; padding: 0.45rem 0.75rem; font-size: 0.82rem; }
+    .stat b { display: block; font-size: 1.15rem; color: #fff; }
+    .stat .was { color: var(--tg-muted); text-decoration: line-through; margin-right: 0.35rem; }
+    .stat.s-live { border-color: #2b5c30; } .stat.s-gated { border-color: #6b4611; }
+    .stat.s-wire { border-color: #1d4a70; } .stat.s-build { border-color: #3a3a3a; }
+    nav.tabs { display: flex; gap: 0.4rem; padding: 0.75rem 1.5rem 0; background: var(--tg-panel); border-bottom: 1px solid #243447; flex-wrap: wrap; }
+    nav.tabs button { background: transparent; border: 1px solid #243447; border-bottom: none; color: var(--tg-muted); padding: 0.45rem 0.9rem; border-radius: 8px 8px 0 0; cursor: pointer; font-size: 0.86rem; }
+    nav.tabs button.active { background: #0a1018; color: #fff; border-color: #2b5278; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .filterbar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center;
+      padding: 0.7rem 1.5rem; background: #0c141d; border-bottom: 1px solid #243447; font-size: 0.84rem; }
+    .filterbar .lbl { color: var(--tg-muted); }
+    .modes { display: flex; gap: 0; border: 1px solid #243447; border-radius: 8px; overflow: hidden; }
+    .modes button { background: #101a26; border: none; border-right: 1px solid #243447; color: var(--tg-muted); padding: 0.4rem 0.8rem; cursor: pointer; font-size: 0.82rem; }
+    .modes button:last-child { border-right: none; }
+    .modes button.active { background: #2b5278; color: #fff; }
+    .filterbar .count { color: #8fd3a0; font-variant-numeric: tabular-nums; }
+    main { display: grid; grid-template-columns: minmax(280px, 370px) 1fr; gap: 1.5rem; padding: 1.5rem; max-width: 1500px; margin: 0 auto; align-items: start; }
+    @media (max-width: 1000px) { main { grid-template-columns: 1fr; } }
+    .sticky { position: sticky; top: 4rem; }
+    .phone { background: var(--tg-bg); border-radius: 16px; border: 1px solid #243447; overflow: hidden; }
+    .bar { background: var(--tg-accent); padding: 0.6rem 1rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; font-size: 0.92rem; }
+    .bar .crumb { font-weight: 400; font-size: 0.75rem; opacity: 0.85; }
+    .bubble { background: var(--tg-bubble); margin: 0.9rem; padding: 0.7rem 0.9rem; border-radius: 12px; white-space: pre-wrap; font-size: 0.8rem; max-height: 220px; overflow-y: auto; color: #dbe4ee; }
+    .keys { padding: 0 0.7rem 1rem; display: flex; flex-direction: column; gap: 6px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .row.single { grid-template-columns: 1fr; }
+    .row.triple { grid-template-columns: 1fr 1fr 1fr; }
+    .keys button { background: var(--tg-btn); border: none; color: var(--tg-text); padding: 0.55rem 0.35rem; border-radius: 8px; font-size: 0.76rem; cursor: pointer; text-align: center; line-height: 1.25; position: relative; }
+    .keys button:hover { background: var(--tg-btn-hover); }
+    .keys button.chrome { background: #1e2c3b; }
+    .keys button.url { background: #24405c; }
+    .keys button.st-gated { background: #4a3410; color: #ffd9a0; }
+    .keys button.st-wire { background: #14304a; color: #b6d8f5; }
+    .keys button.st-build { background: #262b30; color: #9aa4ad; }
+    .keys .empty { color: var(--tg-muted); font-size: 0.8rem; text-align: center; padding: 0.8rem 0; }
+    .hint { color: var(--tg-muted); font-size: 0.78rem; margin: 0.6rem 0 0; }
+    #tree h2, .panel h2 { margin: 0 0 0.5rem; font-size: 1.05rem; }
+    .legend { display: flex; gap: 0.9rem; flex-wrap: wrap; margin-bottom: 1rem; font-size: 0.82rem; color: var(--tg-muted); }
+    .legend span::before { content: "●"; margin-right: 0.3rem; }
+    .legend .live::before { color: var(--live); } .legend .gated::before { color: var(--gated); }
+    .legend .wire::before { color: var(--wire); } .legend .build::before { color: var(--build); }
+    .legend .kept::before { color: var(--kept); } .legend .moved::before { color: var(--moved); }
+    .legend .merged::before { color: var(--merged); } .legend .new::before { color: var(--new); }
+    details.sec { margin: 0.5rem 0; border: 1px solid #1d2b3a; border-radius: 10px; background: #0d1520; }
+    details.sec > summary { cursor: pointer; font-weight: 600; padding: 0.6rem 0.8rem; font-size: 0.95rem; }
+    details.sec[open] > summary { border-bottom: 1px solid #1d2b3a; }
+    details.sec .body { padding: 0.7rem 0.9rem; }
+    details.sec.child { margin-left: 1.25rem; background: #0b121b; }
+    .why { color: #b8c5d3; font-size: 0.86rem; margin: 0 0 0.7rem; max-width: 60rem; }
+    .why.warn { color: #ffd180; border-left: 2px solid #ff9800; padding-left: 0.65rem; }
+    table { border-collapse: collapse; width: 100%; font-size: 0.83rem; }
+    th, td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid #1a2634; vertical-align: top; }
+    th { color: var(--tg-muted); font-weight: 600; }
+    td.cmd { white-space: nowrap; font-family: ui-monospace, Menlo, monospace; color: #8fd3a0; }
+    td.path { color: #cfd9e4; }
+    .badge { display: inline-block; font-size: 0.66rem; padding: 0.08rem 0.42rem; border-radius: 4px; margin-left: 0.35rem; vertical-align: middle; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; }
+    .badge.live { background: #14331a; color: #81c784; }
+    .badge.gated { background: #4a3410; color: #ffb74d; }
+    .badge.wire { background: #0f2c45; color: #7fc0f5; }
+    .badge.build { background: #2a2a2a; color: #bdbdbd; }
+    .badge.kept { background: #14331a; color: #81c784; }
+    .badge.moved { background: #0f2c45; color: #7fc0f5; }
+    .badge.merged { background: #2c1436; color: #ce93d8; }
+    .badge.new { background: #4a3410; color: #ffb74d; }
+    .badge.gone { background: #401414; color: #ef9a9a; }
+    .badge.spec { background: #10202e; color: #7f9cb5; text-transform: none; letter-spacing: 0; }
+    .kind { color: var(--tg-muted); font-size: 0.72rem; }
+    .filter { width: 100%; max-width: 30rem; padding: 0.5rem 0.7rem; border-radius: 8px; border: 1px solid #243447; background: #101a26; color: #fff; margin-bottom: 0.8rem; }
+    .wrap { padding: 1.5rem; max-width: 1500px; margin: 0 auto; }
+    .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+    .card { border: 1px solid #1d2b3a; border-radius: 10px; padding: 0.9rem 1rem; background: #0d1520; }
+    .card h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+    ul.tight { margin: 0.3rem 0 0; padding-left: 1.1rem; font-size: 0.86rem; color: #c3ceda; }
+    ul.tight li { margin-bottom: 0.3rem; }
+    .old-root { display: flex; flex-wrap: wrap; gap: 5px; margin: 0.5rem 0 0; }
+    .old-root span { background: #1a2735; border: 1px solid #24384c; border-radius: 6px; padding: 0.25rem 0.5rem; font-size: 0.78rem; }
+    .scrollbox { max-height: 70vh; overflow: auto; border: 1px solid #1d2b3a; border-radius: 10px; }
+    .scrollbox th { position: sticky; top: 0; background: #0a1018; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Telegram <code>/config</code> menu — proposed redesign <span style="color:#81c784;font-size:0.85rem;">(shipped 2026-07-27)</span></h1>
+    <p><strong>Live source of truth:</strong> <code>about-sevn.bot/Telegram Menu.html</code> — CI-gated by <code>make telegram-menu-docs-check</code>. This file is a historical design artefact for the 19→8 tile regroup; the running bot matches the live catalog.</p>
+    <p>A structural proposal that shipped on branch <code>wave/telegram-menu-redesign</code>. Status data re-verified against <code>519b0321</code> at authoring time.</p>
+    <p><strong>Problem.</strong> The root keyboard is 19 tiles deep — a 10-row wall of buttons where <em>Session</em>, <em>Notifications</em>, <em>Shortcuts</em>, <em>Channels</em> and <em>Voice</em> are five separate destinations for one idea ("how the chat behaves"), <em>Advanced</em> is a dumping ground for five unrelated sub-sections plus two orphan toggles, and <em>sevn.bot</em> sits next to <em>My sevn bot</em> with no way to tell them apart. Meanwhile only 20 of the 126 <code>sevn</code> CLI leaf commands have a menu destination that works today — see the coverage tab.</p>
+    <p><strong>Proposal.</strong> Eight root tiles grouped by <em>what the operator is trying to do</em>, every section under 14 rows, no leaf deeper than three taps, and full <code>sevn</code> CLI coverage.</p>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="structure" class="active">Structure</button>
+    <button data-tab="rationale">Why this shape</button>
+    <button data-tab="migration">Migration map</button>
+    <button data-tab="coverage">CLI coverage (126)</button>
+    <button data-tab="impl">Implementation notes</button>
+  </nav>
+
+  <div class="filterbar">
+    <span class="lbl">Show:</span>
+    <span class="modes" id="modes">
+      <button data-mode="all" class="active">Everything</button>
+      <button data-mode="unblock">Works + 1-line unblock</button>
+      <button data-mode="live">Works today only</button>
+    </span>
+    <span class="count" id="fcount"></span>
+    <span class="lbl" id="fnote"></span>
+  </div>
+
+  <!-- ============================= STRUCTURE ============================= -->
+  <div class="panel active" id="panel-structure">
+    <main>
+      <section id="mock" class="sticky"></section>
+      <section id="tree"></section>
+    </main>
+  </div>
+
+  <!-- ============================= RATIONALE ============================= -->
+  <div class="panel" id="panel-rationale">
+    <div class="wrap">
+      <h2>What was wrong with the old root</h2>
+      <div class="old-root">
+        <span>📦 Session</span><span>🤖 Agents</span><span>🧠 Models</span><span>🎙 Voice</span><span>🔌 Channels</span>
+        <span>🔐 Secrets</span><span>🧩 Skills</span><span>🛠 Tools</span><span>💻 Code</span><span>🛡 Security</span>
+        <span>🌐 Integrations</span><span>📊 Dashboard</span><span>⌨️ Shortcuts</span><span>🔔 Notifications</span>
+        <span>⚙️ Advanced</span><span>📜 Logs</span><span>❓ Commands</span><span>sevn.bot</span><span>🤖 My sevn bot</span>
+      </div>
+      <div class="cols" style="margin-top:1.2rem">
+        <div class="card">
+          <h3>Five diagnoses</h3>
+          <ul class="tight">
+            <li><strong>One idea, five doors.</strong> Session, Channels, Notifications, Shortcuts and Voice all answer "how does this chat behave?" — they are now one <em>💬 Chat</em> tile.</li>
+            <li><strong>Advanced was a junk drawer.</strong> It held RLM, Self-Improve, Second Brain, Sub-agents and CodeMode — five unrelated things whose only shared trait was "we had nowhere to put it" — plus two orphan toggles (auto-resume, trace redaction) that belonged to Deployment and Health. Advanced is dissolved; every child gets a real home.</li>
+            <li><strong>Two tiles named the same thing.</strong> <em>sevn.bot</em> (upstream project: sync, bugs, features) vs <em>🤖 My sevn bot</em> (this install: restarts, tunnel, ids). Now: the project lives under <em>❓ Help</em>, the install under <em>🖥 Deployment</em>.</li>
+            <li><strong>Near-empty tiles cost a full row.</strong> Tools (0 action rows), Secrets (1), Shortcuts (1), Notifications (1), Agents (1), Integrations (1) each burned a root slot for one button. They are now rows or sub-sections.</li>
+            <li><strong>Duplicated controls drift.</strong> "Trace redaction" existed on both Advanced and Logs — and the two copies do not even have the same status: the Logs one is <span class="badge live">live</span>, the Advanced one is <span class="badge gated">gated</span>. "Queue mode" was on both Session and Sub-agents. Each control now has exactly one home.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Five rules the new tree follows</h3>
+          <ul class="tight">
+            <li><strong>Group by operator intent, not by config file shape.</strong> Root tiles answer questions an operator actually asks ("is it healthy?", "who can talk to it?"), not <code>sevn.json</code> top-level keys.</li>
+            <li><strong>≤ 8 root tiles, ≤ 14 rows per screen.</strong> Four thumb-reachable rows at root; no screen needs a long scroll on a phone.</li>
+            <li><strong>≤ 3 taps to any leaf.</strong> Root → section → sub-section. Nothing goes deeper except the two pre-existing setup flows (Discogs setup, Sub-agents running list).</li>
+            <li><strong>One home, many cross-links.</strong> Every control is owned by exactly one section; other sections may link to it (e.g. <em>Chat › Channels</em> links to <em>Access › DM policy</em>) but never duplicate it. This is why the persistent-tunnel switch is <em>not</em> repeated inside <em>Tunnel setup</em>.</li>
+            <li><strong>Frequency wins the top row, and working buttons never get demoted.</strong> Model pickers, queue mode, restarts, the tunnel switch, tail logs and "add secret" stay on their section's first screen; rare and destructive things sink into sub-sections behind a confirm.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="cols" style="margin-top:1.2rem">
+        <div class="card">
+          <h3>The eight tiles, and why each earns a root slot</h3>
+          <ul class="tight">
+            <li><strong>💬 Chat</strong> — the surface the operator is literally standing in. Highest-frequency tweaks (queue mode, quick actions, notifications).</li>
+            <li><strong>🧠 Agent</strong> — "who answers and with what model". Second-highest frequency: model switching.</li>
+            <li><strong>🧩 Skills &amp; Tools</strong> — what sevn can <em>do</em>. Grows fastest as skills ship, so it needs its own room.</li>
+            <li><strong>📚 Memory</strong> — what sevn <em>knows</em>: Second Brain, Dreaming, code understanding, OpenWiki.</li>
+            <li><strong>🔐 Access</strong> — credentials in, and the guard rails on content coming in. Security-sensitive things read better together.</li>
+            <li><strong>📊 Health</strong> — is it working, what did it cost, what happened. The on-call tile.</li>
+            <li><strong>🖥 Deployment</strong> — my install: services, the public tunnel, config file, versions, upgrades. The tile with the most <span class="badge live">live</span> owner actions.</li>
+            <li><strong>❓ Help</strong> — commands, guides, and the sevn.bot project itself (sync / bugs / features).</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>How CLI parity is achieved without bloating the menu</h3>
+          <ul class="tight">
+            <li><strong>Section captions are <code>sevn config &lt;section&gt;</code>.</strong> Every section already renders live state in its caption bubble; formalising that as "the caption <em>is</em> the section's config dump" covers 20 of the 21 <code>sevn config &lt;section&gt;</code> commands with zero extra buttons.</li>
+            <li><strong>Read-only commands become one action row</strong> that posts its output as a message (<code>doctor</code>, <code>usage show</code>, <code>skills list</code>, <code>tools health</code>, <code>secrets list</code>, <code>sessions list</code>, <code>tunnel status</code>).</li>
+            <li><strong>Commands taking free-form input become forms</strong> (<code>config set</code>, <code>memory search</code>, <code>sessions history</code>, <code>message send</code>, <code>subagents kill</code>, <code>turn-bundle view</code>, <code>tunnel setup</code>).</li>
+            <li><strong>Host-shell-only commands get a copy-paste card, not a fake button.</strong> <code>completion install</code>, <code>shell-history install</code>, <code>secrets store-passphrase</code>, <code>onboard</code>, <code>gateway set-gateway-token</code>, <code>dashboard set-login-password</code> and <code>unboard</code> mutate the operator's own shell/Keychain — <em>🖥 Deployment › Host-only commands</em> prints the exact command instead of pretending Telegram can run it.</li>
+            <li><strong>Repo-only commands are quarantined.</strong> <code>readme *</code>, <code>about-docs *</code> and <code>gui migrate</code> only make sense inside a source checkout; they live under <em>❓ Help › Developer</em>, owner-gated and hidden when no checkout is bound.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================= MIGRATION ============================= -->
+  <div class="panel" id="panel-migration">
+    <div class="wrap">
+      <h2>Old path → new path</h2>
+      <p class="why">Every row that exists today, and where it lands. Nothing is dropped; four controls are de-duplicated to a single home and one section (<em>Advanced</em>) is dissolved.</p>
+      <input class="filter" id="mig-filter" placeholder="Filter old or new path…" />
+      <div class="scrollbox"><table id="mig-table"></table></div>
+    </div>
+  </div>
+
+  <!-- ============================= COVERAGE ============================= -->
+  <div class="panel" id="panel-coverage">
+    <div class="wrap">
+      <h2>CLI coverage — all 126 <code>sevn</code> leaf commands</h2>
+      <p class="why">Generated against the live Typer/Click tree (<code>sevn.cli.app</code>, 45 root commands / 126 leaves). Every leaf has a menu destination in the proposed tree; the status column says whether that destination works today. Honours the filter bar above.</p>
+      <input class="filter" id="cov-filter" placeholder="Filter command or menu path…" />
+      <div class="scrollbox"><table id="cov-table"></table></div>
+    </div>
+  </div>
+
+  <!-- ============================= IMPL ============================= -->
+  <div class="panel" id="panel-impl">
+    <div class="wrap">
+      <h2>Where the status data comes from</h2>
+      <div class="cols">
+        <div class="card">
+          <h3>Read from code (not hand-guessed)</h3>
+          <ul class="tight">
+            <li><span class="badge live">live</span> and <span class="badge gated">gated</span> are computed from the running gateway: every keyboard was rendered via <code>build_config_menu_keyboard()</code> and each callback resolved through <code>menu_readiness.readiness_for_callback()</code> and <code>menu_registry.match_menu_button_spec()</code>.</li>
+            <li>Result across the current menu: <strong>24 WIP</strong> rows and <strong>every matched spec with <code>implemented=True</code></strong> — so nothing in the live menu is a dead handler. The 24 WIP rows are gated purely by the <code>_READY_SPEC_IDS</code> allow-list in <code>menu_readiness.py</code>, which is why unblocking one is a one-line change plus a functional check.</li>
+            <li>Spec ids (<code>C1.6</code>, <code>C20.4</code>, <code>C22.1</code>, …) shown on each row are the real <code>MenuButtonSpec.spec_id</code> values, so you can grep them straight into <code>menu_registry.py</code>.</li>
+            <li><strong>Re-verified at <code>519b0321</code></strong> after the tunnel work merged (PR #58). Diff against the earlier snapshot: exactly one row added (<code>C22.1</code>, Ready), nothing removed, no readiness changes. All 88 spec assertions in this document still match the live menu.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Classified by hand (my judgement, verify before planning)</h3>
+          <ul class="tight">
+            <li><span class="badge wire">wire-up</span> means I found an existing callable in this repo that already does the work — a CLI command, a gateway module, or a store API. Spot-checks behind the calls: <code>PairingStore.list_pending()</code>/<code>approve_code()</code>, <code>shortcuts_store.delete_shortcut()</code>/<code>list_visible_shortcuts()</code>, <code>list_guide_topics()</code>, the <code>/new</code> and <code>/stop</code> <code>CommandSpec</code> rows in <code>commands/registry.py</code>.</li>
+            <li><span class="badge build">build</span> means I did not find a callable path from the gateway process: the copy-paste card renderer, the repo-checkout guard for developer rows, the destructive-export flow, and the integrations status listing.</li>
+            <li>The <span class="badge wire">wire-up</span>/<span class="badge build">build</span> split is an estimate of <em>shape</em>, not effort. Treat it as a starting point for a wave plan, not as sizing.</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 style="margin-top:1.5rem">Two patterns the tunnel work established — reuse them</h2>
+      <div class="cols">
+        <div class="card">
+          <h3>Two-step confirm</h3>
+          <ul class="tight">
+            <li><code>act:tunnel:on</code> matches <code>^act:tunnel:on(:confirm|:cancel)?$</code> and renders through <code>build_tunnel_on_confirm_keyboard()</code> + <code>tunnel_on_confirm_message()</code>. Turning <em>off</em> takes no prompt — it only reduces exposure.</li>
+            <li>That asymmetry is the right rule and should be copied verbatim by the other irreversible/exposure-increasing rows in this plan: <code>secrets rm</code>, <code>export-secrets</code>, <code>unboard</code>, and <code>deploy remote</code>.</li>
+            <li>It is a better precedent than the Discogs setup flow, which is a linear wizard rather than a guard.</li>
+            <li><code>2e4ea761</code> also set the error-handling rule: unknown <code>tunnel:*</code> callbacks are <em>rejected</em>, not silently treated as "stop". New callback families should reject unknown suffixes the same way rather than falling through to a default action.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Conditional rows</h3>
+          <ul class="tight">
+            <li><code>_tunnel_toggle_row()</code> returns <code>None</code> unless <code>infrastructure.tunnel.mode</code> is in <code>RUNNABLE_MODES</code> — the row simply is not rendered when no provider is configured.</li>
+            <li>This is cleaner than a 🚧 row for capability-gated controls, and the same treatment suits <em>Memory › OpenWiki</em> (hide until installed), <em>Help › Developer</em> (hide without a checkout) and per-skill sub-sections.</li>
+            <li><strong>But it leaves a gap.</strong> With <code>mode: none</code>, an operator sees nothing about tunnels at all and has no path to configure one from Telegram. The <em>🌍 Tunnel setup</em> sub-section in this plan exists specifically to close that: it is always present, and <code>sevn tunnel setup</code> becomes reachable.</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2 style="margin-top:1.5rem">What has to change in code</h2>
+      <div class="cols">
+        <div class="card">
+          <h3>Touch points</h3>
+          <ul class="tight">
+            <li><code>src/sevn/gateway/menu/menu.py</code> — <code>_CONFIG_ROOT_TILES</code> (19 → 8), <code>_CONFIG_SECTIONS</code> (27 → 43 ids), and one <code>_build_&lt;section&gt;_keyboard_rows</code> per new section. <code>_build_my_sevn_bot_keyboard_rows()</code> becomes the Deployment builder and keeps <code>_tunnel_toggle_row()</code> unchanged.</li>
+            <li><code>src/sevn/gateway/menu/menu_registry.py</code> — <code>MenuButtonSpec</code> rows keyed by callback data; renamed sections change <code>cfg:section:*</code> ids, so specs move with them. <code>act:*</code> rows (restarts, tunnel, sevn.bot) keep their callbacks and need no change.</li>
+            <li><code>src/sevn/gateway/menu/menu_readiness.py</code> — <code>_READY_SPEC_IDS</code> allow-list; already-Ready callbacks keep their ids where the callback string is unchanged. Its section blurbs mention "My sevn bot" and need re-pointing at Deployment.</li>
+            <li><code>src/sevn/cli/config_sections/</code> — <code>sevn config &lt;section&gt;</code> subcommands are 1:1 with section ids; adding/renaming sections regenerates this surface (<code>sevn config sections</code> is the SSOT listing).</li>
+            <li><code>scripts/telegram_menu_catalog.py</code> + <code>scripts/check_telegram_menu_docs.py</code> — the docs gate parses <code>Telegram Menu.html</code>; it must be re-scaffolded (<code>make telegram-menu-docs-scaffold</code>) once the new keyboards land.</li>
+            <li><code>scripts/check_cli_help_docs.py</code> — unchanged, but <code>ROOT_COMMAND_PANELS</code> panel names ("Ops", "Core", "Surfaces", …) should be re-pointed at the eight menu groups so CLI help and Telegram tell the same story.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Sequencing (safe, gate-by-gate)</h3>
+          <ul class="tight">
+            <li><strong>1. Callback-stable move.</strong> Re-parent existing sections under the 8 new tiles <em>without</em> renaming any <code>cfg:*</code> or <code>act:*</code> callback data. Nothing in <code>menu_readiness</code> or the registry changes; only <code>_CONFIG_ROOT_TILES</code> and the nav rows do. Ships the root-level win on its own, and every <span class="badge live">live</span> row — the tunnel switch included — stays exactly as live as it is now.</li>
+            <li><strong>2. Clear the gated backlog.</strong> 24 rows are implemented but not allow-listed. Verify each and add its spec id to <code>_READY_SPEC_IDS</code> — the cheapest operator-visible win available, and independent of the restructure. Switch the filter above to "Works + 1-line unblock" to see exactly what it buys.</li>
+            <li><strong>3. Dissolve Advanced.</strong> Move its two orphan toggles (<code>gateway.restart.auto_resume_b</code> → Deployment, <code>tracing.redaction.enabled</code> → Health › Trace export, de-duplicating the Logs copy) and delete the section id.</li>
+            <li><strong>4. Rename section ids</strong> (<code>session</code>→<code>chat</code>, <code>my_sevn_bot</code>→<code>deployment</code>, …) behind an alias table so old callback payloads in already-sent messages still resolve. Regenerate <code>sevn config</code> subcommands.</li>
+            <li><strong>5. Add the new leaves</strong> — the <span class="badge wire">wire-up</span> and <span class="badge build">build</span> rows. <em>Tunnel setup</em> is a good first one: four rows, one existing CLI surface, and it closes the <code>mode: none</code> dead end. Add ids to <code>_READY_SPEC_IDS</code> as they land so unfinished rows stay 🚧-prefixed rather than silently dead.</li>
+            <li><strong>6. Re-scaffold docs</strong> — <code>make telegram-menu-docs-scaffold</code>, then <code>make ci-docs</code>.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="cols" style="margin-top:1.2rem">
+        <div class="card">
+          <h3>Open decisions</h3>
+          <ul class="tight">
+            <li><strong>Persistent vs one-shot tunnel control.</strong> <code>act:tunnel:on/off</code> sets <code>autostart</code> and survives reboots; <code>sevn tunnel start/stop</code> is this-boot-only process control. Two controls, near-identical names. This plan keeps the switch on the Deployment screen and relabels the CLI-backed pair to "Start now / Stop now" inside <em>Tunnel setup</em>. If you would rather not surface the one-shot pair at all, drop those two rows — the plan loses two CLI leaves and nothing else.</li>
+            <li><strong>Owner gating.</strong> <em>Access</em>, <em>Deployment</em> and <em>Help › Developer</em> are owner-only — <code>_build_my_sevn_bot_keyboard_rows(is_owner=…)</code> already does this for the tunnel and restart rows. Non-owner paired users should see a 4-tile root (Chat, Agent, Skills &amp; Tools, Help). Needs a per-tile <code>owner_only</code> flag on the root tile tuple.</li>
+            <li><strong>Dynamic sub-sections.</strong> <em>Skills &amp; Tools</em> currently hard-codes Social Media Manager and Discogs. As skills ship, this should page over the skills inventory rather than grow a row per skill.</li>
+            <li><strong>Long output.</strong> <code>doctor</code>, <code>config show</code> and <code>skills list</code> exceed Telegram's 4096-char message limit; they need the existing paginated/file-link path rather than a raw dump.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Deliberately <em>not</em> executable from the menu</h3>
+          <ul class="tight">
+            <li>All 126 leaves have a destination — but 9 of them (<code>completion *</code>, <code>shell-history *</code>, <code>onboard</code>, <code>secrets store-passphrase</code>, <code>gateway set-gateway-token</code>, <code>dashboard set-login-password</code>, <code>unboard</code>/<code>uninstall</code>/<code>remove</code>) appear as <em>copy-paste instructions</em>, not executable buttons, because they act on the operator's own machine outside the gateway's reach.</li>
+            <li>11 more (<code>readme *</code>, <code>about-docs *</code>, <code>gui migrate</code>) are shown only when a source checkout is bound.</li>
+            <li>If you would rather these be hidden entirely, the change is one flag on <em>Help › Developer</em> and <em>Deployment › Host-only commands</em> — the rest of the tree is unaffected.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ---------------------------------------------------------------- data
+     * st (status) — how much of this row exists today:
+     *   live  : row exists in the running bot, handler implemented, readiness
+     *           "Ready" in menu_readiness._READY_SPEC_IDS. Tapping it works.
+     *   gated : row exists, handler implemented (MenuButtonSpec.implemented=True),
+     *           but the spec id is NOT in _READY_SPEC_IDS — renders with 🚧 and
+     *           answers cfg:disabled:*. Unblock = one allow-list line + a check.
+     *   wire  : no row today; the operation already exists as callable code in
+     *           this repo. Work = callback id + keyboard row + handler.
+     *   build : no row and no callable path from the gateway; needs new logic.
+     * ch (change vs today): kept | moved | merged | new
+     * sp: real MenuButtonSpec.spec_id where the row exists today.
+     */
+    function b(t, kind, opts) { return Object.assign({ t: t, k: kind, st: "wire" }, opts || {}); }
+
+    const S = {
+      root: {
+        title: "sevn control panel",
+        caption: "sevn — control panel\nGateway: running · Tier B: claude-opus-5 · Queue: cancel\n\nEight places. Tap one.",
+        why: "Eight tiles in four rows, ordered by how often an operator reaches for them. The old root needed ten rows and mixed a per-reply button toggle (Session) with an uninstall path (My sevn bot) at the same level. Every tile is a re-parenting of sections that already render, so this screen is pure restructure work — no new backend.",
+        buttons: [
+          b("💬 Chat", "nav", { to: "chat", ch: "merged", n: "Absorbs the old Session, Channels, Notifications and Shortcuts tiles plus Voice." }),
+          b("🧠 Agent", "nav", { to: "agent", ch: "merged", n: "Absorbs Agents + Models, and adopts Sub-agents, RLM, CodeMode and Self-Improve out of Advanced." }),
+          b("🧩 Skills & Tools", "nav", { to: "skills", ch: "merged", n: "Absorbs Skills, Tools and Integrations — three near-empty root tiles." }),
+          b("📚 Memory", "nav", { to: "memory", ch: "new", n: "New grouping for what sevn knows: Second Brain (from Advanced), Code (from root), Dreaming and OpenWiki (both previously CLI-only)." }),
+          b("🔐 Access", "nav", { to: "access", ch: "merged", n: "Absorbs Secrets and Security, and adopts DM policy / pairing from Channels." }),
+          b("📊 Health", "nav", { to: "health", ch: "merged", n: "Absorbs Logs and Dashboard, and adopts doctor / usage / turn bundles from the CLI." }),
+          b("🖥 Deployment", "nav", { to: "deployment", ch: "moved", n: "The old 'My sevn bot', renamed and filled out with service control, tunnel setup, config file and upgrades." }),
+          b("❓ Help", "nav", { to: "help", ch: "merged", n: "The old 'Commands' tile merged with the upstream 'sevn.bot' tile — guides, slash commands, bugs, features." })
+        ],
+        chrome: [b("🌐 Mission Control", "url", { st: "live" }), b("❌ Close", "back", { st: "live" })]
+      },
+
+      /* ------------------------------------------------------------- CHAT */
+      chat: {
+        title: "💬 Chat", parent: "root",
+        caption: "💬 Chat\nQuick actions: Regen, 👍, 👎, Share, Feedback\nQueue: cancel · Reply keyboard: on · Routing: hidden\nNotify: all · Shortcuts: 3 · Voice: TTS off / STT whisper_cpp",
+        why: "One home for 'how this conversation behaves'. Replaces five root tiles (Session, Channels, Notifications, Shortcuts, Voice). The two controls an operator flips mid-conversation — queue mode and the reply keyboard — stay on the first screen; the five per-reply button toggles collapse into one sub-section because they are set once and forgotten.",
+        buttons: [
+          b("⚡ Quick actions", "nav", { to: "chat_qa", ch: "merged", n: "The five old Session toggles, one tap down. They are configure-once settings and no longer deserve five root-adjacent rows." }),
+          b("Queue: cancel (→steer)", "cycle", { full: true, ch: "kept", st: "live", sp: "C1.6", n: "Cycles gateway.queue_mode cancel → steer → multi. Kept on the first screen: it is the one setting operators change mid-run. De-duplicated — the old Sub-agents copy is removed." }),
+          b("⌨️ Reply keyboard ✅", "toggle", { ch: "moved", st: "live", sp: "C5.1", n: "From Channels. channels.telegram.reply_keyboard.enabled." }),
+          b("Show routing off", "toggle", { ch: "moved", st: "live", sp: "C5.2", n: "From Channels. channels.telegram.show_routing." }),
+          b("🔔 Notify: all (→errors)", "cycle", { full: true, ch: "moved", st: "gated", sp: "C17.1", n: "The entire old Notifications root tile was this one button — and it does not work today. channels.telegram.telegram_notify_policy." }),
+          b("⌨️ Shortcuts", "nav", { to: "chat_shortcuts", ch: "moved", n: "From root; was a one-button tile." }),
+          b("🎙 Voice", "nav", { to: "chat_voice", ch: "moved", st: "live", sp: "C0.4", n: "From root. Voice is chat I/O, not an agent capability. Destination section already works." }),
+          b("🔌 Channels", "nav", { to: "chat_channels", ch: "moved", n: "From root, minus DM policy which moves to Access." }),
+          b("🧾 Sessions", "nav", { to: "chat_sessions", ch: "new", n: "Covers sevn sessions list/history and sevn message send — no menu affordance today." }),
+          b("🌐 Open Chat settings", "url", { full: true, ch: "kept", st: "live" })
+        ]
+      },
+      chat_qa: {
+        title: "⚡ Quick actions", parent: "chat",
+        caption: "⚡ Quick actions\nButtons attached to each assistant reply.\nRegen ✅ · 👍 ✅ · 👎 ✅ · Share ✅ · Feedback ✅",
+        why: "Verbatim from the old Session section, and entirely live today. Each toggle writes channels.telegram.quick_actions.* and takes effect on the next reply.",
+        buttons: [
+          b("Regen ✅", "toggle", { ch: "kept", st: "live", sp: "C1.1" }), b("👍 Up ✅", "toggle", { ch: "kept", st: "live", sp: "C1.2" }),
+          b("👎 Down ✅", "toggle", { ch: "kept", st: "live", sp: "C1.3" }), b("Share ✅", "toggle", { ch: "kept", st: "live", sp: "C1.4" }),
+          b("Feedback ✅", "toggle", { full: true, ch: "kept", st: "live", sp: "C1.5" })
+        ]
+      },
+      chat_shortcuts: {
+        title: "⌨️ Shortcuts", parent: "chat",
+        caption: "⌨️ Shortcuts — 3 saved\n/standup · /triage · /wrapup",
+        why: "The old root tile had exactly one button, and that button is gated. Adding list + remove makes it a real screen instead of a wasted root slot; both call existing shortcuts_store APIs.",
+        buttons: [
+          b("+ Add shortcut", "form", { full: true, ch: "kept", st: "gated", sp: "C16.2" }),
+          b("📋 List shortcuts", "action", { ch: "new", cli: "sevn config shortcuts", n: "shortcuts_store.list_visible_shortcuts() already exists." }),
+          b("🗑 Remove shortcut", "form", { ch: "new", n: "shortcuts_store.delete_shortcut() already exists." })
+        ]
+      },
+      chat_voice: {
+        title: "🎙 Voice", parent: "chat",
+        caption: "🎙 Voice\nTTS: off · engine kokoro · STT: whisper_cpp",
+        why: "Fully live today; gains the two CLI-only reads (sevn voice show / sevn voice status).",
+        buttons: [
+          b("TTS: off ✅", "action", { ch: "kept", st: "live", sp: "C3.1" }), b("TTS: all", "action", { ch: "kept", st: "live", sp: "C3.2" }),
+          b("TTS: when_asked", "action", { full: true, ch: "kept", st: "live", sp: "C3.3" }),
+          b("TTS engine: kokoro 🔁", "cycle", { ch: "kept", st: "live", sp: "C3.5" }), b("STT: whisper_cpp 🔁", "cycle", { ch: "kept", st: "live", sp: "C3.4" }),
+          b("🔊 Probe backends", "action", { ch: "new", cli: "sevn voice status", n: "Live STT/TTS health probe through the gateway." }),
+          b("📋 Voice settings", "action", { ch: "new", cli: "sevn voice show" })
+        ]
+      },
+      chat_channels: {
+        title: "🔌 Channels", parent: "chat",
+        caption: "🔌 Channels\ntelegram: enabled · 2 sessions · webhook healthy",
+        why: "Keeps enablement and health; DM policy moves to Access (it is an access-control question, not a channel setting) and is reachable here by cross-link.",
+        buttons: [
+          b("📶 Channel status", "action", { ch: "new", cli: "sevn channels status" }),
+          b("📋 Channel config", "action", { ch: "new", cli: "sevn channels config" }),
+          b("👥 Who can DM →", "nav", { to: "access_pairing", full: true, ch: "moved", n: "Cross-link, not a copy: DM policy + pairing are owned by Access." })
+        ]
+      },
+      chat_sessions: {
+        title: "🧾 Sessions", parent: "chat",
+        caption: "🧾 Sessions — 4 in sevn.db\ncurrent: tg:me · 218 messages · started 2h ago",
+        why: "Entirely new. sevn sessions list/history and sevn message send were CLI-only; the slash commands /new and /stop get a discoverable home too (both already exist as CommandSpec rows).",
+        buttons: [
+          b("📋 List sessions", "action", { ch: "new", cli: "sevn sessions list" }),
+          b("🕘 Session history", "form", { ch: "new", cli: "sevn sessions history" }),
+          b("✉️ Send to another session", "form", { full: true, ch: "new", cli: "sevn message send" }),
+          b("🆕 New session", "action", { ch: "new", n: "Same effect as /new — CommandSpec(\"new\") already registered." }),
+          b("⏹ Stop current run", "action", { ch: "new", n: "Same effect as /stop — CommandSpec(\"stop\") already registered." })
+        ]
+      },
+
+      /* ------------------------------------------------------------ AGENT */
+      agent: {
+        title: "🧠 Agent", parent: "root",
+        caption: "🧠 Agent — “sevn”\nUnified model: on · Triager/B/C-D: claude-opus-5\nSub-agents: on (L1:0 L2:0) · RLM: off · CodeMode: off",
+        why: "Merges the old Agents (one button) and Models tiles, and adopts the four agent-shaped sub-sections that were stranded in Advanced. Model pickers stay on the first screen because switching models is the second-most-common action after chatting.",
+        buttons: [
+          b("Unified model ✅", "toggle", { full: true, ch: "kept", st: "gated", sp: "C4.1" }),
+          b("Pick Triager", "action", { ch: "kept", st: "live", sp: "C4.2" }), b("Pick Tier B", "action", { ch: "kept", st: "live", sp: "C4.3" }), b("Pick Tier C/D", "action", { ch: "kept", st: "live", sp: "C4.4", triple: true }),
+          b("↔ Swap last model", "action", { full: true, ch: "kept", st: "gated", sp: "C4.5" }),
+          b("✏️ Identity", "nav", { to: "agent_identity", ch: "merged", n: "The old Agents root tile (display name + persona) becomes a sub-section." }),
+          b("🎚 Sampling", "nav", { to: "agent_sampling", ch: "new", n: "sevn models params / set-max-output-tokens — CLI-only today." }),
+          b("🤖 Sub-agents", "nav", { to: "agent_subagents", ch: "moved", st: "live", sp: "C25.8", n: "Out of Advanced; destination section already works." }),
+          b("🔬 Lab", "nav", { to: "agent_lab", ch: "merged", n: "RLM + CodeMode + Self-Improve, three one-toggle sections from Advanced, collapsed into one screen." }),
+          b("📋 Active runs", "action", { ch: "new", cli: "sevn agent status" }),
+          b("🌐 Open Models tab", "url", { full: true, ch: "kept", st: "live" })
+        ]
+      },
+      agent_identity: {
+        title: "✏️ Identity", parent: "agent",
+        caption: "✏️ Identity\nDisplay name: sevn · Persona: IDENTITY.md (1.2 KB)",
+        why: "The old Agents tile, verbatim, plus the resolved model-slot read that sevn agent config / sevn models show expose. Note the one action row here is gated today — the two working rows are both URL links out to Mission Control.",
+        buttons: [
+          b("✏️ Edit display name", "form", { full: true, ch: "kept", st: "gated", sp: "C19.2" }),
+          b("✏️ Edit persona", "url", { ch: "kept", st: "live" }), b("📄 Open IDENTITY.md", "url", { ch: "kept", st: "live" }),
+          b("📋 Resolved slots", "action", { full: true, ch: "new", cli: "sevn agent config · sevn models show" })
+        ]
+      },
+      agent_sampling: {
+        title: "🎚 Sampling", parent: "agent",
+        caption: "🎚 Sampling — LLM_params_config.json\ntemperature 1.0 · max_output_tokens 8192",
+        why: "New. Sampling overrides were reachable only from the CLI.",
+        buttons: [
+          b("📋 Show params", "action", { ch: "new", cli: "sevn models params" }),
+          b("🔢 Set max output tokens", "form", { ch: "new", cli: "sevn models set-max-output-tokens" })
+        ]
+      },
+      agent_subagents: {
+        title: "🤖 Sub-agents", parent: "agent",
+        caption: "🤖 Sub-agents ✅\nRunning L1:0 L2:0 · limits: triager 2 / B 4 / C 2 / D 1",
+        why: "Unchanged from the old Advanced › Sub-agents and fully live, minus the duplicated Queue-mode toggle (now owned by Chat).",
+        buttons: [
+          b("Sub-agents ✅", "toggle", { full: true, ch: "kept", st: "live", sp: "C25.1" }),
+          b("Running L1:0 L2:0", "nav", { to: "agent_subagents_running", full: true, ch: "kept", st: "live", sp: "C25.2" }),
+          b("Global override", "form", { full: true, ch: "kept", st: "live", sp: "C25.3" }),
+          b("Limits Triager", "form", { ch: "kept", st: "live", sp: "C25.4" }), b("Limits Tier B", "form", { ch: "kept", st: "live", sp: "C25.4" }),
+          b("Limits Tier C", "form", { ch: "kept", st: "live", sp: "C25.4" }), b("Limits Tier D", "form", { ch: "kept", st: "live", sp: "C25.4" }),
+          b("🌐 Open Sub-agents panel", "url", { full: true, ch: "kept", st: "live" })
+        ]
+      },
+      agent_subagents_running: {
+        title: "▶ Running sub-agents", parent: "agent_subagents",
+        caption: "▶ Running — none\n(L1: 0 · L2: 0)",
+        why: "Existing screen, but it currently has no actions on it at all. Gains the kill affordances that sevn subagents kill already implements against the gateway supervisor.",
+        buttons: [
+          b("🛑 Kill one", "form", { ch: "new", cli: "sevn subagents kill" }),
+          b("🛑 Kill all", "action", { ch: "new", cli: "sevn subagents kill --all" })
+        ]
+      },
+      agent_lab: {
+        title: "🔬 Lab", parent: "agent",
+        caption: "🔬 Lab — experimental reasoning\nλ-RLM: off · CodeMode: off · Self-improve: on",
+        why: "Three separate one-toggle sections (RLM, CodeMode, Self-Improve) merged into one screen, plus the three sevn improve subcommands that had no menu path. Note two of the three toggles are gated today — only CodeMode is live.",
+        buttons: [
+          b("λ-RLM off", "toggle", { ch: "moved", st: "gated", sp: "C9.1" }), b("🧪 CodeMode off", "toggle", { ch: "moved", st: "live", sp: "C24.1" }),
+          b("📈 Self-improve ✅", "toggle", { full: true, ch: "moved", st: "gated", sp: "C12.1" }),
+          b("🩺 Improve doctor", "action", { ch: "new", cli: "sevn improve doctor" }),
+          b("📝 Record lesson", "form", { ch: "new", cli: "sevn improve learn" }),
+          b("🎞 Replay sampler", "action", { ch: "new", cli: "sevn improve replay-sampler", n: "Developer aid; owner-gated." }),
+          b("🌐 RLM tab", "url", { ch: "kept", st: "live" }), b("🌐 Jobs / Traces", "url", { ch: "kept", st: "live" })
+        ]
+      },
+
+      /* ------------------------------------------------- SKILLS AND TOOLS */
+      skills: {
+        title: "🧩 Skills & Tools", parent: "root",
+        caption: "🧩 Skills & Tools\n14 skills loaded · 2 configurable · tools: 0 chronic failures\nIntegrations: github ✅ · discogs ⚠ unauthenticated",
+        why: "Three root tiles with three action rows between them (Skills 2, Tools 0, Integrations 1) become one tile. Adds the three sevn skills subcommands and sevn tools health.",
+        buttons: [
+          b("📋 Skills list", "action", { ch: "new", cli: "sevn skills list" }),
+          b("🔄 Sync skills index", "action", { ch: "new", cli: "sevn skills sync" }),
+          b("🛡 Security scan", "action", { full: true, ch: "new", cli: "sevn skills security-scan", n: "SkillSpector static scan over workspace skill directories." }),
+          b("📱 Social Media Manager", "nav", { to: "skills_smm", full: true, ch: "kept", st: "live", sp: "C7.4" }),
+          b("📀 Discogs", "nav", { to: "skills_discogs", full: true, ch: "kept", st: "live", sp: "C7.8" }),
+          b("🛠 Tools", "nav", { to: "skills_tools", ch: "moved", st: "live", sp: "C0.8", n: "The old Tools root tile had zero action rows — only two URL rows." }),
+          b("🌐 Integrations", "nav", { to: "skills_integrations", ch: "moved", st: "live", sp: "C0.14" }),
+          b("🌐 Open Skills tab", "url", { full: true, ch: "kept", st: "live" })
+        ]
+      },
+      skills_smm: {
+        title: "📱 Social Media Manager", parent: "skills",
+        caption: "📱 Social Media Manager\nDefault medium: browser · TwexAPI: off",
+        why: "Unchanged. Live except the secret-wizard row, which shares the gated C6.1 family.",
+        buttons: [
+          b("Default medium: browser (→twexapi)", "cycle", { full: true, ch: "kept", st: "live", sp: "C7.5" }),
+          b("TwexAPI off", "toggle", { full: true, ch: "kept", st: "live", sp: "C7.6" }),
+          b("Set TwexAPI key", "form", { full: true, ch: "kept", st: "gated", sp: "C6.1b" }),
+          b("Facebook: browser", "cycle", { ch: "kept", st: "live", sp: "C7.5" }), b("Instagram: browser", "cycle", { ch: "kept", st: "live", sp: "C7.5" }),
+          b("LinkedIn: browser", "cycle", { ch: "kept", st: "live", sp: "C7.5" }), b("Reddit: browser", "cycle", { ch: "kept", st: "live", sp: "C7.5" }),
+          b("TikTok: browser", "cycle", { ch: "kept", st: "live", sp: "C7.5" }), b("X: browser (→twexapi)", "cycle", { ch: "kept", st: "live", sp: "C7.5" })
+        ]
+      },
+      skills_discogs: {
+        title: "📀 Discogs", parent: "skills",
+        caption: "📀 Discogs — group off\nauth: user_token · confirm writes: on",
+        why: "Unchanged. The per-feature toggles are live; only the group master switch is gated.",
+        buttons: [
+          b("Discogs group off", "toggle", { full: true, ch: "kept", st: "gated", sp: "C7.2" }),
+          b("Database off", "toggle", { ch: "kept", st: "live", sp: "C7.11" }), b("Marketplace off", "toggle", { ch: "kept", st: "live", sp: "C7.12" }),
+          b("Collection off", "toggle", { ch: "kept", st: "live", sp: "C7.13" }), b("Wantlist off", "toggle", { ch: "kept", st: "live", sp: "C7.14" }),
+          b("Identity off", "toggle", { full: true, ch: "kept", st: "live", sp: "C7.15" }),
+          b("Auth: user_token (→oauth)", "cycle", { ch: "kept", st: "live", sp: "C7.16" }), b("Confirm writes ✅", "toggle", { ch: "kept", st: "live", sp: "C7.17" }),
+          b("⚙ Setup", "nav", { to: "skills_discogs_setup", full: true, ch: "kept", st: "live", sp: "C7.9" })
+        ]
+      },
+      skills_discogs_setup: {
+        title: "⚙ Discogs setup", parent: "skills_discogs",
+        caption: "⚙ Discogs setup\nNo credential stored.",
+        why: "Unchanged and fully live. One of only two four-tap leaves, kept because it is a linear setup flow.",
+        buttons: [
+          b("User-token", "form", { full: true, ch: "kept", st: "live", sp: "C7.18" }),
+          b("OAuth 1.0a (Setup)", "form", { ch: "kept", st: "live", sp: "C7.19" }), b("Test connection", "action", { ch: "kept", st: "live", sp: "C7.20" })
+        ]
+      },
+      skills_tools: {
+        title: "🛠 Tools", parent: "skills",
+        caption: "🛠 Tools\n38 registered · 0 chronic failures · 2 MCP servers",
+        why: "The old root tile was two URL rows and nothing else — it has no callback-driven action at all today. Adding sevn tools health gives it a reason to exist.",
+        buttons: [
+          b("🩺 Tool health", "action", { full: true, ch: "new", cli: "sevn tools health", n: "Chronic tool/skill failure rows from the gateway." }),
+          b("🌐 Tools tab", "url", { ch: "kept", st: "live" }), b("🔌 MCP servers", "url", { ch: "kept", st: "live" })
+        ]
+      },
+      skills_integrations: {
+        title: "🌐 Integrations", parent: "skills",
+        caption: "🌐 Integrations\ngithub ✅ · openwiki ⚠ no key · discogs ⚠ unauthenticated",
+        why: "Was a one-button root tile, and that button is gated — so today this tile does nothing but link out.",
+        buttons: [
+          b("+ Add integration", "url", { full: true, ch: "kept", st: "live" }),
+          b("🔄 Refresh list", "action", { ch: "kept", st: "gated", sp: "C14.3" }),
+          b("📋 Integration status", "action", { ch: "new", st: "build", n: "No per-integration status listing exists yet; the refresh handler only re-renders." })
+        ]
+      },
+
+      /* ----------------------------------------------------------- MEMORY */
+      memory: {
+        title: "📚 Memory", parent: "root",
+        caption: "📚 Memory\nSecond Brain: on (PARA) · Dreaming: on · MYCODE: on\nVault: ~/Documents/vault · last reindex 3h ago",
+        why: "A new grouping for 'what sevn knows'. Pulls Second Brain out of Advanced and Code out of the root, and gives Dreaming/LCM and OpenWiki their first menu presence — five sevn memory subcommands and three sevn openwiki subcommands were CLI-only.",
+        buttons: [
+          b("📚 Second Brain", "nav", { to: "memory_sb", ch: "moved", st: "live", sp: "C13.2", n: "Out of Advanced; section renders today (its toggles are gated)." }),
+          b("💤 Dreaming", "nav", { to: "memory_dreaming", ch: "new", n: "Grounded Dreaming backfill — sevn memory status / rem-backfill / reconcile-cron." }),
+          b("🔎 Search memory", "form", { ch: "new", cli: "sevn memory search" }),
+          b("🗂 Rebuild index", "action", { ch: "new", cli: "sevn memory index" }),
+          b("💻 Code understanding", "nav", { to: "memory_code", full: true, ch: "moved", st: "live", sp: "C0.10", n: "The old Code root tile — MYCODE and the review graph are knowledge indexes, so they belong here." }),
+          b("📖 OpenWiki", "nav", { to: "memory_openwiki", full: true, ch: "new" }),
+          b("🌐 Open Second Brain tab", "url", { full: true, ch: "kept", st: "live" })
+        ]
+      },
+      memory_sb: {
+        title: "📚 Second Brain", parent: "memory",
+        caption: "📚 Second Brain ✅\nLayout: PARA · Vault: ~/Documents/vault · index: fresh",
+        why: "Unchanged rows plus the two sevn second-brain subcommands. Worth flagging: all four existing controls here are gated — the section renders but nothing on it can be tapped through today.",
+        buttons: [
+          b("Second Brain ✅", "toggle", { full: true, ch: "kept", st: "gated", sp: "C13.1" }),
+          b("Layout: legacy (→para)", "cycle", { full: true, ch: "kept", st: "gated", sp: "C13.6" }),
+          b("📁 Set vault path", "form", { ch: "kept", st: "gated", sp: "C13.4" }), b("🗂️ Browse folders", "form", { ch: "kept", st: "gated", sp: "C13.5" }),
+          b("🔄 Reindex vault", "action", { ch: "new", cli: "sevn second-brain reindex" }),
+          b("⚙ Bootstrap layout", "action", { ch: "new", cli: "sevn second-brain setup" }),
+          b("🌐 Open Second Brain tab", "url", { full: true, ch: "kept", st: "live" })
+        ]
+      },
+      memory_dreaming: {
+        title: "💤 Dreaming", parent: "memory",
+        caption: "💤 Dreaming — on\nCron: 03:00 daily · last batch 2026-07-24 (41 rows)",
+        why: "Entirely new. Grounded Dreaming backfill is a scheduled, occasionally-wrong process — an operator needs to see it and undo it from the phone, not only from a laptop shell.",
+        buttons: [
+          b("📋 Dreaming status", "action", { full: true, ch: "new", cli: "sevn memory status" }),
+          b("🕰 Backfill window", "form", { ch: "new", cli: "sevn memory rem-backfill" }),
+          b("↩️ Undo last batch", "action", { ch: "new", cli: "sevn memory rem-backfill --undo" }),
+          b("🔁 Reconcile cron", "action", { full: true, ch: "new", cli: "sevn memory reconcile-cron" })
+        ]
+      },
+      memory_code: {
+        title: "💻 Code understanding", parent: "memory",
+        caption: "💻 Code understanding\nMYCODE: on · Review graph: off",
+        why: "The old Code root tile, unchanged, one level down. Both toggles are gated today.",
+        buttons: [
+          b("MYCODE ✅", "toggle", { ch: "kept", st: "gated", sp: "C10.1" }), b("Review graph off", "toggle", { ch: "kept", st: "gated", sp: "C10.2" }),
+          b("🌐 Open Code tab", "url", { full: true, ch: "kept", st: "live" })
+        ]
+      },
+      memory_openwiki: {
+        title: "📖 OpenWiki", parent: "memory",
+        caption: "📖 OpenWiki — not installed\nLLM key: not set",
+        why: "New. The bundled OpenWiki skill needs an npm install and an API key; both were CLI-only. Good candidate for the conditional-row pattern the tunnel toggle established — hide the operate rows until it is installed.",
+        buttons: [
+          b("⬇️ Install CLI", "action", { ch: "new", cli: "sevn openwiki install" }),
+          b("🔑 Configure LLM key", "form", { ch: "new", cli: "sevn openwiki configure" }),
+          b("⚙ Install + key", "action", { full: true, ch: "new", cli: "sevn openwiki setup" })
+        ]
+      },
+
+      /* ----------------------------------------------------------- ACCESS */
+      access: {
+        title: "🔐 Access", parent: "root",
+        caption: "🔐 Access\n7 secrets · store unlocked · OAuth: openai ✅ anthropic ✅\nDM policy: open · Guard: full scan",
+        why: "Secrets and Security were separate root tiles answering the same question — who and what is allowed in. DM policy and pairing join them from Channels, because 'who may DM the bot' is access control, not channel configuration. Owner-only.",
+        buttons: [
+          b("+ Add secret", "form", { full: true, ch: "kept", st: "gated", sp: "C6.1", n: "Hoisted: the single most-used row in the old Secrets tile — and gated today, so the whole Secrets tile is currently inert." }),
+          b("🔐 Secrets", "nav", { to: "access_secrets", ch: "moved", st: "live", sp: "C0.6" }),
+          b("🪪 Provider logins", "nav", { to: "access_providers", ch: "new" }),
+          b("🐙 GitHub token", "form", { ch: "new", cli: "sevn gh add-github-token" }),
+          b("🛡 Guard rails", "nav", { to: "access_guard", ch: "moved", st: "live", sp: "C0.11", n: "The old Security root tile." }),
+          b("👥 DM policy & pairing", "nav", { to: "access_pairing", full: true, ch: "merged" }),
+          b("🌐 Open Security tab", "url", { full: true, ch: "kept", st: "live" })
+        ]
+      },
+      access_secrets: {
+        title: "🔐 Secrets", parent: "access",
+        caption: "🔐 Secrets — 7 aliases\nStore: unlocked (Keychain) · never shows values",
+        why: "The old Secrets tile had one button (+ Add secret), and it is gated. All five sevn secrets subcommands plus the export bundle now have a home. The two destructive rows should reuse the tunnel-on confirm pattern.",
+        buttons: [
+          b("+ Add secret", "form", { full: true, ch: "kept", st: "gated", sp: "C6.1", cli: "sevn secrets put" }),
+          b("📋 List aliases", "action", { ch: "new", cli: "sevn secrets list", n: "Aliases and fingerprints only — never values." }),
+          b("🗑 Remove secret", "form", { ch: "new", cli: "sevn secrets rm", n: "Two-step confirm on alias + fingerprint, modelled on build_tunnel_on_confirm_keyboard()." }),
+          b("🔓 Unlock status", "action", { full: true, ch: "new", cli: "sevn secrets check-unlock" }),
+          b("🔑 Store passphrase (host)", "action", { full: true, ch: "new", st: "build", cli: "sevn secrets store-passphrase", n: "Copy-paste card — writes to the operator's macOS Keychain, outside the gateway's reach." }),
+          b("📤 Export .env bundle", "action", { full: true, ch: "new", st: "build", cli: "sevn export-secrets", n: "Writes plaintext secrets. Needs the two-step confirm and a file-delivery path that does not exist yet. Owner only." })
+        ]
+      },
+      access_providers: {
+        title: "🪪 Provider logins", parent: "access",
+        caption: "🪪 Provider OAuth\nopenai: paired (Codex PKCE) · anthropic: paired",
+        why: "New. sevn providers oauth login/logout/status had no menu path, so re-pairing a lapsed provider token required a laptop.",
+        buttons: [
+          b("📋 OAuth status", "action", { full: true, ch: "new", cli: "sevn providers oauth status" }),
+          b("🔗 Link provider", "form", { ch: "new", cli: "sevn providers oauth login" }),
+          b("🔌 Unlink provider", "form", { ch: "new", cli: "sevn providers oauth logout" })
+        ]
+      },
+      access_guard: {
+        title: "🛡 Guard rails", parent: "access",
+        caption: "🛡 Guard rails\nScanner: full · owner overrides: none",
+        why: "The old Security tile, verbatim. The three owner-override kill-switches are live; the scanner mode toggle is gated.",
+        buttons: [
+          b("Heuristic-only off", "toggle", { full: true, ch: "kept", st: "gated", sp: "C11.1" }),
+          b("Skip guard on my text off", "toggle", { full: true, ch: "kept", st: "live", sp: "C11.3" }),
+          b("Skip guard on my links off", "toggle", { full: true, ch: "kept", st: "live", sp: "C11.4" }),
+          b("Skip guard on my documents off", "toggle", { full: true, ch: "kept", st: "live", sp: "C11.5" }),
+          b("🌐 Open Security tab", "url", { full: true, ch: "kept", st: "live" })
+        ]
+      },
+      access_pairing: {
+        title: "👥 DM policy & pairing", parent: "access",
+        caption: "👥 DM policy: open\nPending pairing requests: 0 · allowlist: 1",
+        why: "DM policy moves here from Channels and finally sits next to the approval step it gates — sevn pairing approve was CLI-only, which meant an inbound pairing code could not be approved from the phone that received it. PairingStore.list_pending() and approve_code() already exist.",
+        buttons: [
+          b("DM policy: open (→pairing)", "cycle", { full: true, ch: "moved", st: "gated", sp: "C5.3" }),
+          b("✅ Approve pairing code", "form", { ch: "new", cli: "sevn pairing approve" }),
+          b("📋 Pending requests", "action", { ch: "new", n: "PairingStore.list_pending() already exists." })
+        ]
+      },
+
+      /* ----------------------------------------------------------- HEALTH */
+      health: {
+        title: "📊 Health", parent: "root",
+        caption: "📊 Health\nGateway ✅ · Proxy ✅ · Tunnel ✅ · doctor: 0 fail / 2 warn\nToday: 1.2M tokens · $4.10 · 38 turns",
+        why: "The on-call tile. Merges Logs and Dashboard, and adopts the diagnostics that were CLI-only: doctor, usage, turn bundles. The five log/trace rows it inherits are among the most solid in the whole menu — all live.",
+        buttons: [
+          b("🩺 Run doctor", "action", { full: true, ch: "new", cli: "sevn doctor", n: "Local + gateway probes, posted as a message. The single most useful missing button." }),
+          b("📄 Tail gateway", "action", { ch: "kept", st: "live", sp: "C20.1" }), b("📄 Tail proxy", "action", { ch: "kept", st: "live", sp: "C20.2" }),
+          b("🔍 Grep logs", "form", { full: true, ch: "kept", st: "live", sp: "C20.3" }),
+          b("🧵 Recent traces", "action", { ch: "kept", st: "live", sp: "C20.4" }), b("🔎 Trace by id", "form", { ch: "kept", st: "live", sp: "C20.5" }),
+          b("📦 Turn bundles", "nav", { to: "health_bundles", ch: "new" }),
+          b("💰 Usage & budget", "action", { ch: "new", cli: "sevn usage show" }),
+          b("📡 Trace export", "nav", { to: "health_tracing", ch: "merged", n: "Logfire toggle + token + redaction, previously three loose rows on Logs with a duplicate on Advanced." }),
+          b("📌 Status pin", "nav", { to: "health_pin", ch: "moved", st: "live", sp: "C0.15", n: "The old Dashboard root tile." }),
+          b("🌐 Open Mission Control", "url", { full: true, ch: "kept", st: "live" })
+        ]
+      },
+      health_bundles: {
+        title: "📦 Turn bundles", parent: "health",
+        caption: "📦 Turn bundles — .sevn/turns/\n38 indexed · last export 12m ago",
+        why: "New. Per-turn diagnostic bundles are the fastest way to answer 'what did it actually do on that turn', and were reachable only from a shell.",
+        buttons: [
+          b("📦 Export / refresh", "action", { ch: "new", cli: "sevn turn-bundle export" }),
+          b("🔎 View a turn", "form", { ch: "new", cli: "sevn turn-bundle view" })
+        ]
+      },
+      health_tracing: {
+        title: "📡 Trace export", parent: "health",
+        caption: "📡 Trace export\nLogfire: off · redaction: on",
+        why: "Groups the three loose Logs rows — all live — and removes the duplicate redaction toggle that also lived on Advanced, where it was gated. Keeping the live copy is the whole point of de-duplicating.",
+        buttons: [
+          b("Logfire export: off", "toggle", { full: true, ch: "kept", st: "live", sp: "C20.8", cli: "sevn tracing logfire enable|disable" }),
+          b("🔑 Set Logfire token", "form", { full: true, ch: "kept", st: "live", sp: "C20.9" }),
+          b("Trace redaction: on", "toggle", { full: true, ch: "merged", st: "live", sp: "C20.6", n: "De-duplicated — the identical Advanced toggle (C18.2, gated) is removed in favour of this working one." }),
+          b("📋 Tracing config", "action", { full: true, ch: "new", cli: "sevn config tracing" })
+        ]
+      },
+      health_pin: {
+        title: "📌 Status pin", parent: "health",
+        caption: "📌 Status pin — pinned\nUpdated 40s ago in this chat",
+        why: "The old Dashboard root tile, one level down. All three pin actions are gated today, so this tile currently only links out.",
+        buttons: [
+          b("📌 Create/update pin", "action", { full: true, ch: "kept", st: "gated", sp: "C15.3" }),
+          b("🔄 Refresh pin", "action", { ch: "kept", st: "gated", sp: "C15.1" }), b("📤 Unpin", "action", { ch: "kept", st: "gated", sp: "C15.4" }),
+          b("🔐 Set dashboard password (host)", "action", { full: true, ch: "new", st: "build", cli: "sevn dashboard set-login-password" }),
+          b("🌐 Open Mission Control", "url", { full: true, ch: "kept", st: "live" })
+        ]
+      },
+
+      /* ------------------------------------------------------- DEPLOYMENT */
+      deployment: {
+        title: "🖥 Deployment", parent: "root",
+        caption: "🖥 Deployment — this install\nGateway: running (pid 4821) · Proxy: running\nTunnel: cloudflare · persistent: off\nVersion: pre-0.0.1 (519b032) · schema v1",
+        why: "The old 'My sevn bot' tile, renamed so it no longer collides with the upstream 'sevn.bot' tile, and filled out with everything an operator does to their own install: service control, tunnel, the config file, upgrades, remote deploy. Its five inherited rows are all live — including the persistent-tunnel switch that landed in PR #58. Owner-only.",
+        buttons: [
+          b("🔄 Restart gateway", "action", { ch: "kept", st: "live", sp: "C18.4" }), b("🔄 Restart proxy", "action", { ch: "kept", st: "live", sp: "C18.5" }),
+          b("🌐 Tunnel: off — turn on", "action", { full: true, ch: "kept", st: "live", sp: "C22.1/C22.2", n: "The persistent switch: sets infrastructure.tunnel.autostart, starts the provider now, and re-launches on every gateway boot. Two-step confirm on ON (it stands up a public URL); OFF needs no prompt since it only reduces exposure. Stays on the first screen — it is the highest-value tunnel control, and demoting a working button into a sub-section would be a regression. Renders only when infrastructure.tunnel.mode is in RUNNABLE_MODES." }),
+          b("⚙️ Services", "nav", { to: "deployment_services", ch: "new", n: "start / stop / status / logs for both units — CLI-only today." }),
+          b("🌍 Tunnel setup", "nav", { to: "deployment_tunnel", ch: "new", n: "Provider config, health, and one-shot process control. The persistent switch above is deliberately NOT repeated inside." }),
+          b("🆔 Deployment id", "action", { ch: "kept", st: "live", sp: "C20.7" }), b("🏷 Version id", "action", { ch: "kept", st: "live", sp: "C20.7a" }),
+          b("📄 Config file", "nav", { to: "deployment_config", ch: "new" }),
+          b("⬆️ Update & migrate", "nav", { to: "deployment_update", ch: "new" }),
+          b("🚀 Deploy to host", "nav", { to: "deployment_deploy", ch: "new" }),
+          b("🖥 Host-only commands", "nav", { to: "deployment_host", ch: "new", st: "build", n: "Copy-paste cards for commands that act on the operator's own machine." }),
+          b("Auto-resume tier B off", "toggle", { full: true, ch: "moved", st: "gated", sp: "C18.1", n: "Orphan toggle rescued from Advanced — gateway.restart.auto_resume_b is a restart-behaviour setting and belongs next to the restart buttons." }),
+          b("🌐 Open Mission Control", "url", { full: true, ch: "kept", st: "live" })
+        ]
+      },
+      deployment_services: {
+        title: "⚙️ Services", parent: "deployment",
+        caption: "⚙️ Services\nGateway: running · Proxy: running (launchd user units)",
+        why: "New. Restart existed; start, stop, status and logs did not — so a stopped gateway could not be started from Telegram. All eight map onto existing service_manager code.",
+        buttons: [
+          b("▶ Start gateway", "action", { ch: "new", cli: "sevn gateway start" }), b("⏹ Stop gateway", "action", { ch: "new", cli: "sevn gateway stop" }),
+          b("📊 Gateway status", "action", { ch: "new", cli: "sevn gateway status" }), b("📄 Gateway logs", "action", { ch: "new", cli: "sevn gateway logs" }),
+          b("▶ Start proxy", "action", { ch: "new", cli: "sevn proxy start" }), b("⏹ Stop proxy", "action", { ch: "new", cli: "sevn proxy stop" }),
+          b("📊 Proxy status", "action", { ch: "new", cli: "sevn proxy status" }), b("📄 Proxy logs", "action", { ch: "new", cli: "sevn proxy logs" })
+        ]
+      },
+      deployment_tunnel: {
+        title: "🌍 Tunnel setup", parent: "deployment",
+        caption: "🌍 Tunnel setup — cloudflare\nPersistent: off  (switch is on the Deployment screen)\nRunning now: no · https://—",
+        why: "Everything about the tunnel EXCEPT the persistent switch, which stays one level up where it already works. Two hazards drove this split. First, sevn tunnel start/stop is one-shot process control for this boot only, while act:tunnel:on/off sets autostart and survives reboots — near-identical names, completely different blast radius — so the CLI-backed pair is relabelled 'Start now / Stop now' and the caption states the persistent state explicitly. Second, _tunnel_toggle_row() returns None when mode is not in RUNNABLE_MODES, so an operator with no provider configured sees nothing about tunnels at all today; this screen is always present and makes sevn tunnel setup reachable, closing that dead end.",
+        warn: true,
+        buttons: [
+          b("📊 Tunnel status", "action", { full: true, ch: "new", cli: "sevn tunnel status", n: "Mode, process health, and the public URL." }),
+          b("▶ Start now (this boot)", "action", { ch: "new", cli: "sevn tunnel start", n: "One-shot: spawns the provider without touching autostart." }),
+          b("⏹ Stop now (this boot)", "action", { ch: "new", cli: "sevn tunnel stop", n: "One-shot: kills the process, leaves autostart as-is — so a persistent tunnel comes back on the next gateway boot. The caption must make that obvious." }),
+          b("⚙ Setup / change provider", "form", { full: true, ch: "new", cli: "sevn tunnel setup", n: "Picks the mode and stores provider secrets. The one row that turns a mode:none install into one where the persistent switch renders at all." })
+        ]
+      },
+      deployment_config: {
+        title: "📄 Config file", parent: "deployment",
+        caption: "📄 sevn.json — schema v1, valid\n~/.sevn/sevn.json · 412 lines",
+        why: "New. Direct access to the bound sevn.json: read it, validate it, set an arbitrary key. The per-section views (sevn config <section>) are covered by each section's caption, not by rows here.",
+        buttons: [
+          b("📋 Show sevn.json", "action", { ch: "new", cli: "sevn config show" }),
+          b("✅ Validate", "action", { ch: "new", cli: "sevn config validate" }),
+          b("✏️ Set a key", "form", { full: true, ch: "new", cli: "sevn config set", n: "Free-form dot-path + value, atomic promote via mutate_sevn_json. Owner only." }),
+          b("🗂 Sections & SSOT paths", "action", { full: true, ch: "new", cli: "sevn config sections" })
+        ]
+      },
+      deployment_update: {
+        title: "⬆️ Update & migrate", parent: "deployment",
+        caption: "⬆️ Update & migrate\nCLI pre-0.0.1 · schema v1 (current) · checkout 519b032",
+        why: "New. Four upgrade-shaped CLI commands (update, sync, upgrade, migrate) that had no menu presence — though the sync action itself already works from the sevn.bot tile.",
+        buttons: [
+          b("⬆️ Update CLI", "action", { ch: "new", cli: "sevn update" }),
+          b("🔀 Sync checkout", "action", { ch: "new", st: "live", sp: "C21.1", n: "Already implemented as act:sevn_bot:sync; also reachable from Help." }),
+          b("🧬 Schema posture", "action", { ch: "new", cli: "sevn upgrade" }),
+          b("🚚 Migrate / import", "form", { ch: "new", cli: "sevn migrate" })
+        ]
+      },
+      deployment_deploy: {
+        title: "🚀 Deploy to host", parent: "deployment",
+        caption: "🚀 Remote deploy\nNo remote host configured.",
+        why: "New. Remote SSH deploy from an export bundle. Deploying to a remote host is exposure-increasing and should reuse the tunnel-on confirm gate.",
+        buttons: [
+          b("🔌 Check SSH host", "form", { ch: "new", cli: "sevn deploy check" }),
+          b("🚀 Deploy to remote", "form", { ch: "new", cli: "sevn deploy remote" }),
+          b("📤 Build export bundle →", "nav", { to: "access_secrets", full: true, ch: "new", cli: "sevn export-secrets", n: "Cross-link to Access › Secrets, which owns the bundle." })
+        ]
+      },
+      deployment_host: {
+        title: "🖥 Host-only commands", parent: "deployment",
+        caption: "🖥 Host-only\nThese run in your shell, not through the gateway.\nTap one to get a copy-paste block.",
+        why: "Honest design: these commands mutate the operator's own shell, Keychain or filesystem and cannot be executed by the gateway. Rather than fake buttons that answer 'not supported', each row posts the exact command to paste. The card renderer does not exist yet — this whole screen is new logic, but small and shared.",
+        warn: true,
+        buttons: [
+          b("🧭 Onboard wizard", "action", { full: true, ch: "new", st: "build", cli: "sevn onboard --web" }),
+          b("⌨️ Shell completion", "action", { ch: "new", st: "build", cli: "sevn completion install|show|uninstall" }),
+          b("🕵️ Shell-history hook", "action", { ch: "new", st: "build", cli: "sevn shell-history install|status|uninstall" }),
+          b("🔑 Set gateway token", "action", { ch: "new", st: "build", cli: "sevn gateway set-gateway-token" }),
+          b("🔐 Set dashboard password", "action", { ch: "new", st: "build", cli: "sevn dashboard set-login-password" }),
+          b("🗝 Store passphrase", "action", { full: true, ch: "new", st: "build", cli: "sevn secrets store-passphrase" }),
+          b("☠️ Uninstall sevn", "action", { full: true, ch: "new", st: "build", cli: "sevn unboard", n: "Prints the command only — never executes. Aliases: sevn uninstall, sevn remove." })
+        ]
+      },
+
+      /* ------------------------------------------------------------- HELP */
+      help: {
+        title: "❓ Help", parent: "root",
+        caption: "❓ Help\n/new /stop /status /model /voice /logs /traces /config /menu\nsevn.bot pre-0.0.1 · 6 guides bundled",
+        why: "The old '❓ Commands' tile merged with the upstream 'sevn.bot' tile. Both answer 'tell me about sevn itself' — one as documentation, one as the project. Keeping them apart was the source of the sevn.bot / My sevn bot confusion. The three sevn.bot actions are live.",
+        buttons: [
+          b("📖 Slash commands", "action", { full: true, ch: "kept", st: "live", sp: "C0.20", n: "The old Commands section body — a caption-only screen today, with no action rows at all." }),
+          b("📚 Guides", "nav", { to: "help_guides", full: true, ch: "new", cli: "sevn guide" }),
+          b("🔄 Sync sevn.bot (latest)", "action", { full: true, ch: "moved", st: "live", sp: "C21.1", n: "From the old sevn.bot tile." }),
+          b("🐛 Bugs", "action", { ch: "moved", st: "live", sp: "C21.2" }), b("✨ Features", "action", { ch: "moved", st: "live", sp: "C21.3" }),
+          b("🏷 CLI version", "action", { ch: "new", cli: "sevn version" }),
+          b("🧑‍💻 Developer", "nav", { to: "help_dev", ch: "new", st: "build", n: "Only shown when a source checkout is bound — that guard does not exist yet." }),
+          b("🌐 about.sevn.bot", "url", { full: true, ch: "kept", st: "live" })
+        ]
+      },
+      help_guides: {
+        title: "📚 Guides", parent: "help",
+        caption: "📚 Bundled guides\nonboarding · secrets · gateway · tunnel · skills · troubleshooting",
+        why: "New. sevn guide ships narrative walkthroughs that no Telegram user could reach; list_guide_topics() already enumerates them.",
+        buttons: [
+          b("📋 List guides", "action", { full: true, ch: "new", cli: "sevn guide" }),
+          b("📖 Read a guide", "form", { full: true, ch: "new", cli: "sevn guide <topic>", n: "One row per bundled topic once the list is known." })
+        ]
+      },
+      help_dev: {
+        title: "🧑‍💻 Developer", parent: "help",
+        caption: "🧑‍💻 Developer — source checkout bound\nThese only work inside a sevn.bot git checkout.",
+        why: "Repo-only commands, quarantined behind an owner gate and a checkout check. They post copy-paste blocks rather than running docs pipelines from a chat message. Both the card renderer and the checkout guard are new.",
+        warn: true,
+        buttons: [
+          b("📘 README pipeline", "action", { full: true, ch: "new", st: "build", cli: "sevn readme check|generate|update|scaffold|index|curate|fingerprint" }),
+          b("📗 About-docs", "action", { full: true, ch: "new", st: "build", cli: "sevn about-docs check|generate|index|extract|context|schema|migrate" }),
+          b("🖥 GUI migration notes", "action", { full: true, ch: "new", st: "build", cli: "sevn gui migrate" })
+        ]
+      }
+    };
+
+    /* ------------------------------------------------------ migration map */
+    const MIGRATION = [
+      ["📦 Session › Regen / 👍 / 👎 / Share / Feedback", "💬 Chat › ⚡ Quick actions", "merged"],
+      ["📦 Session › Queue mode", "💬 Chat › Queue (first screen)", "kept"],
+      ["🤖 Agents › Edit display name / persona / IDENTITY.md", "🧠 Agent › ✏️ Identity", "merged"],
+      ["🧠 Models › all rows", "🧠 Agent (first screen)", "merged"],
+      ["🎙 Voice › all rows", "💬 Chat › 🎙 Voice", "moved"],
+      ["🔌 Channels › Reply keyboard", "💬 Chat (first screen)", "moved"],
+      ["🔌 Channels › Show routing", "💬 Chat (first screen)", "moved"],
+      ["🔌 Channels › DM policy", "🔐 Access › 👥 DM policy & pairing", "moved"],
+      ["🔐 Secrets › + Add secret", "🔐 Access (first screen) + 🔐 Secrets", "kept"],
+      ["🧩 Skills › Social Media Manager", "🧩 Skills & Tools › 📱 Social Media Manager", "kept"],
+      ["🧩 Skills › Discogs (+ setup)", "🧩 Skills & Tools › 📀 Discogs", "kept"],
+      ["🛠 Tools › Tools tab / MCP servers", "🧩 Skills & Tools › 🛠 Tools", "moved"],
+      ["💻 Code › MYCODE / Review graph", "📚 Memory › 💻 Code understanding", "moved"],
+      ["🛡 Security › all rows", "🔐 Access › 🛡 Guard rails", "moved"],
+      ["🌐 Integrations › Refresh / Add", "🧩 Skills & Tools › 🌐 Integrations", "moved"],
+      ["📊 Dashboard › pin rows", "📊 Health › 📌 Status pin", "moved"],
+      ["⌨️ Shortcuts › + Add shortcut", "💬 Chat › ⌨️ Shortcuts", "moved"],
+      ["🔔 Notifications › Notify policy", "💬 Chat (first screen)", "moved"],
+      ["⚙️ Advanced › Auto-resume tier B", "🖥 Deployment (first screen)", "moved"],
+      ["⚙️ Advanced › Trace redaction (gated copy)", "removed — 📊 Health keeps the live C20.6 copy", "gone"],
+      ["⚙️ Advanced › RLM", "🧠 Agent › 🔬 Lab", "merged"],
+      ["⚙️ Advanced › Self-Improve", "🧠 Agent › 🔬 Lab", "merged"],
+      ["⚙️ Advanced › Second Brain", "📚 Memory › 📚 Second Brain", "moved"],
+      ["⚙️ Advanced › Sub-agents (+ running)", "🧠 Agent › 🤖 Sub-agents", "moved"],
+      ["⚙️ Advanced › CodeMode", "🧠 Agent › 🔬 Lab", "merged"],
+      ["⚙️ Advanced (section itself)", "dissolved — no replacement tile", "gone"],
+      ["📜 Logs › Tail gateway / proxy / Grep", "📊 Health (first screen)", "moved"],
+      ["📜 Logs › Recent traces / Trace by id", "📊 Health (first screen)", "moved"],
+      ["📜 Logs › Logfire export / token / redaction", "📊 Health › 📡 Trace export", "merged"],
+      ["❓ Commands (section body)", "❓ Help › 📖 Slash commands", "moved"],
+      ["sevn.bot › Sync (latest) / Bugs / Features", "❓ Help (first screen)", "moved"],
+      ["🤖 My sevn bot › Restart gateway / proxy", "🖥 Deployment (first screen)", "kept"],
+      ["🤖 My sevn bot › Tunnel: on/off (C22.1 / C22.2)", "🖥 Deployment (first screen) — not demoted", "kept"],
+      ["🤖 My sevn bot › Deployment id / Version id", "🖥 Deployment (first screen)", "kept"],
+      ["🤖 Sub-agents › Queue mode (duplicate)", "removed — owned by 💬 Chat", "gone"]
+    ];
+
+    /* -------------------------------------------------------- CLI mapping */
+    const COVERAGE = [
+      ["about-docs check", "❓ Help › 🧑‍💻 Developer › About-docs", "copy-paste", "build"],
+      ["about-docs context", "❓ Help › 🧑‍💻 Developer › About-docs", "copy-paste", "build"],
+      ["about-docs extract", "❓ Help › 🧑‍💻 Developer › About-docs", "copy-paste", "build"],
+      ["about-docs generate", "❓ Help › 🧑‍💻 Developer › About-docs", "copy-paste", "build"],
+      ["about-docs index", "❓ Help › 🧑‍💻 Developer › About-docs", "copy-paste", "build"],
+      ["about-docs migrate", "❓ Help › 🧑‍💻 Developer › About-docs", "copy-paste", "build"],
+      ["about-docs schema", "❓ Help › 🧑‍💻 Developer › About-docs", "copy-paste", "build"],
+      ["agent config", "🧠 Agent › ✏️ Identity › Resolved slots", "action", "wire"],
+      ["agent status", "🧠 Agent › 📋 Active runs", "action", "wire"],
+      ["channels config", "💬 Chat › 🔌 Channels › Channel config", "action", "wire"],
+      ["channels status", "💬 Chat › 🔌 Channels › Channel status", "action", "wire"],
+      ["completion install", "🖥 Deployment › 🖥 Host-only › Shell completion", "copy-paste", "build"],
+      ["completion show", "🖥 Deployment › 🖥 Host-only › Shell completion", "copy-paste", "build"],
+      ["completion uninstall", "🖥 Deployment › 🖥 Host-only › Shell completion", "copy-paste", "build"],
+      ["config advanced", "retired — Advanced is dissolved; keys re-homed", "n/a", "gone"],
+      ["config agents", "🧠 Agent › ✏️ Identity (caption)", "caption", "wire"],
+      ["config channels", "💬 Chat › 🔌 Channels (caption)", "caption", "wire"],
+      ["config code", "📚 Memory › 💻 Code understanding (caption)", "caption", "live"],
+      ["config dashboard", "📊 Health › 📌 Status pin (caption)", "caption", "live"],
+      ["config help", "❓ Help (caption)", "caption", "live"],
+      ["config integrations", "🧩 Skills & Tools › 🌐 Integrations (caption)", "caption", "live"],
+      ["config logs", "📊 Health (caption)", "caption", "wire"],
+      ["config models", "🧠 Agent (caption)", "caption", "wire"],
+      ["config my_sevn_bot", "🖥 Deployment (caption)", "caption", "wire"],
+      ["config notifications", "💬 Chat (caption)", "caption", "wire"],
+      ["config second-brain", "📚 Memory › 📚 Second Brain (caption)", "caption", "live"],
+      ["config secrets", "🔐 Access › 🔐 Secrets (caption)", "caption", "wire"],
+      ["config sections", "🖥 Deployment › 📄 Config file › Sections & SSOT paths", "action", "wire"],
+      ["config security", "🔐 Access › 🛡 Guard rails (caption)", "caption", "live"],
+      ["config session", "💬 Chat › ⚡ Quick actions (caption)", "caption", "wire"],
+      ["config set", "🖥 Deployment › 📄 Config file › Set a key", "form", "wire"],
+      ["config sevn_bot", "❓ Help (caption)", "caption", "live"],
+      ["config shortcuts", "💬 Chat › ⌨️ Shortcuts › List shortcuts", "action", "wire"],
+      ["config show", "🖥 Deployment › 📄 Config file › Show sevn.json", "action", "wire"],
+      ["config skills", "🧩 Skills & Tools (caption)", "caption", "wire"],
+      ["config subagents", "🧠 Agent › 🤖 Sub-agents (caption)", "caption", "live"],
+      ["config tools", "🧩 Skills & Tools › 🛠 Tools (caption)", "caption", "live"],
+      ["config tracing", "📊 Health › 📡 Trace export › Tracing config", "action", "wire"],
+      ["config validate", "🖥 Deployment › 📄 Config file › Validate", "action", "wire"],
+      ["config voice", "💬 Chat › 🎙 Voice (caption)", "caption", "live"],
+      ["dashboard set-login-password", "📊 Health › 📌 Status pin › Set dashboard password", "copy-paste", "build"],
+      ["deploy check", "🖥 Deployment › 🚀 Deploy to host › Check SSH host", "form", "wire"],
+      ["deploy remote", "🖥 Deployment › 🚀 Deploy to host › Deploy to remote", "form (confirm)", "wire"],
+      ["doctor", "📊 Health › 🩺 Run doctor", "action", "wire"],
+      ["export-secrets", "🔐 Access › 🔐 Secrets › Export .env bundle", "action (confirm)", "build"],
+      ["gateway logs", "🖥 Deployment › ⚙️ Services › Gateway logs", "action", "wire"],
+      ["gateway restart", "🖥 Deployment › 🔄 Restart gateway", "action", "live"],
+      ["gateway set-gateway-token", "🖥 Deployment › 🖥 Host-only › Set gateway token", "copy-paste", "build"],
+      ["gateway start", "🖥 Deployment › ⚙️ Services › Start gateway", "action", "wire"],
+      ["gateway status", "🖥 Deployment › ⚙️ Services › Gateway status", "action", "wire"],
+      ["gateway stop", "🖥 Deployment › ⚙️ Services › Stop gateway", "action", "wire"],
+      ["gh add-github-token", "🔐 Access › 🐙 GitHub token", "form", "wire"],
+      ["gui migrate", "❓ Help › 🧑‍💻 Developer › GUI migration notes", "copy-paste", "build"],
+      ["guide", "❓ Help › 📚 Guides", "action + form", "wire"],
+      ["improve doctor", "🧠 Agent › 🔬 Lab › Improve doctor", "action", "wire"],
+      ["improve learn", "🧠 Agent › 🔬 Lab › Record lesson", "form", "wire"],
+      ["improve replay-sampler", "🧠 Agent › 🔬 Lab › Replay sampler", "action", "wire"],
+      ["logs", "📊 Health › Tail gateway / Tail proxy / Grep logs", "action + form", "live"],
+      ["memory index", "📚 Memory › 🗂 Rebuild index", "action", "wire"],
+      ["memory reconcile-cron", "📚 Memory › 💤 Dreaming › Reconcile cron", "action", "wire"],
+      ["memory rem-backfill", "📚 Memory › 💤 Dreaming › Backfill window / Undo last batch", "form + action", "wire"],
+      ["memory search", "📚 Memory › 🔎 Search memory", "form", "wire"],
+      ["memory status", "📚 Memory › 💤 Dreaming › Dreaming status", "action", "wire"],
+      ["message send", "💬 Chat › 🧾 Sessions › Send to another session", "form", "wire"],
+      ["migrate", "🖥 Deployment › ⬆️ Update & migrate › Migrate / import", "form", "wire"],
+      ["models params", "🧠 Agent › 🎚 Sampling › Show params", "action", "wire"],
+      ["models set-max-output-tokens", "🧠 Agent › 🎚 Sampling › Set max output tokens", "form", "wire"],
+      ["models show", "🧠 Agent › ✏️ Identity › Resolved slots", "action", "wire"],
+      ["onboard", "🖥 Deployment › 🖥 Host-only › Onboard wizard", "copy-paste", "build"],
+      ["openwiki configure", "📚 Memory › 📖 OpenWiki › Configure LLM key", "form", "wire"],
+      ["openwiki install", "📚 Memory › 📖 OpenWiki › Install CLI", "action", "wire"],
+      ["openwiki setup", "📚 Memory › 📖 OpenWiki › Install + key", "action", "wire"],
+      ["pairing approve", "🔐 Access › 👥 DM policy & pairing › Approve pairing code", "form", "wire"],
+      ["providers oauth login", "🔐 Access › 🪪 Provider logins › Link provider", "form", "wire"],
+      ["providers oauth logout", "🔐 Access › 🪪 Provider logins › Unlink provider", "form", "wire"],
+      ["providers oauth status", "🔐 Access › 🪪 Provider logins › OAuth status", "action", "wire"],
+      ["proxy logs", "🖥 Deployment › ⚙️ Services › Proxy logs", "action", "wire"],
+      ["proxy restart", "🖥 Deployment › 🔄 Restart proxy", "action", "live"],
+      ["proxy start", "🖥 Deployment › ⚙️ Services › Start proxy", "action", "wire"],
+      ["proxy status", "🖥 Deployment › ⚙️ Services › Proxy status", "action", "wire"],
+      ["proxy stop", "🖥 Deployment › ⚙️ Services › Stop proxy", "action", "wire"],
+      ["readme check", "❓ Help › 🧑‍💻 Developer › README pipeline", "copy-paste", "build"],
+      ["readme curate", "❓ Help › 🧑‍💻 Developer › README pipeline", "copy-paste", "build"],
+      ["readme fingerprint", "❓ Help › 🧑‍💻 Developer › README pipeline", "copy-paste", "build"],
+      ["readme generate", "❓ Help › 🧑‍💻 Developer › README pipeline", "copy-paste", "build"],
+      ["readme index", "❓ Help › 🧑‍💻 Developer › README pipeline", "copy-paste", "build"],
+      ["readme scaffold", "❓ Help › 🧑‍💻 Developer › README pipeline", "copy-paste", "build"],
+      ["readme update", "❓ Help › 🧑‍💻 Developer › README pipeline", "copy-paste", "build"],
+      ["remove", "🖥 Deployment › 🖥 Host-only › Uninstall sevn", "copy-paste", "build"],
+      ["second-brain reindex", "📚 Memory › 📚 Second Brain › Reindex vault", "action", "wire"],
+      ["second-brain setup", "📚 Memory › 📚 Second Brain › Bootstrap layout", "action", "wire"],
+      ["secrets check-unlock", "🔐 Access › 🔐 Secrets › Unlock status", "action", "wire"],
+      ["secrets list", "🔐 Access › 🔐 Secrets › List aliases", "action", "wire"],
+      ["secrets put", "🔐 Access › + Add secret", "form", "gated"],
+      ["secrets rm", "🔐 Access › 🔐 Secrets › Remove secret", "form (confirm)", "wire"],
+      ["secrets store-passphrase", "🔐 Access › 🔐 Secrets › Store passphrase", "copy-paste", "build"],
+      ["sessions history", "💬 Chat › 🧾 Sessions › Session history", "form", "wire"],
+      ["sessions list", "💬 Chat › 🧾 Sessions › List sessions", "action", "wire"],
+      ["shell-history install", "🖥 Deployment › 🖥 Host-only › Shell-history hook", "copy-paste", "build"],
+      ["shell-history status", "🖥 Deployment › 🖥 Host-only › Shell-history hook", "copy-paste", "build"],
+      ["shell-history uninstall", "🖥 Deployment › 🖥 Host-only › Shell-history hook", "copy-paste", "build"],
+      ["skills list", "🧩 Skills & Tools › 📋 Skills list", "action", "wire"],
+      ["skills security-scan", "🧩 Skills & Tools › 🛡 Security scan", "action", "wire"],
+      ["skills sync", "🧩 Skills & Tools › 🔄 Sync skills index", "action", "wire"],
+      ["subagents kill", "🧠 Agent › 🤖 Sub-agents › Running › Kill one / Kill all", "form + action", "wire"],
+      ["subagents limits", "🧠 Agent › 🤖 Sub-agents › Limits Triager/B/C/D", "form", "live"],
+      ["subagents list", "🧠 Agent › 🤖 Sub-agents › Running", "nav", "live"],
+      ["sync", "🖥 Deployment › ⬆️ Update & migrate › Sync checkout", "action", "live"],
+      ["tools health", "🧩 Skills & Tools › 🛠 Tools › Tool health", "action", "wire"],
+      ["traces", "📊 Health › Recent traces / Trace by id", "action + form", "live"],
+      ["tracing logfire disable", "📊 Health › 📡 Trace export › Logfire export", "toggle", "live"],
+      ["tracing logfire enable", "📊 Health › 📡 Trace export › Logfire export", "toggle", "live"],
+      ["tunnel setup", "🖥 Deployment › 🌍 Tunnel setup › Setup / change provider", "form", "wire"],
+      ["tunnel start", "🖥 Deployment › 🌍 Tunnel setup › Start now (this boot)", "action", "wire"],
+      ["tunnel status", "🖥 Deployment › 🌍 Tunnel setup › Tunnel status", "action", "wire"],
+      ["tunnel stop", "🖥 Deployment › 🌍 Tunnel setup › Stop now (this boot)", "action", "wire"],
+      ["turn-bundle export", "📊 Health › 📦 Turn bundles › Export / refresh", "action", "wire"],
+      ["turn-bundle view", "📊 Health › 📦 Turn bundles › View a turn", "form", "wire"],
+      ["unboard", "🖥 Deployment › 🖥 Host-only › Uninstall sevn", "copy-paste", "build"],
+      ["uninstall", "🖥 Deployment › 🖥 Host-only › Uninstall sevn", "copy-paste", "build"],
+      ["update", "🖥 Deployment › ⬆️ Update & migrate › Update CLI", "action", "wire"],
+      ["upgrade", "🖥 Deployment › ⬆️ Update & migrate › Schema posture", "action", "wire"],
+      ["usage show", "📊 Health › 💰 Usage & budget", "action", "wire"],
+      ["version", "❓ Help › 🏷 CLI version", "action", "wire"],
+      ["voice show", "💬 Chat › 🎙 Voice › Voice settings", "action", "wire"],
+      ["voice status", "💬 Chat › 🎙 Voice › Probe backends", "action", "wire"]
+    ];
+
+    /* ------------------------------------------------------------ filter */
+    const MODE_SET = { all: null, unblock: { live: 1, gated: 1 }, live: { live: 1 } };
+    const MODE_NOTE = {
+      all: "Full proposal — every row, whatever its status.",
+      unblock: "Rows that work today, plus rows whose handler is already implemented and only needs its spec id added to _READY_SPEC_IDS.",
+      live: "Only rows an operator can tap and get a result from in the running bot right now."
+    };
+    let mode = "all";
+    function passes(st) { const set = MODE_SET[mode]; return !set || !!set[st]; }
+
+    /* -------------------------------------------- visibility (recursive) */
+    function visibleRows(id, seen) {
+      const sec = S[id];
+      if (!sec) return 0;
+      seen = seen || {};
+      if (seen[id]) return 0;
+      seen[id] = 1;
+      let n = 0;
+      for (const btn of sec.buttons) {
+        if (btn.k === "nav" && btn.to) { if (visibleRows(btn.to, seen) > 0 || passes(btn.st)) n++; continue; }
+        if (passes(btn.st)) n++;
+      }
+      return n;
+    }
+    function btnVisible(btn) {
+      if (btn.k === "nav" && btn.to) return passes(btn.st) || visibleRows(btn.to) > 0;
+      return passes(btn.st);
+    }
+
+    /* ------------------------------------------------------------ render */
+    const KIND_LABEL = { nav: "→ section", toggle: "toggle", cycle: "cycle", form: "form", action: "action", url: "URL", back: "nav" };
+    const ST_LABEL = { live: "live", gated: "gated", wire: "wire-up", build: "build" };
+
+    function rowsOf(buttons) {
+      const rows = []; let pair = [];
+      const flush = () => { if (pair.length) { rows.push(pair); pair = []; } };
+      for (const btn of buttons) {
+        if (btn.full) { flush(); rows.push([btn]); continue; }
+        pair.push(btn);
+        if (btn.triple) { if (pair.length >= 3) flush(); continue; }
+        if (pair.length === 2) flush();
+      }
+      flush();
+      return rows;
+    }
+
+    function crumb(id) {
+      const parts = []; let cur = id;
+      while (cur && S[cur]) { parts.unshift(S[cur].title); cur = S[cur].parent; }
+      return parts.join(" › ");
+    }
+
+    let current = "root";
+    function renderMock() {
+      if (!S[current]) current = "root";
+      const sec = S[current];
+      const shown = sec.buttons.filter(btnVisible);
+      const rows = rowsOf(shown);
+      const chrome = current === "root"
+        ? (sec.chrome || [])
+        : [{ t: "◀ Back", k: "back" }, { t: "🏠 Home", k: "back" }, { t: "❌ Close", k: "back" }];
+      let html = '<div class="phone">';
+      html += '<div class="bar"><span>' + sec.title + '</span><span class="crumb">' + crumb(current) + "</span></div>";
+      html += '<div class="bubble">' + sec.caption + '</div><div class="keys">';
+      if (!shown.length) html += '<div class="empty">Nothing on this screen matches the filter.</div>';
+      for (const row of rows) {
+        const cls = row.length === 1 ? "row single" : (row.length === 3 ? "row triple" : "row");
+        html += '<div class="' + cls + '">';
+        for (const btn of row) {
+          const cls2 = btn.k === "url" ? "url" : ("st-" + btn.st);
+          html += '<button class="' + cls2 + '" data-to="' + (btn.to || "") + '" title="' + ST_LABEL[btn.st] + (btn.sp ? " · " + btn.sp : "") + '">' + btn.t + "</button>";
+        }
+        html += "</div>";
+      }
+      html += '<div class="row' + (chrome.length === 2 ? "" : " triple") + '">';
+      for (const c of chrome) html += '<button class="chrome" data-nav="' + (c.t.indexOf("Back") >= 0 ? "back" : (c.t.indexOf("Home") >= 0 ? "home" : "")) + '">' + c.t + "</button>";
+      html += "</div></div></div>";
+      html += '<p class="hint">Interactive: tap a section tile to walk the proposed tree. Back / Home work; button colour = status; hover a button for its status and spec id.</p>';
+      const mount = document.getElementById("mock");
+      mount.innerHTML = html;
+      mount.querySelectorAll("button[data-to]").forEach(el => {
+        const to = el.getAttribute("data-to");
+        if (to) el.addEventListener("click", () => { current = to; renderMock(); });
+      });
+      mount.querySelectorAll("button[data-nav]").forEach(el => {
+        const nav = el.getAttribute("data-nav");
+        if (nav === "back") el.addEventListener("click", () => { current = S[current].parent || "root"; renderMock(); });
+        if (nav === "home") el.addEventListener("click", () => { current = "root"; renderMock(); });
+      });
+    }
+
+    function badge(cls, text) { return cls ? '<span class="badge ' + cls + '">' + (text || cls) + "</span>" : ""; }
+
+    function sectionTree(id, depth) {
+      const sec = S[id];
+      const shown = sec.buttons.filter(btnVisible);
+      if (!shown.length && depth > 0) return "";
+      const open = depth === 0 ? " open" : "";
+      const counts = {};
+      for (const btn of shown) counts[btn.st] = (counts[btn.st] || 0) + 1;
+      const chips = ["live", "gated", "wire", "build"].filter(k => counts[k]).map(k => badge(k, counts[k] + " " + ST_LABEL[k])).join("");
+      let html = '<details class="sec' + (depth ? " child" : "") + '"' + open + "><summary>" + sec.title +
+        ' <span class="kind">' + shown.length + " rows</span> " + chips + "</summary><div class=\"body\">";
+      html += '<p class="why' + (sec.warn ? " warn" : "") + '">' + sec.why + "</p>";
+      html += "<table><tr><th>Row</th><th>Status</th><th>Kind</th><th>CLI</th><th>Note</th></tr>";
+      for (const btn of shown) {
+        html += "<tr><td>" + btn.t + badge(btn.ch) + "</td><td>" + badge(btn.st, ST_LABEL[btn.st]) +
+          (btn.sp ? badge("spec", btn.sp) : "") + '</td><td class="kind">' + (KIND_LABEL[btn.k] || btn.k) +
+          '</td><td class="cmd">' + (btn.cli ? btn.cli.replace(/</g, "&lt;") : "") + '</td><td class="path">' + (btn.n || "") + "</td></tr>";
+      }
+      html += "</table>";
+      const kids = Object.keys(S).filter(k => S[k].parent === id);
+      for (const k of kids) html += sectionTree(k, depth + 1);
+      html += "</div></details>";
+      return html;
+    }
+
+    function renderTree() {
+      let html = '<h2>Proposed tree</h2>';
+      html += '<div class="legend">' +
+        '<span class="live"><strong>live</strong> — exists and works today (readiness Ready)</span>' +
+        '<span class="gated"><strong>gated</strong> — exists, handler implemented, blocked by the _READY_SPEC_IDS allow-list</span>' +
+        '<span class="wire"><strong>wire-up</strong> — no row yet; the code it would call already exists</span>' +
+        '<span class="build"><strong>build</strong> — needs new logic</span></div>';
+      html += '<div class="legend">' +
+        '<span class="kept">kept — same row, same home</span><span class="moved">moved — same row, new home</span>' +
+        '<span class="merged">merged — combined / de-duplicated</span><span class="new">new — no menu affordance today</span></div>';
+      html += sectionTree("root", 0);
+      document.getElementById("tree").innerHTML = html;
+    }
+
+    let migQuery = "", covQuery = "";
+    function renderMigration() {
+      const mount = document.getElementById("mig-table");
+      const needle = migQuery.toLowerCase();
+      let html = "<tr><th>Old path</th><th>New path</th><th></th></tr>";
+      let n = 0;
+      for (const r of MIGRATION) {
+        if (needle && r.join(" ").toLowerCase().indexOf(needle) < 0) continue;
+        n++;
+        html += '<tr><td class="path">' + r[0] + '</td><td class="path">' + r[1] + "</td><td>" + badge(r[2]) + "</td></tr>";
+      }
+      html += '<tr><td colspan="3" class="kind">' + n + " row(s)</td></tr>";
+      mount.innerHTML = html;
+    }
+    function renderCoverage() {
+      const mount = document.getElementById("cov-table");
+      const needle = covQuery.toLowerCase();
+      let html = "<tr><th>CLI command</th><th>Menu destination</th><th>Surface</th><th>Status</th></tr>";
+      let n = 0, hidden = 0;
+      for (const r of COVERAGE) {
+        if (r[3] !== "gone" && !passes(r[3])) { hidden++; continue; }
+        if (needle && r.join(" ").toLowerCase().indexOf(needle) < 0) continue;
+        n++;
+        html += '<tr><td class="cmd">sevn ' + r[0] + '</td><td class="path">' + r[1] + '</td><td class="kind">' + r[2] +
+          "</td><td>" + (r[3] === "gone" ? badge("gone", "retired") : badge(r[3], ST_LABEL[r[3]])) + "</td></tr>";
+      }
+      html += '<tr><td colspan="4" class="kind">' + n + " row(s)" + (hidden ? " · " + hidden + " hidden by filter" : "") + "</td></tr>";
+      mount.innerHTML = html;
+    }
+
+    function renderStats() {
+      const counts = { live: 0, gated: 0, wire: 0, build: 0 };
+      let total = 0;
+      for (const id of Object.keys(S)) for (const btn of S[id].buttons) { counts[btn.st]++; total++; }
+      const covCounts = { live: 0, gated: 0, wire: 0, build: 0, gone: 0 };
+      for (const r of COVERAGE) covCounts[r[3]]++;
+      const html =
+        '<div class="stat"><b><span class="was">19</span>8</b>root tiles</div>' +
+        '<div class="stat"><b><span class="was">10</span>4</b>root rows</div>' +
+        '<div class="stat"><b><span class="was">27</span>' + Object.keys(S).length + "</b>sections</div>" +
+        '<div class="stat"><b><span class="was">' + (covCounts.live + covCounts.gated) + "</span>126</b>CLI leaves reachable</div>" +
+        '<div class="stat s-live"><b>' + counts.live + "</b>rows live today</div>" +
+        '<div class="stat s-gated"><b>' + counts.gated + "</b>gated (1-line unblock)</div>" +
+        '<div class="stat s-wire"><b>' + counts.wire + "</b>wire-up</div>" +
+        '<div class="stat s-build"><b>' + counts.build + "</b>build</div>" +
+        '<div class="stat"><b>' + total + "</b>rows total</div>";
+      document.getElementById("stats").innerHTML = html;
+    }
+
+    function renderCount() {
+      let vis = 0, total = 0;
+      for (const id of Object.keys(S)) for (const btn of S[id].buttons) { total++; if (passes(btn.st)) vis++; }
+      document.getElementById("fcount").textContent = vis + " / " + total + " rows shown";
+      document.getElementById("fnote").textContent = MODE_NOTE[mode];
+    }
+
+    function renderAll() { renderMock(); renderTree(); renderCoverage(); renderCount(); }
+
+    document.querySelectorAll("nav.tabs button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("nav.tabs button").forEach(b2 => b2.classList.remove("active"));
+        document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById("panel-" + btn.dataset.tab).classList.add("active");
+      });
+    });
+    document.querySelectorAll("#modes button").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#modes button").forEach(b2 => b2.classList.remove("active"));
+        btn.classList.add("active");
+        mode = btn.dataset.mode;
+        renderAll();
+      });
+    });
+    document.getElementById("mig-filter").addEventListener("input", e => { migQuery = e.target.value; renderMigration(); });
+    document.getElementById("cov-filter").addEventListener("input", e => { covQuery = e.target.value; renderCoverage(); });
+
+    renderStats();
+    renderMigration();
+    renderAll();
+  </script>
+</body>
+</html>

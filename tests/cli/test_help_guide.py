@@ -18,15 +18,15 @@ from sevn.cli.help.panels import (
 )
 
 
-def test_panel_order_matches_mission_control_groups() -> None:
+def test_panel_order_matches_telegram_menu_groups() -> None:
     assert len(PANEL_ORDER) == 8
-    assert PANEL_ORDER[0] == "Core"
-    assert "Surfaces" in PANEL_ORDER
+    assert PANEL_ORDER[0] == "Chat"
+    assert "Help" in PANEL_ORDER
 
 
 def test_root_command_panel_map_covers_guide() -> None:
-    assert ROOT_COMMAND_PANELS["guide"] == "Ops"
-    assert panel_for("doctor") == "Core"
+    assert ROOT_COMMAND_PANELS["guide"] == "Help"
+    assert panel_for("doctor") == "Health"
 
 
 def test_apply_root_panels_assigns_click_metadata() -> None:
@@ -41,8 +41,8 @@ def test_apply_root_panels_assigns_click_metadata() -> None:
 
     apply_root_panels(mini)
     panels = dict(iter_root_click_commands(mini))
-    assert panels["doctor"] == "Core"
-    assert panels["guide"] == "Ops"
+    assert panels["doctor"] == "Health"
+    assert panels["guide"] == "Help"
 
 
 def test_list_guide_topics_includes_getting_started() -> None:
@@ -91,7 +91,7 @@ def test_sevn_help_groups_by_panel_on_tty() -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    for panel in ("Core", "Observability", "Ops"):
+    for panel in ("Chat", "Health", "Help"):
         assert panel in result.stdout
 
 

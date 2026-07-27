@@ -57,8 +57,8 @@
     },
     "gateway": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-25T16:04:59Z",
-      "digest": "14ce8e20eb3f25376b68df0549c5a2966bd654d979c1aa74a440455aca66e6e4",
+      "computed_at": "2026-07-27T11:32:34Z",
+      "digest": "f2917500381bc27cb16da54a35eaa5df427f8dfcd6687f4e7026452c646674e2",
       "source_globs": [
         "src/sevn/gateway/**"
       ]
@@ -116,8 +116,8 @@
     },
     "root": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T18:28:59Z",
-      "digest": "96512721bdf691b29c5500a5e8b9c9908f625db385abe92c3782eb0b27acf87e",
+      "computed_at": "2026-07-27T01:20:50Z",
+      "digest": "543e04782ae2e679ee4b1074da38f92dacb0e6b00434a1c91e9a18c436927e03",
       "source_globs": [
         "pyproject.toml",
         "CLAUDE.md",
@@ -193,8 +193,8 @@
     },
     "tools": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-18T19:38:20Z",
-      "digest": "048045f2e76de0bffecc5a8815d7a8156433bab62a87f8bd194a42f0aedff49f",
+      "computed_at": "2026-07-27T01:20:50Z",
+      "digest": "bdeda49c216744bbdf764d14cb2c54eb5c41613402e21e6a1704e39505bf6e8e",
       "source_globs": [
         "src/sevn/tools/**"
       ]
@@ -218,8 +218,8 @@
     },
     "ui-mission-control": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-25T15:45:46Z",
-      "digest": "f24183944375c38912ac8633595413a0d0e3d1cbd8512f0b40293d3917e6b42a",
+      "computed_at": "2026-07-27T01:20:50Z",
+      "digest": "63ba9690e11ae8d0f1f1c330223fbfeb6d901882eadacd942a80390c80ec4c58",
       "source_globs": [
         "src/sevn/ui/**"
       ]

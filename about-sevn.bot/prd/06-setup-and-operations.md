@@ -6,8 +6,8 @@ status: ready
 owner: Alex
 summary: Local-first bots are judged in the first ten minutes—clone, three setup commands,
   and a Telegram reply, or the operator returns to a hosted assistant.
-last_updated: '2026-07-24'
-fingerprint: sha256:ff62839e435f934edfc05faddf75fa7aee238fedb614140f9ff2e3604e01f00c
+last_updated: '2026-07-27'
+fingerprint: sha256:eaa2016a3e433ef6a324acdaaefb84620a14cf2027f8d30ae90b88f98a9b41d5
 related:
 - prd-07-mission-control
 sources:
@@ -41,6 +41,12 @@ This PRD is `ready` while linked specs below are not normatively complete (`draf
 | spec-25-cicd-full | draft |
 
 <!-- HUMAN-INPUT[owner=operator]: Reconcile PRD `ready` vs implementing spec maturity — downgrade PRD, or keep ready and finish normative spec bodies. -->
+
+## Amendments (telegram-menu-redesign W9)
+
+Telegram ``/config`` Deployment and Help sections expose service control, tunnel,
+doctor, config file editing, and guides — the phone-first operate-the-install surface
+this PRD describes alongside the CLI.
 
 ## Problem & Motivation
 

@@ -20,7 +20,11 @@ from typing import NoReturn
 import typer
 from pydantic import ValidationError
 
-from sevn.cli.config_paths import iter_config_sections, section_by_slug
+from sevn.cli.config_paths import (
+    iter_config_sections,
+    iter_config_slug_aliases,
+    section_by_slug,
+)
 from sevn.cli.config_sections import format_section_plain, section_payload
 from sevn.cli.errors import CliPreconditionError
 from sevn.cli.json_util import emit_json_failure, emit_json_success
@@ -207,25 +211,42 @@ def register(app: typer.Typer) -> None:
             typer.echo("\nRun `sevn config <slug>` or `sevn config` for the interactive menu.")
         raise typer.Exit(0)
 
+    def _make_section_handler(section_slug: str, *, name: str | None = None) -> Callable[[], None]:
+        def _handler(
+            json_out: bool = typer.Option(
+                False,
+                "--json",
+                help="Emit JSON section summary.",
+            ),
+        ) -> None:
+            _show_config_section(section_slug, json_out=json_out)
+
+        _handler.__name__ = f"config_{name or section_slug}"
+        return _handler
+
     for _section in iter_config_sections():
-
-        def _make_section_handler(section_slug: str) -> Callable[[], None]:
-            def _handler(
-                json_out: bool = typer.Option(
-                    False,
-                    "--json",
-                    help="Emit JSON section summary.",
-                ),
-            ) -> None:
-                _show_config_section(section_slug, json_out=json_out)
-
-            _handler.__name__ = f"config_{section_slug}"
-            return _handler
-
         cfg.command(
             _section.slug,
             help=f"Show {_section.label} keys ({_section.callback}).",
         )(_make_section_handler(_section.slug))
+
+    # Retired slugs (`voice`, `session`, `secrets`, …) resolve through
+    # `section_by_slug`, but that was unreachable from the CLI — `sevn config voice`
+    # exited with "No such command" while the shipped guide advertised it. Register
+    # each alias as a hidden subcommand onto its canonical section.
+    _registered = {str(cmd.name) for cmd in cfg.registered_commands if cmd.name}
+    for _alias, _canonical in iter_config_slug_aliases():
+        if _alias in _registered:
+            continue
+        _target = section_by_slug(_canonical)
+        if _target is None:
+            continue
+        cfg.command(
+            _alias,
+            hidden=True,
+            help=f"Alias for `sevn config {_canonical}`.",
+        )(_make_section_handler(_target.slug, name=_alias))
+        _registered.add(_alias)
 
     @cfg.command("second-brain")
     def config_second_brain(

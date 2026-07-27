@@ -82,7 +82,7 @@ def test_tts_engine_cycle_callback_parses() -> None:
 async def test_voice_mode_round_trip_persists_to_sevn_json(tmp_path: Path) -> None:
     router, cap, ws = _build_router(tmp_path)
     await router.route_incoming(
-        _config_callback("cfg:section:voice", callback_query_id="cq-nav"),
+        _config_callback("cfg:section:chat_voice", callback_query_id="cq-nav"),
     )
     await router.route_incoming(
         _config_callback("cfg:voice:mode:when_asked", callback_query_id="cq-toggle"),
@@ -98,7 +98,7 @@ async def test_voice_mode_round_trip_persists_to_sevn_json(tmp_path: Path) -> No
 async def test_tts_engine_round_trip_persists_to_sevn_json(tmp_path: Path) -> None:
     router, cap, ws = _build_router(tmp_path)
     await router.route_incoming(
-        _config_callback("cfg:section:voice", callback_query_id="cq-nav-engine"),
+        _config_callback("cfg:section:chat_voice", callback_query_id="cq-nav-engine"),
     )
     await router.route_incoming(
         _config_callback("cfg:voice:engine:next", callback_query_id="cq-engine"),

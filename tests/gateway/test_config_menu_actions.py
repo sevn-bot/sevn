@@ -80,6 +80,7 @@ def _build_router(tmp_path: Path) -> tuple[ChannelRouter, _MenuCaptureTelegram, 
         WorkspaceLayout(sevn_json, root),
         NullTraceSink(),
     )
+    router._owner_ids = frozenset({"u1"})
     return router, cap, ws
 
 
@@ -110,7 +111,7 @@ def _config_callback(
 @pytest.mark.asyncio
 async def test_section_navigation_edits_message(tmp_path: Path) -> None:
     router, cap, _ws = _build_router(tmp_path)
-    await router.route_incoming(_config_callback("cfg:section:voice"))
+    await router.route_incoming(_config_callback("cfg:section:chat_voice"))
     assert cap.answered == [("cq-config-1", None)]
     assert len(cap.edited) == 1
     assert cap.edited[0]["message_id"] == 99
@@ -122,7 +123,7 @@ async def test_section_navigation_edits_message(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_nav_back_returns_previous_section(tmp_path: Path) -> None:
     router, cap, _ws = _build_router(tmp_path)
-    await router.route_incoming(_config_callback("cfg:section:voice", callback_query_id="cq1"))
+    await router.route_incoming(_config_callback("cfg:section:chat_voice", callback_query_id="cq1"))
     await router.route_incoming(
         _config_callback("cfg:nav:back", callback_query_id="cq2"),
     )
@@ -135,7 +136,7 @@ async def test_nav_back_returns_previous_section(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_nav_home_returns_root(tmp_path: Path) -> None:
     router, cap, _ws = _build_router(tmp_path)
-    await router.route_incoming(_config_callback("cfg:section:voice", callback_query_id="cq1"))
+    await router.route_incoming(_config_callback("cfg:section:chat_voice", callback_query_id="cq1"))
     await router.route_incoming(
         _config_callback("cfg:nav:home", callback_query_id="cq2"),
     )
@@ -159,7 +160,7 @@ async def test_nav_close_clears_markup(tmp_path: Path) -> None:
 async def test_voice_toggle_updates_caption_in_place(tmp_path: Path) -> None:
     router, cap, _ws = _build_router(tmp_path)
     await router.route_incoming(
-        _config_callback("cfg:section:voice", callback_query_id="cq-nav"),
+        _config_callback("cfg:section:chat_voice", callback_query_id="cq-nav"),
     )
     await router.route_incoming(
         _config_callback("cfg:voice:mode:all", callback_query_id="cq-toggle"),
@@ -168,7 +169,7 @@ async def test_voice_toggle_updates_caption_in_place(tmp_path: Path) -> None:
     toggle_edit = cap.edited[-1]
     assert toggle_edit["message_id"] == 99
     assert "TTS mode: all" in toggle_edit["text"]
-    kb = build_config_menu_keyboard(router._workspace, section="voice")
+    kb = build_config_menu_keyboard(router._workspace, section="chat_voice")
     tts_labels = [
         btn["text"]
         for row in kb["inline_keyboard"]
@@ -184,12 +185,11 @@ async def test_voice_toggle_updates_caption_in_place(tmp_path: Path) -> None:
 @pytest.mark.asyncio
 async def test_models_section_navigation(tmp_path: Path) -> None:
     router, cap, _ws = _build_router(tmp_path)
-    await router.route_incoming(_config_callback("cfg:section:models"))
+    await router.route_incoming(_config_callback("cfg:section:agent"))
     assert len(cap.edited) == 1
-    assert "Models" in cap.edited[0]["text"]
-    assert "Triager:" in cap.edited[0]["text"]
-    assert "Tier B:" in cap.edited[0]["text"]
-    callbacks = _config_section_callbacks(router._workspace, "models")
+    assert "Agent" in cap.edited[0]["text"]
+    assert "agent.tier_b.model" in cap.edited[0]["text"]
+    callbacks = _config_section_callbacks(router._workspace, "agent")
     assert any(cb.startswith("cfg:toggle:providers.use_main_model_for_all:") for cb in callbacks)
 
 
@@ -199,9 +199,9 @@ async def test_models_toggle_updates_caption_in_place(tmp_path: Path) -> None:
     sevn_json = root / "sevn.json"
     router, cap, ws = _build_router(tmp_path)
     await router.route_incoming(
-        _config_callback("cfg:section:models", callback_query_id="cq-nav"),
+        _config_callback("cfg:section:agent", callback_query_id="cq-nav"),
     )
-    kb = build_config_menu_keyboard(ws, section="models")
+    kb = build_config_menu_keyboard(ws, section="agent")
     toggle_btn = next(
         btn
         for row in kb["inline_keyboard"]
@@ -216,25 +216,18 @@ async def test_models_toggle_updates_caption_in_place(tmp_path: Path) -> None:
     doc = load_raw_sevn_json(sevn_json)
     assert _get_nested(doc, "providers.use_main_model_for_all") is True
     toggle_edit = cap.edited[-1]
-    assert "Unified model: on" in toggle_edit["text"]
-    unified_labels = [
-        btn["text"]
-        for row in toggle_edit["reply_markup"]["inline_keyboard"]
-        for btn in row
-        if "Unified model" in btn.get("text", "")
-    ]
-    assert any("✅" in label for label in unified_labels)
+    assert "providers.use_main_model_for_all: True" in toggle_edit["text"]
     assert ("cq-toggle", "✅ Updated.") in cap.answered
 
 
 @pytest.mark.asyncio
 async def test_security_section_navigation(tmp_path: Path) -> None:
     router, cap, _ws = _build_router(tmp_path)
-    await router.route_incoming(_config_callback("cfg:section:security"))
+    await router.route_incoming(_config_callback("cfg:section:access_guard"))
     assert len(cap.edited) == 1
-    assert "Security" in cap.edited[0]["text"]
+    assert "Guard rails" in cap.edited[0]["text"]
     assert "Heuristic-only scanner:" in cap.edited[0]["text"]
-    callbacks = _config_section_callbacks(router._workspace, "security")
+    callbacks = _config_section_callbacks(router._workspace, "access_guard")
     assert any(cb.startswith("cfg:toggle:security.scanner.heuristic_only:") for cb in callbacks)
 
 
@@ -244,9 +237,9 @@ async def test_security_toggle_updates_caption_in_place(tmp_path: Path) -> None:
     sevn_json = root / "sevn.json"
     router, cap, ws = _build_router(tmp_path)
     await router.route_incoming(
-        _config_callback("cfg:section:security", callback_query_id="cq-nav"),
+        _config_callback("cfg:section:access_guard", callback_query_id="cq-nav"),
     )
-    kb = build_config_menu_keyboard(ws, section="security")
+    kb = build_config_menu_keyboard(ws, section="access_guard")
     toggle_btn = next(
         btn
         for row in kb["inline_keyboard"]
@@ -278,8 +271,8 @@ async def test_help_section_navigation(tmp_path: Path) -> None:
     await router.route_incoming(_config_callback("cfg:section:help"))
     assert len(cap.edited) == 1
     assert "Help" in cap.edited[0]["text"]
-    assert "/config" in cap.edited[0]["text"]
     catalog = config_menu_help_catalog_text()
+    assert "/config" in catalog
     assert "/status" in catalog
     assert "/stop" in catalog
     callbacks = [
@@ -288,7 +281,8 @@ async def test_help_section_navigation(tmp_path: Path) -> None:
         for btn in row
         if "callback_data" in btn
     ]
-    assert all(str(cb).startswith("cfg:nav:") for cb in callbacks)
+    assert any(str(cb).startswith("act:sevn_bot:") for cb in callbacks)
+    assert any(str(cb).startswith("cfg:nav:") for cb in callbacks)
 
 
 @pytest.mark.asyncio
@@ -297,9 +291,9 @@ async def test_session_toggle_mutates_sevn_json(tmp_path: Path) -> None:
     sevn_json = root / "sevn.json"
     router, cap, ws = _build_router(tmp_path)
     await router.route_incoming(
-        _config_callback("cfg:section:session", callback_query_id="cq-nav"),
+        _config_callback("cfg:section:chat_qa", callback_query_id="cq-nav"),
     )
-    kb = build_config_menu_keyboard(ws, section="session")
+    kb = build_config_menu_keyboard(ws, section="chat_qa")
     regen_btn = next(
         btn
         for row in kb["inline_keyboard"]
@@ -331,12 +325,12 @@ async def test_session_toggle_refresh_uses_forum_general_thread_id(tmp_path: Pat
     router, cap, ws = _build_router(tmp_path)
     await router.route_incoming(
         _config_callback(
-            "cfg:section:session",
+            "cfg:section:chat_qa",
             callback_query_id="cq-nav",
             metadata_extra={"telegram_thread_id": 1, "topic_id": None},
         ),
     )
-    kb = build_config_menu_keyboard(ws, section="session")
+    kb = build_config_menu_keyboard(ws, section="chat_qa")
     regen_btn = next(
         btn
         for row in kb["inline_keyboard"]
@@ -393,7 +387,7 @@ async def test_shortcut_delete_round_trip(tmp_path: Path) -> None:
     adapter = router._adapters["telegram"]
     adapter._flush_set_my_commands = AsyncMock()
     await router.route_incoming(
-        _config_callback("cfg:section:shortcuts", callback_query_id="cq-nav"),
+        _config_callback("cfg:section:chat_shortcuts", callback_query_id="cq-nav"),
     )
     assert "standup" in cap.edited[-1]["text"]
     root = tmp_path / "w"
@@ -401,7 +395,7 @@ async def test_shortcut_delete_round_trip(tmp_path: Path) -> None:
         cb
         for cb in _config_section_callbacks(
             router._workspace,
-            "shortcuts",
+            "chat_shortcuts",
             content_root=root,
             user_id="u1",
         )
@@ -429,10 +423,10 @@ async def test_dashboard_section_navigation(tmp_path: Path) -> None:
     ws, _ = load_workspace(sevn_json=sevn_json)
     router._workspace = ws
     router._config_menu_handler._workspace = ws
-    await router.route_incoming(_config_callback("cfg:section:dashboard"))
+    await router.route_incoming(_config_callback("cfg:section:health_pin"))
     assert len(cap.edited) == 1
     assert "Dashboard" in cap.edited[0]["text"]
-    callbacks = _config_section_callbacks(ws, "dashboard")
+    callbacks = _config_section_callbacks(ws, "health_pin")
     assert "cfg:dashboard:create_pin" in callbacks
     assert "cfg:dashboard:refresh_pin" in callbacks
     assert "cfg:dashboard:unpin" in callbacks
@@ -450,40 +444,29 @@ async def test_shortcuts_section_navigation(tmp_path: Path) -> None:
         root,
         {"name": "daily", "description": "Daily note", "type": "prompt", "payload": {}},
     )
-    await router.route_incoming(_config_callback("cfg:section:shortcuts"))
+    await router.route_incoming(_config_callback("cfg:section:chat_shortcuts"))
     assert len(cap.edited) == 1
     assert "daily" in cap.edited[0]["text"]
     callbacks = _config_section_callbacks(
         router._workspace,
-        "shortcuts",
+        "chat_shortcuts",
         content_root=root,
         user_id="u1",
     )
     assert "form:shortcut_add" in callbacks
     assert "act:shortcut_delete:daily" in callbacks
-    assert parse_action_callback("cfg:section:shortcuts") is None
+    assert parse_action_callback("cfg:section:chat_shortcuts") is None
 
 
-_WAVE7_SECTIONS = frozenset({"agents", "skills", "tools", "rlm", "code"})
-_WAVE8_SECTIONS = frozenset({"secrets", "self_improve", "second_brain", "integrations"})
-
-_ALL_CONFIG_SECTIONS: tuple[str, ...] = (
-    "session",
-    "agents",
-    "models",
-    "voice",
-    "channels",
-    "secrets",
-    "skills",
-    "tools",
-    "code",
-    "security",
-    "integrations",
-    "dashboard",
-    "shortcuts",
-    "notifications",
-    "advanced",
-    "help",
+_REDIRECT_ROOT_SECTIONS: tuple[tuple[str, str], ...] = (
+    ("chat", "Chat"),
+    ("agent", "Agent"),
+    ("skills", "Skills"),
+    ("memory", "Memory"),
+    ("access", "Access"),
+    ("health", "Health"),
+    ("deployment", "Deployment"),
+    ("help", "Help"),
 )
 
 
@@ -494,17 +477,14 @@ def _keyboard_buttons(edit: dict[str, Any]) -> list[dict[str, Any]]:
 @pytest.mark.asyncio
 async def test_all_root_sections_navigate(tmp_path: Path) -> None:
     router, cap, _ws = _build_router(tmp_path)
-    for idx, section in enumerate(_ALL_CONFIG_SECTIONS):
+    for idx, (section, title) in enumerate(_REDIRECT_ROOT_SECTIONS):
         await router.route_incoming(
             _config_callback(f"cfg:section:{section}", callback_query_id=f"cq-{idx}"),
         )
         edit = cap.edited[-1]
-        title = section.replace("_", " ").title()
-        assert title in edit["text"] or section == "help"
+        assert title in edit["text"]
         buttons = _keyboard_buttons(edit)
         assert buttons
-        if section in _WAVE7_SECTIONS or section in _WAVE8_SECTIONS:
-            assert not any(btn.get("text") == "Coming soon" for btn in buttons)
         assert parse_action_callback(f"cfg:section:{section}") is None
 
 
@@ -514,9 +494,9 @@ async def test_rlm_toggle_updates_caption_in_place(tmp_path: Path) -> None:
     sevn_json = root / "sevn.json"
     router, cap, ws = _build_router(tmp_path)
     await router.route_incoming(
-        _config_callback("cfg:section:rlm", callback_query_id="cq-nav"),
+        _config_callback("cfg:section:agent_lab", callback_query_id="cq-nav"),
     )
-    kb = build_config_menu_keyboard(ws, section="rlm")
+    kb = build_config_menu_keyboard(ws, section="agent_lab")
     toggle_btn = next(
         btn
         for row in kb["inline_keyboard"]
@@ -531,7 +511,7 @@ async def test_rlm_toggle_updates_caption_in_place(tmp_path: Path) -> None:
     doc = load_raw_sevn_json(sevn_json)
     assert _get_nested(doc, "executors.tier_cd.lambda_rlm.enabled") is True
     toggle_edit = cap.edited[-1]
-    assert "λ-RLM opt-in: on" in toggle_edit["text"]
+    assert "λ-RLM: on" in toggle_edit["text"]
     assert ("cq-toggle", "✅ Updated.") in cap.answered
 
 
@@ -541,9 +521,9 @@ async def test_code_review_graph_toggle_updates_caption_in_place(tmp_path: Path)
     sevn_json = root / "sevn.json"
     router, cap, ws = _build_router(tmp_path)
     await router.route_incoming(
-        _config_callback("cfg:section:code", callback_query_id="cq-nav"),
+        _config_callback("cfg:section:memory_code", callback_query_id="cq-nav"),
     )
-    kb = build_config_menu_keyboard(ws, section="code")
+    kb = build_config_menu_keyboard(ws, section="memory_code")
     toggle_btn = next(
         btn
         for row in kb["inline_keyboard"]
@@ -565,19 +545,18 @@ async def test_code_review_graph_toggle_updates_caption_in_place(tmp_path: Path)
 @pytest.mark.asyncio
 async def test_channels_section_navigation(tmp_path: Path) -> None:
     router, cap, _ws = _build_router(tmp_path)
-    await router.route_incoming(_config_callback("cfg:section:channels"))
+    await router.route_incoming(_config_callback("cfg:section:chat_channels"))
     assert len(cap.edited) == 1
     assert "Channels" in cap.edited[0]["text"]
     assert "DM policy:" in cap.edited[0]["text"]
     assert "Telegram mode:" in cap.edited[0]["text"]
     assert "(read-only)" in cap.edited[0]["text"]
-    callbacks = _config_section_callbacks(router._workspace, "channels")
+    callbacks = _config_section_callbacks(router._workspace, "chat_channels")
     assert any(
         cb.startswith("cfg:toggle:channels.telegram.reply_keyboard.enabled:") for cb in callbacks
     )
     assert any(cb.startswith("cfg:toggle:channels.telegram.show_routing:") for cb in callbacks)
-    assert any(cb.startswith("cfg:toggle:channels.telegram.dm_policy:") for cb in callbacks)
-    assert parse_action_callback("cfg:section:channels") is None
+    assert parse_action_callback("cfg:section:chat_channels") is None
 
 
 @pytest.mark.asyncio
@@ -586,9 +565,9 @@ async def test_show_routing_toggle_mutates_and_refreshes(tmp_path: Path) -> None
     sevn_json = root / "sevn.json"
     router, cap, ws = _build_router(tmp_path)
     await router.route_incoming(
-        _config_callback("cfg:section:channels", callback_query_id="cq-nav"),
+        _config_callback("cfg:section:chat_channels", callback_query_id="cq-nav"),
     )
-    kb = build_config_menu_keyboard(ws, section="channels")
+    kb = build_config_menu_keyboard(ws, section="chat_channels")
     toggle_btn = next(
         btn
         for row in kb["inline_keyboard"]
@@ -615,11 +594,11 @@ async def test_show_routing_toggle_mutates_and_refreshes(tmp_path: Path) -> None
 @pytest.mark.asyncio
 async def test_notifications_section_navigation(tmp_path: Path) -> None:
     router, cap, _ws = _build_router(tmp_path)
-    await router.route_incoming(_config_callback("cfg:section:notifications"))
+    await router.route_incoming(_config_callback("cfg:section:chat"))
     assert len(cap.edited) == 1
-    assert "Notifications" in cap.edited[0]["text"]
-    assert "Telegram notify policy:" in cap.edited[0]["text"]
-    callbacks = _config_section_callbacks(router._workspace, "notifications")
+    assert "Chat" in cap.edited[0]["text"]
+    assert "channels.telegram.telegram_notify_policy" in cap.edited[0]["text"]
+    callbacks = _config_section_callbacks(router._workspace, "chat")
     assert any(
         cb.startswith("cfg:toggle:channels.telegram.telegram_notify_policy:") for cb in callbacks
     )
@@ -631,9 +610,9 @@ async def test_notifications_policy_cycle_mutates_and_refreshes(tmp_path: Path) 
     sevn_json = root / "sevn.json"
     router, cap, ws = _build_router(tmp_path)
     await router.route_incoming(
-        _config_callback("cfg:section:notifications", callback_query_id="cq-nav"),
+        _config_callback("cfg:section:chat", callback_query_id="cq-nav"),
     )
-    kb = build_config_menu_keyboard(ws, section="notifications")
+    kb = build_config_menu_keyboard(ws, section="chat")
     cycle_btn = next(
         btn
         for row in kb["inline_keyboard"]
@@ -648,37 +627,19 @@ async def test_notifications_policy_cycle_mutates_and_refreshes(tmp_path: Path) 
     doc = load_raw_sevn_json(sevn_json)
     assert _get_nested(doc, "channels.telegram.telegram_notify_policy") == "errors"
     toggle_edit = cap.edited[-1]
-    assert "Telegram notify policy: errors" in toggle_edit["text"]
+    assert (
+        "Telegram notify policy: errors" in toggle_edit["text"]
+        or "telegram_notify_policy: 'errors'" in toggle_edit["text"]
+    )
     assert ("cq-cycle", "✅ Updated.") in cap.answered
 
 
 @pytest.mark.asyncio
 async def test_advanced_section_navigation(tmp_path: Path) -> None:
-    from sevn.config.loader import load_workspace
-    from sevn.gateway.config_io.workspace_config_io import mutate_sevn_json
-    from sevn.onboarding.web_app import _set_nested
-
     router, cap, _ws = _build_router(tmp_path)
-    root = tmp_path / "w"
-    sevn_json = root / "sevn.json"
-    mutate_sevn_json(sevn_json, lambda d: _set_nested(d, "web_ui.url", "https://app.example/"))
-    ws, _ = load_workspace(sevn_json=sevn_json)
-    router._workspace = ws
-    router._config_menu_handler._workspace = ws
     await router.route_incoming(_config_callback("cfg:section:advanced"))
-    assert len(cap.edited) == 1
-    assert "Advanced" in cap.edited[0]["text"]
-    assert "Auto-resume tier B" in cap.edited[0]["text"]
-    assert "Trace redaction:" in cap.edited[0]["text"]
-    callbacks = _config_section_callbacks(ws, "advanced")
-    assert any(cb.startswith("cfg:toggle:gateway.restart.auto_resume_b:") for cb in callbacks)
-    assert any(cb.startswith("cfg:toggle:tracing.redaction.enabled:") for cb in callbacks)
-    assert "cfg:section:rlm" in callbacks
-    assert "cfg:section:self_improve" in callbacks
-    assert "cfg:section:second_brain" in callbacks
-    assert "cfg:section:codemode" in callbacks
-    buttons = [btn for row in cap.edited[0]["reply_markup"]["inline_keyboard"] for btn in row]
-    assert any(btn.get("url") == "https://app.example/" for btn in buttons)
+    assert cap.edited == []
+    assert any("dissolved" in (text or "").lower() for _cq, text in cap.answered)
 
 
 @pytest.mark.asyncio
@@ -687,9 +648,9 @@ async def test_codemode_toggle_updates_caption_in_place(tmp_path: Path) -> None:
     sevn_json = root / "sevn.json"
     router, cap, ws = _build_router(tmp_path)
     await router.route_incoming(
-        _config_callback("cfg:section:codemode", callback_query_id="cq-nav"),
+        _config_callback("cfg:section:agent_lab", callback_query_id="cq-nav"),
     )
-    kb = build_config_menu_keyboard(ws, section="codemode")
+    kb = build_config_menu_keyboard(ws, section="agent_lab")
     toggle_btn = next(
         btn
         for row in kb["inline_keyboard"]
@@ -702,7 +663,7 @@ async def test_codemode_toggle_updates_caption_in_place(tmp_path: Path) -> None:
     doc = load_raw_sevn_json(sevn_json)
     assert _get_nested(doc, "agent.codemode.enabled") is True
     toggle_edit = cap.edited[-1]
-    assert "Tier-B CodeMode: on" in toggle_edit["text"]
+    assert "CodeMode: on" in toggle_edit["text"]
     assert ("cq-toggle", "✅ Updated.") in cap.answered
 
 
@@ -712,9 +673,9 @@ async def test_advanced_auto_resume_toggle_mutates_and_refreshes(tmp_path: Path)
     sevn_json = root / "sevn.json"
     router, cap, ws = _build_router(tmp_path)
     await router.route_incoming(
-        _config_callback("cfg:section:advanced", callback_query_id="cq-nav"),
+        _config_callback("cfg:section:deployment", callback_query_id="cq-nav"),
     )
-    kb = build_config_menu_keyboard(ws, section="advanced")
+    kb = build_config_menu_keyboard(ws, section="deployment")
     toggle_btn = next(
         btn
         for row in kb["inline_keyboard"]
@@ -727,18 +688,18 @@ async def test_advanced_auto_resume_toggle_mutates_and_refreshes(tmp_path: Path)
     doc = load_raw_sevn_json(sevn_json)
     assert _get_nested(doc, "gateway.restart.auto_resume_b") is True
     toggle_edit = cap.edited[-1]
-    assert "Auto-resume tier B on restart: on" in toggle_edit["text"]
+    assert "gateway.restart.auto_resume_b: True" in toggle_edit["text"]
     assert ("cq-toggle", "✅ Updated.") in cap.answered
 
 
 @pytest.mark.asyncio
 async def test_secrets_section_navigation(tmp_path: Path) -> None:
     router, cap, _ws = _build_router(tmp_path)
-    await router.route_incoming(_config_callback("cfg:section:secrets"))
+    await router.route_incoming(_config_callback("cfg:section:access_secrets"))
     assert len(cap.edited) == 1
     assert "Secrets" in cap.edited[0]["text"]
     assert "Configured secret refs:" in cap.edited[0]["text"]
-    callbacks = _config_section_callbacks(router._workspace, "secrets")
+    callbacks = _config_section_callbacks(router._workspace, "access_secrets")
     assert "form:secret_wizard" in callbacks
     assert parse_action_callback("form:secret_wizard") == ("form", "secret_wizard", None)
 
@@ -749,9 +710,9 @@ async def test_self_improve_toggle_updates_caption_in_place(tmp_path: Path) -> N
     sevn_json = root / "sevn.json"
     router, cap, ws = _build_router(tmp_path)
     await router.route_incoming(
-        _config_callback("cfg:section:self_improve", callback_query_id="cq-nav"),
+        _config_callback("cfg:section:agent_lab", callback_query_id="cq-nav"),
     )
-    kb = build_config_menu_keyboard(ws, section="self_improve")
+    kb = build_config_menu_keyboard(ws, section="agent_lab")
     toggle_btn = next(
         btn
         for row in kb["inline_keyboard"]
@@ -764,7 +725,7 @@ async def test_self_improve_toggle_updates_caption_in_place(tmp_path: Path) -> N
     doc = load_raw_sevn_json(sevn_json)
     assert _get_nested(doc, "self_improve.enabled") is False
     toggle_edit = cap.edited[-1]
-    assert "Enabled: off" in toggle_edit["text"]
+    assert "Self-improve: off" in toggle_edit["text"]
     assert ("cq-toggle", "✅ Updated.") in cap.answered
 
 
@@ -774,9 +735,9 @@ async def test_second_brain_toggle_updates_caption_in_place(tmp_path: Path) -> N
     sevn_json = root / "sevn.json"
     router, cap, ws = _build_router(tmp_path)
     await router.route_incoming(
-        _config_callback("cfg:section:second_brain", callback_query_id="cq-nav"),
+        _config_callback("cfg:section:memory_sb", callback_query_id="cq-nav"),
     )
-    kb = build_config_menu_keyboard(ws, section="second_brain")
+    kb = build_config_menu_keyboard(ws, section="memory_sb")
     toggle_btn = next(
         btn
         for row in kb["inline_keyboard"]
@@ -815,7 +776,7 @@ async def test_integrations_section_lists_ids_and_dashboard_link(tmp_path: Path)
     router._menu_action_router._workspace = ws
     expected_url = _mission_control_url(ws, fragment="integrations")
     assert expected_url is not None
-    await router.route_incoming(_config_callback("cfg:section:integrations"))
+    await router.route_incoming(_config_callback("cfg:section:skills_integrations"))
     assert len(cap.edited) == 1
     assert "Integrations" in cap.edited[0]["text"]
     assert "cursor" in cap.edited[0]["text"]

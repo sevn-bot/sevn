@@ -32,6 +32,8 @@ from sevn.gateway.menu.menu_registry import (
     match_menu_button_spec,
 )
 
+READINESS_LOCKED_TOAST = "Not active yet — see /config → Help for status."
+
 _CHROME_CALLBACKS: frozenset[str] = frozenset(
     {
         "cfg:nav:back",
@@ -70,7 +72,6 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C0.15",
         "C0.16",
         "C0.17",
-        "C0.18",
         "C0.19",
         "C0.20",
         "C0.21",
@@ -96,13 +97,58 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C3.3",
         "C3.4",
         "C3.5",
-        # Channels (routing footer + reply keyboard)
+        "C3.6",
+        "C3.7",
+        # Channels (routing footer + reply keyboard + DM policy)
         "C5.1",
         "C5.2",
-        # Security (owner LLM-guard kill-switches)
+        "C5.3",
+        "C5.6",
+        "C5.7",
+        # Models (unified toggle + swap last model)
+        "C4.1",
+        "C4.5",
+        "C4.5-pick",
+        # Secrets (+ scoped wizard aliases e.g. TwexAPI)
+        "C6.1",
+        "C6.1b",
+        # Per-skill enable toggle (``cfg:toggle:skills.*.enabled``)
+        "C7.2",
+        # RLM λ toggle
+        "C9.1",
+        # Code understanding toggles
+        "C10.1",
+        "C10.2",
+        # Security (heuristic-only + owner LLM-guard kill-switches)
+        "C11.1",
         "C11.3",
         "C11.4",
         "C11.5",
+        # Self-improve toggle
+        "C12.1",
+        # Second Brain (enable + vault path/browse forms + layout cycle)
+        "C13.1",
+        "C13.4",
+        "C13.5",
+        "C13.6",
+        # Integrations refresh
+        "C14.3",
+        # Dashboard status pin
+        "C15.1",
+        "C15.3",
+        "C15.4",
+        # Shortcuts add wizard
+        "C16.1",
+        "C16.2",
+        "C16.5",
+        "C16.6",
+        # Telegram notify policy cycle
+        "C17.1",
+        "C17.2",
+        # Auto-resume tier B on Deployment (Advanced dissolved W5)
+        "C18.1",
+        # Agent display name form
+        "C19.2",
         # Logs section (Wave TE-9)
         "C20.1",
         "C20.2",
@@ -131,6 +177,105 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C25.6",
         "C25.7",
         "C25.8",
+        # Chat sessions (W7a)
+        "C26.1",
+        "C26.2",
+        "C26.3",
+        # Agent leaves (W7b)
+        "C27.1",
+        "C27.2",
+        "C27.3",
+        "C27.4",
+        "C27.5",
+        "C27.6",
+        "C27.7",
+        "C27.8",
+        # Skills & Tools + Memory leaves (W7c)
+        "C28.1",
+        "C28.2",
+        "C28.3",
+        "C28.4",
+        "C28.5",
+        "C28.6",
+        "C28.7",
+        "C28.8",
+        "C28.9",
+        "C28.10",
+        "C28.11",
+        "C28.12",
+        "C28.13",
+        "C28.14",
+        "C28.15",
+        "C28.16",
+        "C28.17",
+        # Access + Health leaves (W7d)
+        "C29.1",
+        "C29.2",
+        "C29.3",
+        "C29.4",
+        "C29.5",
+        "C29.6",
+        "C29.7",
+        "C29.8",
+        "C29.9",
+        "C29.10",
+        "C29.11",
+        "C29.12",
+        "C29.13",
+        "C29.14",
+        "C29.15",
+        "C29.16",
+        "C29.17",
+        # Deployment + Help leaves (W7e)
+        "C30.1",
+        "C30.2",
+        "C30.3",
+        "C30.4",
+        "C30.5",
+        "C30.6",
+        "C30.7",
+        "C30.8",
+        "C30.9",
+        "C30.10",
+        "C30.11",
+        "C30.12",
+        "C30.13",
+        "C30.14",
+        "C30.15",
+        "C30.16",
+        "C30.17",
+        "C30.18",
+        "C30.19",
+        "C30.20",
+        "C30.21",
+        "C30.22",
+        "C30.23",
+        "C30.24",
+        "C30.25",
+        "C30.26",
+        "C30.27",
+        "C30.28",
+        "C30.29",
+        "C30.30",
+        "C30.31",
+        "C30.32",
+        "C30.33",
+        "C30.34",
+        "C31.1",
+        "C31.2",
+        "C31.3",
+        "C31.4",
+        "C31.5",
+        "C31.6",
+        "C31.7",
+        "C31.8",
+        "C31.9",
+        "C31.10",
+        "C31.11",
+        "C31.12",
+        "C31.13",
+        "C31.14",
+        "C31.15",
         # Social Media Manager (W3)
         "C7.4",
         "C7.5",
@@ -265,12 +410,6 @@ _CONFIG_SECTION_CATALOG: tuple[tuple[str, str, str, MenuReadiness], ...] = (
         "WIP",
     ),
     (
-        "Advanced",
-        "Auto-resume tier B, trace redaction, nested RLM / Self-Improve / Second Brain / CodeMode, Mission Control.",
-        "RLM, Self-Improve, and Second Brain moved from root; gateway/proxy restart under My sevn bot.",
-        "WIP",
-    ),
-    (
         "CodeMode",
         "Tier-B CodeMode (Monty run_code over triager-listed tools); default off.",
         "Writes agent.codemode.enabled; flat tool path when disabled.",
@@ -278,8 +417,8 @@ _CONFIG_SECTION_CATALOG: tuple[tuple[str, str, str, MenuReadiness], ...] = (
     ),
     (
         "Logs",
-        "Tail gateway/proxy logs, grep, traces, trace-redaction toggle.",
-        "Owner-only diagnostics; deployment id is under My sevn bot.",
+        "Tail gateway/proxy logs, grep, and traces.",
+        "Owner-only diagnostics; trace redaction under Health > Trace export.",
         "Ready",
     ),
     (
@@ -295,7 +434,7 @@ _CONFIG_SECTION_CATALOG: tuple[tuple[str, str, str, MenuReadiness], ...] = (
         "Ready",
     ),
     (
-        "My sevn bot",
+        "Deployment",
         "Deployment id, build version id, owner gateway/proxy restart (two-step confirm), and persistent tunnel on/off.",
         "Restart uses service manager; tunnel on starts the provider now and, once healthy, is re-launched on every gateway boot (surviving host restart only when the gateway itself runs as a daemon); deployment id mirrors /status; version id is the sevn.json build stamp.",
         "Ready",
@@ -505,8 +644,8 @@ def config_menu_level_help_text(
         title = "/config root"
     elif section == "sevn_bot":
         title = "sevn.bot"
-    elif section == "my_sevn_bot":
-        title = "My sevn bot"
+    elif section == "deployment":
+        title = "Deployment"
     lines = [f"Help — {title}", ""]
     body_rows: list[list[dict[str, Any]]] = []
     if isinstance(markup, dict):
@@ -518,31 +657,16 @@ def config_menu_level_help_text(
 
         catalog_by_title = {row[0]: row for row in _CONFIG_SECTION_CATALOG}
         section_titles = {
-            "session": "Session",
-            "agents": "Agents",
-            "models": "Models",
-            "voice": "Voice",
-            "channels": "Channels",
-            "secrets": "Secrets",
-            "skills": "Skills",
-            "tools": "Tools",
-            "rlm": "RLM",
-            "code": "Code",
-            "security": "Security",
-            "self_improve": "Self-Improve",
-            "second_brain": "Second Brain",
-            "integrations": "Integrations",
-            "dashboard": "Dashboard",
-            "shortcuts": "Shortcuts",
-            "notifications": "Notifications",
-            "advanced": "Advanced",
-            "codemode": "CodeMode",
-            "logs": "Logs",
-            "help": "Slash help",
-            "sevn_bot": "sevn.bot",
-            "my_sevn_bot": "My sevn bot",
+            "chat": "Chat",
+            "agent": "Agent",
+            "skills": "Skills & Tools",
+            "memory": "Memory",
+            "access": "Access",
+            "health": "Health",
+            "deployment": "Deployment",
+            "help": "Help",
         }
-        for label, sid, _cb in _CONFIG_ROOT_TILES:
+        for label, sid, _cb, _owner in _CONFIG_ROOT_TILES:
             cat = catalog_by_title.get(section_titles.get(sid, ""))
             lines.append(f"▸ {label} [Ready]")
             if cat is not None:
@@ -605,6 +729,7 @@ def config_menu_help_catalog_text() -> str:
 
 
 __all__ = [
+    "READINESS_LOCKED_TOAST",
     "config_menu_help_catalog_text",
     "config_menu_level_help_text",
     "config_section_catalog",

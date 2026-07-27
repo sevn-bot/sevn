@@ -25,7 +25,7 @@ def test_second_brain_caption_shows_vault_path(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     ws = WorkspaceConfig.model_validate(json.loads(sj.read_text(encoding="utf-8")))
-    caption = config_menu_message_text(ws, section="second_brain", content_root=tmp_path)
+    caption = config_menu_message_text(ws, section="memory_sb", content_root=tmp_path)
     assert "Vault: obsidian/alex_AI" in caption
 
 
@@ -51,7 +51,7 @@ def test_second_brain_caption_shows_layout_and_role_paths(tmp_path: Path) -> Non
         encoding="utf-8",
     )
     ws = WorkspaceConfig.model_validate(json.loads(sj.read_text(encoding="utf-8")))
-    caption = config_menu_message_text(ws, section="second_brain", content_root=tmp_path)
+    caption = config_menu_message_text(ws, section="memory_sb", content_root=tmp_path)
     assert "Layout: para" in caption
     assert "00_Inbox" in caption
     assert "30_Resources" in caption

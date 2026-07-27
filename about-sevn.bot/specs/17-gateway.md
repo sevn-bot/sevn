@@ -7,8 +7,8 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
-last_updated: '2026-07-25'
-fingerprint: sha256:14ce8e20eb3f25376b68df0549c5a2966bd654d979c1aa74a440455aca66e6e4
+last_updated: '2026-07-27'
+fingerprint: sha256:f2917500381bc27cb16da54a35eaa5df427f8dfcd6687f4e7026452c646674e2
 related: []
 sources:
 - src/sevn/gateway/**
@@ -441,6 +441,12 @@ interfaces:
 - name: MediaStore
   file: src/sevn/gateway/media/media_store.py
   symbol: MediaStore
+- name: build_confirm_gate_keyboard
+  file: src/sevn/gateway/menu/confirm_gates.py
+  symbol: build_confirm_gate_keyboard
+- name: confirm_gate_message
+  file: src/sevn/gateway/menu/confirm_gates.py
+  symbol: confirm_gate_message
 - name: build_discogs_keyboard_rows
   file: src/sevn/gateway/menu/discogs_menu.py
   symbol: build_discogs_keyboard_rows
@@ -453,6 +459,12 @@ interfaces:
 - name: discogs_setup_caption
   file: src/sevn/gateway/menu/discogs_menu.py
   symbol: discogs_setup_caption
+- name: has_bound_source_checkout
+  file: src/sevn/gateway/menu/host_command_cards.py
+  symbol: has_bound_source_checkout
+- name: render_host_command_card
+  file: src/sevn/gateway/menu/host_command_cards.py
+  symbol: render_host_command_card
 - name: ConfigMenuHandler
   file: src/sevn/gateway/menu/menu.py
   symbol: ConfigMenuHandler
@@ -534,6 +546,9 @@ interfaces:
 - name: refresh_config_menu_message
   file: src/sevn/gateway/menu/menu.py
   symbol: refresh_config_menu_message
+- name: resolve_config_section_alias
+  file: src/sevn/gateway/menu/menu.py
+  symbol: resolve_config_section_alias
 - name: service_restart_confirm_message
   file: src/sevn/gateway/menu/menu.py
   symbol: service_restart_confirm_message
@@ -1565,6 +1580,13 @@ Sub-agent L1 registration/finalize hooks in `_run_guarded` (spec-36).
 `session_manager.enqueue_dispatch` classifies busy input via relatedness labels
 and may spawn concurrent L1 tier-B runs (`src/sevn/gateway/queue/queue_multi.py`).
 `routing_footer.py` tags parallel L1 replies with short sub-agent ids.
+
+## Amendments (telegram-menu-redesign W9)
+
+Telegram `/config` callback routing serves the redesigned eight-tile tree via
+`build_config_menu_keyboard()` and `MenuActionRouter`; stale `cfg:section:*` ids
+resolve through `_SECTION_ALIASES`. Section dispatch and action handlers are shared
+with the menu E2E walker recipe (`src/sevn/browser/recipes/telegram_menu.py`).
 
 ## Test Strategy
 

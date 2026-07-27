@@ -6,8 +6,8 @@ status: ready
 owner: Alex
 summary: The operator talks to sevn where they already chat—Telegram on phone, web/Mission
   Control on laptop—with shared sessions, voice, and one gateway turn spine.
-last_updated: '2026-07-25'
-fingerprint: sha256:bd42a1c898d7191ebcb76130efa2ea7dc80c3be5f9a5f695e2476c8356e9f58c
+last_updated: '2026-07-27'
+fingerprint: sha256:d34d2c00cc31a1c346d15d5322a93464921577571fe5e5509969f24e3eab5070
 related:
 - prd-07-mission-control
 - prd-10-generated-ui
@@ -39,6 +39,12 @@ This PRD is `ready` while linked specs below are not normatively complete (`draf
 | spec-37-openui | draft |
 
 <!-- HUMAN-INPUT[owner=operator]: Reconcile PRD `ready` vs implementing spec maturity — downgrade PRD, or keep ready and finish normative spec bodies. -->
+
+## Amendments (telegram-menu-redesign W9)
+
+Telegram ``/config`` is regrouped into eight intent tiles with Chat as the home surface
+for session, channels, voice, shortcuts, and notifications — aligning inline menu navigation
+with the conversational UX this PRD describes.
 
 ## Problem & Motivation
 

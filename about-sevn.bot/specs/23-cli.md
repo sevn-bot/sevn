@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver the primary operator and automation surface for install, upgrades,
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
-last_updated: '2026-07-24'
-fingerprint: sha256:a7975b8a66ab1fd58112c38223dff12638a668e3b9c949c8fbf6f78dc93a895b
+last_updated: '2026-07-27'
+fingerprint: sha256:d7ca0647649794dd1b3cd0a959fd780818c20ffead2cf9c9637650811c5ab2f2
 related: []
 sources:
 - src/sevn/cli/**
@@ -231,6 +231,9 @@ interfaces:
 - name: iter_config_sections
   file: src/sevn/cli/config_paths.py
   symbol: iter_config_sections
+- name: iter_config_slug_aliases
+  file: src/sevn/cli/config_paths.py
+  symbol: iter_config_slug_aliases
 - name: menu_registry_root_slugs
   file: src/sevn/cli/config_paths.py
   symbol: menu_registry_root_slugs
@@ -820,6 +823,13 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Amendments (telegram-menu-redesign W9)
+
+Root CLI ``rich_help_panel`` groups mirror the eight Telegram ``/config`` tiles
+(``sevn.cli.help.panels.PANEL_ORDER``). ``sevn config sections`` lists the same eight
+slugs derived from ``menu_registry`` (``config_paths.menu_registry_root_slugs()``).
+``make cli-help-docs-check`` gates panel drift.
 
 ## Human-input needed
 

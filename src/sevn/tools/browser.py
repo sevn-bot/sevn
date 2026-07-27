@@ -191,6 +191,7 @@ _BROWSER_PARAMS: Final[dict[str, Any]] = {
                 "youtube",
                 "social",
                 "linkedin",
+                "telegram_menu",
             ],
             "description": "Which browser action to execute.",
         },
@@ -198,6 +199,7 @@ _BROWSER_PARAMS: Final[dict[str, Any]] = {
             "type": "string",
             "description": (
                 "Recipe sub-op: telegram (login|chats|read|send|reply|search|botfather); "
+                "telegram_menu (walk); "
                 "gmail (list|read|search|compose|reply); maps (search|place|directions|reviews) "
                 '— e.g. action=maps, op=search, query="coffee near me"; '
                 "youtube (search|info|comments|read_replies|comment|reply); "
@@ -609,6 +611,9 @@ async def _dispatch(
     if action == "telegram":
         return await _telegram(page, dom, params)
 
+    if action == "telegram_menu":
+        return await _telegram_menu(page, dom, params, content_root, session_id)
+
     if action == "google_search":
         return await _google_search(page, dom, params)
 
@@ -750,6 +755,63 @@ async def _telegram(page: Page, dom: Dom, params: dict[str, Any]) -> str:
         f"unknown telegram op: {op!r} (login|chats|read|send|reply|search|botfather)",
         code=ToolResultCode.VALIDATION_ERROR,
     )
+
+
+async def _telegram_menu(
+    page: Page,
+    dom: Dom,
+    params: dict[str, Any],
+    content_root: Path,
+    session_id: str,
+) -> str:
+    """Dispatch the Telegram /config menu walker and return a JSON envelope.
+
+    Args:
+        page (Page): Working-tab page.
+        dom (Dom): Working-tab finder.
+        params (dict[str, Any]): Action parameters (``op``, ``chat``, ``safe``).
+        content_root (Path): Workspace content root (unused; reserved).
+        session_id (str): Gateway session id (unused; reserved).
+
+    Returns:
+        str: JSON tool envelope.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_telegram_menu)
+        True
+    """
+    from sevn.browser.recipes.base import RecipeError
+    from sevn.browser.recipes.telegram_menu import TelegramMenuWalker, ensure_login
+    from sevn.browser.recipes.telegram_web import TelegramWeb
+
+    tg = TelegramWeb(page, dom)
+    op = str(params.get("op") or "walk").strip().lower()
+    chat = str(params.get("chat") or "").strip()
+    if op != "walk":
+        return enveloped_failure(
+            f"unknown telegram_menu op: {op!r} (walk)",
+            code=ToolResultCode.VALIDATION_ERROR,
+        )
+    if not chat:
+        return enveloped_failure(
+            "chat is required for telegram_menu walk",
+            code=ToolResultCode.VALIDATION_ERROR,
+        )
+    safe = params.get("safe", True)
+    if isinstance(safe, str):
+        safe = safe.strip().lower() not in {"0", "false", "no"}
+    try:
+        await ensure_login(tg, timeout_s=float(params.get("login_timeout") or 300))
+        await tg.open_chat(chat)
+        walker = TelegramMenuWalker(tg=tg, safe=bool(safe))
+        report = await walker.walk()
+    except RecipeError as exc:
+        return enveloped_failure(
+            f"telegram_menu walk failed: {exc}",
+            code=ToolResultCode.VALIDATION_ERROR,
+        )
+    return enveloped_success(report)
 
 
 async def _google_search(page: Page, dom: Dom, params: dict[str, Any]) -> str:

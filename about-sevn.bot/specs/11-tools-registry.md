@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that every
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
-last_updated: '2026-07-21'
-fingerprint: sha256:048045f2e76de0bffecc5a8815d7a8156433bab62a87f8bd194a42f0aedff49f
+last_updated: '2026-07-27'
+fingerprint: sha256:bdeda49c216744bbdf764d14cb2c54eb5c41613402e21e6a1704e39505bf6e8e
 related: []
 sources:
 - src/sevn/tools/**
@@ -562,6 +562,13 @@ Path resolution for file tools: `src/sevn/tools/paths.py` (`source_code/` prefix
 | MCP server down | Stub tool explains unavailability |
 | Plugin disabled | Entry-point filtered by toggle |
 | Path escape | File ops reject paths outside allowed roots |
+
+## Amendments (telegram-menu-redesign W9)
+
+The browser recipe registry gains ``telegram_menu`` / ``telegram_menu_walk`` for the
+``/config`` menu E2E harness (``make telegram-menu-e2e`` when ``SEVN_TELEGRAM_MENU_E2E=1``),
+reusing ``TelegramWeb`` inline-keyboard primitives. Destructive menu rows are deny-listed
+(D6); the walker derives its expected tree from ``build_config_menu_keyboard()`` at runtime.
 
 ## Test Strategy
 

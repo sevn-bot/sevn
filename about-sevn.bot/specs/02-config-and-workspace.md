@@ -827,6 +827,12 @@ via `x-sevn-process-settings-env` in the JSON Schema.
 | `TriagerUnavailable` | Triager config incomplete at routing time |
 | JSON Schema drift | `make config-schema` fails in CI |
 
+## Amendments (telegram-menu-redesign W9)
+
+Telegram ``/config`` exposes ``sevn config show|set|validate|sections`` from Deployment
+and Help sections; section slugs match the eight root tiles via ``config_paths`` (derived
+from ``menu_registry``, not hand-written ``config_sections/`` packages).
+
 ## Test Strategy
 
 | Tests | Focus |

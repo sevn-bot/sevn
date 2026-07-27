@@ -61,12 +61,12 @@ def _collect_live_telegram_menu(workspace: WorkspaceConfig) -> list[dict[str, An
 
     Examples:
         >>> rows = _collect_live_telegram_menu(WorkspaceConfig.minimal())
-        >>> any(r["section_id"] == "session" for r in rows)
+        >>> any(r["section_id"] == "chat" for r in rows)
         True
     """
 
     sections: list[dict[str, Any]] = []
-    for tile_label, section_id, section_cb in _CONFIG_ROOT_TILES:
+    for tile_label, section_id, section_cb, _owner_only in _CONFIG_ROOT_TILES:
         kb = build_config_menu_keyboard(workspace, section=section_id)  # type: ignore[arg-type]
         buttons: list[dict[str, str]] = []
         for row in kb.get("inline_keyboard", []):

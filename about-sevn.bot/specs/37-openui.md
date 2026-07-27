@@ -197,6 +197,12 @@ Initial draft for **Failure Modes** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
 
 Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
+
+## Amendments (telegram-menu-redesign W9)
+
+Telegram `/config` Memory › OpenWiki is the first menu presence for OpenWiki install
+and configure flows (conditional rows when the skill is enabled).
+
 ## Test Strategy
 
 Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.

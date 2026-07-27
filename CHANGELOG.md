@@ -12,7 +12,36 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
-- [2026-07-24] Build ``version_id`` resolves from the code checkout (branch/tag + short SHA, e.g. ``pre-0.0.1_393f918b``) instead of falling back to the package version ``0.0.1`` when the operator workspace is not a git tree; the resolved id is persisted into workspace ``sevn.json`` at boot so the ``/config`` button and Mission Control read a real build identity
+- [2026-07-27] Thermos hardening for Telegram ``/config``: owner gates on W7 mutators/forms, readiness enforcement at dispatch, user-scoped secrets export/deploy confirms, redacted ``act:config:show``, CLI slug aliases, ``secrets_export`` dispatcher kind, and ``owner_only`` registry flags on security/deployment toggles
+
+### Added
+
+- [2026-07-26] Telegram ``/config`` root regrouped into eight intent tiles (Chat, Agent, Skills & Tools, Memory, Access, Health, Deployment, Help) with ``owner_only`` gating (non-owners see four tiles); legacy section callbacks unchanged; nav shells re-parent existing rows
+- [2026-07-26] Telegram ``/config`` menu E2E harness: ``TelegramMenuWalker`` recipe, ``make telegram-menu-e2e`` (``SEVN_TELEGRAM_MENU_E2E=1``), inline-keyboard primitives on ``TelegramWeb``, and per-row verdict + spec-id coverage reports under ``evidence/telegram-menu-e2e/``
+- [2026-07-27] Telegram ``/config`` Chat leaves (W7a): Sessions section (list/history/send, ``/new``, ``/stop``), shortcuts list/remove, voice probe/settings, channel status/config, notify-policy on Chat root
+- [2026-07-27] Telegram ``/config`` Agent leaves (W7b): Sampling section (show params, set max output tokens), resolved slots, active runs, Lab improve doctor/record/replay-sampler, sub-agent kill form on Running
+- [2026-07-27] Telegram ``/config`` Skills & Tools + Memory leaves (W7c): skills list/sync/security-scan, tool health, memory search/index, Second Brain reindex/bootstrap, Dreaming status/backfill/undo/cron, OpenWiki install/configure with conditional rows
+- [2026-07-27] Telegram ``/config`` Access + Health leaves (W7d): secrets list/rm/unlock with two-step confirm, provider OAuth link/unlink, GitHub token form, DM policy & pairing, doctor/usage, turn bundles export/view, tracing config; confirm-gate helper and D15 unknown-suffix rejection
+- [2026-07-27] Telegram ``/config`` Deployment + Help leaves (W7e): service start/stop/status/logs, tunnel one-shot control and setup form, config show/validate/set/sections, update/schema/migrate, deploy check/remote confirm, slash commands, guides list/read, CLI version
+- [2026-07-27] Telegram ``/config`` build rows (W8): host-only and developer copy-paste command cards (D17), checkout-gated Help › Developer, secrets export bundle with two-step confirm and file delivery, integrations status listing, Health › Status pin dashboard-password host card
+
+### Changed
+
+- [2026-07-27] Telegram ``/config`` docs catalog regenerated for the eight-tile tree (`make telegram-menu-docs-check` green); root CLI help panels mirror the eight menu groups; redesign proposal HTML marked shipped (live SSOT: ``Telegram Menu.html``)
+
+### Fixed
+
+- [2026-07-27] Telegram ``/config`` DM-policy cycle is owner-only: the row went live in this cycle without an owner gate, so any member of a chat where the menu was rendered could change who may DM the bot
+- [2026-07-27] Telegram ``/config`` section entry gates every section under an owner-only root tile, not just the eight root tiles — ``cfg:section:access_secrets`` and siblings no longer bypass the gate when entered directly
+- [2026-07-27] Telegram ``/config`` Agent › Sub-agents "Running L1/L2" row opens the Running submenu again; it still emitted the pre-rename ``subagents_running`` id, so every tap bounced through the alias table back to the Agent root tile
+- [2026-07-27] Telegram ``/config`` Memory › Dreaming backfill completes instead of always reporting "Backfill failed" (``asyncio.run()`` inside the gateway's running event loop)
+- [2026-07-27] ``sevn config <retired-slug>`` (``voice``, ``session``, ``secrets``, ``logs``, …) works as documented: the aliases resolved internally but were never registered as CLI subcommands
+- [2026-07-27] Telegram menu walker reaches sections nested two or more levels deep (path-aware navigation instead of one blind Back tap), and ``--mutate`` now taps and restores toggle/cycle rows instead of no-opping into a coverage failure
+- [2026-07-27] Telegram Menu docs scaffold: skip full ``ROOT_TILES`` sync when an explicit live dict is passed so per-gap tile inserts are not clobbered
+- [2026-07-27] ``sevn config <section>`` doctests use the redesign ``chat`` slug instead of retired ``session``
+- [2026-07-26] Telegram ``/config`` Advanced section dissolved: auto-resume tier B on Deployment, trace redaction de-duplicated to Health > Trace export (``C20.6``), queue mode only on Chat, RLM/CodeMode/Self-Improve under Agent > Lab, Second Brain under Memory, Sub-agents under Agent; stale ``cfg:section:advanced`` answers a moved toast
+- [2026-07-26] Telegram ``/config`` readiness allow-list: 23 previously gated WIP rows (models, channels, secrets, skills, RLM, code, security, self-improve, second brain, integrations, dashboard pin, shortcuts, notify policy, auto-resume tier B, agent display name) are pressable; Advanced trace-redaction duplicate ``C18.2`` stays gated until W5
+- [2026-07-24] Telegram ``/config`` Version id shows branch/tag + short SHA (e.g. ``pre-0.0.1_393f918b``) instead of falling back to the package version ``0.0.1`` when the operator workspace is not a git tree; the resolved id is persisted into workspace ``sevn.json`` at boot so the ``/config`` button and Mission Control read a real build identity
 - [2026-07-21] Gateway shutdown drains the default executor before closing SQLite (then restores a fresh executor so TestClient's shared loop keeps ``to_thread``); dashboard replay queue tests stub ``schedule``; CI skips flaky local-open PTY terminal WS smoke under xdist
 - [2026-07-21] Form-wizard Telegram callbacks answer via production ``answer_callback`` (same probe order as menu-action); ``answer_callback`` returns Bot API ``ok`` so stale-query failures trigger Version/Deployment id chat-text fallback; contacts ``pinned_keys_for`` soft-fails on decrypt so mail send falls through to the directory
 - [2026-07-21] Thermos: Google Workspace ``prefer_gws`` handlers pass real ``params``/``body`` to ``run_gws`` (writes/searches no longer hollow); media download/upload and docs append stay on the Python client; Drive share sends explicit ``sendNotificationEmail`` true/false for gws; TTS engine toast reads the first backend that exposes ``.engine``

@@ -1,6 +1,6 @@
 # Getting started with the sevn CLI
 
-The `sevn` CLI is the operator surface for workspace setup, health checks, and local services. Commands are grouped into **eight Mission Control panels** (run `sevn --help` on a TTY to see them).
+The `sevn` CLI is the operator surface for workspace setup, health checks, and local services. Commands are grouped into **eight Telegram `/config` menu panels** (run `sevn --help` on a TTY to see them: Chat, Agent, Skills & Tools, Memory, Access, Health, Deployment, Help).
 
 ## First steps
 

@@ -18,10 +18,10 @@ def runner() -> CliRunner:
 
 
 def test_panels_w10_w19_commands() -> None:
-    assert panel_for("channels") == "Observability"
-    assert panel_for("tools") == "Agent"
-    assert panel_for("usage") == "Observability"
-    assert panel_for("providers") == "Ops"
+    assert panel_for("channels") == "Chat"
+    assert panel_for("tools") == "Skills & Tools"
+    assert panel_for("usage") == "Health"
+    assert panel_for("providers") == "Access"
 
 
 def test_sevn_channels_status_json(
