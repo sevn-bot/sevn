@@ -12,7 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
-- [2026-07-27] Thermos hardening for Telegram ``/config``: owner gates on W7 mutators/forms, readiness enforcement at dispatch, user-scoped secrets export/deploy confirms, redacted ``act:config:show``, CLI slug aliases, and ``secrets_export`` dispatcher kind
+- [2026-07-27] Thermos hardening for Telegram ``/config``: owner gates on W7 mutators/forms, readiness enforcement at dispatch, user-scoped secrets export/deploy confirms, redacted ``act:config:show``, CLI slug aliases, ``secrets_export`` dispatcher kind, and ``owner_only`` registry flags on security/deployment toggles
 
 ### Added
 

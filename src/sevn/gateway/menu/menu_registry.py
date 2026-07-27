@@ -649,6 +649,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "memory_code",
         "MYCODE",
         implemented=True,
+        owner_only=True,
         notes="Runtime via code_understanding.mycode.enabled reload",
     )
     add(
@@ -658,6 +659,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "memory_code",
         "Review graph",
         implemented=True,
+        owner_only=True,
         notes="Runtime via code_review_graph_mcp_enabled reload",
     )
     add(
@@ -679,6 +681,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "access_guard",
         "Heuristic-only",
         implemented=True,
+        owner_only=True,
         notes="Reloads LLMGuardScanner on toggle (TMF-9)",
     )
     add(
@@ -698,6 +701,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "access_guard",
         "Skip guard on my text",
         implemented=True,
+        owner_only=True,
         notes="Owner-actor text scans bypassed when on; reloads scanner",
     )
     add(
@@ -707,6 +711,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "access_guard",
         "Skip guard on my links",
         implemented=True,
+        owner_only=True,
         notes="Owner-actor link scans bypassed when on; mixed-kind only skipped when every kind is disabled",
     )
     add(
@@ -716,6 +721,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "access_guard",
         "Skip guard on my documents",
         implemented=True,
+        owner_only=True,
         notes="Owner-actor attachment scans bypassed when on",
     )
 
@@ -757,6 +763,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "memory_sb",
         "Second Brain enabled",
         implemented=True,
+        owner_only=True,
         notes="JSON",
     )
     add(
@@ -804,6 +811,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "memory_sb",
         "Vault layout",
         implemented=True,
+        owner_only=True,
         notes="legacy ↔ para cycle",
     )
 
@@ -1587,6 +1595,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "deployment",
         "Auto-resume tier B",
         implemented=True,
+        owner_only=True,
         notes="JSON; moved from Advanced to Deployment (W5)",
     )
     add(
@@ -1732,6 +1741,16 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         implemented=True,
         owner_only=True,
         notes="Single trace-redaction home on Health > Trace export (W5)",
+    )
+    add(
+        "C20.6b",
+        _toggle("tracing.redaction.enabled"),
+        "C",
+        "health_tracing",
+        "Trace redaction enabled",
+        implemented=True,
+        owner_only=True,
+        notes="Alternate toggle path; primary UX is cfg:logs:toggle_redaction (C20.6)",
     )
     add(
         "C20.8",

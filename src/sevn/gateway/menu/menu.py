@@ -5708,6 +5708,15 @@ class ConfigMenuHandler:
         if kind == "retired_section" and value is not None:
             alias_target = _SECTION_ALIASES.get(value, "")
             if alias_target and alias_target in _CONFIG_SECTIONS:
+                if (
+                    alias_target in _OWNER_ONLY_ROOT_SECTIONS
+                    and not self._router._resolve_owner_flag(msg)
+                ):
+                    if cq_str:
+                        await _answer_callback_query(
+                            adapter, callback_query_id=cq_str, text="Owner only."
+                        )
+                    return
                 frame = ConfigMenuNavFrame(section=alias_target)  # type: ignore[arg-type]
                 chat_raw = md.get("chat_id")
                 message_raw = md.get("message_id")
