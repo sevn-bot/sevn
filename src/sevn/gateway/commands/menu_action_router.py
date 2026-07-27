@@ -132,6 +132,20 @@ _DEV_SHELL_COMMANDS: dict[str, str] = {
     "gui-migrate": "sevn gui migrate",
 }
 
+# Mutating or cross-session actions gated to workspace owner (Thermos: align W7a/W7c with W7d/W7e).
+_OWNER_ONLY_ACTION_TARGETS: frozenset[str] = frozenset(
+    {
+        "skills:sync",
+        "second_brain:setup",
+        "second_brain:reindex",
+        "dreaming:undo",
+        "dreaming:reconcile_cron",
+        "openui:install",
+        "openui:setup",
+        "sessions:list",
+    }
+)
+
 _CALLBACK_SECTION_PREFIXES: tuple[tuple[str, ConfigSection], ...] = (
     ("voice:", "chat_voice"),
     ("security:", "access_guard"),
@@ -506,6 +520,12 @@ class MenuActionRouter:
         parsed = parse_action_callback(str(raw).strip()) if isinstance(raw, str) else None
         if parsed is None or parsed[0] == "form":
             return None
+        from sevn.gateway.menu.menu_readiness import READINESS_LOCKED_TOAST, readiness_for_callback
+
+        if readiness_for_callback(str(raw).strip()) != "Ready":
+            toast = READINESS_LOCKED_TOAST
+            answered = await self._refresh_config_menu_after_action(msg, raw, toast=toast)
+            return None if answered else toast
         kind, target, value = parsed
         if kind == "cycle":
             if value is None:
@@ -583,6 +603,9 @@ class MenuActionRouter:
                 text = f"/{target}"
             return text
         if kind == "action":
+            if target in _OWNER_ONLY_ACTION_TARGETS and not self._router._resolve_owner_flag(msg):
+                await self._answer_owner_only(msg)
+                return None
             if target == "dashboard:refresh_pin":
                 return await self._handle_dashboard_refresh_pin(msg, raw)
             if target == "dashboard:create_pin":
@@ -2443,8 +2466,11 @@ class MenuActionRouter:
             return None
         md = msg.metadata if isinstance(msg.metadata, dict) else {}
         chat_raw = md.get("chat_id")
+        user_raw = msg.user_id
+        user_id = int(user_raw) if str(user_raw).isdigit() else 0
         pending = self._find_pending_secrets_rm(
-            chat_id=int(chat_raw) if isinstance(chat_raw, int) else 0
+            chat_id=int(chat_raw) if isinstance(chat_raw, int) else 0,
+            user_id=user_id,
         )
         if pending is None:
             return "No pending secret removal — start again from Remove secret."
@@ -2466,7 +2492,10 @@ class MenuActionRouter:
         if fingerprint_sha256_hex(existing) != fingerprint:
             return "Fingerprint mismatch — list aliases and try again."
         await backend.delete(alias)
-        self._clear_pending_secrets_rm(chat_id=int(chat_raw) if isinstance(chat_raw, int) else 0)
+        self._clear_pending_secrets_rm(
+            chat_id=int(chat_raw) if isinstance(chat_raw, int) else 0,
+            user_id=user_id,
+        )
         toast = f"Deleted {alias!r}."
         if isinstance(chat_raw, int) and isinstance(md.get("message_id"), int):
             get_config_menu_nav(
@@ -2499,8 +2528,12 @@ class MenuActionRouter:
         _ = callback_data
         md = msg.metadata if isinstance(msg.metadata, dict) else {}
         chat_raw = md.get("chat_id")
+        user_raw = msg.user_id
         if isinstance(chat_raw, int):
-            self._clear_pending_secrets_rm(chat_id=chat_raw)
+            self._clear_pending_secrets_rm(
+                chat_id=chat_raw,
+                user_id=int(user_raw) if str(user_raw).isdigit() else 0,
+            )
         if isinstance(chat_raw, int) and isinstance(md.get("message_id"), int):
             get_config_menu_nav(
                 self._router, chat_raw, md["message_id"]
@@ -2705,6 +2738,17 @@ class MenuActionRouter:
         if thread_id is not None:
             body["message_thread_id"] = thread_id
         config_menu_nav_push_current(self._router, chat_raw, message_raw)
+        user_raw = msg.user_id
+        insert_dispatcher_state(
+            self._conn,
+            token=f"ds:{secrets.token_hex(8)}",
+            kind="secrets_export",
+            user_id=int(user_raw) if str(user_raw).isdigit() else 0,
+            chat_id=chat_raw,
+            topic_id=thread_id,
+            payload_json=json.dumps({"v": 1}, separators=(",", ":")),
+            ttl_seconds=600,
+        )
         return bool(await cast("Callable[..., Awaitable[Any]]", edit_text)(**body))
 
     async def _handle_secrets_export_prompt(
@@ -2758,6 +2802,15 @@ class MenuActionRouter:
         if not self._router._resolve_owner_flag(msg):
             await self._answer_owner_only(msg)
             return None
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        chat_raw = md.get("chat_id")
+        user_raw = msg.user_id
+        pending = self._find_pending_secrets_export(
+            chat_id=int(chat_raw) if isinstance(chat_raw, int) else 0,
+            user_id=int(user_raw) if str(user_raw).isdigit() else 0,
+        )
+        if pending is None:
+            return "No pending export — start again from Export .env bundle."
         from sevn.gateway.channel_router import OutgoingMessage, _telegram_reply_metadata
         from sevn.onboarding.export_bundle import ExportBundleError, run_export_secrets
         from sevn.tools.outbound import _attachment_kind, _guess_mime
@@ -2789,6 +2842,10 @@ class MenuActionRouter:
         )
         if result.git_unignored_warning:
             summary += "\nWarning: export path is not git-ignored."
+        self._clear_pending_secrets_export(
+            chat_id=int(chat_raw) if isinstance(chat_raw, int) else 0,
+            user_id=int(user_raw) if str(user_raw).isdigit() else 0,
+        )
         await adapter.send(
             OutgoingMessage(
                 channel=msg.channel,
@@ -2832,6 +2889,12 @@ class MenuActionRouter:
         _ = callback_data
         md = msg.metadata if isinstance(msg.metadata, dict) else {}
         chat_raw = md.get("chat_id")
+        user_raw = msg.user_id
+        if isinstance(chat_raw, int):
+            self._clear_pending_secrets_export(
+                chat_id=chat_raw,
+                user_id=int(user_raw) if str(user_raw).isdigit() else 0,
+            )
         if isinstance(chat_raw, int) and isinstance(md.get("message_id"), int):
             get_config_menu_nav(
                 self._router, chat_raw, md["message_id"]
@@ -2841,11 +2904,12 @@ class MenuActionRouter:
         )
         return None if answered else "Cancelled."
 
-    def _find_pending_secrets_rm(self, *, chat_id: int) -> dict[str, Any] | None:
-        """Return the newest pending secrets-rm payload for one chat.
+    def _find_pending_secrets_rm(self, *, chat_id: int, user_id: int) -> dict[str, Any] | None:
+        """Return the newest pending secrets-rm payload for one chat and user.
 
         Args:
             chat_id (int): Telegram chat id.
+            user_id (int): Telegram user id that started the confirm flow.
 
         Returns:
             dict[str, Any] | None: Parsed payload or ``None``.
@@ -2857,10 +2921,10 @@ class MenuActionRouter:
         row = self._conn.execute(
             """
             SELECT payload_json FROM dispatcher_state
-            WHERE kind = 'secrets_rm' AND chat_id = ?
+            WHERE kind = 'secrets_rm' AND chat_id = ? AND user_id = ?
             ORDER BY rowid DESC LIMIT 1
             """,
-            (chat_id,),
+            (chat_id, user_id),
         ).fetchone()
         if row is None:
             return None
@@ -2870,19 +2934,67 @@ class MenuActionRouter:
             return None
         return payload if isinstance(payload, dict) else None
 
-    def _clear_pending_secrets_rm(self, *, chat_id: int) -> None:
-        """Drop pending secrets-rm dispatcher rows for one chat.
+    def _clear_pending_secrets_rm(self, *, chat_id: int, user_id: int) -> None:
+        """Drop pending secrets-rm dispatcher rows for one chat and user.
 
         Args:
             chat_id (int): Telegram chat id.
+            user_id (int): Telegram user id that started the confirm flow.
 
         Examples:
             >>> MenuActionRouter._clear_pending_secrets_rm.__name__
             '_clear_pending_secrets_rm'
         """
         self._conn.execute(
-            "DELETE FROM dispatcher_state WHERE kind = 'secrets_rm' AND chat_id = ?",
-            (chat_id,),
+            "DELETE FROM dispatcher_state WHERE kind = 'secrets_rm' AND chat_id = ? AND user_id = ?",
+            (chat_id, user_id),
+        )
+        self._conn.commit()
+
+    def _find_pending_secrets_export(self, *, chat_id: int, user_id: int) -> dict[str, Any] | None:
+        """Return the newest pending secrets-export payload for one chat and user.
+
+        Args:
+            chat_id (int): Telegram chat id.
+            user_id (int): Telegram user id that started the confirm flow.
+
+        Returns:
+            dict[str, Any] | None: Parsed payload or ``None``.
+
+        Examples:
+            >>> MenuActionRouter._find_pending_secrets_export.__name__
+            '_find_pending_secrets_export'
+        """
+        row = self._conn.execute(
+            """
+            SELECT payload_json FROM dispatcher_state
+            WHERE kind = 'secrets_export' AND chat_id = ? AND user_id = ?
+            ORDER BY rowid DESC LIMIT 1
+            """,
+            (chat_id, user_id),
+        ).fetchone()
+        if row is None:
+            return None
+        try:
+            payload = json.loads(str(row[0]))
+        except (TypeError, json.JSONDecodeError):
+            return None
+        return payload if isinstance(payload, dict) else None
+
+    def _clear_pending_secrets_export(self, *, chat_id: int, user_id: int) -> None:
+        """Drop pending secrets-export dispatcher rows for one chat and user.
+
+        Args:
+            chat_id (int): Telegram chat id.
+            user_id (int): Telegram user id that started the confirm flow.
+
+        Examples:
+            >>> MenuActionRouter._clear_pending_secrets_export.__name__
+            '_clear_pending_secrets_export'
+        """
+        self._conn.execute(
+            "DELETE FROM dispatcher_state WHERE kind = 'secrets_export' AND chat_id = ? AND user_id = ?",
+            (chat_id, user_id),
         )
         self._conn.commit()
 
@@ -3314,11 +3426,13 @@ class MenuActionRouter:
             import json as json_mod
 
             from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+            from sevn.ui.dashboard.api.ops import _redact_config_document
 
             doc = load_raw_sevn_json(self._sevn_json) or {}
-            body = json_mod.dumps(doc, indent=2, sort_keys=True)
+            redacted = _redact_config_document(doc)
+            body = json_mod.dumps(redacted, indent=2, sort_keys=True)
             await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
-            await self._answer_chat_action(msg, "sevn.json sent")
+            await self._answer_chat_action(msg, "sevn.json sent (redacted)")
             return None
         if suffix == "validate":
             from sevn.config.workspace_config import parse_workspace_config

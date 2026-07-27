@@ -266,9 +266,18 @@ class MenuFormHandler:
             await self._handle_second_brain_browse_callback(msg, data=raw_cb.strip())
             return
         if isinstance(raw_cb, str) and parse_form_callback(raw_cb.strip()):
+            from sevn.gateway.menu.menu_readiness import (
+                READINESS_LOCKED_TOAST,
+                readiness_for_callback,
+            )
+
+            raw_stripped = raw_cb.strip()
+            if readiness_for_callback(raw_stripped) != "Ready":
+                await self._answer_callback(msg, text=READINESS_LOCKED_TOAST)
+                return
             await self._start_form(
                 msg,
-                target=parse_form_callback(raw_cb.strip()) or "",
+                target=parse_form_callback(raw_stripped) or "",
                 session_id=session_id,
             )
             return
@@ -321,6 +330,10 @@ class MenuFormHandler:
             "migrate:import",
             "deploy:check",
             "deploy:remote",
+            "sessions:history",
+            "sessions:send",
+            "memory:backfill",
+            "openui:configure",
         } and not self._router._resolve_owner_flag(msg):
             await self._answer_callback(msg, text="Owner only.")
             return

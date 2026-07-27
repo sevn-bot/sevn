@@ -5472,8 +5472,6 @@ def parse_config_callback_data(data: str) -> tuple[str, str | None] | None:
         name = raw.removeprefix("cfg:section:").strip().lower()
         if name in _CONFIG_SECTIONS:
             return ("section", name)
-        if name in _SECTION_ALIASES:
-            return ("retired_section", name)
         return ("retired_section", name)
     if raw.startswith("cfg:help:cmd:"):
         cmd = raw.removeprefix("cfg:help:cmd:").strip().lower()

@@ -6,11 +6,11 @@
 
 ```bash
 sevn config                  # Textual section picker on a TTY; help when piped
-sevn config sections         # list 19 /config sections
+sevn config sections         # list 8 /config sections
 sevn config show             # print raw sevn.json
 sevn config validate
 sevn config validate --json
-sevn config session          # show Session dot-paths + current values
+sevn config chat             # show Chat dot-paths + current values (``session`` alias still works)
 sevn config voice --json
 ```
 

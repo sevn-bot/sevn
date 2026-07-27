@@ -43,8 +43,10 @@ def test_chat_root_section_exists() -> None:
     assert chat.slug == "chat"
 
 
-def test_legacy_session_slug_not_in_root_cli() -> None:
-    assert section_by_slug("session") is None
+def test_legacy_session_slug_resolves_via_cli_alias() -> None:
+    session = section_by_slug("session")
+    assert session is not None
+    assert session.slug == "chat"
 
 
 def test_sevn_config_sections_lists_slugs() -> None:

@@ -167,6 +167,31 @@ _EXTRA_DOT_PATHS: dict[str, tuple[str, ...]] = {
     "health_tracing": ("tracing.redaction.enabled",),
 }
 
+# Retired CLI slugs → redesign root slugs (parity with ``menu._SECTION_ALIASES``).
+_CLI_SLUG_ALIASES: dict[str, str] = {
+    "session": "chat",
+    "voice": "chat",
+    "channels": "chat",
+    "shortcuts": "chat",
+    "notifications": "chat",
+    "agents": "agent",
+    "models": "agent",
+    "rlm": "agent",
+    "codemode": "agent",
+    "self_improve": "agent",
+    "subagents": "agent",
+    "tools": "skills",
+    "integrations": "skills",
+    "code": "memory",
+    "second_brain": "memory",
+    "secrets": "access",
+    "security": "access",
+    "logs": "health",
+    "dashboard": "health",
+    "my_sevn_bot": "deployment",
+    "sevn_bot": "help",
+}
+
 
 def _dot_path_from_toggle_pattern(pattern: str) -> str | None:
     """Extract a ``sevn.json`` dot path from a ``cfg:toggle:`` regex pattern.
@@ -298,8 +323,9 @@ def section_by_slug(slug: str) -> ConfigSection | None:
         True
     """
     normalized = slug.strip().lower().replace("-", "_")
+    canonical = _CLI_SLUG_ALIASES.get(normalized, normalized)
     for section in iter_config_sections():
-        if section.slug == normalized:
+        if section.slug == canonical:
             return section
     return None
 

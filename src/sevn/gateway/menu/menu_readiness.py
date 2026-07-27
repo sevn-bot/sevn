@@ -32,6 +32,8 @@ from sevn.gateway.menu.menu_registry import (
     match_menu_button_spec,
 )
 
+READINESS_LOCKED_TOAST = "Not active yet — see /config → Help for status."
+
 _CHROME_CALLBACKS: frozenset[str] = frozenset(
     {
         "cfg:nav:back",
@@ -106,6 +108,7 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         # Models (unified toggle + swap last model)
         "C4.1",
         "C4.5",
+        "C4.5-pick",
         # Secrets (+ scoped wizard aliases e.g. TwexAPI)
         "C6.1",
         "C6.1b",
@@ -135,6 +138,7 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C15.3",
         "C15.4",
         # Shortcuts add wizard
+        "C16.1",
         "C16.2",
         "C16.5",
         "C16.6",
@@ -725,6 +729,7 @@ def config_menu_help_catalog_text() -> str:
 
 
 __all__ = [
+    "READINESS_LOCKED_TOAST",
     "config_menu_help_catalog_text",
     "config_menu_level_help_text",
     "config_section_catalog",
