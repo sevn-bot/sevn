@@ -3882,6 +3882,14 @@ def _build_agent_lab_keyboard_rows(
         url_pair.append({"text": "📈 View jobs / Traces", "url": traces_url})
     if url_pair:
         rows.append(url_pair)
+    _append_nav_section_rows(
+        rows,
+        (
+            ("🧭 RLM (legacy)", "rlm"),
+            ("🧪 CodeMode (legacy)", "codemode"),
+            ("📈 Self-Improve (legacy)", "self_improve"),
+        ),
+    )
     return rows
 
 
