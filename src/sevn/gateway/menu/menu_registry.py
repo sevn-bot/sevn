@@ -322,6 +322,24 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         implemented=True,
         notes="Cycles voice.local_tts_engine (kokoro / supertonic)",
     )
+    add(
+        "C3.6",
+        _exact("act:voice:status"),
+        "C",
+        "chat_voice",
+        "Probe backends",
+        implemented=True,
+        notes="Live STT/TTS health probe (W7a)",
+    )
+    add(
+        "C3.7",
+        _exact("act:voice:show"),
+        "C",
+        "chat_voice",
+        "Voice settings",
+        implemented=True,
+        notes="Local voice settings dump (W7a)",
+    )
 
     # --- C4. Models ---
     add(
@@ -429,6 +447,24 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "Webchat TTS inline",
         implemented=False,
         notes="OMIT button; caption-only (schema path absent) TMF Wave 7",
+    )
+    add(
+        "C5.6",
+        _exact("act:channels:status"),
+        "C",
+        "chat_channels",
+        "Channel status",
+        implemented=True,
+        notes="Runtime health + session counts (W7a)",
+    )
+    add(
+        "C5.7",
+        _exact("act:channels:config"),
+        "C",
+        "chat_channels",
+        "Channel config",
+        implemented=True,
+        notes="Editable channel toggles dump (W7a)",
     )
 
     # --- C6. Secrets ---
@@ -848,6 +884,35 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         notes="Nav from Agent root (W5)",
     )
 
+    # --- C26. Chat sessions (W7a) ---
+    add(
+        "C26.1",
+        _exact("act:sessions:list"),
+        "C",
+        "chat_sessions",
+        "List sessions",
+        implemented=True,
+        notes="Gateway SQLite session index (W7a)",
+    )
+    add(
+        "C26.2",
+        _exact("form:sessions:history"),
+        "C",
+        "chat_sessions",
+        "Session history",
+        implemented=True,
+        notes="Form → fetch_session_history (W7a)",
+    )
+    add(
+        "C26.3",
+        _exact("form:sessions:send"),
+        "C",
+        "chat_sessions",
+        "Send to another session",
+        implemented=True,
+        notes="Form → send_to_session (W7a)",
+    )
+
     # --- C14. Integrations ---
     add(
         "C14.1",
@@ -936,6 +1001,24 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         implemented=True,
         notes="form wizard; TMF Wave 3",
     )
+    add(
+        "C16.5",
+        _exact("act:shortcuts:list"),
+        "C",
+        "chat_shortcuts",
+        "List shortcuts",
+        implemented=True,
+        notes="shortcuts_store.list_visible_shortcuts (W7a)",
+    )
+    add(
+        "C16.6",
+        _exact("form:shortcut_remove"),
+        "C",
+        "chat_shortcuts",
+        "Remove shortcut",
+        implemented=True,
+        notes="shortcuts_store.delete_shortcut form (W7a)",
+    )
     for spec_id, label in (("C16.3", "Edit shortcut"), ("C16.4", "Run shortcut")):
         add(spec_id, r"^short:run:.*$", "C", "shortcuts", label, implemented=False, notes="MISSING")
 
@@ -948,6 +1031,15 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "Notify policy cycle",
         implemented=True,
         notes="Notify policy cycle verified TMF Wave 7",
+    )
+    add(
+        "C17.2",
+        r"^cfg:cycle:channels\.telegram\.telegram_notify_policy:.+$",
+        "C",
+        "chat",
+        "Notify policy cycle (cfg:cycle alias)",
+        implemented=True,
+        notes="Registry alias for W1.11; live row uses cfg:toggle (W7a)",
     )
 
     # --- C18. Deployment / Lab (Advanced dissolved W5) ---

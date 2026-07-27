@@ -120,6 +120,8 @@ _CALLBACK_SECTION_PREFIXES: tuple[tuple[str, ConfigSection], ...] = (
     ("security:", "access_guard"),
     ("dashboard:", "health_pin"),
     ("shortcuts:", "chat_shortcuts"),
+    ("sessions:", "chat_sessions"),
+    ("channels:", "chat_channels"),
     ("skills:", "skills"),
     ("integrations:", "skills_integrations"),
     ("logs:", "health"),
@@ -259,6 +261,11 @@ def infer_config_section_from_callback(data: str) -> ConfigSection:
         return _CONFIG_PATH_SECTION.get(top, "root")
     if raw.startswith("cfg:"):
         key = raw.removeprefix("cfg:")
+        for prefix, section in _CALLBACK_SECTION_PREFIXES:
+            if key.startswith(prefix):
+                return section
+    if raw.startswith("act:"):
+        key = raw.removeprefix("act:")
         for prefix, section in _CALLBACK_SECTION_PREFIXES:
             if key.startswith(prefix):
                 return section
@@ -519,12 +526,17 @@ class MenuActionRouter:
             if target == "dashboard:unpin":
                 return await self._handle_dashboard_unpin(msg, raw)
             if target == "shortcuts:list":
-                answered = await self._refresh_config_menu_after_action(
-                    msg,
-                    raw,
-                    toast="Refreshed.",
-                )
-                return None if answered else "Refreshed."
+                return await self._handle_shortcuts_list(msg, raw, session_id=session_id)
+            if target == "voice:status":
+                return await self._handle_voice_status(msg, raw)
+            if target == "voice:show":
+                return await self._handle_voice_show(msg, raw)
+            if target == "channels:status":
+                return await self._handle_channels_status(msg, raw)
+            if target == "channels:config":
+                return await self._handle_channels_config(msg, raw)
+            if target == "sessions:list":
+                return await self._handle_sessions_list(msg, raw, session_id=session_id)
             if target in {"skills:refresh", "integrations:refresh"}:
                 answered = await self._refresh_config_menu_after_action(
                     msg,
@@ -1091,6 +1103,251 @@ class MenuActionRouter:
             toast="Deleted.",
         )
         return None if answered else "Deleted."
+
+    async def _handle_shortcuts_list(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        *,
+        session_id: str,
+    ) -> str | None:
+        """Post visible workspace shortcuts as a chat message.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            session_id (str): Active gateway session id (unused).
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_shortcuts_list)
+            True
+        """
+        _ = session_id
+        from sevn.gateway.commands.shortcuts_store import list_visible_shortcuts
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+
+        is_owner = self._router._resolve_owner_flag(msg)
+        rows = list_visible_shortcuts(
+            self._content_root,
+            user_id=str(msg.user_id),
+            is_owner=is_owner,
+        )
+        if not rows:
+            body = "No shortcuts."
+        else:
+            names = [str(row.get("name", "")).strip() for row in rows if row.get("name")]
+            body = "Shortcuts:\n" + "\n".join(f"/{name}" for name in names if name)
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Shortcuts sent")
+        return None
+
+    async def _handle_voice_show(self, msg: IncomingMessage, callback_data: str) -> str | None:
+        """Post local ``sevn.json`` voice settings (``sevn voice show`` parity).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_voice_show)
+            True
+        """
+        _ = callback_data
+        from sevn.cli.commands.voice_cmd import _format_voice_settings, _voice_settings_snapshot
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+
+        body = _format_voice_settings(_voice_settings_snapshot(self._workspace))
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Voice settings sent")
+        return None
+
+    async def _handle_voice_status(self, msg: IncomingMessage, callback_data: str) -> str | None:
+        """Probe configured STT/TTS backends and post health summary.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_voice_status)
+            True
+        """
+        _ = callback_data
+        from sevn.cli.commands.voice_cmd import _format_voice_status
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.ui.dashboard.api.system import _probe_voice_backend
+        from sevn.voice.backends import build_stt_backend, build_tts_backend
+        from sevn.voice.factory import voice_runtime_settings
+
+        voice_settings = voice_runtime_settings(self._workspace)
+        rows: list[dict[str, object]] = []
+        for tag in voice_settings.stt_providers:
+            rows.append(await _probe_voice_backend("stt", tag, build_stt_backend))
+        for tag in voice_settings.tts_providers:
+            rows.append(await _probe_voice_backend("tts", tag, build_tts_backend))
+        normalized = [
+            {
+                "provider_id": row.get("provider_id"),
+                "status": "ok" if row.get("ok") else "warn",
+                "detail": row.get("detail") or "",
+            }
+            for row in rows
+        ]
+        body = _format_voice_status(normalized)
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Voice probe sent")
+        return None
+
+    def _mission_runtime_channel_map(self) -> dict[str, Any]:
+        """Return live channel health from gateway mission state when wired.
+
+        Returns:
+            dict[str, Any]: Channel name to runtime health mapping.
+
+        Examples:
+            >>> router = MenuActionRouter.__new__(MenuActionRouter)
+            >>> router._router = type("_R", (), {"_mission_control_state": None})()
+            >>> router._mission_runtime_channel_map()
+            {}
+        """
+        state = getattr(self._router, "_mission_control_state", None)
+        if state is None or not callable(getattr(state, "get_status", None)):
+            return {}
+        status = state.get_status()
+        channels = status.get("channels")
+        return channels if isinstance(channels, dict) else {}
+
+    async def _handle_channels_status(self, msg: IncomingMessage, callback_data: str) -> str | None:
+        """Post runtime channel health (``sevn channels status`` parity).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_channels_status)
+            True
+        """
+        _ = callback_data
+        from sevn.cli.commands.channels_cmd import _format_channels_status
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.ui.dashboard.api.channels import (
+            _channel_enabled_flags,
+            _merge_channel_rows,
+            _session_counts_by_channel,
+        )
+
+        enabled = _channel_enabled_flags(self._workspace)
+        runtime = self._mission_runtime_channel_map()
+        sessions = _session_counts_by_channel(self._conn)
+        channels = _merge_channel_rows(enabled=enabled, runtime=runtime, sessions=sessions)
+        body = _format_channels_status({"channels": channels})
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Channel status sent")
+        return None
+
+    async def _handle_channels_config(self, msg: IncomingMessage, callback_data: str) -> str | None:
+        """Post editable channel toggles (``sevn channels config`` parity).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_channels_config)
+            True
+        """
+        _ = callback_data
+        from sevn.cli.commands.channels_cmd import _format_channels_config
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.ui.dashboard.api.channels import _channels_config_payload
+
+        body = _format_channels_config(_channels_config_payload(self._workspace))
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Channel config sent")
+        return None
+
+    async def _handle_sessions_list(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        *,
+        session_id: str,
+    ) -> str | None:
+        """Post visibility-scoped gateway sessions (``sevn sessions list`` parity).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            session_id (str): Active gateway session id for visibility filter.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_sessions_list)
+            True
+        """
+        _ = callback_data
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.gateway.session.sessions_query import list_sessions
+
+        items = list_sessions(
+            self._conn,
+            caller_session_id=session_id or None,
+            limit=50,
+        )
+        if not items:
+            body = "No sessions."
+        else:
+            lines = [
+                f"{it.get('session_id', '?')}\t{it.get('channel', '?')}\t{it.get('updated_at', '')}"
+                for it in items
+            ]
+            body = "\n".join(lines)
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Sessions sent")
+        return None
+
+    async def _answer_chat_action(self, msg: IncomingMessage, text: str) -> None:
+        """Acknowledge a read-only menu action with a short callback toast.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            text (str): Toast body.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._answer_chat_action)
+            True
+        """
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        cq_id = md.get("callback_query_id")
+        cq_str = cq_id.strip() if isinstance(cq_id, str) else ""
+        adapter = self._router._adapters.get(msg.channel)
+        if adapter is not None and cq_str:
+            await _answer_callback(adapter, callback_query_id=cq_str, text=text)
 
     async def _handle_voice_stt_cycle(
         self,

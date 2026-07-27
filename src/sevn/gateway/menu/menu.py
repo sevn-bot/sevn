@@ -1015,9 +1015,11 @@ def _build_voice_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str
         >>> rows[0][0]["callback_data"]
         'cfg:voice:mode:off'
         >>> rows[-1][0]["callback_data"]
-        'cfg:voice:stt:next'
+        'act:voice:show'
         >>> rows[-2][0]["callback_data"]
-        'cfg:voice:engine:next'
+        'act:voice:status'
+        >>> rows[-3][0]["callback_data"]
+        'cfg:voice:stt:next'
     """
     mode = _voice_tts_mode(workspace)
     rows: list[list[dict[str, Any]]] = []
@@ -1037,6 +1039,8 @@ def _build_voice_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str
     rows.append(
         [{"text": f"STT: {_voice_stt_active(workspace)} 🔁", "callback_data": "cfg:voice:stt:next"}]
     )
+    rows.append([{"text": "🔊 Probe backends", "callback_data": "act:voice:status"}])
+    rows.append([{"text": "📋 Voice settings", "callback_data": "act:voice:show"}])
     return rows
 
 
@@ -1489,7 +1493,7 @@ def _build_notifications_keyboard_rows(workspace: WorkspaceConfig) -> list[list[
     return [
         [
             {
-                "text": f"Notify policy: {current} (→{nxt})",
+                "text": f"🔔 Notify: {current} (→{nxt})",
                 "callback_data": f"cfg:toggle:channels.telegram.telegram_notify_policy:{nxt}",
             },
         ],
@@ -1998,7 +2002,7 @@ def _build_shortcuts_keyboard_rows(
         ...     user_id="1",
         ... )
         >>> rows[-1][0]["callback_data"]
-        'form:shortcut_add'
+        'form:shortcut_remove'
     """
     rows: list[list[dict[str, Any]]] = []
     for row in list_visible_shortcuts(content_root, user_id=user_id, is_owner=is_owner)[
@@ -2011,6 +2015,8 @@ def _build_shortcuts_keyboard_rows(
             [{"text": f"🗑 /{name}", "callback_data": f"act:shortcut_delete:{name}"}],
         )
     rows.append([{"text": "+ Add shortcut", "callback_data": "form:shortcut_add"}])
+    rows.append([{"text": "📋 List shortcuts", "callback_data": "act:shortcuts:list"}])
+    rows.append([{"text": "🗑 Remove shortcut", "callback_data": "form:shortcut_remove"}])
     return rows
 
 
@@ -3624,8 +3630,13 @@ def _build_chat_shortcuts_keyboard_rows(
     """
     _ = workspace
     if content_root is not None:
-        return _build_shortcuts_keyboard_rows(content_root, user_id=user_id, is_owner=is_owner)
-    return [[{"text": "+ Add shortcut", "callback_data": "form:shortcut_add"}]]
+        rows = _build_shortcuts_keyboard_rows(content_root, user_id=user_id, is_owner=is_owner)
+    else:
+        rows = [[{"text": "+ Add shortcut", "callback_data": "form:shortcut_add"}]]
+    if not any(btn.get("callback_data") == "act:shortcuts:list" for row in rows for btn in row):
+        rows.append([{"text": "📋 List shortcuts", "callback_data": "act:shortcuts:list"}])
+        rows.append([{"text": "🗑 Remove shortcut", "callback_data": "form:shortcut_remove"}])
+    return rows
 
 
 def _build_chat_voice_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
@@ -3660,9 +3671,38 @@ def _build_chat_channels_keyboard_rows(workspace: WorkspaceConfig) -> list[list[
         >>> rows[-1][0]["callback_data"]
         'cfg:section:access'
     """
-    rows = _build_channels_chat_rows(workspace)
+    rows: list[list[dict[str, Any]]] = [
+        [{"text": "📶 Channel status", "callback_data": "act:channels:status"}],
+        [{"text": "📋 Channel config", "callback_data": "act:channels:config"}],
+    ]
+    rows.extend(_build_channels_chat_rows(workspace))
     rows.append([_nav_section_button("👥 Who can DM →", "access")])
     return rows
+
+
+def _build_chat_sessions_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Chat > Sessions — list/history/send plus ``/new`` and ``/stop`` command rows.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_chat_sessions_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"]
+        'act:sessions:list'
+    """
+    _ = workspace
+    return [
+        [{"text": "📋 List sessions", "callback_data": "act:sessions:list"}],
+        [{"text": "🕘 Session history", "callback_data": "form:sessions:history"}],
+        [{"text": "✉️ Send to another session", "callback_data": "form:sessions:send"}],
+        [{"text": "🆕 New session", "callback_data": "menu:cmd:new"}],
+        [{"text": "⏹ Stop current run", "callback_data": "menu:cmd:stop"}],
+    ]
 
 
 def _build_chat_keyboard_rows(
@@ -4199,6 +4239,8 @@ def build_config_menu_keyboard(
         rows_sec = _build_chat_voice_keyboard_rows(workspace)
     elif section == "chat_channels":
         rows_sec = _build_chat_channels_keyboard_rows(workspace)
+    elif section == "chat_sessions":
+        rows_sec = _build_chat_sessions_keyboard_rows(workspace)
     elif section == "agent":
         if models_picker_slot and model_picker_slots_for_key(models_picker_slot):
             rows_sec = _build_models_picker_keyboard_rows(
@@ -4649,6 +4691,8 @@ def config_menu_message_text(
         if not _schema_has_config_path("channels.webchat.tts_inline"):
             lines.append("Webchat TTS inline is caption-only (no schema toggle path).")
         return "\n".join(lines)
+    if section == "chat_sessions":
+        return "Sessions\n\nList sessions, open history, or send to another session.\n/new and /stop are one tap below."
     if section == "deployment":
         lines = [
             "Deployment",

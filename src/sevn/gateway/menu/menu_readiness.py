@@ -95,10 +95,14 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C3.3",
         "C3.4",
         "C3.5",
+        "C3.6",
+        "C3.7",
         # Channels (routing footer + reply keyboard + DM policy)
         "C5.1",
         "C5.2",
         "C5.3",
+        "C5.6",
+        "C5.7",
         # Models (unified toggle + swap last model)
         "C4.1",
         "C4.5",
@@ -132,8 +136,11 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C15.4",
         # Shortcuts add wizard
         "C16.2",
+        "C16.5",
+        "C16.6",
         # Telegram notify policy cycle
         "C17.1",
+        "C17.2",
         # Auto-resume tier B on Deployment (Advanced dissolved W5)
         "C18.1",
         # Agent display name form
@@ -166,6 +173,10 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C25.6",
         "C25.7",
         "C25.8",
+        # Chat sessions (W7a)
+        "C26.1",
+        "C26.2",
+        "C26.3",
         # Social Media Manager (W3)
         "C7.4",
         "C7.5",

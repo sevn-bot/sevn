@@ -58,6 +58,7 @@ if TYPE_CHECKING:
 FORM_TARGETS: frozenset[str] = frozenset(
     {
         "shortcut_add",
+        "shortcut_remove",
         "secret_wizard",
         "agent_display_name",
         "logs_grep",
@@ -67,6 +68,8 @@ FORM_TARGETS: frozenset[str] = frozenset(
         "second_brain_vault_browse",
         "subagents_max_override",
         "discogs:oauth_start",
+        "sessions:history",
+        "sessions:send",
     },
 )
 _SECRET_ALIAS_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
@@ -102,6 +105,12 @@ def parse_form_callback(data: str) -> str | None:
         return "logs_span_id"
     if raw == "form:logs:logfire_token":
         return "logs_logfire_token"
+    if raw == "form:shortcut_remove":
+        return "shortcut_remove"
+    if raw == "form:sessions:history":
+        return "sessions:history"
+    if raw == "form:sessions:send":
+        return "sessions:send"
     if raw.startswith("form:secret_wizard:"):
         alias = raw.removeprefix("form:secret_wizard:").strip()
         if alias and _SECRET_ALIAS_RE.match(alias):
@@ -204,16 +213,27 @@ class MenuFormHandler:
             await self._handle_second_brain_browse_callback(msg, data=raw_cb.strip())
             return
         if isinstance(raw_cb, str) and parse_form_callback(raw_cb.strip()):
-            await self._start_form(msg, target=parse_form_callback(raw_cb.strip()) or "")
+            await self._start_form(
+                msg,
+                target=parse_form_callback(raw_cb.strip()) or "",
+                session_id=session_id,
+            )
             return
         await self._advance_form(msg)
 
-    async def _start_form(self, msg: IncomingMessage, *, target: str) -> None:
+    async def _start_form(
+        self,
+        msg: IncomingMessage,
+        *,
+        target: str,
+        session_id: str = "",
+    ) -> None:
         """Insert dispatcher state and prompt for the first wizard step.
 
         Args:
             msg (IncomingMessage): Inbound callback envelope.
             target (str): Parsed form target (``shortcut_add`` or ``secret_wizard``).
+            session_id (str): Active gateway session id stored for session forms.
 
         Examples:
             >>> import inspect
@@ -268,6 +288,12 @@ class MenuFormHandler:
         elif target == "logs_logfire_token":
             section = "logs"
             step = "token"
+        elif target == "shortcut_remove":
+            section = "chat_shortcuts"
+            step = "name"
+        elif target in {"sessions:history", "sessions:send"}:
+            section = "chat_sessions"
+            step = "session_id"
         elif target == "discogs:oauth_start":
             section = "skills:discogs:setup"
             step = "consumer_key"
@@ -294,6 +320,8 @@ class MenuFormHandler:
             "section": section,
             "user_id": str(msg.user_id),
         }
+        if session_id.strip():
+            payload_obj["caller_session_id"] = session_id.strip()
         if target.startswith("subagents_limits:"):
             payload_obj["role"] = target.removeprefix("subagents_limits:").strip()
         if preset_alias:
@@ -326,6 +354,12 @@ class MenuFormHandler:
             prompt = "Send the trace span id to look up:"
         elif target == "logs_logfire_token":
             prompt = "Send your Logfire write token (pylf_v1_… — not shown again):"
+        elif target == "shortcut_remove":
+            prompt = "Send the shortcut name to remove (without /):"
+        elif target == "sessions:history":
+            prompt = "Send the gateway session id for history:"
+        elif target == "sessions:send":
+            prompt = "Send the target gateway session id:"
         elif target == "discogs:oauth_start":
             prompt = "Send your Discogs OAuth consumer key:"
         elif target == "second_brain_vault_path":
@@ -368,6 +402,21 @@ class MenuFormHandler:
             return
         if target == "shortcut_add":
             await self._advance_shortcut_add(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "shortcut_remove":
+            await self._advance_shortcut_remove(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "sessions:history":
+            await self._advance_sessions_history(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "sessions:send":
+            await self._advance_sessions_send(
                 msg, token=token, step=step, text=text, payload=payload
             )
             return
@@ -810,6 +859,171 @@ class MenuFormHandler:
             await self._send_chat(
                 msg, f"✅ Shortcut /{name} saved and published to the command menu."
             )
+
+    async def _advance_shortcut_remove(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Handle the single-step shortcut remove wizard.
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_shortcut_remove)
+            True
+        """
+        _ = step, payload
+        from sevn.gateway.commands.shortcuts_store import delete_shortcut
+
+        name = text.strip().lower().lstrip("/")
+        if not name:
+            await self._send_chat(msg, "Shortcut name cannot be empty.")
+            return
+        if not delete_shortcut(self._content_root, name):
+            await self._send_chat(msg, f"Shortcut {name!r} not found.")
+            return
+        self._consume_token(token)
+        await republish_set_my_commands(self._router)
+        await self._refresh_section(msg, section="chat_shortcuts", toast=None)
+        await self._send_chat(msg, f"✅ Removed shortcut /{name}.")
+
+    async def _advance_sessions_history(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Handle the single-step session history wizard.
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_sessions_history)
+            True
+        """
+        _ = step
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.gateway.session.sessions_query import fetch_session_history
+
+        session_id = text.strip()
+        if not session_id:
+            await self._send_chat(msg, "Session id cannot be empty.")
+            return
+        caller = str(payload.get("caller_session_id") or "").strip() or None
+        try:
+            result = fetch_session_history(
+                self._conn,
+                session_id,
+                caller_session_id=caller,
+                limit=20,
+            )
+        except ValueError as exc:
+            await self._send_chat(msg, str(exc))
+            return
+        messages = result.get("messages")
+        if not isinstance(messages, list) or not messages:
+            body = f"(no messages for {session_id})"
+        else:
+            lines = [
+                f"{row.get('role', '?')}: {str(row.get('content') or '')[:200]}"
+                for row in messages
+                if isinstance(row, dict)
+            ]
+            body = "\n".join(lines)
+        self._consume_token(token)
+        adapter = self._router._adapters.get(msg.channel)
+        if adapter is not None:
+            from sevn.gateway.channel_router import OutgoingMessage, _telegram_reply_metadata
+
+            for chunk in format_for_telegram(body, redaction=None):
+                await adapter.send(
+                    OutgoingMessage(
+                        channel=msg.channel,
+                        user_id=msg.user_id,
+                        text=chunk,
+                        metadata=dict(_telegram_reply_metadata(msg)),
+                    ),
+                )
+        else:
+            await self._send_chat(msg, body[:3500])
+
+    async def _advance_sessions_send(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Handle the two-step send-to-session wizard.
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_sessions_send)
+            True
+        """
+        from sevn.gateway.session.sessions_query import send_to_session
+
+        caller = str(payload.get("caller_session_id") or "").strip() or None
+        if step == "session_id":
+            target = text.strip()
+            if not target:
+                await self._send_chat(msg, "Session id cannot be empty.")
+                return
+            payload["step"] = "text"
+            payload["target_session_id"] = target
+            self._update_payload(token, payload)
+            await self._send_chat(msg, "Send the message text to append:")
+            return
+        if step == "text":
+            target = str(payload.get("target_session_id") or "").strip()
+            if not target:
+                self._consume_token(token)
+                await self._send_chat(msg, "Wizard expired — start again from /config → Sessions.")
+                return
+            if not text.strip():
+                await self._send_chat(msg, "Message text cannot be empty.")
+                return
+            try:
+                result = send_to_session(
+                    self._conn,
+                    target,
+                    text.strip(),
+                    caller_session_id=caller,
+                )
+            except ValueError as exc:
+                await self._send_chat(msg, str(exc))
+                return
+            self._consume_token(token)
+            await self._send_chat(msg, f"✅ Message queued for {target}: {result!r}")
 
     async def _advance_agent_display_name(
         self,
