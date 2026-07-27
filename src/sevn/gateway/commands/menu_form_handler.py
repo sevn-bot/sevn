@@ -75,6 +75,12 @@ FORM_TARGETS: frozenset[str] = frozenset(
         "subagents:kill",
         "memory:backfill",
         "openui:configure",
+        "secrets:rm",
+        "pairing:approve",
+        "gh:github_token",
+        "providers:oauth:login",
+        "providers:oauth:logout",
+        "turn_bundles:view",
     },
 )
 _SECRET_ALIAS_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
@@ -126,6 +132,18 @@ def parse_form_callback(data: str) -> str | None:
         return "openui:configure"
     if raw == "form:subagents:kill":
         return "subagents:kill"
+    if raw == "form:secrets:rm":
+        return "secrets:rm"
+    if raw == "form:pairing:approve":
+        return "pairing:approve"
+    if raw == "form:gh:github_token":
+        return "gh:github_token"
+    if raw == "form:providers:oauth:login":
+        return "providers:oauth:login"
+    if raw == "form:providers:oauth:logout":
+        return "providers:oauth:logout"
+    if raw == "form:turn_bundles:view":
+        return "turn_bundles:view"
     if raw.startswith("form:secret_wizard:"):
         alias = raw.removeprefix("form:secret_wizard:").strip()
         if alias and _SECRET_ALIAS_RE.match(alias):
@@ -272,6 +290,12 @@ class MenuFormHandler:
             "subagents:kill",
             "models:set_max_output_tokens",
             "improve:learn",
+            "secrets:rm",
+            "gh:github_token",
+            "pairing:approve",
+            "providers:oauth:login",
+            "providers:oauth:logout",
+            "turn_bundles:view",
         } and not self._router._resolve_owner_flag(msg):
             await self._answer_callback(msg, text="Owner only.")
             return
@@ -327,6 +351,21 @@ class MenuFormHandler:
         elif target == "subagents:kill":
             section = "agent_subagents_running"
             step = "run_id"
+        elif target == "secrets:rm":
+            section = "access_secrets"
+            step = "alias"
+        elif target == "pairing:approve":
+            section = "access_pairing"
+            step = "approve"
+        elif target == "gh:github_token":
+            section = "access"
+            step = "token"
+        elif target in {"providers:oauth:login", "providers:oauth:logout"}:
+            section = "access_providers"
+            step = "provider"
+        elif target == "turn_bundles:view":
+            section = "health_bundles"
+            step = "turn_id"
         elif target == "discogs:oauth_start":
             section = "skills:discogs:setup"
             step = "consumer_key"
@@ -405,6 +444,18 @@ class MenuFormHandler:
             prompt = "Send the OpenWiki LLM API key (not shown again):"
         elif target == "subagents:kill":
             prompt = "Send the sub-agent run id to kill (e.g. a1f3):"
+        elif target == "secrets:rm":
+            prompt = "Send the logical secret alias to remove:"
+        elif target == "pairing:approve":
+            prompt = "Send channel and pairing code (e.g. telegram ABCD2345):"
+        elif target == "gh:github_token":
+            prompt = "Send the GitHub personal access token (not shown again):"
+        elif target == "providers:oauth:login":
+            prompt = "Send provider id to link (e.g. openai or anthropic):"
+        elif target == "providers:oauth:logout":
+            prompt = "Send provider id to unlink (e.g. openai):"
+        elif target == "turn_bundles:view":
+            prompt = "Send the turn correlation id to view:"
         elif target == "discogs:oauth_start":
             prompt = "Send your Discogs OAuth consumer key:"
         elif target == "second_brain_vault_path":
@@ -487,6 +538,36 @@ class MenuFormHandler:
             return
         if target == "subagents:kill":
             await self._advance_subagents_kill_form(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "secrets:rm":
+            await self._advance_secrets_rm_form(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "pairing:approve":
+            await self._advance_pairing_approve_form(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "gh:github_token":
+            await self._advance_gh_github_token_form(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "providers:oauth:login":
+            await self._advance_providers_oauth_login_form(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "providers:oauth:logout":
+            await self._advance_providers_oauth_logout_form(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "turn_bundles:view":
+            await self._advance_turn_bundles_view_form(
                 msg, token=token, step=step, text=text, payload=payload
             )
             return
@@ -1332,6 +1413,268 @@ class MenuFormHandler:
             toast="✅ OpenWiki key stored.",
         )
         await self._send_chat(msg, f"Stored {OPENWIKI_LLM_API_KEY_SECRET}.")
+
+    async def _advance_secrets_rm_form(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Collect alias then show two-step remove-secret confirm (W7d).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_secrets_rm_form)
+            True
+        """
+        _ = step, payload
+        alias = text.strip()
+        if not alias or not _SECRET_ALIAS_RE.match(alias):
+            await self._send_chat(
+                msg, "Invalid alias — use letters, digits, dots, dashes, underscores."
+            )
+            return
+        mar = self._router._menu_action_router
+        if mar is None:
+            self._consume_token(token)
+            await self._send_chat(msg, "Secrets removal unavailable.")
+            return
+        try:
+            rows = await mar._load_secrets_entries()
+        except RuntimeError as exc:
+            await self._send_chat(msg, str(exc))
+            return
+        match = next((r for r in rows if r.get("alias") == alias), None)
+        if match is None:
+            await self._send_chat(msg, f"Secret {alias!r} not found — list aliases first.")
+            return
+        fingerprint = str(match.get("fingerprint_sha256_hex", ""))
+        self._consume_token(token)
+        shown = await mar._edit_secrets_rm_confirm(msg, alias=alias, fingerprint=fingerprint)
+        if not shown:
+            await self._send_chat(
+                msg,
+                f"Remove {alias}? fingerprint={fingerprint}\n"
+                "Re-open /config > Secrets and tap Remove secret to confirm.",
+            )
+
+    async def _advance_pairing_approve_form(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Approve one pairing code (``sevn pairing approve`` parity).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_pairing_approve_form)
+            True
+        """
+        _ = step, payload
+        parts = text.strip().split()
+        if len(parts) < 2:
+            await self._send_chat(msg, "Send channel and code, e.g. telegram ABCD2345")
+            return
+        channel, code = parts[0].lower(), parts[1].upper()
+        from sevn.gateway.onboarding.pairing import PairingStore
+
+        result = PairingStore(self._content_root).approve_code(channel, code)
+        self._consume_token(token)
+        if result is None:
+            await self._send_chat(msg, "Invalid or expired pairing code.")
+            return
+        await self._refresh_section(msg, section="access_pairing", toast="✅ Pairing approved.")
+        await self._send_chat(msg, f"Approved {channel} user {result.get('user_id')}.")
+
+    async def _advance_gh_github_token_form(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Store ``integration.github.token`` (``sevn gh add-github-token`` parity).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_gh_github_token_form)
+            True
+        """
+        from sevn.proxy.integration.github import GITHUB_TOKEN_SECRET
+
+        _ = step, payload
+        token_value = text.strip()
+        if not token_value:
+            await self._send_chat(msg, "GitHub token cannot be empty.")
+            return
+        chain = secrets_chain_from_workspace(
+            self._content_root,
+            self._workspace.secrets_backend,
+        )
+        await chain.set(GITHUB_TOKEN_SECRET, token_value)
+        self._consume_token(token)
+        await self._refresh_section(msg, section="access", toast="✅ GitHub token stored.")
+        await self._send_chat(msg, f"Stored {GITHUB_TOKEN_SECRET}.")
+
+    async def _advance_providers_oauth_login_form(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Post OAuth login handoff for one provider id (W7d).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_providers_oauth_login_form)
+            True
+        """
+        from sevn.cli.commands.providers_cmd import _openai_oauth_handoff_message
+        from sevn.security.oauth.authorize import build_authorization_flow
+
+        _ = step, payload
+        provider_id = text.strip().lower()
+        if not provider_id:
+            await self._send_chat(msg, "Provider id cannot be empty.")
+            return
+        self._consume_token(token)
+        if provider_id == "openai":
+            flow = build_authorization_flow()
+            body = _openai_oauth_handoff_message(authorize_url=flow.authorize_url)
+        else:
+            alias = f"oauth.{provider_id}"
+            body = (
+                f"Store an OAuth token at logical secret {alias!r} via your provider's OAuth flow. "
+                f"Use `sevn secrets put {alias}` after obtaining a token, or complete pairing in "
+                "Mission Control → System → Providers."
+            )
+        await self._refresh_section(msg, section="access_providers", toast="OAuth handoff sent.")
+        await self._send_chat(msg, body)
+
+    async def _advance_providers_oauth_logout_form(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Delete ``oauth.<provider>`` logical secret (W7d).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_providers_oauth_logout_form)
+            True
+        """
+        _ = step, payload
+        provider_id = text.strip()
+        if not provider_id:
+            await self._send_chat(msg, "Provider id cannot be empty.")
+            return
+        alias = f"oauth.{provider_id}"
+        chain = secrets_chain_from_workspace(
+            self._content_root,
+            self._workspace.secrets_backend,
+        )
+        existing = await chain.get(alias)
+        if existing is None:
+            self._consume_token(token)
+            await self._send_chat(msg, f"No secret at {alias!r}.")
+            return
+        await chain.delete(alias)
+        self._consume_token(token)
+        await self._refresh_section(msg, section="access_providers", toast="✅ Provider unlinked.")
+        await self._send_chat(msg, f"Deleted {alias!r}.")
+
+    async def _advance_turn_bundles_view_form(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """View one turn bundle by correlation id (W7d).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_turn_bundles_view_form)
+            True
+        """
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.gateway.turn.turn_bundle import view_turn_bundle
+
+        _ = step, payload
+        turn_id = text.strip()
+        if not turn_id:
+            await self._send_chat(msg, "Turn id cannot be empty.")
+            return
+        try:
+            lines = view_turn_bundle(self._content_root, turn_id, section="summary")
+        except ValueError as exc:
+            await self._send_chat(msg, str(exc))
+            return
+        self._consume_token(token)
+        body = "\n".join(lines) if lines else "No matching bundle lines."
+        await self._refresh_section(msg, section="health_bundles", toast="Turn bundle sent.")
+        for chunk in format_for_telegram(body, redaction=None):
+            await self._send_chat(msg, chunk)
 
     async def _advance_subagents_kill_form(
         self,

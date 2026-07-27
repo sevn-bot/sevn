@@ -221,6 +221,18 @@ def infer_config_section_from_callback(data: str) -> ConfigSection:
         'health_tracing'
     """
     raw = data.strip()
+    if raw.startswith("act:secrets:"):
+        return "access_secrets"
+    if raw.startswith("act:pairing:"):
+        return "access_pairing"
+    if raw.startswith("act:providers:"):
+        return "access_providers"
+    if raw in {"act:doctor:run", "act:usage:show"}:
+        return "health"
+    if raw.startswith("act:turn_bundles:"):
+        return "health_bundles"
+    if raw == "act:tracing:config":
+        return "health_tracing"
     if raw.startswith("cfg:logs:"):
         if "toggle_redaction" in raw or "logfire" in raw or "logfire_token" in raw:
             return "health_tracing"
@@ -259,6 +271,8 @@ def infer_config_section_from_callback(data: str) -> ConfigSection:
             return "chat"
         if path.startswith("gateway.restart"):
             return "deployment"
+        if path.startswith("channels.telegram.dm_policy"):
+            return "access_pairing"
         if path.startswith("tracing."):
             return "health_tracing"
         if "telegram_notify_policy" in path:
@@ -581,6 +595,20 @@ class MenuActionRouter:
                 return await self._handle_openui_install(msg, raw)
             if target == "openui:setup":
                 return await self._handle_openui_setup(msg, raw, session_id=session_id)
+            if target.startswith("secrets:"):
+                return await self._handle_secrets_action(msg, raw, target)
+            if target.startswith("pairing:"):
+                return await self._handle_pairing_action(msg, raw, target)
+            if target.startswith("providers:"):
+                return await self._handle_providers_action(msg, raw, target)
+            if target == "doctor:run":
+                return await self._handle_doctor_run(msg, raw)
+            if target == "usage:show":
+                return await self._handle_usage_show(msg, raw)
+            if target.startswith("turn_bundles:"):
+                return await self._handle_turn_bundles_action(msg, raw, target)
+            if target == "tracing:config":
+                return await self._handle_tracing_config(msg, raw)
             if target in {"skills:refresh", "integrations:refresh"}:
                 answered = await self._refresh_config_menu_after_action(
                     msg,
@@ -2089,6 +2117,714 @@ class MenuActionRouter:
             sevn_json_path=self._sevn_json,
         )
         await handler.handle(form_msg, session_id=session_id)
+        return None
+
+    @staticmethod
+    def reject_unknown_callback_suffix(family_prefix: str, suffix: str) -> str:
+        """Return explicit error toast for unrecognised callback suffixes (D15).
+
+        Args:
+            family_prefix (str): Callback family prefix (e.g. ``act:secrets:``).
+            suffix (str): Unrecognised suffix segment.
+
+        Returns:
+            str: Operator-facing error toast text.
+
+        Examples:
+            >>> MenuActionRouter.reject_unknown_callback_suffix("act:secrets:", "nope")
+            "Unknown act:secrets: action: 'nope'."
+        """
+        return f"Unknown {family_prefix} action: {suffix!r}."
+
+    async def _load_secrets_entries(self) -> list[dict[str, str]]:
+        """List logical secret aliases with fingerprints from the encrypted store.
+
+        Returns:
+            list[dict[str, str]]: Rows with ``alias`` and ``fingerprint_sha256_hex``.
+
+        Raises:
+            RuntimeError: When the store cannot be opened.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._load_secrets_entries)
+            True
+        """
+        from sevn.secrets.fingerprint import fingerprint_sha256_hex
+        from sevn.secrets.migrate import encrypted_file_backend_for_workspace
+        from sevn.security.secrets.errors import SecretsStoreCorruptError
+
+        try:
+            backend = encrypted_file_backend_for_workspace(self._content_root, self._workspace)
+            enc_map = await backend.load_decrypted_map()
+        except (ValueError, SecretsStoreCorruptError) as exc:
+            msg = f"Secrets store unavailable: {exc}"
+            raise RuntimeError(msg) from exc
+        return [
+            {"alias": key, "fingerprint_sha256_hex": fingerprint_sha256_hex(enc_map[key])}
+            for key in sorted(enc_map)
+        ]
+
+    async def _handle_secrets_action(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        target: str,
+    ) -> str | None:
+        """Dispatch Access > Secrets ``act:secrets:*`` rows (W7d).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed action target after ``act:``.
+
+        Returns:
+            str | None: Toast when the action could not proceed; ``None`` when handled.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_secrets_action)
+            True
+        """
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        if target == "secrets:list":
+            return await self._handle_secrets_list(msg, callback_data)
+        if target == "secrets:check-unlock":
+            return await self._handle_secrets_check_unlock(msg, callback_data)
+        if target == "secrets:rm:confirm":
+            return await self._handle_secrets_rm_confirm(msg, callback_data)
+        if target == "secrets:rm:cancel":
+            return await self._handle_secrets_rm_cancel(msg, callback_data)
+        toast = self.reject_unknown_callback_suffix("act:secrets:", target.removeprefix("secrets:"))
+        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+        return None if answered else toast
+
+    async def _handle_secrets_list(self, msg: IncomingMessage, callback_data: str) -> str | None:
+        """Post alias + fingerprint listing (never secret values).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Error toast when listing failed.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_secrets_list)
+            True
+        """
+        _ = callback_data
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+
+        try:
+            rows = await self._load_secrets_entries()
+        except RuntimeError as exc:
+            return str(exc)
+        if not rows:
+            body = "No logical secrets stored yet."
+        else:
+            lines = [
+                "alias\tfingerprint_sha256_hex",
+                *(f"{r['alias']}\t{r['fingerprint_sha256_hex']}" for r in rows),
+            ]
+            body = "\n".join(lines)
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Secrets list sent")
+        return None
+
+    async def _handle_secrets_check_unlock(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """Report encrypted-store unlock key reachability.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_secrets_check_unlock)
+            True
+        """
+        _ = callback_data
+        import os
+
+        from sevn.config.workspace_config import effective_encrypted_file_key_source
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.security.secrets.passphrase_prime import (
+            keychain_has_unlock_secret,
+            unlock_env_var_for,
+        )
+
+        key_source = effective_encrypted_file_key_source(self._workspace.secrets_backend)
+        var = unlock_env_var_for(key_source)
+        in_env = bool(os.environ.get(var, "").strip())
+        in_keychain = bool(await keychain_has_unlock_secret(key_source=key_source))
+        reachable = in_env or in_keychain
+        body = (
+            f"key_source={key_source} var={var} in_env={in_env} "
+            f"in_keychain={in_keychain} reachable={reachable}"
+        )
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Unlock status sent")
+        return None
+
+    async def _edit_secrets_rm_confirm(
+        self,
+        msg: IncomingMessage,
+        *,
+        alias: str,
+        fingerprint: str,
+    ) -> bool:
+        """Edit the ``/config`` message to the remove-secret confirmation screen.
+
+        Args:
+            msg (IncomingMessage): Inbound callback or chat envelope.
+            alias (str): Logical secret alias pending deletion.
+            fingerprint (str): SHA-256 hex fingerprint for confirmation copy.
+
+        Returns:
+            bool: ``True`` when the confirm screen was shown.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._edit_secrets_rm_confirm)
+            True
+        """
+        from sevn.gateway.menu.confirm_gates import (
+            build_confirm_gate_keyboard,
+            confirm_gate_message,
+        )
+        from sevn.gateway.menu.menu import _config_chrome
+
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        chat_raw = md.get("chat_id")
+        message_raw = md.get("message_id")
+        if not isinstance(chat_raw, int) or not isinstance(message_raw, int):
+            return False
+        topic_raw = md.get("topic_id")
+        insert_dispatcher_state(
+            self._conn,
+            token=f"ds:{secrets.token_hex(8)}",
+            kind="secrets_rm",
+            user_id=int(msg.user_id) if str(msg.user_id).isdigit() else 0,
+            chat_id=chat_raw,
+            topic_id=topic_raw if isinstance(topic_raw, int) else None,
+            payload_json=json.dumps(
+                {"v": 1, "alias": alias, "fingerprint_sha256_hex": fingerprint},
+                separators=(",", ":"),
+            ),
+            ttl_seconds=600,
+        )
+        config_menu_nav_push_current(self._router, chat_raw, message_raw)
+        adapter = self._router._adapters.get(msg.channel)
+        if adapter is None:
+            return False
+        thread_id = _telegram_api_thread_id(md)
+        rows = build_confirm_gate_keyboard("secrets:rm")
+        rows.extend(_config_chrome())
+        edit_text = getattr(adapter, "edit_message_text", None)
+        if not callable(edit_text):
+            return False
+        caption = confirm_gate_message(
+            title="Remove secret",
+            detail=(
+                f"Delete logical secret `{alias}`?\n"
+                f"fingerprint={fingerprint}\n"
+                "This cannot be undone."
+            ),
+        )
+        body: dict[str, Any] = {
+            "chat_id": chat_raw,
+            "message_id": message_raw,
+            "text": caption,
+            "reply_markup": {"inline_keyboard": rows},
+        }
+        if thread_id is not None:
+            body["message_thread_id"] = thread_id
+        return bool(await cast("Callable[..., Awaitable[Any]]", edit_text)(**body))
+
+    async def _handle_secrets_rm_confirm(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """Delete one logical secret after two-step confirm (W7d).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Toast when deletion failed.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_secrets_rm_confirm)
+            True
+        """
+        _ = callback_data
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        chat_raw = md.get("chat_id")
+        pending = self._find_pending_secrets_rm(
+            chat_id=int(chat_raw) if isinstance(chat_raw, int) else 0
+        )
+        if pending is None:
+            return "No pending secret removal — start again from Remove secret."
+        alias = str(pending.get("alias", "")).strip()
+        fingerprint = str(pending.get("fingerprint_sha256_hex", "")).strip()
+        if not alias or not fingerprint:
+            return "Pending removal payload invalid."
+        from sevn.secrets.fingerprint import fingerprint_sha256_hex
+        from sevn.secrets.migrate import encrypted_file_backend_for_workspace
+        from sevn.security.secrets.errors import SecretsStoreCorruptError
+
+        try:
+            backend = encrypted_file_backend_for_workspace(self._content_root, self._workspace)
+            existing = await backend.get(alias)
+        except (ValueError, SecretsStoreCorruptError) as exc:
+            return f"Could not delete secret: {exc}"
+        if existing is None:
+            return f"Secret {alias!r} not found."
+        if fingerprint_sha256_hex(existing) != fingerprint:
+            return "Fingerprint mismatch — list aliases and try again."
+        await backend.delete(alias)
+        self._clear_pending_secrets_rm(chat_id=int(chat_raw) if isinstance(chat_raw, int) else 0)
+        toast = f"Deleted {alias!r}."
+        if isinstance(chat_raw, int) and isinstance(md.get("message_id"), int):
+            get_config_menu_nav(
+                self._router, chat_raw, md["message_id"]
+            ).current = ConfigMenuNavFrame(
+                section="access_secrets",
+            )
+        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+        return None if answered else toast
+
+    async def _handle_secrets_rm_cancel(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """Return to Access > Secrets after cancelling remove-secret confirm.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Toast when refresh was skipped.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_secrets_rm_cancel)
+            True
+        """
+        _ = callback_data
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        chat_raw = md.get("chat_id")
+        if isinstance(chat_raw, int):
+            self._clear_pending_secrets_rm(chat_id=chat_raw)
+        if isinstance(chat_raw, int) and isinstance(md.get("message_id"), int):
+            get_config_menu_nav(
+                self._router, chat_raw, md["message_id"]
+            ).current = ConfigMenuNavFrame(
+                section="access_secrets",
+            )
+        answered = await self._refresh_config_menu_after_action(
+            msg, callback_data, toast="Cancelled."
+        )
+        return None if answered else "Cancelled."
+
+    def _find_pending_secrets_rm(self, *, chat_id: int) -> dict[str, Any] | None:
+        """Return the newest pending secrets-rm payload for one chat.
+
+        Args:
+            chat_id (int): Telegram chat id.
+
+        Returns:
+            dict[str, Any] | None: Parsed payload or ``None``.
+
+        Examples:
+            >>> MenuActionRouter._find_pending_secrets_rm.__name__
+            '_find_pending_secrets_rm'
+        """
+        row = self._conn.execute(
+            """
+            SELECT payload_json FROM dispatcher_state
+            WHERE kind = 'secrets_rm' AND chat_id = ?
+            ORDER BY rowid DESC LIMIT 1
+            """,
+            (chat_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        try:
+            payload = json.loads(str(row[0]))
+        except (TypeError, json.JSONDecodeError):
+            return None
+        return payload if isinstance(payload, dict) else None
+
+    def _clear_pending_secrets_rm(self, *, chat_id: int) -> None:
+        """Drop pending secrets-rm dispatcher rows for one chat.
+
+        Args:
+            chat_id (int): Telegram chat id.
+
+        Examples:
+            >>> MenuActionRouter._clear_pending_secrets_rm.__name__
+            '_clear_pending_secrets_rm'
+        """
+        self._conn.execute(
+            "DELETE FROM dispatcher_state WHERE kind = 'secrets_rm' AND chat_id = ?",
+            (chat_id,),
+        )
+        self._conn.commit()
+
+    async def _handle_pairing_action(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        target: str,
+    ) -> str | None:
+        """Dispatch Access > pairing ``act:pairing:*`` rows (W7d).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed action target after ``act:``.
+
+        Returns:
+            str | None: Toast when the action could not proceed.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_pairing_action)
+            True
+        """
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        if target == "pairing:pending":
+            return await self._handle_pairing_pending(msg, callback_data)
+        toast = self.reject_unknown_callback_suffix("act:pairing:", target.removeprefix("pairing:"))
+        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+        return None if answered else toast
+
+    async def _handle_pairing_pending(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """List pending pairing requests without revealing plaintext codes.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_pairing_pending)
+            True
+        """
+        _ = callback_data
+        import json
+
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.gateway.onboarding.pairing import PairingStore
+
+        rows = PairingStore(self._content_root).list_pending()
+        body = json.dumps({"pending": rows, "count": len(rows)}, indent=2)
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Pending pairing sent")
+        return None
+
+    async def _handle_providers_action(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        target: str,
+    ) -> str | None:
+        """Dispatch Access > Provider logins ``act:providers:*`` rows (W7d).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed action target after ``act:``.
+
+        Returns:
+            str | None: Toast when the action could not proceed.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_providers_action)
+            True
+        """
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        if target == "providers:oauth:status":
+            return await self._handle_providers_oauth_status(msg, callback_data)
+        toast = self.reject_unknown_callback_suffix(
+            "act:providers:", target.removeprefix("providers:")
+        )
+        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+        return None if answered else toast
+
+    async def _handle_providers_oauth_status(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """Post OAuth secret aliases and OpenAI credential summary.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Error toast when status could not be loaded.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_providers_oauth_status)
+            True
+        """
+        _ = callback_data
+        from sevn.cli.commands.providers_cmd import _format_oauth_status
+        from sevn.cli.workspace import BoundWorkspace
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.security.oauth.credential import oauth_openai_secret_alias
+        from sevn.security.oauth.login_flow import load_codex_oauth_credential_from_workspace
+        from sevn.workspace.layout import WorkspaceLayout
+
+        try:
+            rows = await self._load_secrets_entries()
+        except RuntimeError as exc:
+            return str(exc)
+        aliases = [str(r.get("alias", "")) for r in rows if r.get("alias")]
+        openai_cred: dict[str, Any] | None = None
+        if oauth_openai_secret_alias() in aliases:
+            bw = BoundWorkspace(
+                sevn_json_path=self._sevn_json,
+                config=self._workspace,
+                layout=WorkspaceLayout.from_config(self._sevn_json, self._workspace),
+                raw=load_raw_sevn_json(self._sevn_json) or {},
+            )
+            openai_cred = load_codex_oauth_credential_from_workspace(bw)
+        body = _format_oauth_status([], aliases, openai_oauth=openai_cred)
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "OAuth status sent")
+        return None
+
+    async def _handle_doctor_run(self, msg: IncomingMessage, callback_data: str) -> str | None:
+        """Run ``sevn doctor`` probes and post the report (D19 pagination).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Error toast when doctor could not run.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_doctor_run)
+            True
+        """
+        _ = callback_data
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        from sevn.cli.doctor.checks import CheckResult
+        from sevn.cli.doctor.probes import DoctorRunOptions, run_doctor_probes
+        from sevn.cli.workspace import BoundWorkspace
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.workspace.layout import WorkspaceLayout
+
+        bw = BoundWorkspace(
+            sevn_json_path=self._sevn_json,
+            config=self._workspace,
+            layout=WorkspaceLayout.from_config(self._sevn_json, self._workspace),
+            raw=load_raw_sevn_json(self._sevn_json) or {},
+        )
+        result = CheckResult()
+        run_doctor_probes(bw, result, options=DoctorRunOptions())
+        lines: list[str] = []
+        for section_name, checks in result.by_section():
+            lines.append(section_name)
+            for check in checks:
+                mark = "ok" if check.ok and check.severity != "warn" else check.severity or "fail"
+                detail = check.detail or ""
+                if check.hint:
+                    detail = f"{detail} — {check.hint}" if detail else check.hint
+                lines.append(f"  [{mark}] {check.title}: {detail}")
+        ok_count, warn_count, fail_count = result.counts()
+        lines.append(f"{ok_count} ok · {warn_count} warn · {fail_count} fail")
+        body = "\n".join(lines)
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Doctor sent")
+        return None
+
+    async def _handle_usage_show(self, msg: IncomingMessage, callback_data: str) -> str | None:
+        """Post budget rollups from traces (``sevn usage show`` parity).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_usage_show)
+            True
+        """
+        _ = callback_data
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        from sevn.cli.commands.usage_cmd import _format_usage
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.storage.paths import traces_sqlite_path
+        from sevn.ui.dashboard.query.budget import budget_summary_from_traces
+        from sevn.ui.dashboard.query.traces import ensure_trace_connection
+
+        trace_path = traces_sqlite_path(self._content_root / ".sevn")
+        if not trace_path.exists():
+            body = _format_usage({})
+        else:
+            conn = ensure_trace_connection(trace_path)
+            try:
+                body = _format_usage(budget_summary_from_traces(conn))
+            finally:
+                conn.close()
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Usage sent")
+        return None
+
+    async def _handle_turn_bundles_action(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        target: str,
+    ) -> str | None:
+        """Dispatch Health > Turn bundles ``act:turn_bundles:*`` rows (W7d).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed action target after ``act:``.
+
+        Returns:
+            str | None: Toast when export failed.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_turn_bundles_action)
+            True
+        """
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        if target == "turn_bundles:export":
+            return await self._handle_turn_bundles_export(msg, callback_data)
+        toast = self.reject_unknown_callback_suffix(
+            "act:turn_bundles:",
+            target.removeprefix("turn_bundles:"),
+        )
+        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+        return None if answered else toast
+
+    async def _handle_turn_bundles_export(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """Backfill or refresh turn JSONL bundles under ``.sevn/turns/``.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_turn_bundles_export)
+            True
+        """
+        _ = callback_data
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.gateway.turn.turn_bundle import export_turn_bundles
+        from sevn.storage.paths import traces_sqlite_path
+        from sevn.ui.dashboard.query.traces import ensure_trace_connection
+
+        trace_conn = None
+        trace_path = traces_sqlite_path(self._content_root / ".sevn")
+        if trace_path.exists():
+            trace_conn = ensure_trace_connection(trace_path)
+        try:
+            written = export_turn_bundles(
+                self._conn,
+                trace_conn,
+                content_root=self._content_root,
+            )
+        finally:
+            if trace_conn is not None:
+                trace_conn.close()
+        body = f"Exported {len(written)} turn bundle(s)."
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Turn bundles exported")
+        return None
+
+    async def _handle_tracing_config(self, msg: IncomingMessage, callback_data: str) -> str | None:
+        """Post Logfire / trace export configuration (``sevn config tracing`` parity).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_tracing_config)
+            True
+        """
+        _ = callback_data
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        from sevn.agent.tracing.logfire_config import logfire_export_status_from_doc
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+
+        doc = load_raw_sevn_json(self._sevn_json) or {}
+        status = logfire_export_status_from_doc(doc)
+        redaction = effective_trace_redaction_enabled_from_doc(doc)
+        body = (
+            f"logfire_enabled={status.enabled}\n"
+            f"logfire_token_ref={status.token_ref or '(unset)'}\n"
+            f"trace_redaction={'on' if redaction else 'off'}"
+        )
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Tracing config sent")
         return None
 
     async def _answer_chat_action(self, msg: IncomingMessage, text: str) -> None:

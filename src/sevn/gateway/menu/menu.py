@@ -3170,7 +3170,7 @@ def _configured_integration_ids(
 
 
 def _build_secrets_keyboard_rows() -> list[list[dict[str, Any]]]:
-    """Build Secrets section form launcher (no secret values).
+    """Build Secrets section rows (aliases only — never values).
 
     Returns:
         list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
@@ -3180,7 +3180,12 @@ def _build_secrets_keyboard_rows() -> list[list[dict[str, Any]]]:
         >>> rows[0][0]["callback_data"]
         'form:secret_wizard'
     """
-    return [[{"text": "+ Add secret", "callback_data": "form:secret_wizard"}]]
+    return [
+        [{"text": "+ Add secret", "callback_data": "form:secret_wizard"}],
+        [{"text": "📋 List aliases", "callback_data": "act:secrets:list"}],
+        [{"text": "🗑 Remove secret", "callback_data": "form:secrets:rm"}],
+        [{"text": "🔓 Unlock status", "callback_data": "act:secrets:check-unlock"}],
+    ]
 
 
 def _build_self_improve_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
@@ -4043,17 +4048,74 @@ def _build_memory_openwiki_keyboard_rows(
 
 
 def _build_access_secrets_keyboard_rows() -> list[list[dict[str, Any]]]:
-    """Access > Secrets — re-parent of the Secrets section.
+    """Access > Secrets — list/rm/unlock plus add-secret wizard.
 
     Returns:
         list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
 
     Examples:
         >>> rows = _build_access_secrets_keyboard_rows()
-        >>> rows[0][0]["callback_data"]
-        'form:secret_wizard'
+        >>> rows[1][0]["callback_data"]
+        'act:secrets:list'
     """
     return _build_secrets_keyboard_rows()
+
+
+def _build_access_providers_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Access > Provider logins — OAuth status and link/unlink forms.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_access_providers_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:providers:oauth:status'
+    """
+    return [
+        [{"text": "📋 OAuth status", "callback_data": "act:providers:oauth:status"}],
+        [{"text": "🔗 Link provider", "callback_data": "form:providers:oauth:login"}],
+        [{"text": "🔌 Unlink provider", "callback_data": "form:providers:oauth:logout"}],
+    ]
+
+
+def _build_access_pairing_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+    """Access > DM policy and pairing — policy cycle plus approve/pending rows.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_access_pairing_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"].startswith("cfg:toggle:channels.telegram.dm_policy:")
+        True
+    """
+    return [
+        _build_dm_policy_cycle_row(workspace),
+        [{"text": "✅ Approve pairing code", "callback_data": "form:pairing:approve"}],
+        [{"text": "📋 Pending requests", "callback_data": "act:pairing:pending"}],
+    ]
+
+
+def _build_health_bundles_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Health > Turn bundles — export/refresh and view-by-id form.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_health_bundles_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:turn_bundles:export'
+    """
+    return [
+        [{"text": "📦 Export / refresh", "callback_data": "act:turn_bundles:export"}],
+        [{"text": "🔎 View a turn", "callback_data": "form:turn_bundles:view"}],
+    ]
 
 
 def _build_access_guard_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
@@ -4095,11 +4157,14 @@ def _build_access_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[st
         rows,
         (
             ("🔐 Secrets", "access_secrets"),
+            ("🪪 Provider logins", "access_providers"),
             ("🛡 Guard rails", "access_guard"),
             ("🔐 Secrets (legacy)", "secrets"),
             ("🛡 Security (legacy)", "security"),
         ),
     )
+    rows.append([{"text": "🐙 GitHub token", "callback_data": "form:gh:github_token"}])
+    rows.append([_nav_section_button("👥 DM policy & pairing", "access_pairing")])
     url = _mission_control_url(workspace, fragment="security")
     if url:
         rows.append([{"text": "🌐 Open Security tab", "url": url}])
@@ -4156,6 +4221,7 @@ def _build_health_tracing_keyboard_rows(workspace: WorkspaceConfig) -> list[list
                 "callback_data": "cfg:logs:toggle_redaction",
             },
         ],
+        [{"text": "📋 Tracing config", "callback_data": "act:tracing:config"}],
     ]
 
 
@@ -4175,6 +4241,9 @@ def _build_health_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[st
         True
     """
     rows = _build_logs_keyboard_rows(workspace)
+    rows.insert(0, [{"text": "🩺 Run doctor", "callback_data": "act:doctor:run"}])
+    rows.append([_nav_section_button("📦 Turn bundles", "health_bundles")])
+    rows.append([{"text": "💰 Usage & budget", "callback_data": "act:usage:show"}])
     _append_nav_section_rows(
         rows,
         (
@@ -4423,6 +4492,10 @@ def build_config_menu_keyboard(
         rows_sec = _build_access_keyboard_rows(workspace)
     elif section == "access_secrets":
         rows_sec = _build_access_secrets_keyboard_rows()
+    elif section == "access_providers":
+        rows_sec = _build_access_providers_keyboard_rows()
+    elif section == "access_pairing":
+        rows_sec = _build_access_pairing_keyboard_rows(workspace)
     elif section == "access_guard":
         rows_sec = _build_access_guard_keyboard_rows(workspace)
     elif section == "health":
@@ -4431,6 +4504,8 @@ def build_config_menu_keyboard(
         rows_sec = _build_health_pin_keyboard_rows(workspace)
     elif section == "health_tracing":
         rows_sec = _build_health_tracing_keyboard_rows(workspace)
+    elif section == "health_bundles":
+        rows_sec = _build_health_bundles_keyboard_rows()
     elif section == "deployment":
         rows_sec = _build_deployment_keyboard_rows(workspace, is_owner=is_owner)
     elif section == "skills_tools":
@@ -4969,6 +5044,16 @@ def config_menu_message_text(
                 lines.append(f"… and {len(ref_keys) - 20} more")
         lines.append("Values are never shown in Telegram. Tap Add to open the secret wizard.")
         return "\n".join(lines)
+    if section == "access_providers":
+        return "Provider logins\n\nOAuth tokens for LLM providers. Status lists paired secrets; link/unlink runs provider OAuth handoffs."
+    if section == "access_pairing":
+        return (
+            f"DM policy & pairing\n\n"
+            f"DM policy: {_telegram_dm_policy(workspace)}\n"
+            "Approve inbound pairing codes and review pending requests."
+        )
+    if section == "health_bundles":
+        return "Turn bundles\n\nPer-turn diagnostic JSONL under `.sevn/turns/`. Export refreshes bundles; view explores one turn id."
     if section == "agent_subagents":
         from sevn.config.sections.subagents import SubAgentsWorkspaceConfig, resolve_limits
 

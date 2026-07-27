@@ -1144,6 +1144,162 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         notes="Install OpenWiki CLI then prompt for key (W7c)",
     )
 
+    # --- C29. Access + Health leaves (W7d) ---
+    add(
+        "C29.1",
+        _exact("act:secrets:list"),
+        "C",
+        "access_secrets",
+        "List aliases",
+        implemented=True,
+        notes="Aliases + fingerprints only (W7d)",
+    )
+    add(
+        "C29.2",
+        _exact("form:secrets:rm"),
+        "C",
+        "access_secrets",
+        "Remove secret",
+        implemented=True,
+        owner_only=True,
+        notes="Form + two-step confirm (W7d)",
+    )
+    add(
+        "C29.3",
+        _exact("act:secrets:check-unlock"),
+        "C",
+        "access_secrets",
+        "Unlock status",
+        implemented=True,
+        notes="Encrypted store unlock posture (W7d)",
+    )
+    add(
+        "C29.4",
+        _exact("act:providers:oauth:status"),
+        "C",
+        "access_providers",
+        "OAuth status",
+        implemented=True,
+        notes="Provider OAuth summary (W7d)",
+    )
+    add(
+        "C29.5",
+        _exact("form:providers:oauth:login"),
+        "C",
+        "access_providers",
+        "Link provider",
+        implemented=True,
+        notes="Form → OAuth login handoff (W7d)",
+    )
+    add(
+        "C29.6",
+        _exact("form:providers:oauth:logout"),
+        "C",
+        "access_providers",
+        "Unlink provider",
+        implemented=True,
+        notes="Form → delete oauth.* secret (W7d)",
+    )
+    add(
+        "C29.7",
+        _exact("form:gh:github_token"),
+        "C",
+        "access",
+        "GitHub token",
+        implemented=True,
+        notes="Form → integration.github.token (W7d)",
+    )
+    add(
+        "C29.8",
+        _exact("cfg:section:access_pairing"),
+        "C",
+        "access",
+        "DM policy & pairing nav",
+        implemented=True,
+        notes="Nav to access_pairing (W7d)",
+    )
+    add(
+        "C29.9",
+        _exact("act:pairing:pending"),
+        "C",
+        "access_pairing",
+        "Pending requests",
+        implemented=True,
+        notes="PairingStore.list_pending (W7d)",
+    )
+    add(
+        "C29.10",
+        _exact("form:pairing:approve"),
+        "C",
+        "access_pairing",
+        "Approve pairing code",
+        implemented=True,
+        notes="Form → PairingStore.approve_code (W7d)",
+    )
+    add(
+        "C29.11",
+        _exact("act:doctor:run"),
+        "C",
+        "health",
+        "Run doctor",
+        implemented=True,
+        notes="Local + gateway probes (W7d)",
+    )
+    add(
+        "C29.12",
+        _exact("act:usage:show"),
+        "C",
+        "health",
+        "Usage & budget",
+        implemented=True,
+        notes="Budget rollups from traces (W7d)",
+    )
+    add(
+        "C29.13",
+        _exact("cfg:section:health_bundles"),
+        "C",
+        "health",
+        "Turn bundles nav",
+        implemented=True,
+        notes="Nav to health_bundles (W7d)",
+    )
+    add(
+        "C29.14",
+        _exact("act:turn_bundles:export"),
+        "C",
+        "health_bundles",
+        "Export / refresh",
+        implemented=True,
+        notes="Backfill turn JSONL bundles (W7d)",
+    )
+    add(
+        "C29.15",
+        _exact("form:turn_bundles:view"),
+        "C",
+        "health_bundles",
+        "View a turn",
+        implemented=True,
+        notes="Form → view_turn_bundle explorer (W7d)",
+    )
+    add(
+        "C29.16",
+        _exact("act:tracing:config"),
+        "C",
+        "health_tracing",
+        "Tracing config",
+        implemented=True,
+        notes="Logfire export status dump (W7d)",
+    )
+    add(
+        "C29.17",
+        _exact("cfg:section:access_providers"),
+        "C",
+        "access",
+        "Provider logins nav",
+        implemented=True,
+        notes="Nav to access_providers (W7d)",
+    )
+
     # --- C14. Integrations ---
     add(
         "C14.1",
