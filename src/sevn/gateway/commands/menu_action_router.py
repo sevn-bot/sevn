@@ -526,6 +526,12 @@ class MenuActionRouter:
             toast = READINESS_LOCKED_TOAST
             answered = await self._refresh_config_menu_after_action(msg, raw, toast=toast)
             return None if answered else toast
+        from sevn.gateway.menu.menu_registry import match_menu_button_spec
+
+        spec = match_menu_button_spec(str(raw).strip())
+        if spec is not None and spec.owner_only and not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
         kind, target, value = parsed
         if kind == "cycle":
             if value is None:
@@ -3728,8 +3734,13 @@ class MenuActionRouter:
             True
         """
         _ = callback_data
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
         md = msg.metadata if isinstance(msg.metadata, dict) else {}
         chat_raw = md.get("chat_id")
+        user_raw = msg.user_id
+        user_id = int(user_raw) if str(user_raw).isdigit() else 0
         from pathlib import Path
 
         from sevn.cli.commands.deploy_cmd import _run_deploy_command
@@ -3737,7 +3748,8 @@ class MenuActionRouter:
         from sevn.gateway.diagnostics.diagnostics import format_for_telegram
 
         active = self._find_pending_deploy_remote(
-            chat_id=int(chat_raw) if isinstance(chat_raw, int) else 0
+            chat_id=int(chat_raw) if isinstance(chat_raw, int) else 0,
+            user_id=user_id,
         )
         if active is None:
             return "Deploy confirm expired — start again."
@@ -3759,7 +3771,10 @@ class MenuActionRouter:
             if isinstance(exc, Exit):
                 return f"Deploy failed (exit {exc.exit_code})."
             return f"Deploy failed: {exc}"
-        self._clear_pending_deploy_remote(chat_id=int(chat_raw) if isinstance(chat_raw, int) else 0)
+        self._clear_pending_deploy_remote(
+            chat_id=int(chat_raw) if isinstance(chat_raw, int) else 0,
+            user_id=user_id,
+        )
         await self._send_logs_chunks(
             msg, format_for_telegram(f"Deploy to {host} completed.", redaction=None)
         )
@@ -3784,20 +3799,28 @@ class MenuActionRouter:
             True
         """
         _ = callback_data
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
         md = msg.metadata if isinstance(msg.metadata, dict) else {}
         chat_raw = md.get("chat_id")
+        user_raw = msg.user_id
         if isinstance(chat_raw, int):
-            self._clear_pending_deploy_remote(chat_id=chat_raw)
+            self._clear_pending_deploy_remote(
+                chat_id=chat_raw,
+                user_id=int(user_raw) if str(user_raw).isdigit() else 0,
+            )
         answered = await self._refresh_config_menu_after_action(
             msg, callback_data, toast="Deploy cancelled."
         )
         return None if answered else "Deploy cancelled."
 
-    def _find_pending_deploy_remote(self, *, chat_id: int) -> dict[str, Any] | None:
-        """Return the newest pending remote-deploy payload for *chat_id*.
+    def _find_pending_deploy_remote(self, *, chat_id: int, user_id: int) -> dict[str, Any] | None:
+        """Return the newest pending remote-deploy payload for one chat and user.
 
         Args:
             chat_id (int): Telegram chat id.
+            user_id (int): Telegram user id that started the confirm flow.
 
         Returns:
             dict[str, Any] | None: Parsed payload, or ``None``.
@@ -3807,8 +3830,8 @@ class MenuActionRouter:
             '_find_pending_deploy_remote'
         """
         row = self._conn.execute(
-            "SELECT payload_json FROM dispatcher_state WHERE kind = 'deploy_remote' AND chat_id = ? ORDER BY rowid DESC LIMIT 1",
-            (chat_id,),
+            "SELECT payload_json FROM dispatcher_state WHERE kind = 'deploy_remote' AND chat_id = ? AND user_id = ? ORDER BY rowid DESC LIMIT 1",
+            (chat_id, user_id),
         ).fetchone()
         if row is None:
             return None
@@ -3818,18 +3841,20 @@ class MenuActionRouter:
             return None
         return payload if isinstance(payload, dict) else None
 
-    def _clear_pending_deploy_remote(self, *, chat_id: int) -> None:
-        """Delete pending remote-deploy rows for *chat_id*.
+    def _clear_pending_deploy_remote(self, *, chat_id: int, user_id: int) -> None:
+        """Delete pending remote-deploy rows for one chat and user.
 
         Args:
             chat_id (int): Telegram chat id.
+            user_id (int): Telegram user id that started the confirm flow.
 
         Examples:
             >>> MenuActionRouter._clear_pending_deploy_remote.__name__
             '_clear_pending_deploy_remote'
         """
         self._conn.execute(
-            "DELETE FROM dispatcher_state WHERE kind = 'deploy_remote' AND chat_id = ?", (chat_id,)
+            "DELETE FROM dispatcher_state WHERE kind = 'deploy_remote' AND chat_id = ? AND user_id = ?",
+            (chat_id, user_id),
         )
         self._conn.commit()
 

@@ -476,6 +476,7 @@ def _keyboard_buttons(edit: dict[str, Any]) -> list[dict[str, Any]]:
 @pytest.mark.asyncio
 async def test_all_root_sections_navigate(tmp_path: Path) -> None:
     router, cap, _ws = _build_router(tmp_path)
+    router._owner_ids = frozenset({"u1"})
     for idx, (section, title) in enumerate(_REDIRECT_ROOT_SECTIONS):
         await router.route_incoming(
             _config_callback(f"cfg:section:{section}", callback_query_id=f"cq-{idx}"),

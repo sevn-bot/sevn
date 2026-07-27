@@ -180,6 +180,7 @@ _CLI_SLUG_ALIASES: dict[str, str] = {
     "codemode": "agent",
     "self_improve": "agent",
     "subagents": "agent",
+    "subagents_running": "agent",
     "tools": "skills",
     "integrations": "skills",
     "code": "memory",

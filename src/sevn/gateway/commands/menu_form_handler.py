@@ -302,7 +302,7 @@ class MenuFormHandler:
             >>> inspect.iscoroutinefunction(MenuFormHandler._start_form)
             True
         """
-        if target == "secret_wizard" and not self._router._resolve_owner_flag(msg):
+        if target.startswith("secret_wizard") and not self._router._resolve_owner_flag(msg):
             await self._answer_callback(msg, text="Owner only.")
             return
         preset_alias: str | None = None
@@ -334,7 +334,11 @@ class MenuFormHandler:
             "sessions:send",
             "memory:backfill",
             "openui:configure",
+            "subagents_max_override",
         } and not self._router._resolve_owner_flag(msg):
+            await self._answer_callback(msg, text="Owner only.")
+            return
+        if target.startswith("subagents_limits:") and not self._router._resolve_owner_flag(msg):
             await self._answer_callback(msg, text="Owner only.")
             return
         if target in {

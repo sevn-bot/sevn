@@ -56,3 +56,33 @@ def test_unknown_callback_suffix_rejected_not_defaulted(
     assert family_prefix in toast
     assert unknown_suffix in toast
     assert toast.startswith("Unknown ")
+
+
+def test_secrets_export_dispatcher_kind_registered() -> None:
+    """Thermos — export confirm pending rows use a registered dispatcher kind."""
+    import json
+    import sqlite3
+
+    from sevn.gateway.commands.dispatcher_kinds import ALL_DISPATCHER_KINDS
+    from sevn.gateway.dispatcher.dispatcher_state import insert_dispatcher_state
+    from sevn.storage.migrate import apply_migrations
+
+    assert "secrets_export" in ALL_DISPATCHER_KINDS
+    conn = sqlite3.connect(":memory:")
+    apply_migrations(conn)
+    insert_dispatcher_state(
+        conn,
+        token="ds:export-test",
+        kind="secrets_export",
+        user_id=1,
+        chat_id=2,
+        topic_id=None,
+        payload_json=json.dumps({"v": 1}, separators=(",", ":")),
+        ttl_seconds=600,
+    )
+    row = conn.execute(
+        "SELECT kind FROM dispatcher_state WHERE token = ?",
+        ("ds:export-test",),
+    ).fetchone()
+    assert row is not None
+    assert row[0] == "secrets_export"

@@ -557,6 +557,10 @@ _CONFIG_ROOT_TILES: tuple[tuple[str, str, str, bool], ...] = (
     ("❓ Help", "help", "cfg:section:help", False),
 )
 
+_OWNER_ONLY_ROOT_SECTIONS: frozenset[str] = frozenset(
+    sid for _label, sid, _cb, owner_only in _CONFIG_ROOT_TILES if owner_only
+)
+
 _MENU_SECTIONS: frozenset[str] = frozenset({"identity", "quick", "workspace", "diagnostics"})
 
 
@@ -5804,6 +5808,12 @@ class ConfigMenuHandler:
         elif kind == "back":
             frame = config_menu_nav_pop(self._router, chat_raw, message_raw)
         elif kind == "section" and value in _CONFIG_SECTIONS:
+            if value in _OWNER_ONLY_ROOT_SECTIONS and not self._router._resolve_owner_flag(msg):
+                if cq_str:
+                    await _answer_callback_query(
+                        adapter, callback_query_id=cq_str, text="Owner only."
+                    )
+                return
             frame = ConfigMenuNavFrame(section=value)  # type: ignore[arg-type]
             config_menu_nav_go(self._router, chat_raw, message_raw, frame)
         else:

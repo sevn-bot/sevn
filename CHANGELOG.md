@@ -10,6 +10,10 @@ are cut into a dated, versioned section at release time.
 
 ## [Unreleased]
 
+### Fixed
+
+- [2026-07-27] Thermos hardening for Telegram ``/config``: owner gates on W7 mutators/forms, readiness enforcement at dispatch, user-scoped secrets export/deploy confirms, redacted ``act:config:show``, CLI slug aliases, and ``secrets_export`` dispatcher kind
+
 ### Added
 
 - [2026-07-26] Telegram ``/config`` root regrouped into eight intent tiles (Chat, Agent, Skills & Tools, Memory, Access, Health, Deployment, Help) with ``owner_only`` gating (non-owners see four tiles); legacy section callbacks unchanged; nav shells re-parent existing rows

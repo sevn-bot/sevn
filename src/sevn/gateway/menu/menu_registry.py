@@ -815,6 +815,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "agent_subagents",
         "Sub-agents enabled",
         implemented=True,
+        owner_only=True,
         notes="JSON; W7 operator surface",
     )
     add(
@@ -833,6 +834,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "agent_subagents",
         "Global override",
         implemented=True,
+        owner_only=True,
         notes="Numeric form wizard",
     )
     add(
@@ -842,6 +844,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "agent_subagents",
         "Per-role limits",
         implemented=True,
+        owner_only=True,
         notes="Two-step L1/L2 numeric wizard",
     )
     add(
