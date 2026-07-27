@@ -5,6 +5,7 @@ Depends: dataclasses, re, sevn.gateway.menu.menu_registry
 
 Exports:
     ConfigSection — one ``/config`` root section and its schema dot-paths.
+    iter_config_slug_aliases — retired CLI slug → canonical slug pairs.
     iter_config_sections — canonical section order from ``menu_registry``.
     section_by_slug — lookup by section slug.
     section_callback — ``cfg:section:{slug}`` callback string.
@@ -192,6 +193,24 @@ _CLI_SLUG_ALIASES: dict[str, str] = {
     "my_sevn_bot": "deployment",
     "sevn_bot": "help",
 }
+
+
+def iter_config_slug_aliases() -> tuple[tuple[str, str], ...]:
+    """Return ``(retired_slug, canonical_slug)`` pairs for the CLI section surface.
+
+    ``section_by_slug`` has always resolved these, but the resolution was only
+    reachable from non-CLI callers (the Textual picker); ``sevn config voice``
+    still exited with Typer's "No such command". ``config_cmd.register`` uses
+    this to register each retired slug as a hidden alias subcommand.
+
+    Returns:
+        tuple[tuple[str, str], ...]: Sorted ``(alias, canonical)`` pairs.
+
+    Examples:
+        >>> ("voice", "chat") in iter_config_slug_aliases()
+        True
+    """
+    return tuple(sorted(_CLI_SLUG_ALIASES.items()))
 
 
 def _dot_path_from_toggle_pattern(pattern: str) -> str | None:

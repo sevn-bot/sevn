@@ -428,7 +428,12 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "channels",
         "DM policy cycle",
         implemented=True,
-        notes="open→pairing→allowlist→disabled TMF Wave 7",
+        owner_only=True,
+        notes=(
+            "open→pairing→allowlist→disabled TMF Wave 7; owner-only — this row decides "
+            "who may DM the bot, and inline keyboards are tappable by any member of the "
+            "chat the message was rendered in"
+        ),
     )
     add(
         "C5.4",
@@ -828,7 +833,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
     )
     add(
         "C25.2",
-        _exact("cfg:section:subagents_running"),
+        _exact("cfg:section:agent_subagents_running"),
         "C",
         "agent_subagents",
         "Running L1/L2 counts",

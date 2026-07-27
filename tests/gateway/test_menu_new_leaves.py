@@ -223,3 +223,88 @@ async def test_w7e_leaf_handler_returns_non_empty_answer(tmp_path: Path, callbac
         assert str(cap.sent[0][0]).strip()
     elif cap.answered:
         assert any(text for _cq, text in cap.answered if text)
+
+
+@pytest.mark.asyncio
+async def test_dreaming_backfill_completes_inside_running_loop(tmp_path: Path) -> None:
+    """PR #63 review: the backfill form ran ``asyncio.run()`` inside the gateway loop.
+
+    ``_advance_memory_backfill`` is an async handler, so ``asyncio.run()`` raised
+    ``RuntimeError: cannot be called from a running event loop``; the broad
+    ``except`` then reported "Backfill failed" for every window the operator sent.
+    The handler must await the engine and reach the success path instead.
+    """
+    import json
+    import sqlite3
+    from dataclasses import dataclass, field
+    from unittest.mock import AsyncMock, MagicMock
+
+    from sevn.config.workspace_config import WorkspaceConfig
+    from sevn.gateway.commands.menu_form_handler import MenuFormHandler
+    from sevn.storage.migrate import apply_migrations
+
+    @dataclass
+    class _Result:
+        run_id: str = "run-42"
+        promoted: list[str] = field(default_factory=lambda: ["a", "b"])
+        skipped: list[str] = field(default_factory=list)
+
+    class _FakeEngine:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            pass
+
+        async def run_backfill(self, **_kwargs: object) -> _Result:
+            return _Result()
+
+    import sevn.memory.dreaming.engine as engine_mod
+
+    original = engine_mod.DreamingEngine
+    engine_mod.DreamingEngine = _FakeEngine  # type: ignore[misc,assignment]
+    try:
+        cfg = WorkspaceConfig.minimal()
+        sevn_json = tmp_path / "sevn.json"
+        sevn_json.write_text(json.dumps(cfg.model_dump(mode="json")), encoding="utf-8")
+        router = MagicMock()
+        router._resolve_owner_flag.return_value = True
+        router._content_root = tmp_path
+        router._workspace = cfg
+        adapter = MagicMock()
+        adapter.send = AsyncMock()
+        router._adapters = {"telegram": adapter}
+        conn = sqlite3.connect(":memory:")
+        apply_migrations(conn)
+        handler = MenuFormHandler(
+            workspace=cfg,
+            router=router,
+            conn=conn,
+            content_root=tmp_path,
+            sevn_json_path=sevn_json,
+        )
+        sent: list[str] = []
+        refreshed: list[tuple[str, str | None]] = []
+
+        async def _capture_chat(_msg: object, text: str, **_kw: object) -> None:
+            sent.append(text)
+
+        async def _capture_refresh(_msg: object, *, section: str, toast: str | None) -> None:
+            refreshed.append((section, toast))
+
+        handler._send_chat = _capture_chat  # type: ignore[method-assign,assignment]
+        handler._refresh_section = _capture_refresh  # type: ignore[method-assign,assignment]
+        handler._consume_token = lambda _token: None  # type: ignore[method-assign,assignment]
+
+        from tests.gateway.test_menu import _config_callback
+
+        await handler._advance_memory_backfill(
+            _config_callback("form:memory:backfill"),
+            token="tok-1",
+            step="window",
+            text="2026-07-01 2026-07-02",
+            payload={},
+        )
+    finally:
+        engine_mod.DreamingEngine = original  # type: ignore[misc]
+
+    assert not any("Backfill failed" in text for text in sent), sent
+    assert any("run-42" in text for text in sent), sent
+    assert refreshed == [("memory_dreaming", "✅ Backfill complete.")]

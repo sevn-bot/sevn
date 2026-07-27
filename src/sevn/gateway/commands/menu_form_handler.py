@@ -1434,8 +1434,6 @@ class MenuFormHandler:
             >>> inspect.iscoroutinefunction(MenuFormHandler._advance_memory_backfill)
             True
         """
-        import asyncio
-
         from sevn.agent.tracing.sink import NullTraceSink
         from sevn.memory.dreaming.engine import DreamingEngine
 
@@ -1449,14 +1447,15 @@ class MenuFormHandler:
         lock = asyncio.Lock()
         eng = DreamingEngine(self._conn, trace, lock, transport=None)
         try:
-            result = asyncio.run(
-                eng.run_backfill(
-                    workspace_root=self._content_root,
-                    ws=self._workspace,
-                    date_from=date_from,
-                    date_to=date_to,
-                    unbounded_acknowledged=False,
-                ),
+            # Awaited, not asyncio.run() — this handler already runs inside the
+            # gateway's event loop, where asyncio.run() raises RuntimeError and
+            # the except below turns every backfill into "Backfill failed".
+            result = await eng.run_backfill(
+                workspace_root=self._content_root,
+                ws=self._workspace,
+                date_from=date_from,
+                date_to=date_to,
+                unbounded_acknowledged=False,
             )
         except Exception as exc:
             await self._send_chat(msg, f"Backfill failed: {exc}")

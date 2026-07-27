@@ -233,7 +233,9 @@ _SECTION_ALIASES: dict[str, str] = {
     "codemode": "agent",
     "self_improve": "agent",
     "subagents": "agent",
-    "subagents_running": "agent",
+    # Stale taps from messages rendered before the rename land on the real
+    # Running submenu, not one level up on the Agent root tile.
+    "subagents_running": "agent_subagents_running",
     "tools": "skills",
     "integrations": "skills",
     "code": "memory",
@@ -560,6 +562,66 @@ _CONFIG_ROOT_TILES: tuple[tuple[str, str, str, bool], ...] = (
 _OWNER_ONLY_ROOT_SECTIONS: frozenset[str] = frozenset(
     sid for _label, sid, _cb, owner_only in _CONFIG_ROOT_TILES if owner_only
 )
+
+
+def _owning_root_section(section_id: str) -> str | None:
+    """Return the root tile a section belongs to, by id prefix.
+
+    Child sections are named ``<root>_<leaf>`` (``access_secrets``) or
+    ``<root>:<path>`` (``skills:discogs:setup``), so the owning root is
+    recoverable from the id alone.
+
+    Args:
+        section_id (str): Section id from ``_CONFIG_SECTIONS``.
+
+    Returns:
+        str | None: Owning root section id, or ``None`` when unrecognised.
+
+    Examples:
+        >>> _owning_root_section("access_secrets")
+        'access'
+        >>> _owning_root_section("skills:discogs:setup")
+        'skills'
+        >>> _owning_root_section("chat") is None
+        False
+    """
+    for _label, root_id, _cb, _owner_only in _CONFIG_ROOT_TILES:
+        if section_id == root_id or section_id.startswith((f"{root_id}_", f"{root_id}:")):
+            return root_id
+    return None
+
+
+# Every section under an owner-gated root tile, not just the tile itself. Entering
+# `cfg:section:access_secrets` directly must hit the same gate as tapping 🔐 Access,
+# otherwise the nav check is bypassable by anyone holding a stale callback string.
+_OWNER_ONLY_SECTIONS: frozenset[str] = frozenset(
+    sid
+    for sid in _CONFIG_SECTIONS
+    if (_owning_root_section(sid) or "") in _OWNER_ONLY_ROOT_SECTIONS
+)
+
+
+def _section_requires_owner(section_id: str) -> bool:
+    """Return whether entering ``section_id`` requires the owner flag.
+
+    Unknown ids fail closed when they resolve to an owner-gated root prefix.
+
+    Args:
+        section_id (str): Section id from a ``cfg:section:*`` callback.
+
+    Returns:
+        bool: ``True`` when only the owner may open the section.
+
+    Examples:
+        >>> _section_requires_owner("access_secrets")
+        True
+        >>> _section_requires_owner("chat_voice")
+        False
+    """
+    if section_id in _OWNER_ONLY_SECTIONS:
+        return True
+    return (_owning_root_section(section_id) or "") in _OWNER_ONLY_ROOT_SECTIONS
+
 
 _MENU_SECTIONS: frozenset[str] = frozenset({"identity", "quick", "workspace", "diagnostics"})
 
@@ -3351,7 +3413,7 @@ def _build_subagents_keyboard_rows(
         [
             {
                 "text": f"Running L1:{level1_count} L2:{level2_count}",
-                "callback_data": "cfg:section:subagents_running",
+                "callback_data": "cfg:section:agent_subagents_running",
             },
         ],
         [
@@ -5708,9 +5770,8 @@ class ConfigMenuHandler:
         if kind == "retired_section" and value is not None:
             alias_target = _SECTION_ALIASES.get(value, "")
             if alias_target and alias_target in _CONFIG_SECTIONS:
-                if (
-                    alias_target in _OWNER_ONLY_ROOT_SECTIONS
-                    and not self._router._resolve_owner_flag(msg)
+                if _section_requires_owner(alias_target) and not self._router._resolve_owner_flag(
+                    msg
                 ):
                     if cq_str:
                         await _answer_callback_query(
@@ -5817,7 +5878,7 @@ class ConfigMenuHandler:
         elif kind == "back":
             frame = config_menu_nav_pop(self._router, chat_raw, message_raw)
         elif kind == "section" and value in _CONFIG_SECTIONS:
-            if value in _OWNER_ONLY_ROOT_SECTIONS and not self._router._resolve_owner_flag(msg):
+            if _section_requires_owner(value) and not self._router._resolve_owner_flag(msg):
                 if cq_str:
                     await _answer_callback_query(
                         adapter, callback_query_id=cq_str, text="Owner only."

@@ -31,6 +31,12 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-27] Telegram ``/config`` DM-policy cycle is owner-only: the row went live in this cycle without an owner gate, so any member of a chat where the menu was rendered could change who may DM the bot
+- [2026-07-27] Telegram ``/config`` section entry gates every section under an owner-only root tile, not just the eight root tiles — ``cfg:section:access_secrets`` and siblings no longer bypass the gate when entered directly
+- [2026-07-27] Telegram ``/config`` Agent › Sub-agents "Running L1/L2" row opens the Running submenu again; it still emitted the pre-rename ``subagents_running`` id, so every tap bounced through the alias table back to the Agent root tile
+- [2026-07-27] Telegram ``/config`` Memory › Dreaming backfill completes instead of always reporting "Backfill failed" (``asyncio.run()`` inside the gateway's running event loop)
+- [2026-07-27] ``sevn config <retired-slug>`` (``voice``, ``session``, ``secrets``, ``logs``, …) works as documented: the aliases resolved internally but were never registered as CLI subcommands
+- [2026-07-27] Telegram menu walker reaches sections nested two or more levels deep (path-aware navigation instead of one blind Back tap), and ``--mutate`` now taps and restores toggle/cycle rows instead of no-opping into a coverage failure
 - [2026-07-27] Telegram Menu docs scaffold: skip full ``ROOT_TILES`` sync when an explicit live dict is passed so per-gap tile inserts are not clobbered
 - [2026-07-27] ``sevn config <section>`` doctests use the redesign ``chat`` slug instead of retired ``session``
 - [2026-07-26] Telegram ``/config`` Advanced section dissolved: auto-resume tier B on Deployment, trace redaction de-duplicated to Health > Trace export (``C20.6``), queue mode only on Chat, RLM/CodeMode/Self-Improve under Agent > Lab, Second Brain under Memory, Sub-agents under Agent; stale ``cfg:section:advanced`` answers a moved toast

@@ -10,9 +10,11 @@ sevn config sections         # list 8 /config sections
 sevn config show             # print raw sevn.json
 sevn config validate
 sevn config validate --json
-sevn config chat             # show Chat dot-paths + current values (``session`` alias still works)
-sevn config voice --json
+sevn config chat             # show Chat dot-paths + current values
+sevn config voice --json     # retired slugs resolve to their new home (voice → chat)
 ```
+
+Retired slugs from the pre-redesign tree (`session`, `voice`, `channels`, `secrets`, `logs`, `my_sevn_bot`, …) stay valid as hidden aliases onto the eight sections, so links and muscle memory keep working.
 
 Dot-path SSOT lives in `src/sevn/cli/config_paths.py` (aligned with `menu_registry.py` `cfg:section:*` and `cfg:toggle:*` rows).
 

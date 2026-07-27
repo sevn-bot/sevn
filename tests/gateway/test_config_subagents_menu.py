@@ -26,9 +26,32 @@ def test_subagents_keyboard_rows_include_toggle_limits_and_running() -> None:
     rows = _build_subagents_keyboard_rows(ws, level1_count=2, level2_count=1)
     callbacks = [btn["callback_data"] for row in rows for btn in row]
     assert "cfg:toggle:subagents.enabled:false" in callbacks
-    assert "cfg:section:subagents_running" in callbacks
+    assert "cfg:section:agent_subagents_running" in callbacks
     assert "form:subagents_max_override" in callbacks
     assert any(cb.startswith("form:subagents_limits:") for cb in callbacks)
+
+
+def test_every_rendered_section_callback_targets_a_live_section() -> None:
+    """PR #63 review: a `cfg:section:*` button must not route through the alias table.
+
+    The Running L1/L2 row kept emitting the pre-rename `subagents_running` id, so
+    every tap was classified as a retired section and bounced back to the Agent
+    root tile — a live, Ready-marked row that silently did nothing.
+
+    Rows explicitly labelled "(legacy)" are exempt: those exist precisely to
+    exercise the D14 alias table for callbacks held by older messages.
+    """
+    from sevn.gateway.menu.menu import _CONFIG_SECTIONS
+    from tests.gateway.telegram_menu_redesign_helpers import iter_rendered_buttons
+
+    retired = [
+        (section, label, cb)
+        for section, label, cb in iter_rendered_buttons()
+        if cb.startswith("cfg:section:")
+        and cb.removeprefix("cfg:section:") not in _CONFIG_SECTIONS
+        and "(legacy)" not in label
+    ]
+    assert retired == []
 
 
 def test_subagents_running_keyboard_owner_kill_buttons() -> None:
@@ -146,5 +169,7 @@ def test_build_config_menu_keyboard_subagents_section() -> None:
     )
     body = kb["inline_keyboard"][:-1]
     assert any(
-        btn.get("callback_data") == "cfg:section:subagents_running" for row in body for btn in row
+        btn.get("callback_data") == "cfg:section:agent_subagents_running"
+        for row in body
+        for btn in row
     )

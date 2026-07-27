@@ -9,7 +9,11 @@ import pytest
 from typer.testing import CliRunner
 
 from sevn.cli.app import app
-from sevn.cli.config_paths import iter_config_sections, menu_registry_root_slugs
+from sevn.cli.config_paths import (
+    iter_config_sections,
+    iter_config_slug_aliases,
+    menu_registry_root_slugs,
+)
 
 REDESIGN_ROOT_SLUGS: tuple[str, ...] = (
     "chat",
@@ -88,3 +92,38 @@ def test_config_paths_doctest_slug_count() -> None:
 
     failures, _attempts = doctest.testmod(config_paths, verbose=False)
     assert failures == 0
+
+
+@pytest.mark.parametrize(
+    ("alias", "canonical"),
+    [pair for pair in iter_config_slug_aliases() if pair[0] != "subagents"],
+)
+def test_retired_config_slug_alias_is_invokable(
+    alias: str,
+    canonical: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """PR #63 review: retired slugs must be real subcommands, not just resolvable.
+
+    ``section_by_slug`` always mapped ``voice`` → ``chat``, but the CLI never
+    registered the alias, so the shipped guide's ``sevn config voice --json``
+    exited with Typer's "No such command 'voice'".
+
+    ``subagents`` is excluded: it is a distinct pre-existing command, not an alias.
+    """
+    home = tmp_path / "sevnhome"
+    ws = home / "workspace"
+    ws.mkdir(parents=True)
+    doc = {
+        "schema_version": 1,
+        "workspace_root": ".",
+        "gateway": {"token": "${SECRET:keychain:sevn.gateway.token}"},
+    }
+    (ws / "sevn.json").write_text(json.dumps(doc), encoding="utf-8")
+    monkeypatch.setenv("SEVN_HOME", str(home))
+    result = CliRunner().invoke(app, ["config", alias, "--json"], env={"NO_COLOR": "1"})
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["data"]["slug"] == canonical

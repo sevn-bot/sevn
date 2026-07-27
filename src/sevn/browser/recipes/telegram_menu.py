@@ -77,6 +77,55 @@ _CHROME_CALLBACKS: Final[frozenset[str]] = frozenset(
     {"cfg:nav:back", "cfg:nav:help", "cfg:nav:home", "cfg:nav:close"}
 )
 _SECTION_PREFIX: Final[str] = "cfg:section:"
+_MUTATION_PREFIXES: Final[tuple[str, ...]] = ("cfg:toggle:", "cfg:cycle:")
+#: Upper bound on re-taps when restoring a cycle row; the longest live cycle is
+#: four-valued (dm_policy), so this leaves headroom without looping forever.
+_MAX_RESTORE_TAPS: Final[int] = 8
+
+
+def _is_mutation_pattern(callback_pattern: str) -> bool:
+    """Return whether a registry pattern describes a toggle/cycle row.
+
+    Args:
+        callback_pattern (str): ``MenuButtonSpec.callback_pattern`` value.
+
+    Returns:
+        bool: ``True`` for toggle/cycle patterns, anchored or bare.
+
+    Examples:
+        >>> _is_mutation_pattern(r"^cfg:toggle:gateway\\.queue_mode:.+$")
+        True
+        >>> _is_mutation_pattern("cfg:cycle:x:.+")
+        True
+        >>> _is_mutation_pattern("^act:doctor:run$")
+        False
+    """
+    stripped = callback_pattern.removeprefix("^")
+    return stripped.startswith(_MUTATION_PREFIXES)
+
+
+def _mutation_target(callback_data: str) -> str:
+    """Return the dot-path a toggle/cycle callback mutates, or ``""``.
+
+    Args:
+        callback_data (str): Raw ``callback_data`` from an inline button.
+
+    Returns:
+        str: Dot-path being mutated, empty when the callback is not a mutation.
+
+    Examples:
+        >>> _mutation_target("cfg:toggle:channels.telegram.show_routing:false")
+        'channels.telegram.show_routing'
+        >>> _mutation_target("cfg:cycle:channels.telegram.dm_policy:pairing")
+        'channels.telegram.dm_policy'
+        >>> _mutation_target("act:doctor:run")
+        ''
+    """
+    for prefix in _MUTATION_PREFIXES:
+        if callback_data.startswith(prefix):
+            rest = callback_data[len(prefix) :]
+            return rest.rsplit(":", 1)[0] if ":" in rest else rest
+    return ""
 
 
 class Verdict(StrEnum):
@@ -99,6 +148,10 @@ class MenuTreeNode:
 
     section_id: str
     rows: tuple[tuple[dict[str, Any], ...], ...]
+    #: Section ids from ``root`` down to and including this node. The walker
+    #: needs the full path to navigate: one blind ``press_back()`` per node only
+    #: works while the tree is one level deep.
+    path: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -137,29 +190,33 @@ def expected_tree(*, workspace: WorkspaceConfig | None = None) -> list[MenuTreeN
         >>> plan = expected_tree()
         >>> plan[0].section_id
         'root'
+        >>> plan[0].path
+        ('root',)
         >>> len(plan) >= 19
+        True
+        >>> all(node.path[-1] == node.section_id for node in plan)
         True
     """
     ws = workspace or WorkspaceConfig.minimal()
     plan: list[MenuTreeNode] = []
     visited: set[str] = set()
 
-    def dfs(section_id: str) -> None:
+    def dfs(section_id: str, path: tuple[str, ...]) -> None:
         if section_id in visited:
             return
         visited.add(section_id)
         markup = build_config_menu_keyboard(ws, section=section_id)  # type: ignore[arg-type]
         raw_rows = markup.get("inline_keyboard") or []
         frozen_rows = tuple(tuple(dict(btn) for btn in row) for row in raw_rows)
-        plan.append(MenuTreeNode(section_id=section_id, rows=frozen_rows))
+        plan.append(MenuTreeNode(section_id=section_id, rows=frozen_rows, path=path))
         for row in raw_rows:
             for btn in row:
                 cb = str(btn.get("callback_data") or "")
                 if cb.startswith(_SECTION_PREFIX):
                     target = cb[len(_SECTION_PREFIX) :]
-                    dfs(target)
+                    dfs(target, (*path, target))
 
-    dfs("root")
+    dfs("root", ("root",))
     return plan
 
 
@@ -468,19 +525,81 @@ class TelegramMenuWalker:
         """
         await self.tg.open_menu("/config")
         plan = expected_tree(workspace=self.workspace)
+        current: tuple[str, ...] = ("root",)
         for node in plan:
-            if node.section_id != "root":
-                await self._enter_section(node.section_id)
+            target = node.path or (node.section_id,)
+            current = await self._navigate_to(target, current=current)
             await self._walk_section(node.section_id)
-            if node.section_id != "root":
-                with contextlib.suppress(RecipeError):
-                    await self.tg.press_back()
         report = self._build_report()
         if self.out_dir is not None:
             self._write_evidence(report)
         self._reconcile_skipped_specs()
         assert_spec_coverage({"visited": self.visited_spec_ids, "skipped": self.skipped_spec_ids})
         return report
+
+    async def _navigate_to(
+        self,
+        target: tuple[str, ...],
+        *,
+        current: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        """Walk from ``current`` to ``target`` via the nearest common ancestor.
+
+        The plan is a flat pre-order DFS, so consecutive nodes are frequently not
+        parent/child: finishing ``chat_voice`` and starting ``agent`` means going
+        up two levels and down one. Popping back to the shared prefix and then
+        entering the remaining segments is what makes sections two or more levels
+        deep reachable at all.
+
+        Args:
+            target (tuple[str, ...]): Section path to land on, ``root`` first.
+            current (tuple[str, ...]): Section path currently displayed.
+
+        Returns:
+            tuple[str, ...]: The path actually reached (``target`` on success).
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(TelegramMenuWalker._navigate_to)
+            True
+        """
+        if target == current:
+            return current
+        shared = 0
+        for left, right in zip(current, target, strict=False):
+            if left != right:
+                break
+            shared += 1
+        for _ in range(len(current) - shared):
+            try:
+                await self.tg.press_back()
+            except RecipeError:
+                # Back chrome missing (or the screen never rendered) — fall back to
+                # /config so the walk resumes from a known screen instead of
+                # aborting every remaining section.
+                await self.tg.open_menu("/config")
+                current = ("root",)
+                shared = 1 if target and target[0] == "root" else 0
+                break
+        reached = list(target[:shared]) or ["root"]
+        for section_id in target[shared:]:
+            try:
+                await self._enter_section(section_id)
+            except RecipeError as exc:
+                self._log_lines.append(
+                    json.dumps(
+                        {
+                            "event": "navigation_failed",
+                            "section": section_id,
+                            "path": list(target),
+                            "error": str(exc),
+                        },
+                        sort_keys=True,
+                    ),
+                )
+                return tuple(reached)
+            reached.append(section_id)
+        return tuple(reached)
 
     async def _enter_section(self, section_id: str) -> None:
         """Navigate into ``section_id`` from the current keyboard.
@@ -499,7 +618,15 @@ class TelegramMenuWalker:
             if cb == f"{_SECTION_PREFIX}{section_id}":
                 await self.tg.tap_inline(str(btn.get("text") or ""), settle_timeout=6.0)
                 return
-        await self.tg.tap_inline(f"cfg:section:{section_id}", settle_timeout=6.0)
+        # `tap_inline` matches on visible button text, so passing a raw callback
+        # string here never matched — it only produced a confusing "no button
+        # labelled cfg:section:x" error. Say what actually went wrong instead.
+        visible = ", ".join(sorted(str(b.get("text") or "") for b in buttons)) or "<none>"
+        msg = (
+            f"section {section_id!r} not reachable from the current screen; "
+            f"visible buttons: {visible}"
+        )
+        raise RecipeError(msg)
 
     async def _walk_section(self, section_id: str) -> None:
         """Tap every actionable row on ``section_id`` and record verdicts.
@@ -553,12 +680,13 @@ class TelegramMenuWalker:
             if row.spec_id:
                 self.visited_spec_ids.add(row.spec_id)
             return
-        if not self.safe and row.row_kind in {"toggle", "cycle"}:
-            return
-        if self.safe and row.row_kind in {"toggle", "cycle"}:
-            if row.spec_id:
-                self.skipped_spec_ids[row.spec_id] = "mutate_only"
-            self._record_row(section_id, row, Verdict.SKIPPED, reason="mutate_only")
+        if row.row_kind in {"toggle", "cycle"}:
+            if self.safe:
+                if row.spec_id:
+                    self.skipped_spec_ids[row.spec_id] = "mutate_only"
+                self._record_row(section_id, row, Verdict.SKIPPED, reason="mutate_only")
+                return
+            await self._mutate_and_restore(btn, row, section_id=section_id)
             return
         label = str(btn.get("text") or cb or "button")
         before = {
@@ -590,6 +718,103 @@ class TelegramMenuWalker:
                 self.skipped_spec_ids[row.spec_id] = "skipped"
             else:
                 self.visited_spec_ids.add(row.spec_id)
+
+    async def _mutate_and_restore(
+        self,
+        btn: dict[str, Any],
+        row: MenuRow,
+        *,
+        section_id: str,
+    ) -> None:
+        """Tap a toggle/cycle row in ``--mutate`` mode, then restore it (D7).
+
+        Previously this path returned without tapping *and* without recording a
+        skip, so every toggle spec landed in neither ``visited_spec_ids`` nor
+        ``skipped_spec_ids`` and ``assert_spec_coverage`` failed the whole run.
+
+        Restore works off the callback itself: a toggle/cycle button encodes the
+        value the *next* tap would apply, so the original state is back exactly
+        when the row's ``callback_data`` matches what it was before the first tap.
+
+        Args:
+            btn (dict[str, Any]): Inline button metadata from Telegram Web.
+            row (MenuRow): Classified row metadata.
+            section_id (str): Active section id.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(TelegramMenuWalker._mutate_and_restore)
+            True
+        """
+        original_cb = row.callback_data
+        target = _mutation_target(original_cb)
+        label = str(btn.get("text") or original_cb or "button")
+        before = {
+            "signature": await self.tg.screen_signature(),
+            "message_count": await self.tg._message_count(),
+        }
+        raw_count = before.get("message_count", 0)
+        before_count = raw_count if isinstance(raw_count, int) else 0
+        try:
+            outcome = await self.tg.tap_inline(label, settle_timeout=6.0)
+        except RecipeError as exc:
+            self._record_row(section_id, row, Verdict.ERROR, detail=str(exc))
+            if row.spec_id:
+                self.visited_spec_ids.add(row.spec_id)
+            return
+        after = {
+            "signature": outcome.get("new_signature") or before["signature"],
+            "message_count": before_count + (1 if outcome.get("new_message") else 0),
+        }
+        verdict = classify_outcome(before, after, outcome.get("toast"), row_kind=row.row_kind)
+        restored = await self._restore_mutation(target, original_cb)
+        detail = outcome.get("toast")
+        if not restored:
+            verdict = Verdict.ERROR
+            detail = f"could not restore {target or original_cb!r} to its original value"
+        self._record_row(section_id, row, verdict, detail=detail)
+        if row.spec_id:
+            self.visited_spec_ids.add(row.spec_id)
+
+    async def _restore_mutation(self, target: str, original_cb: str) -> bool:
+        """Re-tap a toggle/cycle row until its callback matches ``original_cb``.
+
+        Args:
+            target (str): Dot-path the row mutates (``channels.telegram.dm_policy``).
+            original_cb (str): Callback the row carried before the first tap.
+
+        Returns:
+            bool: ``True`` when the row is back to its original value.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(TelegramMenuWalker._restore_mutation)
+            True
+        """
+        if not target:
+            return False
+        for _ in range(_MAX_RESTORE_TAPS):
+            try:
+                buttons = await self.tg.inline_buttons(message="last")
+            except RecipeError:
+                return False
+            match = next(
+                (
+                    b
+                    for b in buttons
+                    if _mutation_target(str(b.get("callback_data") or "")) == target
+                ),
+                None,
+            )
+            if match is None:
+                return False
+            if str(match.get("callback_data") or "") == original_cb:
+                return True
+            try:
+                await self.tg.tap_inline(str(match.get("text") or ""), settle_timeout=6.0)
+            except RecipeError:
+                return False
+        return False
 
     async def _cancel_form(self) -> None:
         """Send ``/cancel`` to close an opened form prompt (D8).
@@ -671,11 +896,12 @@ class TelegramMenuWalker:
             if "cfg:nav:" in spec.callback_pattern or "cfg:section:" in spec.callback_pattern:
                 self.skipped_spec_ids[sid] = "nav_or_section"
                 continue
-            if self.safe and (
-                spec.callback_pattern.startswith("cfg:toggle:")
-                or spec.callback_pattern.startswith("cfg:cycle:")
-            ):
-                self.skipped_spec_ids[sid] = "mutate_only"
+            if _is_mutation_pattern(spec.callback_pattern):
+                # In --safe these are skipped by design. In --mutate they are
+                # tapped, so anything still unaccounted for here was never
+                # rendered on a reachable screen — record that, don't silently
+                # leave it out of both sets and fail coverage.
+                self.skipped_spec_ids[sid] = "mutate_only" if self.safe else "not_in_tree"
                 continue
             matched_rendered = any(
                 (m := match_menu_button_spec(cb)) is not None and m.spec_id == sid

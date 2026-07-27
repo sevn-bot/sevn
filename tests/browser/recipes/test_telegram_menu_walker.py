@@ -8,6 +8,9 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from sevn.browser.recipes.base import RecipeError
+from sevn.browser.recipes.telegram_menu import _mutation_target
+
 if TYPE_CHECKING:
     from tests.browser.conftest import FakeCDPServer
 
@@ -290,3 +293,184 @@ def test_live_menu_walk_smoke_returns_report_without_dead() -> None:
     payload = json.loads(out)
     assert payload["summary"]["dead"] == 0
     assert payload["summary"]["visited"] >= 1
+
+
+class _FakeTelegramWeb:
+    """In-memory Telegram Web that serves exactly the real ``expected_tree`` shape.
+
+    Screens come from the live keyboard builders, so the walker is exercised
+    against the actual nesting depth of the shipped tree rather than a two-level
+    toy fixture.
+    """
+
+    def __init__(self, plan: list[Any]) -> None:
+        self.screens: dict[str, tuple[Any, ...]] = {n.section_id: n.rows for n in plan}
+        self.path: list[str] = ["root"]
+        self.entered: list[str] = []
+        self.max_depth = 0
+        self.taps: list[str] = []
+        self.mut_index: dict[str, int] = {}
+        self.mut_ring: dict[str, list[str]] = {}
+        self._counter = 0
+        for node in plan:
+            for row in node.rows:
+                for btn in row:
+                    cb = str(btn.get("callback_data") or "")
+                    target = _mutation_target(cb)
+                    if target and target not in self.mut_ring:
+                        suffix = cb.rsplit(":", 1)[-1]
+                        if cb.startswith("cfg:toggle:"):
+                            other = "true" if suffix == "false" else "false"
+                            self.mut_ring[target] = [suffix, other]
+                        else:
+                            self.mut_ring[target] = [suffix, "_alt1", "_alt2"]
+                        self.mut_index[target] = 0
+
+    def _current_buttons(self) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        for row in self.screens.get(self.path[-1], ()):
+            for btn in row:
+                item = dict(btn)
+                cb = str(item.get("callback_data") or "")
+                target = _mutation_target(cb)
+                if target:
+                    prefix = cb[: cb.rindex(":")]
+                    ring = self.mut_ring[target]
+                    item["callback_data"] = f"{prefix}:{ring[self.mut_index[target]]}"
+                out.append(item)
+        if len(self.path) > 1:
+            out.append({"text": "⬅ Back", "callback_data": "cfg:nav:back"})
+        return out
+
+    async def open_menu(self, _cmd: str) -> None:
+        self.path = ["root"]
+
+    async def inline_buttons(self, *, message: str = "last") -> list[dict[str, Any]]:
+        _ = message
+        return self._current_buttons()
+
+    async def screen_signature(self) -> str:
+        return f"{'/'.join(self.path)}#{sorted(self.mut_index.items())}"
+
+    async def _message_count(self) -> int:
+        return self._counter
+
+    async def press_back(self) -> dict[str, Any]:
+        if len(self.path) == 1:
+            msg = "no back button on root"
+            raise RecipeError(msg)
+        self.path.pop()
+        return {"new_signature": await self.screen_signature(), "new_message": False}
+
+    async def tap_inline(self, label: str, *, settle_timeout: float = 0.0) -> dict[str, Any]:
+        _ = settle_timeout
+        match = next((b for b in self._current_buttons() if str(b.get("text")) == label), None)
+        if match is None:
+            msg = f"no button labelled {label!r}"
+            raise RecipeError(msg)
+        cb = str(match.get("callback_data") or "")
+        self.taps.append(cb)
+        if cb == "cfg:nav:back":
+            return await self.press_back()
+        if cb.startswith("cfg:section:"):
+            target = cb.removeprefix("cfg:section:")
+            if target not in self.screens:
+                msg = f"unknown section {target!r}"
+                raise RecipeError(msg)
+            self.path.append(target)
+            self.entered.append(target)
+            self.max_depth = max(self.max_depth, len(self.path) - 1)
+            return {"new_signature": await self.screen_signature(), "new_message": False}
+        target = _mutation_target(cb)
+        if target:
+            ring = self.mut_ring[target]
+            self.mut_index[target] = (self.mut_index[target] + 1) % len(ring)
+            return {"new_signature": await self.screen_signature(), "new_message": False}
+        self._counter += 1
+        return {
+            "new_signature": await self.screen_signature(),
+            "new_message": True,
+            "toast": f"ran {cb}",
+        }
+
+
+@pytest.mark.asyncio
+async def test_walk_reaches_every_section_including_nested_ones() -> None:
+    """PR #63 review: one blind ``press_back()`` per node could not go past depth 1.
+
+    ``expected_tree`` is a flat pre-order DFS, so consecutive plan nodes are often
+    not parent/child. With a single back-tap the walker sat on the wrong screen and
+    ``_enter_section`` raised ``RecipeError``, aborting the run — so the "full-tree
+    navigation evidence" claim only ever covered the first level.
+    """
+    from sevn.browser.recipes.telegram_menu import TelegramMenuWalker, expected_tree
+
+    plan = expected_tree()
+    fake = _FakeTelegramWeb(plan)
+    walker = TelegramMenuWalker(tg=fake, safe=True)  # type: ignore[arg-type]
+    await walker.walk()
+
+    planned = {node.section_id for node in plan} - {"root"}
+    assert set(fake.entered) >= planned, planned - set(fake.entered)
+    assert fake.max_depth >= 2, "fixture must exercise a section nested two levels deep"
+    assert not [line for line in walker._log_lines if "navigation_failed" in line]
+
+    # Sections whose rows are all nav/chrome record nothing by design; every
+    # section that does hold an actionable row must appear in the walk log.
+    from sevn.gateway.menu.menu_registry import is_nav_chrome_callback
+
+    actionable = {
+        node.section_id
+        for node in plan
+        if any(
+            (cb := str(btn.get("callback_data") or ""))
+            and not cb.startswith("cfg:section:")
+            and not is_nav_chrome_callback(cb)
+            for row in node.rows
+            for btn in row
+        )
+    }
+    walked_sections = {row["section"] for row in walker.rows}
+    assert walked_sections >= actionable, actionable - walked_sections
+    deep = {node.section_id for node in plan if len(node.path) >= 3}
+    assert walked_sections & deep, "no section nested two levels deep recorded any row"
+
+
+@pytest.mark.asyncio
+async def test_mutate_mode_taps_and_restores_toggle_rows() -> None:
+    """PR #63 review: ``--mutate`` tapped nothing and always raised ``CoverageError``.
+
+    Toggle/cycle rows returned early without being tapped *and* without being
+    recorded as skipped, so their spec ids were in neither coverage set.
+    """
+    from sevn.browser.recipes.telegram_menu import TelegramMenuWalker, expected_tree
+
+    plan = expected_tree()
+    fake = _FakeTelegramWeb(plan)
+    walker = TelegramMenuWalker(tg=fake, safe=False)  # type: ignore[arg-type]
+    report = await walker.walk()
+
+    mutated = [cb for cb in fake.taps if _mutation_target(cb)]
+    assert mutated, "mutate mode tapped no toggle/cycle rows"
+    assert all(idx == 0 for idx in fake.mut_index.values()), "rows left mutated after the walk"
+
+    toggle_rows = [r for r in report["rows"] if r["row_kind"] in {"toggle", "cycle"}]
+    assert toggle_rows, "no toggle rows recorded in mutate mode"
+    assert not [r for r in toggle_rows if r["skip_reason"] == "mutate_only"]
+    assert not [r for r in toggle_rows if r["verdict"] == "error"], toggle_rows[:3]
+
+
+@pytest.mark.asyncio
+async def test_safe_mode_leaves_toggle_rows_untouched() -> None:
+    """--safe still records toggle rows as skipped(mutate_only) without tapping."""
+    from sevn.browser.recipes.telegram_menu import TelegramMenuWalker, expected_tree
+
+    fake = _FakeTelegramWeb(expected_tree())
+    walker = TelegramMenuWalker(tg=fake, safe=True)  # type: ignore[arg-type]
+    report = await walker.walk()
+
+    assert not [cb for cb in fake.taps if _mutation_target(cb)]
+    assert all(idx == 0 for idx in fake.mut_index.values())
+    toggle_rows = [r for r in report["rows"] if r["row_kind"] in {"toggle", "cycle"}]
+    assert toggle_rows
+    assert all(r["skip_reason"] == "mutate_only" for r in toggle_rows)

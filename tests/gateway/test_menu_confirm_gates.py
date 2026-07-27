@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from sevn.gateway.menu.menu import build_tunnel_on_confirm_keyboard, tunnel_on_confirm_message
@@ -86,3 +88,94 @@ def test_secrets_export_dispatcher_kind_registered() -> None:
     ).fetchone()
     assert row is not None
     assert row[0] == "secrets_export"
+
+
+# The live callbacks for the three families, as rendered today: secret removal is
+# a form row (`form:secrets:rm`), not an `act:` row.
+DESTRUCTIVE_NON_OWNER_CALLBACKS: tuple[str, ...] = (
+    "form:secrets:rm",
+    "act:secrets:export-secrets",
+    "act:secrets:export-secrets:confirm",
+    "form:deploy:remote",
+    "act:deploy:remote",
+    "act:deploy:remote:confirm",
+)
+
+
+@pytest.mark.parametrize("callback", DESTRUCTIVE_NON_OWNER_CALLBACKS)
+@pytest.mark.asyncio
+async def test_destructive_action_rejects_non_owner(callback: str, tmp_path: Path) -> None:
+    """PR #63 review: nothing drove these three families through ``route_incoming``.
+
+    The rest of this file unit-tests pure helpers, and
+    ``tests/gateway/test_config_menu_actions.py`` only ever routes as the sole
+    owner — so the PR's "owner bypass closed" claim had no runtime evidence for
+    ``secrets:rm``, ``secrets:export-secrets`` or ``deploy:remote``. Tapping the
+    confirm leg directly must be rejected too, not just the first step.
+    """
+    from tests.gateway.test_config_menu_actions import _build_router, _config_callback
+
+    router, cap, _ws = _build_router(tmp_path)
+    router._owner_ids = frozenset()
+    cq = f"cq-{callback.replace(':', '-')}"
+    await router.route_incoming(_config_callback(callback, callback_query_id=cq))
+
+    assert (cq, "Owner only.") in cap.answered, cap.answered
+    assert not cap.sent, f"{callback} leaked output to a non-owner: {cap.sent}"
+
+
+@pytest.mark.asyncio
+async def test_dm_policy_cycle_rejects_non_owner(tmp_path: Path) -> None:
+    """PR #63 review: the DM-policy cycle went live in this PR without an owner gate.
+
+    Inline keyboards are tappable by any member of the chat the message was
+    rendered in, so an ungated cycle let anyone change who may DM the bot.
+    """
+    from sevn.gateway.menu.menu import build_config_menu_keyboard
+    from tests.gateway.test_config_menu_actions import _build_router, _config_callback
+
+    router, cap, _ws = _build_router(tmp_path)
+    kb = build_config_menu_keyboard(router._workspace, section="access_pairing")
+    cycle_btn = next(
+        btn
+        for row in kb["inline_keyboard"]
+        for btn in row
+        if str(btn.get("callback_data", "")).startswith("cfg:toggle:channels.telegram.dm_policy:")
+    )
+    router._owner_ids = frozenset()
+    await router.route_incoming(
+        _config_callback(cycle_btn["callback_data"], callback_query_id="cq-dm-nonowner"),
+    )
+
+    assert ("cq-dm-nonowner", "Owner only.") in cap.answered, cap.answered
+    # The row still offers the same next value, i.e. nothing was cycled.
+    after_kb = build_config_menu_keyboard(router._workspace, section="access_pairing")
+    after_btn = next(
+        btn
+        for row in after_kb["inline_keyboard"]
+        for btn in row
+        if str(btn.get("callback_data", "")).startswith("cfg:toggle:channels.telegram.dm_policy:")
+    )
+    assert after_btn["callback_data"] == cycle_btn["callback_data"]
+
+
+@pytest.mark.parametrize(
+    "section",
+    ["access_secrets", "access_pairing", "access_guard", "deployment_host", "deployment_services"],
+)
+@pytest.mark.asyncio
+async def test_owner_only_child_section_rejects_non_owner(section: str, tmp_path: Path) -> None:
+    """PR #63 review: the nav gate only covered the 8 root tiles.
+
+    ``cfg:section:access_secrets`` and friends sit under an owner-gated root but
+    were not themselves in ``_OWNER_ONLY_ROOT_SECTIONS``, so entering a child
+    directly skipped the gate entirely.
+    """
+    from tests.gateway.test_config_menu_actions import _build_router, _config_callback
+
+    router, cap, _ws = _build_router(tmp_path)
+    router._owner_ids = frozenset()
+    cq = f"cq-{section}"
+    await router.route_incoming(_config_callback(f"cfg:section:{section}", callback_query_id=cq))
+
+    assert (cq, "Owner only.") in cap.answered, cap.answered

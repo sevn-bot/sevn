@@ -12,7 +12,13 @@ from sevn.gateway.menu.menu_readiness import readiness_for_callback
 from sevn.gateway.menu.menu_registry import match_menu_button_spec
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-BASELINE_JSON = REPO_ROOT / ".ignorelocal/waves/telegram-menu-baseline.json"
+
+# Tracked snapshot of the W0.3 baseline readiness sets. The full wave artefact
+# (rows, anchors, section deltas) stays local-only under
+# .ignorelocal/waves/telegram-menu-baseline.json, which is gitignored and
+# therefore absent in CI — these two sets are the part the suite asserts on, so
+# they live in tests/fixtures/ where every runner can read them.
+BASELINE_JSON = REPO_ROOT / "tests/fixtures/gateway/telegram_menu_baseline_spec_ids.json"
 
 # Redesign contract (D16, redesign HTML root block) — implementation lands in W3+.
 REDESIGN_OWNER_ROOT_TILES: tuple[tuple[str, str, bool], ...] = (
@@ -47,7 +53,9 @@ RETIRED_SECTION_ALIASES: dict[str, str] = {
     "codemode": "agent",
     "self_improve": "agent",
     "subagents": "agent",
-    "subagents_running": "agent",
+    # Retargeted from "agent" during PR #63 review: a stale tap must reach the
+    # Running submenu itself, not bounce one level up to the Agent root tile.
+    "subagents_running": "agent_subagents_running",
     "tools": "skills",
     "integrations": "skills",
     "code": "memory",
@@ -92,7 +100,7 @@ def iter_rendered_buttons(
     out: list[tuple[str, str, str]] = []
     for section in _keyboard_sections():
         kwargs: dict[str, Any] = {"is_owner": is_owner}
-        if section == "subagents_running":
+        if section == "agent_subagents_running":
             kwargs["subagent_running_rows"] = ()
         kb = build_config_menu_keyboard(ws, section=section, **kwargs)  # type: ignore[arg-type]
         for row in kb.get("inline_keyboard", []):
@@ -137,7 +145,7 @@ def count_rows_for_section(section: str, *, is_owner: bool = True) -> int:
     """Count inline keyboard rows for one section (including chrome)."""
     ws = DEFAULT_DOCS_WORKSPACE
     kwargs: dict[str, Any] = {"is_owner": is_owner}
-    if section == "subagents_running":
+    if section == "agent_subagents_running":
         kwargs["subagent_running_rows"] = ()
     kb = build_config_menu_keyboard(ws, section=section, **kwargs)  # type: ignore[arg-type]
     return len(kb.get("inline_keyboard", []))
