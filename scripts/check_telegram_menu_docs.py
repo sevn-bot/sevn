@@ -469,10 +469,14 @@ def scaffold_dev_catalog(
                 text = new_text
                 inserted += 1
 
-    synced = _sync_root_tiles(text, menu)
-    if synced != text:
-        text = synced
-        inserted += 1
+    # Full root sync applies only when deriving live from code (``live is None``).
+    # Callers passing an explicit ``live`` dict (unit tests, partial scaffolds) rely on
+    # per-gap ``_insert_root_tile`` without replacing the block from ``_CONFIG_ROOT_TILES``.
+    if live is None:
+        synced = _sync_root_tiles(text, menu)
+        if synced != text:
+            text = synced
+            inserted += 1
 
     if inserted:
         path.write_text(text, encoding="utf-8")

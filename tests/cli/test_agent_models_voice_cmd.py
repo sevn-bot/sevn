@@ -28,9 +28,9 @@ def runner() -> CliRunner:
 
 
 def test_help_panels_agent_models_voice() -> None:
-    assert panel_for("agent") == "Core"
+    assert panel_for("agent") == "Agent"
     assert panel_for("models") == "Agent"
-    assert panel_for("voice") == "Agent"
+    assert panel_for("voice") == "Chat"
 
 
 def test_voice_settings_snapshot_defaults() -> None:

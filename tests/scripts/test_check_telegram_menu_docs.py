@@ -117,6 +117,6 @@ def test_scaffold_adds_root_tile_without_clobbering_btn(tmp_path: Path) -> None:
     assert not any(g.kind == "missing_root_tile" for g in hard)
 
 
-def test_repo_dev_catalog_includes_logs_root_tile() -> None:
+def test_repo_dev_catalog_includes_health_root_tile() -> None:
     tiles = parse_dev_root_tiles()
-    assert any(sid == "logs" for sid, _label in tiles)
+    assert any(sid == "health" for sid, _label in tiles)
