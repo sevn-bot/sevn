@@ -1971,6 +1971,12 @@ def _build_dashboard_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict
         [{"text": "📌 Create/update pin", "callback_data": "cfg:dashboard:create_pin"}],
         [{"text": "🔄 Refresh pin", "callback_data": "cfg:dashboard:refresh_pin"}],
         [{"text": "📤 Unpin", "callback_data": "cfg:dashboard:unpin"}],
+        [
+            {
+                "text": "🔐 Set dashboard password (host)",
+                "callback_data": "act:host:dashboard-password",
+            },
+        ],
     ]
     url = web_ui_url_from_workspace(workspace)
     if url:
@@ -3185,6 +3191,7 @@ def _build_secrets_keyboard_rows() -> list[list[dict[str, Any]]]:
         [{"text": "📋 List aliases", "callback_data": "act:secrets:list"}],
         [{"text": "🗑 Remove secret", "callback_data": "form:secrets:rm"}],
         [{"text": "🔓 Unlock status", "callback_data": "act:secrets:check-unlock"}],
+        [{"text": "📤 Export .env bundle", "callback_data": "act:secrets:export-secrets"}],
     ]
 
 
@@ -3423,8 +3430,10 @@ def _build_integrations_keyboard_rows(
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
         >>> rows = _build_integrations_keyboard_rows(WorkspaceConfig.minimal())
-        >>> rows[0][0]["callback_data"]
+        >>> rows[-1][0]["callback_data"]
         'cfg:integrations:refresh'
+        >>> rows[-2][0]["callback_data"]
+        'act:integrations:status'
     """
     rows: list[list[dict[str, Any]]] = []
     url = _mission_control_url(workspace, fragment="integrations")
@@ -3450,6 +3459,7 @@ def _build_integrations_keyboard_rows(
                 ),
             ],
         )
+    rows.append([{"text": "📋 Integration status", "callback_data": "act:integrations:status"}])
     rows.append([{"text": "🔄 Refresh list", "callback_data": "cfg:integrations:refresh"}])
     return rows
 
@@ -4367,6 +4377,46 @@ def _build_deployment_deploy_keyboard_rows() -> list[list[dict[str, Any]]]:
     ]
 
 
+def _build_deployment_host_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Deployment > Host-only commands — copy-paste cards only (D17, W8).
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_deployment_host_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:host:onboard'
+    """
+    return [
+        [{"text": "🧭 Onboard wizard", "callback_data": "act:host:onboard"}],
+        [{"text": "⌨️ Shell completion", "callback_data": "act:host:completion"}],
+        [{"text": "🕵️ Shell-history hook", "callback_data": "act:host:shell-history"}],
+        [{"text": "🔑 Set gateway token", "callback_data": "act:host:gateway-token"}],
+        [{"text": "🔐 Set dashboard password", "callback_data": "act:host:dashboard-password"}],
+        [{"text": "🗝 Store passphrase", "callback_data": "act:host:store-passphrase"}],
+        [{"text": "☠️ Uninstall sevn", "callback_data": "act:host:uninstall"}],
+    ]
+
+
+def _build_help_dev_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Help > Developer — repo-only copy-paste cards (W8, checkout-gated).
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_help_dev_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:dev:readme'
+    """
+    return [
+        [{"text": "📘 README pipeline", "callback_data": "act:dev:readme"}],
+        [{"text": "📗 About-docs", "callback_data": "act:dev:about-docs"}],
+        [{"text": "🖥 GUI migration notes", "callback_data": "act:dev:gui-migrate"}],
+    ]
+
+
 def _build_help_guides_keyboard_rows() -> list[list[dict[str, Any]]]:
     """Help > Guides (W7e).
 
@@ -4431,6 +4481,7 @@ def _build_deployment_keyboard_rows(
         ),
     )
     if is_owner:
+        _append_nav_section_rows(rows, (("🖥 Host-only commands", "deployment_host"),))
         auto_resume = _gateway_auto_resume_b(workspace)
         rows.append(
             [
@@ -4485,11 +4536,18 @@ def _build_skills_tools_keyboard_rows(
     return rows
 
 
-def _build_help_redesign_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str, Any]]]:
+def _build_help_redesign_keyboard_rows(
+    workspace: WorkspaceConfig,
+    *,
+    content_root: Path | None = None,
+    is_owner: bool = True,
+) -> list[list[dict[str, Any]]]:
     """Help root tile — slash catalog body plus sevn.bot upstream rows.
 
     Args:
         workspace (WorkspaceConfig): Parsed workspace settings.
+        content_root (Path | None): Workspace content root for checkout guard.
+        is_owner (bool): When ``False``, hide owner-only Developer nav.
 
     Returns:
         list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
@@ -4500,6 +4558,8 @@ def _build_help_redesign_keyboard_rows(workspace: WorkspaceConfig) -> list[list[
         >>> rows[-1][0]["callback_data"]
         'cfg:section:sevn_bot'
     """
+    from sevn.gateway.menu.host_command_cards import has_bound_source_checkout
+
     _ = workspace
     rows: list[list[dict[str, Any]]] = [
         [{"text": "📖 Slash commands", "callback_data": "act:help:slash"}],
@@ -4512,6 +4572,8 @@ def _build_help_redesign_keyboard_rows(workspace: WorkspaceConfig) -> list[list[
         [{"text": "🏷 CLI version", "callback_data": "act:help:version"}],
         [{"text": "🌐 about.sevn.bot", "callback_data": "act:help:about"}],
     ]
+    if is_owner and has_bound_source_checkout(workspace, content_root):
+        rows.insert(-1, [_nav_section_button("🧑‍💻 Developer", "help_dev")])
     rows.append([_nav_section_button("sevn.bot (legacy)", "sevn_bot")])
     return rows
 
@@ -4676,14 +4738,22 @@ def build_config_menu_keyboard(
         rows_sec = _build_deployment_update_keyboard_rows()
     elif section == "deployment_deploy":
         rows_sec = _build_deployment_deploy_keyboard_rows()
+    elif section == "deployment_host":
+        rows_sec = _build_deployment_host_keyboard_rows()
     elif section == "help_guides":
         rows_sec = _build_help_guides_keyboard_rows()
+    elif section == "help_dev":
+        rows_sec = _build_help_dev_keyboard_rows()
     elif section == "skills_tools":
         rows_sec = _build_tools_keyboard_rows(workspace, content_root)
     elif section == "skills_integrations":
         rows_sec = _build_integrations_keyboard_rows(workspace, content_root)
     elif section == "help":
-        rows_sec = _build_help_redesign_keyboard_rows(workspace)
+        rows_sec = _build_help_redesign_keyboard_rows(
+            workspace,
+            content_root=content_root,
+            is_owner=is_owner,
+        )
     elif section == "skills":
         rows_sec = _build_skills_tools_keyboard_rows(workspace, content_root)
     elif section == "skills:social_media_manager":
@@ -5183,6 +5253,18 @@ def config_menu_message_text(
         return "Update & migrate\n\nCLI upgrade hints, checkout sync, schema posture, and import."
     if section == "deployment_deploy":
         return "Deploy to host\n\nCheck SSH inventory hosts and deploy from an export bundle."
+    if section == "deployment_host":
+        return (
+            "Host-only commands\n\n"
+            "These run in your shell, not through the gateway.\n"
+            "Tap one to get a copy-paste block."
+        )
+    if section == "help_dev":
+        return (
+            "Developer — source checkout bound\n\n"
+            "These only work inside a sevn.bot git checkout.\n"
+            "Each row posts the exact command to paste."
+        )
     if section == "help_guides":
         from sevn.cli.help.guide import list_guide_topics
 

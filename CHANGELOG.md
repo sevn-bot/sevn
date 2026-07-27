@@ -19,6 +19,7 @@ are cut into a dated, versioned section at release time.
 - [2026-07-27] Telegram ``/config`` Skills & Tools + Memory leaves (W7c): skills list/sync/security-scan, tool health, memory search/index, Second Brain reindex/bootstrap, Dreaming status/backfill/undo/cron, OpenWiki install/configure with conditional rows
 - [2026-07-27] Telegram ``/config`` Access + Health leaves (W7d): secrets list/rm/unlock with two-step confirm, provider OAuth link/unlink, GitHub token form, DM policy & pairing, doctor/usage, turn bundles export/view, tracing config; confirm-gate helper and D15 unknown-suffix rejection
 - [2026-07-27] Telegram ``/config`` Deployment + Help leaves (W7e): service start/stop/status/logs, tunnel one-shot control and setup form, config show/validate/set/sections, update/schema/migrate, deploy check/remote confirm, slash commands, guides list/read, CLI version
+- [2026-07-27] Telegram ``/config`` build rows (W8): host-only and developer copy-paste command cards (D17), checkout-gated Help › Developer, secrets export bundle with two-step confirm and file delivery, integrations status listing, Health › Status pin dashboard-password host card
 
 ### Changed
 

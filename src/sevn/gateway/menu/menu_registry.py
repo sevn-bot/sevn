@@ -1362,6 +1362,91 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         notes="Two-step confirm (W7e)",
     )
 
+    # --- C31. Build rows (W8) ---
+    add(
+        "C31.1",
+        _exact("cfg:section:deployment_host"),
+        "C",
+        "deployment",
+        "Host-only commands nav",
+        implemented=True,
+        owner_only=True,
+        notes="Nav to deployment_host (W8)",
+    )
+    for spec_id, pattern, label in (
+        ("C31.2", _exact("act:host:onboard"), "Onboard wizard"),
+        ("C31.3", _exact("act:host:completion"), "Shell completion"),
+        ("C31.4", _exact("act:host:shell-history"), "Shell-history hook"),
+        ("C31.5", _exact("act:host:gateway-token"), "Set gateway token"),
+        ("C31.6", _exact("act:host:dashboard-password"), "Set dashboard password"),
+        ("C31.7", _exact("act:host:store-passphrase"), "Store passphrase"),
+        ("C31.8", _exact("act:host:uninstall"), "Uninstall sevn"),
+    ):
+        add(
+            spec_id,
+            pattern,
+            "C",
+            "deployment_host",
+            label,
+            implemented=True,
+            owner_only=True,
+            notes="Host-only copy-paste card (W8, D17)",
+        )
+    add(
+        "C31.9",
+        _exact("cfg:section:help_dev"),
+        "C",
+        "help",
+        "Developer nav",
+        implemented=True,
+        owner_only=True,
+        notes="Checkout-gated nav (W8)",
+    )
+    for spec_id, pattern, label in (
+        ("C31.10", _exact("act:dev:readme"), "README pipeline"),
+        ("C31.11", _exact("act:dev:about-docs"), "About-docs"),
+        ("C31.12", _exact("act:dev:gui-migrate"), "GUI migration notes"),
+    ):
+        add(
+            spec_id,
+            pattern,
+            "C",
+            "help_dev",
+            label,
+            implemented=True,
+            owner_only=True,
+            notes="Developer copy-paste card (W8)",
+        )
+    add(
+        "C31.13",
+        _exact("act:secrets:export-secrets"),
+        "C",
+        "access_secrets",
+        "Export .env bundle",
+        implemented=True,
+        owner_only=True,
+        notes="Two-step confirm + file delivery (W8)",
+    )
+    add(
+        "C31.14",
+        r"^act:secrets:export-secrets:(?:confirm|cancel)$",
+        "C",
+        "access_secrets",
+        "Export bundle confirm",
+        implemented=True,
+        owner_only=True,
+        notes="Confirm/cancel gate (W8)",
+    )
+    add(
+        "C31.15",
+        _exact("act:integrations:status"),
+        "C",
+        "skills_integrations",
+        "Integration status",
+        implemented=True,
+        notes="Per-integration listing (W8)",
+    )
+
     # --- C14. Integrations ---
     add(
         "C14.1",

@@ -116,6 +116,22 @@ _CFG_ACTION_KEYS: frozenset[str] = frozenset(
     }
 )
 
+_HOST_SHELL_COMMANDS: dict[str, str] = {
+    "onboard": "sevn onboard --web",
+    "completion": "sevn completion install",
+    "shell-history": "sevn shell-history install",
+    "gateway-token": "sevn gateway set-gateway-token",
+    "dashboard-password": "sevn dashboard set-login-password",
+    "store-passphrase": "sevn secrets store-passphrase",
+    "uninstall": "sevn unboard",
+}
+
+_DEV_SHELL_COMMANDS: dict[str, str] = {
+    "readme": "sevn readme check|generate|update|scaffold|index|curate|fingerprint",
+    "about-docs": "sevn about-docs check|generate|index|extract|context|schema|migrate",
+    "gui-migrate": "sevn gui migrate",
+}
+
 _CALLBACK_SECTION_PREFIXES: tuple[tuple[str, ConfigSection], ...] = (
     ("voice:", "chat_voice"),
     ("security:", "access_guard"),
@@ -647,6 +663,12 @@ class MenuActionRouter:
                 return await self._handle_update_action(msg, raw, target)
             if target.startswith("deploy:"):
                 return await self._handle_deploy_action(msg, raw, target)
+            if target == "integrations:status":
+                return await self._handle_integrations_status(msg, raw)
+            if target.startswith("host:"):
+                return await self._handle_host_action(msg, raw, target)
+            if target.startswith("dev:"):
+                return await self._handle_dev_action(msg, raw, target)
             if target in {"skills:refresh", "integrations:refresh"}:
                 answered = await self._refresh_config_menu_after_action(
                     msg,
@@ -2235,6 +2257,12 @@ class MenuActionRouter:
             return await self._handle_secrets_rm_confirm(msg, callback_data)
         if target == "secrets:rm:cancel":
             return await self._handle_secrets_rm_cancel(msg, callback_data)
+        if target == "secrets:export-secrets":
+            return await self._handle_secrets_export_prompt(msg, callback_data)
+        if target == "secrets:export-secrets:confirm":
+            return await self._handle_secrets_export_confirm(msg, callback_data)
+        if target == "secrets:export-secrets:cancel":
+            return await self._handle_secrets_export_cancel(msg, callback_data)
         toast = self.reject_unknown_callback_suffix("act:secrets:", target.removeprefix("secrets:"))
         answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
         return None if answered else toast
@@ -2479,6 +2507,335 @@ class MenuActionRouter:
             ).current = ConfigMenuNavFrame(
                 section="access_secrets",
             )
+        answered = await self._refresh_config_menu_after_action(
+            msg, callback_data, toast="Cancelled."
+        )
+        return None if answered else "Cancelled."
+
+    async def _handle_host_action(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        target: str,
+    ) -> str | None:
+        """Post copy-paste host-only command cards (D17, W8).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed action target after ``act:``.
+
+        Returns:
+            str | None: Toast when the card could not be sent.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_host_action)
+            True
+        """
+        _ = callback_data
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        suffix = target.removeprefix("host:")
+        command = _HOST_SHELL_COMMANDS.get(suffix)
+        if command is None:
+            toast = self.reject_unknown_callback_suffix("act:host:", suffix)
+            answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+            return None if answered else toast
+        from sevn.gateway.menu.host_command_cards import render_host_command_card
+
+        card = await render_host_command_card(
+            command,
+            why="Run this in your shell — the gateway cannot execute it here.",
+        )
+        await self._send_logs_chunks(msg, [card])
+        await self._answer_chat_action(msg, "Command card sent")
+        return None
+
+    async def _handle_dev_action(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        target: str,
+    ) -> str | None:
+        """Post repo-only developer copy-paste cards (W8).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed action target after ``act:``.
+
+        Returns:
+            str | None: Toast when the card could not be sent.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_dev_action)
+            True
+        """
+        _ = callback_data
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        from sevn.config.sevn_repo import resolve_sevn_checkout_for_workspace
+        from sevn.gateway.menu.host_command_cards import (
+            has_bound_source_checkout,
+            render_host_command_card,
+        )
+
+        if not has_bound_source_checkout(self._workspace, self._content_root):
+            return "No sevn.bot checkout — set my_sevn.repo_path in sevn.json."
+        suffix = target.removeprefix("dev:")
+        command = _DEV_SHELL_COMMANDS.get(suffix)
+        if command is None:
+            toast = self.reject_unknown_callback_suffix("act:dev:", suffix)
+            answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+            return None if answered else toast
+        checkout = resolve_sevn_checkout_for_workspace(
+            self._workspace,
+            content_root=self._content_root,
+        )
+        why = "Run this inside your sevn.bot git checkout — the gateway cannot execute it here."
+        if checkout is not None:
+            why = f"{why}\nCheckout: {checkout}"
+        card = await render_host_command_card(command, why=why)
+        await self._send_logs_chunks(msg, [card])
+        await self._answer_chat_action(msg, "Developer command card sent")
+        return None
+
+    async def _handle_integrations_status(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """List per-integration enabled/config posture (W8).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Error toast when listing failed.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_integrations_status)
+            True
+        """
+        _ = callback_data
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.gateway.menu.menu import (
+            _configured_integration_ids,
+            _integration_enabled,
+            _raw_sevn_doc,
+            _schema_has_integration_enabled_toggle,
+        )
+
+        raw_doc = _raw_sevn_doc(self._content_root)
+        ids = _configured_integration_ids(self._workspace, raw_doc=raw_doc)
+        if not ids:
+            body = "No integrations configured yet."
+        else:
+            lines = ["Integration status", ""]
+            for integration_id in ids:
+                enabled = _integration_enabled(
+                    self._workspace,
+                    integration_id,
+                    raw_doc=raw_doc,
+                )
+                toggle = (
+                    "schema toggle"
+                    if _schema_has_integration_enabled_toggle(integration_id)
+                    else "no schema toggle"
+                )
+                lines.append(f"• {integration_id}: enabled={'on' if enabled else 'off'} ({toggle})")
+            body = "\n".join(lines)
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Integration status sent")
+        return None
+
+    async def _edit_secrets_export_confirm(self, msg: IncomingMessage) -> bool:
+        """Edit the menu message to the export-secrets confirmation screen (W8).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+
+        Returns:
+            bool: ``True`` when the confirm screen was shown.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._edit_secrets_export_confirm)
+            True
+        """
+        from sevn.gateway.menu.confirm_gates import (
+            build_confirm_gate_keyboard,
+            confirm_gate_message,
+        )
+        from sevn.gateway.menu.menu import _config_chrome
+
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        chat_raw = md.get("chat_id")
+        message_raw = md.get("message_id")
+        if not isinstance(chat_raw, int) or not isinstance(message_raw, int):
+            return False
+        adapter = self._router._adapters.get(msg.channel)
+        if adapter is None:
+            return False
+        thread_id = _telegram_api_thread_id(md)
+        rows = build_confirm_gate_keyboard("secrets:export-secrets")
+        rows.extend(_config_chrome())
+        edit_text = getattr(adapter, "edit_message_text", None)
+        if not callable(edit_text):
+            return False
+        caption = confirm_gate_message(
+            title="Export .env bundle",
+            detail=(
+                "Writes a plaintext `.env` bundle with decrypted secrets.\n"
+                "Store it safely — anyone with the file can recover your secrets."
+            ),
+        )
+        body: dict[str, Any] = {
+            "chat_id": chat_raw,
+            "message_id": message_raw,
+            "text": caption,
+            "reply_markup": {"inline_keyboard": rows},
+        }
+        if thread_id is not None:
+            body["message_thread_id"] = thread_id
+        config_menu_nav_push_current(self._router, chat_raw, message_raw)
+        return bool(await cast("Callable[..., Awaitable[Any]]", edit_text)(**body))
+
+    async def _handle_secrets_export_prompt(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """Show two-step confirm before exporting secrets (W8).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Toast when confirm could not be shown.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_secrets_export_prompt)
+            True
+        """
+        _ = callback_data
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        if await self._edit_secrets_export_confirm(msg):
+            await self._answer_chat_action(msg, "Confirm export")
+            return None
+        return "Could not show export confirm."
+
+    async def _handle_secrets_export_confirm(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """Export decrypted secrets to a bundle file and deliver via Telegram (W8).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Error toast when export failed.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_secrets_export_confirm)
+            True
+        """
+        _ = callback_data
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        from sevn.gateway.channel_router import OutgoingMessage, _telegram_reply_metadata
+        from sevn.onboarding.export_bundle import ExportBundleError, run_export_secrets
+        from sevn.tools.outbound import _attachment_kind, _guess_mime
+
+        export_dir = self._content_root / ".sevn" / "telegram-exports"
+        export_dir.mkdir(parents=True, exist_ok=True)
+        out_path = export_dir / "secrets-export.env"
+        try:
+            result = await run_export_secrets(
+                workspace_root=self._content_root,
+                to_file=out_path,
+                force=True,
+            )
+        except ExportBundleError as exc:
+            return str(exc)
+        adapter = self._router._adapters.get(msg.channel)
+        if adapter is None:
+            return "Channel unavailable."
+        attachment_meta: dict[str, Any] = {
+            "attachment_path": str(result.path),
+            "attachment_filename": result.path.name,
+            "attachment_mime": _guess_mime(result.path),
+            "attachment_kind": _attachment_kind(result.path),
+        }
+        attachment_meta.update(_telegram_reply_metadata(msg))
+        summary = (
+            f"Exported {result.secret_count} secret(s) for {result.bot_name!r}.\n"
+            "Plaintext bundle attached — store it safely."
+        )
+        if result.git_unignored_warning:
+            summary += "\nWarning: export path is not git-ignored."
+        await adapter.send(
+            OutgoingMessage(
+                channel=msg.channel,
+                user_id=msg.user_id,
+                text=summary,
+                metadata=attachment_meta,
+            ),
+        )
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        chat_raw = md.get("chat_id")
+        if isinstance(chat_raw, int) and isinstance(md.get("message_id"), int):
+            get_config_menu_nav(
+                self._router, chat_raw, md["message_id"]
+            ).current = ConfigMenuNavFrame(section="access_secrets")
+        answered = await self._refresh_config_menu_after_action(
+            msg,
+            callback_data,
+            toast="Export sent.",
+        )
+        return None if answered else "Export sent."
+
+    async def _handle_secrets_export_cancel(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+    ) -> str | None:
+        """Return to Access > Secrets after cancelling export confirm (W8).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Toast when refresh was skipped.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_secrets_export_cancel)
+            True
+        """
+        _ = callback_data
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        chat_raw = md.get("chat_id")
+        if isinstance(chat_raw, int) and isinstance(md.get("message_id"), int):
+            get_config_menu_nav(
+                self._router, chat_raw, md["message_id"]
+            ).current = ConfigMenuNavFrame(section="access_secrets")
         answered = await self._refresh_config_menu_after_action(
             msg, callback_data, toast="Cancelled."
         )
