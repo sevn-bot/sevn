@@ -11,6 +11,10 @@
 # committed here: the reviewer writes it when it first accepts a pushback, and
 # until then its absence simply reads as empty memory.
 
+# Post GitHub APPROVE (not COMMENT) when the reviewer sets approved:true, so a
+# successful re-review supersedes a prior CHANGES_REQUESTED review.
+prApproveEnabled: true
+
 # Mechanical gates the reviewer runs over a PR's changed files, so a convention
 # violation is reported as a named failing command instead of a style opinion.
 #

@@ -13,8 +13,9 @@
 # Auth: only CLAUDE_CODE_OAUTH_TOKEN is required (Claude subscription); the job
 # skips gracefully when it is absent (e.g. fork PRs).
 #
-# To make this a hard merge gate, add the "pullfrog-py review" job (or the
-# `pullfrog-approval` check) to branch protection required checks.
+# Merge gate: ruleset `require-pullfrog-py-review` requires the **pullfrog-py
+# review** job check only — not the raw `pullfrog` completion check (which goes
+# red on agent infra failures while the enforce step correctly fail-opens).
 name: pullfrog-py
 
 on:
@@ -68,6 +69,14 @@ jobs:
           # below, so a persisted token cannot be used to push.
           persist-credentials: true
 
+      - name: Ensure PR base ref exists locally
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          base="${{ github.event.pull_request.base.ref }}"
+          git fetch --no-tags origin "${base}:refs/remotes/origin/${base}"
+          git branch -f "${base}" "origin/${base}"
+
       - name: Skip when Claude subscription auth is not configured
         if: env.HAS_CLAUDE_CODE != 'true'
         run: |
@@ -78,12 +87,12 @@ jobs:
         id: pullfrog
         continue-on-error: true
         # pullfrog-py, SHA-pinned to alexhawat/pullfrog-py main.
-        uses: alexhawat/pullfrog-py@0d40626097fd92976425f7eacd2e213ee1f6d5d5 # main
+        uses: alexhawat/pullfrog-py@4673ba4 # fix/checkout-pr-base-branch-alias
         with:
           # For pull_request events, name the PR number explicitly so the agent
           # calls checkout_pr(<n>) instead of asking which PR to review.
           prompt: >-
-            ${{ (github.event_name == 'pull_request' && format('Review pull request #{0}. Focus on correctness, security, regressions, missing tests, and maintainability. Leave concise, actionable comments only for issues that should be addressed before merge.', github.event.pull_request.number))
+            ${{ (github.event_name == 'pull_request' && format('Review pull request #{0}. Call checkout_pr first. For base-side file reads use origin/{1}:path, not bare branch names. If prior Pullfrog threads are resolved and the latest commits address them, submit approved:true with a short summary. Focus on correctness, security, regressions, missing tests, and maintainability. Leave concise, actionable comments only for issues that should be addressed before merge.', github.event.pull_request.number, github.event.pull_request.base.ref))
                 || (github.event_name == 'workflow_dispatch' && inputs.prompt != '' && inputs.prompt)
                 || 'Review the current pull request.' }}
           model: anthropic/claude-sonnet
