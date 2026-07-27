@@ -24,7 +24,6 @@ from tests.gateway.telegram_menu_redesign_helpers import DEFAULT_DOCS_WORKSPACE
     ],
 )
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W8: host-only card renders exact command", strict=False)
 async def test_host_only_row_renders_copy_paste_card(command: str) -> None:
     """W1.12 / D17 — host-only rows post ``<pre>`` command cards, never subprocess."""
     from sevn.gateway.menu.host_command_cards import render_host_command_card
@@ -35,7 +34,6 @@ async def test_host_only_row_renders_copy_paste_card(command: str) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W8: host-only rows never invoke subprocess", strict=False)
 async def test_host_only_card_never_spawns_subprocess() -> None:
     """W1.12 — render_host_command_card must not call subprocess."""
     from sevn.gateway.menu.host_command_cards import render_host_command_card
@@ -45,7 +43,6 @@ async def test_host_only_card_never_spawns_subprocess() -> None:
     run_mock.assert_not_called()
 
 
-@pytest.mark.xfail(reason="green after W8: unboard has no execution path", strict=False)
 def test_unboard_has_no_act_execution_callback() -> None:
     """W1.12 — uninstall row is print-only at every layer."""
     from sevn.gateway.menu.menu_registry import MENU_BUTTON_SPECS
@@ -58,7 +55,6 @@ def test_unboard_has_no_act_execution_callback() -> None:
     assert not unboard
 
 
-@pytest.mark.xfail(reason="green after W8: developer rows hidden without checkout", strict=False)
 def test_developer_section_hidden_without_checkout() -> None:
     """W1.12 — Help > Developer follows conditional-row precedent (hide, not grey)."""
     ws = WorkspaceConfig.minimal()
