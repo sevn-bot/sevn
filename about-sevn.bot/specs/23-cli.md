@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver the primary operator and automation surface for install, upgrades,
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
-last_updated: '2026-07-24'
-fingerprint: sha256:a7975b8a66ab1fd58112c38223dff12638a668e3b9c949c8fbf6f78dc93a895b
+last_updated: '2026-07-27'
+fingerprint: sha256:dcf17a167f6c160a6745a36ec334bdb8de6c0708c97ac32387750a61fefad9a6
 related: []
 sources:
 - src/sevn/cli/**
