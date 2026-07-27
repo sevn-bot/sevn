@@ -932,6 +932,7 @@ def test_my_sevn_bot_restart_buttons_owner_only() -> None:
 async def test_gateway_restart_non_owner_rejected(tmp_path: Path) -> None:
     """Non-owner tapping restart gets an owner-only toast."""
     router, cap, _root = _build_router(tmp_path)
+    router._owner_ids = frozenset()
     await router.route_incoming(
         _config_callback("act:gateway:restart", callback_query_id="cq-restart"),
     )
