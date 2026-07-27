@@ -775,6 +775,7 @@ def _build_models_router(
         WorkspaceLayout(sevn_json, root),
         NullTraceSink(),
     )
+    router._owner_ids = frozenset({"u1"})
     return router, cap, root
 
 
