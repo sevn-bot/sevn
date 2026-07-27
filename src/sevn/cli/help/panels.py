@@ -1,4 +1,4 @@
-"""Mission Control eight-group ``rich_help_panel`` SSOT for the root CLI (D11).
+"""Telegram ``/config`` eight-group ``rich_help_panel`` SSOT for the root CLI.
 
 Module: sevn.cli.help.panels
 Depends: typer
@@ -17,64 +17,64 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import typer
 
-# Mirrors ``sevn.ui.dashboard.tab_registry.DASHBOARD_GROUPS`` group labels.
+# Mirrors ``_CONFIG_ROOT_TILES`` group labels in ``menu.py``.
 PANEL_ORDER: tuple[str, ...] = (
-    "Core",
-    "Observability",
+    "Chat",
     "Agent",
-    "Knowledge",
-    "Self-improve",
-    "Evolution",
-    "Ops",
-    "Surfaces",
+    "Skills & Tools",
+    "Memory",
+    "Access",
+    "Health",
+    "Deployment",
+    "Help",
 )
 
 ROOT_COMMAND_PANELS: dict[str, str] = {
-    "about-docs": "Ops",
-    "agent": "Core",
-    "channels": "Observability",
-    "completion": "Ops",
-    "config": "Ops",
-    "dashboard": "Core",
-    "deploy": "Ops",
-    "doctor": "Core",
-    "export-secrets": "Ops",
-    "gateway": "Ops",
-    "gh": "Evolution",
-    "guide": "Ops",
-    "gui": "Surfaces",
-    "improve": "Self-improve",
-    "logs": "Observability",
-    "memory": "Knowledge",
-    "message": "Core",
+    "about-docs": "Help",
+    "agent": "Agent",
+    "channels": "Chat",
+    "completion": "Help",
+    "config": "Deployment",
+    "dashboard": "Deployment",
+    "deploy": "Deployment",
+    "doctor": "Health",
+    "export-secrets": "Access",
+    "gateway": "Deployment",
+    "gh": "Skills & Tools",
+    "guide": "Help",
+    "gui": "Deployment",
+    "improve": "Agent",
+    "logs": "Health",
+    "memory": "Memory",
+    "message": "Chat",
+    "migrate": "Deployment",
     "models": "Agent",
-    "migrate": "Ops",
-    "onboard": "Surfaces",
-    "openwiki": "Agent",
-    "pairing": "Ops",
-    "providers": "Ops",
-    "proxy": "Ops",
-    "readme": "Ops",
-    "remove": "Ops",
-    "secrets": "Ops",
-    "second-brain": "Knowledge",
-    "sessions": "Core",
-    "shell-history": "Ops",
-    "skills": "Agent",
+    "onboard": "Deployment",
+    "openwiki": "Memory",
+    "pairing": "Access",
+    "providers": "Access",
+    "proxy": "Deployment",
+    "readme": "Help",
+    "remove": "Deployment",
+    "secrets": "Access",
+    "second-brain": "Memory",
+    "sessions": "Chat",
+    "shell-history": "Help",
+    "skills": "Skills & Tools",
     "subagents": "Agent",
-    "sync": "Ops",
-    "tools": "Agent",
-    "traces": "Observability",
-    "tracing": "Observability",
-    "tunnel": "Ops",
-    "turn-bundle": "Observability",
-    "unboard": "Ops",
-    "uninstall": "Ops",
-    "update": "Ops",
-    "upgrade": "Ops",
-    "usage": "Observability",
-    "version": "Ops",
-    "voice": "Agent",
+    "sync": "Deployment",
+    "tools": "Skills & Tools",
+    "traces": "Health",
+    "tracing": "Health",
+    "tunnel": "Deployment",
+    "turn-bundle": "Health",
+    "unboard": "Deployment",
+    "uninstall": "Deployment",
+    "update": "Deployment",
+    "upgrade": "Deployment",
+    "usage": "Health",
+    "version": "Help",
+    "voice": "Chat",
 }
 
 
@@ -89,13 +89,13 @@ def panel_for(command: str) -> str:
 
     Examples:
         >>> panel_for("doctor")
-        'Core'
-        >>> panel_for("logs")
-        'Observability'
+        'Health'
+        >>> panel_for("sessions")
+        'Chat'
         >>> panel_for("unknown-cmd")
-        'Ops'
+        'Help'
     """
-    return ROOT_COMMAND_PANELS.get(command, "Ops")
+    return ROOT_COMMAND_PANELS.get(command, "Help")
 
 
 def _panel_value(raw: object, *, command: str) -> str:
@@ -109,10 +109,10 @@ def _panel_value(raw: object, *, command: str) -> str:
         str: Panel label.
 
     Examples:
-        >>> _panel_value("Core", command="doctor")
-        'Core'
+        >>> _panel_value("Health", command="doctor")
+        'Health'
         >>> _panel_value(None, command="doctor")
-        'Core'
+        'Health'
     """
     if isinstance(raw, str) and raw:
         return raw

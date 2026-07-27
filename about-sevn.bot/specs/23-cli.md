@@ -821,6 +821,13 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
 
+## Amendments (telegram-menu-redesign W9)
+
+Root CLI ``rich_help_panel`` groups mirror the eight Telegram ``/config`` tiles
+(``sevn.cli.help.panels.PANEL_ORDER``). ``sevn config sections`` lists the same eight
+slugs derived from ``menu_registry`` (``config_paths.menu_registry_root_slugs()``).
+``make cli-help-docs-check`` gates panel drift.
+
 ## Human-input needed
 
 Prose body not yet authored (W9 scope). Normative contract requires operator or

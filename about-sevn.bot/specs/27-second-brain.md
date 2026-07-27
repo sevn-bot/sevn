@@ -394,6 +394,13 @@ Initial draft for **Failure Modes** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
 
 Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
+
+## Amendments (telegram-menu-redesign W9)
+
+Telegram `/config` Memory › Second Brain is the first menu presence for
+``sevn second-brain`` operations (reindex, bootstrap, vault layout captions); nav
+replaces the former Advanced › Second Brain dump.
+
 ## Test Strategy
 
 Unit tests under `tests/second_brain/` cover path resolution, bootstrap idempotency, config validation, CLI setup, Telegram menu captions, and onboarding capability manifest rows.

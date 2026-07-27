@@ -23,6 +23,10 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- [2026-07-27] Telegram ``/config`` docs catalog regenerated for the eight-tile tree (`make telegram-menu-docs-check` green); root CLI help panels mirror the eight menu groups; redesign proposal HTML marked shipped (live SSOT: ``Telegram Menu.html``)
+
+### Fixed
+
 - [2026-07-26] Telegram ``/config`` section ids renamed to the redesign tree (43 sections under eight root tiles); stale ``cfg:section:*`` callbacks resolve through a permanent alias table (``session``→Chat, ``my_sevn_bot``→Deployment, ``advanced``→moved toast) and unknown ids answer gracefully instead of erroring
 - [2026-07-26] Telegram ``/config`` Advanced section dissolved: auto-resume tier B on Deployment, trace redaction de-duplicated to Health > Trace export (``C20.6``), queue mode only on Chat, RLM/CodeMode/Self-Improve under Agent > Lab, Second Brain under Memory, Sub-agents under Agent; stale ``cfg:section:advanced`` answers a moved toast
 

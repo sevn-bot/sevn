@@ -188,6 +188,12 @@ Initial draft for **Failure Modes** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Failure Modes — acceptance criteria and edge cases. -->
 
 Document observable failure surfaces from the implementing modules (exceptions, logged errors, degraded modes) — cite code paths.
+
+## Amendments (telegram-menu-redesign W9)
+
+Telegram `/config` Memory › Dreaming exposes status, backfill, undo, and cron rows
+for the dreaming pipeline — first menu presence for ``sevn memory dreaming`` controls.
+
 ## Test Strategy
 
 Initial draft for **Test Strategy** — grounded in extracted interfaces; confirm normative wording.

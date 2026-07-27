@@ -288,6 +288,64 @@ def _button_stub(btn: LiveButton) -> str:
     )
 
 
+def _has_section_in_catalog(text: str, section_id: str) -> bool:
+    """Return whether ``SECTIONS.<id>`` exists in the dev catalog block.
+
+    Args:
+        text (str): Full dev HTML file.
+        section_id (str): Config section slug.
+
+    Returns:
+        bool: ``True`` when the section key is declared under ``const SECTIONS``.
+
+    Examples:
+        >>> html = 'const SECTIONS = {\\n      chat: { title: "C" },\\n    };'
+        >>> _has_section_in_catalog(html, "chat")
+        True
+        >>> _has_section_in_catalog('Type slash commands in chat: /help', "chat")
+        False
+    """
+    bounds = sections_block_bounds(text)
+    if bounds is None:
+        return False
+    block = text[bounds[0] : bounds[1]]
+    return re.search(rf"(?m)^\s+{re.escape(section_id)}:\s*\{{", block) is not None
+
+
+def _sync_root_tiles(text: str, live: dict[str, LiveSection]) -> str:
+    """Replace ``ROOT_TILES`` with the live eight-tile root keyboard.
+
+    Args:
+        text (str): Full dev HTML file.
+        live (dict[str, LiveSection]): Live snapshot keyed by root section id.
+
+    Returns:
+        str: Updated HTML when the block changed.
+
+    Examples:
+        >>> html = 'const ROOT_TILES = [\\n      ["session", "S"],\\n    ];'
+        >>> out = _sync_root_tiles(html, {"chat": LiveSection("chat", "💬 Chat", "cfg:section:chat", ())})
+        >>> '["chat", "💬 Chat"]' in out and '["session"' not in out
+        True
+    """
+    from sevn.gateway.menu.menu import _CONFIG_ROOT_TILES
+
+    marker = "const ROOT_TILES = ["
+    start = text.find(marker)
+    if start < 0:
+        return text
+    close = text.find("\n    ];", start)
+    if close < 0:
+        return text
+    rows: list[str] = []
+    for label, section_id, _, _ in _CONFIG_ROOT_TILES:
+        if section_id not in live:
+            continue
+        rows.append(f'      ["{section_id}", "{label}"],')
+    new_block = marker + "\n" + "\n".join(rows) + "\n    "
+    return text[:start] + new_block + text[close + 1 :]
+
+
 def _insert_root_tile(text: str, section_id: str, tile_label: str) -> str:
     """Append one ``ROOT_TILES`` entry when missing.
 
@@ -334,11 +392,16 @@ def _append_button_to_section(text: str, section_id: str, btn: LiveButton) -> st
         >>> _append_button_to_section(html, "logs", LiveButton("X", "cfg:logs:x", True))
         'logs: { title: "L", status: "WIP", short: "s", long: "l", buttons: [ ], },'
     """
+    bounds = sections_block_bounds(text)
+    if bounds is None:
+        return text
+    sec_start, sec_end = bounds
+    block = text[sec_start:sec_end]
     pattern = re.compile(
-        rf"(\s+{re.escape(section_id)}:\s*\{{[\s\S]*?buttons:\s*\[)([\s\S]*?)(\n\s+\],)",
+        rf"(\s+{re.escape(section_id)}:\s*\{{[\s\S]*?buttons:\s*\[)([\s\S]*?)(\],)",
         re.MULTILINE,
     )
-    match = pattern.search(text)
+    match = pattern.search(block)
     if not match:
         return text
     body = match.group(2)
@@ -346,7 +409,8 @@ def _append_button_to_section(text: str, section_id: str, btn: LiveButton) -> st
     if stub.strip() in body:
         return text
     new_body = body.rstrip() + "\n" + stub
-    return text[: match.start(2)] + new_body + text[match.end(2) :]
+    new_block = block[: match.start(2)] + new_body + block[match.end(2) :]
+    return text[:sec_start] + new_block + text[sec_end:]
 
 
 def scaffold_dev_catalog(
@@ -387,7 +451,7 @@ def scaffold_dev_catalog(
             continue
         _, end = bounds
         stub = _section_stub(gap.section_id, live_sec)
-        if f"{gap.section_id}:" not in text:
+        if not _has_section_in_catalog(text, gap.section_id):
             text = text[:end] + stub + text[end:]
             inserted += 1
             bounds = sections_block_bounds(text)
@@ -404,6 +468,11 @@ def scaffold_dev_catalog(
             if new_text != text:
                 text = new_text
                 inserted += 1
+
+    synced = _sync_root_tiles(text, menu)
+    if synced != text:
+        text = synced
+        inserted += 1
 
     if inserted:
         path.write_text(text, encoding="utf-8")

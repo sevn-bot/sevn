@@ -563,6 +563,13 @@ Path resolution for file tools: `src/sevn/tools/paths.py` (`source_code/` prefix
 | Plugin disabled | Entry-point filtered by toggle |
 | Path escape | File ops reject paths outside allowed roots |
 
+## Amendments (telegram-menu-redesign W9)
+
+The browser recipe registry gains ``telegram_menu`` / ``telegram_menu_walk`` for the
+``/config`` menu E2E harness (``make telegram-menu-e2e`` when ``SEVN_TELEGRAM_MENU_E2E=1``),
+reusing ``TelegramWeb`` inline-keyboard primitives. Destructive menu rows are deny-listed
+(D6); the walker derives its expected tree from ``build_config_menu_keyboard()`` at runtime.
+
 ## Test Strategy
 
 | Tests | Focus |

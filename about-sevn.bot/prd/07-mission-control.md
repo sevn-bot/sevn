@@ -36,6 +36,12 @@ This PRD is `ready` while linked specs below are not normatively complete (`draf
 
 <!-- HUMAN-INPUT[owner=operator]: Reconcile PRD `ready` vs implementing spec maturity — downgrade PRD, or keep ready and finish normative spec bodies. -->
 
+## Amendments (telegram-menu-redesign W9)
+
+Root CLI ``sevn --help`` panels now mirror the eight Telegram ``/config`` menu groups
+so CLI discovery and Telegram navigation tell the same story; Mission Control tab groups
+remain separate dashboard taxonomy.
+
 ## Problem & Motivation
 
 A self-hosted AI bot that *can* do a lot is hard to live with unless you can *see* what it just

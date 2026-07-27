@@ -105,8 +105,9 @@
 </head>
 <body>
   <header>
-    <h1>Telegram <code>/config</code> menu — proposed redesign</h1>
-    <p>A structural proposal, not a snapshot of the running bot. The live catalog stays in <code>about-sevn.bot/Telegram Menu.html</code> (CI-gated by <code>make telegram-menu-docs-check</code>); this file describes where the menu should go, and how much of it works today. Status data re-verified against <code>519b0321</code>.</p>
+    <h1>Telegram <code>/config</code> menu — proposed redesign <span style="color:#81c784;font-size:0.85rem;">(shipped 2026-07-27)</span></h1>
+    <p><strong>Live source of truth:</strong> <code>about-sevn.bot/Telegram Menu.html</code> — CI-gated by <code>make telegram-menu-docs-check</code>. This file is a historical design artefact for the 19→8 tile regroup; the running bot matches the live catalog.</p>
+    <p>A structural proposal that shipped on branch <code>wave/telegram-menu-redesign</code>. Status data re-verified against <code>519b0321</code> at authoring time.</p>
     <p><strong>Problem.</strong> The root keyboard is 19 tiles deep — a 10-row wall of buttons where <em>Session</em>, <em>Notifications</em>, <em>Shortcuts</em>, <em>Channels</em> and <em>Voice</em> are five separate destinations for one idea ("how the chat behaves"), <em>Advanced</em> is a dumping ground for five unrelated sub-sections plus two orphan toggles, and <em>sevn.bot</em> sits next to <em>My sevn bot</em> with no way to tell them apart. Meanwhile only 20 of the 126 <code>sevn</code> CLI leaf commands have a menu destination that works today — see the coverage tab.</p>
     <p><strong>Proposal.</strong> Eight root tiles grouped by <em>what the operator is trying to do</em>, every section under 14 rows, no leaf deeper than three taps, and full <code>sevn</code> CLI coverage.</p>
     <div class="stats" id="stats"></div>

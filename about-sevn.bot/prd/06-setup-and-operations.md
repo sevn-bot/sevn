@@ -42,6 +42,12 @@ This PRD is `ready` while linked specs below are not normatively complete (`draf
 
 <!-- HUMAN-INPUT[owner=operator]: Reconcile PRD `ready` vs implementing spec maturity — downgrade PRD, or keep ready and finish normative spec bodies. -->
 
+## Amendments (telegram-menu-redesign W9)
+
+Telegram ``/config`` Deployment and Help sections expose service control, tunnel,
+doctor, config file editing, and guides — the phone-first operate-the-install surface
+this PRD describes alongside the CLI.
+
 ## Problem & Motivation
 
 Local-first AI bots are judged in the **first ten minutes**. The operator opens the README,

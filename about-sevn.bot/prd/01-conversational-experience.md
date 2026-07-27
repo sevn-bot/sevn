@@ -40,6 +40,12 @@ This PRD is `ready` while linked specs below are not normatively complete (`draf
 
 <!-- HUMAN-INPUT[owner=operator]: Reconcile PRD `ready` vs implementing spec maturity — downgrade PRD, or keep ready and finish normative spec bodies. -->
 
+## Amendments (telegram-menu-redesign W9)
+
+Telegram ``/config`` is regrouped into eight intent tiles with Chat as the home surface
+for session, channels, voice, shortcuts, and notifications — aligning inline menu navigation
+with the conversational UX this PRD describes.
+
 ## Problem & Motivation
 
 A personal AI is only useful if it lives in the conversational surfaces the operator

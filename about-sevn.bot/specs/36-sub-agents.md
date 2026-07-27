@@ -489,6 +489,12 @@ Public entrypoints: `execute_social_media_manager_task`, `parse_social_media_tas
 | Run timeout (D11) | Supervisor marks `failed` |
 | Crash mid-run (D10) | Boot orphan sweep → `orphaned`; not silently deleted |
 
+## Amendments (telegram-menu-redesign W9)
+
+Telegram `/config` Agent › Sub-agents › Running exposes per-run kill rows
+(``act:subagents:kill:*``) for owner operators; kill callbacks are deny-listed in the
+menu E2E harness (D6) but exercised to the confirm prompt then cancelled.
+
 ## Test Strategy
 
 Unit/harness tests only — no live LLM in CI:

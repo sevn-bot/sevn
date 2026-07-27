@@ -1566,6 +1566,13 @@ Sub-agent L1 registration/finalize hooks in `_run_guarded` (spec-36).
 and may spawn concurrent L1 tier-B runs (`src/sevn/gateway/queue/queue_multi.py`).
 `routing_footer.py` tags parallel L1 replies with short sub-agent ids.
 
+## Amendments (telegram-menu-redesign W9)
+
+Telegram `/config` callback routing serves the redesigned eight-tile tree via
+`build_config_menu_keyboard()` and `MenuActionRouter`; stale `cfg:section:*` ids
+resolve through `_SECTION_ALIASES`. Section dispatch and action handlers are shared
+with the menu E2E walker recipe (`src/sevn/browser/recipes/telegram_menu.py`).
+
 ## Test Strategy
 
 | Tests | Focus |

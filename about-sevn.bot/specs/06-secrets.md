@@ -187,6 +187,12 @@ Map to existing tests under `tests/` that cover this subsystem; add Makefile-onl
 
 Pass foundation reads + write paths: mocked `PassService` / Typer paths in `tests/proton_cli/test_pr_verifier_w1_red.py` (items/vault create, `pass secrets get`, unlock + item-decrypt surfacing, stdin `_resolve_secret_value`, SRP HV retry + `PROTON_HV_TOKEN`); skill bridge argv / async runner in `tests/skills/test_proton_management_skill*.py`; backend seam in `tests/security/secrets/test_proton_pass_backend.py`.
 
+## Amendments (telegram-menu-redesign W9)
+
+Telegram `/config` Access section lists, removes, and unlocks secrets from the menu;
+``export-secrets`` bundle export uses a two-step confirm gate before writing the archive.
+Host-only secret flows post copy-paste CLI cards when the gateway cannot execute them (D17).
+
 ## Human-input needed
 
 Prose body not yet authored (W9 scope). Normative contract requires operator or

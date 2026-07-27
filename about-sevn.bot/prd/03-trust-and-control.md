@@ -48,6 +48,13 @@ This PRD is `ready` while linked specs below are not normatively complete (`draf
 
 <!-- HUMAN-INPUT[owner=operator]: Reconcile PRD `ready` vs implementing spec maturity — downgrade PRD, or keep ready and finish normative spec bodies. -->
 
+## Amendments (telegram-menu-redesign W9)
+
+Telegram ``/config`` owner gating, two-step confirm gates on destructive rows, and
+honest host-only copy-paste cards (D17) implement the trust boundaries this PRD requires
+when operating from a phone — non-owners never see owner-only tiles, and rows that cannot
+run in-gateway fail gracefully with 🚧 toasts rather than dead taps.
+
 ## Problem & Motivation
 
 A personal AI is only useful if you can let it act on your behalf. The moment it can act,
