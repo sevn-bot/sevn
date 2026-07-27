@@ -16,6 +16,8 @@ Examples:
 
 from __future__ import annotations
 
+import asyncio
+import copy
 import json
 import re
 import secrets
@@ -35,7 +37,7 @@ from sevn.gateway.commands.shortcuts_store import (
     republish_set_my_commands,
     validate_shortcut_name,
 )
-from sevn.gateway.config_io.workspace_config_io import mutate_sevn_json
+from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
 from sevn.gateway.dispatcher.dispatcher_state import (
     dispatcher_state_ttl_for_kind,
     insert_dispatcher_state,
@@ -81,6 +83,12 @@ FORM_TARGETS: frozenset[str] = frozenset(
         "providers:oauth:login",
         "providers:oauth:logout",
         "turn_bundles:view",
+        "config:set",
+        "tunnel:setup",
+        "migrate:import",
+        "deploy:check",
+        "deploy:remote",
+        "guides:read",
     },
 )
 _SECRET_ALIAS_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
@@ -144,6 +152,18 @@ def parse_form_callback(data: str) -> str | None:
         return "providers:oauth:logout"
     if raw == "form:turn_bundles:view":
         return "turn_bundles:view"
+    if raw == "form:config:set":
+        return "config:set"
+    if raw == "form:tunnel:setup":
+        return "tunnel:setup"
+    if raw == "form:migrate:import":
+        return "migrate:import"
+    if raw == "form:deploy:check":
+        return "deploy:check"
+    if raw == "form:deploy:remote":
+        return "deploy:remote"
+    if raw == "form:guides:read":
+        return "guides:read"
     if raw.startswith("form:secret_wizard:"):
         alias = raw.removeprefix("form:secret_wizard:").strip()
         if alias and _SECRET_ALIAS_RE.match(alias):
@@ -296,6 +316,11 @@ class MenuFormHandler:
             "providers:oauth:login",
             "providers:oauth:logout",
             "turn_bundles:view",
+            "config:set",
+            "tunnel:setup",
+            "migrate:import",
+            "deploy:check",
+            "deploy:remote",
         } and not self._router._resolve_owner_flag(msg):
             await self._answer_callback(msg, text="Owner only.")
             return
@@ -366,6 +391,21 @@ class MenuFormHandler:
         elif target == "turn_bundles:view":
             section = "health_bundles"
             step = "turn_id"
+        elif target == "config:set":
+            section = "deployment_config"
+            step = "path"
+        elif target == "tunnel:setup":
+            section = "deployment_tunnel"
+            step = "mode"
+        elif target == "migrate:import":
+            section = "deployment_update"
+            step = "path"
+        elif target in {"deploy:check", "deploy:remote"}:
+            section = "deployment_deploy"
+            step = "host"
+        elif target == "guides:read":
+            section = "help_guides"
+            step = "topic"
         elif target == "discogs:oauth_start":
             section = "skills:discogs:setup"
             step = "consumer_key"
@@ -456,6 +496,18 @@ class MenuFormHandler:
             prompt = "Send provider id to unlink (e.g. openai):"
         elif target == "turn_bundles:view":
             prompt = "Send the turn correlation id to view:"
+        elif target == "config:set":
+            prompt = "Send the dot-path to set (e.g. gateway.port):"
+        elif target == "tunnel:setup":
+            prompt = "Send tunnel mode (cloudflare, ngrok, quick, or none):"
+        elif target == "migrate:import":
+            prompt = "Send foreign workspace path to import, or empty for in-place schema upgrade:"
+        elif target == "deploy:check":
+            prompt = "Send inventory host id (e.g. staging):"
+        elif target == "deploy:remote":
+            prompt = "Send inventory host id for remote deploy:"
+        elif target == "guides:read":
+            prompt = "Send guide topic slug (list guides first):"
         elif target == "discogs:oauth_start":
             prompt = "Send your Discogs OAuth consumer key:"
         elif target == "second_brain_vault_path":
@@ -568,6 +620,36 @@ class MenuFormHandler:
             return
         if target == "turn_bundles:view":
             await self._advance_turn_bundles_view_form(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "config:set":
+            await self._advance_config_set_form(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "tunnel:setup":
+            await self._advance_tunnel_setup_form(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "migrate:import":
+            await self._advance_migrate_import_form(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "deploy:check":
+            await self._advance_deploy_check_form(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "deploy:remote":
+            await self._advance_deploy_remote_form(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "guides:read":
+            await self._advance_guides_read_form(
                 msg, token=token, step=step, text=text, payload=payload
             )
             return
@@ -1673,6 +1755,322 @@ class MenuFormHandler:
         self._consume_token(token)
         body = "\n".join(lines) if lines else "No matching bundle lines."
         await self._refresh_section(msg, section="health_bundles", toast="Turn bundle sent.")
+        for chunk in format_for_telegram(body, redaction=None):
+            await self._send_chat(msg, chunk)
+
+    async def _advance_config_set_form(
+        self, msg: IncomingMessage, *, token: str, step: str, text: str, payload: dict[str, Any]
+    ) -> None:
+        """Apply ``form:config:set`` — dot-path then value (W7e).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_config_set_form)
+            True
+        """
+        from pydantic import ValidationError
+
+        from sevn.cli.workspace_schema import (
+            config_set_reload_hint,
+            dotted_path_in_schema,
+            load_workspace_json_schema,
+            parse_config_set_value,
+        )
+        from sevn.config.errors import UnsupportedSchemaVersionError
+        from sevn.config.model_resolution import maybe_split_unified_model_on_config_set
+        from sevn.onboarding.validate import validate_workspace_document
+        from sevn.onboarding.web_app import _set_nested
+
+        if step == "path":
+            dotted = text.strip()
+            if not dotted:
+                await self._send_chat(msg, "Dot path cannot be empty.")
+                return
+            try:
+                schema = load_workspace_json_schema()
+            except (OSError, json.JSONDecodeError) as exc:
+                await self._send_chat(msg, f"Schema unavailable: {exc}")
+                return
+            if not dotted_path_in_schema(schema, dotted):
+                await self._send_chat(msg, f"Unknown config key {dotted!r}.")
+                return
+            payload["path"] = dotted
+            payload["step"] = "value"
+            self._update_payload(token, payload)
+            await self._send_chat(msg, f"Send JSON or string value for `{dotted}`:")
+            return
+        dotted = str(payload.get("path", "")).strip()
+        if not dotted:
+            self._consume_token(token)
+            await self._send_chat(msg, "Form state lost — start again.")
+            return
+        try:
+            parsed_value = parse_config_set_value(text)
+            doc = load_raw_sevn_json(self._sevn_json) or {}
+            updated = copy.deepcopy(doc)
+            _set_nested(updated, dotted, parsed_value)
+            maybe_split_unified_model_on_config_set(updated, dotted, parsed_value)
+            validate_workspace_document(updated)
+
+            def _apply(d: dict[str, Any]) -> None:
+                d.clear()
+                d.update(updated)
+
+            mutate_sevn_json(self._sevn_json, _apply)
+        except (ValidationError, UnsupportedSchemaVersionError, ValueError, OSError) as exc:
+            await self._send_chat(msg, str(exc))
+            return
+        self._consume_token(token)
+        hint = config_set_reload_hint(dotted)
+        await self._refresh_section(msg, section="deployment_config", toast=f"✅ Set {dotted}.")
+        if hint:
+            await self._send_chat(msg, hint)
+
+    async def _advance_tunnel_setup_form(
+        self, msg: IncomingMessage, *, token: str, step: str, text: str, payload: dict[str, Any]
+    ) -> None:
+        """Apply ``form:tunnel:setup`` — pick tunnel provider mode (W7e).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_tunnel_setup_form)
+            True
+        """
+        from sevn.cli.commands.tunnel_cmd import _build_config_fields
+        from sevn.cli.gateway_token_store import GatewayTokenBootstrap
+        from sevn.cli.tunnel_setup_store import apply_tunnel_setup_local
+
+        _ = step, payload
+        mode = text.strip().lower()
+        if mode not in {"cloudflare", "ngrok", "quick", "none"}:
+            await self._send_chat(msg, "Mode must be cloudflare, ngrok, quick, or none.")
+            return
+        gateway_port = self._workspace.gateway.port if self._workspace.gateway else None
+        fields = _build_config_fields(
+            mode=mode,
+            hostname=None,
+            local_port=gateway_port,
+            metrics_addr=None,
+            config_path=None,
+            tunnel_id=None,
+        )
+        bootstrap = GatewayTokenBootstrap(
+            self._sevn_json, self._content_root, self._workspace.secrets_backend
+        )
+        try:
+            apply_tunnel_setup_local(bootstrap, config_fields=fields)
+        except ValueError as exc:
+            await self._send_chat(msg, str(exc))
+            return
+        self._consume_token(token)
+        await self._refresh_section(
+            msg, section="deployment_tunnel", toast=f"✅ Tunnel mode set to {mode}."
+        )
+        await self._send_chat(msg, f"Tunnel mode set to {mode}. Restart gateway if needed.")
+
+    async def _advance_migrate_import_form(
+        self, msg: IncomingMessage, *, token: str, step: str, text: str, payload: dict[str, Any]
+    ) -> None:
+        """Apply ``form:migrate:import`` — foreign import or schema upgrade (W7e).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_migrate_import_form)
+            True
+        """
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.onboarding.migrate import (
+            describe_schema_upgrade,
+            import_foreign_workspace,
+            upgrade_schema_inplace,
+        )
+        from sevn.workspace.layout import WorkspaceLayout
+
+        _ = step, payload
+        path_text = text.strip()
+        self._consume_token(token)
+        if path_text:
+            try:
+                resolved = await asyncio.to_thread(lambda: Path(path_text).resolve())
+                plan = await asyncio.to_thread(import_foreign_workspace, resolved, dry_run=True)
+            except (OSError, ValueError) as exc:
+                await self._send_chat(msg, str(exc))
+                return
+            body = json.dumps(plan.to_json_dict(), indent=2, sort_keys=True)
+            await self._refresh_section(msg, section="deployment_update", toast="Import plan sent.")
+            for chunk in format_for_telegram(body, redaction=None):
+                await self._send_chat(msg, chunk)
+            return
+        layout = WorkspaceLayout(self._sevn_json, self._content_root)
+        preview = describe_schema_upgrade(layout.content_root)
+        if not preview.get("changed"):
+            body = json.dumps(preview, indent=2, sort_keys=True)
+            await self._refresh_section(msg, section="deployment_update", toast="Schema current.")
+            for chunk in format_for_telegram(body, redaction=None):
+                await self._send_chat(msg, chunk)
+            return
+        summary = upgrade_schema_inplace(layout.content_root, consent=True, dry_run=False)
+        body = json.dumps(summary, indent=2, sort_keys=True)
+        await self._refresh_section(msg, section="deployment_update", toast="Schema upgraded.")
+        for chunk in format_for_telegram(body, redaction=None):
+            await self._send_chat(msg, chunk)
+
+    async def _advance_deploy_check_form(
+        self, msg: IncomingMessage, *, token: str, step: str, text: str, payload: dict[str, Any]
+    ) -> None:
+        """Apply ``form:deploy:check`` — SSH inventory host check (W7e).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_deploy_check_form)
+            True
+        """
+        import io
+        from contextlib import redirect_stdout
+
+        from sevn.cli.commands.deploy_cmd import _run_deploy_command
+        from sevn.deploy.remote import DeployMode
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+
+        _ = step, payload
+        host = text.strip()
+        if not host:
+            await self._send_chat(msg, "Host id cannot be empty.")
+            return
+        self._consume_token(token)
+        buf = io.StringIO()
+        try:
+            with redirect_stdout(buf):
+                await asyncio.to_thread(
+                    _run_deploy_command,
+                    host=host,
+                    inventory=None,
+                    mode=DeployMode.CHECK,
+                    bundle=None,
+                )
+        except Exception as exc:
+            from typer import Exit
+
+            if isinstance(exc, Exit):
+                await self._send_chat(msg, f"Deploy check failed (exit {exc.exit_code}).")
+            else:
+                await self._send_chat(msg, f"Deploy check failed: {exc}")
+            return
+        body = buf.getvalue().strip() or f"Deploy check ok for {host}."
+        await self._refresh_section(msg, section="deployment_deploy", toast="Deploy check sent.")
+        for chunk in format_for_telegram(body, redaction=None):
+            await self._send_chat(msg, chunk)
+
+    async def _advance_deploy_remote_form(
+        self, msg: IncomingMessage, *, token: str, step: str, text: str, payload: dict[str, Any]
+    ) -> None:
+        """Apply ``form:deploy:remote`` — host then bundle path (W7e).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_deploy_remote_form)
+            True
+        """
+        if step == "host":
+            host = text.strip()
+            if not host:
+                await self._send_chat(msg, "Host id cannot be empty.")
+                return
+            payload["host"] = host
+            payload["step"] = "bundle"
+            self._update_payload(token, payload)
+            await self._send_chat(msg, "Send export bundle path (.env from export-secrets):")
+            return
+        host = str(payload.get("host", "")).strip()
+        bundle = text.strip()
+        if not host or not bundle:
+            self._consume_token(token)
+            await self._send_chat(msg, "Form state lost — start again.")
+            return
+        bundle_path = await asyncio.to_thread(lambda: Path(bundle).expanduser())
+        bundle_exists = await asyncio.to_thread(bundle_path.is_file)
+        if not bundle_exists:
+            await self._send_chat(msg, f"Bundle not found: {bundle_path}")
+            return
+        self._consume_token(token)
+        mar = self._router._menu_action_router
+        if mar is None:
+            await self._send_chat(msg, "Deploy unavailable.")
+            return
+        shown = await mar._edit_deploy_remote_confirm(msg, host=host, bundle=str(bundle_path))
+        if not shown:
+            await self._send_chat(
+                msg, f"Confirm deploy to {host} from {bundle_path} via /config > Deploy."
+            )
+
+    async def _advance_guides_read_form(
+        self, msg: IncomingMessage, *, token: str, step: str, text: str, payload: dict[str, Any]
+    ) -> None:
+        """Apply ``form:guides:read`` — load one bundled guide topic (W7e).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_guides_read_form)
+            True
+        """
+        from sevn.cli.help.guide import guide_title, load_guide
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+
+        _ = step, payload
+        topic = text.strip().lower()
+        if not topic:
+            await self._send_chat(msg, "Topic cannot be empty.")
+            return
+        try:
+            body = load_guide(topic)
+        except (FileNotFoundError, ValueError) as exc:
+            await self._send_chat(msg, str(exc))
+            return
+        title = guide_title(topic, body)
+        self._consume_token(token)
+        await self._refresh_section(msg, section="help_guides", toast=f"Guide: {title}")
         for chunk in format_for_telegram(body, redaction=None):
             await self._send_chat(msg, chunk)
 

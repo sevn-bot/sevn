@@ -1300,6 +1300,68 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         notes="Nav to access_providers (W7d)",
     )
 
+    # --- C30. Deployment + Help leaves (W7e) ---
+    for spec_id, pattern, section, label in (
+        ("C30.1", _exact("cfg:section:deployment_services"), "deployment", "Services nav"),
+        ("C30.2", _exact("act:services:gateway:start"), "deployment_services", "Start gateway"),
+        ("C30.3", _exact("act:services:gateway:stop"), "deployment_services", "Stop gateway"),
+        ("C30.4", _exact("act:services:gateway:status"), "deployment_services", "Gateway status"),
+        ("C30.5", _exact("act:services:gateway:logs"), "deployment_services", "Gateway logs"),
+        ("C30.6", _exact("act:services:proxy:start"), "deployment_services", "Start proxy"),
+        ("C30.7", _exact("act:services:proxy:stop"), "deployment_services", "Stop proxy"),
+        ("C30.8", _exact("act:services:proxy:status"), "deployment_services", "Proxy status"),
+        ("C30.9", _exact("act:services:proxy:logs"), "deployment_services", "Proxy logs"),
+        ("C30.10", _exact("cfg:section:deployment_tunnel"), "deployment", "Tunnel setup nav"),
+        ("C30.11", _exact("act:tunnel:status"), "deployment_tunnel", "Tunnel status"),
+        ("C30.12", _exact("act:tunnel:start"), "deployment_tunnel", "Start now (this boot)"),
+        ("C30.13", _exact("act:tunnel:stop"), "deployment_tunnel", "Stop now (this boot)"),
+        ("C30.14", _exact("form:tunnel:setup"), "deployment_tunnel", "Setup / change provider"),
+        ("C30.15", _exact("cfg:section:deployment_config"), "deployment", "Config file nav"),
+        ("C30.16", _exact("act:config:show"), "deployment_config", "Show sevn.json"),
+        ("C30.17", _exact("act:config:validate"), "deployment_config", "Validate"),
+        ("C30.18", _exact("form:config:set"), "deployment_config", "Set a key"),
+        ("C30.19", _exact("act:config:sections"), "deployment_config", "Sections & SSOT paths"),
+        ("C30.20", _exact("cfg:section:deployment_update"), "deployment", "Update & migrate nav"),
+        ("C30.21", _exact("act:update:cli"), "deployment_update", "Update CLI"),
+        ("C30.22", _exact("act:update:schema"), "deployment_update", "Schema posture"),
+        ("C30.23", _exact("form:migrate:import"), "deployment_update", "Migrate / import"),
+        ("C30.24", _exact("cfg:section:deployment_deploy"), "deployment", "Deploy to host nav"),
+        ("C30.25", _exact("form:deploy:check"), "deployment_deploy", "Check SSH host"),
+        ("C30.26", _exact("form:deploy:remote"), "deployment_deploy", "Deploy to remote"),
+        (
+            "C30.27",
+            _exact("cfg:section:access_secrets"),
+            "deployment_deploy",
+            "Export bundle cross-link",
+        ),
+        ("C30.28", _exact("act:help:slash"), "help", "Slash commands"),
+        ("C30.29", _exact("cfg:section:help_guides"), "help", "Guides nav"),
+        ("C30.30", _exact("act:guides:list"), "help_guides", "List guides"),
+        ("C30.31", _exact("form:guides:read"), "help_guides", "Read a guide"),
+        ("C30.32", _exact("act:help:version"), "help", "CLI version"),
+        ("C30.33", _exact("act:help:about"), "help", "about.sevn.bot"),
+    ):
+        add(
+            spec_id,
+            pattern,
+            "C",
+            section,
+            label,
+            implemented=True,
+            owner_only=section.startswith("deployment"),
+            notes="W7e deployment/help leaf",
+        )
+    add(
+        "C30.34",
+        r"^act:deploy:remote(:confirm|:cancel)?$",
+        "C",
+        "deployment_deploy",
+        "Deploy to remote confirm",
+        implemented=True,
+        owner_only=True,
+        notes="Two-step confirm (W7e)",
+    )
+
     # --- C14. Integrations ---
     add(
         "C14.1",

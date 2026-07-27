@@ -233,13 +233,39 @@ def infer_config_section_from_callback(data: str) -> ConfigSection:
         return "health_bundles"
     if raw == "act:tracing:config":
         return "health_tracing"
+    if raw.startswith("act:services:"):
+        return "deployment_services"
+    if raw.startswith("act:config:"):
+        return "deployment_config"
+    if raw.startswith("act:guides:"):
+        return "help_guides"
+    if raw.startswith("act:help:"):
+        return "help"
+    if raw.startswith("act:update:"):
+        return "deployment_update"
+    if raw.startswith("act:deploy:"):
+        return "deployment_deploy"
+    if raw.startswith("form:config:"):
+        return "deployment_config"
+    if raw.startswith("form:tunnel:"):
+        return "deployment_tunnel"
+    if raw.startswith("form:migrate:"):
+        return "deployment_update"
+    if raw.startswith("form:deploy:"):
+        return "deployment_deploy"
+    if raw.startswith("form:guides:"):
+        return "help_guides"
     if raw.startswith("cfg:logs:"):
         if "toggle_redaction" in raw or "logfire" in raw or "logfire_token" in raw:
             return "health_tracing"
         return "health"
     if raw.startswith("cfg:models:"):
         return "agent"
-    if raw.startswith(("act:gateway:", "act:proxy:", "act:tunnel:")):
+    if raw.startswith(("act:gateway:", "act:proxy:")):
+        return "deployment"
+    if raw.startswith("act:tunnel:"):
+        if raw in {"act:tunnel:status", "act:tunnel:start", "act:tunnel:stop"}:
+            return "deployment_tunnel"
         return "deployment"
     if raw.startswith("act:sevn_bot:"):
         return "help"
@@ -609,6 +635,18 @@ class MenuActionRouter:
                 return await self._handle_turn_bundles_action(msg, raw, target)
             if target == "tracing:config":
                 return await self._handle_tracing_config(msg, raw)
+            if target.startswith("services:"):
+                return await self._handle_services_action(msg, raw, target)
+            if target.startswith("config:"):
+                return await self._handle_config_action(msg, raw, target)
+            if target.startswith("guides:"):
+                return await self._handle_guides_action(msg, raw, target)
+            if target.startswith("help:"):
+                return await self._handle_help_action(msg, raw, target)
+            if target.startswith("update:"):
+                return await self._handle_update_action(msg, raw, target)
+            if target.startswith("deploy:"):
+                return await self._handle_deploy_action(msg, raw, target)
             if target in {"skills:refresh", "integrations:refresh"}:
                 answered = await self._refresh_config_menu_after_action(
                     msg,
@@ -2827,6 +2865,503 @@ class MenuActionRouter:
         await self._answer_chat_action(msg, "Tracing config sent")
         return None
 
+    async def _handle_services_action(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        target: str,
+    ) -> str | None:
+        """Dispatch Deployment > Services ``act:services:*`` rows (W7e).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed action target (``services:<service>:<action>``).
+
+        Returns:
+            str | None: Error text, or ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_services_action)
+            True
+        """
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        suffix = target.removeprefix("services:")
+        parts = suffix.split(":", 1)
+        if len(parts) != 2:
+            toast = self.reject_unknown_callback_suffix("act:services:", suffix)
+            answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+            return None if answered else toast
+        service_raw, action = parts
+        if service_raw not in {"gateway", "proxy"} or action not in {
+            "start",
+            "stop",
+            "status",
+            "logs",
+        }:
+            toast = self.reject_unknown_callback_suffix("act:services:", suffix)
+            answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+            return None if answered else toast
+        service = cast("Literal['gateway', 'proxy']", service_raw)
+        if action == "logs":
+            return await self._handle_logs_tail(msg, f"tail:{service}:0")
+        home = sevn_home_dir()
+        try:
+            sm_action = cast("Literal['start', 'stop', 'status']", action)
+            if service == "gateway" and sm_action in {"start", "stop"}:
+                gw_action = cast("Literal['start', 'stop']", sm_action)
+                lines = await asyncio.to_thread(
+                    _mutate_gateway_with_proxy,
+                    home=Path.home(),
+                    action=gw_action,
+                )
+                line = "\n".join(lines)
+            else:
+                line = await asyncio.to_thread(
+                    control_unit, home=home, service=service, action=sm_action
+                )
+        except (OperatorLockHeld, ServiceManagerError) as exc:
+            return str(exc)
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+
+        await self._send_logs_chunks(msg, format_for_telegram(line, redaction=None))
+        await self._answer_chat_action(msg, f"{service} {action} sent")
+        return None
+
+    async def _handle_config_action(
+        self, msg: IncomingMessage, callback_data: str, target: str
+    ) -> str | None:
+        """Dispatch Deployment > Config file ``act:config:*`` rows (W7e).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed action target (``config:<suffix>``).
+
+        Returns:
+            str | None: Error text, or ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_config_action)
+            True
+        """
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        suffix = target.removeprefix("config:")
+        if suffix == "show":
+            import json as json_mod
+
+            from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+
+            doc = load_raw_sevn_json(self._sevn_json) or {}
+            body = json_mod.dumps(doc, indent=2, sort_keys=True)
+            await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+            await self._answer_chat_action(msg, "sevn.json sent")
+            return None
+        if suffix == "validate":
+            from sevn.config.workspace_config import parse_workspace_config
+            from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+            from sevn.onboarding.live_validate import emit_openai_oauth_warnings
+            from sevn.onboarding.validate import (
+                emit_unused_provider_warnings,
+                validate_workspace_document,
+            )
+            from sevn.security.secrets.factory import secrets_chain_from_workspace
+
+            doc = load_raw_sevn_json(self._sevn_json) or {}
+            try:
+                validate_workspace_document(doc)
+            except ValueError as exc:
+                return str(exc)
+            warnings: list[str] = []
+
+            def _collect(msg_text: str) -> None:
+                warnings.append(msg_text)
+
+            emit_unused_provider_warnings(parse_workspace_config(doc), echo=_collect)
+            chain = secrets_chain_from_workspace(
+                self._content_root, self._workspace.secrets_backend
+            )
+            emit_openai_oauth_warnings(doc, echo=_collect, secrets_chain=chain)
+            body = "sevn.json: valid" + (("\n\n" + "\n".join(warnings)) if warnings else "")
+            await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+            await self._answer_chat_action(msg, "Validate sent")
+            return None
+        if suffix == "sections":
+            from sevn.cli.config_paths import iter_config_sections
+            from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+
+            lines = ["slug\tlabel", *(f"{s.slug}\t{s.label}" for s in iter_config_sections())]
+            await self._send_logs_chunks(msg, format_for_telegram("\n".join(lines), redaction=None))
+            await self._answer_chat_action(msg, "Sections sent")
+            return None
+        toast = self.reject_unknown_callback_suffix("act:config:", suffix)
+        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+        return None if answered else toast
+
+    async def _handle_guides_action(
+        self, msg: IncomingMessage, callback_data: str, target: str
+    ) -> str | None:
+        """Dispatch Help > Guides ``act:guides:*`` rows (W7e).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed action target (``guides:<suffix>``).
+
+        Returns:
+            str | None: Toast text, or ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_guides_action)
+            True
+        """
+        suffix = target.removeprefix("guides:")
+        if suffix != "list":
+            toast = self.reject_unknown_callback_suffix("act:guides:", suffix)
+            answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+            return None if answered else toast
+        from sevn.cli.help.guide import list_guide_topics
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+
+        topics = list_guide_topics()
+        body = " · ".join(topics) if topics else "No bundled guides found."
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Guides list sent")
+        return None
+
+    async def _handle_help_action(
+        self, msg: IncomingMessage, callback_data: str, target: str
+    ) -> str | None:
+        """Dispatch Help ``act:help:*`` rows (W7e).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed action target (``help:<suffix>``).
+
+        Returns:
+            str | None: Toast text, or ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_help_action)
+            True
+        """
+        suffix = target.removeprefix("help:")
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+
+        if suffix == "slash":
+            body = (
+                "Slash shortcuts:\n"
+                "/new /stop /status /model /voice /logs /traces /config /menu /help\n"
+                "Owner: /platform /improve /file_issue /agents"
+            )
+            await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+            await self._answer_chat_action(msg, "Slash commands sent")
+            return None
+        if suffix == "version":
+            from importlib.metadata import PackageNotFoundError
+            from importlib.metadata import version as pkg_version
+
+            try:
+                cli_version = pkg_version("sevn")
+            except PackageNotFoundError:
+                cli_version = "0.0.0"
+            await self._send_logs_chunks(
+                msg, format_for_telegram(f"sevn CLI version: {cli_version}", redaction=None)
+            )
+            await self._answer_chat_action(msg, "Version sent")
+            return None
+        if suffix == "about":
+            await self._send_logs_chunks(
+                msg,
+                format_for_telegram("https://about.sevn.bot", redaction=None),
+            )
+            await self._answer_chat_action(msg, "About link sent")
+            return None
+        toast = self.reject_unknown_callback_suffix("act:help:", suffix)
+        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+        return None if answered else toast
+
+    async def _handle_update_action(
+        self, msg: IncomingMessage, callback_data: str, target: str
+    ) -> str | None:
+        """Dispatch Deployment > Update ``act:update:*`` rows (W7e).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed action target (``update:<suffix>``).
+
+        Returns:
+            str | None: Error or toast text, or ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_update_action)
+            True
+        """
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        suffix = target.removeprefix("update:")
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+
+        if suffix == "cli":
+            from importlib.metadata import PackageNotFoundError
+            from importlib.metadata import version as pkg_version
+
+            try:
+                current = pkg_version("sevn")
+            except PackageNotFoundError:
+                current = "0.0.0"
+            body = f"installed: {current}\nuv tool upgrade sevn  # or: pip install -U sevn"
+            await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+            await self._answer_chat_action(msg, "Update hint sent")
+            return None
+        if suffix == "schema":
+            import json as json_mod
+
+            from sevn.onboarding.migrate import describe_schema_upgrade
+            from sevn.workspace.layout import WorkspaceLayout
+
+            layout = WorkspaceLayout(self._sevn_json, self._content_root)
+            plan = describe_schema_upgrade(layout.content_root)
+            body = json_mod.dumps(plan, indent=2, sort_keys=True)
+            body += "\nRun `sevn migrate` when an in-place schema upgrade is required."
+            await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+            await self._answer_chat_action(msg, "Schema posture sent")
+            return None
+        toast = self.reject_unknown_callback_suffix("act:update:", suffix)
+        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+        return None if answered else toast
+
+    async def _handle_deploy_action(
+        self, msg: IncomingMessage, callback_data: str, target: str
+    ) -> str | None:
+        """Dispatch Deployment > Deploy ``act:deploy:*`` confirm rows (W7e).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed action target (``deploy:<suffix>``).
+
+        Returns:
+            str | None: Error or toast text, or ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_deploy_action)
+            True
+        """
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        suffix = target.removeprefix("deploy:")
+        if suffix == "remote:cancel":
+            return await self._handle_deploy_remote_cancel(msg, callback_data)
+        if suffix == "remote:confirm":
+            return await self._handle_deploy_remote_confirm(msg, callback_data)
+        toast = self.reject_unknown_callback_suffix("act:deploy:", suffix)
+        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+        return None if answered else toast
+
+    async def _edit_deploy_remote_confirm(
+        self, msg: IncomingMessage, *, host: str, bundle: str
+    ) -> bool:
+        """Show two-step remote deploy confirm keyboard (W7e).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            host (str): Inventory host id.
+            bundle (str): Export bundle path.
+
+        Returns:
+            bool: ``True`` when the confirm keyboard was edited in place.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._edit_deploy_remote_confirm)
+            True
+        """
+        from sevn.gateway.menu.confirm_gates import (
+            build_confirm_gate_keyboard,
+            confirm_gate_message,
+        )
+        from sevn.gateway.menu.menu import _config_chrome
+
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        chat_raw = md.get("chat_id")
+        message_raw = md.get("message_id")
+        if not isinstance(chat_raw, int) or not isinstance(message_raw, int):
+            return False
+        topic_raw = md.get("topic_id")
+        insert_dispatcher_state(
+            self._conn,
+            token=f"ds:{secrets.token_hex(8)}",
+            kind="deploy_remote",
+            user_id=int(msg.user_id) if str(msg.user_id).isdigit() else 0,
+            chat_id=chat_raw,
+            topic_id=topic_raw if isinstance(topic_raw, int) else None,
+            payload_json=json.dumps(
+                {"v": 1, "host": host, "bundle": bundle}, separators=(",", ":")
+            ),
+            ttl_seconds=600,
+        )
+        config_menu_nav_push_current(self._router, chat_raw, message_raw)
+        adapter = self._router._adapters.get(msg.channel)
+        if adapter is None:
+            return False
+        thread_id = _telegram_api_thread_id(md)
+        rows = build_confirm_gate_keyboard("deploy:remote")
+        rows.extend(_config_chrome())
+        edit_text = getattr(adapter, "edit_message_text", None)
+        if not callable(edit_text):
+            return False
+        caption = confirm_gate_message(
+            title="Deploy to remote",
+            detail=f"Deploy to host `{host}` from bundle `{bundle}`?\nThis mutates the remote install over SSH.",
+        )
+        body: dict[str, Any] = {
+            "chat_id": chat_raw,
+            "message_id": message_raw,
+            "text": caption,
+            "reply_markup": {"inline_keyboard": rows},
+        }
+        if thread_id is not None:
+            body["message_thread_id"] = thread_id
+        return bool(await cast("Callable[..., Awaitable[Any]]", edit_text)(**body))
+
+    async def _handle_deploy_remote_confirm(
+        self, msg: IncomingMessage, callback_data: str
+    ) -> str | None:
+        """Run remote deploy after operator confirms (W7e).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Error text, or ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_deploy_remote_confirm)
+            True
+        """
+        _ = callback_data
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        chat_raw = md.get("chat_id")
+        from pathlib import Path
+
+        from sevn.cli.commands.deploy_cmd import _run_deploy_command
+        from sevn.deploy.remote import DeployMode
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+
+        active = self._find_pending_deploy_remote(
+            chat_id=int(chat_raw) if isinstance(chat_raw, int) else 0
+        )
+        if active is None:
+            return "Deploy confirm expired — start again."
+        host = str(active.get("host", "")).strip()
+        bundle = str(active.get("bundle", "")).strip()
+        if not host or not bundle:
+            return "Pending deploy payload invalid."
+        try:
+            await asyncio.to_thread(
+                _run_deploy_command,
+                host=host,
+                inventory=None,
+                mode=DeployMode.DEPLOY,
+                bundle=Path(bundle),
+            )
+        except Exception as exc:
+            from typer import Exit
+
+            if isinstance(exc, Exit):
+                return f"Deploy failed (exit {exc.exit_code})."
+            return f"Deploy failed: {exc}"
+        self._clear_pending_deploy_remote(chat_id=int(chat_raw) if isinstance(chat_raw, int) else 0)
+        await self._send_logs_chunks(
+            msg, format_for_telegram(f"Deploy to {host} completed.", redaction=None)
+        )
+        await self._answer_chat_action(msg, "Deploy sent")
+        return None
+
+    async def _handle_deploy_remote_cancel(
+        self, msg: IncomingMessage, callback_data: str
+    ) -> str | None:
+        """Cancel pending remote deploy confirm (W7e).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Toast text, or ``None`` when the config menu was edited in place.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_deploy_remote_cancel)
+            True
+        """
+        _ = callback_data
+        md = msg.metadata if isinstance(msg.metadata, dict) else {}
+        chat_raw = md.get("chat_id")
+        if isinstance(chat_raw, int):
+            self._clear_pending_deploy_remote(chat_id=chat_raw)
+        answered = await self._refresh_config_menu_after_action(
+            msg, callback_data, toast="Deploy cancelled."
+        )
+        return None if answered else "Deploy cancelled."
+
+    def _find_pending_deploy_remote(self, *, chat_id: int) -> dict[str, Any] | None:
+        """Return the newest pending remote-deploy payload for *chat_id*.
+
+        Args:
+            chat_id (int): Telegram chat id.
+
+        Returns:
+            dict[str, Any] | None: Parsed payload, or ``None``.
+
+        Examples:
+            >>> MenuActionRouter._find_pending_deploy_remote.__name__
+            '_find_pending_deploy_remote'
+        """
+        row = self._conn.execute(
+            "SELECT payload_json FROM dispatcher_state WHERE kind = 'deploy_remote' AND chat_id = ? ORDER BY rowid DESC LIMIT 1",
+            (chat_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        try:
+            payload = json.loads(str(row[0]))
+        except (TypeError, json.JSONDecodeError):
+            return None
+        return payload if isinstance(payload, dict) else None
+
+    def _clear_pending_deploy_remote(self, *, chat_id: int) -> None:
+        """Delete pending remote-deploy rows for *chat_id*.
+
+        Args:
+            chat_id (int): Telegram chat id.
+
+        Examples:
+            >>> MenuActionRouter._clear_pending_deploy_remote.__name__
+            '_clear_pending_deploy_remote'
+        """
+        self._conn.execute(
+            "DELETE FROM dispatcher_state WHERE kind = 'deploy_remote' AND chat_id = ?", (chat_id,)
+        )
+        self._conn.commit()
+
     async def _answer_chat_action(self, msg: IncomingMessage, text: str) -> None:
         """Acknowledge a read-only menu action with a short callback toast.
 
@@ -3123,6 +3658,67 @@ class MenuActionRouter:
             return ""
         return " Install the gateway daemon so it survives host restart."
 
+    async def _handle_tunnel_lifecycle(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        target: str,
+    ) -> str | None:
+        """One-shot ``sevn tunnel status|start|stop`` (W7e).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed action target (``tunnel:<action>``).
+
+        Returns:
+            str | None: Error text, or ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_tunnel_lifecycle)
+            True
+        """
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.infrastructure.tunnel_config import (
+            prepare_tunnel_runtime_cfg,
+            tunnel_cfg_from_disk,
+        )
+        from sevn.infrastructure.tunnel_manager import default_manager
+
+        action = target.removeprefix("tunnel:")
+        tunnel_cfg = tunnel_cfg_from_disk(self._workspace, sevn_json=self._sevn_json)
+        try:
+            if action == "status":
+                status = default_manager.status(tunnel_cfg)
+            elif action == "stop":
+                status = await asyncio.to_thread(default_manager.stop, tunnel_cfg, confirm=True)
+            else:
+                gateway_port = self._workspace.gateway.port if self._workspace.gateway else None
+                runtime_cfg = await prepare_tunnel_runtime_cfg(
+                    tunnel_cfg,
+                    gateway_port=gateway_port,
+                    content_root=self._content_root,
+                    secrets_backend=self._workspace.secrets_backend,
+                )
+                status = await asyncio.to_thread(default_manager.start, runtime_cfg, confirm=True)
+        except (OSError, RuntimeError, ValueError) as exc:
+            return f"Tunnel {action} failed: {exc}"
+        state = "running" if status.healthy else "stopped"
+        line = f"tunnel {action}: mode={status.mode} {state}"
+        if status.pid:
+            line += f" pid={status.pid}"
+        url = status.mission_control_url or status.public_url
+        if url:
+            line += f" url={url}"
+        if status.error:
+            line += f"\n{status.error}"
+        await self._send_logs_chunks(msg, format_for_telegram(line, redaction=None))
+        answered = await self._refresh_config_menu_after_action(
+            msg, callback_data, toast=f"Tunnel {action} sent"
+        )
+        return None if answered else f"Tunnel {action} sent"
+
     async def _handle_tunnel_action(
         self,
         msg: IncomingMessage,
@@ -3155,6 +3751,8 @@ class MenuActionRouter:
         if not self._router._resolve_owner_flag(msg):
             await self._answer_owner_only(msg)
             return None
+        if target in {"tunnel:status", "tunnel:start", "tunnel:stop"}:
+            return await self._handle_tunnel_lifecycle(msg, callback_data, target)
         if target == "tunnel:on:cancel":
             return await self._handle_tunnel_on_cancel(msg, callback_data)
         # Enumerate the valid targets explicitly (like _handle_service_restart_action) so

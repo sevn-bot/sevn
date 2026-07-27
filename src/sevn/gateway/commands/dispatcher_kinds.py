@@ -32,6 +32,7 @@ DispatcherKind = Literal[
     "webapp_feedback",
     "webapp_viewer",
     "secrets_rm",
+    "deploy_remote",
 ]
 
 ALL_DISPATCHER_KINDS: frozenset[str] = frozenset(
@@ -50,6 +51,7 @@ ALL_DISPATCHER_KINDS: frozenset[str] = frozenset(
         "webapp_feedback",
         "webapp_viewer",
         "secrets_rm",
+        "deploy_remote",
     }
 )
 

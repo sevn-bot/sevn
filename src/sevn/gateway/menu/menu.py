@@ -4259,16 +4259,141 @@ def _build_health_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[st
     return rows
 
 
+def _build_deployment_services_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Deployment > Services — start/stop/status/logs (W7e).
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_deployment_services_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:services:gateway:start'
+    """
+    return [
+        [
+            {"text": "▶ Start gateway", "callback_data": "act:services:gateway:start"},
+            {"text": "⏹ Stop gateway", "callback_data": "act:services:gateway:stop"},
+        ],
+        [
+            {"text": "📊 Gateway status", "callback_data": "act:services:gateway:status"},
+            {"text": "📄 Gateway logs", "callback_data": "act:services:gateway:logs"},
+        ],
+        [
+            {"text": "▶ Start proxy", "callback_data": "act:services:proxy:start"},
+            {"text": "⏹ Stop proxy", "callback_data": "act:services:proxy:stop"},
+        ],
+        [
+            {"text": "📊 Proxy status", "callback_data": "act:services:proxy:status"},
+            {"text": "📄 Proxy logs", "callback_data": "act:services:proxy:logs"},
+        ],
+    ]
+
+
+def _build_deployment_tunnel_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Deployment > Tunnel setup — one-shot control (W7e).
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_deployment_tunnel_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:tunnel:status'
+    """
+    return [
+        [{"text": "📊 Tunnel status", "callback_data": "act:tunnel:status"}],
+        [
+            {"text": "▶ Start now (this boot)", "callback_data": "act:tunnel:start"},
+            {"text": "⏹ Stop now (this boot)", "callback_data": "act:tunnel:stop"},
+        ],
+        [{"text": "⚙ Setup / change provider", "callback_data": "form:tunnel:setup"}],
+    ]
+
+
+def _build_deployment_config_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Deployment > Config file (W7e).
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_deployment_config_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:config:show'
+    """
+    return [
+        [{"text": "📋 Show sevn.json", "callback_data": "act:config:show"}],
+        [{"text": "✅ Validate", "callback_data": "act:config:validate"}],
+        [{"text": "✏ Set a key", "callback_data": "form:config:set"}],
+        [{"text": "🗂 Sections & SSOT paths", "callback_data": "act:config:sections"}],
+    ]
+
+
+def _build_deployment_update_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Deployment > Update & migrate (W7e).
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_deployment_update_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:update:cli'
+    """
+    return [
+        [{"text": "⬆ Update CLI", "callback_data": "act:update:cli"}],
+        [{"text": "🔀 Sync checkout", "callback_data": "act:sevn_bot:sync"}],
+        [{"text": "🧬 Schema posture", "callback_data": "act:update:schema"}],
+        [{"text": "🚚 Migrate / import", "callback_data": "form:migrate:import"}],
+    ]
+
+
+def _build_deployment_deploy_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Deployment > Deploy to host (W7e).
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_deployment_deploy_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'form:deploy:check'
+    """
+    return [
+        [{"text": "🔌 Check SSH host", "callback_data": "form:deploy:check"}],
+        [{"text": "🚀 Deploy to remote", "callback_data": "form:deploy:remote"}],
+        [_nav_section_button("📤 Build export bundle →", "access_secrets")],
+    ]
+
+
+def _build_help_guides_keyboard_rows() -> list[list[dict[str, Any]]]:
+    """Help > Guides (W7e).
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> rows = _build_help_guides_keyboard_rows()
+        >>> rows[0][0]["callback_data"]
+        'act:guides:list'
+    """
+    return [
+        [{"text": "📋 List guides", "callback_data": "act:guides:list"}],
+        [{"text": "📖 Read a guide", "callback_data": "form:guides:read"}],
+    ]
+
+
 def _build_deployment_keyboard_rows(
     workspace: WorkspaceConfig,
     *,
     is_owner: bool = True,
 ) -> list[list[dict[str, Any]]]:
-    """Deployment root tile — operator rows from My sevn bot (callback-stable).
+    """Deployment root tile — services, tunnel, config, upgrade (W7e).
 
     Args:
-        workspace (WorkspaceConfig): Parsed workspace settings.
-        is_owner (bool): Whether the viewer is the workspace owner.
+        workspace (WorkspaceConfig): Loaded workspace settings.
+        is_owner (bool): When ``False``, hide owner-only restart/tunnel rows.
 
     Returns:
         list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
@@ -4276,24 +4401,47 @@ def _build_deployment_keyboard_rows(
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
         >>> rows = _build_deployment_keyboard_rows(WorkspaceConfig.minimal())
-        >>> any(r["callback_data"] == "cfg:section:my_sevn_bot" for row in rows for r in row)
+        >>> any(r[0]["callback_data"] == "cfg:section:deployment_services" for r in rows)
         True
     """
-    rows = _build_my_sevn_bot_keyboard_rows(workspace, is_owner=is_owner)
-    auto_resume = _gateway_auto_resume_b(workspace)
-    rows.append(
-        [
-            _config_bool_toggle_button(
-                "Auto-resume tier B",
-                "gateway.restart.auto_resume_b",
-                enabled=auto_resume,
-            ),
-        ],
-    )
+    rows: list[list[dict[str, Any]]] = []
+    if is_owner:
+        rows.append([{"text": "🔄 Restart gateway", "callback_data": "act:gateway:restart"}])
+        rows.append([{"text": "🔄 Restart proxy", "callback_data": "act:proxy:restart"}])
+        from sevn.infrastructure.tunnel_config import tunnel_cfg_from_workspace
+
+        tunnel_row = _tunnel_toggle_row(tunnel_cfg_from_workspace(workspace))
+        if tunnel_row is not None:
+            rows.append(tunnel_row)
     _append_nav_section_rows(
         rows,
-        (("🖥 My sevn bot (legacy)", "my_sevn_bot"),),
+        (
+            ("⚙️ Services", "deployment_services"),
+            ("🌍 Tunnel setup", "deployment_tunnel"),
+        ),
     )
+    rows.append([{"text": "🆔 Deployment id", "callback_data": "cfg:logs:deployment_id"}])
+    rows.append([{"text": "🏷 Version id", "callback_data": "cfg:logs:version_id"}])
+    _append_nav_section_rows(
+        rows,
+        (
+            ("📄 Config file", "deployment_config"),
+            ("⬆ Update & migrate", "deployment_update"),
+            ("🚀 Deploy to host", "deployment_deploy"),
+        ),
+    )
+    if is_owner:
+        auto_resume = _gateway_auto_resume_b(workspace)
+        rows.append(
+            [
+                _config_bool_toggle_button(
+                    "Auto-resume tier B",
+                    "gateway.restart.auto_resume_b",
+                    enabled=auto_resume,
+                ),
+            ],
+        )
+    _append_nav_section_rows(rows, (("🖥 My sevn bot (legacy)", "my_sevn_bot"),))
     url = web_ui_url_from_workspace(workspace)
     if url:
         rows.append([{"text": "🌐 Open Mission Control", "url": url}])
@@ -4353,7 +4501,17 @@ def _build_help_redesign_keyboard_rows(workspace: WorkspaceConfig) -> list[list[
         'cfg:section:sevn_bot'
     """
     _ = workspace
-    rows = _build_sevn_bot_keyboard_rows(workspace)
+    rows: list[list[dict[str, Any]]] = [
+        [{"text": "📖 Slash commands", "callback_data": "act:help:slash"}],
+        [_nav_section_button("📚 Guides", "help_guides")],
+        [{"text": "🔄 Sync sevn.bot (latest)", "callback_data": "act:sevn_bot:sync"}],
+        [
+            {"text": "🐛 Bugs", "callback_data": "act:sevn_bot:bugs"},
+            {"text": "✨ Features", "callback_data": "act:sevn_bot:features"},
+        ],
+        [{"text": "🏷 CLI version", "callback_data": "act:help:version"}],
+        [{"text": "🌐 about.sevn.bot", "callback_data": "act:help:about"}],
+    ]
     rows.append([_nav_section_button("sevn.bot (legacy)", "sevn_bot")])
     return rows
 
@@ -4508,6 +4666,18 @@ def build_config_menu_keyboard(
         rows_sec = _build_health_bundles_keyboard_rows()
     elif section == "deployment":
         rows_sec = _build_deployment_keyboard_rows(workspace, is_owner=is_owner)
+    elif section == "deployment_services":
+        rows_sec = _build_deployment_services_keyboard_rows()
+    elif section == "deployment_tunnel":
+        rows_sec = _build_deployment_tunnel_keyboard_rows()
+    elif section == "deployment_config":
+        rows_sec = _build_deployment_config_keyboard_rows()
+    elif section == "deployment_update":
+        rows_sec = _build_deployment_update_keyboard_rows()
+    elif section == "deployment_deploy":
+        rows_sec = _build_deployment_deploy_keyboard_rows()
+    elif section == "help_guides":
+        rows_sec = _build_help_guides_keyboard_rows()
     elif section == "skills_tools":
         rows_sec = _build_tools_keyboard_rows(workspace, content_root)
     elif section == "skills_integrations":
@@ -4975,16 +5145,50 @@ def config_menu_message_text(
     if section == "chat_sessions":
         return "Sessions\n\nList sessions, open history, or send to another session.\n/new and /stop are one tap below."
     if section == "deployment":
+        from sevn.infrastructure.tunnel_config import tunnel_cfg_from_workspace
+
+        tunnel_cfg = tunnel_cfg_from_workspace(workspace)
+        mode = str(tunnel_cfg.get("mode") or "none")
+        persistent = "on" if tunnel_cfg.get("autostart") else "off"
         lines = [
             "Deployment",
             "",
-            "Gateway instance: deployment id, version id, and owner service restarts.",
+            f"Tunnel: {mode} · persistent: {persistent}",
+            "Restart gateway/proxy on this screen; one-shot tunnel control lives under Tunnel setup.",
         ]
         if is_owner:
-            lines.append("Restart gateway or proxy below (two-step confirm).")
+            lines.append("Owner-only: services, config file, upgrade, and remote deploy below.")
         else:
-            lines.append("Restart actions are owner-only.")
+            lines.append("Owner-only rows are hidden for paired users.")
         return "\n".join(lines)
+    if section == "deployment_services":
+        return "Services\n\nStart, stop, status, and logs for gateway and proxy user units."
+    if section == "deployment_tunnel":
+        from sevn.infrastructure.tunnel_config import tunnel_cfg_from_workspace
+
+        tunnel_cfg = tunnel_cfg_from_workspace(workspace)
+        mode = str(tunnel_cfg.get("mode") or "none")
+        persistent = "on" if tunnel_cfg.get("autostart") else "off"
+        return (
+            f"Tunnel setup\n\nMode: {mode}\n"
+            f"Persistent: {persistent} (switch is on the Deployment screen)\n"
+            "Start/stop here affects this boot only."
+        )
+    if section == "deployment_config":
+        path = content_root / "sevn.json" if content_root is not None else "sevn.json"
+        return (
+            f"Config file\n\nBound workspace config at {path}\nShow, validate, or set keys below."
+        )
+    if section == "deployment_update":
+        return "Update & migrate\n\nCLI upgrade hints, checkout sync, schema posture, and import."
+    if section == "deployment_deploy":
+        return "Deploy to host\n\nCheck SSH inventory hosts and deploy from an export bundle."
+    if section == "help_guides":
+        from sevn.cli.help.guide import list_guide_topics
+
+        topics = list_guide_topics()
+        listed = " · ".join(topics[:8]) if topics else "none bundled"
+        return f"Guides\n\nBundled topics: {listed}"
     if section == "health":
         from sevn.gateway.webapp.webapp_qa import (
             resolve_webapp_public_base,
