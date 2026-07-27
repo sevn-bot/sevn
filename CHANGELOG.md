@@ -16,6 +16,7 @@ are cut into a dated, versioned section at release time.
 - [2026-07-26] Telegram ``/config`` menu E2E harness: ``TelegramMenuWalker`` recipe, ``make telegram-menu-e2e`` (``SEVN_TELEGRAM_MENU_E2E=1``), inline-keyboard primitives on ``TelegramWeb``, and per-row verdict + spec-id coverage reports under ``evidence/telegram-menu-e2e/``
 - [2026-07-27] Telegram ``/config`` Chat leaves (W7a): Sessions section (list/history/send, ``/new``, ``/stop``), shortcuts list/remove, voice probe/settings, channel status/config, notify-policy on Chat root
 - [2026-07-27] Telegram ``/config`` Agent leaves (W7b): Sampling section (show params, set max output tokens), resolved slots, active runs, Lab improve doctor/record/replay-sampler, sub-agent kill form on Running
+- [2026-07-27] Telegram ``/config`` Skills & Tools + Memory leaves (W7c): skills list/sync/security-scan, tool health, memory search/index, Second Brain reindex/bootstrap, Dreaming status/backfill/undo/cron, OpenWiki install/configure with conditional rows
 
 ### Changed
 

@@ -73,6 +73,8 @@ FORM_TARGETS: frozenset[str] = frozenset(
         "models:set_max_output_tokens",
         "improve:learn",
         "subagents:kill",
+        "memory:backfill",
+        "openui:configure",
     },
 )
 _SECRET_ALIAS_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
@@ -118,6 +120,10 @@ def parse_form_callback(data: str) -> str | None:
         return "models:set_max_output_tokens"
     if raw == "form:improve:learn":
         return "improve:learn"
+    if raw == "form:memory:backfill":
+        return "memory:backfill"
+    if raw == "form:openui:configure":
+        return "openui:configure"
     if raw == "form:subagents:kill":
         return "subagents:kill"
     if raw.startswith("form:secret_wizard:"):
@@ -312,6 +318,12 @@ class MenuFormHandler:
         elif target == "improve:learn":
             section = "agent_lab"
             step = "claim"
+        elif target == "memory:backfill":
+            section = "memory_dreaming"
+            step = "window"
+        elif target == "openui:configure":
+            section = "memory_openwiki"
+            step = "api_key"
         elif target == "subagents:kill":
             section = "agent_subagents_running"
             step = "run_id"
@@ -387,6 +399,10 @@ class MenuFormHandler:
             prompt = f"Send agent name ({', '.join(AGENT_NAMES)}):"
         elif target == "improve:learn":
             prompt = "Send the lesson claim (one short sentence):"
+        elif target == "memory:backfill":
+            prompt = "Send backfill window as FROM TO (YYYY-MM-DD YYYY-MM-DD):"
+        elif target == "openui:configure":
+            prompt = "Send the OpenWiki LLM API key (not shown again):"
         elif target == "subagents:kill":
             prompt = "Send the sub-agent run id to kill (e.g. a1f3):"
         elif target == "discogs:oauth_start":
@@ -456,6 +472,16 @@ class MenuFormHandler:
             return
         if target == "improve:learn":
             await self._advance_improve_learn(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "memory:backfill":
+            await self._advance_memory_backfill(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "openui:configure":
+            await self._advance_openui_configure(
                 msg, token=token, step=step, text=text, payload=payload
             )
             return
@@ -1204,6 +1230,108 @@ class MenuFormHandler:
             self._consume_token(token)
             await self._refresh_section(msg, section="agent_lab", toast="✅ Lesson recorded.")
             await self._send_chat(msg, "appended candidate_lessons.jsonl")
+
+    async def _advance_memory_backfill(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Run grounded Dreaming backfill for an inclusive date window (W7c).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_memory_backfill)
+            True
+        """
+        import asyncio
+
+        from sevn.agent.tracing.sink import NullTraceSink
+        from sevn.memory.dreaming.engine import DreamingEngine
+
+        _ = step
+        parts = text.strip().split()
+        if len(parts) != 2:
+            await self._send_chat(msg, "Send two dates: FROM TO (YYYY-MM-DD YYYY-MM-DD).")
+            return
+        date_from, date_to = parts
+        trace = NullTraceSink()
+        lock = asyncio.Lock()
+        eng = DreamingEngine(self._conn, trace, lock, transport=None)
+        try:
+            result = asyncio.run(
+                eng.run_backfill(
+                    workspace_root=self._content_root,
+                    ws=self._workspace,
+                    date_from=date_from,
+                    date_to=date_to,
+                    unbounded_acknowledged=False,
+                ),
+            )
+        except Exception as exc:
+            await self._send_chat(msg, f"Backfill failed: {exc}")
+            return
+        self._consume_token(token)
+        body = (
+            f"run_id: {result.run_id}\n"
+            f"promoted: {len(result.promoted)}\n"
+            f"skipped: {len(result.skipped)}"
+        )
+        await self._refresh_section(msg, section="memory_dreaming", toast="✅ Backfill complete.")
+        await self._send_chat(msg, body)
+
+    async def _advance_openui_configure(
+        self,
+        msg: IncomingMessage,
+        *,
+        token: str,
+        step: str,
+        text: str,
+        payload: dict[str, Any],
+    ) -> None:
+        """Store ``integration.openwiki.llm_api_key`` from a one-step wizard (W7c).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_openui_configure)
+            True
+        """
+        from sevn.skills.openwiki_secrets import OPENWIKI_LLM_API_KEY_SECRET
+
+        _ = step, payload
+        key = text.strip()
+        if not key:
+            await self._send_chat(msg, "API key cannot be empty.")
+            return
+        chain = secrets_chain_from_workspace(
+            self._content_root,
+            self._workspace.secrets_backend,
+        )
+        await chain.set(OPENWIKI_LLM_API_KEY_SECRET, key)
+        self._consume_token(token)
+        await self._refresh_section(
+            msg,
+            section="memory_openwiki",
+            toast="✅ OpenWiki key stored.",
+        )
+        await self._send_chat(msg, f"Stored {OPENWIKI_LLM_API_KEY_SECRET}.")
 
     async def _advance_subagents_kill_form(
         self,

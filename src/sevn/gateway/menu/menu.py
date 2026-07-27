@@ -2723,11 +2723,14 @@ def _build_tools_keyboard_rows(
 
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
-        >>> _build_tools_keyboard_rows(WorkspaceConfig.minimal())
-        []
+        >>> rows = _build_tools_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"]
+        'act:tools:health'
     """
     _ = content_root
-    rows: list[list[dict[str, Any]]] = []
+    rows: list[list[dict[str, Any]]] = [
+        [{"text": "🩺 Tool health", "callback_data": "act:tools:health"}],
+    ]
     url = _mission_control_url(workspace, fragment="tools")
     if url:
         rows.append([{"text": "🌐 Open Tools tab", "url": url}])
@@ -3247,6 +3250,8 @@ def _build_second_brain_keyboard_rows(workspace: WorkspaceConfig) -> list[list[d
             {"text": "📁 Set vault path", "callback_data": "form:second_brain_vault_path"},
             {"text": "🗂️ Browse folders", "callback_data": "form:second_brain_vault_browse"},
         ],
+        [{"text": "🔄 Reindex vault", "callback_data": "act:second_brain:reindex"}],
+        [{"text": "⚙ Bootstrap layout", "callback_data": "act:second_brain:setup"}],
     ]
     url = _mission_control_url(workspace, fragment="second_brain")
     if url:
@@ -3967,14 +3972,73 @@ def _build_memory_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[st
         rows,
         (
             ("📚 Second Brain", "memory_sb"),
+            ("💤 Dreaming", "memory_dreaming"),
             ("💻 Code understanding", "memory_code"),
+            ("📖 OpenWiki", "memory_openwiki"),
             ("📚 Second Brain (legacy)", "second_brain"),
             ("💻 Code (legacy)", "code"),
         ),
     )
+    rows.append([{"text": "🔎 Search memory", "callback_data": "act:memory:search"}])
+    rows.append([{"text": "🗂 Rebuild index", "callback_data": "act:memory:index"}])
     url = _mission_control_url(workspace, fragment="second-brain")
     if url:
         rows.append([{"text": "🌐 Open Second Brain tab", "url": url}])
+    return rows
+
+
+def _build_memory_dreaming_keyboard_rows(
+    workspace: WorkspaceConfig,
+) -> list[list[dict[str, Any]]]:
+    """Memory > Dreaming — status, backfill, undo, and cron reconcile (W7c).
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_memory_dreaming_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"]
+        'act:dreaming:status'
+    """
+    _ = workspace
+    return [
+        [{"text": "📋 Dreaming status", "callback_data": "act:dreaming:status"}],
+        [{"text": "🕰 Backfill window", "callback_data": "form:memory:backfill"}],
+        [{"text": "↩️ Undo last batch", "callback_data": "act:dreaming:undo"}],
+        [{"text": "🔁 Reconcile cron", "callback_data": "act:dreaming:reconcile_cron"}],
+    ]
+
+
+def _build_memory_openwiki_keyboard_rows(
+    workspace: WorkspaceConfig,
+) -> list[list[dict[str, Any]]]:
+    """Memory > OpenWiki — install/configure rows hidden until CLI is on PATH (W7c).
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace settings.
+
+    Returns:
+        list[list[dict[str, Any]]]: Inline keyboard rows (no nav chrome).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> rows = _build_memory_openwiki_keyboard_rows(WorkspaceConfig.minimal())
+        >>> rows[0][0]["callback_data"].startswith(("act:openui:", "form:openui:"))
+        True
+    """
+    _ = workspace
+    from sevn.skills.openwiki_install import openwiki_cli_installed
+
+    rows: list[list[dict[str, Any]]] = []
+    if not openwiki_cli_installed():
+        rows.append([{"text": "⬇️ Install CLI", "callback_data": "act:openui:install"}])
+        return rows
+    rows.append([{"text": "🔑 Configure LLM key", "callback_data": "form:openui:configure"}])
+    rows.append([{"text": "⚙ Install + key", "callback_data": "act:openui:setup"}])
     return rows
 
 
@@ -4186,7 +4250,12 @@ def _build_skills_tools_keyboard_rows(
         >>> any(r["callback_data"] == "cfg:section:tools" for row in rows for r in row)
         True
     """
-    rows = _build_skills_keyboard_rows(workspace, content_root)
+    rows: list[list[dict[str, Any]]] = [
+        [{"text": "📋 Skills list", "callback_data": "act:skills:list"}],
+        [{"text": "🔄 Sync skills index", "callback_data": "act:skills:sync"}],
+        [{"text": "🛡 Security scan", "callback_data": "act:skills:security-scan"}],
+    ]
+    rows.extend(_build_skills_keyboard_rows(workspace, content_root))
     _append_nav_section_rows(
         rows,
         (
@@ -4346,6 +4415,10 @@ def build_config_menu_keyboard(
         rows_sec = _build_memory_code_keyboard_rows(workspace)
     elif section == "memory_sb":
         rows_sec = _build_second_brain_keyboard_rows(workspace)
+    elif section == "memory_dreaming":
+        rows_sec = _build_memory_dreaming_keyboard_rows(workspace)
+    elif section == "memory_openwiki":
+        rows_sec = _build_memory_openwiki_keyboard_rows(workspace)
     elif section == "access":
         rows_sec = _build_access_keyboard_rows(workspace)
     elif section == "access_secrets":
@@ -4752,6 +4825,46 @@ def config_menu_message_text(
         url = web_ui_url_from_workspace(workspace)
         if url:
             lines.append(f"Mission Control: {url}")
+        return "\n".join(lines)
+    if section == "memory":
+        sb_on = _second_brain_enabled(workspace)
+        from sevn.memory.dreaming.scheduler import effective_dreaming
+
+        dreaming = effective_dreaming(workspace)
+        mycode = _mycode_enabled(workspace)
+        lines = [
+            "Memory",
+            "",
+            f"Second Brain: {'on' if sb_on else 'off'} ({_second_brain_layout(workspace)})",
+            f"Dreaming: {'on' if dreaming.enabled else 'off'}",
+            f"MYCODE: {'on' if mycode else 'off'}",
+        ]
+        if content_root is not None:
+            lines.append(f"Vault: {_second_brain_vault_display(content_root, workspace)}")
+        return "\n".join(lines)
+    if section == "memory_dreaming":
+        from sevn.memory.dreaming.scheduler import effective_dreaming
+
+        dreaming = effective_dreaming(workspace)
+        lines = [
+            "Dreaming",
+            "",
+            f"Enabled: {'on' if dreaming.enabled else 'off'}",
+            f"Cron: {dreaming.cron or '—'}",
+            f"Threshold: {dreaming.threshold}",
+            f"Max promotions/run: {dreaming.max_promotions_per_run}",
+        ]
+        return "\n".join(lines)
+    if section == "memory_openwiki":
+        from sevn.skills.openwiki_install import openwiki_cli_installed
+
+        installed = openwiki_cli_installed()
+        lines = [
+            "OpenWiki",
+            "",
+            f"CLI: {'installed' if installed else 'not installed'}",
+            "LLM key: configure after install (integration.openwiki.llm_api_key).",
+        ]
         return "\n".join(lines)
     if section == "memory_code":
         mycode = _mycode_enabled(workspace)

@@ -989,6 +989,161 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         notes="Form → subagents kill by id (W7b)",
     )
 
+    # --- C28. Skills & Tools + Memory leaves (W7c) ---
+    add(
+        "C28.1",
+        _exact("act:skills:list"),
+        "C",
+        "skills",
+        "Skills list",
+        implemented=True,
+        notes="Gateway skills inventory (W7c)",
+    )
+    add(
+        "C28.2",
+        _exact("act:skills:sync"),
+        "C",
+        "skills",
+        "Sync skills index",
+        implemented=True,
+        notes="Additive INDEX.md sync (W7c)",
+    )
+    add(
+        "C28.3",
+        _exact("act:skills:security-scan"),
+        "C",
+        "skills",
+        "Security scan",
+        implemented=True,
+        notes="SkillSpector workspace scan (W7c)",
+    )
+    add(
+        "C28.4",
+        _exact("act:tools:health"),
+        "C",
+        "skills_tools",
+        "Tool health",
+        implemented=True,
+        notes="Chronic tool/skill failure rows (W7c)",
+    )
+    add(
+        "C28.5",
+        _exact("cfg:section:memory_dreaming"),
+        "C",
+        "memory",
+        "Dreaming nav",
+        implemented=True,
+        notes="Nav to memory_dreaming (W7c)",
+    )
+    add(
+        "C28.6",
+        _exact("act:memory:search"),
+        "C",
+        "memory",
+        "Search memory",
+        implemented=True,
+        notes="Federated memory browse/search (W7c)",
+    )
+    add(
+        "C28.7",
+        _exact("act:memory:index"),
+        "C",
+        "memory",
+        "Rebuild index",
+        implemented=True,
+        notes="Memory index hook (W7c)",
+    )
+    add(
+        "C28.8",
+        _exact("cfg:section:memory_openwiki"),
+        "C",
+        "memory",
+        "OpenWiki nav",
+        implemented=True,
+        notes="Nav to memory_openwiki (W7c)",
+    )
+    add(
+        "C28.9",
+        _exact("act:second_brain:reindex"),
+        "C",
+        "memory_sb",
+        "Reindex vault",
+        implemented=True,
+        notes="Witchcraft reindex (W7c)",
+    )
+    add(
+        "C28.10",
+        _exact("act:second_brain:setup"),
+        "C",
+        "memory_sb",
+        "Bootstrap layout",
+        implemented=True,
+        notes="Second Brain setup/bootstrap (W7c)",
+    )
+    add(
+        "C28.11",
+        _exact("act:dreaming:status"),
+        "C",
+        "memory_dreaming",
+        "Dreaming status",
+        implemented=True,
+        notes="Dreaming config summary (W7c)",
+    )
+    add(
+        "C28.12",
+        _exact("form:memory:backfill"),
+        "C",
+        "memory_dreaming",
+        "Backfill window",
+        implemented=True,
+        notes="Form → grounded Dreaming backfill (W7c)",
+    )
+    add(
+        "C28.13",
+        _exact("act:dreaming:undo"),
+        "C",
+        "memory_dreaming",
+        "Undo last batch",
+        implemented=True,
+        notes="Rollback last auto Dreaming batch (W7c)",
+    )
+    add(
+        "C28.14",
+        _exact("act:dreaming:reconcile_cron"),
+        "C",
+        "memory_dreaming",
+        "Reconcile cron",
+        implemented=True,
+        notes="Rewrite Dreaming cron row (W7c)",
+    )
+    add(
+        "C28.15",
+        _exact("act:openui:install"),
+        "C",
+        "memory_openwiki",
+        "Install CLI",
+        implemented=True,
+        notes="npm install openwiki CLI (W7c)",
+    )
+    add(
+        "C28.16",
+        _exact("form:openui:configure"),
+        "C",
+        "memory_openwiki",
+        "Configure LLM key",
+        implemented=True,
+        notes="Form → integration.openwiki.llm_api_key (W7c)",
+    )
+    add(
+        "C28.17",
+        _exact("act:openui:setup"),
+        "C",
+        "memory_openwiki",
+        "Install + key",
+        implemented=True,
+        notes="Install OpenWiki CLI then prompt for key (W7c)",
+    )
+
     # --- C14. Integrations ---
     add(
         "C14.1",

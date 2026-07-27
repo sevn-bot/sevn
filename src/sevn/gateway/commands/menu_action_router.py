@@ -110,6 +110,7 @@ _CFG_ACTION_KEYS: frozenset[str] = frozenset(
         "dashboard:unpin",
         "shortcuts:list",
         "skills:refresh",
+        "skills:sync",
         "integrations:refresh",
         "models:swap",
     }
@@ -125,6 +126,11 @@ _CALLBACK_SECTION_PREFIXES: tuple[tuple[str, ConfigSection], ...] = (
     ("agent:", "agent"),
     ("self_improve:", "agent_lab"),
     ("skills:", "skills"),
+    ("tools:", "skills_tools"),
+    ("memory:", "memory"),
+    ("dreaming:", "memory_dreaming"),
+    ("openui:", "memory_openwiki"),
+    ("second_brain:", "memory_sb"),
     ("integrations:", "skills_integrations"),
     ("logs:", "health"),
 )
@@ -549,6 +555,32 @@ class MenuActionRouter:
                 return await self._handle_self_improve_doctor(msg, raw)
             if target == "self_improve:replay_sampler":
                 return await self._handle_self_improve_replay_sampler(msg, raw)
+            if target == "skills:list":
+                return await self._handle_skills_list(msg, raw)
+            if target == "skills:sync":
+                return await self._handle_skills_sync(msg, raw)
+            if target == "skills:security-scan":
+                return await self._handle_skills_security_scan(msg, raw)
+            if target == "tools:health":
+                return await self._handle_tools_health(msg, raw)
+            if target == "memory:search":
+                return await self._handle_memory_search(msg, raw, session_id=session_id)
+            if target == "memory:index":
+                return await self._handle_memory_index(msg, raw)
+            if target == "second_brain:reindex":
+                return await self._handle_second_brain_reindex(msg, raw)
+            if target == "second_brain:setup":
+                return await self._handle_second_brain_setup(msg, raw)
+            if target == "dreaming:status":
+                return await self._handle_dreaming_status(msg, raw)
+            if target == "dreaming:undo":
+                return await self._handle_dreaming_undo(msg, raw)
+            if target == "dreaming:reconcile_cron":
+                return await self._handle_dreaming_reconcile_cron(msg, raw)
+            if target == "openui:install":
+                return await self._handle_openui_install(msg, raw)
+            if target == "openui:setup":
+                return await self._handle_openui_setup(msg, raw, session_id=session_id)
             if target in {"skills:refresh", "integrations:refresh"}:
                 answered = await self._refresh_config_menu_after_action(
                     msg,
@@ -1561,6 +1593,502 @@ class MenuActionRouter:
         )
         await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
         await self._answer_chat_action(msg, "Replay sampler sent")
+        return None
+
+    async def _handle_skills_list(self, msg: IncomingMessage, callback_data: str) -> str | None:
+        """Post workspace skills inventory (``sevn skills list`` parity).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_skills_list)
+            True
+        """
+        _ = callback_data
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.skills.manager import SkillsManager
+        from sevn.ui.dashboard.api.agent import _serialize_skill_inventory
+        from sevn.workspace.layout import WorkspaceLayout
+
+        layout = WorkspaceLayout.from_config(self._sevn_json, self._workspace)
+        manager = SkillsManager.shared(
+            layout.content_root,
+            layout=layout,
+            config=self._workspace,
+        )
+        skills = _serialize_skill_inventory(manager)
+        lines = [f"skills: {len(skills)}"]
+        for row in skills[:50]:
+            name = row.get("id") or row.get("name") or "?"
+            lines.append(f"  {name}")
+        body = "\n".join(lines)
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Skills list sent")
+        return None
+
+    async def _handle_skills_sync(self, msg: IncomingMessage, callback_data: str) -> str | None:
+        """Append missing starter rows to ``skills/INDEX.md`` (``sevn skills sync --additive``).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_skills_sync)
+            True
+        """
+        _ = callback_data
+        from sevn.cli.commands.skills_cmd import _resolve_workspace_index, _sync_additive
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+
+        target = _resolve_workspace_index(self._content_root)
+        added, total = _sync_additive(target)
+        rel = (
+            target.relative_to(self._content_root)
+            if self._content_root in target.parents
+            else target
+        )
+        body = f"skills sync: appended {added} row(s); starter has {total} (target: {rel})"
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Skills index synced")
+        return None
+
+    async def _handle_skills_security_scan(
+        self, msg: IncomingMessage, callback_data: str
+    ) -> str | None:
+        """Run SkillSpector over workspace user/generated skill dirs.
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Error toast text, or ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_skills_security_scan)
+            True
+        """
+        _ = callback_data
+        from sevn.cli.commands.skills_cmd import _collect_security_scan_paths
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.skills.security_scan import (
+            DEFAULT_FAIL_SEVERITIES,
+            normalize_skill_path,
+            resolve_skillspector_command,
+            scan_skill_path,
+            write_workspace_scan_summary,
+        )
+
+        if resolve_skillspector_command() is None:
+            return "SkillSpector CLI not found — install with: uv sync --extra skillspector"
+        try:
+            targets = _collect_security_scan_paths(
+                self._content_root,
+                scan_path=None,
+                all_user=True,
+                all_generated=True,
+            )
+        except Exception as exc:
+            return str(exc)
+        lines: list[str] = []
+        total_findings = 0
+        high_critical = 0
+        rel_paths: list[str] = []
+        exit_code = 0
+        for target in targets:
+            result = scan_skill_path(target, fail_severities=DEFAULT_FAIL_SEVERITIES)
+            rel = normalize_skill_path(target, repo_root=self._content_root)
+            rel_paths.append(rel)
+            if result.error:
+                lines.append(f"{rel}: scan error — {result.error}")
+                exit_code = 1
+                continue
+            total_findings += len(result.issues)
+            high_critical += len(result.issues_at_or_above(DEFAULT_FAIL_SEVERITIES))
+            if result.issues:
+                lines.append(f"{rel}: {len(result.issues)} HIGH/CRITICAL finding(s)")
+                exit_code = 1
+            else:
+                lines.append(f"{rel}: ok")
+        write_workspace_scan_summary(
+            self._content_root,
+            scanned_paths=rel_paths,
+            total_findings=total_findings,
+            high_critical=high_critical,
+        )
+        body = "No skill directories to scan." if not lines else "\n".join(lines)
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(
+            msg,
+            "Scan complete" if exit_code == 0 else "Scan found issues",
+        )
+        return None
+
+    async def _handle_tools_health(self, msg: IncomingMessage, callback_data: str) -> str | None:
+        """Post chronic tool/skill failure rows (``sevn tools health`` parity).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_tools_health)
+            True
+        """
+        _ = callback_data
+        from sevn.cli.commands.tools_cmd import _format_tools_health
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.ui.dashboard.api.agent import _workspace_id
+        from sevn.ui.dashboard.services.tool_skill_health import ToolSkillHealthService
+        from sevn.workspace.layout import WorkspaceLayout
+
+        layout = WorkspaceLayout.from_config(self._sevn_json, self._workspace)
+        svc = ToolSkillHealthService(workspace_id=_workspace_id(self._workspace, layout))
+        rows = svc.list_rows(self._conn, source="telegram")
+        body = _format_tools_health({"rows": rows, "count": len(rows)})
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Tool health sent")
+        return None
+
+    async def _handle_memory_search(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        *,
+        session_id: str,
+    ) -> str | None:
+        """Browse or search federated memory layers (``memory_search`` tool parity).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            session_id (str): Active gateway session id for SQLite scope.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_memory_search)
+            True
+        """
+        _ = callback_data
+        import json
+
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.tools.memory_tools import federated_memory_search
+
+        sid = session_id.strip() or str(msg.metadata.get("session_id") or "telegram:menu")
+        hits, truncated = federated_memory_search(
+            self._content_root,
+            self._conn,
+            query="",
+            session_id=sid,
+            source="all",
+            limit=10,
+        )
+        body = json.dumps({"hits": hits, "truncated": truncated}, indent=2)
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Memory search sent")
+        return None
+
+    async def _handle_memory_index(self, msg: IncomingMessage, callback_data: str) -> str | None:
+        """Report memory index CLI posture (``sevn memory index`` is not implemented yet).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_memory_index)
+            True
+        """
+        _ = callback_data
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+
+        body = "`sevn memory index` is not implemented yet."
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Memory index")
+        return None
+
+    async def _handle_second_brain_reindex(
+        self, msg: IncomingMessage, callback_data: str
+    ) -> str | None:
+        """Build or refresh the Witchcraft semantic index (``sevn second-brain reindex``).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Precondition error text, or ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_second_brain_reindex)
+            True
+        """
+        _ = callback_data
+        from sevn.cli.commands.second_brain_cmd import _run_reindex
+        from sevn.cli.errors import CliPreconditionError
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+
+        try:
+            _run_reindex(self._workspace, self._content_root)
+        except CliPreconditionError as exc:
+            return str(exc)
+        body = "Witchcraft index built for resolved vault content roots."
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Reindex complete")
+        return None
+
+    async def _handle_second_brain_setup(
+        self, msg: IncomingMessage, callback_data: str
+    ) -> str | None:
+        """Enable Second Brain and bootstrap vault layout (``sevn second-brain setup``).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Error toast text, or ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_second_brain_setup)
+            True
+        """
+        _ = callback_data
+        from sevn.cli.commands.second_brain_cmd import _resolve_setup_layout
+        from sevn.config.sections.features import SecondBrainParaConfig
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.second_brain.bootstrap import ensure_second_brain_scope_layout
+        from sevn.second_brain.paths import effective_scope, resolve_scope_root
+
+        layout_name = _resolve_setup_layout(
+            "auto", content_root=self._content_root, vault_norm=None
+        )
+
+        def _apply(doc: dict[str, Any]) -> None:
+            _set_nested(doc, "second_brain.enabled", True)
+            _set_nested(doc, "second_brain.layout", layout_name)
+            if layout_name == "para":
+                sb_obj = doc.setdefault("second_brain", {})
+                if isinstance(sb_obj, dict) and "para" not in sb_obj:
+                    sb_obj["para"] = SecondBrainParaConfig().model_dump()
+
+        mutate_sevn_json(self._sevn_json, _apply)
+        self._reload_workspace()
+        sb_cfg = self._workspace.second_brain
+        if sb_cfg is None:
+            return "second_brain config missing after setup"
+        scope = effective_scope(None, sb_cfg)
+        scope_root = resolve_scope_root(self._content_root, sb_cfg, scope)
+        try:
+            created = ensure_second_brain_scope_layout(
+                scope_root,
+                cfg=self._workspace,
+                copy_model=True,
+            )
+        except Exception as exc:
+            return str(exc)
+        body = (
+            f"Second Brain enabled (layout: {layout_name}).\n"
+            f"Created: {', '.join(created) if created else 'none'}"
+        )
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Second Brain bootstrapped")
+        return None
+
+    async def _handle_dreaming_status(self, msg: IncomingMessage, callback_data: str) -> str | None:
+        """Summarize Dreaming toggles (``sevn memory status`` parity).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_dreaming_status)
+            True
+        """
+        _ = callback_data
+        import json
+
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.memory.dreaming.scheduler import effective_dreaming
+
+        dreaming = effective_dreaming(self._workspace)
+        body = json.dumps(
+            {
+                "dreaming_enabled": dreaming.enabled,
+                "promotion_mode": dreaming.promotion_mode,
+                "cron": dreaming.cron,
+                "threshold": dreaming.threshold,
+                "max_promotions_per_run": dreaming.max_promotions_per_run,
+            },
+            indent=2,
+        )
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Dreaming status sent")
+        return None
+
+    async def _handle_dreaming_undo(self, msg: IncomingMessage, callback_data: str) -> str | None:
+        """Undo the last auto Dreaming batch (``sevn memory rem-backfill --rollback``).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_dreaming_undo)
+            True
+        """
+        _ = callback_data
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.memory.dreaming.rollback import rollback_last_auto_batch
+
+        rollback_last_auto_batch(self._content_root)
+        body = "rollback complete"
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Dreaming rollback complete")
+        return None
+
+    async def _handle_dreaming_reconcile_cron(
+        self, msg: IncomingMessage, callback_data: str
+    ) -> str | None:
+        """Rewrite the Dreaming cron row (``sevn memory reconcile-cron``).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_dreaming_reconcile_cron)
+            True
+        """
+        _ = callback_data
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.memory.dreaming.scheduler import reconcile_dreaming_cron_job
+
+        reconcile_dreaming_cron_job(self._conn, self._workspace)
+        body = "dreaming cron row reconciled"
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Cron reconciled")
+        return None
+
+    async def _handle_openui_install(self, msg: IncomingMessage, callback_data: str) -> str | None:
+        """Install the upstream OpenWiki npm CLI (``sevn openwiki install``).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Error text, or ``None`` after refresh/toast.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_openui_install)
+            True
+        """
+        _ = callback_data
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.skills.openwiki_install import openwiki_cli_installed, run_openwiki_install
+
+        code, detail = run_openwiki_install(skip_if_installed=True)
+        if code != 0:
+            return detail or "OpenWiki install failed"
+        installed = openwiki_cli_installed()
+        body = detail or f"openwiki CLI {'installed' if installed else 'install finished'}"
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        answered = await self._refresh_config_menu_after_action(
+            msg,
+            callback_data,
+            toast="OpenWiki installed.",
+        )
+        return None if answered else body
+
+    async def _handle_openui_setup(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        *,
+        session_id: str = "",
+    ) -> str | None:
+        """Install OpenWiki CLI then start the LLM key form (``sevn openwiki setup``).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            session_id (str): Active gateway session id for the configure wizard.
+
+        Returns:
+            str | None: Install error text, or ``None`` after starting the form.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_openui_setup)
+            True
+        """
+        _ = callback_data
+        from sevn.gateway.channel_router import IncomingMessage
+        from sevn.gateway.commands.menu_form_handler import MenuFormHandler
+        from sevn.skills.openwiki_install import openwiki_cli_installed, run_openwiki_install
+
+        code, detail = run_openwiki_install(skip_if_installed=True)
+        if code != 0:
+            return detail or "OpenWiki install failed"
+        if not openwiki_cli_installed():
+            return detail or "OpenWiki install did not place openwiki on PATH"
+        md = dict(msg.metadata) if isinstance(msg.metadata, dict) else {}
+        md["callback_data"] = "form:openui:configure"
+        form_msg = IncomingMessage(
+            channel=msg.channel,
+            user_id=msg.user_id,
+            text=msg.text,
+            metadata=md,
+        )
+        handler = MenuFormHandler(
+            workspace=self._workspace,
+            router=self._router,
+            conn=self._conn,
+            content_root=self._content_root,
+            sevn_json_path=self._sevn_json,
+        )
+        await handler.handle(form_msg, session_id=session_id)
         return None
 
     async def _answer_chat_action(self, msg: IncomingMessage, text: str) -> None:
