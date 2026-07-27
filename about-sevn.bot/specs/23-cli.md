@@ -8,7 +8,7 @@ summary: Deliver the primary operator and automation surface for install, upgrad
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
 last_updated: '2026-07-27'
-fingerprint: sha256:1178b0793ea62f12e84c9c57a9ae0e5bb75358c300b157345ee072f9ba9bc0bb
+fingerprint: sha256:d7ca0647649794dd1b3cd0a959fd780818c20ffead2cf9c9637650811c5ab2f2
 related: []
 sources:
 - src/sevn/cli/**
@@ -231,6 +231,9 @@ interfaces:
 - name: iter_config_sections
   file: src/sevn/cli/config_paths.py
   symbol: iter_config_sections
+- name: iter_config_slug_aliases
+  file: src/sevn/cli/config_paths.py
+  symbol: iter_config_slug_aliases
 - name: menu_registry_root_slugs
   file: src/sevn/cli/config_paths.py
   symbol: menu_registry_root_slugs
