@@ -28,6 +28,7 @@ are cut into a dated, versioned section at release time.
 ### Fixed
 
 - [2026-07-27] Telegram Menu docs scaffold: skip full ``ROOT_TILES`` sync when an explicit live dict is passed so per-gap tile inserts are not clobbered
+- [2026-07-27] ``sevn config <section>`` doctests use the redesign ``chat`` slug instead of retired ``session``
 - [2026-07-26] Telegram ``/config`` Advanced section dissolved: auto-resume tier B on Deployment, trace redaction de-duplicated to Health > Trace export (``C20.6``), queue mode only on Chat, RLM/CodeMode/Self-Improve under Agent > Lab, Second Brain under Memory, Sub-agents under Agent; stale ``cfg:section:advanced`` answers a moved toast
 
 ### Fixed

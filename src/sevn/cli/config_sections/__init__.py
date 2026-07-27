@@ -52,7 +52,7 @@ def section_payload(section: ConfigSection, document: dict[str, Any]) -> dict[st
 
     Examples:
         >>> from sevn.cli.config_paths import section_by_slug
-        >>> sec = section_by_slug("session")
+        >>> sec = section_by_slug("chat")
         >>> assert sec is not None
         >>> payload = section_payload(sec, {"gateway": {"queue_mode": "cancel"}})
         >>> "paths" in payload
@@ -80,9 +80,9 @@ def format_section_plain(section: ConfigSection, document: dict[str, Any]) -> st
 
     Examples:
         >>> from sevn.cli.config_paths import section_by_slug
-        >>> sec = section_by_slug("session")
+        >>> sec = section_by_slug("chat")
         >>> assert sec is not None
-        >>> "Session" in format_section_plain(sec, {})
+        >>> "Chat" in format_section_plain(sec, {})
         True
     """
     lines = [
