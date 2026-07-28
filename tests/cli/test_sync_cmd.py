@@ -32,7 +32,7 @@ def test_sync_dry_run_exits_zero(
             updated=False,
             local_rev="dry-run",
             remote_rev="dry-run",
-            detail="dry-run: git fetch origin test-pre; update checkout; make sync-cli (install-cli-browser); refresh skills/core",
+            detail="dry-run: git fetch origin pre-0.0.1; update checkout; make sync-cli (install-cli-browser); refresh skills/core",
         ),
     )
     result = runner.invoke(

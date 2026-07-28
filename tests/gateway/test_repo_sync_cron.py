@@ -45,7 +45,7 @@ def test_diverged_my_sevn_sync_surfaces_single_actionable_notice(
     def _raise_diverged(*, home: object = None, dry_run: bool = False) -> str:
         _ = home, dry_run
         msg = (
-            "local history diverged from origin/test-pre; pass --latest to reset to the remote tip"
+            "local history diverged from origin/pre-0.0.1; pass --latest to reset to the remote tip"
         )
         raise RepoSyncError(msg)
 
@@ -75,7 +75,7 @@ def test_repo_sync_cron_failure_is_not_logged_every_run(
 
     warnings, sink_id = _capture_loguru(level="WARNING")
     exc = RepoSyncError(
-        "local history diverged from origin/test-pre; pass --latest to reset to the remote tip",
+        "local history diverged from origin/pre-0.0.1; pass --latest to reset to the remote tip",
     )
     try:
         for _ in range(3):
