@@ -358,7 +358,7 @@ def run_scheduled_repo_sync(*, home: Path | None = None, dry_run: bool = False) 
     repo_root = _resolve_sync_repo_root(home=home)
     result = sync_source_tree(
         repo_root=repo_root,
-        latest=True,
+        latest=False,
         dry_run=dry_run,
         restart_gateway=not dry_run,
         home=home,

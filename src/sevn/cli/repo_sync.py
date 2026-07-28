@@ -33,6 +33,7 @@ from pathlib import Path
 
 from loguru import logger
 
+from sevn.cli.errors import CliPreconditionError
 from sevn.cli.operator_lock import OperatorLockHeld, operator_lock
 from sevn.cli.service_manager import ServiceManagerError, control_unit
 
@@ -42,40 +43,8 @@ SYNC_REMOTE = "origin"
 # Back-compat alias for tests and callers that imported the old constant name.
 SYNC_TRACKING_BRANCH = DEFAULT_SYNC_TRACKING_BRANCH
 
-
-def resolve_sync_tracking_branch(*, explicit: str | None = None) -> str:
-    """Return the git branch ``sevn sync`` / ``sevn update`` should track.
-
-    Resolution order: explicit argument, ``SEVN_SYNC_BRANCH`` env, bound
-    ``my_sevn.sync.branch`` in ``sevn.json``, then
-    :data:`DEFAULT_SYNC_TRACKING_BRANCH`.
-
-    Args:
-        explicit (str | None): CLI ``--branch`` override.
-
-    Returns:
-        str: Remote tracking branch name (e.g. ``pre-0.0.1``, ``main``).
-
-    Examples:
-        >>> resolve_sync_tracking_branch(explicit="main")
-        'main'
-    """
-    if explicit is not None and explicit.strip():
-        return explicit.strip()
-    env = os.environ.get("SEVN_SYNC_BRANCH", "").strip()
-    if env:
-        return env
-    try:
-        from sevn.cli.workspace import load_bound_workspace
-        from sevn.config.my_sevn import effective_my_sevn_sync
-
-        bound = load_bound_workspace()
-        branch = str(effective_my_sevn_sync(bound.config).branch or "").strip()
-        if branch:
-            return branch
-    except Exception:
-        pass
-    return DEFAULT_SYNC_TRACKING_BRANCH
+# Git branch/ref names allowed for operator sync (no shell metacharacters or ``..``).
+_TRACKING_BRANCH_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]*$")
 
 
 class RepoSyncError(RuntimeError):
@@ -104,6 +73,69 @@ class SyncResult:
     local_rev: str
     remote_rev: str
     detail: str
+
+
+def _validate_tracking_branch(branch: str) -> str:
+    """Return ``branch`` when it is a safe single git ref segment.
+
+    Args:
+        branch (str): Candidate tracking branch from config, env, or CLI.
+
+    Returns:
+        str: Validated branch name.
+
+    Raises:
+        RepoSyncError: When ``branch`` is empty or contains disallowed characters.
+
+    Examples:
+        >>> _validate_tracking_branch("pre-0.0.1")
+        'pre-0.0.1'
+    """
+    name = branch.strip()
+    if not name or ".." in name or not _TRACKING_BRANCH_RE.fullmatch(name):
+        msg = f"invalid sync branch name: {branch!r} (use alphanumerics, ., _, /, -)"
+        raise RepoSyncError(msg)
+    return name
+
+
+def resolve_sync_tracking_branch(*, explicit: str | None = None) -> str:
+    """Return the git branch ``sevn sync`` / ``sevn update`` should track.
+
+    Resolution order: explicit argument, ``SEVN_SYNC_BRANCH`` env, bound
+    ``my_sevn.sync.branch`` in ``sevn.json``, then
+    :data:`DEFAULT_SYNC_TRACKING_BRANCH`.
+
+    Args:
+        explicit (str | None): CLI ``--branch`` override.
+
+    Returns:
+        str: Remote tracking branch name (e.g. ``pre-0.0.1``, ``main``).
+
+    Raises:
+        RepoSyncError: When an configured branch name is invalid.
+
+    Examples:
+        >>> resolve_sync_tracking_branch(explicit="main")
+        'main'
+    """
+    if explicit is not None and explicit.strip():
+        return _validate_tracking_branch(explicit)
+    env = os.environ.get("SEVN_SYNC_BRANCH", "").strip()
+    if env:
+        return _validate_tracking_branch(env)
+    try:
+        from sevn.cli.workspace import load_bound_workspace
+        from sevn.config.my_sevn import effective_my_sevn_sync
+
+        bound = load_bound_workspace()
+        branch = str(effective_my_sevn_sync(bound.config).branch or "").strip()
+        if branch:
+            return _validate_tracking_branch(branch)
+    except RepoSyncError:
+        raise
+    except (CliPreconditionError, ImportError, OSError, RuntimeError, ValueError) as exc:
+        logger.debug("sync branch from workspace unavailable: {}", exc)
+    return DEFAULT_SYNC_TRACKING_BRANCH
 
 
 def _repo_root_from_workspace() -> Path | None:

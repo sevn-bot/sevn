@@ -384,6 +384,13 @@ def test_resolve_sync_tracking_branch_explicit_and_default(
     assert resolve_sync_tracking_branch() == "develop"
 
 
+def test_resolve_sync_tracking_branch_rejects_unsafe_names() -> None:
+    with pytest.raises(RepoSyncError, match=r"invalid sync branch name"):
+        resolve_sync_tracking_branch(explicit="pre-0.0.1; echo pwned")
+    with pytest.raises(RepoSyncError, match=r"invalid sync branch name"):
+        resolve_sync_tracking_branch(explicit="../main")
+
+
 def test_sync_latest_runs_git_clean(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

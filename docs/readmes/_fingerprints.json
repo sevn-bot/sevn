@@ -26,8 +26,8 @@
     },
     "config-workspace": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-24T12:29:20Z",
-      "digest": "ca9abe6bbcffbda89bb1d17ab7da673a9360e4950674699af144a3c6c1621cb5",
+      "computed_at": "2026-07-28T11:50:39Z",
+      "digest": "766427d8df79c3ac3f85339fcd7d88ac9deccf820cbcf7491eca5b6e33b97308",
       "source_globs": [
         "src/sevn/config/**",
         "src/sevn/workspace/**",
@@ -49,8 +49,8 @@
     },
     "evolution": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-20T09:51:24Z",
-      "digest": "5d861c872064da2d57a613f098f5bec034b55609b9858fea362c45502cdc6e8a",
+      "computed_at": "2026-07-28T11:50:39Z",
+      "digest": "b7015f05ce053bbe5de35d2ef28e81c33814fda4be14e1d0c65099942a52d87c",
       "source_globs": [
         "src/sevn/evolution/**"
       ]
