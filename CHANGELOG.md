@@ -12,10 +12,12 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-28] Operator sync branch names from config, env, and CLI flags are validated before git subprocess use; daily repo-sync cron stays ff-only with divergence recovery (force-reset remains on ``sevn update`` / ``--latest``)
 - [2026-07-27] Thermos hardening for Telegram ``/config``: owner gates on W7 mutators/forms, readiness enforcement at dispatch, user-scoped secrets export/deploy confirms, redacted ``act:config:show``, CLI slug aliases, ``secrets_export`` dispatcher kind, and ``owner_only`` registry flags on security/deployment toggles
 
 ### Added
 
+- [2026-07-28] Operator upgrades can force-reset the gateway source checkout to ``origin/pre-0.0.1`` or ``main``, reinstall the ``sevn`` CLI, and discard local checkout edits without merge prompts — via ``sevn update``, ``make update-cli``, or ``sevn sync --latest --branch …``
 - [2026-07-26] Telegram ``/config`` root regrouped into eight intent tiles (Chat, Agent, Skills & Tools, Memory, Access, Health, Deployment, Help) with ``owner_only`` gating (non-owners see four tiles); legacy section callbacks unchanged; nav shells re-parent existing rows
 - [2026-07-26] Telegram ``/config`` menu E2E harness: ``TelegramMenuWalker`` recipe, ``make telegram-menu-e2e`` (``SEVN_TELEGRAM_MENU_E2E=1``), inline-keyboard primitives on ``TelegramWeb``, and per-row verdict + spec-id coverage reports under ``evidence/telegram-menu-e2e/``
 - [2026-07-27] Telegram ``/config`` Chat leaves (W7a): Sessions section (list/history/send, ``/new``, ``/stop``), shortcuts list/remove, voice probe/settings, channel status/config, notify-policy on Chat root

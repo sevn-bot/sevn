@@ -87,6 +87,7 @@ class MySevnSyncWorkspaceConfig(BaseModel):
 
     enabled: bool = True
     cron: str = "0 4 * * *"
+    branch: str = "pre-0.0.1"
 
 
 class MySevnBugsWorkspaceConfig(BaseModel):

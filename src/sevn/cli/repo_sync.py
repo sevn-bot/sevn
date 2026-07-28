@@ -7,6 +7,7 @@ Exports:
     RepoSyncError — precondition or git failure.
     SyncResult — outcome summary for callers.
     resolve_sevn_repo_root — locate the sevn.bot git checkout.
+    resolve_sync_tracking_branch — branch name for operator sync/update.
     sync_source_tree — fetch, fast-forward or reset, run ``make sync-cli``, optional gateway restart.
 
 Private:
@@ -32,12 +33,18 @@ from pathlib import Path
 
 from loguru import logger
 
+from sevn.cli.errors import CliPreconditionError
 from sevn.cli.operator_lock import OperatorLockHeld, operator_lock
 from sevn.cli.service_manager import ServiceManagerError, control_unit
 
-# v1 tracks test-pre; switch to main per specs/23-cli.md §11 when stable ships on main.
-SYNC_TRACKING_BRANCH = "test-pre"
+# Operator sync tracks a release-staging or stable branch on origin.
+DEFAULT_SYNC_TRACKING_BRANCH = "pre-0.0.1"
 SYNC_REMOTE = "origin"
+# Back-compat alias for tests and callers that imported the old constant name.
+SYNC_TRACKING_BRANCH = DEFAULT_SYNC_TRACKING_BRANCH
+
+# Git branch/ref names allowed for operator sync (no shell metacharacters or ``..``).
+_TRACKING_BRANCH_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]*$")
 
 
 class RepoSyncError(RuntimeError):
@@ -66,6 +73,69 @@ class SyncResult:
     local_rev: str
     remote_rev: str
     detail: str
+
+
+def _validate_tracking_branch(branch: str) -> str:
+    """Return ``branch`` when it is a safe single git ref segment.
+
+    Args:
+        branch (str): Candidate tracking branch from config, env, or CLI.
+
+    Returns:
+        str: Validated branch name.
+
+    Raises:
+        RepoSyncError: When ``branch`` is empty or contains disallowed characters.
+
+    Examples:
+        >>> _validate_tracking_branch("pre-0.0.1")
+        'pre-0.0.1'
+    """
+    name = branch.strip()
+    if not name or ".." in name or not _TRACKING_BRANCH_RE.fullmatch(name):
+        msg = f"invalid sync branch name: {branch!r} (use alphanumerics, ., _, /, -)"
+        raise RepoSyncError(msg)
+    return name
+
+
+def resolve_sync_tracking_branch(*, explicit: str | None = None) -> str:
+    """Return the git branch ``sevn sync`` / ``sevn update`` should track.
+
+    Resolution order: explicit argument, ``SEVN_SYNC_BRANCH`` env, bound
+    ``my_sevn.sync.branch`` in ``sevn.json``, then
+    :data:`DEFAULT_SYNC_TRACKING_BRANCH`.
+
+    Args:
+        explicit (str | None): CLI ``--branch`` override.
+
+    Returns:
+        str: Remote tracking branch name (e.g. ``pre-0.0.1``, ``main``).
+
+    Raises:
+        RepoSyncError: When an configured branch name is invalid.
+
+    Examples:
+        >>> resolve_sync_tracking_branch(explicit="main")
+        'main'
+    """
+    if explicit is not None and explicit.strip():
+        return _validate_tracking_branch(explicit)
+    env = os.environ.get("SEVN_SYNC_BRANCH", "").strip()
+    if env:
+        return _validate_tracking_branch(env)
+    try:
+        from sevn.cli.workspace import load_bound_workspace
+        from sevn.config.my_sevn import effective_my_sevn_sync
+
+        bound = load_bound_workspace()
+        branch = str(effective_my_sevn_sync(bound.config).branch or "").strip()
+        if branch:
+            return _validate_tracking_branch(branch)
+    except RepoSyncError:
+        raise
+    except (CliPreconditionError, ImportError, OSError, RuntimeError, ValueError) as exc:
+        logger.debug("sync branch from workspace unavailable: {}", exc)
+    return DEFAULT_SYNC_TRACKING_BRANCH
 
 
 def _repo_root_from_workspace() -> Path | None:
@@ -255,25 +325,45 @@ def _is_ancestor(repo_root: Path, older: str, newer: str, *, dry_run: bool = Fal
     return proc.returncode == 0
 
 
-def _ensure_tracking_branch(repo_root: Path, *, dry_run: bool = False) -> None:
+def _ensure_tracking_branch(repo_root: Path, *, branch: str, dry_run: bool = False) -> None:
     """Check out the configured tracking branch, creating it from remote when needed.
+
+    Args:
+        repo_root (Path): Repository root.
+        branch (str): Local/remote tracking branch name.
+        dry_run (bool): Skip mutating git commands when True.
+
+    Examples:
+        >>> _ensure_tracking_branch(Path("."), branch="pre-0.0.1", dry_run=True) is None
+        True
+    """
+    remote_ref = f"{SYNC_REMOTE}/{branch}"
+    listed = _git(repo_root, "branch", "--list", branch, dry_run=dry_run)
+    if dry_run:
+        return
+    if branch in listed:
+        _git(repo_root, "checkout", branch)
+    else:
+        _git(repo_root, "checkout", "-B", branch, remote_ref)
+
+
+def _clean_untracked(repo_root: Path, *, dry_run: bool = False) -> None:
+    """Remove untracked files and directories under the checkout.
+
+    Uses ``git clean -fd`` only — never ``-x``/``-X`` (repo policy: preserves
+    gitignored operator trees like ``.ignorelocal/`` when present in a dev clone).
 
     Args:
         repo_root (Path): Repository root.
         dry_run (bool): Skip mutating git commands when True.
 
     Examples:
-        >>> _ensure_tracking_branch(Path("."), dry_run=True) is None
+        >>> _clean_untracked(Path("."), dry_run=True) is None
         True
     """
-    remote_ref = f"{SYNC_REMOTE}/{SYNC_TRACKING_BRANCH}"
-    listed = _git(repo_root, "branch", "--list", SYNC_TRACKING_BRANCH, dry_run=dry_run)
     if dry_run:
         return
-    if SYNC_TRACKING_BRANCH in listed:
-        _git(repo_root, "checkout", SYNC_TRACKING_BRANCH)
-    else:
-        _git(repo_root, "checkout", "-B", SYNC_TRACKING_BRANCH, remote_ref)
+    _git(repo_root, "clean", "-fd")
 
 
 def _run_sync_cli(repo_root: Path, *, dry_run: bool = False) -> None:
@@ -504,20 +594,24 @@ def sync_source_tree(
     *,
     repo_root: Path,
     latest: bool = False,
+    branch: str | None = None,
     dry_run: bool = False,
     restart_gateway: bool = True,
     home: Path | None = None,
 ) -> SyncResult:
-    """Fetch ``origin/<tracking-branch>``, update the checkout, and reinstall the CLI.
+    """Fetch ``origin/<branch>``, update the checkout, and reinstall the CLI.
 
     Default mode fast-forwards only when the remote tip is strictly ahead of ``HEAD``.
-    ``--latest`` always matches the remote tip (``git reset --hard`` when needed) and
-    reruns ``make sync-cli`` even when already at the tip. Ignored and untracked files
-    (for example ``.env``, ``.env.proxy``) are never removed.
+    ``--latest`` / ``sevn update`` always matches the remote tip (``git reset --hard``
+    when needed), removes untracked paths with ``git clean -fd``, and reruns
+    ``make sync-cli`` even when already at the tip. Ignored files (for example
+    ``.env``, ``.env.proxy``) are never removed.
 
     Args:
         repo_root (Path): sevn.bot checkout root.
         latest (bool): Force sync and setup even when already at the remote tip.
+        branch (str | None): Tracking branch; default from config/env
+            (:func:`resolve_sync_tracking_branch`).
         dry_run (bool): Plan git and make steps without mutating disk or services.
         restart_gateway (bool): Restart gateway when its user unit is active.
         home (Path | None): Operator home for service control; defaults to ``Path.home()``.
@@ -533,13 +627,16 @@ def sync_source_tree(
         False
     """
     operator_home = home if home is not None else Path.home()
-    remote_ref = f"{SYNC_REMOTE}/{SYNC_TRACKING_BRANCH}"
+    tracking_branch = resolve_sync_tracking_branch(explicit=branch)
+    remote_ref = f"{SYNC_REMOTE}/{tracking_branch}"
 
     if dry_run:
         plan = (
-            f"dry-run: git fetch {SYNC_REMOTE} {SYNC_TRACKING_BRANCH}; "
+            f"dry-run: git fetch {SYNC_REMOTE} {tracking_branch}; "
             "update checkout; make sync-cli (install-cli-browser + browser-cdp); refresh skills/core"
         )
+        if latest:
+            plan = f"{plan}; git clean -fd (untracked only)"
         refresh_line = _refresh_workspace_skills(dry_run=True)
         if refresh_line:
             plan = f"{plan}; {refresh_line}"
@@ -562,7 +659,7 @@ def sync_source_tree(
             detail=plan,
         )
 
-    _git(repo_root, "fetch", SYNC_REMOTE, SYNC_TRACKING_BRANCH)
+    _git(repo_root, "fetch", SYNC_REMOTE, tracking_branch)
     local_rev = _git(repo_root, "rev-parse", "HEAD")
     remote_rev = _git(repo_root, "rev-parse", remote_ref)
 
@@ -575,26 +672,33 @@ def sync_source_tree(
             updated=False,
             local_rev=local_rev,
             remote_rev=remote_rev,
-            detail=f"{repo_root} already up to date with origin (pass --latest to rerun setup)",
+            detail=(
+                f"{repo_root} already up to date with origin "
+                f"(pass --latest or run `sevn update` to rerun setup)"
+            ),
         )
 
     if not latest and ahead:
-        msg = f"local {SYNC_TRACKING_BRANCH} is ahead of {remote_ref}; push or reset before syncing"
+        msg = f"local {tracking_branch} is ahead of {remote_ref}; push or reset before syncing"
         raise RepoSyncError(msg)
 
     if not latest and diverged:
-        msg = f"local history diverged from {remote_ref}; pass --latest to reset to the remote tip"
+        msg = (
+            f"local history diverged from {remote_ref}; "
+            "pass --latest or run `sevn update` to reset to the remote tip"
+        )
         raise RepoSyncError(msg)
 
     need_git_write = latest or behind
     updated = False
     if need_git_write:
-        _ensure_tracking_branch(repo_root)
+        _ensure_tracking_branch(repo_root, branch=tracking_branch)
         if latest:
             # --latest matches the remote tip even when behind: a ff-only merge
             # aborts on locally-regenerated tracked artifacts (e.g. the code
-            # index), while reset --hard leaves untracked/ignored files intact.
+            # index), while reset --hard leaves ignored files intact.
             _git(repo_root, "reset", "--hard", remote_ref)
+            _clean_untracked(repo_root)
             updated = local_rev != remote_rev or ahead
         elif behind:
             _git(repo_root, "merge", "--ff-only", remote_ref)
@@ -617,7 +721,7 @@ def sync_source_tree(
     if restart_gateway:
         restart_line = _maybe_restart_gateway(home=operator_home)
 
-    detail = f"synced {repo_root} to {remote_ref[:12]}"
+    detail = f"synced {repo_root} to {remote_ref[:12]} ({tracking_branch})"
     if hook_line:
         detail = f"{detail}; {hook_line}"
     if refresh_line:
@@ -639,10 +743,12 @@ def sync_source_tree(
 
 
 __all__ = [
+    "DEFAULT_SYNC_TRACKING_BRANCH",
     "SYNC_REMOTE",
     "SYNC_TRACKING_BRANCH",
     "RepoSyncError",
     "SyncResult",
     "resolve_sevn_repo_root",
+    "resolve_sync_tracking_branch",
     "sync_source_tree",
 ]

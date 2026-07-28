@@ -34,8 +34,14 @@ def register(app: typer.Typer) -> None:
             "--latest",
             help=(
                 "Match the remote branch tip and rerun CLI reinstall even when already up to date; "
-                "reset hard when history diverged; play logo animation on interactive TTY."
+                "reset hard when history diverged; remove untracked paths; play logo on TTY. "
+                "Same as `sevn update`."
             ),
+        ),
+        branch: str | None = typer.Option(
+            None,
+            "--branch",
+            help="Git branch to track (default: my_sevn.sync.branch or pre-0.0.1).",
         ),
         repo: Path | None = typer.Option(
             None,
@@ -59,6 +65,7 @@ def register(app: typer.Typer) -> None:
             result = sync_source_tree(
                 repo_root=root,
                 latest=latest,
+                branch=branch,
                 dry_run=dry_run,
                 restart_gateway=not no_restart,
             )

@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver the primary operator and automation surface for install, upgrades,
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
-last_updated: '2026-07-27'
-fingerprint: sha256:d7ca0647649794dd1b3cd0a959fd780818c20ffead2cf9c9637650811c5ab2f2
+last_updated: '2026-07-28'
+fingerprint: sha256:aac74e7ffd3d312c32b91802d479f0552bf2c6983f0de6c509ea9cff4ad4347c
 related: []
 sources:
 - src/sevn/cli/**
@@ -564,6 +564,9 @@ interfaces:
 - name: resolve_sevn_repo_root
   file: src/sevn/cli/repo_sync.py
   symbol: resolve_sevn_repo_root
+- name: resolve_sync_tracking_branch
+  file: src/sevn/cli/repo_sync.py
+  symbol: resolve_sync_tracking_branch
 - name: sync_source_tree
   file: src/sevn/cli/repo_sync.py
   symbol: sync_source_tree

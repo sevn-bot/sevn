@@ -1,7 +1,7 @@
-"""``sevn update`` / ``sevn upgrade`` — package and schema helpers (`specs/23-cli.md` §2.4).
+"""``sevn update`` / ``sevn upgrade`` — operator upgrade helpers (`specs/23-cli.md` §2.4).
 
 Module: sevn.cli.commands.update_cmd
-Depends: importlib.metadata, sys, typer, sevn.onboarding.migrate
+Depends: json, sys, pathlib, typer, sevn.cli.repo_sync, sevn.onboarding.migrate
 
 Exports:
     register — attach ``update`` and ``upgrade`` root commands.
@@ -11,12 +11,12 @@ from __future__ import annotations
 
 import json
 import sys
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as pkg_version
+from pathlib import Path
 
 import typer
 
 from sevn.cli.json_util import emit_json_success
+from sevn.cli.repo_sync import RepoSyncError, resolve_sevn_repo_root, sync_source_tree
 from sevn.cli.workspace import load_bound_workspace
 from sevn.onboarding.migrate import describe_schema_upgrade
 
@@ -34,21 +34,53 @@ def register(app: typer.Typer) -> None:
 
     @app.command("update")
     def update_cmd(
+        branch: str | None = typer.Option(
+            None,
+            "--branch",
+            help="Git branch to track (default: my_sevn.sync.branch or pre-0.0.1).",
+        ),
+        repo: Path | None = typer.Option(
+            None,
+            "--repo",
+            help="sevn.bot checkout root (default: my_sevn.repo_path / SEVN_REPO_ROOT / cwd).",
+        ),
+        dry_run: bool = typer.Option(
+            False,
+            "--dry-run",
+            help="Print planned git and make steps without changing disk or services.",
+        ),
+        no_restart: bool = typer.Option(
+            False,
+            "--no-restart",
+            help="Do not restart the gateway user unit after a successful update.",
+        ),
         json_out: bool = typer.Option(False, "--json", help="Emit JSON envelope on stdout."),
     ) -> None:
-        """Show how to upgrade the installed ``sevn`` CLI package."""
+        """Force-update the sevn.bot checkout and reinstall the CLI (discards local checkout edits)."""
         command = "sevn update"
         try:
-            current = pkg_version("sevn")
-        except PackageNotFoundError:
-            current = "0.0.0"
-        hint = "uv tool upgrade sevn  # or: pip install -U sevn"
-        data = {"current_version": current, "hint": hint}
+            root = resolve_sevn_repo_root(repo)
+            result = sync_source_tree(
+                repo_root=root,
+                latest=True,
+                branch=branch,
+                dry_run=dry_run,
+                restart_gateway=not no_restart,
+            )
+        except RepoSyncError as exc:
+            typer.secho(str(exc), err=True)
+            raise typer.Exit(exc.exit_code) from exc
+        data = {
+            "updated": result.updated,
+            "local_rev": result.local_rev,
+            "remote_rev": result.remote_rev,
+            "detail": result.detail,
+            "repo_root": str(root),
+        }
         if json_out:
             emit_json_success(command=command, data=data)
             return
-        typer.echo(f"installed: {current}")
-        typer.echo(hint)
+        typer.echo(result.detail)
 
     @app.command("upgrade")
     def upgrade_cmd(

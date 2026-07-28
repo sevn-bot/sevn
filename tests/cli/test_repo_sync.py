@@ -8,9 +8,11 @@ from pathlib import Path
 import pytest
 
 from sevn.cli.repo_sync import (
+    DEFAULT_SYNC_TRACKING_BRANCH,
     SYNC_TRACKING_BRANCH,
     RepoSyncError,
     resolve_sevn_repo_root,
+    resolve_sync_tracking_branch,
     sync_source_tree,
 )
 
@@ -106,7 +108,7 @@ def test_sync_skips_when_already_up_to_date(
         calls.append(args)
         if args == ("rev-parse", "HEAD"):
             return rev
-        if args == ("rev-parse", "origin/test-pre"):
+        if args == ("rev-parse", "origin/pre-0.0.1"):
             return rev
         if args[:2] == ("merge-base", "--is-ancestor"):
             return ""
@@ -134,13 +136,13 @@ def test_sync_ff_when_behind(
     def fake_git(repo_root: Path, *args: str, dry_run: bool = False) -> str:
         if args == ("rev-parse", "HEAD"):
             return local if not merged else remote
-        if args == ("rev-parse", "origin/test-pre"):
+        if args == ("rev-parse", "origin/pre-0.0.1"):
             return remote
         if args == ("branch", "--list", SYNC_TRACKING_BRANCH):
             return f"  {SYNC_TRACKING_BRANCH}\n"
         if args == ("checkout", SYNC_TRACKING_BRANCH):
             return ""
-        if args == ("merge", "--ff-only", "origin/test-pre"):
+        if args == ("merge", "--ff-only", "origin/pre-0.0.1"):
             merged.append("ok")
             return ""
         return ""
@@ -173,7 +175,7 @@ def test_sync_latest_resets_when_diverged(
     def fake_git(repo_root: Path, *args: str, dry_run: bool = False) -> str:
         if args == ("rev-parse", "HEAD"):
             return "local"
-        if args == ("rev-parse", "origin/test-pre"):
+        if args == ("rev-parse", "origin/pre-0.0.1"):
             return "remote"
         if args == ("branch", "--list", SYNC_TRACKING_BRANCH):
             return ""
@@ -190,7 +192,7 @@ def test_sync_latest_resets_when_diverged(
     monkeypatch.setattr("sevn.cli.repo_sync._maybe_restart_gateway", lambda **k: None)
 
     sync_source_tree(repo_root=root, latest=True)
-    assert reset == ["origin/test-pre"]
+    assert reset == ["origin/pre-0.0.1"]
 
 
 def test_sync_latest_resets_when_behind(
@@ -205,7 +207,7 @@ def test_sync_latest_resets_when_behind(
     def fake_git(repo_root: Path, *args: str, dry_run: bool = False) -> str:
         if args == ("rev-parse", "HEAD"):
             return local if not reset else remote
-        if args == ("rev-parse", "origin/test-pre"):
+        if args == ("rev-parse", "origin/pre-0.0.1"):
             return remote
         if args == ("branch", "--list", SYNC_TRACKING_BRANCH):
             return f"  {SYNC_TRACKING_BRANCH}\n"
@@ -225,7 +227,7 @@ def test_sync_latest_resets_when_behind(
     monkeypatch.setattr("sevn.cli.repo_sync._maybe_restart_gateway", lambda **k: None)
 
     result = sync_source_tree(repo_root=root, latest=True)
-    assert reset == ["origin/test-pre"]
+    assert reset == ["origin/pre-0.0.1"]
     assert result.updated is True
 
 
@@ -241,7 +243,7 @@ def test_sync_latest_reruns_sync_cli_when_already_up_to_date(
     def fake_git(repo_root: Path, *args: str, dry_run: bool = False) -> str:
         if args == ("rev-parse", "HEAD"):
             return rev
-        if args == ("rev-parse", "origin/test-pre"):
+        if args == ("rev-parse", "origin/pre-0.0.1"):
             return rev
         if args == ("branch", "--list", SYNC_TRACKING_BRANCH):
             return f"  {SYNC_TRACKING_BRANCH}\n"
@@ -275,7 +277,7 @@ def test_sync_latest_runs_logo_mark_animate(
     def fake_git(repo_root: Path, *args: str, dry_run: bool = False) -> str:
         if args == ("rev-parse", "HEAD"):
             return "rev"
-        if args == ("rev-parse", "origin/test-pre"):
+        if args == ("rev-parse", "origin/pre-0.0.1"):
             return "rev"
         if args == ("branch", "--list", SYNC_TRACKING_BRANCH):
             return f"  {SYNC_TRACKING_BRANCH}\n"
@@ -310,13 +312,13 @@ def test_sync_skips_logo_mark_animate_without_latest(
     def fake_git(repo_root: Path, *args: str, dry_run: bool = False) -> str:
         if args == ("rev-parse", "HEAD"):
             return local
-        if args == ("rev-parse", "origin/test-pre"):
+        if args == ("rev-parse", "origin/pre-0.0.1"):
             return remote
         if args == ("branch", "--list", SYNC_TRACKING_BRANCH):
             return f"  {SYNC_TRACKING_BRANCH}\n"
         if args == ("checkout", SYNC_TRACKING_BRANCH):
             return ""
-        if args == ("merge", "--ff-only", "origin/test-pre"):
+        if args == ("merge", "--ff-only", "origin/pre-0.0.1"):
             return ""
         return ""
 
@@ -348,7 +350,7 @@ def test_sync_refreshes_workspace_skills_after_sync_cli(
     def fake_git(repo_root: Path, *args: str, dry_run: bool = False) -> str:
         if args == ("rev-parse", "HEAD"):
             return "rev"
-        if args == ("rev-parse", "origin/test-pre"):
+        if args == ("rev-parse", "origin/pre-0.0.1"):
             return "rev"
         if args == ("branch", "--list", SYNC_TRACKING_BRANCH):
             return f"  {SYNC_TRACKING_BRANCH}\n"
@@ -370,3 +372,53 @@ def test_sync_refreshes_workspace_skills_after_sync_cli(
     result = sync_source_tree(repo_root=root, latest=True)
     assert refresh_called == [True]
     assert "refreshed skills/core" in result.detail
+
+
+def test_resolve_sync_tracking_branch_explicit_and_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("SEVN_SYNC_BRANCH", raising=False)
+    assert resolve_sync_tracking_branch(explicit="main") == "main"
+    assert resolve_sync_tracking_branch() == DEFAULT_SYNC_TRACKING_BRANCH
+    monkeypatch.setenv("SEVN_SYNC_BRANCH", "develop")
+    assert resolve_sync_tracking_branch() == "develop"
+
+
+def test_resolve_sync_tracking_branch_rejects_unsafe_names() -> None:
+    with pytest.raises(RepoSyncError, match=r"invalid sync branch name"):
+        resolve_sync_tracking_branch(explicit="pre-0.0.1; echo pwned")
+    with pytest.raises(RepoSyncError, match=r"invalid sync branch name"):
+        resolve_sync_tracking_branch(explicit="../main")
+
+
+def test_sync_latest_runs_git_clean(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "sevn.bot"
+    _write_sevn_repo(root)
+    cleaned: list[bool] = []
+
+    def fake_git(repo_root: Path, *args: str, dry_run: bool = False) -> str:
+        if args == ("rev-parse", "HEAD"):
+            return "rev"
+        if args == ("rev-parse", "origin/pre-0.0.1"):
+            return "rev"
+        if args == ("branch", "--list", SYNC_TRACKING_BRANCH):
+            return f"  {SYNC_TRACKING_BRANCH}\n"
+        if args[0] == "checkout":
+            return ""
+        if args[:2] == ("reset", "--hard"):
+            return ""
+        if args == ("clean", "-fd"):
+            cleaned.append(True)
+            return ""
+        return ""
+
+    monkeypatch.setattr("sevn.cli.repo_sync._git", fake_git)
+    monkeypatch.setattr("sevn.cli.repo_sync._is_ancestor", lambda *a, **k: True)
+    monkeypatch.setattr("sevn.cli.repo_sync._run_sync_cli", lambda *a, **k: None)
+    monkeypatch.setattr("sevn.cli.repo_sync._maybe_restart_gateway", lambda **k: None)
+
+    sync_source_tree(repo_root=root, latest=True)
+    assert cleaned == [True]

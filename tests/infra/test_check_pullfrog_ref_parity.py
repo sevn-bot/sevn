@@ -31,7 +31,7 @@ def test_check_pullfrog_ref_parity_detects_drift(tmp_path: Path) -> None:
     (tmp_path / ".github" / "workflows" / "pullfrog.yml").write_text(workflow, encoding="utf-8")
     # Force drift: swap the Makefile default ref to a different value.
     drifted = makefile.replace(
-        "$(SEVN_PULLFROG_PY_REF),416020af9e1e3e051b4ba185708b1334e5277136)",
+        "$(SEVN_PULLFROG_PY_REF),de69b08a02f06fd053838035aab1a6b19d9b965a)",
         "$(SEVN_PULLFROG_PY_REF),0000000000000000000000000000000000000000)",
     )
     assert drifted != makefile, "test fixture must actually change the pinned ref"

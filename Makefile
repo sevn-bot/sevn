@@ -7,6 +7,10 @@
 # duplicate ``typecheck`` later per ``specs/25-cicd-full.md`` §11.
 
 UV ?= $(shell command -v uv 2>/dev/null || echo $(HOME)/.local/bin/uv)
+# Operator source checkout used by gateway + editable `uv tool install sevn`.
+SEVN_OPERATOR_REPO ?= $(HOME)/Documents/sevn
+# Branch tracked by `make update-cli`, `sevn update`, and `my_sevn.sync.branch` default.
+SEVN_OPERATOR_BRANCH ?= pre-0.0.1
 RUFF ?= $(UV) run ruff
 MYPY ?= $(UV) run mypy
 PYTEST ?= $(UV) run pytest
@@ -20,10 +24,10 @@ PIP_AUDIT_CACHE ?= $(CURDIR)/.cache/pip-audit
 # the same SHA as the CI workflow (.github/workflows/pullfrog.yml) so local review
 # runs the reviewed code, not whatever `main` currently is. Override with
 # SEVN_PULLFROG_PY_REF=main (or another ref) to track a branch locally.
-PULLFROG_PY_REF ?= $(if $(SEVN_PULLFROG_PY_REF),$(SEVN_PULLFROG_PY_REF),416020af9e1e3e051b4ba185708b1334e5277136)
+PULLFROG_PY_REF ?= $(if $(SEVN_PULLFROG_PY_REF),$(SEVN_PULLFROG_PY_REF),de69b08a02f06fd053838035aab1a6b19d9b965a)
 PRE_COMMIT ?= $(UV) run pre-commit
 
-.PHONY: help setup install install-git-guards check-git-guards snapshot-local install-snapshot-timer install-cli install-cli-browser sync-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover stale-xfail-check md-links-check doctest security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage pullfrog-ref-check review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-down compose-logs compose-restart log-explore telegram-checks telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-curate readme-curate-prompt readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate spec-check prd-check spec-sync prd-sync logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve
+.PHONY: help setup install install-git-guards check-git-guards snapshot-local install-snapshot-timer install-cli install-cli-browser sync-cli update-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover stale-xfail-check md-links-check doctest security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage pullfrog-ref-check review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-down compose-logs compose-restart log-explore telegram-checks telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-curate readme-curate-prompt readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate spec-check prd-check spec-sync prd-sync logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve
 
 
 PROXY_ENV_FILE ?= .env.proxy
@@ -89,6 +93,17 @@ pdf-native-libs: ## Install WeasyPrint native libs (pango/cairo/gobject) for PDF
 	fi
 
 sync-cli: install-cli-browser ## Operator `sevn sync`: editable CLI + browser-cdp (no pre-commit hooks)
+
+update-cli: ## Force-reset SEVN_OPERATOR_REPO to origin/SEVN_OPERATOR_BRANCH, clean untracked, reinstall CLI
+	@repo="$(SEVN_OPERATOR_REPO)"; branch="$(SEVN_OPERATOR_BRANCH)"; \
+	if [ ! -d "$$repo/.git" ]; then echo "missing git checkout: $$repo (set SEVN_OPERATOR_REPO=)" >&2; exit 1; fi; \
+	echo "Updating $$repo -> origin/$$branch …"; \
+	git -C "$$repo" fetch origin "$$branch"; \
+	git -C "$$repo" checkout -B "$$branch" "origin/$$branch"; \
+	git -C "$$repo" reset --hard "origin/$$branch"; \
+	git -C "$$repo" clean -fd; \
+	$(MAKE) -C "$$repo" sync-cli; \
+	echo "sevn CLI reinstalled from $$repo @ $$branch"
 
 install-cli: styles-build ## Install the `sevn` console script as a uv tool (on PATH via ~/.local/bin)
 	@$(UV) tool install --reinstall --force --editable . >/dev/null
