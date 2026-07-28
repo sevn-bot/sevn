@@ -20,14 +20,14 @@ PYTEST_XDIST := $(if $(filter 0,$(SEVN_PYTEST_JOBS)),,$(if $(SEVN_PYTEST_JOBS),-
 BANDIT ?= $(UV) run bandit
 PIP_AUDIT ?= $(UV) run pip-audit
 PIP_AUDIT_CACHE ?= $(CURDIR)/.cache/pip-audit
-# pullfrog-py ref for local `make review` (offline `pfpy diff-review`), pinned to
-# the same SHA as the CI workflow (.github/workflows/pullfrog.yml) so local review
+# mergeCraft ref for local `make review` (offline `mergecraft diff-review`), pinned to
+# the same SHA as the CI workflow (.github/workflows/mergecraft.yml) so local review
 # runs the reviewed code, not whatever `main` currently is. Override with
-# SEVN_PULLFROG_PY_REF=main (or another ref) to track a branch locally.
-PULLFROG_PY_REF ?= $(if $(SEVN_PULLFROG_PY_REF),$(SEVN_PULLFROG_PY_REF),de69b08a02f06fd053838035aab1a6b19d9b965a)
+# SEVN_MERGECRAFT_REF=main (or another ref) to track a branch locally.
+MERGECRAFT_REF ?= $(if $(SEVN_MERGECRAFT_REF),$(SEVN_MERGECRAFT_REF),b8e83a82e97ed537706d9a712e59af9ef031588f)
 PRE_COMMIT ?= $(UV) run pre-commit
 
-.PHONY: help setup install install-git-guards check-git-guards snapshot-local install-snapshot-timer install-cli install-cli-browser sync-cli update-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover stale-xfail-check md-links-check doctest security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage pullfrog-ref-check review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-down compose-logs compose-restart log-explore telegram-checks telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-curate readme-curate-prompt readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate spec-check prd-check spec-sync prd-sync logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve
+.PHONY: help setup install install-git-guards check-git-guards snapshot-local install-snapshot-timer install-cli install-cli-browser sync-cli update-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover stale-xfail-check md-links-check doctest security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage mergecraft-ref-check review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-down compose-logs compose-restart log-explore telegram-checks telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-curate readme-curate-prompt readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate spec-check prd-check spec-sync prd-sync logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve
 
 
 PROXY_ENV_FILE ?= .env.proxy
@@ -244,8 +244,8 @@ infra-check: ## Fail when infra/ JSON metadata drifts from golden fixtures (see 
 	$(UV) run python scripts/check_infra_parity.py
 	$(UV) run python scripts/export_triage_schema.py
 
-pullfrog-ref-check: ## Fail when the pullfrog-py pin drifts between pullfrog.yml and PULLFROG_PY_REF
-	$(UV) run python scripts/check_pullfrog_ref_parity.py
+mergecraft-ref-check: ## Fail when the mergeCraft pin drifts between mergecraft.yml and MERGECRAFT_REF
+	$(UV) run python scripts/check_mergecraft_ref_parity.py
 
 schema-export: ## Refresh infra/triage_result.schema.json from TriageResult (`specs/10-schema-ontology.md` §11)
 	$(UV) run python scripts/export_triage_schema.py --write
@@ -442,7 +442,7 @@ ci-docs: telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme
 
 ci-skills: skills-core-check skillspector-check skills-index-check dreaming-allowlist-check ## Skills inventory tier
 
-ci-parity: code-index deploy-remote-report-check code-index-check pullfrog-ref-check ## Parity tier (public)
+ci-parity: code-index deploy-remote-report-check code-index-check mergecraft-ref-check ## Parity tier (public)
 
 ci: ci-core ci-infra ci-docs ci-skills ci-parity ## Full gate (same as CI)
 
@@ -496,7 +496,7 @@ deps-check: ## Deptry gate (advisory; `ci-quality`)
 docstring-coverage: ## Interrogate docstring-coverage gate (advisory; `ci-quality`)
 	$(UV) run interrogate src scripts
 
-review: ## Advisory offline review vs SEVN_CI_BASE via pullfrog-py (needs CLAUDE_CODE_OAUTH_TOKEN in `.env`)
+review: ## Advisory offline review vs SEVN_CI_BASE via mergeCraft (needs CLAUDE_CODE_OAUTH_TOKEN in `.env`)
 	@set -a; \
 	if [ -f .env ]; then . ./.env; fi; \
 	set +a; \
@@ -505,9 +505,9 @@ review: ## Advisory offline review vs SEVN_CI_BASE via pullfrog-py (needs CLAUDE
 		exit 0; \
 	fi; \
 	base="$${SEVN_CI_BASE:-origin/main}"; \
-	echo "Running pullfrog-py diff-review (base=$$base, ref=$(PULLFROG_PY_REF))…"; \
-	$(UV) tool run --python 3.14 --from git+https://github.com/alexhawat/pullfrog-py@$(PULLFROG_PY_REF) \
-		pfpy diff-review --base "$$base"
+	echo "Running mergecraft diff-review (base=$$base, ref=$(MERGECRAFT_REF))…"; \
+	$(UV) tool run --python 3.14 --from git+https://github.com/alexhawat/mergeCraft@$(MERGECRAFT_REF) \
+		mergecraft diff-review --base "$$base"
 
 v1-smoke: dash-build ## Seven v1 user paths (`plan/v1-release-scope.md`); sequential pytest gates
 	$(UV) run python scripts/v1_smoke.py

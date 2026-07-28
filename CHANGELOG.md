@@ -10,6 +10,10 @@ are cut into a dated, versioned section at release time.
 
 ## [Unreleased]
 
+### Changed
+
+- [2026-07-28] PR review backend cut over from pullfrog-py to mergeCraft: ``mergecraft.yml`` workflow, ``MERGECRAFT_REF`` / ``make review`` pin, ``.mergecraft/config.yaml``, and ``mergecraft-ref-check`` parity gate
+
 ### Fixed
 
 - [2026-07-28] Operator sync branch names from config, env, and CLI flags are validated before git subprocess use; daily repo-sync cron stays ff-only with divergence recovery (force-reset remains on ``sevn update`` / ``--latest``)
