@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 from tests.cli.dashboard_testutil import patch_dashboard_gateway
@@ -76,10 +77,35 @@ def test_sevn_providers_oauth_login(
     assert "oauth.anthropic" in result.stdout
 
 
-def test_sevn_update_shows_hint(runner: CliRunner) -> None:
-    result = runner.invoke(app, ["update"], env={"NO_COLOR": "1"})
+def test_sevn_update_runs_force_sync(
+    runner: CliRunner,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "sevn.bot"
+    repo_root.mkdir()
+    (repo_root / ".git").mkdir()
+    (repo_root / "pyproject.toml").write_text('[project]\nname = "sevn"\n', encoding="utf-8")
+
+    from sevn.cli.repo_sync import SyncResult
+
+    monkeypatch.setattr(
+        "sevn.cli.commands.update_cmd.sync_source_tree",
+        lambda **kwargs: SyncResult(
+            updated=True,
+            local_rev="abc1234",
+            remote_rev="def5678",
+            detail="Force-updated checkout to def5678 on pre-0.0.1.",
+        ),
+    )
+
+    result = runner.invoke(
+        app,
+        ["update", "--repo", str(repo_root), "--no-restart"],
+        env={"NO_COLOR": "1"},
+    )
     assert result.exit_code == 0
-    assert "uv tool upgrade" in result.stdout or "pip install" in result.stdout
+    assert "Force-updated checkout" in result.stdout
 
 
 def test_sevn_guide_lists_new_topics(runner: CliRunner) -> None:

@@ -49,8 +49,8 @@
     },
     "evolution": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-28T11:50:39Z",
-      "digest": "b7015f05ce053bbe5de35d2ef28e81c33814fda4be14e1d0c65099942a52d87c",
+      "computed_at": "2026-07-28T12:24:48Z",
+      "digest": "5d861c872064da2d57a613f098f5bec034b55609b9858fea362c45502cdc6e8a",
       "source_globs": [
         "src/sevn/evolution/**"
       ]
