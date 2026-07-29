@@ -16,6 +16,29 @@ _GH_ISSUES_ROOT = _REPO_ROOT / "src" / "sevn" / "data" / "bundled_skills" / "cor
 _CREATE_SCRIPT = _GH_ISSUES_ROOT / "scripts" / "issue_create.py"
 
 
+def _loads_stdout_envelope(out: str) -> dict[str, object]:
+    """Parse the last JSON object from script stdout (tolerates stray prefix bytes)."""
+    text = out.strip()
+    if not text:
+        return {}
+    decoder = json.JSONDecoder()
+    idx = 0
+    last: dict[str, object] | None = None
+    while idx < len(text):
+        while idx < len(text) and text[idx].isspace():
+            idx += 1
+        if idx >= len(text):
+            break
+        obj, end = decoder.raw_decode(text, idx)
+        if isinstance(obj, dict):
+            last = obj
+        idx = end
+    if last is None:
+        msg = "no JSON envelope on stdout"
+        raise json.JSONDecodeError(msg, text, 0)
+    return last
+
+
 def _load_issue_create() -> Any:
     spec = importlib.util.spec_from_file_location("gh_issues_issue_create", _CREATE_SCRIPT)
     assert spec is not None
@@ -157,7 +180,7 @@ def test_d12_gh_auth_error_is_precise_not_proxy_404(
         code = mod.main(["sevn-bot/sevn", "--template", "bug", "--title", "B", "--summary", "S"])
     assert code != 0
     out = capsys.readouterr().out
-    payload = json.loads(out.strip() or "{}")
+    payload = _loads_stdout_envelope(out.strip() or "{}")
     err = str(payload.get("error") or payload)
     assert "proxy status 404" not in err.lower()
     assert "gh not authenticated" in err.lower() or "gh auth login" in err.lower()
@@ -183,7 +206,7 @@ def test_d12_gh_absent_falls_back_to_proxy(
         # rather than crashing on missing ``gh``.
         code = mod.main(["sevn-bot/sevn", "--template", "chore", "--title", "C", "--summary", "S"])
     out = capsys.readouterr().out
-    payload = json.loads(out.strip() or "{}")
+    payload = _loads_stdout_envelope(out.strip() or "{}")
     assert code in (0, 1)
     assert "No such file or directory" not in str(payload)
     # Envelope is present either way.
