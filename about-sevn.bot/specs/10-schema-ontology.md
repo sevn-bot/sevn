@@ -8,7 +8,7 @@ summary: 'Define the runtime ontology for Triager output and related labels acro
   the agent core: canonical field names, closed enums, typing conventions, and how
   they compose with executor dispatch described '
 last_updated: '2026-07-29'
-fingerprint: sha256:849a87236476b4ce7ce6729c38c745334ce43ee56c87cadbb23c52871bcc5474
+fingerprint: sha256:caa6db82951f0fef46dcc8437d925cbc9951fa713d437f3f206adbb626b4ab30
 related: []
 sources:
 - src/sevn/config/**
@@ -191,6 +191,9 @@ interfaces:
 - name: tier_b_history_compaction_strategy
   file: src/sevn/config/model_resolution.py
   symbol: tier_b_history_compaction_strategy
+- name: tier_b_history_compaction_target_tokens
+  file: src/sevn/config/model_resolution.py
+  symbol: tier_b_history_compaction_target_tokens
 - name: use_main_model_for_all
   file: src/sevn/config/model_resolution.py
   symbol: use_main_model_for_all
