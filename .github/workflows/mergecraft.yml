@@ -86,8 +86,14 @@ jobs:
         if: env.HAS_CLAUDE_CODE == 'true'
         id: mergecraft
         continue-on-error: true
-        # mergeCraft — full SHA pinned to alexhawat/mergeCraft pre-0.0.1 (org policy).
-        uses: alexhawat/mergeCraft@b8e83a82e97ed537706d9a712e59af9ef031588f # pre-0.0.1
+        # mergeCraft — full SHA pinned to the alexhawat/mergeCraft `pre-0.0.1` head.
+        # The pin is MANDATORY, not a preference: sevn-bot enforces Actions SHA
+        # pinning (`sha_pinning_required`), so a branch ref like `@pre-0.0.1` is
+        # rejected at action-resolution time ("all actions must be pinned to a
+        # full-length commit SHA") before the review step runs. Bump this SHA and
+        # `MERGECRAFT_REF` in the Makefile together — `make mergecraft-ref-check`
+        # fails on one-sided bumps.
+        uses: alexhawat/mergeCraft@f98aeb0063b387a51960503a758351608d377002 # pre-0.0.1
         with:
           # For pull_request events, name the PR number explicitly so the agent
           # calls checkout_pr(<n>) instead of asking which PR to review.
