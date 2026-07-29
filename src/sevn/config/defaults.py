@@ -191,6 +191,13 @@ DEFAULT_CODEMODE_MAX_MEMORY_BYTES: Final[int] = 512 * 1024 * 1024
 DEFAULT_CODEMODE_MAX_ALLOCATIONS: Final[int] = 50_000_000
 DEFAULT_CODEMODE_MAX_RETRIES: Final[int] = 3
 
+# Tier-B harness history compaction (``agent.history_compaction.*``); W6 default off (D9).
+DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED: Final[bool] = False
+DEFAULT_TIER_B_HISTORY_COMPACTION_STRATEGY: Final[
+    Literal["tiered", "summarizing", "clear_tool_results", "clamp_oversized"]
+] = "tiered"
+DEFAULT_TIER_B_HISTORY_COMPACTION_TARGET_TOKENS: Final[int] = 80_000
+
 # CLI diagnostic agent (``agent.diagnostics.enabled``); W4 default on.
 DEFAULT_DIAGNOSTICS_AGENT_ENABLED: Final[bool] = True
 

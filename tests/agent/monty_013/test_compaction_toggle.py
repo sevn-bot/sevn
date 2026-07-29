@@ -13,7 +13,6 @@ def _compaction_flag_name() -> str:
     return "DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED"
 
 
-@pytest.mark.xfail(reason="green after W6: compaction config default exists (D9)", strict=False)
 def test_compaction_toggle_default_is_off() -> None:
     from sevn.config import defaults
 
@@ -21,9 +20,6 @@ def test_compaction_toggle_default_is_off() -> None:
     assert getattr(defaults, _compaction_flag_name()) is False
 
 
-@pytest.mark.xfail(
-    reason="green after W6: default-off leaves capability inventory unchanged", strict=False
-)
 def test_compaction_disabled_does_not_change_inventory() -> None:
     baseline = load_capability_baseline()
     expected = baseline["scenarios"]["codemode_off"]["class_names"]
@@ -39,9 +35,6 @@ def test_compaction_disabled_does_not_change_inventory() -> None:
     assert capability_class_names(caps_default) == expected
 
 
-@pytest.mark.xfail(
-    reason="green after W6: enabled compaction shrinks oversized history", strict=False
-)
 @pytest.mark.asyncio
 async def test_compaction_enabled_reduces_oversized_history() -> None:
     from sevn.agent.adapters.tier_b_compaction import compact_history_if_enabled

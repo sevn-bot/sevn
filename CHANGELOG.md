@@ -25,6 +25,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- [2026-07-29] Opt-in tier-B harness history compaction (default off, D9) — ``DEFAULT_TIER_B_HISTORY_COMPACTION_*`` selects ``TieredCompaction`` / ``SummarizingCompaction`` / ``ClearToolResults`` / ``ClampOversizedMessages`` when enabled via ``build_tier_b_capabilities``
 - [2026-07-28] Operator upgrades can force-reset the gateway source checkout to ``origin/pre-0.0.1`` or ``main``, reinstall the ``sevn`` CLI, and discard local checkout edits without merge prompts — via ``sevn update``, ``make update-cli``, or ``sevn sync --latest --branch …``
 - [2026-07-26] Telegram ``/config`` root regrouped into eight intent tiles (Chat, Agent, Skills & Tools, Memory, Access, Health, Deployment, Help) with ``owner_only`` gating (non-owners see four tiles); legacy section callbacks unchanged; nav shells re-parent existing rows
 - [2026-07-26] Telegram ``/config`` menu E2E harness: ``TelegramMenuWalker`` recipe, ``make telegram-menu-e2e`` (``SEVN_TELEGRAM_MENU_E2E=1``), inline-keyboard primitives on ``TelegramWeb``, and per-row verdict + spec-id coverage reports under ``evidence/telegram-menu-e2e/``

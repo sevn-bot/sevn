@@ -132,7 +132,11 @@ from sevn.agent.triager.routing_policy import (
     is_identity_or_capability_message,
     is_log_provenance_intent_message,
 )
-from sevn.config.defaults import TIER_B_TOOL_MAX_RETRIES
+from sevn.config.defaults import (
+    DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED,
+    DEFAULT_TIER_B_HISTORY_COMPACTION_STRATEGY,
+    TIER_B_TOOL_MAX_RETRIES,
+)
 from sevn.config.llm_params import resolve_effective_max_output_tokens
 from sevn.config.model_resolution import (
     ModelSlot,
@@ -875,6 +879,8 @@ def build_tier_b_capabilities(
     codemode_limits: Mapping[str, float | int] | None = None,
     codemode_max_retries: int | None = None,
     overflow_on: bool = True,
+    history_compaction_enabled: bool | None = None,
+    history_compaction_strategy: str | None = None,
 ) -> list[AbstractCapability[BTierDeps]]:
     """Assemble tier-B agent capabilities (W5 merge-conflict mitigation).
 
@@ -890,6 +896,10 @@ def build_tier_b_capabilities(
             for ``CodeMode`` (duration/memory/allocations); ``None`` uses defaults.
         codemode_max_retries (int | None): ``run_code`` retry budget; ``None`` uses defaults.
         overflow_on (bool): When ``True``, append harness ``ToolOutputLimits`` (D6).
+        history_compaction_enabled (bool | None): When ``True``, append harness compaction
+            (D9). ``None`` uses :data:`DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED` (default off).
+        history_compaction_strategy (str | None): Compaction menu entry; ``None`` uses
+            :data:`DEFAULT_TIER_B_HISTORY_COMPACTION_STRATEGY`.
 
     Returns:
         list[AbstractCapability[BTierDeps]]: Capability list for ``Agent(capabilities=...)``.
@@ -902,6 +912,20 @@ def build_tier_b_capabilities(
         >>> caps[0].__class__.__name__
         'Instrumentation'
     """
+    from sevn.agent.adapters.tier_b_compaction import (
+        TierBHistoryCompactionStrategy,
+        build_compaction_capability,
+    )
+
+    compaction_on = (
+        DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED
+        if history_compaction_enabled is None
+        else history_compaction_enabled
+    )
+    compaction_strategy = cast(
+        "TierBHistoryCompactionStrategy",
+        history_compaction_strategy or DEFAULT_TIER_B_HISTORY_COMPACTION_STRATEGY,
+    )
     capabilities: list[AbstractCapability[BTierDeps]] = [
         cast("AbstractCapability[BTierDeps]", instrumentation_capability()),
         cast("AbstractCapability[BTierDeps]", hooks),
@@ -909,6 +933,13 @@ def build_tier_b_capabilities(
     ]
     if overflow_on:
         capabilities.append(cast("AbstractCapability[BTierDeps]", build_overflow_capability()))
+    if compaction_on:
+        capabilities.append(
+            cast(
+                "AbstractCapability[BTierDeps]",
+                build_compaction_capability(strategy=compaction_strategy),
+            )
+        )
     if extra:
         capabilities.extend(extra)
     if codemode_on:
