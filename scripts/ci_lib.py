@@ -171,6 +171,15 @@ PATH_RULES: tuple[PathRule, ...] = (
     ),
     PathRule(
         (
+            "docs/faq/**",
+            "docs/FAQ.md",
+            "src/sevn/docs/faq.py",
+            "scripts/generate_faq.py",
+        ),
+        "faq-check",
+    ),
+    PathRule(
+        (
             "about-sevn.bot/specs/**",
             "about-sevn.bot/prd/**",
             "spec-kit-wave/**",
@@ -221,6 +230,7 @@ TARGET_ORDER: tuple[str, ...] = (
     "tools-skills-inventory-check",
     "dreaming-allowlist-check",
     "readme-check",
+    "faq-check",
     "about-docs-check",
     "about-site-check",
     "code-index-check",
