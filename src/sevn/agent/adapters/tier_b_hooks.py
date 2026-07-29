@@ -40,14 +40,14 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
-from pydantic_ai._agent_graph import AgentNode, ModelRequestNode
 from pydantic_ai.capabilities.hooks import Hooks
-from pydantic_ai.exceptions import ModelRetry, SkipToolExecution, UsageLimitExceeded
+from pydantic_ai.exceptions import ModelRetry
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
-from pydantic_ai.tools import DeferredToolRequests, DeferredToolResults, ToolDefinition, ToolDenied
+from pydantic_ai.tools import DeferredToolRequests, DeferredToolResults, ToolDefinition
 
 if TYPE_CHECKING:
     from pydantic_ai import RunContext
+    from pydantic_ai._agent_graph import AgentNode
     from pydantic_ai.capabilities import ValidatedToolArgs
     from pydantic_ai.models import ModelRequestContext
 
@@ -58,11 +58,6 @@ from sevn.agent.adapters.tier_b_tools import (
     _ALWAYS_INVOKABLE_FILE_OPS,
     _ALWAYS_INVOKABLE_SKILL_RUNNERS,
     _ALWAYS_INVOKABLE_TIER_B,
-)
-from sevn.agent.adapters.tool_approval_bridge import (
-    ack_tool_on_deps,
-    get_tool_approval_bridge,
-    summarize_tool_args,
 )
 from sevn.agent.grounding import (
     apply_audit_evidence_guard,
@@ -473,16 +468,9 @@ async def enforce_round_budget(
         >>> inspect.iscoroutinefunction(enforce_round_budget)
         True
     """
-    _ = ctx
-    if not isinstance(node, ModelRequestNode):
-        return node
-    if config.max_rounds is not None and config.provider_round_counter[0] >= config.max_rounds:
-        msg = (
-            f"tier-B counted-round budget exhausted (rounds={config.provider_round_counter[0]}, "
-            f"max={config.max_rounds}, count_planning={config.count_planning})"
-        )
-        raise UsageLimitExceeded(msg)
-    return node
+    from sevn.agent.adapters.tier_b_guardrails import round_budget_guardrail
+
+    return await round_budget_guardrail(config).check_before_node(ctx, node=node)
 
 
 def _turn_has_deliverable_user_text(deps: BTierDeps, response_text: str) -> bool:
@@ -687,6 +675,7 @@ async def await_human_tool_approval(
     *,
     tool_name: str,
     args: dict[str, Any],
+    config: TierBHookConfig | None = None,
 ) -> bool:
     """Block on Mission Control until the operator approves or denies ``tool_name``.
 
@@ -694,6 +683,8 @@ async def await_human_tool_approval(
         ctx (RunContext[BTierDeps]): Pydantic AI run context.
         tool_name (str): Registry tool name awaiting acknowledgement.
         args (dict[str, Any]): Validated tool arguments for the approval card.
+        config (TierBHookConfig | None): Hook config for guardrail factory; ``None`` uses
+            a placeholder config (approval path ignores hook fields).
 
     Returns:
         bool: ``True`` when the operator approved (once/session/always); ``False`` on deny/timeout.
@@ -703,25 +694,20 @@ async def await_human_tool_approval(
         >>> inspect.iscoroutinefunction(await_human_tool_approval)
         True
     """
-    bridge = get_tool_approval_bridge()
-    if bridge is None:
-        return False
-    tool_ctx = ctx.deps.effective_tool_context()
-    if tool_name in tool_ctx.human_acknowledged_tools:
-        return True
-    verdict = await bridge.await_operator_verdict(
-        session_id=tool_ctx.session_id,
-        turn_id=tool_ctx.turn_id,
-        tool_name=tool_name,
-        args_summary=summarize_tool_args(args),
-        trace=tool_ctx.trace,
+    from sevn.agent.adapters.tier_b_guardrails import approval_guardrail
+
+    hook_config = config or TierBHookConfig(
+        provider_round_counter=[0],
+        max_rounds=None,
+        count_planning=False,
+        bound_tool_names=frozenset(),
+        triager_first_reply="",
     )
-    if verdict == "deny":
-        return False
-    if verdict == "session":
-        bridge.record_session_ack(tool_ctx.session_id, tool_name)
-    ack_tool_on_deps(ctx.deps, tool_name)
-    return True
+    return await approval_guardrail(hook_config).resolve_approval(
+        ctx,
+        tool_name=tool_name,
+        args=args,
+    )
 
 
 async def permission_before_tool_execute(
@@ -730,6 +716,7 @@ async def permission_before_tool_execute(
     call: ToolCallPart,
     tool_def: ToolDefinition,
     args: ValidatedToolArgs,
+    config: TierBHookConfig | None = None,
 ) -> ValidatedToolArgs:
     """Deny tool execution via ``SkipToolExecution`` when gates fail (W5.3).
 
@@ -738,6 +725,8 @@ async def permission_before_tool_execute(
         call (ToolCallPart): Tool invocation the model requested.
         tool_def (ToolDefinition): Prepared tool definition.
         args (ValidatedToolArgs): Schema-validated arguments.
+        config (TierBHookConfig | None): Hook config for guardrail factory; required when
+            called outside :func:`build_tier_b_hooks` (tests pass via closure there).
 
     Returns:
         ValidatedToolArgs: Unmodified args when execution may proceed.
@@ -751,23 +740,20 @@ async def permission_before_tool_execute(
         True
     """
     _ = tool_def
-    denial = check_permission_before_dispatch(ctx.deps, call.tool_name)
-    if denial is not None:
-        blob = json.loads(denial)
-        if (
-            blob.get("code") == ToolResultCode.PLAN_HUMAN_GATE
-            and get_tool_approval_bridge() is not None
-        ):
-            approved = await await_human_tool_approval(
-                ctx,
-                tool_name=call.tool_name,
-                args=dict(args),
-            )
-            if not approved:
-                raise SkipToolExecution(denial)
-            denial = check_permission_before_dispatch(ctx.deps, call.tool_name)
-        if denial is not None:
-            raise SkipToolExecution(denial)
+    from sevn.agent.adapters.tier_b_guardrails import permission_guardrail
+
+    hook_config = config or TierBHookConfig(
+        provider_round_counter=[0],
+        max_rounds=None,
+        count_planning=False,
+        bound_tool_names=frozenset(),
+        triager_first_reply="",
+    )
+    await permission_guardrail(hook_config).check_tool_access(
+        ctx,
+        tool_name=call.tool_name,
+        args=dict(args),
+    )
     return args
 
 
@@ -775,12 +761,14 @@ async def resolve_deferred_approvals(
     ctx: RunContext[BTierDeps],
     *,
     requests: DeferredToolRequests,
+    config: TierBHookConfig | None = None,
 ) -> DeferredToolResults:
     """Bridge pydantic-ai deferred approvals to ``human_acknowledged_tools`` (W5.4).
 
     Args:
         ctx (RunContext[BTierDeps]): Pydantic AI run context.
         requests (DeferredToolRequests): Approval and external-call deferrals.
+        config (TierBHookConfig | None): Hook config for guardrail factory.
 
     Returns:
         DeferredToolResults: Approval map keyed by ``tool_call_id``.
@@ -790,29 +778,32 @@ async def resolve_deferred_approvals(
         >>> inspect.iscoroutinefunction(resolve_deferred_approvals)
         True
     """
+    from sevn.agent.adapters.tier_b_guardrails import approval_guardrail
+
+    hook_config = config or TierBHookConfig(
+        provider_round_counter=[0],
+        max_rounds=None,
+        count_planning=False,
+        bound_tool_names=frozenset(),
+        triager_first_reply="",
+    )
+    guard = approval_guardrail(hook_config)
     tool_ctx = ctx.deps.effective_tool_context()
     acked = tool_ctx.human_acknowledged_tools
     results = DeferredToolResults()
-    bridge = get_tool_approval_bridge()
     for call in requests.approvals:
         if call.tool_name in acked:
             results.approvals[call.tool_call_id] = True
             continue
-        if bridge is not None:
-            approved = await await_human_tool_approval(
-                ctx,
-                tool_name=call.tool_name,
-                args=dict(call.args) if isinstance(call.args, dict) else {},
-            )
-            if approved:
-                results.approvals[call.tool_call_id] = True
-                continue
-        results.approvals[call.tool_call_id] = ToolDenied(
-            message=(
-                f"Human approval required before `{call.tool_name}` can run. "
-                "Acknowledge the destructive action, then retry."
-            ),
+        denied = await guard.resolve(
+            ctx,
+            tool_name=call.tool_name,
+            args=dict(call.args) if isinstance(call.args, dict) else {},
         )
+        if denied is None:
+            results.approvals[call.tool_call_id] = True
+        else:
+            results.approvals[call.tool_call_id] = denied
     return results
 
 
@@ -845,14 +836,6 @@ def build_tier_b_hooks(config: TierBHookConfig) -> Hooks:
     ) -> ModelRequestContext:
         return await inject_owner_steer(ctx, request_context)
 
-    @hooks.on.before_node_run
-    async def _enforce_round_budget(
-        ctx: RunContext[BTierDeps],
-        *,
-        node: AgentNode[Any],
-    ) -> AgentNode[Any]:
-        return await enforce_round_budget(config, ctx, node=node)
-
     @hooks.on.after_model_request
     async def _grounding_guard_retry(
         ctx: RunContext[BTierDeps],
@@ -862,16 +845,6 @@ def build_tier_b_hooks(config: TierBHookConfig) -> Hooks:
     ) -> ModelResponse:
         _ = request_context
         return await grounding_guard_after_model(config, ctx, response)
-
-    @hooks.on.before_tool_execute
-    async def _permission_and_provision_gate(
-        ctx: RunContext[BTierDeps],
-        *,
-        call: ToolCallPart,
-        tool_def: ToolDefinition,
-        args: ValidatedToolArgs,
-    ) -> ValidatedToolArgs:
-        return await permission_before_tool_execute(ctx, call=call, tool_def=tool_def, args=args)
 
     @hooks.on.before_tool_execute
     async def trace_tool_before(
@@ -932,14 +905,6 @@ def build_tier_b_hooks(config: TierBHookConfig) -> Hooks:
             **fields,
         )
         return result
-
-    @hooks.on.deferred_tool_calls
-    async def _bridge_human_approval(
-        ctx: RunContext[BTierDeps],
-        *,
-        requests: DeferredToolRequests,
-    ) -> DeferredToolResults:
-        return await resolve_deferred_approvals(ctx, requests=requests)
 
     return hooks
 

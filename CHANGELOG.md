@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- [2026-07-29] Tier-B permission, round-budget, and approval gates moved from lifecycle hooks onto guardrail capabilities — steer, grounding, and fetch-round steer remain sevn-owned hooks (D7/W8)
 - [2026-07-29] **Breaking:** tier-B stack migrated to `pydantic-ai` v2.20 + `pydantic-ai-harness` 0.13 / Monty 0.0.19 — `SevnAsyncCodeMode` replaces sync harness CodeMode; Monty `ResourceLimits` injected via fail-loud `checkout` patch ([upstream #501](https://github.com/pydantic/pydantic-ai-harness/issues/501))
 - [2026-07-29] Tier-B skills replaced hand-rolled deferred capabilities with harness `Skills` — triager-scoped `include`, staged `SKILL.md` frontmatter, and `sevn_run_skill_script` dispatch preserved (D7)
 - [2026-07-29] Tier-B overflow replaced hand-rolled `OverflowingToolOutput` with harness `ToolOutputLimits` — full inline content up to 1 MiB preserved (D7); `read_tool_result` paging retained for pathological spills

@@ -97,7 +97,6 @@ async def test_grounding_hook_remains_sevn_owned() -> None:
     assert result is response
 
 
-@pytest.mark.xfail(reason="green after W8: permission gate guardrail parity", strict=False)
 @pytest.mark.asyncio
 async def test_permission_gate_matches_harness_guardrail() -> None:
     from sevn.agent.adapters.tier_b_guardrails import permission_guardrail
@@ -116,7 +115,6 @@ async def test_permission_gate_matches_harness_guardrail() -> None:
         await guard.check_tool_access(ctx, tool_name="delete", args={})
 
 
-@pytest.mark.xfail(reason="green after W8: round budget guardrail parity", strict=False)
 @pytest.mark.asyncio
 async def test_budget_enforcement_matches_harness_guardrail() -> None:
     from sevn.agent.adapters.tier_b_guardrails import round_budget_guardrail
@@ -134,7 +132,6 @@ async def test_budget_enforcement_matches_harness_guardrail() -> None:
         await guard.check_before_node(ctx, node=node)
 
 
-@pytest.mark.xfail(reason="green after W8: approval workflow guardrail parity", strict=False)
 @pytest.mark.asyncio
 async def test_deferred_approval_matches_harness_guardrail() -> None:
     from sevn.agent.adapters.tier_b_guardrails import approval_guardrail

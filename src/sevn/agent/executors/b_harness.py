@@ -876,6 +876,7 @@ async def _consume_model_request_stream(
 def build_tier_b_capabilities(
     *,
     hooks: Hooks,
+    hook_config: TierBHookConfig | None = None,
     extra: Sequence[AbstractCapability[BTierDeps]] | None = None,
     codemode_on: bool = False,
     codemode_limits: Mapping[str, float | int] | None = None,
@@ -892,7 +893,9 @@ def build_tier_b_capabilities(
     editing the ``Agent(...)`` call directly. W1 ``Instrumentation`` is always included.
 
     Args:
-        hooks (Hooks): Tier-B lifecycle hooks (steer, grounding, permission, budget, approval).
+        hooks (Hooks): Tier-B lifecycle hooks (steer, grounding, tool trace).
+        hook_config (TierBHookConfig | None): Per-turn state for permission/budget/approval
+            guardrails. ``None`` uses inventory defaults (W8).
         extra (Sequence[AbstractCapability[BTierDeps]] | None): Optional capabilities appended
             after the core bundle (e.g. W7 ``WebSearch`` / ``Thinking``).
         codemode_on (bool): When ``True``, append triager-scoped ``CodeMode`` (W8).
@@ -928,6 +931,7 @@ def build_tier_b_capabilities(
         TierBHistoryCompactionStrategy,
         build_compaction_capability,
     )
+    from sevn.agent.adapters.tier_b_guardrails import build_tier_b_guardrail_capabilities
 
     compaction_on = (
         DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED
@@ -955,6 +959,7 @@ def build_tier_b_capabilities(
     ]
     if overflow_on:
         capabilities.append(cast("AbstractCapability[BTierDeps]", build_overflow_capability()))
+    capabilities.extend(build_tier_b_guardrail_capabilities(hook_config))
     if compaction_on:
         capabilities.append(
             cast(
@@ -1462,6 +1467,7 @@ async def run_b_turn(
         deps_type=BTierDeps,
         capabilities=build_tier_b_capabilities(
             hooks=tier_b_hooks,
+            hook_config=hook_config,
             extra=capability_extra or None,
             codemode_on=codemode_on,
             codemode_limits=codemode_resource_limits(workspace),
