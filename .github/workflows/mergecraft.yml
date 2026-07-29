@@ -33,6 +33,14 @@ on:
     # .coderabbit.yaml `pre-.*` coverage).
     branches: [main, develop, test-pre, "pre-*"]
     types: [opened, synchronize, reopened, ready_for_review]
+  # Bootstrap: GitHub evaluates pull_request workflows from the merge commit.
+  # A PR that replaces pull_request with pull_request_target-only would otherwise
+  # never fire mergecraft (pull_request event ≠ pull_request_target listener).
+  # Keep both until this workflow is on the base branch; remove pull_request in a
+  # follow-up once pull_request_target alone covers all PRs (conflict-safe path).
+  pull_request:
+    branches: [main, develop, test-pre, "pre-*"]
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
     inputs:
       prompt:
@@ -79,7 +87,7 @@ jobs:
           persist-credentials: true
 
       - name: Ensure PR base ref exists locally
-        if: github.event_name == 'pull_request_target'
+        if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
         run: |
           set -euo pipefail
           base="${{ github.event.pull_request.base.ref }}"
@@ -111,7 +119,7 @@ jobs:
           # For pull_request events, name the PR number explicitly so the agent
           # calls checkout_pr(<n>) instead of asking which PR to review.
           prompt: >-
-            ${{ (github.event_name == 'pull_request_target' && format('Review pull request #{0}. Call checkout_pr first. For base-side file reads use origin/{1}:path, not bare branch names. If prior mergeCraft threads are resolved and the latest commits address them, submit approved:true with a short summary. Focus on correctness, security, regressions, missing tests, and maintainability. Leave concise, actionable comments only for issues that should be addressed before merge.', github.event.pull_request.number, github.event.pull_request.base.ref))
+            ${{ ((github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('Review pull request #{0}. Call checkout_pr first. For base-side file reads use origin/{1}:path, not bare branch names. If prior mergeCraft threads are resolved and the latest commits address them, submit approved:true with a short summary. Focus on correctness, security, regressions, missing tests, and maintainability. Leave concise, actionable comments only for issues that should be addressed before merge.', github.event.pull_request.number, github.event.pull_request.base.ref))
                 || (github.event_name == 'workflow_dispatch' && inputs.prompt != '' && inputs.prompt)
                 || 'Review the current pull request.' }}
           model: anthropic/claude-sonnet
@@ -132,7 +140,7 @@ jobs:
         # hiccup even when the review + approval check posted fine). Runs on every
         # PR where auth is present.
         if: >-
-          github.event_name == 'pull_request_target' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
           env.HAS_CLAUDE_CODE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}

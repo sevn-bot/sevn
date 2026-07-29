@@ -16,6 +16,18 @@ _GH_ISSUES_ROOT = _REPO_ROOT / "src" / "sevn" / "data" / "bundled_skills" / "cor
 _CREATE_SCRIPT = _GH_ISSUES_ROOT / "scripts" / "issue_create.py"
 
 
+def _stdout_json_envelope(out: str) -> dict[str, Any]:
+    """Parse the tool JSON envelope from captured stdout (tolerates stray prefix lines)."""
+    text = out.strip()
+    if not text:
+        return {}
+    for line in reversed(text.splitlines()):
+        candidate = line.strip()
+        if candidate.startswith("{"):
+            return json.loads(candidate)
+    return json.loads(text)
+
+
 def _load_issue_create() -> Any:
     spec = importlib.util.spec_from_file_location("gh_issues_issue_create", _CREATE_SCRIPT)
     assert spec is not None
@@ -153,11 +165,11 @@ def test_d12_gh_auth_error_is_precise_not_proxy_404(
         )
 
     mod = _load_issue_create()
-    with patch("subprocess.run", side_effect=_fake_run):
+    with patch("sevn.integrations.github_skill.gh_cli.subprocess.run", side_effect=_fake_run):
         code = mod.main(["sevn-bot/sevn", "--template", "bug", "--title", "B", "--summary", "S"])
     assert code != 0
     out = capsys.readouterr().out
-    payload = json.loads(out.strip() or "{}")
+    payload = _stdout_json_envelope(out)
     err = str(payload.get("error") or payload)
     assert "proxy status 404" not in err.lower()
     assert "gh not authenticated" in err.lower() or "gh auth login" in err.lower()
@@ -178,12 +190,12 @@ def test_d12_gh_absent_falls_back_to_proxy(
         raise AssertionError(f"unexpected subprocess: {argv}")
 
     mod = _load_issue_create()
-    with patch("subprocess.run", side_effect=_no_gh):
+    with patch("sevn.integrations.github_skill.gh_cli.subprocess.run", side_effect=_no_gh):
         # Proxy may fail to connect; the important contract is that we attempted fallback
         # rather than crashing on missing ``gh``.
         code = mod.main(["sevn-bot/sevn", "--template", "chore", "--title", "C", "--summary", "S"])
     out = capsys.readouterr().out
-    payload = json.loads(out.strip() or "{}")
+    payload = _stdout_json_envelope(out)
     assert code in (0, 1)
     assert "No such file or directory" not in str(payload)
     # Envelope is present either way.
