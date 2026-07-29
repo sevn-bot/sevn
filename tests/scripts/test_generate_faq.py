@@ -121,8 +121,8 @@ def test_main_rejects_input_path_escaping_repo_root(
 ) -> None:
     """An --input path that resolves outside the repo root is rejected, not read."""
     main = _load_generate_faq_main()
-    repo = _repo_with_input(_valid_input(), tmp_path)
-    outside = tmp_path.parent / "outside.json"
+    repo = _repo_with_input(_valid_input(), tmp_path / "repo")
+    outside = tmp_path / "outside.json"
     outside.write_text(json.dumps(_valid_input()), encoding="utf-8")
     exit_code = main(["--input", f"../{outside.name}"], repo_root=repo)
     captured = capsys.readouterr()
@@ -136,9 +136,9 @@ def test_main_rejects_output_path_escaping_repo_root(
 ) -> None:
     """An --output path that resolves outside the repo root is rejected, not written."""
     main = _load_generate_faq_main()
-    repo = _repo_with_input(_valid_input(), tmp_path)
+    repo = _repo_with_input(_valid_input(), tmp_path / "repo")
     exit_code = main(["--output", "../outside.md"], repo_root=repo)
     captured = capsys.readouterr()
     assert exit_code == 1
     assert "must resolve within the repository root" in captured.err.lower()
-    assert not (tmp_path.parent / "outside.md").exists()
+    assert not (tmp_path / "outside.md").exists()
