@@ -61,7 +61,6 @@ def test_web_fetch_native_with_local_fallback_constructor() -> None:
     assert cap.local is local_tool
 
 
-@pytest.mark.xfail(reason="green after W3: sevn keeps registry fallback not Exa (D8)", strict=False)
 def test_build_web_thinking_extra_never_uses_exa_research() -> None:
     ws = WorkspaceConfig.minimal()
     exe = ToolExecutor()
@@ -106,7 +105,6 @@ def test_codemode_constructor_signature_matches_harness_wheel() -> None:
     assert "resource_limits" in params
 
 
-@pytest.mark.xfail(reason="green after W3: OTel holds v4 usage attribute shape (D11)", strict=False)
 def test_instrumentation_disables_aggregated_usage_attributes() -> None:
     from sevn.tracing.otel_pipeline import instrumentation_capability
 

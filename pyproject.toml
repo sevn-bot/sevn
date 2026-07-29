@@ -23,7 +23,7 @@ dependencies = [
     "pydantic==2.13.3",
     "pydantic-settings==2.14.0",
     "starlette==1.0.1",
-    "pydantic-ai>=1.106,<2",
+    "pydantic-ai>=1.107,<2",
     "textual==8.2.7",
     "uvicorn[standard]==0.46.0",
     "weasyprint==69.0",
@@ -36,7 +36,7 @@ dependencies = [
     "pyjwt[crypto]>=2.13.0",
     "pydantic-evals>=1.99.0",
     "logfire>=4.32.1",
-    "pydantic-ai-harness[codemode]>=0.3.0",
+    "pydantic-ai-harness[codemode]>=0.4,<0.5",
     "bcrypt>=4.2.0",
     "pgpy>=0.6.0",
 ]

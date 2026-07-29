@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- [2026-07-29] Tier-B stack staged on `pydantic-ai` 1.107 and `pydantic-ai-harness` 0.4 ahead of the v2 cutover — web capability and CodeMode behavior unchanged; clears v1 deprecation warnings on the adapter surface
 - [2026-07-28] PR review backend cut over from pullfrog-py to mergeCraft: ``mergecraft.yml`` workflow, ``MERGECRAFT_REF`` / ``make review`` pin, ``.mergecraft/config.yaml``, and ``mergecraft-ref-check`` parity gate
 
 ### Fixed
