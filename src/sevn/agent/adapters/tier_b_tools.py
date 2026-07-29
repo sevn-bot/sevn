@@ -1069,7 +1069,7 @@ def build_pydantic_tools_for_registry(
 async def prepare_lazy_tool_definitions(
     ctx: RunContext[BTierDeps],
     defs: list[PAToolDefinition],
-) -> list[PAToolDefinition] | None:
+) -> list[PAToolDefinition]:
     """Strip tool JSON schemas until ``load_tool`` marks a name hot (§3.3 stub pattern).
 
     Tools in the always-on sets (meta, skill runners, core file ops, ``request_escalation``)

@@ -28,6 +28,8 @@ Exports:
     strip_orphan_tool_result_blocks - drop tool_result whose tool_use was stripped (2013 fix).
     rewrite_codemode_native_tool_calls - recover bare sandboxed-tool calls into run_code (§10.30).
     normalize_codemode_run_code_payloads - unwrap double-wrapped run_code {"code": ...} payloads.
+    read_model_profile_field - pydantic-ai v2 ``ModelProfile`` TypedDict field access.
+    normalize_tier_b_model_name - validate provider-prefixed model names for v2.
     replay_stubs_are_same_turn_only - classify same-turn vs cross-turn replay stubs (W3).
     prepare_anthropic_messages_for_transport - coalesce + strip + sanitize pipeline.
     append_owner_steer_model_request - inject /steer without splitting user rows.
@@ -108,6 +110,54 @@ from sevn.config.model_resolution import is_minimax_catalog_model
 
 # Meta loaders (load_tool / load_skill) do not consume tier-B counted-round budget.
 _BUDGET_EXCLUDED_TOOL_NAMES: frozenset[str] = frozenset({"load_tool", "load_skill"})
+
+
+def read_model_profile_field(
+    profile: dict[str, Any] | Any, field: str, *, default: Any = None
+) -> Any:
+    """Read one field from a pydantic-ai v2 ``ModelProfile`` TypedDict or mapping.
+
+    Args:
+        profile (dict[str, Any] | Any): Provider model profile (v2 TypedDict or legacy object).
+        field (str): Field name to read.
+        default (Any): Value when the field is absent.
+
+    Returns:
+        Any: Profile field value or *default*.
+
+    Examples:
+        >>> read_model_profile_field({"supports_tools": True}, "supports_tools", default=False)
+        True
+    """
+    if isinstance(profile, dict):
+        return profile.get(field, default)
+    return getattr(profile, field, default)
+
+
+def normalize_tier_b_model_name(model_name: str) -> str:
+    """Validate and return a provider-prefixed pydantic-ai v2 model name.
+
+    pydantic-ai v2 requires an explicit provider prefix (e.g. ``openai-chat:gpt-5``).
+
+    Args:
+        model_name (str): Candidate model identifier.
+
+    Returns:
+        str: The normalized, provider-prefixed name.
+
+    Raises:
+        ValueError: When *model_name* has no ``provider:`` prefix.
+
+    Examples:
+        >>> normalize_tier_b_model_name("openai-chat:gpt-5")
+        'openai-chat:gpt-5'
+    """
+    stripped = model_name.strip()
+    if ":" not in stripped:
+        msg = "tier-B model name requires a provider prefix (e.g. openai-chat:gpt-5)"
+        raise ValueError(msg)
+    return stripped
+
 
 # Whitelist of redaction-safe correlation keys for MiniMax ``metadata`` (D2).
 _LLM_REQUEST_METADATA_KEYS: Final[frozenset[str]] = frozenset(
@@ -3431,11 +3481,13 @@ __all__ = [
     "finalize_openai_chat_messages",
     "is_anthropic_empty_end_turn",
     "merge_adjacent_anthropic_text_blocks",
+    "normalize_tier_b_model_name",
     "openai_completion_to_model_response",
     "prepare_anthropic_messages_for_transport",
     "pydantic_messages_to_anthropic_messages",
     "pydantic_messages_to_bedrock_converse",
     "pydantic_messages_to_openai_chat",
+    "read_model_profile_field",
     "repair_anthropic_tool_pairing",
     "repair_openai_tool_pairing",
     "replay_stubs_are_same_turn_only",

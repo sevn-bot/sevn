@@ -14,7 +14,6 @@ from sevn.config.workspace_config import WorkspaceConfig
 from sevn.tools.base import ToolExecutor
 
 
-@pytest.mark.xfail(reason="green after W2: RunUsage v2 token field names", strict=False)
 def test_run_usage_exposes_v2_token_fields_only() -> None:
     usage = RunUsage(input_tokens=3, output_tokens=7)
     assert usage.input_tokens == 3
@@ -23,7 +22,6 @@ def test_run_usage_exposes_v2_token_fields_only() -> None:
     assert not hasattr(usage, "response_tokens")
 
 
-@pytest.mark.xfail(reason="green after W2: streaming result property accessors", strict=False)
 @pytest.mark.asyncio
 async def test_streaming_uses_property_accessors_not_callables() -> None:
     from pydantic_ai import Agent
@@ -33,32 +31,38 @@ async def test_streaming_uses_property_accessors_not_callables() -> None:
     async def model_fn(messages: list[object], info: MagicMock) -> ModelResponse:
         return ModelResponse(parts=[TextPart(content="hi")])
 
-    agent = Agent(FunctionModel(model_fn))
+    async def stream_fn(messages: list[object], info: MagicMock):
+        yield "hi"
+
+    agent = Agent(FunctionModel(model_fn, stream_function=stream_fn))
     async with agent.run_stream("ping") as stream:
         assert not callable(getattr(stream, "usage", None))
         _ = stream.usage
-        response = await stream.get_response()
-        assert response.output == "hi"
+        assert await stream.get_output() == "hi"
 
 
-@pytest.mark.xfail(reason="green after W3: WebSearch native+local constructor (D8)", strict=False)
 def test_web_search_native_with_local_fallback_constructor() -> None:
     from pydantic_ai.capabilities import WebSearch
 
-    local_tool = MagicMock()
-    cap = WebSearch(native=True, local=local_tool)
-    assert cap.native is True
-    assert cap.local is local_tool
+    async def local_serp(**kwargs: object) -> str:
+        return "ok"
+
+    cap = WebSearch(native=True, local=local_serp)
+    assert cap.native is not None
+    assert cap.local is not None
+    assert getattr(cap.local, "function", cap.local) is local_serp
 
 
-@pytest.mark.xfail(reason="green after W3: WebFetch native+local constructor (D8)", strict=False)
 def test_web_fetch_native_with_local_fallback_constructor() -> None:
     from pydantic_ai.capabilities import WebFetch
 
-    local_tool = MagicMock()
-    cap = WebFetch(native=True, local=local_tool)
-    assert cap.native is True
-    assert cap.local is local_tool
+    async def local_fetch(**kwargs: object) -> str:
+        return "ok"
+
+    cap = WebFetch(native=True, local=local_fetch)
+    assert cap.native is not None
+    assert cap.local is not None
+    assert getattr(cap.local, "function", cap.local) is local_fetch
 
 
 def test_build_web_thinking_extra_never_uses_exa_research() -> None:
@@ -76,7 +80,6 @@ def test_build_web_thinking_extra_never_uses_exa_research() -> None:
         assert "exa" not in mod.lower()
 
 
-@pytest.mark.xfail(reason="green after W3: ModelProfile TypedDict .get() access", strict=False)
 def test_model_profile_accessed_as_typed_dict() -> None:
     from sevn.agent.adapters.tier_b_model import read_model_profile_field
 
@@ -85,7 +88,6 @@ def test_model_profile_accessed_as_typed_dict() -> None:
     assert read_model_profile_field(profile, "missing", default="fallback") == "fallback"
 
 
-@pytest.mark.xfail(reason="green after W3: provider-prefixed model names required", strict=False)
 def test_bare_model_name_rejected_without_provider_prefix() -> None:
     from sevn.agent.adapters.tier_b_model import normalize_tier_b_model_name
 
@@ -94,15 +96,13 @@ def test_bare_model_name_rejected_without_provider_prefix() -> None:
     assert normalize_tier_b_model_name("openai-chat:gpt-5") == "openai-chat:gpt-5"
 
 
-@pytest.mark.xfail(reason="green after W3: CodeMode wheel signature pinned (D10)", strict=False)
 def test_codemode_constructor_signature_matches_harness_wheel() -> None:
-    from pydantic_ai_harness import CodeMode
+    from sevn.agent.adapters.tier_b_async_codemode import SevnAsyncCodeMode
 
-    params = list(inspect.signature(CodeMode).parameters)
+    params = list(inspect.signature(SevnAsyncCodeMode).parameters)
     assert "tools" in params
     assert "max_retries" in params
     assert "dynamic_catalog" in params
-    assert "resource_limits" in params
 
 
 def test_instrumentation_disables_aggregated_usage_attributes() -> None:

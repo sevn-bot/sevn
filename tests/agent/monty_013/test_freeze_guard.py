@@ -27,6 +27,7 @@ from sevn.tools.permissions import AllowAllPermissionPolicy
 
 def _reset_monty_limits_install_state() -> None:
     monty_limits_mod._installed = False
+    monty_limits_mod._original_checkouts.clear()
 
 
 def _hook_config() -> TierBHookConfig:
@@ -60,7 +61,6 @@ def _deps(executor: ToolExecutor | None = None) -> BTierDeps:
     )
 
 
-@pytest.mark.xfail(reason="green after W3: fail-loud freeze guard (D5)", strict=False)
 def test_install_raises_when_limit_injection_target_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -71,13 +71,12 @@ def test_install_raises_when_limit_injection_target_missing(
 
     from pydantic_ai_harness.code_mode import _toolset as harness_toolset
 
-    monkeypatch.delattr(harness_toolset, "MontyRepl", raising=False)
+    monkeypatch.delattr(harness_toolset, "Monty", raising=False)
 
     with pytest.raises(guard_exc, match=r"(?i)limit|injection|Monty"):
         install_monty_resource_limits({"max_duration_secs": 1})
 
 
-@pytest.mark.xfail(reason="green after W3: tier-B runaway run_code interrupt", strict=False)
 @pytest.mark.asyncio
 async def test_codemode_hang_terminates_within_tier_b_cap() -> None:
     """Hung run_code must abort within DEFAULT_CODEMODE_MAX_DURATION_S (limits + wait_for)."""

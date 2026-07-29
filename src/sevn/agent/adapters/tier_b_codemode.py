@@ -152,26 +152,25 @@ def build_codemode_capability(
             :data:`DEFAULT_CODEMODE_MAX_RETRIES`.
 
     Returns:
-        AbstractCapability[BTierDeps]: ``CodeMode`` selecting metadata-tagged tools only.
+        AbstractCapability[BTierDeps]: ``SevnAsyncCodeMode`` selecting metadata-tagged tools only.
 
     Examples:
         >>> cap = build_codemode_capability()
         >>> cap.__class__.__name__
-        'CodeMode'
+        'SevnAsyncCodeMode'
     """
-    from pydantic_ai_harness import CodeMode
-
     from sevn.agent.adapters._monty_limits import install_monty_resource_limits
+    from sevn.agent.adapters.tier_b_async_codemode import SevnAsyncCodeMode
 
     install_monty_resource_limits(limits)
     effective_retries = DEFAULT_CODEMODE_MAX_RETRIES if max_retries is None else max_retries
-    codemode_params = inspect.signature(CodeMode).parameters
+    codemode_params = inspect.signature(SevnAsyncCodeMode).parameters
     if "dynamic_catalog" not in codemode_params:
         msg = "harness CodeMode missing dynamic_catalog field (expected harness >=0.4.0)"
         raise RuntimeError(msg)
     return cast(
         "AbstractCapability[BTierDeps]",
-        CodeMode(
+        SevnAsyncCodeMode(
             tools={"code_mode": True},
             max_retries=effective_retries,
             dynamic_catalog=False,

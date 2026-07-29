@@ -44,7 +44,7 @@ def snapshot_capability(cap: AbstractCapability[BTierDeps]) -> dict[str, Any]:
         "module": cap.__class__.__module__,
         "defer_loading": bool(getattr(cap, "defer_loading", False)),
     }
-    if cap.__class__.__name__ == "CodeMode":
+    if cap.__class__.__name__ in ("CodeMode", "SevnAsyncCodeMode"):
         entry["max_retries"] = getattr(cap, "max_retries", None)
         tools = getattr(cap, "tools", None)
         entry["tools"] = dict(tools) if isinstance(tools, dict) else tools

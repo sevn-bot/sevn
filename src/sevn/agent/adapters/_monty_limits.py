@@ -1,24 +1,23 @@
-"""Inject Monty ``ResourceLimits`` into CodeMode's sandbox REPL.
+"""Inject Monty ``ResourceLimits`` into CodeMode sandbox sessions (D5/D6).
 
 Module: sevn.agent.adapters._monty_limits
 Depends: pydantic_monty, pydantic_ai_harness.code_mode
 
-``pydantic-ai-harness`` runs LLM-authored Python through Monty (``pydantic_monty``) driven
-*synchronously* on the event loop (``CodeModeToolset._execution_loop`` uses ``feed_start`` /
-``resume`` with no background threads). A CPU-bound or pathological ``run_code`` snippet (e.g.
-catastrophic regex backtracking) therefore blocks the whole event loop, so the outer
-``asyncio.wait_for`` tier-B executor timeout cannot fire and the gateway freezes until Monty
-returns (an 8.5-minute freeze was observed 2026-06-22).
+Harness 0.13+ drives Monty via ``Monty()`` / ``AsyncMonty()`` pool checkout rather than
+``MontyRepl``. We patch ``checkout`` on both pool types so every CodeMode session receives
+sevn's ``DEFAULT_CODEMODE_*`` caps when the caller omits ``limits``.
 
-Monty's Rust sandbox enforces ``ResourceLimits`` (duration / memory / allocations) regardless
-of the event loop, so capping execution there is the only reliable interrupt. The harness
-creates ``MontyRepl()`` with no limits and exposes no knob, so we patch the ``MontyRepl``
-symbol the harness imported (``pydantic_ai_harness.code_mode._toolset.MontyRepl``) to a factory
-that default-injects limits. Install-once + idempotent; re-installing only updates the limits.
+Install is idempotent and **fail-loud**: if the injection target disappears (upstream
+execution-model drift), :func:`install_monty_resource_limits` raises :class:`MontyLimitInstallError`
+instead of silently skipping — the regression this module exists to prevent (2026-06-22 freeze).
+
+Upstream tracking (delete this patch when landed):
+https://github.com/pydantic/pydantic-ai-harness/issues/XXX
 
 Exports:
-    default_codemode_limits — ResourceLimits built from ``DEFAULT_CODEMODE_*``.
-    install_monty_resource_limits — patch the harness ``MontyRepl`` to default-inject limits.
+    MontyLimitInstallError — raised when limit injection cannot be installed.
+    default_codemode_limits — ResourceLimits mapping from ``DEFAULT_CODEMODE_*``.
+    install_monty_resource_limits — patch Monty/AsyncMonty checkout to default-inject limits.
 """
 
 from __future__ import annotations
@@ -35,9 +34,16 @@ from sevn.config.defaults import (
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+_UPSTREAM_RESOURCE_LIMITS_ISSUE = "https://github.com/pydantic/pydantic-ai-harness/issues/501"
+
 _lock = threading.Lock()
 _installed = False
 _active_limits: dict[str, float | int] = {}
+_original_checkouts: dict[type[Any], Any] = {}
+
+
+class MontyLimitInstallError(RuntimeError):
+    """Raised when Monty ResourceLimits injection cannot be installed (D5)."""
 
 
 def default_codemode_limits() -> dict[str, float | int]:
@@ -57,15 +63,101 @@ def default_codemode_limits() -> dict[str, float | int]:
     }
 
 
-def install_monty_resource_limits(limits: Mapping[str, float | int] | None = None) -> None:
-    """Patch the harness ``MontyRepl`` so CodeMode REPLs carry default resource limits.
+def _limits_object(limits: Mapping[str, float | int]) -> Any:
+    """Build a pydantic_monty ``ResourceLimits`` from a plain mapping.
 
-    Idempotent: the patch is applied once; subsequent calls only update the active limits the
-    factory injects. A no-op (logged, not raised) if the harness/sandbox isn't importable.
+    Args:
+        limits (Mapping[str, float | int]): Limit fields to apply at checkout.
+
+    Returns:
+        Any: ``ResourceLimits`` instance for Monty checkout.
+
+    Examples:
+        >>> from sevn.agent.adapters._monty_limits import _limits_object
+        >>> obj = _limits_object({"max_duration_secs": 1.0, "max_memory": 1, "max_allocations": 1})
+        >>> obj["max_duration_secs"]
+        1.0
+    """
+    from pydantic_monty import ResourceLimits
+
+    return ResourceLimits(
+        max_duration_secs=limits.get("max_duration_secs"),
+        max_memory=int(limits["max_memory"]) if "max_memory" in limits else None,
+        max_allocations=int(limits["max_allocations"]) if "max_allocations" in limits else None,  # type: ignore[typeddict-unknown-key]
+    )
+
+
+def _limited_checkout(original: Any, pool: Any, /, *args: Any, **kwargs: Any) -> Any:
+    """Call the real ``checkout`` with sevn default ``ResourceLimits`` when omitted.
+
+    Args:
+        original (Any): Unpatched ``Monty.checkout`` or ``AsyncMonty.checkout``.
+        pool (Any): Monty pool instance.
+        args (Any): Positional args forwarded to ``checkout``.
+        kwargs (Any): Keyword args forwarded to ``checkout``; ``limits`` defaults when omitted.
+
+    Returns:
+        Any: Checked-out Monty session context manager.
+
+    Examples:
+        >>> True
+        True
+    """
+    if kwargs.get("limits") is None:
+        kwargs["limits"] = _limits_object(_active_limits)
+    return original(pool, *args, **kwargs)
+
+
+def _assert_injection_targets_present() -> tuple[type[Any], type[Any]]:
+    """Verify Monty pool types exist for limit injection.
+
+    Returns:
+        tuple[type[Any], type[Any]]: ``(Monty, AsyncMonty)`` classes.
+
+    Raises:
+        MontyLimitInstallError: When either pool type is missing.
+
+    Examples:
+        >>> from pydantic_ai_harness.code_mode import _toolset as ts
+        >>> hasattr(ts, "Monty")
+        True
+    """
+    try:
+        from pydantic_ai_harness.code_mode import _toolset as harness_toolset
+    except Exception as exc:  # pragma: no cover - harness optional
+        msg = f"CodeMode limit injection: harness code_mode._toolset import failed: {exc}"
+        raise MontyLimitInstallError(msg) from exc
+
+    monty_cls = getattr(harness_toolset, "Monty", None)
+    if monty_cls is None:
+        msg = (
+            "CodeMode limit injection target missing: "
+            "pydantic_ai_harness.code_mode._toolset.Monty — "
+            f"file upstream {_UPSTREAM_RESOURCE_LIMITS_ISSUE}"
+        )
+        raise MontyLimitInstallError(msg)
+
+    try:
+        from pydantic_monty import AsyncMonty
+    except Exception as exc:  # pragma: no cover
+        msg = f"CodeMode limit injection: pydantic_monty.AsyncMonty import failed: {exc}"
+        raise MontyLimitInstallError(msg) from exc
+
+    return monty_cls, AsyncMonty
+
+
+def install_monty_resource_limits(limits: Mapping[str, float | int] | None = None) -> None:
+    """Patch Monty pool ``checkout`` so CodeMode sessions carry default resource limits.
+
+    Idempotent: patches are applied once; subsequent calls only update the active limits
+    mapping injected when ``limits=None`` at checkout.
 
     Args:
         limits (Mapping[str, float | int] | None): ``ResourceLimits`` mapping; defaults to
             :func:`default_codemode_limits` when ``None``.
+
+    Raises:
+        MontyLimitInstallError: When the harness Monty injection anchor is absent (D5).
 
     Examples:
         >>> install_monty_resource_limits({"max_duration_secs": 5})  # doctest: +SKIP
@@ -75,21 +167,24 @@ def install_monty_resource_limits(limits: Mapping[str, float | int] | None = Non
         _active_limits = dict(limits) if limits is not None else default_codemode_limits()
         if _installed:
             return
-        try:
-            from pydantic_ai_harness.code_mode import _toolset as harness_toolset
-        except Exception:  # pragma: no cover - harness optional / import shape drift
-            return
 
-        real_repl = harness_toolset.MontyRepl  # type: ignore[attr-defined]
+        monty_cls, async_monty_cls = _assert_injection_targets_present()
 
-        def _limited_monty_repl(*args: Any, **kwargs: Any) -> Any:
-            """Construct a ``MontyRepl`` defaulting ``limits`` to the active CodeMode caps."""
-            if kwargs.get("limits") is None:
-                kwargs["limits"] = dict(_active_limits)
-            return real_repl(*args, **kwargs)
+        for cls in (monty_cls, async_monty_cls):
+            if cls not in _original_checkouts:
+                original = cls.checkout
+                _original_checkouts[cls] = original
 
-        harness_toolset.MontyRepl = _limited_monty_repl  # type: ignore[attr-defined, assignment]
+                def _patched(pool: Any, /, *args: Any, _orig: Any = original, **kwargs: Any) -> Any:
+                    return _limited_checkout(_orig, pool, *args, **kwargs)
+
+                cls.checkout = _patched
+
         _installed = True
 
 
-__all__ = ["default_codemode_limits", "install_monty_resource_limits"]
+__all__ = [
+    "MontyLimitInstallError",
+    "default_codemode_limits",
+    "install_monty_resource_limits",
+]
