@@ -1397,3 +1397,9 @@ Tier B runs register as **level-1** sub-agents. Exposes `spawn_subagent` tool
 (fire-and-forget + optional `wait:true`) for **level-2** workers and specialists
 (`src/sevn/tools/subagent_spawn.py`). L2 spawns draw the parent `CascadeBudget` (D11).
 See spec-36 (`about-sevn.bot/specs/36-sub-agents.md`) for the full orchestration contract.
+
+## 10. Build Checklist
+
+### 10.1 monty-013 W9 — harness SubAgents/DynamicWorkflow deferred — append-only
+
+**Decision: defer** wiring harness `SubAgents` or `DynamicWorkflow` into tier B. Tier B already registers as a spec-36 level-1 sub-agent and exposes `spawn_subagent` for level-2 workers/specialists with gateway supervision (registry, kill, cascade budget, announce-back). Harness `SubAgents` would add a parallel `delegate_task` tool with isolated pydantic-ai runs but without sevn's persistence, operator kill surfaces, or `ToolExecutor.dispatch` re-entry contract. `DynamicWorkflow` would nest Monty-orchestrated multi-agent scripts inside tier B, overlapping CodeMode (W3/W7) and tier C/D RLM without replacing either. Per-delegation model selection via `SubAgents.models` is not adopted — `resolve_model_slot()` / `SpecialistConfig` already resolve models per slot and specialist. **D6 reference:** `DynamicWorkflow.resource_limits` documents the upstream API sevn asked to port to `CodeMode` ([#501](https://github.com/pydantic/pydantic-ai-harness/issues/501)).

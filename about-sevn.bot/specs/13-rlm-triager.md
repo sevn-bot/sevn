@@ -1381,3 +1381,9 @@ Relatedness classifier for `multi` queue mode: `classify_busy_relatedness` in
 | `tests/agent/test_triager_tracing.py` | OTel spans |
 | `tests/gateway/test_triage_context.py` | Gateway integration |
 | `tests/code_understanding/test_triager_orientation.py` | Orientation hints |
+
+## 10. Build Checklist
+
+### 10.1 monty-013 W9 — harness SubAgents/DynamicWorkflow deferred — append-only
+
+**Decision: defer.** The triager is a tool-less structured-output routing step (`triage_turn` → `TriageResult` → gateway tier dispatch), not an in-loop pydantic-ai agent that delegates via tools. Harness `SubAgents` (`delegate_task`) and `DynamicWorkflow` (`run_workflow` Monty orchestration) target tier-B-style agent loops; they do not replace triager routing, fast paths, or `apply_routing_policy`. sevn already owns L1/L2 orchestration in spec-36 (`SubAgentSupervisor`, `spawn_subagent`, specialists, kill/registry/Mission Control). Per-delegation model menus (`SubAgents.models`) duplicate `ModelSlot` + `resolve_model_slot()` and `SpecialistConfig.model` — not adopted. **D6 note:** `DynamicWorkflow.resource_limits` is the upstream reference shape for porting sandbox limits to `CodeMode` ([#501](https://github.com/pydantic/pydantic-ai-harness/issues/501)); sevn keeps the W3 Monty checkout patch until then.
