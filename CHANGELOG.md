@@ -17,6 +17,7 @@ are cut into a dated, versioned section at release time.
 - [2026-07-29] Tier-B overflow replaced hand-rolled `OverflowingToolOutput` with harness `ToolOutputLimits` — full inline content up to 1 MiB preserved (D7); `read_tool_result` paging retained for pathological spills
 - [2026-07-29] Tier-B skills replaced hand-rolled deferred capabilities with harness `Skills` — triager-scoped `include`, staged `SKILL.md` frontmatter, and `sevn_run_skill_script` dispatch preserved (D7)
 - [2026-07-29] Tier-B permission, round-budget, and approval gates moved from lifecycle hooks onto guardrail capabilities — steer, grounding, and fetch-round steer remain sevn-owned hooks (D7/W8)
+- [2026-07-29] PR review runs the current upstream mergeCraft ``pre-0.0.1`` head (``f98aeb0``), bumped in both ``mergecraft.yml`` and ``MERGECRAFT_REF``; the pin stays a full SHA because the org enforces Actions SHA pinning (a branch ref fails the review job at action resolution), and ``mergecraft-ref-check`` no longer assumes hex so it reports real drift instead of "no pin found"
 - [2026-07-28] PR review backend cut over from pullfrog-py to mergeCraft: ``mergecraft.yml`` workflow, ``MERGECRAFT_REF`` / ``make review`` pin, ``.mergecraft/config.yaml``, and ``mergecraft-ref-check`` parity gate
 
 ### Fixed
