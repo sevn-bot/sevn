@@ -26,13 +26,15 @@ from pydantic_ai import AbstractToolset, RunContext  # noqa: TC002
 from pydantic_ai.exceptions import ApprovalRequired, CallDeferred, ModelRetry, UserError
 from pydantic_ai.messages import ToolCallPart, ToolReturn, ToolReturnPart
 from pydantic_ai.tool_manager import ToolManager
-from pydantic_ai.tools import AgentDepsT, ToolDenied
+from pydantic_ai.tools import AgentDepsT, ToolDefinition, ToolDenied
 from pydantic_ai.toolsets.abstract import ToolsetTool  # noqa: TC002
 from pydantic_ai_harness import CodeMode
 from pydantic_ai_harness._monty_exec import PrintCapture, is_sandbox_panic
 from pydantic_ai_harness.code_mode._toolset import (  # pyright: ignore[reportPrivateUsage]
+    _RUN_CODE_JSON_SCHEMA,
     _TOOL_RETURN_CONTENT_TA,
     CodeModeToolset,
+    _base_description,
     _contains_multimodal,
     _global_mode_is_sequential,
     _RunCodeTool,
@@ -559,6 +561,64 @@ class SevnAsyncCodeModeToolset(CodeModeToolset[AgentDepsT]):
 @dataclass
 class SevnAsyncCodeMode(CodeMode[BTierDeps]):
     """Tier-B ``CodeMode`` with an ``AsyncMonty`` execution backend (D13)."""
+
+    _discovered_callable_defs: dict[str, ToolDefinition] = field(
+        default_factory=dict[str, ToolDefinition],
+        init=False,
+        repr=False,
+        compare=False,
+    )
+
+    def get_tool_def(self) -> dict[str, Any]:
+        """Return the ``run_code`` tool definition for cache-stability tests (W1.8 seam).
+
+        Returns:
+            dict[str, Any]: JSON-serializable ``run_code`` name, description, and schema.
+
+        Examples:
+            >>> from sevn.agent.adapters.tier_b_codemode import build_codemode_capability
+            >>> cap = build_codemode_capability()
+            >>> cap.get_tool_def()["name"]
+            'run_code'
+        """
+        has_os = self.os_access is not None
+        has_mount = self.mount is not None
+        callable_defs = dict(self._discovered_callable_defs)
+        if self.dynamic_catalog:
+            description = _base_description(has_os=has_os, has_mount=has_mount)
+        else:
+            description = CodeModeToolset._build_description(
+                callable_defs,
+                has_os=has_os,
+                has_mount=has_mount,
+            )
+        return {
+            "name": "run_code",
+            "description": description,
+            "parameters_json_schema": _RUN_CODE_JSON_SCHEMA,
+        }
+
+    def register_discovered_tool(self, *, name: str, schema: dict[str, Any]) -> None:
+        """Simulate a ToolSearch discovery adding a sandboxed callable (W1.8 seam).
+
+        Args:
+            name (str): Discovered tool name folded into the ``run_code`` catalog.
+            schema (dict[str, Any]): JSON Schema for the tool parameters.
+
+        Examples:
+            >>> from sevn.agent.adapters.tier_b_codemode import build_codemode_capability
+            >>> cap = build_codemode_capability(dynamic_catalog=True)
+            >>> before = cap.get_tool_def()
+            >>> cap.register_discovered_tool(name="new_tool", schema={"type": "object"})
+            >>> cap.get_tool_def() == before
+            True
+        """
+        self._discovered_callable_defs[name] = ToolDefinition(
+            name=name,
+            description=f"Discovered tool {name}.",
+            parameters_json_schema=schema,
+            sequential=True,
+        )
 
     def get_wrapper_toolset(
         self, toolset: AbstractToolset[BTierDeps]

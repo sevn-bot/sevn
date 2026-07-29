@@ -190,6 +190,10 @@ DEFAULT_CODEMODE_MAX_DURATION_S: Final[float] = 45.0
 DEFAULT_CODEMODE_MAX_MEMORY_BYTES: Final[int] = 512 * 1024 * 1024
 DEFAULT_CODEMODE_MAX_ALLOCATIONS: Final[int] = 50_000_000
 DEFAULT_CODEMODE_MAX_RETRIES: Final[int] = 3
+DEFAULT_CODEMODE_DYNAMIC_CATALOG: Final[bool] = False
+
+# Tier-B harness cache-stability monitor (``agent.cache_stability.*``); W7 default off (D9).
+DEFAULT_TIER_B_CACHE_STABILITY_MONITOR_ENABLED: Final[bool] = False
 
 # Tier-B harness history compaction (``agent.history_compaction.*``); W6 default off (D9).
 DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED: Final[bool] = False

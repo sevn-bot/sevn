@@ -133,6 +133,8 @@ from sevn.agent.triager.routing_policy import (
     is_log_provenance_intent_message,
 )
 from sevn.config.defaults import (
+    DEFAULT_CODEMODE_DYNAMIC_CATALOG,
+    DEFAULT_TIER_B_CACHE_STABILITY_MONITOR_ENABLED,
     DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED,
     DEFAULT_TIER_B_HISTORY_COMPACTION_STRATEGY,
     TIER_B_TOOL_MAX_RETRIES,
@@ -881,6 +883,8 @@ def build_tier_b_capabilities(
     overflow_on: bool = True,
     history_compaction_enabled: bool | None = None,
     history_compaction_strategy: str | None = None,
+    cache_stability_monitor_enabled: bool | None = None,
+    codemode_dynamic_catalog: bool | None = None,
 ) -> list[AbstractCapability[BTierDeps]]:
     """Assemble tier-B agent capabilities (W5 merge-conflict mitigation).
 
@@ -900,6 +904,11 @@ def build_tier_b_capabilities(
             (D9). ``None`` uses :data:`DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED` (default off).
         history_compaction_strategy (str | None): Compaction menu entry; ``None`` uses
             :data:`DEFAULT_TIER_B_HISTORY_COMPACTION_STRATEGY`.
+        cache_stability_monitor_enabled (bool | None): When ``True``, append harness
+            ``WarnOnCacheBusts`` (D9). ``None`` uses
+            :data:`DEFAULT_TIER_B_CACHE_STABILITY_MONITOR_ENABLED` (default off).
+        codemode_dynamic_catalog (bool | None): ``CodeMode.dynamic_catalog`` toggle; ``None``
+            uses :data:`DEFAULT_CODEMODE_DYNAMIC_CATALOG` (default off, D9).
 
     Returns:
         list[AbstractCapability[BTierDeps]]: Capability list for ``Agent(capabilities=...)``.
@@ -912,6 +921,9 @@ def build_tier_b_capabilities(
         >>> caps[0].__class__.__name__
         'Instrumentation'
     """
+    from sevn.agent.adapters.tier_b_cache_stability import (
+        build_cache_stability_monitor_capability,
+    )
     from sevn.agent.adapters.tier_b_compaction import (
         TierBHistoryCompactionStrategy,
         build_compaction_capability,
@@ -921,6 +933,16 @@ def build_tier_b_capabilities(
         DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED
         if history_compaction_enabled is None
         else history_compaction_enabled
+    )
+    cache_monitor_on = (
+        DEFAULT_TIER_B_CACHE_STABILITY_MONITOR_ENABLED
+        if cache_stability_monitor_enabled is None
+        else cache_stability_monitor_enabled
+    )
+    dynamic_catalog_on = (
+        DEFAULT_CODEMODE_DYNAMIC_CATALOG
+        if codemode_dynamic_catalog is None
+        else codemode_dynamic_catalog
     )
     compaction_strategy = cast(
         "TierBHistoryCompactionStrategy",
@@ -940,6 +962,13 @@ def build_tier_b_capabilities(
                 build_compaction_capability(strategy=compaction_strategy),
             )
         )
+    if cache_monitor_on:
+        capabilities.append(
+            cast(
+                "AbstractCapability[BTierDeps]",
+                build_cache_stability_monitor_capability(),
+            )
+        )
     if extra:
         capabilities.extend(extra)
     if codemode_on:
@@ -947,6 +976,7 @@ def build_tier_b_capabilities(
             build_codemode_capability(
                 codemode_limits,
                 max_retries=codemode_max_retries,
+                dynamic_catalog=dynamic_catalog_on,
             )
         )
     return capabilities

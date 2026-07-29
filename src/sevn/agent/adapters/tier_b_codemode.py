@@ -28,7 +28,7 @@ from __future__ import annotations
 import inspect
 from typing import TYPE_CHECKING, cast
 
-from sevn.config.defaults import DEFAULT_CODEMODE_MAX_RETRIES
+from sevn.config.defaults import DEFAULT_CODEMODE_DYNAMIC_CATALOG, DEFAULT_CODEMODE_MAX_RETRIES
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -138,6 +138,7 @@ def build_codemode_capability(
     limits: Mapping[str, float | int] | None = None,
     *,
     max_retries: int | None = None,
+    dynamic_catalog: bool | None = None,
 ) -> AbstractCapability[BTierDeps]:
     """Build the tier-B ``CodeMode`` capability (W8.2).
 
@@ -150,6 +151,9 @@ def build_codemode_capability(
             uses the defaults.
         max_retries (int | None): ``run_code`` retry budget; ``None`` uses
             :data:`DEFAULT_CODEMODE_MAX_RETRIES`.
+        dynamic_catalog (bool | None): When ``True``, keep ``run_code`` tool-def cache-stable
+            and surface discovered sandbox tools via dynamic instructions; ``None`` uses
+            :data:`DEFAULT_CODEMODE_DYNAMIC_CATALOG` (default off, D9).
 
     Returns:
         AbstractCapability[BTierDeps]: ``SevnAsyncCodeMode`` selecting metadata-tagged tools only.
@@ -164,6 +168,9 @@ def build_codemode_capability(
 
     install_monty_resource_limits(limits)
     effective_retries = DEFAULT_CODEMODE_MAX_RETRIES if max_retries is None else max_retries
+    effective_dynamic_catalog = (
+        DEFAULT_CODEMODE_DYNAMIC_CATALOG if dynamic_catalog is None else dynamic_catalog
+    )
     codemode_params = inspect.signature(SevnAsyncCodeMode).parameters
     if "dynamic_catalog" not in codemode_params:
         msg = "harness CodeMode missing dynamic_catalog field (expected harness >=0.4.0)"
@@ -173,7 +180,7 @@ def build_codemode_capability(
         SevnAsyncCodeMode(
             tools={"code_mode": True},
             max_retries=effective_retries,
-            dynamic_catalog=False,
+            dynamic_catalog=effective_dynamic_catalog,
         ),
     )
 

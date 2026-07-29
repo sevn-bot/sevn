@@ -25,6 +25,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- [2026-07-29] Opt-in tier-B cache-stability monitor and CodeMode ``dynamic_catalog`` (default off, D9) — ``DEFAULT_TIER_B_CACHE_STABILITY_MONITOR_ENABLED`` wires harness ``WarnOnCacheBusts``; ``DEFAULT_CODEMODE_DYNAMIC_CATALOG`` keeps ``run_code`` tool-def cache-stable across tool discovery
 - [2026-07-29] Opt-in tier-B harness history compaction (default off, D9) — ``DEFAULT_TIER_B_HISTORY_COMPACTION_*`` selects ``TieredCompaction`` / ``SummarizingCompaction`` / ``ClearToolResults`` / ``ClampOversizedMessages`` when enabled via ``build_tier_b_capabilities``
 - [2026-07-28] Operator upgrades can force-reset the gateway source checkout to ``origin/pre-0.0.1`` or ``main``, reinstall the ``sevn`` CLI, and discard local checkout edits without merge prompts — via ``sevn update``, ``make update-cli``, or ``sevn sync --latest --branch …``
 - [2026-07-26] Telegram ``/config`` root regrouped into eight intent tiles (Chat, Agent, Skills & Tools, Memory, Access, Health, Deployment, Help) with ``owner_only`` gating (non-owners see four tiles); legacy section callbacks unchanged; nav shells re-parent existing rows
