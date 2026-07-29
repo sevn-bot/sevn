@@ -18,6 +18,7 @@ Exports:
 
 from __future__ import annotations
 
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -405,7 +406,7 @@ def skill_capability(source: SkillCapabilitySource) -> Capability[BTierDeps]:
         triage_skills=[source.skill_id],
         skill_descriptions={source.skill_id: source.description},
         skills_manager=None,
-        workspace_path=Path("/tmp"),
+        workspace_path=Path(tempfile.gettempdir()),
     )
     if skills is None:
         msg = f"failed to build harness skill capability for {source.skill_id!r}"
