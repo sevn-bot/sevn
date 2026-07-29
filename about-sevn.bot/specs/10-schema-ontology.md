@@ -8,7 +8,7 @@ summary: 'Define the runtime ontology for Triager output and related labels acro
   the agent core: canonical field names, closed enums, typing conventions, and how
   they compose with executor dispatch described '
 last_updated: '2026-07-29'
-fingerprint: sha256:074293c8324e4afb37ee402a09d439996b9ee0eb3aa12b891c69118764a55982
+fingerprint: sha256:849a87236476b4ce7ce6729c38c745334ce43ee56c87cadbb23c52871bcc5474
 related: []
 sources:
 - src/sevn/config/**
@@ -116,6 +116,9 @@ interfaces:
 - name: apply_model_to_picker_slot
   file: src/sevn/config/model_resolution.py
   symbol: apply_model_to_picker_slot
+- name: codemode_dynamic_catalog
+  file: src/sevn/config/model_resolution.py
+  symbol: codemode_dynamic_catalog
 - name: codemode_enabled
   file: src/sevn/config/model_resolution.py
   symbol: codemode_enabled
@@ -179,6 +182,15 @@ interfaces:
 - name: resolve_wire_model_id
   file: src/sevn/config/model_resolution.py
   symbol: resolve_wire_model_id
+- name: tier_b_cache_stability_monitor_enabled
+  file: src/sevn/config/model_resolution.py
+  symbol: tier_b_cache_stability_monitor_enabled
+- name: tier_b_history_compaction_enabled
+  file: src/sevn/config/model_resolution.py
+  symbol: tier_b_history_compaction_enabled
+- name: tier_b_history_compaction_strategy
+  file: src/sevn/config/model_resolution.py
+  symbol: tier_b_history_compaction_strategy
 - name: use_main_model_for_all
   file: src/sevn/config/model_resolution.py
   symbol: use_main_model_for_all
@@ -329,12 +341,18 @@ interfaces:
 - name: tool_debug_result_max_chars
   file: src/sevn/config/sections/accessors.py
   symbol: tool_debug_result_max_chars
+- name: AgentCacheStabilityConfig
+  file: src/sevn/config/sections/agent.py
+  symbol: AgentCacheStabilityConfig
 - name: AgentCodemodeConfig
   file: src/sevn/config/sections/agent.py
   symbol: AgentCodemodeConfig
 - name: AgentDiagnosticsConfig
   file: src/sevn/config/sections/agent.py
   symbol: AgentDiagnosticsConfig
+- name: AgentHistoryCompactionConfig
+  file: src/sevn/config/sections/agent.py
+  symbol: AgentHistoryCompactionConfig
 - name: AgentWorkspaceConfig
   file: src/sevn/config/sections/agent.py
   symbol: AgentWorkspaceConfig

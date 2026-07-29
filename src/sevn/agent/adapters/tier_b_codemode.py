@@ -61,6 +61,7 @@ def is_codemode_eligible_tool(
     *,
     triager_tools: frozenset[str],
     triager_skills: frozenset[str],
+    human_gated_tools: frozenset[str] = frozenset(),
 ) -> bool:
     """Return whether *tool_name* may be tagged ``code_mode=True`` for this turn.
 
@@ -68,6 +69,8 @@ def is_codemode_eligible_tool(
         tool_name (str): Registry or meta tool name.
         triager_tools (frozenset[str]): Names the Triager listed in ``triage.tools[]``.
         triager_skills (frozenset[str]): Names the Triager listed in ``triage.skills[]``.
+        human_gated_tools (frozenset[str]): Registry tools with ``requires_human=True`` that
+            must stay native so approval/deferred flows work outside ``run_code``.
 
     Returns:
         bool: ``True`` when the tool may run inside ``run_code`` for this turn.
@@ -92,7 +95,7 @@ def is_codemode_eligible_tool(
         ... )
         True
     """
-    if tool_name in CODEMODE_NATIVE_TOOL_NAMES:
+    if tool_name in CODEMODE_NATIVE_TOOL_NAMES or tool_name in human_gated_tools:
         return False
     if tool_name in CODEMODE_SKILL_RUNNER_NAMES:
         return bool(triager_skills)
@@ -103,12 +106,15 @@ def compute_codemode_eligible_names(
     *,
     triager_tools: frozenset[str],
     triager_skills: frozenset[str],
+    human_gated_tools: frozenset[str] = frozenset(),
 ) -> frozenset[str]:
     """Compute registry tool names to tag with ``code_mode`` metadata for one turn.
 
     Args:
         triager_tools (frozenset[str]): ``triage.tools[]`` for the turn.
         triager_skills (frozenset[str]): ``triage.skills[]`` for the turn.
+        human_gated_tools (frozenset[str]): ``requires_human`` registry tools excluded from
+            the sandbox (native approval path only).
 
     Returns:
         frozenset[str]: Names eligible for ``CodeMode(tools={'code_mode': True})``.
@@ -129,6 +135,7 @@ def compute_codemode_eligible_names(
             name,
             triager_tools=triager_tools,
             triager_skills=triager_skills,
+            human_gated_tools=human_gated_tools,
         ):
             eligible.add(name)
     return frozenset(eligible)
@@ -164,8 +171,12 @@ def build_codemode_capability(
         'SevnAsyncCodeMode'
     """
     from sevn.agent.adapters._monty_limits import install_monty_resource_limits
-    from sevn.agent.adapters.tier_b_async_codemode import SevnAsyncCodeMode
+    from sevn.agent.adapters.tier_b_async_codemode import (
+        SevnAsyncCodeMode,
+        assert_async_codemode_backend_present,
+    )
 
+    assert_async_codemode_backend_present()
     install_monty_resource_limits(limits)
     effective_retries = DEFAULT_CODEMODE_MAX_RETRIES if max_retries is None else max_retries
     effective_dynamic_catalog = (

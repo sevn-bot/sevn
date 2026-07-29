@@ -10,8 +10,10 @@ Module: sevn.agent.adapters.tier_b_async_codemode
 Depends: pydantic_ai_harness, pydantic_monty, sevn.agent.adapters._monty_limits
 
 Exports:
+    AsyncCodeModeBackendInstallError — raised when harness async backend anchors vanish.
     SevnAsyncCodeMode — drop-in ``CodeMode`` using ``AsyncMonty`` (provider ``monty`` only).
     SevnAsyncCodeModeToolset — harness toolset with async Monty execution backend.
+    assert_async_codemode_backend_present — fail-loud install probe for harness anchors.
 """
 
 from __future__ import annotations
@@ -58,6 +60,50 @@ from pydantic_monty import (
 from sevn.agent.executors.b_types import BTierDeps
 
 PendingCall = asyncio.Task[Any] | Coroutine[Any, Any, Any]
+
+_UPSTREAM_ASYNC_CODEMODE_ISSUE = "https://github.com/pydantic/pydantic-ai-harness/issues/501"
+
+
+class AsyncCodeModeBackendInstallError(RuntimeError):
+    """Raised when SevnAsyncCodeMode harness private anchors are absent (D5)."""
+
+
+def assert_async_codemode_backend_present() -> None:
+    """Verify harness symbols required by ``SevnAsyncCodeModeToolset`` exist (fail-loud, D5).
+
+    Raises:
+        AsyncCodeModeBackendInstallError: When a required harness anchor is missing.
+
+    Examples:
+        >>> assert_async_codemode_backend_present()  # doctest: +SKIP
+    """
+    required: tuple[tuple[str, str], ...] = (
+        ("pydantic_ai_harness.code_mode._toolset", "CodeModeToolset"),
+        ("pydantic_ai_harness.code_mode._toolset", "_RunCodeTool"),
+        ("pydantic_ai_harness.code_mode._toolset", "_RUN_CODE_JSON_SCHEMA"),
+        ("pydantic_ai_harness._monty_exec", "PrintCapture"),
+        ("pydantic_ai_harness._monty_exec", "is_sandbox_panic"),
+        ("pydantic_monty", "AsyncMonty"),
+        ("pydantic_monty", "AsyncMontySession"),
+    )
+    missing: list[str] = []
+    for module_name, attr in required:
+        try:
+            import importlib
+
+            mod = importlib.import_module(module_name)
+        except Exception as exc:
+            missing.append(f"{module_name} import failed: {exc}")
+            continue
+        if getattr(mod, attr, None) is None:
+            missing.append(f"{module_name}.{attr}")
+    if missing:
+        msg = (
+            "SevnAsyncCodeMode backend anchors missing: "
+            + ", ".join(missing)
+            + f" — track upstream {_UPSTREAM_ASYNC_CODEMODE_ISSUE}"
+        )
+        raise AsyncCodeModeBackendInstallError(msg)
 
 
 def _make_external_lookup_entry(
@@ -647,4 +693,9 @@ class SevnAsyncCodeMode(CodeMode[BTierDeps]):
         )
 
 
-__all__ = ["SevnAsyncCodeMode", "SevnAsyncCodeModeToolset"]
+__all__ = [
+    "AsyncCodeModeBackendInstallError",
+    "SevnAsyncCodeMode",
+    "SevnAsyncCodeModeToolset",
+    "assert_async_codemode_backend_present",
+]

@@ -2659,8 +2659,10 @@ def build_tier_b_function_model(
             with ``TOOL_NOT_PROVISIONED`` steer. When ``None``, no filtering is applied.
         on_granted_tool (Callable[[str], None] | None): Optional callback when a
             registry-valid tool is auto-granted (e.g. add to ``BTierDeps.loaded_tools``).
-        lifecycle_via_hooks (bool): When ``True``, steer injection and the manual round-budget
-            guard in ``_preamble`` are skipped because tier-B ``Hooks`` own those concerns (W5).
+        lifecycle_via_hooks (bool): When ``True``, steer injection in ``_preamble`` is skipped
+            because tier-B ``Hooks`` own steer. Round-budget enforcement remains in ``_preamble``
+            for the ``FunctionModel`` transport path; ``TierBRoundBudgetGuardrailCapability``
+            mirrors the same check for native-model runs (W8).
         thinking_via_capability (bool): When ``True``, skip manual MiniMax ``thinking`` body injection (W7).
         turn_message_start_index (int): Anthropic row index where this turn's
             ``new_messages()`` begin; used to classify same-turn replay stubs (W3).

@@ -621,3 +621,29 @@ def test_delete_tool_not_tagged_codemode() -> None:
     tool = _make_registry_tool(defn, code_mode=False)
     assert tool.requires_approval is True
     assert (tool.metadata or {}).get("code_mode") is not True
+
+
+def test_human_gated_tools_excluded_from_codemode_eligible() -> None:
+    from sevn.agent.adapters.tier_b_codemode import compute_codemode_eligible_names
+
+    human_gated = frozenset({"promote_generated_skill"})
+    assert (
+        is_codemode_eligible_tool(
+            "promote_generated_skill",
+            triager_tools=frozenset({"promote_generated_skill", "glob"}),
+            triager_skills=frozenset(),
+            human_gated_tools=human_gated,
+        )
+        is False
+    )
+    assert compute_codemode_eligible_names(
+        triager_tools=frozenset({"glob", "promote_generated_skill"}),
+        triager_skills=frozenset(),
+        human_gated_tools=human_gated,
+    ) == frozenset({"glob"})
+
+
+def test_assert_async_codemode_backend_present_ok() -> None:
+    from sevn.agent.adapters.tier_b_async_codemode import assert_async_codemode_backend_present
+
+    assert_async_codemode_backend_present()

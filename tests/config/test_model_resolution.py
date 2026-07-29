@@ -291,3 +291,31 @@ def test_resolve_minimax_openai_base_url_custom() -> None:
         resolve_minimax_openai_base_url("https://custom.minimax.io/v1")
         == "https://custom.minimax.io/v1"
     )
+
+
+def test_monty_013_d9_agent_toggle_resolution() -> None:
+    from sevn.config.model_resolution import (
+        codemode_dynamic_catalog,
+        tier_b_cache_stability_monitor_enabled,
+        tier_b_history_compaction_enabled,
+        tier_b_history_compaction_strategy,
+    )
+    from sevn.config.workspace_config import WorkspaceConfig
+
+    minimal = WorkspaceConfig.minimal()
+    assert tier_b_history_compaction_enabled(minimal) is False
+    assert tier_b_history_compaction_strategy(minimal) == "tiered"
+    assert tier_b_cache_stability_monitor_enabled(minimal) is False
+    assert codemode_dynamic_catalog(minimal) is False
+
+    enabled = WorkspaceConfig.minimal(
+        agent={
+            "history_compaction": {"enabled": True, "strategy": "summarizing"},
+            "cache_stability": {"enabled": True},
+            "codemode": {"dynamic_catalog": True},
+        },
+    )
+    assert tier_b_history_compaction_enabled(enabled) is True
+    assert tier_b_history_compaction_strategy(enabled) == "summarizing"
+    assert tier_b_cache_stability_monitor_enabled(enabled) is True
+    assert codemode_dynamic_catalog(enabled) is True

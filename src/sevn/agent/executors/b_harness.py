@@ -142,10 +142,14 @@ from sevn.config.defaults import (
 from sevn.config.llm_params import resolve_effective_max_output_tokens
 from sevn.config.model_resolution import (
     ModelSlot,
+    codemode_dynamic_catalog,
     codemode_enabled,
     codemode_max_retries,
     codemode_resource_limits,
     native_model_enabled,
+    tier_b_cache_stability_monitor_enabled,
+    tier_b_history_compaction_enabled,
+    tier_b_history_compaction_strategy,
 )
 from sevn.config.sections.providers import providers_section_dict
 from sevn.config.settings import ProcessSettings
@@ -1200,6 +1204,7 @@ async def run_b_turn(
         bound_tool_names = bound_tool_names | frozenset({"run_code"})
     triager_tools = frozenset(triage.tools)
     triager_skills = frozenset(triage.skills)
+    human_gated_tools = frozenset(d.name for d in tool_executor.definitions() if d.requires_human)
     # Names callable only inside ``run_code`` this turn. Used by the FunctionModel to
     # rewrite a contract-violating bare native call back into ``run_code`` (Layer 1,
     # `specs/14-executor-tier-b.md` §5.1). Empty when CodeMode is off → rewrite is a no-op.
@@ -1207,6 +1212,7 @@ async def run_b_turn(
         compute_codemode_eligible_names(
             triager_tools=triager_tools,
             triager_skills=triager_skills,
+            human_gated_tools=human_gated_tools,
         )
         if codemode_on
         else frozenset()
@@ -1228,6 +1234,7 @@ async def run_b_turn(
         codemode_enabled=codemode_on,
         triager_tools=triager_tools,
         triager_skills=triager_skills,
+        human_gated_tools=human_gated_tools,
         exclude_tool_names=capability_owned_tools,
         codemode_web_policy=codemode_web_policy,
     )
@@ -1472,6 +1479,10 @@ async def run_b_turn(
             codemode_on=codemode_on,
             codemode_limits=codemode_resource_limits(workspace),
             codemode_max_retries=codemode_max_retries(workspace),
+            history_compaction_enabled=tier_b_history_compaction_enabled(workspace),
+            history_compaction_strategy=tier_b_history_compaction_strategy(workspace),
+            cache_stability_monitor_enabled=tier_b_cache_stability_monitor_enabled(workspace),
+            codemode_dynamic_catalog=codemode_dynamic_catalog(workspace),
         ),
         system_prompt=system_prompt,
         instructions=instructions,

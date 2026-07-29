@@ -8,7 +8,7 @@ summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–�
   a single, tool-less outbound generation step that emits validated TriageResult consumed
   by tier dispatch (A / B / C / D), MCP e'
 last_updated: '2026-07-29'
-fingerprint: sha256:238b1ec7b72aa5fbb44869b0af0f55a8af6c3ed2195fb724452e795fe9e34053
+fingerprint: sha256:404bc6efd73c8e9008c2e6ebd3c4f696ac53dd2ecf2c0d54338705c56b346bd5
 related: []
 sources:
 - src/sevn/agent/**
@@ -92,12 +92,18 @@ interfaces:
 - name: register_pydantic_tools
   file: src/sevn/agent/adapters/pydantic_adapter.py
   symbol: register_pydantic_tools
+- name: AsyncCodeModeBackendInstallError
+  file: src/sevn/agent/adapters/tier_b_async_codemode.py
+  symbol: AsyncCodeModeBackendInstallError
 - name: SevnAsyncCodeMode
   file: src/sevn/agent/adapters/tier_b_async_codemode.py
   symbol: SevnAsyncCodeMode
 - name: SevnAsyncCodeModeToolset
   file: src/sevn/agent/adapters/tier_b_async_codemode.py
   symbol: SevnAsyncCodeModeToolset
+- name: assert_async_codemode_backend_present
+  file: src/sevn/agent/adapters/tier_b_async_codemode.py
+  symbol: assert_async_codemode_backend_present
 - name: build_cache_stability_monitor_capability
   file: src/sevn/agent/adapters/tier_b_cache_stability.py
   symbol: build_cache_stability_monitor_capability
