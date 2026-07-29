@@ -20,11 +20,11 @@
 #
 # Workflow resolution (GitHub Nov 2025 policy, effective 2025-12-08): pull_request_target
 # definitions are read from the repository default branch (`main`), not the PR base.
-# `main` currently has no mergecraft.yml — real development lives on `pre-0.0.1`.
-# Until this file lands on `main` (or default branch changes), pull_request_target
-# alone will not fire for PRs targeting `pre-*` / `develop` / `test-pre`. The
-# bootstrap `pull_request` trigger below MUST stay until then; do not remove it in
-# the same PR that introduces pull_request_target.
+# Companion PR to `main` must land this workflow there first; until then,
+# pull_request_target alone will not fire for PRs targeting `pre-*` / `develop` /
+# `test-pre`. The bootstrap `pull_request` trigger below MUST stay until `main`
+# carries an equivalent file; do not remove it in the same PR that introduces
+# pull_request_target.
 #
 # Same-repo guard below keeps fork PRs from receiving secrets (prior pull_request
 # behavior). mergeCraft uses checkout_pr + API with push/shell disabled — no
@@ -69,7 +69,9 @@ permissions:
   id-token: write
 
 concurrency:
-  group: mergecraft-${{ github.workflow }}-${{ github.ref }}
+  # pull_request_target resolves github.ref to the default branch; key on PR number
+  # so concurrent reviews do not cancel each other (GitHub Nov 2025 policy).
+  group: mergecraft-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
