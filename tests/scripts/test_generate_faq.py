@@ -71,7 +71,8 @@ def test_main_writes_faq_when_valid(tmp_path: Path) -> None:
 
 
 def test_main_check_fails_when_output_missing(
-    capsys: pytest.CaptureFixture[str], tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
 ) -> None:
     """--check fails (exit 1) when docs/FAQ.md has not been generated yet."""
     main = _load_generate_faq_main()
@@ -91,7 +92,8 @@ def test_main_check_passes_after_generate(tmp_path: Path) -> None:
 
 
 def test_main_reports_validation_errors(
-    capsys: pytest.CaptureFixture[str], tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
 ) -> None:
     """An answer missing a reference placeholder fails with a clear error."""
     main = _load_generate_faq_main()
@@ -114,7 +116,8 @@ def test_main_missing_input_file(capsys: pytest.CaptureFixture[str], tmp_path: P
 
 
 def test_main_rejects_input_path_escaping_repo_root(
-    capsys: pytest.CaptureFixture[str], tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
 ) -> None:
     """An --input path that resolves outside the repo root is rejected, not read."""
     main = _load_generate_faq_main()
@@ -128,7 +131,8 @@ def test_main_rejects_input_path_escaping_repo_root(
 
 
 def test_main_rejects_output_path_escaping_repo_root(
-    capsys: pytest.CaptureFixture[str], tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
 ) -> None:
     """An --output path that resolves outside the repo root is rejected, not written."""
     main = _load_generate_faq_main()

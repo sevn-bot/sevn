@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict delivery
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
-last_updated: '2026-07-28'
-fingerprint: sha256:7c24a29a3d5afed2ee3d1745d55006d3ae8989337e495ebec47676fc07f43198
+last_updated: '2026-07-29'
+fingerprint: sha256:da52e385da0d4d118ccc3dc4d111299f2ef122be040b4d981b68ab424d2d257a
 related: []
 sources:
 - .github/workflows/**
@@ -87,6 +87,30 @@ interfaces:
 - name: load_manifest_entries
   file: src/sevn/docs/about/registry.py
   symbol: load_manifest_entries
+- name: Document
+  file: src/sevn/docs/faq.py
+  symbol: Document
+- name: Question
+  file: src/sevn/docs/faq.py
+  symbol: Question
+- name: Reference
+  file: src/sevn/docs/faq.py
+  symbol: Reference
+- name: Section
+  file: src/sevn/docs/faq.py
+  symbol: Section
+- name: load_document
+  file: src/sevn/docs/faq.py
+  symbol: load_document
+- name: render_markdown
+  file: src/sevn/docs/faq.py
+  symbol: render_markdown
+- name: slugify
+  file: src/sevn/docs/faq.py
+  symbol: slugify
+- name: validate_document
+  file: src/sevn/docs/faq.py
+  symbol: validate_document
 - name: load_root_intro_lines
   file: src/sevn/docs/readme/brand.py
   symbol: load_root_intro_lines
@@ -409,7 +433,7 @@ and docs/skills/infra checks that block regressions before merge.
 | `make ci-resume` / `make ci-reset` | Resumable / reset CI checkpoint |
 | `make ci-core` | lockcheck, lint, typecheck, pyright, test, doctest, security, build, doctor |
 | `make ci-infra` | config-schema, onboarding schemas, git guards, manifests |
-| `make ci-docs` | about-site, readme, changelog, skw spec/prd gates, telegram menu docs |
+| `make ci-docs` | about-site, readme, changelog, FAQ, skw spec/prd gates, telegram menu docs |
 | `make ci-skills` | skillspector + skill inventory checks |
 | `make ci-parity` | code-index, deploy report parity |
 | `make ci-affected` / `make ci-changed` | Path-aware partial gates |
@@ -424,7 +448,7 @@ Docs tooling in scope: `src/sevn/docs/about/check.py` (`check_about_docs`),
 
 ## Data Model
 
-### `CI_STEPS` (32 ordered steps)
+### `CI_STEPS` (33 ordered steps)
 
 Defined in root `Makefile` — consumed by `make ci-resume` via `scripts/ci_resume.sh`.
 First infra step includes `make config-schema` against `infra/sevn.schema.json` goldens.

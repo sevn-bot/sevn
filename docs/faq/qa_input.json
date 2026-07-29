@@ -19,7 +19,7 @@
         {
           "id": "which-channels",
           "question": "Which channels can I talk to sevn.bot through?",
-          "answer": "Today sevn.bot ships with a Telegram adapter and a browser-based Web UI bridge, with voice input/output layered on top of the gateway. Every channel talks to the same triage and executor pipeline, so the assistant behaves consistently no matter which surface you use. See {{ref:channels}} for the adapter patterns and how new channels plug into the turn spine.",
+          "answer": "Telegram and the browser Web UI bridge are the production channels today, with stub Discord and Slack adapters available for early integration work and voice input/output layered on top of the gateway. Every channel normalises inbound messages into the same triage and executor pipeline, so the assistant behaves consistently no matter which surface you use. See {{ref:channels}} for the adapter patterns and how new channels plug into the turn spine.",
           "references": {
             "channels": {
               "path": "docs/readmes/channels.md",

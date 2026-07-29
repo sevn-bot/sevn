@@ -25,7 +25,7 @@ sevn.bot is a single AI assistant that you own and that lives in the channels yo
 
 ### Which channels can I talk to sevn.bot through?
 
-Today sevn.bot ships with a Telegram adapter and a browser-based Web UI bridge, with voice input/output layered on top of the gateway. Every channel talks to the same triage and executor pipeline, so the assistant behaves consistently no matter which surface you use. See [channels subsystem README](readmes/channels.md) for the adapter patterns and how new channels plug into the turn spine.
+Telegram and the browser Web UI bridge are the production channels today, with stub Discord and Slack adapters available for early integration work and voice input/output layered on top of the gateway. Every channel normalises inbound messages into the same triage and executor pipeline, so the assistant behaves consistently no matter which surface you use. See [channels subsystem README](readmes/channels.md) for the adapter patterns and how new channels plug into the turn spine.
 
 ### How do I install and run sevn.bot?
 
