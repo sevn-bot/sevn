@@ -1,0 +1,173 @@
+{
+  "recorded_at": "2026-07-29",
+  "git_head": "8506a79e",
+  "uv_lock_versions": {
+    "pydantic-ai": "1.106.0",
+    "pydantic-ai-harness": "0.3.0",
+    "pydantic-monty": "0.0.18",
+    "pydantic-evals": "1.106.0"
+  },
+  "scenarios": {
+    "codemode_off": {
+      "count": 7,
+      "capabilities": [
+        {
+          "class": "Instrumentation",
+          "module": "pydantic_ai.capabilities.instrumentation",
+          "defer_loading": false
+        },
+        {
+          "class": "Hooks",
+          "module": "pydantic_ai.capabilities.hooks",
+          "defer_loading": false
+        },
+        {
+          "class": "PrepareTools",
+          "module": "pydantic_ai.capabilities.prepare_tools",
+          "defer_loading": false
+        },
+        {
+          "class": "ToolOutputLimits",
+          "module": "pydantic_ai_harness.tool_output_limits._capability",
+          "defer_loading": false
+        },
+        {
+          "class": "TierBPermissionGuardrailCapability",
+          "module": "sevn.agent.adapters.tier_b_guardrails",
+          "defer_loading": false
+        },
+        {
+          "class": "TierBRoundBudgetGuardrailCapability",
+          "module": "sevn.agent.adapters.tier_b_guardrails",
+          "defer_loading": false
+        },
+        {
+          "class": "TierBApprovalGuardrailCapability",
+          "module": "sevn.agent.adapters.tier_b_guardrails",
+          "defer_loading": false
+        }
+      ],
+      "class_names": [
+        "Instrumentation",
+        "Hooks",
+        "PrepareTools",
+        "ToolOutputLimits",
+        "TierBPermissionGuardrailCapability",
+        "TierBRoundBudgetGuardrailCapability",
+        "TierBApprovalGuardrailCapability"
+      ]
+    },
+    "codemode_on": {
+      "count": 8,
+      "capabilities": [
+        {
+          "class": "Instrumentation",
+          "module": "pydantic_ai.capabilities.instrumentation",
+          "defer_loading": false
+        },
+        {
+          "class": "Hooks",
+          "module": "pydantic_ai.capabilities.hooks",
+          "defer_loading": false
+        },
+        {
+          "class": "PrepareTools",
+          "module": "pydantic_ai.capabilities.prepare_tools",
+          "defer_loading": false
+        },
+        {
+          "class": "ToolOutputLimits",
+          "module": "pydantic_ai_harness.tool_output_limits._capability",
+          "defer_loading": false
+        },
+        {
+          "class": "TierBPermissionGuardrailCapability",
+          "module": "sevn.agent.adapters.tier_b_guardrails",
+          "defer_loading": false
+        },
+        {
+          "class": "TierBRoundBudgetGuardrailCapability",
+          "module": "sevn.agent.adapters.tier_b_guardrails",
+          "defer_loading": false
+        },
+        {
+          "class": "TierBApprovalGuardrailCapability",
+          "module": "sevn.agent.adapters.tier_b_guardrails",
+          "defer_loading": false
+        },
+        {
+          "class": "SevnAsyncCodeMode",
+          "module": "sevn.agent.adapters.tier_b_async_codemode",
+          "max_retries": 3,
+          "tools": {
+            "code_mode": true
+          },
+          "defer_loading": false
+        }
+      ],
+      "class_names": [
+        "Instrumentation",
+        "Hooks",
+        "PrepareTools",
+        "ToolOutputLimits",
+        "TierBPermissionGuardrailCapability",
+        "TierBRoundBudgetGuardrailCapability",
+        "TierBApprovalGuardrailCapability",
+        "SevnAsyncCodeMode"
+      ]
+    },
+    "codemode_on_no_overflow": {
+      "count": 7,
+      "capabilities": [
+        {
+          "class": "Instrumentation",
+          "module": "pydantic_ai.capabilities.instrumentation",
+          "defer_loading": false
+        },
+        {
+          "class": "Hooks",
+          "module": "pydantic_ai.capabilities.hooks",
+          "defer_loading": false
+        },
+        {
+          "class": "PrepareTools",
+          "module": "pydantic_ai.capabilities.prepare_tools",
+          "defer_loading": false
+        },
+        {
+          "class": "TierBPermissionGuardrailCapability",
+          "module": "sevn.agent.adapters.tier_b_guardrails",
+          "defer_loading": false
+        },
+        {
+          "class": "TierBRoundBudgetGuardrailCapability",
+          "module": "sevn.agent.adapters.tier_b_guardrails",
+          "defer_loading": false
+        },
+        {
+          "class": "TierBApprovalGuardrailCapability",
+          "module": "sevn.agent.adapters.tier_b_guardrails",
+          "defer_loading": false
+        },
+        {
+          "class": "SevnAsyncCodeMode",
+          "module": "sevn.agent.adapters.tier_b_async_codemode",
+          "max_retries": 3,
+          "tools": {
+            "code_mode": true
+          },
+          "defer_loading": false
+        }
+      ],
+      "class_names": [
+        "Instrumentation",
+        "Hooks",
+        "PrepareTools",
+        "TierBPermissionGuardrailCapability",
+        "TierBRoundBudgetGuardrailCapability",
+        "TierBApprovalGuardrailCapability",
+        "SevnAsyncCodeMode"
+      ]
+    }
+  }
+}

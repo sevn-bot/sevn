@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from sevn.agent.executors.b_types import BTierDeps
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_BASELINE_PATH = _REPO_ROOT / ".ignorelocal/waves/monty-013-capability-baseline.json"
+_BASELINE_PATH = _REPO_ROOT / "tests/fixtures/agent/monty-013-capability-baseline.json"
 
 
 def repo_root() -> Path:
