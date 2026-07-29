@@ -16,10 +16,19 @@
 # Trigger: pull_request_target (not pull_request). GitHub skips pull_request
 # workflows when refs/pull/N/merge cannot be built (merge conflicts), which
 # leaves ruleset require-mergecraft-review with a permanently missing check.
-# pull_request_target always fires; workflow YAML is always read from the base
-# branch. Same-repo guard below keeps fork PRs from receiving secrets (prior
-# pull_request behavior). mergeCraft uses checkout_pr + API with push/shell
-# disabled — no PR-controlled scripts run in CI.
+# pull_request_target always fires on synchronize even with merge conflicts.
+#
+# Workflow resolution (GitHub Nov 2025 policy, effective 2025-12-08): pull_request_target
+# definitions are read from the repository default branch (`main`), not the PR base.
+# `main` currently has no mergecraft.yml — real development lives on `pre-0.0.1`.
+# Until this file lands on `main` (or default branch changes), pull_request_target
+# alone will not fire for PRs targeting `pre-*` / `develop` / `test-pre`. The
+# bootstrap `pull_request` trigger below MUST stay until then; do not remove it in
+# the same PR that introduces pull_request_target.
+#
+# Same-repo guard below keeps fork PRs from receiving secrets (prior pull_request
+# behavior). mergeCraft uses checkout_pr + API with push/shell disabled — no
+# PR-controlled scripts run in CI.
 #
 # Merge gate: ruleset `require-mergecraft-review` requires the **mergeCraft
 # review** job check only — not the raw `mergecraft` completion check (which goes
@@ -33,11 +42,11 @@ on:
     # .coderabbit.yaml `pre-.*` coverage).
     branches: [main, develop, test-pre, "pre-*"]
     types: [opened, synchronize, reopened, ready_for_review]
-  # Bootstrap: GitHub evaluates pull_request workflows from the merge commit.
-  # A PR that replaces pull_request with pull_request_target-only would otherwise
-  # never fire mergecraft (pull_request event ≠ pull_request_target listener).
-  # Keep both until this workflow is on the base branch; remove pull_request in a
-  # follow-up once pull_request_target alone covers all PRs (conflict-safe path).
+  # Bootstrap: keep pull_request until mergecraft.yml exists on `main` (default
+  # branch). GitHub resolves pull_request_target from default branch, so
+  # pull_request_target-only would not fire for pre-* PRs while main lacks this
+  # file. pull_request uses the merge commit and fires today; remove only after
+  # main carries this workflow (or default branch moves to pre-0.0.1).
   pull_request:
     branches: [main, develop, test-pre, "pre-*"]
     types: [opened, synchronize, reopened, ready_for_review]
