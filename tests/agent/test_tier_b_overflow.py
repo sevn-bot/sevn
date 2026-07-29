@@ -1,4 +1,4 @@
-"""Tests for tier-B overflow capability (Wave W5 — provider-neutral)."""
+"""Tests for tier-B overflow capability (harness ToolOutputLimits via factory)."""
 
 from __future__ import annotations
 
@@ -7,13 +7,20 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic_ai.messages import ToolReturn
+from pydantic_ai_harness.tool_output_limits import ToolOutputLimits
 
-from sevn.agent.adapters.tier_b_overflow import (
+from sevn.agent.adapters.tier_b_tool_output_limits import (
     OVERFLOW_SPILL_THRESHOLD,
     OVERFLOW_TRUNCATE_FLOOR,
-    OverflowingToolOutput,
     build_overflow_capability,
 )
+
+
+def _result_text(result: object) -> str:
+    if isinstance(result, ToolReturn):
+        return str(result.return_value)
+    return str(result)
 
 
 @pytest.fixture
@@ -23,9 +30,9 @@ def spill_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def cap(spill_dir: Path) -> OverflowingToolOutput[Any]:
+def cap(spill_dir: Path) -> ToolOutputLimits[Any]:
     """Capability with low thresholds for testing."""
-    return OverflowingToolOutput(
+    return build_overflow_capability(
         truncate_floor=20,
         spill_threshold=100,
         spill_dir=spill_dir,
@@ -35,7 +42,10 @@ def cap(spill_dir: Path) -> OverflowingToolOutput[Any]:
 @pytest.fixture
 def mock_ctx() -> MagicMock:
     """Minimal RunContext mock."""
-    return MagicMock()
+    ctx = MagicMock()
+    ctx.run_id = "run_test"
+    ctx.retry = 0
+    return ctx
 
 
 @pytest.fixture
@@ -54,12 +64,12 @@ def mock_tool_def() -> MagicMock:
 
 
 class TestPassthrough:
-    """Results below truncate_floor pass unchanged."""
+    """Results below spill_threshold pass unchanged."""
 
     @pytest.mark.anyio
     async def test_small_string_passthrough(
         self,
-        cap: OverflowingToolOutput[Any],
+        cap: ToolOutputLimits[Any],
         mock_ctx: MagicMock,
         mock_call: MagicMock,
         mock_tool_def: MagicMock,
@@ -72,7 +82,7 @@ class TestPassthrough:
     @pytest.mark.anyio
     async def test_small_dict_passthrough(
         self,
-        cap: OverflowingToolOutput[Any],
+        cap: ToolOutputLimits[Any],
         mock_ctx: MagicMock,
         mock_call: MagicMock,
         mock_tool_def: MagicMock,
@@ -90,40 +100,40 @@ class TestFullInline:
     @pytest.mark.anyio
     async def test_mid_size_returned_in_full(
         self,
-        cap: OverflowingToolOutput[Any],
+        cap: ToolOutputLimits[Any],
         mock_ctx: MagicMock,
         mock_call: MagicMock,
         mock_tool_def: MagicMock,
     ) -> None:
-        content = "x" * 50  # > old truncate_floor, < spill_threshold
+        content = "x" * 50
         result = await cap.after_tool_execute(
             mock_ctx, call=mock_call, tool_def=mock_tool_def, args={}, result=content
         )
-        assert result == content  # full content; LLM never faces a truncation notice
-        assert "truncated" not in str(result)
-        assert "read_tool_result" not in str(result)
+        assert result == content
+        assert "truncated" not in _result_text(result)
+        assert "read_tool_result" not in _result_text(result)
 
     @pytest.mark.anyio
     async def test_tool_return_unwrapped_in_full(
         self,
-        cap: OverflowingToolOutput[Any],
+        cap: ToolOutputLimits[Any],
         mock_ctx: MagicMock,
         mock_call: MagicMock,
         mock_tool_def: MagicMock,
     ) -> None:
-        """A CodeMode ToolReturn is unwrapped to its return_value, not the wrapper repr."""
-        from pydantic_ai.messages import ToolReturn
-
+        """A CodeMode ToolReturn keeps its envelope when below the spill band."""
         payload = '{"ok":true,"data":{"v":' + "9" * 40 + "}}"
+        wrapped = ToolReturn(return_value=payload, metadata={"code_mode": True})
         result = await cap.after_tool_execute(
             mock_ctx,
             call=mock_call,
             tool_def=mock_tool_def,
             args={},
-            result=ToolReturn(return_value=payload, metadata={"code_mode": True}),
+            result=wrapped,
         )
-        assert result == payload  # clean content, no "ToolReturn(return_value=" repr
-        assert "ToolReturn(" not in str(result)
+        assert isinstance(result, ToolReturn)
+        assert result.return_value == payload
+        assert "ToolReturn(" not in _result_text(result)
 
 
 class TestSpill:
@@ -132,7 +142,7 @@ class TestSpill:
     @pytest.mark.anyio
     async def test_large_result_spilled(
         self,
-        cap: OverflowingToolOutput[Any],
+        cap: ToolOutputLimits[Any],
         mock_ctx: MagicMock,
         mock_call: MagicMock,
         mock_tool_def: MagicMock,
@@ -142,47 +152,15 @@ class TestSpill:
         result = await cap.after_tool_execute(
             mock_ctx, call=mock_call, tool_def=mock_tool_def, args={}, result=content
         )
-        assert isinstance(result, str)
-        assert "spilled to disk" in result.lower() or "spill" in result.lower()
-        assert "read_tool_result" in result
-        assert "spill_0" in result
-        # Verify file exists on disk
-        assert (spill_dir / "spill_0.txt").exists()
-
-    @pytest.mark.anyio
-    async def test_spill_content_retrievable(
-        self,
-        cap: OverflowingToolOutput[Any],
-        mock_ctx: MagicMock,
-        mock_call: MagicMock,
-        mock_tool_def: MagicMock,
-    ) -> None:
-        content = "z" * 200
-        await cap.after_tool_execute(
-            mock_ctx, call=mock_call, tool_def=mock_tool_def, args={}, result=content
-        )
-        slice_result = cap.read_spill("spill_0", offset=0, limit=50)
-        assert "z" * 50 in slice_result
-
-    @pytest.mark.anyio
-    async def test_spill_offset_and_limit(
-        self,
-        cap: OverflowingToolOutput[Any],
-        mock_ctx: MagicMock,
-        mock_call: MagicMock,
-        mock_tool_def: MagicMock,
-    ) -> None:
-        content = "0123456789" * 30  # 300 bytes
-        await cap.after_tool_execute(
-            mock_ctx, call=mock_call, tool_def=mock_tool_def, args={}, result=content
-        )
-        slice_result = cap.read_spill("spill_0", offset=10, limit=10)
-        assert "0123456789" in slice_result
+        text = _result_text(result)
+        assert "read_tool_result" in text
+        assert "stored to handle" in text.lower() or "too large" in text.lower()
+        assert any(spill_dir.rglob("*"))
 
     @pytest.mark.anyio
     async def test_dict_result_spilled(
         self,
-        cap: OverflowingToolOutput[Any],
+        cap: ToolOutputLimits[Any],
         mock_ctx: MagicMock,
         mock_call: MagicMock,
         mock_tool_def: MagicMock,
@@ -191,37 +169,17 @@ class TestSpill:
         result = await cap.after_tool_execute(
             mock_ctx, call=mock_call, tool_def=mock_tool_def, args={}, result=data
         )
-        assert "read_tool_result" in result
+        assert "read_tool_result" in _result_text(result)
 
 
 class TestReadToolResult:
-    """The read_tool_result tool retrieves spilled content."""
+    """The read_tool_result tool is registered for spilled payloads."""
 
     def test_toolset_registered(self) -> None:
-        cap: OverflowingToolOutput[Any] = OverflowingToolOutput()
+        cap = build_overflow_capability()
         ts = cap.get_toolset()
         assert ts is not None
-
-    @pytest.mark.anyio
-    async def test_read_unknown_spill_id(self, cap: OverflowingToolOutput[Any]) -> None:
-        result = cap.read_spill("nonexistent")
-        assert "error" in result.lower()
-        assert "unknown" in result.lower()
-
-    @pytest.mark.anyio
-    async def test_read_spill_function(
-        self,
-        cap: OverflowingToolOutput[Any],
-        mock_ctx: MagicMock,
-        mock_call: MagicMock,
-        mock_tool_def: MagicMock,
-    ) -> None:
-        content = "payload_data" * 20  # > 100 threshold
-        await cap.after_tool_execute(
-            mock_ctx, call=mock_call, tool_def=mock_tool_def, args={}, result=content
-        )
-        result = cap.read_spill("spill_0", offset=0, limit=50)
-        assert "payload_data" in result
+        assert "read_tool_result" in ts.tools
 
 
 class TestSelfSkip:
@@ -230,7 +188,7 @@ class TestSelfSkip:
     @pytest.mark.anyio
     async def test_read_tool_result_bypassed(
         self,
-        cap: OverflowingToolOutput[Any],
+        cap: ToolOutputLimits[Any],
         mock_ctx: MagicMock,
         mock_tool_def: MagicMock,
     ) -> None:
@@ -249,37 +207,14 @@ class TestBuildHelper:
 
     def test_default_thresholds(self) -> None:
         cap = build_overflow_capability()
-        assert isinstance(cap, OverflowingToolOutput)
-        assert cap.truncate_floor == OVERFLOW_TRUNCATE_FLOOR
-        assert cap.spill_threshold == OVERFLOW_SPILL_THRESHOLD
+        assert isinstance(cap, ToolOutputLimits)
+        assert cap.bands[0].over == OVERFLOW_SPILL_THRESHOLD
 
     def test_custom_thresholds(self) -> None:
         cap = build_overflow_capability(truncate_floor=1024, spill_threshold=8192)
-        assert isinstance(cap, OverflowingToolOutput)
-        assert cap.truncate_floor == 1024
-        assert cap.spill_threshold == 8192
-
-
-class TestCleanup:
-    """Cleanup removes spill files."""
-
-    @pytest.mark.anyio
-    async def test_cleanup_removes_files(
-        self,
-        cap: OverflowingToolOutput[Any],
-        mock_ctx: MagicMock,
-        mock_call: MagicMock,
-        mock_tool_def: MagicMock,
-        spill_dir: Path,
-    ) -> None:
-        content = "q" * 200
-        await cap.after_tool_execute(
-            mock_ctx, call=mock_call, tool_def=mock_tool_def, args={}, result=content
-        )
-        assert (spill_dir / "spill_0.txt").exists()
-        cap.cleanup()
-        assert not (spill_dir / "spill_0.txt").exists()
-        assert len(cap._spills) == 0
+        assert isinstance(cap, ToolOutputLimits)
+        assert cap.bands[0].over == 8192
+        _ = OVERFLOW_TRUNCATE_FLOOR  # retained in API; factory accepts the kwarg
 
 
 class TestBuildTierBCapabilities:
@@ -292,7 +227,7 @@ class TestBuildTierBCapabilities:
 
         caps = build_tier_b_capabilities(hooks=Hooks())
         cap_names = [c.__class__.__name__ for c in caps]
-        assert "OverflowingToolOutput" in cap_names
+        assert "ToolOutputLimits" in cap_names
 
     def test_overflow_disabled(self) -> None:
         from pydantic_ai.capabilities.hooks import Hooks
@@ -301,4 +236,4 @@ class TestBuildTierBCapabilities:
 
         caps = build_tier_b_capabilities(hooks=Hooks(), overflow_on=False)
         cap_names = [c.__class__.__name__ for c in caps]
-        assert "OverflowingToolOutput" not in cap_names
+        assert "ToolOutputLimits" not in cap_names

@@ -131,9 +131,9 @@ def _tool_result_debug_fields(tool_name: str, result: object) -> dict[str, Any]:
     _ = tool_name
     # Unwrap CodeMode ``ToolReturn`` so the logged outcome reflects the real envelope (ok/error)
     # rather than ``parse_error``/``text`` on the wrapper repr (transcript-review-2026-06-22).
-    from sevn.agent.adapters.tier_b_overflow import _unwrap_tool_return
+    from pydantic_ai.messages import ToolReturn
 
-    unwrapped, _was_tool_return = _unwrap_tool_return(result)
+    unwrapped = result.return_value if isinstance(result, ToolReturn) else result
     outcome = "text"
     if isinstance(unwrapped, str):
         try:

@@ -69,8 +69,8 @@ from sevn.agent.adapters.tier_b_multimodal import (
     resolve_tier_b_modality_support,
     resolve_turn_media_items,
 )
-from sevn.agent.adapters.tier_b_overflow import build_overflow_capability
 from sevn.agent.adapters.tier_b_skill_capabilities import build_tier_b_skill_capabilities
+from sevn.agent.adapters.tier_b_tool_output_limits import build_overflow_capability
 from sevn.agent.adapters.tier_b_tools import (
     _NEVER_LAZY_NAMES,
     bound_file_search_tools,
@@ -889,7 +889,7 @@ def build_tier_b_capabilities(
         codemode_limits (Mapping[str, float | int] | None): Monty sandbox ``ResourceLimits``
             for ``CodeMode`` (duration/memory/allocations); ``None`` uses defaults.
         codemode_max_retries (int | None): ``run_code`` retry budget; ``None`` uses defaults.
-        overflow_on (bool): When ``True``, append ``OverflowingToolOutput`` (D6).
+        overflow_on (bool): When ``True``, append harness ``ToolOutputLimits`` (D6).
 
     Returns:
         list[AbstractCapability[BTierDeps]]: Capability list for ``Agent(capabilities=...)``.
