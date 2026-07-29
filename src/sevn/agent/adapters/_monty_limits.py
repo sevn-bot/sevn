@@ -12,7 +12,7 @@ execution-model drift), :func:`install_monty_resource_limits` raises :class:`Mon
 instead of silently skipping — the regression this module exists to prevent (2026-06-22 freeze).
 
 Upstream tracking (delete this patch when landed):
-https://github.com/pydantic/pydantic-ai-harness/issues/XXX
+https://github.com/pydantic/pydantic-ai-harness/issues/501
 
 Exports:
     MontyLimitInstallError — raised when limit injection cannot be installed.

@@ -1407,3 +1407,34 @@ See spec-36 (`about-sevn.bot/specs/36-sub-agents.md`) for the full orchestration
 ### 10.2 monty-013 W10 — harness Memory deferred — append-only
 
 **Decision: defer** wiring harness `Memory` into tier B. sevn already owns workspace-scoped memory via `MEMORY.md`, daily logs (`memory/YYYY-MM-DD.md`), SQLite short-term rows, federated `memory_search`, Dreaming promotion, LCM compaction, Honcho-style `user_model.json`, and second-brain wiki tools — all under operator/gateway policy rather than agent-initiated notebook writes. Harness `Memory` would add four tier-B tools (`write_memory`, `read_memory`, `delete_memory`, `search_memory`) with a separate namespaced `FileStore`, bounded `<memory>` injection, and optimistic-concurrency semantics that duplicate `memory_search` / bootstrap `write_bootstrap_markdown` without integrating Dreaming recall telemetry, deny-topics, or rollback manifests. Not a gap — a parallel notebook contract. Revisit only if tier B needs harness-native cross-session injection without sevn's existing stack.
+
+### 10.3 monty-013 W11 — pydantic-ai v2 + harness 0.13 stack — append-only
+
+Tier B runs on **pydantic-ai** `>=2.14.1,<3` (resolved 2.20.0) and **pydantic-ai-harness** `>=0.13,<0.14` (0.13.0) with **pydantic-monty** 0.0.19. Capabilities assemble exclusively via `build_tier_b_capabilities()` → `Agent(capabilities=…)` (no constructor-arg migration leftovers). OTel usage attributes hold v4 shape via `use_aggregated_usage_attribute_names=False` (D11). `pydantic-evals` re-resolves to the v2 line (D12; golden-LLM re-run at Final).
+
+### 10.4 monty-013 W11 — harness replacements (D7) — append-only
+
+| Former sevn shim | Harness / successor | Preserved behavior |
+|---|---|---|
+| `tier_b_overflow.py` | `ToolOutputLimits` via `tier_b_tool_output_limits.build_overflow_capability` | Full inline content ≤ 1 MiB; pathological spills paged via `read_tool_result` |
+| `tier_b_skill_capabilities.py` | harness `Skills` via `tier_b_skills.build_tier_b_skill_capabilities` | Triager-scoped defer-load; staged `SKILL.md` frontmatter; `sevn_run_skill_script` → `ToolExecutor.dispatch` |
+| permission / round-budget / approval hooks | `TierB*GuardrailCapability` adapters (`tier_b_guardrails.py`) | Parity with former `tier_b_hooks` handlers; steer + grounding + fetch-round-cap remain sevn hooks |
+
+### 10.5 monty-013 W11 — CodeMode sandbox (W3, D5/D6/D13) — append-only
+
+`SevnAsyncCodeMode` / `SevnAsyncCodeModeToolset` (`tier_b_async_codemode.py`) replace sync harness CodeMode so tier-B `asyncio.wait_for` can interrupt runaway `run_code` (D13). Monty `ResourceLimits` (`DEFAULT_CODEMODE_*`) inject via fail-loud `Monty.checkout` / `AsyncMonty.checkout` patch in `_monty_limits.py` (D5) — `MontyLimitInstallError` if the target vanishes. Upstream [#501](https://github.com/pydantic/pydantic-ai-harness/issues/501) tracks porting `DynamicWorkflow.resource_limits` to `CodeMode` so the patch can be deleted (D6).
+
+### 10.6 monty-013 W11 — opt-in harness capabilities (D9, default off) — append-only
+
+| Flag | Harness capability | Module |
+|---|---|---|
+| `DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED` | compaction menu (`TieredCompaction`, …) | `tier_b_compaction.py` |
+| `DEFAULT_TIER_B_CACHE_STABILITY_MONITOR_ENABLED` | `WarnOnCacheBusts` | `tier_b_cache_stability.py` |
+| `DEFAULT_CODEMODE_DYNAMIC_CATALOG` | `CodeMode(dynamic_catalog=True)` | `tier_b_codemode.py` |
+
+### 10.7 monty-013 W11 — sevn-owned surfaces kept — append-only
+
+- **Web research:** `WebSearch` / `WebFetch` with provider-adaptive native attempt + local `ddgs` / `get_page_content` registry fallback — harness Exa web research rejected (D8).
+- **Model transport:** OpenAI Chat Completions `FunctionModel` bridge + MiniMax wrapper migrated in place (`tier_b_model.py`); provider-prefixed model names via `normalize_tier_b_model_name`.
+- **Lazy tools:** `PrepareTools(prepare_lazy_tool_definitions)` + `SevnRegistryToolset` re-entry through `ToolExecutor.dispatch`.
+- **Deferred (see §10.1–10.2):** harness `SubAgents`, `DynamicWorkflow`, `Memory`.

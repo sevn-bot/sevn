@@ -580,3 +580,11 @@ reusing ``TelegramWeb`` inline-keyboard primitives. Destructive menu rows are de
 | `tests/browser/test_telegram_checks_w1_red.py` | `telegram_checks.run_checks` / `assert_send_receive` (mocked) |
 | `make telegram-checks` | Host Bot-API `getMe` via `python -m sevn.browser.recipes.telegram_checks` |
 | `make skillspector-check` | Bundled skill inventory (CI skills tier) |
+
+## 10. Build Checklist
+
+### 10.1 monty-013 W11 — harness Skills + CodeMode tool eligibility — append-only
+
+**Skills (W5):** Tier B exposes operator skills as harness deferred `Skills` capabilities (`tier_b_skills.build_tier_b_skill_capabilities`). Triager-named skill ids scope the include list; each `SKILL.md` is staged to an ephemeral `.sevn-harness-skills/` tree with frontmatter preserved. Script dispatch stays on `sevn_run_skill_script` → `ToolExecutor.dispatch` (same registry contract as native tools).
+
+**CodeMode (W3/W7):** Registry tools marked `code_mode=True` are eligible for the Monty `run_code` sandbox when triage enables CodeMode. Host-side tool calls from sandboxed snippets re-enter `ToolExecutor.dispatch` via the harness function catalog. `SevnAsyncCodeMode` is the tier-B backend; Monty `ResourceLimits` are injected at pool checkout (`_monty_limits.py`, D5/D6). Opt-in `dynamic_catalog` (default off, D9) keeps the `run_code` tool definition byte-stable across lazy tool discovery.
