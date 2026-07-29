@@ -69,7 +69,7 @@ from sevn.agent.adapters.tier_b_multimodal import (
     resolve_tier_b_modality_support,
     resolve_turn_media_items,
 )
-from sevn.agent.adapters.tier_b_skill_capabilities import build_tier_b_skill_capabilities
+from sevn.agent.adapters.tier_b_skills import build_tier_b_skill_capabilities
 from sevn.agent.adapters.tier_b_tool_output_limits import build_overflow_capability
 from sevn.agent.adapters.tier_b_tools import (
     _NEVER_LAZY_NAMES,
@@ -1181,6 +1181,7 @@ async def run_b_turn(
             config=workspace,
             trace_sink=trace,
         ),
+        workspace_path=Path(tool_context.workspace_path),
     )
     tool_allowlist = MutableToolAllowlist(
         base=bound_tool_names,

@@ -10,9 +10,11 @@ from pydantic_ai import Agent, RunContext
 from pydantic_ai.messages import ModelResponse, TextPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage
+from pydantic_ai_harness.skills import Skills
 
-from sevn.agent.adapters.tier_b_skill_capabilities import (
+from sevn.agent.adapters.tier_b_skills import (
     SkillCapabilitySource,
+    build_harness_skills_capability,
     build_tier_b_skill_capabilities,
     sevn_run_skill_script,
     skill_capability,
@@ -55,18 +57,18 @@ def _run_ctx(deps: BTierDeps) -> RunContext[BTierDeps]:
     return RunContext(deps=deps, model=MagicMock(), usage=RunUsage())
 
 
-@pytest.mark.xfail(reason="green after W5: harness Skills import + wiring", strict=False)
 def test_build_tier_b_skill_capabilities_uses_harness_module() -> None:
     caps = build_tier_b_skill_capabilities(
         triage_skills=["pdf"],
         skill_descriptions={"pdf": "PDF helpers"},
         skills_manager=None,
+        workspace_path=Path("/tmp"),
     )
     assert caps
+    assert isinstance(caps[0], Skills)
     assert caps[0].__class__.__module__.startswith("pydantic_ai_harness")
 
 
-@pytest.mark.xfail(reason="green after W5: defer_load + instructions parity (D7)", strict=False)
 @pytest.mark.asyncio
 async def test_harness_skills_match_sevn_instructions_and_defer_load(
     tmp_path: Path,
@@ -77,20 +79,22 @@ async def test_harness_skills_match_sevn_instructions_and_defer_load(
     skill_dir = tmp_path / "pdf"
     skill_dir.mkdir()
     body = "Runbook body for pdf skill."
-    (skill_dir / "SKILL.md").write_text(f"# PDF\n\n{body}\n", encoding="utf-8")
+    (skill_dir / "SKILL.md").write_text(
+        f"---\nname: pdf\ndescription: PDF helpers\n---\n\n{body}\n",
+        encoding="utf-8",
+    )
 
     sevn_cap = skill_capability(
         SkillCapabilitySource("pdf", "PDF helpers", body),
     )
-    harness_caps = skills_cls(directories=[tmp_path]).capabilities
+    harness_caps = skills_cls(directories=[tmp_path])._deferred_capabilities
     harness_pdf = next(c for c in harness_caps if getattr(c, "id", "") == "pdf")
 
     assert sevn_cap.defer_loading is True
     assert harness_pdf.defer_loading is True
-    assert body in (harness_pdf.instructions or "")
+    assert body in "".join(harness_pdf.get_instructions())
 
 
-@pytest.mark.xfail(reason="green after W5: sevn_run_skill_script dispatch parity", strict=False)
 @pytest.mark.asyncio
 async def test_harness_skills_dispatch_sevn_run_skill_script() -> None:
     skills_cls = _harness_skills_cls()
@@ -98,8 +102,8 @@ async def test_harness_skills_dispatch_sevn_run_skill_script() -> None:
 
     dispatched: list[str] = []
 
-    async def fake_dispatch(self: ToolExecutor, call: ToolCall, ctx: ToolContext) -> object:
-        dispatched.append(call.tool_name)
+    async def fake_dispatch(ctx: ToolContext, call: ToolCall) -> object:
+        dispatched.append(call.name)
         return {"ok": True}
 
     exe = ToolExecutor()
@@ -107,27 +111,29 @@ async def test_harness_skills_dispatch_sevn_run_skill_script() -> None:
     deps = _deps(executor=exe)
     ctx = _run_ctx(deps)
 
-    await sevn_run_skill_script(ctx, skill_id="pdf", script="scripts/run.py", args={})
-    assert dispatched == ["run_skill_script"]
-
-    harness_builder = getattr(
-        __import__("sevn.agent.adapters.tier_b_skill_capabilities", fromlist=["x"]),
-        "build_harness_skills_capability",
-        None,
+    await sevn_run_skill_script(
+        ctx,
+        skill="pdf",
+        script="scripts/run.py",
+        argv=[],
     )
-    assert harness_builder is not None, "W5 must expose harness Skills builder with dispatch hook"
+    assert dispatched == ["run_skill_script"]
 
     async def model_fn(messages: list[object], info: MagicMock) -> ModelResponse:
         return ModelResponse(parts=[TextPart(content="ok")])
 
+    skills_cap = build_harness_skills_capability(
+        triage_skills=["pdf"],
+        skill_descriptions={"pdf": "PDF"},
+        skills_manager=None,
+        workspace_path=Path("/tmp"),
+    )
+    assert skills_cap is not None
+
     agent = Agent(
         FunctionModel(model_fn),
         deps_type=BTierDeps,
-        capabilities=harness_builder(
-            triage_skills=["pdf"],
-            skill_descriptions={"pdf": "PDF"},
-            skills_manager=None,
-        ),
+        capabilities=[skills_cap],
     )
     await agent.run("skill dispatch", deps=deps)
     assert "run_skill_script" in dispatched
