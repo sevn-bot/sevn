@@ -6,6 +6,12 @@ must match it so local ``make review`` runs the same reviewed code as CI. Nothin
 else enforces that invariant, so a one-sided bump would silently break it — this
 gate makes such drift fail CI (wired into ``make ci-parity``).
 
+Ref *equality* is all this checks — it does not require a SHA. GitHub does: the
+``sevn-bot`` org enforces Actions SHA pinning, so a branch ref in the workflow is
+rejected at action-resolution time regardless of what this gate says. The ref
+grammar here stays permissive so a local ``SEVN_MERGECRAFT_REF`` branch override
+and any future policy change need no edit.
+
 Module: scripts.check_mergecraft_ref_parity
 Depends: re, pathlib, sys
 
@@ -28,8 +34,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "mergecraft.yml"
 MAKEFILE = REPO_ROOT / "Makefile"
 
-# `uses: alexhawat/mergeCraft@<ref>` in the workflow.
-_WORKFLOW_RE = re.compile(r"uses:\s*alexhawat/mergeCraft@(?P<ref>[0-9a-fA-F]{7,40})\b")
+# `uses: alexhawat/mergeCraft@<ref>` in the workflow. CI must carry a full SHA (org
+# SHA-pinning policy), but match any git ref characters up to the trailing
+# ` # <branch>` comment rather than hex only, so the gate still reports real drift
+# instead of "no pin found" if the ref is ever something else.
+_WORKFLOW_RE = re.compile(r"uses:\s*alexhawat/mergeCraft@(?P<ref>[^\s#]+)")
 # `MERGECRAFT_REF ?= $(if $(SEVN_MERGECRAFT_REF),$(SEVN_MERGECRAFT_REF),<ref>)`
 # in the Makefile — the default (third) argument is the pinned ref.
 _MAKEFILE_RE = re.compile(
@@ -70,11 +79,11 @@ def main() -> int:
             "mergecraft-ref-check: mergeCraft pin drift —\n"
             f"  workflow (.github/workflows/mergecraft.yml): {workflow_ref}\n"
             f"  Makefile (MERGECRAFT_REF default):           {makefile_ref}\n"
-            "Bump both to the same SHA so local `make review` matches CI.",
+            "Set both to the same ref so local `make review` matches CI.",
             file=sys.stderr,
         )
         return 1
-    print(f"mergecraft-ref-check: ok — both pinned to {workflow_ref}", file=sys.stderr)
+    print(f"mergecraft-ref-check: ok — both on {workflow_ref}", file=sys.stderr)
     return 0
 
 

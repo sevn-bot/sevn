@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -11,7 +12,7 @@ SCRIPT = REPO / "scripts" / "check_mergecraft_ref_parity.py"
 
 
 def test_check_mergecraft_ref_parity_exits_zero() -> None:
-    """Against the real repo, the workflow and Makefile pins match → exit 0."""
+    """Against the real repo, the workflow and Makefile refs match → exit 0."""
     proc = subprocess.run(
         [sys.executable, str(SCRIPT)],
         cwd=REPO,
@@ -29,12 +30,17 @@ def test_check_mergecraft_ref_parity_detects_drift(tmp_path: Path) -> None:
 
     (tmp_path / ".github" / "workflows").mkdir(parents=True)
     (tmp_path / ".github" / "workflows" / "mergecraft.yml").write_text(workflow, encoding="utf-8")
-    # Force drift: swap the Makefile default ref to a different value.
-    drifted = makefile.replace(
-        "$(SEVN_MERGECRAFT_REF),b8e83a82e97ed537706d9a712e59af9ef031588f)",
-        "$(SEVN_MERGECRAFT_REF),0000000000000000000000000000000000000000)",
+    # Force drift: swap the Makefile default ref to a different value. Matched by
+    # pattern rather than by literal so this fixture survives future ref changes
+    # (SHA -> branch and back) without needing an edit here.
+    drifted, count = re.subn(
+        r"(MERGECRAFT_REF\s*\?=\s*\$\(if\s*\$\(SEVN_MERGECRAFT_REF\)\s*,\s*"
+        r"\$\(SEVN_MERGECRAFT_REF\)\s*,\s*)[^),\s]+(\s*\))",
+        r"\1definitely-not-the-workflow-ref\2",
+        makefile,
     )
-    assert drifted != makefile, "test fixture must actually change the pinned ref"
+    assert count == 1, "test fixture must match exactly one MERGECRAFT_REF default"
+    assert drifted != makefile, "test fixture must actually change the ref"
     (tmp_path / "Makefile").write_text(drifted, encoding="utf-8")
     (tmp_path / "scripts").mkdir()
     (tmp_path / "scripts" / "check_mergecraft_ref_parity.py").write_text(
