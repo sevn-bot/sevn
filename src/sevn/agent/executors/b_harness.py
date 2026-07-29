@@ -150,6 +150,7 @@ from sevn.config.model_resolution import (
     tier_b_cache_stability_monitor_enabled,
     tier_b_history_compaction_enabled,
     tier_b_history_compaction_strategy,
+    tier_b_history_compaction_target_tokens,
 )
 from sevn.config.sections.providers import providers_section_dict
 from sevn.config.settings import ProcessSettings
@@ -888,6 +889,7 @@ def build_tier_b_capabilities(
     overflow_on: bool = True,
     history_compaction_enabled: bool | None = None,
     history_compaction_strategy: str | None = None,
+    history_compaction_target_tokens: int | None = None,
     cache_stability_monitor_enabled: bool | None = None,
     codemode_dynamic_catalog: bool | None = None,
 ) -> list[AbstractCapability[BTierDeps]]:
@@ -911,6 +913,8 @@ def build_tier_b_capabilities(
             (D9). ``None`` uses :data:`DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED` (default off).
         history_compaction_strategy (str | None): Compaction menu entry; ``None`` uses
             :data:`DEFAULT_TIER_B_HISTORY_COMPACTION_STRATEGY`.
+        history_compaction_target_tokens (int | None): Token budget for compaction;
+            ``None`` uses :data:`DEFAULT_TIER_B_HISTORY_COMPACTION_TARGET_TOKENS`.
         cache_stability_monitor_enabled (bool | None): When ``True``, append harness
             ``WarnOnCacheBusts`` (D9). ``None`` uses
             :data:`DEFAULT_TIER_B_CACHE_STABILITY_MONITOR_ENABLED` (default off).
@@ -936,6 +940,7 @@ def build_tier_b_capabilities(
         build_compaction_capability,
     )
     from sevn.agent.adapters.tier_b_guardrails import build_tier_b_guardrail_capabilities
+    from sevn.config.defaults import DEFAULT_TIER_B_HISTORY_COMPACTION_TARGET_TOKENS
 
     compaction_on = (
         DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED
@@ -956,6 +961,11 @@ def build_tier_b_capabilities(
         "TierBHistoryCompactionStrategy",
         history_compaction_strategy or DEFAULT_TIER_B_HISTORY_COMPACTION_STRATEGY,
     )
+    compaction_target_tokens = (
+        DEFAULT_TIER_B_HISTORY_COMPACTION_TARGET_TOKENS
+        if history_compaction_target_tokens is None
+        else history_compaction_target_tokens
+    )
     capabilities: list[AbstractCapability[BTierDeps]] = [
         cast("AbstractCapability[BTierDeps]", instrumentation_capability()),
         cast("AbstractCapability[BTierDeps]", hooks),
@@ -968,7 +978,10 @@ def build_tier_b_capabilities(
         capabilities.append(
             cast(
                 "AbstractCapability[BTierDeps]",
-                build_compaction_capability(strategy=compaction_strategy),
+                build_compaction_capability(
+                    strategy=compaction_strategy,
+                    target_tokens=compaction_target_tokens,
+                ),
             )
         )
     if cache_monitor_on:
@@ -1481,6 +1494,7 @@ async def run_b_turn(
             codemode_max_retries=codemode_max_retries(workspace),
             history_compaction_enabled=tier_b_history_compaction_enabled(workspace),
             history_compaction_strategy=tier_b_history_compaction_strategy(workspace),
+            history_compaction_target_tokens=tier_b_history_compaction_target_tokens(workspace),
             cache_stability_monitor_enabled=tier_b_cache_stability_monitor_enabled(workspace),
             codemode_dynamic_catalog=codemode_dynamic_catalog(workspace),
         ),

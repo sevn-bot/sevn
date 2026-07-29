@@ -21,6 +21,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-29] Tier-B history compaction honors ``agent.history_compaction.target_tokens`` from ``sevn.json`` — previously validated in schema but silently ignored at capability assembly
 - [2026-07-29] Thermos tier-B hardening: human-gated tools stay native outside CodeMode; D9 opt-in toggles wired through ``agent.history_compaction`` / ``agent.cache_stability`` / ``agent.codemode.dynamic_catalog``; fail-loud async CodeMode backend probe
 - [2026-07-28] Operator sync branch names from config, env, and CLI flags are validated before git subprocess use; daily repo-sync cron stays ff-only with divergence recovery (force-reset remains on ``sevn update`` / ``--latest``)
 - [2026-07-27] Thermos hardening for Telegram ``/config``: owner gates on W7 mutators/forms, readiness enforcement at dispatch, user-scoped secrets export/deploy confirms, redacted ``act:config:show``, CLI slug aliases, ``secrets_export`` dispatcher kind, and ``owner_only`` registry flags on security/deployment toggles

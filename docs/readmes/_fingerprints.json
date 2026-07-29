@@ -2,8 +2,8 @@
   "entries": {
     "agent": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-29T21:40:39Z",
-      "digest": "404bc6efd73c8e9008c2e6ebd3c4f696ac53dd2ecf2c0d54338705c56b346bd5",
+      "computed_at": "2026-07-29T21:51:02Z",
+      "digest": "12d564951f4e404d5e0bb6cbed8754e8a843ca4e9969b389d130dd45af6a22fe",
       "source_globs": [
         "src/sevn/agent/**"
       ]
@@ -26,8 +26,8 @@
     },
     "config-workspace": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-29T21:40:58Z",
-      "digest": "eff29d9318847560944db6dbcdc568fef584777374b5655835e28d3943500cc1",
+      "computed_at": "2026-07-29T21:51:02Z",
+      "digest": "6c2f0282d39999b077217d041ab53ea6d576ddeed5b7e1a7fb28800b6bdb1e37",
       "source_globs": [
         "src/sevn/config/**",
         "src/sevn/workspace/**",

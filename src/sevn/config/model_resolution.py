@@ -30,6 +30,7 @@ Exports:
     codemode_dynamic_catalog — read ``agent.codemode.dynamic_catalog`` (default false, D9).
     tier_b_history_compaction_enabled — read ``agent.history_compaction.enabled`` (default false).
     tier_b_history_compaction_strategy — read ``agent.history_compaction.strategy``.
+    tier_b_history_compaction_target_tokens — read ``agent.history_compaction.target_tokens``.
     tier_b_cache_stability_monitor_enabled — read ``agent.cache_stability.enabled`` (default false).
     diagnostics_agent_enabled — read ``agent.diagnostics.enabled`` (default true, W4).
     resolve_diagnostics_model — ``agent.diagnostics.model`` or tier-B default; ``--model`` wins.
@@ -56,6 +57,7 @@ from sevn.config.defaults import (
     DEFAULT_TIER_B_CACHE_STABILITY_MONITOR_ENABLED,
     DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED,
     DEFAULT_TIER_B_HISTORY_COMPACTION_STRATEGY,
+    DEFAULT_TIER_B_HISTORY_COMPACTION_TARGET_TOKENS,
     DEFAULT_USE_MAIN_MODEL_FOR_ALL,
 )
 from sevn.config.errors import TriagerUnavailable
@@ -802,6 +804,30 @@ def tier_b_history_compaction_strategy(cfg: object) -> str:
     if raw in ("tiered", "summarizing", "clear_tool_results", "clamp_oversized"):
         return str(raw)
     return DEFAULT_TIER_B_HISTORY_COMPACTION_STRATEGY
+
+
+def tier_b_history_compaction_target_tokens(cfg: object) -> int:
+    """Resolve compaction token budget from ``agent.history_compaction.target_tokens``.
+
+    Args:
+        cfg (object): Parsed workspace settings.
+
+    Returns:
+        int: Token budget for ``TieredCompaction`` escalation stop.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> tier_b_history_compaction_target_tokens(WorkspaceConfig.minimal())
+        80000
+    """
+    agent = _agent_dict(cfg)
+    block = agent.get("history_compaction")
+    if not isinstance(block, dict):
+        return DEFAULT_TIER_B_HISTORY_COMPACTION_TARGET_TOKENS
+    raw = block.get("target_tokens")
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 1:
+        return DEFAULT_TIER_B_HISTORY_COMPACTION_TARGET_TOKENS
+    return raw
 
 
 def tier_b_cache_stability_monitor_enabled(cfg: object) -> bool:
