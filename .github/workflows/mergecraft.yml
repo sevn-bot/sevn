@@ -13,13 +13,21 @@
 # Auth: only CLAUDE_CODE_OAUTH_TOKEN is required (Claude subscription); the job
 # skips gracefully when it is absent (e.g. fork PRs).
 #
+# Trigger: pull_request_target (not pull_request). GitHub skips pull_request
+# workflows when refs/pull/N/merge cannot be built (merge conflicts), which
+# leaves ruleset require-mergecraft-review with a permanently missing check.
+# pull_request_target always fires; workflow YAML is always read from the base
+# branch. Same-repo guard below keeps fork PRs from receiving secrets (prior
+# pull_request behavior). mergeCraft uses checkout_pr + API with push/shell
+# disabled — no PR-controlled scripts run in CI.
+#
 # Merge gate: ruleset `require-mergecraft-review` requires the **mergeCraft
 # review** job check only — not the raw `mergecraft` completion check (which goes
 # red on agent infra failures while the enforce step correctly fail-opens).
 name: mergecraft
 
 on:
-  pull_request:
+  pull_request_target:
     # `pre-*` glob keeps every release-staging branch (pre-0.0.1, pre-0.0.2, …)
     # auto-reviewed without editing this list each cut (matches the old
     # .coderabbit.yaml `pre-.*` coverage).
@@ -55,7 +63,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      HAS_CLAUDE_CODE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+      IS_SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+      HAS_CLAUDE_CODE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' && github.event.pull_request.head.repo.full_name == github.repository }}
 
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
@@ -70,7 +79,7 @@ jobs:
           persist-credentials: true
 
       - name: Ensure PR base ref exists locally
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request_target'
         run: |
           set -euo pipefail
           base="${{ github.event.pull_request.base.ref }}"
@@ -80,7 +89,11 @@ jobs:
       - name: Skip when Claude subscription auth is not configured
         if: env.HAS_CLAUDE_CODE != 'true'
         run: |
-          echo "::notice title=mergecraft skipped::Configure CLAUDE_CODE_OAUTH_TOKEN to enable mergeCraft reviews (fork PRs run without secrets)."
+          if [ "${{ env.IS_SAME_REPO }}" != "true" ]; then
+            echo "::notice title=mergecraft skipped::Fork PR — review skipped (same as before)."
+          else
+            echo "::notice title=mergecraft skipped::Configure CLAUDE_CODE_OAUTH_TOKEN to enable mergeCraft reviews."
+          fi
 
       - name: mergeCraft PR review (Claude subscription)
         if: env.HAS_CLAUDE_CODE == 'true'
@@ -98,7 +111,7 @@ jobs:
           # For pull_request events, name the PR number explicitly so the agent
           # calls checkout_pr(<n>) instead of asking which PR to review.
           prompt: >-
-            ${{ (github.event_name == 'pull_request' && format('Review pull request #{0}. Call checkout_pr first. For base-side file reads use origin/{1}:path, not bare branch names. If prior mergeCraft threads are resolved and the latest commits address them, submit approved:true with a short summary. Focus on correctness, security, regressions, missing tests, and maintainability. Leave concise, actionable comments only for issues that should be addressed before merge.', github.event.pull_request.number, github.event.pull_request.base.ref))
+            ${{ (github.event_name == 'pull_request_target' && format('Review pull request #{0}. Call checkout_pr first. For base-side file reads use origin/{1}:path, not bare branch names. If prior mergeCraft threads are resolved and the latest commits address them, submit approved:true with a short summary. Focus on correctness, security, regressions, missing tests, and maintainability. Leave concise, actionable comments only for issues that should be addressed before merge.', github.event.pull_request.number, github.event.pull_request.base.ref))
                 || (github.event_name == 'workflow_dispatch' && inputs.prompt != '' && inputs.prompt)
                 || 'Review the current pull request.' }}
           model: anthropic/claude-sonnet
@@ -119,7 +132,7 @@ jobs:
         # hiccup even when the review + approval check posted fine). Runs on every
         # PR where auth is present.
         if: >-
-          github.event_name == 'pull_request' &&
+          github.event_name == 'pull_request_target' &&
           env.HAS_CLAUDE_CODE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
