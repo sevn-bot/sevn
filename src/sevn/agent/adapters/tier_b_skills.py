@@ -83,13 +83,13 @@ def _harness_skill_name(sevn_skill_id: str) -> str:
 
 def _write_ephemeral_skill_library(
     sources: Sequence[SkillCapabilitySource],
-    staging_root: Path,
+    library: Path,
 ) -> Path:
     """Materialize harness-valid ``SKILL.md`` packages from resolved sevn metadata.
 
     Args:
         sources (Sequence[SkillCapabilitySource]): Resolved skill rows for this turn.
-        staging_root (Path): Workspace root receiving ``.sevn-harness-skills/``.
+        library (Path): Per-turn staging directory (typically a process tempdir).
 
     Returns:
         Path: Staged skill-library directory passed to harness ``Skills``.
@@ -97,12 +97,11 @@ def _write_ephemeral_skill_library(
     Examples:
         >>> lib = _write_ephemeral_skill_library(
         ...     [SkillCapabilitySource("pdf", "PDF helpers", "body")],
-        ...     Path("/tmp/ws"),
+        ...     Path("/tmp/sevn-harness-skills-abc"),
         ... )
         >>> (lib / "pdf" / "SKILL.md").is_file()
         True
     """
-    library = staging_root / ".sevn-harness-skills"
     library.mkdir(parents=True, exist_ok=True)
     for src in sources:
         harness_name = _harness_skill_name(src.skill_id)
@@ -117,14 +116,11 @@ def _write_ephemeral_skill_library(
 
 def _resolve_skill_directories(
     sources: Sequence[SkillCapabilitySource],
-    *,
-    workspace_path: Path | None,
 ) -> tuple[tuple[Path, ...], frozenset[str]]:
     """Stage harness-compatible skill libraries and the triager ``include`` set.
 
     Args:
         sources (Sequence[SkillCapabilitySource]): Resolved skill rows for this turn.
-        workspace_path (Path | None): Workspace root for ephemeral staging.
 
     Returns:
         tuple[tuple[Path, ...], frozenset[str]]: Library paths and harness include names.
@@ -132,15 +128,14 @@ def _resolve_skill_directories(
     Examples:
         >>> dirs, include = _resolve_skill_directories(
         ...     [SkillCapabilitySource("pdf", "PDF helpers", "body")],
-        ...     workspace_path=Path("/tmp/ws"),
         ... )
         >>> include
         frozenset({'pdf'})
     """
-    if workspace_path is None:
-        msg = "workspace_path required to stage harness skill libraries"
-        raise ValueError(msg)
-    library = _write_ephemeral_skill_library(sources, workspace_path)
+    library = _write_ephemeral_skill_library(
+        sources,
+        Path(tempfile.mkdtemp(prefix="sevn-harness-skills-")),
+    )
     include = frozenset(_harness_skill_name(src.skill_id) for src in sources)
     return (library,), include
 
@@ -262,7 +257,8 @@ def build_harness_skills_capability(
         triage_skills (Sequence[str]): Triager-narrowed skill ids for this turn.
         skill_descriptions (Mapping[str, str]): Registered skill summaries from the toolset.
         skills_manager (SkillsManager | None): Optional manager for ``SKILL.md`` bodies.
-        workspace_path (Path | None): Workspace root for harness-compatible staging.
+        workspace_path (Path | None): Retained for call-site compatibility; skill
+            packages are staged in a per-turn process tempdir, not under the workspace.
 
     Returns:
         Skills[BTierDeps] | None: Configured harness capability, or ``None`` when empty.
@@ -285,10 +281,7 @@ def build_harness_skills_capability(
     if not sources:
         return None
 
-    directories, include = _resolve_skill_directories(
-        sources,
-        workspace_path=workspace_path,
-    )
+    directories, include = _resolve_skill_directories(sources)
     skills = Skills[BTierDeps](directories=directories, include=sorted(include))
     _remap_capability_ids(skills, sources)
     _attach_dispatch_tools(skills)
@@ -308,7 +301,8 @@ def build_tier_b_skill_capabilities(
         triage_skills (Sequence[str]): Triager-narrowed skill ids for this turn.
         skill_descriptions (Mapping[str, str]): Registered skill summaries from the toolset.
         skills_manager (SkillsManager | None): Optional manager for ``SKILL.md`` bodies.
-        workspace_path (Path | None): Workspace root for harness-compatible staging.
+        workspace_path (Path | None): Retained for call-site compatibility; skill
+            packages are staged in a per-turn process tempdir, not under the workspace.
 
     Returns:
         list[AbstractCapability[BTierDeps]]: Empty when no skills are listed; otherwise one
