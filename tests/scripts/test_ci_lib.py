@@ -50,6 +50,12 @@ def test_match_path_rules_spec_kit_wave() -> None:
     assert targets == ["about-docs-check"]
 
 
+def test_match_path_rules_faq_check() -> None:
+    assert match_path_rules(["docs/faq/qa_input.json"]) == ["faq-check"]
+    assert match_path_rules(["src/sevn/docs/faq.py"]) == ["faq-check"]
+    assert match_path_rules(["scripts/generate_faq.py"]) == ["faq-check"]
+
+
 def test_discover_related_tests_includes_paired_file() -> None:
     src = REPO_ROOT / "src/sevn/gateway/bootstrap/bootstrap_capture.py"
     tests = discover_related_tests([src])
