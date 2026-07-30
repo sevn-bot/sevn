@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- [2026-07-30] `make ci-resume` now walks `mergecraft-ref-check` — the mergeCraft pin gate is in `CI_STEPS` alongside the other `ci-parity` steps, and tier↔resume parity is enforced by `tests/infra/test_ci_steps_tier_parity.py` instead of a Makefile comment alone
 - [2026-07-30] `make mergecraft-ref-check` now reads the mergeCraft action pin from `origin/main` — the workflow copy GitHub actually runs — instead of an inert trunk copy that was compared against the Makefile while the executing pin went unchecked; a pin bumped only on `main` is no longer invisible to `make ci`. The trunk copy of `.github/workflows/mergecraft.yml` is deleted, so workflow edits are a single PR against `main` rather than two mirrored ones. The gate skips with a warning when `origin/main` is unreachable locally, and hard-fails under `CI`; override the compared ref with `SEVN_MERGECRAFT_WORKFLOW_REF`
 - [2026-07-29] Tier-B stack staged on `pydantic-ai` 1.107 and `pydantic-ai-harness` 0.4 ahead of the v2 cutover — web capability and CodeMode behavior unchanged; clears v1 deprecation warnings on the adapter surface
 - [2026-07-29] **Breaking:** tier-B stack migrated to `pydantic-ai` v2.20 + `pydantic-ai-harness` 0.13 / Monty 0.0.19 — `SevnAsyncCodeMode` replaces sync harness CodeMode; Monty `ResourceLimits` injected via fail-loud `checkout` patch ([upstream #501](https://github.com/pydantic/pydantic-ai-harness/issues/501))

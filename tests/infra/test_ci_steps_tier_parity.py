@@ -6,8 +6,6 @@ import re
 import subprocess
 from pathlib import Path
 
-import pytest
-
 REPO = Path(__file__).resolve().parents[2]
 
 _TIER_ORDER = ("ci-core", "ci-infra", "ci-docs", "ci-skills", "ci-parity")
@@ -20,7 +18,8 @@ def _makefile_text() -> str:
 def _tier_prerequisites(makefile: str, tier: str) -> list[str]:
     match = re.search(rf"^{tier}:\s*(.+)$", makefile, re.MULTILINE)
     assert match is not None, f"missing Makefile tier {tier!r}"
-    return match.group(1).split()
+    raw = match.group(1).split(" ## ", 1)[0]
+    return raw.split()
 
 
 def _flattened_tier_steps(makefile: str) -> list[str]:
@@ -53,7 +52,6 @@ def _make_ci_steps() -> list[str]:
     return proc.stdout.strip().split()
 
 
-@pytest.mark.xfail(reason="green after W2: CI_STEPS matches flattened tiers", strict=False)
 def test_ci_steps_matches_flattened_tier_prerequisites() -> None:
     """W1.1: ``make ci-steps`` must equal flattened ci-* tier lists from the Makefile."""
     makefile = _makefile_text()
@@ -62,7 +60,6 @@ def test_ci_steps_matches_flattened_tier_prerequisites() -> None:
     assert actual == expected
 
 
-@pytest.mark.xfail(reason="green after W2: mergecraft-ref-check in CI_STEPS", strict=False)
 def test_mergecraft_ref_check_reachable_from_ci_resume() -> None:
     """W1.2: pin gate must appear in ``CI_STEPS`` so ``ci-resume`` cannot skip it."""
     makefile = _makefile_text()
