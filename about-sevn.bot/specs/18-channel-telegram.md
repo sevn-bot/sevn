@@ -534,6 +534,13 @@ persona/display-name — not the run inventory. Menu-action callback toasts use 
 inline answer fails, identity buttons (Version id / Deployment id) still emit chat fallback
 text. Slash `/stop` kill callbacks re-edit the picker message and ack the callback query.
 
+## Amendments (open-issues-sweep W10 — #88)
+
+Slash `/model --once <provider/model>` sets a one-turn model override for the
+active chat session without persisting to `sevn.json`. The operator sees staged
+vs persisted model on `/status`; the menu registry notes `/model toggle` and
+`--once` on the B8 slash row.
+
 ## Amendments (telegram-menu-redesign W9)
 
 Telegram `/config` ships an eight-tile root keyboard (Chat, Agent, Skills & Tools, Memory,

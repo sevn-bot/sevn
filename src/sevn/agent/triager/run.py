@@ -1196,6 +1196,7 @@ async def triage_turn(
     turn_span_id: str | None = None,
     channel: str = "",
     scope_key: str | None = None,
+    session_once_model: str | None = None,
 ) -> TriageResult:
     """Run one structured routing pass (`specs/13` §2).
     Args:
@@ -1211,6 +1212,7 @@ async def triage_turn(
         turn_span_id (str | None): Turn root span id (``gateway.turn.start`` parent).
         channel (str): Active channel adapter name for turn-scoped model overlays.
         scope_key (str | None): Session scope key for topic-level model overrides.
+        session_once_model (str | None): One-turn session model override (**W10** hook).
     Returns:
         TriageResult: Validated and finalised triage result (after caps,
             filtering, and coercion rules).
@@ -1245,6 +1247,7 @@ async def triage_turn(
             triager_cfg=cfg,
             channel=channel,
             scope_key=scope_key,
+            session_once_model=session_once_model,
         )
     except TriagerUnavailable:
         model_id = "unknown"

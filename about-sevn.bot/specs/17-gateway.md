@@ -1029,12 +1029,18 @@ interfaces:
 - name: clear_dispatch_routing
   file: src/sevn/gateway/session_manager.py
   symbol: clear_dispatch_routing
+- name: clear_model_once_override
+  file: src/sevn/gateway/session_manager.py
+  symbol: clear_model_once_override
 - name: dispatch_routing_for
   file: src/sevn/gateway/session_manager.py
   symbol: dispatch_routing_for
 - name: format_lcm_status_lines
   file: src/sevn/gateway/session_manager.py
   symbol: format_lcm_status_lines
+- name: get_model_once_override
+  file: src/sevn/gateway/session_manager.py
+  symbol: get_model_once_override
 - name: get_tts_mode_override
   file: src/sevn/gateway/session_manager.py
   symbol: get_tts_mode_override
@@ -1050,6 +1056,9 @@ interfaces:
 - name: outbound_routing_for_session
   file: src/sevn/gateway/session_manager.py
   symbol: outbound_routing_for_session
+- name: set_model_once_override
+  file: src/sevn/gateway/session_manager.py
+  symbol: set_model_once_override
 - name: set_tts_mode_override
   file: src/sevn/gateway/session_manager.py
   symbol: set_tts_mode_override
@@ -1606,6 +1615,16 @@ edit into a prior turn's placeholder bubble. Routing extras
 spawned turn; the decision is logged as
 ``gateway.queue_classifier_timeout_spawned`` with ``prior_turn_id``,
 ``new_turn_id``, ``timeout_s``, and ``routing_action``.
+
+## Amendments (open-issues-sweep W10 — #88)
+
+`/model --once <provider/model>` stages a one-turn model override in
+`gateway_sessions.metadata_json` (`model_once_override`). The next agent turn
+consumes it via `SessionManager.take_model_once_override` at turn start and
+clears any remainder in `clear_model_once_override_after_turn` on all exit
+paths — mirroring `take_regen_target` lifecycle. Persisted
+`providers.tier_default.B` is unchanged; `/status` shows staged vs persisted
+model when an override is pending.
 
 ## Amendments (telegram-menu-redesign W9)
 

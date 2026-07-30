@@ -1316,6 +1316,13 @@ def build_agent_run_turn(
         regen_target = router._sessions.take_regen_target(session_id)
         regen_edit_message_id: int | None = None
         regen_suggested_tier: str | None = None
+        session_once_model = router._sessions.take_model_once_override(session_id)
+        if session_once_model:
+            logger.info(
+                "agent_turn model_once_override session_id={} model_id={} source=session",
+                session_id,
+                session_once_model,
+            )
         if replay_target is not None and replay_target[0].strip():
             user_text = replay_target[0]
             replay_attrs = {
@@ -1542,6 +1549,7 @@ def build_agent_run_turn(
                     turn_span_id=turn_span_id,
                     channel=sess.channel,
                     scope_key=sess.scope_key,
+                    session_once_model=session_once_model,
                 )
                 triager_ms = max(1, int((time_ns() - triage_started_ns) / 1_000_000))
                 l1_state.triager_ms = triager_ms
@@ -1861,6 +1869,7 @@ def build_agent_run_turn(
                 process,
                 channel=sess.channel,
                 scope_key=sess.scope_key,
+                session_once_model=session_once_model,
             )
             if bundle.model_source:
                 route_meta["model_resolution_source"] = bundle.model_source
@@ -2738,6 +2747,10 @@ def build_agent_run_turn(
             )
             from sevn.gateway.session_manager import clear_dispatch_routing
 
+            router._sessions.clear_model_once_override_after_turn(
+                session_id,
+                success=(terminal_status == "ok"),
+            )
             clear_dispatch_routing(session_id, correlation_id)
             router._active_l1_turn_state = None  # type: ignore[attr-defined]
 
