@@ -201,7 +201,12 @@ jobs:
           set -euo pipefail
           base="${{ github.event.pull_request.base.ref }}"
           git fetch --no-tags origin "${base}:refs/remotes/origin/${base}"
-          git branch -f "${base}" "origin/${base}"
+          # pull_request_target checks out the default branch (`main`). When the
+          # PR targets `main`, `git branch -f main …` fails because that branch
+          # is the active worktree — origin/main is already fetched above.
+          if [ "$(git rev-parse --abbrev-ref HEAD)" != "${base}" ]; then
+            git branch -f "${base}" "origin/${base}"
+          fi
 
       - name: Skip when Claude subscription auth is not configured
         if: env.HAS_CLAUDE_CODE != 'true'
