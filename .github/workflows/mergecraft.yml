@@ -13,16 +13,41 @@
 # Auth: only CLAUDE_CODE_OAUTH_TOKEN is required (Claude subscription); the job
 # skips gracefully when it is absent (e.g. fork PRs).
 #
+# Trigger: pull_request_target (not pull_request). GitHub skips pull_request
+# workflows when refs/pull/N/merge cannot be built (merge conflicts), which
+# leaves ruleset require-mergecraft-review with a permanently missing check.
+# pull_request_target always fires on synchronize even with merge conflicts.
+#
+# Workflow resolution (GitHub Nov 2025 policy, effective 2025-12-08): pull_request_target
+# definitions are read from the repository default branch (`main`), not the PR base.
+# Companion PR sevn-bot/sevn#96 lands this workflow on `main` (default branch).
+# Until that merges, pull_request_target alone will not fire for PRs targeting
+# `pre-*` / `develop` / `test-pre`. The bootstrap `pull_request` trigger below
+# MUST stay until then; do not remove it in the same PR that introduces
+# pull_request_target.
+#
+# Same-repo guard below keeps fork PRs from receiving secrets (prior pull_request
+# behavior). mergeCraft uses checkout_pr + API with push/shell disabled — no
+# PR-controlled scripts run in CI.
+#
 # Merge gate: ruleset `require-mergecraft-review` requires the **mergeCraft
 # review** job check only — not the raw `mergecraft` completion check (which goes
 # red on agent infra failures while the enforce step correctly fail-opens).
 name: mergecraft
 
 on:
-  pull_request:
+  pull_request_target:
     # `pre-*` glob keeps every release-staging branch (pre-0.0.1, pre-0.0.2, …)
     # auto-reviewed without editing this list each cut (matches the old
     # .coderabbit.yaml `pre-.*` coverage).
+    branches: [main, develop, test-pre, "pre-*"]
+    types: [opened, synchronize, reopened, ready_for_review]
+  # Bootstrap: keep pull_request until mergecraft.yml exists on `main` (default
+  # branch). GitHub resolves pull_request_target from default branch, so
+  # pull_request_target-only would not fire for pre-* PRs while main lacks this
+  # file. pull_request uses the merge commit and fires today; remove only after
+  # main carries this workflow (or default branch moves to pre-0.0.1).
+  pull_request:
     branches: [main, develop, test-pre, "pre-*"]
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
@@ -44,7 +69,9 @@ permissions:
   id-token: write
 
 concurrency:
-  group: mergecraft-${{ github.workflow }}-${{ github.ref }}
+  # pull_request_target resolves github.ref to the default branch; key on PR number
+  # so concurrent reviews do not cancel each other (GitHub Nov 2025 policy).
+  group: mergecraft-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -55,7 +82,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      HAS_CLAUDE_CODE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+      IS_SAME_REPO: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
+      HAS_CLAUDE_CODE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
 
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
@@ -70,7 +98,7 @@ jobs:
           persist-credentials: true
 
       - name: Ensure PR base ref exists locally
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
         run: |
           set -euo pipefail
           base="${{ github.event.pull_request.base.ref }}"
@@ -80,7 +108,11 @@ jobs:
       - name: Skip when Claude subscription auth is not configured
         if: env.HAS_CLAUDE_CODE != 'true'
         run: |
-          echo "::notice title=mergecraft skipped::Configure CLAUDE_CODE_OAUTH_TOKEN to enable mergeCraft reviews (fork PRs run without secrets)."
+          if [ "${{ env.IS_SAME_REPO }}" != "true" ]; then
+            echo "::notice title=mergecraft skipped::Fork PR — review skipped (same as before)."
+          else
+            echo "::notice title=mergecraft skipped::Configure CLAUDE_CODE_OAUTH_TOKEN to enable mergeCraft reviews."
+          fi
 
       - name: mergeCraft PR review (Claude subscription)
         if: env.HAS_CLAUDE_CODE == 'true'
@@ -98,7 +130,7 @@ jobs:
           # For pull_request events, name the PR number explicitly so the agent
           # calls checkout_pr(<n>) instead of asking which PR to review.
           prompt: >-
-            ${{ (github.event_name == 'pull_request' && format('Review pull request #{0}. Call checkout_pr first. For base-side file reads use origin/{1}:path, not bare branch names. If prior mergeCraft threads are resolved and the latest commits address them, submit approved:true with a short summary. Focus on correctness, security, regressions, missing tests, and maintainability. Leave concise, actionable comments only for issues that should be addressed before merge.', github.event.pull_request.number, github.event.pull_request.base.ref))
+            ${{ ((github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('Review pull request #{0}. Call checkout_pr first. For base-side file reads use origin/{1}:path, not bare branch names. If prior mergeCraft threads are resolved and the latest commits address them, submit approved:true with a short summary. Focus on correctness, security, regressions, missing tests, and maintainability. Leave concise, actionable comments only for issues that should be addressed before merge.', github.event.pull_request.number, github.event.pull_request.base.ref))
                 || (github.event_name == 'workflow_dispatch' && inputs.prompt != '' && inputs.prompt)
                 || 'Review the current pull request.' }}
           model: anthropic/claude-sonnet
@@ -119,7 +151,7 @@ jobs:
         # hiccup even when the review + approval check posted fine). Runs on every
         # PR where auth is present.
         if: >-
-          github.event_name == 'pull_request' &&
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
           env.HAS_CLAUDE_CODE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
