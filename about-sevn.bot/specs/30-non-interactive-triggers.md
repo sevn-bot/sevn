@@ -8,7 +8,7 @@ summary: 'Deliver non-interactive dispatch: external events (“something happen
   and schedules (“tick”) compile to DispatchRequest, optionally pass through notify_only
   (zero LLM, zero sandbox boot), otherwise'
 last_updated: '2026-07-30'
-fingerprint: sha256:c331a882c868fedbd6cbe69877acdd9bcee1d533e069dd457f18de9682fee723
+fingerprint: sha256:6c8f7ab3f6e4a9a64fd53142b55bddc28098b05dbad752eb756bd40767d97207
 related: []
 sources:
 - src/sevn/triggers/**
@@ -106,6 +106,9 @@ interfaces:
 - name: reconcile_stale_cron_claims
   file: src/sevn/triggers/cron_boot.py
   symbol: reconcile_stale_cron_claims
+- name: complete_cron_run_event
+  file: src/sevn/triggers/cron_runs.py
+  symbol: complete_cron_run_event
 - name: cron_has_in_flight_run
   file: src/sevn/triggers/cron_runs.py
   symbol: cron_has_in_flight_run

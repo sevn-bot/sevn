@@ -8,7 +8,7 @@ summary: 'Own application persistence: connection setup (WAL, foreign keys), ver
   migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence
   contracts for crash-resume and (w'
 last_updated: '2026-07-30'
-fingerprint: sha256:6aae2b141defc5d218387be83056e9010e17ff47a6347d380ca5ad56825d21af
+fingerprint: sha256:fd0b7cbdcf542049178b7df814cd0a272357ff84239c8ac3ffbcd816501c8fa5
 related: []
 sources:
 - src/sevn/storage/**
@@ -28,6 +28,12 @@ interfaces:
 - name: D1StorageBackend
   file: src/sevn/storage/d1_backend.py
   symbol: D1StorageBackend
+- name: adapter_message_id_from_chunks
+  file: src/sevn/storage/delivery.py
+  symbol: adapter_message_id_from_chunks
+- name: confirm_delivery_after_send
+  file: src/sevn/storage/delivery.py
+  symbol: confirm_delivery_after_send
 - name: confirm_delivery_obligation
   file: src/sevn/storage/delivery.py
   symbol: confirm_delivery_obligation
