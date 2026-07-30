@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own application persistence: connection setup (WAL, foreign keys), versioned
   migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence
   contracts for crash-resume and (w'
-last_updated: '2026-07-15'
-fingerprint: sha256:e137b7d914427fd13aa35a7b3326888c676fb1518e5948eefaad855c36678f55
+last_updated: '2026-07-30'
+fingerprint: sha256:6af4d8c21735f603124c7c4f6d2e57ad629ada7877417e951c316f95667f970d
 related: []
 sources:
 - src/sevn/storage/**
@@ -144,6 +144,14 @@ Document observable failure surfaces from the implementing modules (exceptions, 
 Adds `subagent_runs` table (migration 23) mirroring the in-memory registry for
 restart reconciliation, Mission Control recent history, and
 `sevn subagents list --all`. Boot orphan sweep marks stale `running` → `orphaned`.
+
+## Amendments (open-issues-sweep W18, #75)
+
+Adds `delivery_obligations` table (migration 25): a first-class delivery-obligation
+ledger with adapter-confirmed platform message ids. `ChannelRouter.route_outgoing`
+persists a pending obligation before `adapter.send` and confirms it on success;
+`sweep_outbound_retries` reconciles confirmed obligations without double-send when
+`gateway_messages.status` lags after a crash.
 
 ## Implemented by
 

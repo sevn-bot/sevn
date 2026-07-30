@@ -24,8 +24,10 @@ from tests.open_issues_sweep.batch_d.conftest import (
 
 
 def test_batch_d_baseline_head_is_24_before_w18() -> None:
-    """W17 gate: implementation starts from migration head 24."""
-    assert MIGRATION_HEAD_VERSION == BATCH_D_BASELINE_HEAD
+    """W17 gate recorded pre-W18 head 24; W18 advances head to migration 25."""
+    assert MIGRATION_HEAD_VERSION >= BATCH_D_BASELINE_HEAD
+    registered = {version for version, _ in MIGRATIONS}
+    assert 25 in registered
 
 
 def test_migration_head_matches_migrations_tail() -> None:
@@ -43,21 +45,23 @@ def test_batch_d_planned_versions_are_contiguous_25_through_29() -> None:
 
 
 def test_batch_d_no_impl_migrations_registered_yet() -> None:
-    """Head must remain 24 until W18 appends migration 25."""
+    """Versions 26-29 remain unregistered until W19-W22 land."""
     registered = {version for version, _ in MIGRATIONS}
     for slot in BATCH_D_MIGRATION_SLOTS:
+        if slot.version <= 25:
+            continue
         assert slot.version not in registered
 
 
 def test_apply_migrations_idempotent_at_batch_d_baseline(tmp_path: Path) -> None:
-    """Every bundled migration through head 24 applies idempotently."""
+    """Every bundled migration through current head applies idempotently."""
     db_path = tmp_path / "idempotent.sqlite"
     conn = sqlite3.connect(db_path)
     try:
         apply_migrations(conn)
         apply_migrations(conn)
         ver = int(conn.execute("SELECT MAX(version) FROM schema_migrations").fetchone()[0])
-        assert ver == BATCH_D_BASELINE_HEAD
+        assert ver == MIGRATION_HEAD_VERSION
     finally:
         conn.close()
 
@@ -69,8 +73,8 @@ def test_golden_fixture_present_for_batch_d_baseline() -> None:
 
 
 def test_head_schema_matches_golden_at_batch_d_baseline() -> None:
-    """Live head dump byte-matches the checked-in golden fixture."""
-    fixture = golden_path(BATCH_D_BASELINE_HEAD)
+    """Live head dump byte-matches the checked-in golden fixture for migration 25."""
+    fixture = golden_path(MIGRATION_HEAD_VERSION)
     expected = fixture.read_text(encoding="utf-8")
     actual = dump_head_schema()
     assert actual == expected
@@ -78,8 +82,8 @@ def test_head_schema_matches_golden_at_batch_d_baseline() -> None:
 
 @pytest.mark.parametrize(
     "slot",
-    BATCH_D_MIGRATION_SLOTS,
-    ids=[f"v{s.version}_{s.wave}" for s in BATCH_D_MIGRATION_SLOTS],
+    [s for s in BATCH_D_MIGRATION_SLOTS if s.version > 25],
+    ids=[f"v{s.version}_{s.wave}" for s in BATCH_D_MIGRATION_SLOTS if s.version > 25],
 )
 @pytest.mark.xfail(reason="green after impl wave: migration registered", strict=False)
 def test_batch_d_migration_registered(slot: object) -> None:
@@ -91,10 +95,16 @@ def test_batch_d_migration_registered(slot: object) -> None:
     assert slot.version in registered
 
 
+def test_batch_d_migration_25_registered() -> None:
+    """W18 registers migration 25 for the delivery-obligation ledger."""
+    registered = {version for version, _ in MIGRATIONS}
+    assert 25 in registered
+
+
 @pytest.mark.parametrize(
     "slot",
-    BATCH_D_MIGRATION_SLOTS,
-    ids=[f"v{s.version}_{s.wave}" for s in BATCH_D_MIGRATION_SLOTS],
+    [s for s in BATCH_D_MIGRATION_SLOTS if s.version > 25],
+    ids=[f"v{s.version}_{s.wave}" for s in BATCH_D_MIGRATION_SLOTS if s.version > 25],
 )
 @pytest.mark.xfail(reason="green after impl wave: schema artifact present", strict=False)
 def test_batch_d_migration_schema_artifact(slot: object, tmp_path: Path) -> None:
@@ -115,10 +125,22 @@ def test_batch_d_migration_schema_artifact(slot: object, tmp_path: Path) -> None
         conn.close()
 
 
+def test_batch_d_migration_25_schema_artifact(tmp_path: Path) -> None:
+    """W18 ``delivery_obligations`` table exists after ``apply_migrations``."""
+    slot = next(s for s in BATCH_D_MIGRATION_SLOTS if s.version == 25)
+    conn = sqlite3.connect(tmp_path / "m25.sqlite")
+    try:
+        apply_migrations(conn)
+        assert slot.table is not None
+        assert table_exists(conn, slot.table), f"missing table {slot.table!r}"
+    finally:
+        conn.close()
+
+
 @pytest.mark.parametrize(
     "slot",
-    BATCH_D_MIGRATION_SLOTS,
-    ids=[f"v{s.version}_{s.wave}" for s in BATCH_D_MIGRATION_SLOTS],
+    [s for s in BATCH_D_MIGRATION_SLOTS if s.version > 25],
+    ids=[f"v{s.version}_{s.wave}" for s in BATCH_D_MIGRATION_SLOTS if s.version > 25],
 )
 @pytest.mark.xfail(reason="green after impl wave: golden fixture refreshed", strict=False)
 def test_batch_d_golden_fixture_for_version(slot: object) -> None:
@@ -128,3 +150,9 @@ def test_batch_d_golden_fixture_for_version(slot: object) -> None:
     assert isinstance(slot, BatchDMigrationSlot)
     fixture = golden_path(slot.version)
     assert fixture.is_file(), f"missing golden fixture for migration {slot.version}: {fixture}"
+
+
+def test_batch_d_golden_fixture_for_migration_25() -> None:
+    """W18 golden dump exists for migration head 25."""
+    fixture = golden_path(25)
+    assert fixture.is_file(), f"missing golden fixture for migration 25: {fixture}"

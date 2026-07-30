@@ -16,6 +16,14 @@ from loguru import logger
 
 from sevn.agent.tracing.sink import TraceEvent
 from sevn.gateway.channel_router import OutgoingMessage
+from sevn.storage.delivery import (
+    confirm_delivery_obligation,
+    create_delivery_obligation,
+    fail_delivery_obligation,
+    hash_delivery_payload,
+    is_delivery_confirmed,
+    reconcile_confirmed_obligation,
+)
 
 if TYPE_CHECKING:
     from sevn.agent.tracing.sink import TraceSink
@@ -59,9 +67,27 @@ async def sweep_outbound_retries(
         session_id = str(row[3])
         channel = str(row[4])
         user_id = str(row[5])
-        adapter = router.adapter_named(channel)
         now_ns = time.time_ns()
         turn_id = uuid.uuid4().hex
+        if is_delivery_confirmed(conn, mid):
+            if reconcile_confirmed_obligation(conn, mid):
+                sent_ok += 1
+                await trace.emit(
+                    TraceEvent(
+                        kind="gateway.boot.recovery",
+                        span_id=uuid.uuid4().hex,
+                        parent_span_id=None,
+                        session_id=session_id,
+                        turn_id=turn_id,
+                        tier=None,
+                        ts_start_ns=now_ns,
+                        ts_end_ns=time.time_ns(),
+                        status="reconciled_sent",
+                        attrs={"message_id": mid, "channel": channel},
+                    ),
+                )
+            continue
+        adapter = router.adapter_named(channel)
         if adapter is None:
             await trace.emit(
                 TraceEvent(
@@ -78,6 +104,15 @@ async def sweep_outbound_retries(
                 ),
             )
             continue
+        create_delivery_obligation(
+            conn,
+            message_id=mid,
+            session_id=session_id,
+            channel=channel,
+            user_id=user_id,
+            payload_hash=hash_delivery_payload(content),
+            now_ns=now_ns,
+        )
         out = OutgoingMessage(
             channel=channel,
             user_id=user_id,
@@ -86,9 +121,15 @@ async def sweep_outbound_retries(
             metadata={},
         )
         try:
-            _chunks = await adapter.send(out)
+            chunks = await adapter.send(out)
         except Exception:
             logger.exception("outbound_sweep_send_failed message_id={}", mid)
+            fail_delivery_obligation(
+                conn,
+                message_id=mid,
+                error_details="send_error",
+                now_ns=time.time_ns(),
+            )
             conn.execute(
                 "UPDATE gateway_messages SET status = 'failed' WHERE id = ?",
                 (mid,),
@@ -109,7 +150,14 @@ async def sweep_outbound_retries(
                 ),
             )
             continue
-        _ = _chunks
+        adapter_message_id = str(chunks[0]).strip() if chunks else ""
+        if adapter_message_id:
+            confirm_delivery_obligation(
+                conn,
+                message_id=mid,
+                adapter_message_id=adapter_message_id,
+                now_ns=time.time_ns(),
+            )
         conn.execute(
             "UPDATE gateway_messages SET status = 'sent' WHERE id = ?",
             (mid,),

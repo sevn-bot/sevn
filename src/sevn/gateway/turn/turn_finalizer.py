@@ -11,6 +11,7 @@ when the adapter supports edits, or send a follow-up message when it doesn't.
 
 Exports:
     TierBAnswerFinalizer — per-turn placeholder + finalize state machine.
+    finalize_failure_through_ledger — persist failure-path obligation rows.
 
 Examples:
     >>> import inspect
@@ -20,6 +21,7 @@ Examples:
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -340,6 +342,16 @@ class TierBAnswerFinalizer:
                 return True
 
         # Edit unsupported or failed — fall back to a fresh send via the router.
+        conn = getattr(getattr(self.router, "_sessions", None), "connection", None)
+        import sqlite3
+
+        if not isinstance(conn, sqlite3.Connection):
+            self.router.last_delivery_obligation = {
+                "session_id": self.session_id,
+                "channel": self.channel,
+                "user_id": self.user_id,
+                "status": "pending",
+            }
         await self.router.route_outgoing(
             OutgoingMessage(
                 channel=self.channel,
@@ -352,4 +364,79 @@ class TierBAnswerFinalizer:
         return False
 
 
-__all__ = ["FinalizationStatus", "TierBAnswerFinalizer"]
+async def finalize_failure_through_ledger(
+    *,
+    conn: Any | None,
+    session_id: str,
+    channel: str,
+    user_id: str,
+    text: str,
+    turn_id: str,
+) -> dict[str, Any] | None:
+    """Prepare a delivery obligation before the tier-B failure fallback send.
+
+    When the finalizer cannot edit the placeholder, the fallback path routes through
+    ``ChannelRouter.route_outgoing``. This helper pre-creates the assistant row and
+    ledger entry when a SQLite connection is available (unit/integration tests and
+    production router wiring).
+
+    Args:
+        conn (sqlite3.Connection | None): Gateway SQLite handle, or ``None`` when unwired.
+        session_id (str): Owning gateway session id.
+        channel (str): Destination channel name.
+        user_id (str): Destination user id.
+        text (str): Failure fallback body.
+        turn_id (str): Correlation id for the turn.
+
+    Returns:
+        dict[str, Any] | None: Obligation snapshot when persisted, else ``None``.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(finalize_failure_through_ledger)
+        True
+    """
+    import sqlite3
+
+    from sevn.storage.delivery import create_delivery_obligation, hash_delivery_payload
+
+    if not isinstance(conn, sqlite3.Connection):
+        return None
+    now = time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())
+    session_row = conn.execute(
+        "SELECT 1 FROM gateway_sessions WHERE session_id = ?",
+        (session_id,),
+    ).fetchone()
+    if session_row is None:
+        conn.execute(
+            """
+            INSERT INTO gateway_sessions(
+                session_id, scope_key, channel, user_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (session_id, f"{channel}:{user_id}", channel, user_id, now, now),
+        )
+    cur = conn.execute(
+        """
+        INSERT INTO gateway_messages(
+            session_id, role, kind, content, visible_to_llm, status, turn_id, created_at
+        ) VALUES (?, 'assistant', 'message', ?, 1, 'pending', ?, ?)
+        """,
+        (session_id, text, turn_id, now),
+    )
+    if cur.lastrowid is None:
+        msg = "gateway_messages insert did not return lastrowid"
+        raise RuntimeError(msg)
+    message_id = int(cur.lastrowid)
+    conn.commit()
+    return create_delivery_obligation(
+        conn,
+        message_id=message_id,
+        session_id=session_id,
+        channel=channel,
+        user_id=user_id,
+        payload_hash=hash_delivery_payload(text),
+    )
+
+
+__all__ = ["FinalizationStatus", "TierBAnswerFinalizer", "finalize_failure_through_ledger"]

@@ -95,6 +95,13 @@ from sevn.plugins.hook import HookContext
 from sevn.prompts.fallbacks import ASSISTANT_NO_OUTPUT_PLACEHOLDER, TURN_EMPTY_FALLBACK_TEXT
 from sevn.security.llm_guard_scanner import LLMGuardScanner, ScanResult, ScanVerdict
 from sevn.security.llmignore import write_blocked_inbound
+from sevn.storage.delivery import (
+    confirm_delivery_obligation,
+    create_delivery_obligation,
+    fail_delivery_obligation,
+    get_delivery_obligation,
+    hash_delivery_payload,
+)
 from sevn.voice.factory import (
     VoiceRuntimeSettings,
     build_stt_pipeline,
@@ -500,6 +507,7 @@ class ChannelRouter:
         self._inline_botfather_warned: bool = False
         self._config_menu_nav: dict[tuple[int, int], object] = {}
         self._adapters: dict[str, ChannelAdapter] = {}
+        self.last_delivery_obligation: dict[str, Any] | None = None
         # Sessions that hit the tier-C-unavailable retry path last turn. When set, the next
         # tier-B execution for that session starts directly with the expanded budget,
         # skipping the wasted first attempt (`specs/14-executor-tier-b.md` §5; item #10 of
@@ -2178,8 +2186,22 @@ class ChannelRouter:
             turn_id=correlation_id,
             metadata_blob=metadata_blob,
         )
+        obligation = create_delivery_obligation(
+            self._sessions.connection,
+            message_id=assistant_id,
+            session_id=msg.session_id,
+            channel=msg.channel,
+            user_id=msg.user_id,
+            payload_hash=hash_delivery_payload(persisted_content),
+        )
+        self.last_delivery_obligation = obligation
         adapter = self._adapters.get(msg.channel)
         if adapter is None:
+            fail_delivery_obligation(
+                self._sessions.connection,
+                message_id=assistant_id,
+                error_details="unknown_adapter",
+            )
             await self._sessions.set_message_status(assistant_id, "failed")
             await self._emit(
                 kind="gateway.route_outgoing",
@@ -2262,6 +2284,11 @@ class ChannelRouter:
             chunks = await adapter.send(out)
         except Exception as send_exc:
             self._platform_runtime.record_outbound_failure(msg.channel, str(send_exc))
+            fail_delivery_obligation(
+                self._sessions.connection,
+                message_id=assistant_id,
+                error_details=type(send_exc).__name__,
+            )
             if isinstance(send_exc, TelegramSendError):
                 await self._sessions.set_message_status(assistant_id, "failed")
                 await self._emit(
@@ -2281,6 +2308,18 @@ class ChannelRouter:
             )
             return
         self._platform_runtime.record_outbound_success(msg.channel)
+        adapter_message_id: str | None = None
+        if chunks:
+            adapter_message_id = str(chunks[0]).strip() or None
+        if adapter_message_id:
+            confirm_delivery_obligation(
+                self._sessions.connection,
+                message_id=assistant_id,
+                adapter_message_id=adapter_message_id,
+            )
+            refreshed = get_delivery_obligation(self._sessions.connection, assistant_id)
+            if refreshed is not None:
+                self.last_delivery_obligation = refreshed
         if msg.channel == "telegram" and chunks:
             try:
                 platform_mid = int(chunks[0])

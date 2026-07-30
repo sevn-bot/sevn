@@ -7,8 +7,8 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
-last_updated: '2026-08-01'
-fingerprint: sha256:1375dc484a8aecc9e4f2a38d080abd62faa042ab08c55ae9365564b2e05fed68
+last_updated: '2026-07-30'
+fingerprint: sha256:316ebe8665d4579859b71f35d1c687f14b101a22ace1ea42dac2808aa09ec5b1
 related: []
 sources:
 - src/sevn/gateway/**
@@ -123,9 +123,6 @@ interfaces:
 - name: verify_telegram_secret
   file: src/sevn/gateway/auth.py
   symbol: verify_telegram_secret
-- name: verify_telegram_webhook_freshness
-  file: src/sevn/gateway/auth.py
-  symbol: verify_telegram_webhook_freshness
 - name: verify_webchat_jwt
   file: src/sevn/gateway/auth.py
   symbol: verify_webchat_jwt
@@ -1029,18 +1026,12 @@ interfaces:
 - name: clear_dispatch_routing
   file: src/sevn/gateway/session_manager.py
   symbol: clear_dispatch_routing
-- name: clear_model_once_override
-  file: src/sevn/gateway/session_manager.py
-  symbol: clear_model_once_override
 - name: dispatch_routing_for
   file: src/sevn/gateway/session_manager.py
   symbol: dispatch_routing_for
 - name: format_lcm_status_lines
   file: src/sevn/gateway/session_manager.py
   symbol: format_lcm_status_lines
-- name: get_model_once_override
-  file: src/sevn/gateway/session_manager.py
-  symbol: get_model_once_override
 - name: get_tts_mode_override
   file: src/sevn/gateway/session_manager.py
   symbol: get_tts_mode_override
@@ -1056,9 +1047,6 @@ interfaces:
 - name: outbound_routing_for_session
   file: src/sevn/gateway/session_manager.py
   symbol: outbound_routing_for_session
-- name: set_model_once_override
-  file: src/sevn/gateway/session_manager.py
-  symbol: set_model_once_override
 - name: set_tts_mode_override
   file: src/sevn/gateway/session_manager.py
   symbol: set_tts_mode_override
@@ -1068,36 +1056,6 @@ interfaces:
 - name: validate_dispatch_routing_identity
   file: src/sevn/gateway/session_manager.py
   symbol: validate_dispatch_routing_identity
-- name: SlashSkillInboundPreprocessResult
-  file: src/sevn/gateway/slash_skills.py
-  symbol: SlashSkillInboundPreprocessResult
-- name: StackedSlashSkillParseResult
-  file: src/sevn/gateway/slash_skills.py
-  symbol: StackedSlashSkillParseResult
-- name: build_slash_skill_turn_overlay
-  file: src/sevn/gateway/slash_skills.py
-  symbol: build_slash_skill_turn_overlay
-- name: format_slash_skill_errors
-  file: src/sevn/gateway/slash_skills.py
-  symbol: format_slash_skill_errors
-- name: known_skill_ids_from_manager
-  file: src/sevn/gateway/slash_skills.py
-  symbol: known_skill_ids_from_manager
-- name: merge_slash_skills_into_triage
-  file: src/sevn/gateway/slash_skills.py
-  symbol: merge_slash_skills_into_triage
-- name: parse_stacked_slash_skills
-  file: src/sevn/gateway/slash_skills.py
-  symbol: parse_stacked_slash_skills
-- name: preprocess_stacked_slash_skills_inbound
-  file: src/sevn/gateway/slash_skills.py
-  symbol: preprocess_stacked_slash_skills_inbound
-- name: resolve_skill_shortcut_slash
-  file: src/sevn/gateway/slash_skills.py
-  symbol: resolve_skill_shortcut_slash
-- name: skill_shortcut_slash_text
-  file: src/sevn/gateway/slash_skills.py
-  symbol: skill_shortcut_slash_text
 - name: build_announce_back_hook
   file: src/sevn/gateway/subagents/subagents_announce.py
   symbol: build_announce_back_hook
@@ -1386,6 +1344,9 @@ interfaces:
 - name: TierBAnswerFinalizer
   file: src/sevn/gateway/turn/turn_finalizer.py
   symbol: TierBAnswerFinalizer
+- name: finalize_failure_through_ledger
+  file: src/sevn/gateway/turn/turn_finalizer.py
+  symbol: finalize_failure_through_ledger
 - name: TurnMediaItem
   file: src/sevn/gateway/turn/turn_media.py
   symbol: TurnMediaItem
@@ -1646,32 +1607,20 @@ spawned turn; the decision is logged as
 ``gateway.queue_classifier_timeout_spawned`` with ``prior_turn_id``,
 ``new_turn_id``, ``timeout_s``, and ``routing_action``.
 
-## Amendments (open-issues-sweep W10 — #88)
-
-`/model --once <provider/model>` stages a one-turn model override in
-`gateway_sessions.metadata_json` (`model_once_override`). The next agent turn
-consumes it via `SessionManager.take_model_once_override` at turn start and
-clears any remainder in `clear_model_once_override_after_turn` on all exit
-paths — mirroring `take_regen_target` lifecycle. Persisted
-`providers.tier_default.B` is unchanged; `/status` shows staged vs persisted
-model when an override is pending.
-
-## Amendments (open-issues-sweep W12 — #79)
-
-When `routing.enabled` is true, `build_agent_run_turn` resolves one routing
-profile per turn from `routing.channel_map` + session scope key, threads
-overrides through model resolution (session → routing profile → channel →
-workspace), prompt overlays, skill registry filtering, persona/memory namespace,
-permissions, and logs `routing_profile` on turn metadata. Unknown routes with
-`routing.unknown_route: deny` reject the turn before triage. `TopicConfig.skills`
-from Telegram inbound metadata intersects the profile skill allowlist.
-
 ## Amendments (telegram-menu-redesign W9)
 
 Telegram `/config` callback routing serves the redesigned eight-tile tree via
 `build_config_menu_keyboard()` and `MenuActionRouter`; stale `cfg:section:*` ids
 resolve through `_SECTION_ALIASES`. Section dispatch and action handlers are shared
 with the menu E2E walker recipe (`src/sevn/browser/recipes/telegram_menu.py`).
+
+## Amendments (open-issues-sweep W18, #75)
+
+Outbound delivery persists a `delivery_obligations` ledger row before
+`adapter.send` and records the platform message id on confirmation. Boot replay
+via `sweep_outbound_retries` skips resend when the obligation is already
+confirmed, closing the double-send window after a crash between send and status
+update. Tier-B finalizer failure paths participate through `route_outgoing`.
 
 ## Test Strategy
 

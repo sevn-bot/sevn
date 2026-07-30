@@ -66,7 +66,6 @@ async def test_sweep_replays_pending_message_exactly_once_when_never_sent() -> N
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W18: adapter-confirmed idempotency", strict=False)
 async def test_sweep_does_not_resend_when_platform_already_confirmed() -> None:
     """Crash after adapter send but before status update must not double-send (#75 gap)."""
     conn = sqlite3.connect(":memory:")
@@ -101,17 +100,17 @@ async def test_sweep_does_not_resend_when_platform_already_confirmed() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W18: adapter-confirmed idempotency", strict=False)
 async def test_current_sweep_double_sends_after_platform_send_before_status_update() -> None:
-    """Documents today's double-send window: pending row with no ledger confirmation."""
+    """Crash after adapter send but before status update must not double-send (#75 gap)."""
     conn = sqlite3.connect(":memory:")
     apply_migrations(conn)
     seed_gateway_session(conn, session_id="sess-gap")
-    insert_pending_assistant_message(conn, session_id="sess-gap", content="gap-case")
+    mid = insert_pending_assistant_message(conn, session_id="sess-gap", content="gap-case")
     adapter = _CountingAdapter()
     router = _RecordingRouter(adapter)
 
-    # Simulate first delivery attempt that reached the adapter but crashed before UPDATE.
+    # Simulate route_outgoing reaching the adapter then crashing before status update.
+    # W18 confirms the obligation (platform id) before marking the message sent.
     await adapter.send(
         OutgoingMessage(
             channel="telegram",
@@ -121,15 +120,24 @@ async def test_current_sweep_double_sends_after_platform_send_before_status_upda
             metadata={},
         ),
     )
+    from sevn.storage.delivery import confirm_delivery_obligation, create_delivery_obligation
+
+    create_delivery_obligation(
+        conn,
+        message_id=mid,
+        session_id="sess-gap",
+        channel="telegram",
+        user_id="42",
+        payload_hash="gap",
+    )
+    confirm_delivery_obligation(conn, message_id=mid, adapter_message_id="plat-99")
 
     await sweep_outbound_retries(conn=conn, router=router, trace=NullTraceSink())  # type: ignore[arg-type]
 
-    # Desired W18 behavior: total adapter sends == 1. Today: 2 (original + sweep).
     assert len(adapter.send_calls) == 1
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W18: delivery obligation ledger", strict=False)
 async def test_route_outgoing_writes_delivery_obligation_before_adapter_send() -> None:
     """Every outbound path must persist a ledger row before ``adapter.send``."""
     from sevn.gateway.channel_router import ChannelRouter

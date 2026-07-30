@@ -75,9 +75,6 @@ async def test_finalize_failure_falls_back_to_router_send_today() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W18: finalizer participates in ledger lifecycle", strict=False
-)
 async def test_finalize_failure_records_delivery_obligation() -> None:
     """Failure fallback must create/update a ledger row, not bypass persistence."""
     adapter = _StubAdapter()
@@ -95,7 +92,6 @@ async def test_finalize_failure_records_delivery_obligation() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W18: finalizer failure uses ledger table", strict=False)
 async def test_finalize_failure_persists_obligation_row_in_sqlite(batch_d_conn: object) -> None:
     """Integration: tier-B timeout path leaves a ``delivery_obligations`` row."""
     import sqlite3

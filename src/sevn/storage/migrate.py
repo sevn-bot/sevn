@@ -548,6 +548,27 @@ _MIGRATION_24: Final[tuple[str, ...]] = (
     "CREATE INDEX IF NOT EXISTS ix_telegram_chat_names_updated_at ON telegram_chat_names(updated_at)",
 )
 
+# First-class delivery-obligation ledger (#75; `specs/03-storage.md` amendments).
+# Adapter-confirmed platform ids let boot replay skip double-send when status lags.
+_MIGRATION_25: Final[tuple[str, ...]] = (
+    """CREATE TABLE IF NOT EXISTS delivery_obligations (
+        message_id INTEGER PRIMARY KEY NOT NULL
+            REFERENCES gateway_messages(id) ON DELETE CASCADE,
+        session_id TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        payload_hash TEXT NOT NULL,
+        adapter_message_id TEXT,
+        status TEXT NOT NULL DEFAULT 'pending'
+            CHECK (status IN ('pending', 'confirmed', 'failed')),
+        error_details TEXT,
+        created_at_ns INTEGER NOT NULL,
+        updated_at_ns INTEGER NOT NULL
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_delivery_obligations_session ON delivery_obligations(session_id)",
+    "CREATE INDEX IF NOT EXISTS ix_delivery_obligations_status ON delivery_obligations(status)",
+)
+
 MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (1, _MIGRATION_1),
     (2, _MIGRATION_2),
@@ -573,6 +594,7 @@ MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (22, _MIGRATION_22),
     (23, _MIGRATION_23),
     (24, _MIGRATION_24),
+    (25, _MIGRATION_25),
 )
 
 MIGRATION_HEAD_VERSION: Final[int] = max(v for v, _ in MIGRATIONS)
