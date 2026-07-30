@@ -20,8 +20,18 @@
 #
 # Workflow resolution (GitHub Nov 2025 policy, effective 2025-12-08): pull_request_target
 # definitions are read from the repository default branch (`main`), not the PR base.
-# Companion PR sevn-bot/sevn#96 landed this workflow on `main` (default branch), so
-# pull_request_target now fires for PRs targeting `pre-*` / `develop` / `test-pre`.
+# Companion PR sevn-bot/sevn#96 landed this workflow on `main`, so pull_request_target
+# now fires for PRs targeting `pre-*` / `develop` / `test-pre`.
+#
+# THIS COPY DOES NOT RUN. The copy on `main` is authoritative for pull_request_target
+# — it is used for every PR regardless of what the base branch carries here — and
+# with the `pull_request` trigger gone (below) nothing reads this file at review
+# time. It stays because `make mergecraft-ref-check` (ci-parity, via `make ci`)
+# reads the action pin out of it; see scripts/check_mergecraft_ref_parity.py.
+# Any edit here MUST be mirrored to `main` in a companion PR or it has no effect,
+# and the action SHA must match in three places: this file, main's copy, and
+# MERGECRAFT_REF in the Makefile (only the first and third are gate-checked).
+#
 # The bootstrap `pull_request` trigger has been removed: running BOTH triggers made
 # each synchronize fire two runs that resolved to the SAME concurrency group (see
 # below) — with cancel-in-progress they cancelled each other, and a cancelled
