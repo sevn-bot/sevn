@@ -23,6 +23,7 @@ are cut into a dated, versioned section at release time.
 - [2026-07-31] Webhook-minimal host env now covers queued agent turns (not just the HTTP handler), uses an allowlist instead of a suffix blocklist, and approval denial reasons return per-verdict tuples instead of shared bridge state; WebSocket frames after auth respect the 1 MiB ingress cap; Telegram freshness no longer trusts spoofable HTTP `Date` headers (#81, #80, open-issues-sweep E-Thermos)
 - [2026-07-31] Gateway and egress-proxy HTTP ingress reject bodies over 1 MiB (**413**); signed GitHub webhooks reject stale timestamps; Telegram transport errors and API failure logs redact bot tokens; webhook-triggered subprocesses inherit a minimized host env (#81, open-issues-sweep W24)### Fixed
 - [2026-07-31] Batch D Thermos: cron overlap skip clears in-flight audit rows on completion (jobs no longer run once then skip forever); delivery obligations confirm with a local sentinel when adapters omit platform ids so boot replay cannot double-send; subagent announce-back marks delivered only after confirmed outbound delivery and redacts persisted `result_body`; session export records failed jobs in audit
+- [2026-07-31] Batch D Thermos pass 2: subagent delivery marking helper, accurate boot-restore counter, steer-inject marks delivered, public `key_denied` export API
 
 ### Changed
 

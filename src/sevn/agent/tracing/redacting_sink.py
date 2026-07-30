@@ -4,6 +4,7 @@ Module: sevn.agent.tracing.redacting_sink
 Depends: copy, dataclasses, re, sevn.agent.tracing.sink, sevn.config.defaults
 Exports:
     TraceRedactionPolicy — deny-key and pattern rules for one emit pass.
+    key_denied — public deny-key matcher for export redaction.
     redact_attrs — redact one attrs mapping without building a ``TraceEvent``.
     redact_text_value — redact one text blob with a configurable placeholder.
     redact — return a copy of ``TraceEvent`` with redacted ``attrs``.
@@ -94,6 +95,23 @@ class TraceRedactionPolicy:
             deny_value_patterns=DEFAULT_TRACE_REDACTION_DENY_VALUE_PATTERNS,
             _compiled_patterns=(),
         )
+
+
+def key_denied(key: object, deny_keys: tuple[str, ...]) -> bool:
+    """Return whether ``key`` matches any deny-list substring.
+
+    Args:
+        key (object): Attribute or metadata key name.
+        deny_keys (tuple[str, ...]): Lowercase substrings to match.
+
+    Returns:
+        bool: ``True`` when the key should be redacted.
+
+    Examples:
+        >>> key_denied("api_key", ("api_key",))
+        True
+    """
+    return _key_denied(key, deny_keys)
 
 
 def _key_denied(key: object, deny_keys: tuple[str, ...]) -> bool:
@@ -312,6 +330,7 @@ class RedactingSink:
 __all__ = [
     "RedactingSink",
     "TraceRedactionPolicy",
+    "key_denied",
     "redact",
     "redact_attrs",
     "redact_text_value",

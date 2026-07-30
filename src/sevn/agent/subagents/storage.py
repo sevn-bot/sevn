@@ -542,17 +542,17 @@ async def restore_pending_subagent_deliveries(
         if body is None:
             continue
         try:
-            await deliver_subagent_result_through_ledger(
+            if await deliver_subagent_result_through_ledger(
                 router=router,
                 conn=conn,
                 run=run,
                 session=sess,
                 result_body=body,
-            )
+            ):
+                delivered += 1
         except Exception:
             logger.bind(subagent_id=run.id, session_id=run.session_id).exception(
                 "subagent_restore_delivery_failed"
             )
             continue
-        delivered += 1
     return delivered

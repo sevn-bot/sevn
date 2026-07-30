@@ -33,6 +33,7 @@ from sevn.agent.subagents.transcript import (
 )
 from sevn.gateway.channel_router import ChannelRouter, OutgoingMessage
 from sevn.gateway.session_manager import load_session_row
+from sevn.storage.delivery import is_delivery_confirmed
 
 if TYPE_CHECKING:
     from sevn.agent.subagents.models import SubAgentRun
@@ -159,6 +160,48 @@ def load_subagent_result_for_announce(conn: sqlite3.Connection, run_id: str) -> 
     return load_subagent_result_body(conn, run_id)
 
 
+def _mark_subagent_delivered_if_confirmed(
+    *,
+    router: ChannelRouter,
+    conn: sqlite3.Connection,
+    run_id: str,
+) -> bool:
+    """Mark one sub-agent result delivered when the latest outbound obligation confirmed.
+
+    Args:
+        router (ChannelRouter): Gateway router that recorded ``last_delivery_obligation``.
+        conn (sqlite3.Connection): Gateway SQLite handle.
+        run_id (str): Target sub-agent run id.
+
+    Returns:
+        bool: ``True`` when ``result_delivered_at_ns`` was set.
+
+    Examples:
+        >>> import sqlite3
+        >>> from sevn.gateway.channel_router import ChannelRouter
+        >>> _mark_subagent_delivered_if_confirmed(
+        ...     router=ChannelRouter.__new__(ChannelRouter),
+        ...     conn=sqlite3.connect(":memory:"),
+        ...     run_id="missing",
+        ... )
+        False
+    """
+    last_ob = getattr(router, "last_delivery_obligation", None)
+    if not isinstance(last_ob, dict):
+        return False
+    message_id_raw = last_ob.get("message_id")
+    if message_id_raw is None:
+        return False
+    try:
+        message_id = int(message_id_raw)
+    except (TypeError, ValueError):
+        return False
+    if not is_delivery_confirmed(conn, message_id):
+        return False
+    mark_subagent_result_delivered(conn, run_id)
+    return True
+
+
 async def deliver_subagent_result_through_ledger(
     *,
     router: ChannelRouter,
@@ -166,7 +209,7 @@ async def deliver_subagent_result_through_ledger(
     run: SubAgentRun,
     session: SessionRow,
     result_body: str,
-) -> None:
+) -> bool:
     """Send one persisted sub-agent result through ``route_outgoing`` (#76 / W18).
 
     Args:
@@ -175,6 +218,9 @@ async def deliver_subagent_result_through_ledger(
         run (SubAgentRun): Completed level-2 run being announced.
         session (SessionRow): Owning gateway session row.
         result_body (str): Raw completion text (tag applied here).
+
+    Returns:
+        bool: ``True`` when delivery was confirmed and marked delivered.
 
     Examples:
         >>> import inspect
@@ -188,7 +234,7 @@ async def deliver_subagent_result_through_ledger(
             run.session_id,
             session.session_id,
         )
-        return
+        return False
     text = _render_result_text(
         run,
         result_body,
@@ -205,12 +251,7 @@ async def deliver_subagent_result_through_ledger(
             metadata={"subagent_id": run.id},
         ),
     )
-    from sevn.storage.delivery import is_delivery_confirmed
-
-    last_ob = getattr(router, "last_delivery_obligation", None)
-    message_id = int(last_ob["message_id"]) if isinstance(last_ob, dict) else None
-    if message_id is not None and is_delivery_confirmed(conn, message_id):
-        mark_subagent_result_delivered(conn, run.id)
+    return _mark_subagent_delivered_if_confirmed(router=router, conn=conn, run_id=run.id)
 
 
 def build_announce_back_hook(
@@ -264,6 +305,7 @@ def build_announce_back_hook(
         if running and store is not None:
             try:
                 store.steer_inject_for(run.session_id).inject_pending(text)
+                mark_subagent_result_delivered(conn, run.id)
                 return
             except Exception:
                 logger.exception(
@@ -289,12 +331,7 @@ def build_announce_back_hook(
                     metadata={"subagent_id": run.id},
                 ),
             )
-            from sevn.storage.delivery import is_delivery_confirmed
-
-            last_ob = getattr(router, "last_delivery_obligation", None)
-            message_id = int(last_ob["message_id"]) if isinstance(last_ob, dict) else None
-            if message_id is not None and is_delivery_confirmed(conn, message_id):
-                mark_subagent_result_delivered(conn, run.id)
+            _mark_subagent_delivered_if_confirmed(router=router, conn=conn, run_id=run.id)
         except Exception:
             logger.exception("subagent_announce_back_send_failed run_id={}", run.id)
 

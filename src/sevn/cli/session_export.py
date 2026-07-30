@@ -22,7 +22,7 @@ from pathlib import Path
 
 from sevn.agent.tracing.redacting_sink import (
     TraceRedactionPolicy,
-    _key_denied,
+    key_denied,
     redact_text_value,
 )
 from sevn.gateway.session.sessions_query import parse_session_metadata
@@ -135,7 +135,7 @@ def _export_key_denied(key: str, policy: TraceRedactionPolicy) -> bool:
     lowered = key.lower()
     if lowered in _EXPORT_EXTRA_DENY_KEYS:
         return True
-    return _key_denied(key, policy.deny_keys)
+    return key_denied(key, policy.deny_keys)
 
 
 def redact_export_text(text: str, policy: TraceRedactionPolicy) -> str:
