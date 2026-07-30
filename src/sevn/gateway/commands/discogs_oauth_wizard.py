@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from sevn.config.sections.skills_discogs import discogs_settings
+from sevn.gateway.commands.form_prompts import form_prompt_with_cancel
 from sevn.gateway.config_io.workspace_config_io import mutate_sevn_json
 from sevn.gateway.menu.discogs_menu import (
     DISCOGS_CONSUMER_KEY_SECRET_ALIAS,
@@ -175,7 +176,7 @@ async def advance_discogs_oauth(
         _update_oauth_payload("consumer_secret")
         await handler._send_chat(
             msg,
-            "Send your Discogs OAuth consumer secret (not shown again):",
+            form_prompt_with_cancel(_DISCOGS_CONSUMER_SECRET_PROMPT),
         )
         return
 

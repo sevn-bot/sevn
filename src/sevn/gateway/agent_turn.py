@@ -3832,26 +3832,21 @@ def _outbound_routing_metadata(
         >>> inspect.isfunction(_outbound_routing_metadata)
         True
     """
-    if turn_id:
-        row = conn.execute(
-            """
-            SELECT extras_json FROM gateway_messages
-            WHERE session_id = ? AND role = 'user' AND kind = 'message' AND turn_id = ?
-            ORDER BY id DESC LIMIT 1
-            """,
-            (session_id, turn_id),
-        ).fetchone()
-    else:
-        row = None
-    if row is None:
-        row = conn.execute(
-            """
-            SELECT extras_json FROM gateway_messages
-            WHERE session_id = ? AND role = 'user' AND kind = 'message'
-            ORDER BY id DESC LIMIT 1
-            """,
-            (session_id,),
-        ).fetchone()
+    row = conn.execute(
+        """
+        SELECT extras_json FROM gateway_messages
+        WHERE session_id = ? AND role = 'user' AND kind = 'message'
+        ORDER BY
+            CASE
+                WHEN ? IS NOT NULL AND turn_id = ? THEN 0
+                WHEN ? IS NULL THEN 1
+                ELSE 2
+            END,
+            id DESC
+        LIMIT 1
+        """,
+        (session_id, turn_id, turn_id, turn_id),
+    ).fetchone()
     if row is not None and row[0]:
         try:
             parsed = json.loads(str(row[0]))

@@ -17,7 +17,6 @@ import hashlib
 import json
 import re
 import secrets
-import sqlite3
 import time
 import uuid
 from collections.abc import Awaitable, Callable, Coroutine
@@ -62,6 +61,7 @@ from sevn.gateway.channel_types import (
     OutgoingMessage as OutgoingMessage,
 )
 from sevn.gateway.commands.dispatcher import CommandDispatcher
+from sevn.gateway.inbound.referenced_context import prefix_inbound_referenced_context
 from sevn.gateway.lcm.lcm_ingest import ingest_gateway_message_row
 from sevn.gateway.media.media_store import MediaStore
 from sevn.gateway.onboarding.pairing import PairingStore
@@ -80,7 +80,6 @@ from sevn.gateway.telegram.telegram_quick_actions import (
     GATEWAY_OUTBOUND_PHASE_KEY,
     build_quick_action_inline_keyboard,
     is_telegram_fast_callback_ack,
-    lookup_assistant_row_by_platform_message,
     record_assistant_platform_message,
     telegram_fast_callback_ack_text,
 )
@@ -966,43 +965,26 @@ class ChannelRouter:
         self,
         msg: IncomingMessage,
         user_text: str,
-        *,
-        session_id: str,
     ) -> str:
         """Prepend explicit referenced-message blocks for quote and bot-self-reply paths.
 
         Args:
             msg (IncomingMessage): Inbound message carrying quote metadata.
             user_text (str): Operator text after voice/STT normalization.
-            session_id (str): Resolved gateway session id (reserved for future turn lookup).
 
         Returns:
             str: User text prefixed with an explicit ``[Referenced message]`` block when applicable.
 
         Examples:
             >>> import inspect
-            >>> inspect.isfunction(ChannelRouter._prefix_inbound_referenced_context)
-            True
+            >>> inspect.ismethoddescriptor(ChannelRouter._prefix_inbound_referenced_context)
+            False
         """
-        _ = session_id
-        md = msg.metadata if isinstance(msg.metadata, dict) else {}
-        rq = md.get("reply_to_quote") or md.get("reply_quote")
-        if isinstance(rq, str) and rq.strip():
-            return f"{_explicit_referenced_message_block(rq)}{user_text}"
-        ref_mid = md.get("referenced_message_id")
-        if ref_mid is None:
-            ref_mid = md.get("reply_to_message_id")
-        if isinstance(ref_mid, int) and md.get("reply_to_quote") is None:
-            chat_raw = md.get("chat_id") or md.get("telegram_chat_id")
-            chat_id = str(chat_raw) if chat_raw is not None else None
-            block = _bot_self_reply_reference_block(
-                self.session_manager.connection,
-                channel=msg.channel,
-                platform_message_id=ref_mid,
-                platform_chat_id=chat_id,
-            )
-            return f"{block}{user_text}"
-        return user_text
+        return prefix_inbound_referenced_context(
+            msg,
+            user_text,
+            conn=self.session_manager.connection,
+        )
 
     def _resolve_owner_flag(self, msg: IncomingMessage) -> bool:
         """Return ``True`` when ``msg`` originates from the workspace owner.
@@ -1852,7 +1834,7 @@ class ChannelRouter:
                 attrs={"reason": cap_reject},
             )
             return
-        user_text = self._prefix_inbound_referenced_context(msg, user_text, session_id=session_id)
+        user_text = self._prefix_inbound_referenced_context(msg, user_text)
         actor_is_owner = self._resolve_owner_flag(msg)
         guard_skip_reason = None
         if actor_is_owner:
@@ -2092,7 +2074,8 @@ class ChannelRouter:
         effective_mode = self.resolve_effective_tts_mode(msg.session_id)
         from sevn.gateway.routing.routing_footer import strip_model_emitted_footer
 
-        tts_input = strip_model_emitted_footer(filtered).rstrip()
+        clean_content = strip_model_emitted_footer(filtered).rstrip()
+        tts_input = clean_content
         if vr.enabled and self._tts.should_synthesize(
             session_tts_mode=effective_mode,
             user_text_last_turn=u_last,
@@ -2130,7 +2113,7 @@ class ChannelRouter:
         # ``filtered`` value below — but ``persisted_content`` is what
         # ``add_message`` writes, and it's authoritative for LLM read-back.
         # ``tts_input`` (computed above) uses the same strip for synthesis.
-        persisted_content = strip_model_emitted_footer(filtered).rstrip()
+        persisted_content = clean_content
         if persisted_content.strip() == ASSISTANT_NO_OUTPUT_PLACEHOLDER:
             logger.info(
                 "route_outgoing.no_output_placeholder session_id={} turn_id={}",
@@ -2352,71 +2335,6 @@ class ChannelRouter:
             status="sent",
             attrs={"chunks": len(chunks)},
         )
-
-
-def _explicit_referenced_message_block(body: str) -> str:
-    """Wrap quoted inbound context so the model can distinguish it from user text.
-
-    Args:
-        body (str): Reply-quote prefix from ``format_reply_quote`` or adapter metadata.
-
-    Returns:
-        str: Block wrapped in ``[Referenced message]`` markers, or the original when already marked.
-
-    Examples:
-        >>> _explicit_referenced_message_block("Quoted from Alice:\\nhi\\n")
-        '[Referenced message]\\nQuoted from Alice:\\nhi\\n[/Referenced message]\\n\\n'
-        >>> _explicit_referenced_message_block("[Quote]\\nx\\n[/Quote]\\n").startswith("[Quote]")
-        True
-    """
-    stripped = body.strip()
-    if not stripped:
-        return ""
-    if "[Referenced message]" in stripped or stripped.startswith("[Quote]"):
-        return body
-    return f"[Referenced message]\n{stripped}\n[/Referenced message]\n\n"
-
-
-def _bot_self_reply_reference_block(
-    conn: sqlite3.Connection,
-    *,
-    channel: str,
-    platform_message_id: int,
-    platform_chat_id: str | None,
-) -> str:
-    """Build an explicit reference block for bot-self-replies (quote suppressed at parse).
-
-    Args:
-        conn (sqlite3.Connection): Gateway SQLite handle.
-        channel (str): Channel key (``telegram``).
-        platform_message_id (int): Telegram ``reply_to_message.message_id``.
-        platform_chat_id (str | None): Optional chat id filter for lookup.
-
-    Returns:
-        str: ``[Referenced message]`` block with assistant content when resolvable.
-
-    Examples:
-        >>> import inspect
-        >>> inspect.isfunction(_bot_self_reply_reference_block)
-        True
-    """
-    lookup = lookup_assistant_row_by_platform_message(
-        conn,
-        channel=channel,
-        platform_message_id=platform_message_id,
-        platform_chat_id=platform_chat_id,
-    )
-    if lookup is not None:
-        _session_id, _row_id, content = lookup
-        body = content.strip() or "[no text]"
-    else:
-        body = "[content unavailable at ingest]"
-    return (
-        f"[Referenced message]\n"
-        f"Telegram message_id={platform_message_id} (assistant):\n"
-        f"{body}\n"
-        f"[/Referenced message]\n\n"
-    )
 
 
 _OUTBOUND_ROUTING_METADATA_KEYS = (

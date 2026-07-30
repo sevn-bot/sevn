@@ -1,4 +1,4 @@
-"""Telegram menu form re-prompt + cancel (#71 / D19 — green after W3)."""
+"""Telegram menu form re-prompt + cancel (#71 / D19)."""
 
 from __future__ import annotations
 

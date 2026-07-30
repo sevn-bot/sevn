@@ -103,7 +103,12 @@ def migrate_legacy_config_backups(sevn_json_path: Path) -> int:
             continue
         target = archive_dir / legacy.name
         if target.is_file():
-            legacy.unlink(missing_ok=True)
+            suffix = 0
+            collision_target = target
+            while collision_target.is_file():
+                suffix += 1
+                collision_target = archive_dir / f"{legacy.name}.legacy{suffix}"
+            os.replace(legacy, collision_target)
             moved += 1
             continue
         os.replace(legacy, target)
@@ -132,7 +137,6 @@ def _resolve_archive_backup_path(sevn_json_path: Path, old_schema: int) -> Path:
 
     archive_dir = config_backup_archive_dir(sevn_json_path)
     archive_dir.mkdir(parents=True, exist_ok=True)
-    migrate_legacy_config_backups(sevn_json_path)
     backup = archive_dir / f"sevn.json.v{old_schema}"
     target_backup = backup
     suffix = 0
@@ -197,7 +201,6 @@ def prune_config_backups(
         2
     """
 
-    migrate_legacy_config_backups(sevn_json_path)
     archive_dir = config_backup_archive_dir(sevn_json_path)
     if not archive_dir.is_dir():
         return 0
@@ -255,6 +258,7 @@ def backup_previous_sevn_json(sevn_json_path: Path) -> Path | None:
 
     if not sevn_json_path.is_file():
         return None
+    migrate_legacy_config_backups(sevn_json_path)
     try:
         old_doc = json.loads(sevn_json_path.read_text(encoding="utf-8"))
         old_schema = int(old_doc.get("schema_version", 1))

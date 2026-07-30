@@ -1540,7 +1540,7 @@ async def backup_manifest(
         "snapshot_manifest_path": str(manifest_path),
         "snapshot_manifest": manifest_body,
         "snapshot_tarballs": _list_snapshot_tarballs(layout),
-        "restore_hint": "Restore via CLI: sevn migrate / promote from sevn.json.vN backup",
+        "restore_hint": "Restore via CLI: sevn migrate / promote from sevn.json.archive/sevn.json.vN backup",
     }
 
 

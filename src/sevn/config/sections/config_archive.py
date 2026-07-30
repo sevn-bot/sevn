@@ -22,5 +22,9 @@ class ConfigArchiveWorkspaceConfig(BaseModel):
 
     model_config = ConfigDict(extra="allow")
 
-    keep_count: int = Field(default=DEFAULT_CONFIG_ARCHIVE_KEEP_COUNT, ge=0)
+    keep_count: int = Field(
+        default=DEFAULT_CONFIG_ARCHIVE_KEEP_COUNT,
+        ge=0,
+        description="Max archived backups to keep; 0 disables count-based pruning.",
+    )
     retention_days: int = Field(default=DEFAULT_CONFIG_ARCHIVE_RETENTION_DAYS, ge=0)

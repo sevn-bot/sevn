@@ -1432,7 +1432,7 @@
           "type": "integer",
           "minimum": 0,
           "default": 5,
-          "$comment": "Maximum number of ``sevn.json.v*`` backups retained under ``sevn.json.archive/`` after each config write."
+          "$comment": "Maximum number of ``sevn.json.v*`` backups retained under ``sevn.json.archive/`` after each config write. ``0`` disables count-based pruning (only ``retention_days`` applies when > 0)."
         },
         "retention_days": {
           "type": "integer",
