@@ -51,7 +51,6 @@ def _routing_profiles_workspace() -> object:
     return WorkspaceConfig.model_validate(doc)
 
 
-@pytest.mark.xfail(reason="green after W12: routing profile isolation", strict=False)
 def test_two_profiles_have_distinct_memory_skill_and_permission_sets() -> None:
     from sevn.config.routing import resolve_routing_profile_bundle
 
@@ -67,7 +66,6 @@ def test_two_profiles_have_distinct_memory_skill_and_permission_sets() -> None:
     )
 
 
-@pytest.mark.xfail(reason="green after W12: channel map resolves profile per turn", strict=False)
 def test_channel_map_selects_expected_profile() -> None:
     from sevn.config.routing import resolve_routing_profile_for_turn
 
@@ -90,9 +88,6 @@ def test_channel_map_selects_expected_profile() -> None:
     )
 
 
-@pytest.mark.xfail(
-    reason="green after W12: unknown route falls back to default profile", strict=False
-)
 def test_unknown_route_hits_configured_default_profile() -> None:
     from sevn.config.routing import resolve_routing_profile_for_turn
 
@@ -107,7 +102,6 @@ def test_unknown_route_hits_configured_default_profile() -> None:
     )
 
 
-@pytest.mark.xfail(reason="green after W12: unknown route deny mode", strict=False)
 def test_unknown_route_deny_mode_blocks_turn() -> None:
     from sevn.config.routing import (
         RoutingProfileDenied,

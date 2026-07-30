@@ -889,6 +889,18 @@ from ``menu_registry``, not hand-written ``config_sections/`` packages).
 each backup; legacy ``sevn.json.v*`` beside the active config migrate on the next write.
 Dashboard backup manifest/export/import use the same archive directory.
 
+## Amendments (open-issues-sweep W12 — #79)
+
+Named **routing profiles** live under ``routing.profiles`` (not ``permissions.profiles`` —
+D14). ``routing.channel_map`` maps ``channel:scope_key`` strings to profile names.
+Each profile may override model, system prompt, skills allowlist, ``memory_namespace``
+(persona files under ``.sevn/routing-profiles/<ns>/``), ``secrets_scope`` (logical-key
+prefix), and ``permissions_profile`` (a key in ``permissions.profiles``). Set
+``routing.enabled`` true to activate on the gateway turn spine; default-off preserves
+today's behavior when the section is absent (**D9**). Unknown routes honor
+``routing.unknown_route`` (``default`` | ``deny``). Turn metadata exposes
+``routing_profile`` for logs/transcripts.
+
 ## Test Strategy
 
 | Tests | Focus |

@@ -5,8 +5,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 _EXISTING_PROFILE_DOT_PATHS = frozenset(
     {
         "onboarding.applied_profile",
@@ -17,7 +15,6 @@ _EXISTING_PROFILE_DOT_PATHS = frozenset(
 )
 
 
-@pytest.mark.xfail(reason="green after W12: routing profile config namespace", strict=False)
 def test_routing_profile_dot_paths_do_not_collide_with_existing_profile_keys() -> None:
     from sevn.config.sections.routing import routing_profile_config_paths
 
@@ -29,9 +26,6 @@ def test_routing_profile_dot_paths_do_not_collide_with_existing_profile_keys() -
     assert paths.profiles_dot_path != "permissions.profiles"
 
 
-@pytest.mark.xfail(
-    reason="green after W12: schema exposes routing.profiles distinctly", strict=False
-)
 def test_schema_routing_profiles_is_separate_from_permissions_profiles() -> None:
     repo_root = Path(__file__).resolve().parents[3]
     schema = json.loads((repo_root / "infra" / "sevn.schema.json").read_text(encoding="utf-8"))
@@ -44,7 +38,6 @@ def test_schema_routing_profiles_is_separate_from_permissions_profiles() -> None
     assert routing_props["profiles"] is not permissions_props["profiles"]
 
 
-@pytest.mark.xfail(reason="green after W12: routing module documents disambiguation", strict=False)
 def test_routing_profile_disambiguation_doc_lists_four_existing_concepts() -> None:
     from sevn.config.sections.routing import routing_profile_disambiguation_notes
 

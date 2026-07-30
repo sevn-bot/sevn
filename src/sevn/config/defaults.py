@@ -180,6 +180,7 @@ DEFAULT_NATIVE_MODEL_ENABLED: Final[bool] = False
 
 # Tier-B CodeMode (``agent.codemode.enabled``); W8 default off.
 DEFAULT_CODEMODE_ENABLED: Final[bool] = False
+DEFAULT_ROUTING_PROFILES_ENABLED: Final[bool] = False
 
 # CodeMode sandbox (Monty) ``ResourceLimits`` — enforced inside the Rust sandbox so a
 # CPU-bound or pathological snippet (e.g. catastrophic regex) aborts in-sandbox instead of

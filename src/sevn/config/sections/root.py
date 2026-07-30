@@ -55,6 +55,7 @@ from sevn.config.sections.ops import (
 )
 from sevn.config.sections.providers import ProvidersWorkspaceSectionConfig
 from sevn.config.sections.provisioning import ProvisioningWorkspaceConfig
+from sevn.config.sections.routing import RoutingWorkspaceSectionConfig
 from sevn.config.sections.secrets import (
     SecretsBackendSectionConfig,
     _coerce_secrets_backend_model,
@@ -108,6 +109,7 @@ class WorkspaceConfig(BaseModel):
     replay: ReplayWorkspaceConfig | None = None
     harness: HarnessWorkspaceConfig | None = None
     permissions: JsonDict | None = None
+    routing: RoutingWorkspaceSectionConfig | None = None
     skills: JsonDict | None = None
     tools: JsonDict | None = None
     onboarding: OnboardingWorkspaceSectionConfig | None = None
@@ -124,6 +126,29 @@ class WorkspaceConfig(BaseModel):
     code_understanding: CodeUnderstandingSettings | None = None
     docs: DocsWorkspaceSectionConfig | None = None
     agent: AgentWorkspaceConfig | None = None
+
+    @field_validator("routing", mode="before")
+    @classmethod
+    def _coerce_routing_section(cls, v: object) -> object:
+        """Parse optional ``routing`` subtree (#79 / W12).
+
+        Args:
+            cls (type): Model class.
+            v (object): Raw JSON fragment.
+
+        Returns:
+            object: ``None``, existing model, or coerced mapping.
+
+        Examples:
+            >>> WorkspaceConfig._coerce_routing_section(None) is None
+            True
+        """
+        if v is None or isinstance(v, RoutingWorkspaceSectionConfig):
+            return v
+        if isinstance(v, dict):
+            return RoutingWorkspaceSectionConfig.model_validate(v)
+        msg = f"invalid routing section type: {type(v).__name__}"
+        raise ValueError(msg)
 
     @field_validator("agent", mode="before")
     @classmethod

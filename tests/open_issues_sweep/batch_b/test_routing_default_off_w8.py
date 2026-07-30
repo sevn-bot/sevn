@@ -76,5 +76,7 @@ def test_default_off_no_routing_overlay_keys_in_minimal_config(slot: ModelSlot) 
         if isinstance(body, dict):
             assert "model" not in body, f"unexpected channels.{name}.model in baseline"
             assert "system_prompt" not in body, f"unexpected channels.{name}.system_prompt"
-    assert "routing" not in doc
+    from sevn.config.routing import routing_profiles_active
+
+    assert not routing_profiles_active(cfg)
     assert resolve_model_slot(cfg, slot) == "minimax/MiniMax-M2.7"

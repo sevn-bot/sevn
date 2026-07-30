@@ -22,6 +22,7 @@ class PromptOverlaySource(StrEnum):
 
     topic = "topic"
     channel = "channel"
+    routing_profile = "routing_profile"
     metadata = "metadata"
     none = "none"
 
@@ -40,17 +41,20 @@ def resolve_turn_prompt_overlays(
     channel: str = "",
     scope_key: str | None = None,
     metadata_topic_prompt: str | None = None,
+    routing_profile_prompt: str | None = None,
 ) -> TurnPromptOverlays:
     """Resolve channel/topic system prompt overlay for tier-B assembly.
 
     Topic-level prompts beat channel-level prompts. Inbound metadata topic
-    prompts beat config lookup for the same topic (**W9.5**).
+    prompts beat config lookup for the same topic (**W9.5**). Routing profile
+    prompts apply when channel/topic overlays are absent (**W12**).
 
     Args:
         cfg (object): Parsed workspace settings.
         channel (str): Active channel adapter name.
         scope_key (str | None): Session scope key for topic resolution.
         metadata_topic_prompt (str | None): Topic prompt from inbound metadata.
+        routing_profile_prompt (str | None): Named routing profile prompt (**W12**).
 
     Returns:
         TurnPromptOverlays: Overlay text and provenance; absent keys ⇒ ``none``.
@@ -98,5 +102,15 @@ def resolve_turn_prompt_overlays(
         return TurnPromptOverlays(
             system_prompt=channel_prompt,
             source=PromptOverlaySource.channel,
+        )
+    profile_prompt = (
+        routing_profile_prompt.strip()
+        if isinstance(routing_profile_prompt, str) and routing_profile_prompt.strip()
+        else None
+    )
+    if profile_prompt is not None:
+        return TurnPromptOverlays(
+            system_prompt=profile_prompt,
+            source=PromptOverlaySource.routing_profile,
         )
     return TurnPromptOverlays(system_prompt=None, source=PromptOverlaySource.none)

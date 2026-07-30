@@ -1286,6 +1286,64 @@
         }
       }
     },
+    "routing": {
+      "type": "object",
+      "description": "Named routing profiles for turn-scoped model/prompt/skills/memory/permissions isolation (#79). Distinct from permissions.profiles and other *profile* keys (D14).",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "$comment": "Maintainer: D9 default-off — when false, routing profiles do not apply on the gateway turn spine."
+        },
+        "default_profile": {
+          "type": "string",
+          "default": "default",
+          "description": "Profile name used when channel_map has no match and unknown_route is default."
+        },
+        "unknown_route": {
+          "type": "string",
+          "enum": ["default", "deny"],
+          "default": "default",
+          "description": "Whether unknown routes fall back to default_profile or deny the turn."
+        },
+        "profiles": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "model": { "type": "string" },
+              "system_prompt": { "type": "string" },
+              "skills": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "memory_namespace": {
+                "type": "string",
+                "default": "default",
+                "description": "Persona/memory file namespace under content_root or .sevn/routing-profiles/<ns>/."
+              },
+              "secrets_scope": {
+                "type": "string",
+                "description": "Prefix for ${SECRET:…} logical keys scoped to this profile."
+              },
+              "permissions_profile": {
+                "type": "string",
+                "description": "Key under permissions.profiles for this route's tool policy."
+              },
+              "reasoning_effort": { "type": "string" }
+            }
+          },
+          "$comment": "Maintainer: routing.profiles — NOT permissions.profiles (D14)."
+        },
+        "channel_map": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Maps channel:scope_key (e.g. telegram:forum:1:42) to a routing.profiles key."
+        }
+      }
+    },
     "triager": {
       "type": "object",
       "properties": {

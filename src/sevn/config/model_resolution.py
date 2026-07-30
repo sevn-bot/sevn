@@ -351,6 +351,7 @@ class ModelResolutionSource(StrEnum):
     default = "default"
     workspace = "workspace"
     channel = "channel"
+    routing_profile = "routing_profile"
     session = "session"
 
 
@@ -391,8 +392,9 @@ def resolve_model_slot_for_turn(
     channel: str = "",
     scope_key: str | None = None,
     session_once_model: str | None = None,
+    routing_profile_model: str | None = None,
 ) -> ModelResolutionResult:
-    """Resolve a model slot with turn-scoped overlays (session → channel → workspace).
+    """Resolve a model slot with turn-scoped overlays (session → profile → channel → workspace).
 
     When no overlay applies, behavior matches :func:`resolve_model_slot` (**D9**
     default-off).
@@ -403,6 +405,7 @@ def resolve_model_slot_for_turn(
         channel (str): Active channel adapter name.
         scope_key (str | None): Session scope key for topic-level overrides.
         session_once_model (str | None): One-turn session override (**W10** hook).
+        routing_profile_model (str | None): Named routing profile model (**W12** hook).
 
     Returns:
         ModelResolutionResult: Resolved model id and winning provenance level.
@@ -423,6 +426,13 @@ def resolve_model_slot_for_turn(
     once = session_once_model.strip() if isinstance(session_once_model, str) else ""
     if once:
         return ModelResolutionResult(once, ModelResolutionSource.session)
+    profile_model = (
+        routing_profile_model.strip()
+        if isinstance(routing_profile_model, str) and routing_profile_model.strip()
+        else ""
+    )
+    if profile_model:
+        return ModelResolutionResult(profile_model, ModelResolutionSource.routing_profile)
     channel_model = resolve_channel_model_override(cfg, channel=channel, scope_key=scope_key)
     if channel_model is not None:
         return ModelResolutionResult(channel_model, ModelResolutionSource.channel)

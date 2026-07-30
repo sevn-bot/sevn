@@ -125,6 +125,7 @@ def registry_snapshot_from_tool_set(
     *,
     workspace: WorkspaceConfig | None = None,
     content_root: Path | None = None,
+    skill_allowlist: frozenset[str] | None = None,
 ) -> RegistrySnapshot:
     """Materialise a Triager catalogue slice from a session ``ToolSet``.
 
@@ -134,6 +135,7 @@ def registry_snapshot_from_tool_set(
             ``add_core_tools_to_all_context`` policy.
         content_root (Path | None): When set, loads ``TOOLS.md`` into
             ``tools_md_body`` for Triager prompts.
+        skill_allowlist (frozenset[str] | None): When set, restrict skill rows (**W12**).
 
     Returns:
         RegistrySnapshot: Sorted index rows for ``triage_turn`` validation.
@@ -156,13 +158,17 @@ def registry_snapshot_from_tool_set(
         >>> snap.skills[0].identifier
         'zebra'
     """
+    from sevn.config.routing import filter_tool_set_skills
+
+    filtered = filter_tool_set_skills(tool_set, skill_allowlist)
+    active = filtered if filtered is not None else tool_set
     tools = [
         RegistryIndexEntry(
             sort_name=definition.name,
             identifier=definition.name,
             display_line=f"{definition.name} - {definition.description.replace(chr(10), ' ').strip()}",
         )
-        for definition in sorted(tool_set.native, key=lambda row: row.name)
+        for definition in sorted(active.native, key=lambda row: row.name)
     ]
     mcp_servers = [
         RegistryIndexEntry(
@@ -170,7 +176,7 @@ def registry_snapshot_from_tool_set(
             identifier=definition.name,
             display_line=f"{definition.name} - {definition.description.replace(chr(10), ' ').strip()}",
         )
-        for definition in sorted(tool_set.mcp, key=lambda row: row.name)
+        for definition in sorted(active.mcp, key=lambda row: row.name)
     ]
     skills = [
         RegistryIndexEntry(
@@ -178,10 +184,10 @@ def registry_snapshot_from_tool_set(
             identifier=skill_name,
             display_line=f"{skill_name} - {summary.replace(chr(10), ' ').strip()}",
         )
-        for skill_name, summary in sorted(tool_set.skill_descriptions.items())
+        for skill_name, summary in sorted(active.skill_descriptions.items())
     ]
     available_skills: list[SkillSurfaceEntry] = []
-    for skill_name, payload in sorted(tool_set.skill_inventory.items()):
+    for skill_name, payload in sorted(active.skill_inventory.items()):
         raw_scripts = payload.get("scripts", [])
         raw_runnables = payload.get("runnables", [])
         scripts = [str(item) for item in raw_scripts] if isinstance(raw_scripts, list) else []
@@ -195,7 +201,7 @@ def registry_snapshot_from_tool_set(
             ),
         )
     add_core = _add_core_tools_to_all_context(workspace)
-    version = tool_set.registry_version or INITIAL_REGISTRY_VERSION
+    version = active.registry_version or INITIAL_REGISTRY_VERSION
     tools_md_body: str | None = None
     if content_root is not None:
         from sevn.workspace.tools_md import read_tools_md_body
@@ -420,6 +426,7 @@ def triage_context_from_session(
     turn_id: str = "",
     channel: str | None = None,
     user_id: str | None = None,
+    memory_namespace: str | None = None,
 ) -> TriagePromptContext:
     """Assemble per-call Triager suffix inputs from gateway history.
 
@@ -427,6 +434,7 @@ def triage_context_from_session(
     ``inject_group_triage_block`` is left false here; ``triage_turn`` merges via
     :func:`~sevn.agent.triager.run.should_inject_group_triage_block`.
     When ``layout`` is set, loads ``personality_markdown`` and ``lcm_summary_stub``.
+    Optional ``memory_namespace`` selects routing-profile persona files (**W12**).
 
     Args:
         conn (sqlite3.Connection): Gateway SQLite handle.
@@ -437,6 +445,7 @@ def triage_context_from_session(
         turn_id (str): Turn correlation id for routing-policy ack rotation.
         channel (str | None): Session channel for first-session scope resolution.
         user_id (str | None): Session user id for first-session scope resolution.
+        memory_namespace (str | None): Routing profile memory namespace when set.
 
     Returns:
         TriagePromptContext: Suffix inputs for ``triage_turn``.
@@ -462,7 +471,13 @@ def triage_context_from_session(
     personality_md: str | None = None
     personality_ver = 0
     if layout is not None:
-        personality_md, personality_ver = load_workspace_personality(layout.content_root)
+        from sevn.config.routing import routing_profile_personality_root
+
+        persona_root = routing_profile_personality_root(
+            layout.content_root,
+            memory_namespace or "default",
+        )
+        personality_md, personality_ver = load_workspace_personality(persona_root)
     lcm_stub = lcm_summary_stub_for_session(conn, session_id)
     agent_name = resolve_agent_display_name(workspace.model_dump(mode="json"))
     first_sess = is_first_session_turn(

@@ -1626,6 +1626,16 @@ paths — mirroring `take_regen_target` lifecycle. Persisted
 `providers.tier_default.B` is unchanged; `/status` shows staged vs persisted
 model when an override is pending.
 
+## Amendments (open-issues-sweep W12 — #79)
+
+When `routing.enabled` is true, `build_agent_run_turn` resolves one routing
+profile per turn from `routing.channel_map` + session scope key, threads
+overrides through model resolution (session → routing profile → channel →
+workspace), prompt overlays, skill registry filtering, persona/memory namespace,
+permissions, and logs `routing_profile` on turn metadata. Unknown routes with
+`routing.unknown_route: deny` reject the turn before triage. `TopicConfig.skills`
+from Telegram inbound metadata intersects the profile skill allowlist.
+
 ## Amendments (telegram-menu-redesign W9)
 
 Telegram `/config` callback routing serves the redesigned eight-tile tree via
