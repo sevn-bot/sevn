@@ -1,0 +1,193 @@
+# mergeCraft PR review (BYOK; https://github.com/alexhawat/mergeCraft).
+#
+# Replaces the upstream pullfrog/pullfrog action AND CodeRabbit. Auto-reviews PRs
+# on open / ready / new commits, posting inline comments + a summary as
+# github-actions[bot], plus opt-in `mergecraft` / `mergecraft-approval` check-runs.
+# The enforce step below fails the job when `mergecraft-approval` is "would not
+# approve" (outstanding review feedback). If the review cannot run (fork PR with
+# no secrets, Claude session limit, no approval posted), the job passes.
+#
+# mergeCraft reads the native GITHUB_EVENT_PATH, so the workflow just passes a
+# prompt — no ~mergecraft JSON payload needed.
+#
+# Auth: only CLAUDE_CODE_OAUTH_TOKEN is required (Claude subscription); the job
+# skips gracefully when it is absent (e.g. fork PRs).
+#
+# Trigger: pull_request_target (not pull_request). GitHub skips pull_request
+# workflows when refs/pull/N/merge cannot be built (merge conflicts), which
+# leaves ruleset require-mergecraft-review with a permanently missing check.
+# pull_request_target always fires on synchronize even with merge conflicts.
+#
+# Workflow resolution (GitHub Nov 2025 policy, effective 2025-12-08): pull_request_target
+# definitions are read from the repository default branch (`main`), not the PR base.
+# This copy on `main` is authoritative — PRs targeting `pre-*` / `develop` /
+# `test-pre` / `main` use this file for pull_request_target even when their base
+# branch carries a different workflow under `.github/workflows/`.
+#
+# Same-repo guard below keeps fork PRs from receiving secrets (prior pull_request
+# behavior). mergeCraft uses checkout_pr + API with push/shell disabled — no
+# PR-controlled scripts run in CI.
+#
+# Merge gate: ruleset `require-mergecraft-review` requires the **mergeCraft
+# review** job check only — not the raw `mergecraft` completion check (which goes
+# red on agent infra failures while the enforce step correctly fail-opens).
+name: mergecraft
+
+on:
+  pull_request_target:
+    # `pre-*` glob keeps every release-staging branch (pre-0.0.1, pre-0.0.2, …)
+    # auto-reviewed without editing this list each cut (matches the old
+    # .coderabbit.yaml `pre-.*` coverage).
+    branches: [main, develop, test-pre, "pre-*"]
+    types: [opened, synchronize, reopened, ready_for_review]
+  # Bootstrap for PRs landing this file on `main`: pull_request reads from the
+  # merge commit until this workflow exists on the default branch.
+  pull_request:
+    branches: [main, develop, test-pre, "pre-*"]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: Prompt for the agent (workflow_dispatch only)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  # Post inline PR review + comments.
+  pull-requests: write
+  issues: write
+  # Post mergecraft / mergecraft-approval check-runs.
+  checks: write
+  statuses: write
+  # mergeCraft can mint short-lived tokens via OIDC when configured.
+  id-token: write
+
+concurrency:
+  # pull_request_target resolves github.ref to the default branch; key on PR number
+  # so concurrent reviews do not cancel each other (GitHub Nov 2025 policy).
+  group: mergecraft-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: mergecraft review
+    # Skip drafts (reviewed once marked ready); always allow manual dispatch.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      IS_SAME_REPO: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
+      HAS_CLAUDE_CODE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
+
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          fetch-depth: 0
+          # Persist the checkout token so the mergeCraft action's own git layer
+          # (checkout_pr / git_fetch) can authenticate. Without it those git ops
+          # fail and the action marks its `mergecraft` self-status check red even
+          # though the review completes via the GitHub API. Read-only escalation
+          # only: the action already sets ``push: disabled`` / ``shell: disabled``
+          # below, so a persisted token cannot be used to push.
+          persist-credentials: true
+
+      - name: Ensure PR base ref exists locally
+        if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
+        run: |
+          set -euo pipefail
+          base="${{ github.event.pull_request.base.ref }}"
+          git fetch --no-tags origin "${base}:refs/remotes/origin/${base}"
+          git branch -f "${base}" "origin/${base}"
+
+      - name: Skip when Claude subscription auth is not configured
+        if: env.HAS_CLAUDE_CODE != 'true'
+        run: |
+          if [ "${{ env.IS_SAME_REPO }}" != "true" ]; then
+            echo "::notice title=mergecraft skipped::Fork PR — review skipped (same as before)."
+          else
+            echo "::notice title=mergecraft skipped::Configure CLAUDE_CODE_OAUTH_TOKEN to enable mergeCraft reviews."
+          fi
+
+      - name: mergeCraft PR review (Claude subscription)
+        if: env.HAS_CLAUDE_CODE == 'true'
+        id: mergecraft
+        continue-on-error: true
+        # mergeCraft — full SHA pinned to the alexhawat/mergeCraft `pre-0.0.1` head.
+        # The pin is MANDATORY, not a preference: sevn-bot enforces Actions SHA
+        # pinning (`sha_pinning_required`), so a branch ref like `@pre-0.0.1` is
+        # rejected at action-resolution time ("all actions must be pinned to a
+        # full-length commit SHA") before the review step runs. Bump this SHA and
+        # `MERGECRAFT_REF` in the Makefile together — `make mergecraft-ref-check`
+        # fails on one-sided bumps.
+        uses: alexhawat/mergeCraft@f98aeb0063b387a51960503a758351608d377002 # pre-0.0.1
+        with:
+          # For pull_request events, name the PR number explicitly so the agent
+          # calls checkout_pr(<n>) instead of asking which PR to review.
+          prompt: >-
+            ${{ ((github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('Review pull request #{0}. Call checkout_pr first. For base-side file reads use origin/{1}:path, not bare branch names. If prior mergeCraft threads are resolved and the latest commits address them, submit approved:true with a short summary. Focus on correctness, security, regressions, missing tests, and maintainability. Leave concise, actionable comments only for issues that should be addressed before merge.', github.event.pull_request.number, github.event.pull_request.base.ref))
+                || (github.event_name == 'workflow_dispatch' && inputs.prompt != '' && inputs.prompt)
+                || 'Review the current pull request.' }}
+          model: anthropic/claude-sonnet
+          push: disabled
+          shell: disabled
+          status_checks: enabled
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+      - name: mergeCraft review incomplete (non-fatal)
+        if: env.HAS_CLAUDE_CODE == 'true' && steps.mergecraft.outcome != 'success'
+        run: |
+          echo "::notice title=mergecraft incomplete::Review step did not finish successfully (see its log — e.g. Claude session limit or a runtime error). Approval enforcement skipped."
+
+      - name: Fail when mergeCraft would not approve
+        # Gate directly on the `mergecraft-approval` check-run, decoupled from the
+        # review step's own exit code (which can be non-zero on a benign output
+        # hiccup even when the review + approval check posted fine). Runs on every
+        # PR where auth is present.
+        if: >-
+          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          env.HAS_CLAUDE_CODE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # The action posts a `mergecraft-approval` check-run on the PR head SHA:
+          # conclusion=success => no outstanding feedback; failure => changes wanted.
+          # Retry so a transient API error is not mistaken for "no review ran"
+          # (which would silently mask a genuine "would not approve").
+          conclusion=""; queried=""
+          for attempt in $(seq 1 5); do
+            if conclusion="$(gh api "/repos/${REPO}/commits/${HEAD_SHA}/check-runs" \
+                --jq '[.check_runs[]? | select(.name == "mergecraft-approval")]
+                      | sort_by(.completed_at // .started_at) | last | .conclusion // ""')"; then
+              queried="yes"; break
+            fi
+            echo "check-runs query failed (attempt ${attempt}/5); retrying in 5s…" >&2
+            sleep 5
+          done
+          if [ -z "${queried}" ]; then
+            # DELIBERATE fail-open: if the check-runs API is unreachable even after
+            # retries, that's a GitHub-infra failure, not a review verdict. Blocking
+            # here (exit 1) would turn a GitHub API outage into a repo-wide merge
+            # freeze on every gated branch. We accept the small risk that a rare,
+            # sustained API outage lets one PR through unverified rather than halting
+            # all merges. (A genuine "would not approve" is handled below via the
+            # posted check-run, which does block.)
+            echo "::warning title=mergecraft approval unknown::Could not query check-runs for ${HEAD_SHA} after retries. Failing open (GitHub API issue) — approval state unverified."
+            exit 0
+          fi
+          case "${conclusion}" in
+            failure)
+              echo "::error title=mergecraft requested changes::mergecraft-approval check failed — address the review feedback on this PR."
+              exit 1
+              ;;
+            success)
+              echo "mergecraft approval: no outstanding review feedback."
+              ;;
+            *)
+              echo "::notice title=mergecraft approval not posted::No mergecraft-approval check on ${HEAD_SHA} (review found nothing to gate, or did not complete). Not blocking."
+              ;;
+          esac
