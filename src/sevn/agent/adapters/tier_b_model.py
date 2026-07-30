@@ -104,7 +104,7 @@ from sevn.agent.tracing.sink import TraceEvent, TraceSink
 from sevn.config.llm_params import (
     MINIMAX_THINKING_AGENTS,
     resolve_llm_request_params,
-    resolve_minimax_thinking_request,
+    resolve_reasoning_for_turn,
 )
 from sevn.config.model_resolution import is_minimax_catalog_model
 
@@ -2329,6 +2329,7 @@ def apply_minimax_anthropic_request_hygiene(
     workspace_id: str | None = None,
     executor_tier: str | None = None,
     thinking_via_capability: bool = False,
+    route_reasoning_effort: str | None = None,
     tool_choice_type: Literal["auto", "any"] | None = None,
 ) -> None:
     """Apply MiniMax anthropic-wire request param hygiene in place (D2).
@@ -2355,6 +2356,7 @@ def apply_minimax_anthropic_request_hygiene(
         workspace_id (str | None): Workspace id for ``metadata``.
         executor_tier (str | None): Executor tier label for ``metadata``.
         thinking_via_capability (bool): When ``True``, skip manual ``thinking`` body injection (W7).
+        route_reasoning_effort (str | None): Turn-scoped reasoning effort overlay (**W11**).
         tool_choice_type (Literal["auto", "any"] | None): Anthropic ``tool_choice.type``
             when ``has_tools``; defaults to ``"auto"``.
 
@@ -2397,7 +2399,12 @@ def apply_minimax_anthropic_request_hygiene(
         choice = tool_choice_type or "auto"
         req["tool_choice"] = {"type": choice}
     if not thinking_via_capability:
-        thinking = resolve_minimax_thinking_request(agent, model_id, content_root=content_root)
+        thinking = resolve_reasoning_for_turn(
+            agent,
+            model_id,
+            content_root=content_root,
+            route_reasoning_effort=route_reasoning_effort,
+        )
         if thinking is not None:
             req["thinking"] = thinking
     if agent in MINIMAX_THINKING_AGENTS:
@@ -2614,6 +2621,7 @@ def build_tier_b_function_model(
     on_granted_tool: Callable[[str], None] | None = None,
     lifecycle_via_hooks: bool = False,
     thinking_via_capability: bool = False,
+    route_reasoning_effort: str | None = None,
     turn_message_start_index: int = 0,
     codemode_sandboxed_tool_names: frozenset[str] = frozenset(),
     triager_bound_tool_choice: TriagerBoundToolChoiceContext | None = None,
@@ -2664,6 +2672,7 @@ def build_tier_b_function_model(
             for the ``FunctionModel`` transport path; ``TierBRoundBudgetGuardrailCapability``
             mirrors the same check for native-model runs (W8).
         thinking_via_capability (bool): When ``True``, skip manual MiniMax ``thinking`` body injection (W7).
+        route_reasoning_effort (str | None): Turn-scoped reasoning effort overlay (**W11**).
         turn_message_start_index (int): Anthropic row index where this turn's
             ``new_messages()`` begin; used to classify same-turn replay stubs (W3).
         codemode_sandboxed_tool_names (frozenset[str]): Tool names callable only inside
@@ -2973,6 +2982,7 @@ def build_tier_b_function_model(
                     workspace_id=workspace_id,
                     executor_tier=executor_tier,
                     thinking_via_capability=thinking_via_capability,
+                    route_reasoning_effort=route_reasoning_effort,
                     tool_choice_type=tool_choice_type,
                 )
             elif tool_choice_type is not None:

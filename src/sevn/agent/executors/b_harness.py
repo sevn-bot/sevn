@@ -1211,6 +1211,12 @@ async def run_b_turn(
     codemode_on = codemode_enabled(workspace, model_id=transport_bundle.model_id)
     if codemode_on:
         seeded_tools.add("run_code")
+    route_reasoning_effort_raw = tool_context.outbound_metadata.get("route_reasoning_effort")
+    route_reasoning_effort = (
+        route_reasoning_effort_raw.strip()
+        if isinstance(route_reasoning_effort_raw, str) and route_reasoning_effort_raw.strip()
+        else None
+    )
     registry_tool_names = frozenset(d.name for d in tool_executor.definitions())
     bound_tool_names = frozenset(registration.tool_names) | frozenset({"request_escalation"})
     if codemode_on:
@@ -1237,6 +1243,7 @@ async def run_b_turn(
         triage_tools=triage.tools,
         content_root=content_root,
         codemode_enabled=codemode_on,
+        route_reasoning_effort=route_reasoning_effort,
     )
     capability_owned_tools = registry_tool_names_owned_by_web_capabilities(web_thinking_extra)
     codemode_web_policy = resolve_web_egress_domain_policy(workspace) if codemode_on else None
@@ -1386,6 +1393,7 @@ async def run_b_turn(
         on_granted_tool=_on_auto_granted_tool,
         lifecycle_via_hooks=True,
         thinking_via_capability=thinking_via_capability,
+        route_reasoning_effort=route_reasoning_effort,
         turn_message_start_index=turn_message_start_index,
         codemode_sandboxed_tool_names=codemode_sandboxed_tool_names,
         triager_bound_tool_choice=triager_bound_tool_choice,
@@ -1412,6 +1420,7 @@ async def run_b_turn(
             channel=tool_context.delivery_channel or None,
             workspace_id=tool_context.workspace_id or None,
             executor_tier="B",
+            route_reasoning_effort=route_reasoning_effort,
             triager_bound_tool_choice=triager_bound_tool_choice,
         )
         model = resolve_pydantic_model_for_slot(workspace=workspace, ctx=native_ctx)

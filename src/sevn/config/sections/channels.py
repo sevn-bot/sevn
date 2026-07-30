@@ -150,6 +150,7 @@ class TelegramChannelConfig(BaseModel):
     owner_scanner_overrides: OwnerScannerOverrides = Field(default_factory=OwnerScannerOverrides)
     model: str | None = None
     system_prompt: str | None = None
+    reasoning_effort: str | None = None
 
 
 class WebChatChannelConfig(BaseModel):
@@ -167,6 +168,7 @@ class WebChatChannelConfig(BaseModel):
     telegram_bot_token_ref: str | None = None
     model: str | None = None
     system_prompt: str | None = None
+    reasoning_effort: str | None = None
 
 
 class VoiceConfig(BaseModel):

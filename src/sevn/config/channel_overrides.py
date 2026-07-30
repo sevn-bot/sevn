@@ -7,6 +7,7 @@ Exports:
     topic_id_from_scope_key — parse forum/topic id from a session scope key.
     resolve_channel_model_override — channel/topic model overlay (absent ⇒ None).
     resolve_channel_system_prompt_override — channel/topic prompt overlay.
+    resolve_channel_reasoning_effort_override — channel/topic reasoning effort overlay.
 """
 
 from __future__ import annotations
@@ -177,3 +178,41 @@ def resolve_channel_system_prompt_override(
         if topic_prompt is not None:
             return topic_prompt
     return _non_empty_str(extra.get("system_prompt"))
+
+
+def resolve_channel_reasoning_effort_override(
+    cfg: object,
+    *,
+    channel: str,
+    scope_key: str | None,
+) -> str | None:
+    """Return a channel- or topic-level reasoning effort when configured.
+
+    Args:
+        cfg (object): Parsed workspace settings.
+        channel (str): Active channel adapter name.
+        scope_key (str | None): Session scope key for topic resolution.
+
+    Returns:
+        str | None: Override effort label, or ``None`` when unset (**D9** default-off).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> cfg = WorkspaceConfig.minimal(
+        ...     channels={"telegram": {"reasoning_effort": "high"}},
+        ... )
+        >>> resolve_channel_reasoning_effort_override(cfg, channel="telegram", scope_key=None)
+        'high'
+    """
+    if not channel or not channel.strip():
+        return None
+    channels = getattr(cfg, "channels", None)
+    extra = channel_extra_dict(channels, channel.strip())
+    if not extra:
+        return None
+    topic_id = topic_id_from_scope_key(scope_key)
+    if topic_id is not None:
+        topic_effort = _non_empty_str(_topic_entry(extra, topic_id).get("reasoning_effort"))
+        if topic_effort is not None:
+            return topic_effort
+    return _non_empty_str(extra.get("reasoning_effort"))

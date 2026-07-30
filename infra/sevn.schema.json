@@ -132,7 +132,12 @@
         },
         "max_concurrent": { "type": "integer", "minimum": 1, "default": 2, "description": "Max concurrent running instances of this specialist across the workspace." },
         "skill": { "type": ["string", "null"], "description": "Bundled skill name this specialist is wired to (e.g. `media_generation`)." },
-        "system_prompt_ref": { "type": ["string", "null"], "description": "Optional reference to a system-prompt override for this specialist." }
+        "system_prompt_ref": { "type": ["string", "null"], "description": "Optional reference to a system-prompt override for this specialist." },
+        "reasoning_effort": {
+          "type": ["string", "null"],
+          "enum": ["minimal", "low", "medium", "high", "xhigh", null],
+          "description": "Optional reasoning effort hint for this specialist (#89 / W11)."
+        }
       },
       "additionalProperties": false
     }
@@ -915,6 +920,11 @@
             "type": "string",
             "description": "Per-channel system prompt overlay for tier-B assembly (#86 / W9). Absent ⇒ no overlay."
           },
+          "reasoning_effort": {
+            "type": "string",
+            "enum": ["minimal", "low", "medium", "high", "xhigh"],
+            "description": "Per-channel reasoning effort overlay for tier-B/C (#89 / W11). Absent ⇒ LLM_params default."
+          },
           "topics": {
             "type": "object",
             "additionalProperties": {
@@ -923,7 +933,11 @@
               "properties": {
                 "topic_id": { "type": "integer" },
                 "model": { "type": "string" },
-                "system_prompt": { "type": "string" }
+                "system_prompt": { "type": "string" },
+                "reasoning_effort": {
+                  "type": "string",
+                  "enum": ["minimal", "low", "medium", "high", "xhigh"]
+                }
               }
             },
             "$comment": "Forum topic overrides (`channels.telegram.topics`; W9). TopicConfig.skills is W12."

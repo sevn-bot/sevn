@@ -60,6 +60,7 @@ class SpecialistConfig(BaseModel):
     max_concurrent: int = Field(default=DEFAULT_SUBAGENT_SPECIALIST_MAX_CONCURRENT, ge=1)
     skill: str | None = None
     system_prompt_ref: str | None = None
+    reasoning_effort: str | None = None
     skills: list[str] = Field(default_factory=list)
     """Optional core skill ids assigned to this specialist's toolkit."""
     tools: list[str] = Field(default_factory=list)

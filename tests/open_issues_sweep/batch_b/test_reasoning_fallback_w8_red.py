@@ -5,46 +5,43 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from sevn.config.llm_params import LLM_PARAMS_FILENAME, resolve_reasoning_request
 
 
-@pytest.mark.xfail(
-    reason="green after W11: unsupported provider degrades with logged note",
-    strict=False,
-)
 def test_non_minimax_reasoning_override_logs_and_omits_wire_param(
     tmp_path: Path,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
+    from loguru import logger as loguru_logger
+
     from sevn.config.llm_params import resolve_reasoning_for_turn
 
-    (tmp_path / LLM_PARAMS_FILENAME).write_text(
-        json.dumps(
-            {
-                "tier_b": {
-                    "reasoning": {"enabled": True, "type": "enabled", "budget_tokens": 2048},
-                },
-            }
-        ),
-        encoding="utf-8",
-    )
-    body = resolve_reasoning_for_turn(
-        "tier_b",
-        "anthropic/claude-sonnet-4-20250514",
-        content_root=tmp_path,
-        route_reasoning_effort="high",
-    )
+    captured: list[str] = []
+    sink_id = loguru_logger.add(lambda rec: captured.append(str(rec)), level="INFO")
+    try:
+        (tmp_path / LLM_PARAMS_FILENAME).write_text(
+            json.dumps(
+                {
+                    "tier_b": {
+                        "reasoning": {"enabled": True, "type": "enabled", "budget_tokens": 2048},
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        body = resolve_reasoning_for_turn(
+            "tier_b",
+            "anthropic/claude-sonnet-4-20250514",
+            content_root=tmp_path,
+            route_reasoning_effort="high",
+        )
+    finally:
+        loguru_logger.remove(sink_id)
     assert body is None
-    joined = caplog.text.lower()
+    joined = " ".join(captured).lower()
     assert "reasoning" in joined
     assert "unsupported" in joined or "degrad" in joined or "skipped" in joined
 
 
-@pytest.mark.xfail(
-    reason="green after W11: route-level reasoning honors explicit effort", strict=False
-)
 def test_explicit_reasoning_effort_on_supported_minimax(tmp_path: Path) -> None:
     from sevn.config.llm_params import resolve_reasoning_for_turn
 

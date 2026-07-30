@@ -1994,6 +1994,15 @@ def build_agent_run_turn(
         if overlays.system_prompt:
             extra_parts.append(overlays.system_prompt)
         route_meta["prompt_overlay_source"] = overlays.source.value
+        from sevn.config.channel_overrides import resolve_channel_reasoning_effort_override
+
+        route_effort = resolve_channel_reasoning_effort_override(
+            workspace,
+            channel=sess.channel,
+            scope_key=sess.scope_key,
+        )
+        if route_effort is not None:
+            route_meta["route_reasoning_effort"] = route_effort
         extra_instructions = "\n\n".join(p for p in extra_parts if p.strip())
 
         tier_b_tool_context = _tool_context_for_turn(

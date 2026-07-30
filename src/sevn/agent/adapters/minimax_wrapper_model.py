@@ -50,7 +50,7 @@ from sevn.agent.adapters.tier_b_model import (
     build_llm_request_metadata,
     repair_openai_tool_pairing,
 )
-from sevn.config.llm_params import MINIMAX_THINKING_AGENTS, resolve_minimax_thinking_request
+from sevn.config.llm_params import MINIMAX_THINKING_AGENTS, resolve_reasoning_for_turn
 from sevn.config.model_resolution import is_minimax_catalog_model
 
 if TYPE_CHECKING:
@@ -74,6 +74,7 @@ class MiniMaxHygieneContext:
     workspace_id: str | None = None
     executor_tier: str | None = None
     triager_bound_tool_choice: TriagerBoundToolChoiceContext | None = None
+    route_reasoning_effort: str | None = None
 
 
 def _with_xml_tool_recovery(response: ModelResponse) -> ModelResponse:
@@ -370,10 +371,11 @@ class MiniMaxWrapperModel(WrapperModel):
             else:
                 payload["tool_choice"] = {"type": "auto"}
 
-        thinking = resolve_minimax_thinking_request(
+        thinking = resolve_reasoning_for_turn(
             self.hygiene.agent,
             self.catalog_model_id,
             content_root=self.hygiene.content_root,
+            route_reasoning_effort=self.hygiene.route_reasoning_effort,
         )
         if thinking is not None:
             payload["anthropic_thinking"] = thinking
@@ -584,10 +586,11 @@ class MiniMaxOpenAIWrapperModel(WrapperModel):
             else:
                 payload["tool_choice"] = "auto"
 
-        thinking = resolve_minimax_thinking_request(
+        thinking = resolve_reasoning_for_turn(
             self.hygiene.agent,
             self.catalog_model_id,
             content_root=self.hygiene.content_root,
+            route_reasoning_effort=self.hygiene.route_reasoning_effort,
         )
         if thinking is not None:
             payload["openai_thinking"] = thinking

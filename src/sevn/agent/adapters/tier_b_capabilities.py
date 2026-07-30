@@ -11,7 +11,8 @@ Exports:
     resolve_web_egress_domain_policy — read domain policy from workspace config.
     provider_supports_native_web_search — whether native provider search is available.
     provider_supports_native_web_fetch — whether native provider fetch is available.
-    resolve_thinking_effort — map ``minimax_thinking`` config to ``Thinking`` effort.
+    provider_supports_reasoning_capability — whether extended reasoning is available.
+    resolve_thinking_effort — map reasoning config to pydantic-ai ``Thinking`` effort.
     build_serp_local_tool — ``serp`` local fallback via ``ToolExecutor``.
     build_get_page_content_local_tool — ``get_page_content`` local fallback via ``ToolExecutor``.
     make_codemode_web_registry_tool — web registry ``Tool`` with egress policy + ``code_mode=True``.
@@ -42,7 +43,7 @@ from sevn.agent.adapters.tier_b_tools import (
     _dispatch_tool,
     tool_definition_to_args_model,
 )
-from sevn.config.llm_params import resolve_minimax_thinking_request
+from sevn.config.llm_params import ReasoningParams, resolve_reasoning_params
 from sevn.config.model_resolution import is_minimax_catalog_model
 from sevn.config.sections.providers import providers_section_dict
 from sevn.tools.base import enveloped_failure
@@ -473,20 +474,82 @@ def build_get_page_content_local_tool(
     )
 
 
+def provider_supports_reasoning_capability(
+    model_id: str,
+    providers_obj: dict[str, Any] | None,
+) -> bool:
+    """Return whether the resolved model may use extended reasoning (wire or capability).
+
+    MiniMax catalog ids use the anthropic-wire ``thinking`` body; Anthropic and OpenAI
+    families use pydantic-ai ``Thinking`` when reasoning is enabled.
+
+    Args:
+        model_id (str): Catalog model id for the tier-B slot.
+        providers_obj (dict[str, Any] | None): Merged ``providers`` block.
+
+    Returns:
+        bool: ``True`` when reasoning effort may apply for this model.
+
+    Examples:
+        >>> provider_supports_reasoning_capability("minimax/MiniMax-M2", None)
+        True
+        >>> provider_supports_reasoning_capability("anthropic/claude-sonnet-4-20250514", None)
+        True
+        >>> provider_supports_reasoning_capability("bedrock/anthropic.claude-3-haiku", None)
+        False
+    """
+    if is_minimax_catalog_model(model_id):
+        return True
+    family = _catalog_provider_family(model_id, providers_obj)
+    return family in {"anthropic", "openai"}
+
+
+def _thinking_effort_from_params(params: ReasoningParams) -> ThinkingLevel | None:
+    """Map resolved :class:`ReasoningParams` to a pydantic-ai effort level.
+
+    Args:
+        params (ReasoningParams): Resolved reasoning bundle.
+
+    Returns:
+        ThinkingLevel | None: Effort for ``Thinking(effort=...)``.
+
+    Examples:
+        >>> _thinking_effort_from_params(ReasoningParams(enabled=True, effort="high"))
+        'high'
+    """
+    if params.effort is not None:
+        return cast("ThinkingLevel", params.effort)
+    if params.type == "adaptive":
+        return "medium"
+    budget = params.budget_tokens
+    if isinstance(budget, int):
+        if budget >= 4096:
+            return "high"
+        if budget >= 2048:
+            return "medium"
+        return "low"
+    return "medium"
+
+
 def resolve_thinking_effort(
     agent: str,
     model_id: str,
     *,
     content_root: object | None = None,
+    route_reasoning_effort: str | None = None,
+    providers_obj: dict[str, Any] | None = None,
 ) -> ThinkingLevel | None:
-    """Map workspace ``minimax_thinking`` config to pydantic-ai ``Thinking`` effort.
+    """Map workspace reasoning config to pydantic-ai ``Thinking`` effort.
 
-    Returns ``None`` when thinking is disabled or the model/agent is out of scope.
+    Returns ``None`` when thinking is disabled, the agent is out of scope, or the
+    provider lacks reasoning support.
 
     Args:
         agent (str): Agent key (``tier_b`` / ``tier_cd``).
         model_id (str): Resolved catalog model id.
         content_root (object | None): Workspace content root for overrides.
+        route_reasoning_effort (str | None): Turn-scoped effort overlay (**W11**).
+        providers_obj (dict[str, Any] | None): Merged ``providers`` block.
 
     Returns:
         ThinkingLevel | None: Effort level for ``Thinking(effort=...)``.
@@ -500,20 +563,17 @@ def resolve_thinking_effort(
     from pathlib import Path
 
     root = content_root if isinstance(content_root, Path) else None
-    thinking_body = resolve_minimax_thinking_request(agent, model_id, content_root=root)
-    if thinking_body is None:
+    params = resolve_reasoning_params(
+        agent,
+        model_id,
+        content_root=root,
+        route_reasoning_effort=route_reasoning_effort,
+    )
+    if not params.enabled:
         return None
-    thinking_type = str(thinking_body.get("type", "adaptive"))
-    if thinking_type == "adaptive":
-        return "medium"
-    budget = thinking_body.get("budget_tokens")
-    if isinstance(budget, int):
-        if budget >= 4096:
-            return "high"
-        if budget >= 2048:
-            return "medium"
-        return "low"
-    return "medium"
+    if not provider_supports_reasoning_capability(model_id, providers_obj):
+        return None
+    return _thinking_effort_from_params(params)
 
 
 def build_web_thinking_extra_capabilities(
@@ -524,6 +584,7 @@ def build_web_thinking_extra_capabilities(
     triage_tools: tuple[str, ...] | list[str] | frozenset[str],
     content_root: object | None = None,
     codemode_enabled: bool = False,
+    route_reasoning_effort: str | None = None,
 ) -> tuple[list[AbstractCapability[BTierDeps]], bool]:
     """Build optional W7 capabilities for one tier-B turn.
 
@@ -535,6 +596,7 @@ def build_web_thinking_extra_capabilities(
         content_root (object | None): Workspace content root for thinking overrides.
         codemode_enabled (bool): When ``True``, omit ``WebSearch`` / ``WebFetch`` so triager-scoped
             web tools stay on the registry path with ``code_mode=True`` (W8+B).
+        route_reasoning_effort (str | None): Turn-scoped reasoning effort overlay (**W11**).
 
     Returns:
         tuple[list[AbstractCapability[BTierDeps]], bool]: Capabilities and whether
@@ -596,7 +658,13 @@ def build_web_thinking_extra_capabilities(
                 ),
             )
 
-    effort = resolve_thinking_effort("tier_b", model_id, content_root=content_root)
+    effort = resolve_thinking_effort(
+        "tier_b",
+        model_id,
+        content_root=content_root,
+        route_reasoning_effort=route_reasoning_effort,
+        providers_obj=providers_obj,
+    )
     thinking_via_capability = effort is not None
     if thinking_via_capability:
         extras.append(Thinking(effort=cast("ThinkingLevel", effort)))
@@ -640,6 +708,7 @@ __all__ = [
     "make_codemode_web_registry_tool",
     "provider_supports_native_web_fetch",
     "provider_supports_native_web_search",
+    "provider_supports_reasoning_capability",
     "registry_tool_names_owned_by_web_capabilities",
     "resolve_thinking_effort",
     "resolve_web_egress_domain_policy",
