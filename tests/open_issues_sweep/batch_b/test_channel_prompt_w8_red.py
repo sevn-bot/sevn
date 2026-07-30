@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
 from tests.open_issues_sweep.batch_b.conftest import baseline_minimal_workspace
 
 
@@ -27,9 +26,6 @@ def _assemble_tier_b_prompt(
     return "\n\n".join(parts)
 
 
-@pytest.mark.xfail(
-    reason="green after W9: channel system prompt reaches tier-B assembly", strict=False
-)
 def test_channel_system_prompt_reaches_tier_b_assembly(batch_b_content_root: Path) -> None:
     cfg_doc = baseline_minimal_workspace().model_dump()
     cfg_doc["channels"] = {
@@ -47,10 +43,6 @@ def test_channel_system_prompt_reaches_tier_b_assembly(batch_b_content_root: Pat
     assert "CHANNEL SYSTEM: use terse bullet answers." in prompt
 
 
-@pytest.mark.xfail(
-    reason="green after W9: TopicConfig.system_prompt wired for forum topics",
-    strict=False,
-)
 def test_topic_config_system_prompt_reaches_tier_b_assembly(batch_b_content_root: Path) -> None:
     cfg_doc = baseline_minimal_workspace().model_dump()
     cfg_doc["channels"] = {
@@ -75,9 +67,6 @@ def test_topic_config_system_prompt_reaches_tier_b_assembly(batch_b_content_root
     assert "TOPIC SYSTEM: stay on music catalog tasks only." in prompt
 
 
-@pytest.mark.xfail(
-    reason="green after W9: channel prompt does not leak across channels", strict=False
-)
 def test_channel_prompt_isolated_per_channel(batch_b_content_root: Path) -> None:
     cfg_doc = baseline_minimal_workspace().model_dump()
     cfg_doc["channels"] = {

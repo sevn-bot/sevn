@@ -160,7 +160,6 @@ def _workspace_for_case(case: _PrecedenceCase) -> object:
         ),
     ],
 )
-@pytest.mark.xfail(reason="green after W9: turn-scoped model precedence matrix", strict=False)
 def test_model_precedence_matrix_exactly_one_winner(case: _PrecedenceCase) -> None:
     cfg = _workspace_for_case(case)
     model_id, source = _resolve_turn_model(
@@ -173,7 +172,6 @@ def test_model_precedence_matrix_exactly_one_winner(case: _PrecedenceCase) -> No
     assert source == case.expected_source
 
 
-@pytest.mark.xfail(reason="green after W9: scope_key channel overlay", strict=False)
 def test_precedence_scope_key_does_not_leak_across_topics() -> None:
     cfg = _workspace_for_case(
         _PrecedenceCase(

@@ -1540,6 +1540,8 @@ def build_agent_run_turn(
                     content_root=layout.content_root,
                     trace=trace,
                     turn_span_id=turn_span_id,
+                    channel=sess.channel,
+                    scope_key=sess.scope_key,
                 )
                 triager_ms = max(1, int((time_ns() - triage_started_ns) / 1_000_000))
                 l1_state.triager_ms = triager_ms
@@ -1854,7 +1856,14 @@ def build_agent_run_turn(
         if tier_b_bundle_factory is not None:
             bundle = await tier_b_bundle_factory(workspace)
         else:
-            bundle = _resolve_tier_b_bundle(workspace, process)
+            bundle = _resolve_tier_b_bundle(
+                workspace,
+                process,
+                channel=sess.channel,
+                scope_key=sess.scope_key,
+            )
+            if bundle.model_source:
+                route_meta["model_resolution_source"] = bundle.model_source
         exe, tool_set = session_exe, session_tool_set
         if first_task is not None:
             await first_task
@@ -1964,6 +1973,18 @@ def build_agent_run_turn(
             if is_routing_footer_query(user_text):
                 extra_parts.append(tier_b_routing_footer_inject())
             extra_parts.append(tier_b_repo_access_prompt(workspace, layout.content_root))
+        from sevn.agent.prompt_overlays import resolve_turn_prompt_overlays
+
+        topic_prompt = route_meta.get("topic_system_prompt")
+        overlays = resolve_turn_prompt_overlays(
+            workspace,
+            channel=sess.channel,
+            scope_key=sess.scope_key,
+            metadata_topic_prompt=topic_prompt if isinstance(topic_prompt, str) else None,
+        )
+        if overlays.system_prompt:
+            extra_parts.append(overlays.system_prompt)
+        route_meta["prompt_overlay_source"] = overlays.source.value
         extra_instructions = "\n\n".join(p for p in extra_parts if p.strip())
 
         tier_b_tool_context = _tool_context_for_turn(
@@ -2772,7 +2793,12 @@ def build_agent_run_turn(
             if tier_b_bundle_factory is not None:
                 bundle = await tier_b_bundle_factory(workspace_local)
             else:
-                bundle = _resolve_tier_b_bundle(workspace_local, process)
+                bundle = _resolve_tier_b_bundle(
+                    workspace_local,
+                    process,
+                    channel=sess.channel,
+                    scope_key=sess.scope_key,
+                )
             triage_ctx = triage_context_from_session(
                 conn,
                 session_id,
@@ -4101,11 +4127,18 @@ def _providers_mapping(workspace: WorkspaceConfig) -> dict[str, Any]:
 def _resolve_tier_b_bundle(
     workspace: WorkspaceConfig,
     process: ProcessSettings,
+    *,
+    channel: str = "",
+    scope_key: str | None = None,
+    session_once_model: str | None = None,
 ) -> ResolvedTierBModel:
     """Resolve tier-B model + transport for ``run_b_turn``.
     Args:
         workspace (WorkspaceConfig): Parsed workspace configuration.
         process (ProcessSettings): Process settings (proxy URL).
+        channel (str): Active channel adapter name for turn overlays.
+        scope_key (str | None): Session scope key for topic-level overrides.
+        session_once_model (str | None): One-turn session model override (**W10** hook).
     Returns:
         ResolvedTierBModel: Bundle passed to the tier-B harness.
     Examples:
@@ -4113,7 +4146,16 @@ def _resolve_tier_b_bundle(
         >>> inspect.isfunction(_resolve_tier_b_bundle)
         True
     """
-    model_id = resolve_model_slot(workspace, ModelSlot.tier_b)
+    from sevn.config.model_resolution import resolve_model_slot_for_turn
+
+    resolved = resolve_model_slot_for_turn(
+        workspace,
+        ModelSlot.tier_b,
+        channel=channel,
+        scope_key=scope_key,
+        session_once_model=session_once_model,
+    )
+    model_id = resolved.model_id
     transport_name = resolve_transport_for_model_id(_providers_mapping(workspace), model_id)
     _, transport = resolve_model(
         model_id=model_id,
@@ -4124,6 +4166,7 @@ def _resolve_tier_b_bundle(
         model_id=model_id,
         transport=transport,
         budget=ModelBudget(model_id=model_id, regime=BudgetRegime.PER_TOKEN),
+        model_source=resolved.source.value,
     )
 
 

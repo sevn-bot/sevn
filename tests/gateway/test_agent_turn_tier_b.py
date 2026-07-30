@@ -258,9 +258,21 @@ async def test_agent_turn_tier_b_tool_context_and_model_slot(
     slot_calls: list[ModelSlot] = []
     captured_ctx: dict[str, Any] = {}
 
-    def _resolve_slot(ws: WorkspaceConfig, slot: ModelSlot) -> str:
+    def _resolve_for_turn(
+        ws: WorkspaceConfig,
+        slot: ModelSlot,
+        **kwargs: Any,
+    ) -> Any:
+        _ = ws, kwargs
         slot_calls.append(slot)
-        return "openai/gpt-tier-b-test"
+        from sevn.config.model_resolution import ModelResolutionResult, ModelResolutionSource
+
+        return ModelResolutionResult("openai/gpt-tier-b-test", ModelResolutionSource.default)
+
+    monkeypatch.setattr(
+        "sevn.config.model_resolution.resolve_model_slot_for_turn",
+        _resolve_for_turn,
+    )
 
     def _fake_resolve_model(
         *,
@@ -292,7 +304,6 @@ async def test_agent_turn_tier_b_tool_context_and_model_slot(
             rounds_used=1,
         )
 
-    monkeypatch.setattr(agent_turn_mod, "resolve_model_slot", _resolve_slot)
     monkeypatch.setattr(agent_turn_mod, "resolve_model", _fake_resolve_model)
     monkeypatch.setattr(agent_turn_mod, "run_b_turn", _fake_run_b_turn)
 

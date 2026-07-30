@@ -907,6 +907,27 @@
             "items": { "type": "string" },
             "$comment": "Maintainer: the design docs (MCP precedence). Session mcp_enabled overrides channel list overrides workspace mcp_enabled; absent at all levels means no MCP for that session."
           },
+          "model": {
+            "type": "string",
+            "description": "Per-channel model override for triager and tier-B turns (#86 / W9). Absent ⇒ workspace slot."
+          },
+          "system_prompt": {
+            "type": "string",
+            "description": "Per-channel system prompt overlay for tier-B assembly (#86 / W9). Absent ⇒ no overlay."
+          },
+          "topics": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "topic_id": { "type": "integer" },
+                "model": { "type": "string" },
+                "system_prompt": { "type": "string" }
+              }
+            },
+            "$comment": "Forum topic overrides (`channels.telegram.topics`; W9). TopicConfig.skills is W12."
+          },
           "rich": {
             "type": "object",
             "additionalProperties": true,
