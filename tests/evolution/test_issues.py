@@ -168,7 +168,6 @@ def test_evolution_issue_roundtrip_dict() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W5: neutral issue filing confirmation wording", strict=False)
 async def test_file_issue_confirmation_is_neutral_before_github_number(tmp_path: Path) -> None:
     """#68: confirmation must not presuppose GitHub issue numbers before creation succeeds."""
     from unittest.mock import AsyncMock, MagicMock

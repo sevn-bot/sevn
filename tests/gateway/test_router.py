@@ -361,7 +361,6 @@ async def test_reply_quote_prefix_persisted_untruncated(
         conn.close()
 
 
-@pytest.mark.xfail(reason="green after W5: outbound reply binds answered turn", strict=False)
 def test_outbound_routing_metadata_binds_answered_turn_not_latest_user() -> None:
     """#67 outbound: ``reply_to_message_id`` must come from the turn being answered."""
     import json
@@ -382,26 +381,27 @@ def test_outbound_routing_metadata_binds_answered_turn_not_latest_user() -> None
     conn.execute(
         """
         INSERT INTO gateway_messages(
-            session_id, role, kind, content, visible_to_llm, status, turn_id, extras_json
-        ) VALUES (?,?,?,?,?,?,?,?)
+            session_id, role, kind, content, visible_to_llm, status, turn_id, extras_json,
+            created_at
+        ) VALUES (?,?,?,?,?,?,?,?,?)
         """,
-        (sid, "user", "message", "older question", 1, "sent", "turn-a", older_extras),
+        (sid, "user", "message", "older question", 1, "sent", "turn-a", older_extras, "t1"),
     )
     conn.execute(
         """
         INSERT INTO gateway_messages(
-            session_id, role, kind, content, visible_to_llm, status, turn_id, extras_json
-        ) VALUES (?,?,?,?,?,?,?,?)
+            session_id, role, kind, content, visible_to_llm, status, turn_id, extras_json,
+            created_at
+        ) VALUES (?,?,?,?,?,?,?,?,?)
         """,
-        (sid, "user", "message", "newer question", 1, "sent", "turn-b", newer_extras),
+        (sid, "user", "message", "newer question", 1, "sent", "turn-b", newer_extras, "t2"),
     )
     conn.commit()
-    md = _outbound_routing_metadata(conn, sid, "telegram", "1")
+    md = _outbound_routing_metadata(conn, sid, "telegram", "1", "turn-a")
     assert md.get("reply_to_message_id") == 100
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W5: referenced quote block is explicit", strict=False)
 async def test_route_inbound_marks_referenced_quote_block_explicitly(
     tmp_path: Path,
     monkeypatch: Any,

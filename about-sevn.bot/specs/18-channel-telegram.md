@@ -555,6 +555,21 @@ operator on a validation failure:
 - Inline-keyboard flows (e.g. vault browse) reuse the existing `✗ Cancel` button pattern
   where a keyboard is already present.
 
+## Amendments (open-issues-sweep W5 — #67, #68)
+
+Quoted-message handling splits **verbatim quote suppression** from **turn identity**:
+
+- Replying to the bot's own Telegram message suppresses ``reply_to_quote`` (no duplicate
+  assistant body in context) but still sets ``referenced_message_id`` and
+  ``reply_to_message_id`` in inbound metadata.
+- ``ChannelRouter._prefix_inbound_referenced_context`` wraps quote text in
+  ``[Referenced message]`` markers (or resolves bot-self-replies from stored assistant
+  rows via ``lookup_assistant_row_by_platform_message``).
+- Outbound ``reply_to_message_id`` binds to the **turn being answered** via
+  ``_outbound_routing_metadata(..., turn_id=correlation_id)``, not the latest user row.
+
+``format_reply_quote`` and callback-query ingest (no reply context) remain unchanged.
+
 - [`PlatformChannelConfig`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
 - [`busy_input_mode_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
 - [`channel_blob`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`

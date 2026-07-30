@@ -617,6 +617,13 @@ def tier_b_retrieval_honesty_prompt() -> str:
         'Never answer "fresh session, no history" or similar unless `history` (or the '
         "fallback recall path) succeeded with an empty result set.\n"
         "\n"
+        "## Referenced messages (mandatory)\n"
+        "When the operator message includes a ``[Referenced message]`` or ``[Quote]`` "
+        "block, treat it as a pointer to earlier content — not as verified fact. Before "
+        "summarizing or attributing statements to the operator from such a block, verify "
+        "via `history`, `read_transcript`, or another recall tool. Do not claim the "
+        "operator said something that appears only inside referenced context.\n"
+        "\n"
         "**Conversation recall — use the recall tools, never walk the filesystem.** "
         "For 'what did I ask', 'last/previous sessions', 'earlier you said', or any "
         "question about prior conversation, call `history` (cross-session search; pass "

@@ -253,9 +253,6 @@ def test_parse_webhook_suppresses_bot_self_reply_quote() -> None:
     assert msg.text == "follow-up"
 
 
-@pytest.mark.xfail(
-    reason="green after W5: bot-self-reply exposes referenced turn identity", strict=False
-)
 def test_bot_self_reply_carries_referenced_turn_identity() -> None:
     """#67 inbound: replying to the bot's own message must identify the referenced turn."""
     cfg = TelegramConfig(bot_token="", bot_user_id=777)
