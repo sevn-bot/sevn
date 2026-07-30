@@ -7,8 +7,8 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
-last_updated: '2026-07-27'
-fingerprint: sha256:f2917500381bc27cb16da54a35eaa5df427f8dfcd6687f4e7026452c646674e2
+last_updated: '2026-07-30'
+fingerprint: sha256:bc74621372954bf0029bf10299c7c29883a5525218f74fce18c307d7a69de555
 related: []
 sources:
 - src/sevn/gateway/**
@@ -252,6 +252,9 @@ interfaces:
 - name: MenuFormHandler
   file: src/sevn/gateway/commands/menu_form_handler.py
   symbol: MenuFormHandler
+- name: form_prompt_with_cancel
+  file: src/sevn/gateway/commands/menu_form_handler.py
+  symbol: form_prompt_with_cancel
 - name: parse_form_callback
   file: src/sevn/gateway/commands/menu_form_handler.py
   symbol: parse_form_callback
@@ -1580,6 +1583,17 @@ Sub-agent L1 registration/finalize hooks in `_run_guarded` (spec-36).
 `session_manager.enqueue_dispatch` classifies busy input via relatedness labels
 and may spawn concurrent L1 tier-B runs (`src/sevn/gateway/queue/queue_multi.py`).
 `routing_footer.py` tags parallel L1 replies with short sub-agent ids.
+
+## Amendments (open-issues-sweep W7 — #70)
+
+When ``multi`` queue mode spawns a new turn because the relatedness classifier
+timed out, queue internals never surface as user-visible text on an unrelated
+turn — no operator notice via ``notify_operator`` / ``route_outgoing``, and no
+edit into a prior turn's placeholder bubble. Routing extras
+(``relatedness_classifier_fallback``, ``chat_id``) are still preserved for the
+spawned turn; the decision is logged as
+``gateway.queue_classifier_timeout_spawned`` with ``prior_turn_id``,
+``new_turn_id``, ``timeout_s``, and ``routing_action``.
 
 ## Amendments (telegram-menu-redesign W9)
 

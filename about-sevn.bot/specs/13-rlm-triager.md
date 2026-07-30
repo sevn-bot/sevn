@@ -7,7 +7,7 @@ owner: Alex
 summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–§5.2):
   a single, tool-less outbound generation step that emits validated TriageResult consumed
   by tier dispatch (A / B / C / D), MCP e'
-last_updated: '2026-07-29'
+last_updated: '2026-07-30'
 fingerprint: sha256:71b7c8889a302835169e10dfcef10ab6c20e112d4a6c0be4607f6f0ed2cb1465
 related: []
 sources:
@@ -1451,3 +1451,7 @@ Relatedness classifier for `multi` queue mode: `classify_busy_relatedness` in
 ### 10.2 monty-013 W11 — triager pydantic-ai v2 surface — append-only
 
 The triager adapter runs on the same **pydantic-ai v2** stack as tier B (monty-013 W3). Model resolution uses provider-prefixed names and `resolve_model_slot()` unchanged in contract; v2 migration touched token terms (`input_tokens` / `output_tokens` / `RunUsage`), streaming property access, and OTel v4 usage attribute shape (D11). No harness delegation capabilities attach to the triager — routing stays structured-output + gateway policy (§10.1). Harness `Memory` remains deferred for tier B (spec-14 §10.2).
+
+### 10.3 open-issues-sweep W7 — classifier-timeout spawn notice — append-only
+
+On relatedness classifier timeout in ``multi`` queue mode, ``classify_relatedness`` returns ``new_task`` with ``fallback=True`` (D15). The gateway spawns a concurrent L1 tier-B turn and preserves dispatch routing extras — but does **not** emit a user-facing timeout notice on the in-flight turn's bubble or as a standalone assistant row (#70). Operators diagnose the fallback via ``gateway.queue_classifier_timeout_spawned`` (prior/new turn ids, ``timeout_s``, ``routing_action``) plus the existing ``relatedness_classifier_timeout`` log from ``classify_relatedness``.

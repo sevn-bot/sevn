@@ -218,7 +218,6 @@ async def test_multi_supersede_cancel_aborts_in_flight(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W7: timeout notice not on prior turn", strict=False)
 async def test_multi_classifier_timeout_notice_not_on_prior_turn(
     tmp_path: Path,
     allow_scan: None,
@@ -226,17 +225,23 @@ async def test_multi_classifier_timeout_notice_not_on_prior_turn(
 ) -> None:
     """#70 inverted: classifier timeout must not mutate the prior turn's visible reply."""
     gate = asyncio.Event()
-    run_turn_calls: list[tuple[str, str]] = []
+    spawned: list[str] = []
     outbound_texts: list[str] = []
     edit_calls: list[tuple[int | None, str]] = []
 
     async def slow_run(sid: str, cid: str) -> None:
-        run_turn_calls.append((sid, cid))
         gate.set()
         await asyncio.sleep(0.25)
 
     async def classify(_inp: RelatednessInput) -> RelatednessResult:
         return RelatednessResult(label="new_task", fallback=True)
+
+    async def spawn_ok(_sid: str, cid: str) -> MultiSpawnOutcome:
+        spawned.append(cid)
+        return MultiSpawnOutcome.SPAWNED
+
+    async def notify_must_not(_sid: str, _line: str) -> None:
+        pytest.fail("classifier timeout must not call notify_operator")
 
     class _EditCaptureTelegram(TelegramAdapter):
         def __init__(self) -> None:
@@ -256,11 +261,10 @@ async def test_multi_classifier_timeout_notice_not_on_prior_turn(
     router = _router(tmp_path, conn, run_turn=slow_run, classify=classify)
     adapter = _EditCaptureTelegram()
     router.register_adapter(adapter)
-    hooks = router._test_multi_hooks
     router._test_multi_hooks = MultiDispatchHooks(  # type: ignore[attr-defined]
-        classify_busy=hooks.classify_busy,
-        spawn_new_task=hooks.spawn_new_task,
-        notify_operator=hooks.notify_operator,
+        classify_busy=router._test_multi_hooks.classify_busy,
+        spawn_new_task=spawn_ok,
+        notify_operator=notify_must_not,
     )
     monkeypatch.setattr(
         router,
@@ -306,7 +310,7 @@ async def test_multi_classifier_timeout_notice_not_on_prior_turn(
             ),
         )
         await asyncio.gather(t1, t2)
-        assert len(run_turn_calls) >= 2
+        assert len(spawned) >= 1
         notice_markers = ("timed out", "queuing", "own turn")
         for text in outbound_texts:
             low = text.lower()
@@ -332,17 +336,16 @@ async def test_multi_classifier_timeout_notice_not_on_prior_turn(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W7: classifier timeout structured log", strict=False)
 async def test_multi_classifier_timeout_logs_decision_context(
     tmp_path: Path,
     allow_scan: None,
     monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Timeout routing must remain diagnosable from structured logs."""
-    import logging
+    from loguru import logger as loguru_logger
 
     gate = asyncio.Event()
+    captured: list[str] = []
 
     async def slow_run(_sid: str, _cid: str) -> None:
         gate.set()
@@ -358,7 +361,7 @@ async def test_multi_classifier_timeout_logs_decision_context(
         "build_multi_dispatch_hooks",
         lambda **_k: router._test_multi_hooks,
     )
-    caplog.set_level(logging.INFO)
+    sink_id = loguru_logger.add(lambda rec: captured.append(str(rec)), level="INFO")
     try:
         t1 = asyncio.create_task(
             router.route_incoming(
@@ -382,11 +385,15 @@ async def test_multi_classifier_timeout_logs_decision_context(
             ),
         )
         await asyncio.gather(t1, t2)
-        joined = "\n".join(r.getMessage() for r in caplog.records)
-        assert "relatedness_classifier_timeout" in joined or "queue_multi_spawned" in joined
+        joined = "\n".join(captured)
+        assert "gateway.queue_classifier_timeout_spawned" in joined
         assert "session_id=" in joined
-        assert "correlation_id=" in joined or "new_task" in joined
+        assert "prior_turn_id=" in joined
+        assert "new_turn_id=" in joined
+        assert "timeout_s=" in joined
+        assert "routing_action=new_task" in joined
     finally:
+        loguru_logger.remove(sink_id)
         await router.session_manager.drain()
         conn.close()
 

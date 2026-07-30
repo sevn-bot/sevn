@@ -38,7 +38,11 @@ from loguru import logger
 from sevn.config.defaults import DEFAULT_GATEWAY_SESSION_MESSAGE_CAP_DM
 from sevn.config.workspace_config import LcmWorkspaceConfig, WorkspaceConfig
 from sevn.gateway.browser.browser_lifecycle import close_browser_for_rotate
-from sevn.gateway.queue.queue_multi import MultiDispatchHooks, MultiSpawnOutcome
+from sevn.gateway.queue.queue_multi import (
+    RELATEDNESS_CLASSIFIER_TIMEOUT_S,
+    MultiDispatchHooks,
+    MultiSpawnOutcome,
+)
 from sevn.gateway.session.session_mirror import mark_session_superseded, mirror_gateway_message
 
 DispatchFn = Callable[[str, str], Coroutine[Any, Any, None]]
@@ -492,6 +496,8 @@ class SessionManager:
         self._queues: dict[str, asyncio.Queue[str]] = {}
         self._worker_tasks: dict[str, asyncio.Task[None]] = {}
         self._active_dispatch_task: dict[str, asyncio.Task[None]] = {}
+        # Correlation id of the in-flight ``dispatch`` task (for timeout diagnostics).
+        self._active_dispatch_correlation_id: dict[str, str] = {}
         self._dispatch_fn: DispatchFn | None = None
         self._drain_requested = False
         # Wave 3 (CONVERSATION_REVIEW_2026-05-28.md §A15 + §A16): one-shot
@@ -1109,11 +1115,6 @@ class SessionManager:
                 elif label == "new_task":
                     spawn_outcome = await multi_hooks.spawn_new_task(session_id, correlation_id)
                     if spawn_outcome == MultiSpawnOutcome.SPAWNED:
-                        logger.info(
-                            "gateway.queue_multi_spawned session_id={} correlation_id={}",
-                            session_id,
-                            correlation_id,
-                        )
                         if classifier_fallback:
                             if resolved_chat_id is not None:
                                 _merge_dispatch_routing_extras(
@@ -1125,11 +1126,25 @@ class SessionManager:
                                         "relatedness_classifier_fallback": True,
                                     },
                                 )
-                            notice_line = (
-                                "Queue classifier timed out — queuing this message "
-                                "as its own turn instead."
+                            prior_turn_id = self._active_dispatch_correlation_id.get(
+                                session_id,
+                                "",
                             )
-                            await multi_hooks.notify_operator(session_id, notice_line)
+                            logger.info(
+                                "gateway.queue_classifier_timeout_spawned "
+                                "session_id={} prior_turn_id={} new_turn_id={} "
+                                "timeout_s={} routing_action=new_task",
+                                session_id,
+                                prior_turn_id,
+                                correlation_id,
+                                RELATEDNESS_CLASSIFIER_TIMEOUT_S,
+                            )
+                            return
+                        logger.info(
+                            "gateway.queue_multi_spawned session_id={} correlation_id={}",
+                            session_id,
+                            correlation_id,
+                        )
                         return
                     effective_mode = "steer"
                     notice_line = (
@@ -1298,6 +1313,7 @@ class SessionManager:
                 semaphore_held = True
                 run_task: asyncio.Task[None] = asyncio.create_task(dispatch(session_id, cid))
                 self._active_dispatch_task[session_id] = run_task
+                self._active_dispatch_correlation_id[session_id] = cid
                 try:
                     await run_task
                 except asyncio.CancelledError:
@@ -1317,6 +1333,7 @@ class SessionManager:
                     logger.exception("session_dispatch_failed session_id={}", session_id)
                 finally:
                     self._active_dispatch_task.pop(session_id, None)
+                    self._active_dispatch_correlation_id.pop(session_id, None)
                     if semaphore_held:
                         self._turn_semaphore.release()
                     q.task_done()

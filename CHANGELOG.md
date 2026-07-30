@@ -24,6 +24,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-30] Classifier timeouts in `multi` queue mode no longer append a timeout notice to the prior turn's reply — the new turn still spawns with routing extras preserved, and the decision is logged as `gateway.queue_classifier_timeout_spawned`; fixes #70
 - [2026-07-30] Voice replies no longer speak routing diagnostics — when `show_routing` is on, TTS input strips the `_intent=… · tier=… · conf=…_` footer while chat text keeps it; fixes #66
 - [2026-07-30] Telegram quoted replies now bind to the referenced turn — bot-self-replies carry `referenced_message_id` through ingest, inbound quotes are wrapped in explicit `[Referenced message]` blocks, outbound `reply_to_message_id` follows the turn being answered (not the latest user row), and issue-filing confirmations stay neutral until GitHub mirror succeeds — fixes #67 and #68
 - [2026-07-30] `sevn.json` versioned backups now land in `sevn.json.archive/` beside the active config and are pruned by `config_archive.keep_count` (default 5) — fixes #62 (unbounded `sevn.json.v*` pile beside every `/config` toggle); legacy beside-config backups migrate into the archive on the next write
