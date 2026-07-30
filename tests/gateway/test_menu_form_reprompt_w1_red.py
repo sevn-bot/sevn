@@ -88,7 +88,6 @@ def form_harness(tmp_path: Path) -> _FormHarness:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W3: first form prompt advertises cancel", strict=False)
 async def test_tunnel_setup_first_prompt_advertises_cancel(form_harness: _FormHarness) -> None:
     """Discoverability: value-required prompts must mention cancel on the first ask."""
     await form_harness.start("tunnel:setup")
@@ -98,9 +97,6 @@ async def test_tunnel_setup_first_prompt_advertises_cancel(form_harness: _FormHa
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W3: invalid tunnel mode re-prompts with cancel", strict=False
-)
 async def test_tunnel_setup_invalid_mode_reprompts_with_cancel(form_harness: _FormHarness) -> None:
     token = await form_harness.start("tunnel:setup")
     form_harness.sent.clear()
@@ -128,7 +124,6 @@ async def test_tunnel_setup_cancel_clears_form_token(form_harness: _FormHarness)
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W3: tunnel quick alias normalizes", strict=False)
 async def test_tunnel_setup_quick_reaches_config_writer_as_cloudflare_quick(
     form_harness: _FormHarness,
 ) -> None:
@@ -232,7 +227,6 @@ class _InvalidFormCase:
         ),
     ],
 )
-@pytest.mark.xfail(reason="green after W3: shared form validation re-prompt helper", strict=False)
 async def test_invalid_form_input_reprompts_with_cancel(
     form_harness: _FormHarness,
     case: _InvalidFormCase,

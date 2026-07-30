@@ -213,6 +213,7 @@ MODE_ALIASES: dict[str, str] = {
     "cloudflare": "cloudflare",
     "cloudflare-quick": "cloudflare_quick",
     "cloudflare_quick": "cloudflare_quick",
+    "quick": "cloudflare_quick",
     "ngrok": "ngrok",
     "tailscale-serve": "tailscale_serve",
     "tailscale_serve": "tailscale_serve",

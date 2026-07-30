@@ -543,6 +543,18 @@ Legacy section ids resolve through `_SECTION_ALIASES`; the live catalog is
 render copy-paste cards (D17); destructive rows use two-step confirm gates. Menu E2E:
 `make telegram-menu-e2e` when `SEVN_TELEGRAM_MENU_E2E=1`.
 
+## Amendments (open-issues-sweep W3 — #71)
+
+Telegram `/config` multi-step **form wizards** (`MenuFormHandler`) must never trap the
+operator on a validation failure:
+
+- Every value-required first prompt advertises the canonical exit vocabulary
+  (`cancel` / `abort`) via `form_prompt_with_cancel`.
+- On invalid input, handlers call `_form_validation_failure`: send the error, re-send
+  the step prompt with the cancel affordance, and **do not** consume the wizard token.
+- Inline-keyboard flows (e.g. vault browse) reuse the existing `✗ Cancel` button pattern
+  where a keyboard is already present.
+
 - [`PlatformChannelConfig`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
 - [`busy_input_mode_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
 - [`channel_blob`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`

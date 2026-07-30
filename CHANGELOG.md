@@ -24,6 +24,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-30] Telegram `/config` form wizards re-prompt on validation failure and advertise `cancel`/`abort` on every value-required first ask — fixes #71 (trapped tunnel mode prompt); `quick` tunnel alias now normalizes to `cloudflare_quick`
 - [2026-07-29] Tier-B harness skill staging uses a per-turn process tempdir — avoids accumulating ``.sevn-harness-skills/`` under long-lived workspaces
 - [2026-07-29] Tier-B history compaction honors ``agent.history_compaction.target_tokens`` from ``sevn.json`` — previously validated in schema but silently ignored at capability assembly
 - [2026-07-29] Thermos tier-B hardening: human-gated tools stay native outside CodeMode; D9 opt-in toggles wired through ``agent.history_compaction`` / ``agent.cache_stability`` / ``agent.codemode.dynamic_catalog``; fail-loud async CodeMode backend probe
