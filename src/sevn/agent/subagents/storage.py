@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING, cast
 from loguru import logger
 
 from sevn.agent.subagents.models import SubAgentRun, SubAgentStatus
+from sevn.agent.tracing.redacting_sink import TraceRedactionPolicy, redact_text_value
 
 if TYPE_CHECKING:
     from sevn.agent.subagents.registry import PersistHook
@@ -171,6 +172,10 @@ def persist_subagent_run(
         >>> conn.execute("SELECT status FROM subagent_runs WHERE id = 'a1f3'").fetchone()[0]
         'pending'
     """
+    stored_body = result_body
+    if stored_body is not None:
+        policy = TraceRedactionPolicy.from_defaults()
+        stored_body = redact_text_value(stored_body, policy)
     try:
         conn.execute(
             """
@@ -207,7 +212,7 @@ def persist_subagent_run(
                 int(run.started_at),
                 run.finished_at,
                 run.trace_id,
-                result_body,
+                stored_body,
                 transcript_path,
             ),
         )
@@ -216,6 +221,7 @@ def persist_subagent_run(
         logger.bind(subagent_id=run.id, session_id=run.session_id).exception(
             "persist_subagent_run SQL failed"
         )
+        raise
 
 
 def sqlite_persist_hook(conn: sqlite3.Connection) -> PersistHook:

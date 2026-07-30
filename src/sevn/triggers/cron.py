@@ -41,6 +41,7 @@ from loguru import logger
 from sevn.agent.tracing.sink import TraceEvent, TraceSink
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.triggers.cron_runs import (
+    complete_cron_run_event,
     cron_has_in_flight_run,
     insert_cron_run_event,
     recover_stale_cron_claims,
@@ -1134,13 +1135,12 @@ async def cron_tick(
         result_summary: str | None = None,
         error: str | None = None,
     ) -> None:
-        insert_cron_run_event(
+        complete_cron_run_event(
             conn,
             job_id=job_id,
             run_id=run_id,
             claimed_at=claimed_at,
             status=status,
-            completed_at=time.time_ns(),
             result_summary=result_summary,
             error=error,
         )

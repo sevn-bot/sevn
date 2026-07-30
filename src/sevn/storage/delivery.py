@@ -7,6 +7,8 @@ platform message id on confirmation so boot replay can distinguish "sent but
 unconfirmed" from "never sent".
 
 Exports:
+    adapter_message_id_from_chunks — extract platform id from adapter chunks.
+    confirm_delivery_after_send — confirm obligation after successful send.
     count_open_obligations — count non-terminal obligation rows.
     create_delivery_obligation — persist a pending obligation before send.
     confirm_delivery_obligation — record adapter-confirmed platform id.
@@ -117,6 +119,79 @@ def create_delivery_obligation(
         msg = f"delivery obligation missing after insert message_id={message_id}"
         raise RuntimeError(msg)
     return row
+
+
+def adapter_message_id_from_chunks(chunks: list[str] | None) -> str | None:
+    """Extract the first non-empty platform message id from adapter chunks.
+
+    Args:
+        chunks (list[str] | None): Values returned by ``adapter.send``.
+
+    Returns:
+        str | None: Platform message id when present.
+
+    Examples:
+        >>> adapter_message_id_from_chunks(["tg-42", "extra"])
+        'tg-42'
+        >>> adapter_message_id_from_chunks([]) is None
+        True
+    """
+    if not chunks:
+        return None
+    adapter_id = str(chunks[0]).strip()
+    return adapter_id or None
+
+
+def confirm_delivery_after_send(
+    conn: sqlite3.Connection,
+    *,
+    message_id: int,
+    chunks: list[str] | None,
+    now_ns: int | None = None,
+) -> str:
+    """Confirm a delivery obligation after a successful ``adapter.send``.
+
+    When the adapter returns no platform id, a deterministic local sentinel is
+    stored so boot replay skips duplicate sends.
+
+    Args:
+        conn (sqlite3.Connection): Open gateway SQLite handle.
+        message_id (int): ``gateway_messages.id`` tied to the obligation.
+        chunks (list[str] | None): Adapter return values from ``send``.
+        now_ns (int | None): Optional monotonic timestamp.
+
+    Returns:
+        str: Stored adapter or local confirmation id.
+
+    Examples:
+        >>> import sqlite3
+        >>> from sevn.storage.migrate import apply_migrations
+        >>> conn = sqlite3.connect(":memory:")
+        >>> apply_migrations(conn)
+        >>> _ = conn.execute(
+        ...     "INSERT INTO gateway_sessions(session_id, scope_key, channel, user_id, created_at, updated_at)"
+        ...     " VALUES ('s', 'telegram:1', 'telegram', '1', 'now', 'now')"
+        ... )
+        >>> _ = conn.execute(
+        ...     "INSERT INTO gateway_messages(session_id, role, kind, content, visible_to_llm, status, created_at)"
+        ...     " VALUES ('s', 'assistant', 'message', 'hi', 1, 'pending', 'now')"
+        ... )
+        >>> mid = int(conn.execute("SELECT id FROM gateway_messages").fetchone()[0])
+        >>> _ = create_delivery_obligation(
+        ...     conn, message_id=mid, session_id='s', channel='telegram', user_id='1', payload_hash='h'
+        ... )
+        >>> confirm_delivery_after_send(conn, message_id=mid, chunks=[])
+        'local:1'
+        >>> conn.close()
+    """
+    adapter_id = adapter_message_id_from_chunks(chunks) or f"local:{message_id}"
+    confirm_delivery_obligation(
+        conn,
+        message_id=message_id,
+        adapter_message_id=adapter_id,
+        now_ns=now_ns,
+    )
+    return adapter_id
 
 
 def confirm_delivery_obligation(
@@ -337,6 +412,8 @@ def count_open_obligations(conn: sqlite3.Connection) -> int:
 
 __all__ = [
     "DeliveryObligationStatus",
+    "adapter_message_id_from_chunks",
+    "confirm_delivery_after_send",
     "confirm_delivery_obligation",
     "count_open_obligations",
     "create_delivery_obligation",

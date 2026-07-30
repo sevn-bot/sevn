@@ -71,6 +71,7 @@ from sevn.triggers.cron import (
     list_cron_jobs,
 )
 from sevn.triggers.cron_runs import (
+    complete_cron_run_event,
     cron_run_to_dict,
     insert_cron_run_event,
     list_recent_cron_runs,
@@ -534,23 +535,21 @@ async def dispatch_cron_job_now(request: Request, *, job_id: str) -> dict[str, o
     try:
         await asyncio.wait_for(dispatch_fn(req), timeout=600.0)
     except Exception as exc:
-        insert_cron_run_event(
+        complete_cron_run_event(
             conn,
             job_id=row.job_id,
             run_id=correlation_id,
             claimed_at=claimed_at,
             status="failed",
-            completed_at=time.time_ns(),
             error=str(exc)[:500],
         )
         raise
-    insert_cron_run_event(
+    complete_cron_run_event(
         conn,
         job_id=row.job_id,
         run_id=correlation_id,
         claimed_at=claimed_at,
         status="ok",
-        completed_at=time.time_ns(),
         result_summary="manual_dispatch_completed",
     )
     nxt = compute_next_fire_ns(

@@ -205,7 +205,12 @@ async def deliver_subagent_result_through_ledger(
             metadata={"subagent_id": run.id},
         ),
     )
-    mark_subagent_result_delivered(conn, run.id)
+    from sevn.storage.delivery import is_delivery_confirmed
+
+    last_ob = getattr(router, "last_delivery_obligation", None)
+    message_id = int(last_ob["message_id"]) if isinstance(last_ob, dict) else None
+    if message_id is not None and is_delivery_confirmed(conn, message_id):
+        mark_subagent_result_delivered(conn, run.id)
 
 
 def build_announce_back_hook(
@@ -259,7 +264,6 @@ def build_announce_back_hook(
         if running and store is not None:
             try:
                 store.steer_inject_for(run.session_id).inject_pending(text)
-                mark_subagent_result_delivered(conn, run.id)
                 return
             except Exception:
                 logger.exception(
@@ -276,27 +280,21 @@ def build_announce_back_hook(
             )
             return
         try:
-            if error is not None or not (
-                isinstance(effective_result, str) and effective_result.strip()
-            ):
-                await router.route_outgoing(
-                    OutgoingMessage(
-                        channel=sess.channel,
-                        user_id=sess.user_id,
-                        text=text,
-                        session_id=run.session_id,
-                        metadata={"subagent_id": run.id},
-                    ),
-                )
-                mark_subagent_result_delivered(conn, run.id)
-                return
-            await deliver_subagent_result_through_ledger(
-                router=router,
-                conn=conn,
-                run=run,
-                session=sess,
-                result_body=str(effective_result).strip(),
+            await router.route_outgoing(
+                OutgoingMessage(
+                    channel=sess.channel,
+                    user_id=sess.user_id,
+                    text=text,
+                    session_id=run.session_id,
+                    metadata={"subagent_id": run.id},
+                ),
             )
+            from sevn.storage.delivery import is_delivery_confirmed
+
+            last_ob = getattr(router, "last_delivery_obligation", None)
+            message_id = int(last_ob["message_id"]) if isinstance(last_ob, dict) else None
+            if message_id is not None and is_delivery_confirmed(conn, message_id):
+                mark_subagent_result_delivered(conn, run.id)
         except Exception:
             logger.exception("subagent_announce_back_send_failed run_id={}", run.id)
 

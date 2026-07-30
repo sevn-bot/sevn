@@ -17,7 +17,7 @@ from loguru import logger
 from sevn.agent.tracing.sink import TraceEvent
 from sevn.gateway.channel_router import OutgoingMessage
 from sevn.storage.delivery import (
-    confirm_delivery_obligation,
+    confirm_delivery_after_send,
     create_delivery_obligation,
     fail_delivery_obligation,
     hash_delivery_payload,
@@ -150,14 +150,12 @@ async def sweep_outbound_retries(
                 ),
             )
             continue
-        adapter_message_id = str(chunks[0]).strip() if chunks else ""
-        if adapter_message_id:
-            confirm_delivery_obligation(
-                conn,
-                message_id=mid,
-                adapter_message_id=adapter_message_id,
-                now_ns=time.time_ns(),
-            )
+        adapter_message_id = confirm_delivery_after_send(
+            conn,
+            message_id=mid,
+            chunks=chunks,
+            now_ns=time.time_ns(),
+        )
         conn.execute(
             "UPDATE gateway_messages SET status = 'sent' WHERE id = ?",
             (mid,),
@@ -175,7 +173,11 @@ async def sweep_outbound_retries(
                 ts_start_ns=now_ns,
                 ts_end_ns=time.time_ns(),
                 status="retried_sent",
-                attrs={"message_id": mid, "channel": channel},
+                attrs={
+                    "message_id": mid,
+                    "channel": channel,
+                    "adapter_message_id": adapter_message_id,
+                },
             ),
         )
     return sent_ok

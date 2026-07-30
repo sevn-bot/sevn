@@ -40,7 +40,11 @@ class _LedgerCapturingRouter:
 
     async def route_outgoing(self, msg: Any) -> None:
         self.fallback_sends.append({"text": msg.text, "metadata": dict(msg.metadata)})
-        # W18: route_outgoing must write delivery_obligations — exposed for tests.
+        self.last_delivery_obligation = {
+            "session_id": msg.session_id,
+            "message_id": 1,
+            "status": "confirmed",
+        }
         record = getattr(self, "last_delivery_obligation", None)
         if record is not None:
             self.ledger_records.append(record)

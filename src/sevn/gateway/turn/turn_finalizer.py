@@ -342,16 +342,6 @@ class TierBAnswerFinalizer:
                 return True
 
         # Edit unsupported or failed — fall back to a fresh send via the router.
-        conn = getattr(getattr(self.router, "_sessions", None), "connection", None)
-        import sqlite3
-
-        if not isinstance(conn, sqlite3.Connection):
-            self.router.last_delivery_obligation = {
-                "session_id": self.session_id,
-                "channel": self.channel,
-                "user_id": self.user_id,
-                "status": "pending",
-            }
         await self.router.route_outgoing(
             OutgoingMessage(
                 channel=self.channel,

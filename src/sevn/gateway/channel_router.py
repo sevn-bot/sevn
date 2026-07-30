@@ -96,7 +96,7 @@ from sevn.prompts.fallbacks import ASSISTANT_NO_OUTPUT_PLACEHOLDER, TURN_EMPTY_F
 from sevn.security.llm_guard_scanner import LLMGuardScanner, ScanResult, ScanVerdict
 from sevn.security.llmignore import write_blocked_inbound
 from sevn.storage.delivery import (
-    confirm_delivery_obligation,
+    confirm_delivery_after_send,
     create_delivery_obligation,
     fail_delivery_obligation,
     get_delivery_obligation,
@@ -2308,18 +2308,14 @@ class ChannelRouter:
             )
             return
         self._platform_runtime.record_outbound_success(msg.channel)
-        adapter_message_id: str | None = None
-        if chunks:
-            adapter_message_id = str(chunks[0]).strip() or None
-        if adapter_message_id:
-            confirm_delivery_obligation(
-                self._sessions.connection,
-                message_id=assistant_id,
-                adapter_message_id=adapter_message_id,
-            )
-            refreshed = get_delivery_obligation(self._sessions.connection, assistant_id)
-            if refreshed is not None:
-                self.last_delivery_obligation = refreshed
+        confirm_delivery_after_send(
+            self._sessions.connection,
+            message_id=assistant_id,
+            chunks=chunks,
+        )
+        refreshed = get_delivery_obligation(self._sessions.connection, assistant_id)
+        if refreshed is not None:
+            self.last_delivery_obligation = refreshed
         if msg.channel == "telegram" and chunks:
             try:
                 platform_mid = int(chunks[0])

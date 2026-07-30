@@ -15,7 +15,6 @@ Exports:
 from __future__ import annotations
 
 import json
-import re
 import sqlite3
 import uuid
 from datetime import UTC, datetime
@@ -24,7 +23,7 @@ from pathlib import Path
 from sevn.agent.tracing.redacting_sink import (
     TraceRedactionPolicy,
     _key_denied,
-    redact_attrs,
+    redact_text_value,
 )
 from sevn.gateway.session.sessions_query import parse_session_metadata
 from sevn.gateway.turn.turn_bundle import (
@@ -32,12 +31,9 @@ from sevn.gateway.turn.turn_bundle import (
     load_turn_bundle_index,
     load_turn_bundle_records,
 )
-from sevn.logging.log_redact import redact_log_line
 from sevn.storage.paths import turn_bundle_index_path, turn_bundles_dir
 
 _EXPORT_REDACTED = "[REDACTED]"
-_SK_PATTERN = re.compile(r"sk-[A-Za-z0-9-]{8,}")
-_GHP_PATTERN = re.compile(r"ghp_[A-Za-z0-9]{20,}")
 
 
 def _utc_now_iso() -> str:
@@ -112,7 +108,7 @@ def _session_matches_profile(
         >>> _session_matches_profile(scope_key="telegram:7", metadata_json=None, profile="telegram")
         True
     """
-    if profile in scope_key:
+    if profile == scope_key.split(":", 1)[0]:
         return True
     meta = parse_session_metadata(str(metadata_json) if metadata_json is not None else None)
     routing = meta.get("routing_profile") or meta.get("profile")
@@ -156,17 +152,7 @@ def redact_export_text(text: str, policy: TraceRedactionPolicy) -> str:
         >>> redact_export_text("token=abc123", TraceRedactionPolicy.from_defaults())
         '[REDACTED]'
     """
-    line = text
-    for _ in range(3):
-        line = redact_log_line(line).replace("<redacted>", _EXPORT_REDACTED)
-    if policy.enabled:
-        for pattern in policy._compiled_patterns:
-            line = pattern.sub(_EXPORT_REDACTED, line)
-        line = _SK_PATTERN.sub(_EXPORT_REDACTED, line)
-        line = _GHP_PATTERN.sub(_EXPORT_REDACTED, line)
-        redacted = redact_attrs({"text": line}, policy)
-        line = str(redacted.get("text", line)).replace("<redacted>", _EXPORT_REDACTED)
-    return line
+    return redact_text_value(text, policy, placeholder=_EXPORT_REDACTED)
 
 
 def redact_export_value(value: object, policy: TraceRedactionPolicy) -> object:
@@ -789,6 +775,22 @@ def export_sessions(
             row_count=total_rows,
             status="completed",
         )
+    except Exception as exc:
+        record_session_export_job(
+            conn,
+            export_id=export_id,
+            session_id=session_id,
+            channel=channel,
+            profile=profile,
+            since=since,
+            until=until,
+            formats=fmt,
+            output_path=str(out_dir) if out_dir is not None else None,
+            row_count=total_rows,
+            status="failed",
+            error=str(exc)[:500],
+        )
+        raise
     finally:
         if own_conn:
             conn.close()

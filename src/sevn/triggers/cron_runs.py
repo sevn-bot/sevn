@@ -3,6 +3,7 @@
 Module: sevn.triggers.cron_runs
 Depends: sqlite3, time
 Exports:
+    complete_cron_run_event — close an in-flight audit row in place.
     cron_has_in_flight_run — whether a job has an incomplete audit row.
     cron_run_to_dict — dashboard-safe projection of one audit row.
     insert_cron_run_event — append one audit row for claim or completion.
@@ -75,6 +76,82 @@ def insert_cron_run_event(
             error,
         ),
     )
+    conn.commit()
+
+
+def complete_cron_run_event(
+    conn: sqlite3.Connection,
+    *,
+    job_id: str,
+    run_id: str,
+    claimed_at: int,
+    status: str,
+    completed_at: int | None = None,
+    transcript_path: str | None = None,
+    result_summary: str | None = None,
+    error: str | None = None,
+) -> None:
+    """Close an in-flight cron audit row, or insert a terminal-only row.
+
+    Claim paths insert one ``running`` row; completion must update that row in
+    place so ``cron_has_in_flight_run`` clears. Overlap skips that never claimed
+    fall back to a standalone insert.
+
+    Args:
+        conn (sqlite3.Connection): Open ``sevn.db`` handle.
+        job_id (str): ``trigger_cron_jobs.job_id``.
+        run_id (str): Stable id for this execution attempt.
+        claimed_at (int): Claim instant in nanoseconds since epoch.
+        status (str): Terminal audit status label.
+        completed_at (int | None, optional): Completion instant when known.
+        transcript_path (str | None, optional): Workspace-relative transcript path.
+        result_summary (str | None, optional): Short operator-facing summary.
+        error (str | None, optional): Concise error text on failure.
+
+    Examples:
+        >>> import sqlite3
+        >>> from sevn.storage.migrate import apply_migrations
+        >>> from sevn.triggers.cron_runs import complete_cron_run_event, cron_has_in_flight_run
+        >>> from sevn.triggers.cron_runs import insert_cron_run_event
+        >>> c = sqlite3.connect(":memory:")
+        >>> apply_migrations(c)
+        >>> insert_cron_run_event(
+        ...     c, job_id="j", run_id="r", claimed_at=1, status="running",
+        ... )
+        >>> complete_cron_run_event(
+        ...     c, job_id="j", run_id="r", claimed_at=1, status="ok",
+        ... )
+        >>> cron_has_in_flight_run(c, "j")
+        False
+    """
+    ts = int(completed_at if completed_at is not None else time.time_ns())
+    cur = conn.execute(
+        """
+        UPDATE cron_runs
+        SET status = ?,
+            completed_at = ?,
+            transcript_path = COALESCE(?, transcript_path),
+            result_summary = COALESCE(?, result_summary),
+            error = COALESCE(?, error)
+        WHERE job_id = ?
+          AND run_id = ?
+          AND completed_at IS NULL
+        """,
+        (status, ts, transcript_path, result_summary, error, job_id, run_id),
+    )
+    if cur.rowcount == 0:
+        insert_cron_run_event(
+            conn,
+            job_id=job_id,
+            run_id=run_id,
+            claimed_at=claimed_at,
+            status=status,
+            completed_at=ts,
+            transcript_path=transcript_path,
+            result_summary=result_summary,
+            error=error,
+        )
+        return
     conn.commit()
 
 
@@ -239,6 +316,7 @@ def cron_run_to_dict(row: dict[str, Any]) -> dict[str, Any]:
 
 
 __all__ = [
+    "complete_cron_run_event",
     "cron_has_in_flight_run",
     "cron_run_to_dict",
     "insert_cron_run_event",

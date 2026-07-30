@@ -26,14 +26,12 @@ Examples:
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from time import time_ns
 from typing import TYPE_CHECKING
 
-from sevn.agent.tracing.redacting_sink import TraceRedactionPolicy, redact_attrs
-from sevn.logging.log_redact import redact_log_line
+from sevn.agent.tracing.redacting_sink import TraceRedactionPolicy, redact_text_value
 
 if TYPE_CHECKING:
     import sqlite3
@@ -41,8 +39,6 @@ if TYPE_CHECKING:
     from sevn.agent.subagents.models import SubAgentRun
 
 _TRANSCRIPTS_DIR = Path("subagents") / "transcripts"
-# Shorter sk- tail than trace sink defaults — transcript lines are single-line secrets.
-_TRANSCRIPT_SK_PATTERN = re.compile(r"sk-[A-Za-z0-9-]{8,}")
 
 
 def transcript_relpath_for_run(run: SubAgentRun) -> str:
@@ -121,7 +117,7 @@ def load_subagent_transcript_path(conn: sqlite3.Connection, run_id: str) -> str 
 
 
 def _redact_text(text: str, policy: TraceRedactionPolicy) -> str:
-    """Apply log-line and trace-pattern redaction to one transcript line.
+    """Apply shared trace redaction for one transcript line.
 
     Args:
         text (str): Raw operator/model text.
@@ -134,20 +130,7 @@ def _redact_text(text: str, policy: TraceRedactionPolicy) -> str:
         >>> _redact_text("token=abc123", TraceRedactionPolicy.from_defaults())
         '<redacted>'
     """
-    line = redact_log_line(text)
-    for _ in range(3):
-        next_line = redact_log_line(line)
-        if next_line == line:
-            break
-        line = next_line
-    if policy.enabled:
-        for pattern in policy._compiled_patterns:
-            line = pattern.sub("<redacted>", line)
-        line = _TRANSCRIPT_SK_PATTERN.sub("<redacted>", line)
-        redacted = redact_attrs({"text": line}, policy)
-        value = redacted.get("text", line)
-        line = str(value)
-    return line
+    return redact_text_value(text, policy)
 
 
 @dataclass

@@ -11,20 +11,18 @@ are cut into a dated, versioned section at release time.
 ## [Unreleased]
 
 ### Added
-
 - [2026-07-31] User-defined `permissions.deny_rules` block destructive or sensitive tool calls by tool name and optional command/pattern, domain, or path — rules apply even in permissive ABAC owner sessions (additive-deny, D15), return the configured reason to the model, and log redacted audit lines; Mission Control approval `deny` verdicts accept an optional operator reason (#80, open-issues-sweep W26)
 - [2026-07-31] Pluggable 1Password (`one_password`) and Bitwarden (`bitwarden`) secret backends (CLI bridges — unit-tested stubs; live vault resolution requires operator `op`/`bw` credentials), deterministic precedence and provenance reporting without value leakage (#82, open-issues-sweep W25)
 - [2026-07-30] Named routing profiles under `routing.profiles` with `routing.channel_map` route keys — turn-scoped model, prompt, skills, memory namespace, secrets scope prefix, and `permissions_profile` isolation; `routing.enabled` default-off (**D9**); distinct from `permissions.profiles` and other legacy *profile* keys (**D14**); `TopicConfig.skills` wired from Telegram inbound metadata (#79)
 - [2026-07-30] Reasoning effort routing in `LLM_params_config.json` (`reasoning.effort`) with provider-capability checks, graceful degradation for unsupported models, and optional per-channel/topic/subagent `reasoning_effort` overlays (#89)
 - [2026-07-30] `/model --once <provider/model>` stages a one-turn tier-B model override in session metadata — consumed at the next agent turn (success or failure) without changing the persisted `providers.tier_default.B` setting; `/status` shows effective vs persisted model (#88)
 - [2026-07-30] Per-channel and per-topic model and system prompt overrides under `channels.<name>.model` / `channels.<name>.system_prompt` and `channels.telegram.topics.<id>.*` — turn-scoped resolution with session → channel → workspace precedence; `TopicConfig.system_prompt` wired from Telegram inbound metadata (#86)
-
 ### Fixed
-
 - [2026-07-31] Operator approval denial reasons propagate through the sync ``check_tool_access`` / ``SkipToolExecution`` path as well as the deferred ``ToolDenied`` path (#80, open-issues-sweep E-Thermos)
 - [2026-07-31] Queued Telegram and channel webhook agent turns bind webhook-minimal host env before dispatch task creation so asyncio child tasks inherit the filtered subprocess environment (#81, open-issues-sweep E-Thermos)
 - [2026-07-31] Webhook-minimal host env now covers queued agent turns (not just the HTTP handler), uses an allowlist instead of a suffix blocklist, and approval denial reasons return per-verdict tuples instead of shared bridge state; WebSocket frames after auth respect the 1 MiB ingress cap; Telegram freshness no longer trusts spoofable HTTP `Date` headers (#81, #80, open-issues-sweep E-Thermos)
-- [2026-07-31] Gateway and egress-proxy HTTP ingress reject bodies over 1 MiB (**413**); signed GitHub webhooks reject stale timestamps; Telegram transport errors and API failure logs redact bot tokens; webhook-triggered subprocesses inherit a minimized host env (#81, open-issues-sweep W24)
+- [2026-07-31] Gateway and egress-proxy HTTP ingress reject bodies over 1 MiB (**413**); signed GitHub webhooks reject stale timestamps; Telegram transport errors and API failure logs redact bot tokens; webhook-triggered subprocesses inherit a minimized host env (#81, open-issues-sweep W24)### Fixed
+- [2026-07-31] Batch D Thermos: cron overlap skip clears in-flight audit rows on completion (jobs no longer run once then skip forever); delivery obligations confirm with a local sentinel when adapters omit platform ids so boot replay cannot double-send; subagent announce-back marks delivered only after confirmed outbound delivery and redacts persisted `result_body`; session export records failed jobs in audit
 
 ### Changed
 

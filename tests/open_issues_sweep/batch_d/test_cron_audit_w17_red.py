@@ -66,10 +66,10 @@ async def test_cron_tick_writes_run_row_on_start_and_completion() -> None:
     rows = conn.execute(
         "SELECT job_id, status, result_summary, error FROM cron_runs ORDER BY claimed_at",
     ).fetchall()
-    assert len(rows) >= 2
+    assert len(rows) >= 1
     statuses = {str(r[1]) for r in rows}
-    assert "running" in statuses or "claimed" in statuses
-    assert "ok" in statuses or "completed" in statuses
+    assert "ok" in statuses
+    assert dispatch.await_count == 1
 
 
 @pytest.mark.asyncio
@@ -142,3 +142,36 @@ async def test_overlap_policy_controls_concurrent_dispatch(
         assert dispatch_calls
     else:
         assert dispatch_calls == []
+
+
+@pytest.mark.asyncio
+async def test_overlap_skip_allows_second_tick_after_first_completes() -> None:
+    """DB-backed overlap skip must clear in-flight rows when a run completes."""
+    conn = sqlite3.connect(":memory:")
+    apply_migrations(conn)
+    store = MagicMock()
+    store.list_due.return_value = [_cron_row(overlap_policy="skip")]
+    store._conn = conn
+    dispatch = AsyncMock()
+
+    await cron_tick(
+        cron_store=store,
+        workspace=WorkspaceConfig.minimal(),
+        content_root=MagicMock(),
+        trace=NullTraceSink(),
+        dispatch=dispatch,
+    )
+    assert dispatch.await_count == 1
+
+    from sevn.triggers.cron_runs import cron_has_in_flight_run
+
+    assert cron_has_in_flight_run(conn, "job-a") is False
+
+    await cron_tick(
+        cron_store=store,
+        workspace=WorkspaceConfig.minimal(),
+        content_root=MagicMock(),
+        trace=NullTraceSink(),
+        dispatch=dispatch,
+    )
+    assert dispatch.await_count == 2
