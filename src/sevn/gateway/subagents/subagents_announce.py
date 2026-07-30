@@ -10,6 +10,7 @@ Depends: sevn.agent.subagents, sevn.gateway.channel_router, sevn.gateway.session
 
 Exports:
     build_announce_back_hook — construct an ``AnnounceBackHook`` bound to one router/conn.
+    format_transcript_reference — human-readable transcript path for one run (#77).
     load_subagent_result_for_announce — read persisted completion text from SQLite.
     deliver_subagent_result_through_ledger — outbound delivery via W18 ledger.
 """
@@ -17,6 +18,7 @@ Exports:
 from __future__ import annotations
 
 import sqlite3
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -24,6 +26,10 @@ from loguru import logger
 from sevn.agent.subagents.storage import (
     load_subagent_result_body,
     mark_subagent_result_delivered,
+)
+from sevn.agent.subagents.transcript import (
+    load_subagent_transcript_path,
+    transcript_relpath_for_run,
 )
 from sevn.gateway.channel_router import ChannelRouter, OutgoingMessage
 from sevn.gateway.session_manager import load_session_row
@@ -36,14 +42,55 @@ if TYPE_CHECKING:
 __all__ = [
     "build_announce_back_hook",
     "deliver_subagent_result_through_ledger",
+    "format_transcript_reference",
     "load_subagent_result_for_announce",
 ]
+
+
+def format_transcript_reference(
+    conn: sqlite3.Connection,
+    run: SubAgentRun,
+    *,
+    content_root: Path,
+) -> str:
+    """Return a human-readable transcript location for one sub-agent run (#77).
+
+    Args:
+        conn (sqlite3.Connection): Open, migrated ``sevn.db`` connection.
+        run (SubAgentRun): Target run row.
+        content_root (Path): Workspace content root for fallback path resolution.
+
+    Returns:
+        str: Operator-facing transcript reference including the run id.
+
+    Examples:
+        >>> import sqlite3
+        >>> from pathlib import Path
+        >>> from sevn.storage.migrate import apply_migrations
+        >>> from sevn.agent.subagents.models import SubAgentRun, SubAgentStatus
+        >>> from sevn.gateway.subagents.subagents_announce import format_transcript_reference
+        >>> conn = sqlite3.connect(":memory:")
+        >>> apply_migrations(conn)
+        >>> run = SubAgentRun(
+        ...     id="run-t1", level=2, role="tier_b", specialist=None, parent_id="p1",
+        ...     session_id="s", channel="c", task_summary="t",
+        ...     status=SubAgentStatus.DONE, started_at=1, finished_at=2, trace_id=None,
+        ... )
+        >>> ref = format_transcript_reference(conn, run, content_root=Path("/tmp/ws"))
+        >>> "transcript" in ref.lower()
+        True
+    """
+    rel = load_subagent_transcript_path(conn, run.id) or transcript_relpath_for_run(run)
+    return f"transcript for run {run.id}: {rel}"
 
 
 def _render_result_text(
     run: SubAgentRun,
     result: object | None,
     error: BaseException | None,
+    *,
+    conn: sqlite3.Connection | None = None,
+    content_root: Path | None = None,
 ) -> str:
     """Render the announce-back text for one finished level-2 run.
 
@@ -51,6 +98,8 @@ def _render_result_text(
         run (SubAgentRun): The finished run (``done``/``failed``/``killed``).
         result (object | None): Body return value on success.
         error (BaseException | None): Body exception, or timeout/cancel marker.
+        conn (sqlite3.Connection | None): Gateway SQLite handle for transcript lookup.
+        content_root (Path | None): Workspace content root for transcript path fallback.
 
     Returns:
         str: One-line (or short) message suitable for steer-inject or outbound send.
@@ -70,10 +119,14 @@ def _render_result_text(
     if error is not None:
         return f"{tag} failed: {error}"
     if isinstance(result, str) and result.strip():
-        return f"{tag} {result.strip()}"
-    if result is None:
-        return f"{tag} done."
-    return f"{tag} {result}"
+        body = f"{tag} {result.strip()}"
+    elif result is None:
+        body = f"{tag} done."
+    else:
+        body = f"{tag} {result}"
+    if conn is not None and content_root is not None:
+        body = f"{body}\n{format_transcript_reference(conn, run, content_root=content_root)}"
+    return body
 
 
 def load_subagent_result_for_announce(conn: sqlite3.Connection, run_id: str) -> str | None:
@@ -136,7 +189,13 @@ async def deliver_subagent_result_through_ledger(
             session.session_id,
         )
         return
-    text = _render_result_text(run, result_body, None)
+    text = _render_result_text(
+        run,
+        result_body,
+        None,
+        conn=conn,
+        content_root=getattr(router, "_content_root", None),
+    )
     await router.route_outgoing(
         OutgoingMessage(
             channel=session.channel,
@@ -185,7 +244,13 @@ def build_announce_back_hook(
         effective_result = result
         if effective_result is None and error is None:
             effective_result = load_subagent_result_for_announce(conn, run.id)
-        text = _render_result_text(run, effective_result, error)
+        text = _render_result_text(
+            run,
+            effective_result,
+            error,
+            conn=conn,
+            content_root=getattr(router, "_content_root", None),
+        )
         store = getattr(router, "_steer_store", None)
         try:
             _depth, running = router._sessions.dispatch_queue_snapshot(run.session_id)

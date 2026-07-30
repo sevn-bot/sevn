@@ -143,6 +143,7 @@ def persist_subagent_run(
     run: SubAgentRun,
     *,
     result_body: str | None = None,
+    transcript_path: str | None = None,
 ) -> None:
     """Upsert one ``subagent_runs`` row from a registry transition (D10 write-through).
 
@@ -151,6 +152,8 @@ def persist_subagent_run(
         run (SubAgentRun): Current row state.
         result_body (str | None): Optional completion text for level-2 announce-back
             replay (#76). When ``None``, an existing stored body is preserved.
+        transcript_path (str | None): Optional workspace-relative JSONL path (#77).
+            When ``None``, an existing stored path is preserved.
 
     Examples:
         >>> import sqlite3
@@ -174,8 +177,8 @@ def persist_subagent_run(
             INSERT INTO subagent_runs (
                 id, level, role, specialist, parent_id, session_id, channel,
                 task_summary, status, started_at_ns, finished_at_ns, trace_id,
-                result_body
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                result_body, transcript_path
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 level = excluded.level,
                 role = excluded.role,
@@ -188,7 +191,8 @@ def persist_subagent_run(
                 started_at_ns = excluded.started_at_ns,
                 finished_at_ns = excluded.finished_at_ns,
                 trace_id = excluded.trace_id,
-                result_body = COALESCE(excluded.result_body, subagent_runs.result_body)
+                result_body = COALESCE(excluded.result_body, subagent_runs.result_body),
+                transcript_path = COALESCE(excluded.transcript_path, subagent_runs.transcript_path)
             """,
             (
                 run.id,
@@ -204,6 +208,7 @@ def persist_subagent_run(
                 run.finished_at,
                 run.trace_id,
                 result_body,
+                transcript_path,
             ),
         )
         _commit_if_in_transaction(conn)

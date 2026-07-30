@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import replace
 from pathlib import Path
-
-import pytest
 
 from sevn.agent.subagents.models import SubAgentRun, SubAgentStatus
 from sevn.agent.subagents.storage import persist_subagent_run
@@ -29,7 +28,6 @@ def _sample_run(run_id: str = "run-t1") -> SubAgentRun:
     )
 
 
-@pytest.mark.xfail(reason="green after W20: stable transcript path per run", strict=False)
 def test_subagent_run_has_stable_transcript_path(tmp_path: Path) -> None:
     """Each run exposes a deterministic transcript file path keyed by run id."""
     from sevn.agent.subagents.transcript import transcript_path_for_run
@@ -42,7 +40,6 @@ def test_subagent_run_has_stable_transcript_path(tmp_path: Path) -> None:
     assert path == again
 
 
-@pytest.mark.xfail(reason="green after W20: transcript append with redaction", strict=False)
 def test_subagent_transcript_appends_redacted_events(tmp_path: Path) -> None:
     """Prompts, tool calls, results, status, and summary are appended with redaction."""
     from sevn.agent.subagents.transcript import SubagentTranscriptWriter
@@ -66,7 +63,6 @@ def test_subagent_transcript_appends_redacted_events(tmp_path: Path) -> None:
     assert "done" in text
 
 
-@pytest.mark.xfail(reason="green after W20: specialist worker transcripts", strict=False)
 def test_specialist_worker_writes_transcript_outside_tier_b_session() -> None:
     """``_specialist_worker_body`` appends to the run-scoped transcript file."""
     from sevn.tools.subagent_spawn import _specialist_worker_body
@@ -77,7 +73,6 @@ def test_specialist_worker_writes_transcript_outside_tier_b_session() -> None:
     )
 
 
-@pytest.mark.xfail(reason="green after W20: parent turn reports transcript location", strict=False)
 def test_parent_turn_reports_subagent_transcript_location() -> None:
     """Completion updates include a human-readable transcript path."""
     from sevn.gateway.subagents.subagents_announce import format_transcript_reference
@@ -85,16 +80,13 @@ def test_parent_turn_reports_subagent_transcript_location() -> None:
     conn = sqlite3.connect(":memory:")
     apply_migrations(conn)
     run = _sample_run()
-    run = SubAgentRun(
-        **{**run.__dict__, "status": SubAgentStatus.DONE, "finished_at": 200},
-    )
+    run = replace(run, status=SubAgentStatus.DONE, finished_at=200)
     persist_subagent_run(conn, run)
     ref = format_transcript_reference(conn, run, content_root=Path("/tmp/ws"))
     assert run.id in ref
     assert "transcript" in ref.lower()
 
 
-@pytest.mark.xfail(reason="green after W20: run-scoped transcript reader", strict=False)
 def test_transcript_reader_scoped_to_subagent_run(tmp_path: Path) -> None:
     """``read_transcript`` (or successor) can load a subagent run file by id."""
     from sevn.tools.transcript import read_subagent_transcript

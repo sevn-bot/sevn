@@ -183,6 +183,12 @@ Adds `subagent_runs.result_body` and `result_delivered_at_ns` (migration 26).
 Level-2 completion text is persisted at finish, delivered through the W18
 delivery-obligation ledger, and replayed on boot when a crash prevented announce-back.
 
+## Amendments (open-issues-sweep W20, #77)
+
+Adds `subagent_runs.transcript_path` (migration 27). Each run writes a tailable
+redacted JSONL transcript under `subagents/transcripts/<run_id>.jsonl` in the
+workspace content root; completion updates include the path for operators.
+
 ## Implemented by
 
 - [`D1Backend`](src/sevn/storage/d1.py) — `src/sevn/storage/d1.py`

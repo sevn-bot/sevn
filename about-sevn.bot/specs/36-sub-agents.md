@@ -600,4 +600,8 @@ Docs gate: `make subagents-chart-check` (deterministic SVG); `make ci-docs`.
 
 ### 10.11 Durable background subagent results — append-only
 
-- [ ] Persist level-2 completion text in `subagent_runs.result_body` (migration 26); write at finish in `SubAgentSupervisor._announce`; deliver through W18 ledger; boot replay via `restore_pending_subagent_deliveries` (#76, open-issues-sweep W19)
+- [x] Persist level-2 completion text in `subagent_runs.result_body` (migration 26); write at finish in `SubAgentSupervisor._announce`; deliver through W18 ledger; boot replay via `restore_pending_subagent_deliveries` (#76, open-issues-sweep W19) (2026-07-30 ✅: cbce9bf9)
+
+### 10.12 Live subagent transcripts — append-only
+
+- [ ] Persist workspace-relative transcript path in `subagent_runs.transcript_path` (migration 27); append redacted JSONL events via `SubagentTranscriptWriter`; specialist workers write through `_specialist_worker_body`; parent announce-back reports location via `format_transcript_reference`; run-scoped reads via `read_subagent_transcript` (#77, open-issues-sweep W20)

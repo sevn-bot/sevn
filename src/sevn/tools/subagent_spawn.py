@@ -24,6 +24,8 @@ Examples:
 from __future__ import annotations
 
 import asyncio
+import json
+import sqlite3
 from typing import TYPE_CHECKING, cast
 
 from sevn.agent.subagents import (
@@ -51,6 +53,7 @@ async def _specialist_worker_body(
     *,
     task: str,
     specialist: str | None,
+    transcript: object | None = None,
 ) -> str:
     """Dispatch a level-2 worker body for a named specialist (W8).
 
@@ -58,6 +61,8 @@ async def _specialist_worker_body(
         ctx (ToolContext): Spawn invocation context (session, router, supervisor).
         task (str): Sub-task description passed to ``spawn_subagent``.
         specialist (str | None): Specialist name when this is a specialist spawn.
+        transcript (object | None): Optional :class:`~sevn.agent.subagents.transcript.SubagentTranscriptWriter`
+            for live per-run JSONL persistence (#77).
 
     Returns:
         str: Worker result text (JSON for known specialists).
@@ -70,16 +75,36 @@ async def _specialist_worker_body(
         >>> inspect.iscoroutinefunction(_specialist_worker_body)
         True
     """
+    from sevn.agent.subagents.transcript import SubagentTranscriptWriter
+
+    writer = transcript if isinstance(transcript, SubagentTranscriptWriter) else None
+    if writer is not None:
+        writer.append_prompt(f"specialist task: {task}")
     if specialist == "media_generator":
         from sevn.agent.subagents.media_worker import execute_media_generator_for_context
 
-        return await execute_media_generator_for_context(ctx, task)
+        if writer is not None:
+            writer.append_tool_call(name="media_generator", arguments=json.dumps({"task": task}))
+        result = await execute_media_generator_for_context(ctx, task)
+        if writer is not None:
+            writer.append_tool_result(result)
+        return result
     if specialist == "social_media_manager":
         from sevn.agent.subagents.social_media_worker import (
             execute_social_media_manager_for_context,
         )
 
-        return await execute_social_media_manager_for_context(ctx, task)
+        if writer is not None:
+            writer.append_tool_call(
+                name="social_media_manager",
+                arguments=json.dumps({"task": task}),
+            )
+        result = await execute_social_media_manager_for_context(ctx, task)
+        if writer is not None:
+            writer.append_tool_result(result)
+        return result
+    if writer is not None:
+        writer.append_status("placeholder_worker")
     return await _placeholder_worker_body(task=task, specialist=specialist)
 
 
@@ -206,17 +231,41 @@ async def spawn_subagent_tool(
             )
 
     outcome: dict[str, str] = {}
+    run_id_box: dict[str, str] = {}
 
     async def _work() -> str:
+        run = await supervisor.registry.get(run_id_box["id"])
+        transcript = None
+        if run is not None:
+            from sevn.agent.subagents.transcript import SubagentTranscriptWriter
+
+            conn = None
+            router = ctx.channel_router
+            if router is not None and getattr(router, "_sessions", None) is not None:
+                conn = router._sessions.connection
+            transcript = SubagentTranscriptWriter(
+                content_root=ctx.workspace_path,
+                run=run,
+                conn=conn if isinstance(conn, sqlite3.Connection) else None,
+            )
+            transcript.append_prompt(f"spawn_subagent task: {task_text}")
+            transcript.append_status("running")
         try:
             text = await _specialist_worker_body(
                 ctx,
                 task=task_text,
                 specialist=specialist_name,
+                transcript=transcript,
             )
         except Exception as exc:  # recorded for the wait=True path below
+            if transcript is not None:
+                transcript.append_status("failed")
+                transcript.append_summary(str(exc))
             outcome["error"] = str(exc)
             raise
+        if transcript is not None:
+            transcript.append_status("done")
+            transcript.append_summary(text)
         outcome["result"] = text
         return text
 
@@ -233,6 +282,7 @@ async def spawn_subagent_tool(
     handle = await supervisor.spawn(spec)
     if isinstance(handle, SubAgentLimitExceeded):
         return enveloped_failure(str(handle), code=ToolResultCode.VALIDATION_ERROR)
+    run_id_box["id"] = handle.id
     if not wait:
         return enveloped_success(
             {

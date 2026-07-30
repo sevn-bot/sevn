@@ -576,6 +576,12 @@ _MIGRATION_26: Final[tuple[str, ...]] = (
     "ALTER TABLE subagent_runs ADD COLUMN result_delivered_at_ns INTEGER",
 )
 
+# Live per-run subagent transcripts (#77; `specs/36-sub-agents.md`). Stores the
+# workspace-relative JSONL path under ``subagents/transcripts/<run_id>.jsonl``.
+_MIGRATION_27: Final[tuple[str, ...]] = (
+    "ALTER TABLE subagent_runs ADD COLUMN transcript_path TEXT",
+)
+
 MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (1, _MIGRATION_1),
     (2, _MIGRATION_2),
@@ -603,6 +609,7 @@ MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (24, _MIGRATION_24),
     (25, _MIGRATION_25),
     (26, _MIGRATION_26),
+    (27, _MIGRATION_27),
 )
 
 MIGRATION_HEAD_VERSION: Final[int] = max(v for v, _ in MIGRATIONS)
