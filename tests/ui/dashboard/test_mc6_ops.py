@@ -7,13 +7,10 @@ import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
+import pytest
 from starlette.testclient import TestClient
-
-if TYPE_CHECKING:
-    import pytest
 
 from sevn.config.workspace_config import (
     DashboardWorkspaceConfig,
@@ -141,6 +138,24 @@ def test_security_put_updates_scanner_toggle(tmp_path: Path) -> None:
 
 def test_backup_manifest_lists_config_backup(tmp_path: Path) -> None:
     backup = tmp_path / "sevn.json.v1"
+    backup.write_text(
+        '{"schema_version": 1, "gateway": {"token": "${SECRET:keychain:sevn.gateway.token}"}}',
+        encoding="utf-8",
+    )
+    with _client(tmp_path) as client:
+        login = client.post("/api/v1/auth/login", json={"password": "pw", "totp": "000000"})
+        assert login.status_code == 200
+        resp = client.get("/api/v1/backup/manifest")
+        assert resp.status_code == 200
+        names = {row["name"] for row in resp.json()["config_backups"]}
+        assert "sevn.json.v1" in names
+
+
+@pytest.mark.xfail(reason="green after W4: dashboard lists archived config backups", strict=False)
+def test_backup_manifest_lists_archived_config_backup(tmp_path: Path) -> None:
+    archive_dir = tmp_path / "sevn.json.archive"
+    archive_dir.mkdir()
+    backup = archive_dir / "sevn.json.v1"
     backup.write_text(
         '{"schema_version": 1, "gateway": {"token": "${SECRET:keychain:sevn.gateway.token}"}}',
         encoding="utf-8",

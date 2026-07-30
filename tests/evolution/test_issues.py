@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -22,7 +23,11 @@ from sevn.evolution.issues import (
     my_sevn_repo_slug,
     save_issue,
 )
-from sevn.gateway.commands.evolution_issue_commands import _parse_file_issue_args
+from sevn.gateway.channel_router import IncomingMessage
+from sevn.gateway.commands.evolution_issue_commands import (
+    FileIssueCommandHandler,
+    _parse_file_issue_args,
+)
 from sevn.integrations.github_skill.hooks import GithubSkillHooks, integration_call_from_mapping
 from sevn.workspace.layout import WorkspaceLayout
 
@@ -160,3 +165,34 @@ def test_evolution_issue_roundtrip_dict() -> None:
     restored = EvolutionIssue.from_dict(row.to_dict())
     assert restored.kind == "feature"
     assert restored.github == {"number": 1, "url": "https://example.com/1"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.xfail(reason="green after W5: neutral issue filing confirmation wording", strict=False)
+async def test_file_issue_confirmation_is_neutral_before_github_number(tmp_path: Path) -> None:
+    """#68: confirmation must not presuppose GitHub issue numbers before creation succeeds."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    lay, cfg = _layout(tmp_path)
+    router = MagicMock()
+    router._resolve_owner_flag.return_value = True
+    handler = FileIssueCommandHandler(
+        workspace=cfg,
+        layout=lay,
+        router=router,
+    )
+    with patch(
+        "sevn.gateway.commands.evolution_issue_commands.maybe_mirror_issue_to_github",
+        new=AsyncMock(side_effect=lambda _lay, issue, _cfg: issue),
+    ):
+        reply = await handler.handle(
+            IncomingMessage(
+                channel="telegram",
+                user_id="owner",
+                text="/file_issue bug Quoted message mismatch",
+            ),
+            session_id="s1",
+        )
+    assert "Filed bug issue" in reply
+    assert "GitHub #" not in reply
+    assert "quoted message" not in reply.lower() or "mismatch" in reply.lower()

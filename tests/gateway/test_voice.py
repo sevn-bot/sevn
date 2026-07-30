@@ -321,3 +321,103 @@ async def test_voice_disabled_skips_stt(tmp_path: Path, monkeypatch: Any) -> Non
         if router is not None:
             await router.session_manager.drain()
         conn.close()
+
+
+class _CaptureTTS(TextToSpeechPipeline):
+    """Records ``synthesize_or_skip`` input text."""
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)  # type: ignore[arg-type]
+        self.synthesized_texts: list[str] = []
+
+    async def synthesize_or_skip(
+        self,
+        *,
+        cleaned_assistant_text: str,
+        voice_id: str | None,
+        session_id: str,
+        turn_id: str,
+    ) -> Any:
+        self.synthesized_texts.append(cleaned_assistant_text)
+        return await super().synthesize_or_skip(
+            cleaned_assistant_text=cleaned_assistant_text,
+            voice_id=voice_id,
+            session_id=session_id,
+            turn_id=turn_id,
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.xfail(reason="green after W6: TTS excludes routing footer", strict=False)
+async def test_tts_input_excludes_routing_footer_while_chat_keeps_it(tmp_path: Path) -> None:
+    """#66: voice output must not speak routing diagnostics when ``show_routing`` is on."""
+    from sevn.config.workspace_config import ChannelsWorkspaceSectionConfig, TelegramChannelConfig
+
+    root = tmp_path / "w"
+    root.mkdir()
+    sevn_json = root / "sevn.json"
+    sevn_json.write_text('{"schema_version":1,"workspace_root":"."}', encoding="utf-8")
+    ws = WorkspaceConfig(
+        schema_version=1,
+        workspace_root=".",
+        channels=ChannelsWorkspaceSectionConfig(
+            telegram=TelegramChannelConfig(show_routing=True),
+        ),
+        voice=VoiceConfig(tts_mode="all"),
+        gateway={"token": "x"},
+    )
+    layout = WorkspaceLayout.from_config(sevn_json, ws)
+    conn = _conn()
+    conn.execute(
+        """
+        INSERT INTO gateway_sessions(session_id, scope_key, channel, user_id, created_at, updated_at)
+        VALUES (?,?,?,?,?,?)
+        """,
+        ("sess-tts", "scope", "telegram", "1", "t", "t"),
+    )
+    conn.commit()
+    router: ChannelRouter | None = None
+    footer = "_intent=NEW_REQUEST · tier=B · conf=0.75_"
+    body = f"Spoken answer.\n\n{footer}"
+    try:
+        sessions = SessionManager(conn)
+        media = MediaStore(conn, root)
+        scanner = LLMGuardScanner(root, ws)
+        tts_dir = root / "out" / "audio"
+        tts = _CaptureTTS(
+            [_OkTTS()],
+            voice_trigger_keywords=(),
+            trace=NullTraceSink(),
+            tts_output_dir=tts_dir,
+        )
+        router = ChannelRouter(
+            workspace=ws,
+            content_root=layout.content_root,
+            sessions=sessions,
+            dispatcher=CommandDispatcher(),
+            scanner=scanner,
+            trace=NullTraceSink(),
+            rate=TokenBucketLimiter(capacity=10.0, refill_per_second=10.0),
+            media=media,
+            run_turn=AsyncMock(),
+            tts_pipeline=tts,
+        )
+        adapter = _CaptureAdapter()
+        router.register_adapter(adapter)
+        await router.route_outgoing(
+            OutgoingMessage(
+                channel="telegram",
+                user_id="1",
+                text=body,
+                session_id="sess-tts",
+                metadata={"chat_id": 1},
+            ),
+        )
+        assert tts.synthesized_texts
+        assert "intent=NEW_REQUEST" not in tts.synthesized_texts[0]
+        assert adapter.sent
+        assert "intent=NEW_REQUEST" in adapter.sent[0].text
+    finally:
+        if router is not None:
+            await router.session_manager.drain()
+        conn.close()

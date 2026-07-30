@@ -359,3 +359,91 @@ async def test_reply_quote_prefix_persisted_untruncated(
         if router is not None:
             await router.session_manager.drain()
         conn.close()
+
+
+@pytest.mark.xfail(reason="green after W5: outbound reply binds answered turn", strict=False)
+def test_outbound_routing_metadata_binds_answered_turn_not_latest_user() -> None:
+    """#67 outbound: ``reply_to_message_id`` must come from the turn being answered."""
+    import json
+
+    from sevn.gateway.agent_turn import _outbound_routing_metadata
+
+    conn = _memory_conn()
+    sid = "sess-quote-bind"
+    conn.execute(
+        """
+        INSERT INTO gateway_sessions(session_id, scope_key, channel, user_id, created_at, updated_at)
+        VALUES (?,?,?,?,?,?)
+        """,
+        (sid, "telegram:1", "telegram", "1", "t0", "t0"),
+    )
+    older_extras = json.dumps({"chat_id": 1, "message_id": 10, "reply_to_message_id": 100})
+    newer_extras = json.dumps({"chat_id": 1, "message_id": 11, "reply_to_message_id": 999})
+    conn.execute(
+        """
+        INSERT INTO gateway_messages(
+            session_id, role, kind, content, visible_to_llm, status, turn_id, extras_json
+        ) VALUES (?,?,?,?,?,?,?,?)
+        """,
+        (sid, "user", "message", "older question", 1, "sent", "turn-a", older_extras),
+    )
+    conn.execute(
+        """
+        INSERT INTO gateway_messages(
+            session_id, role, kind, content, visible_to_llm, status, turn_id, extras_json
+        ) VALUES (?,?,?,?,?,?,?,?)
+        """,
+        (sid, "user", "message", "newer question", 1, "sent", "turn-b", newer_extras),
+    )
+    conn.commit()
+    md = _outbound_routing_metadata(conn, sid, "telegram", "1")
+    assert md.get("reply_to_message_id") == 100
+
+
+@pytest.mark.asyncio
+@pytest.mark.xfail(reason="green after W5: referenced quote block is explicit", strict=False)
+async def test_route_inbound_marks_referenced_quote_block_explicitly(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    """#68: quoted context injected at route_inbound must be distinguishable from user text."""
+
+    async def _stub(
+        _self: LLMGuardScanner,
+        *,
+        text: str,
+        channel: str,
+        user_id: str,
+        actor_is_owner: bool,
+        source: str,
+    ) -> ScanResult:
+        _ = channel, user_id, actor_is_owner, source
+        assert "[Referenced message]" in text or "[Quote]" in text
+        return ScanResult(
+            verdict=ScanVerdict.allow,
+            reasons=(),
+            scores={},
+            provider_used=None,
+            details={},
+        )
+
+    monkeypatch.setattr(LLMGuardScanner, "scan_inbound", _stub)
+    root = tmp_path / "w"
+    root.mkdir()
+    conn = _memory_conn()
+    router: ChannelRouter | None = None
+    try:
+        router = _router_bundle(root, conn)
+        quote = "[Quote]\nEarlier assistant note\n[/Quote]\n"
+        await router.route_incoming(
+            IncomingMessage(
+                channel="telegram",
+                user_id="ref-explicit",
+                text="please verify that",
+                metadata={"reply_to_quote": quote},
+            ),
+        )
+    finally:
+        if router is not None:
+            await router.session_manager.drain()
+        conn.close()

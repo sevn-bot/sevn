@@ -253,6 +253,35 @@ def test_parse_webhook_suppresses_bot_self_reply_quote() -> None:
     assert msg.text == "follow-up"
 
 
+@pytest.mark.xfail(
+    reason="green after W5: bot-self-reply exposes referenced turn identity", strict=False
+)
+def test_bot_self_reply_carries_referenced_turn_identity() -> None:
+    """#67 inbound: replying to the bot's own message must identify the referenced turn."""
+    cfg = TelegramConfig(bot_token="", bot_user_id=777)
+    adapter = TelegramAdapter(config=cfg)
+    payload: dict[str, Any] = {
+        "update_id": 72,
+        "message": {
+            "message_id": 5,
+            "from": {"id": 1},
+            "chat": {"id": 1, "type": "private"},
+            "text": "what did you mean here?",
+            "reply_to_message": {
+                "message_id": 4,
+                "from": {"id": 777, "is_bot": True, "first_name": "Sevn"},
+                "text": "earlier bot answer about deployment",
+            },
+        },
+    }
+    msg = adapter.parse_webhook(payload)
+    assert msg is not None
+    assert msg.metadata.get("reply_to_message_id") == 4
+    handle = msg.metadata.get("referenced_turn_id") or msg.metadata.get("referenced_message_id")
+    quote = msg.metadata.get("reply_to_quote")
+    assert handle is not None or (isinstance(quote, str) and quote.strip())
+
+
 def test_parse_webhook_keeps_other_user_quote() -> None:
     cfg = TelegramConfig(bot_token="", bot_user_id=777)
     adapter = TelegramAdapter(config=cfg)

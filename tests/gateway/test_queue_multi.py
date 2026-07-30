@@ -12,6 +12,7 @@ import pytest
 
 from sevn.agent.tracing.sink import NullTraceSink
 from sevn.agent.triager.relatedness import RelatednessInput, RelatednessResult
+from sevn.channels.telegram import TelegramAdapter
 from sevn.config.workspace_config import (
     GatewayConfig,
     SecurityScannerSubConfig,
@@ -217,14 +218,131 @@ async def test_multi_supersede_cancel_aborts_in_flight(
 
 
 @pytest.mark.asyncio
-async def test_multi_classifier_timeout_queues_new_task_with_notice(
+@pytest.mark.xfail(reason="green after W7: timeout notice not on prior turn", strict=False)
+async def test_multi_classifier_timeout_notice_not_on_prior_turn(
     tmp_path: Path,
     allow_scan: None,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """D15: classifier timeout → ``new_task`` + operator notice (not steer)."""
+    """#70 inverted: classifier timeout must not mutate the prior turn's visible reply."""
     gate = asyncio.Event()
-    notices: list[str] = []
+    run_turn_calls: list[tuple[str, str]] = []
+    outbound_texts: list[str] = []
+    edit_calls: list[tuple[int | None, str]] = []
+
+    async def slow_run(sid: str, cid: str) -> None:
+        run_turn_calls.append((sid, cid))
+        gate.set()
+        await asyncio.sleep(0.25)
+
+    async def classify(_inp: RelatednessInput) -> RelatednessResult:
+        return RelatednessResult(label="new_task", fallback=True)
+
+    class _EditCaptureTelegram(TelegramAdapter):
+        def __init__(self) -> None:
+            super().__init__()
+            self.sent_texts: list[str] = []
+
+        async def send(self, message: Any) -> list[str]:
+            outbound_texts.append(str(message.text))
+            if message.metadata.get("edit_message_id") is not None:
+                edit_calls.append(
+                    (message.metadata.get("edit_message_id"), str(message.text)),
+                )
+            self.sent_texts.append(str(message.text))
+            return ["1"]
+
+    conn = _memory_conn()
+    router = _router(tmp_path, conn, run_turn=slow_run, classify=classify)
+    adapter = _EditCaptureTelegram()
+    router.register_adapter(adapter)
+    hooks = router._test_multi_hooks
+    router._test_multi_hooks = MultiDispatchHooks(  # type: ignore[attr-defined]
+        classify_busy=hooks.classify_busy,
+        spawn_new_task=hooks.spawn_new_task,
+        notify_operator=hooks.notify_operator,
+    )
+    monkeypatch.setattr(
+        router,
+        "build_multi_dispatch_hooks",
+        lambda **_k: router._test_multi_hooks,
+    )
+    sid_holder: list[str] = []
+    scope = "telegram:9001"
+    try:
+        t1 = asyncio.create_task(
+            router.route_incoming(
+                IncomingMessage(
+                    channel="telegram",
+                    user_id="9001",
+                    text="one",
+                    metadata={"chat_id": 9001},
+                ),
+            ),
+        )
+        await asyncio.wait_for(gate.wait(), timeout=2.0)
+        row = conn.execute(
+            "SELECT session_id FROM gateway_sessions WHERE scope_key = ?",
+            (scope,),
+        ).fetchone()
+        assert row is not None
+        sid_holder.append(str(row[0]))
+        prior_assistant_before = conn.execute(
+            """
+            SELECT content FROM gateway_messages
+            WHERE session_id = ? AND role = 'assistant' AND kind = 'message'
+            ORDER BY id ASC
+            """,
+            (sid_holder[0],),
+        ).fetchall()
+        t2 = asyncio.create_task(
+            router.route_incoming(
+                IncomingMessage(
+                    channel="telegram",
+                    user_id="9001",
+                    text="two",
+                    metadata={"chat_id": 9001},
+                ),
+            ),
+        )
+        await asyncio.gather(t1, t2)
+        assert len(run_turn_calls) >= 2
+        notice_markers = ("timed out", "queuing", "own turn")
+        for text in outbound_texts:
+            low = text.lower()
+            assert not any(marker in low for marker in notice_markers)
+        for _mid, edited in edit_calls:
+            low = edited.lower()
+            assert not any(marker in low for marker in notice_markers)
+        rows = conn.execute(
+            """
+            SELECT content FROM gateway_messages
+            WHERE session_id = ? AND role = 'assistant' AND kind = 'message'
+            ORDER BY id ASC
+            """,
+            (sid_holder[0],),
+        ).fetchall()
+        new_rows = rows[len(prior_assistant_before) :]
+        for (content,) in new_rows:
+            low = str(content).lower()
+            assert not any(marker in low for marker in notice_markers)
+    finally:
+        await router.session_manager.drain()
+        conn.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.xfail(reason="green after W7: classifier timeout structured log", strict=False)
+async def test_multi_classifier_timeout_logs_decision_context(
+    tmp_path: Path,
+    allow_scan: None,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Timeout routing must remain diagnosable from structured logs."""
+    import logging
+
+    gate = asyncio.Event()
 
     async def slow_run(_sid: str, _cid: str) -> None:
         gate.set()
@@ -233,33 +351,41 @@ async def test_multi_classifier_timeout_queues_new_task_with_notice(
     async def classify(_inp: RelatednessInput) -> RelatednessResult:
         return RelatednessResult(label="new_task", fallback=True)
 
-    async def notify(_sid: str, line: str) -> None:
-        notices.append(line)
-
     conn = _memory_conn()
     router = _router(tmp_path, conn, run_turn=slow_run, classify=classify)
-    hooks = router._test_multi_hooks
-    router._test_multi_hooks = MultiDispatchHooks(  # type: ignore[attr-defined]
-        classify_busy=hooks.classify_busy,
-        spawn_new_task=hooks.spawn_new_task,
-        notify_operator=notify,
-    )
     monkeypatch.setattr(
         router,
         "build_multi_dispatch_hooks",
         lambda **_k: router._test_multi_hooks,
     )
+    caplog.set_level(logging.INFO)
     try:
         t1 = asyncio.create_task(
-            router.route_incoming(IncomingMessage(channel="webchat", user_id="mt", text="one")),
+            router.route_incoming(
+                IncomingMessage(
+                    channel="telegram",
+                    user_id="9002",
+                    text="one",
+                    metadata={"chat_id": 9002},
+                ),
+            ),
         )
         await asyncio.wait_for(gate.wait(), timeout=2.0)
         t2 = asyncio.create_task(
-            router.route_incoming(IncomingMessage(channel="webchat", user_id="mt", text="two")),
+            router.route_incoming(
+                IncomingMessage(
+                    channel="telegram",
+                    user_id="9002",
+                    text="two",
+                    metadata={"chat_id": 9002},
+                ),
+            ),
         )
         await asyncio.gather(t1, t2)
-        assert any("timed out" in n.lower() for n in notices)
-        assert any("own turn" in n.lower() or "queuing" in n.lower() for n in notices)
+        joined = "\n".join(r.getMessage() for r in caplog.records)
+        assert "relatedness_classifier_timeout" in joined or "queue_multi_spawned" in joined
+        assert "session_id=" in joined
+        assert "correlation_id=" in joined or "new_task" in joined
     finally:
         await router.session_manager.drain()
         conn.close()
