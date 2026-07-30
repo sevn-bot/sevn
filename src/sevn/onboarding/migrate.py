@@ -205,19 +205,9 @@ def _atomic_write_sevn_json_with_optional_backup(
 
     backup_written: Path | None = None
     if sevn_json_path.is_file() and backup_previous:
-        try:
-            old_doc = json.loads(sevn_json_path.read_text(encoding="utf-8"))
-            old_schema = int(old_doc.get("schema_version", 1))
-        except (OSError, UnicodeError, json.JSONDecodeError, TypeError, ValueError):
-            old_schema = 1
-        backup = sevn_json_path.parent / f"sevn.json.v{old_schema}"
-        target_backup = backup
-        suffix = 0
-        while target_backup.is_file():
-            suffix += 1
-            target_backup = sevn_json_path.parent / f"sevn.json.v{old_schema}.{suffix}"
-        os.replace(sevn_json_path, target_backup)
-        backup_written = target_backup
+        from sevn.config.sevn_json_backup import backup_previous_sevn_json
+
+        backup_written = backup_previous_sevn_json(sevn_json_path)
 
     os.replace(tmp, sevn_json_path)
     return backup_written

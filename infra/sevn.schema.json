@@ -1425,6 +1425,24 @@
       },
       "additionalProperties": true
     },
+    "config_archive": {
+      "type": "object",
+      "properties": {
+        "keep_count": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 5,
+          "$comment": "Maximum number of ``sevn.json.v*`` backups retained under ``sevn.json.archive/`` after each config write."
+        },
+        "retention_days": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "$comment": "When > 0, prune archived config backups older than this many whole days (mtime), same semantics as ``logging.retention_days``."
+        }
+      },
+      "additionalProperties": true
+    },
     "logging": {
       "type": "object",
       "properties": {

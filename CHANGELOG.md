@@ -24,6 +24,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-30] `sevn.json` versioned backups now land in `sevn.json.archive/` beside the active config and are pruned by `config_archive.keep_count` (default 5) — fixes #62 (unbounded `sevn.json.v*` pile beside every `/config` toggle); legacy beside-config backups migrate into the archive on the next write
 - [2026-07-30] Telegram `/config` form wizards re-prompt on validation failure and advertise `cancel`/`abort` on every value-required first ask — fixes #71 (trapped tunnel mode prompt); `quick` tunnel alias now normalizes to `cloudflare_quick`
 - [2026-07-29] Tier-B harness skill staging uses a per-turn process tempdir — avoids accumulating ``.sevn-harness-skills/`` under long-lived workspaces
 - [2026-07-29] Tier-B history compaction honors ``agent.history_compaction.target_tokens`` from ``sevn.json`` — previously validated in schema but silently ignored at capability assembly

@@ -345,7 +345,7 @@ def _redact_config_document(doc: dict[str, Any]) -> dict[str, Any]:
 
 
 def _list_config_backups(sevn_json: Path) -> list[dict[str, object]]:
-    """List ``sevn.json.v*`` backup files beside the active config.
+    """List ``sevn.json.v*`` backup files under ``sevn.json.archive/``.
 
     Args:
         sevn_json (Path): Active ``sevn.json`` path.
@@ -358,13 +358,10 @@ def _list_config_backups(sevn_json: Path) -> list[dict[str, object]]:
         []
     """
 
-    parent = sevn_json.parent
-    if not parent.is_dir():
-        return []
+    from sevn.config.sevn_json_backup import iter_config_backup_paths
+
     entries: list[dict[str, object]] = []
-    for path in sorted(parent.glob("sevn.json.v*")):
-        if not path.is_file():
-            continue
+    for path in iter_config_backup_paths(sevn_json):
         stat = path.stat()
         entries.append(
             {

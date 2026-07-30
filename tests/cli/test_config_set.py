@@ -87,13 +87,14 @@ def test_config_set_atomic_write_creates_backup(
     ws = home / "workspace"
     result = runner.invoke(get_command(app), ["config", "set", "gateway.host", '"127.0.0.2"'])
     assert result.exit_code == 0
-    backups = list(ws.glob("sevn.json.v1*"))
+    archive_dir = ws / "sevn.json.archive"
+    assert archive_dir.is_dir()
+    backups = list(archive_dir.glob("sevn.json.v1*"))
     assert backups
     doc = json.loads((ws / "sevn.json").read_text(encoding="utf-8"))
     assert doc["gateway"]["host"] == "127.0.0.2"
 
 
-@pytest.mark.xfail(reason="green after W4: CLI config writes archive backups", strict=False)
 def test_config_set_backups_use_archive_directory(
     runner: ClickCliRunner,
     tmp_path: Path,

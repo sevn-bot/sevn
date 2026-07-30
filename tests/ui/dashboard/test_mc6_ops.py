@@ -7,10 +7,13 @@ import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
-import pytest
 from starlette.testclient import TestClient
+
+if TYPE_CHECKING:
+    import pytest
 
 from sevn.config.workspace_config import (
     DashboardWorkspaceConfig,
@@ -151,7 +154,6 @@ def test_backup_manifest_lists_config_backup(tmp_path: Path) -> None:
         assert "sevn.json.v1" in names
 
 
-@pytest.mark.xfail(reason="green after W4: dashboard lists archived config backups", strict=False)
 def test_backup_manifest_lists_archived_config_backup(tmp_path: Path) -> None:
     archive_dir = tmp_path / "sevn.json.archive"
     archive_dir.mkdir()

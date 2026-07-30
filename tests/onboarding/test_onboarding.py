@@ -738,13 +738,12 @@ def test_promote_with_backup_renames_prior_sevn_json(tmp_path: Path) -> None:
     new_draft["timezone"] = "UTC"
     write_draft(sevn_json, new_draft)
     promote_draft(sevn_json, backup_previous=True)
-    backup = tmp_path / "sevn.json.v1"
+    backup = tmp_path / "sevn.json.archive" / "sevn.json.v1"
     assert backup.is_file()
     assert json.loads(backup.read_text(encoding="utf-8")) == prior
     assert json.loads(sevn_json.read_text(encoding="utf-8"))["timezone"] == "UTC"
 
 
-@pytest.mark.xfail(reason="green after W4: backups land in sevn.json.archive/", strict=False)
 def test_promote_draft_backups_use_archive_directory(tmp_path: Path) -> None:
     """#62: versioned backups must not accumulate beside the active config."""
     sevn_json = tmp_path / "sevn.json"
@@ -771,7 +770,6 @@ def test_promote_draft_backups_use_archive_directory(tmp_path: Path) -> None:
     assert not list(tmp_path.glob("sevn.json.v*"))
 
 
-@pytest.mark.xfail(reason="green after W4: archive retention prunes old backups", strict=False)
 def test_promote_draft_archive_retention_bounds_backup_count(tmp_path: Path) -> None:
     """Repeated promotes must not grow an unbounded pile of archived configs."""
     sevn_json = tmp_path / "sevn.json"

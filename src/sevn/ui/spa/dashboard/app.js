@@ -1952,7 +1952,7 @@ async function renderBackupSnapshots() {
       </label>
     </div>
     <p class="muted">${escapeHtml(data.restore_hint || "")}</p>
-    <h3>Config backups (sevn.json.v*)</h3>
+    <h3>Config backups (sevn.json.archive/)</h3>
     ${tableFromRows(backups, [
       { key: "name", label: "File" },
       { key: "size_bytes", label: "Bytes" },

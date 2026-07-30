@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Provide a single, testable configuration surface before storage, tracing,
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
-last_updated: '2026-07-29'
-fingerprint: sha256:caa6db82951f0fef46dcc8437d925cbc9951fa713d437f3f206adbb626b4ab30
+last_updated: '2026-07-30'
+fingerprint: sha256:31f7ce74a659367b58be54b03e41523ff5d7bb5f92cdc90343be7868963c9e41
 related: []
 sources:
 - src/sevn/config/**
@@ -853,6 +853,14 @@ via `x-sevn-process-settings-env` in the JSON Schema.
 Telegram ``/config`` exposes ``sevn config show|set|validate|sections`` from Deployment
 and Help sections; section slugs match the eight root tiles via ``config_paths`` (derived
 from ``menu_registry``, not hand-written ``config_sections/`` packages).
+
+## Amendments (open-issues-sweep W4, #62)
+
+``promote_draft`` and schema migration write versioned backups under
+``sevn.json.archive/`` (not beside ``sevn.json``). ``config_archive.keep_count``
+(default 5) and optional ``config_archive.retention_days`` prune the archive after
+each backup; legacy ``sevn.json.v*`` beside the active config migrate on the next write.
+Dashboard backup manifest/export/import use the same archive directory.
 
 ## Test Strategy
 
