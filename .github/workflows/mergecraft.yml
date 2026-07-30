@@ -20,11 +20,22 @@
 #
 # Workflow resolution (GitHub Nov 2025 policy, effective 2025-12-08): pull_request_target
 # definitions are read from the repository default branch (`main`), not the PR base.
-# Companion PR sevn-bot/sevn#96 lands this workflow on `main` (default branch).
-# Until that merges, pull_request_target alone will not fire for PRs targeting
-# `pre-*` / `develop` / `test-pre`. The bootstrap `pull_request` trigger below
-# MUST stay until then; do not remove it in the same PR that introduces
-# pull_request_target.
+# Companion PR sevn-bot/sevn#96 landed this workflow on `main`, so pull_request_target
+# now fires for PRs targeting `pre-*` / `develop` / `test-pre`.
+#
+# THIS COPY DOES NOT RUN. The copy on `main` is authoritative for pull_request_target
+# — it is used for every PR regardless of what the base branch carries here — and
+# with the `pull_request` trigger gone (below) nothing reads this file at review
+# time. It stays because `make mergecraft-ref-check` (ci-parity, via `make ci`)
+# reads the action pin out of it; see scripts/check_mergecraft_ref_parity.py.
+# Any edit here MUST be mirrored to `main` in a companion PR or it has no effect,
+# and the action SHA must match in three places: this file, main's copy, and
+# MERGECRAFT_REF in the Makefile (only the first and third are gate-checked).
+#
+# The bootstrap `pull_request` trigger has been removed: running BOTH triggers made
+# each synchronize fire two runs that resolved to the SAME concurrency group (see
+# below) — with cancel-in-progress they cancelled each other, and a cancelled
+# `mergecraft review` is a non-success on the required check. Do not re-add it.
 #
 # Same-repo guard below keeps fork PRs from receiving secrets (prior pull_request
 # behavior). mergeCraft uses checkout_pr + API with push/shell disabled — no
@@ -40,14 +51,6 @@ on:
     # `pre-*` glob keeps every release-staging branch (pre-0.0.1, pre-0.0.2, …)
     # auto-reviewed without editing this list each cut (matches the old
     # .coderabbit.yaml `pre-.*` coverage).
-    branches: [main, develop, test-pre, "pre-*"]
-    types: [opened, synchronize, reopened, ready_for_review]
-  # Bootstrap: keep pull_request until mergecraft.yml exists on `main` (default
-  # branch). GitHub resolves pull_request_target from default branch, so
-  # pull_request_target-only would not fire for pre-* PRs while main lacks this
-  # file. pull_request uses the merge commit and fires today; remove only after
-  # main carries this workflow (or default branch moves to pre-0.0.1).
-  pull_request:
     branches: [main, develop, test-pre, "pre-*"]
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
@@ -75,10 +78,105 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Hold the review until sevn's own CI has finished on the PR head SHA, so the
+  # reviewer can read real lint/typecheck/test outcomes instead of guessing.
+  # `needs:` cannot reference another workflow file, so this polls the check-runs
+  # API for ci.yml's `Verify (…)` jobs.
+  #
+  # ALWAYS fail-open (`exit 0` on every path): mergecraft review is a required
+  # check, so a wait that could fail would convert a slow or absent CI run into a
+  # permanent merge block. Timing out just means the review proceeds without CI
+  # context, which is the pre-existing behavior.
+  wait-for-ci:
+    name: mergecraft wait for CI
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      # complete | timeout | absent | skipped
+      state: ${{ steps.wait.outputs.state || 'skipped' }}
+      failed_count: ${{ steps.wait.outputs.failed_count || '0' }}
+      failed_names: ${{ steps.wait.outputs.failed_names || '' }}
+      check_suite_id: ${{ steps.wait.outputs.check_suite_id || '' }}
+    steps:
+      - name: Wait for CI checks on the PR head SHA
+        id: wait
+        if: github.event_name == 'pull_request_target'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          # Total budget. ci.yml runs ~12-15 min; 20 leaves headroom without
+          # pinning a runner for the job's full 25.
+          WAIT_BUDGET_SECONDS: "1200"
+          # If no Verify job has even appeared by then, assume CI is not running
+          # for this PR and stop waiting.
+          APPEAR_BUDGET_SECONDS: "300"
+        run: |
+          set -uo pipefail
+          # Selector for ci.yml's jobs — all of them are named "Verify (…)".
+          jq_verify='[.check_runs[]? | select(.name | startswith("Verify ("))]'
+          started="$(date +%s)"
+          state="timeout"
+          failed_count=0
+          failed_names=""
+          check_suite_id=""
+
+          while :; do
+            now="$(date +%s)"
+            elapsed=$(( now - started ))
+
+            if runs="$(gh api "/repos/${REPO}/commits/${HEAD_SHA}/check-runs?per_page=100" 2>/dev/null)"; then
+              total="$(printf '%s' "${runs}" | jq "${jq_verify} | length")"
+              pending="$(printf '%s' "${runs}" | jq "${jq_verify} | map(select(.status != \"completed\")) | length")"
+
+              if [ "${total}" -gt 0 ] && [ "${pending}" -eq 0 ]; then
+                state="complete"
+                failed_count="$(printf '%s' "${runs}" | jq "${jq_verify} | map(select(.conclusion != \"success\" and .conclusion != \"neutral\" and .conclusion != \"skipped\")) | length")"
+                failed_names="$(printf '%s' "${runs}" | jq -r "${jq_verify} | map(select(.conclusion != \"success\" and .conclusion != \"neutral\" and .conclusion != \"skipped\") | .name) | join(\", \")")"
+                # Any failing Verify job carries the check_suite id the reviewer
+                # needs for get_check_suite_logs().
+                check_suite_id="$(printf '%s' "${runs}" | jq -r "${jq_verify} | map(select(.conclusion != \"success\" and .conclusion != \"neutral\" and .conclusion != \"skipped\") | .check_suite.id) | first // \"\"")"
+                break
+              fi
+
+              if [ "${total}" -eq 0 ] && [ "${elapsed}" -ge "${APPEAR_BUDGET_SECONDS}" ]; then
+                state="absent"
+                break
+              fi
+            else
+              echo "check-runs query failed (elapsed ${elapsed}s) — retrying" >&2
+            fi
+
+            if [ "${elapsed}" -ge "${WAIT_BUDGET_SECONDS}" ]; then
+              state="timeout"
+              break
+            fi
+            sleep 20
+          done
+
+          {
+            echo "state=${state}"
+            echo "failed_count=${failed_count}"
+            echo "failed_names=${failed_names}"
+            echo "check_suite_id=${check_suite_id}"
+          } >> "${GITHUB_OUTPUT}"
+          echo "CI wait finished: state=${state} failed=${failed_count} suite=${check_suite_id:-none}"
+          case "${state}" in
+            timeout) echo "::notice title=mergecraft CI wait::CI did not finish within ${WAIT_BUDGET_SECONDS}s — reviewing without CI context." ;;
+            absent)  echo "::notice title=mergecraft CI wait::No Verify checks appeared for ${HEAD_SHA} — reviewing without CI context." ;;
+          esac
+          exit 0
+
   review:
     name: mergecraft review
-    # Skip drafts (reviewed once marked ready); always allow manual dispatch.
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    needs: wait-for-ci
+    # `always()` keeps the required check reporting even if the (fail-open) wait
+    # job errors out on a runner fault; a skipped wait job still skips the review,
+    # because the draft/dispatch condition below is the same one it uses.
+    if: >-
+      always() &&
+      (github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -98,7 +196,7 @@ jobs:
           persist-credentials: true
 
       - name: Ensure PR base ref exists locally
-        if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
+        if: github.event_name == 'pull_request_target'
         run: |
           set -euo pipefail
           base="${{ github.event.pull_request.base.ref }}"
@@ -114,6 +212,50 @@ jobs:
             echo "::notice title=mergecraft skipped::Configure CLAUDE_CODE_OAUTH_TOKEN to enable mergeCraft reviews."
           fi
 
+      # Composed in a step rather than inline in `with:` so the CI-context clause
+      # stays readable. Every interpolated value is repo-controlled (PR number,
+      # base ref, our own wait-job outputs) — no PR-authored free text reaches the
+      # prompt.
+      - name: Compose review prompt
+        id: prompt
+        if: env.HAS_CLAUDE_CODE == 'true'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_PROMPT: ${{ inputs.prompt }}
+          CI_STATE: ${{ needs.wait-for-ci.outputs.state }}
+          CI_FAILED_COUNT: ${{ needs.wait-for-ci.outputs.failed_count }}
+          CI_FAILED_NAMES: ${{ needs.wait-for-ci.outputs.failed_names }}
+          CI_CHECK_SUITE_ID: ${{ needs.wait-for-ci.outputs.check_suite_id }}
+        run: |
+          set -euo pipefail
+          if [ "${EVENT_NAME}" != "pull_request_target" ]; then
+            text="${DISPATCH_PROMPT:-Review the current pull request.}"
+          else
+            text="Review pull request #${PR_NUMBER}. Call checkout_pr first. For base-side file reads use origin/${BASE_REF}:path, not bare branch names. If prior mergeCraft threads are resolved and the latest commits address them, submit approved:true with a short summary. Focus on correctness, security, regressions, missing tests, and maintainability. Leave concise, actionable comments only for issues that should be addressed before merge."
+            # The Action runs with `shell: disabled`, so the reviewer cannot run
+            # lint/typecheck/tests itself. Hand it the CI outcome instead — and the
+            # check_suite id, because no MCP tool can discover one.
+            case "${CI_STATE}" in
+              complete)
+                if [ "${CI_FAILED_COUNT}" -gt 0 ] 2>/dev/null && [ -n "${CI_CHECK_SUITE_ID}" ]; then
+                  text="${text} CI has finished on this head commit and ${CI_FAILED_COUNT} job(s) FAILED (${CI_FAILED_NAMES}). Call get_check_suite_logs with check_suite_id ${CI_CHECK_SUITE_ID} and ground your review in those failures — report the underlying defect, not the log line."
+                else
+                  text="${text} CI has finished green on this head commit, so lint, typecheck, and the full test suite already pass; do not speculate about mechanical failures those gates would have caught, and spend the review on logic, design, and missing coverage."
+                fi
+                ;;
+              *)
+                text="${text} CI results are NOT available for this head commit (wait state: ${CI_STATE}), so no lint/typecheck/test signal informs this review. Do not assert that the change passes or fails those gates."
+                ;;
+            esac
+          fi
+          {
+            echo "text<<MERGECRAFT_PROMPT_EOF"
+            echo "${text}"
+            echo "MERGECRAFT_PROMPT_EOF"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: mergeCraft PR review (Claude subscription)
         if: env.HAS_CLAUDE_CODE == 'true'
         id: mergecraft
@@ -127,13 +269,13 @@ jobs:
         # fails on one-sided bumps.
         uses: alexhawat/mergeCraft@f98aeb0063b387a51960503a758351608d377002 # pre-0.0.1
         with:
-          # For pull_request events, name the PR number explicitly so the agent
-          # calls checkout_pr(<n>) instead of asking which PR to review.
-          prompt: >-
-            ${{ ((github.event_name == 'pull_request' || github.event_name == 'pull_request_target') && format('Review pull request #{0}. Call checkout_pr first. For base-side file reads use origin/{1}:path, not bare branch names. If prior mergeCraft threads are resolved and the latest commits address them, submit approved:true with a short summary. Focus on correctness, security, regressions, missing tests, and maintainability. Leave concise, actionable comments only for issues that should be addressed before merge.', github.event.pull_request.number, github.event.pull_request.base.ref))
-                || (github.event_name == 'workflow_dispatch' && inputs.prompt != '' && inputs.prompt)
-                || 'Review the current pull request.' }}
-          model: anthropic/claude-sonnet
+          prompt: ${{ steps.prompt.outputs.text }}
+          # Must stay BELOW the job's timeout-minutes: when GitHub kills the job
+          # first, the action never posts its `mergecraft` completion check and the
+          # only diagnostic is lost. Leaving 5 min of headroom lets it exit
+          # cleanly and report failure instead.
+          timeout: 25m
+          model: anthropic/claude-opus
           push: disabled
           shell: disabled
           status_checks: enabled
@@ -151,7 +293,7 @@ jobs:
         # hiccup even when the review + approval check posted fine). Runs on every
         # PR where auth is present.
         if: >-
-          (github.event_name == 'pull_request' || github.event_name == 'pull_request_target') &&
+          github.event_name == 'pull_request_target' &&
           env.HAS_CLAUDE_CODE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
