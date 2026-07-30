@@ -8,7 +8,7 @@ summary: 'Own everything under workspace/skills/: how skills are discovered, val
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
 last_updated: '2026-07-30'
-fingerprint: sha256:c46ed9f95b242a06af7a10c635660f41b68e89e49c3291f513a97d9b6cf8c560
+fingerprint: sha256:64e5203e9d30c81f547c740ac50a21438c2a62be61c22da0a15dfc4517da07ee
 related: []
 sources:
 - src/sevn/skills/**
@@ -176,6 +176,12 @@ interfaces:
 - name: gate_cursor_cloud_core_skill
   file: src/sevn/skills/cursor_cloud.py
   symbol: gate_cursor_cloud_core_skill
+- name: SkillDependencies
+  file: src/sevn/skills/dependencies.py
+  symbol: SkillDependencies
+- name: coerce_skill_dependencies
+  file: src/sevn/skills/dependencies.py
+  symbol: coerce_skill_dependencies
 - name: discogs_config_enabled
   file: src/sevn/skills/discogs.py
   symbol: discogs_config_enabled
@@ -566,6 +572,18 @@ interfaces:
 - name: write_workspace_scan_summary
   file: src/sevn/skills/security_scan.py
   symbol: write_workspace_scan_summary
+- name: InstallConfirmationRequired
+  file: src/sevn/skills/setup.py
+  symbol: InstallConfirmationRequired
+- name: execute_skill_setup
+  file: src/sevn/skills/setup.py
+  symbol: execute_skill_setup
+- name: skill_setup_requirements
+  file: src/sevn/skills/setup.py
+  symbol: skill_setup_requirements
+- name: skill_setup_status
+  file: src/sevn/skills/setup.py
+  symbol: skill_setup_status
 - name: gate_social_media_manager_core_skill
   file: src/sevn/skills/social_media_manager.py
   symbol: gate_social_media_manager_core_skill

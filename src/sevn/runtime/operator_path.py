@@ -78,11 +78,12 @@ def _venv_bin_prefixes(*, env: Mapping[str, str] | None = None) -> tuple[Path, .
         bin_dir = Path(venv) / "bin"
         if bin_dir.is_dir():
             return (bin_dir,)
-    prefix = Path(sys.prefix)
-    pyvenv = prefix / "pyvenv.cfg"
-    prefix_bin = prefix / "bin"
-    if pyvenv.is_file() and prefix_bin.is_dir():
-        return (prefix_bin,)
+    if env is None:
+        prefix = Path(sys.prefix)
+        pyvenv = prefix / "pyvenv.cfg"
+        prefix_bin = prefix / "bin"
+        if pyvenv.is_file() and prefix_bin.is_dir():
+            return (prefix_bin,)
     return ()
 
 
