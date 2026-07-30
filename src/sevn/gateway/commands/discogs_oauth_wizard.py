@@ -92,7 +92,7 @@ async def cleanup_discogs_oauth_interim_secrets(chain: SecretsChain) -> None:
 
 
 _DISCOGS_CONSUMER_KEY_PROMPT = "Send your Discogs OAuth consumer key:"
-_DISCOGS_CONSUMER_SECRET_PROMPT = "Send your Discogs OAuth consumer secret (not shown again):"
+_DISCOGS_CONSUMER_SECRET_PROMPT = "Send your Discogs OAuth consumer secret (not shown again):"  # nosec B105 — UI prompt text
 _DISCOGS_VERIFIER_PROMPT = "Paste the verifier code from the Discogs authorization page:"
 
 

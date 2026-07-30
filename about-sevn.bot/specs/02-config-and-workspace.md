@@ -8,7 +8,7 @@ summary: 'Provide a single, testable configuration surface before storage, traci
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
 last_updated: '2026-07-30'
-fingerprint: sha256:31f7ce74a659367b58be54b03e41523ff5d7bb5f92cdc90343be7868963c9e41
+fingerprint: sha256:3926ca4247284008c4c291b27f88c84de6edcb3aa982d82761a8394f2a8007ee
 related: []
 sources:
 - src/sevn/config/**
@@ -407,6 +407,9 @@ interfaces:
 - name: parse_coding_agents_section
   file: src/sevn/config/sections/coding_agents.py
   symbol: parse_coding_agents_section
+- name: ConfigArchiveWorkspaceConfig
+  file: src/sevn/config/sections/config_archive.py
+  symbol: ConfigArchiveWorkspaceConfig
 - name: DashboardPageAgentConfig
   file: src/sevn/config/sections/dashboard.py
   symbol: DashboardPageAgentConfig
@@ -731,6 +734,24 @@ interfaces:
 - name: ProcessSettings
   file: src/sevn/config/settings.py
   symbol: ProcessSettings
+- name: backup_previous_sevn_json
+  file: src/sevn/config/sevn_json_backup.py
+  symbol: backup_previous_sevn_json
+- name: config_backup_archive_dir
+  file: src/sevn/config/sevn_json_backup.py
+  symbol: config_backup_archive_dir
+- name: effective_config_backup_settings
+  file: src/sevn/config/sevn_json_backup.py
+  symbol: effective_config_backup_settings
+- name: iter_config_backup_paths
+  file: src/sevn/config/sevn_json_backup.py
+  symbol: iter_config_backup_paths
+- name: migrate_legacy_config_backups
+  file: src/sevn/config/sevn_json_backup.py
+  symbol: migrate_legacy_config_backups
+- name: prune_config_backups
+  file: src/sevn/config/sevn_json_backup.py
+  symbol: prune_config_backups
 - name: is_sevn_repo
   file: src/sevn/config/sevn_repo.py
   symbol: is_sevn_repo

@@ -278,6 +278,7 @@ def iter_config_backup_paths(sevn_json_path: Path) -> list[Path]:
         list[Path]: Sorted backup file paths (archive preferred over legacy duplicates).
 
     Examples:
+        >>> from pathlib import Path
         >>> iter_config_backup_paths(Path("/tmp/none/sevn.json"))
         []
     """
