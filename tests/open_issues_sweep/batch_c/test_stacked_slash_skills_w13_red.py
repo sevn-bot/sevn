@@ -72,7 +72,6 @@ def _core_handler_matches_slash(text: str) -> bool:
         ),
     ],
 )
-@pytest.mark.xfail(reason="green after W16: stacked slash-skill parsing (#87)", strict=False)
 def test_stacked_slash_skill_parse_happy_paths(case: _SlashCase) -> None:
     """Single and stacked leading slash-skill tokens load in order with remainder text."""
     result = _parse_stacked_slash_skills(
@@ -84,7 +83,6 @@ def test_stacked_slash_skill_parse_happy_paths(case: _SlashCase) -> None:
     assert result.errors == ()
 
 
-@pytest.mark.xfail(reason="green after W16: unknown slash token reported (#87)", strict=False)
 def test_unknown_slash_skill_token_is_reported_not_prose() -> None:
     """Unknown slash tokens are reported explicitly — never silently treated as prose."""
     result = _parse_stacked_slash_skills(
@@ -96,9 +94,6 @@ def test_unknown_slash_skill_token_is_reported_not_prose() -> None:
     assert result.remainder == "" or "continue here" not in result.remainder
 
 
-@pytest.mark.xfail(
-    reason="green after W16: conflicting stacked skills resolved deterministically", strict=False
-)
 def test_conflicting_stacked_skills_later_token_wins() -> None:
     """When stacked skills supply conflicting metadata, the later token wins deterministically."""
     result = _parse_stacked_slash_skills(
@@ -134,7 +129,6 @@ def test_core_slash_commands_still_match_core_handler(text: str) -> None:
         "/new",
     ],
 )
-@pytest.mark.xfail(reason="green after W16: parser defers to core slash handler", strict=False)
 def test_parser_defers_core_slash_commands(text: str) -> None:
     """Stacked-slash parser must not treat core commands as skill tokens."""
     result = _parse_stacked_slash_skills(
@@ -145,7 +139,6 @@ def test_parser_defers_core_slash_commands(text: str) -> None:
     assert result.deferred_to_core_handler is True
 
 
-@pytest.mark.xfail(reason="green after W16: loaded skill metadata visible on turn", strict=False)
 def test_stacked_slash_skills_surface_loaded_metadata_in_order() -> None:
     """Ordered context load exposes which skills were loaded for the turn."""
     from sevn.gateway.slash_skills import build_slash_skill_turn_overlay

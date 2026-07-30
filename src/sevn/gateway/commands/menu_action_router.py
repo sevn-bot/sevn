@@ -740,7 +740,24 @@ class MenuActionRouter:
             )
             if restart_handled is not None:
                 return restart_handled
-        if kind in {"skill", "action", "scene"}:
+        if kind == "skill":
+            from sevn.gateway.channel_router import IncomingMessage
+
+            skill_id = target.strip()
+            if not skill_id:
+                return "Unknown skill shortcut."
+            prompt = (value or "").strip()
+            slash_text = f"/{skill_id} {prompt}".strip()
+            await self._router.route_incoming(
+                IncomingMessage(
+                    channel=msg.channel,
+                    user_id=msg.user_id,
+                    text=slash_text,
+                    metadata=dict(md),
+                ),
+            )
+            return None
+        if kind in {"action", "scene"}:
             token = f"ds:{secrets.token_hex(8)}"
             payload = json.dumps(
                 {"v": 1, "kind": kind, "target": target, "value": value},

@@ -8,7 +8,7 @@ summary: 'Own everything under workspace/skills/: how skills are discovered, val
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
 last_updated: '2026-07-30'
-fingerprint: sha256:64e5203e9d30c81f547c740ac50a21438c2a62be61c22da0a15dfc4517da07ee
+fingerprint: sha256:9f41c715e314e6b884e328e315987d7da72b8d785a9785057d8ff9b2acda12f8
 related: []
 sources:
 - src/sevn/skills/**
@@ -194,6 +194,15 @@ interfaces:
 - name: merge_discogs_proc_env
   file: src/sevn/skills/discogs_secrets.py
   symbol: merge_discogs_proc_env
+- name: discovery_cache_enabled
+  file: src/sevn/skills/discovery_cache.py
+  symbol: discovery_cache_enabled
+- name: discovery_cache_file
+  file: src/sevn/skills/discovery_cache.py
+  symbol: discovery_cache_file
+- name: reload_skills_with_cache
+  file: src/sevn/skills/discovery_cache.py
+  symbol: reload_skills_with_cache
 - name: EmailAccount
   file: src/sevn/skills/email_management.py
   symbol: EmailAccount
@@ -678,6 +687,19 @@ canonical setup contract (D7). Skills without the field mean **no setup required
 `resolve_install_plan` / `uv sync --extra …` actions from `onboarding_capabilities.json`.
 Post-install, `augment_operator_path` prepends the active venv ``bin`` so uv-extra
 console scripts (e.g. ``yt-dlp``) resolve in skill subprocesses without manual PATH fixes.
+
+## Amendments (open-issues-sweep W16, #87)
+
+Stacked slash-skill invocation is parsed in ``src/sevn/gateway/slash_skills.py`` and wired
+into gateway dispatch **after** the existing core/menu slash handler chain
+(``build_agent_run_turn`` → ``_route_incoming_with_menu``). Messages like
+``/research /writing compare notes`` load ``research`` then ``writing`` in order;
+the remainder text becomes the user prompt. Unknown ``/tokens`` produce explicit
+errors (never silent prose). Metadata conflicts across stacked skills resolve with
+**later token wins** (``effective_skill_id``). Shortcut rows with ``type: skill`` and
+menu callbacks with ``kind: skill`` rewrite to slash-skill text and route through the
+same parser. Turn overlay is stored on the user message metadata key
+``slash_skill_overlay`` and merged into ``TriageResult.skills`` before tier dispatch.
 
 ## Amendments (spec-36-sub-agents)
 

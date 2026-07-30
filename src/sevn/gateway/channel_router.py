@@ -1958,6 +1958,11 @@ class ChannelRouter:
             return
         self._schedule_telegram_typing(msg, session_id=session_id)
         user_meta = _telegram_reply_metadata(msg)
+        md_in = msg.metadata if isinstance(msg.metadata, dict) else {}
+        slash_overlay = md_in.get("slash_skill_overlay")
+        if slash_overlay is not None:
+            user_meta = dict(user_meta)
+            user_meta["slash_skill_overlay"] = slash_overlay
         voice_last_turn = msg.metadata.get("voice_user_text_last_turn")
         if isinstance(voice_last_turn, str) and voice_last_turn.strip():
             user_meta = dict(user_meta)

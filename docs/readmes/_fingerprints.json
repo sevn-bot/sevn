@@ -2,8 +2,13 @@
   "entries": {
     "agent": {
       "algorithm": "sha256_glob_aggregate",
+<<<<<<< HEAD
       "computed_at": "2026-08-01T12:28:26Z",
       "digest": "b09d7a6a83a3069880797a0c5b5b50c268f5c0f5bcdba042ffa67b9448afbe36",
+=======
+      "computed_at": "2026-07-29T22:20:05Z",
+      "digest": "71b7c8889a302835169e10dfcef10ab6c20e112d4a6c0be4607f6f0ed2cb1465",
+>>>>>>> 1a8f5f4b (feat(gateway): support stacked slash-skill invocation)
       "source_globs": [
         "src/sevn/agent/**"
       ]
