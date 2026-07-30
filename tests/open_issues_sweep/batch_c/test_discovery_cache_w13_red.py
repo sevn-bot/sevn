@@ -34,9 +34,6 @@ def _discovery_cache_path(content_root: Path) -> Path:
     return discovery_cache_file(content_root)
 
 
-@pytest.mark.xfail(
-    reason="green after W15: warm discovery cache skips tree scan (#84)", strict=False
-)
 def test_warm_discovery_cache_skips_rescan(
     tmp_path: Path,
     batch_c_skills_root: Path,
@@ -91,7 +88,6 @@ def test_warm_discovery_cache_skips_rescan(
         ),
     ],
 )
-@pytest.mark.xfail(reason="green after W15: discovery cache invalidation (#84)", strict=False)
 def test_discovery_cache_invalidates_on_content_change(
     tmp_path: Path,
     batch_c_skills_root: Path,
@@ -117,7 +113,6 @@ def test_discovery_cache_invalidates_on_content_change(
     assert len(calls) == 2
 
 
-@pytest.mark.xfail(reason="green after W15: registry version bump invalidates cache", strict=False)
 def test_discovery_cache_invalidates_on_registry_version_bump(
     tmp_path: Path,
     batch_c_skills_root: Path,
@@ -139,7 +134,6 @@ def test_discovery_cache_invalidates_on_registry_version_bump(
     assert len(calls) == 2
 
 
-@pytest.mark.xfail(reason="green after W15: corrupt cache falls back to full scan", strict=False)
 def test_corrupt_discovery_cache_falls_back_to_full_scan(
     tmp_path: Path,
     batch_c_skills_root: Path,
@@ -155,7 +149,6 @@ def test_corrupt_discovery_cache_falls_back_to_full_scan(
     assert "recover" in man.index.lines
 
 
-@pytest.mark.xfail(reason="green after W15: quarantine preserved on cache hit", strict=False)
 @pytest.mark.asyncio
 async def test_quarantine_preserved_across_discovery_cache_hit(
     tmp_path: Path,
@@ -179,7 +172,6 @@ async def test_quarantine_preserved_across_discovery_cache_hit(
     assert out["code"] == SKILL_QUARANTINED
 
 
-@pytest.mark.xfail(reason="green after W15: parse-failure quarantine survives cache", strict=False)
 def test_parse_failure_quarantine_preserved_on_cache_hit(
     tmp_path: Path,
     batch_c_skills_root: Path,

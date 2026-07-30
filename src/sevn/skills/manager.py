@@ -841,7 +841,7 @@ class SkillsManager:
         self._index = SkillsIndex(lines={})
         self._registry_seq = 0
         self._last_digest = ""
-        self.reload()
+        self.reload_uncached()
 
     @classmethod
     def shared(
@@ -952,6 +952,18 @@ class SkillsManager:
             >>> sig = inspect.signature(SkillsManager.reload)
             >>> sig.return_annotation
             'dict[str, int]'
+        """
+        from sevn.skills.discovery_cache import discovery_cache_enabled, reload_skills_with_cache
+
+        return reload_skills_with_cache(self, enabled=discovery_cache_enabled(self._config))
+
+    def reload_uncached(self) -> dict[str, int]:
+        """Full filesystem rescan without the opt-in discovery cache (**D9** default path).
+        Returns:
+            dict[str, int]: ``prev_count``, ``new_count`` for tracing hooks.
+        Examples:
+            >>> callable(getattr(SkillsManager, "reload_uncached", None))
+            True
         """
         prev = len(self._records)
         discovered: list[tuple[int, SkillRecord]] = []

@@ -2437,6 +2437,19 @@
             }
           },
           "$comment": "Maintainer: printing-press-library bundled skill — PP4; binaries installed via `make printing-press-starter-pack`."
+        },
+        "discovery_cache": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Opt-in signature cache for skill tree discovery (#84, W15; shared seam for W30 #78).",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, reuse a warm on-disk discovery snapshot when the skills tree signature is unchanged (D9 default off)."
+            }
+          },
+          "$comment": "Maintainer: open-issues-sweep W15 — default-off discovery cache; invalidates on manifest/script edits and registry_version bumps."
         }
       }
     },
