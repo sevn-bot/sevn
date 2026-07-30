@@ -348,7 +348,6 @@ class _CaptureTTS(TextToSpeechPipeline):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W6: TTS excludes routing footer", strict=False)
 async def test_tts_input_excludes_routing_footer_while_chat_keeps_it(tmp_path: Path) -> None:
     """#66: voice output must not speak routing diagnostics when ``show_routing`` is on."""
     from sevn.config.workspace_config import ChannelsWorkspaceSectionConfig, TelegramChannelConfig

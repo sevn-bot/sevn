@@ -2090,13 +2090,16 @@ class ChannelRouter:
             or self._session_inbound_voice_flag.pop(msg.session_id, False)
         )
         effective_mode = self.resolve_effective_tts_mode(msg.session_id)
+        from sevn.gateway.routing.routing_footer import strip_model_emitted_footer
+
+        tts_input = strip_model_emitted_footer(filtered).rstrip()
         if vr.enabled and self._tts.should_synthesize(
             session_tts_mode=effective_mode,
             user_text_last_turn=u_last,
             inbound_voice_attachment=inbound_voice,
         ):
             tts_out = await self._tts.synthesize_or_skip(
-                cleaned_assistant_text=filtered,
+                cleaned_assistant_text=tts_input,
                 voice_id=vr.tts_voice_id,
                 session_id=msg.session_id,
                 turn_id=correlation_id,
@@ -2126,8 +2129,7 @@ class ChannelRouter:
         # next turn. The footer (when enabled) is still rendered on the outbound
         # ``filtered`` value below — but ``persisted_content`` is what
         # ``add_message`` writes, and it's authoritative for LLM read-back.
-        from sevn.gateway.routing.routing_footer import strip_model_emitted_footer
-
+        # ``tts_input`` (computed above) uses the same strip for synthesis.
         persisted_content = strip_model_emitted_footer(filtered).rstrip()
         if persisted_content.strip() == ASSISTANT_NO_OUTPUT_PLACEHOLDER:
             logger.info(

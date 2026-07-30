@@ -6,7 +6,7 @@ status: scaffold
 owner: Alex
 summary: 'Own the provider-chain facades for speech-to-text and text-to-speech so
   the gateway can:'
-last_updated: '2026-07-21'
+last_updated: '2026-07-30'
 fingerprint: sha256:465a1380c5aaa0f2edc54b6811c494148cceec21d28164f20a432f026096487a
 related: []
 sources:
@@ -233,3 +233,18 @@ Map to existing tests under `tests/` that cover this subsystem; add Makefile-onl
 Prose body not yet authored (W9 scope). Normative contract requires operator or
 follow-up wave authoring against verified code (`sevn about-docs extract` + graphify).
 Do not mark `status: done` until `make -C spec-kit-wave spec-check` scores ≥ 80.
+
+## Amendments (open-issues-sweep W6 — #66)
+
+When `channels.telegram.show_routing` appends the routing diagnostics footer to
+assistant replies, **TTS input must exclude it** while chat delivery keeps the full
+text (footer visible in the message bubble):
+
+- `ChannelRouter.route_outgoing` passes `strip_model_emitted_footer(filtered)` to
+  `TextToSpeechPipeline.synthesize_or_skip`, not the post-footer `filtered` body.
+- Footer producers (`format_routing_footer`, `append_routing_footer`,
+  `_apply_routing_footer_once`) are unchanged; only the TTS seam strips.
+- Tier-B finalization routes through `route_outgoing`, so the same strip covers
+  placeholder-bubble edits and fresh sends.
+
+Test: `tests/gateway/test_voice.py::test_tts_input_excludes_routing_footer_while_chat_keeps_it`.
