@@ -27,6 +27,11 @@ Exports:
     codemode_enabled — read ``agent.codemode.enabled`` (default false, W8 sole owner).
     codemode_resource_limits — resolve Monty sandbox ``ResourceLimits`` from ``agent.codemode``.
     codemode_max_retries — read ``agent.codemode.max_retries`` (default 3).
+    codemode_dynamic_catalog — read ``agent.codemode.dynamic_catalog`` (default false, D9).
+    tier_b_history_compaction_enabled — read ``agent.history_compaction.enabled`` (default false).
+    tier_b_history_compaction_strategy — read ``agent.history_compaction.strategy``.
+    tier_b_history_compaction_target_tokens — read ``agent.history_compaction.target_tokens``.
+    tier_b_cache_stability_monitor_enabled — read ``agent.cache_stability.enabled`` (default false).
     diagnostics_agent_enabled — read ``agent.diagnostics.enabled`` (default true, W4).
     resolve_diagnostics_model — ``agent.diagnostics.model`` or tier-B default; ``--model`` wins.
     resolve_slot_fallback_model_ids — fallback catalog ids for ``FallbackModel`` (W3.2).
@@ -38,6 +43,7 @@ from enum import StrEnum
 from typing import Any
 
 from sevn.config.defaults import (
+    DEFAULT_CODEMODE_DYNAMIC_CATALOG,
     DEFAULT_CODEMODE_ENABLED,
     DEFAULT_CODEMODE_MAX_ALLOCATIONS,
     DEFAULT_CODEMODE_MAX_DURATION_S,
@@ -48,6 +54,10 @@ from sevn.config.defaults import (
     DEFAULT_MINIMAX_OPENAI_BASE_URL,
     DEFAULT_MINIMAX_TRANSPORT,
     DEFAULT_NATIVE_MODEL_ENABLED,
+    DEFAULT_TIER_B_CACHE_STABILITY_MONITOR_ENABLED,
+    DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED,
+    DEFAULT_TIER_B_HISTORY_COMPACTION_STRATEGY,
+    DEFAULT_TIER_B_HISTORY_COMPACTION_TARGET_TOKENS,
     DEFAULT_USE_MAIN_MODEL_FOR_ALL,
 )
 from sevn.config.errors import TriagerUnavailable
@@ -107,7 +117,7 @@ def _agent_dict(cfg: object) -> dict[str, Any]:
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
         >>> _agent_dict(WorkspaceConfig.minimal(agent={"codemode": {"enabled": True}}))
-        {'codemode': {'enabled': True, 'max_retries': 3}}
+        {'codemode': {'enabled': True, 'max_retries': 3, 'dynamic_catalog': False}}
     """
     raw = getattr(cfg, "agent", None)
     if isinstance(raw, dict):
@@ -700,6 +710,146 @@ def codemode_max_retries(cfg: object) -> int:
     codemode = agent.get("codemode")
     cm = codemode if isinstance(codemode, dict) else {}
     return _positive_int(cm.get("max_retries"), DEFAULT_CODEMODE_MAX_RETRIES)
+
+
+def _agent_bool(cfg: object, section: str, key: str, *, default: bool) -> bool:
+    """Read a boolean from ``agent.<section>.<key>`` with a code default.
+
+    Args:
+        cfg (object): Parsed workspace settings.
+        section (str): Agent subtree key (e.g. ``history_compaction``).
+        key (str): Boolean field name.
+        default (bool): Fallback when absent or invalid.
+
+    Returns:
+        bool: Resolved flag.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> _agent_bool(WorkspaceConfig.minimal(), "cache_stability", "enabled", default=False)
+        False
+    """
+    agent = _agent_dict(cfg)
+    block = agent.get(section)
+    if not isinstance(block, dict):
+        return default
+    raw = block.get(key)
+    if isinstance(raw, bool):
+        return raw
+    return default
+
+
+def codemode_dynamic_catalog(cfg: object) -> bool:
+    """Resolve ``CodeMode.dynamic_catalog`` from ``agent.codemode.dynamic_catalog`` (D9).
+
+    Args:
+        cfg (object): Parsed workspace settings.
+
+    Returns:
+        bool: Whether cache-stable ``run_code`` tool-def is enabled.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> codemode_dynamic_catalog(WorkspaceConfig.minimal())
+        False
+        >>> codemode_dynamic_catalog(
+        ...     WorkspaceConfig.minimal(agent={"codemode": {"dynamic_catalog": True}}),
+        ... )
+        True
+    """
+    return _agent_bool(cfg, "codemode", "dynamic_catalog", default=DEFAULT_CODEMODE_DYNAMIC_CATALOG)
+
+
+def tier_b_history_compaction_enabled(cfg: object) -> bool:
+    """Resolve tier-B history compaction from ``agent.history_compaction.enabled`` (D9).
+
+    Args:
+        cfg (object): Parsed workspace settings.
+
+    Returns:
+        bool: Whether harness compaction is appended to tier-B capabilities.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> tier_b_history_compaction_enabled(WorkspaceConfig.minimal())
+        False
+    """
+    return _agent_bool(
+        cfg,
+        "history_compaction",
+        "enabled",
+        default=DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED,
+    )
+
+
+def tier_b_history_compaction_strategy(cfg: object) -> str:
+    """Resolve compaction menu strategy from ``agent.history_compaction.strategy``.
+
+    Args:
+        cfg (object): Parsed workspace settings.
+
+    Returns:
+        str: One of ``tiered``, ``summarizing``, ``clear_tool_results``, ``clamp_oversized``.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> tier_b_history_compaction_strategy(WorkspaceConfig.minimal())
+        'tiered'
+    """
+    agent = _agent_dict(cfg)
+    block = agent.get("history_compaction")
+    if not isinstance(block, dict):
+        return DEFAULT_TIER_B_HISTORY_COMPACTION_STRATEGY
+    raw = block.get("strategy")
+    if raw in ("tiered", "summarizing", "clear_tool_results", "clamp_oversized"):
+        return str(raw)
+    return DEFAULT_TIER_B_HISTORY_COMPACTION_STRATEGY
+
+
+def tier_b_history_compaction_target_tokens(cfg: object) -> int:
+    """Resolve compaction token budget from ``agent.history_compaction.target_tokens``.
+
+    Args:
+        cfg (object): Parsed workspace settings.
+
+    Returns:
+        int: Token budget for ``TieredCompaction`` escalation stop.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> tier_b_history_compaction_target_tokens(WorkspaceConfig.minimal())
+        80000
+    """
+    agent = _agent_dict(cfg)
+    block = agent.get("history_compaction")
+    if not isinstance(block, dict):
+        return DEFAULT_TIER_B_HISTORY_COMPACTION_TARGET_TOKENS
+    raw = block.get("target_tokens")
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 1:
+        return DEFAULT_TIER_B_HISTORY_COMPACTION_TARGET_TOKENS
+    return raw
+
+
+def tier_b_cache_stability_monitor_enabled(cfg: object) -> bool:
+    """Resolve cache-stability monitor from ``agent.cache_stability.enabled`` (D9).
+
+    Args:
+        cfg (object): Parsed workspace settings.
+
+    Returns:
+        bool: Whether ``WarnOnCacheBusts`` is appended to tier-B capabilities.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> tier_b_cache_stability_monitor_enabled(WorkspaceConfig.minimal())
+        False
+    """
+    return _agent_bool(
+        cfg,
+        "cache_stability",
+        "enabled",
+        default=DEFAULT_TIER_B_CACHE_STABILITY_MONITOR_ENABLED,
+    )
 
 
 def diagnostics_agent_enabled(cfg: object) -> bool:

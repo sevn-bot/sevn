@@ -7,8 +7,8 @@ owner: Alex
 summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–§5.2):
   a single, tool-less outbound generation step that emits validated TriageResult consumed
   by tier dispatch (A / B / C / D), MCP e'
-last_updated: '2026-07-19'
-fingerprint: sha256:67c38c4dbd12af31a2dbad7770bd5fa6a54f1f4241770fed4f1a14d15a26e40b
+last_updated: '2026-07-29'
+fingerprint: sha256:71b7c8889a302835169e10dfcef10ab6c20e112d4a6c0be4607f6f0ed2cb1465
 related: []
 sources:
 - src/sevn/agent/**
@@ -17,6 +17,9 @@ depends_on:
 - spec-05-llm-transports
 build_phase: null
 interfaces:
+- name: MontyLimitInstallError
+  file: src/sevn/agent/adapters/_monty_limits.py
+  symbol: MontyLimitInstallError
 - name: default_codemode_limits
   file: src/sevn/agent/adapters/_monty_limits.py
   symbol: default_codemode_limits
@@ -89,6 +92,21 @@ interfaces:
 - name: register_pydantic_tools
   file: src/sevn/agent/adapters/pydantic_adapter.py
   symbol: register_pydantic_tools
+- name: AsyncCodeModeBackendInstallError
+  file: src/sevn/agent/adapters/tier_b_async_codemode.py
+  symbol: AsyncCodeModeBackendInstallError
+- name: SevnAsyncCodeMode
+  file: src/sevn/agent/adapters/tier_b_async_codemode.py
+  symbol: SevnAsyncCodeMode
+- name: SevnAsyncCodeModeToolset
+  file: src/sevn/agent/adapters/tier_b_async_codemode.py
+  symbol: SevnAsyncCodeModeToolset
+- name: assert_async_codemode_backend_present
+  file: src/sevn/agent/adapters/tier_b_async_codemode.py
+  symbol: assert_async_codemode_backend_present
+- name: build_cache_stability_monitor_capability
+  file: src/sevn/agent/adapters/tier_b_cache_stability.py
+  symbol: build_cache_stability_monitor_capability
 - name: WebEgressDomainPolicy
   file: src/sevn/agent/adapters/tier_b_capabilities.py
   symbol: WebEgressDomainPolicy
@@ -131,6 +149,42 @@ interfaces:
 - name: is_codemode_eligible_tool
   file: src/sevn/agent/adapters/tier_b_codemode.py
   symbol: is_codemode_eligible_tool
+- name: build_compaction_capability
+  file: src/sevn/agent/adapters/tier_b_compaction.py
+  symbol: build_compaction_capability
+- name: compact_history_if_enabled
+  file: src/sevn/agent/adapters/tier_b_compaction.py
+  symbol: compact_history_if_enabled
+- name: TierBApprovalGuardrail
+  file: src/sevn/agent/adapters/tier_b_guardrails.py
+  symbol: TierBApprovalGuardrail
+- name: TierBApprovalGuardrailCapability
+  file: src/sevn/agent/adapters/tier_b_guardrails.py
+  symbol: TierBApprovalGuardrailCapability
+- name: TierBPermissionGuardrail
+  file: src/sevn/agent/adapters/tier_b_guardrails.py
+  symbol: TierBPermissionGuardrail
+- name: TierBPermissionGuardrailCapability
+  file: src/sevn/agent/adapters/tier_b_guardrails.py
+  symbol: TierBPermissionGuardrailCapability
+- name: TierBRoundBudgetGuardrail
+  file: src/sevn/agent/adapters/tier_b_guardrails.py
+  symbol: TierBRoundBudgetGuardrail
+- name: TierBRoundBudgetGuardrailCapability
+  file: src/sevn/agent/adapters/tier_b_guardrails.py
+  symbol: TierBRoundBudgetGuardrailCapability
+- name: approval_guardrail
+  file: src/sevn/agent/adapters/tier_b_guardrails.py
+  symbol: approval_guardrail
+- name: build_tier_b_guardrail_capabilities
+  file: src/sevn/agent/adapters/tier_b_guardrails.py
+  symbol: build_tier_b_guardrail_capabilities
+- name: permission_guardrail
+  file: src/sevn/agent/adapters/tier_b_guardrails.py
+  symbol: permission_guardrail
+- name: round_budget_guardrail
+  file: src/sevn/agent/adapters/tier_b_guardrails.py
+  symbol: round_budget_guardrail
 - name: TierBHookConfig
   file: src/sevn/agent/adapters/tier_b_hooks.py
   symbol: TierBHookConfig
@@ -206,6 +260,9 @@ interfaces:
 - name: normalize_codemode_run_code_payloads
   file: src/sevn/agent/adapters/tier_b_model.py
   symbol: normalize_codemode_run_code_payloads
+- name: normalize_tier_b_model_name
+  file: src/sevn/agent/adapters/tier_b_model.py
+  symbol: normalize_tier_b_model_name
 - name: openai_completion_to_model_response
   file: src/sevn/agent/adapters/tier_b_model.py
   symbol: openai_completion_to_model_response
@@ -221,6 +278,9 @@ interfaces:
 - name: pydantic_messages_to_openai_chat
   file: src/sevn/agent/adapters/tier_b_model.py
   symbol: pydantic_messages_to_openai_chat
+- name: read_model_profile_field
+  file: src/sevn/agent/adapters/tier_b_model.py
+  symbol: read_model_profile_field
 - name: repair_anthropic_tool_pairing
   file: src/sevn/agent/adapters/tier_b_model.py
   symbol: repair_anthropic_tool_pairing
@@ -257,27 +317,27 @@ interfaces:
 - name: resolve_turn_media_items
   file: src/sevn/agent/adapters/tier_b_multimodal.py
   symbol: resolve_turn_media_items
-- name: OverflowingToolOutput
-  file: src/sevn/agent/adapters/tier_b_overflow.py
-  symbol: OverflowingToolOutput
-- name: build_overflow_capability
-  file: src/sevn/agent/adapters/tier_b_overflow.py
-  symbol: build_overflow_capability
 - name: SkillCapabilitySource
-  file: src/sevn/agent/adapters/tier_b_skill_capabilities.py
+  file: src/sevn/agent/adapters/tier_b_skills.py
   symbol: SkillCapabilitySource
+- name: build_harness_skills_capability
+  file: src/sevn/agent/adapters/tier_b_skills.py
+  symbol: build_harness_skills_capability
 - name: build_tier_b_skill_capabilities
-  file: src/sevn/agent/adapters/tier_b_skill_capabilities.py
+  file: src/sevn/agent/adapters/tier_b_skills.py
   symbol: build_tier_b_skill_capabilities
 - name: resolve_skill_capability_sources
-  file: src/sevn/agent/adapters/tier_b_skill_capabilities.py
+  file: src/sevn/agent/adapters/tier_b_skills.py
   symbol: resolve_skill_capability_sources
 - name: sevn_run_skill_script
-  file: src/sevn/agent/adapters/tier_b_skill_capabilities.py
+  file: src/sevn/agent/adapters/tier_b_skills.py
   symbol: sevn_run_skill_script
 - name: skill_capability
-  file: src/sevn/agent/adapters/tier_b_skill_capabilities.py
+  file: src/sevn/agent/adapters/tier_b_skills.py
   symbol: skill_capability
+- name: build_overflow_capability
+  file: src/sevn/agent/adapters/tier_b_tool_output_limits.py
+  symbol: build_overflow_capability
 - name: bound_file_search_tools
   file: src/sevn/agent/adapters/tier_b_tools.py
   symbol: bound_file_search_tools
@@ -1381,3 +1441,13 @@ Relatedness classifier for `multi` queue mode: `classify_busy_relatedness` in
 | `tests/agent/test_triager_tracing.py` | OTel spans |
 | `tests/gateway/test_triage_context.py` | Gateway integration |
 | `tests/code_understanding/test_triager_orientation.py` | Orientation hints |
+
+## 10. Build Checklist
+
+### 10.1 monty-013 W9 — harness SubAgents/DynamicWorkflow deferred — append-only
+
+**Decision: defer.** The triager is a tool-less structured-output routing step (`triage_turn` → `TriageResult` → gateway tier dispatch), not an in-loop pydantic-ai agent that delegates via tools. Harness `SubAgents` (`delegate_task`) and `DynamicWorkflow` (`run_workflow` Monty orchestration) target tier-B-style agent loops; they do not replace triager routing, fast paths, or `apply_routing_policy`. sevn already owns L1/L2 orchestration in spec-36 (`SubAgentSupervisor`, `spawn_subagent`, specialists, kill/registry/Mission Control). Per-delegation model menus (`SubAgents.models`) duplicate `ModelSlot` + `resolve_model_slot()` and `SpecialistConfig.model` — not adopted. **D6 note:** `DynamicWorkflow.resource_limits` is the upstream reference shape for porting sandbox limits to `CodeMode` ([#501](https://github.com/pydantic/pydantic-ai-harness/issues/501)); sevn keeps the W3 Monty checkout patch until then.
+
+### 10.2 monty-013 W11 — triager pydantic-ai v2 surface — append-only
+
+The triager adapter runs on the same **pydantic-ai v2** stack as tier B (monty-013 W3). Model resolution uses provider-prefixed names and `resolve_model_slot()` unchanged in contract; v2 migration touched token terms (`input_tokens` / `output_tokens` / `RunUsage`), streaming property access, and OTel v4 usage attribute shape (D11). No harness delegation capabilities attach to the triager — routing stays structured-output + gateway policy (§10.1). Harness `Memory` remains deferred for tier B (spec-14 §10.2).

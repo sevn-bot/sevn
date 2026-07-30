@@ -566,7 +566,7 @@ def build_web_thinking_extra_capabilities(
             extras.append(
                 WebSearch(
                     native=True,
-                    local=local_serp,
+                    local=local_serp if local_serp is not None else False,
                     allowed_domains=allowed,
                     blocked_domains=blocked,
                 ),
@@ -581,7 +581,7 @@ def build_web_thinking_extra_capabilities(
             extras.append(
                 WebFetch(
                     native=True,
-                    local=local_fetch,
+                    local=local_fetch if local_fetch is not None else False,
                     allowed_domains=allowed,
                     blocked_domains=blocked,
                 ),

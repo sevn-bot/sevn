@@ -12,7 +12,9 @@ import time
 from types import SimpleNamespace
 
 import pytest
+from pydantic_monty import Monty
 
+import sevn.agent.adapters._monty_limits as monty_limits_mod
 from sevn.agent.adapters._monty_limits import (
     default_codemode_limits,
     install_monty_resource_limits,
@@ -77,34 +79,33 @@ def test_codemode_max_retries_ignores_bad_values() -> None:
 
 
 def test_install_is_idempotent_and_updates_limits() -> None:
+    monty_limits_mod._installed = False
+    monty_limits_mod._original_checkouts.clear()
     install_monty_resource_limits({"max_duration_secs": 1})
-    from pydantic_ai_harness.code_mode import _toolset as ts
-
-    first = ts.MontyRepl
+    first = Monty.checkout
     install_monty_resource_limits({"max_duration_secs": 2})
-    # Patch applied once: the symbol object is stable across re-installs.
-    assert ts.MontyRepl is first
+    assert Monty.checkout is first
 
 
 def _drive_to_completion(repl: object, code: str) -> object:
     """Run *code* in *repl*, advancing Monty snapshots until completion."""
-    from pydantic_ai_harness.code_mode import _toolset as ts
+    from pydantic_monty import MontyComplete
 
     state = repl.feed_start(code)  # type: ignore[attr-defined]
-    while not isinstance(state, ts.MontyComplete):
+    while not isinstance(state, MontyComplete):
         state = state.resume()
     return state
 
 
 def test_runaway_snippet_aborts_within_cap() -> None:
     """An infinite loop must abort near the duration cap, not run unbounded."""
-    install_monty_resource_limits({"max_duration_secs": 0.5})
-    from pydantic_ai_harness.code_mode import _toolset as ts
+    from pydantic_monty import Monty, MontyRuntimeError
 
-    repl = ts.MontyRepl()
-    t0 = time.monotonic()
-    with pytest.raises(ts.MontyRuntimeError) as exc:
-        _drive_to_completion(repl, "x = 0\nwhile True:\n    x += 1\n")
-    elapsed = time.monotonic() - t0
-    assert "time limit" in str(exc.value).lower()
-    assert elapsed < 5.0, f"abort took {elapsed:.2f}s — cap not enforced"
+    install_monty_resource_limits({"max_duration_secs": 0.5})
+    with Monty() as pool, pool.checkout() as repl:
+        t0 = time.monotonic()
+        with pytest.raises(MontyRuntimeError) as exc:
+            _drive_to_completion(repl, "x = 0\nwhile True:\n    x += 1\n")
+        elapsed = time.monotonic() - t0
+        assert "time limit" in str(exc.value).lower()
+        assert elapsed < 5.0, f"abort took {elapsed:.2f}s — cap not enforced"

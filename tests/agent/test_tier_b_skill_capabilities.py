@@ -12,8 +12,9 @@ from pydantic_ai.capabilities import Capability
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage
+from pydantic_ai_harness.skills import Skills
 
-from sevn.agent.adapters.tier_b_skill_capabilities import (
+from sevn.agent.adapters.tier_b_skills import (
     SkillCapabilitySource,
     build_tier_b_skill_capabilities,
     resolve_skill_capability_sources,
@@ -68,10 +69,12 @@ def test_build_tier_b_skill_capabilities_scoped_to_triage_skills() -> None:
             "graphify": "Code graph",
         },
         skills_manager=None,
+        workspace_path=Path("/tmp"),
     )
     assert len(caps) == 1
-    assert caps[0].id == "pdf"
-    assert caps[0].defer_loading is True
+    assert isinstance(caps[0], Skills)
+    assert caps[0].include == frozenset({"pdf"})
+    assert caps[0]._deferred_capabilities[0].defer_loading is True
 
 
 def test_build_tier_b_skill_capabilities_empty_when_no_skills() -> None:
@@ -173,9 +176,10 @@ def test_build_tier_b_capabilities_accepts_skill_extra() -> None:
         triage_skills=["pdf"],
         skill_descriptions={"pdf": "PDF helpers"},
         skills_manager=None,
+        workspace_path=Path("/tmp"),
     )
     caps = build_tier_b_capabilities(hooks=Hooks(), extra=skill_caps)
-    assert any(isinstance(c, Capability) and c.id == "pdf" for c in caps)
+    assert any(isinstance(c, Skills) for c in caps)
 
 
 def test_resolve_skill_capability_sources_uses_manager_markdown(tmp_path: Path) -> None:

@@ -33,7 +33,6 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, cast
 
-from pydantic_ai._deprecated_callable import deprecated_callable_property
 from pydantic_ai.messages import (
     ModelMessage,
     ModelResponse,
@@ -151,19 +150,16 @@ class _RecoveredStreamedResponse(StreamedResponse):
         """
         await self._inner.close_stream()
 
-    @deprecated_callable_property(
-        "`StreamedResponse.usage` is no longer a method; access it as a property (drop the parentheses).",
-    )
-    def usage(self) -> Any:  # type: ignore[override]
+    @property
+    def usage(self) -> Any:
         """Return token usage accumulated on the inner stream.
 
         Returns:
             Any: Inner :attr:`StreamedResponse.usage` value.
 
         Examples:
-            >>> import inspect
-            >>> isinstance(type(_RecoveredStreamedResponse).usage, property)
-            False
+            >>> isinstance(_RecoveredStreamedResponse.usage, property)
+            True
         """
         return self._inner.usage
 

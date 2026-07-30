@@ -25,9 +25,10 @@ Examples:
 
 from __future__ import annotations
 
+import inspect
 from typing import TYPE_CHECKING, cast
 
-from sevn.config.defaults import DEFAULT_CODEMODE_MAX_RETRIES
+from sevn.config.defaults import DEFAULT_CODEMODE_DYNAMIC_CATALOG, DEFAULT_CODEMODE_MAX_RETRIES
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -60,6 +61,7 @@ def is_codemode_eligible_tool(
     *,
     triager_tools: frozenset[str],
     triager_skills: frozenset[str],
+    human_gated_tools: frozenset[str] = frozenset(),
 ) -> bool:
     """Return whether *tool_name* may be tagged ``code_mode=True`` for this turn.
 
@@ -67,6 +69,8 @@ def is_codemode_eligible_tool(
         tool_name (str): Registry or meta tool name.
         triager_tools (frozenset[str]): Names the Triager listed in ``triage.tools[]``.
         triager_skills (frozenset[str]): Names the Triager listed in ``triage.skills[]``.
+        human_gated_tools (frozenset[str]): Registry tools with ``requires_human=True`` that
+            must stay native so approval/deferred flows work outside ``run_code``.
 
     Returns:
         bool: ``True`` when the tool may run inside ``run_code`` for this turn.
@@ -91,7 +95,7 @@ def is_codemode_eligible_tool(
         ... )
         True
     """
-    if tool_name in CODEMODE_NATIVE_TOOL_NAMES:
+    if tool_name in CODEMODE_NATIVE_TOOL_NAMES or tool_name in human_gated_tools:
         return False
     if tool_name in CODEMODE_SKILL_RUNNER_NAMES:
         return bool(triager_skills)
@@ -102,12 +106,15 @@ def compute_codemode_eligible_names(
     *,
     triager_tools: frozenset[str],
     triager_skills: frozenset[str],
+    human_gated_tools: frozenset[str] = frozenset(),
 ) -> frozenset[str]:
     """Compute registry tool names to tag with ``code_mode`` metadata for one turn.
 
     Args:
         triager_tools (frozenset[str]): ``triage.tools[]`` for the turn.
         triager_skills (frozenset[str]): ``triage.skills[]`` for the turn.
+        human_gated_tools (frozenset[str]): ``requires_human`` registry tools excluded from
+            the sandbox (native approval path only).
 
     Returns:
         frozenset[str]: Names eligible for ``CodeMode(tools={'code_mode': True})``.
@@ -128,6 +135,7 @@ def compute_codemode_eligible_names(
             name,
             triager_tools=triager_tools,
             triager_skills=triager_skills,
+            human_gated_tools=human_gated_tools,
         ):
             eligible.add(name)
     return frozenset(eligible)
@@ -137,6 +145,7 @@ def build_codemode_capability(
     limits: Mapping[str, float | int] | None = None,
     *,
     max_retries: int | None = None,
+    dynamic_catalog: bool | None = None,
 ) -> AbstractCapability[BTierDeps]:
     """Build the tier-B ``CodeMode`` capability (W8.2).
 
@@ -149,24 +158,41 @@ def build_codemode_capability(
             uses the defaults.
         max_retries (int | None): ``run_code`` retry budget; ``None`` uses
             :data:`DEFAULT_CODEMODE_MAX_RETRIES`.
+        dynamic_catalog (bool | None): When ``True``, keep ``run_code`` tool-def cache-stable
+            and surface discovered sandbox tools via dynamic instructions; ``None`` uses
+            :data:`DEFAULT_CODEMODE_DYNAMIC_CATALOG` (default off, D9).
 
     Returns:
-        AbstractCapability[BTierDeps]: ``CodeMode`` selecting metadata-tagged tools only.
+        AbstractCapability[BTierDeps]: ``SevnAsyncCodeMode`` selecting metadata-tagged tools only.
 
     Examples:
         >>> cap = build_codemode_capability()
         >>> cap.__class__.__name__
-        'CodeMode'
+        'SevnAsyncCodeMode'
     """
-    from pydantic_ai_harness import CodeMode
-
     from sevn.agent.adapters._monty_limits import install_monty_resource_limits
+    from sevn.agent.adapters.tier_b_async_codemode import (
+        SevnAsyncCodeMode,
+        assert_async_codemode_backend_present,
+    )
 
+    assert_async_codemode_backend_present()
     install_monty_resource_limits(limits)
     effective_retries = DEFAULT_CODEMODE_MAX_RETRIES if max_retries is None else max_retries
+    effective_dynamic_catalog = (
+        DEFAULT_CODEMODE_DYNAMIC_CATALOG if dynamic_catalog is None else dynamic_catalog
+    )
+    codemode_params = inspect.signature(SevnAsyncCodeMode).parameters
+    if "dynamic_catalog" not in codemode_params:
+        msg = "harness CodeMode missing dynamic_catalog field (expected harness >=0.4.0)"
+        raise RuntimeError(msg)
     return cast(
         "AbstractCapability[BTierDeps]",
-        CodeMode(tools={"code_mode": True}, max_retries=effective_retries),
+        SevnAsyncCodeMode(
+            tools={"code_mode": True},
+            max_retries=effective_retries,
+            dynamic_catalog=effective_dynamic_catalog,
+        ),
     )
 
 

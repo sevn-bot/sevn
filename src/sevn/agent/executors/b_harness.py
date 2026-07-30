@@ -69,8 +69,8 @@ from sevn.agent.adapters.tier_b_multimodal import (
     resolve_tier_b_modality_support,
     resolve_turn_media_items,
 )
-from sevn.agent.adapters.tier_b_overflow import build_overflow_capability
-from sevn.agent.adapters.tier_b_skill_capabilities import build_tier_b_skill_capabilities
+from sevn.agent.adapters.tier_b_skills import build_tier_b_skill_capabilities
+from sevn.agent.adapters.tier_b_tool_output_limits import build_overflow_capability
 from sevn.agent.adapters.tier_b_tools import (
     _NEVER_LAZY_NAMES,
     bound_file_search_tools,
@@ -132,14 +132,25 @@ from sevn.agent.triager.routing_policy import (
     is_identity_or_capability_message,
     is_log_provenance_intent_message,
 )
-from sevn.config.defaults import TIER_B_TOOL_MAX_RETRIES
+from sevn.config.defaults import (
+    DEFAULT_CODEMODE_DYNAMIC_CATALOG,
+    DEFAULT_TIER_B_CACHE_STABILITY_MONITOR_ENABLED,
+    DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED,
+    DEFAULT_TIER_B_HISTORY_COMPACTION_STRATEGY,
+    TIER_B_TOOL_MAX_RETRIES,
+)
 from sevn.config.llm_params import resolve_effective_max_output_tokens
 from sevn.config.model_resolution import (
     ModelSlot,
+    codemode_dynamic_catalog,
     codemode_enabled,
     codemode_max_retries,
     codemode_resource_limits,
     native_model_enabled,
+    tier_b_cache_stability_monitor_enabled,
+    tier_b_history_compaction_enabled,
+    tier_b_history_compaction_strategy,
+    tier_b_history_compaction_target_tokens,
 )
 from sevn.config.sections.providers import providers_section_dict
 from sevn.config.settings import ProcessSettings
@@ -870,11 +881,17 @@ async def _consume_model_request_stream(
 def build_tier_b_capabilities(
     *,
     hooks: Hooks,
+    hook_config: TierBHookConfig | None = None,
     extra: Sequence[AbstractCapability[BTierDeps]] | None = None,
     codemode_on: bool = False,
     codemode_limits: Mapping[str, float | int] | None = None,
     codemode_max_retries: int | None = None,
     overflow_on: bool = True,
+    history_compaction_enabled: bool | None = None,
+    history_compaction_strategy: str | None = None,
+    history_compaction_target_tokens: int | None = None,
+    cache_stability_monitor_enabled: bool | None = None,
+    codemode_dynamic_catalog: bool | None = None,
 ) -> list[AbstractCapability[BTierDeps]]:
     """Assemble tier-B agent capabilities (W5 merge-conflict mitigation).
 
@@ -882,14 +899,27 @@ def build_tier_b_capabilities(
     editing the ``Agent(...)`` call directly. W1 ``Instrumentation`` is always included.
 
     Args:
-        hooks (Hooks): Tier-B lifecycle hooks (steer, grounding, permission, budget, approval).
+        hooks (Hooks): Tier-B lifecycle hooks (steer, grounding, tool trace).
+        hook_config (TierBHookConfig | None): Per-turn state for permission/budget/approval
+            guardrails. ``None`` uses inventory defaults (W8).
         extra (Sequence[AbstractCapability[BTierDeps]] | None): Optional capabilities appended
             after the core bundle (e.g. W7 ``WebSearch`` / ``Thinking``).
         codemode_on (bool): When ``True``, append triager-scoped ``CodeMode`` (W8).
         codemode_limits (Mapping[str, float | int] | None): Monty sandbox ``ResourceLimits``
             for ``CodeMode`` (duration/memory/allocations); ``None`` uses defaults.
         codemode_max_retries (int | None): ``run_code`` retry budget; ``None`` uses defaults.
-        overflow_on (bool): When ``True``, append ``OverflowingToolOutput`` (D6).
+        overflow_on (bool): When ``True``, append harness ``ToolOutputLimits`` (D6).
+        history_compaction_enabled (bool | None): When ``True``, append harness compaction
+            (D9). ``None`` uses :data:`DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED` (default off).
+        history_compaction_strategy (str | None): Compaction menu entry; ``None`` uses
+            :data:`DEFAULT_TIER_B_HISTORY_COMPACTION_STRATEGY`.
+        history_compaction_target_tokens (int | None): Token budget for compaction;
+            ``None`` uses :data:`DEFAULT_TIER_B_HISTORY_COMPACTION_TARGET_TOKENS`.
+        cache_stability_monitor_enabled (bool | None): When ``True``, append harness
+            ``WarnOnCacheBusts`` (D9). ``None`` uses
+            :data:`DEFAULT_TIER_B_CACHE_STABILITY_MONITOR_ENABLED` (default off).
+        codemode_dynamic_catalog (bool | None): ``CodeMode.dynamic_catalog`` toggle; ``None``
+            uses :data:`DEFAULT_CODEMODE_DYNAMIC_CATALOG` (default off, D9).
 
     Returns:
         list[AbstractCapability[BTierDeps]]: Capability list for ``Agent(capabilities=...)``.
@@ -902,6 +932,40 @@ def build_tier_b_capabilities(
         >>> caps[0].__class__.__name__
         'Instrumentation'
     """
+    from sevn.agent.adapters.tier_b_cache_stability import (
+        build_cache_stability_monitor_capability,
+    )
+    from sevn.agent.adapters.tier_b_compaction import (
+        TierBHistoryCompactionStrategy,
+        build_compaction_capability,
+    )
+    from sevn.agent.adapters.tier_b_guardrails import build_tier_b_guardrail_capabilities
+    from sevn.config.defaults import DEFAULT_TIER_B_HISTORY_COMPACTION_TARGET_TOKENS
+
+    compaction_on = (
+        DEFAULT_TIER_B_HISTORY_COMPACTION_ENABLED
+        if history_compaction_enabled is None
+        else history_compaction_enabled
+    )
+    cache_monitor_on = (
+        DEFAULT_TIER_B_CACHE_STABILITY_MONITOR_ENABLED
+        if cache_stability_monitor_enabled is None
+        else cache_stability_monitor_enabled
+    )
+    dynamic_catalog_on = (
+        DEFAULT_CODEMODE_DYNAMIC_CATALOG
+        if codemode_dynamic_catalog is None
+        else codemode_dynamic_catalog
+    )
+    compaction_strategy = cast(
+        "TierBHistoryCompactionStrategy",
+        history_compaction_strategy or DEFAULT_TIER_B_HISTORY_COMPACTION_STRATEGY,
+    )
+    compaction_target_tokens = (
+        DEFAULT_TIER_B_HISTORY_COMPACTION_TARGET_TOKENS
+        if history_compaction_target_tokens is None
+        else history_compaction_target_tokens
+    )
     capabilities: list[AbstractCapability[BTierDeps]] = [
         cast("AbstractCapability[BTierDeps]", instrumentation_capability()),
         cast("AbstractCapability[BTierDeps]", hooks),
@@ -909,6 +973,24 @@ def build_tier_b_capabilities(
     ]
     if overflow_on:
         capabilities.append(cast("AbstractCapability[BTierDeps]", build_overflow_capability()))
+    capabilities.extend(build_tier_b_guardrail_capabilities(hook_config))
+    if compaction_on:
+        capabilities.append(
+            cast(
+                "AbstractCapability[BTierDeps]",
+                build_compaction_capability(
+                    strategy=compaction_strategy,
+                    target_tokens=compaction_target_tokens,
+                ),
+            )
+        )
+    if cache_monitor_on:
+        capabilities.append(
+            cast(
+                "AbstractCapability[BTierDeps]",
+                build_cache_stability_monitor_capability(),
+            )
+        )
     if extra:
         capabilities.extend(extra)
     if codemode_on:
@@ -916,6 +998,7 @@ def build_tier_b_capabilities(
             build_codemode_capability(
                 codemode_limits,
                 max_retries=codemode_max_retries,
+                dynamic_catalog=dynamic_catalog_on,
             )
         )
     return capabilities
@@ -1134,6 +1217,7 @@ async def run_b_turn(
         bound_tool_names = bound_tool_names | frozenset({"run_code"})
     triager_tools = frozenset(triage.tools)
     triager_skills = frozenset(triage.skills)
+    human_gated_tools = frozenset(d.name for d in tool_executor.definitions() if d.requires_human)
     # Names callable only inside ``run_code`` this turn. Used by the FunctionModel to
     # rewrite a contract-violating bare native call back into ``run_code`` (Layer 1,
     # `specs/14-executor-tier-b.md` §5.1). Empty when CodeMode is off → rewrite is a no-op.
@@ -1141,6 +1225,7 @@ async def run_b_turn(
         compute_codemode_eligible_names(
             triager_tools=triager_tools,
             triager_skills=triager_skills,
+            human_gated_tools=human_gated_tools,
         )
         if codemode_on
         else frozenset()
@@ -1162,6 +1247,7 @@ async def run_b_turn(
         codemode_enabled=codemode_on,
         triager_tools=triager_tools,
         triager_skills=triager_skills,
+        human_gated_tools=human_gated_tools,
         exclude_tool_names=capability_owned_tools,
         codemode_web_policy=codemode_web_policy,
     )
@@ -1181,6 +1267,7 @@ async def run_b_turn(
             config=workspace,
             trace_sink=trace,
         ),
+        workspace_path=Path(tool_context.workspace_path),
     )
     tool_allowlist = MutableToolAllowlist(
         base=bound_tool_names,
@@ -1400,10 +1487,16 @@ async def run_b_turn(
         deps_type=BTierDeps,
         capabilities=build_tier_b_capabilities(
             hooks=tier_b_hooks,
+            hook_config=hook_config,
             extra=capability_extra or None,
             codemode_on=codemode_on,
             codemode_limits=codemode_resource_limits(workspace),
             codemode_max_retries=codemode_max_retries(workspace),
+            history_compaction_enabled=tier_b_history_compaction_enabled(workspace),
+            history_compaction_strategy=tier_b_history_compaction_strategy(workspace),
+            history_compaction_target_tokens=tier_b_history_compaction_target_tokens(workspace),
+            cache_stability_monitor_enabled=tier_b_cache_stability_monitor_enabled(workspace),
+            codemode_dynamic_catalog=codemode_dynamic_catalog(workspace),
         ),
         system_prompt=system_prompt,
         instructions=instructions,

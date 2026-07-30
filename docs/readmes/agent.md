@@ -170,7 +170,7 @@ See `src/sevn/agent/adapters/tier_b_model.py` for implementation details.
 
 ### Additional modules
 
-78 more Python files under `src/sevn/agent/` — including `src/sevn/agent/adapters/tier_b_multimodal.py`, `src/sevn/agent/adapters/tier_b_overflow.py`, `src/sevn/agent/adapters/tier_b_skill_capabilities.py`, `src/sevn/agent/adapters/tier_b_tools.py`.
+78 more Python files under `src/sevn/agent/` — including `src/sevn/agent/adapters/tier_b_multimodal.py`, `src/sevn/agent/adapters/tier_b_tool_output_limits.py`, `src/sevn/agent/adapters/tier_b_skills.py`, `src/sevn/agent/adapters/tier_b_tools.py`.
 
 ### Extension and invariants
 

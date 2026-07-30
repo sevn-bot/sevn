@@ -100,6 +100,7 @@ class SevnRegistryToolset(FunctionToolset[BTierDeps]):
         codemode_enabled: bool = False,
         triager_tools: frozenset[str] | None = None,
         triager_skills: frozenset[str] | None = None,
+        human_gated_tools: frozenset[str] | None = None,
         exclude_tool_names: frozenset[str] | None = None,
         codemode_web_policy: WebEgressDomainPolicy | None = None,
     ) -> SevnRegistryToolset:
@@ -113,6 +114,8 @@ class SevnRegistryToolset(FunctionToolset[BTierDeps]):
             codemode_enabled (bool): When ``True``, tag triager-scoped tools for ``CodeMode`` (W8).
             triager_tools (frozenset[str] | None): ``triage.tools[]`` for metadata scoping.
             triager_skills (frozenset[str] | None): ``triage.skills[]`` for skill-runner scoping.
+            human_gated_tools (frozenset[str] | None): ``requires_human`` tools kept native
+                (excluded from ``code_mode`` metadata).
             exclude_tool_names (frozenset[str] | None): Names omitted when a capability owns them.
             codemode_web_policy (object | None): Egress policy for CodeMode-local web registry tools.
 
@@ -133,6 +136,7 @@ class SevnRegistryToolset(FunctionToolset[BTierDeps]):
             codemode_eligible = compute_codemode_eligible_names(
                 triager_tools=triager_tools or frozenset(),
                 triager_skills=triager_skills or frozenset(),
+                human_gated_tools=human_gated_tools or frozenset(),
             )
         tools = build_pydantic_tools_for_registry(
             executor,

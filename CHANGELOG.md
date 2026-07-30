@@ -12,16 +12,26 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- [2026-07-29] Tier-B stack staged on `pydantic-ai` 1.107 and `pydantic-ai-harness` 0.4 ahead of the v2 cutover — web capability and CodeMode behavior unchanged; clears v1 deprecation warnings on the adapter surface
+- [2026-07-29] **Breaking:** tier-B stack migrated to `pydantic-ai` v2.20 + `pydantic-ai-harness` 0.13 / Monty 0.0.19 — `SevnAsyncCodeMode` replaces sync harness CodeMode; Monty `ResourceLimits` injected via fail-loud `checkout` patch ([upstream #501](https://github.com/pydantic/pydantic-ai-harness/issues/501))
+- [2026-07-29] Tier-B overflow replaced hand-rolled `OverflowingToolOutput` with harness `ToolOutputLimits` — full inline content up to 1 MiB preserved (D7); `read_tool_result` paging retained for pathological spills
+- [2026-07-29] Tier-B skills replaced hand-rolled deferred capabilities with harness `Skills` — triager-scoped `include`, staged `SKILL.md` frontmatter, and `sevn_run_skill_script` dispatch preserved (D7)
+- [2026-07-29] Tier-B permission, round-budget, and approval gates moved from lifecycle hooks onto guardrail capabilities — steer, grounding, and fetch-round steer remain sevn-owned hooks (D7/W8)
 - [2026-07-29] PR review runs the current upstream mergeCraft ``pre-0.0.1`` head (``f98aeb0``), bumped in both ``mergecraft.yml`` and ``MERGECRAFT_REF``; the pin stays a full SHA because the org enforces Actions SHA pinning (a branch ref fails the review job at action resolution), and ``mergecraft-ref-check`` no longer assumes hex so it reports real drift instead of "no pin found"
 - [2026-07-28] PR review backend cut over from pullfrog-py to mergeCraft: ``mergecraft.yml`` workflow, ``MERGECRAFT_REF`` / ``make review`` pin, ``.mergecraft/config.yaml``, and ``mergecraft-ref-check`` parity gate
 
 ### Fixed
 
+- [2026-07-29] Tier-B harness skill staging uses a per-turn process tempdir — avoids accumulating ``.sevn-harness-skills/`` under long-lived workspaces
+- [2026-07-29] Tier-B history compaction honors ``agent.history_compaction.target_tokens`` from ``sevn.json`` — previously validated in schema but silently ignored at capability assembly
+- [2026-07-29] Thermos tier-B hardening: human-gated tools stay native outside CodeMode; D9 opt-in toggles wired through ``agent.history_compaction`` / ``agent.cache_stability`` / ``agent.codemode.dynamic_catalog``; fail-loud async CodeMode backend probe
 - [2026-07-28] Operator sync branch names from config, env, and CLI flags are validated before git subprocess use; daily repo-sync cron stays ff-only with divergence recovery (force-reset remains on ``sevn update`` / ``--latest``)
 - [2026-07-27] Thermos hardening for Telegram ``/config``: owner gates on W7 mutators/forms, readiness enforcement at dispatch, user-scoped secrets export/deploy confirms, redacted ``act:config:show``, CLI slug aliases, ``secrets_export`` dispatcher kind, and ``owner_only`` registry flags on security/deployment toggles
 
 ### Added
 
+- [2026-07-29] Opt-in tier-B cache-stability monitor and CodeMode ``dynamic_catalog`` (default off, D9) — ``DEFAULT_TIER_B_CACHE_STABILITY_MONITOR_ENABLED`` wires harness ``WarnOnCacheBusts``; ``DEFAULT_CODEMODE_DYNAMIC_CATALOG`` keeps ``run_code`` tool-def cache-stable across tool discovery
+- [2026-07-29] Opt-in tier-B harness history compaction (default off, D9) — ``DEFAULT_TIER_B_HISTORY_COMPACTION_*`` selects ``TieredCompaction`` / ``SummarizingCompaction`` / ``ClearToolResults`` / ``ClampOversizedMessages`` when enabled via ``build_tier_b_capabilities``
 - [2026-07-29] Code-generated FAQ (``docs/FAQ.md``) rendered from operator-editable ``docs/faq/qa_input.json``: answers embed ``{{ref:<id>}}`` placeholders resolved to working links, validation rejects dangling or non-existent references, and ``make faq-generate`` / ``make faq-check`` keep it fresh (wired into ``ci-docs`` and ``ci-affected``)
 - [2026-07-28] Operator upgrades can force-reset the gateway source checkout to ``origin/pre-0.0.1`` or ``main``, reinstall the ``sevn`` CLI, and discard local checkout edits without merge prompts — via ``sevn update``, ``make update-cli``, or ``sevn sync --latest --branch …``
 - [2026-07-26] Telegram ``/config`` root regrouped into eight intent tiles (Chat, Agent, Skills & Tools, Memory, Access, Health, Deployment, Help) with ``owner_only`` gating (non-owners see four tiles); legacy section callbacks unchanged; nav shells re-parent existing rows

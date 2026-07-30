@@ -457,7 +457,10 @@ def instrumentation_capability() -> Instrumentation:
     provider = trace.get_tracer_provider()
     tracer_provider = provider if isinstance(provider, TracerProvider) else None
     return Instrumentation(
-        settings=InstrumentationSettings(tracer_provider=tracer_provider),
+        settings=InstrumentationSettings(
+            tracer_provider=tracer_provider,
+            use_aggregated_usage_attribute_names=False,
+        ),
     )
 
 

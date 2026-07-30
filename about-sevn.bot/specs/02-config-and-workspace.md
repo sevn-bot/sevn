@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Provide a single, testable configuration surface before storage, tracing,
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
-last_updated: '2026-07-28'
-fingerprint: sha256:41fb14fce91e23b376892ac854f11bde8679f06da56966af11339afd1f83f154
+last_updated: '2026-07-29'
+fingerprint: sha256:caa6db82951f0fef46dcc8437d925cbc9951fa713d437f3f206adbb626b4ab30
 related: []
 sources:
 - src/sevn/config/**
@@ -107,6 +107,9 @@ interfaces:
 - name: apply_model_to_picker_slot
   file: src/sevn/config/model_resolution.py
   symbol: apply_model_to_picker_slot
+- name: codemode_dynamic_catalog
+  file: src/sevn/config/model_resolution.py
+  symbol: codemode_dynamic_catalog
 - name: codemode_enabled
   file: src/sevn/config/model_resolution.py
   symbol: codemode_enabled
@@ -170,6 +173,18 @@ interfaces:
 - name: resolve_wire_model_id
   file: src/sevn/config/model_resolution.py
   symbol: resolve_wire_model_id
+- name: tier_b_cache_stability_monitor_enabled
+  file: src/sevn/config/model_resolution.py
+  symbol: tier_b_cache_stability_monitor_enabled
+- name: tier_b_history_compaction_enabled
+  file: src/sevn/config/model_resolution.py
+  symbol: tier_b_history_compaction_enabled
+- name: tier_b_history_compaction_strategy
+  file: src/sevn/config/model_resolution.py
+  symbol: tier_b_history_compaction_strategy
+- name: tier_b_history_compaction_target_tokens
+  file: src/sevn/config/model_resolution.py
+  symbol: tier_b_history_compaction_target_tokens
 - name: use_main_model_for_all
   file: src/sevn/config/model_resolution.py
   symbol: use_main_model_for_all
@@ -320,12 +335,18 @@ interfaces:
 - name: tool_debug_result_max_chars
   file: src/sevn/config/sections/accessors.py
   symbol: tool_debug_result_max_chars
+- name: AgentCacheStabilityConfig
+  file: src/sevn/config/sections/agent.py
+  symbol: AgentCacheStabilityConfig
 - name: AgentCodemodeConfig
   file: src/sevn/config/sections/agent.py
   symbol: AgentCodemodeConfig
 - name: AgentDiagnosticsConfig
   file: src/sevn/config/sections/agent.py
   symbol: AgentDiagnosticsConfig
+- name: AgentHistoryCompactionConfig
+  file: src/sevn/config/sections/agent.py
+  symbol: AgentHistoryCompactionConfig
 - name: AgentWorkspaceConfig
   file: src/sevn/config/sections/agent.py
   symbol: AgentWorkspaceConfig

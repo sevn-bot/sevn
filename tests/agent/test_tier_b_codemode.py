@@ -12,7 +12,7 @@ from pydantic_ai.exceptions import SkipToolExecution
 from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart
 from pydantic_ai.models.function import FunctionModel
 from pydantic_ai.usage import RunUsage
-from pydantic_monty import MontyRepl, MontyRuntimeError
+from pydantic_monty import Monty, MontyRuntimeError
 
 from sevn.agent.adapters.pydantic_adapter import PydanticToolRegistration
 from sevn.agent.adapters.tier_b_codemode import (
@@ -192,8 +192,8 @@ def test_build_tier_b_capabilities_codemode_off_by_default() -> None:
 def test_build_tier_b_capabilities_codemode_on() -> None:
     hooks = build_tier_b_hooks(_hook_config())
     caps = build_tier_b_capabilities(hooks=hooks, codemode_on=True)
-    assert caps[-1].__class__.__name__ == "CodeMode"
-    assert build_codemode_capability().__class__.__name__ == "CodeMode"
+    assert caps[-1].__class__.__name__ == "SevnAsyncCodeMode"
+    assert build_codemode_capability().__class__.__name__ == "SevnAsyncCodeMode"
 
 
 def test_build_codemode_capability_honors_max_retries_override() -> None:
@@ -224,8 +224,11 @@ def test_registry_toolset_tags_triager_tools_for_codemode() -> None:
 
 
 def test_monty_rejects_import_httpx() -> None:
-    repl = MontyRepl()
-    with pytest.raises(MontyRuntimeError, match="httpx"):
+    with (
+        Monty() as pool,
+        pool.checkout() as repl,
+        pytest.raises(MontyRuntimeError, match="httpx"),
+    ):
         repl.feed_start("import httpx")
 
 
@@ -618,3 +621,29 @@ def test_delete_tool_not_tagged_codemode() -> None:
     tool = _make_registry_tool(defn, code_mode=False)
     assert tool.requires_approval is True
     assert (tool.metadata or {}).get("code_mode") is not True
+
+
+def test_human_gated_tools_excluded_from_codemode_eligible() -> None:
+    from sevn.agent.adapters.tier_b_codemode import compute_codemode_eligible_names
+
+    human_gated = frozenset({"promote_generated_skill"})
+    assert (
+        is_codemode_eligible_tool(
+            "promote_generated_skill",
+            triager_tools=frozenset({"promote_generated_skill", "glob"}),
+            triager_skills=frozenset(),
+            human_gated_tools=human_gated,
+        )
+        is False
+    )
+    assert compute_codemode_eligible_names(
+        triager_tools=frozenset({"glob", "promote_generated_skill"}),
+        triager_skills=frozenset(),
+        human_gated_tools=human_gated,
+    ) == frozenset({"glob"})
+
+
+def test_assert_async_codemode_backend_present_ok() -> None:
+    from sevn.agent.adapters.tier_b_async_codemode import assert_async_codemode_backend_present
+
+    assert_async_codemode_backend_present()

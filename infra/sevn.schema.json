@@ -976,9 +976,50 @@
               "minimum": 1,
               "default": 3,
               "description": "Per-turn retry budget for the CodeMode run_code tool before pydantic-ai fails the tool call."
+            },
+            "dynamic_catalog": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, keep run_code tool-def cache-stable across tool discovery (monty-013 W7, D9 default off)."
             }
           },
           "$comment": "W8 — sole owner of CodeMode flag; default false preserves flat tools until operator opt-in."
+        },
+        "history_compaction": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, append harness history compaction to tier-B capabilities (monty-013 W6, D9 default off)."
+            },
+            "strategy": {
+              "type": "string",
+              "enum": ["tiered", "summarizing", "clear_tool_results", "clamp_oversized"],
+              "default": "tiered",
+              "description": "Compaction menu entry when history_compaction.enabled is true."
+            },
+            "target_tokens": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 80000,
+              "description": "Token target for tiered/summarizing compaction strategies."
+            }
+          },
+          "$comment": "monty-013 W6 — opt-in harness compaction (D9 default off)."
+        },
+        "cache_stability": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "When true, append WarnOnCacheBusts to tier-B capabilities (monty-013 W7, D9 default off)."
+            }
+          },
+          "$comment": "monty-013 W7 — opt-in cache-stability monitor (D9 default off)."
         },
         "diagnostics": {
           "type": "object",

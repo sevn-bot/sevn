@@ -2,8 +2,8 @@
   "entries": {
     "agent": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-20T09:50:51Z",
-      "digest": "67c38c4dbd12af31a2dbad7770bd5fa6a54f1f4241770fed4f1a14d15a26e40b",
+      "computed_at": "2026-07-29T22:20:05Z",
+      "digest": "71b7c8889a302835169e10dfcef10ab6c20e112d4a6c0be4607f6f0ed2cb1465",
       "source_globs": [
         "src/sevn/agent/**"
       ]
@@ -26,8 +26,8 @@
     },
     "config-workspace": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-28T11:50:39Z",
-      "digest": "766427d8df79c3ac3f85339fcd7d88ac9deccf820cbcf7491eca5b6e33b97308",
+      "computed_at": "2026-07-29T21:51:02Z",
+      "digest": "6c2f0282d39999b077217d041ab53ea6d576ddeed5b7e1a7fb28800b6bdb1e37",
       "source_globs": [
         "src/sevn/config/**",
         "src/sevn/workspace/**",
@@ -116,8 +116,8 @@
     },
     "root": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-27T01:20:50Z",
-      "digest": "543e04782ae2e679ee4b1074da38f92dacb0e6b00434a1c91e9a18c436927e03",
+      "computed_at": "2026-07-29T21:40:48Z",
+      "digest": "cf0f1a669e3e5f82fae16cb124fc03af778deea9ba23be5b30e246f4fe8d57c1",
       "source_globs": [
         "pyproject.toml",
         "CLAUDE.md",
@@ -201,8 +201,8 @@
     },
     "tracing": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-20T09:50:51Z",
-      "digest": "005cd7103bcd6c6ecb0d81a8443739a4a3d7b90d8e4642d5d01b1a1680f39029",
+      "computed_at": "2026-07-29T21:40:55Z",
+      "digest": "dd68ccca9fab2a8e2ff3741aa531802e77f0cbfb67fc0c1ce6203ef940c7d5bb",
       "source_globs": [
         "src/sevn/tracing/**",
         "src/sevn/agent/tracing/**"
