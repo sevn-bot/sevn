@@ -20,10 +20,10 @@
 #
 # Workflow resolution (GitHub Nov 2025 policy, effective 2025-12-08): pull_request_target
 # definitions are read from the repository default branch (`main`), not the PR base.
-# Companion PR to `main` must land this workflow there first; until then,
-# pull_request_target alone will not fire for PRs targeting `pre-*` / `develop` /
-# `test-pre`. The bootstrap `pull_request` trigger below MUST stay until `main`
-# carries an equivalent file; do not remove it in the same PR that introduces
+# Companion PR sevn-bot/sevn#96 lands this workflow on `main` (default branch).
+# Until that merges, pull_request_target alone will not fire for PRs targeting
+# `pre-*` / `develop` / `test-pre`. The bootstrap `pull_request` trigger below
+# MUST stay until then; do not remove it in the same PR that introduces
 # pull_request_target.
 #
 # Same-repo guard below keeps fork PRs from receiving secrets (prior pull_request
