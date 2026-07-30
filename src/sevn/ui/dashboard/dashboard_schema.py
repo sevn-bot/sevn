@@ -845,7 +845,7 @@ DASHBOARD_TAB_DESCRIPTORS: dict[str, TabDescriptor] = {
     "cron": _tab(
         group="ops",
         title="Cron",
-        read_endpoints=["/api/v1/cron/jobs"],
+        read_endpoints=["/api/v1/cron/jobs", "/api/v1/cron/runs"],
         key_selectors={
             "create_form": "#cron-create-form",
             "config_form": "#cron-config-form",

@@ -582,6 +582,30 @@ _MIGRATION_27: Final[tuple[str, ...]] = (
     "ALTER TABLE subagent_runs ADD COLUMN transcript_path TEXT",
 )
 
+# Cron execution audit history (#85; `specs/30-non-interactive-triggers.md`).
+_MIGRATION_28: Final[tuple[str, ...]] = (
+    """CREATE TABLE IF NOT EXISTS cron_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    claimed_at INTEGER NOT NULL,
+    completed_at INTEGER,
+    status TEXT NOT NULL
+        CHECK (status IN (
+            'claimed', 'running', 'ok', 'completed', 'failed', 'error',
+            'skipped', 'stale', 'recovered'
+        )),
+    transcript_path TEXT,
+    result_summary TEXT,
+    error TEXT
+)""",
+    "CREATE INDEX IF NOT EXISTS ix_cron_runs_job_claimed ON cron_runs(job_id, claimed_at DESC)",
+    "CREATE INDEX IF NOT EXISTS ix_cron_runs_run_id ON cron_runs(run_id, claimed_at DESC)",
+    """CREATE INDEX IF NOT EXISTS ix_cron_runs_in_flight
+    ON cron_runs(job_id, status)
+    WHERE completed_at IS NULL""",
+)
+
 MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (1, _MIGRATION_1),
     (2, _MIGRATION_2),
@@ -610,6 +634,7 @@ MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (25, _MIGRATION_25),
     (26, _MIGRATION_26),
     (27, _MIGRATION_27),
+    (28, _MIGRATION_28),
 )
 
 MIGRATION_HEAD_VERSION: Final[int] = max(v for v, _ in MIGRATIONS)

@@ -35,7 +35,6 @@ def _cron_row(
     return row
 
 
-@pytest.mark.xfail(reason="green after W21: cron_runs table", strict=False)
 def test_cron_runs_table_has_issue_named_columns() -> None:
     """Migration 28 creates ``cron_runs`` with #85 field names."""
     conn = sqlite3.connect(":memory:")
@@ -46,7 +45,6 @@ def test_cron_runs_table_has_issue_named_columns() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W21: audit row on start and completion", strict=False)
 async def test_cron_tick_writes_run_row_on_start_and_completion() -> None:
     """``cron_tick`` persists claimed and completed audit rows with summaries."""
     conn = sqlite3.connect(":memory:")
@@ -75,7 +73,6 @@ async def test_cron_tick_writes_run_row_on_start_and_completion() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W21: stale claim recovery on boot", strict=False)
 async def test_stale_cron_claim_recovered_at_startup() -> None:
     """Crashed claim rows are reconciled beside ``run_cron_reconciles`` on boot."""
     conn = sqlite3.connect(":memory:")
@@ -101,6 +98,7 @@ async def test_stale_cron_claim_recovered_at_startup() -> None:
     ).fetchone()
     assert row is not None
     assert str(row[0]) in {"failed", "stale", "recovered"}
+    assert row[1] is not None
 
 
 @pytest.mark.parametrize(
@@ -112,7 +110,6 @@ async def test_stale_cron_claim_recovered_at_startup() -> None:
     ],
 )
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W21: overlap_policy enforced", strict=False)
 async def test_overlap_policy_controls_concurrent_dispatch(
     overlap_policy: str,
     expect_second_dispatch: bool,

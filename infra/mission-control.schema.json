@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-12T07:45:24.848401+00:00",
+  "generated_at": "2026-07-30T21:57:52.952452+00:00",
   "nav": {
     "groups": [
       {
@@ -860,6 +860,10 @@
     {
       "method": "POST",
       "path": "/api/v1/cron/jobs/{job_id}/run"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/cron/runs"
     },
     {
       "method": "GET",
@@ -1729,7 +1733,8 @@
       },
       "kind": "wired",
       "read_endpoints": [
-        "/api/v1/cron/jobs"
+        "/api/v1/cron/jobs",
+        "/api/v1/cron/runs"
       ],
       "title": "Cron",
       "views": [

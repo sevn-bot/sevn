@@ -11,6 +11,7 @@ Exports:
     config_full_validate — dry-run validation for the unified Config tab.
     config_get — read redacted ``sevn.json`` for the Config tab.
     cron_jobs_list — workspace cron rows from ``sevn.db``.
+    cron_runs_list — recent cron execution audit rows from ``sevn.db``.
     cron_config_put — persist the ``triggers.paused`` scheduler flag.
     security_get — ``security.*`` subtree + scanner posture.
     security_put — patch ``security.*`` toggles in ``sevn.json``.
@@ -75,7 +76,6 @@ from sevn.onboarding.validate import validate_workspace_document
 from sevn.security.sandbox_runtime import snapshots_dir
 from sevn.security.secrets.errors import SecretsStoreCorruptError, is_encrypted_store_unlock_error
 from sevn.security.secrets.factory import secrets_chain_from_workspace
-from sevn.triggers.cron import cron_job_to_dict, list_cron_jobs
 from sevn.ui.dashboard.api._config_persist import (
     load_workspace_document,
     persist_workspace_document,
@@ -94,6 +94,7 @@ from sevn.ui.dashboard.services.config_full import (
     validation_errors_from_exception,
 )
 from sevn.ui.dashboard.services.mission_audit import emit_mission_audit
+from sevn.ui.dashboard.services.ops_control import cron_job_payload, cron_runs_payload
 from sevn.workspace.layout import WorkspaceLayout
 
 router = APIRouter(tags=["dashboard-ops"])
@@ -757,15 +758,43 @@ async def cron_jobs_list(
     return _cron_payload(conn, ws)
 
 
+@router.get("/cron/runs")
+async def cron_runs_list(
+    request: Request,
+    _claims: DashboardClaims = Depends(require_dashboard_owner),
+    job_id: str | None = None,
+    limit: int = 50,
+) -> dict[str, object]:
+    """List recent cron execution audit rows from workspace ``sevn.db``.
+
+    Args:
+        request (Request): FastAPI request with sqlite connection.
+        _claims (DashboardClaims): Verified dashboard owner claims.
+        job_id (str | None, optional): Filter to one cron job id.
+        limit (int): Maximum rows to return (capped at 200).
+
+    Returns:
+        dict[str, object]: Recent audit rows with concise error summaries.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(cron_runs_list)
+        True
+    """
+
+    conn = request.app.state.sqlite_conn
+    return cron_runs_payload(conn, job_id=job_id, limit=limit)
+
+
 def _cron_payload(conn: Any, ws: WorkspaceConfig) -> dict[str, object]:
-    """Build the Cron tab payload (persisted jobs + paused flag).
+    """Build the Cron tab payload (persisted jobs + recent audit rows + paused flag).
 
     Args:
         conn (Any): Workspace ``sevn.db`` connection.
         ws (WorkspaceConfig): Active workspace config.
 
     Returns:
-        dict[str, object]: Cron job rows, count, and ``triggers.paused`` flag.
+        dict[str, object]: Cron job rows, recent audit history, and ``triggers.paused`` flag.
 
     Examples:
         >>> import inspect
@@ -773,9 +802,7 @@ def _cron_payload(conn: Any, ws: WorkspaceConfig) -> dict[str, object]:
         True
     """
 
-    jobs = [cron_job_to_dict(job) for job in list_cron_jobs(conn)]
-    paused = bool(ws.triggers and ws.triggers.paused)
-    return {"jobs": jobs, "count": len(jobs), "triggers_paused": paused}
+    return cron_job_payload(conn, ws)
 
 
 @router.put("/cron/config")
@@ -1590,6 +1617,7 @@ __all__ = [
     "config_get",
     "cron_config_put",
     "cron_jobs_list",
+    "cron_runs_list",
     "mission_subagent_kill",
     "mission_subagents_get",
     "mission_subagents_kill_all",
