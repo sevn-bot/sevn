@@ -1063,7 +1063,7 @@ jobs:
 
 **Advisory pre-commit (manual stage):** `codespell` and `vulture` hooks in `.pre-commit-config.yaml` (`stages: [manual]`) — run with `pre-commit run --hook-stage manual` when desired; they do not block ordinary commits.
 
-**Advisory PR review:** `make review` (offline `mergecraft diff-review` from [mergeCraft](https://github.com/alexhawat/mergeCraft) + `CLAUDE_CODE_OAUTH_TOKEN`) — never referenced by `ci` or `ci-quality`. The mergeCraft GitHub Action (`.github/workflows/mergecraft.yml`) posts inline PR reviews and gates on the `mergecraft-approval` check.
+**Advisory PR review:** `make review` (offline `mergecraft diff-review` from [mergeCraft](https://github.com/alexhawat/mergeCraft) + `CLAUDE_CODE_OAUTH_TOKEN`) — never referenced by `ci` or `ci-quality`. The mergeCraft GitHub Action posts inline PR reviews and gates on the `mergecraft-approval` check; its workflow (`.github/workflows/mergecraft.yml`) lives **only on the default branch** (`main`), because GitHub resolves `pull_request_target` definitions from there — edit it in a PR against `main`, and keep its action pin equal to `MERGECRAFT_REF` (enforced by `make mergecraft-ref-check`, which reads `origin/main`).
 
 ### Additional enforcement (beyond Ruff, mypy, pytest, bandit)
 
