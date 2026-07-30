@@ -8,7 +8,7 @@ summary: Deliver the primary operator and automation surface for install, upgrad
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
 last_updated: '2026-07-30'
-fingerprint: sha256:486f2019776472565b0f448a372a1b3bb5332500a5d056e9aa3593037c6fd12b
+fingerprint: sha256:bd10c225b1a1370a6a3ac857f3217ca84c52fe793d814bb40bd93ffb1d61f217
 related: []
 sources:
 - src/sevn/cli/**
@@ -833,6 +833,12 @@ Root CLI ``rich_help_panel`` groups mirror the eight Telegram ``/config`` tiles
 (``sevn.cli.help.panels.PANEL_ORDER``). ``sevn config sections`` lists the same eight
 slugs derived from ``menu_registry`` (``config_paths.menu_registry_root_slugs()``).
 ``make cli-help-docs-check`` gates panel drift.
+
+## Amendments (open-issues-sweep W14, #69 / #93)
+
+``sevn skills setup-status <skill>`` lists manifest-declared uv extras and executables;
+``sevn skills setup <skill> --yes`` runs confirmation-gated installs via the onboarding
+install orchestrator. Unsupported requirements return a manual next-step message.
 
 ## Human-input needed
 

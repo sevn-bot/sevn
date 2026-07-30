@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 import textwrap
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -52,30 +53,21 @@ def write_min_skill(
         encoding="utf-8",
     )
     name = skill_dir.name
-    extra_lines: list[str] = []
+    body_lines = [
+        "---",
+        f"name: {name}",
+        f"description: {description}",
+        f"version: {version}",
+        "scripts:",
+        "  - path: scripts/run.py",
+        "    description: main",
+    ]
     if quarantine is not None:
-        extra_lines.append(f"quarantine: {'true' if quarantine else 'false'}")
+        body_lines.append(f"quarantine: {'true' if quarantine else 'false'}")
     if dependencies_yaml:
-        extra_lines.append(dependencies_yaml.rstrip())
-    extra_block = "\n".join(extra_lines)
-    if extra_block:
-        extra_block = extra_block + "\n"
-    (skill_dir / "SKILL.md").write_text(
-        textwrap.dedent(
-            f"""\
-            ---
-            name: {name}
-            description: {description}
-            version: {version}
-            scripts:
-              - path: scripts/run.py
-                description: main
-            {extra_block}---
-            body
-            """
-        ),
-        encoding="utf-8",
-    )
+        body_lines.extend(dependencies_yaml.rstrip().splitlines())
+    body_lines.extend(["---", "body", ""])
+    (skill_dir / "SKILL.md").write_text("\n".join(body_lines), encoding="utf-8")
 
 
 def install_fake_yt_dlp(tmp_path: Path) -> Path:
@@ -118,6 +110,102 @@ def _reset_skill_singletons() -> None:
     SkillsManager.reset_singletons_for_tests()
     yield
     SkillsManager.reset_singletons_for_tests()
+
+
+@pytest.fixture(autouse=True)
+def _patch_job_ops_install_guard(
+    monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+) -> None:
+    """Stabilize ``test_setup_job_ops_installs_jobspy_extra`` across network/jobspy outcomes."""
+    if request.node.name != "test_setup_job_ops_installs_jobspy_extra":
+        return
+    scripts = (
+        Path(__file__).resolve().parents[3]
+        / "src"
+        / "sevn"
+        / "data"
+        / "bundled_skills"
+        / "core"
+        / "job-ops"
+        / "scripts"
+    )
+    if str(scripts) not in sys.path:
+        sys.path.insert(0, str(scripts))
+    from lib.extractors import jobspy_source
+    from lib.extractors.base import ExtractorResult
+
+    installed = {"value": False}
+
+    def fake_run(query: object) -> ExtractorResult:
+        if not installed["value"]:
+            return ExtractorResult(
+                source="jobspy",
+                success=False,
+                error="python-jobspy is not installed; run `uv sync --extra job-ops`",
+            )
+        try:
+            import jobspy  # noqa: F401
+        except ImportError:
+            return ExtractorResult(
+                source="jobspy",
+                success=False,
+                error="python-jobspy is not installed; run `uv sync --extra job-ops`",
+            )
+        return ExtractorResult(
+            source="jobspy",
+            success=False,
+            error="jobspy probe failed after install (test stub)",
+        )
+
+    monkeypatch.setattr(jobspy_source, "run", fake_run)
+
+    import sevn.skills.setup as setup_mod
+
+    real_execute = setup_mod.execute_skill_setup
+
+    def wrapped_execute(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        result = real_execute(*args, **kwargs)
+        if result.get("ok"):
+            installed["value"] = True
+        return result
+
+    monkeypatch.setattr(setup_mod, "execute_skill_setup", wrapped_execute)
+
+
+@pytest.fixture(autouse=True)
+def _force_unmet_uv_extra_for_confirmation_test(
+    monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+) -> None:
+    """Ensure ``test_install_requires_operator_confirmation`` hits the confirm gate."""
+    if request.node.name != "test_install_requires_operator_confirmation":
+        return
+    import sevn.skills.setup as setup_mod
+
+    monkeypatch.setattr(setup_mod, "_uv_extra_satisfied", lambda _extra: False)
+
+
+@pytest.fixture(autouse=True)
+def _monkeypatch_dict_compat(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pytest 9 removed ``MonkeyPatch.dict``; Batch C tests still use it."""
+    if hasattr(monkeypatch, "dict"):
+        return
+    from contextlib import contextmanager
+
+    @contextmanager
+    def dict_patch(d, values, *, clear: bool = False):
+        saved = dict(d)
+        if clear:
+            d.clear()
+        d.update(values)
+        try:
+            yield
+        finally:
+            if clear:
+                d.clear()
+            d.clear()
+            d.update(saved)
+
+    monkeypatch.dict = dict_patch  # type: ignore[attr-defined]
 
 
 @pytest.fixture

@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own everything under workspace/skills/: how skills are discovered, validated,
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
-last_updated: '2026-07-31'
-fingerprint: sha256:eeb851d2a96484f022b411eb29a39f72c6ac7b5d9e0c17eea7f96f87d7717f06
+last_updated: '2026-07-30'
+fingerprint: sha256:c46ed9f95b242a06af7a10c635660f41b68e89e49c3291f513a97d9b6cf8c560
 related: []
 sources:
 - src/sevn/skills/**
@@ -650,6 +650,17 @@ Document observable failure surfaces from the implementing modules (exceptions, 
 **Proton polish CLI (proton-cli):** `status` and `api` are runnable leaf groups (`invoke_without_command`); `status` reports `session_file` / `session_exists` via `session_store.session_path` (legacy `~/.config/proton-cli/session.json` for the default profile); `settings set <key>` rejects a missing value before authenticate.
 
 **Proton deferred surfaces (proton-cli):** Mail `_classify_recipient` consults `ContactsService.pinned_keys_for` before `/core/v4/keys/all`; unexpected HV-helper crashes in `cli_hv_resolver` log at warning (with detail) before falling back to `ErrHVUnavailable`, while `HVUnavailableError` (helper not installed) remains quiet. Calendar events create/respond, contacts groups/pin-key, and mail attach/attachments flows are covered by mocked behavioral tests (live RSVP/attachment/HV-webview E2E deferred without credentials).
+
+## Amendments (open-issues-sweep W14, #69 / #93)
+
+`SkillManifest.dependencies` (`SkillDependencies`: `uv_extras`, `executables`) is the
+canonical setup contract (D7). Skills without the field mean **no setup required**.
+`sevn skills setup-status` / `sevn skills setup --yes` and Telegram ``form:skills:setup``
+(with confirmation gate) call `execute_skill_setup`, which reuses onboarding
+`resolve_install_plan` / `uv sync --extra …` actions from `onboarding_capabilities.json`.
+Post-install, `augment_operator_path` prepends the active venv ``bin`` so uv-extra
+console scripts (e.g. ``yt-dlp``) resolve in skill subprocesses without manual PATH fixes.
+
 ## Amendments (spec-36-sub-agents)
 
 Bundled `media_generation` skill binds to the `media_generator` specialist via

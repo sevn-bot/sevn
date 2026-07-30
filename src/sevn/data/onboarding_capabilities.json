@@ -1361,6 +1361,14 @@
           "kind": "noop",
           "argv": [],
           "fatal": false
+        },
+        {
+          "id": "skill.yt_dlp.uv",
+          "kind": "uv_extra",
+          "argv": [
+            "yt-dlp"
+          ],
+          "fatal": false
         }
       ]
     },

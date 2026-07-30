@@ -90,6 +90,7 @@ FORM_TARGETS: frozenset[str] = frozenset(
         "deploy:check",
         "deploy:remote",
         "guides:read",
+        "skills:setup",
     },
 )
 _SECRET_ALIAS_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
@@ -168,6 +169,8 @@ def parse_form_callback(data: str) -> str | None:
         return "config:set"
     if raw == "form:tunnel:setup":
         return "tunnel:setup"
+    if raw == "form:skills:setup":
+        return "skills:setup"
     if raw == "form:migrate:import":
         return "migrate:import"
     if raw == "form:deploy:check":
@@ -426,6 +429,9 @@ class MenuFormHandler:
         elif target == "tunnel:setup":
             section = "deployment_tunnel"
             step = "mode"
+        elif target == "skills:setup":
+            section = "skills_tools"
+            step = "skill_id"
         elif target == "migrate:import":
             section = "deployment_update"
             step = "path"
@@ -529,6 +535,8 @@ class MenuFormHandler:
             prompt = "Send the dot-path to set (e.g. gateway.port):"
         elif target == "tunnel:setup":
             prompt = _PROMPT_TUNNEL_SETUP
+        elif target == "skills:setup":
+            prompt = "Send the skill id to set up (e.g. job-ops or yt-dlp):
         elif target == "migrate:import":
             prompt = "Send foreign workspace path to import, or empty for in-place schema upgrade:"
         elif target == "deploy:check":
@@ -659,6 +667,11 @@ class MenuFormHandler:
             return
         if target == "tunnel:setup":
             await self._advance_tunnel_setup_form(
+                msg, token=token, step=step, text=text, payload=payload
+            )
+            return
+        if target == "skills:setup":
+            await self._advance_skills_setup_form(
                 msg, token=token, step=step, text=text, payload=payload
             )
             return
@@ -3025,6 +3038,81 @@ class MenuFormHandler:
         topic_raw = md.get("topic_id")
         topic_id = int(topic_raw) if isinstance(topic_raw, int) else None
         return chat_id, topic_id
+
+    async def _advance_skills_setup_form(
+        self, msg: IncomingMessage, *, token: str, step: str, text: str, payload: dict[str, Any]
+    ) -> None:
+        """Apply ``form:skills:setup`` — skill id then optional confirm keyboard (W14).
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            token (str): Active ``dispatcher_state`` token.
+            step (str): Current step id.
+            text (str): Operator reply text.
+            payload (dict[str, Any]): Parsed wizard payload.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._advance_skills_setup_form)
+            True
+        """
+        from sevn.skills.manager import SkillsManager
+        from sevn.skills.setup import skill_setup_requirements, skill_setup_status
+
+        if step != "skill_id":
+            self._consume_token(token)
+            await self._send_chat(msg, "Form state lost — start again.")
+            return
+        skill_id = text.strip()
+        if not skill_id:
+            await self._send_chat(msg, "Skill id cannot be empty.")
+            return
+        manager = SkillsManager.shared(self._content_root)
+        try:
+            record = manager.get_record(skill_id)
+        except Exception as exc:
+            await self._send_chat(msg, str(exc))
+            return
+        status = skill_setup_status(record.manifest)
+        requirements = skill_setup_requirements(record.manifest)
+        lines = [f"{skill_id}: {status}"]
+        for row in requirements:
+            mark = "ok" if row.get("satisfied") else "missing"
+            lines.append(f"  [{mark}] {row.get('kind')} {row.get('name')}")
+        unsupported = [
+            row
+            for row in requirements
+            if not row.get("satisfied") and row.get("capability_id") is None
+        ]
+        unmet = [row for row in requirements if not row.get("satisfied")]
+        if unsupported:
+            names = ", ".join(str(row["name"]) for row in unsupported)
+            lines.append(
+                f"No automated setup for {names}. Install manually and ensure PATH is correct.",
+            )
+            self._consume_token(token)
+            await self._send_chat(msg, "\n".join(lines))
+            return
+        if not unmet:
+            self._consume_token(token)
+            await self._send_chat(msg, "\n".join(lines))
+            return
+        self._consume_token(token)
+        keyboard = [
+            [
+                {
+                    "text": "✅ Confirm install",
+                    "callback_data": f"act:skills:setup:confirm:{skill_id}",
+                },
+                {"text": "Cancel", "callback_data": "act:skills:setup:cancel"},
+            ],
+        ]
+        lines.append("Tap Confirm to run uv/install actions for missing requirements.")
+        await self._send_chat(
+            msg,
+            "\n".join(lines),
+            reply_markup={"inline_keyboard": keyboard},
+        )
 
 
 __all__ = ["FORM_TARGETS", "MenuFormHandler", "parse_form_callback"]

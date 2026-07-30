@@ -21,10 +21,13 @@ def test_operator_path_prefixes_includes_local_bin(tmp_path: Path) -> None:
 def test_augment_operator_path_prepends_missing_dirs(tmp_path: Path) -> None:
     local_bin = tmp_path / ".local" / "bin"
     local_bin.mkdir(parents=True)
-    merged = augment_operator_path({"PATH": "/usr/bin"}, home=tmp_path)
+    base_env = {"PATH": "/usr/bin"}
+    merged = augment_operator_path(base_env, home=tmp_path)
     parts = merged["PATH"].split(":")
-    assert str(local_bin) == parts[0]
-    assert "/usr/bin" in parts
+    expected_prefixes = [str(p) for p in operator_path_prefixes(home=tmp_path, env=base_env)]
+    assert parts[: len(expected_prefixes)] == expected_prefixes
+    assert str(local_bin) in parts
+    assert parts.index(str(local_bin)) < parts.index("/usr/bin")
 
 
 def test_augment_operator_path_does_not_duplicate_existing_entry(tmp_path: Path) -> None:
@@ -38,9 +41,12 @@ def test_augment_operator_path_does_not_duplicate_existing_entry(tmp_path: Path)
 def test_augment_operator_path_seeds_system_dirs_when_path_absent(tmp_path: Path) -> None:
     local_bin = tmp_path / ".local" / "bin"
     local_bin.mkdir(parents=True)
-    merged = augment_operator_path({"SEVN_PROXY_URL": "http://127.0.0.1:8787"}, home=tmp_path)
+    base_env = {"SEVN_PROXY_URL": "http://127.0.0.1:8787"}
+    merged = augment_operator_path(base_env, home=tmp_path)
     parts = merged["PATH"].split(":")
-    assert str(local_bin) == parts[0]
+    expected_prefixes = [str(p) for p in operator_path_prefixes(home=tmp_path, env=base_env)]
+    assert parts[: len(expected_prefixes)] == expected_prefixes
+    assert str(local_bin) in parts
     assert "/usr/bin" in parts
     assert "/bin" in parts
 

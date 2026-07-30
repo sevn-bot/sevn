@@ -60,7 +60,6 @@ def _jobspy_guard_message() -> str:
     return result.error
 
 
-@pytest.mark.xfail(reason="green after W14: job-ops uv extra install (#93)", strict=False)
 def test_setup_job_ops_installs_jobspy_extra(tmp_path: Path) -> None:
     """Setting up ``job-ops`` installs its uv extra and clears the JobSpy guard."""
     guard_before = _jobspy_guard_message()
@@ -82,7 +81,6 @@ def test_setup_job_ops_installs_jobspy_extra(tmp_path: Path) -> None:
     assert "python-jobspy is not installed" not in guard_after
 
 
-@pytest.mark.xfail(reason="green after W14: venv bin on PATH for skill runner (#69)", strict=False)
 def test_skill_runner_finds_yt_dlp_after_setup(
     tmp_path: Path,
     batch_c_skills_root: Path,
@@ -118,7 +116,6 @@ def test_skill_runner_finds_yt_dlp_after_setup(
         assert yt_dlp_available() is True
 
 
-@pytest.mark.xfail(reason="green after W14: install confirmation guardrail", strict=False)
 def test_install_requires_operator_confirmation(tmp_path: Path) -> None:
     """Install actions require explicit operator confirmation."""
     from sevn.skills.setup import InstallConfirmationRequired
@@ -137,9 +134,6 @@ def test_install_requires_operator_confirmation(tmp_path: Path) -> None:
     assert "confirm" in str(excinfo.value).lower()
 
 
-@pytest.mark.xfail(
-    reason="green after W14: unsupported dependency manual-next-step message", strict=False
-)
 def test_unsupported_dependency_names_manual_next_step(tmp_path: Path) -> None:
     """Unsupported dependencies produce a clear message naming the manual next step."""
     write_min_skill(
@@ -158,9 +152,6 @@ def test_unsupported_dependency_names_manual_next_step(tmp_path: Path) -> None:
     assert "manual" in message.lower() or "next step" in message.lower()
 
 
-@pytest.mark.xfail(
-    reason="green after W14: skill setup status lists pending requirements", strict=False
-)
 def test_skill_setup_status_lists_unmet_requirements(tmp_path: Path) -> None:
     """Setup status enumerates missing uv extras and executables before install."""
     from sevn.skills.setup import skill_setup_requirements

@@ -55,6 +55,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 
+- [2026-07-30] Manifest-declared skill dependencies (`SkillManifest.dependencies`): `sevn skills setup-status` / `sevn skills setup --yes`, Telegram `/config` **Skill setup** form with confirmation gate, venv `bin` on operator PATH for uv-extra executables (#69, #93); `skill.yt_dlp` wired to `extra.yt_dlp` install action
 - [2026-07-29] Opt-in tier-B cache-stability monitor and CodeMode ``dynamic_catalog`` (default off, D9) — ``DEFAULT_TIER_B_CACHE_STABILITY_MONITOR_ENABLED`` wires harness ``WarnOnCacheBusts``; ``DEFAULT_CODEMODE_DYNAMIC_CATALOG`` keeps ``run_code`` tool-def cache-stable across tool discovery
 - [2026-07-29] Opt-in tier-B harness history compaction (default off, D9) — ``DEFAULT_TIER_B_HISTORY_COMPACTION_*`` selects ``TieredCompaction`` / ``SummarizingCompaction`` / ``ClearToolResults`` / ``ClampOversizedMessages`` when enabled via ``build_tier_b_capabilities``
 - [2026-07-29] Code-generated FAQ (``docs/FAQ.md``) rendered from operator-editable ``docs/faq/qa_input.json``: answers embed ``{{ref:<id>}}`` placeholders resolved to working links, validation rejects dangling or non-existent references, and ``make faq-generate`` / ``make faq-check`` keep it fresh (wired into ``ci-docs`` and ``ci-affected``)
