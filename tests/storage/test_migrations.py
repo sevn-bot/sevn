@@ -18,7 +18,7 @@ from sevn.storage import (
 
 
 def test_migration_head_matches_bundle() -> None:
-    assert MIGRATION_HEAD_VERSION == 28
+    assert MIGRATION_HEAD_VERSION == 29
 
 
 def test_apply_migrations_idempotent_memory() -> None:

@@ -8,7 +8,7 @@ summary: 'Own application persistence: connection setup (WAL, foreign keys), ver
   migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence
   contracts for crash-resume and (w'
 last_updated: '2026-07-30'
-fingerprint: sha256:319e1825e064c7dcc8f98c98cd727b6435e4b752a616a908c8d47a6d10884887
+fingerprint: sha256:6aae2b141defc5d218387be83056e9010e17ff47a6347d380ca5ad56825d21af
 related: []
 sources:
 - src/sevn/storage/**
@@ -188,6 +188,12 @@ delivery-obligation ledger, and replayed on boot when a crash prevented announce
 Adds `subagent_runs.transcript_path` (migration 27). Each run writes a tailable
 redacted JSONL transcript under `subagents/transcripts/<run_id>.jsonl` in the
 workspace content root; completion updates include the path for operators.
+
+## Amendments (open-issues-sweep W21, #85)
+
+Adds `cron_runs` table (migration 28): append-only audit rows at claim and
+completion, stale in-flight claims reconciled at gateway boot, and `overlap_policy`
+enforced in `cron_tick`. Recent history is exposed on Mission Control cron ops APIs.
 
 ## Amendments (open-issues-sweep W22, #83)
 

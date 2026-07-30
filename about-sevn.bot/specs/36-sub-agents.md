@@ -8,7 +8,7 @@ summary: Level-1 sub-agents (tracked, concurrent, killable role runs) that may s
   level-2 workers (incl. specialists); multi queue mode; limits, tracing, kill surfaces,
   media_generation skill.
 last_updated: '2026-07-30'
-fingerprint: sha256:c59d97dafaee8e6bd522ca44ec95ca2188420f126ce9de3d96cbae386b71f967
+fingerprint: sha256:cbc9c0e50032c83b4dae92e364776e3378ab1da8f39fc130212253fffc3f39fc
 related: []
 sources:
 - src/sevn/agent/subagents/**
@@ -203,6 +203,18 @@ interfaces:
 - name: SubAgentSupervisor
   file: src/sevn/agent/subagents/supervisor.py
   symbol: SubAgentSupervisor
+- name: SubagentTranscriptWriter
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: SubagentTranscriptWriter
+- name: load_subagent_transcript_path
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: load_subagent_transcript_path
+- name: transcript_path_for_run
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: transcript_path_for_run
+- name: transcript_relpath_for_run
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: transcript_relpath_for_run
 - name: register
   file: src/sevn/cli/commands/subagents_cmd.py
   symbol: register
@@ -604,4 +616,4 @@ Docs gate: `make subagents-chart-check` (deterministic SVG); `make ci-docs`.
 
 ### 10.12 Live subagent transcripts — append-only
 
-- [ ] Persist workspace-relative transcript path in `subagent_runs.transcript_path` (migration 27); append redacted JSONL events via `SubagentTranscriptWriter`; specialist workers write through `_specialist_worker_body`; parent announce-back reports location via `format_transcript_reference`; run-scoped reads via `read_subagent_transcript` (#77, open-issues-sweep W20)
+- [x] Persist workspace-relative transcript path in `subagent_runs.transcript_path` (migration 27); append redacted JSONL events via `SubagentTranscriptWriter`; specialist workers write through `_specialist_worker_body`; parent announce-back reports location via `format_transcript_reference`; run-scoped reads via `read_subagent_transcript` (#77, open-issues-sweep W20) (2026-07-30 ✅: a533a686)

@@ -1,7 +1,7 @@
 """W17.1 - Batch D migration contract (D13).
 
-Green at head 24 before W18 touches storage; future versions 25-29 are xfail until
-their implementation waves land and refresh golden fixtures.
+Asserts migrations 25-29 register, apply idempotently, match schema artifacts,
+and have golden fixtures through head 29 (W18-W22).
 """
 
 from __future__ import annotations
@@ -9,7 +9,6 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-import pytest
 from scripts.dump_storage_golden import dump_head_schema, golden_path
 
 from sevn.storage.migrate import MIGRATION_HEAD_VERSION, MIGRATIONS, apply_migrations
@@ -102,49 +101,10 @@ def test_head_schema_matches_golden_at_batch_d_baseline() -> None:
     assert actual == expected
 
 
-@pytest.mark.parametrize(
-    "slot",
-    [s for s in BATCH_D_MIGRATION_SLOTS if s.version > 29],
-    ids=[f"v{s.version}_{s.wave}" for s in BATCH_D_MIGRATION_SLOTS if s.version > 29],
-)
-@pytest.mark.xfail(reason="green after impl wave: migration registered", strict=False)
-def test_batch_d_migration_registered(slot: object) -> None:
-    """Each planned migration version appears in ``MIGRATIONS``."""
-    from tests.open_issues_sweep.batch_d.conftest import BatchDMigrationSlot
-
-    assert isinstance(slot, BatchDMigrationSlot)
-    registered = {version for version, _ in MIGRATIONS}
-    assert slot.version in registered
-
-
 def test_batch_d_migration_25_registered() -> None:
     """W18 registers migration 25 for the delivery-obligation ledger."""
     registered = {version for version, _ in MIGRATIONS}
     assert 25 in registered
-
-
-@pytest.mark.parametrize(
-    "slot",
-    [s for s in BATCH_D_MIGRATION_SLOTS if s.version > 29],
-    ids=[f"v{s.version}_{s.wave}" for s in BATCH_D_MIGRATION_SLOTS if s.version > 29],
-)
-@pytest.mark.xfail(reason="green after impl wave: schema artifact present", strict=False)
-def test_batch_d_migration_schema_artifact(slot: object, tmp_path: Path) -> None:
-    """Each wave's table/column contract exists after ``apply_migrations``."""
-    from tests.open_issues_sweep.batch_d.conftest import BatchDMigrationSlot
-
-    assert isinstance(slot, BatchDMigrationSlot)
-    conn = sqlite3.connect(tmp_path / f"m{slot.version}.sqlite")
-    try:
-        apply_migrations(conn)
-        if slot.table is not None:
-            assert table_exists(conn, slot.table), f"missing table {slot.table!r}"
-            cols = table_columns(conn, slot.table)
-            for col_name, col_type in slot.columns:
-                assert col_name in cols, f"missing column {col_name!r} on {slot.table!r}"
-                assert cols[col_name].upper() == col_type.upper()
-    finally:
-        conn.close()
 
 
 def test_batch_d_migration_25_schema_artifact(tmp_path: Path) -> None:
@@ -224,21 +184,6 @@ def test_batch_d_migration_29_schema_artifact(tmp_path: Path) -> None:
         assert table_exists(conn, slot.table), f"missing table {slot.table!r}"
     finally:
         conn.close()
-
-
-@pytest.mark.parametrize(
-    "slot",
-    [s for s in BATCH_D_MIGRATION_SLOTS if s.version > 29],
-    ids=[f"v{s.version}_{s.wave}" for s in BATCH_D_MIGRATION_SLOTS if s.version > 29],
-)
-@pytest.mark.xfail(reason="green after impl wave: golden fixture refreshed", strict=False)
-def test_batch_d_golden_fixture_for_version(slot: object) -> None:
-    """Each new migration version has a checked-in golden SQL dump."""
-    from tests.open_issues_sweep.batch_d.conftest import BatchDMigrationSlot
-
-    assert isinstance(slot, BatchDMigrationSlot)
-    fixture = golden_path(slot.version)
-    assert fixture.is_file(), f"missing golden fixture for migration {slot.version}: {fixture}"
 
 
 def test_batch_d_golden_fixture_for_migration_25() -> None:

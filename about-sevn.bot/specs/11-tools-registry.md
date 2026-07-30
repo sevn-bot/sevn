@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that every
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
-last_updated: '2026-08-01'
-fingerprint: sha256:858bb5689d3c9341849ce49564af16e7d098b47bbdab9fb117e53282ec717d7c
+last_updated: '2026-07-30'
+fingerprint: sha256:7197e7d6af52f5c5bf0e453e5ce04aac6320b3f1d38f37dce63c3aaead6cb77e
 related: []
 sources:
 - src/sevn/tools/**
@@ -83,33 +83,6 @@ interfaces:
 - name: tool_from_decorated
   file: src/sevn/tools/decorator.py
   symbol: tool_from_decorated
-- name: DenyDecision
-  file: src/sevn/tools/deny_rules.py
-  symbol: DenyDecision
-- name: DenyRule
-  file: src/sevn/tools/deny_rules.py
-  symbol: DenyRule
-- name: check_deny_rules_for_dispatch
-  file: src/sevn/tools/deny_rules.py
-  symbol: check_deny_rules_for_dispatch
-- name: deny_envelope_from_rules
-  file: src/sevn/tools/deny_rules.py
-  symbol: deny_envelope_from_rules
-- name: enveloped_deny_with_reason
-  file: src/sevn/tools/deny_rules.py
-  symbol: enveloped_deny_with_reason
-- name: evaluate_deny_rules
-  file: src/sevn/tools/deny_rules.py
-  symbol: evaluate_deny_rules
-- name: load_deny_rules_from_workspace
-  file: src/sevn/tools/deny_rules.py
-  symbol: load_deny_rules_from_workspace
-- name: log_deny_decision
-  file: src/sevn/tools/deny_rules.py
-  symbol: log_deny_decision
-- name: parse_deny_rules
-  file: src/sevn/tools/deny_rules.py
-  symbol: parse_deny_rules
 - name: reserved_plugin_row
   file: src/sevn/tools/entrypoints.py
   symbol: reserved_plugin_row
@@ -473,6 +446,9 @@ interfaces:
 - name: history_tool
   file: src/sevn/tools/transcript.py
   symbol: history_tool
+- name: read_subagent_transcript
+  file: src/sevn/tools/transcript.py
+  symbol: read_subagent_transcript
 - name: read_transcript_tool
   file: src/sevn/tools/transcript.py
   symbol: read_transcript_tool
@@ -615,11 +591,3 @@ reusing ``TelegramWeb`` inline-keyboard primitives. Destructive menu rows are de
 **Skills (W5):** Tier B exposes operator skills as harness deferred `Skills` capabilities (`tier_b_skills.build_tier_b_skill_capabilities`). Triager-named skill ids scope the include list; each `SKILL.md` is staged to an ephemeral `.sevn-harness-skills/` tree with frontmatter preserved. Script dispatch stays on `sevn_run_skill_script` → `ToolExecutor.dispatch` (same registry contract as native tools).
 
 **CodeMode (W3/W7):** Registry tools marked `code_mode=True` are eligible for the Monty `run_code` sandbox when triage enables CodeMode. Host-side tool calls from sandboxed snippets re-enter `ToolExecutor.dispatch` via the harness function catalog. `SevnAsyncCodeMode` is the tier-B backend; Monty `ResourceLimits` are injected at pool checkout (`_monty_limits.py`, D5/D6). Opt-in `dynamic_catalog` (default off, D9) keeps the `run_code` tool definition byte-stable across lazy tool discovery.
-
-### 10.2 open-issues-sweep W15 — discovery cache + registry_version — append-only
-
-Skill discovery cache invalidation reuses the existing registry fingerprint machinery:
-``_registry_fingerprint_lines`` + ``_sha256_lines`` + ``_bump_if_changed`` drive
-``LoadedBodyCache`` invalidation keyed by ``registry_version``. The W15 on-disk cache stores
-``registry_seq`` and rejects warm hits when the global tool/schema version bumps, keeping
-callable-tool rows consistent with the live ``ToolSet``.

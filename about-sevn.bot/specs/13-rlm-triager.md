@@ -8,7 +8,7 @@ summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–�
   a single, tool-less outbound generation step that emits validated TriageResult consumed
   by tier dispatch (A / B / C / D), MCP e'
 last_updated: '2026-07-30'
-fingerprint: sha256:ffaf49a8aaae7f61fa27306958a3e554daa9e16aa346b7d6c22c25e216d47834
+fingerprint: sha256:8ce12396ce02d962f149f0087d2543cc737f4212648b5cd6983c839ba71f0b29
 related: []
 sources:
 - src/sevn/agent/**
@@ -995,6 +995,18 @@ interfaces:
 - name: SubAgentSupervisor
   file: src/sevn/agent/subagents/supervisor.py
   symbol: SubAgentSupervisor
+- name: SubagentTranscriptWriter
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: SubagentTranscriptWriter
+- name: load_subagent_transcript_path
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: load_subagent_transcript_path
+- name: transcript_path_for_run
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: transcript_path_for_run
+- name: transcript_relpath_for_run
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: transcript_relpath_for_run
 - name: TemplateEntry
   file: src/sevn/agent/templates/registry.py
   symbol: TemplateEntry

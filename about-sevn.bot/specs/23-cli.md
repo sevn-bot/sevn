@@ -8,7 +8,7 @@ summary: Deliver the primary operator and automation surface for install, upgrad
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
 last_updated: '2026-07-30'
-fingerprint: sha256:1df73310b311ac7da976be2e6d26ce099777c98c89b449793004e93d0c08f414
+fingerprint: sha256:b8bc695685324309346b09b7f8ba641f7990640c0f97d454bf47c00ab98dda74
 related: []
 sources:
 - src/sevn/cli/**
@@ -618,6 +618,18 @@ interfaces:
 - name: unit_is_active
   file: src/sevn/cli/service_manager.py
   symbol: unit_is_active
+- name: export_sessions
+  file: src/sevn/cli/session_export.py
+  symbol: export_sessions
+- name: record_session_export_job
+  file: src/sevn/cli/session_export.py
+  symbol: record_session_export_job
+- name: redact_export_text
+  file: src/sevn/cli/session_export.py
+  symbol: redact_export_text
+- name: redact_export_value
+  file: src/sevn/cli/session_export.py
+  symbol: redact_export_value
 - name: resolve_shell_history_path
   file: src/sevn/cli/shell_history.py
   symbol: resolve_shell_history_path

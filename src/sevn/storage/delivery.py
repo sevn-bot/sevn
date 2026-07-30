@@ -84,11 +84,11 @@ def create_delivery_obligation(
         >>> from sevn.storage.migrate import apply_migrations
         >>> conn = sqlite3.connect(":memory:")
         >>> apply_migrations(conn)
-        >>> conn.execute(
+        >>> _ = conn.execute(
         ...     "INSERT INTO gateway_sessions(session_id, scope_key, channel, user_id, created_at, updated_at)"
         ...     " VALUES ('s', 'telegram:1', 'telegram', '1', 'now', 'now')"
         ... )
-        >>> conn.execute(
+        >>> _ = conn.execute(
         ...     "INSERT INTO gateway_messages(session_id, role, kind, content, visible_to_llm, status, created_at)"
         ...     " VALUES ('s', 'assistant', 'message', 'hi', 1, 'pending', 'now')"
         ... )
@@ -139,16 +139,16 @@ def confirm_delivery_obligation(
         >>> from sevn.storage.migrate import apply_migrations
         >>> conn = sqlite3.connect(":memory:")
         >>> apply_migrations(conn)
-        >>> conn.execute(
+        >>> _ = conn.execute(
         ...     "INSERT INTO gateway_sessions(session_id, scope_key, channel, user_id, created_at, updated_at)"
         ...     " VALUES ('s', 'telegram:1', 'telegram', '1', 'now', 'now')"
         ... )
-        >>> conn.execute(
+        >>> _ = conn.execute(
         ...     "INSERT INTO gateway_messages(session_id, role, kind, content, visible_to_llm, status, created_at)"
         ...     " VALUES ('s', 'assistant', 'message', 'hi', 1, 'pending', 'now')"
         ... )
         >>> mid = int(conn.execute("SELECT id FROM gateway_messages").fetchone()[0])
-        >>> create_delivery_obligation(
+        >>> _ = create_delivery_obligation(
         ...     conn, message_id=mid, session_id='s', channel='telegram', user_id='1', payload_hash='h'
         ... )
         >>> confirm_delivery_obligation(conn, message_id=mid, adapter_message_id='tg-1')

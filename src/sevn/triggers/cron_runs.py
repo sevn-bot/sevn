@@ -228,8 +228,8 @@ def cron_run_to_dict(row: dict[str, Any]) -> dict[str, Any]:
 
     Examples:
         >>> from sevn.triggers.cron_runs import cron_run_to_dict
-        >>> cron_run_to_dict({"job_id": "j", "run_id": "r", "error": "x" * 500})["error"]
-        'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+        >>> len(cron_run_to_dict({"job_id": "j", "run_id": "r", "error": "x" * 500})["error"])
+        200
     """
     out = dict(row)
     err = out.get("error")

@@ -521,7 +521,7 @@ def _render_markdown(
 
     Examples:
         >>> _render_markdown({"session_id": "s", "channel": "webui", "scope_key": "webui:1"}, [])
-        '# Session export: s\\n\\n- **Channel:** webui\\n- **Scope:** webui:1\\n\\n## Messages\\n\\n'
+        '# Session export: s\\n\\n- **Channel:** webui\\n- **Scope:** webui:1\\n\\n## Messages\\n'
     """
     lines = [
         f"# Session export: {session['session_id']}",
