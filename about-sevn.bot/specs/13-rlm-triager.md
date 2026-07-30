@@ -7,8 +7,8 @@ owner: Alex
 summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–§5.2):
   a single, tool-less outbound generation step that emits validated TriageResult consumed
   by tier dispatch (A / B / C / D), MCP e'
-last_updated: '2026-08-01'
-fingerprint: sha256:d8a335b3594483d5ddf400dd81ccd4c8054bfe2cb5604560088275bad746a4f0
+last_updated: '2026-07-30'
+fingerprint: sha256:ffaf49a8aaae7f61fa27306958a3e554daa9e16aa346b7d6c22c25e216d47834
 related: []
 sources:
 - src/sevn/agent/**
@@ -128,9 +128,6 @@ interfaces:
 - name: provider_supports_native_web_search
   file: src/sevn/agent/adapters/tier_b_capabilities.py
   symbol: provider_supports_native_web_search
-- name: provider_supports_reasoning_capability
-  file: src/sevn/agent/adapters/tier_b_capabilities.py
-  symbol: provider_supports_reasoning_capability
 - name: registry_tool_names_owned_by_web_capabilities
   file: src/sevn/agent/adapters/tier_b_capabilities.py
   symbol: registry_tool_names_owned_by_web_capabilities
@@ -389,9 +386,6 @@ interfaces:
 - name: install_tool_approval_bridge
   file: src/sevn/agent/adapters/tool_approval_bridge.py
   symbol: install_tool_approval_bridge
-- name: log_approval_decision
-  file: src/sevn/agent/adapters/tool_approval_bridge.py
-  symbol: log_approval_decision
 - name: reset_tool_approval_bridge_for_tests
   file: src/sevn/agent/adapters/tool_approval_bridge.py
   symbol: reset_tool_approval_bridge_for_tests
@@ -737,15 +731,6 @@ interfaces:
 - name: tier_b_workspace_roots_prompt
   file: src/sevn/agent/persona.py
   symbol: tier_b_workspace_roots_prompt
-- name: PromptOverlaySource
-  file: src/sevn/agent/prompt_overlays.py
-  symbol: PromptOverlaySource
-- name: TurnPromptOverlays
-  file: src/sevn/agent/prompt_overlays.py
-  symbol: TurnPromptOverlays
-- name: resolve_turn_prompt_overlays
-  file: src/sevn/agent/prompt_overlays.py
-  symbol: resolve_turn_prompt_overlays
 - name: BudgetRegime
   file: src/sevn/agent/providers/budget.py
   symbol: BudgetRegime
@@ -980,12 +965,21 @@ interfaces:
 - name: list_recent_subagent_runs
   file: src/sevn/agent/subagents/storage.py
   symbol: list_recent_subagent_runs
+- name: load_subagent_result_body
+  file: src/sevn/agent/subagents/storage.py
+  symbol: load_subagent_result_body
+- name: mark_subagent_result_delivered
+  file: src/sevn/agent/subagents/storage.py
+  symbol: mark_subagent_result_delivered
 - name: persist_subagent_run
   file: src/sevn/agent/subagents/storage.py
   symbol: persist_subagent_run
 - name: prune_subagent_runs
   file: src/sevn/agent/subagents/storage.py
   symbol: prune_subagent_runs
+- name: restore_pending_subagent_deliveries
+  file: src/sevn/agent/subagents/storage.py
+  symbol: restore_pending_subagent_deliveries
 - name: sqlite_persist_hook
   file: src/sevn/agent/subagents/storage.py
   symbol: sqlite_persist_hook
@@ -1470,7 +1464,3 @@ The triager adapter runs on the same **pydantic-ai v2** stack as tier B (monty-0
 ### 10.3 open-issues-sweep W7 — classifier-timeout spawn notice — append-only
 
 On relatedness classifier timeout in ``multi`` queue mode, ``classify_relatedness`` returns ``new_task`` with ``fallback=True`` (D15). The gateway spawns a concurrent L1 tier-B turn and preserves dispatch routing extras — but does **not** emit a user-facing timeout notice on the in-flight turn's bubble or as a standalone assistant row (#70). Operators diagnose the fallback via ``gateway.queue_classifier_timeout_spawned`` (prior/new turn ids, ``timeout_s``, ``routing_action``) plus the existing ``relatedness_classifier_timeout`` log from ``classify_relatedness``.
-
-### 10.4 open-issues-sweep W11 — triager excludes reasoning wire — append-only
-
-When reasoning-effort routing is enabled workspace-wide (**#89**), ``resolve_reasoning_for_turn("triager", …)`` always returns ``None`` — the triager never sends thinking/reasoning wire parameters regardless of channel, profile, or ``LLM_params_config.json`` effort settings. Channel-aware model resolution still applies via ``resolve_model_slot_for_turn`` at the triager read site.

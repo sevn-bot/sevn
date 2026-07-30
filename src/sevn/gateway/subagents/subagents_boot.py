@@ -9,6 +9,7 @@ Exports:
         side-effect, mirrors ``telemetry_boot.py``; registration itself is
         one-shot — see ``boot_registry.register_boot_hook`` — so unlike this
         module's own import-time call, re-invoking it a second time raises).
+    build_persist_result_hook — write completion text at finish (#76).
 
 One :class:`~sevn.agent.subagents.SubAgentRegistry` /
 :class:`~sevn.agent.subagents.SubAgentSupervisor` pair is constructed per
@@ -32,16 +33,84 @@ Examples:
 
 from __future__ import annotations
 
+import asyncio
+import sqlite3
+
 from loguru import logger
 
 from sevn.agent.subagents import SubAgentRegistry, SubAgentSupervisor
-from sevn.agent.subagents.storage import sqlite_persist_hook, sweep_orphaned_subagent_runs
+from sevn.agent.subagents.models import SubAgentRun
+from sevn.agent.subagents.storage import (
+    persist_subagent_run,
+    restore_pending_subagent_deliveries,
+    sqlite_persist_hook,
+    sweep_orphaned_subagent_runs,
+)
+from sevn.agent.subagents.supervisor import PersistResultHook
 from sevn.agent.tracing.subagent_trace import (
     SubAgentPrometheusCounts,
     build_subagent_trace_hook,
 )
 from sevn.gateway.boot_registry import BootContext, register_boot_hook
 from sevn.gateway.subagents.subagents_announce import build_announce_back_hook
+
+
+def _result_body_from_completion(
+    result: object | None,
+    error: BaseException | None,
+) -> str | None:
+    """Normalize a completion value into storable ``result_body`` text.
+
+    Args:
+        result (object | None): Body return value on success.
+        error (BaseException | None): Body exception, or timeout/cancel marker.
+
+    Returns:
+        str | None: Text to persist, or ``None`` when there is nothing to store.
+
+    Examples:
+        >>> _result_body_from_completion("done", None)
+        'done'
+    """
+    if error is not None:
+        return f"failed: {error}"
+    if isinstance(result, str) and result.strip():
+        return result.strip()
+    if result is not None:
+        return str(result)
+    return None
+
+
+def build_persist_result_hook(conn: sqlite3.Connection) -> PersistResultHook:
+    """Write completion text to ``subagent_runs.result_body`` (#76).
+
+    Args:
+        conn (sqlite3.Connection): Open, migrated ``sevn.db`` connection.
+
+    Returns:
+        PersistResultHook: Async callback for :class:`~sevn.agent.subagents.supervisor.SubAgentSupervisor`.
+
+    Examples:
+        >>> import sqlite3
+        >>> from sevn.storage.migrate import apply_migrations
+        >>> conn = sqlite3.connect(":memory:")
+        >>> apply_migrations(conn)
+        >>> hook = build_persist_result_hook(conn)
+        >>> hook.__name__
+        '_persist'
+    """
+
+    async def _persist(
+        run: SubAgentRun,
+        result: object | None,
+        error: BaseException | None,
+    ) -> None:
+        body = _result_body_from_completion(result, error)
+        if body is None:
+            return
+        await asyncio.to_thread(persist_subagent_run, conn, run, result_body=body)
+
+    return _persist
 
 
 async def _construct_subagent_supervisor(ctx: BootContext) -> None:
@@ -58,6 +127,12 @@ async def _construct_subagent_supervisor(ctx: BootContext) -> None:
     orphaned = sweep_orphaned_subagent_runs(ctx.conn)
     if orphaned:
         logger.bind(orphaned=orphaned).info("subagents boot sweep marked stale runs orphaned")
+    restored = await restore_pending_subagent_deliveries(
+        conn=ctx.conn,
+        router=ctx.gateway_router,
+    )
+    if restored:
+        logger.bind(restored=restored).info("subagents boot restored completed run deliveries")
     prometheus = SubAgentPrometheusCounts()
     registry = SubAgentRegistry(persist=sqlite_persist_hook(ctx.conn))
     registry.wire_trace(build_subagent_trace_hook(registry, prometheus=prometheus))
@@ -66,6 +141,7 @@ async def _construct_subagent_supervisor(ctx: BootContext) -> None:
         registry,
         config=ctx.workspace.subagents,
         announce_back=build_announce_back_hook(ctx.gateway_router, ctx.conn),
+        persist_result=build_persist_result_hook(ctx.conn),
     )
     ctx.app.state.subagent_registry = registry
     ctx.app.state.subagent_supervisor = supervisor
@@ -89,4 +165,4 @@ def register_subagents_boot_hook() -> None:
 
 register_subagents_boot_hook()
 
-__all__ = ["register_subagents_boot_hook"]
+__all__ = ["build_persist_result_hook", "register_subagents_boot_hook"]

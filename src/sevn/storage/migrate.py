@@ -569,6 +569,13 @@ _MIGRATION_25: Final[tuple[str, ...]] = (
     "CREATE INDEX IF NOT EXISTS ix_delivery_obligations_status ON delivery_obligations(status)",
 )
 
+# Durable subagent result body (#76; `specs/36-sub-agents.md` §10.11). Persists level-2
+# completion text for boot replay through the delivery-obligation ledger (W18).
+_MIGRATION_26: Final[tuple[str, ...]] = (
+    "ALTER TABLE subagent_runs ADD COLUMN result_body TEXT",
+    "ALTER TABLE subagent_runs ADD COLUMN result_delivered_at_ns INTEGER",
+)
+
 MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (1, _MIGRATION_1),
     (2, _MIGRATION_2),
@@ -595,6 +602,7 @@ MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (23, _MIGRATION_23),
     (24, _MIGRATION_24),
     (25, _MIGRATION_25),
+    (26, _MIGRATION_26),
 )
 
 MIGRATION_HEAD_VERSION: Final[int] = max(v for v, _ in MIGRATIONS)

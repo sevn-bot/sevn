@@ -8,7 +8,7 @@ summary: Level-1 sub-agents (tracked, concurrent, killable role runs) that may s
   level-2 workers (incl. specialists); multi queue mode; limits, tracing, kill surfaces,
   media_generation skill.
 last_updated: '2026-07-30'
-fingerprint: sha256:79b48623733460c8c6611717d94442952744a5ae7b4a448c617ea4b7078f2419
+fingerprint: sha256:c59d97dafaee8e6bd522ca44ec95ca2188420f126ce9de3d96cbae386b71f967
 related: []
 sources:
 - src/sevn/agent/subagents/**
@@ -173,12 +173,21 @@ interfaces:
 - name: list_recent_subagent_runs
   file: src/sevn/agent/subagents/storage.py
   symbol: list_recent_subagent_runs
+- name: load_subagent_result_body
+  file: src/sevn/agent/subagents/storage.py
+  symbol: load_subagent_result_body
+- name: mark_subagent_result_delivered
+  file: src/sevn/agent/subagents/storage.py
+  symbol: mark_subagent_result_delivered
 - name: persist_subagent_run
   file: src/sevn/agent/subagents/storage.py
   symbol: persist_subagent_run
 - name: prune_subagent_runs
   file: src/sevn/agent/subagents/storage.py
   symbol: prune_subagent_runs
+- name: restore_pending_subagent_deliveries
+  file: src/sevn/agent/subagents/storage.py
+  symbol: restore_pending_subagent_deliveries
 - name: sqlite_persist_hook
   file: src/sevn/agent/subagents/storage.py
   symbol: sqlite_persist_hook
@@ -588,3 +597,7 @@ Docs gate: `make subagents-chart-check` (deterministic SVG); `make ci-docs`.
 - [x] TwexAPI X-only guard + browser CDP plan return path (2026-07-15 ✅: worker + `src/sevn/integrations/twexapi/`)
 - [x] Telegram `/config → Skills → Social Media Manager` menu (2026-07-15 ✅: `src/sevn/gateway/menu/social_media_manager_menu.py`)
 - [x] Bundled skill + onboarding opt-in (`default: false`) + normative docs (2026-07-15 ✅: W5 spec/PRD/SKILL/onboarding)
+
+### 10.11 Durable background subagent results — append-only
+
+- [ ] Persist level-2 completion text in `subagent_runs.result_body` (migration 26); write at finish in `SubAgentSupervisor._announce`; deliver through W18 ledger; boot replay via `restore_pending_subagent_deliveries` (#76, open-issues-sweep W19)

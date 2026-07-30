@@ -8,7 +8,7 @@ summary: 'Own application persistence: connection setup (WAL, foreign keys), ver
   migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence
   contracts for crash-resume and (w'
 last_updated: '2026-07-30'
-fingerprint: sha256:6af4d8c21735f603124c7c4f6d2e57ad629ada7877417e951c316f95667f970d
+fingerprint: sha256:a492f4d835ca841b001e965b5ff50f764868c793a560c72e0d2e8257a7bd6cc5
 related: []
 sources:
 - src/sevn/storage/**
@@ -28,6 +28,30 @@ interfaces:
 - name: D1StorageBackend
   file: src/sevn/storage/d1_backend.py
   symbol: D1StorageBackend
+- name: confirm_delivery_obligation
+  file: src/sevn/storage/delivery.py
+  symbol: confirm_delivery_obligation
+- name: count_open_obligations
+  file: src/sevn/storage/delivery.py
+  symbol: count_open_obligations
+- name: create_delivery_obligation
+  file: src/sevn/storage/delivery.py
+  symbol: create_delivery_obligation
+- name: fail_delivery_obligation
+  file: src/sevn/storage/delivery.py
+  symbol: fail_delivery_obligation
+- name: get_delivery_obligation
+  file: src/sevn/storage/delivery.py
+  symbol: get_delivery_obligation
+- name: hash_delivery_payload
+  file: src/sevn/storage/delivery.py
+  symbol: hash_delivery_payload
+- name: is_delivery_confirmed
+  file: src/sevn/storage/delivery.py
+  symbol: is_delivery_confirmed
+- name: reconcile_confirmed_obligation
+  file: src/sevn/storage/delivery.py
+  symbol: reconcile_confirmed_obligation
 - name: MigrationError
   file: src/sevn/storage/errors.py
   symbol: MigrationError
@@ -152,6 +176,12 @@ ledger with adapter-confirmed platform message ids. `ChannelRouter.route_outgoin
 persists a pending obligation before `adapter.send` and confirms it on success;
 `sweep_outbound_retries` reconciles confirmed obligations without double-send when
 `gateway_messages.status` lags after a crash.
+
+## Amendments (open-issues-sweep W19, #76)
+
+Adds `subagent_runs.result_body` and `result_delivered_at_ns` (migration 26).
+Level-2 completion text is persisted at finish, delivered through the W18
+delivery-obligation ledger, and replayed on boot when a crash prevented announce-back.
 
 ## Implemented by
 

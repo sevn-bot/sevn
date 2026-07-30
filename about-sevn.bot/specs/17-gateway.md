@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-07-30'
-fingerprint: sha256:316ebe8665d4579859b71f35d1c687f14b101a22ace1ea42dac2808aa09ec5b1
+fingerprint: sha256:14191192f04694409bd484397047a3eae82591bf19b38fc5954c52587cd235a0
 related: []
 sources:
 - src/sevn/gateway/**
@@ -1059,6 +1059,15 @@ interfaces:
 - name: build_announce_back_hook
   file: src/sevn/gateway/subagents/subagents_announce.py
   symbol: build_announce_back_hook
+- name: deliver_subagent_result_through_ledger
+  file: src/sevn/gateway/subagents/subagents_announce.py
+  symbol: deliver_subagent_result_through_ledger
+- name: load_subagent_result_for_announce
+  file: src/sevn/gateway/subagents/subagents_announce.py
+  symbol: load_subagent_result_for_announce
+- name: build_persist_result_hook
+  file: src/sevn/gateway/subagents/subagents_boot.py
+  symbol: build_persist_result_hook
 - name: register_subagents_boot_hook
   file: src/sevn/gateway/subagents/subagents_boot.py
   symbol: register_subagents_boot_hook

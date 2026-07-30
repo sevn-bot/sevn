@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Tier B is the default “do work” executor for messages the Triager classifies
   as complexity == B (prd-04-getting-things-done §5.2): a single pydantic-ai Agent
   loop over the user’s incoming_text, with t'
-last_updated: '2026-08-01'
-fingerprint: sha256:d8a335b3594483d5ddf400dd81ccd4c8054bfe2cb5604560088275bad746a4f0
+last_updated: '2026-07-30'
+fingerprint: sha256:ffaf49a8aaae7f61fa27306958a3e554daa9e16aa346b7d6c22c25e216d47834
 related: []
 sources:
 - src/sevn/agent/**
@@ -130,9 +130,6 @@ interfaces:
 - name: provider_supports_native_web_search
   file: src/sevn/agent/adapters/tier_b_capabilities.py
   symbol: provider_supports_native_web_search
-- name: provider_supports_reasoning_capability
-  file: src/sevn/agent/adapters/tier_b_capabilities.py
-  symbol: provider_supports_reasoning_capability
 - name: registry_tool_names_owned_by_web_capabilities
   file: src/sevn/agent/adapters/tier_b_capabilities.py
   symbol: registry_tool_names_owned_by_web_capabilities
@@ -391,9 +388,6 @@ interfaces:
 - name: install_tool_approval_bridge
   file: src/sevn/agent/adapters/tool_approval_bridge.py
   symbol: install_tool_approval_bridge
-- name: log_approval_decision
-  file: src/sevn/agent/adapters/tool_approval_bridge.py
-  symbol: log_approval_decision
 - name: reset_tool_approval_bridge_for_tests
   file: src/sevn/agent/adapters/tool_approval_bridge.py
   symbol: reset_tool_approval_bridge_for_tests
@@ -739,15 +733,6 @@ interfaces:
 - name: tier_b_workspace_roots_prompt
   file: src/sevn/agent/persona.py
   symbol: tier_b_workspace_roots_prompt
-- name: PromptOverlaySource
-  file: src/sevn/agent/prompt_overlays.py
-  symbol: PromptOverlaySource
-- name: TurnPromptOverlays
-  file: src/sevn/agent/prompt_overlays.py
-  symbol: TurnPromptOverlays
-- name: resolve_turn_prompt_overlays
-  file: src/sevn/agent/prompt_overlays.py
-  symbol: resolve_turn_prompt_overlays
 - name: BudgetRegime
   file: src/sevn/agent/providers/budget.py
   symbol: BudgetRegime
@@ -982,12 +967,21 @@ interfaces:
 - name: list_recent_subagent_runs
   file: src/sevn/agent/subagents/storage.py
   symbol: list_recent_subagent_runs
+- name: load_subagent_result_body
+  file: src/sevn/agent/subagents/storage.py
+  symbol: load_subagent_result_body
+- name: mark_subagent_result_delivered
+  file: src/sevn/agent/subagents/storage.py
+  symbol: mark_subagent_result_delivered
 - name: persist_subagent_run
   file: src/sevn/agent/subagents/storage.py
   symbol: persist_subagent_run
 - name: prune_subagent_runs
   file: src/sevn/agent/subagents/storage.py
   symbol: prune_subagent_runs
+- name: restore_pending_subagent_deliveries
+  file: src/sevn/agent/subagents/storage.py
+  symbol: restore_pending_subagent_deliveries
 - name: sqlite_persist_hook
   file: src/sevn/agent/subagents/storage.py
   symbol: sqlite_persist_hook
@@ -1513,8 +1507,3 @@ Tier B runs on **pydantic-ai** `>=2.14.1,<3` (resolved 2.20.0) and **pydantic-ai
 - **Model transport:** OpenAI Chat Completions `FunctionModel` bridge + MiniMax wrapper migrated in place (`tier_b_model.py`); provider-prefixed model names via `normalize_tier_b_model_name`.
 - **Lazy tools:** `PrepareTools(prepare_lazy_tool_definitions)` + `SevnRegistryToolset` re-entry through `ToolExecutor.dispatch`.
 - **Deferred (see §10.1–10.2):** harness `SubAgents`, `DynamicWorkflow`, `Memory`.
-
-### 10.8 open-issues-sweep W9/W11 — turn overlays — append-only
-
-- **Model + prompt (W9 / #86):** tier-B model id comes from ``resolve_model_slot_for_turn``; channel/topic/routing-profile system prompts merge through ``resolve_turn_prompt_overlays`` → ``extra_instructions`` / ``tier_b_system_prompt_builders`` — no parallel prompt path.
-- **Reasoning effort (W11 / #89):** ``resolve_thinking_effort`` and ``build_web_thinking_extra_capabilities`` honor an explicitly configured ``reasoning.effort`` and route-level overlays; ``resolve_reasoning_for_turn`` applies provider-capability gating before the wire body reaches ``tier_b_model`` / MiniMax wrapper.

@@ -33,7 +33,6 @@ def _done_run(*, run_id: str = "sub1", session_id: str = "sess-a") -> SubAgentRu
     )
 
 
-@pytest.mark.xfail(reason="green after W19: subagent result_body persisted", strict=False)
 def test_persist_subagent_run_stores_result_body() -> None:
     """Completed runs must persist result text, not metadata only."""
     conn = sqlite3.connect(":memory:")
@@ -50,9 +49,6 @@ def test_persist_subagent_run_stores_result_body() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W19: completed subagent delivered after restart", strict=False
-)
 async def test_boot_restores_and_delivers_completed_subagent_result() -> None:
     """A run that finished before crash must be delivered on boot, not orphaned."""
     conn = sqlite3.connect(":memory:")
@@ -82,7 +78,6 @@ async def test_boot_restores_and_delivers_completed_subagent_result() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W19: cross-session ownership enforced", strict=False)
 async def test_restored_subagent_result_cannot_leak_to_other_session() -> None:
     """Ownership checks block delivery when session row does not match run.session_id."""
     conn = sqlite3.connect(":memory:")
@@ -108,7 +103,6 @@ async def test_restored_subagent_result_cannot_leak_to_other_session() -> None:
     assert leaks == []
 
 
-@pytest.mark.xfail(reason="green after W19: announce-back reads persisted result", strict=False)
 def test_subagent_announce_reads_result_from_storage_not_registry() -> None:
     """``build_announce_back_hook`` must load result body from SQLite after restart."""
     from sevn.gateway.subagents.subagents_announce import load_subagent_result_for_announce

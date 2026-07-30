@@ -52,6 +52,7 @@ if TYPE_CHECKING:
 
 __all__ = [
     "AnnounceBackHook",
+    "PersistResultHook",
     "SubAgentBody",
     "SubAgentHandle",
     "SubAgentSpec",
@@ -69,6 +70,11 @@ gateway, in W3) injecting this as a constructor parameter — this module must
 never import ``sevn.gateway`` so the supervisor stays usable in isolation
 (CLI, tests, future non-gateway hosts).
 """
+
+PersistResultHook = Callable[
+    [SubAgentRun, "object | None", "BaseException | None"], Awaitable[None]
+]
+"""Optional callback to persist completion text before announce-back (#76)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +131,8 @@ class SubAgentSupervisor:
             ``config.timeout_s`` when omitted.
         announce_back (AnnounceBackHook | None): Completion callback (D9);
             ``None`` disables announce-back (e.g. in unit tests).
+        persist_result (PersistResultHook | None): Optional callback to write
+            completion text to SQLite before announce-back (#76).
 
     Examples:
         >>> from sevn.agent.subagents.registry import SubAgentRegistry
@@ -140,6 +148,7 @@ class SubAgentSupervisor:
         config: SubAgentsWorkspaceConfig | None = None,
         default_timeout_s: float | None = None,
         announce_back: AnnounceBackHook | None = None,
+        persist_result: PersistResultHook | None = None,
     ) -> None:
         """Bind a supervisor to one registry, config, and optional hooks (D4).
 
@@ -152,6 +161,8 @@ class SubAgentSupervisor:
                 when a spec omits its own (D11); defaults to ``config.timeout_s``.
             announce_back (AnnounceBackHook | None): Completion callback (D9);
                 ``None`` disables announce-back (e.g. in unit tests).
+            persist_result (PersistResultHook | None): Optional callback to write
+                completion text to SQLite before announce-back (#76).
 
         Examples:
             >>> from sevn.agent.subagents.registry import SubAgentRegistry
@@ -166,6 +177,7 @@ class SubAgentSupervisor:
             else (config.timeout_s if config is not None else None)
         )
         self._announce_back = announce_back
+        self._persist_result = persist_result
         self._tasks: dict[str, asyncio.Task[object]] = {}
 
     @property
@@ -348,6 +360,11 @@ class SubAgentSupervisor:
         """
         if self._announce_back is None:
             return
+        if self._persist_result is not None:
+            try:
+                await self._persist_result(run, result, error)
+            except Exception:
+                logger.bind(subagent_id=run.id).exception("subagent result persist hook failed")
         try:
             await self._announce_back(run, result, error)
         except Exception:
