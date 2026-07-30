@@ -149,15 +149,13 @@ def resolve_routing_profile_for_turn(
 
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
-        >>> doc = {
-        ...     "schema_version": 1,
-        ...     "routing": {
+        >>> cfg = WorkspaceConfig.minimal(
+        ...     routing={
         ...         "default_profile": "safe",
         ...         "profiles": {"safe": {}, "ops": {}},
         ...         "channel_map": {"webhook:ingress-a": "ops"},
         ...     },
-        ... }
-        >>> cfg = WorkspaceConfig.model_validate(doc)
+        ... )
         >>> resolve_routing_profile_for_turn(cfg, channel="webhook", scope_key="ingress-a")
         'ops'
     """
@@ -291,9 +289,8 @@ def resolve_routing_profile_bundle(
 
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
-        >>> doc = {
-        ...     "schema_version": 1,
-        ...     "routing": {
+        >>> cfg = WorkspaceConfig.minimal(
+        ...     routing={
         ...         "profiles": {
         ...             "research": {
         ...                 "memory_namespace": "research",
@@ -302,11 +299,10 @@ def resolve_routing_profile_bundle(
         ...             },
         ...         },
         ...     },
-        ...     "permissions": {
+        ...     permissions={
         ...         "profiles": {"research_perms": {"deny_tools": ["terminal_run"]}},
         ...     },
-        ... }
-        >>> cfg = WorkspaceConfig.model_validate(doc)
+        ... )
         >>> bundle = resolve_routing_profile_bundle(cfg, profile_name="research")
         >>> bundle.memory_namespace
         'research'

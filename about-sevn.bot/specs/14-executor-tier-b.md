@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Tier B is the default “do work” executor for messages the Triager classifies
   as complexity == B (prd-04-getting-things-done §5.2): a single pydantic-ai Agent
   loop over the user’s incoming_text, with t'
-last_updated: '2026-07-31'
-fingerprint: sha256:12e61f0fb422cdd25cbcc4fcbb2d7215698c5d8bf2d3b5736844552157fbf58b
+last_updated: '2026-07-30'
+fingerprint: sha256:218b60021e648e972935b65eb6fa7d2877ad87cdcdb7c53e74132f0cd179f0ab
 related: []
 sources:
 - src/sevn/agent/**
@@ -130,6 +130,9 @@ interfaces:
 - name: provider_supports_native_web_search
   file: src/sevn/agent/adapters/tier_b_capabilities.py
   symbol: provider_supports_native_web_search
+- name: provider_supports_reasoning_capability
+  file: src/sevn/agent/adapters/tier_b_capabilities.py
+  symbol: provider_supports_reasoning_capability
 - name: registry_tool_names_owned_by_web_capabilities
   file: src/sevn/agent/adapters/tier_b_capabilities.py
   symbol: registry_tool_names_owned_by_web_capabilities
@@ -388,9 +391,6 @@ interfaces:
 - name: install_tool_approval_bridge
   file: src/sevn/agent/adapters/tool_approval_bridge.py
   symbol: install_tool_approval_bridge
-- name: log_approval_decision
-  file: src/sevn/agent/adapters/tool_approval_bridge.py
-  symbol: log_approval_decision
 - name: reset_tool_approval_bridge_for_tests
   file: src/sevn/agent/adapters/tool_approval_bridge.py
   symbol: reset_tool_approval_bridge_for_tests
@@ -736,6 +736,15 @@ interfaces:
 - name: tier_b_workspace_roots_prompt
   file: src/sevn/agent/persona.py
   symbol: tier_b_workspace_roots_prompt
+- name: PromptOverlaySource
+  file: src/sevn/agent/prompt_overlays.py
+  symbol: PromptOverlaySource
+- name: TurnPromptOverlays
+  file: src/sevn/agent/prompt_overlays.py
+  symbol: TurnPromptOverlays
+- name: resolve_turn_prompt_overlays
+  file: src/sevn/agent/prompt_overlays.py
+  symbol: resolve_turn_prompt_overlays
 - name: BudgetRegime
   file: src/sevn/agent/providers/budget.py
   symbol: BudgetRegime
@@ -1502,8 +1511,7 @@ Tier B runs on **pydantic-ai** `>=2.14.1,<3` (resolved 2.20.0) and **pydantic-ai
 - **Lazy tools:** `PrepareTools(prepare_lazy_tool_definitions)` + `SevnRegistryToolset` re-entry through `ToolExecutor.dispatch`.
 - **Deferred (see §10.1–10.2):** harness `SubAgents`, `DynamicWorkflow`, `Memory`.
 
-### 10.8 open-issues-sweep W26 — deny-rule guardrails (#80) — append-only
+### 10.8 open-issues-sweep W9/W11 — turn overlays — append-only
 
-**Pre-dispatch:** `TierBPermissionGuardrail.check_tool_access` calls `check_permission_before_dispatch(deps, tool_name, args=…)` so pattern/domain/path deny rules see validated args.
-
-**Deferred approval:** `TierBApprovalGuardrail.resolve` returns `ToolDenied` with the operator denial reason (Mission Control `reason` field or a default operator-denied message) so the model can revise.
+- **Model + prompt (W9 / #86):** tier-B model id comes from ``resolve_model_slot_for_turn``; channel/topic/routing-profile system prompts merge through ``resolve_turn_prompt_overlays`` → ``extra_instructions`` / ``tier_b_system_prompt_builders`` — no parallel prompt path.
+- **Reasoning effort (W11 / #89):** ``resolve_thinking_effort`` and ``build_web_thinking_extra_capabilities`` honor an explicitly configured ``reasoning.effort`` and route-level overlays; ``resolve_reasoning_for_turn`` applies provider-capability gating before the wire body reaches ``tier_b_model`` / MiniMax wrapper.

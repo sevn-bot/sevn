@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Provide a single, testable configuration surface before storage, tracing,
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
-last_updated: '2026-07-31'
-fingerprint: sha256:b0fa577a145d18ab47e3d3589cb2b46ad94f8986cdf1afcf6a69cec28483b8ae
+last_updated: '2026-07-30'
+fingerprint: sha256:3b3ca9c37a169f68b5fbe15013d1505b208b65029057fc2f740d9b948f0e9598
 related: []
 sources:
 - src/sevn/config/**
@@ -17,6 +17,18 @@ depends_on:
 - spec-00-foundation
 build_phase: null
 interfaces:
+- name: resolve_channel_model_override
+  file: src/sevn/config/channel_overrides.py
+  symbol: resolve_channel_model_override
+- name: resolve_channel_reasoning_effort_override
+  file: src/sevn/config/channel_overrides.py
+  symbol: resolve_channel_reasoning_effort_override
+- name: resolve_channel_system_prompt_override
+  file: src/sevn/config/channel_overrides.py
+  symbol: resolve_channel_system_prompt_override
+- name: topic_id_from_scope_key
+  file: src/sevn/config/channel_overrides.py
+  symbol: topic_id_from_scope_key
 - name: SevnConfigError
   file: src/sevn/config/errors.py
   symbol: SevnConfigError
@@ -50,6 +62,9 @@ interfaces:
 - name: load_or_create_llm_params_doc
   file: src/sevn/config/llm_params.py
   symbol: load_or_create_llm_params_doc
+- name: provider_supports_reasoning_wire
+  file: src/sevn/config/llm_params.py
+  symbol: provider_supports_reasoning_wire
 - name: resolve_effective_max_output_tokens
   file: src/sevn/config/llm_params.py
   symbol: resolve_effective_max_output_tokens
@@ -65,6 +80,9 @@ interfaces:
 - name: resolve_minimax_thinking_request
   file: src/sevn/config/llm_params.py
   symbol: resolve_minimax_thinking_request
+- name: resolve_reasoning_for_turn
+  file: src/sevn/config/llm_params.py
+  symbol: resolve_reasoning_for_turn
 - name: resolve_reasoning_params
   file: src/sevn/config/llm_params.py
   symbol: resolve_reasoning_params
@@ -101,6 +119,12 @@ interfaces:
 - name: resolve_sevn_json_path
   file: src/sevn/config/loader.py
   symbol: resolve_sevn_json_path
+- name: ModelResolutionResult
+  file: src/sevn/config/model_resolution.py
+  symbol: ModelResolutionResult
+- name: ModelResolutionSource
+  file: src/sevn/config/model_resolution.py
+  symbol: ModelResolutionSource
 - name: ModelSlot
   file: src/sevn/config/model_resolution.py
   symbol: ModelSlot
@@ -164,6 +188,9 @@ interfaces:
 - name: resolve_model_slot
   file: src/sevn/config/model_resolution.py
   symbol: resolve_model_slot
+- name: resolve_model_slot_for_turn
+  file: src/sevn/config/model_resolution.py
+  symbol: resolve_model_slot_for_turn
 - name: resolve_slot_fallback_model_ids
   file: src/sevn/config/model_resolution.py
   symbol: resolve_slot_fallback_model_ids
@@ -278,6 +305,36 @@ interfaces:
 - name: resolve_handoff_secret_alias
   file: src/sevn/config/provider_secrets.py
   symbol: resolve_handoff_secret_alias
+- name: RoutingProfileBundle
+  file: src/sevn/config/routing.py
+  symbol: RoutingProfileBundle
+- name: RoutingProfileDenied
+  file: src/sevn/config/routing.py
+  symbol: RoutingProfileDenied
+- name: filter_tool_set_skills
+  file: src/sevn/config/routing.py
+  symbol: filter_tool_set_skills
+- name: permission_policy_for_permissions_profile
+  file: src/sevn/config/routing.py
+  symbol: permission_policy_for_permissions_profile
+- name: prefix_secrets_logical_key
+  file: src/sevn/config/routing.py
+  symbol: prefix_secrets_logical_key
+- name: resolve_routing_profile_bundle
+  file: src/sevn/config/routing.py
+  symbol: resolve_routing_profile_bundle
+- name: resolve_routing_profile_for_turn
+  file: src/sevn/config/routing.py
+  symbol: resolve_routing_profile_for_turn
+- name: routing_channel_map_key
+  file: src/sevn/config/routing.py
+  symbol: routing_channel_map_key
+- name: routing_profile_personality_root
+  file: src/sevn/config/routing.py
+  symbol: routing_profile_personality_root
+- name: routing_profiles_active
+  file: src/sevn/config/routing.py
+  symbol: routing_profiles_active
 - name: agent_max_output_tokens_ceiling
   file: src/sevn/config/sections/accessors.py
   symbol: agent_max_output_tokens_ceiling
@@ -596,9 +653,24 @@ interfaces:
 - name: WorkspaceConfig
   file: src/sevn/config/sections/root.py
   symbol: WorkspaceConfig
-- name: BitwardenBackendEntry
-  file: src/sevn/config/sections/secrets.py
-  symbol: BitwardenBackendEntry
+- name: RoutingProfileConfigPaths
+  file: src/sevn/config/sections/routing.py
+  symbol: RoutingProfileConfigPaths
+- name: RoutingProfileEntryConfig
+  file: src/sevn/config/sections/routing.py
+  symbol: RoutingProfileEntryConfig
+- name: RoutingWorkspaceSectionConfig
+  file: src/sevn/config/sections/routing.py
+  symbol: RoutingWorkspaceSectionConfig
+- name: routing_profile_config_paths
+  file: src/sevn/config/sections/routing.py
+  symbol: routing_profile_config_paths
+- name: routing_profile_disambiguation_notes
+  file: src/sevn/config/sections/routing.py
+  symbol: routing_profile_disambiguation_notes
+- name: routing_section_dict
+  file: src/sevn/config/sections/routing.py
+  symbol: routing_section_dict
 - name: EncryptedFileBackendEntry
   file: src/sevn/config/sections/secrets.py
   symbol: EncryptedFileBackendEntry
@@ -611,9 +683,6 @@ interfaces:
 - name: MacOSKeychainBackendEntry
   file: src/sevn/config/sections/secrets.py
   symbol: MacOSKeychainBackendEntry
-- name: OnePasswordBackendEntry
-  file: src/sevn/config/sections/secrets.py
-  symbol: OnePasswordBackendEntry
 - name: OpenBaoBackendEntry
   file: src/sevn/config/sections/secrets.py
   symbol: OpenBaoBackendEntry
@@ -900,6 +969,24 @@ prefix), and ``permissions_profile`` (a key in ``permissions.profiles``). Set
 today's behavior when the section is absent (**D9**). Unknown routes honor
 ``routing.unknown_route`` (``default`` | ``deny``). Turn metadata exposes
 ``routing_profile`` for logs/transcripts.
+
+## Amendments (open-issues-sweep W9 — #86)
+
+Per-channel model and system prompt overrides live under ``channels.<name>.model`` and
+``channels.<name>.system_prompt``; Telegram forum topics use
+``channels.telegram.topics.<id>.model`` / ``.system_prompt``. Turn-scoped resolution via
+``resolve_model_slot_for_turn`` applies precedence **session → routing profile → channel →
+workspace**; absent keys preserve today's global slot behavior (**D9**). Turn metadata
+exposes ``model_resolution_source`` and ``prompt_overlay_source``.
+
+## Amendments (open-issues-sweep W11 — #89)
+
+Reasoning effort is configured in ``LLM_params_config.json`` under ``reasoning.effort``
+(validated against ``REASONING_EFFORT_LEVELS``). Optional per-channel, per-topic, per-subagent,
+and routing-profile ``reasoning_effort`` keys overlay the workspace default for tier B/C only;
+``resolve_reasoning_for_turn`` checks provider capability and logs a degradation note rather
+than sending an unsupported wire parameter. The triager slot always receives ``None`` from
+that resolver — thinking/reasoning never reaches triage.
 
 ## Test Strategy
 

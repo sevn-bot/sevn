@@ -6,8 +6,8 @@ status: ready
 owner: Alex
 summary: A daily-driver AI must help you code—from repo Q&A and orientation through
   tier B quick fixes to tier C/D plans, workspace mirror, and PR workflows.
-last_updated: '2026-07-14'
-fingerprint: sha256:5a97e9841a414ba088717f40956b00e55c59c77add891779e0555da9bb2c9f93
+last_updated: '2026-07-30'
+fingerprint: sha256:020c0a42746098915a9305e685fdabd07350df6503316abfa2dfd5d454421d7d
 related:
 - prd-01-conversational-experience
 sources:

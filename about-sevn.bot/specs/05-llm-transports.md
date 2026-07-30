@@ -197,6 +197,14 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
 
+## Amendments (open-issues-sweep W11 — #89)
+
+Reasoning/thinking wire bodies are assembled by ``resolve_reasoning_for_turn`` from
+``LLM_params_config.json`` ``reasoning.*`` (including explicit ``effort``) plus optional
+turn-scoped overlays. Provider capability is checked per model id — unsupported providers
+omit the wire parameter and emit a logged degradation note. MiniMax ``minimax_thinking``
+legacy aliases remain valid. Triager requests never receive a reasoning wire body.
+
 ## Human-input needed
 
 Prose body not yet authored (W9 scope). Normative contract requires operator or

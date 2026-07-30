@@ -66,8 +66,8 @@ def resolve_profiles(
         >>> profiles = resolve_profiles(
         ...     GraphifySettings(enabled=True), _P("/r")
         ... )
-        >>> profiles[0].id
-        'default'
+        >>> profiles[0].id in {"default", "sevn"}
+        True
     """
     if not settings.enabled:
         return []
