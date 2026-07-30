@@ -21,11 +21,16 @@ BANDIT ?= $(UV) run bandit
 PIP_AUDIT ?= $(UV) run pip-audit
 PIP_AUDIT_CACHE ?= $(CURDIR)/.cache/pip-audit
 # mergeCraft ref for local `make review` (offline `mergecraft diff-review`), pinned to
-# the same SHA as the CI workflow (.github/workflows/mergecraft.yml) so local review
-# runs the reviewed code, not whatever the upstream branch currently is. CI cannot
-# track a branch here — sevn-bot enforces Actions SHA pinning — so bump both sides
-# together (see mergecraft-ref-check). Override with SEVN_MERGECRAFT_REF=pre-0.0.1
-# (or another ref) to track a branch locally.
+# the same SHA as the CI workflow so local review runs the reviewed code, not whatever
+# the upstream branch currently is. That workflow lives ONLY on the default branch
+# (`main`) — GitHub resolves pull_request_target from there.
+#
+# BUMP ORDER: merge the `main` PR FIRST, then this line. `make mergecraft-ref-check`
+# reads the pin out of origin/main, so bumping this line first fails the gate until
+# `main` catches up.
+#
+# CI cannot track a branch here (sevn-bot enforces Actions SHA pinning). Override
+# with SEVN_MERGECRAFT_REF=pre-0.0.1 (or another ref) to track a branch locally.
 MERGECRAFT_REF ?= $(if $(SEVN_MERGECRAFT_REF),$(SEVN_MERGECRAFT_REF),f98aeb0063b387a51960503a758351608d377002)
 PRE_COMMIT ?= $(UV) run pre-commit
 
@@ -246,7 +251,7 @@ infra-check: ## Fail when infra/ JSON metadata drifts from golden fixtures (see 
 	$(UV) run python scripts/check_infra_parity.py
 	$(UV) run python scripts/export_triage_schema.py
 
-mergecraft-ref-check: ## Fail when the mergeCraft pin drifts between mergecraft.yml and MERGECRAFT_REF
+mergecraft-ref-check: ## Fail when the mergeCraft pin drifts between origin/main's mergecraft.yml and MERGECRAFT_REF
 	$(UV) run python scripts/check_mergecraft_ref_parity.py
 
 schema-export: ## Refresh infra/triage_result.schema.json from TriageResult (`specs/10-schema-ontology.md` §11)

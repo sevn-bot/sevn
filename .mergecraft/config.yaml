@@ -1,9 +1,10 @@
 # mergeCraft per-repo settings (https://github.com/alexhawat/mergeCraft).
 #
 # Only keys with no action-input equivalent belong here. `model`, `push`,
-# `shell`, and `status_checks` are set in .github/workflows/mergecraft.yml and win
-# over this file (`shell` resolves to the stricter of the two), so nothing here
-# can loosen the reviewer's permissions.
+# `shell`, and `status_checks` are set in `.github/workflows/mergecraft.yml` on the
+# default branch (`main` — the only copy that exists) and win over this file
+# (`shell` resolves to the stricter of the two), so nothing here can loosen the
+# reviewer's permissions.
 #
 # A sibling `learnings.md` holds durable review memory, including the
 # `## Withdrawn review findings (known non-issues)` section a reviewer consults
