@@ -606,6 +606,27 @@ _MIGRATION_28: Final[tuple[str, ...]] = (
     WHERE completed_at IS NULL""",
 )
 
+# Session export audit metadata (#83; ``specs/03-storage.md``). Optional operator trail for
+# offline ``sevn sessions export`` runs — not required for export correctness.
+_MIGRATION_29: Final[tuple[str, ...]] = (
+    """CREATE TABLE IF NOT EXISTS session_export_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    export_id TEXT NOT NULL UNIQUE,
+    session_id TEXT,
+    channel TEXT,
+    profile TEXT,
+    since TEXT,
+    until TEXT,
+    formats TEXT NOT NULL,
+    output_path TEXT,
+    row_count INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL CHECK (status IN ('completed', 'failed')),
+    created_at TEXT NOT NULL,
+    error TEXT
+)""",
+    "CREATE INDEX IF NOT EXISTS ix_session_export_jobs_created ON session_export_jobs(created_at DESC)",
+)
+
 MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (1, _MIGRATION_1),
     (2, _MIGRATION_2),
@@ -635,6 +656,7 @@ MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (26, _MIGRATION_26),
     (27, _MIGRATION_27),
     (28, _MIGRATION_28),
+    (29, _MIGRATION_29),
 )
 
 MIGRATION_HEAD_VERSION: Final[int] = max(v for v, _ in MIGRATIONS)

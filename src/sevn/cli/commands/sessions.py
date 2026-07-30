@@ -15,6 +15,7 @@ from pathlib import Path
 
 import typer
 
+from sevn.cli.session_export import export_sessions
 from sevn.config.loader import find_sevn_json
 from sevn.config.workspace_config import parse_workspace_config
 from sevn.storage import open_sevn_sqlite
@@ -163,3 +164,61 @@ def register(app: typer.Typer) -> None:
                 typer.echo(f"[{m['created_at']}] {m['role']}/{m['kind']}: {m['content']}")
         finally:
             conn.close()
+
+    @sess.command("export")
+    def sessions_export(
+        session: str | None = typer.Option(None, "--session", help="Export one session id."),
+        channel: str | None = typer.Option(None, "--channel", help="Filter by channel."),
+        profile: str | None = typer.Option(None, "--profile", help="Filter by routing profile."),
+        since: str | None = typer.Option(
+            None, "--since", help="Include rows at or after this ISO date."
+        ),
+        until: str | None = typer.Option(
+            None, "--until", help="Include rows on or before this ISO date."
+        ),
+        fmt: str = typer.Option(
+            "markdown",
+            "--format",
+            help="Comma-separated export formats: markdown, jsonl.",
+        ),
+        output: Path | None = typer.Option(
+            None,
+            "--output",
+            "-o",
+            help="Directory for export artifacts (required unless --json).",
+        ),
+        json_out: bool = typer.Option(False, "--json"),
+    ) -> None:
+        """Export redacted session history (markdown and/or JSONL)."""
+        if output is None and not json_out:
+            typer.echo("Specify --output or pass --json for stdout.", err=True)
+            raise typer.Exit(2)
+        if session is None and channel is None and profile is None:
+            typer.echo("Specify at least one of --session, --channel, or --profile.", err=True)
+            raise typer.Exit(2)
+        try:
+            payload = export_sessions(
+                session_id=session,
+                channel=channel,
+                profile=profile,
+                since=since,
+                until=until,
+                fmt=fmt if not json_out else "jsonl",
+                output=output,
+            )
+        except ValueError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(2) from exc
+        if json_out:
+            typer.echo(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "command": "sessions export",
+                        "data": {"result": payload},
+                    },
+                    sort_keys=True,
+                ),
+            )
+            return
+        typer.echo(payload)

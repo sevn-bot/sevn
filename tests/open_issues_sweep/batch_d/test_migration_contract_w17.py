@@ -44,13 +44,11 @@ def test_batch_d_planned_versions_are_contiguous_25_through_29() -> None:
     assert waves == ["W18", "W19", "W20", "W21", "W22"]
 
 
-def test_batch_d_no_impl_migrations_registered_yet() -> None:
-    """Version 29 remains unregistered until W22 lands."""
+def test_batch_d_all_planned_migrations_registered() -> None:
+    """Batch D migrations 25-29 are registered after W22."""
     registered = {version for version, _ in MIGRATIONS}
     for slot in BATCH_D_MIGRATION_SLOTS:
-        if slot.version <= 28:
-            continue
-        assert slot.version not in registered
+        assert slot.version in registered
 
 
 def test_batch_d_migration_26_registered() -> None:
@@ -69,6 +67,12 @@ def test_batch_d_migration_28_registered() -> None:
     """W21 registers migration 28 for cron execution audit history."""
     registered = {version for version, _ in MIGRATIONS}
     assert 28 in registered
+
+
+def test_batch_d_migration_29_registered() -> None:
+    """W22 registers migration 29 for session export audit metadata."""
+    registered = {version for version, _ in MIGRATIONS}
+    assert 29 in registered
 
 
 def test_apply_migrations_idempotent_at_batch_d_baseline(tmp_path: Path) -> None:
@@ -100,8 +104,8 @@ def test_head_schema_matches_golden_at_batch_d_baseline() -> None:
 
 @pytest.mark.parametrize(
     "slot",
-    [s for s in BATCH_D_MIGRATION_SLOTS if s.version > 28],
-    ids=[f"v{s.version}_{s.wave}" for s in BATCH_D_MIGRATION_SLOTS if s.version > 28],
+    [s for s in BATCH_D_MIGRATION_SLOTS if s.version > 29],
+    ids=[f"v{s.version}_{s.wave}" for s in BATCH_D_MIGRATION_SLOTS if s.version > 29],
 )
 @pytest.mark.xfail(reason="green after impl wave: migration registered", strict=False)
 def test_batch_d_migration_registered(slot: object) -> None:
@@ -121,8 +125,8 @@ def test_batch_d_migration_25_registered() -> None:
 
 @pytest.mark.parametrize(
     "slot",
-    [s for s in BATCH_D_MIGRATION_SLOTS if s.version > 28],
-    ids=[f"v{s.version}_{s.wave}" for s in BATCH_D_MIGRATION_SLOTS if s.version > 28],
+    [s for s in BATCH_D_MIGRATION_SLOTS if s.version > 29],
+    ids=[f"v{s.version}_{s.wave}" for s in BATCH_D_MIGRATION_SLOTS if s.version > 29],
 )
 @pytest.mark.xfail(reason="green after impl wave: schema artifact present", strict=False)
 def test_batch_d_migration_schema_artifact(slot: object, tmp_path: Path) -> None:
@@ -210,10 +214,22 @@ def test_batch_d_migration_28_schema_artifact(tmp_path: Path) -> None:
         conn.close()
 
 
+def test_batch_d_migration_29_schema_artifact(tmp_path: Path) -> None:
+    """W22 ``session_export_jobs`` table exists after ``apply_migrations``."""
+    slot = next(s for s in BATCH_D_MIGRATION_SLOTS if s.version == 29)
+    conn = sqlite3.connect(tmp_path / "m29.sqlite")
+    try:
+        apply_migrations(conn)
+        assert slot.table is not None
+        assert table_exists(conn, slot.table), f"missing table {slot.table!r}"
+    finally:
+        conn.close()
+
+
 @pytest.mark.parametrize(
     "slot",
-    [s for s in BATCH_D_MIGRATION_SLOTS if s.version > 28],
-    ids=[f"v{s.version}_{s.wave}" for s in BATCH_D_MIGRATION_SLOTS if s.version > 28],
+    [s for s in BATCH_D_MIGRATION_SLOTS if s.version > 29],
+    ids=[f"v{s.version}_{s.wave}" for s in BATCH_D_MIGRATION_SLOTS if s.version > 29],
 )
 @pytest.mark.xfail(reason="green after impl wave: golden fixture refreshed", strict=False)
 def test_batch_d_golden_fixture_for_version(slot: object) -> None:
@@ -247,3 +263,9 @@ def test_batch_d_golden_fixture_for_migration_28() -> None:
     """W21 golden dump exists for migration head 28."""
     fixture = golden_path(28)
     assert fixture.is_file(), f"missing golden fixture for migration 28: {fixture}"
+
+
+def test_batch_d_golden_fixture_for_migration_29() -> None:
+    """W22 golden dump exists for migration head 29."""
+    fixture = golden_path(29)
+    assert fixture.is_file(), f"missing golden fixture for migration 29: {fixture}"

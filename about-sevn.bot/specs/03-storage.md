@@ -8,7 +8,7 @@ summary: 'Own application persistence: connection setup (WAL, foreign keys), ver
   migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence
   contracts for crash-resume and (w'
 last_updated: '2026-07-30'
-fingerprint: sha256:a492f4d835ca841b001e965b5ff50f764868c793a560c72e0d2e8257a7bd6cc5
+fingerprint: sha256:319e1825e064c7dcc8f98c98cd727b6435e4b752a616a908c8d47a6d10884887
 related: []
 sources:
 - src/sevn/storage/**
@@ -188,6 +188,12 @@ delivery-obligation ledger, and replayed on boot when a crash prevented announce
 Adds `subagent_runs.transcript_path` (migration 27). Each run writes a tailable
 redacted JSONL transcript under `subagents/transcripts/<run_id>.jsonl` in the
 workspace content root; completion updates include the path for operators.
+
+## Amendments (open-issues-sweep W22, #83)
+
+Adds `session_export_jobs` (migration 29) for optional offline export audit
+metadata. `sevn sessions export` gathers redacted history from SQLite,
+workspace session mirror JSONL, turn metadata, and turn bundles.
 
 ## Implemented by
 
