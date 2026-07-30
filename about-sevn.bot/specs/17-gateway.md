@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-07-30'
-fingerprint: sha256:117762da3a491e3815ac7535b9a7edde2083a142d77ce5fd4d6d84be5e69b855
+fingerprint: sha256:c15df45fa876025ced3f45f58c6b59418a36fd2a4c86f6fe6e4c6ae20cc6f321
 related: []
 sources:
 - src/sevn/gateway/**
@@ -234,6 +234,9 @@ interfaces:
 - name: FileLinkCallbackHandler
   file: src/sevn/gateway/commands/file_link_callback_handler.py
   symbol: FileLinkCallbackHandler
+- name: form_prompt_with_cancel
+  file: src/sevn/gateway/commands/form_prompts.py
+  symbol: form_prompt_with_cancel
 - name: MenuActionRouter
   file: src/sevn/gateway/commands/menu_action_router.py
   symbol: MenuActionRouter
@@ -252,9 +255,6 @@ interfaces:
 - name: MenuFormHandler
   file: src/sevn/gateway/commands/menu_form_handler.py
   symbol: MenuFormHandler
-- name: form_prompt_with_cancel
-  file: src/sevn/gateway/commands/menu_form_handler.py
-  symbol: form_prompt_with_cancel
 - name: parse_form_callback
   file: src/sevn/gateway/commands/menu_form_handler.py
   symbol: parse_form_callback
@@ -438,6 +438,15 @@ interfaces:
 - name: wait_for_proxy_boot_health
   file: src/sevn/gateway/http_server.py
   symbol: wait_for_proxy_boot_health
+- name: bot_self_reply_reference_block
+  file: src/sevn/gateway/inbound/referenced_context.py
+  symbol: bot_self_reply_reference_block
+- name: explicit_referenced_message_block
+  file: src/sevn/gateway/inbound/referenced_context.py
+  symbol: explicit_referenced_message_block
+- name: prefix_inbound_referenced_context
+  file: src/sevn/gateway/inbound/referenced_context.py
+  symbol: prefix_inbound_referenced_context
 - name: ingest_gateway_message_row
   file: src/sevn/gateway/lcm/lcm_ingest.py
   symbol: ingest_gateway_message_row
