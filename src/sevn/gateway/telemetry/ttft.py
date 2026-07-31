@@ -22,7 +22,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import uuid
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from time import time_ns
@@ -300,6 +300,7 @@ async def resolve_mcp_tool_definitions_lazy(
     content_root: Path,
     mcp_defs_box: list[tuple[ToolDefinition, ...]],
     mcp_servers_map: dict[str, dict[str, Any]] | None = None,
+    oauth_credentials: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> tuple[ToolDefinition, ...]:
     """Return MCP tool defs, discovering lazily when deferral is enabled (W30.3).
 
@@ -308,6 +309,7 @@ async def resolve_mcp_tool_definitions_lazy(
         content_root (Path): Workspace content root.
         mcp_defs_box (list[tuple[ToolDefinition, ...]]): Mutable holder updated in-place.
         mcp_servers_map (dict[str, dict[str, Any]] | None): Pre-built server map.
+        oauth_credentials (Mapping[str, Mapping[str, Any]] | None): OAuth blobs for discovery.
 
     Returns:
         tuple[ToolDefinition, ...]: Current MCP tool definitions.
@@ -327,7 +329,7 @@ async def resolve_mcp_tool_definitions_lazy(
         return mcp_defs_box[0]
     if not defer_mcp_discovery_enabled(workspace):
         return mcp_defs_box[0] if mcp_defs_box else ()
-    from sevn.code_understanding.graphify_mcp import build_effective_mcp_servers
+    from sevn.tools.mcp_boot import effective_mcp_servers_for_workspace, load_mcp_oauth_credentials
     from sevn.tools.mcp_stdio_client import discover_mcp_tool_definitions
 
     async with _MCP_DISCOVERY_LOCK:
@@ -336,12 +338,23 @@ async def resolve_mcp_tool_definitions_lazy(
         servers = (
             mcp_servers_map
             if mcp_servers_map is not None
-            else build_effective_mcp_servers(workspace, content_root)
+            else effective_mcp_servers_for_workspace(workspace, content_root)
         )
         if not servers:
             return ()
+        oauth_map = oauth_credentials
+        if oauth_map is None:
+            oauth_map = await load_mcp_oauth_credentials(
+                content_root,
+                servers,
+                secrets_backend=workspace.secrets_backend,
+            )
         started = time_ns()
-        defs = await discover_mcp_tool_definitions(servers, workspace_path=content_root)
+        defs = await discover_mcp_tool_definitions(
+            servers,
+            workspace_path=content_root,
+            oauth_credentials=oauth_map,
+        )
         elapsed_ms = max(0.1, (time_ns() - started) / 1_000_000)
         logger.debug(
             "gateway_mcp_discovery_lazy content_root={} servers={} tools={} ms={:.1f}",

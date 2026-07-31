@@ -57,7 +57,11 @@ are cut into a dated, versioned section at release time.
 =======
 =======
 - [2026-07-31] Batch F Thermos hardening: MCP OAuth credentials and profile ``mcp_enabled`` filtering wired at gateway boot; MCP ``isError`` responses surface as tool failures; ACP turn bridge reads assistant text from the session DB; Buzz relay URL resolution no longer aliases webhook secrets; browser persistence markers written at CDP spawn; golden_llm harness lives under ``src/sevn/golden_llm`` for model_eval imports
+<<<<<<< HEAD
 >>>>>>> f9e7158e (fix(integrations): address F-Thermos review findings for batch F)
+=======
+- [2026-07-31] Batch F Thermos hardening: MCP OAuth credentials and profile ``mcp_enabled`` filtering wired at gateway boot; MCP ``isError`` responses surface as tool failures; deferred MCP lazy discovery passes OAuth credentials; ACP turn bridge reads assistant text from the session DB; Buzz relay URL resolution no longer aliases webhook secrets; browser persistence markers written at CDP spawn; golden_llm harness lives under ``src/sevn/golden_llm`` for model_eval imports
+>>>>>>> 9aab3b88 (fix(gateway): pass OAuth credentials into deferred MCP discovery)
 - [2026-07-31] MCP catalog preset apply now reports success after merge helpers replace ``mcp_servers``; batch F doctest examples aligned with secrets-chain and workspace validation
 >>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)
 - [2026-07-29] Tier-B harness skill staging uses a per-turn process tempdir — avoids accumulating ``.sevn-harness-skills/`` under long-lived workspaces
