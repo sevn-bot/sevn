@@ -1285,6 +1285,9 @@ async def run_b_turn(
         tool_allowlist=tool_allowlist,
         triager_bound_tools=frozenset(triager_bound_tool_picks),
         triager_bound_skills=frozenset(triager_bound_skill_picks),
+        workspace_permissions=(
+            workspace.permissions if isinstance(workspace.permissions, dict) else None
+        ),
     )
     log_provenance_audit = is_log_provenance_intent_message(incoming_text)
     # Identity / capability questions ("who are you?", "which LLM model are you using?") are

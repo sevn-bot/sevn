@@ -175,6 +175,8 @@ class BTierDeps:
     tool_allowlist: MutableToolAllowlist | None = None
     fetch_round_steer_injected: bool = False
     """Set after W5/D9 summarize steer fires once mid-turn (post-round-4 fetch loop)."""
+    workspace_permissions: dict[str, Any] | None = None
+    """Raw ``permissions`` subtree from ``sevn.json`` for deny-rule evaluation."""
 
     @staticmethod
     def call_signature(tool_name: str, payload: dict[str, Any]) -> str:

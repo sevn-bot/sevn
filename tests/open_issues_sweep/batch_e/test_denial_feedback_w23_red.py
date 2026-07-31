@@ -71,9 +71,6 @@ def _run_ctx(deps: BTierDeps) -> RunContext[BTierDeps]:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W26: SkipToolExecution carries operator denial reason", strict=False
-)
 async def test_permission_guardrail_skip_envelope_includes_human_reason(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -84,7 +81,10 @@ async def test_permission_guardrail_skip_envelope_includes_human_reason(
     human_reason = "Do not delete production configs without a ticket"
     denial = enveloped_deny_with_reason(tool_name="delete", reason=human_reason)
 
-    def _deny(_deps: BTierDeps, tool_name: str) -> str | None:
+    def _deny(
+        _deps: BTierDeps, tool_name: str, args: dict[str, object] | None = None
+    ) -> str | None:
+        _ = _deps, args
         return denial if tool_name == "delete" else None
 
     monkeypatch.setattr(
@@ -95,20 +95,18 @@ async def test_permission_guardrail_skip_envelope_includes_human_reason(
     ctx = _run_ctx(deps)
     with pytest.raises(SkipToolExecution) as exc_info:
         await guard.check_tool_access(ctx, tool_name="delete", args={})
-    blob = json.loads(str(exc_info.value))
+    blob = json.loads(exc_info.value.result)
     assert blob.get("message") == human_reason or human_reason in str(blob)
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W26: ToolDenied carries operator denial reason", strict=False
-)
 async def test_approval_guardrail_tool_denied_includes_human_reason() -> None:
     """Deferred path: ``ToolDenied.message`` includes the operator's denial reason."""
     bridge = MagicMock()
     bridge.await_operator_verdict = AsyncMock(return_value="deny")
     bridge.await_approval = None
     bridge.record_session_ack = MagicMock()
+    bridge.last_deny_reason = None
 
     deps = _deps()
     deps.approval_bridge = bridge
@@ -121,9 +119,6 @@ async def test_approval_guardrail_tool_denied_includes_human_reason() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W26: check_permission_before_dispatch merges deny rules", strict=False
-)
 async def test_check_permission_surfaces_configured_deny_reason() -> None:
     """Pre-dispatch hook returns PERMISSION_DENIED with the configured deny reason."""
     deps = _deps()
@@ -134,7 +129,7 @@ async def test_check_permission_surfaces_configured_deny_reason() -> None:
             {"tool": "delete", "reason": "operator blocked delete in this session"},
         ],
     }
-    deps.workspace_permissions = ws_permissions  # type: ignore[attr-defined]
+    deps.workspace_permissions = ws_permissions
     denial = check_permission_before_dispatch(deps, "delete")
     assert denial is not None
     blob = json.loads(denial)

@@ -1233,6 +1233,21 @@
             }
           },
           "additionalProperties": true
+        },
+        "deny_rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tool": { "type": "string" },
+              "pattern": { "type": "string" },
+              "domain": { "type": "string" },
+              "path": { "type": "string" },
+              "reason": { "type": "string" }
+            },
+            "additionalProperties": false
+          },
+          "$comment": "Maintainer: W26 (#80) — additive deny rules by tool name and optional command/pattern, domain, or path match. Apply even in permissive ABAC owner sessions unless operator session-acks the tool."
         }
       }
     },

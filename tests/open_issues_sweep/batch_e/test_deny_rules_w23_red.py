@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.gateway.agent_turn import _permission_policy_from_workspace
 from sevn.tools.permissions import AllowAllPermissionPolicy
@@ -23,9 +21,6 @@ _DENY_RULES_FIXTURE: dict[str, object] = {
 }
 
 
-@pytest.mark.xfail(
-    reason="green after W26: deny rules config parsed from permissions", strict=False
-)
 def test_deny_rules_config_loads_from_permissions_block() -> None:
     """``permissions.deny_rules`` is available to the gateway policy resolver."""
     from sevn.tools.deny_rules import load_deny_rules_from_workspace
@@ -34,10 +29,9 @@ def test_deny_rules_config_loads_from_permissions_block() -> None:
     rules = load_deny_rules_from_workspace(ws)
     assert len(rules) == 1
     assert rules[0].tool == "sandbox_exec"
-    assert "rm" in rules[0].pattern
+    assert "rm" in (rules[0].pattern or "")
 
 
-@pytest.mark.xfail(reason="green after W26: deny rule blocks tool in permissive mode", strict=False)
 def test_user_deny_rule_blocks_even_in_allow_all_mode() -> None:
     """Deny rules apply even when the session ceiling is permissive (D15)."""
     from sevn.tools.deny_rules import evaluate_deny_rules
@@ -52,7 +46,6 @@ def test_user_deny_rule_blocks_even_in_allow_all_mode() -> None:
     assert decision.reason == "operator blocked destructive rm"
 
 
-@pytest.mark.xfail(reason="green after W26: deny rule beats abac owner allow", strict=False)
 def test_deny_rule_blocks_abac_owner_for_matching_tool() -> None:
     """ABAC owner permissive mode does not override an explicit deny rule."""
     ws = WorkspaceConfig.minimal(permissions=_DENY_RULES_FIXTURE)
@@ -70,18 +63,24 @@ def test_deny_rule_blocks_abac_owner_for_matching_tool() -> None:
     assert decision.denied is True
 
 
-@pytest.mark.xfail(reason="green after W26: deny decisions logged with redaction", strict=False)
-def test_deny_decision_audit_log_redacts_secrets(caplog: pytest.LogCaptureFixture) -> None:
+def test_deny_decision_audit_log_redacts_secrets() -> None:
     """Approval/deny audit lines never include tool args secrets."""
+    from loguru import logger as loguru_logger
+
     from sevn.tools.deny_rules import log_deny_decision
 
     secret_arg = "token=super-secret-value"
-    log_deny_decision(
-        tool_name="integration_call",
-        args={"headers": secret_arg},
-        reason="operator denied outbound",
-        session_id="sess-deny-1",
-    )
-    combined = " ".join(record.message for record in caplog.records)
+    captured: list[str] = []
+    sink_id = loguru_logger.add(lambda rec: captured.append(str(rec)), level="INFO")
+    try:
+        log_deny_decision(
+            tool_name="integration_call",
+            args={"headers": secret_arg},
+            reason="operator denied outbound",
+            session_id="sess-deny-1",
+        )
+    finally:
+        loguru_logger.remove(sink_id)
+    combined = " ".join(captured)
     assert "super-secret-value" not in combined
     assert "operator denied outbound" in combined

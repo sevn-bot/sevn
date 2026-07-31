@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that every
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
-last_updated: '2026-07-27'
-fingerprint: sha256:bdeda49c216744bbdf764d14cb2c54eb5c41613402e21e6a1704e39505bf6e8e
+last_updated: '2026-07-31'
+fingerprint: sha256:ffe10fdebc0dae56893add6fa75f81457a1713d0fc7c45e584f8aa774f7fa80e
 related: []
 sources:
 - src/sevn/tools/**
@@ -588,3 +588,11 @@ reusing ``TelegramWeb`` inline-keyboard primitives. Destructive menu rows are de
 **Skills (W5):** Tier B exposes operator skills as harness deferred `Skills` capabilities (`tier_b_skills.build_tier_b_skill_capabilities`). Triager-named skill ids scope the include list; each `SKILL.md` is staged to an ephemeral `.sevn-harness-skills/` tree with frontmatter preserved. Script dispatch stays on `sevn_run_skill_script` → `ToolExecutor.dispatch` (same registry contract as native tools).
 
 **CodeMode (W3/W7):** Registry tools marked `code_mode=True` are eligible for the Monty `run_code` sandbox when triage enables CodeMode. Host-side tool calls from sandboxed snippets re-enter `ToolExecutor.dispatch` via the harness function catalog. `SevnAsyncCodeMode` is the tier-B backend; Monty `ResourceLimits` are injected at pool checkout (`_monty_limits.py`, D5/D6). Opt-in `dynamic_catalog` (default off, D9) keeps the `run_code` tool definition byte-stable across lazy tool discovery.
+
+### 10.2 open-issues-sweep W26 — user-defined deny rules (#80) — append-only
+
+**Config:** `permissions.deny_rules` — list of `{tool?, pattern?, domain?, path?, reason}` entries extending the existing permissions subtree (additive-deny only, D15).
+
+**Evaluation:** `check_permission_before_dispatch` (`tier_b_hooks.py`) and defense-in-depth `ToolExecutor.dispatch` (`base.py`) via `sevn.tools.deny_rules`. Deny rules apply even when the session ABAC profile is owner-permissive unless the operator session-acks the tool.
+
+**Feedback:** Denials return `PERMISSION_DENIED` envelopes with a `message` field carrying the configured or operator-supplied reason. Mission Control approval POST accepts optional `reason` on `deny` verdicts; audit logs redact args.

@@ -8,7 +8,7 @@ summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / sa
   (when routed through the execution sandbox), process when configured for sandbox
   routing, and skill subprocesses spawned b
 last_updated: '2026-07-31'
-fingerprint: sha256:452f387bb63f05f39d42f7a7721790eb3e53efafe8c89e05cbf0a1de64920aa8
+fingerprint: sha256:3de9c856fdaa3ecda088763e42ab64892fd1cec97b5eea0617adbb40c1f2ee49
 related: []
 sources:
 - src/sevn/security/**
@@ -214,6 +214,9 @@ interfaces:
 - name: sweep_orphan_labels
   file: src/sevn/security/sandbox_sweeper.py
   symbol: sweep_orphan_labels
+- name: BitwardenCliBackend
+  file: src/sevn/security/secrets/backends/bitwarden.py
+  symbol: BitwardenCliBackend
 - name: EncryptedFileBackend
   file: src/sevn/security/secrets/backends/encrypted_file.py
   symbol: EncryptedFileBackend
@@ -226,6 +229,9 @@ interfaces:
 - name: MacOSKeychainBackend
   file: src/sevn/security/secrets/backends/macos_keychain.py
   symbol: MacOSKeychainBackend
+- name: OnePasswordCliBackend
+  file: src/sevn/security/secrets/backends/one_password.py
+  symbol: OnePasswordCliBackend
 - name: OpenBaoBackend
   file: src/sevn/security/secrets/backends/openbao.py
   symbol: OpenBaoBackend
@@ -298,6 +304,15 @@ interfaces:
 - name: SecretsBackend
   file: src/sevn/security/secrets/protocol.py
   symbol: SecretsBackend
+- name: SecretProvenanceReport
+  file: src/sevn/security/secrets/provenance.py
+  symbol: SecretProvenanceReport
+- name: provenance_for_cache_entry
+  file: src/sevn/security/secrets/provenance.py
+  symbol: provenance_for_cache_entry
+- name: resolve_secret_provenance
+  file: src/sevn/security/secrets/provenance.py
+  symbol: resolve_secret_provenance
 - name: EnvUnresolvedError
   file: src/sevn/security/secrets/value_expand.py
   symbol: EnvUnresolvedError

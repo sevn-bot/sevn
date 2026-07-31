@@ -106,7 +106,7 @@ class TierBPermissionGuardrail:
             True
         """
         _ = self.config
-        denial = check_permission_before_dispatch(ctx.deps, tool_name)
+        denial = check_permission_before_dispatch(ctx.deps, tool_name, args=args)
         if denial is not None:
             blob = json.loads(denial)
             if (
@@ -120,7 +120,7 @@ class TierBPermissionGuardrail:
                 )
                 if not approved:
                     raise SkipToolExecution(denial)
-                denial = check_permission_before_dispatch(ctx.deps, tool_name)
+                denial = check_permission_before_dispatch(ctx.deps, tool_name, args=args)
             if denial is not None:
                 raise SkipToolExecution(denial)
 
@@ -249,12 +249,16 @@ class TierBApprovalGuardrail:
         approved = await self.resolve_approval(ctx, tool_name=tool_name, args=args)
         if approved:
             return None
-        return ToolDenied(
-            message=(
-                f"Human approval required before `{tool_name}` can run. "
-                "Acknowledge the destructive action, then retry."
-            ),
-        )
+        bridge = _approval_bridge(ctx)
+        reason = getattr(bridge, "last_deny_reason", None) if bridge is not None else None
+        if reason:
+            message = reason
+        else:
+            message = (
+                f"Operator denied approval for `{tool_name}`. "
+                "Revise the plan or choose a different approach."
+            )
+        return ToolDenied(message=message)
 
 
 def permission_guardrail(config: TierBHookConfig) -> TierBPermissionGuardrail:

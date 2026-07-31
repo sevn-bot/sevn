@@ -732,6 +732,17 @@ class ToolExecutor:
                 "Permission denied for tool invocation",
                 code=ToolResultCode.PERMISSION_DENIED,
             )
+        from sevn.tools.deny_rules import check_deny_rules_for_dispatch
+
+        deny_envelope = check_deny_rules_for_dispatch(ctx, name, payload_args)
+        if deny_envelope is not None:
+            await _trace_emit(
+                ctx,
+                kind="tool.error",
+                status="error",
+                attrs={"name": name, "code": ToolResultCode.PERMISSION_DENIED.value},
+            )
+            return deny_envelope
 
         if definition.requires_human and name not in ctx.human_acknowledged_tools:
             await _trace_emit(ctx, kind="tool.error", status="error", attrs={"name": name})
