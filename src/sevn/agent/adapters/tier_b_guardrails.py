@@ -113,12 +113,21 @@ class TierBPermissionGuardrail:
                 blob.get("code") == ToolResultCode.PLAN_HUMAN_GATE
                 and _approval_bridge(ctx) is not None
             ):
-                approved = await TierBApprovalGuardrail(self.config).resolve_approval(
+                approved, deny_reason = await TierBApprovalGuardrail(self.config).resolve_approval(
                     ctx,
                     tool_name=tool_name,
                     args=args,
                 )
                 if not approved:
+                    if deny_reason:
+                        from sevn.tools.deny_rules import enveloped_deny_with_reason
+
+                        raise SkipToolExecution(
+                            enveloped_deny_with_reason(
+                                tool_name=tool_name,
+                                reason=deny_reason,
+                            ),
+                        )
                     raise SkipToolExecution(denial)
                 denial = check_permission_before_dispatch(ctx.deps, tool_name, args=args)
             if denial is not None:

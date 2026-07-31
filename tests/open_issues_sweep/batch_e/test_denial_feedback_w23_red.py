@@ -118,6 +118,52 @@ async def test_approval_guardrail_tool_denied_includes_human_reason() -> None:
 
 
 @pytest.mark.asyncio
+async def test_check_tool_access_sync_path_includes_operator_deny_reason() -> None:
+    """Sync ``check_tool_access`` path surfaces operator denial reason in ``SkipToolExecution``."""
+    bridge = MagicMock()
+    bridge.await_operator_verdict = AsyncMock(
+        return_value=("deny", "need a ticket before delete"),
+    )
+    bridge.await_approval = None
+    bridge.record_session_ack = MagicMock()
+
+    exe = ToolExecutor()
+    exe.register(
+        FunctionTool(
+            ToolDefinition(
+                name="delete",
+                category="file",
+                description="delete",
+                parameters={"type": "object", "properties": {}},
+                requires_human=True,
+            ),
+            lambda _ctx: enveloped_success({"deleted": True}),
+        ),
+    )
+    deps = BTierDeps(
+        tool_executor=exe,
+        tool_context_template=ToolContext(
+            session_id="sess-sync-deny",
+            workspace_path=Path("/tmp"),
+            workspace_id="w",
+            registry_version=1,
+            trace=None,
+            permissions=AllowAllPermissionPolicy(),
+        ),
+        workspace_path=Path("/tmp"),
+        registry_version=1,
+        loaded_tools={"delete"},
+    )
+    deps.approval_bridge = bridge
+    ctx = _run_ctx(deps)
+    guard = TierBPermissionGuardrail(_hook_config())
+    with pytest.raises(SkipToolExecution) as exc_info:
+        await guard.check_tool_access(ctx, tool_name="delete", args={"path": "/etc/sevn.json"})
+    blob = json.loads(exc_info.value.result)
+    assert blob.get("message") == "need a ticket before delete"
+
+
+@pytest.mark.asyncio
 async def test_check_permission_surfaces_configured_deny_reason() -> None:
     """Pre-dispatch hook returns PERMISSION_DENIED with the configured deny reason."""
     deps = _deps()
