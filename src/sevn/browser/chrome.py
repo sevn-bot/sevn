@@ -20,6 +20,8 @@ Exports:
     resolve_browser_headless — headed default on host unless config/binary absent.
     resolve_cdp_url — operator CDP override, else registry, else seed hint URL.
     resolve_chrome_executable — locate Chrome, Chromium, or Brave binary.
+    resolve_login_grade_chrome_args — login-grade Chrome flags incl. password-store.
+    resolve_password_store — ``basic`` (default) or ``system`` OS keychain mode.
     resolve_profile_dir — session-scoped persistent profile directory.
     spawn_chrome — Popen-only Chrome launch (``--remote-debugging-port=0``).
 
@@ -53,13 +55,16 @@ if TYPE_CHECKING:
     from sevn.config.workspace_config import WorkspaceConfig
 
 _PROFILE_ENV: Final[str] = "SEVN_BROWSER_PROFILE_DIR"
+_PASSWORD_STORE_ENV: Final[str] = "SEVN_BROWSER_PASSWORD_STORE"
 # Login-grade defaults: re-passed on every spawn; cookies live in the profile.
+# ``--password-store=basic`` is appended only when ``resolve_password_store`` returns
+# ``basic`` (default) — CI/Docker-safe. Set ``skills.browser.password_store`` to
+# ``system`` (or ``SEVN_BROWSER_PASSWORD_STORE=system``) to use the OS keychain.
 _LOGIN_GRADE_CHROME_ARGS: Final[tuple[str, ...]] = (
     "--remote-allow-origins=*",
     "--no-service-autorun",
     "--homepage=about:blank",
     "--no-pings",
-    "--password-store=basic",
     "--disable-infobars",
     "--disable-breakpad",
     "--disable-dev-shm-usage",
@@ -151,6 +156,52 @@ def resolve_profile_dir(
         return from_cfg.expanduser().resolve()
     sid = normalise_session_id(session_id)
     return (content_root / ".sevn" / "browser-profiles" / sid).resolve()
+
+
+def resolve_password_store(cfg: WorkspaceConfig | None = None) -> str:
+    """Return Chrome ``--password-store`` mode: ``basic`` (default) or ``system``.
+
+    ``basic`` opts out of the OS keychain — required for headless CI/Docker where no
+    keychain exists. ``system`` omits the flag so Chrome uses the platform store.
+
+    Precedence: ``SEVN_BROWSER_PASSWORD_STORE`` env → ``skills.browser.password_store``.
+
+    Args:
+        cfg (WorkspaceConfig | None): Parsed workspace config.
+
+    Returns:
+        str: ``basic`` or ``system``.
+
+    Examples:
+        >>> resolve_password_store(None)
+        'basic'
+    """
+    env_raw = os.environ.get(_PASSWORD_STORE_ENV, "").strip().lower()
+    if env_raw in {"basic", "system"}:
+        return env_raw
+    from sevn.config.sections.accessors import browser_settings
+
+    store = browser_settings(cfg).password_store.strip().lower()
+    return store if store in {"basic", "system"} else "basic"
+
+
+def resolve_login_grade_chrome_args(cfg: WorkspaceConfig | None = None) -> tuple[str, ...]:
+    """Return login-grade Chrome flags including conditional password-store.
+
+    Args:
+        cfg (WorkspaceConfig | None): Parsed workspace config.
+
+    Returns:
+        tuple[str, ...]: Chrome CLI flags for spawn.
+
+    Examples:
+        >>> "AutomationControlled" in str(resolve_login_grade_chrome_args(None))
+        True
+    """
+    args = list(_LOGIN_GRADE_CHROME_ARGS)
+    if resolve_password_store(cfg) == "basic":
+        args.append("--password-store=basic")
+    return tuple(args)
 
 
 def cdp_port_seed(session_id: str) -> int:
@@ -619,7 +670,7 @@ def spawn_chrome(
         f"--user-data-dir={profile_dir}",
         "--no-first-run",
         "--no-default-browser-check",
-        *_LOGIN_GRADE_CHROME_ARGS,
+        *resolve_login_grade_chrome_args(cfg),
         *resolve_browser_extra_args(),
     ]
     if headless:
@@ -659,6 +710,8 @@ __all__ = [
     "resolve_browser_headless",
     "resolve_cdp_url",
     "resolve_chrome_executable",
+    "resolve_login_grade_chrome_args",
+    "resolve_password_store",
     "resolve_profile_dir",
     "spawn_chrome",
 ]

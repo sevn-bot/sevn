@@ -158,3 +158,5 @@ class BrowserWorkspaceConfig(BaseModel):
     profile_dir: str | None = None
     idle_close_seconds: int = Field(default=0, ge=0)
     headless: bool = False
+    password_store: str = "basic"
+    persist_auth: bool = True

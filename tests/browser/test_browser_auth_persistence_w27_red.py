@@ -20,8 +20,8 @@ def test_profile_dirs_isolated_per_session(tmp_path: Path) -> None:
     a = resolve_profile_dir(root, "telegram:1:general")
     b = resolve_profile_dir(root, "telegram:2:general")
     assert a != b
-    assert a.name == "telegram-1-general"
-    assert b.name == "telegram-2-general"
+    assert a.name == "telegram:1:general"
+    assert b.name == "telegram:2:general"
 
 
 def test_stable_profile_dir_when_skills_browser_profile_configured(tmp_path: Path) -> None:
@@ -36,7 +36,6 @@ def test_stable_profile_dir_when_skills_browser_profile_configured(tmp_path: Pat
     assert first == second == shared.expanduser().resolve()
 
 
-@pytest.mark.xfail(reason="green after W28: cross-restart browser session state", strict=False)
 def test_session_cookies_survive_simulated_gateway_restart(tmp_path: Path) -> None:
     """Cookies/session markers written for a profile survive a tool/gateway restart."""
     from sevn.browser.persistence import (
@@ -60,7 +59,6 @@ def test_session_cookies_survive_simulated_gateway_restart(tmp_path: Path) -> No
     assert read_browser_session_marker(profile_after_restart) == marker
 
 
-@pytest.mark.xfail(reason="green after W28: ephemeral/no-persistence browser mode", strict=False)
 def test_ephemeral_profile_mode_uses_non_persistent_directory(tmp_path: Path) -> None:
     """Sensitive tasks can opt into an ephemeral profile outside the persistent tree."""
     from sevn.browser.persistence import resolve_browser_profile_dir
@@ -80,7 +78,6 @@ def test_ephemeral_profile_mode_uses_non_persistent_directory(tmp_path: Path) ->
     assert not str(ephemeral).startswith(str(persistent.parent))
 
 
-@pytest.mark.xfail(reason="green after W28: credential path redaction in logs", strict=False)
 def test_browser_profile_paths_redacted_in_log_lines(tmp_path: Path) -> None:
     """Cookie/password profile paths must not appear verbatim in log output."""
     from sevn.browser.redaction import redact_browser_credential_paths
@@ -98,7 +95,6 @@ def test_browser_profile_paths_redacted_in_log_lines(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W28: cookie paths redacted in tool output", strict=False)
 async def test_get_cookies_tool_output_redacts_absolute_paths(
     tmp_path: Path,
     fake_cdp: Any,
@@ -146,10 +142,6 @@ async def test_get_cookies_tool_output_redacts_absolute_paths(
         await session.disconnect()
 
 
-@pytest.mark.xfail(
-    reason="green after W28: credentials never written to plaintext workspace files",
-    strict=False,
-)
 def test_login_credentials_not_persisted_as_plaintext_workspace_files(tmp_path: Path) -> None:
     """Credential material must never land in a plaintext file under the workspace."""
     from sevn.browser.redaction import assert_no_plaintext_browser_credentials
@@ -164,7 +156,6 @@ def test_login_credentials_not_persisted_as_plaintext_workspace_files(tmp_path: 
             assert password not in text
 
 
-@pytest.mark.xfail(reason="green after W28: spawn logs redact profile paths", strict=False)
 def test_chrome_spawn_log_line_redacts_profile_dir(tmp_path: Path) -> None:
     """Chrome spawn diagnostics must redact ``--user-data-dir`` values."""
     from sevn.browser.redaction import redact_browser_credential_paths

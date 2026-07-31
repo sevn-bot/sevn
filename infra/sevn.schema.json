@@ -275,6 +275,11 @@
       "long_description": "Process-level preference for which Chromium-compatible family to resolve when `SEVN_CHROME_EXECUTABLE` is unset. Wins over `skills.browser.engine` in sevn.json. `auto` prefers Chrome/Chromium before Brave so host Chrome installs keep working; set `brave` in Docker/browser images."
     },
     {
+      "name": "SEVN_BROWSER_PASSWORD_STORE",
+      "description": "Override `skills.browser.password_store` (`basic` or `system`).",
+      "long_description": "When `basic` (default), Chrome spawn passes `--password-store=basic` so credentials stay in the profile without OS keychain — required for headless CI/Docker. When `system`, the flag is omitted so Chrome uses the platform keychain. Wins over `skills.browser.password_store` in sevn.json."
+    },
+    {
       "name": "SEVN_SKILL_FULL_WORKSPACE",
       "description": "Proposed opt-in for vetted core skills only (architecture-questions-skills.md); not normative v1.",
       "long_description": "Hypothesized escape hatch discussed in skills Q&A: a deliberately scary env var that would allow a tiny allowlist of core skills to see the real workspace instead of the shadow tree. v1 normative posture is shadow-only with no opt-out from inside the skill process. If ever implemented, would require explicit operator acknowledgement in SKILL.md and strict gateway checks; schema retains the name so design discussions and future validators stay synchronized."
@@ -2199,6 +2204,17 @@
               "enum": ["auto", "chrome", "chromium", "brave"],
               "default": "auto",
               "description": "Which Chromium-compatible browser to prefer when resolving the spawn binary (`auto`: Chrome/Chromium before Brave)."
+            },
+            "password_store": {
+              "type": "string",
+              "enum": ["basic", "system"],
+              "default": "basic",
+              "description": "Chrome credential store: `basic` (no OS keychain; default for CI/Docker) or `system` (platform keychain)."
+            },
+            "persist_auth": {
+              "type": "boolean",
+              "default": true,
+              "description": "When true (default), gateway sessions reuse persistent Chrome profiles under `.sevn/browser-profiles/`."
             }
           },
           "$comment": "Maintainer: browser-session-lifecycle W5 — D8 idle TTL, D13 headed default, Brave multi-arch Docker; registry under `.sevn/browser-sessions/`."
