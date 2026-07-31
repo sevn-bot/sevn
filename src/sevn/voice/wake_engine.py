@@ -130,7 +130,7 @@ def build_wake_word_engine(*, wake_word: str, engine_id: str | None = None) -> W
         return NullWakeWordEngine()
     try:
         return OpenWakeWordEngine(wake_word=wake_word)
-    except WakeModelLoadError:
+    except (ImportError, ModuleNotFoundError, WakeModelLoadError):
         return NullWakeWordEngine()
 
 
