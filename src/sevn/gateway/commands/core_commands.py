@@ -588,6 +588,16 @@ class CoreCommandHandler:
                     "Usage: /model --once <provider/model> — "
                     "applies to the next turn only; persisted setting unchanged."
                 )
+            from sevn.config.model_resolution import list_catalog_model_ids
+
+            catalog = set(list_catalog_model_ids(self._workspace))
+            if rest not in catalog:
+                known = ", ".join(sorted(catalog)[:8])
+                suffix = "…" if len(catalog) > 8 else ""
+                return (
+                    f"Unknown model {rest!r}. "
+                    f"Choose from configured catalog (e.g. {known}{suffix})."
+                )
             self._sessions.set_model_once_override(session_id, rest)
             persisted = resolve_model_slot(self._workspace, ModelSlot.tier_b)
             return (

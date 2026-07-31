@@ -124,13 +124,16 @@ class ResolvedSecretsCache:
             >>> True
             True
         """
-        ck = self._make_key(source, logical_key)
+        from sevn.security.secrets.routing_scope import scoped_secret_logical_key
+
+        scoped_key = scoped_secret_logical_key(logical_key)
+        ck = self._make_key(source, scoped_key)
         now = self._clock()
         if self._ttl > 0:
             ent = self._data.get(ck)
             if ent is not None and ent.expires_at > now:
                 return ent.value
-        value = await self._chain.get(logical_key)
+        value = await self._chain.get(scoped_key)
         if value is None:
             return None
         from sevn.security.secrets.provenance import resolve_secret_provenance

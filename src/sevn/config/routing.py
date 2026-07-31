@@ -242,6 +242,65 @@ def permission_policy_for_permissions_profile(
     return AllowAllPermissionPolicy()
 
 
+def _skill_allowlist_for_profile(
+    section: RoutingWorkspaceSectionConfig | None,
+    profile_name: str,
+    entry: RoutingProfileEntryConfig,
+    *,
+    raw_profiles: dict[str, Any] | None = None,
+) -> frozenset[str] | None:
+    """Resolve skill allowlist, distinguishing absent key from explicit ``[]``.
+
+    When ``skills`` is omitted from config, returns ``None`` (no restriction).
+    When ``skills: []`` is present, returns an empty frozenset (deny all skills).
+
+    Args:
+        section (RoutingWorkspaceSectionConfig | None): Parsed routing section.
+        profile_name (str): Profile key under ``routing.profiles``.
+        entry (RoutingProfileEntryConfig): Coerced profile entry.
+        raw_profiles (dict[str, Any] | None): Unparsed ``routing.profiles`` map when available.
+
+    Returns:
+        frozenset[str] | None: Allowlist, empty deny-all set, or unrestricted ``None``.
+
+    Examples:
+        >>> section = RoutingWorkspaceSectionConfig(
+        ...     profiles={"safe": {"skills": []}, "open": {}},
+        ... )
+        >>> raw = {"safe": {"skills": []}, "open": {}}
+        >>> _skill_allowlist_for_profile(
+        ...     section, "safe", _profile_entry(section, "safe"), raw_profiles=raw
+        ... )
+        frozenset()
+        >>> _skill_allowlist_for_profile(
+        ...     section, "open", _profile_entry(section, "open"), raw_profiles=raw
+        ... ) is None
+        True
+    """
+    if isinstance(raw_profiles, dict):
+        raw = raw_profiles.get(profile_name)
+        if isinstance(raw, dict):
+            if "skills" not in raw:
+                return None
+            skills_raw = raw.get("skills")
+            if not isinstance(skills_raw, list):
+                return None
+            return frozenset(str(s).strip() for s in skills_raw if str(s).strip())
+    if section is not None:
+        raw = section.profiles.get(profile_name)
+        if isinstance(raw, dict):
+            if "skills" not in raw:
+                return None
+            skills_raw = raw.get("skills")
+            if not isinstance(skills_raw, list):
+                return None
+            return frozenset(str(s).strip() for s in skills_raw if str(s).strip())
+    skills = entry.skills or []
+    if skills:
+        return frozenset(str(s).strip() for s in skills if str(s).strip())
+    return None
+
+
 def _profile_entry(
     section: RoutingWorkspaceSectionConfig, profile_name: str
 ) -> RoutingProfileEntryConfig:
@@ -313,8 +372,14 @@ def resolve_routing_profile_bundle(
         if section is not None
         else RoutingProfileEntryConfig()
     )
-    skills = entry.skills or []
-    skill_allowlist = frozenset(str(s).strip() for s in skills if str(s).strip()) or None
+    raw_section = routing_section_dict(cfg)
+    raw_profiles = raw_section.get("profiles") if isinstance(raw_section, dict) else None
+    skill_allowlist = _skill_allowlist_for_profile(
+        section,
+        profile_name,
+        entry,
+        raw_profiles=raw_profiles if isinstance(raw_profiles, dict) else None,
+    )
     perms_key = (
         entry.permissions_profile.strip() if isinstance(entry.permissions_profile, str) else None
     )
@@ -396,11 +461,9 @@ def prefix_secrets_logical_key(secrets_scope: str | None, logical_key: str) -> s
         >>> prefix_secrets_logical_key(None, "api.token")
         'api.token'
     """
-    key = logical_key.strip()
-    scope = secrets_scope.strip() if isinstance(secrets_scope, str) else ""
-    if not scope:
-        return key
-    return f"{scope}/{key}"
+    from sevn.security.secrets.routing_scope import scoped_secret_logical_key
+
+    return scoped_secret_logical_key(logical_key, scope=secrets_scope)
 
 
 def filter_tool_set_skills(tool_set: Any, skill_allowlist: frozenset[str] | None) -> Any:
@@ -423,6 +486,14 @@ def filter_tool_set_skills(tool_set: Any, skill_allowlist: frozenset[str] | None
 
     if not isinstance(tool_set, ToolSet):
         return tool_set
+    if not skill_allowlist:
+        return ToolSet(
+            tool_set.registry_version,
+            tool_set.native,
+            tool_set.mcp,
+            {},
+            skill_inventory={},
+        )
     skill_desc = {
         name: summary
         for name, summary in tool_set.skill_descriptions.items()

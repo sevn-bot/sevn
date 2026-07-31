@@ -248,6 +248,7 @@ def resolve_triager_model_id_for_turn(
     channel: str = "",
     scope_key: str | None = None,
     session_once_model: str | None = None,
+    routing_profile_model: str | None = None,
 ) -> str:
     """Pick triager model id for this turn (main or optional cheap continuation model).
 
@@ -265,6 +266,7 @@ def resolve_triager_model_id_for_turn(
         channel (str): Active channel adapter name.
         scope_key (str | None): Session scope key for topic-level overrides.
         session_once_model (str | None): One-turn session model override (**W10** hook).
+        routing_profile_model (str | None): Named routing profile model (**W12** hook).
 
     Returns:
         str: Model id for the structured triage LLM call.
@@ -293,6 +295,7 @@ def resolve_triager_model_id_for_turn(
         channel=channel,
         scope_key=scope_key,
         session_once_model=session_once_model,
+        routing_profile_model=routing_profile_model,
     ).model_id
 
 
@@ -1197,6 +1200,7 @@ async def triage_turn(
     channel: str = "",
     scope_key: str | None = None,
     session_once_model: str | None = None,
+    routing_profile_model: str | None = None,
 ) -> TriageResult:
     """Run one structured routing pass (`specs/13` §2).
     Args:
@@ -1213,6 +1217,7 @@ async def triage_turn(
         channel (str): Active channel adapter name for turn-scoped model overlays.
         scope_key (str | None): Session scope key for topic-level model overrides.
         session_once_model (str | None): One-turn session model override (**W10** hook).
+        routing_profile_model (str | None): Named routing profile model (**W12** hook).
     Returns:
         TriageResult: Validated and finalised triage result (after caps,
             filtering, and coercion rules).
@@ -1248,6 +1253,7 @@ async def triage_turn(
             channel=channel,
             scope_key=scope_key,
             session_once_model=session_once_model,
+            routing_profile_model=routing_profile_model,
         )
     except TriagerUnavailable:
         model_id = "unknown"

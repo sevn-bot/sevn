@@ -73,7 +73,7 @@ def test_core_command_model_once_stages_without_persisting(tmp_path: Path) -> No
     handler._workspace = baseline_minimal_workspace()
     handler._sessions = SessionManager(conn)
 
-    reply = handler._handle_model("--once openai/gpt-4o", session_id="sess-cmd")
-    assert "openai/gpt-4o" in reply
-    assert handler._sessions.peek_model_once_override("sess-cmd") == "openai/gpt-4o"
+    reply = handler._handle_model("--once minimax/MiniMax-M2.7", session_id="sess-cmd")
+    assert "minimax/MiniMax-M2.7" in reply
+    assert handler._sessions.peek_model_once_override("sess-cmd") == "minimax/MiniMax-M2.7"
     assert resolve_model_slot(handler._workspace, ModelSlot.tier_b) == "minimax/MiniMax-M2.7"
