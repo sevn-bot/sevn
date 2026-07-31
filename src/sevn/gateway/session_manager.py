@@ -1346,9 +1346,6 @@ class SessionManager:
                             if not run_task.done():
                                 run_task.cancel()
                                 await run_task
-                        self._turn_semaphore.release()
-                        semaphore_held = False
-                        raise
                     except Exception:
                         logger.exception("session_dispatch_failed session_id={}", session_id)
                     finally:

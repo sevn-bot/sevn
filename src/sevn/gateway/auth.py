@@ -571,9 +571,13 @@ def verify_telegram_init_data(
     if not provided:
         return None
     data_check_string = "\n".join(f"{k}={fields[k]}" for k in sorted(fields))
-    secret_key = hmac.new(b"WebAppData", bot_token.encode("utf-8"), hashlib.sha256).digest()
+    secret_key = hmac.new(
+        b"WebAppData", bot_token.encode("utf-8"), hashlib.sha256
+    ).digest()  # codeql[py/weak-sensitive-data-hashing]
     expected_hex = hmac.new(
-        secret_key, data_check_string.encode("utf-8"), hashlib.sha256
+        secret_key,
+        data_check_string.encode("utf-8"),
+        hashlib.sha256,  # codeql[py/weak-sensitive-data-hashing]
     ).hexdigest()
     if not hmac.compare_digest(expected_hex, provided):
         return None
