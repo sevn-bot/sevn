@@ -41,6 +41,8 @@ Config spans [`src/sevn/config/`](../../src/sevn/config/), workspace layout in [
 
 The `permissions` subtree is a JSON object on the root document ([`root.py`](../../src/sevn/config/sections/root.py#L109)). **`permissions.deny_rules`:** optional array of `{tool?, pattern?, domain?, path?, reason?}` objects in [`infra/sevn.schema.json`](../../infra/sevn.schema.json). Each rule is additive deny — match by tool name plus optional command/pattern, domain, or path. Rules apply even in permissive ABAC owner sessions unless you session-ack the tool.
 
+`skills.hermes_model_eval` in [`infra/sevn.schema.json`](../../infra/sevn.schema.json) is an opt-in advisory skill flag (default via [`DEFAULT_HERMES_MODEL_EVAL_ENABLED`](../../src/sevn/config/defaults.py#L256) — **false**). Set `enabled` to turn it on; it does not change routing defaults. Optional `models` is a list of `{label, model_id}` aliases for comparison reports. No dedicated section module — the blob lives on the skills map like other opt-in skill flags.
+
 **MCP and routing profiles** are top-level schema keys in [`infra/sevn.schema.json`](../../infra/sevn.schema.json), retained on [`WorkspaceConfig`](../../src/sevn/config/sections/root.py) via `extra="allow"` (no dedicated section modules):
 
 - `mcp_servers` — map of server id → `{command, args}`; optional `env` (static subprocess env, merged before OAuth-resolved vars) and `oauth` (metadata and secret refs only — token blobs live at `oauth.mcp.<server_id>` in the secrets chain)

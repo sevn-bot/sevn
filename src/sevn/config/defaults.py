@@ -253,6 +253,9 @@ DEFAULT_CUA_AGENT_REQUIRE_COMPUTER_USE: Final[bool] = True
 DEFAULT_CUA_AGENT_APPROVAL: Final[str] = "per_run"
 DEFAULT_LUME_ENABLED: Final[bool] = False
 
+# Hermes 4 cross-model eval skill (#91, W32) — advisory only; default off (D9).
+DEFAULT_HERMES_MODEL_EVAL_ENABLED: Final[bool] = False
+
 # Tool registry + spill knobs (`specs/11-tools-registry.md`).
 LOADED_BODY_CACHE_DEFAULT_CAP: Final[int] = 64
 TOOL_LARGE_RESULT_THRESHOLD_BYTES: Final[int] = 32_768

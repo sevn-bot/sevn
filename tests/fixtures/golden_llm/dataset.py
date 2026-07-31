@@ -11,7 +11,7 @@ Exports:
 
 from __future__ import annotations
 
-from typing import Any, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from pydantic_evals import Case, Dataset
 
@@ -22,6 +22,9 @@ from tests.fixtures.golden_llm.evaluators import (
     optional_llm_judge_evaluator,
 )
 from tests.fixtures.golden_llm.harness import discover_cases, load_recording
+
+if TYPE_CHECKING:
+    from pydantic_evals.evaluators import Evaluator
 
 
 class GoldenCaseMetadata(TypedDict):
@@ -88,7 +91,10 @@ def build_golden_eval_dataset(
                     "category": case.category,
                     "has_recording": recording is not None,
                 },
-                evaluators=build_case_evaluators(case),
+                evaluators=cast(
+                    "tuple[Evaluator[str, GoldenRunOutput, GoldenCaseMetadata], ...]",
+                    build_case_evaluators(case),
+                ),
             ),
         )
     dataset_evaluators: list[Any] = []

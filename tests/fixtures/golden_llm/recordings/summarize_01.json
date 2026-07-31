@@ -1,0 +1,68 @@
+{
+  "case_id": "summarize_01",
+  "version": 1,
+  "transport_responses": [
+    {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "id": "c1",
+                "type": "function",
+                "function": {
+                  "name": "load_tool",
+                  "arguments": "{\"name\": \"read\"}"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 12,
+        "completion_tokens": 8
+      }
+    },
+    {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "tool_calls": [
+              {
+                "id": "c2",
+                "type": "function",
+                "function": {
+                  "name": "read",
+                  "arguments": "{\"path\":\"notes.txt\"}"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 24,
+        "completion_tokens": 10
+      }
+    },
+    {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": "The gateway batches outbound messages and attaches routing footers for operator visibility."
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 40,
+        "completion_tokens": 18
+      }
+    }
+  ],
+  "provider_turn_messages": [],
+  "final_text": "The gateway batches outbound messages and attaches routing footers for operator visibility."
+}

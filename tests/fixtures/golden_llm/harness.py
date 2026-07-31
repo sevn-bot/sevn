@@ -274,8 +274,8 @@ class _ScriptedChatTransport(ChatCompletionsTransport):
     async def complete(self, request: dict[str, object]) -> dict[str, object]:
         result = self._fn(dict(request))
         if hasattr(result, "__await__"):
-            return await result  # type: ignore[misc]
-        return result
+            return await result  # type: ignore[no-any-return]
+        return result  # type: ignore[no-any-return]
 
 
 def _triage_from_case(case: GoldenCase) -> TriageResult:
@@ -347,7 +347,7 @@ async def run_golden_case_replay(
     transport = _ScriptedChatTransport(_next)
     bundle = ResolvedTierBModel(
         model_id="openai/gpt-golden",
-        transport=transport,
+        transport=transport,  # type: ignore[arg-type]
         budget=ModelBudget(model_id="openai/gpt-golden", regime=BudgetRegime.FREE_LOCAL),
     )
     incoming = case.user_messages[-1]
@@ -456,7 +456,7 @@ async def run_golden_case_live(
     )
     bundle = ResolvedTierBModel(
         model_id="openai/gpt-golden-live",
-        transport=wrapped,
+        transport=wrapped,  # type: ignore[arg-type]
         budget=ModelBudget(model_id="openai/gpt-golden-live", regime=BudgetRegime.FREE_LOCAL),
     )
     outcome = await run_b_turn(

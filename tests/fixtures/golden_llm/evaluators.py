@@ -174,7 +174,7 @@ def build_case_evaluators(
     for tool in case.assertions.tools_called:
         evaluators.append(
             HasMatchingSpan(
-                query=tool_span_query(tool),
+                query=tool_span_query(tool),  # type: ignore[arg-type]
                 evaluation_name=f"span_tool_{tool}",
             ),
         )
@@ -222,7 +222,7 @@ class CategoryPassRateReportEvaluator(
             mean_rate = sum(rates) / len(rates) if rates else 0.0
             analyses.append(
                 ScalarResult(
-                    name=f"{self.evaluation_name}.{category}",
+                    title=f"{self.evaluation_name}.{category}",
                     value=mean_rate,
                     unit="ratio",
                     description=f"Mean assertion pass rate for category {category!r}",

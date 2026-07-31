@@ -2215,6 +2215,37 @@
           },
           "$comment": "Maintainer: the design docs — opt-in `lume` skill (VM lifecycle). Default false. macOS Apple-Silicon only; fail fast at load when enabled on unsupported hosts."
         },
+        "hermes_model_eval": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Opt-in Hermes 4 / cross-model eval skill (advisory; does not change routing defaults)."
+            },
+            "models": {
+              "type": "array",
+              "description": "Provider-agnostic model aliases to compare in live eval runs.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["label", "model_id"],
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "description": "Short label in comparison reports."
+                  },
+                  "model_id": {
+                    "type": "string",
+                    "description": "Catalog model id (e.g. openrouter/nousresearch/hermes-4-70b)."
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "Maintainer: #91 hermes-model-eval bundled skill — golden_llm harness only (W32 D21). Default false."
+        },
         "browser": {
           "type": "object",
           "additionalProperties": true,
