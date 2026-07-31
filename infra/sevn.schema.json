@@ -1505,11 +1505,48 @@
           "args": {
             "type": "array",
             "items": { "type": "string" }
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "$comment": "Static subprocess env entries merged before OAuth-resolved vars (W29)."
+          },
+          "oauth": {
+            "type": "object",
+            "properties": {
+              "env_var": { "type": "string" },
+              "refresh_env_var": { "type": "string" },
+              "authorize_url_template": { "type": "string" },
+              "token_url": { "type": "string" },
+              "client_id_ref": { "type": "string" },
+              "client_secret_ref": { "type": "string" },
+              "scopes": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+            "additionalProperties": false,
+            "$comment": "OAuth metadata only — tokens live at oauth.mcp.<server_id> in the secrets chain (W29 #90)."
           }
         },
         "additionalProperties": true
       },
       "$comment": "Maintainer: the design docs example — map server id -> {command, args} for MCPServerStdio; keys referenced by mcp_enabled / channels.*.mcp_enabled / session override."
+    },
+    "routing_profiles": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "mcp_disabled_servers": {
+            "type": "array",
+            "items": { "type": "string" },
+            "$comment": "Profile-level MCP deny list layered on workspace mcp_enabled (W29 #90)."
+          }
+        },
+        "additionalProperties": true
+      },
+      "$comment": "W29 routing profile overlays (distinct from routing.profiles W12 namespace when both present)."
     },
     "mcp_enabled": {
       "type": "array",

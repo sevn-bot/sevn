@@ -39,6 +39,7 @@ from sevn.tools.codes import ToolResultCode
 from sevn.tools.context import ToolContext
 from sevn.tools.integration_gh_repo import GITHUB_INTEGRATION_SERVICE
 from sevn.tools.integration_proxy_client import IntegrationCredentialRequired
+from sevn.tools.mcp_naming import mcp_server_id_from_tool_name, upstream_mcp_tool_name
 
 _UPSTREAM_STATUS_RE = re.compile(r"\bproxy status (\d{3})\b", re.IGNORECASE)
 _GITHUB_REPO_SLUG_RE = re.compile(
@@ -248,22 +249,25 @@ class RuntimeToolBindings:
 
 
 def _server_id_for_tool(tool_name: str) -> str:
-    """Return the MCP server id portion of a dotted tool name (``server.tool``).
+    """Return the MCP server id from a registry tool name.
+
+    Supports W29 ``mcp__server__tool`` names and the legacy ``server.tool`` dot form.
 
     Args:
-        tool_name (str): Registry tool name (typically ``server.tool``).
+        tool_name (str): Registry tool name.
 
     Returns:
-        str: Substring up to the first ``.``; the full string when no dot is present.
+        str: MCP server id substring.
 
     Examples:
+        >>> _server_id_for_tool("mcp__code_review_graph__get_minimal_context_tool")
+        'code_review_graph'
         >>> _server_id_for_tool("code_review_graph.get_minimal_context_tool")
         'code_review_graph'
         >>> _server_id_for_tool("plain")
         'plain'
     """
-    head, sep, _tail = tool_name.partition(".")
-    return head if sep else tool_name
+    return mcp_server_id_from_tool_name(tool_name)
 
 
 def make_integration_call_tool(bindings: RuntimeToolBindings) -> FunctionTool:
@@ -562,7 +566,7 @@ class McpStdioTool(FunctionTool):
         """
         self._client = client
         self._server_id = server_id or _server_id_for_tool(definition_obj.name)
-        upstream_tool_name = definition_obj.name[len(self._server_id) + 1 :] or definition_obj.name
+        upstream_tool_name = upstream_mcp_tool_name(definition_obj.name)
 
         async def _invoke(ctx: ToolContext, **kwargs: Any) -> str:
             try:

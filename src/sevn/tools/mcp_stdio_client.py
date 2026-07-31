@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Mapping
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
@@ -32,6 +33,9 @@ from mcp.client.session import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
 from sevn.tools.base import ToolDefinition
+from sevn.tools.mcp_logging import append_mcp_log
+from sevn.tools.mcp_naming import format_mcp_tool_name
+from sevn.tools.mcp_oauth import resolve_mcp_oauth_env
 
 if TYPE_CHECKING:
     from sevn.tools.context import ToolContext
@@ -55,11 +59,18 @@ class SevnMcpStdioClient:
             read from workspace config (``mcp_servers`` key or ``build_effective_mcp_servers``).
     """
 
-    def __init__(self, mcp_servers: Mapping[str, Mapping[str, Any]]) -> None:
+    def __init__(
+        self,
+        mcp_servers: Mapping[str, Mapping[str, Any]],
+        *,
+        oauth_credentials: Mapping[str, Mapping[str, Any]] | None = None,
+    ) -> None:
         """Bind to the declared server map.
 
         Args:
             mcp_servers (Mapping[str, Mapping[str, Any]]): server_id → ``{command, args}`` rows.
+            oauth_credentials (Mapping[str, Mapping[str, Any]] | None): Optional pre-loaded
+                OAuth token blobs keyed by server id (secrets chain resolution at boot).
 
         Returns:
             None
@@ -70,6 +81,9 @@ class SevnMcpStdioClient:
             ['srv']
         """
         self._servers: dict[str, dict[str, Any]] = {k: dict(v) for k, v in mcp_servers.items()}
+        self._oauth_credentials: dict[str, dict[str, Any]] = {
+            k: dict(v) for k, v in (oauth_credentials or {}).items()
+        }
 
     @property
     def mcp_server_ids(self) -> list[str]:
@@ -152,16 +166,38 @@ class SevnMcpStdioClient:
             msg = f"MCP server '{server_id}' not declared in mcp_servers"
             raise RuntimeError(msg)
         command, args = params
+        row = self._servers.get(server_id) or {}
+        oauth_env = resolve_mcp_oauth_env(row, self._oauth_credentials.get(server_id))
+        base_env = row.get("env")
+        merged_env: dict[str, str] = {}
+        if isinstance(base_env, dict):
+            merged_env.update({str(k): str(v) for k, v in base_env.items()})
+        merged_env.update(oauth_env)
 
-        sp = StdioServerParameters(command=command, args=args)
-        async with asyncio.timeout(_MCP_CALL_TIMEOUT_S):
-            async with stdio_client(sp) as (read_stream, write_stream):
-                async with ClientSession(read_stream, write_stream) as session:
-                    await session.initialize()
-                    result = await session.call_tool(
-                        name=tool_name,
-                        arguments=dict(arguments),
-                    )
+        sp = StdioServerParameters(
+            command=command,
+            args=args,
+            env=merged_env or None,
+        )
+        try:
+            async with asyncio.timeout(_MCP_CALL_TIMEOUT_S):
+                async with stdio_client(sp) as (read_stream, write_stream):
+                    async with ClientSession(read_stream, write_stream) as session:
+                        await session.initialize()
+                        result = await session.call_tool(
+                            name=tool_name,
+                            arguments=dict(arguments),
+                        )
+        except Exception as exc:
+            append_mcp_log(
+                ctx.workspace_path,
+                "call_failed",
+                server_id=server_id,
+                tool_name=tool_name,
+                level="error",
+                error=str(exc),
+            )
+            raise
 
         if result.isError:
             # Surface server-side errors as a plain mapping so McpStdioTool wraps them
@@ -207,14 +243,20 @@ async def list_tools_from_server(
     args: list[str],
     *,
     timeout_s: float = _MCP_DISCOVER_TIMEOUT_S,
+    workspace_path: Path | None = None,
+    server_spec: Mapping[str, Any] | None = None,
+    oauth_credential: Mapping[str, Any] | None = None,
 ) -> list[ToolDefinition]:
     """Discover ``ToolDefinition`` rows by calling ``tools/list`` on one MCP server.
 
     Args:
-        server_id (str): Stable server id used to prefix tool names (``server_id.tool_name``).
+        server_id (str): Stable server id used to prefix tool names (``mcp__server__tool``).
         command (str): Executable for the MCP server subprocess.
         args (list[str]): argv tail.
         timeout_s (float): Discovery timeout.  Defaults to ``_MCP_DISCOVER_TIMEOUT_S``.
+        workspace_path (Path | None): Workspace root for ``logs/mcp.log`` append.
+        server_spec (Mapping[str, Any] | None): Full server row for OAuth env injection.
+        oauth_credential (Mapping[str, Any] | None): Stored OAuth blob for this server.
 
     Returns:
         list[ToolDefinition]: Prefixed descriptors; empty on transport error.
@@ -224,8 +266,19 @@ async def list_tools_from_server(
         >>> inspect.iscoroutinefunction(list_tools_from_server)
         True
     """
+    spec = dict(server_spec) if isinstance(server_spec, dict) else {}
+    oauth_env = resolve_mcp_oauth_env(spec, oauth_credential)
+    base_env = spec.get("env")
+    merged_env: dict[str, str] = {}
+    if isinstance(base_env, dict):
+        merged_env.update({str(k): str(v) for k, v in base_env.items()})
+    merged_env.update(oauth_env)
     try:
-        sp = StdioServerParameters(command=command, args=args)
+        sp = StdioServerParameters(
+            command=command,
+            args=args,
+            env=merged_env or None,
+        )
         async with asyncio.timeout(timeout_s):
             async with stdio_client(sp) as (read_stream, write_stream):
                 async with ClientSession(read_stream, write_stream) as session:
@@ -234,7 +287,7 @@ async def list_tools_from_server(
 
         out: list[ToolDefinition] = []
         for tool in tools_result.tools:
-            qualified_name = f"{server_id}.{tool.name}"
+            qualified_name = format_mcp_tool_name(server_id, tool.name)
             out.append(
                 ToolDefinition(
                     name=qualified_name,
@@ -244,6 +297,12 @@ async def list_tools_from_server(
                     enabled=True,
                 )
             )
+        append_mcp_log(
+            workspace_path,
+            "discover_ok",
+            server_id=server_id,
+            tool_count=len(out),
+        )
         return out
     except Exception as exc:
         # Broad catch: MCP transport errors (McpError, ExceptionGroup wrapping McpError),
@@ -255,6 +314,14 @@ async def list_tools_from_server(
             command,
             exc,
         )
+        append_mcp_log(
+            workspace_path,
+            "discover_failed",
+            server_id=server_id,
+            level="warning",
+            command=command,
+            error=str(exc),
+        )
         return []
 
 
@@ -262,6 +329,8 @@ async def discover_mcp_tool_definitions(
     mcp_servers: Mapping[str, Mapping[str, Any]],
     *,
     timeout_s: float = _MCP_DISCOVER_TIMEOUT_S,
+    workspace_path: Path | None = None,
+    oauth_credentials: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> tuple[ToolDefinition, ...]:
     """Probe each declared MCP server and collect their tool descriptors.
 
@@ -273,6 +342,8 @@ async def discover_mcp_tool_definitions(
     Args:
         mcp_servers (Mapping[str, Mapping[str, Any]]): Server id → ``{command, args}`` rows.
         timeout_s (float): Per-server discovery timeout.
+        workspace_path (Path | None): Workspace root for ``logs/mcp.log``.
+        oauth_credentials (Mapping[str, Mapping[str, Any]] | None): OAuth blobs by server id.
 
     Returns:
         tuple[ToolDefinition, ...]: Flattened discovered tool definitions.
@@ -285,6 +356,7 @@ async def discover_mcp_tool_definitions(
     if not mcp_servers:
         return ()
 
+    oauth_map = oauth_credentials or {}
     tasks: list[tuple[str, asyncio.Task[list[ToolDefinition]]]] = []
     async with asyncio.TaskGroup() as tg:
         for server_id, spec in mcp_servers.items():
@@ -295,8 +367,17 @@ async def discover_mcp_tool_definitions(
                 continue
             args_raw = spec.get("args")
             args: list[str] = [str(a) for a in args_raw] if isinstance(args_raw, list) else []
+            cred = oauth_map.get(server_id)
             task = tg.create_task(
-                list_tools_from_server(server_id, command, args, timeout_s=timeout_s)
+                list_tools_from_server(
+                    server_id,
+                    command,
+                    args,
+                    timeout_s=timeout_s,
+                    workspace_path=workspace_path,
+                    server_spec=spec,
+                    oauth_credential=cred if isinstance(cred, dict) else None,
+                )
             )
             tasks.append((server_id, task))
 
@@ -308,6 +389,8 @@ async def discover_mcp_tool_definitions(
 
 def build_mcp_stdio_client(
     mcp_servers: Mapping[str, Mapping[str, Any]],
+    *,
+    oauth_credentials: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> SevnMcpStdioClient | None:
     """Return a bound :class:`SevnMcpStdioClient` when servers are declared, else ``None``.
 
@@ -319,6 +402,8 @@ def build_mcp_stdio_client(
         mcp_servers (Mapping[str, Mapping[str, Any]]): Effective server map from
             :func:`~sevn.code_understanding.graphify_mcp.build_effective_mcp_servers` or
             equivalent.
+        oauth_credentials (Mapping[str, Mapping[str, Any]] | None): Optional OAuth blobs
+            keyed by server id for subprocess env injection.
 
     Returns:
         SevnMcpStdioClient | None: Live client, or ``None`` when no servers are declared.
@@ -332,7 +417,7 @@ def build_mcp_stdio_client(
     """
     if not mcp_servers:
         return None
-    return SevnMcpStdioClient(mcp_servers)
+    return SevnMcpStdioClient(mcp_servers, oauth_credentials=oauth_credentials)
 
 
 __all__ = [

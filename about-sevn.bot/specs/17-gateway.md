@@ -7,8 +7,13 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
+<<<<<<< HEAD
 last_updated: '2026-08-01'
 fingerprint: sha256:081c650916d0c0786463d9f18402828be65b4949f038ebf6de16bb59cc2d08b3
+=======
+last_updated: '2026-07-31'
+fingerprint: sha256:32e3d781575223a6455e33e97aae2bccaa376062a0959a412235eb867f892850
+>>>>>>> afb21033 (feat(tools)!: standardize MCP tool naming and add OAuth, logs, presets)
 related: []
 sources:
 - src/sevn/gateway/**

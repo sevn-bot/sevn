@@ -1318,7 +1318,10 @@ def create_app(
         )
         # W3: single RuntimeToolBindings factory (integration W2, sandbox W3, MCP W6).
         _mcp_servers_map = build_effective_mcp_servers(ws, ly.content_root)
-        _mcp_tool_defs = await discover_mcp_tool_definitions(_mcp_servers_map)
+        _mcp_tool_defs = await discover_mcp_tool_definitions(
+            _mcp_servers_map,
+            workspace_path=ly.content_root,
+        )
         _proxy_url = (effective_process.proxy_url if effective_process else None) or None
         _runtime_bindings = build_runtime_tool_bindings(
             ws,

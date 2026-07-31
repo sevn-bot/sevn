@@ -9,7 +9,11 @@
 
 ## Level 1 — Overview (non-technical)
 
+<<<<<<< HEAD
 **Config & workspace** is how sevn.bot knows *your* install: where files live, which models and channels are enabled, and what the gateway may touch. Everything operator-facing rolls up to **`sevn.json`** at the workspace root (bound path: `~/.sevn/workspace/sevn.json` when using the default operator home). The workspace directory holds prompts, skills, memory files, and SQLite state under `.sevn/`.
+=======
+**Config & workspace** is how sevn.bot knows *your* install: where files live, which models, channels, and MCP servers are enabled, and what the gateway may touch. Everything operator-facing rolls up to **`sevn.json`** at the workspace root (bound path: `~/.sevn/workspace/sevn.json` when using the default operator home). The workspace directory holds prompts, skills, memory files, SQLite state, and (by default) persistent browser skill profiles under `.sevn/`.
+>>>>>>> afb21033 (feat(tools)!: standardize MCP tool naming and add OAuth, logs, presets)
 
 Edit `sevn.json` through Mission Control, Telegram `/config`, the onboarding wizard, or by hand — then validate before restarting the gateway. When a write replaces the live file, sevn moves the previous copy into **`sevn.json.archive/`** beside it (as `sevn.json.v*`) and prunes that archive using optional **`config_archive`** settings — by default keep the five newest backups (`keep_count: 5`; `retention_days: 0` disables day-based expiry).
 
@@ -36,6 +40,12 @@ Config spans [`src/sevn/config/`](../../src/sevn/config/), workspace layout in [
 **`config_archive` retention** ([`ConfigArchiveWorkspaceConfig`](../../src/sevn/config/sections/config_archive.py); runtime in [`sevn_json_backup.py`](../../src/sevn/config/sevn_json_backup.py)): `config_archive.keep_count` (default `5`) caps archived `sevn.json.v*` files under `sevn.json.archive/`; optional `config_archive.retention_days` drops backups older than N whole days (mtime), matching `logging.retention_days` semantics. Legacy beside-config backups migrate into the archive directory on the next write.
 
 The `permissions` subtree is a JSON object on the root document ([`root.py`](../../src/sevn/config/sections/root.py#L109)). **`permissions.deny_rules`:** optional array of `{tool?, pattern?, domain?, path?, reason?}` objects in [`infra/sevn.schema.json`](../../infra/sevn.schema.json). Each rule is additive deny — match by tool name plus optional command/pattern, domain, or path. Rules apply even in permissive ABAC owner sessions unless you session-ack the tool.
+
+**MCP and routing profiles** are top-level schema keys in [`infra/sevn.schema.json`](../../infra/sevn.schema.json), retained on [`WorkspaceConfig`](../../src/sevn/config/sections/root.py) via `extra="allow"` (no dedicated section modules):
+
+- `mcp_servers` — map of server id → `{command, args}`; optional `env` (static subprocess env, merged before OAuth-resolved vars) and `oauth` (metadata and secret refs only — token blobs live at `oauth.mcp.<server_id>` in the secrets chain)
+- `mcp_enabled` — workspace-default allowlist of those ids; absent means none enabled
+- `routing_profiles` — profile overlays keyed by profile id; each may set `mcp_disabled_servers` to subtract from the workspace allowlist. Distinct from nested `routing.profiles` when both are present
 
 **Schema vs Pydantic gaps:** typed models may include subtrees not yet reflected in [`infra/sevn.schema.json`](../../infra/sevn.schema.json). Notably [`provisioning`](../../src/sevn/config/sections/provisioning.py) (host-dependency auto-install allowlist) and [`coding_agents`](../../src/sevn/config/sections/coding_agents.py) (Coding Agents hub) parse from raw JSON via Pydantic but have **no** top-level schema entries today — validate with `sevn config validate` for schema-covered keys and read the section modules for the full contract.
 

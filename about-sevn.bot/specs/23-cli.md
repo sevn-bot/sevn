@@ -7,8 +7,13 @@ owner: Alex
 summary: Deliver the primary operator and automation surface for install, upgrades,
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
+<<<<<<< HEAD
 last_updated: '2026-08-01'
 fingerprint: sha256:d1957467c6c2c40ee56704e979e2c2d088d3cdbbbb399c199cacf286a6ec3b71
+=======
+last_updated: '2026-07-31'
+fingerprint: sha256:5e2db5bb121f5b494122c38f0418ad95e4e20ff1e4db0f3454caf48efcf32210
+>>>>>>> afb21033 (feat(tools)!: standardize MCP tool naming and add OAuth, logs, presets)
 related: []
 sources:
 - src/sevn/cli/**
@@ -50,6 +55,9 @@ interfaces:
   symbol: register
 - name: register
   file: src/sevn/cli/commands/agent_cmd.py
+  symbol: register
+- name: register
+  file: src/sevn/cli/commands/browser_cmd.py
   symbol: register
 - name: register
   file: src/sevn/cli/commands/channels_cmd.py

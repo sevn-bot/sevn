@@ -7,8 +7,13 @@ owner: Alex
 summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that every
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
+<<<<<<< HEAD
 last_updated: '2026-08-01'
 fingerprint: sha256:e6e90434d4162f106513af12a3caad4262964fb1a54a2c2ab085e09b91da4a5a
+=======
+last_updated: '2026-07-31'
+fingerprint: sha256:ea51e4918e2ab7b3e4b79e9a4d315f76cbb930d7cbbf2eb684db19081d69b70c
+>>>>>>> afb21033 (feat(tools)!: standardize MCP tool naming and add OAuth, logs, presets)
 related: []
 sources:
 - src/sevn/tools/**
@@ -618,3 +623,34 @@ reusing ``TelegramWeb`` inline-keyboard primitives. Destructive menu rows are de
 **Skills (W5):** Tier B exposes operator skills as harness deferred `Skills` capabilities (`tier_b_skills.build_tier_b_skill_capabilities`). Triager-named skill ids scope the include list; each `SKILL.md` is staged to an ephemeral `.sevn-harness-skills/` tree with frontmatter preserved. Script dispatch stays on `sevn_run_skill_script` → `ToolExecutor.dispatch` (same registry contract as native tools).
 
 **CodeMode (W3/W7):** Registry tools marked `code_mode=True` are eligible for the Monty `run_code` sandbox when triage enables CodeMode. Host-side tool calls from sandboxed snippets re-enter `ToolExecutor.dispatch` via the harness function catalog. `SevnAsyncCodeMode` is the tier-B backend; Monty `ResourceLimits` are injected at pool checkout (`_monty_limits.py`, D5/D6). Opt-in `dynamic_catalog` (default off, D9) keeps the `run_code` tool definition byte-stable across lazy tool discovery.
+<<<<<<< HEAD
+=======
+
+### 10.2 open-issues-sweep W28 — browser auth persistence (#92) — append-only
+
+Gateway browser sessions persist cookies and login state via Chrome ``user-data-dir`` profiles
+(``resolve_profile_dir`` in ``src/sevn/browser/chrome.py``). Precedence:
+``SEVN_BROWSER_PROFILE_DIR`` → ``skills.browser.profile_dir`` →
+``skills.social_browser.profile_dir`` → ``<content_root>/.sevn/browser-profiles/<session_id>``.
+
+**W28 decisions (2026-07-31):**
+
+| Topic | Decision |
+|-------|----------|
+| Per-session default | **Kept** — isolation by session id; operators set ``skills.browser.profile_dir`` for a shared stable profile across sessions |
+| Password store | **Configurable** — ``skills.browser.password_store`` / ``SEVN_BROWSER_PASSWORD_STORE``: ``basic`` (default, CI/Docker-safe) or ``system`` (OS keychain) |
+| Reset | ``sevn browser clear-auth`` — closes sevn-spawned browsers and removes profile trees + CDP registries |
+| Redaction | ``sevn.browser.redaction`` scrubs cookie/profile paths from logs and browser tool JSON envelopes |
+| Ephemeral mode | ``resolve_browser_profile_dir(..., ephemeral=True)`` under ``.sevn/browser-ephemeral/`` |
+| Onboarding split | Onboarding uses ``~/.sevn/onboarding-chrome-profile`` (``src/sevn/onboarding/browser_automation.py``) — intentionally separate from gateway session profiles; my.telegram.org cookies do not share Telegram Web session profiles |
+
+### 10.3 open-issues-sweep W29 — MCP naming, OAuth, logs, catalog (#90) — append-only
+
+| Topic | Decision |
+|-------|----------|
+| Tool naming | **Breaking:** qualified MCP tools use ``mcp__<server>__<tool>``; legacy ``server.tool`` dispatch still resolves |
+| Profile MCP | ``routing_profiles.<id>.mcp_disabled_servers`` subtracts from workspace ``mcp_enabled`` |
+| OAuth | Credential JSON at ``oauth.mcp.<server_id>`` via secrets chain; ``mcp_servers.*.oauth`` holds metadata/refs only |
+| Logs | Structured JSON lines appended to ``<workspace>/logs/mcp.log`` on discover/call events |
+| Catalog | ``list_mcp_catalog_presets()`` surfaced read-only on Mission Control ``GET /api/v1/agent/mcp-servers`` |
+>>>>>>> afb21033 (feat(tools)!: standardize MCP tool naming and add OAuth, logs, presets)

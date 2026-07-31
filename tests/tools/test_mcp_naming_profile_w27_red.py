@@ -24,7 +24,6 @@ def _fake_mcp_list_tools(*, tool_name: str = "ping") -> Any:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W29: mcp__server__tool naming convention", strict=False)
 async def test_list_tools_from_server_uses_mcp_double_underscore_convention() -> None:
     """Registered MCP tools use ``mcp__<server>__<tool>`` qualified names."""
     fake_session = AsyncMock()
@@ -55,14 +54,12 @@ async def test_list_tools_from_server_uses_mcp_double_underscore_convention() ->
     assert tools[0].name == "mcp__demo__ping"
 
 
-@pytest.mark.xfail(reason="green after W29: MCP dispatch resolves mcp__server__tool", strict=False)
 def test_server_id_for_tool_parses_mcp_double_underscore_qualified_name() -> None:
     """Runtime dispatch extracts the server id from ``mcp__server__tool`` names."""
     qualified = "mcp__code_review_graph__get_minimal_context_tool"
     assert _server_id_for_tool(qualified) == "code_review_graph"
 
 
-@pytest.mark.xfail(reason="green after W29: MCP tool name formatter", strict=False)
 def test_format_mcp_tool_name_matches_convention() -> None:
     """Public formatter emits stable ``mcp__server__tool`` identifiers."""
     from sevn.tools.mcp_naming import format_mcp_tool_name
@@ -70,7 +67,6 @@ def test_format_mcp_tool_name_matches_convention() -> None:
     assert format_mcp_tool_name("graphify", "query") == "mcp__graphify__query"
 
 
-@pytest.mark.xfail(reason="green after W29: per-profile MCP server disable", strict=False)
 def test_routing_profile_can_disable_mcp_server() -> None:
     """A routing profile may disable an MCP server even when workspace enables it."""
     from sevn.tools.mcp_profile_policy import resolve_mcp_servers_for_profile
@@ -94,9 +90,6 @@ def test_routing_profile_can_disable_mcp_server() -> None:
     assert "code_review_graph" not in effective
 
 
-@pytest.mark.xfail(
-    reason="green after W29: profile MCP policy defaults to workspace list", strict=False
-)
 def test_resolve_mcp_servers_for_profile_honours_workspace_mcp_enabled() -> None:
     """When a profile does not override MCP, workspace ``mcp_enabled`` applies."""
     from sevn.tools.mcp_profile_policy import resolve_mcp_servers_for_profile

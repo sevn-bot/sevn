@@ -7,8 +7,13 @@ owner: Alex
 summary: A general-purpose AI assistant earns its keep by doing things—answering questions,
   fetching pages, opening PRs, and acting on the operator's behalf via tools, skills,
   and tiered executors.
+<<<<<<< HEAD
 last_updated: '2026-08-01'
 fingerprint: sha256:592ba359dc37bce4c3b945d38018a246e85127f4861526e40c7583cc4139236c
+=======
+last_updated: '2026-07-31'
+fingerprint: sha256:e5bbe3583612944150ff6c5fd007ab94f4078d6a61cd4d2b5ef3248ebc581a90
+>>>>>>> afb21033 (feat(tools)!: standardize MCP tool naming and add OAuth, logs, presets)
 related:
 - prd-03-trust-and-control
 - prd-08-coding-companion
