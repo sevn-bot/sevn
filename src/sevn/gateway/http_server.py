@@ -1308,6 +1308,7 @@ def create_app(
             owner_user_ids=owner_user_ids_from_workspace(ws),
             steer_store=steer_store,
         )
+        gateway_router._voice_activation_runtime = _activation_state
         from sevn.infrastructure.tunnel_manager import default_manager, tunnel_pid_file
 
         default_manager.attach_pid_file(tunnel_pid_file(ly.content_root))

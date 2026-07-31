@@ -537,6 +537,14 @@ persona/display-name — not the run inventory. Menu-action callback toasts use 
 inline answer fails, identity buttons (Version id / Deployment id) still emit chat fallback
 text. Slash `/stop` kill callbacks re-edit the picker message and ack the callback query.
 
+## Amendments (open-issues-sweep Batch G W38 — #102 wake-word activation)
+
+Chat → Voice adds wake-word activation controls: toggle
+(``cfg:toggle:voice.activation.enabled``), listening-state status
+(``act:voice:activation:status``), and wake-phrase cycle when the engine supports
+bundled models. Section body summarizes opt-in semantics and D24 privacy guardrails
+(ambient audio never stored or logged until the wake word).
+
 ## Amendments (telegram-menu-redesign W9)
 
 Telegram `/config` ships an eight-tile root keyboard (Chat, Agent, Skills & Tools, Memory,

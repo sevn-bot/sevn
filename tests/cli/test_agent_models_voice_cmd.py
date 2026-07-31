@@ -54,6 +54,7 @@ def test_sevn_models_and_voice_help(runner: CliRunner) -> None:
     voice = runner.invoke(app, ["voice", "--help"], env={"NO_COLOR": "1"})
     assert voice.exit_code == 0
     assert "status" in voice.stdout
+    assert "activation" in voice.stdout
 
 
 def _patch_dashboard_via_gateway(

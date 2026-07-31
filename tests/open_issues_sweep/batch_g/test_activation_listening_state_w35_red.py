@@ -17,7 +17,6 @@ from sevn.cli.app import app
 from sevn.gateway.channel_router import IncomingMessage
 
 
-@pytest.mark.xfail(reason="green after W38: sevn voice activation status CLI", strict=False)
 def test_cli_activation_status_reports_listening_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -46,7 +45,6 @@ def test_cli_activation_status_reports_listening_state(
     }
 
 
-@pytest.mark.xfail(reason="green after W38: enable/disable flips listening state", strict=False)
 def test_cli_activation_enable_disable_flips_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -82,18 +80,16 @@ def test_cli_activation_enable_disable_flips_state(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W38: Telegram activation status action", strict=False)
 async def test_telegram_activation_status_action_reports_listening_state(tmp_path: Path) -> None:
     import_voice_activation_module()
     router, cap, _ws = _build_router(tmp_path)
     msg = IncomingMessage(
         channel="telegram",
-        chat_id="1",
-        user_id="1",
+        user_id="u1",
         text="",
-        metadata={"callback_query_id": "cq-activation-status"},
+        metadata={"callback_query_id": "cq-activation-status", "chat_id": 1},
     )
-    handler = getattr(router, "_menu_actions", None)
+    handler = getattr(router, "_menu_action_router", None)
     assert handler is not None
     handle = getattr(handler, "_handle_voice_activation_status", None)
     assert handle is not None, "act:voice:activation:status handler missing"

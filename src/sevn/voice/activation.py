@@ -10,10 +10,14 @@ Exports:
     activation_config_key_paths — dotted config paths under ``voice.activation.*``.
     activation_supported_platform — host/container gate for capture (D25).
     build_wake_word_listener — factory when enabled and available.
+    format_activation_status — plain-text activation status (W38).
     has_input_device — best-effort mic probe without opening a stream.
     maybe_start_wake_word_listener — gateway lifespan startup hook.
     maybe_stop_wake_word_listener — gateway lifespan shutdown hook.
+    activation_status_payload — CLI/Telegram listening-state snapshot (W38).
+    available_wake_word_models — engine-derived wake phrase choices (W38).
     probe_voice_activation — structured availability verdict (D25).
+    resolve_listening_state — D24 three-way listening verdict (W38).
     resolve_voice_activation_settings — merge config with defaults.
     voice_activation_config_enabled — ``voice.activation.enabled`` alone.
     voice_activation_enabled — conjunctive ``voice.enabled`` + activation.
@@ -31,7 +35,7 @@ from collections.abc import AsyncIterator
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from sevn.config.defaults import (
     DEFAULT_VOICE_ACTIVATION_ENABLED,
@@ -46,6 +50,8 @@ from sevn.voice.factory import build_stt_pipeline, voice_enabled, voice_runtime_
 from sevn.voice.frame_sources import build_live_frame_source
 from sevn.voice.trace_events import emit_voice_event
 from sevn.voice.wake_engine import WakeWordEngine, build_wake_word_engine
+
+ListeningState = Literal["disabled", "enabled_listening", "enabled_unavailable"]
 
 _ACTIVATION_CONFIG_PREFIX = "voice.activation"
 _WAKE_SESSION_ID = "_wake_word"
@@ -261,6 +267,179 @@ def has_input_device() -> bool:
         return any(int(d.get("max_input_channels") or 0) > 0 for d in devices)
     except Exception:
         return False
+
+
+def available_wake_word_models(*, engine_id: str | None = None) -> tuple[str, ...]:
+    """Return wake phrases the configured offline engine can load (W38.4).
+
+    Args:
+        engine_id (str | None): ``voice.activation.engine`` value.
+
+    Returns:
+        tuple[str, ...]: Human-readable phrases; empty when the engine is unsupported.
+
+    Examples:
+        >>> models = available_wake_word_models(engine_id="openwakeword")
+        >>> isinstance(models, tuple)
+        True
+    """
+    chosen = (engine_id or DEFAULT_VOICE_ACTIVATION_ENGINE).strip().casefold()
+    if chosen != "openwakeword":
+        return ()
+    if voice_wake_extra_installed():
+        try:
+            from openwakeword.model import Model
+
+            model = Model()
+            ids = tuple(sorted(str(k) for k in model.models))
+            if ids:
+                return tuple(_wake_model_id_to_phrase(mid) for mid in ids)
+        except Exception:
+            pass
+    return _fallback_wake_phrases()
+
+
+def _fallback_wake_phrases() -> tuple[str, ...]:
+    """Bundled openWakeWord model ids mapped to operator-facing phrases.
+
+    Returns:
+        tuple[str, ...]: Default wake phrases when the engine extra is absent.
+
+    Examples:
+        >>> "hey jarvis" in _fallback_wake_phrases()
+        True
+    """
+    return ("hey jarvis", "alexa", "hey mycroft", "hey sevn")
+
+
+def _wake_model_id_to_phrase(model_id: str) -> str:
+    """Map an openWakeWord model slug to a display phrase.
+
+    Args:
+        model_id (str): Engine model identifier such as ``hey_jarvis``.
+
+    Returns:
+        str: Human-readable wake phrase.
+
+    Examples:
+        >>> _wake_model_id_to_phrase("hey_jarvis")
+        'hey jarvis'
+    """
+    slug = model_id.strip().casefold()
+    mapping = {
+        "hey_jarvis": "hey jarvis",
+        "alexa": "alexa",
+        "hey_mycroft": "hey mycroft",
+    }
+    return mapping.get(slug, slug.replace("_", " "))
+
+
+def resolve_listening_state(
+    ws: WorkspaceConfig,
+    *,
+    runtime_listening: bool | None = None,
+) -> ListeningState:
+    """Return the D24 three-way listening verdict for operator surfaces (W38).
+
+    Args:
+        ws (WorkspaceConfig): Parsed workspace document.
+        runtime_listening (bool | None): Gateway lifespan ``listening`` flag when known.
+
+    Returns:
+        ListeningState: ``disabled``, ``enabled_listening``, or ``enabled_unavailable``.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> resolve_listening_state(WorkspaceConfig.minimal())
+        'disabled'
+    """
+    if not voice_activation_config_enabled(ws):
+        return "disabled"
+    if runtime_listening is True:
+        return "enabled_listening"
+    return "enabled_unavailable"
+
+
+def activation_status_payload(
+    ws: WorkspaceConfig,
+    *,
+    runtime_listening: bool | None = None,
+) -> dict[str, Any]:
+    """Build JSON-safe activation status for CLI and Telegram (W38).
+
+    Args:
+        ws (WorkspaceConfig): Parsed workspace document.
+        runtime_listening (bool | None): Live gateway listening flag when wired.
+
+    Returns:
+        dict[str, Any]: ``listening_state``, settings, verdict, and privacy hints.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> activation_status_payload(WorkspaceConfig.minimal())["listening_state"]
+        'disabled'
+    """
+    settings = resolve_voice_activation_settings(ws, listening=runtime_listening is True)
+    verdict = probe_voice_activation(ws)
+    state = resolve_listening_state(ws, runtime_listening=runtime_listening)
+    models = available_wake_word_models(engine_id=settings.engine)
+    return {
+        "listening_state": state,
+        "activation_enabled": voice_activation_config_enabled(ws),
+        "voice_enabled": voice_enabled(ws),
+        "wake_word": settings.wake_word,
+        "engine": settings.engine,
+        "available_wake_words": list(models),
+        "wake_word_selectable": bool(models),
+        "verdict": verdict,
+        "privacy": (
+            "Opt-in (default-off). Ambient audio stays in memory until the wake word; "
+            "only post-activation utterances may be written under channel_files/ and "
+            "transcribed. Raw audio and non-activated transcripts are never logged or traced. "
+            "Disable activation or stop the gateway to close the mic."
+        ),
+    }
+
+
+def format_activation_status(data: dict[str, Any]) -> str:
+    """Render :func:`activation_status_payload` as plain text.
+
+    Args:
+        data (dict[str, Any]): Payload from :func:`activation_status_payload`.
+
+    Returns:
+        str: Human-readable status lines.
+
+    Examples:
+        >>> "listening_state" in format_activation_status({"listening_state": "disabled"})
+        True
+    """
+    state = str(data.get("listening_state") or "disabled")
+    labels = {
+        "disabled": "disabled (mic closed)",
+        "enabled_listening": "listening (mic open for wake word)",
+        "enabled_unavailable": "enabled but unavailable (mic not open)",
+    }
+    lines = [
+        f"listening_state: {labels.get(state, state)}",
+        f"activation_enabled: {data.get('activation_enabled')}",
+        f"wake_word: {data.get('wake_word')}",
+        f"engine: {data.get('engine')}",
+    ]
+    verdict = data.get("verdict")
+    if isinstance(verdict, dict):
+        reason = str(verdict.get("reason") or "").strip()
+        if reason:
+            lines.append(f"reason: {reason}")
+    if data.get("wake_word_selectable"):
+        words = data.get("available_wake_words") or []
+        if words:
+            lines.append(f"available_wake_words: {', '.join(str(w) for w in words)}")
+    privacy = data.get("privacy")
+    if isinstance(privacy, str) and privacy.strip():
+        lines.append("")
+        lines.append(privacy.strip())
+    return "\n".join(lines)
 
 
 def probe_voice_activation(ws: WorkspaceConfig) -> dict[str, Any]:
@@ -777,15 +956,20 @@ async def maybe_stop_wake_word_listener(
 
 __all__ = [
     "AudioFrameSource",
+    "ListeningState",
     "VoiceActivationSettings",
     "WakeWordListener",
     "activation_config_key_paths",
+    "activation_status_payload",
     "activation_supported_platform",
+    "available_wake_word_models",
     "build_wake_word_listener",
+    "format_activation_status",
     "has_input_device",
     "maybe_start_wake_word_listener",
     "maybe_stop_wake_word_listener",
     "probe_voice_activation",
+    "resolve_listening_state",
     "resolve_voice_activation_settings",
     "voice_activation_config_enabled",
     "voice_activation_enabled",

@@ -858,6 +858,14 @@ Root CLI ``rich_help_panel`` groups mirror the eight Telegram ``/config`` tiles
 slugs derived from ``menu_registry`` (``config_paths.menu_registry_root_slugs()``).
 ``make cli-help-docs-check`` gates panel drift.
 
+## Amendments (open-issues-sweep Batch G W38 — #102 wake-word activation)
+
+``sevn voice activation status`` reports ``listening_state``
+(``disabled`` | ``enabled_listening`` | ``enabled_unavailable``), availability
+verdict, wake phrase, and privacy notes. ``sevn voice activation enable|disable``
+mutates ``voice.activation.enabled`` (default-off, D24). Restart the gateway after
+toggling so the microphone opens or closes.
+
 ## Human-input needed
 
 Prose body not yet authored (W9 scope). Normative contract requires operator or

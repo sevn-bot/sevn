@@ -255,6 +255,26 @@ post-activation utterance capture. Inbound voice *attachments* already pass thro
 never reach the scanner (D24). W37 will wire ``scan_voice`` for the post-activation
 utterance only — no second overlapping config key.
 
+### Operator surfaces (Batch G W38 — #102)
+
+**CLI:** ``sevn voice activation status|enable|disable`` reports the D24
+``listening_state`` (`disabled` | `enabled_listening` | `enabled_unavailable`),
+availability verdict, wake phrase, and privacy guardrails. Enable/disable mutates
+``voice.activation.enabled`` in ``sevn.json``; restart the gateway to open or close
+the microphone.
+
+**Telegram:** ``/config`` → Chat → Voice exposes a wake-word toggle
+(``cfg:toggle:voice.activation.enabled``), status row (``act:voice:activation:status``),
+and wake-phrase cycle when the engine exposes bundled models.
+
+**Wake-word selection:** openWakeWord phrases are derived from bundled models
+(``available_wake_word_models``); custom phrases outside the bundle are not supported.
+
+**Privacy (D24):** activation is opt-in and default-off. Ambient audio stays in memory
+until the wake word; only post-activation utterances may be written under
+``channel_files/`` and transcribed. Raw audio and non-activated transcripts are never
+logged or traced. Disable activation or stop the gateway to verify the mic is closed.
+
 ## Human-input needed
 
 Prose body not yet authored (W9 scope). Normative contract requires operator or

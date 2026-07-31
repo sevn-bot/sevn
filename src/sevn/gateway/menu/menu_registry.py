@@ -340,6 +340,33 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         implemented=True,
         notes="Local voice settings dump (W7a)",
     )
+    add(
+        "C3.8",
+        _toggle("voice.activation.enabled"),
+        "C",
+        "chat_voice",
+        "Wake-word activation",
+        implemented=True,
+        notes="Opt-in wake-word toggle (Batch G W38)",
+    )
+    add(
+        "C3.9",
+        _exact("act:voice:activation:status"),
+        "C",
+        "chat_voice",
+        "Wake-word status",
+        implemented=True,
+        notes="Listening state + availability (D24)",
+    )
+    add(
+        "C3.10",
+        r"^cfg:voice:activation:wake:.*$",
+        "C",
+        "chat_voice",
+        "Wake phrase cycle",
+        implemented=True,
+        notes="Cycles engine-supported wake phrases (W38.4)",
+    )
 
     # --- C4. Models ---
     add(

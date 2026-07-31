@@ -422,6 +422,8 @@ def parse_action_callback(data: str) -> tuple[ActionKind, str, str | None] | Non
             return ("action", key, None)
         if key.startswith("voice:engine:"):
             return ("action", key, None)
+        if key.startswith("voice:activation:wake:"):
+            return ("action", key, None)
         if key.endswith((":off", ":on")):
             parts = key.rsplit(":", 1)
             return ("toggle", parts[0].replace(":", "."), parts[1])
@@ -628,6 +630,8 @@ class MenuActionRouter:
                 return await self._handle_shortcuts_list(msg, raw, session_id=session_id)
             if target == "voice:status":
                 return await self._handle_voice_status(msg, raw)
+            if target == "voice:activation:status":
+                return await self._handle_voice_activation_status(msg, raw)
             if target == "voice:show":
                 return await self._handle_voice_show(msg, raw)
             if target == "channels:status":
@@ -722,6 +726,8 @@ class MenuActionRouter:
                 return await self._handle_voice_stt_cycle(msg, raw, target)
             if target.startswith("voice:engine:"):
                 return await self._handle_voice_engine_cycle(msg, raw, target)
+            if target.startswith("voice:activation:wake:"):
+                return await self._handle_voice_activation_wake_cycle(msg, raw, target)
             if target == "models:swap":
                 return await self._handle_models_swap(msg, raw)
             if target.startswith("models:pick:"):
@@ -1398,6 +1404,107 @@ class MenuActionRouter:
         await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
         await self._answer_chat_action(msg, "Voice probe sent")
         return None
+
+    def _voice_activation_runtime_listening(self) -> bool | None:
+        """Return live gateway listening flag when wired on the router.
+
+        Returns:
+            bool | None: ``True``/``False`` when runtime state is attached; else ``None``.
+
+        Examples:
+            >>> router = MenuActionRouter.__new__(MenuActionRouter)
+            >>> router._router = type("_R", (), {})()
+            >>> router._voice_activation_runtime_listening() is None
+            True
+        """
+        runtime = getattr(self._router, "_voice_activation_runtime", None)
+        if isinstance(runtime, dict) and "listening" in runtime:
+            return bool(runtime.get("listening"))
+        return None
+
+    async def _handle_voice_activation_status(
+        self, msg: IncomingMessage, callback_data: str
+    ) -> str | None:
+        """Post wake-word listening state (``act:voice:activation:status`` — W38).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_voice_activation_status)
+            True
+        """
+        _ = callback_data
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.voice.activation import activation_status_payload, format_activation_status
+
+        payload = activation_status_payload(
+            self._workspace,
+            runtime_listening=self._voice_activation_runtime_listening(),
+        )
+        body = format_activation_status(payload)
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        state = str(payload.get("listening_state") or "disabled")
+        await self._answer_chat_action(msg, f"Wake-word {state.replace('_', ' ')}")
+        return None
+
+    async def _handle_voice_activation_wake_cycle(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        target: str,
+    ) -> str | None:
+        """Cycle ``voice.activation.wake_word`` through engine-supported phrases (W38.4).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            target (str): Parsed action target (``voice:activation:wake:<suffix>``).
+
+        Returns:
+            str | None: Toast text, or ``None`` when the config menu was edited in place.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_voice_activation_wake_cycle)
+            True
+        """
+        from sevn.voice.activation import (
+            available_wake_word_models,
+            resolve_voice_activation_settings,
+        )
+
+        suffix = target.removeprefix("voice:activation:wake:").strip()
+        settings = resolve_voice_activation_settings(self._workspace)
+        choices = available_wake_word_models(engine_id=settings.engine)
+        if not choices:
+            toast = "Wake phrase not selectable for this engine."
+            answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+            return None if answered else toast
+        current = settings.wake_word.strip().casefold()
+        normalized = [c.strip().casefold() for c in choices]
+        if suffix and suffix != "next" and suffix.casefold() in normalized:
+            new_word = choices[normalized.index(suffix.casefold())]
+        else:
+            try:
+                idx = normalized.index(current)
+            except ValueError:
+                idx = -1
+            new_word = choices[(idx + 1) % len(choices)]
+
+        def _apply(doc: dict[str, Any]) -> None:
+            _set_nested(doc, "voice.activation.wake_word", new_word)
+
+        mutate_sevn_json(self._sevn_json, _apply)
+        self._reload_workspace()
+        toast = f"Wake phrase: {new_word}"
+        answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
+        return None if answered else toast
 
     def _mission_runtime_channel_map(self) -> dict[str, Any]:
         """Return live channel health from gateway mission state when wired.
