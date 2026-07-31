@@ -8,7 +8,7 @@ summary: 'Deliver a single trust boundary for credentials: backend modules + TTL
   under src/sevn/security/, wired exclusively by the egress proxy (src/sevn/proxy/)
   so agent-facing processes never see raw k'
 last_updated: '2026-07-31'
-fingerprint: sha256:1feb96f23658dac3a7d2a73594908dce6960eff08ca8c453e86dbd86fa66f548
+fingerprint: sha256:536494a42242b4b08323c9e2e5740e886e85ac3d4472c316fa548dabf563ce52
 related: []
 sources:
 - src/sevn/security/secrets/**
@@ -102,6 +102,18 @@ interfaces:
 - name: SecretsBackend
   file: src/sevn/security/secrets/protocol.py
   symbol: SecretsBackend
+- name: bind_routing_secrets_scope
+  file: src/sevn/security/secrets/routing_scope.py
+  symbol: bind_routing_secrets_scope
+- name: current_routing_secrets_scope
+  file: src/sevn/security/secrets/routing_scope.py
+  symbol: current_routing_secrets_scope
+- name: reset_routing_secrets_scope
+  file: src/sevn/security/secrets/routing_scope.py
+  symbol: reset_routing_secrets_scope
+- name: scoped_secret_logical_key
+  file: src/sevn/security/secrets/routing_scope.py
+  symbol: scoped_secret_logical_key
 - name: EnvUnresolvedError
   file: src/sevn/security/secrets/value_expand.py
   symbol: EnvUnresolvedError

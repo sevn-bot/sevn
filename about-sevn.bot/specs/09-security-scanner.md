@@ -8,7 +8,7 @@ summary: Deliver a single scanner subsystem that runs in the gateway process so 
   content is filtered before the Triager or any routing model sees user-visible text,
   transcripts, or selected tool output.
 last_updated: '2026-07-31'
-fingerprint: sha256:7386c50d4cbd5dc30b4888a0740a0705128acd3291e7b69d67a385228ca04f7d
+fingerprint: sha256:2877301a402824421f331e029573b19931c9ba1ded61bc23ffe4fc668c73b547
 related: []
 sources:
 - src/sevn/security/**
@@ -279,6 +279,18 @@ interfaces:
 - name: SecretsBackend
   file: src/sevn/security/secrets/protocol.py
   symbol: SecretsBackend
+- name: bind_routing_secrets_scope
+  file: src/sevn/security/secrets/routing_scope.py
+  symbol: bind_routing_secrets_scope
+- name: current_routing_secrets_scope
+  file: src/sevn/security/secrets/routing_scope.py
+  symbol: current_routing_secrets_scope
+- name: reset_routing_secrets_scope
+  file: src/sevn/security/secrets/routing_scope.py
+  symbol: reset_routing_secrets_scope
+- name: scoped_secret_logical_key
+  file: src/sevn/security/secrets/routing_scope.py
+  symbol: scoped_secret_logical_key
 - name: EnvUnresolvedError
   file: src/sevn/security/secrets/value_expand.py
   symbol: EnvUnresolvedError
