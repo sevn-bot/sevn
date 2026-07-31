@@ -1713,6 +1713,19 @@ discovery off the boot critical path without changing turn output.
 Opt-in ``gateway.cache_session_registry`` reuses in-process registry snapshots
 via the W15 fingerprint seam. Mission Control samples TTFT per stage when wired.
 
+## Amendments (voice activation W37)
+
+Gateway lifespan starts an optional wake-word listener when ``voice.enabled`` and
+``voice.activation.enabled`` are both true **and** ``probe_voice_activation`` reports
+``available`` (``voice-wake`` extra installed, supported platform, input device present).
+Startup and shutdown hooks live in ``maybe_start_wake_word_listener`` /
+``maybe_stop_wake_word_listener`` (``src/sevn/voice/activation.py``), wired from the
+FastAPI lifespan in ``http_server.py`` beside ``maybe_preload_local_tts``. The listener
+does **not** open an input stream when activation is disabled or unavailable (D24/D25);
+shutdown drains the background task with ``gateway.shutdown_timeout_s``. Ambient frames
+stay in memory only; post-activation utterances reuse the existing STT chain and attachment
+caps.
+
 ## Amendments (telegram-menu-redesign W9)
 
 Telegram `/config` callback routing serves the redesigned eight-tile tree via

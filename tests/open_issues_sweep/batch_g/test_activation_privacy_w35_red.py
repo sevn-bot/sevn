@@ -44,7 +44,6 @@ def _trace_attrs_contain_audio_or_transcript(events: list[TraceEvent]) -> list[s
         ),
     ],
 )
-@pytest.mark.xfail(reason="green after W37: ambient frames never persisted", strict=False)
 async def test_non_activated_audio_writes_no_attachment_files(
     tmp_path: Path,
     scenario: FakeAudioScenario,
@@ -68,7 +67,6 @@ async def test_non_activated_audio_writes_no_attachment_files(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W37: ambient audio never transcribed", strict=False)
 async def test_non_activated_audio_produces_no_transcript(
     tmp_path: Path,
     mock_stt_pipeline: AsyncMock,
@@ -87,7 +85,6 @@ async def test_non_activated_audio_produces_no_transcript(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W37: ambient audio never traced", strict=False)
 async def test_non_activated_audio_emits_no_audio_bearing_trace_attrs(
     tmp_path: Path,
     recording_trace_sink: _RecordingTraceSink,

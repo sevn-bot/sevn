@@ -19,9 +19,6 @@ from tests.open_issues_sweep.batch_g.conftest import (
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W37: activation hands off to existing STT chain", strict=False
-)
 async def test_activation_invokes_transcribe_or_placeholder_once(
     tmp_path: Path,
     mock_stt_pipeline: AsyncMock,
@@ -40,13 +37,13 @@ async def test_activation_invokes_transcribe_or_placeholder_once(
         trace=None,
         attachments_dir=tmp_path / "attachments",
         wake_word="hey sevn",
+        simulate_activation_at_frame=scenario.activation_at_frame,
     )
     await listener.run_until_idle(max_frames=len(scenario.frames))
     mock_stt_pipeline.transcribe_or_placeholder.assert_awaited_once()
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W37: no parallel transcription path", strict=False)
 async def test_activation_does_not_call_alternate_transcription_helper(
     tmp_path: Path,
     mock_stt_pipeline: AsyncMock,
