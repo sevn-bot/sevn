@@ -8,7 +8,7 @@ summary: 'Deliver the browser conversational surface required by prd-01-conversa
   §5.1: owner-only WebSocket chat, static SPA shell, and session continuity with Telegram
   via the shared SessionMa'
 last_updated: '2026-07-31'
-fingerprint: sha256:873655d657c47fcd3f63d7d76ae898413c84c66d189a211dbcaf55d09d634112
+fingerprint: sha256:8b387643bdeac57e14abd497e9a673d52b25e7f7cc4bbfb24b8961fceb7ff128
 related: []
 sources:
 - src/sevn/channels/**

@@ -8,7 +8,7 @@ summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / sa
   (when routed through the execution sandbox), process when configured for sandbox
   routing, and skill subprocesses spawned b
 last_updated: '2026-07-31'
-fingerprint: sha256:3de9c856fdaa3ecda088763e42ab64892fd1cec97b5eea0617adbb40c1f2ee49
+fingerprint: sha256:95d3b292d439ca974288e775bcc65ba5a57e97470442104afc7ada3fdc563ccc
 related: []
 sources:
 - src/sevn/security/**
@@ -46,6 +46,9 @@ interfaces:
 - name: read_limited_body
   file: src/sevn/security/ingress_policy.py
   symbol: read_limited_body
+- name: wire_ingress_body_limit
+  file: src/sevn/security/ingress_policy.py
+  symbol: wire_ingress_body_limit
 - name: BlockReason
   file: src/sevn/security/llm_guard_scanner.py
   symbol: BlockReason
