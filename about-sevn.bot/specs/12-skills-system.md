@@ -8,7 +8,7 @@ summary: 'Own everything under workspace/skills/: how skills are discovered, val
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
 last_updated: '2026-07-31'
-fingerprint: sha256:caaba03119d1497c2b3755558a2d02ce935b0c227d4178f4b8d820c15a2cdffb
+fingerprint: sha256:35aa9c11136817dba8e61eebd34fa872893492d12fa7f9a4101031438523d9e3
 related: []
 sources:
 - src/sevn/skills/**
@@ -437,6 +437,9 @@ interfaces:
 - name: SkillsManager
   file: src/sevn/skills/manager.py
   symbol: SkillsManager
+- name: core_skill_discovery_skipped
+  file: src/sevn/skills/manager.py
+  symbol: core_skill_discovery_skipped
 - name: did_you_mean_skill_script
   file: src/sevn/skills/manager.py
   symbol: did_you_mean_skill_script
@@ -593,6 +596,9 @@ interfaces:
 - name: skill_setup_status
   file: src/sevn/skills/setup.py
   symbol: skill_setup_status
+- name: skill_setup_telegram_summary
+  file: src/sevn/skills/setup.py
+  symbol: skill_setup_telegram_summary
 - name: gate_social_media_manager_core_skill
   file: src/sevn/skills/social_media_manager.py
   symbol: gate_social_media_manager_core_skill
