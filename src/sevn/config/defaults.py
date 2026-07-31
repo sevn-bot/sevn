@@ -127,6 +127,10 @@ DEFAULT_GATEWAY_RATE_LIMIT_CAPACITY: Final[float] = 30.0
 DEFAULT_GATEWAY_RATE_LIMIT_REFILL_PER_SECOND: Final[float] = 1.5
 DEFAULT_GATEWAY_SHUTDOWN_DRAIN_TIMEOUT_S: Final[float] = 20.0
 
+# Turn startup / TTFT perf toggles (#78, W30; D9 default-off).
+DEFAULT_GATEWAY_DEFER_MCP_DISCOVERY: Final[bool] = False
+DEFAULT_GATEWAY_CACHE_SESSION_REGISTRY: Final[bool] = False
+
 # ``dispatcher_callbacks`` dedupe row retention (`specs/17-gateway.md` §3.4).
 DEFAULT_DISPATCHER_CALLBACKS_TTL_SECONDS: Final[int] = 7 * 24 * 3600
 

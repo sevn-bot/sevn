@@ -184,6 +184,7 @@ from sevn.skills.browser_session import (
 )
 from sevn.storage.paths import traces_sqlite_path
 from sevn.storage.sqlite import open_sevn_sqlite
+from sevn.tools.base import ToolDefinition
 from sevn.tools.mcp_stdio_client import discover_mcp_tool_definitions
 from sevn.tools.runtime_bindings_factory import build_runtime_tool_bindings
 from sevn.tools.spill_gc import prune_orphan_tool_result_dirs
@@ -1318,10 +1319,19 @@ def create_app(
         )
         # W3: single RuntimeToolBindings factory (integration W2, sandbox W3, MCP W6).
         _mcp_servers_map = build_effective_mcp_servers(ws, ly.content_root)
-        _mcp_tool_defs = await discover_mcp_tool_definitions(
-            _mcp_servers_map,
-            workspace_path=ly.content_root,
-        )
+        from sevn.config.sections.accessors import defer_mcp_discovery_enabled
+
+        if defer_mcp_discovery_enabled(ws):
+            _mcp_tool_defs: tuple[ToolDefinition, ...] = ()
+            logger.info(
+                "gateway_boot defer_mcp_discovery=true mcp_servers={} — discovery on first turn",
+                len(_mcp_servers_map),
+            )
+        else:
+            _mcp_tool_defs = await discover_mcp_tool_definitions(
+                _mcp_servers_map,
+                workspace_path=ly.content_root,
+            )
         _proxy_url = (effective_process.proxy_url if effective_process else None) or None
         _runtime_bindings = build_runtime_tool_bindings(
             ws,

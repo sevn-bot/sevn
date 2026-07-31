@@ -84,6 +84,10 @@ from sevn.config.model_resolution import (
     resolve_model_slot,
     resolve_transport_for_model_id,
 )
+from sevn.config.sections.accessors import (
+    cache_session_registry_enabled,
+    defer_mcp_discovery_enabled,
+)
 from sevn.config.sections.subagents import Role as SubAgentRole
 from sevn.config.settings import ProcessSettings
 from sevn.config.sevn_repo import resolve_sevn_checkout_for_workspace
@@ -141,6 +145,14 @@ from sevn.gateway.telegram.telegram_quick_actions import (
     GATEWAY_OUTBOUND_PHASE_KEY,
     QuickActionCallbackHandler,
 )
+from sevn.gateway.telemetry.ttft import (
+    SessionRegistryTurnCache,
+    TurnStartupTimings,
+    log_turn_startup_timings,
+    record_ttft_sample,
+    resolve_mcp_tool_definitions_lazy,
+    session_registry_cache_key,
+)
 from sevn.gateway.triage.triage_audit import persist_triage_decision
 from sevn.gateway.triage.triage_context import (
     is_triager_enabled,
@@ -178,6 +190,8 @@ from sevn.tools.permissions import (
 from sevn.tools.registry import build_session_registry
 from sevn.tools.runtime_dispatch import RuntimeToolBindings
 from sevn.workspace.layout import WorkspaceLayout
+
+_SESSION_REGISTRY_TURN_CACHE = SessionRegistryTurnCache()
 
 # Typed reason → user-facing line lives in ``sevn.prompts.fallbacks.NO_ANSWER_MESSAGES``.
 # Re-exported here for tests that import ``_NO_ANSWER_MESSAGES`` from this module.
@@ -633,6 +647,7 @@ def _build_turn_stage_latencies(
     triager_ms: int | None,
     executor_ms: int | None,
     rounds_used: int = 0,
+    ttft_ms: float | None = None,
 ) -> dict[str, float]:
     """Map a completed turn to per-stage latency samples for Mission Control (D3).
 
@@ -640,10 +655,11 @@ def _build_turn_stage_latencies(
         triager_ms (int | None): Triager wall time in milliseconds.
         executor_ms (int | None): Tier-B/C/D executor wall time in milliseconds.
         rounds_used (int): Tool-loop rounds reported by the executor outcome.
+        ttft_ms (float | None): First-token latency in milliseconds (#78).
 
     Returns:
         dict[str, float]: Stage label → latency ms (``triager``, ``tool-loop``,
-        ``upstream``).
+        ``upstream``, ``ttft``).
 
     Examples:
         >>> _build_turn_stage_latencies(triager_ms=120, executor_ms=4_000, rounds_used=2)
@@ -652,6 +668,8 @@ def _build_turn_stage_latencies(
         {'triager': 50.0, 'upstream': 90000.0}
     """
     timings: dict[str, float] = {}
+    if ttft_ms is not None and ttft_ms > 0:
+        timings["ttft"] = float(ttft_ms)
     if triager_ms is not None and triager_ms > 0:
         timings["triager"] = float(triager_ms)
     exec_ms = float(executor_ms or 0)
@@ -829,6 +847,11 @@ class _L1TurnState:
     executor_started_ns: int | None = None
     executor_rounds_used: int = 0
     stage_latencies_ms: dict[str, float] = dataclasses.field(default_factory=dict)
+    turn_started_ns: int | None = None
+    ttft_ms: float | None = None
+    ttft_recorded: bool = False
+    session_id: str = ""
+    correlation_id: str = ""
     progress_task: asyncio.Task[None] | None = None
     secrets_scope_token: contextvars.Token[str | None] | None = None
 
@@ -905,7 +928,8 @@ def build_agent_run_turn(
 
     process = process_settings or ProcessSettings()
     bindings = runtime_bindings or RuntimeToolBindings()
-    mcp_defs: tuple[ToolDefinition, ...] = mcp_tool_definitions
+    mcp_defs_box: list[tuple[ToolDefinition, ...]] = [mcp_tool_definitions]
+    mcp_servers_map = dict(getattr(runtime_bindings, "mcp_servers", None) or {})
     plan_registry = PlanGateWaitRegistry()
     plan_handler = PlanGateCallbackHandler(conn, plan_registry)
     evo_registry = EvolutionApprovalWaitRegistry()
@@ -1435,6 +1459,9 @@ def build_agent_run_turn(
         from sevn.agent.tracing.subagent_trace import bind_subagent_turn_context
 
         bind_subagent_turn_context(turn_id=correlation_id, turn_span_id=turn_span_id)
+        l1_state.turn_started_ns = time_ns()
+        l1_state.session_id = session_id
+        l1_state.correlation_id = correlation_id
         await _emit_gateway_span(
             trace,
             kind="gateway.turn.start",
@@ -1572,16 +1599,42 @@ def build_agent_run_turn(
             triage_ctx = triage_ctx.model_copy(
                 update={"bootstrap_capture_active": bootstrap_active},
             )
-        session_exe, session_tool_set = await asyncio.to_thread(
-            build_session_registry,
-            workspace_config=workspace,
-            runtime_bindings=bindings,
-            extra_mcp=mcp_defs,
-            workspace_root=layout.content_root,
-            layout=layout,
-            trace_sink=trace,
-            include_bootstrap_tools=bootstrap_active,
+        resolved_mcp_defs = await resolve_mcp_tool_definitions_lazy(
+            workspace=workspace,
+            content_root=layout.content_root,
+            mcp_defs_box=mcp_defs_box,
+            mcp_servers_map=mcp_servers_map,
         )
+        registry_cache_hit = False
+        cache_key: str | None = None
+        if cache_session_registry_enabled(workspace):
+            ws_fp = str(getattr(bindings, "registry_fingerprint", None) or workspace.schema_version)
+            cache_key = session_registry_cache_key(
+                workspace_fingerprint=ws_fp,
+                mcp_tool_names=tuple(d.name for d in resolved_mcp_defs),
+                include_bootstrap_tools=bootstrap_active,
+            )
+            cached_registry = _SESSION_REGISTRY_TURN_CACHE.get(cache_key)
+            if cached_registry is not None:
+                session_exe, session_tool_set = cached_registry
+                registry_cache_hit = True
+        if not registry_cache_hit:
+            registry_started_ns = time_ns()
+            session_exe, session_tool_set = await asyncio.to_thread(
+                build_session_registry,
+                workspace_config=workspace,
+                runtime_bindings=bindings,
+                extra_mcp=resolved_mcp_defs,
+                workspace_root=layout.content_root,
+                layout=layout,
+                trace_sink=trace,
+                include_bootstrap_tools=bootstrap_active,
+            )
+            build_registry_ms = max(0.1, (time_ns() - registry_started_ns) / 1_000_000)
+            if cache_key is not None:
+                _SESSION_REGISTRY_TURN_CACHE.put(cache_key, (session_exe, session_tool_set))
+        else:
+            build_registry_ms = 0.0
 
         effective_skill_allowlist: frozenset[str] | None = None
         if routing_bundle is not None and routing_bundle.skill_allowlist is not None:
@@ -1610,7 +1663,19 @@ def build_agent_run_turn(
                 agent_name=agent_name,
             )
 
+        sync_started_ns = time_ns()
         await asyncio.to_thread(_sync_tools_md_catalog)
+        sync_tools_md_ms = max(0.1, (time_ns() - sync_started_ns) / 1_000_000)
+        startup_timings = TurnStartupTimings(
+            build_session_registry_ms=build_registry_ms,
+            sync_tools_md_ms=sync_tools_md_ms,
+        )
+        log_turn_startup_timings(
+            session_id=session_id,
+            timings=startup_timings,
+            defer_mcp=defer_mcp_discovery_enabled(workspace),
+            cache_hit=registry_cache_hit,
+        )
         registry = registry_snapshot_from_tool_set(
             effective_tool_set,
             workspace=workspace,
@@ -1687,6 +1752,13 @@ def build_agent_run_turn(
                 )
                 triager_ms = max(1, int((time_ns() - triage_started_ns) / 1_000_000))
                 l1_state.triager_ms = triager_ms
+                startup_timings.triage_ms = float(triager_ms)
+                log_turn_startup_timings(
+                    session_id=session_id,
+                    timings=startup_timings,
+                    defer_mcp=defer_mcp_discovery_enabled(workspace),
+                    cache_hit=registry_cache_hit,
+                )
             except TriagerUnavailable:
                 if triager_run_id is not None and triager_registry is not None:
                     await triager_registry.mark_failed(triager_run_id)
@@ -1976,7 +2048,7 @@ def build_agent_run_turn(
                 route_meta=route_meta,
                 process=process,
                 bindings=bindings,
-                mcp_tool_definitions=mcp_defs,
+                mcp_tool_definitions=resolved_mcp_defs,
                 plan_registry=plan_registry,
                 had_triager_first=had_triager_first,
                 timeout_s=budget.clamp(tier_cd_timeout_s),
@@ -2495,7 +2567,7 @@ def build_agent_run_turn(
                     route_meta=route_meta,
                     process=process,
                     bindings=bindings,
-                    mcp_tool_definitions=mcp_defs,
+                    mcp_tool_definitions=resolved_mcp_defs,
                     plan_registry=plan_registry,
                     had_triager_first=had_triager_first,
                     finalizer=finalizer,
@@ -2779,7 +2851,7 @@ def build_agent_run_turn(
             route_meta=route_meta,
             process=process,
             bindings=bindings,
-            mcp_tool_definitions=mcp_defs,
+            mcp_tool_definitions=resolved_mcp_defs,
             plan_registry=plan_registry,
             had_triager_first=had_triager_first,
             finalizer=finalizer,
@@ -2950,6 +3022,13 @@ def build_agent_run_turn(
                     triager_ms=l1_state.triager_ms,
                     executor_ms=executor_ms,
                     rounds_used=l1_state.executor_rounds_used,
+                    ttft_ms=l1_state.ttft_ms,
+                )
+            elif l1_state.ttft_ms is not None and l1_state.ttft_ms > 0:
+                l1_state.stage_latencies_ms = _build_turn_stage_latencies(
+                    triager_ms=l1_state.triager_ms,
+                    executor_ms=None,
+                    ttft_ms=l1_state.ttft_ms,
                 )
             _record_turn_stage_latencies(router, l1_state.stage_latencies_ms)
             await run_post_turn_hooks(
@@ -3013,39 +3092,16 @@ def build_agent_run_turn(
             from sevn.gateway.session_manager import merge_dispatch_routing
 
             route_meta = merge_dispatch_routing(route_meta, session_id, correlation_id)
-            from sevn.config.routing import (
-                filter_tool_set_skills,
-                resolve_routing_profile_bundle,
-                resolve_routing_profile_for_turn,
-                routing_profiles_active,
-            )
-            from sevn.security.secrets.routing_scope import bind_routing_secrets_scope
-
-            spawn_routing_bundle = None
-            if routing_profiles_active(workspace_local):
-                from sevn.config.routing import RoutingProfileDenied
-
-                try:
-                    profile_name = resolve_routing_profile_for_turn(
-                        workspace_local,
-                        channel=sess.channel,
-                        scope_key=sess.scope_key,
-                    )
-                except RoutingProfileDenied:
-                    return "This route is not permitted by routing policy."
-                spawn_routing_bundle = resolve_routing_profile_bundle(
-                    workspace_local,
-                    profile_name=profile_name,
-                    channel=sess.channel,
-                    user_id=sess.user_id,
-                )
-                route_meta["routing_profile"] = spawn_routing_bundle.profile_name
-                spawn_secrets_token = bind_routing_secrets_scope(spawn_routing_bundle.secrets_scope)
-            session_exe, session_tool_set = await asyncio.to_thread(
+            spawn_mcp_defs = await resolve_mcp_tool_definitions_lazy(
+                workspace=workspace_local,
+                content_root=layout.content_root,
+                mcp_defs_box=mcp_defs_box,
+                mcp_servers_map=mcp_servers_map,
+            )            session_exe, session_tool_set = await asyncio.to_thread(
                 build_session_registry,
                 workspace_config=workspace_local,
                 runtime_bindings=bindings,
-                extra_mcp=mcp_defs,
+                extra_mcp=spawn_mcp_defs,
                 workspace_root=layout.content_root,
                 layout=layout,
                 trace_sink=trace,
@@ -5079,6 +5135,40 @@ def _outbound_phase_for_assistant_chunk(
     return "continue"
 
 
+async def _maybe_record_ttft(
+    router: ChannelRouter,
+    l1_state: _L1TurnState,
+    text: str,
+) -> None:
+    """Record first-token latency on the first non-progress assistant outbound (W30).
+
+    Args:
+        router (ChannelRouter): Gateway router (trace sink on ``router._trace``).
+        l1_state (_L1TurnState): Per-turn mutable state with ``turn_started_ns``.
+        text (str): Assistant-visible outbound text.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_maybe_record_ttft)
+        True
+    """
+    if l1_state.ttft_recorded or not text.strip():
+        return
+    if text.strip() == turn_progress_signal_text().strip():
+        return
+    if l1_state.turn_started_ns is None:
+        return
+    ttft_ms = max(1.0, (time_ns() - l1_state.turn_started_ns) / 1_000_000)
+    l1_state.ttft_ms = ttft_ms
+    l1_state.ttft_recorded = True
+    await record_ttft_sample(
+        router._trace,
+        session_id=l1_state.session_id,
+        turn_id=l1_state.correlation_id,
+        ttft_ms=ttft_ms,
+    )
+
+
 async def _route_assistant_text(
     router: ChannelRouter,
     channel: str,
@@ -5106,6 +5196,7 @@ async def _route_assistant_text(
     active_l1 = getattr(router, "_active_l1_turn_state", None)
     if active_l1 is not None and text.strip() != turn_progress_signal_text().strip():
         _cancel_turn_progress_signal(active_l1)
+        await _maybe_record_ttft(router, active_l1, text)
     meta = dict(metadata or {})
     if outbound_phase and channel == "telegram":
         meta[GATEWAY_OUTBOUND_PHASE_KEY] = outbound_phase
