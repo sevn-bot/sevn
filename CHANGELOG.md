@@ -17,6 +17,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-31] Webhook-minimal host env now covers queued agent turns (not just the HTTP handler), uses an allowlist instead of a suffix blocklist, and approval denial reasons return per-verdict tuples instead of shared bridge state; WebSocket frames after auth respect the 1 MiB ingress cap; Telegram freshness no longer trusts spoofable HTTP `Date` headers (#81, #80, open-issues-sweep E-Thermos)
 - [2026-07-31] Gateway and egress-proxy HTTP ingress reject bodies over 1 MiB (**413**); signed GitHub webhooks reject stale timestamps; Telegram transport errors and API failure logs redact bot tokens; webhook-triggered subprocesses inherit a minimized host env (#81, open-issues-sweep W24)
 
 ### Changed

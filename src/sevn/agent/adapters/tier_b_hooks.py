@@ -726,11 +726,12 @@ async def await_human_tool_approval(
         bound_tool_names=frozenset(),
         triager_first_reply="",
     )
-    return await approval_guardrail(hook_config).resolve_approval(
+    approved, _deny_reason = await approval_guardrail(hook_config).resolve_approval(
         ctx,
         tool_name=tool_name,
         args=args,
     )
+    return approved
 
 
 async def permission_before_tool_execute(

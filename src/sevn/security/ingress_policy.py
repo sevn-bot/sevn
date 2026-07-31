@@ -8,6 +8,7 @@ Exports:
     ingress_body_too_large_response — shared 413 response factory.
     read_limited_body — bounded ``request.body()`` helper.
     first_ws_frame_within_limit — webchat auth-frame size guard.
+    wire_ingress_body_limit — register body-cap middleware on a gateway app.
 """
 
 from __future__ import annotations
@@ -17,13 +18,15 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from fastapi import FastAPI
+
 from starlette.requests import Request  # noqa: TC002
 from starlette.responses import Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send  # noqa: TC002
 
 from sevn.config.defaults import DEFAULT_MAX_INGRESS_BODY_BYTES
 
-_INGRESS_CAP_METHODS = frozenset({"POST", "PUT", "PATCH"})
+_INGRESS_CAP_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
 def ingress_body_too_large_response() -> Response:
@@ -115,6 +118,7 @@ class IngressBodyLimitMiddleware:
 
         received = 0
         rejected = False
+        response_started = False
 
         async def limited_receive() -> Message:
             nonlocal received, rejected
@@ -127,12 +131,25 @@ class IngressBodyLimitMiddleware:
             received += len(chunk)
             if received > self.max_bytes:
                 rejected = True
-                response = ingress_body_too_large_response()
-                await response(scope, receive, send)
                 return {"type": "http.disconnect"}
             return message
 
-        await self.app(scope, limited_receive, send)
+        async def limited_send(message: Message) -> None:
+            nonlocal response_started
+            if rejected:
+                if message["type"] == "http.response.start" and not response_started:
+                    response_started = True
+                    response = ingress_body_too_large_response()
+                    await response(scope, receive, send)
+                return
+            if message["type"] == "http.response.start":
+                response_started = True
+            await send(message)
+
+        await self.app(scope, limited_receive, limited_send)
+        if rejected and not response_started:
+            response = ingress_body_too_large_response()
+            await response(scope, receive, send)
 
 
 async def read_limited_body(
@@ -194,9 +211,35 @@ def first_ws_frame_within_limit(frame: Mapping[str, Any], *, max_bytes: int) -> 
     return True
 
 
+def wire_ingress_body_limit(
+    app: FastAPI,
+    *,
+    max_bytes: int = DEFAULT_MAX_INGRESS_BODY_BYTES,
+) -> None:
+    """Register ingress body-size middleware on a gateway FastAPI app.
+
+    Args:
+        app (FastAPI): Gateway application instance.
+        max_bytes (int): Maximum allowed request body size in bytes.
+
+    Returns:
+        None: Side-effect only.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.isfunction(wire_ingress_body_limit)
+        True
+    """
+    app.add_middleware(
+        IngressBodyLimitMiddleware,
+        max_bytes=max_bytes,
+    )
+
+
 __all__ = [
     "IngressBodyLimitMiddleware",
     "first_ws_frame_within_limit",
     "ingress_body_too_large_response",
     "read_limited_body",
+    "wire_ingress_body_limit",
 ]

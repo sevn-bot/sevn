@@ -300,8 +300,9 @@ def verify_telegram_webhook_freshness(
     """Return ``False`` when an optional Telegram webhook timestamp is stale.
 
     Telegram's static secret header has no signed timestamp. When operators or
-    relays attach ``X-Telegram-Request-Timestamp`` (epoch seconds) or an HTTP
-    ``Date`` header is present, reject deliveries outside ``max_skew_seconds``.
+    relays attach ``X-Telegram-Request-Timestamp`` (epoch seconds), reject
+    deliveries outside ``max_skew_seconds``. Missing timestamp headers are
+    accepted (no replay protection beyond the static secret).
 
     Args:
         headers (dict[str, str]): Raw request headers (any casing).
@@ -323,15 +324,6 @@ def verify_telegram_webhook_freshness(
             issued_at = int(raw_ts)
         except ValueError:
             return False
-    else:
-        date_hdr = lower.get("date", "").strip()
-        if date_hdr:
-            from email.utils import parsedate_to_datetime
-
-            try:
-                issued_at = int(parsedate_to_datetime(date_hdr).timestamp())
-            except (TypeError, ValueError, OverflowError):
-                return False
     if issued_at is None:
         return True
     current = int(time.time()) if now is None else int(now)

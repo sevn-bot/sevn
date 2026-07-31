@@ -103,10 +103,9 @@ async def test_permission_guardrail_skip_envelope_includes_human_reason(
 async def test_approval_guardrail_tool_denied_includes_human_reason() -> None:
     """Deferred path: ``ToolDenied.message`` includes the operator's denial reason."""
     bridge = MagicMock()
-    bridge.await_operator_verdict = AsyncMock(return_value="deny")
+    bridge.await_operator_verdict = AsyncMock(return_value=("deny", "need a ticket first"))
     bridge.await_approval = None
     bridge.record_session_ack = MagicMock()
-    bridge.last_deny_reason = None
 
     deps = _deps()
     deps.approval_bridge = bridge

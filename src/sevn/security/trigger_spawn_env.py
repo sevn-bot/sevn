@@ -31,29 +31,46 @@ _WEBHOOK_MINIMAL_HOST_ENV: contextvars.ContextVar[bool] = contextvars.ContextVar
     default=False,
 )
 
-_BLOCKED_ENV_SUFFIXES: Final[tuple[str, ...]] = (
-    "_API_KEY",
-    "_SECRET",
-    "_TOKEN",
-    "_PASSWORD",
-    "_PASSPHRASE",
-)
-
-_BLOCKED_ENV_KEYS: Final[frozenset[str]] = frozenset(
+# Allowlist for webhook-triggered subprocess host env (issue #81). Workspace/sandbox
+# shims inject SEVN_* keys explicitly after this base is resolved.
+_WEBHOOK_ENV_ALLOWLIST: Final[frozenset[str]] = frozenset(
     {
-        "SEVN_GATEWAY_TOKEN",
-        "SEVN_SECRETS_PASSPHRASE",
-        "SEVN_DASHBOARD_JWT_SECRET",
-        "TELEGRAM_BOT_TOKEN",
-        "BOT_TOKEN",
-        "OPENAI_API_KEY",
-        "ANTHROPIC_API_KEY",
-        "GITHUB_TOKEN",
-        "GH_TOKEN",
+        "PATH",
+        "HOME",
+        "USER",
+        "LOGNAME",
+        "SHELL",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "LC_MESSAGES",
+        "LC_NUMERIC",
+        "LC_TIME",
+        "LC_MONETARY",
+        "TZ",
+        "TMPDIR",
+        "TMP",
+        "TEMP",
+        "TERM",
+        "COLORTERM",
+        "NO_COLOR",
+        "XDG_RUNTIME_DIR",
+        "XDG_CONFIG_HOME",
+        "XDG_CACHE_HOME",
+        "XDG_DATA_HOME",
+        "PWD",
+        "HOSTNAME",
+        "SSH_AUTH_SOCK",
+        "DISPLAY",
+        "SYSTEMROOT",
+        "WINDIR",
+        "COMSPEC",
+        "PATHEXT",
+        "HOMEDRIVE",
+        "HOMEPATH",
+        "USERPROFILE",
     },
 )
-
-_ALLOWED_TOKEN_KEYS: Final[frozenset[str]] = frozenset({"SEVN_SESSION_TOKEN"})
 
 _TELEGRAM_BOT_URL_RE = re.compile(r"/bot[^/]+/", re.IGNORECASE)
 
@@ -76,29 +93,6 @@ def is_webhook_trigger_scope(scope_key: str) -> bool:
     return scope_key.startswith("trigger:webhook:")
 
 
-def _env_key_blocked(key: str) -> bool:
-    """Return ``True`` when ``key`` must not pass to webhook subprocesses.
-
-    Args:
-        key (str): Environment variable name.
-
-    Returns:
-        bool: Whether the key is blocked.
-
-    Examples:
-        >>> _env_key_blocked("OPENAI_API_KEY")
-        True
-        >>> _env_key_blocked("SEVN_SESSION_TOKEN")
-        False
-    """
-    upper = key.upper()
-    if upper in _ALLOWED_TOKEN_KEYS:
-        return False
-    if upper in _BLOCKED_ENV_KEYS:
-        return True
-    return any(upper.endswith(suffix) for suffix in _BLOCKED_ENV_SUFFIXES)
-
-
 def minimal_webhook_host_env(*, base: Mapping[str, str] | None = None) -> dict[str, str]:
     """Return a host env with gateway secrets stripped for webhook ingress paths.
 
@@ -112,16 +106,41 @@ def minimal_webhook_host_env(*, base: Mapping[str, str] | None = None) -> dict[s
         >>> env = minimal_webhook_host_env(base={"PATH": "/usr/bin", "OPENAI_API_KEY": "x"})
         >>> "OPENAI_API_KEY" not in env
         True
+        >>> env["PATH"]
+        '/usr/bin'
     """
     source = dict(os.environ if base is None else base)
-    return {key: value for key, value in source.items() if not _env_key_blocked(key)}
+    return {key: value for key, value in source.items() if key.upper() in _WEBHOOK_ENV_ALLOWLIST}
 
 
-def host_env_base_for_subprocess(*, base: Mapping[str, str] | None = None) -> dict[str, str]:
+def _should_minimize_host_env(*, scope_key: str | None = None) -> bool:
+    """Return ``True`` when subprocess host env must be webhook-minimal.
+
+    Args:
+        scope_key (str | None): Optional gateway session scope key.
+
+    Returns:
+        bool: Whether to strip host secrets before sandbox/skill shims.
+
+    Examples:
+        >>> _should_minimize_host_env(scope_key="trigger:webhook:x")
+        True
+    """
+    if _WEBHOOK_MINIMAL_HOST_ENV.get():
+        return True
+    return bool(scope_key and is_webhook_trigger_scope(scope_key))
+
+
+def host_env_base_for_subprocess(
+    *,
+    base: Mapping[str, str] | None = None,
+    scope_key: str | None = None,
+) -> dict[str, str]:
     """Resolve the host env base before workspace/sandbox shims are applied.
 
     Args:
         base (Mapping[str, str] | None): Optional explicit base env.
+        scope_key (str | None): Gateway session scope key for trigger webhook sessions.
 
     Returns:
         dict[str, str]: Full or minimized host env depending on webhook ingress context.
@@ -130,18 +149,21 @@ def host_env_base_for_subprocess(*, base: Mapping[str, str] | None = None) -> di
         >>> isinstance(host_env_base_for_subprocess(), dict)
         True
     """
-    if _WEBHOOK_MINIMAL_HOST_ENV.get():
+    if _should_minimize_host_env(scope_key=scope_key):
         return minimal_webhook_host_env(base=base)
     return dict(os.environ if base is None else base)
 
 
 def augment_operator_path_for_subprocess(
     env: Mapping[str, str] | None = None,
+    *,
+    scope_key: str | None = None,
 ) -> dict[str, str]:
     """Like :func:`sevn.runtime.operator_path.augment_operator_path` with webhook filtering.
 
     Args:
         env (Mapping[str, str] | None): Optional explicit base env.
+        scope_key (str | None): Gateway session scope key for trigger webhook sessions.
 
     Returns:
         dict[str, str]: Operator PATH augmentation on the resolved host env base.
@@ -150,7 +172,9 @@ def augment_operator_path_for_subprocess(
         >>> "PATH" in augment_operator_path_for_subprocess({"PATH": "/usr/bin"})
         True
     """
-    return augment_operator_path(host_env_base_for_subprocess(base=env))
+    return augment_operator_path(
+        host_env_base_for_subprocess(base=env, scope_key=scope_key),
+    )
 
 
 @contextmanager

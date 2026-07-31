@@ -938,6 +938,15 @@ class ChannelRouter:
         msg = adapter.parse_webhook(body)
         if msg is None:
             return
+        md = dict(msg.metadata) if isinstance(msg.metadata, dict) else {}
+        md["webhook_ingress"] = True
+        msg = IncomingMessage(
+            channel=msg.channel,
+            user_id=msg.user_id,
+            text=msg.text,
+            attachments=msg.attachments,
+            metadata=md,
+        )
         if channel == "telegram":
             md = msg.metadata if isinstance(msg.metadata, dict) else {}
             is_inline = bool(md.get("is_inline_query") or md.get("is_chosen_inline_result"))
@@ -2004,6 +2013,9 @@ class ChannelRouter:
             in_flight_task_summary=in_flight_summary,
             channel=msg.channel,
             chat_id=user_meta.get("chat_id") if isinstance(user_meta.get("chat_id"), int) else None,
+            webhook_minimal_env=bool(
+                isinstance(msg.metadata, dict) and msg.metadata.get("webhook_ingress"),
+            ),
         )
         await self._emit(
             kind="gateway.route_incoming",

@@ -523,6 +523,8 @@ class SessionManager:
         self._cancel_superseded_at: dict[str, float] = {}
         # W4: per-session queued task summaries for ``multi`` relatedness prompts.
         self._multi_queued_summaries: dict[str, list[str]] = {}
+        # Issue #81: per-turn webhook-minimal subprocess env (survives async queue hop).
+        self._webhook_minimal_env_turns: dict[tuple[str, str], bool] = {}
 
     @property
     def connection(self) -> sqlite3.Connection:
@@ -1047,6 +1049,7 @@ class SessionManager:
         in_flight_task_summary: str = "",
         channel: str | None = None,
         chat_id: int | None = None,
+        webhook_minimal_env: bool = False,
     ) -> None:
         """Serialize ``dispatch(session_id, correlation_id)`` per ``session_id`` (`specs/17-gateway.md` §4.3).
         ``queue_mode`` ``cancel`` aborts an in-flight dispatch task for the session,
@@ -1066,6 +1069,7 @@ class SessionManager:
             in_flight_task_summary (str): Active L1 tier-B summary for classification.
             channel (str | None): Channel identity captured at enqueue (D6).
             chat_id (int | None): Platform chat id captured at enqueue (D6).
+            webhook_minimal_env (bool): When ``True``, bind minimal host env for this turn.
         Raises:
             RuntimeError: When ``dispatch`` differs between calls.
             ValueError: When Telegram enqueue would have no ``chat_id`` (D6).
@@ -1177,8 +1181,11 @@ class SessionManager:
                         break
                     else:
                         clear_dispatch_routing(session_id, drained_cid)
+                        self._webhook_minimal_env_turns.pop((session_id, drained_cid), None)
                         q.task_done()
                 self._multi_queued_summaries.pop(session_id, None)
+            if webhook_minimal_env:
+                self._webhook_minimal_env_turns[(session_id, correlation_id)] = True
             await q.put(correlation_id)
             if effective_mode != "cancel":
                 in_flight = self._active_dispatch_task.get(session_id)
@@ -1311,11 +1318,18 @@ class SessionManager:
                 # blocks here in the per-session worker, not in ``enqueue_dispatch``.
                 await self._turn_semaphore.acquire()
                 semaphore_held = True
+                webhook_minimal = self._webhook_minimal_env_turns.pop((session_id, cid), False)
                 run_task: asyncio.Task[None] = asyncio.create_task(dispatch(session_id, cid))
                 self._active_dispatch_task[session_id] = run_task
                 self._active_dispatch_correlation_id[session_id] = cid
                 try:
-                    await run_task
+                    if webhook_minimal:
+                        from sevn.security.trigger_spawn_env import bind_webhook_minimal_host_env
+
+                        with bind_webhook_minimal_host_env():
+                            await run_task
+                    else:
+                        await run_task
                 except asyncio.CancelledError:
                     if self._drain_requested:
                         with contextlib.suppress(asyncio.CancelledError):

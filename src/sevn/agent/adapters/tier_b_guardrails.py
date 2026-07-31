@@ -181,7 +181,7 @@ class TierBApprovalGuardrail:
         *,
         tool_name: str,
         args: dict[str, Any],
-    ) -> bool:
+    ) -> tuple[bool, str | None]:
         """Block on operator approval for ``tool_name`` when required.
 
         Args:
@@ -190,7 +190,7 @@ class TierBApprovalGuardrail:
             args (dict[str, Any]): Validated tool arguments for the approval card.
 
         Returns:
-            bool: ``True`` when approved; ``False`` on deny/timeout/no bridge.
+            tuple[bool, str | None]: Approval flag and optional operator denial reason.
 
         Examples:
             >>> import inspect
@@ -200,17 +200,17 @@ class TierBApprovalGuardrail:
         _ = self.config
         bridge = _approval_bridge(ctx)
         if bridge is None:
-            return False
+            return False, None
         tool_ctx = ctx.deps.effective_tool_context()
         if tool_name in tool_ctx.human_acknowledged_tools:
-            return True
+            return True, None
         await_fn = getattr(bridge, "await_approval", None)
         if await_fn is not None:
             approved = await await_fn(tool_name=tool_name, args=args)
             if approved:
                 ack_tool_on_deps(ctx.deps, tool_name)
-            return bool(approved)
-        verdict = await bridge.await_operator_verdict(
+            return bool(approved), None
+        verdict, deny_reason = await bridge.await_operator_verdict(
             session_id=tool_ctx.session_id,
             turn_id=tool_ctx.turn_id,
             tool_name=tool_name,
@@ -218,11 +218,11 @@ class TierBApprovalGuardrail:
             trace=tool_ctx.trace,
         )
         if verdict == "deny":
-            return False
+            return False, deny_reason
         if verdict == "session":
             bridge.record_session_ack(tool_ctx.session_id, tool_name)
         ack_tool_on_deps(ctx.deps, tool_name)
-        return True
+        return True, None
 
     async def resolve(
         self,
@@ -246,13 +246,11 @@ class TierBApprovalGuardrail:
             >>> inspect.iscoroutinefunction(TierBApprovalGuardrail.resolve)
             True
         """
-        approved = await self.resolve_approval(ctx, tool_name=tool_name, args=args)
+        approved, deny_reason = await self.resolve_approval(ctx, tool_name=tool_name, args=args)
         if approved:
             return None
-        bridge = _approval_bridge(ctx)
-        reason = getattr(bridge, "last_deny_reason", None) if bridge is not None else None
-        if reason:
-            message = reason
+        if deny_reason:
+            message = deny_reason
         else:
             message = (
                 f"Operator denied approval for `{tool_name}`. "

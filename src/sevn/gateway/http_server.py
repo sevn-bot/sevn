@@ -163,8 +163,8 @@ from sevn.plugins.registry import (
 from sevn.second_brain.fetch import SecondBrainFetchError, fetch_url_to_raw
 from sevn.second_brain.paths import VaultLayout, display_scope_root_relative, resolve_scope_root
 from sevn.security.ingress_policy import (
-    IngressBodyLimitMiddleware,
     first_ws_frame_within_limit,
+    wire_ingress_body_limit,
 )
 from sevn.security.llm_guard_scanner import LLMGuardScanner
 from sevn.security.secrets.factory import secrets_chain_from_workspace
@@ -2040,6 +2040,9 @@ def create_app(
                         raw_frame = await websocket.receive_text()
                     except WebSocketDisconnect:
                         break
+                    if len(raw_frame.encode("utf-8")) > DEFAULT_MAX_INGRESS_BODY_BYTES:
+                        await websocket.close(code=1009)
+                        break
                     try:
                         frame = json.loads(raw_frame)
                     except (ValueError, TypeError):
@@ -3049,8 +3052,5 @@ def create_app(
 
     _mount_mission_control_spa(app)
 
-    app.add_middleware(
-        IngressBodyLimitMiddleware,
-        max_bytes=DEFAULT_MAX_INGRESS_BODY_BYTES,
-    )
+    wire_ingress_body_limit(app, max_bytes=DEFAULT_MAX_INGRESS_BODY_BYTES)
     return app

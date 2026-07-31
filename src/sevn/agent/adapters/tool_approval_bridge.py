@@ -229,7 +229,6 @@ class ToolApprovalBridge:
 
     hub: DashboardHub | None = None
     timeout_s: float = _DEFAULT_TIMEOUT_S
-    last_deny_reason: str | None = None
     _pending: dict[str, PendingToolApproval] = field(default_factory=dict)
     _session_acks: dict[str, set[str]] = field(default_factory=dict)
     _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
@@ -354,7 +353,7 @@ class ToolApprovalBridge:
         tool_name: str,
         args_summary: str,
         trace: TraceSink | None = None,
-    ) -> ApprovalVerdict:
+    ) -> tuple[ApprovalVerdict, str | None]:
         """Publish a pending approval and block until verdict or timeout.
 
         Args:
@@ -365,7 +364,7 @@ class ToolApprovalBridge:
             trace (TraceSink | None): Optional trace sink for audit rows.
 
         Returns:
-            ApprovalVerdict: Operator verdict, or ``deny`` on timeout.
+            tuple[ApprovalVerdict, str | None]: Operator verdict and optional denial reason.
 
         Examples:
             >>> import asyncio
@@ -378,7 +377,7 @@ class ToolApprovalBridge:
             ...         args_summary='{"path":"x"}',
             ...     )
             ... )
-            'deny'
+            ('deny', None)
         """
 
         decision_id = str(uuid.uuid4())
@@ -433,7 +432,6 @@ class ToolApprovalBridge:
             verdict = row.verdict or "deny"
 
         deny_reason = row.deny_reason if verdict == "deny" else None
-        self.last_deny_reason = deny_reason
         log_approval_decision(
             tool_name=tool_name,
             session_id=session_id,
@@ -479,7 +477,7 @@ class ToolApprovalBridge:
                 },
             )
 
-        return verdict
+        return verdict, deny_reason
 
 
 __all__ = [
