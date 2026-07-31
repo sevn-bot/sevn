@@ -71,8 +71,9 @@ def known_skill_ids_from_manager(manager: SkillsManager) -> frozenset[str]:
         frozenset[str]: Advertised (non-quarantined) skill ids.
 
     Examples:
+        >>> from pathlib import Path
         >>> from sevn.skills.manager import SkillsManager
-        >>> isinstance(known_skill_ids_from_manager(SkillsManager.shared("/tmp")), frozenset)
+        >>> isinstance(known_skill_ids_from_manager(SkillsManager.shared(Path("/tmp"))), frozenset)
         True
     """
     return frozenset(manager.advertised_skill_descriptions())

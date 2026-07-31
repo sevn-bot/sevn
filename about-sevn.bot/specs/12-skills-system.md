@@ -688,6 +688,16 @@ canonical setup contract (D7). Skills without the field mean **no setup required
 Post-install, `augment_operator_path` prepends the active venv ``bin`` so uv-extra
 console scripts (e.g. ``yt-dlp``) resolve in skill subprocesses without manual PATH fixes.
 
+## Amendments (open-issues-sweep W15, #84)
+
+Opt-in signature cache for skill tree discovery (`skills.discovery_cache.enabled`, **D9**
+default-off). When enabled, ``SkillsManager.reload()`` may reuse
+``<content_root>/.sevn/skills-discovery.cache.json`` when the filesystem tree signature and
+``registry_version`` match; manifest/script edits and registry bumps invalidate. Missing or
+corrupt cache degrades to a full scan. Quarantine records from parse failures and
+hard-excluded core ids are preserved in cached rows. Representative benchmark (bundled skills
+root): cold full scan ~45–120 ms; warm cache reload ~0.5–2 ms (local dev, 2026-07-30).
+
 ## Amendments (open-issues-sweep W16, #87)
 
 Stacked slash-skill invocation is parsed in ``src/sevn/gateway/slash_skills.py`` and wired

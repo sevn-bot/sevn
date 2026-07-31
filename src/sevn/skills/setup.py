@@ -251,9 +251,9 @@ def _import_probe_satisfied(probe: str) -> bool:
         >>> _import_probe_satisfied("import sys")
         True
     """
-    import subprocess
+    import subprocess  # nosec B404
 
-    proc = subprocess.run(
+    proc = subprocess.run(  # nosec B603
         [sys.executable, "-c", probe],
         check=False,
         capture_output=True,
@@ -475,7 +475,7 @@ def _run_skill_install_plan(
         >>> _run_skill_install_plan(empty, install_root=Path("."), content_root=Path(".")).ok
         True
     """
-    import subprocess
+    import subprocess  # nosec B404
 
     events: list[dict[str, Any]] = []
     failed_fatal: list[str] = []
@@ -491,7 +491,7 @@ def _run_skill_install_plan(
                     "capability_id": step.capability_id,
                 },
             )
-            proc = subprocess.run(
+            proc = subprocess.run(  # nosec B603
                 argv,
                 cwd=install_root,
                 capture_output=True,
