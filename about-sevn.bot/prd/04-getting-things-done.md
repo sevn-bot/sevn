@@ -10,8 +10,7 @@ summary: A general-purpose AI assistant earns its keep by doing things—answeri
 last_updated: '2026-08-01'
 fingerprint: sha256:592ba359dc37bce4c3b945d38018a246e85127f4861526e40c7583cc4139236c=======
 fingerprint: sha256:eb88a4aaaa8c1e3e644b78710ebee7453c12cbd9ca4faee8384300415bf37ebc
->>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)
-related:
+>>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)related:
 - prd-03-trust-and-control
 - prd-08-coding-companion
 - prd-11-automation-and-triggers

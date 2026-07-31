@@ -10,8 +10,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
 last_updated: '2026-08-01'
 fingerprint: sha256:081c650916d0c0786463d9f18402828be65b4949f038ebf6de16bb59cc2d08b3=======
 fingerprint: sha256:b998c90107d48af5975e4ecfe5563f9e9f03f8344fa0385a8a4c3beefc33d8a5
->>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)
-related: []
+>>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)related: []
 sources:
 - src/sevn/gateway/**
 parent_prd: prd-01-conversational-experience
@@ -1274,6 +1273,9 @@ interfaces:
 - name: SessionRegistryTurnCache
   file: src/sevn/gateway/telemetry/ttft.py
   symbol: SessionRegistryTurnCache
+- name: TurnRegistryPrep
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: TurnRegistryPrep
 - name: TurnStartupTimings
   file: src/sevn/gateway/telemetry/ttft.py
   symbol: TurnStartupTimings
@@ -1283,6 +1285,9 @@ interfaces:
 - name: log_turn_startup_timings
   file: src/sevn/gateway/telemetry/ttft.py
   symbol: log_turn_startup_timings
+- name: prepare_turn_session_registry
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: prepare_turn_session_registry
 - name: record_ttft_sample
   file: src/sevn/gateway/telemetry/ttft.py
   symbol: record_ttft_sample

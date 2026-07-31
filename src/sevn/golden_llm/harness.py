@@ -394,15 +394,15 @@ def assert_golden_outcome(
                 tool_names.append(tool)
                 seen.add(tool)
     for expected in case.assertions.tools_called:
-        assert expected in tool_names, f"case {case.id}: expected tool {expected!r} in {tool_names}"
+        assert expected in tool_names, f"case {case.id}: expected tool {expected!r} in {tool_names}"  # nosec B101
     if case.assertions.tool_success:
         errors = _tool_errors_from_provider_messages(provider_msgs)
-        assert not errors, f"case {case.id}: tool errors {errors}"
+        assert not errors, f"case {case.id}: tool errors {errors}"  # nosec B101
     if getattr(outcome, "status", None) == "failed" and not case.assertions.tool_success:
         return
     joined = " ".join(m.text for m in outcome.final_messages)
     for fragment in case.assertions.response_contains:
-        assert fragment.lower() in joined.lower(), (
+        assert fragment.lower() in joined.lower(), (  # nosec B101
             f"case {case.id}: expected {fragment!r} in assistant text {joined!r}"
         )
 

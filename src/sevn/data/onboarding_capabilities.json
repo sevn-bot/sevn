@@ -1225,6 +1225,26 @@
       ]
     },
     {
+      "capability_id": "skill.reddit_karma_loop",
+      "group": "B",
+      "label": "reddit_karma_loop",
+      "description": "Draft-only Reddit karma loop — browser discovery, quality gate, grounded comment drafts, rate limits, and structured logging.",
+      "config_paths": [
+        "skills.reddit_karma_loop.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.reddit_karma_loop.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
       "capability_id": "skill.roam_code",
       "group": "B",
       "label": "roam_code",

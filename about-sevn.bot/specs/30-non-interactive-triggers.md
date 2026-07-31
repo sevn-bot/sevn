@@ -8,8 +8,7 @@ summary: 'Deliver non-interactive dispatch: external events (“something happen
   and schedules (“tick”) compile to DispatchRequest, optionally pass through notify_only
   (zero LLM, zero sandbox boot), otherwise'
 last_updated: '2026-08-01'
-fingerprint: sha256:5cb1679d572735f927bfa4f524738ea44d8d4e26c93e563b4cb641516f386a2f
-related: []
+fingerprint: sha256:5cb1679d572735f927bfa4f524738ea44d8d4e26c93e563b4cb641516f386a2frelated: []
 sources:
 - src/sevn/triggers/**
 parent_prd: prd-11-automation-and-triggers
@@ -142,6 +141,9 @@ interfaces:
 - name: agent_dispatch_kwargs
   file: src/sevn/triggers/dispatcher.py
   symbol: agent_dispatch_kwargs
+- name: assistant_texts_for_session
+  file: src/sevn/triggers/dispatcher.py
+  symbol: assistant_texts_for_session
 - name: dispatch_notify_only
   file: src/sevn/triggers/dispatcher.py
   symbol: dispatch_notify_only

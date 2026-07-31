@@ -9,8 +9,7 @@ summary: The operator talks to sevn where they already chat—Telegram on phone,
 last_updated: '2026-08-01'
 fingerprint: sha256:cab3be0b0e329c3290a9f999e027dd9b21053e7c7b462a87c7ff4aaa88c13274=======
 fingerprint: sha256:0fe9d98c3cb01182f37e3dd83f769ded67e24800cdfc206d7efc0740102064da
->>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)
-related:
+>>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)related:
 - prd-07-mission-control
 - prd-10-generated-ui
 sources:

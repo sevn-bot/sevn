@@ -9,8 +9,7 @@ summary: Local-first bots are judged in the first ten minutes—clone, three set
 last_updated: '2026-08-01'
 fingerprint: sha256:99f16a556774452f725a055069dc25aeb1c6af33a009025ab55293f859a8bafe=======
 fingerprint: sha256:31aba95fa352acf7a5fee4f41d53fd1f2ac2f2fbb91f40e6d4e067f9b28a956b
->>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)
-related:
+>>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)related:
 - prd-07-mission-control
 sources:
 - src/sevn/config/**

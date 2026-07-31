@@ -13,11 +13,15 @@ fingerprint: sha256:e6e90434d4162f106513af12a3caad4262964fb1a54a2c2ab085e09b91da
 =======
 last_updated: '2026-07-31'
 <<<<<<< HEAD
+<<<<<<< HEAD
 fingerprint: sha256:ea51e4918e2ab7b3e4b79e9a4d315f76cbb930d7cbbf2eb684db19081d69b70c
 >>>>>>> afb21033 (feat(tools)!: standardize MCP tool naming and add OAuth, logs, presets)
 =======
 fingerprint: sha256:9e39cf9c95077024d5b6efa0a63eda0f3aa44352ee0cebb87c10c7710a345c96
 >>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)
+=======
+fingerprint: sha256:3144901b220aacb1a78346a5257bdf0e628468d867526f70b99e32fadf8da836
+>>>>>>> 7f52e7d1 (fix(ci): refresh about-docs, onboarding manifest, bandit nosec)
 related: []
 sources:
 - src/sevn/tools/**
@@ -245,6 +249,15 @@ interfaces:
 - name: tail_log_lines
   file: src/sevn/tools/log_query.py
   symbol: tail_log_lines
+- name: compute_mcp_registry_fingerprint
+  file: src/sevn/tools/mcp_boot.py
+  symbol: compute_mcp_registry_fingerprint
+- name: effective_mcp_servers_for_workspace
+  file: src/sevn/tools/mcp_boot.py
+  symbol: effective_mcp_servers_for_workspace
+- name: load_mcp_oauth_credentials
+  file: src/sevn/tools/mcp_boot.py
+  symbol: load_mcp_oauth_credentials
 - name: apply_catalog_preset_to_doc
   file: src/sevn/tools/mcp_catalog.py
   symbol: apply_catalog_preset_to_doc
