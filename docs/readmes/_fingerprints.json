@@ -190,8 +190,7 @@
     "tools": {
       "algorithm": "sha256_glob_aggregate",
       "computed_at": "2026-08-01T14:19:54Z",
-      "digest": "e6e90434d4162f106513af12a3caad4262964fb1a54a2c2ab085e09b91da4a5a",      "source_globs": [        "src/sevn/tools/**"
-      ]
+      "digest": "e6e90434d4162f106513af12a3caad4262964fb1a54a2c2ab085e09b91da4a5a",      "source_globs": [        "src/sevn/tools/**"      ]
     },
     "tracing": {
       "algorithm": "sha256_glob_aggregate",
