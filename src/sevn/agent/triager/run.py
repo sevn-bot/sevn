@@ -281,9 +281,15 @@ def resolve_triager_model_id_for_turn(
         'anthropic:claude-3-5-haiku'
     """
     cheap = triager_cfg.cheap_model_id
+    profile_model = (
+        routing_profile_model.strip()
+        if isinstance(routing_profile_model, str) and routing_profile_model.strip()
+        else ""
+    )
     if (
         cheap
         and cheap.strip()
+        and not profile_model
         and is_obvious_continuation_message(triage_context.current_message)
         and not triage_context.is_first_session
         and not triage_context.bootstrap_capture_active

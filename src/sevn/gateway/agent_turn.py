@@ -1908,6 +1908,11 @@ def build_agent_run_turn(
                 subagent_parent_id=l1_state.run_id,
                 subagent_specialist_grants=_specialist_grants_for_triage(triage, workspace),
                 subagent_remaining_budget_s=budget.remaining_s,
+                permissions_profile=(
+                    routing_bundle.permissions_profile if routing_bundle is not None else None
+                ),
+                effective_tool_set=effective_tool_set,
+                session_exe=session_exe,
             )
             if await _bootstrap_capture_after_turn(
                 bootstrap_active=bootstrap_active,
@@ -2289,6 +2294,15 @@ def build_agent_run_turn(
                 no_answer_reason=no_answer_reason,
                 outcome=outcome,
             )
+        if retry_warranted and effective_skill_allowlist is not None:
+            logger.info(
+                "agent_turn.full_index_retry_skipped_routing_profile session_id={} "
+                "correlation_id={} reason={}",
+                session_id,
+                correlation_id,
+                no_answer_reason or "missing_outcome",
+            )
+            retry_warranted = False
         if retry_warranted:
             logger.info(
                 "agent_turn.full_index_retry_start session_id={} correlation_id={} reason={}",
@@ -2357,6 +2371,10 @@ def build_agent_run_turn(
                 subagent_parent_id=l1_state.run_id,
                 subagent_specialist_grants=_specialist_grants_for_triage(triage, workspace),
                 subagent_remaining_budget_s=budget.remaining_s,
+                permissions_profile=(
+                    routing_bundle.permissions_profile if routing_bundle is not None else None
+                ),
+                filtered_tool_set=effective_tool_set,
             )
             _log_b_turn_pass(
                 b_turn_kind="full_index",
@@ -2410,6 +2428,11 @@ def build_agent_run_turn(
                     subagent_parent_id=l1_state.run_id,
                     subagent_specialist_grants=_specialist_grants_for_triage(triage, workspace),
                     subagent_remaining_budget_s=budget.remaining_s,
+                    permissions_profile=(
+                        routing_bundle.permissions_profile if routing_bundle is not None else None
+                    ),
+                    effective_tool_set=effective_tool_set,
+                    session_exe=session_exe,
                 )
                 return
             # Retry produced an outcome — fall through to the regular outcome
@@ -2689,6 +2712,11 @@ def build_agent_run_turn(
             subagent_parent_id=l1_state.run_id,
             subagent_specialist_grants=_specialist_grants_for_triage(triage, workspace),
             subagent_remaining_budget_s=budget.remaining_s,
+            permissions_profile=(
+                routing_bundle.permissions_profile if routing_bundle is not None else None
+            ),
+            effective_tool_set=effective_tool_set,
+            session_exe=session_exe,
         )
 
     async def _run_guarded(session_id: str, correlation_id: str) -> None:
@@ -2918,11 +2946,16 @@ def build_agent_run_turn(
 
             spawn_routing_bundle = None
             if routing_profiles_active(workspace_local):
-                profile_name = resolve_routing_profile_for_turn(
-                    workspace_local,
-                    channel=sess.channel,
-                    scope_key=sess.scope_key,
-                )
+                from sevn.config.routing import RoutingProfileDenied
+
+                try:
+                    profile_name = resolve_routing_profile_for_turn(
+                        workspace_local,
+                        channel=sess.channel,
+                        scope_key=sess.scope_key,
+                    )
+                except RoutingProfileDenied:
+                    return "This route is not permitted by routing policy."
                 spawn_routing_bundle = resolve_routing_profile_bundle(
                     workspace_local,
                     profile_name=profile_name,
@@ -3169,6 +3202,8 @@ async def _run_full_index_retry(
     subagent_parent_id: str | None = None,
     subagent_specialist_grants: frozenset[str] = frozenset(),
     subagent_remaining_budget_s: Callable[[], float] | None = None,
+    permissions_profile: str | None = None,
+    filtered_tool_set: Any | None = None,
 ) -> tuple[Any | None, str | None]:
     """Run one tier-B retry with the full skills/INDEX exposed (`PROBLEMS.md` 1(e)).
 
@@ -3218,6 +3253,8 @@ async def _run_full_index_retry(
             granted this turn (D8/W3.4).
         subagent_remaining_budget_s (Callable[[], float] | None): Zero-arg callable
             returning the parent turn's remaining ``CascadeBudget`` seconds (D11).
+        permissions_profile (str | None): Routing-profile permissions key (**W12**).
+        filtered_tool_set (Any | None): Skill-filtered ``ToolSet`` when routing applies.
 
     Returns:
         tuple[BTurnOutcome | None, str | None]: ``(outcome, None)`` on success
@@ -3274,6 +3311,8 @@ async def _run_full_index_retry(
                     subagent_parent_id=subagent_parent_id,
                     subagent_specialist_grants=subagent_specialist_grants,
                     subagent_remaining_budget_s=subagent_remaining_budget_s,
+                    permissions_profile=permissions_profile,
+                    filtered_tool_set=filtered_tool_set or tool_set,
                 ),
                 max_rounds=expanded_rounds,
                 streaming_sink=streaming_sink,
@@ -3527,6 +3566,9 @@ async def _run_cd_dispatch(
     subagent_parent_id: str | None = None,
     subagent_specialist_grants: frozenset[str] = frozenset(),
     subagent_remaining_budget_s: Callable[[], float] | None = None,
+    permissions_profile: str | None = None,
+    effective_tool_set: Any | None = None,
+    session_exe: Any | None = None,
 ) -> None:
     """Execute ``run_cd_turn`` and map ``CdTurnOutcome`` payloads outbound.
 
@@ -3566,6 +3608,9 @@ async def _run_cd_dispatch(
             granted this turn (D8/W3.4).
         subagent_remaining_budget_s (Callable[[], float] | None): Zero-arg callable
             returning the parent turn's remaining ``CascadeBudget`` seconds (D11).
+        permissions_profile (str | None): Routing-profile permissions key (**W12**).
+        effective_tool_set (Any | None): Pre-built filtered ``ToolSet`` from the turn spine.
+        session_exe (Any | None): Pre-built ``ToolExecutor`` paired with *effective_tool_set*.
 
     Examples:
         >>> import inspect
@@ -3573,15 +3618,18 @@ async def _run_cd_dispatch(
         True
     """
     bundle = _resolve_cd_outer_models(workspace, process, triage.complexity)
-    exe, tool_set = await asyncio.to_thread(
-        build_session_registry,
-        workspace_config=workspace,
-        runtime_bindings=bindings,
-        extra_mcp=mcp_tool_definitions,
-        workspace_root=layout.content_root,
-        layout=layout,
-        trace_sink=trace,
-    )
+    if effective_tool_set is not None and session_exe is not None:
+        exe, tool_set = session_exe, effective_tool_set
+    else:
+        exe, tool_set = await asyncio.to_thread(
+            build_session_registry,
+            workspace_config=workspace,
+            runtime_bindings=bindings,
+            extra_mcp=mcp_tool_definitions,
+            workspace_root=layout.content_root,
+            layout=layout,
+            trace_sink=trace,
+        )
     channel_adapter = router.adapter_named(sess_channel)
     plan_gate = _plan_gate_for_turn(
         conn=conn,
@@ -3631,6 +3679,8 @@ async def _run_cd_dispatch(
                     subagent_parent_id=subagent_parent_id,
                     subagent_specialist_grants=subagent_specialist_grants,
                     subagent_remaining_budget_s=subagent_remaining_budget_s,
+                    permissions_profile=permissions_profile,
+                    filtered_tool_set=effective_tool_set or tool_set,
                 ),
             ),
             timeout=timeout_s if timeout_s is not None else tier_cd_executor_timeout_s(workspace),
