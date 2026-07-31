@@ -7,14 +7,8 @@ owner: Alex
 summary: Deliver the primary operator and automation surface for install, upgrades,
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
-<<<<<<< HEAD
 last_updated: '2026-08-01'
-fingerprint: sha256:d1957467c6c2c40ee56704e979e2c2d088d3cdbbbb399c199cacf286a6ec3b71
-=======
-last_updated: '2026-07-31'
-fingerprint: sha256:5e2db5bb121f5b494122c38f0418ad95e4e20ff1e4db0f3454caf48efcf32210
->>>>>>> afb21033 (feat(tools)!: standardize MCP tool naming and add OAuth, logs, presets)
-related: []
+fingerprint: sha256:d1957467c6c2c40ee56704e979e2c2d088d3cdbbbb399c199cacf286a6ec3b71related: []
 sources:
 - src/sevn/cli/**
 parent_prd: prd-06-setup-and-operations
@@ -853,7 +847,6 @@ Map to existing tests under `tests/` that cover this subsystem; add Makefile-onl
 filtering by ``--channel``, ``--profile``, ``--session``, ``--since``, and
 ``--until``. Implementation: ``src/sevn/cli/session_export.py`` +
 ``src/sevn/cli/commands/sessions.py``.
-
 ## Amendments (telegram-menu-redesign W9)
 
 Root CLI ``rich_help_panel`` groups mirror the eight Telegram ``/config`` tiles

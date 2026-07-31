@@ -1666,6 +1666,15 @@ spawned turn; the decision is logged as
 ``gateway.queue_classifier_timeout_spawned`` with ``prior_turn_id``,
 ``new_turn_id``, ``timeout_s``, and ``routing_action``.
 
+## Amendments (open-issues-sweep W31, #72)
+
+``BuzzChannelAdapter`` (`src/sevn/channels/buzz.py`) parses Buzz relay mention
+webhooks into :class:`~sevn.gateway.channel_types.IncomingMessage` and sends
+replies via the configured relay REST API. ACP runtime bridge
+(`src/sevn/acp/turn_bridge.py`) delegates ``session/prompt`` to
+``dispatch_run`` / ``build_agent_run_turn`` when a workspace is bound, or a
+deterministic stub for stdio unit tests.
+
 ## Amendments (telegram-menu-redesign W9)
 
 Telegram `/config` callback routing serves the redesigned eight-tile tree via

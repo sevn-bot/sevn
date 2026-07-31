@@ -5,13 +5,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
-import pytest
 from typer.testing import CliRunner
 
 from sevn.cli.app import app
 
 
-@pytest.mark.xfail(reason="green after W31: sevn acp CLI subcommand", strict=False)
 def test_sevn_acp_subcommand_is_registered() -> None:
     """``sevn acp --help`` exposes the ACP runtime entrypoint."""
     runner = CliRunner()
@@ -20,7 +18,6 @@ def test_sevn_acp_subcommand_is_registered() -> None:
     assert "acp" in result.stdout.lower()
 
 
-@pytest.mark.xfail(reason="green after W31: ACP stdio session handshake", strict=False)
 def test_acp_stdio_prompt_returns_end_turn_stop_reason() -> None:
     """ACP runtime speaks JSON-RPC over stdio and returns ``end_turn`` for a prompt."""
     from sevn.acp.runtime import AcpStopReason, run_acp_stdio_session
@@ -45,7 +42,6 @@ def test_acp_stdio_prompt_returns_end_turn_stop_reason() -> None:
     }
 
 
-@pytest.mark.xfail(reason="green after W31: ACP cancelled stop reason", strict=False)
 def test_acp_stdio_cancelled_stop_reason() -> None:
     """ACP runtime maps operator cancel to ``cancelled`` stop reason."""
     from sevn.acp.runtime import AcpStopReason, run_acp_stdio_session
