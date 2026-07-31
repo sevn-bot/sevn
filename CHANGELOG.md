@@ -10,6 +10,10 @@ are cut into a dated, versioned section at release time.
 
 ## [Unreleased]
 
+### Added
+
+- [2026-07-31] Pluggable 1Password (`one_password`) and Bitwarden (`bitwarden`) secret backends (CLI bridges — unit-tested stubs; live vault resolution requires operator `op`/`bw` credentials), deterministic precedence and provenance reporting without value leakage (#82, open-issues-sweep W25)
+
 ### Fixed
 
 - [2026-07-31] Gateway and egress-proxy HTTP ingress reject bodies over 1 MiB (**413**); signed GitHub webhooks reject stale timestamps; Telegram transport errors and API failure logs redact bot tokens; webhook-triggered subprocesses inherit a minimized host env (#81, open-issues-sweep W24)

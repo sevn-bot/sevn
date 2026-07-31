@@ -8,7 +8,7 @@ summary: 'Provide a single, testable configuration surface before storage, traci
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
 last_updated: '2026-07-31'
-fingerprint: sha256:6f225e5b4ff5cf2133aeada6997099dff59934e644663854209f9c04109a6131
+fingerprint: sha256:762d205afb8e81f9fdbe79ff98834e7c60da9ea2ddea4fc567e92d2a6e86d0e4
 related: []
 sources:
 - src/sevn/config/**
@@ -596,6 +596,9 @@ interfaces:
 - name: WorkspaceConfig
   file: src/sevn/config/sections/root.py
   symbol: WorkspaceConfig
+- name: BitwardenBackendEntry
+  file: src/sevn/config/sections/secrets.py
+  symbol: BitwardenBackendEntry
 - name: EncryptedFileBackendEntry
   file: src/sevn/config/sections/secrets.py
   symbol: EncryptedFileBackendEntry
@@ -608,6 +611,9 @@ interfaces:
 - name: MacOSKeychainBackendEntry
   file: src/sevn/config/sections/secrets.py
   symbol: MacOSKeychainBackendEntry
+- name: OnePasswordBackendEntry
+  file: src/sevn/config/sections/secrets.py
+  symbol: OnePasswordBackendEntry
 - name: OpenBaoBackendEntry
   file: src/sevn/config/sections/secrets.py
   symbol: OpenBaoBackendEntry

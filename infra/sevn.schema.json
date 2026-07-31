@@ -739,7 +739,7 @@
                 "properties": {
                   "type": {
                     "type": "string",
-                    "enum": ["encrypted_file", "macos_keychain", "linux_secret_service", "openbao", "proton_pass"]
+                    "enum": ["encrypted_file", "macos_keychain", "linux_secret_service", "openbao", "proton_pass", "one_password", "bitwarden"]
                   },
                   "path": { "type": "string" },
                   "key_source": {

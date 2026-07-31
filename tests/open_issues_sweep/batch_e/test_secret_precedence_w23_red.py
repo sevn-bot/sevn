@@ -43,7 +43,6 @@ async def test_chain_backend_order_is_config_order() -> None:
 
 
 @pytest.mark.anyio
-@pytest.mark.xfail(reason="green after W25: secret provenance reporting API", strict=False)
 async def test_resolve_secret_provenance_reports_backend_label() -> None:
     """Provenance names the winning source without returning the secret value."""
     from sevn.security.secrets.provenance import resolve_secret_provenance
@@ -59,7 +58,6 @@ async def test_resolve_secret_provenance_reports_backend_label() -> None:
 
 
 @pytest.mark.anyio
-@pytest.mark.xfail(reason="green after W25: provenance never leaks resolved value", strict=False)
 async def test_provenance_cache_does_not_store_plaintext() -> None:
     """TTL cache retains resolved values but provenance snapshots exclude secrets."""
     from sevn.security.secrets.cache import ResolvedSecretsCache

@@ -8,7 +8,7 @@ summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / sa
   (when routed through the execution sandbox), process when configured for sandbox
   routing, and skill subprocesses spawned b
 last_updated: '2026-07-31'
-fingerprint: sha256:fb1b9c9acc24550ced3385ee98a6820bb3187368290d041490eead407277fdfa
+fingerprint: sha256:452f387bb63f05f39d42f7a7721790eb3e53efafe8c89e05cbf0a1de64920aa8
 related: []
 sources:
 - src/sevn/security/**
@@ -34,6 +34,18 @@ interfaces:
 - name: write_macos_pf_ruleset
   file: src/sevn/security/egress_firewall.py
   symbol: write_macos_pf_ruleset
+- name: IngressBodyLimitMiddleware
+  file: src/sevn/security/ingress_policy.py
+  symbol: IngressBodyLimitMiddleware
+- name: first_ws_frame_within_limit
+  file: src/sevn/security/ingress_policy.py
+  symbol: first_ws_frame_within_limit
+- name: ingress_body_too_large_response
+  file: src/sevn/security/ingress_policy.py
+  symbol: ingress_body_too_large_response
+- name: read_limited_body
+  file: src/sevn/security/ingress_policy.py
+  symbol: read_limited_body
 - name: BlockReason
   file: src/sevn/security/llm_guard_scanner.py
   symbol: BlockReason
@@ -298,6 +310,24 @@ interfaces:
 - name: expand_secret_refs
   file: src/sevn/security/secrets/value_expand.py
   symbol: expand_secret_refs
+- name: augment_operator_path_for_subprocess
+  file: src/sevn/security/trigger_spawn_env.py
+  symbol: augment_operator_path_for_subprocess
+- name: bind_webhook_minimal_host_env
+  file: src/sevn/security/trigger_spawn_env.py
+  symbol: bind_webhook_minimal_host_env
+- name: host_env_base_for_subprocess
+  file: src/sevn/security/trigger_spawn_env.py
+  symbol: host_env_base_for_subprocess
+- name: is_webhook_trigger_scope
+  file: src/sevn/security/trigger_spawn_env.py
+  symbol: is_webhook_trigger_scope
+- name: minimal_webhook_host_env
+  file: src/sevn/security/trigger_spawn_env.py
+  symbol: minimal_webhook_host_env
+- name: redact_telegram_bot_token
+  file: src/sevn/security/trigger_spawn_env.py
+  symbol: redact_telegram_bot_token
 ---
 
 ## Purpose

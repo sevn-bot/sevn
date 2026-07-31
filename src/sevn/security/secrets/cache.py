@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from sevn.security.secrets.chain import SecretsChain
+    from sevn.security.secrets.provenance import SecretProvenanceReport
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +62,7 @@ class ResolvedSecretsCache:
         self._ttl = ttl_seconds
         self._clock = clock
         self._data: dict[tuple[str, str], _CacheEntry] = {}
+        self._provenance: dict[tuple[str, str], SecretProvenanceReport] = {}
 
     @property
     def chain(self) -> SecretsChain:
@@ -131,9 +133,33 @@ class ResolvedSecretsCache:
         value = await self._chain.get(logical_key)
         if value is None:
             return None
+        from sevn.security.secrets.provenance import resolve_secret_provenance
+
+        report = await resolve_secret_provenance(self._chain, logical_key)
+        if report is not None:
+            self._provenance[ck] = report
         if self._ttl > 0:
             self._data[ck] = _CacheEntry(value=value, expires_at=now + float(self._ttl))
         return value
+
+    def lookup_provenance(self, *, logical_key: str) -> SecretProvenanceReport | None:
+        """Return provenance for a cached logical key without exposing plaintext.
+
+        Args:
+            logical_key (str): Logical secret id passed to ``get_resolved``.
+
+        Returns:
+            SecretProvenanceReport | None: Recorded source label, or ``None`` when absent.
+
+        Examples:
+            >>> # See tests/open_issues_sweep/batch_e/test_secret_precedence_w23_red.py.
+            >>> True
+            True
+        """
+        for (_source, lk), report in self._provenance.items():
+            if lk == logical_key:
+                return report
+        return None
 
     def invalidate(self, source: str, logical_key: str) -> None:
         """Drop one cached entry.
@@ -147,7 +173,9 @@ class ResolvedSecretsCache:
             >>> True
             True
         """
-        self._data.pop(self._make_key(source, logical_key), None)
+        ck = self._make_key(source, logical_key)
+        self._data.pop(ck, None)
+        self._provenance.pop(ck, None)
 
     def clear(self) -> None:
         """Drop all cached entries.
@@ -158,3 +186,4 @@ class ResolvedSecretsCache:
             True
         """
         self._data.clear()
+        self._provenance.clear()
