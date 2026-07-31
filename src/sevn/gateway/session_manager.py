@@ -1319,13 +1319,6 @@ class SessionManager:
                 await self._turn_semaphore.acquire()
                 semaphore_held = True
                 webhook_minimal = self._webhook_minimal_env_turns.pop((session_id, cid), False)
-                run_task: asyncio.Task[None] = asyncio.create_task(dispatch(session_id, cid))
-                self._active_dispatch_task[session_id] = run_task
-                self._active_dispatch_correlation_id[session_id] = cid
-                try:
-                    if webhook_minimal:
-                        from sevn.security.trigger_spawn_env import bind_webhook_minimal_host_env
-
                 if webhook_minimal:
                     from sevn.security.trigger_spawn_env import bind_webhook_minimal_host_env
 
@@ -1337,6 +1330,7 @@ class SessionManager:
                 with env_cm:
                     run_task = asyncio.create_task(dispatch(session_id, cid))
                     self._active_dispatch_task[session_id] = run_task
+                    self._active_dispatch_correlation_id[session_id] = cid
                     try:
                         await run_task
                     except asyncio.CancelledError:
@@ -1355,23 +1349,11 @@ class SessionManager:
                         self._turn_semaphore.release()
                         semaphore_held = False
                         raise
-                    with contextlib.suppress(asyncio.CancelledError):
-                        if not run_task.done():
-                            run_task.cancel()
-                            await run_task
-                except Exception:
-                    logger.exception("session_dispatch_failed session_id={}", session_id)
-                finally:
-                    self._active_dispatch_task.pop(session_id, None)
-                    self._active_dispatch_correlation_id.pop(session_id, None)
-                    if semaphore_held:
-                        self._turn_semaphore.release()
-                    q.task_done()
-
                     except Exception:
                         logger.exception("session_dispatch_failed session_id={}", session_id)
                     finally:
                         self._active_dispatch_task.pop(session_id, None)
+                        self._active_dispatch_correlation_id.pop(session_id, None)
                         if semaphore_held:
                             self._turn_semaphore.release()
                         q.task_done()
