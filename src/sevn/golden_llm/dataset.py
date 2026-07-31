@@ -25,6 +25,7 @@ from sevn.golden_llm.harness import discover_cases, load_recording
 
 if TYPE_CHECKING:
     from pydantic_evals.evaluators import Evaluator
+    from pydantic_evals.evaluators.report_evaluator import ReportEvaluator
 
 
 class GoldenCaseMetadata(TypedDict):
@@ -105,7 +106,10 @@ def build_golden_eval_dataset(
         name="golden_llm",
         cases=rows,
         evaluators=dataset_evaluators,
-        report_evaluators=list(build_dataset_report_evaluators()),
+        report_evaluators=cast(
+            "list[ReportEvaluator[str, GoldenRunOutput, GoldenCaseMetadata]]",
+            list(build_dataset_report_evaluators()),
+        ),
     )
 
 

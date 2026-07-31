@@ -82,6 +82,7 @@ class ToolSuccessSpanEvaluator(Evaluator[str, GoldenRunOutput, dict[str, Any]]):
     evaluation_name: str = "tool_success"
 
     def evaluate(self, ctx: EvaluatorContext[str, GoldenRunOutput, dict[str, Any]]) -> bool:
+        """Return whether no tool span or provider message reported tool failure."""
         tree = ctx.span_tree
         if hasattr(tree, "any"):
             for node in tree:
@@ -105,6 +106,7 @@ class ToolsCalledOutputEvaluator(Evaluator[str, GoldenRunOutput, dict[str, Any]]
     evaluation_name: str = "tools_called_output"
 
     def evaluate(self, ctx: EvaluatorContext[str, GoldenRunOutput, dict[str, Any]]) -> bool:
+        """Return whether every expected tool appears in the replay output."""
         names = list(ctx.output.tool_names)
         return all(tool in names for tool in self.expected_tools)
 
@@ -137,6 +139,7 @@ class ResponseContainsEvaluator(Evaluator[str, GoldenRunOutput, dict[str, Any]])
     evaluation_name: str | None = None
 
     def evaluate(self, ctx: EvaluatorContext[str, GoldenRunOutput, dict[str, Any]]) -> bool:
+        """Return whether assistant text contains the configured fragment."""
         text = ctx.output.final_text
         if not self.case_sensitive:
             text = text.lower()
@@ -206,6 +209,7 @@ class CategoryPassRateReportEvaluator(
         self,
         ctx: ReportEvaluatorContext[str, GoldenRunOutput, dict[str, Any]],
     ) -> list[ReportAnalysis]:
+        """Aggregate per-category mean assertion pass rates for the golden run."""
         buckets: dict[str, list[float]] = defaultdict(list)
         for report_case in ctx.report.cases:
             category = "unknown"
