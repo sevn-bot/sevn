@@ -7,8 +7,13 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
+<<<<<<< HEAD
 last_updated: '2026-08-01'
 fingerprint: sha256:f58f74387ece13c523c61063957a2725eebf7febc38e4b0cc066f8d2c65449f2
+=======
+last_updated: '2026-07-31'
+fingerprint: sha256:b562ce53ad1a90418c37f891550f43867bcf6ef8e5ae044d9ca96fbca016e5e9
+>>>>>>> b1678366 (fix(voice): pass G-Final CI gate for wake-word batch (#102))
 related: []
 sources:
 - src/sevn/gateway/**

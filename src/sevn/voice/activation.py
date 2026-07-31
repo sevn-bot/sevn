@@ -295,7 +295,7 @@ def available_wake_word_models(*, engine_id: str | None = None) -> tuple[str, ..
             if ids:
                 return tuple(_wake_model_id_to_phrase(mid) for mid in ids)
         except Exception:
-            pass
+            return _fallback_wake_phrases()
     return _fallback_wake_phrases()
 
 

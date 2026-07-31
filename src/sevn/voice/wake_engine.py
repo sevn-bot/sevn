@@ -26,6 +26,7 @@ class WakeWordEngine(Protocol):
             >>> NullWakeWordEngine().reset() is None
             True
         """
+        ...
 
     def score_frame(self, frame: bytes, *, sample_rate: int = 16000) -> float:
         """Return a wake-word confidence in ``[0, 1]`` for one PCM chunk.
@@ -41,6 +42,7 @@ class WakeWordEngine(Protocol):
             >>> NullWakeWordEngine().score_frame(b"\\x00\\x00")
             0.0
         """
+        ...
 
     def is_triggered(self, score: float) -> bool:
         """Return whether ``score`` crosses the engine threshold.
@@ -55,6 +57,7 @@ class WakeWordEngine(Protocol):
             >>> NullWakeWordEngine().is_triggered(0.99)
             False
         """
+        ...
 
 
 class NullWakeWordEngine:

@@ -1084,7 +1084,9 @@ def _build_voice_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str
         'act:voice:show'
         >>> rows[-2][0]["callback_data"]
         'act:voice:status'
-        >>> rows[-4][0]["callback_data"]
+        >>> rows[6][0]["callback_data"]
+        'act:voice:activation:status'
+        >>> rows[4][0]["callback_data"]
         'cfg:voice:stt:next'
     """
     mode = _voice_tts_mode(workspace)

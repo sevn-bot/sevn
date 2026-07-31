@@ -11,12 +11,26 @@ from __future__ import annotations
 
 from typing import Any
 
-import numpy as np
-
 from sevn.voice.wake_engine import NullWakeWordEngine
 
 _ACTIVATION_THRESHOLD = 0.5
 _DEFAULT_SAMPLE_RATE = 16000
+
+
+def _numpy() -> Any:
+    """Import numpy when the ``voice-wake`` extra is installed.
+
+    Returns:
+        Any: The ``numpy`` module object.
+
+    Examples:
+        >>> import types
+        >>> isinstance(_numpy(), types.ModuleType)  # doctest: +SKIP
+        True
+    """
+    import numpy as np
+
+    return np
 
 
 def _normalise_wake_model_name(wake_word: str) -> str:
@@ -55,8 +69,8 @@ class OpenWakeWordEngine(NullWakeWordEngine):
             wake_word (str): Operator-configured wake phrase.
 
         Examples:
-            >>> isinstance(OpenWakeWordEngine(wake_word="hey jarvis"), OpenWakeWordEngine)
-            True
+            >>> OpenWakeWordEngine(wake_word="hey jarvis")  # doctest: +SKIP
+            ...
         """
         from openwakeword.model import Model
 
@@ -65,16 +79,18 @@ class OpenWakeWordEngine(NullWakeWordEngine):
             self._model: Any = Model(wakeword_models=[model_name])
         except Exception:
             self._model = Model()
+        np = _numpy()
         self._buffer = np.array([], dtype=np.int16)
 
     def reset(self) -> None:
         """Clear the rolling PCM buffer.
 
         Examples:
-            >>> eng = OpenWakeWordEngine(wake_word="hey jarvis")
-            >>> eng.reset() is None
+            >>> eng = OpenWakeWordEngine(wake_word="hey jarvis")  # doctest: +SKIP
+            >>> eng.reset() is None  # doctest: +SKIP
             True
         """
+        np = _numpy()
         self._buffer = np.array([], dtype=np.int16)
 
     def score_frame(self, frame: bytes, *, sample_rate: int = _DEFAULT_SAMPLE_RATE) -> float:
@@ -88,12 +104,13 @@ class OpenWakeWordEngine(NullWakeWordEngine):
             float: Confidence score in ``[0, 1]``.
 
         Examples:
-            >>> eng = OpenWakeWordEngine(wake_word="hey jarvis")
-            >>> eng.score_frame(b"\\x00\\x00") >= 0.0
+            >>> eng = OpenWakeWordEngine(wake_word="hey jarvis")  # doctest: +SKIP
+            >>> eng.score_frame(b"\\x00\\x00") >= 0.0  # doctest: +SKIP
             True
         """
         if not frame:
             return 0.0
+        np = _numpy()
         if len(frame) % 2 != 0:
             frame = frame[:-1]
         chunk = np.frombuffer(frame, dtype=np.int16)
@@ -120,8 +137,8 @@ class OpenWakeWordEngine(NullWakeWordEngine):
             bool: ``True`` when activation should start.
 
         Examples:
-            >>> eng = OpenWakeWordEngine(wake_word="hey jarvis")
-            >>> eng.is_triggered(0.0)
+            >>> eng = OpenWakeWordEngine(wake_word="hey jarvis")  # doctest: +SKIP
+            >>> eng.is_triggered(0.0)  # doctest: +SKIP
             False
         """
         return score >= _ACTIVATION_THRESHOLD

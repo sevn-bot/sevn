@@ -6,8 +6,8 @@ status: scaffold
 owner: Alex
 summary: 'Own the provider-chain facades for speech-to-text and text-to-speech so
   the gateway can:'
-last_updated: '2026-07-30'
-fingerprint: sha256:465a1380c5aaa0f2edc54b6811c494148cceec21d28164f20a432f026096487a
+last_updated: '2026-07-31'
+fingerprint: sha256:ab2ef74615a91c04f65ce074c1b040c2ef640e1a15578d8d4f80f69c8a719e8f
 related: []
 sources:
 - src/sevn/voice/**
@@ -21,6 +21,63 @@ depends_on:
 - spec-17-gateway
 build_phase: null
 interfaces:
+- name: OpenWakeWordEngine
+  file: src/sevn/voice/_openwakeword_engine.py
+  symbol: OpenWakeWordEngine
+- name: AudioFrameSource
+  file: src/sevn/voice/activation.py
+  symbol: AudioFrameSource
+- name: VoiceActivationSettings
+  file: src/sevn/voice/activation.py
+  symbol: VoiceActivationSettings
+- name: WakeWordListener
+  file: src/sevn/voice/activation.py
+  symbol: WakeWordListener
+- name: activation_config_key_paths
+  file: src/sevn/voice/activation.py
+  symbol: activation_config_key_paths
+- name: activation_status_payload
+  file: src/sevn/voice/activation.py
+  symbol: activation_status_payload
+- name: activation_supported_platform
+  file: src/sevn/voice/activation.py
+  symbol: activation_supported_platform
+- name: available_wake_word_models
+  file: src/sevn/voice/activation.py
+  symbol: available_wake_word_models
+- name: build_wake_word_listener
+  file: src/sevn/voice/activation.py
+  symbol: build_wake_word_listener
+- name: format_activation_status
+  file: src/sevn/voice/activation.py
+  symbol: format_activation_status
+- name: has_input_device
+  file: src/sevn/voice/activation.py
+  symbol: has_input_device
+- name: maybe_start_wake_word_listener
+  file: src/sevn/voice/activation.py
+  symbol: maybe_start_wake_word_listener
+- name: maybe_stop_wake_word_listener
+  file: src/sevn/voice/activation.py
+  symbol: maybe_stop_wake_word_listener
+- name: probe_voice_activation
+  file: src/sevn/voice/activation.py
+  symbol: probe_voice_activation
+- name: resolve_listening_state
+  file: src/sevn/voice/activation.py
+  symbol: resolve_listening_state
+- name: resolve_voice_activation_settings
+  file: src/sevn/voice/activation.py
+  symbol: resolve_voice_activation_settings
+- name: voice_activation_config_enabled
+  file: src/sevn/voice/activation.py
+  symbol: voice_activation_config_enabled
+- name: voice_activation_enabled
+  file: src/sevn/voice/activation.py
+  symbol: voice_activation_enabled
+- name: voice_wake_extra_installed
+  file: src/sevn/voice/activation.py
+  symbol: voice_wake_extra_installed
 - name: EdgeTtsBackend
   file: src/sevn/voice/backends.py
   symbol: EdgeTtsBackend
@@ -87,6 +144,12 @@ interfaces:
 - name: voice_runtime_settings
   file: src/sevn/voice/factory.py
   symbol: voice_runtime_settings
+- name: LiveMicFrameSource
+  file: src/sevn/voice/frame_sources.py
+  symbol: LiveMicFrameSource
+- name: build_live_frame_source
+  file: src/sevn/voice/frame_sources.py
+  symbol: build_live_frame_source
 - name: maybe_resolve_whisper_model_env
   file: src/sevn/voice/host_deps.py
   symbol: maybe_resolve_whisper_model_env
@@ -126,6 +189,15 @@ interfaces:
 - name: speak_placeholder
   file: src/sevn/voice/tts.py
   symbol: speak_placeholder
+- name: NullWakeWordEngine
+  file: src/sevn/voice/wake_engine.py
+  symbol: NullWakeWordEngine
+- name: WakeWordEngine
+  file: src/sevn/voice/wake_engine.py
+  symbol: WakeWordEngine
+- name: build_wake_word_engine
+  file: src/sevn/voice/wake_engine.py
+  symbol: build_wake_word_engine
 - name: WhisperModelSpec
   file: src/sevn/voice/whisper_model_provisioner.py
   symbol: WhisperModelSpec

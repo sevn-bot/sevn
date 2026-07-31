@@ -7,8 +7,13 @@ owner: Alex
 summary: 'Provide a single, testable configuration surface before storage, tracing,
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
+<<<<<<< HEAD
 last_updated: '2026-08-01'
 fingerprint: sha256:f0028385b0321d680e1e8c4b3a28a0ecc52083d6aeb68e5248ed242ccadd5972
+=======
+last_updated: '2026-07-31'
+fingerprint: sha256:7df7890e97c349b0314beab7f236d2557315f69201e34888ef486352f8bf784a
+>>>>>>> b1678366 (fix(voice): pass G-Final CI gate for wake-word batch (#102))
 related: []
 sources:
 - src/sevn/config/**
@@ -440,6 +445,9 @@ interfaces:
 - name: TelegramWebappConfig
   file: src/sevn/config/sections/channels.py
   symbol: TelegramWebappConfig
+- name: VoiceActivationConfig
+  file: src/sevn/config/sections/channels.py
+  symbol: VoiceActivationConfig
 - name: VoiceConfig
   file: src/sevn/config/sections/channels.py
   symbol: VoiceConfig
