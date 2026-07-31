@@ -161,7 +161,7 @@ def build_case_evaluators(
         tuple[Evaluator, ...]: Evaluators attached to one ``pydantic_evals.Case``.
 
     Examples:
-        >>> from sevn.golden_llm.harness import GoldenCase, GoldenRequires
+        >>> from sevn.golden_llm.harness import GoldenAssertions, GoldenCase, GoldenRequires
         >>> c = GoldenCase(
         ...     id="x",
         ...     user_messages=["hi"],
@@ -169,6 +169,7 @@ def build_case_evaluators(
         ...                  "tools": ["read"], "skills": [], "mcp_servers_required": [],
         ...                  "confidence": 0.9, "requires_vision": False},
         ...     requires=GoldenRequires(tools=["read"]),
+        ...     assertions=GoldenAssertions(tools_called=["read"]),
         ... )
         >>> len(build_case_evaluators(c)) >= 2
         True

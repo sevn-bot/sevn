@@ -14,6 +14,7 @@ fingerprint: sha256:e6e90434d4162f106513af12a3caad4262964fb1a54a2c2ab085e09b91da
 last_updated: '2026-07-31'
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 fingerprint: sha256:ea51e4918e2ab7b3e4b79e9a4d315f76cbb930d7cbbf2eb684db19081d69b70c
 >>>>>>> afb21033 (feat(tools)!: standardize MCP tool naming and add OAuth, logs, presets)
 =======
@@ -22,6 +23,9 @@ fingerprint: sha256:9e39cf9c95077024d5b6efa0a63eda0f3aa44352ee0cebb87c10c7710a34
 =======
 fingerprint: sha256:3144901b220aacb1a78346a5257bdf0e628468d867526f70b99e32fadf8da836
 >>>>>>> 7f52e7d1 (fix(ci): refresh about-docs, onboarding manifest, bandit nosec)
+=======
+fingerprint: sha256:8f822f7540ca296863b471a9be0db0f659ccaa3c5f93ac9edf42d37ac0a1a93f
+>>>>>>> 27e91673 (fix(ci): repair doctests, CodeQL ignore, and about-docs fingerprints)
 related: []
 sources:
 - src/sevn/tools/**

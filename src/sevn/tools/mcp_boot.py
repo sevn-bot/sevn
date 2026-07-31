@@ -111,7 +111,7 @@ def compute_mcp_registry_fingerprint(
 
     Examples:
         >>> compute_mcp_registry_fingerprint({}, None, schema_version=1)[:8]
-        'c775e7b7'
+        '213fbf11'
     """
     server_keys = ",".join(sorted(str(k) for k in mcp_servers))
     oauth_keys = ",".join(sorted(str(k) for k in (oauth_credentials or {})))
