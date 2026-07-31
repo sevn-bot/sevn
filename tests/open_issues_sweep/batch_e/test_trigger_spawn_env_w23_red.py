@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from sevn.security.trigger_spawn_env import (
     bind_webhook_minimal_host_env,
     host_env_base_for_subprocess,
@@ -39,3 +41,18 @@ def test_bind_webhook_minimal_host_env_applies_during_context() -> None:
     assert env == {"PATH": "/x"}
     outside = host_env_base_for_subprocess(base={"PATH": "/x", "ANTHROPIC_API_KEY": "k"})
     assert "ANTHROPIC_API_KEY" in outside
+
+
+def test_create_task_inherits_webhook_minimal_contextvar() -> None:
+    """Regression: asyncio snapshots ContextVar at task creation (E-Thermos M1)."""
+
+    async def _child_reads_minimal() -> bool:
+        env = host_env_base_for_subprocess(base={"PATH": "/x", "OPENAI_API_KEY": "k"})
+        return "OPENAI_API_KEY" not in env
+
+    async def _run() -> None:
+        with bind_webhook_minimal_host_env():
+            task = asyncio.create_task(_child_reads_minimal())
+            assert await task is True
+
+    asyncio.run(_run())

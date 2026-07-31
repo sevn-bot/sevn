@@ -1326,12 +1326,28 @@ class SessionManager:
                     if webhook_minimal:
                         from sevn.security.trigger_spawn_env import bind_webhook_minimal_host_env
 
-                        with bind_webhook_minimal_host_env():
-                            await run_task
-                    else:
+                if webhook_minimal:
+                    from sevn.security.trigger_spawn_env import bind_webhook_minimal_host_env
+
+                    env_cm: contextlib.AbstractContextManager[None] = (
+                        bind_webhook_minimal_host_env()
+                    )
+                else:
+                    env_cm = contextlib.nullcontext()
+                with env_cm:
+                    run_task = asyncio.create_task(dispatch(session_id, cid))
+                    self._active_dispatch_task[session_id] = run_task
+                    try:
                         await run_task
-                except asyncio.CancelledError:
-                    if self._drain_requested:
+                    except asyncio.CancelledError:
+                        if self._drain_requested:
+                            with contextlib.suppress(asyncio.CancelledError):
+                                if not run_task.done():
+                                    run_task.cancel()
+                                    await run_task
+                            self._turn_semaphore.release()
+                            semaphore_held = False
+                            raise
                         with contextlib.suppress(asyncio.CancelledError):
                             if not run_task.done():
                                 run_task.cancel()
@@ -1351,6 +1367,14 @@ class SessionManager:
                     if semaphore_held:
                         self._turn_semaphore.release()
                     q.task_done()
+
+                    except Exception:
+                        logger.exception("session_dispatch_failed session_id={}", session_id)
+                    finally:
+                        self._active_dispatch_task.pop(session_id, None)
+                        if semaphore_held:
+                            self._turn_semaphore.release()
+                        q.task_done()
         except asyncio.CancelledError:
             return
 
