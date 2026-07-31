@@ -116,7 +116,8 @@ def compute_mcp_registry_fingerprint(
     server_keys = ",".join(sorted(str(k) for k in mcp_servers))
     oauth_keys = ",".join(sorted(str(k) for k in (oauth_credentials or {})))
     payload = f"{schema_version}|{server_keys}|{oauth_keys}"
-    return hashlib.sha256(payload.encode()).hexdigest()  # codeql[py/weak-sensitive-data-hashing]
+    # codeql[py/weak-sensitive-data-hashing]
+    return hashlib.sha256(payload.encode()).hexdigest()
 
 
 __all__ = [

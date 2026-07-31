@@ -192,7 +192,7 @@ async def test_agent_turn_tier_b_builds_session_registry(
         calls.append(dict(kwargs))
         return orig(**kwargs)
 
-    monkeypatch.setattr(agent_turn_mod, "build_session_registry", _spy)
+    monkeypatch.setattr("sevn.tools.registry.build_session_registry", _spy)
 
     async def _scripted(_req: dict[str, Any]) -> dict[str, Any]:
         return _openai_assistant_text("Registry path ok.")
