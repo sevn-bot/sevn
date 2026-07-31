@@ -1014,7 +1014,7 @@ that resolver — thinking/reasoning never reaches triage.
 |-----|---------|-------|
 | ``voice.activation.enabled`` | ``false`` | Opt-in wake-word listener (D24) |
 | ``voice.activation.engine`` | ``openwakeword`` | Offline engine id — W37 implements capture |
-| ``voice.activation.wake_word`` | ``hey sevn`` | Local phrase when engine supports custom words |
+| ``voice.activation.wake_word`` | ``hey jarvis`` | Bundled openWakeWord phrase (fail-closed when no model) |
 
 Schema maintainer note (W36.2, do not fix here): ``stt_providers`` still appears as a
 **top-level** key in ``infra/sevn.schema.json`` while runtime reads ``voice.stt_providers``.

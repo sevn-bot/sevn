@@ -96,6 +96,7 @@ acp = []
 voice-wake = [
     "sounddevice>=0.5.0",
     "numpy>=1.26.0",
+    "openwakeword",
 ]
 dev = [
     "pytest==9.0.3",
@@ -131,6 +132,7 @@ override-dependencies = ["typer==0.25.1", "joserfc>=1.6.7", "markdownify==1.2.2"
 
 [tool.uv.sources]
 skillspector = { git = "https://github.com/NVIDIA/SkillSpector", branch = "main" }
+openwakeword = { git = "https://github.com/dscripka/openWakeWord.git", branch = "main" }
 
 [tool.hatch.metadata]
 allow-direct-references = true

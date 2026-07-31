@@ -16,7 +16,6 @@ def test_gateway_lifespan_completes_with_activation_enabled_no_device(tmp_path: 
     import_voice_activation_module()
     doc = activation_enabled_workspace_doc(enabled=True)
     with (
-        gateway_test_client(tmp_path, sevn_doc=doc) as client,
         patch(
             "sevn.voice.activation.probe_voice_activation",
             return_value={
@@ -24,17 +23,14 @@ def test_gateway_lifespan_completes_with_activation_enabled_no_device(tmp_path: 
                 "status": "unavailable",
                 "reason": "no input device",
             },
-            create=True,
         ),
-        patch(
-            "sevn.voice.activation.maybe_start_wake_word_listener",
-            new_callable=AsyncMock,
-            create=True,
-        ) as start_hook,
+        gateway_test_client(tmp_path, sevn_doc=doc) as client,
     ):
         response = client.get("/health")
         assert response.status_code == 200
-        start_hook.assert_not_called()
+        activation = client.app.state.voice_activation
+        assert activation.get("listening") is False
+        assert activation.get("task") is None
 
 
 def test_gateway_shutdown_drains_wake_word_listener_cleanly(tmp_path: Path) -> None:
@@ -45,12 +41,10 @@ def test_gateway_shutdown_drains_wake_word_listener_cleanly(tmp_path: Path) -> N
         patch(
             "sevn.voice.activation.probe_voice_activation",
             return_value={"available": False, "status": "unavailable", "reason": "no device"},
-            create=True,
         ),
         patch(
             "sevn.voice.activation.maybe_stop_wake_word_listener",
             stop_hook,
-            create=True,
         ),
     ):
         with gateway_test_client(tmp_path, sevn_doc=doc) as client:

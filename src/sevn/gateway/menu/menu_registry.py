@@ -347,7 +347,8 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "chat_voice",
         "Wake-word activation",
         implemented=True,
-        notes="Opt-in wake-word toggle (Batch G W38)",
+        owner_only=True,
+        notes="Opt-in wake-word toggle (Batch G W38); owner-only — opens host mic",
     )
     add(
         "C3.9",
@@ -365,7 +366,8 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "chat_voice",
         "Wake phrase cycle",
         implemented=True,
-        notes="Cycles engine-supported wake phrases (W38.4)",
+        owner_only=True,
+        notes="Cycles engine-supported wake phrases (W38.4); owner-only — reloads listener",
     )
 
     # --- C4. Models ---

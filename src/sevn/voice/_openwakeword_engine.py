@@ -5,6 +5,9 @@ Depends: optional ``openwakeword``, ``numpy``
 
 Exports:
     OpenWakeWordEngine — Apache-2.0 offline wake-word scorer.
+    WakeModelLoadError — configured model id failed to load.
+    normalise_wake_model_name — phrase → bundled model slug.
+    wake_word_model_loadable — probe whether a phrase maps to a bundled model.
 """
 
 from __future__ import annotations
@@ -15,6 +18,12 @@ from sevn.voice.wake_engine import NullWakeWordEngine
 
 _ACTIVATION_THRESHOLD = 0.5
 _DEFAULT_SAMPLE_RATE = 16000
+_SCORING_WINDOW_S = 0.08
+_BUFFER_WINDOW_MULTIPLIER = 4
+
+
+class WakeModelLoadError(RuntimeError):
+    """Configured wake phrase has no loadable bundled model."""
 
 
 def _numpy() -> Any:
@@ -33,17 +42,17 @@ def _numpy() -> Any:
     return np
 
 
-def _normalise_wake_model_name(wake_word: str) -> str:
+def normalise_wake_model_name(wake_word: str) -> str:
     """Map operator wake phrase to an openWakeWord bundled model id.
 
     Args:
-        wake_word (str): Configured phrase such as ``hey sevn``.
+        wake_word (str): Configured phrase such as ``hey jarvis``.
 
     Returns:
         str: Model slug understood by openWakeWord.
 
     Examples:
-        >>> _normalise_wake_model_name("hey jarvis")
+        >>> normalise_wake_model_name("hey jarvis")
         'hey_jarvis'
     """
     slug = "_".join(wake_word.strip().casefold().split())
@@ -59,14 +68,37 @@ def _normalise_wake_model_name(wake_word: str) -> str:
     return known.get(wake_word.strip().casefold(), slug.replace(" ", "_"))
 
 
+def wake_word_model_loadable(wake_word: str) -> bool:
+    """Return whether ``wake_word`` maps to a bundled openWakeWord model.
+
+    Args:
+        wake_word (str): Operator-configured phrase.
+
+    Returns:
+        bool: ``True`` when the specific model loads without falling back to all models.
+
+    Examples:
+        >>> wake_word_model_loadable("hey jarvis") in (True, False)
+        True
+    """
+    try:
+        OpenWakeWordEngine(wake_word=wake_word)
+    except (WakeModelLoadError, ImportError):
+        return False
+    return True
+
+
 class OpenWakeWordEngine(NullWakeWordEngine):
     """Apache-2.0 offline scorer — no account, key, or network (D23)."""
 
     def __init__(self, *, wake_word: str) -> None:
-        """Load the bundled openWakeWord model closest to ``wake_word``.
+        """Load exactly one bundled openWakeWord model for ``wake_word``.
 
         Args:
             wake_word (str): Operator-configured wake phrase.
+
+        Raises:
+            WakeModelLoadError: When the configured model id is not bundled.
 
         Examples:
             >>> OpenWakeWordEngine(wake_word="hey jarvis")  # doctest: +SKIP
@@ -74,13 +106,19 @@ class OpenWakeWordEngine(NullWakeWordEngine):
         """
         from openwakeword.model import Model
 
-        model_name = _normalise_wake_model_name(wake_word)
+        model_name = normalise_wake_model_name(wake_word)
         try:
             self._model: Any = Model(wakeword_models=[model_name])
-        except Exception:
-            self._model = Model()
+        except Exception as exc:
+            raise WakeModelLoadError(
+                f"wake-word model {model_name!r} is not available — "
+                f"choose a bundled phrase such as 'hey jarvis'"
+            ) from exc
         np = _numpy()
         self._buffer = np.array([], dtype=np.int16)
+        self._max_buffer_samples = (
+            int(_DEFAULT_SAMPLE_RATE * _SCORING_WINDOW_S) * _BUFFER_WINDOW_MULTIPLIER
+        )
 
     def reset(self) -> None:
         """Clear the rolling PCM buffer.
@@ -115,10 +153,12 @@ class OpenWakeWordEngine(NullWakeWordEngine):
             frame = frame[:-1]
         chunk = np.frombuffer(frame, dtype=np.int16)
         self._buffer = np.concatenate([self._buffer, chunk])
-        min_samples = int(sample_rate * 0.08)
+        if self._buffer.size > self._max_buffer_samples:
+            self._buffer = self._buffer[-self._max_buffer_samples :]
+        min_samples = int(sample_rate * _SCORING_WINDOW_S)
         if self._buffer.size < min_samples:
             return 0.0
-        audio = self._buffer[-min_samples * 4 :]
+        audio = self._buffer[-min_samples * _BUFFER_WINDOW_MULTIPLIER :]
         try:
             scores = self._model.predict(audio)
         except Exception:
@@ -144,4 +184,9 @@ class OpenWakeWordEngine(NullWakeWordEngine):
         return score >= _ACTIVATION_THRESHOLD
 
 
-__all__ = ["OpenWakeWordEngine"]
+__all__ = [
+    "OpenWakeWordEngine",
+    "WakeModelLoadError",
+    "normalise_wake_model_name",
+    "wake_word_model_loadable",
+]

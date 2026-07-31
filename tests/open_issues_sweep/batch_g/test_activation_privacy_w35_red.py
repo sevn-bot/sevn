@@ -101,3 +101,26 @@ async def test_non_activated_audio_emits_no_audio_bearing_trace_attrs(
     await listener.run_until_idle(max_frames=2)
     violations = _trace_attrs_contain_audio_or_transcript(recording_trace_sink.events)
     assert violations == []
+
+
+@pytest.mark.asyncio
+async def test_non_activated_audio_emits_no_ambient_activation_trace_kinds(
+    tmp_path: Path,
+    recording_trace_sink: _RecordingTraceSink,
+) -> None:
+    activation = import_voice_activation_module()
+    source = _StaticFrameSource((b"\x00" * 128,) * 3)
+    listener = activation.WakeWordListener(
+        workspace=baseline_voice_workspace(),
+        frame_source=source,
+        stt_pipeline=AsyncMock(),
+        trace=recording_trace_sink,
+        attachments_dir=tmp_path / "attachments",
+    )
+    await listener.run_until_idle(max_frames=3)
+    ambient_kinds = {
+        event.kind
+        for event in recording_trace_sink.events
+        if event.kind in {"voice.activation.listening", "voice.activation.idle"}
+    }
+    assert ambient_kinds == set()

@@ -514,7 +514,7 @@ DEFAULT_VOICE_PRELOAD_LOCAL_TTS_ON_BOOT: Final[bool] = False
 DEFAULT_VOICE_ENABLED: Final[bool] = True
 DEFAULT_VOICE_ACTIVATION_ENABLED: Final[bool] = False
 DEFAULT_VOICE_ACTIVATION_ENGINE: Final[str] = "openwakeword"
-DEFAULT_VOICE_ACTIVATION_WAKE_WORD: Final[str] = "hey sevn"
+DEFAULT_VOICE_ACTIVATION_WAKE_WORD: Final[str] = "hey jarvis"
 VOICE_WAKE_OPTIONAL_EXTRA: Final[str] = "voice-wake"
 VOICE_WAKE_ENGINE_MODULE: Final[str] = "openwakeword"
 # GGML model the whisper.cpp provisioner downloads by default (pyclaww parity — "base" is

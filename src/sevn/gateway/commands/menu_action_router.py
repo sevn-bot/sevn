@@ -587,6 +587,8 @@ class MenuActionRouter:
 
                 mutate_sevn_json(self._sevn_json, _apply_toggle)
                 self._reload_workspace()
+                if target == "voice.activation.enabled":
+                    await self._reload_voice_activation_runtime()
                 if target == "second_brain.layout":
                     from sevn.config.loader import load_workspace
                     from sevn.second_brain.bootstrap import ensure_second_brain_scope_layout
@@ -1422,6 +1424,27 @@ class MenuActionRouter:
             return bool(runtime.get("listening"))
         return None
 
+    async def _reload_voice_activation_runtime(self) -> None:
+        """Apply activation toggle to the live gateway listener without restart.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._reload_voice_activation_runtime)
+            True
+        """
+        runtime = getattr(self._router, "_voice_activation_runtime", None)
+        if not isinstance(runtime, dict):
+            return
+        from sevn.voice.activation import reload_voice_activation_runtime
+
+        trace = runtime.get("trace")
+        await reload_voice_activation_runtime(
+            app_state=runtime,
+            workspace=self._workspace,
+            trace=trace,
+            content_root=self._content_root,
+        )
+
     async def _handle_voice_activation_status(
         self, msg: IncomingMessage, callback_data: str
     ) -> str | None:
@@ -1502,6 +1525,8 @@ class MenuActionRouter:
 
         mutate_sevn_json(self._sevn_json, _apply)
         self._reload_workspace()
+        if resolve_voice_activation_settings(self._workspace).enabled:
+            await self._reload_voice_activation_runtime()
         toast = f"Wake phrase: {new_word}"
         answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
         return None if answered else toast

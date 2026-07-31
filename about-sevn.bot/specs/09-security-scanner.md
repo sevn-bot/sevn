@@ -427,9 +427,10 @@ Map to existing tests under `tests/` that cover this subsystem; add Makefile-onl
 
 ## Amendments (open-issues-sweep Batch G W36 — ``scan_voice``)
 
-``security.scanner.scan_voice`` stays **dormant** through W36: ``LLMGuardScanner`` has no
-branch for it today. Batch G W37 will honor it for **post-activation utterances** only;
-ambient wake-word frames are never scanned (D24). Do not add a second voice-scan config key.
+``security.scanner.scan_voice`` was **dormant through W36**. Batch G W37 wires it for
+**post-activation utterances** only via ``WakeWordListener._scan_activation_transcript``
+(``src/sevn/voice/activation.py``); ambient wake-word frames are never scanned (D24). Do
+not add a second voice-scan config key.
 
 ## Human-input needed
 

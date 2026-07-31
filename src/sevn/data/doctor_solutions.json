@@ -556,9 +556,9 @@
       "auto_fixable": false,
       "docs_url": "specs/20-voice.md",
       "explanation": "Wake-word activation optional extra or host prerequisites are missing.",
-      "fix_command": "uv sync --extra voice-wake && uv pip install openwakeword",
+      "fix_command": "uv sync --extra voice-wake",
       "remediation": [
-        "Run `uv sync --extra voice-wake` for capture dependencies, then `uv pip install openwakeword` for the Apache-2.0 offline detector (D23).",
+        "Run `uv sync --extra voice-wake` for capture dependencies and the Apache-2.0 offline detector (D23).",
         "Enable only on a host with a microphone; headless containers report unavailable by design."
       ],
       "severity": "warn",

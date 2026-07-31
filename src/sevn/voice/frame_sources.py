@@ -11,70 +11,13 @@ Exports:
 from __future__ import annotations
 
 import asyncio
-import importlib.util
-import os
-import sys
 from collections.abc import AsyncIterator
+from contextlib import suppress
 
-from sevn.config.defaults import VOICE_WAKE_ENGINE_MODULE
+from sevn.voice.capture_prerequisites import has_input_device
 
 _DEFAULT_SAMPLE_RATE = 16000
 _DEFAULT_BLOCK_SAMPLES = 1280
-
-
-def _voice_wake_extra_installed() -> bool:
-    """Return whether the wake-word engine module is importable.
-
-    Returns:
-        bool: ``True`` when ``openwakeword`` is importable.
-
-    Examples:
-        >>> isinstance(_voice_wake_extra_installed(), bool)
-        True
-    """
-    return importlib.util.find_spec(VOICE_WAKE_ENGINE_MODULE) is not None
-
-
-def _activation_supported_platform() -> bool:
-    """Return whether this host may run wake-word capture.
-
-    Returns:
-        bool: ``False`` for unsupported OS, Docker, or headless env.
-
-    Examples:
-        >>> isinstance(_activation_supported_platform(), bool)
-        True
-    """
-    if sys.platform not in ("darwin", "linux"):
-        return False
-    if os.path.exists("/.dockerenv"):
-        return False
-    return os.environ.get("SEVN_HEADLESS", "").strip() not in {"1", "true", "yes"}
-
-
-def _has_input_device() -> bool:
-    """Probe input devices via ``sounddevice`` without opening a stream.
-
-    Returns:
-        bool: ``True`` when at least one input channel exists.
-
-    Examples:
-        >>> _has_input_device() in (True, False)
-        True
-    """
-    if not _activation_supported_platform() or not _voice_wake_extra_installed():
-        return False
-    try:
-        import sounddevice as sd
-    except ImportError:
-        return False
-    try:
-        devices = sd.query_devices()
-        if isinstance(devices, dict):
-            return int(devices.get("max_input_channels") or 0) > 0
-        return any(int(d.get("max_input_channels") or 0) > 0 for d in devices)
-    except Exception:
-        return False
 
 
 class LiveMicFrameSource:
@@ -131,6 +74,13 @@ class LiveMicFrameSource:
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[bytes | None] = asyncio.Queue(maxsize=8)
 
+        def _enqueue(pcm: bytes) -> None:
+            if queue.full():
+                with suppress(asyncio.QueueFull):
+                    queue.get_nowait()
+            with suppress(asyncio.QueueFull):
+                queue.put_nowait(pcm)
+
         def _callback(indata: object, _frames: int, _time: object, status: object) -> None:
             _ = status
             if self._stop.is_set():
@@ -138,8 +88,7 @@ class LiveMicFrameSource:
             import numpy as np
 
             arr = np.asarray(indata, dtype=np.int16)
-            pcm = arr.tobytes()
-            loop.call_soon_threadsafe(queue.put_nowait, pcm)
+            loop.call_soon_threadsafe(_enqueue, arr.tobytes())
 
         stream = sd.InputStream(
             samplerate=self._sample_rate,
@@ -169,7 +118,7 @@ def build_live_frame_source() -> LiveMicFrameSource | None:
         >>> build_live_frame_source() is None or isinstance(build_live_frame_source(), LiveMicFrameSource)
         True
     """
-    if not _has_input_device():
+    if not has_input_device():
         return None
     try:
         import sounddevice  # noqa: F401

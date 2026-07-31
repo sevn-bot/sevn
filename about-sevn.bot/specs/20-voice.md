@@ -319,13 +319,12 @@ Wake-word activation is **opt-in and default-off** under ``voice.activation.*`` 
 Default engine (W37): **openWakeWord** (Apache-2.0), fully offline, no account/key (D23).
 Optional extra: ``uv sync --extra voice-wake``.
 
-### ``security.scanner.scan_voice`` (W36.6)
+### ``security.scanner.scan_voice`` (W36.6 / W37)
 
-The existing ``security.scanner.scan_voice`` flag remains **dormant** until W37 delivers
-post-activation utterance capture. Inbound voice *attachments* already pass through
-``LLMGuardScanner`` on the existing file-based STT path; ambient wake-word frames must
-never reach the scanner (D24). W37 will wire ``scan_voice`` for the post-activation
-utterance only — no second overlapping config key.
+The existing ``security.scanner.scan_voice`` flag is honored for **post-activation**
+utterances in ``WakeWordListener`` (G-Thermos). Inbound voice *attachments* already pass
+through ``LLMGuardScanner`` on the existing file-based STT path; ambient wake-word frames
+must never reach the scanner (D24).
 
 ### Operator surfaces (Batch G W38 — #102)
 

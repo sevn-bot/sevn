@@ -8,28 +8,23 @@ Exports:
     VoiceActivationSettings — resolved activation state for doctor/CLI/gateway.
     WakeWordListener — capture + detection loop with STT hand-off.
     activation_config_key_paths — dotted config paths under ``voice.activation.*``.
-    activation_supported_platform — host/container gate for capture (D25).
-    build_wake_word_listener — factory when enabled and available.
-    format_activation_status — plain-text activation status (W38).
-    has_input_device — best-effort mic probe without opening a stream.
-    maybe_start_wake_word_listener — gateway lifespan startup hook.
-    maybe_stop_wake_word_listener — gateway lifespan shutdown hook.
     activation_status_payload — CLI/Telegram listening-state snapshot (W38).
     available_wake_word_models — engine-derived wake phrase choices (W38).
+    build_wake_word_listener — factory when enabled and available.
+    format_activation_status — plain-text activation status (W38).
+    maybe_start_wake_word_listener — gateway lifespan startup hook.
+    maybe_stop_wake_word_listener — gateway lifespan shutdown hook.
     probe_voice_activation — structured availability verdict (D25).
+    reload_voice_activation_runtime — stop/restart listener after config toggle.
     resolve_listening_state — D24 three-way listening verdict (W38).
     resolve_voice_activation_settings — merge config with defaults.
     voice_activation_config_enabled — ``voice.activation.enabled`` alone.
     voice_activation_enabled — conjunctive ``voice.enabled`` + activation.
-    voice_wake_extra_installed — optional extra import probe.
 """
 
 from __future__ import annotations
 
 import asyncio
-import importlib.util
-import os
-import sys
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import suppress
@@ -41,11 +36,15 @@ from sevn.config.defaults import (
     DEFAULT_VOICE_ACTIVATION_ENABLED,
     DEFAULT_VOICE_ACTIVATION_ENGINE,
     DEFAULT_VOICE_ACTIVATION_WAKE_WORD,
-    VOICE_WAKE_ENGINE_MODULE,
     VOICE_WAKE_OPTIONAL_EXTRA,
 )
 from sevn.config.sections.channels import VoiceActivationConfig, VoiceConfig
 from sevn.config.workspace_config import WorkspaceConfig
+from sevn.voice.capture_prerequisites import (
+    activation_supported_platform,
+    has_input_device,
+    voice_wake_extra_installed,
+)
 from sevn.voice.factory import build_stt_pipeline, voice_enabled, voice_runtime_settings
 from sevn.voice.frame_sources import build_live_frame_source
 from sevn.voice.trace_events import emit_voice_event
@@ -214,59 +213,7 @@ def resolve_voice_activation_settings(
     )
 
 
-def voice_wake_extra_installed() -> bool:
-    """Return whether the optional wake-word engine module is importable.
-
-    Returns:
-        bool: ``True`` when ``openwakeword`` (W37 extra) is on ``sys.path``.
-
-    Examples:
-        >>> isinstance(voice_wake_extra_installed(), bool)
-        True
-    """
-    return importlib.util.find_spec(VOICE_WAKE_ENGINE_MODULE) is not None
-
-
-def activation_supported_platform() -> bool:
-    """Return whether this host may run wake-word capture (D25 platform matrix).
-
-    Returns:
-        bool: ``False`` for unsupported OS, Docker, or explicit headless env.
-
-    Examples:
-        >>> isinstance(activation_supported_platform(), bool)
-        True
-    """
-    if sys.platform not in ("darwin", "linux"):
-        return False
-    if os.path.exists("/.dockerenv"):
-        return False
-    return os.environ.get("SEVN_HEADLESS", "").strip() not in {"1", "true", "yes"}
-
-
-def has_input_device() -> bool:
-    """Best-effort input-device probe without opening a stream (D24).
-
-    Returns:
-        bool: ``True`` when ``sounddevice`` reports at least one input channel.
-
-    Examples:
-        >>> has_input_device() in (True, False)
-        True
-    """
-    if not activation_supported_platform() or not voice_wake_extra_installed():
-        return False
-    try:
-        import sounddevice as sd
-    except ImportError:
-        return False
-    try:
-        devices = sd.query_devices()
-        if isinstance(devices, dict):
-            return int(devices.get("max_input_channels") or 0) > 0
-        return any(int(d.get("max_input_channels") or 0) > 0 for d in devices)
-    except Exception:
-        return False
+_cached_wake_models: dict[str, tuple[str, ...]] = {}
 
 
 def available_wake_word_models(*, engine_id: str | None = None) -> tuple[str, ...]:
@@ -286,6 +233,10 @@ def available_wake_word_models(*, engine_id: str | None = None) -> tuple[str, ..
     chosen = (engine_id or DEFAULT_VOICE_ACTIVATION_ENGINE).strip().casefold()
     if chosen != "openwakeword":
         return ()
+    cache_key = chosen
+    if cache_key in _cached_wake_models:
+        return _cached_wake_models[cache_key]
+    models: tuple[str, ...]
     if voice_wake_extra_installed():
         try:
             from openwakeword.model import Model
@@ -293,10 +244,15 @@ def available_wake_word_models(*, engine_id: str | None = None) -> tuple[str, ..
             model = Model()
             ids = tuple(sorted(str(k) for k in model.models))
             if ids:
-                return tuple(_wake_model_id_to_phrase(mid) for mid in ids)
+                models = tuple(_wake_model_id_to_phrase(mid) for mid in ids)
+            else:
+                models = _fallback_wake_phrases()
         except Exception:
-            return _fallback_wake_phrases()
-    return _fallback_wake_phrases()
+            models = _fallback_wake_phrases()
+    else:
+        models = _fallback_wake_phrases()
+    _cached_wake_models[cache_key] = models
+    return models
 
 
 def _fallback_wake_phrases() -> tuple[str, ...]:
@@ -309,7 +265,7 @@ def _fallback_wake_phrases() -> tuple[str, ...]:
         >>> "hey jarvis" in _fallback_wake_phrases()
         True
     """
-    return ("hey jarvis", "alexa", "hey mycroft", "hey sevn")
+    return ("hey jarvis", "alexa", "hey mycroft")
 
 
 def _wake_model_id_to_phrase(model_id: str) -> str:
@@ -475,8 +431,7 @@ def probe_voice_activation(ws: WorkspaceConfig) -> dict[str, Any]:
             "available": False,
             "status": "unavailable",
             "reason": (
-                f"wake-word engine not installed — run: "
-                f"uv sync --extra {VOICE_WAKE_OPTIONAL_EXTRA} && uv pip install openwakeword"
+                f"wake-word engine not installed — run: uv sync --extra {VOICE_WAKE_OPTIONAL_EXTRA}"
             ),
         }
     if not activation_supported_platform():
@@ -490,6 +445,17 @@ def probe_voice_activation(ws: WorkspaceConfig) -> dict[str, Any]:
             "available": False,
             "status": "unavailable",
             "reason": "no audio input device detected",
+        }
+    from sevn.voice._openwakeword_engine import wake_word_model_loadable
+
+    if not wake_word_model_loadable(settings.wake_word):
+        return {
+            "available": False,
+            "status": "unavailable",
+            "reason": (
+                f"no bundled wake-word model for {settings.wake_word!r} — "
+                f"choose one of: {', '.join(available_wake_word_models(engine_id=settings.engine))}"
+            ),
         }
     return {
         "available": True,
@@ -512,6 +478,7 @@ class WakeWordListener:
         wake_word: str = DEFAULT_VOICE_ACTIVATION_WAKE_WORD,
         engine_id: str | None = None,
         simulate_activation_at_frame: int | None = None,
+        scanner: Any = None,
         content_root: Path | None = None,
     ) -> None:
         """Store capture dependencies; never opens ``frame_source`` until :meth:`run_until_idle`.
@@ -525,7 +492,8 @@ class WakeWordListener:
             wake_word (str): Configured wake phrase.
             engine_id (str | None): ``voice.activation.engine`` value.
             simulate_activation_at_frame (int | None): Test-only activation index.
-            content_root (Path | None): Workspace content root.
+            scanner (Any): Optional :class:`~sevn.security.llm_guard_scanner.LLMGuardScanner`.
+            content_root (Path | None): Workspace root for blocked-inbound persistence.
 
         Examples:
             >>> from pathlib import Path
@@ -553,12 +521,13 @@ class WakeWordListener:
         self._wake_word = wake_word
         self._engine_id = engine_id
         self._simulate_activation_at_frame = simulate_activation_at_frame
-        self._content_root = content_root
         self._stop_requested = False
         self._wake_engine: WakeWordEngine = build_wake_word_engine(
             wake_word=wake_word,
             engine_id=engine_id,
         )
+        self._scanner = scanner
+        self._content_root = content_root
 
     def request_stop(self) -> None:
         """Signal the background loop and live frame source to exit.
@@ -614,15 +583,8 @@ class WakeWordListener:
         activated = False
         utterance_frames: list[bytes] = []
         turn_id = uuid.uuid4().hex
-
-        await emit_voice_event(
-            self._trace,
-            kind="voice.activation.listening",
-            session_id=_WAKE_SESSION_ID,
-            turn_id=turn_id,
-            status="started",
-            attrs={"wake_word": self._wake_word, "engine": self._engine_id or "openwakeword"},
-        )
+        vr = voice_runtime_settings(self._workspace)
+        max_utterance_bytes = int(float(vr.max_voice_seconds) * 2 * _SAMPLE_RATE)
 
         async for frame in self._frame_source.read_frames():
             if self._stop_requested:
@@ -645,20 +607,13 @@ class WakeWordListener:
                     utterance_frames.append(frame)
             else:
                 utterance_frames.append(frame)
+                if sum(len(chunk) for chunk in utterance_frames) >= max_utterance_bytes:
+                    break
 
             frame_idx += 1
 
         if activated and utterance_frames and self._stt_pipeline is not None:
             await self._handoff_utterance(utterance_frames, turn_id=turn_id)
-
-        await emit_voice_event(
-            self._trace,
-            kind="voice.activation.idle",
-            session_id=_WAKE_SESSION_ID,
-            turn_id=turn_id,
-            status="ok",
-            attrs={"frames_processed": frame_idx, "activated": activated},
-        )
 
     def _should_activate(self, frame_idx: int, frame: bytes) -> bool:
         """Return whether the current frame index/audio should trigger capture.
@@ -708,23 +663,144 @@ class WakeWordListener:
         pcm = b"".join(frames)
         vr = voice_runtime_settings(self._workspace)
         max_bytes = int(float(vr.max_voice_mb) * 1024 * 1024)
+        max_duration_bytes = int(float(vr.max_voice_seconds) * 2 * _SAMPLE_RATE)
         if len(pcm) > max_bytes:
             pcm = pcm[:max_bytes]
+        if len(pcm) > max_duration_bytes:
+            pcm = pcm[:max_duration_bytes]
+        duration_s = len(pcm) / (2 * _SAMPLE_RATE) if pcm else None
+        if duration_s is not None and duration_s > float(vr.max_voice_seconds):
+            return
+        if not pcm:
+            return
         self._attachments_dir.mkdir(parents=True, exist_ok=True)
         audio_path = self._attachments_dir / f"wake-{turn_id}.wav"
         await asyncio.to_thread(_write_pcm_wav, audio_path, pcm)
 
-        duration_s = len(pcm) / (2 * _SAMPLE_RATE) if pcm else None
-        if duration_s is not None and duration_s > float(vr.max_voice_seconds):
-            return
-
-        await self._stt_pipeline.transcribe_or_placeholder(
+        llm_line, _meta = await self._stt_pipeline.transcribe_or_placeholder(
             audio_path=audio_path,
             mime_type="audio/wav",
             duration_s=duration_s,
             session_id=_WAKE_SESSION_ID,
             turn_id=turn_id,
         )
+        if not await self._scan_activation_transcript(llm_line, turn_id=turn_id):
+            return
+
+    async def _scan_activation_transcript(self, text: str, *, turn_id: str) -> bool:
+        """Honor ``security.scanner.scan_voice`` for post-activation STT text (W37).
+
+        Args:
+            text (str): Transcript from :meth:`SpeechToTextPipeline.transcribe_or_placeholder`.
+            turn_id (str): Correlation id for traces.
+
+        Returns:
+            bool: ``True`` when scanning is disabled, allowed, or text is empty.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(WakeWordListener._scan_activation_transcript)
+            True
+        """
+        return await _scan_activation_transcript_impl(
+            workspace=self._workspace,
+            scanner=self._scanner,
+            trace=self._trace,
+            content_root=self._content_root,
+            text=text,
+            turn_id=turn_id,
+        )
+
+
+def _scan_voice_enabled(ws: WorkspaceConfig) -> bool:
+    """Return whether post-activation utterances should pass LLM Guard (W37).
+
+    Args:
+        ws (WorkspaceConfig): Parsed workspace document.
+
+    Returns:
+        bool: ``False`` only when ``security.scanner.scan_voice`` is explicitly off.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> _scan_voice_enabled(WorkspaceConfig.minimal())
+        True
+    """
+    sec = ws.security
+    if sec is None or sec.scanner is None:
+        return True
+    return bool(sec.scanner.scan_voice)
+
+
+async def _scan_activation_transcript_impl(
+    *,
+    workspace: WorkspaceConfig,
+    scanner: Any,
+    trace: Any,
+    content_root: Path | None,
+    text: str,
+    turn_id: str,
+) -> bool:
+    """Scan a wake-word transcript when ``scan_voice`` is enabled.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace document.
+        scanner (Any): LLM Guard scanner instance.
+        trace (Any): Gateway trace sink.
+        content_root (Path | None): Workspace root for blocked-inbound writes.
+        text (str): STT transcript for the post-activation utterance.
+        turn_id (str): Correlation id for traces.
+
+    Returns:
+        bool: ``True`` when the utterance may proceed.
+
+    Examples:
+        >>> import asyncio
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> asyncio.run(
+        ...     _scan_activation_transcript_impl(
+        ...         workspace=WorkspaceConfig.minimal(),
+        ...         scanner=None,
+        ...         trace=None,
+        ...         content_root=None,
+        ...         text="",
+        ...         turn_id="t",
+        ...     )
+        ... )
+        True
+    """
+    if not _scan_voice_enabled(workspace) or scanner is None or not text.strip():
+        return True
+    from sevn.security.llm_guard_scanner import ScanVerdict
+    from sevn.security.llmignore import write_blocked_inbound
+
+    verdict = await scanner.scan_inbound(
+        text=text,
+        channel="wake_word",
+        user_id="local",
+        actor_is_owner=True,
+        source="voice.activation.handoff",
+    )
+    if verdict.verdict == ScanVerdict.allow:
+        return True
+    if content_root is not None:
+        await asyncio.to_thread(
+            write_blocked_inbound,
+            content_root,
+            text=text,
+            verdict=verdict,
+            channel="wake_word",
+            user_id="local",
+        )
+    await emit_voice_event(
+        trace,
+        kind="voice.activation.blocked",
+        session_id=_WAKE_SESSION_ID,
+        turn_id=turn_id,
+        status="blocked",
+        attrs={"reasons": [r.value for r in verdict.reasons]},
+    )
+    return False
 
 
 def _write_pcm_wav(path: Path, pcm: bytes, *, sample_rate: int = _SAMPLE_RATE) -> None:
@@ -773,6 +849,7 @@ def build_wake_word_listener(
     trace: Any,
     content_root: Path | None,
     frame_source: AudioFrameSource | None = None,
+    scanner: Any = None,
 ) -> WakeWordListener | None:
     """Return a listener when activation is enabled and available.
 
@@ -782,6 +859,7 @@ def build_wake_word_listener(
         trace (Any): Gateway trace sink.
         content_root (Path | None): Workspace content root.
         frame_source (AudioFrameSource | None): Injectable mic stand-in for tests.
+        scanner (Any): Optional LLM Guard scanner for post-activation ``scan_voice``.
 
     Returns:
         WakeWordListener | None: ``None`` when disabled or unavailable.
@@ -824,6 +902,7 @@ def build_wake_word_listener(
         attachments_dir=attachments_dir,
         wake_word=settings.wake_word,
         engine_id=engine_id,
+        scanner=scanner,
         content_root=content_root,
     )
 
@@ -847,12 +926,49 @@ async def _listener_background_loop(listener: WakeWordListener) -> None:
         raise
 
 
+async def reload_voice_activation_runtime(
+    *,
+    app_state: dict[str, Any],
+    workspace: WorkspaceConfig,
+    trace: Any = None,
+    content_root: Path | None = None,
+) -> None:
+    """Stop any live listener and restart from current config (Telegram toggle).
+
+    Args:
+        app_state (dict[str, Any]): Gateway lifespan bag on ``app.state.voice_activation``.
+        workspace (WorkspaceConfig): Parsed workspace document after toggle.
+        trace (Any): Gateway trace sink.
+        content_root (Path | None): Workspace content root for attachment paths.
+
+    Examples:
+        >>> import asyncio
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> asyncio.run(
+        ...     reload_voice_activation_runtime(
+        ...         app_state={},
+        ...         workspace=WorkspaceConfig.minimal(),
+        ...     ),
+        ... ) is None
+        True
+    """
+    await maybe_stop_wake_word_listener(app_state=app_state)
+    await maybe_start_wake_word_listener(
+        app_state=app_state,
+        workspace=workspace,
+        trace=trace,
+        content_root=content_root,
+        scanner=app_state.get("scanner"),
+    )
+
+
 async def maybe_start_wake_word_listener(
     *,
     app_state: dict[str, Any],
     workspace: WorkspaceConfig,
     trace: Any = None,
     content_root: Path | None = None,
+    scanner: Any = None,
 ) -> None:
     """Gateway lifespan hook — no stream unless enabled **and** available (D24/D25).
 
@@ -861,6 +977,7 @@ async def maybe_start_wake_word_listener(
         workspace (WorkspaceConfig): Parsed workspace document.
         trace (Any): Gateway trace sink.
         content_root (Path | None): Workspace content root for attachment paths.
+        scanner (Any): Optional LLM Guard scanner for ``scan_voice`` on hand-off.
 
     Examples:
         >>> import asyncio
@@ -897,6 +1014,7 @@ async def maybe_start_wake_word_listener(
         stt_pipeline=stt,
         trace=trace,
         content_root=content_root,
+        scanner=scanner or app_state.get("scanner"),
     )
     if listener is None:
         app_state["listening"] = False
@@ -943,6 +1061,8 @@ async def maybe_stop_wake_word_listener(
     if isinstance(task, asyncio.Task):
         with suppress(asyncio.TimeoutError, asyncio.CancelledError):
             await asyncio.wait_for(asyncio.shield(task), timeout=shutdown_timeout_s)
+    app_state.pop("listener", None)
+    app_state.pop("task", None)
     app_state["listening"] = False
     await emit_voice_event(
         trace,
@@ -969,6 +1089,7 @@ __all__ = [
     "maybe_start_wake_word_listener",
     "maybe_stop_wake_word_listener",
     "probe_voice_activation",
+    "reload_voice_activation_runtime",
     "resolve_listening_state",
     "resolve_voice_activation_settings",
     "voice_activation_config_enabled",

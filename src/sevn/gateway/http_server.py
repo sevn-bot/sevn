@@ -1236,15 +1236,7 @@ def create_app(
         if not isinstance(_activation_state, dict):
             _activation_state = {}
             app.state.voice_activation = _activation_state
-        from sevn.voice.activation import maybe_start_wake_word_listener
-
         _activation_state["trace"] = trace
-        await maybe_start_wake_word_listener(
-            app_state=_activation_state,
-            workspace=ws,
-            trace=trace,
-            content_root=ly.content_root,
-        )
         await asyncio.to_thread(
             lambda: prune_stale_tts_files(
                 content_root=ly.content_root,
@@ -1284,6 +1276,16 @@ def create_app(
         scanner_ws = ws.model_copy()
         scanner_ws.trace_sink = trace  # type: ignore[attr-defined]
         scanner = LLMGuardScanner(ly.content_root, scanner_ws)
+        _activation_state["scanner"] = scanner
+        from sevn.voice.activation import maybe_start_wake_word_listener
+
+        await maybe_start_wake_word_listener(
+            app_state=_activation_state,
+            workspace=ws,
+            trace=trace,
+            content_root=ly.content_root,
+            scanner=scanner,
+        )
         rate = TokenBucketLimiter(
             capacity=DEFAULT_GATEWAY_RATE_LIMIT_CAPACITY,
             refill_per_second=DEFAULT_GATEWAY_RATE_LIMIT_REFILL_PER_SECOND,

@@ -125,10 +125,10 @@ def build_wake_word_engine(*, wake_word: str, engine_id: str | None = None) -> W
     if chosen != "openwakeword":
         return NullWakeWordEngine()
     try:
-        from sevn.voice._openwakeword_engine import OpenWakeWordEngine
+        from sevn.voice._openwakeword_engine import OpenWakeWordEngine, WakeModelLoadError
 
         return OpenWakeWordEngine(wake_word=wake_word)
-    except ImportError:
+    except (ImportError, WakeModelLoadError):
         return NullWakeWordEngine()
 
 
