@@ -7,8 +7,8 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
-last_updated: '2026-07-30'
-fingerprint: sha256:c15df45fa876025ced3f45f58c6b59418a36fd2a4c86f6fe6e4c6ae20cc6f321
+last_updated: '2026-07-31'
+fingerprint: sha256:a89d9c589dbefdb441a8e1bbb7a9db50b88bb692f486035a3b703f944f903381
 related: []
 sources:
 - src/sevn/gateway/**
@@ -123,6 +123,9 @@ interfaces:
 - name: verify_telegram_secret
   file: src/sevn/gateway/auth.py
   symbol: verify_telegram_secret
+- name: verify_telegram_webhook_freshness
+  file: src/sevn/gateway/auth.py
+  symbol: verify_telegram_webhook_freshness
 - name: verify_webchat_jwt
   file: src/sevn/gateway/auth.py
   symbol: verify_webchat_jwt
@@ -1610,6 +1613,17 @@ Telegram `/config` callback routing serves the redesigned eight-tile tree via
 `build_config_menu_keyboard()` and `MenuActionRouter`; stale `cfg:section:*` ids
 resolve through `_SECTION_ALIASES`. Section dispatch and action handlers are shared
 with the menu E2E walker recipe (`src/sevn/browser/recipes/telegram_menu.py`).
+
+## Amendments (open-issues-sweep W24, #81)
+
+`create_app` wraps the FastAPI surface in `IngressBodyLimitMiddleware`
+(`src/sevn/gateway/ingress_policy.py`) with `DEFAULT_MAX_INGRESS_BODY_BYTES`
+(1 MiB). Oversized HTTP bodies return **413** before route handlers; webchat
+`/ws/webchat` closes with code **1009** when the first auth frame exceeds the
+cap. Telegram and bearer-authenticated `/webhook/{channel}` handlers bind
+`bind_webhook_minimal_host_env()` so webhook-triggered subprocesses inherit a
+redacted host env. Signed GitHub webhooks reject stale
+`X-Hub-Signature-Timestamp` values (**401**) after HMAC verification.
 
 ## Test Strategy
 

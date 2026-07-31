@@ -568,4 +568,11 @@ def create_app(
             ttl_seconds=eff.cache_ttl_seconds,
         )
     application.add_middleware(GuardMiddleware, settings=resolved)
+    from sevn.config.defaults import DEFAULT_MAX_INGRESS_BODY_BYTES
+    from sevn.security.ingress_policy import IngressBodyLimitMiddleware
+
+    application.add_middleware(
+        IngressBodyLimitMiddleware,
+        max_bytes=DEFAULT_MAX_INGRESS_BODY_BYTES,
+    )
     return application

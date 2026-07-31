@@ -10,6 +10,10 @@ are cut into a dated, versioned section at release time.
 
 ## [Unreleased]
 
+### Fixed
+
+- [2026-07-31] Gateway and egress-proxy HTTP ingress reject bodies over 1 MiB (**413**); signed GitHub webhooks reject stale timestamps; Telegram transport errors and API failure logs redact bot tokens; webhook-triggered subprocesses inherit a minimized host env (#81, open-issues-sweep W24)
+
 ### Changed
 
 - [2026-07-30] `make ci-resume` now walks `mergecraft-ref-check` — the mergeCraft pin gate is in `CI_STEPS` alongside the other `ci-parity` steps, and tier↔resume parity is enforced by `tests/infra/test_ci_steps_tier_parity.py` instead of a Makefile comment alone

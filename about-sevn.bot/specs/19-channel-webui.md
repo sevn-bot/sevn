@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the browser conversational surface required by prd-01-conversational-experience
   §5.1: owner-only WebSocket chat, static SPA shell, and session continuity with Telegram
   via the shared SessionMa'
-last_updated: '2026-07-30'
-fingerprint: sha256:b40b73a21cda7a52117faf66a58b538bb8d26dfa6ff6a1d2211b030a1f0b2e8a
+last_updated: '2026-07-31'
+fingerprint: sha256:873655d657c47fcd3f63d7d76ae898413c84c66d189a211dbcaf55d09d634112
 related: []
 sources:
 - src/sevn/channels/**
@@ -498,6 +498,12 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Amendments (open-issues-sweep W24, #81)
+
+Webchat `/ws/webchat` rejects auth frames larger than
+`DEFAULT_MAX_INGRESS_BODY_BYTES` with WebSocket close code **1009** before
+session registration.
 
 ## Human-input needed
 

@@ -36,6 +36,7 @@ from sevn.config.defaults import (
 )
 from sevn.security.llmignore import assert_shadow_workspace_excludes_llmignore
 from sevn.security.sandbox_runtime import materialize_shadow_workspace
+from sevn.security.trigger_spawn_env import host_env_base_for_subprocess
 from sevn.skills.browser_session import merge_browser_proc_env
 from sevn.skills.capabilities import build_skill_capability_rows
 from sevn.skills.computer_use import COMPUTER_USE_SKILL_ID, gate_computer_use_core_skill
@@ -1111,7 +1112,7 @@ class SkillsManager:
         """
         from sevn.runtime.operator_path import augment_operator_path
 
-        env = augment_operator_path()
+        env = augment_operator_path(host_env_base_for_subprocess())
         env["SEVN_WORKSPACE"] = str(shadow)
         env["SEVN_SKILL_DIR"] = str(skill_dir)
         env["SEVN_CONTENT_ROOT"] = str(self._workspace_root)

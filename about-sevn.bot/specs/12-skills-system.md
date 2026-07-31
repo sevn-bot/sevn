@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own everything under workspace/skills/: how skills are discovered, validated,
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
-last_updated: '2026-07-21'
-fingerprint: sha256:720ea462c5b780097186fbb13aa5172e16d0109a60a3d4eb1bda072ea18ce04a
+last_updated: '2026-07-31'
+fingerprint: sha256:eeb851d2a96484f022b411eb29a39f72c6ac7b5d9e0c17eea7f96f87d7717f06
 related: []
 sources:
 - src/sevn/skills/**

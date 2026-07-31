@@ -70,6 +70,7 @@ from sevn.config.defaults import (
     DEFAULT_GATEWAY_RATE_LIMIT_CAPACITY,
     DEFAULT_GATEWAY_RATE_LIMIT_REFILL_PER_SECOND,
     DEFAULT_GATEWAY_SHUTDOWN_DRAIN_TIMEOUT_S,
+    DEFAULT_MAX_INGRESS_BODY_BYTES,
     DEFAULT_TRACE_ROLLUP_LOOKBACK_HOURS,
     DEFAULT_TRACE_TTL_DAYS,
     DEFAULT_WEBCHAT_AUTH_TIMEOUT_SECONDS,
@@ -102,6 +103,7 @@ from sevn.gateway.auth import (
     verify_login_gateway_token,
     verify_telegram_init_data,
     verify_telegram_secret,
+    verify_telegram_webhook_freshness,
     verify_webchat_jwt,
 )
 from sevn.gateway.boot import run_harness_boot_sweep, run_workspace_layout_validation
@@ -160,8 +162,13 @@ from sevn.plugins.registry import (
 )
 from sevn.second_brain.fetch import SecondBrainFetchError, fetch_url_to_raw
 from sevn.second_brain.paths import VaultLayout, display_scope_root_relative, resolve_scope_root
+from sevn.security.ingress_policy import (
+    IngressBodyLimitMiddleware,
+    first_ws_frame_within_limit,
+)
 from sevn.security.llm_guard_scanner import LLMGuardScanner
 from sevn.security.secrets.factory import secrets_chain_from_workspace
+from sevn.security.trigger_spawn_env import bind_webhook_minimal_host_env
 from sevn.self_improve.effective import effective_self_improve_enabled
 from sevn.self_improve.facade import enqueue_improve_job
 from sevn.self_improve.feedback import (
@@ -1867,12 +1874,15 @@ def create_app(
             header_value=request.headers.get("X-Telegram-Bot-Api-Secret-Token"),
         ):
             return Response(status_code=401, content=b"")
+        if not verify_telegram_webhook_freshness(dict(request.headers)):
+            return Response(status_code=401, content=b"")
         try:
             body = await request.json()
         except Exception as exc:
             raise HTTPException(status_code=400, detail="invalid_json") from exc
         router_local: ChannelRouter = request.app.state.gateway_router
-        await router_local.handle_webhook("telegram", body)
+        with bind_webhook_minimal_host_env():
+            await router_local.handle_webhook("telegram", body)
         return JSONResponse({"ok": True})
 
     app.include_router(build_webhook_router())
@@ -1890,7 +1900,8 @@ def create_app(
         except Exception as exc:
             raise HTTPException(status_code=400, detail="invalid_json") from exc
         router_local: ChannelRouter = request.app.state.gateway_router
-        await router_local.handle_webhook(channel, body)
+        with bind_webhook_minimal_host_env():
+            await router_local.handle_webhook(channel, body)
         return JSONResponse({"ok": True})
 
     @app.websocket("/ws/webchat")
@@ -1932,8 +1943,8 @@ def create_app(
             )
             try:
                 try:
-                    raw = await asyncio.wait_for(
-                        websocket.receive_text(),
+                    first_frame = await asyncio.wait_for(
+                        websocket.receive(),
                         timeout=DEFAULT_WEBCHAT_AUTH_TIMEOUT_SECONDS,
                     )
                 except TimeoutError:
@@ -1947,6 +1958,25 @@ def create_app(
                     return
                 except WebSocketDisconnect:
                     return
+                if not first_ws_frame_within_limit(
+                    first_frame,
+                    max_bytes=DEFAULT_MAX_INGRESS_BODY_BYTES,
+                ):
+                    await websocket.close(code=1009)
+                    return
+                if first_frame.get("type") != "websocket.receive":
+                    await websocket.close(code=4401)
+                    return
+                raw_bytes = first_frame.get("bytes")
+                raw: str
+                if isinstance(raw_bytes, (bytes, bytearray)):
+                    raw = raw_bytes.decode("utf-8", errors="replace")
+                else:
+                    text = first_frame.get("text")
+                    if not isinstance(text, str):
+                        await websocket.close(code=4401)
+                        return
+                    raw = text
                 try:
                     first = json.loads(raw)
                 except (ValueError, TypeError):
@@ -3019,4 +3049,8 @@ def create_app(
 
     _mount_mission_control_spa(app)
 
+    app.add_middleware(
+        IngressBodyLimitMiddleware,
+        max_bytes=DEFAULT_MAX_INGRESS_BODY_BYTES,
+    )
     return app

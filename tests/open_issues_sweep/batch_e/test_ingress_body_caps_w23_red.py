@@ -30,7 +30,6 @@ _INGRESS_CAP_STATUS = 413
 
 
 @pytest.mark.parametrize("target", ingress_post_targets(), ids=lambda t: t.route_id)
-@pytest.mark.xfail(reason="green after W24: centralized ingress body cap", strict=False)
 def test_oversized_post_body_rejected_before_handler(
     tmp_path: Path,
     target: IngressPostTarget,
@@ -49,7 +48,6 @@ def test_oversized_post_body_rejected_before_handler(
     )
 
 
-@pytest.mark.xfail(reason="green after W24: webchat WS frame body cap", strict=False)
 def test_oversized_webchat_ws_first_frame_rejected(tmp_path: Path) -> None:
     """Webchat auth frame larger than cap closes before session registration."""
     with gateway_test_client(tmp_path) as client, client.websocket_connect("/ws/webchat") as ws:
@@ -60,7 +58,6 @@ def test_oversized_webchat_ws_first_frame_rejected(tmp_path: Path) -> None:
 
 
 @pytest.mark.anyio
-@pytest.mark.xfail(reason="green after W24: egress proxy ingress body cap", strict=False)
 async def test_oversized_proxy_llm_post_rejected() -> None:
     """Egress proxy ``POST /llm/*`` rejects oversized bodies before upstream forward."""
     app = create_proxy_app(

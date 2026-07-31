@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the primary daily-driver channel for personal messaging: a ChannelAdapter
   implementation that normalises Telegram Updates into spec-17-gateway IncomingMessage
   / OutgoingMessage and implements '
-last_updated: '2026-07-30'
-fingerprint: sha256:b40b73a21cda7a52117faf66a58b538bb8d26dfa6ff6a1d2211b030a1f0b2e8a
+last_updated: '2026-07-31'
+fingerprint: sha256:873655d657c47fcd3f63d7d76ae898413c84c66d189a211dbcaf55d09d634112
 related: []
 sources:
 - src/sevn/channels/**

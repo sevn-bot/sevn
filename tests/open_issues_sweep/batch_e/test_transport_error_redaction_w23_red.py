@@ -18,7 +18,6 @@ class _TelegramProbe(TelegramApiMixin):
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W24: telegram transport errors redacted", strict=False)
 async def test_telegram_transport_exception_never_contains_bot_token() -> None:
     """Re-raised httpx transport errors must not embed the bot token (#81)."""
     token = "1234567890:SUPER_SECRET_BOT_TOKEN_XYZ"
@@ -38,7 +37,6 @@ async def test_telegram_transport_exception_never_contains_bot_token() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W24: telegram API error logs redacted", strict=False)
 async def test_telegram_api_error_log_line_redacts_secrets(
     caplog: pytest.LogCaptureFixture,
 ) -> None:

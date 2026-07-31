@@ -9,16 +9,17 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from sevn.triggers.sources.github import verify_github_payload
 from tests.open_issues_sweep.batch_e.conftest import (
     gateway_test_client,
     github_signature,
-    github_triggers_config,
 )
+
+if TYPE_CHECKING:
+    from sevn.config.workspace_config import TriggersWorkspaceConfig
 
 _SECRET = b"batch-e-gh-secret"
 
@@ -34,9 +35,6 @@ def test_invalid_github_hmac_rejected_today() -> None:
     assert ok is False
 
 
-@pytest.mark.xfail(
-    reason="green after W24: stale signed webhook timestamp skew check", strict=False
-)
 def test_stale_github_webhook_timestamp_rejected() -> None:
     """Signed webhooks older than allowed skew are rejected before enqueue."""
     from sevn.triggers.sources.github import verify_github_webhook_freshness
@@ -50,8 +48,10 @@ def test_stale_github_webhook_timestamp_rejected() -> None:
     assert verify_github_webhook_freshness(headers, max_skew_seconds=300) is False
 
 
-@pytest.mark.xfail(reason="green after W24: stale signed webhook HTTP rejection", strict=False)
-def test_stale_github_webhook_http_401(tmp_path: Path) -> None:
+def test_stale_github_webhook_http_401(
+    tmp_path: Path,
+    github_triggers_config: TriggersWorkspaceConfig,
+) -> None:
     """HTTP ingress rejects stale signed GitHub deliveries with 401."""
     body = json.dumps({"action": "ping"}).encode("utf-8")
     headers = {
@@ -65,7 +65,10 @@ def test_stale_github_webhook_http_401(tmp_path: Path) -> None:
     assert response.status_code == 401
 
 
-def test_duplicate_github_delivery_deduped_without_double_spawn(tmp_path: Path) -> None:
+def test_duplicate_github_delivery_deduped_without_double_spawn(
+    tmp_path: Path,
+    github_triggers_config: TriggersWorkspaceConfig,
+) -> None:
     """Delivery-id dedupe remains the second replay layer (passes today)."""
     body = json.dumps({"action": "opened"}).encode("utf-8")
     headers = {

@@ -881,7 +881,9 @@ class SubprocessSandboxRuntime:
             },
         )
         work_cwd = cwd or Path(str(rec["cwd"]))
-        merged_env = dict(os.environ)
+        from sevn.security.trigger_spawn_env import host_env_base_for_subprocess
+
+        merged_env = host_env_base_for_subprocess()
         merged_env.update(dict(rec["child_env"]))
         merged_env.setdefault("PYTHONHASHSEED", "0")
         proc = await asyncio.create_subprocess_exec(
@@ -1350,7 +1352,9 @@ class DockerSandboxRuntime:
             exec_argv.extend(["-w", str(cwd)])
         exec_argv.append(sandbox_id)
         exec_argv.extend(argv)
-        merged_env = dict(os.environ)
+        from sevn.security.trigger_spawn_env import host_env_base_for_subprocess
+
+        merged_env = host_env_base_for_subprocess()
         merged_env.update(dict(rec["child_env"]))
         _ = _apply_subprocess_limits(merged_env, self._cfg)
         rc, stdout, stderr = await _docker_run(exec_argv, timeout_s=timeout_s)
