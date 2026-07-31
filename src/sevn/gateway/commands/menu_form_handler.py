@@ -3057,8 +3057,12 @@ class MenuFormHandler:
             True
         """
         from sevn.skills.manager import SkillsManager
-        from sevn.skills.setup import skill_setup_requirements, skill_setup_status
+        from sevn.skills.setup import skill_setup_telegram_summary
 
+        if not self._router._resolve_owner_flag(msg):
+            self._consume_token(token)
+            await self._send_chat(msg, "Skill setup is owner-only.")
+            return
         if step != "skill_id":
             self._consume_token(token)
             await self._send_chat(msg, "Form state lost — start again.")
@@ -3073,18 +3077,10 @@ class MenuFormHandler:
         except Exception as exc:
             await self._send_chat(msg, str(exc))
             return
-        status = skill_setup_status(record.manifest)
-        requirements = skill_setup_requirements(record.manifest)
-        lines = [f"{skill_id}: {status}"]
-        for row in requirements:
-            mark = "ok" if row.get("satisfied") else "missing"
-            lines.append(f"  [{mark}] {row.get('kind')} {row.get('name')}")
-        unsupported = [
-            row
-            for row in requirements
-            if not row.get("satisfied") and row.get("capability_id") is None
-        ]
-        unmet = [row for row in requirements if not row.get("satisfied")]
+        summary = skill_setup_telegram_summary(skill_id, record.manifest)
+        lines = list(summary["lines"])
+        unsupported = summary["unsupported"]
+        unmet = summary["unmet"]
         if unsupported:
             names = ", ".join(str(row["name"]) for row in unsupported)
             lines.append(

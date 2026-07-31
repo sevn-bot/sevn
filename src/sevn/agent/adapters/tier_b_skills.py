@@ -282,7 +282,9 @@ def build_harness_skills_capability(
         return None
 
     directories, include = _resolve_skill_directories(sources)
-    skills = Skills[BTierDeps](directories=directories, include=sorted(include))
+    include_order = list(dict.fromkeys(triage_skills))
+    include_sorted = [sid for sid in include_order if sid in include]
+    skills = Skills[BTierDeps](directories=directories, include=include_sorted)
     _remap_capability_ids(skills, sources)
     _attach_dispatch_tools(skills)
     return skills
@@ -354,7 +356,7 @@ def resolve_skill_capability_sources(
         'pdf'
     """
     out: list[SkillCapabilitySource] = []
-    for skill_id in sorted(dict.fromkeys(skill_ids)):
+    for skill_id in dict.fromkeys(skill_ids):
         description = skill_descriptions.get(skill_id, "").strip()
         if not description:
             continue

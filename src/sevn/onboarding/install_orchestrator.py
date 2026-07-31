@@ -10,6 +10,7 @@ Exports:
     selected_capability_ids — derive enabled capabilities from merged config.
     resolve_install_root — sevn.bot checkout for ``uv`` / ``make``.
     build_install_plan — ordered plan from promoted ``sevn.json``.
+    build_install_plan_for_capability_ids — ordered plan from explicit capability ids.
     run_install_plan — async execute with JSON-line progress events.
     collect_install_run — drain ``run_install_plan`` into a summary dict.
     format_ndjson_event — encode one progress event as NDJSON.
@@ -314,6 +315,81 @@ def build_install_plan(
     )
 
 
+def build_install_plan_for_capability_ids(
+    capability_ids: set[str] | list[str],
+    *,
+    manifest: CapabilityManifest | None = None,
+) -> InstallPlan:
+    """Build an ordered install plan for an explicit capability id set.
+
+    Args:
+        capability_ids (set[str] | list[str]): Selected capability ids (e.g. from skill setup).
+        manifest (CapabilityManifest | None): Optional pre-loaded manifest.
+
+    Returns:
+        InstallPlan: Dependency-safe steps with fatal/warn counts.
+
+    Raises:
+        ValueError: When ids are unknown or dependencies are cyclic.
+
+    Examples:
+        >>> plan = build_install_plan_for_capability_ids(["skill.job_ops"])
+        >>> plan.fatal_count >= 0
+        True
+    """
+    from collections import deque
+
+    doc = manifest or load_manifest()
+    selected = {str(i) for i in capability_ids}
+    index = {row.capability_id: row for row in doc.capabilities}
+    unknown = sorted(selected - set(index))
+    if unknown:
+        msg = f"unknown capability_id(s): {', '.join(unknown)}"
+        raise ValueError(msg)
+
+    indegree: dict[str, int] = {cid: 0 for cid in selected}
+    adj: dict[str, list[str]] = {cid: [] for cid in selected}
+    for cid in selected:
+        cap = index[cid]
+        for dep in cap.depends_on or []:
+            if dep not in selected:
+                continue
+            adj[dep].append(cid)
+            indegree[cid] += 1
+
+    queue: deque[str] = deque(sorted(cid for cid, deg in indegree.items() if deg == 0))
+    cap_order: list[str] = []
+    while queue:
+        node = queue.popleft()
+        cap_order.append(node)
+        for nxt in sorted(adj[node]):
+            indegree[nxt] -= 1
+            if indegree[nxt] == 0:
+                queue.append(nxt)
+    if len(cap_order) != len(selected):
+        msg = "cyclic capability depends_on graph"
+        raise ValueError(msg)
+
+    seen_action_ids: set[str] = set()
+    steps: list[InstallPlanStep] = []
+    for cid in cap_order:
+        for action in index[cid].install_actions:
+            if action.kind == "noop":
+                continue
+            if action.id in seen_action_ids:
+                continue
+            seen_action_ids.add(action.id)
+            steps.append(InstallPlanStep(capability_id=cid, action=action))
+    fatal_count = sum(1 for step in steps if step.action.fatal)
+    warn_count = len(steps) - fatal_count
+    return InstallPlan(
+        steps=tuple(steps),
+        fatal_count=fatal_count,
+        warn_count=warn_count,
+        selected_capability_ids=tuple(sorted(selected)),
+    )
+
+
 async def run_install_plan(
     plan: InstallPlan,
     *,
@@ -459,6 +535,7 @@ __all__ = [
     "InstallPlanStep",
     "InstallRunSummary",
     "build_install_plan",
+    "build_install_plan_for_capability_ids",
     "collect_install_run",
     "format_ndjson_event",
     "resolve_install_root",

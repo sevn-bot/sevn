@@ -136,6 +136,7 @@ _DEV_SHELL_COMMANDS: dict[str, str] = {
 _OWNER_ONLY_ACTION_TARGETS: frozenset[str] = frozenset(
     {
         "skills:sync",
+        "skills:setup:confirm",
         "second_brain:setup",
         "second_brain:reindex",
         "dreaming:undo",
@@ -610,6 +611,11 @@ class MenuActionRouter:
             return text
         if kind == "action":
             if target in _OWNER_ONLY_ACTION_TARGETS and not self._router._resolve_owner_flag(msg):
+                await self._answer_owner_only(msg)
+                return None
+            if target.startswith("skills:setup:confirm:") and not self._router._resolve_owner_flag(
+                msg,
+            ):
                 await self._answer_owner_only(msg)
                 return None
             if target == "dashboard:refresh_pin":
@@ -1898,12 +1904,18 @@ class MenuActionRouter:
             True
         """
         _ = callback_data
+        import asyncio
+
         from sevn.gateway.diagnostics.diagnostics import format_for_telegram
         from sevn.skills.setup import execute_skill_setup
 
         if not skill_id.strip():
             return "Skill id missing."
-        result = execute_skill_setup(
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        result = await asyncio.to_thread(
+            execute_skill_setup,
             skill_id.strip(),
             workspace_root=self._content_root,
             confirmed=True,

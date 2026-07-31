@@ -25,26 +25,16 @@ from typing import TYPE_CHECKING, Any, cast
 from loguru import logger
 
 from sevn.skills.capabilities import build_skill_capability_rows
-from sevn.skills.computer_use import COMPUTER_USE_SKILL_ID, gate_computer_use_core_skill
-from sevn.skills.cua_agent import CUA_AGENT_SKILL_ID, gate_cua_agent_core_skill
-from sevn.skills.cursor_cloud import CURSOR_CLOUD_SKILL_ID, gate_cursor_cloud_core_skill
-from sevn.skills.discogs import DISCOGS_SKILL_IDS, discogs_skill_enabled, gate_discogs_core_skills
 from sevn.skills.index import SkillsIndexBuilder
-from sevn.skills.lume import LUME_SKILL_ID, gate_lume_core_skill
 from sevn.skills.manager import (
     SkillsManager,
     _merge_records,
     _scan_skills_tree,
     _sha256_lines,
+    core_skill_discovery_skipped,
 )
 from sevn.skills.manifest import SkillManifest, manifest_from_mapping
 from sevn.skills.models import ProvenanceKind, SkillRecord
-from sevn.skills.obsidian_cli import OBSIDIAN_CLI_SKILL_ID, gate_obsidian_cli_core_skill
-from sevn.skills.openwiki import OPENWIKI_SKILL_ID, gate_openwiki_core_skill
-from sevn.skills.social_media_manager import (
-    SOCIAL_MEDIA_MANAGER_SKILL_ID,
-    gate_social_media_manager_core_skill,
-)
 
 if TYPE_CHECKING:
     from sevn.config.workspace_config import WorkspaceConfig
@@ -126,6 +116,10 @@ def reload_skills_with_cache(manager: SkillsManager, *, enabled: bool) -> dict[s
     if doc is not None and _cache_matches(doc, tree_sig, roots_key, registry_seq):
         records = _records_from_cache_doc(doc)
         if records is not None:
+            stored_fp = doc.get("registry_fingerprint")
+            if isinstance(stored_fp, str) and _registry_fingerprint_digest(records) != stored_fp:
+                records = None
+        if records is not None:
             manager._records = records
             manager._index = SkillsIndexBuilder.from_records(manager._records)
             manager._bump_if_changed()
@@ -192,31 +186,7 @@ def _core_skill_skipped(child_name: str, cfg: WorkspaceConfig | None) -> bool:
         >>> _core_skill_skipped("kokoro-tts", None)
         True
     """
-    if child_name == COMPUTER_USE_SKILL_ID and gate_computer_use_core_skill(cfg) == "skip":
-        return True
-    if child_name == CUA_AGENT_SKILL_ID and gate_cua_agent_core_skill(cfg) == "skip":
-        return True
-    if child_name == LUME_SKILL_ID and gate_lume_core_skill(cfg) == "skip":
-        return True
-    if child_name == CURSOR_CLOUD_SKILL_ID and gate_cursor_cloud_core_skill(cfg) == "skip":
-        return True
-    if (
-        child_name == SOCIAL_MEDIA_MANAGER_SKILL_ID
-        and gate_social_media_manager_core_skill(cfg) == "skip"
-    ):
-        return True
-    if child_name == OPENWIKI_SKILL_ID and gate_openwiki_core_skill(cfg) == "skip":
-        return True
-    if child_name == OBSIDIAN_CLI_SKILL_ID and gate_obsidian_cli_core_skill(cfg) == "skip":
-        return True
-    if child_name in DISCOGS_SKILL_IDS:
-        if gate_discogs_core_skills(cfg) == "skip":
-            return True
-        if not discogs_skill_enabled(cfg, child_name):
-            return True
-    from sevn.skills.manager import _RUNTIME_QUARANTINED_CORE_SKILL_IDS
-
-    return child_name in _RUNTIME_QUARANTINED_CORE_SKILL_IDS
+    return core_skill_discovery_skipped(child_name, cfg)
 
 
 def _file_stat_line(prefix: str, path: Path) -> str | None:

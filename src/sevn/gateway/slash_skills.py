@@ -5,11 +5,13 @@ Depends: dataclasses, sevn.gateway.commands.shortcuts_store, sevn.skills.manager
 
 Exports:
     StackedSlashSkillParseResult — parser output for one inbound line.
+    SlashSkillInboundPreprocessResult — inbound preprocessor outcome.
     build_slash_skill_turn_overlay — ordered loaded-skill metadata for a turn.
     format_slash_skill_errors — user-visible error text from parser failures.
     known_skill_ids_from_manager — non-quarantined skill ids from inventory.
     merge_slash_skills_into_triage — combine slash-bound and triager skill picks.
     parse_stacked_slash_skills — parse leading ``/skill`` tokens deterministically.
+    preprocess_stacked_slash_skills_inbound — attach slash overlay before triage dispatch.
     resolve_skill_shortcut_slash — map a ``/shortcut`` to a skill shortcut row.
     skill_shortcut_slash_text — build slash-skill text from a shortcut record.
 Examples:
@@ -352,18 +354,111 @@ def merge_slash_skills_into_triage(
             continue
         seen.add(token.lower())
         merged.append(token)
+    effective = str(overlay.get("effective_skill_id") or "").strip()
+    if overlay.get("conflict_resolution") == "later_wins" and effective:
+        merged = [sid for sid in merged if sid.lower() != effective.lower()]
+        merged.append(effective)
     return merged
+
+
+@dataclass(frozen=True, slots=True)
+class SlashSkillInboundPreprocessResult:
+    """Outcome of :func:`preprocess_stacked_slash_skills_inbound`."""
+
+    msg: Any
+    reply_text: str | None = None
+
+
+def preprocess_stacked_slash_skills_inbound(
+    msg: Any,
+    *,
+    slash_text: str,
+    content_root: Path,
+    workspace: Any | None,
+    layout: Any | None,
+) -> SlashSkillInboundPreprocessResult:
+    """Parse stacked slash skills and attach turn overlay before triage dispatch.
+
+    Args:
+        msg (Any): Inbound :class:`~sevn.gateway.channel_router.IncomingMessage`.
+        slash_text (str): Normalised inbound text (may include skill shortcut rewrite).
+        content_root (Path): Workspace content root.
+        workspace (Any | None): Parsed workspace config for :class:`~sevn.skills.manager.SkillsManager`.
+        layout (Any | None): Workspace layout (unused; retained for call-site parity).
+
+    Returns:
+        SlashSkillInboundPreprocessResult: Possibly rewritten ``msg`` or parser error text.
+
+    Examples:
+        >>> from pathlib import Path
+        >>> from sevn.gateway.channel_router import IncomingMessage
+        >>> m = IncomingMessage(channel="telegram", user_id="1", text="/nope")
+        >>> isinstance(
+        ...     preprocess_stacked_slash_skills_inbound(
+        ...         m,
+        ...         slash_text="/nope",
+        ...         content_root=Path("/tmp"),
+        ...         workspace=None,
+        ...         layout=None,
+        ...     ),
+        ...     SlashSkillInboundPreprocessResult,
+        ... )
+        True
+    """
+    from sevn.gateway.channel_router import IncomingMessage
+    from sevn.skills.manager import SkillsManager
+
+    _ = layout
+    if not slash_text.startswith("/"):
+        return SlashSkillInboundPreprocessResult(msg=msg)
+
+    manager = SkillsManager.shared(
+        content_root,
+        layout=layout,
+        config=workspace,
+    )
+    parsed = parse_stacked_slash_skills(
+        slash_text,
+        known_skill_ids=known_skill_ids_from_manager(manager),
+    )
+    if parsed.errors:
+        return SlashSkillInboundPreprocessResult(
+            msg=msg,
+            reply_text=format_slash_skill_errors(parsed.errors),
+        )
+    if not parsed.skill_ids:
+        return SlashSkillInboundPreprocessResult(msg=msg)
+
+    overlay = build_slash_skill_turn_overlay(
+        skill_ids=parsed.skill_ids,
+        remainder=parsed.remainder,
+        conflict_resolution=parsed.conflict_resolution,
+        effective_skill_id=parsed.effective_skill_id,
+    )
+    md = dict(msg.metadata) if isinstance(msg.metadata, dict) else {}
+    md[SLASH_SKILL_OVERLAY_META_KEY] = overlay
+    rewritten = IncomingMessage(
+        channel=msg.channel,
+        user_id=msg.user_id,
+        text=parsed.remainder,
+        metadata=md,
+        raw=msg.raw,
+        attachments=list(msg.attachments),
+    )
+    return SlashSkillInboundPreprocessResult(msg=rewritten)
 
 
 __all__ = [
     "RESERVED_SLASH_SKILL_COMMANDS",
     "SLASH_SKILL_OVERLAY_META_KEY",
+    "SlashSkillInboundPreprocessResult",
     "StackedSlashSkillParseResult",
     "build_slash_skill_turn_overlay",
     "format_slash_skill_errors",
     "known_skill_ids_from_manager",
     "merge_slash_skills_into_triage",
     "parse_stacked_slash_skills",
+    "preprocess_stacked_slash_skills_inbound",
     "resolve_skill_shortcut_slash",
     "skill_shortcut_slash_text",
 ]

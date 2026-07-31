@@ -1228,15 +1228,10 @@ def build_agent_run_turn(
         slash_text = (msg.text or "").strip()
         skill_shortcut_row = None
         from sevn.gateway.slash_skills import (
-            SLASH_SKILL_OVERLAY_META_KEY,
-            build_slash_skill_turn_overlay,
-            format_slash_skill_errors,
-            known_skill_ids_from_manager,
-            parse_stacked_slash_skills,
+            preprocess_stacked_slash_skills_inbound,
             resolve_skill_shortcut_slash,
             skill_shortcut_slash_text,
         )
-        from sevn.skills.manager import SkillsManager
 
         if slash_text.startswith("/"):
             skill_shortcut_row = resolve_skill_shortcut_slash(slash_text, layout.content_root)
@@ -1304,16 +1299,14 @@ def build_agent_run_turn(
                     )
             return
         if slash_text.startswith("/"):
-            manager = SkillsManager.shared(
-                layout.content_root,
+            pre = preprocess_stacked_slash_skills_inbound(
+                msg,
+                slash_text=slash_text,
+                content_root=layout.content_root,
+                workspace=workspace,
                 layout=layout,
-                config=workspace,
             )
-            parsed = parse_stacked_slash_skills(
-                slash_text,
-                known_skill_ids=known_skill_ids_from_manager(manager),
-            )
-            if parsed.errors:
+            if pre.reply_text:
                 adapter = router._adapters.get(msg.channel)
                 if adapter is not None:
                     from sevn.gateway.channel_router import (
@@ -1325,29 +1318,13 @@ def build_agent_run_turn(
                         OutgoingMessage(
                             channel=msg.channel,
                             user_id=msg.user_id,
-                            text=format_slash_skill_errors(parsed.errors),
+                            text=pre.reply_text,
                             session_id=session_id,
                             metadata=dict(_telegram_reply_metadata(msg)),
                         ),
                     )
                 return
-            if parsed.skill_ids:
-                overlay = build_slash_skill_turn_overlay(
-                    skill_ids=parsed.skill_ids,
-                    remainder=parsed.remainder,
-                    conflict_resolution=parsed.conflict_resolution,
-                    effective_skill_id=parsed.effective_skill_id,
-                )
-                md = dict(msg.metadata) if isinstance(msg.metadata, dict) else {}
-                md[SLASH_SKILL_OVERLAY_META_KEY] = overlay
-                msg = IncomingMessage(
-                    channel=msg.channel,
-                    user_id=msg.user_id,
-                    text=parsed.remainder,
-                    metadata=md,
-                    raw=msg.raw,
-                    attachments=list(msg.attachments),
-                )
+            msg = pre.msg
         await _orig_route_incoming(msg)
 
     router.route_incoming = _route_incoming_with_menu  # type: ignore[method-assign]

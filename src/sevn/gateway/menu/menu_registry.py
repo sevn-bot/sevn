@@ -1040,6 +1040,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "skills",
         "Skill setup (form)",
         implemented=True,
+        owner_only=True,
         notes="Manifest-driven dependency setup form (W14)",
     )
     add(
@@ -1049,6 +1050,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "skills",
         "Skill setup confirm",
         implemented=True,
+        owner_only=True,
         notes="Confirmation-gated skill dependency install (W14)",
     )
     add(
@@ -1058,6 +1060,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         "skills",
         "Skill setup cancel",
         implemented=True,
+        owner_only=True,
         notes="Cancel pending skill setup confirm (W14)",
     )
     add(

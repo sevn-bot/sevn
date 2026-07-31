@@ -7,6 +7,7 @@ Exports:
     InstallConfirmationRequired — raised when install runs without operator confirm.
     skill_setup_status — coarse setup state for one manifest.
     skill_setup_requirements — structured unmet rows for CLI/Telegram.
+    skill_setup_telegram_summary — shared setup summary for Telegram form (W14).
     execute_skill_setup — install/repair one skill's declared dependencies.
 """
 
@@ -18,12 +19,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from sevn.onboarding.capabilities_manifest import CapabilityManifest, InstallAction, load_manifest
-from sevn.onboarding.install_actions.executors import execute_install_action
+from sevn.onboarding.capabilities_manifest import CapabilityManifest, load_manifest
 from sevn.onboarding.install_orchestrator import (
-    InstallPlan,
-    InstallPlanStep,
-    InstallRunSummary,
+    build_install_plan_for_capability_ids,
+    collect_install_run,
     resolve_install_root,
 )
 from sevn.onboarding.uv_extra_probes import UV_EXTRA_IMPORT_PROBE
@@ -74,9 +73,10 @@ def skill_setup_requirements(manifest: SkillManifest) -> list[dict[str, Any]]:
     deps = manifest.dependencies
     if not deps.requires_setup:
         return []
+    cap_index = _capability_index()
     rows: list[dict[str, Any]] = []
     for extra in deps.uv_extras:
-        cap_id = _capability_for_uv_extra(extra)
+        cap_id = cap_index.get(extra)
         rows.append(
             {
                 "kind": "uv_extra",
@@ -86,7 +86,7 @@ def skill_setup_requirements(manifest: SkillManifest) -> list[dict[str, Any]]:
             },
         )
     for exe in deps.executables:
-        cap_id = _capability_for_executable(exe)
+        cap_id = cap_index.get(exe)
         rows.append(
             {
                 "kind": "executable",
@@ -96,6 +96,45 @@ def skill_setup_requirements(manifest: SkillManifest) -> list[dict[str, Any]]:
             },
         )
     return rows
+
+
+def skill_setup_telegram_summary(
+    skill_id: str,
+    manifest: SkillManifest,
+) -> dict[str, Any]:
+    """Return shared setup summary rows for CLI and Telegram form flows.
+
+    Args:
+        skill_id (str): Canonical skill id.
+        manifest (SkillManifest): Parsed skill manifest.
+
+    Returns:
+        dict[str, Any]: ``lines``, ``unsupported``, ``unmet``, and ``needs_confirm`` keys.
+
+    Examples:
+        >>> from sevn.skills.manifest import SkillManifest
+        >>> out = skill_setup_telegram_summary("x", SkillManifest(name="x", description="d", version="1.0.0"))
+        >>> out["needs_confirm"] is False
+        True
+    """
+    status = skill_setup_status(manifest)
+    requirements = skill_setup_requirements(manifest)
+    lines = [f"{skill_id}: {status}"]
+    for row in requirements:
+        mark = "ok" if row.get("satisfied") else "missing"
+        lines.append(f"  [{mark}] {row.get('kind')} {row.get('name')}")
+    unsupported = [
+        row for row in requirements if not row.get("satisfied") and row.get("capability_id") is None
+    ]
+    unmet = [row for row in requirements if not row.get("satisfied")]
+    needs_confirm = bool(unmet) and not unsupported
+    return {
+        "lines": lines,
+        "requirements": requirements,
+        "unsupported": unsupported,
+        "unmet": unmet,
+        "needs_confirm": needs_confirm,
+    }
 
 
 def execute_skill_setup(
@@ -172,12 +211,14 @@ def execute_skill_setup(
         raise InstallConfirmationRequired(msg)
 
     capability_ids = {str(row["capability_id"]) for row in unmet if row.get("capability_id")}
-    plan = _build_install_plan_for_capabilities(capability_ids)
+    plan = build_install_plan_for_capability_ids(capability_ids)
     install_root = resolve_install_root()
-    summary = _run_skill_install_plan(
-        plan,
-        install_root=install_root,
-        content_root=workspace_root,
+    summary = asyncio.run(
+        collect_install_run(
+            plan,
+            install_root=install_root,
+            content_root=workspace_root,
+        ),
     )
     manager.reload()
     requirements_after = skill_setup_requirements(manifest)
@@ -290,308 +331,10 @@ def _capability_index(manifest: CapabilityManifest | None = None) -> dict[str, s
     return {**uv_map, **exe_map}
 
 
-def _capability_for_uv_extra(extra: str) -> str | None:
-    """Resolve one uv extra name to a capability id.
-
-    Args:
-        extra (str): Extra name from skill frontmatter.
-
-    Returns:
-        str | None: Matching capability id when known.
-
-    Examples:
-        >>> _capability_for_uv_extra("job-ops") is not None
-        True
-    """
-    return _capability_index().get(extra)
-
-
-def _capability_for_executable(name: str) -> str | None:
-    """Resolve one executable name to a capability id.
-
-    Args:
-        name (str): Executable basename from skill frontmatter.
-
-    Returns:
-        str | None: Matching capability id when known.
-
-    Examples:
-        >>> _capability_for_executable("yt-dlp") is not None
-        True
-    """
-    return _capability_index().get(name)
-
-
-def _capability_order(capability_ids: set[str]) -> list[str]:
-    """Topologically sort capability ids for install ordering.
-
-    Args:
-        capability_ids (set[str]): Selected capability ids.
-
-    Returns:
-        list[str]: Dependency-safe capability order.
-
-    Raises:
-        ValueError: When ids are unknown or cyclic.
-
-    Examples:
-        >>> _capability_order({"skill.job_ops"}) == ["skill.job_ops"]
-        True
-    """
-    from collections import deque
-
-    doc = load_manifest()
-    index = {row.capability_id: row for row in doc.capabilities}
-    wanted = set(capability_ids)
-    unknown = sorted(wanted - set(index))
-    if unknown:
-        msg = f"unknown capability_id(s): {', '.join(unknown)}"
-        raise ValueError(msg)
-
-    indegree: dict[str, int] = {cid: 0 for cid in wanted}
-    adj: dict[str, list[str]] = {cid: [] for cid in wanted}
-    for cid in wanted:
-        cap = index[cid]
-        for dep in cap.depends_on or []:
-            if dep not in wanted:
-                continue
-            adj[dep].append(cid)
-            indegree[cid] += 1
-
-    queue: deque[str] = deque(sorted(cid for cid, deg in indegree.items() if deg == 0))
-    ordered: list[str] = []
-    while queue:
-        node = queue.popleft()
-        ordered.append(node)
-        for nxt in sorted(adj[node]):
-            indegree[nxt] -= 1
-            if indegree[nxt] == 0:
-                queue.append(nxt)
-    if len(ordered) != len(wanted):
-        msg = "cyclic capability depends_on graph"
-        raise ValueError(msg)
-    return ordered
-
-
-def _build_install_plan_for_capabilities(capability_ids: set[str]) -> InstallPlan:
-    """Build an onboarding install plan for selected capability ids.
-
-    Args:
-        capability_ids (set[str]): Selected capability ids.
-
-    Returns:
-        InstallPlan: Ordered install steps excluding noop actions.
-
-    Examples:
-        >>> plan = _build_install_plan_for_capabilities({"skill.job_ops"})
-        >>> len(plan.steps) >= 1
-        True
-    """
-    doc = load_manifest()
-    index = {row.capability_id: row for row in doc.capabilities}
-    ordered = _capability_order(capability_ids)
-    seen_action_ids: set[str] = set()
-    steps: list[InstallPlanStep] = []
-    for cid in ordered:
-        for action in index[cid].install_actions:
-            if action.kind == "noop":
-                continue
-            if action.id in seen_action_ids:
-                continue
-            seen_action_ids.add(action.id)
-            steps.append(InstallPlanStep(capability_id=cid, action=action))
-    fatal_count = sum(1 for step in steps if step.action.fatal)
-    warn_count = len(steps) - fatal_count
-    return InstallPlan(
-        steps=tuple(steps),
-        fatal_count=fatal_count,
-        warn_count=warn_count,
-        selected_capability_ids=tuple(sorted(capability_ids)),
-    )
-
-
-def _checkout_has_dev_group(install_root: Path) -> bool:
-    """Return whether the checkout ``pyproject.toml`` declares a dev group.
-
-    Args:
-        install_root (Path): sevn.bot checkout root.
-
-    Returns:
-        bool: ``True`` when a dev dependency group is declared.
-
-    Examples:
-        >>> isinstance(_checkout_has_dev_group(Path(".")), bool)
-        True
-    """
-    pyproject = install_root / "pyproject.toml"
-    if not pyproject.is_file():
-        return False
-    text = pyproject.read_text(encoding="utf-8")
-    return "\ndev = [" in text or text.startswith("dev = [")
-
-
-def _uv_sync_argv(action: InstallAction, *, install_root: Path) -> list[str]:
-    """Return ``uv sync`` argv for one uv-extra install action.
-
-    Args:
-        action (InstallAction): Manifest uv-extra action.
-        install_root (Path): sevn.bot checkout root.
-
-    Returns:
-        list[str]: argv for ``subprocess.run``.
-
-    Examples:
-        >>> from sevn.onboarding.capabilities_manifest import InstallAction
-        >>> act = InstallAction(id="t", kind="uv_extra", argv=["job-ops"], fatal=False)
-        >>> _uv_sync_argv(act, install_root=Path("."))[1]
-        'sync'
-    """
-    argv = ["uv", "sync", "--extra", *action.argv]
-    if _checkout_has_dev_group(install_root):
-        argv.extend(["--group", "dev"])
-    return argv
-
-
-def _run_skill_install_plan(
-    plan: InstallPlan,
-    *,
-    install_root: Path,
-    content_root: Path,
-) -> InstallRunSummary:
-    """Execute a skill setup install plan and return an aggregate summary.
-
-    Args:
-        plan (InstallPlan): Plan to execute.
-        install_root (Path): sevn.bot checkout root.
-        content_root (Path): Workspace content root.
-
-    Returns:
-        InstallRunSummary: Aggregate ok/fatal flags and captured events.
-
-    Examples:
-        >>> from sevn.onboarding.capabilities_manifest import InstallAction
-        >>> from sevn.onboarding.install_orchestrator import InstallPlan, InstallPlanStep
-        >>> empty = InstallPlan((), 0, 0, ())
-        >>> _run_skill_install_plan(empty, install_root=Path("."), content_root=Path(".")).ok
-        True
-    """
-    import subprocess  # nosec B404
-
-    events: list[dict[str, Any]] = []
-    failed_fatal: list[str] = []
-    skipped: list[str] = []
-    for step in plan.steps:
-        action = step.action
-        if action.kind == "uv_extra":
-            argv = _uv_sync_argv(action, install_root=install_root)
-            events.append(
-                {
-                    "type": "start",
-                    "action_id": action.id,
-                    "capability_id": step.capability_id,
-                },
-            )
-            proc = subprocess.run(  # nosec B603
-                argv,
-                cwd=install_root,
-                capture_output=True,
-                text=True,
-            )
-            if proc.stdout:
-                for line in proc.stdout.splitlines():
-                    events.append(
-                        {
-                            "type": "log",
-                            "action_id": action.id,
-                            "line": line,
-                        },
-                    )
-            if proc.stderr:
-                for line in proc.stderr.splitlines():
-                    events.append(
-                        {
-                            "type": "log",
-                            "action_id": action.id,
-                            "line": line,
-                        },
-                    )
-            status = "ok" if proc.returncode == 0 else "failed"
-            events.append(
-                {
-                    "type": "end",
-                    "action_id": action.id,
-                    "status": status,
-                    "exit_code": proc.returncode,
-                    "fatal": action.fatal,
-                },
-            )
-            if status == "failed" and action.fatal:
-                failed_fatal.append(action.id)
-            continue
-        events.extend(
-            asyncio.run(
-                _collect_install_action_events(
-                    action,
-                    install_root=install_root,
-                    capability_id=step.capability_id,
-                    content_root=content_root,
-                ),
-            ),
-        )
-        end = next((event for event in reversed(events) if event.get("type") == "end"), None)
-        if end is not None:
-            if end.get("status") == "skipped":
-                skipped.append(str(end.get("action_id", "")))
-            elif end.get("status") == "failed" and end.get("fatal"):
-                failed_fatal.append(str(end.get("action_id", "")))
-    fatal_failed = bool(failed_fatal)
-    ok = not fatal_failed
-    return InstallRunSummary(
-        ok=ok,
-        fatal_failed=fatal_failed,
-        events=tuple(events),
-        failed_fatal_action_ids=tuple(failed_fatal),
-        skipped_action_ids=tuple(skipped),
-    )
-
-
-async def _collect_install_action_events(
-    action: InstallAction,
-    *,
-    install_root: Path,
-    capability_id: str,
-    content_root: Path,
-) -> list[dict[str, Any]]:
-    """Drain one async install action into a list of progress events.
-
-    Args:
-        action (InstallAction): Manifest install step.
-        install_root (Path): sevn.bot checkout root.
-        capability_id (str): Owning capability id.
-        content_root (Path): Workspace content root.
-
-    Returns:
-        list[dict[str, Any]]: Progress events emitted by the action.
-
-    Examples:
-        >>> import inspect
-        >>> inspect.iscoroutinefunction(_collect_install_action_events)
-        True
-    """
-    events: list[dict[str, Any]] = []
-    async for event in execute_install_action(
-        action,
-        install_root=install_root,
-        capability_id=capability_id,
-        content_root=content_root,
-    ):
-        events.append(event)
-    return events
-
-
 __all__ = [
     "InstallConfirmationRequired",
     "execute_skill_setup",
     "skill_setup_requirements",
     "skill_setup_status",
+    "skill_setup_telegram_summary",
 ]
