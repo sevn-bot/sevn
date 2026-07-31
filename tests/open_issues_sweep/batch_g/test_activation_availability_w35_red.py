@@ -9,10 +9,12 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, ClassVar
 from unittest.mock import patch
 
-import pytest
+if TYPE_CHECKING:
+    import pytest
+
 from tests.open_issues_sweep.batch_g.conftest import (
     activation_enabled_workspace_doc,
     import_voice_activation_module,
@@ -30,7 +32,6 @@ def _assert_unavailable_verdict(verdict: dict[str, Any]) -> None:
     assert reason, "unavailable verdict must include a human-readable reason"
 
 
-@pytest.mark.xfail(reason="green after W36: probe_voice_activation extra missing", strict=False)
 def test_probe_voice_activation_extra_missing() -> None:
     activation = import_voice_activation_module()
     ws = parse_workspace_config(activation_enabled_workspace_doc(enabled=True))
@@ -40,7 +41,6 @@ def test_probe_voice_activation_extra_missing() -> None:
     assert "extra" in str(verdict.get("reason") or verdict.get("detail") or "").lower()
 
 
-@pytest.mark.xfail(reason="green after W36: probe_voice_activation no input device", strict=False)
 def test_probe_voice_activation_no_input_device() -> None:
     activation = import_voice_activation_module()
     ws = parse_workspace_config(activation_enabled_workspace_doc(enabled=True))
@@ -53,9 +53,6 @@ def test_probe_voice_activation_no_input_device() -> None:
     assert "device" in str(verdict.get("reason") or verdict.get("detail") or "").lower()
 
 
-@pytest.mark.xfail(
-    reason="green after W36: probe_voice_activation unsupported platform", strict=False
-)
 def test_probe_voice_activation_unsupported_platform() -> None:
     activation = import_voice_activation_module()
     ws = parse_workspace_config(activation_enabled_workspace_doc(enabled=True))
@@ -69,7 +66,6 @@ def test_probe_voice_activation_unsupported_platform() -> None:
     assert "platform" in str(verdict.get("reason") or verdict.get("detail") or "").lower()
 
 
-@pytest.mark.xfail(reason="green after W36: doctor voice_activation probe", strict=False)
 def test_sevn_doctor_reports_activation_unavailable_without_failing_run(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -88,6 +84,7 @@ def test_sevn_doctor_reports_activation_unavailable_without_failing_run(
     class _Resp:
         status_code = 200
         text = "{}"
+        headers: ClassVar[dict[str, str]] = {}
 
         def json(self) -> dict[str, object]:
             return {"status": "ok", "ready": True}
@@ -98,7 +95,7 @@ def test_sevn_doctor_reports_activation_unavailable_without_failing_run(
         "sevn.cli.commands.doctor.subprocess.run",
         lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, b"", b""),
     )
-    monkeypatch.setattr("sevn.cli.commands.doctor.proxy_healthz_get", lambda *_a, **_k: None)
+    monkeypatch.setattr("sevn.cli.commands.doctor.proxy_healthz_get", lambda *_a, **_k: _Resp())
     monkeypatch.setattr(
         "sevn.code_understanding.bootstrap.code_orientation_doctor_checks",
         lambda *_a, **_k: [],

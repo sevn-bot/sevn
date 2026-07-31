@@ -1083,6 +1083,45 @@ def run_doctor_probes(
             msg = f"{msg} — {voice_hint}"
         result.warnings.append(msg)
 
+    from sevn.voice.activation import probe_voice_activation, voice_activation_config_enabled
+
+    activation_probe = probe_voice_activation(bw.config)
+    activation_reason = str(
+        activation_probe.get("reason") or activation_probe.get("detail") or "",
+    ).strip()
+    activation_available = bool(activation_probe.get("available"))
+    activation_enabled = voice_activation_config_enabled(bw.config)
+    if not activation_enabled:
+        activation_ok = True
+        activation_severity: Severity = None
+        activation_detail = activation_reason or "voice.activation.enabled is false (default-off)"
+    elif activation_available:
+        activation_ok = True
+        activation_severity = None
+        activation_detail = activation_reason or "wake-word activation available"
+    else:
+        activation_ok = False
+        activation_severity = "warn"
+        activation_detail = activation_reason or "wake-word activation unavailable"
+    activation_hint = None
+    if not activation_available and activation_enabled and "extra" in activation_detail.lower():
+        activation_hint = "uv sync --extra voice-wake"
+    activation_check = DoctorCheck(
+        id="voice_activation",
+        section=section_for("voice_activation"),
+        title=title_for("voice_activation"),
+        ok=activation_ok,
+        severity=activation_severity,
+        detail=activation_detail,
+        hint=activation_hint,
+    )
+    result.add(activation_check)
+    if activation_enabled and not activation_available:
+        msg = f"voice_activation: {activation_detail}"
+        if activation_hint:
+            msg = f"{msg} — fix: {activation_hint}"
+        result.warnings.append(msg)
+
     from sevn.second_brain.witchcraft_bridge import WitchcraftConfig, witchcraft_indexer_available
 
     wc_cfg = WitchcraftConfig.from_workspace_config(bw.config)

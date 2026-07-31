@@ -425,6 +425,12 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
 
+## Amendments (open-issues-sweep Batch G W36 — ``scan_voice``)
+
+``security.scanner.scan_voice`` stays **dormant** through W36: ``LLMGuardScanner`` has no
+branch for it today. Batch G W37 will honor it for **post-activation utterances** only;
+ambient wake-word frames are never scanned (D24). Do not add a second voice-scan config key.
+
 ## Human-input needed
 
 Prose body not yet authored (W9 scope). Normative contract requires operator or

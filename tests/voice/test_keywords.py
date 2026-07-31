@@ -26,9 +26,6 @@ def test_cjk_surrounding_latin_keyword() -> None:
         "请 speak 一下",
     ],
 )
-@pytest.mark.xfail(
-    reason="green after W36: activation config does not change keyword matching", strict=False
-)
 def test_voice_trigger_keywords_unchanged_when_activation_config_present(user_text: str) -> None:
     """``voice.activation`` must remain orthogonal to ``voice.voice_trigger_keywords``."""
     from sevn.config.defaults import DEFAULT_VOICE_TRIGGER_KEYWORDS

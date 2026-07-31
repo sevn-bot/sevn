@@ -228,6 +228,33 @@ Live Telegram `/config → Voice` spoken-reply E2E remains deferred (no creds /
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
 
+## Amendments (open-issues-sweep Batch G W36 — #102 wake-word activation)
+
+Wake-word activation is **opt-in and default-off** under ``voice.activation.*`` (never
+``voice_trigger_keywords`` — that key gates TTS output on request text). The master
+``voice.enabled`` switch is conjunctive: disabling voice disables activation even when
+``voice.activation.enabled`` is true.
+
+### Platform support matrix (D25)
+
+| Platform | Activation mode | Verdict when prerequisites missing |
+|----------|-----------------|--------------------------------------|
+| macOS host (bare metal) | Local offline wake word (W37) | ``unavailable`` with reason via ``sevn doctor`` / ``probe_voice_activation`` — no gateway crash |
+| Linux host (bare metal) | Local offline wake word (W37) | Same as macOS |
+| Docker / container | Not supported | ``unavailable`` — no input device; gateway boots |
+| Remote / headless host | Not supported | ``unavailable`` — treat absent mic as normal (D25), not an error |
+
+Default engine (W37): **openWakeWord** (Apache-2.0), fully offline, no account/key (D23).
+Optional extra: ``uv sync --extra voice-wake``.
+
+### ``security.scanner.scan_voice`` (W36.6)
+
+The existing ``security.scanner.scan_voice`` flag remains **dormant** until W37 delivers
+post-activation utterance capture. Inbound voice *attachments* already pass through
+``LLMGuardScanner`` on the existing file-based STT path; ambient wake-word frames must
+never reach the scanner (D24). W37 will wire ``scan_voice`` for the post-activation
+utterance only — no second overlapping config key.
+
 ## Human-input needed
 
 Prose body not yet authored (W9 scope). Normative contract requires operator or

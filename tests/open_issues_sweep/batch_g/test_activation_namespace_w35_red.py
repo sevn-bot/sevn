@@ -19,7 +19,6 @@ from sevn.config.workspace_config import VoiceConfig, WorkspaceConfig
 from sevn.voice.keywords import user_text_matches_voice_trigger
 
 
-@pytest.mark.xfail(reason="green after W36: activation config key namespace", strict=False)
 def test_activation_config_keys_are_distinct_from_trigger_keywords() -> None:
     activation = import_voice_activation_module()
     keys = frozenset(activation.activation_config_key_paths())
@@ -33,9 +32,6 @@ def test_activation_config_keys_are_distinct_from_trigger_keywords() -> None:
     assert keys.isdisjoint(voice_keys)
 
 
-@pytest.mark.xfail(
-    reason="green after W36: gateway trigger keyword fallback stays separate", strict=False
-)
 def test_activation_keys_do_not_use_gateway_voice_trigger_keywords() -> None:
     activation = import_voice_activation_module()
     keys = activation.activation_config_key_paths()
@@ -50,9 +46,6 @@ def test_activation_keys_do_not_use_gateway_voice_trigger_keywords() -> None:
         ("请 speak 一下", ("speak",)),
     ],
 )
-@pytest.mark.xfail(
-    reason="green after W36: TTS keyword gating unchanged by activation", strict=False
-)
 def test_enabling_activation_leaves_tts_keyword_gating_unchanged(
     user_text: str,
     keywords: tuple[str, ...],
@@ -66,9 +59,6 @@ def test_enabling_activation_leaves_tts_keyword_gating_unchanged(
     assert after == baseline
 
 
-@pytest.mark.xfail(
-    reason="green after W36: VoiceConfig keeps separate activation subtree", strict=False
-)
 def test_voice_config_activation_subtree_not_voice_trigger_keywords() -> None:
     activation = import_voice_activation_module()
     cfg = VoiceConfig.model_validate(

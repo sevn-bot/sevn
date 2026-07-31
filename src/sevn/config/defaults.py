@@ -512,6 +512,11 @@ DEFAULT_VOICE_STT_CONFIDENCE_REPROMPT_THRESHOLD: Final[float] = 0.7
 DEFAULT_VOICE_TTS_TEMP_TTL_DAYS: Final[int] = 7
 DEFAULT_VOICE_PRELOAD_LOCAL_TTS_ON_BOOT: Final[bool] = False
 DEFAULT_VOICE_ENABLED: Final[bool] = True
+DEFAULT_VOICE_ACTIVATION_ENABLED: Final[bool] = False
+DEFAULT_VOICE_ACTIVATION_ENGINE: Final[str] = "openwakeword"
+DEFAULT_VOICE_ACTIVATION_WAKE_WORD: Final[str] = "hey sevn"
+VOICE_WAKE_OPTIONAL_EXTRA: Final[str] = "voice-wake"
+VOICE_WAKE_ENGINE_MODULE: Final[str] = "openwakeword"
 # GGML model the whisper.cpp provisioner downloads by default (pyclaww parity — "base" is
 # recommended for Apple Silicon: balanced speed/accuracy at ~74 MB).
 DEFAULT_VOICE_STT_WHISPER_MODEL: Final[str] = "base"

@@ -14,6 +14,7 @@ Exports:
     TelegramChannelConfig — ``channels.telegram`` (`specs/17-gateway.md` §5).
     WebChatChannelConfig — ``channels.webchat`` (`specs/19-channel-webui.md` §5).
     VoiceConfig — top-level ``voice`` (`specs/20-voice.md`).
+    VoiceActivationConfig — ``voice.activation`` wake-word subtree.
     ChannelsWorkspaceSectionConfig — typed ``channels`` subtree.
     channel_extra_dict — merged per-channel config blob lookup.
     channel_is_enabled — ``channels.<name>.enabled`` gate.
@@ -171,6 +172,16 @@ class WebChatChannelConfig(BaseModel):
     reasoning_effort: str | None = None
 
 
+class VoiceActivationConfig(BaseModel):
+    """``voice.activation`` wake-word subtree (`specs/20-voice.md` — Batch G W36)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    enabled: bool | None = None
+    engine: str | None = None
+    wake_word: str | None = None
+
+
 class VoiceConfig(BaseModel):
     """Top-level ``voice`` workspace keys (`specs/20-voice.md`)."""
 
@@ -188,6 +199,7 @@ class VoiceConfig(BaseModel):
     tts_mode: Literal["off", "all", "when_asked"] | None = None
     tts_voice_id: str | None = None
     local_tts_engine: Literal["kokoro", "supertonic"] | None = None
+    activation: VoiceActivationConfig | None = None
 
     @model_validator(mode="after")
     def _validate_voice_tags_and_keywords(self) -> VoiceConfig:

@@ -13,9 +13,6 @@ from tests.open_issues_sweep.batch_g.conftest import (
 )
 
 
-@pytest.mark.xfail(
-    reason="green after W36: lifespan completes with activation enabled, no mic", strict=False
-)
 def test_gateway_lifespan_completes_with_activation_enabled_no_device(tmp_path: Path) -> None:
     import_voice_activation_module()
     doc = activation_enabled_workspace_doc(enabled=True)

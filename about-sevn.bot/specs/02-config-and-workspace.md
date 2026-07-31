@@ -1000,6 +1000,17 @@ and routing-profile ``reasoning_effort`` keys overlay the workspace default for 
 than sending an unsupported wire parameter. The triager slot always receives ``None`` from
 that resolver — thinking/reasoning never reaches triage.
 
+## Amendments (open-issues-sweep Batch G W36 — #102 wake-word activation)
+
+| Key | Default | Notes |
+|-----|---------|-------|
+| ``voice.activation.enabled`` | ``false`` | Opt-in wake-word listener (D24) |
+| ``voice.activation.engine`` | ``openwakeword`` | Offline engine id — W37 implements capture |
+| ``voice.activation.wake_word`` | ``hey sevn`` | Local phrase when engine supports custom words |
+
+Schema maintainer note (W36.2, do not fix here): ``stt_providers`` still appears as a
+**top-level** key in ``infra/sevn.schema.json`` while runtime reads ``voice.stt_providers``.
+
 ## Test Strategy
 
 | Tests | Focus |

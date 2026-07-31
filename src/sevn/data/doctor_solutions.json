@@ -551,6 +551,19 @@
       "severity": "warn",
       "title": "Browser (CDP engine)"
     },
+    "voice_activation": {
+      "agent_only": true,
+      "auto_fixable": false,
+      "docs_url": "specs/20-voice.md",
+      "explanation": "Wake-word activation optional extra or host prerequisites are missing.",
+      "fix_command": "uv sync --extra voice-wake",
+      "remediation": [
+        "Run `uv sync --extra voice-wake` to install the offline wake-word engine dependency.",
+        "Enable only on a host with a microphone; headless containers report unavailable by design."
+      ],
+      "severity": "warn",
+      "title": "Wake-word activation"
+    },
     "witchcraft_probe": {
       "agent_only": true,
       "auto_fixable": false,

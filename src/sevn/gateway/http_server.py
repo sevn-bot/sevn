@@ -1232,6 +1232,13 @@ def create_app(
         await asyncio.to_thread(_boot_warn_pdf_render_degraded)
         vr = voice_runtime_settings(ws)
         await maybe_preload_local_tts(ws)
+        _activation_state = getattr(app.state, "voice_activation", None)
+        if not isinstance(_activation_state, dict):
+            _activation_state = {}
+            app.state.voice_activation = _activation_state
+        from sevn.voice.activation import maybe_start_wake_word_listener
+
+        await maybe_start_wake_word_listener(app_state=_activation_state, workspace=ws)
         await asyncio.to_thread(
             lambda: prune_stale_tts_files(
                 content_root=ly.content_root,
@@ -1698,6 +1705,12 @@ def create_app(
         gateway_router._subagent_supervisor = getattr(app.state, "subagent_supervisor", None)
         gateway_router._mission_control_state = mission_control_state
         yield
+        _activation_shutdown_state = getattr(app.state, "voice_activation", {})
+        if not isinstance(_activation_shutdown_state, dict):
+            _activation_shutdown_state = {}
+        from sevn.voice.activation import maybe_stop_wake_word_listener
+
+        await maybe_stop_wake_word_listener(app_state=_activation_shutdown_state)
         await _emit_gateway_trace(trace, kind="gateway.shutdown", status="ok")
         cursor_sched = getattr(app.state, "cursor_poll_scheduler", None)
         if isinstance(cursor_sched, CursorPollScheduler):
