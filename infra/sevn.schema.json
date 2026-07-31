@@ -2246,6 +2246,65 @@
           },
           "$comment": "Maintainer: #91 hermes-model-eval bundled skill — golden_llm harness only (W32 D21). Default false."
         },
+        "reddit_karma_loop": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Opt-in draft-only Reddit karma loop skill (#74, D11)."
+            },
+            "subreddits": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Target subreddits (without r/ prefix)."
+            },
+            "topics": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Discovery topic keywords."
+            },
+            "source_paths": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Approved grounding sources (wiki, second_brain)."
+            },
+            "cron_expr": {
+              "type": "string",
+              "default": "0 9,15 * * *",
+              "description": "Cron schedule for loop discovery (UTC)."
+            },
+            "max_comments_per_day": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 5,
+              "description": "Daily cap on recorded Reddit actions."
+            },
+            "cooldown_seconds": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 3600,
+              "description": "Minimum spacing between actions."
+            },
+            "allow_links": {
+              "type": "boolean",
+              "default": false,
+              "description": "When false, strip URLs from drafts."
+            },
+            "ask_before_post": {
+              "type": "boolean",
+              "default": false,
+              "description": "Scaffold only (D11); --confirm is the write gate."
+            },
+            "stop_on_mod_action": {
+              "type": "boolean",
+              "default": true,
+              "description": "Halt loop when mod removal/feedback is logged."
+            }
+          },
+          "$comment": "Maintainer: #74 reddit-karma-loop bundled skill — draft-only (W33 D11). Default false."
+        },
         "browser": {
           "type": "object",
           "additionalProperties": true,

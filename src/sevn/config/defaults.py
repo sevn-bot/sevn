@@ -255,6 +255,7 @@ DEFAULT_LUME_ENABLED: Final[bool] = False
 
 # Hermes 4 cross-model eval skill (#91, W32) — advisory only; default off (D9).
 DEFAULT_HERMES_MODEL_EVAL_ENABLED: Final[bool] = False
+DEFAULT_REDDIT_KARMA_LOOP_ENABLED: Final[bool] = False
 
 # Tool registry + spill knobs (`specs/11-tools-registry.md`).
 LOADED_BODY_CACHE_DEFAULT_CAP: Final[int] = 64

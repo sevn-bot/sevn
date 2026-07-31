@@ -43,6 +43,8 @@ The `permissions` subtree is a JSON object on the root document ([`root.py`](../
 
 `skills.hermes_model_eval` in [`infra/sevn.schema.json`](../../infra/sevn.schema.json) is an opt-in advisory skill flag (default via [`DEFAULT_HERMES_MODEL_EVAL_ENABLED`](../../src/sevn/config/defaults.py#L256) — **false**). Set `enabled` to turn it on; it does not change routing defaults. Optional `models` is a list of `{label, model_id}` aliases for comparison reports. No dedicated section module — the blob lives on the skills map like other opt-in skill flags.
 
+`skills.reddit_karma_loop` in [`infra/sevn.schema.json`](../../infra/sevn.schema.json) is an opt-in draft-only skill flag (default via [`DEFAULT_REDDIT_KARMA_LOOP_ENABLED`](../../src/sevn/config/defaults.py#L257) — **false**). Set `enabled` to turn it on; knobs cover target `subreddits`/`topics`, grounding `source_paths`, `cron_expr`, daily/cooldown caps, and draft gates (`allow_links`, `ask_before_post`, `stop_on_mod_action`). No dedicated section module — same skills-map blob pattern.
+
 **MCP and routing profiles** are top-level schema keys in [`infra/sevn.schema.json`](../../infra/sevn.schema.json), retained on [`WorkspaceConfig`](../../src/sevn/config/sections/root.py) via `extra="allow"` (no dedicated section modules):
 
 - `mcp_servers` — map of server id → `{command, args}`; optional `env` (static subprocess env, merged before OAuth-resolved vars) and `oauth` (metadata and secret refs only — token blobs live at `oauth.mcp.<server_id>` in the secrets chain)

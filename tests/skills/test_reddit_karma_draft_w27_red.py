@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 
 
-@pytest.mark.xfail(reason="green after W33: reddit-karma-loop skill scaffold", strict=False)
 def test_reddit_karma_skill_manifest_exists() -> None:
     """Bundled skill layout includes reddit-karma-loop with SKILL.md."""
     skill_root = (
@@ -23,7 +22,6 @@ def test_reddit_karma_skill_manifest_exists() -> None:
     assert (skill_root / "SKILL.md").is_file()
 
 
-@pytest.mark.xfail(reason="green after W33: reddit post requires operator approval", strict=False)
 def test_reddit_post_action_returns_confirm_required_without_approval() -> None:
     """Reddit skill cannot post without explicit operator confirmation (D11)."""
     from sevn.data.bundled_skills.core.reddit_karma_loop.scripts._reddit_runtime import (
@@ -42,7 +40,6 @@ def test_reddit_post_action_returns_confirm_required_without_approval() -> None:
     assert preview["error"]["code"] == "CONFIRM_REQUIRED"
 
 
-@pytest.mark.xfail(reason="green after W33: reddit draft-only blocks auto_post", strict=False)
 def test_reddit_auto_post_mode_is_not_available() -> None:
     """``auto_post`` must not be implemented in this wave (D11 draft-only)."""
     from sevn.data.bundled_skills.core.reddit_karma_loop.scripts._reddit_runtime import (
@@ -62,7 +59,6 @@ def test_reddit_auto_post_mode_is_not_available() -> None:
         (10, 3, True),
     ],
 )
-@pytest.mark.xfail(reason="green after W33: reddit per-day post caps", strict=False)
 def test_reddit_daily_post_cap_enforced(
     posts_today: int,
     max_per_day: int,
@@ -85,7 +81,6 @@ def test_reddit_daily_post_cap_enforced(
         assert "cap" in reason.lower()
 
 
-@pytest.mark.xfail(reason="green after W33: reddit cooldown between posts", strict=False)
 def test_reddit_cooldown_enforced_between_posts() -> None:
     """Cooldown window blocks back-to-back Reddit actions."""
     from sevn.data.bundled_skills.core.reddit_karma_loop.scripts._reddit_runtime import (
