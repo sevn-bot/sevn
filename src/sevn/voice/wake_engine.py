@@ -126,9 +126,11 @@ def build_wake_word_engine(*, wake_word: str, engine_id: str | None = None) -> W
         return NullWakeWordEngine()
     try:
         from sevn.voice._openwakeword_engine import OpenWakeWordEngine, WakeModelLoadError
-
+    except ImportError:
+        return NullWakeWordEngine()
+    try:
         return OpenWakeWordEngine(wake_word=wake_word)
-    except (ImportError, WakeModelLoadError):
+    except WakeModelLoadError:
         return NullWakeWordEngine()
 
 
