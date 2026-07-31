@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the browser conversational surface required by prd-01-conversational-experience
   §5.1: owner-only WebSocket chat, static SPA shell, and session continuity with Telegram
   via the shared SessionMa'
-last_updated: '2026-07-21'
-fingerprint: sha256:e5914201618f087b26a6fb6edacbf26afae2602613418203c35dd7cdf4fad810
+last_updated: '2026-07-30'
+fingerprint: sha256:b40b73a21cda7a52117faf66a58b538bb8d26dfa6ff6a1d2211b030a1f0b2e8a
 related: []
 sources:
 - src/sevn/channels/**

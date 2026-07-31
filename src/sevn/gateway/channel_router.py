@@ -61,6 +61,7 @@ from sevn.gateway.channel_types import (
     OutgoingMessage as OutgoingMessage,
 )
 from sevn.gateway.commands.dispatcher import CommandDispatcher
+from sevn.gateway.inbound.referenced_context import prefix_inbound_referenced_context
 from sevn.gateway.lcm.lcm_ingest import ingest_gateway_message_row
 from sevn.gateway.media.media_store import MediaStore
 from sevn.gateway.onboarding.pairing import PairingStore
@@ -960,6 +961,31 @@ class ChannelRouter:
         for adapter in self._adapters.values():
             await adapter.stop()
 
+    def _prefix_inbound_referenced_context(
+        self,
+        msg: IncomingMessage,
+        user_text: str,
+    ) -> str:
+        """Prepend explicit referenced-message blocks for quote and bot-self-reply paths.
+
+        Args:
+            msg (IncomingMessage): Inbound message carrying quote metadata.
+            user_text (str): Operator text after voice/STT normalization.
+
+        Returns:
+            str: User text prefixed with an explicit ``[Referenced message]`` block when applicable.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.ismethoddescriptor(ChannelRouter._prefix_inbound_referenced_context)
+            False
+        """
+        return prefix_inbound_referenced_context(
+            msg,
+            user_text,
+            conn=self.session_manager.connection,
+        )
+
     def _resolve_owner_flag(self, msg: IncomingMessage) -> bool:
         """Return ``True`` when ``msg`` originates from the workspace owner.
         Args:
@@ -1808,9 +1834,7 @@ class ChannelRouter:
                 attrs={"reason": cap_reject},
             )
             return
-        rq = msg.metadata.get("reply_to_quote") or msg.metadata.get("reply_quote")
-        if isinstance(rq, str) and rq:
-            user_text = f"{rq}{user_text}"
+        user_text = self._prefix_inbound_referenced_context(msg, user_text)
         actor_is_owner = self._resolve_owner_flag(msg)
         guard_skip_reason = None
         if actor_is_owner:
@@ -2048,13 +2072,17 @@ class ChannelRouter:
             or self._session_inbound_voice_flag.pop(msg.session_id, False)
         )
         effective_mode = self.resolve_effective_tts_mode(msg.session_id)
+        from sevn.gateway.routing.routing_footer import strip_model_emitted_footer
+
+        clean_content = strip_model_emitted_footer(filtered).rstrip()
+        tts_input = clean_content
         if vr.enabled and self._tts.should_synthesize(
             session_tts_mode=effective_mode,
             user_text_last_turn=u_last,
             inbound_voice_attachment=inbound_voice,
         ):
             tts_out = await self._tts.synthesize_or_skip(
-                cleaned_assistant_text=filtered,
+                cleaned_assistant_text=tts_input,
                 voice_id=vr.tts_voice_id,
                 session_id=msg.session_id,
                 turn_id=correlation_id,
@@ -2084,9 +2112,8 @@ class ChannelRouter:
         # next turn. The footer (when enabled) is still rendered on the outbound
         # ``filtered`` value below — but ``persisted_content`` is what
         # ``add_message`` writes, and it's authoritative for LLM read-back.
-        from sevn.gateway.routing.routing_footer import strip_model_emitted_footer
-
-        persisted_content = strip_model_emitted_footer(filtered).rstrip()
+        # ``tts_input`` (computed above) uses the same strip for synthesis.
+        persisted_content = clean_content
         if persisted_content.strip() == ASSISTANT_NO_OUTPUT_PLACEHOLDER:
             logger.info(
                 "route_outgoing.no_output_placeholder session_id={} turn_id={}",

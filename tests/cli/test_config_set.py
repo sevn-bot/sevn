@@ -87,10 +87,33 @@ def test_config_set_atomic_write_creates_backup(
     ws = home / "workspace"
     result = runner.invoke(get_command(app), ["config", "set", "gateway.host", '"127.0.0.2"'])
     assert result.exit_code == 0
-    backups = list(ws.glob("sevn.json.v1*"))
+    archive_dir = ws / "sevn.json.archive"
+    assert archive_dir.is_dir()
+    backups = list(archive_dir.glob("sevn.json.v1*"))
     assert backups
     doc = json.loads((ws / "sevn.json").read_text(encoding="utf-8"))
     assert doc["gateway"]["host"] == "127.0.0.2"
+
+
+def test_config_set_backups_use_archive_directory(
+    runner: ClickCliRunner,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``sevn config set`` toggles must archive into ``sevn.json.archive/`` (#62)."""
+    home = _install_bound_workspace(tmp_path, src=_V1_SEVN_JSON)
+    monkeypatch.setenv("SEVN_HOME", str(home))
+    ws = home / "workspace"
+    for host_suffix in ("2", "3", "4"):
+        result = runner.invoke(
+            get_command(app),
+            ["config", "set", "gateway.host", f'"127.0.0.{host_suffix}"'],
+        )
+        assert result.exit_code == 0
+    archive_dir = ws / "sevn.json.archive"
+    assert archive_dir.is_dir()
+    assert list(archive_dir.glob("sevn.json.v*"))
+    assert not list(ws.glob("sevn.json.v*"))
 
 
 def test_config_set_json_failure_unknown_key(

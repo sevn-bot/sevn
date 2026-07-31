@@ -357,6 +357,12 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
 
+## Amendments (open-issues-sweep W5 — #68)
+
+``/file_issue`` confirmation uses neutral wording: local issue id and title always;
+GitHub issue number or URL only after a successful mirror (never presupposed in the
+subject line).
+
 ## Human-input needed
 
 Prose body not yet authored (W9 scope). Normative contract requires operator or

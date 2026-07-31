@@ -661,6 +661,9 @@ SERVICE_LOG_FORMAT: Final[str] = (
 DEFAULT_LOG_RETENTION_DAYS: Final[int] = 10
 DEFAULT_LOG_ARCHIVE_MODE: Final[str] = "copy"
 DEFAULT_LOG_ARCHIVE_DESTINATION: Final[str] = "logs/archive"
+# ``sevn.json.v*`` versioned backups beside the active config (`specs/02` §2, issue #62).
+DEFAULT_CONFIG_ARCHIVE_KEEP_COUNT: Final[int] = 5
+DEFAULT_CONFIG_ARCHIVE_RETENTION_DAYS: Final[int] = 0
 # ``None`` = use the structured-log hard ceiling (``TOOL_DEBUG_RESULT_LOG_HARD_CAP``)
 # rather than logging the full tool envelope JSON on ``tool_call.finish`` DEBUG lines.
 DEFAULT_TOOL_DEBUG_RESULT_MAX_CHARS: Final[int | None] = None

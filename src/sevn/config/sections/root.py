@@ -25,6 +25,7 @@ from pydantic import (
 from sevn.code_understanding.models import CodeUnderstandingSettings
 from sevn.config.sections.agent import AgentWorkspaceConfig
 from sevn.config.sections.channels import ChannelsWorkspaceSectionConfig, VoiceConfig
+from sevn.config.sections.config_archive import ConfigArchiveWorkspaceConfig
 from sevn.config.sections.dashboard import DashboardWorkspaceConfig
 from sevn.config.sections.docs import DocsWorkspaceSectionConfig
 from sevn.config.sections.evolution import MySevnWorkspaceConfig, SpecKitWorkspaceConfig
@@ -115,6 +116,7 @@ class WorkspaceConfig(BaseModel):
     openui: OpenUIWorkspaceConfig | None = None
     triggers: TriggersWorkspaceConfig | None = None
     logging: LoggingWorkspaceConfig | None = None
+    config_archive: ConfigArchiveWorkspaceConfig | None = None
     self_improve: SelfImproveWorkspaceConfig | None = None
     spec_kit: SpecKitWorkspaceConfig | None = None
     my_sevn: MySevnWorkspaceConfig | None = None

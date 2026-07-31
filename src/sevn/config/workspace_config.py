@@ -25,6 +25,7 @@ from sevn.config.sections.channels import (
     VoiceConfig,
     WebChatChannelConfig,
 )
+from sevn.config.sections.config_archive import ConfigArchiveWorkspaceConfig
 from sevn.config.sections.dashboard import DashboardPageAgentConfig, DashboardWorkspaceConfig
 from sevn.config.sections.evolution import (
     CursorPollMode,
@@ -192,6 +193,7 @@ __all__ = [
     "BackendEntry",
     "BrowserWorkspaceConfig",
     "ChannelsWorkspaceSectionConfig",
+    "ConfigArchiveWorkspaceConfig",
     "CursorPollMode",
     "DashboardPageAgentConfig",
     "DashboardWorkspaceConfig",

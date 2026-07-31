@@ -873,6 +873,8 @@ class TelegramInboundMixin(TelegramSendHost):
         meta.update(meta_extras)
         if suppress_bot_self_quote:
             meta["reply_to_quote"] = None
+            if rmid is not None:
+                meta["referenced_message_id"] = rmid
         elif reply_quote:
             meta["reply_to_quote"] = reply_quote
         return IncomingMessage(

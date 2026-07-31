@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- [2026-07-30] `make ci-resume` now walks `mergecraft-ref-check` — the mergeCraft pin gate is in `CI_STEPS` alongside the other `ci-parity` steps, and tier↔resume parity is enforced by `tests/infra/test_ci_steps_tier_parity.py` instead of a Makefile comment alone
 - [2026-07-30] `make mergecraft-ref-check` now reads the mergeCraft action pin from `origin/main` — the workflow copy GitHub actually runs — instead of an inert trunk copy that was compared against the Makefile while the executing pin went unchecked; a pin bumped only on `main` is no longer invisible to `make ci`. The trunk copy of `.github/workflows/mergecraft.yml` is deleted, so workflow edits are a single PR against `main` rather than two mirrored ones. The gate skips with a warning when `origin/main` is unreachable locally, and hard-fails under `CI`; override the compared ref with `SEVN_MERGECRAFT_WORKFLOW_REF`
 - [2026-07-29] Tier-B stack staged on `pydantic-ai` 1.107 and `pydantic-ai-harness` 0.4 ahead of the v2 cutover — web capability and CodeMode behavior unchanged; clears v1 deprecation warnings on the adapter surface
 - [2026-07-29] **Breaking:** tier-B stack migrated to `pydantic-ai` v2.20 + `pydantic-ai-harness` 0.13 / Monty 0.0.19 — `SevnAsyncCodeMode` replaces sync harness CodeMode; Monty `ResourceLimits` injected via fail-loud `checkout` patch ([upstream #501](https://github.com/pydantic/pydantic-ai-harness/issues/501))
@@ -23,6 +24,12 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-07-30] Batch A Thermos pass — config backup migration preserves colliding legacy archives, Telegram menu forms re-prompt with cancel on remaining validation paths, referenced-message context extracted to `gateway/inbound/referenced_context.py`, and turn-scoped outbound metadata lookup falls back when no turn-bound row exists
+- [2026-07-30] Classifier timeouts in `multi` queue mode no longer append a timeout notice to the prior turn's reply — the new turn still spawns with routing extras preserved, and the decision is logged as `gateway.queue_classifier_timeout_spawned`; fixes #70
+- [2026-07-30] Voice replies no longer speak routing diagnostics — when `show_routing` is on, TTS input strips the `_intent=… · tier=… · conf=…_` footer while chat text keeps it; fixes #66
+- [2026-07-30] Telegram quoted replies now bind to the referenced turn — bot-self-replies carry `referenced_message_id` through ingest, inbound quotes are wrapped in explicit `[Referenced message]` blocks, outbound `reply_to_message_id` follows the turn being answered (not the latest user row), and issue-filing confirmations stay neutral until GitHub mirror succeeds — fixes #67 and #68
+- [2026-07-30] `sevn.json` versioned backups now land in `sevn.json.archive/` beside the active config and are pruned by `config_archive.keep_count` (default 5) — fixes #62 (unbounded `sevn.json.v*` pile beside every `/config` toggle); legacy beside-config backups migrate into the archive on the next write
+- [2026-07-30] Telegram `/config` form wizards re-prompt on validation failure and advertise `cancel`/`abort` on every value-required first ask — fixes #71 (trapped tunnel mode prompt); `quick` tunnel alias now normalizes to `cloudflare_quick`
 - [2026-07-29] Tier-B harness skill staging uses a per-turn process tempdir — avoids accumulating ``.sevn-harness-skills/`` under long-lived workspaces
 - [2026-07-29] Tier-B history compaction honors ``agent.history_compaction.target_tokens`` from ``sevn.json`` — previously validated in schema but silently ignored at capability assembly
 - [2026-07-29] Thermos tier-B hardening: human-gated tools stay native outside CodeMode; D9 opt-in toggles wired through ``agent.history_compaction`` / ``agent.cache_stability`` / ``agent.codemode.dynamic_catalog``; fail-loud async CodeMode backend probe

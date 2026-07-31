@@ -460,12 +460,12 @@ ci-parity: code-index deploy-remote-report-check code-index-check mergecraft-ref
 ci: ci-core ci-infra ci-docs ci-skills ci-parity ## Full gate (same as CI)
 
 # Ordered expansion of `make ci`, consumed by the resumable runner (scripts/ci_resume.sh).
-# Keep in sync with the ci-core/ci-infra/ci-docs/ci-skills/ci-parity tiers above.
+# Tier↔CI_STEPS parity enforced by tests/infra/test_ci_steps_tier_parity.py.
 CI_STEPS := lockcheck lint typecheck pyright test doctest security build doctor-solutions-check \
 	config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards agent-context-manifest-check \
 	telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema spec-kit-wave-test changelog-check faq-check \
 	skills-core-check skillspector-check skills-index-check dreaming-allowlist-check \
-	code-index deploy-remote-report-check code-index-check
+	code-index deploy-remote-report-check code-index-check mergecraft-ref-check
 
 ci-steps: ## Print the ordered `make ci` step list (consumed by ci-resume)
 	@echo $(CI_STEPS)

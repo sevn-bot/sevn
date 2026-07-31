@@ -1398,6 +1398,7 @@ def build_agent_run_turn(
             session_id,
             sess.channel,
             sess.user_id,
+            correlation_id,
         )
         from sevn.gateway.session_manager import merge_dispatch_routing
 
@@ -2596,6 +2597,7 @@ def build_agent_run_turn(
                                 session_id,
                                 _sess.channel,
                                 _sess.user_id,
+                                correlation_id,
                             )
                         )
                         from sevn.gateway.session_manager import merge_dispatch_routing
@@ -2648,6 +2650,7 @@ def build_agent_run_turn(
                 session_id,
                 sess.channel,
                 sess.user_id,
+                correlation_id,
             )
             from sevn.gateway.session_manager import merge_dispatch_routing
 
@@ -2749,6 +2752,7 @@ def build_agent_run_turn(
                 session_id,
                 sess.channel,
                 sess.user_id,
+                correlation_id,
             )
             from sevn.gateway.session_manager import merge_dispatch_routing
 
@@ -3811,6 +3815,7 @@ def _outbound_routing_metadata(
     session_id: str,
     channel: str,
     user_id: str,
+    turn_id: str | None = None,
 ) -> dict[str, Any]:
     """Load adapter routing hints for replies (``chat_id``, topic, reply targets).
     Args:
@@ -3818,6 +3823,8 @@ def _outbound_routing_metadata(
         session_id (str): Owning session id.
         channel (str): Session channel key (e.g. ``telegram``).
         user_id (str): Session user id string.
+        turn_id (str | None): Turn being answered; binds ``reply_to_message_id`` to
+            that user row instead of the latest session message.
     Returns:
         dict[str, Any]: Metadata for :class:`~sevn.gateway.channel_router.OutgoingMessage`.
     Examples:
@@ -3829,9 +3836,16 @@ def _outbound_routing_metadata(
         """
         SELECT extras_json FROM gateway_messages
         WHERE session_id = ? AND role = 'user' AND kind = 'message'
-        ORDER BY id DESC LIMIT 1
+        ORDER BY
+            CASE
+                WHEN ? IS NOT NULL AND turn_id = ? THEN 0
+                WHEN ? IS NULL THEN 1
+                ELSE 2
+            END,
+            id DESC
+        LIMIT 1
         """,
-        (session_id,),
+        (session_id, turn_id, turn_id, turn_id),
     ).fetchone()
     if row is not None and row[0]:
         try:

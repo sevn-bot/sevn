@@ -385,7 +385,7 @@ def restore_workspace_snapshot(request: Request, *, snapshot_id: str) -> dict[st
 
 
 def build_backup_export_bytes(layout: WorkspaceLayout) -> bytes:
-    """Build a tar.gz containing ``sevn.json`` and ``sevn.json.v*`` backups.
+    """Build a tar.gz containing ``sevn.json`` and archived ``sevn.json.v*`` backups.
 
     Args:
         layout (WorkspaceLayout): Workspace layout.
@@ -403,16 +403,15 @@ def build_backup_export_bytes(layout: WorkspaceLayout) -> bytes:
         >>> isinstance(build_backup_export_bytes(lay), bytes)
         True
     """
+    from sevn.config.sevn_json_backup import iter_config_backup_paths
+
     sevn_json = layout.sevn_json_path
-    parent = sevn_json.parent
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
         if sevn_json.is_file():
             tar.add(sevn_json, arcname=sevn_json.name)
-        if parent.is_dir():
-            for backup in sorted(parent.glob("sevn.json.v*")):
-                if backup.is_file():
-                    tar.add(backup, arcname=backup.name)
+        for backup in iter_config_backup_paths(sevn_json):
+            tar.add(backup, arcname=backup.name)
     return buf.getvalue()
 
 
@@ -437,7 +436,10 @@ def import_backup_archive(layout: WorkspaceLayout, data: bytes) -> dict[str, obj
     if not data:
         msg = "empty backup archive"
         raise ValueError(msg)
+    from sevn.config.sevn_json_backup import config_backup_archive_dir
+
     sevn_json = layout.sevn_json_path
+    archive_dir = config_backup_archive_dir(sevn_json)
     imported: list[str] = []
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
         names = {m.name for m in tar.getmembers() if m.isfile()}
@@ -453,7 +455,11 @@ def import_backup_archive(layout: WorkspaceLayout, data: bytes) -> dict[str, obj
             extracted = tar.extractfile(member)
             if extracted is None:
                 continue
-            dest = sevn_json.parent / base
+            if base == "sevn.json":
+                dest = sevn_json
+            else:
+                archive_dir.mkdir(parents=True, exist_ok=True)
+                dest = archive_dir / base
             dest.write_bytes(extracted.read())
             imported.append(base)
     return {"ok": True, "imported": imported}

@@ -32,6 +32,7 @@ from sevn.gateway.commands.discogs_oauth_wizard import (
     advance_discogs_oauth,
     cleanup_discogs_oauth_interim_secrets,
 )
+from sevn.gateway.commands.form_prompts import form_prompt_with_cancel
 from sevn.gateway.commands.shortcuts_store import (
     add_shortcut,
     republish_set_my_commands,
@@ -92,6 +93,17 @@ FORM_TARGETS: frozenset[str] = frozenset(
     },
 )
 _SECRET_ALIAS_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
+
+_PROMPT_TUNNEL_SETUP = "Send tunnel mode (cloudflare, ngrok, quick, or none):"
+_PROMPT_SECRETS_RM = "Send the logical secret alias to remove:"
+_PROMPT_PAIRING_APPROVE = "Send channel and pairing code (e.g. telegram ABCD2345):"
+_PROMPT_SECRET_WIZARD_KEY = "Send the secret logical key (e.g. providers.openai.api_key):"  # nosec B105 — UI prompt text
+_PROMPT_SHORTCUT_ADD_NAME = "Send the shortcut name (e.g. standup):"
+_PROMPT_SESSIONS_SEND_TARGET = "Send the target gateway session id:"
+_PROMPT_MODELS_MAX_TOKENS = "Send max_output_tokens (positive integer):"
+_PROMPT_IMPROVE_LEARN_RATIONALE = "Send the rationale for this lesson:"
+_PROMPT_CONFIG_SET_VALUE = "Send JSON or string value for `{dotted}`:"
+_PROMPT_MIGRATE_IMPORT_EXPORT = "Send export bundle path (.env from export-secrets):"
 
 
 def parse_form_callback(data: str) -> str | None:
@@ -474,7 +486,7 @@ class MenuFormHandler:
             if preset_alias:
                 prompt = f"Send the secret value for `{preset_alias}` (not shown again):"
             else:
-                prompt = "Send the secret logical key (e.g. providers.openai.api_key):"
+                prompt = _PROMPT_SECRET_WIZARD_KEY
         elif target == "agent_display_name":
             prompt = "Send the new bot display name:"
         elif target == "logs_grep":
@@ -502,9 +514,9 @@ class MenuFormHandler:
         elif target == "subagents:kill":
             prompt = "Send the sub-agent run id to kill (e.g. a1f3):"
         elif target == "secrets:rm":
-            prompt = "Send the logical secret alias to remove:"
+            prompt = _PROMPT_SECRETS_RM
         elif target == "pairing:approve":
-            prompt = "Send channel and pairing code (e.g. telegram ABCD2345):"
+            prompt = _PROMPT_PAIRING_APPROVE
         elif target == "gh:github_token":
             prompt = "Send the GitHub personal access token (not shown again):"
         elif target == "providers:oauth:login":
@@ -516,7 +528,7 @@ class MenuFormHandler:
         elif target == "config:set":
             prompt = "Send the dot-path to set (e.g. gateway.port):"
         elif target == "tunnel:setup":
-            prompt = "Send tunnel mode (cloudflare, ngrok, quick, or none):"
+            prompt = _PROMPT_TUNNEL_SETUP
         elif target == "migrate:import":
             prompt = "Send foreign workspace path to import, or empty for in-place schema upgrade:"
         elif target == "deploy:check":
@@ -538,8 +550,8 @@ class MenuFormHandler:
             role = target.removeprefix("subagents_limits:").strip()
             prompt = f"Send max level-1 count for {role} (integer, empty clears override):"
         else:
-            prompt = "Send the shortcut name (e.g. standup):"
-        await self._send_chat(msg, prompt)
+            prompt = _PROMPT_SHORTCUT_ADD_NAME
+        await self._send_chat(msg, form_prompt_with_cancel(prompt))
 
     async def _advance_form(self, msg: IncomingMessage) -> None:
         """Apply one text reply to the active wizard step.
@@ -790,7 +802,11 @@ class MenuFormHandler:
             try:
                 value = max(0, int(text.strip()))
             except ValueError:
-                await self._send_chat(msg, "Send a non-negative integer or empty to clear.")
+                await self._form_validation_failure(
+                    msg,
+                    error="Send a non-negative integer or empty to clear.",
+                    step_prompt="Send global max_override (integer, or empty to clear):",
+                )
                 return
 
         def _apply(doc: dict[str, Any]) -> None:
@@ -837,7 +853,11 @@ class MenuFormHandler:
                 try:
                     payload["max_level1"] = max(0, int(text.strip()))
                 except ValueError:
-                    await self._send_chat(msg, "Send a non-negative integer or empty to clear.")
+                    await self._form_validation_failure(
+                        msg,
+                        error="Send a non-negative integer or empty to clear.",
+                        step_prompt=f"Send max level-1 count for {role} (integer, empty clears override):",
+                    )
                     return
             else:
                 payload["max_level1"] = None
@@ -854,7 +874,11 @@ class MenuFormHandler:
                 try:
                     max_l2 = max(0, int(text.strip()))
                 except ValueError:
-                    await self._send_chat(msg, "Send a non-negative integer or empty to clear.")
+                    await self._form_validation_failure(
+                        msg,
+                        error="Send a non-negative integer or empty to clear.",
+                        step_prompt=f"Send max level-2 count for {role} (integer, empty clears):",
+                    )
                     return
             else:
                 max_l2 = None
@@ -921,12 +945,20 @@ class MenuFormHandler:
         _ = step, payload
         pattern_text = text.strip()
         if not pattern_text:
-            await self._send_chat(msg, "Pattern cannot be empty.")
+            await self._form_validation_failure(
+                msg,
+                error="Pattern cannot be empty.",
+                step_prompt="Send the grep pattern for service logs (gateway+proxy):",
+            )
             return
         try:
             compiled = re.compile(pattern_text)
         except re.error as exc:
-            await self._send_chat(msg, f"Invalid regex: {exc}")
+            await self._form_validation_failure(
+                msg,
+                error=f"Invalid regex: {exc}",
+                step_prompt="Send the grep pattern for service logs (gateway+proxy):",
+            )
             return
         self._consume_token(token)
         layout = WorkspaceLayout(self._sevn_json, self._content_root)
@@ -975,7 +1007,11 @@ class MenuFormHandler:
         _ = step, payload
         span_id = text.strip()
         if not span_id:
-            await self._send_chat(msg, "Span id cannot be empty.")
+            await self._form_validation_failure(
+                msg,
+                error="Span id cannot be empty.",
+                step_prompt="Send the trace span id to look up:",
+            )
             return
         self._consume_token(token)
         layout = WorkspaceLayout(self._sevn_json, self._content_root)
@@ -1023,7 +1059,11 @@ class MenuFormHandler:
             return
         bearer = text.strip()
         if not bearer:
-            await self._send_chat(msg, "Logfire token cannot be empty.")
+            await self._form_validation_failure(
+                msg,
+                error="Logfire token cannot be empty.",
+                step_prompt="Send your Logfire write token (pylf_v1_… — not shown again):",
+            )
             return
         chain = secrets_chain_from_workspace(
             self._content_root,
@@ -1072,12 +1112,19 @@ class MenuFormHandler:
             try:
                 validate_shortcut_name(text)
             except ValueError as exc:
-                await self._send_chat(msg, f"Invalid name: {exc}")
+                await self._form_validation_failure(
+                    msg,
+                    error=f"Invalid name: {exc}",
+                    step_prompt=_PROMPT_SHORTCUT_ADD_NAME,
+                )
                 return
             payload["step"] = "prompt"
             payload["name"] = text.strip().lower()
             self._update_payload(token, payload)
-            await self._send_chat(msg, f"Send the prompt text for /{payload['name']}:")
+            await self._send_chat(
+                msg,
+                form_prompt_with_cancel(f"Send the prompt text for /{payload['name']}:"),
+            )
             return
         if step == "prompt":
             name = str(payload.get("name", "")).strip().lower()
@@ -1086,7 +1133,11 @@ class MenuFormHandler:
                 await self._send_chat(msg, "Wizard expired — start again from /config → Shortcuts.")
                 return
             if not text:
-                await self._send_chat(msg, "Prompt text cannot be empty.")
+                await self._form_validation_failure(
+                    msg,
+                    error="Prompt text cannot be empty.",
+                    step_prompt=f"Send the prompt text for /{name}:",
+                )
                 return
             try:
                 add_shortcut(
@@ -1138,10 +1189,18 @@ class MenuFormHandler:
 
         name = text.strip().lower().lstrip("/")
         if not name:
-            await self._send_chat(msg, "Shortcut name cannot be empty.")
+            await self._form_validation_failure(
+                msg,
+                error="Shortcut name cannot be empty.",
+                step_prompt="Send the shortcut name to remove (without /):",
+            )
             return
         if not delete_shortcut(self._content_root, name):
-            await self._send_chat(msg, f"Shortcut {name!r} not found.")
+            await self._form_validation_failure(
+                msg,
+                error=f"Shortcut {name!r} not found.",
+                step_prompt="Send the shortcut name to remove (without /):",
+            )
             return
         self._consume_token(token)
         await republish_set_my_commands(self._router)
@@ -1177,7 +1236,11 @@ class MenuFormHandler:
 
         session_id = text.strip()
         if not session_id:
-            await self._send_chat(msg, "Session id cannot be empty.")
+            await self._form_validation_failure(
+                msg,
+                error="Session id cannot be empty.",
+                step_prompt="Send the gateway session id for history:",
+            )
             return
         caller = str(payload.get("caller_session_id") or "").strip() or None
         try:
@@ -1246,12 +1309,19 @@ class MenuFormHandler:
         if step == "session_id":
             target = text.strip()
             if not target:
-                await self._send_chat(msg, "Session id cannot be empty.")
+                await self._form_validation_failure(
+                    msg,
+                    error="Session id cannot be empty.",
+                    step_prompt=_PROMPT_SESSIONS_SEND_TARGET,
+                )
                 return
             payload["step"] = "text"
             payload["target_session_id"] = target
             self._update_payload(token, payload)
-            await self._send_chat(msg, "Send the message text to append:")
+            await self._send_chat(
+                msg,
+                form_prompt_with_cancel("Send the message text to append:"),
+            )
             return
         if step == "text":
             target = str(payload.get("target_session_id") or "").strip()
@@ -1260,7 +1330,11 @@ class MenuFormHandler:
                 await self._send_chat(msg, "Wizard expired — start again from /config → Sessions.")
                 return
             if not text.strip():
-                await self._send_chat(msg, "Message text cannot be empty.")
+                await self._form_validation_failure(
+                    msg,
+                    error="Message text cannot be empty.",
+                    step_prompt="Send the message text to append:",
+                )
                 return
             try:
                 result = send_to_session(
@@ -1303,15 +1377,16 @@ class MenuFormHandler:
         if step == "agent":
             agent = text.strip()
             if agent not in AGENT_NAMES:
-                await self._send_chat(
+                await self._form_validation_failure(
                     msg,
-                    f"Unknown agent {agent!r}. Expected one of: {', '.join(AGENT_NAMES)}",
+                    error=f"Unknown agent {agent!r}. Expected one of: {', '.join(AGENT_NAMES)}",
+                    step_prompt=f"Send agent name ({', '.join(AGENT_NAMES)}):",
                 )
                 return
             payload["step"] = "tokens"
             payload["agent"] = agent
             self._update_payload(token, payload)
-            await self._send_chat(msg, "Send max_output_tokens (positive integer):")
+            await self._send_chat(msg, form_prompt_with_cancel(_PROMPT_MODELS_MAX_TOKENS))
             return
         if step == "tokens":
             agent = str(payload.get("agent") or "").strip()
@@ -1322,10 +1397,18 @@ class MenuFormHandler:
             try:
                 max_tokens = int(text.strip())
             except ValueError:
-                await self._send_chat(msg, "Send a positive integer for max_output_tokens.")
+                await self._form_validation_failure(
+                    msg,
+                    error="Send a positive integer for max_output_tokens.",
+                    step_prompt=_PROMPT_MODELS_MAX_TOKENS,
+                )
                 return
             if max_tokens < 1:
-                await self._send_chat(msg, "max_output_tokens must be at least 1.")
+                await self._form_validation_failure(
+                    msg,
+                    error="max_output_tokens must be at least 1.",
+                    step_prompt=_PROMPT_MODELS_MAX_TOKENS,
+                )
                 return
             try:
                 path = set_agent_model_max_output_tokens(
@@ -1380,12 +1463,16 @@ class MenuFormHandler:
         if step == "claim":
             claim = text.strip()
             if not claim:
-                await self._send_chat(msg, "Claim cannot be empty.")
+                await self._form_validation_failure(
+                    msg,
+                    error="Claim cannot be empty.",
+                    step_prompt="Send the lesson claim (one short sentence):",
+                )
                 return
             payload["step"] = "rationale"
             payload["claim"] = claim
             self._update_payload(token, payload)
-            await self._send_chat(msg, "Send the rationale for this lesson:")
+            await self._send_chat(msg, form_prompt_with_cancel(_PROMPT_IMPROVE_LEARN_RATIONALE))
             return
         if step == "rationale":
             claim = str(payload.get("claim") or "").strip()
@@ -1395,7 +1482,11 @@ class MenuFormHandler:
                 return
             rationale = text.strip()
             if not rationale:
-                await self._send_chat(msg, "Rationale cannot be empty.")
+                await self._form_validation_failure(
+                    msg,
+                    error="Rationale cannot be empty.",
+                    step_prompt=_PROMPT_IMPROVE_LEARN_RATIONALE,
+                )
                 return
             root = improve_root(WorkspaceLayout(self._sevn_json, self._content_root))
             append_jsonl_locked(
@@ -1440,7 +1531,11 @@ class MenuFormHandler:
         _ = step
         parts = text.strip().split()
         if len(parts) != 2:
-            await self._send_chat(msg, "Send two dates: FROM TO (YYYY-MM-DD YYYY-MM-DD).")
+            await self._form_validation_failure(
+                msg,
+                error="Send two dates: FROM TO (YYYY-MM-DD YYYY-MM-DD).",
+                step_prompt="Send backfill window as FROM TO (YYYY-MM-DD YYYY-MM-DD):",
+            )
             return
         date_from, date_to = parts
         trace = NullTraceSink()
@@ -1497,7 +1592,11 @@ class MenuFormHandler:
         _ = step, payload
         key = text.strip()
         if not key:
-            await self._send_chat(msg, "API key cannot be empty.")
+            await self._form_validation_failure(
+                msg,
+                error="API key cannot be empty.",
+                step_prompt="Send the OpenWiki LLM API key (not shown again):",
+            )
             return
         chain = secrets_chain_from_workspace(
             self._content_root,
@@ -1538,8 +1637,10 @@ class MenuFormHandler:
         _ = step, payload
         alias = text.strip()
         if not alias or not _SECRET_ALIAS_RE.match(alias):
-            await self._send_chat(
-                msg, "Invalid alias — use letters, digits, dots, dashes, underscores."
+            await self._form_validation_failure(
+                msg,
+                error="Invalid alias — use letters, digits, dots, dashes, underscores.",
+                step_prompt=_PROMPT_SECRETS_RM,
             )
             return
         mar = self._router._menu_action_router
@@ -1554,7 +1655,11 @@ class MenuFormHandler:
             return
         match = next((r for r in rows if r.get("alias") == alias), None)
         if match is None:
-            await self._send_chat(msg, f"Secret {alias!r} not found — list aliases first.")
+            await self._form_validation_failure(
+                msg,
+                error=f"Secret {alias!r} not found — list aliases first.",
+                step_prompt=_PROMPT_SECRETS_RM,
+            )
             return
         fingerprint = str(match.get("fingerprint_sha256_hex", ""))
         self._consume_token(token)
@@ -1592,7 +1697,11 @@ class MenuFormHandler:
         _ = step, payload
         parts = text.strip().split()
         if len(parts) < 2:
-            await self._send_chat(msg, "Send channel and code, e.g. telegram ABCD2345")
+            await self._form_validation_failure(
+                msg,
+                error="Send channel and code, e.g. telegram ABCD2345",
+                step_prompt=_PROMPT_PAIRING_APPROVE,
+            )
             return
         channel, code = parts[0].lower(), parts[1].upper()
         from sevn.gateway.onboarding.pairing import PairingStore
@@ -1600,7 +1709,11 @@ class MenuFormHandler:
         result = PairingStore(self._content_root).approve_code(channel, code)
         self._consume_token(token)
         if result is None:
-            await self._send_chat(msg, "Invalid or expired pairing code.")
+            await self._form_validation_failure(
+                msg,
+                error="Invalid or expired pairing code.",
+                step_prompt=_PROMPT_PAIRING_APPROVE,
+            )
             return
         await self._refresh_section(msg, section="access_pairing", toast="✅ Pairing approved.")
         await self._send_chat(msg, f"Approved {channel} user {result.get('user_id')}.")
@@ -1633,7 +1746,11 @@ class MenuFormHandler:
         _ = step, payload
         token_value = text.strip()
         if not token_value:
-            await self._send_chat(msg, "GitHub token cannot be empty.")
+            await self._form_validation_failure(
+                msg,
+                error="GitHub token cannot be empty.",
+                step_prompt="Send the GitHub personal access token (not shown again):",
+            )
             return
         chain = secrets_chain_from_workspace(
             self._content_root,
@@ -1673,7 +1790,11 @@ class MenuFormHandler:
         _ = step, payload
         provider_id = text.strip().lower()
         if not provider_id:
-            await self._send_chat(msg, "Provider id cannot be empty.")
+            await self._form_validation_failure(
+                msg,
+                error="Provider id cannot be empty.",
+                step_prompt="Send provider id to link (e.g. openai or anthropic):",
+            )
             return
         self._consume_token(token)
         if provider_id == "openai":
@@ -1715,7 +1836,11 @@ class MenuFormHandler:
         _ = step, payload
         provider_id = text.strip()
         if not provider_id:
-            await self._send_chat(msg, "Provider id cannot be empty.")
+            await self._form_validation_failure(
+                msg,
+                error="Provider id cannot be empty.",
+                step_prompt="Send provider id to unlink (e.g. openai):",
+            )
             return
         alias = f"oauth.{provider_id}"
         chain = secrets_chain_from_workspace(
@@ -1761,7 +1886,11 @@ class MenuFormHandler:
         _ = step, payload
         turn_id = text.strip()
         if not turn_id:
-            await self._send_chat(msg, "Turn id cannot be empty.")
+            await self._form_validation_failure(
+                msg,
+                error="Turn id cannot be empty.",
+                step_prompt="Send the turn correlation id to view:",
+            )
             return
         try:
             lines = view_turn_bundle(self._content_root, turn_id, section="summary")
@@ -1807,20 +1936,35 @@ class MenuFormHandler:
         if step == "path":
             dotted = text.strip()
             if not dotted:
-                await self._send_chat(msg, "Dot path cannot be empty.")
+                await self._form_validation_failure(
+                    msg,
+                    error="Dot path cannot be empty.",
+                    step_prompt="Send the dot-path to set (e.g. gateway.port):",
+                )
                 return
             try:
                 schema = load_workspace_json_schema()
             except (OSError, json.JSONDecodeError) as exc:
-                await self._send_chat(msg, f"Schema unavailable: {exc}")
+                await self._form_validation_failure(
+                    msg,
+                    error=f"Schema unavailable: {exc}",
+                    step_prompt="Send the dot-path to set (e.g. gateway.port):",
+                )
                 return
             if not dotted_path_in_schema(schema, dotted):
-                await self._send_chat(msg, f"Unknown config key {dotted!r}.")
+                await self._form_validation_failure(
+                    msg,
+                    error=f"Unknown config key {dotted!r}.",
+                    step_prompt="Send the dot-path to set (e.g. gateway.port):",
+                )
                 return
             payload["path"] = dotted
             payload["step"] = "value"
             self._update_payload(token, payload)
-            await self._send_chat(msg, f"Send JSON or string value for `{dotted}`:")
+            await self._send_chat(
+                msg,
+                form_prompt_with_cancel(_PROMPT_CONFIG_SET_VALUE.format(dotted=dotted)),
+            )
             return
         dotted = str(payload.get("path", "")).strip()
         if not dotted:
@@ -1841,7 +1985,11 @@ class MenuFormHandler:
 
             mutate_sevn_json(self._sevn_json, _apply)
         except (ValidationError, UnsupportedSchemaVersionError, ValueError, OSError) as exc:
-            await self._send_chat(msg, str(exc))
+            await self._form_validation_failure(
+                msg,
+                error=str(exc),
+                step_prompt=f"Send JSON or string value for `{dotted}`:",
+            )
             return
         self._consume_token(token)
         hint = config_set_reload_hint(dotted)
@@ -1869,12 +2017,22 @@ class MenuFormHandler:
         from sevn.cli.commands.tunnel_cmd import _build_config_fields
         from sevn.cli.gateway_token_store import GatewayTokenBootstrap
         from sevn.cli.tunnel_setup_store import apply_tunnel_setup_local
+        from sevn.infrastructure.tunnel_config import normalize_tunnel_mode
 
         _ = step, payload
-        mode = text.strip().lower()
-        if mode not in {"cloudflare", "ngrok", "quick", "none"}:
-            await self._send_chat(msg, "Mode must be cloudflare, ngrok, quick, or none.")
-            return
+        mode_raw = text.strip().lower()
+        if mode_raw == "none":
+            mode = "none"
+        else:
+            try:
+                mode = normalize_tunnel_mode(mode_raw)
+            except ValueError:
+                await self._form_validation_failure(
+                    msg,
+                    error="Mode must be cloudflare, ngrok, quick, or none.",
+                    step_prompt=_PROMPT_TUNNEL_SETUP,
+                )
+                return
         gateway_port = self._workspace.gateway.port if self._workspace.gateway else None
         fields = _build_config_fields(
             mode=mode,
@@ -1890,7 +2048,11 @@ class MenuFormHandler:
         try:
             apply_tunnel_setup_local(bootstrap, config_fields=fields)
         except ValueError as exc:
-            await self._send_chat(msg, str(exc))
+            await self._form_validation_failure(
+                msg,
+                error=str(exc),
+                step_prompt=_PROMPT_TUNNEL_SETUP,
+            )
             return
         self._consume_token(token)
         await self._refresh_section(
@@ -1979,7 +2141,11 @@ class MenuFormHandler:
         _ = step, payload
         host = text.strip()
         if not host:
-            await self._send_chat(msg, "Host id cannot be empty.")
+            await self._form_validation_failure(
+                msg,
+                error="Host id cannot be empty.",
+                step_prompt="Send inventory host id (e.g. staging):",
+            )
             return
         self._consume_token(token)
         buf = io.StringIO()
@@ -2025,12 +2191,16 @@ class MenuFormHandler:
         if step == "host":
             host = text.strip()
             if not host:
-                await self._send_chat(msg, "Host id cannot be empty.")
+                await self._form_validation_failure(
+                    msg,
+                    error="Host id cannot be empty.",
+                    step_prompt="Send inventory host id for remote deploy:",
+                )
                 return
             payload["host"] = host
             payload["step"] = "bundle"
             self._update_payload(token, payload)
-            await self._send_chat(msg, "Send export bundle path (.env from export-secrets):")
+            await self._send_chat(msg, form_prompt_with_cancel(_PROMPT_MIGRATE_IMPORT_EXPORT))
             return
         host = str(payload.get("host", "")).strip()
         bundle = text.strip()
@@ -2041,7 +2211,11 @@ class MenuFormHandler:
         bundle_path = await asyncio.to_thread(lambda: Path(bundle).expanduser())
         bundle_exists = await asyncio.to_thread(bundle_path.is_file)
         if not bundle_exists:
-            await self._send_chat(msg, f"Bundle not found: {bundle_path}")
+            await self._form_validation_failure(
+                msg,
+                error=f"Bundle not found: {bundle_path}",
+                step_prompt=_PROMPT_MIGRATE_IMPORT_EXPORT,
+            )
             return
         self._consume_token(token)
         mar = self._router._menu_action_router
@@ -2077,7 +2251,11 @@ class MenuFormHandler:
         _ = step, payload
         topic = text.strip().lower()
         if not topic:
-            await self._send_chat(msg, "Topic cannot be empty.")
+            await self._form_validation_failure(
+                msg,
+                error="Topic cannot be empty.",
+                step_prompt="Send guide topic slug (list guides first):",
+            )
             return
         try:
             body = load_guide(topic)
@@ -2116,7 +2294,11 @@ class MenuFormHandler:
         _ = step, payload
         run_id = text.strip()
         if not run_id:
-            await self._send_chat(msg, "Run id cannot be empty.")
+            await self._form_validation_failure(
+                msg,
+                error="Run id cannot be empty.",
+                step_prompt="Send the sub-agent run id to kill (e.g. a1f3):",
+            )
             return
         mar = self._router._menu_action_router
         if mar is None:
@@ -2157,7 +2339,11 @@ class MenuFormHandler:
         """
         _ = step, payload
         if not text.strip():
-            await self._send_chat(msg, "Display name cannot be empty.")
+            await self._form_validation_failure(
+                msg,
+                error="Display name cannot be empty.",
+                step_prompt="Send the new bot display name:",
+            )
             return
 
         def _apply(doc: dict[str, Any]) -> None:
@@ -2281,7 +2467,11 @@ class MenuFormHandler:
         try:
             rel = normalise_browse_path(browse_path)
         except Exception as exc:
-            await self._send_chat(msg, f"Invalid browse path: {exc}")
+            await self._form_validation_failure(
+                msg,
+                error=f"Invalid browse path: {exc}",
+                step_prompt="Send the workspace-relative vault path (e.g. obsidian/alex_AI):",
+            )
             return
         rows_data = list_workspace_subdirs(self._content_root, rel)
         payload = {
@@ -2365,7 +2555,11 @@ class MenuFormHandler:
             return
         if action == "select":
             if browse_path == ".":
-                await self._send_chat(msg, "Select a subfolder or enter a path manually.")
+                await self._form_validation_failure(
+                    msg,
+                    error="Select a subfolder or enter a path manually.",
+                    step_prompt="Browse vault folder — tap a folder or ✗ Cancel:",
+                )
                 return
             try:
                 await self._apply_second_brain_vault_path(browse_path)
@@ -2384,14 +2578,26 @@ class MenuFormHandler:
             try:
                 idx = int(action.split(":", 1)[1])
             except ValueError:
-                await self._send_chat(msg, "Invalid folder selection.")
+                await self._form_validation_failure(
+                    msg,
+                    error="Invalid folder selection.",
+                    step_prompt="Browse vault folder — tap a folder or ✗ Cancel:",
+                )
                 return
             if idx < 0 or idx >= len(entry_rows):
-                await self._send_chat(msg, "Folder list changed — start browse again.")
+                await self._form_validation_failure(
+                    msg,
+                    error="Folder list changed — start browse again.",
+                    step_prompt="Browse vault folder — tap a folder or ✗ Cancel:",
+                )
                 return
             row = entry_rows[idx]
             if not isinstance(row, dict):
-                await self._send_chat(msg, "Invalid folder selection.")
+                await self._form_validation_failure(
+                    msg,
+                    error="Invalid folder selection.",
+                    step_prompt="Browse vault folder — tap a folder or ✗ Cancel:",
+                )
                 return
             nxt = str(row.get("relative") or "")
             await self._send_second_brain_browse_keyboard(msg, token=token, browse_path=nxt)
@@ -2427,15 +2633,19 @@ class MenuFormHandler:
         if step == "key":
             alias = text.strip()
             if not _SECRET_ALIAS_RE.match(alias):
-                await self._send_chat(
+                await self._form_validation_failure(
                     msg,
-                    "Invalid key — use letters, digits, dots, underscores, or hyphens.",
+                    error="Invalid key — use letters, digits, dots, underscores, or hyphens.",
+                    step_prompt=_PROMPT_SECRET_WIZARD_KEY,
                 )
                 return
             payload["step"] = "value"
             payload["alias"] = alias
             self._update_payload(token, payload)
-            await self._send_chat(msg, f"Send the secret value for `{alias}` (not shown again):")
+            await self._send_chat(
+                msg,
+                form_prompt_with_cancel(f"Send the secret value for `{alias}` (not shown again):"),
+            )
             return
         if step == "value":
             alias = str(payload.get("alias", "")).strip()
@@ -2444,7 +2654,11 @@ class MenuFormHandler:
                 await self._send_chat(msg, "Wizard expired — start again from /config → Secrets.")
                 return
             if not text:
-                await self._send_chat(msg, "Secret value cannot be empty.")
+                await self._form_validation_failure(
+                    msg,
+                    error="Secret value cannot be empty.",
+                    step_prompt=f"Send the secret value for `{alias}` (not shown again):",
+                )
                 return
             chain = secrets_chain_from_workspace(
                 self._content_root, self._workspace.secrets_backend
@@ -2654,6 +2868,28 @@ class MenuFormHandler:
                     metadata=metadata,
                 ),
             )
+
+    async def _form_validation_failure(
+        self,
+        msg: IncomingMessage,
+        *,
+        error: str,
+        step_prompt: str,
+    ) -> None:
+        """Send a validation error, re-prompt, and cancel affordance without consuming the token.
+
+        Args:
+            msg (IncomingMessage): Inbound chat text envelope.
+            error (str): Validation error summary.
+            step_prompt (str): Step prompt to repeat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuFormHandler._form_validation_failure)
+            True
+        """
+        await self._send_chat(msg, error)
+        await self._send_chat(msg, form_prompt_with_cancel(step_prompt))
 
     async def _send_chat(
         self,

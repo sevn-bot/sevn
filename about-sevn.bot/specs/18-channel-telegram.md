@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the primary daily-driver channel for personal messaging: a ChannelAdapter
   implementation that normalises Telegram Updates into spec-17-gateway IncomingMessage
   / OutgoingMessage and implements '
-last_updated: '2026-07-21'
-fingerprint: sha256:e5914201618f087b26a6fb6edacbf26afae2602613418203c35dd7cdf4fad810
+last_updated: '2026-07-30'
+fingerprint: sha256:b40b73a21cda7a52117faf66a58b538bb8d26dfa6ff6a1d2211b030a1f0b2e8a
 related: []
 sources:
 - src/sevn/channels/**
@@ -542,6 +542,33 @@ Legacy section ids resolve through `_SECTION_ALIASES`; the live catalog is
 `about-sevn.bot/Telegram Menu.html` (`make telegram-menu-docs-check`). Host-only CLI leaves
 render copy-paste cards (D17); destructive rows use two-step confirm gates. Menu E2E:
 `make telegram-menu-e2e` when `SEVN_TELEGRAM_MENU_E2E=1`.
+
+## Amendments (open-issues-sweep W3 — #71)
+
+Telegram `/config` multi-step **form wizards** (`MenuFormHandler`) must never trap the
+operator on a validation failure:
+
+- Every value-required first prompt advertises the canonical exit vocabulary
+  (`cancel` / `abort`) via `form_prompt_with_cancel`.
+- On invalid input, handlers call `_form_validation_failure`: send the error, re-send
+  the step prompt with the cancel affordance, and **do not** consume the wizard token.
+- Inline-keyboard flows (e.g. vault browse) reuse the existing `✗ Cancel` button pattern
+  where a keyboard is already present.
+
+## Amendments (open-issues-sweep W5 — #67, #68)
+
+Quoted-message handling splits **verbatim quote suppression** from **turn identity**:
+
+- Replying to the bot's own Telegram message suppresses ``reply_to_quote`` (no duplicate
+  assistant body in context) but still sets ``referenced_message_id`` and
+  ``reply_to_message_id`` in inbound metadata.
+- ``ChannelRouter._prefix_inbound_referenced_context`` wraps quote text in
+  ``[Referenced message]`` markers (or resolves bot-self-replies from stored assistant
+  rows via ``lookup_assistant_row_by_platform_message``).
+- Outbound ``reply_to_message_id`` binds to the **turn being answered** via
+  ``_outbound_routing_metadata(..., turn_id=correlation_id)``, not the latest user row.
+
+``format_reply_quote`` and callback-query ingest (no reply context) remain unchanged.
 
 - [`PlatformChannelConfig`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
 - [`busy_input_mode_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`

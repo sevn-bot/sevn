@@ -738,10 +738,61 @@ def test_promote_with_backup_renames_prior_sevn_json(tmp_path: Path) -> None:
     new_draft["timezone"] = "UTC"
     write_draft(sevn_json, new_draft)
     promote_draft(sevn_json, backup_previous=True)
-    backup = tmp_path / "sevn.json.v1"
+    backup = tmp_path / "sevn.json.archive" / "sevn.json.v1"
     assert backup.is_file()
     assert json.loads(backup.read_text(encoding="utf-8")) == prior
     assert json.loads(sevn_json.read_text(encoding="utf-8"))["timezone"] == "UTC"
+
+
+def test_promote_draft_backups_use_archive_directory(tmp_path: Path) -> None:
+    """#62: versioned backups must not accumulate beside the active config."""
+    sevn_json = tmp_path / "sevn.json"
+    prior = {
+        "schema_version": 1,
+        "workspace_root": ".",
+        "gateway": {
+            "host": "127.0.0.1",
+            "port": 3001,
+            "queue_mode": "cancel",
+            "token": "${SECRET:keychain:sevn.gateway.token}",
+        },
+    }
+    sevn_json.write_text(json.dumps(prior), encoding="utf-8")
+    for idx in range(3):
+        draft = json.loads(sevn_json.read_text(encoding="utf-8"))
+        draft["timezone"] = f"UTC-{idx}"
+        write_draft(sevn_json, draft)
+        promote_draft(sevn_json, backup_previous=True)
+    archive_dir = tmp_path / "sevn.json.archive"
+    assert archive_dir.is_dir()
+    archived = list(archive_dir.glob("sevn.json.v*"))
+    assert archived
+    assert not list(tmp_path.glob("sevn.json.v*"))
+
+
+def test_promote_draft_archive_retention_bounds_backup_count(tmp_path: Path) -> None:
+    """Repeated promotes must not grow an unbounded pile of archived configs."""
+    sevn_json = tmp_path / "sevn.json"
+    base = {
+        "schema_version": 1,
+        "workspace_root": ".",
+        "gateway": {
+            "host": "127.0.0.1",
+            "port": 3001,
+            "queue_mode": "cancel",
+            "token": "${SECRET:keychain:sevn.gateway.token}",
+        },
+    }
+    sevn_json.write_text(json.dumps(base), encoding="utf-8")
+    max_keep = 5
+    for idx in range(max_keep + 3):
+        draft = json.loads(sevn_json.read_text(encoding="utf-8"))
+        draft["timezone"] = f"UTC-{idx}"
+        write_draft(sevn_json, draft)
+        promote_draft(sevn_json, backup_previous=True)
+    archive_dir = tmp_path / "sevn.json.archive"
+    backups = list(archive_dir.glob("sevn.json.v*")) if archive_dir.is_dir() else []
+    assert len(backups) <= max_keep
 
 
 class _MemorySecretsBackend:

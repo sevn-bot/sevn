@@ -21,7 +21,10 @@ from loguru import logger
 from sevn.agent.subagents.models import SubAgentLimitExceeded
 from sevn.agent.subagents.supervisor import SubAgentSpec, SubAgentSupervisor
 
+RELATEDNESS_CLASSIFIER_TIMEOUT_S: float = 5.0
+
 __all__ = [
+    "RELATEDNESS_CLASSIFIER_TIMEOUT_S",
     "MultiDispatchHooks",
     "MultiSpawnOutcome",
     "in_flight_task_summary_for_session",

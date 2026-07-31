@@ -435,7 +435,7 @@ and docs/skills/infra checks that block regressions before merge.
 | `make ci-infra` | config-schema, onboarding schemas, git guards, manifests |
 | `make ci-docs` | about-site, readme, changelog, FAQ, skw spec/prd gates, telegram menu docs |
 | `make ci-skills` | skillspector + skill inventory checks |
-| `make ci-parity` | code-index, deploy report parity |
+| `make ci-parity` | code-index, deploy report parity, mergecraft pin gate |
 | `make ci-affected` / `make ci-changed` | Path-aware partial gates |
 | `make ci-quality` | Advisory (ruff ratchet, vulture, codespell — not in `make ci`) |
 | `.github/workflows/ci.yml` | Primary CI workflow |
@@ -448,10 +448,13 @@ Docs tooling in scope: `src/sevn/docs/about/check.py` (`check_about_docs`),
 
 ## Data Model
 
-### `CI_STEPS` (33 ordered steps)
+### `CI_STEPS` (34 ordered steps)
 
 Defined in root `Makefile` — consumed by `make ci-resume` via `scripts/ci_resume.sh`.
 First infra step includes `make config-schema` against `infra/sevn.schema.json` goldens.
+Tier↔resume parity is enforced by `tests/infra/test_ci_steps_tier_parity.py` (flattened
+`ci-*` tier prerequisites must equal `make ci-steps` output); a tier addition that omits
+`CI_STEPS` fails CI instead of relying on a Makefile comment.
 
 ### Workflow matrix (`.github/workflows/`)
 

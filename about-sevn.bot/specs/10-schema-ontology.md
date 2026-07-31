@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Define the runtime ontology for Triager output and related labels across
   the agent core: canonical field names, closed enums, typing conventions, and how
   they compose with executor dispatch described '
-last_updated: '2026-07-29'
-fingerprint: sha256:caa6db82951f0fef46dcc8437d925cbc9951fa713d437f3f206adbb626b4ab30
+last_updated: '2026-07-30'
+fingerprint: sha256:e7871bf4fe3bf2ef08a3404c1826eafe79470bf0afa8fb071b586bc48adc745a
 related: []
 sources:
 - src/sevn/config/**
@@ -416,6 +416,9 @@ interfaces:
 - name: parse_coding_agents_section
   file: src/sevn/config/sections/coding_agents.py
   symbol: parse_coding_agents_section
+- name: ConfigArchiveWorkspaceConfig
+  file: src/sevn/config/sections/config_archive.py
+  symbol: ConfigArchiveWorkspaceConfig
 - name: DashboardPageAgentConfig
   file: src/sevn/config/sections/dashboard.py
   symbol: DashboardPageAgentConfig
@@ -740,6 +743,24 @@ interfaces:
 - name: ProcessSettings
   file: src/sevn/config/settings.py
   symbol: ProcessSettings
+- name: backup_previous_sevn_json
+  file: src/sevn/config/sevn_json_backup.py
+  symbol: backup_previous_sevn_json
+- name: config_backup_archive_dir
+  file: src/sevn/config/sevn_json_backup.py
+  symbol: config_backup_archive_dir
+- name: effective_config_backup_settings
+  file: src/sevn/config/sevn_json_backup.py
+  symbol: effective_config_backup_settings
+- name: iter_config_backup_paths
+  file: src/sevn/config/sevn_json_backup.py
+  symbol: iter_config_backup_paths
+- name: migrate_legacy_config_backups
+  file: src/sevn/config/sevn_json_backup.py
+  symbol: migrate_legacy_config_backups
+- name: prune_config_backups
+  file: src/sevn/config/sevn_json_backup.py
+  symbol: prune_config_backups
 - name: is_sevn_repo
   file: src/sevn/config/sevn_repo.py
   symbol: is_sevn_repo

@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the merge + validation + promotion pipeline every setup path shares
   so sevn.json stays the single source of truth (prd-06-setup-and-operations §5.4,
   spec-02-config-and-workspace): shipped pres'
-last_updated: '2026-07-18'
-fingerprint: sha256:a42a6c75d80158c06dc3f5f1dc2645af46cc3c1ba2c887f48e3e3158d229ab85
+last_updated: '2026-07-30'
+fingerprint: sha256:6427bb5e336044c24096d6e2ed0c07d253d2542df1f5e5372f57abdca0222eaf
 related: []
 sources:
 - src/sevn/onboarding/**
@@ -634,6 +634,13 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Amendments (open-issues-sweep W4, #62)
+
+``promote_draft`` (``src/sevn/onboarding/promote.py``) and schema migration
+(``src/sevn/onboarding/migrate.py``) share ``backup_previous_sevn_json`` —
+versioned backups live under ``sevn.json.archive/`` with retention from
+``config_archive.*`` (see ``about-sevn.bot/specs/02-config-and-workspace.md``).
 
 ## Human-input needed
 

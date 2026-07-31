@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from sevn.config.sections.skills_discogs import discogs_settings
+from sevn.gateway.commands.form_prompts import form_prompt_with_cancel
 from sevn.gateway.config_io.workspace_config_io import mutate_sevn_json
 from sevn.gateway.menu.discogs_menu import (
     DISCOGS_CONSUMER_KEY_SECRET_ALIAS,
@@ -91,6 +92,11 @@ async def cleanup_discogs_oauth_interim_secrets(chain: SecretsChain) -> None:
             await chain.delete(alias)
 
 
+_DISCOGS_CONSUMER_KEY_PROMPT = "Send your Discogs OAuth consumer key:"
+_DISCOGS_CONSUMER_SECRET_PROMPT = "Send your Discogs OAuth consumer secret (not shown again):"  # nosec B105 — UI prompt text
+_DISCOGS_VERIFIER_PROMPT = "Paste the verifier code from the Discogs authorization page:"
+
+
 async def advance_discogs_oauth(
     handler: MenuFormHandler,
     msg: IncomingMessage,
@@ -152,24 +158,36 @@ async def advance_discogs_oauth(
     if step == "consumer_key":
         consumer_key = text.strip()
         if not consumer_key:
-            await handler._send_chat(msg, "Consumer key cannot be empty.")
+            await handler._form_validation_failure(
+                msg,
+                error="Consumer key cannot be empty.",
+                step_prompt=_DISCOGS_CONSUMER_KEY_PROMPT,
+            )
             return
         try:
             await chain.set(DISCOGS_CONSUMER_KEY_SECRET_ALIAS, consumer_key)
         except Exception:
-            await handler._send_chat(msg, "Could not store consumer key — try again.")
+            await handler._form_validation_failure(
+                msg,
+                error="Could not store consumer key — try again.",
+                step_prompt=_DISCOGS_CONSUMER_KEY_PROMPT,
+            )
             return
         _update_oauth_payload("consumer_secret")
         await handler._send_chat(
             msg,
-            "Send your Discogs OAuth consumer secret (not shown again):",
+            form_prompt_with_cancel(_DISCOGS_CONSUMER_SECRET_PROMPT),
         )
         return
 
     if step == "consumer_secret":
         consumer_secret = text.strip()
         if not consumer_secret:
-            await handler._send_chat(msg, "Consumer secret cannot be empty.")
+            await handler._form_validation_failure(
+                msg,
+                error="Consumer secret cannot be empty.",
+                step_prompt=_DISCOGS_CONSUMER_SECRET_PROMPT,
+            )
             return
         consumer_key = await _secret_value(DISCOGS_CONSUMER_KEY_SECRET_ALIAS) or ""
         if not consumer_key:
@@ -180,7 +198,11 @@ async def advance_discogs_oauth(
         try:
             await chain.set(DISCOGS_CONSUMER_SECRET_SECRET_ALIAS, consumer_secret)
         except Exception:
-            await handler._send_chat(msg, "Could not store consumer secret — try again.")
+            await handler._form_validation_failure(
+                msg,
+                error="Could not store consumer secret — try again.",
+                step_prompt=_DISCOGS_CONSUMER_SECRET_PROMPT,
+            )
             return
         try:
             request_token, request_secret, authorize_url = begin_oauth(
@@ -189,13 +211,21 @@ async def advance_discogs_oauth(
                 user_agent,
             )
         except DiscogsOAuthError as exc:
-            await handler._send_chat(msg, exc.message)
+            await handler._form_validation_failure(
+                msg,
+                error=exc.message,
+                step_prompt=_DISCOGS_CONSUMER_SECRET_PROMPT,
+            )
             return
         try:
             await chain.set(DISCOGS_OAUTH_REQUEST_TOKEN_SECRET_ALIAS, request_token)
             await chain.set(DISCOGS_OAUTH_REQUEST_SECRET_SECRET_ALIAS, request_secret)
         except Exception:
-            await handler._send_chat(msg, "Could not store OAuth request token — try again.")
+            await handler._form_validation_failure(
+                msg,
+                error="Could not store OAuth request token — try again.",
+                step_prompt=_DISCOGS_CONSUMER_SECRET_PROMPT,
+            )
             return
         _update_oauth_payload("verifier")
         await handler._send_chat(
@@ -210,7 +240,11 @@ async def advance_discogs_oauth(
     if step == "verifier":
         verifier = text.strip()
         if not verifier:
-            await handler._send_chat(msg, "Verifier cannot be empty.")
+            await handler._form_validation_failure(
+                msg,
+                error="Verifier cannot be empty.",
+                step_prompt=_DISCOGS_VERIFIER_PROMPT,
+            )
             return
         consumer_key = await _secret_value(DISCOGS_CONSUMER_KEY_SECRET_ALIAS) or ""
         consumer_secret = await _secret_value(DISCOGS_CONSUMER_SECRET_SECRET_ALIAS) or ""
@@ -231,14 +265,22 @@ async def advance_discogs_oauth(
                 user_agent,
             )
         except DiscogsOAuthError as exc:
-            await handler._send_chat(msg, exc.message)
+            await handler._form_validation_failure(
+                msg,
+                error=exc.message,
+                step_prompt=_DISCOGS_VERIFIER_PROMPT,
+            )
             return
         try:
             await chain.set(DISCOGS_OAUTH_TOKEN_SECRET_ALIAS, access_token)
             await chain.set(DISCOGS_OAUTH_TOKEN_SECRET_SECRET_ALIAS, access_secret)
             await cleanup_discogs_oauth_interim_secrets(chain)
         except Exception:
-            await handler._send_chat(msg, "Could not store OAuth access token — try again.")
+            await handler._form_validation_failure(
+                msg,
+                error="Could not store OAuth access token — try again.",
+                step_prompt=_DISCOGS_VERIFIER_PROMPT,
+            )
             return
 
         def _apply_discogs_oauth(doc: dict[str, Any]) -> None:

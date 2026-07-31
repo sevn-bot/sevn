@@ -11,7 +11,7 @@
 
 **Config & workspace** is how sevn.bot knows *your* install: where files live, which models and channels are enabled, and what the gateway may touch. Everything operator-facing rolls up to **`sevn.json`** at the workspace root (bound path: `~/.sevn/workspace/sevn.json` when using the default operator home). The workspace directory holds prompts, skills, memory files, and SQLite state under `.sevn/`.
 
-Edit `sevn.json` through Mission Control, Telegram `/config`, the onboarding wizard, or by hand — then validate before restarting the gateway.
+Edit `sevn.json` through Mission Control, Telegram `/config`, the onboarding wizard, or by hand — then validate before restarting the gateway. When a write replaces the live file, sevn moves the previous copy into **`sevn.json.archive/`** beside it (as `sevn.json.v*`) and prunes that archive using optional **`config_archive`** settings — by default keep the five newest backups (`keep_count: 5`; `retention_days: 0` disables day-based expiry).
 
 ## Level 2 — How it works (technical)
 
@@ -29,7 +29,9 @@ Config spans [`src/sevn/config/`](../../src/sevn/config/), workspace layout in [
 
 ### Subtree model
 
-`sevn.json` is a single document validated against [`infra/sevn.schema.json`](../../infra/sevn.schema.json). Domain sections live as Pydantic models under [`src/sevn/config/sections/`](../../src/sevn/config/sections/) — e.g. [`gateway.py`](../../src/sevn/config/sections/gateway.py), [`channels.py`](../../src/sevn/config/sections/channels.py), [`agent.py`](../../src/sevn/config/sections/agent.py), [`security.py`](../../src/sevn/config/sections/security.py). CLI section helpers live in the [`cli/config_sections/`](../../src/sevn/cli/config_sections/) package ([`config_sections/__init__.py`](../../src/sevn/cli/config_sections/__init__.py)) and expose stable slugs for **`sevn config <slug>`** (for example `sevn config gateway`).
+`sevn.json` is a single document validated against [`infra/sevn.schema.json`](../../infra/sevn.schema.json). Domain sections live as Pydantic models under [`src/sevn/config/sections/`](../../src/sevn/config/sections/) — e.g. [`gateway.py`](../../src/sevn/config/sections/gateway.py), [`channels.py`](../../src/sevn/config/sections/channels.py), [`agent.py`](../../src/sevn/config/sections/agent.py), [`security.py`](../../src/sevn/config/sections/security.py), [`config_archive.py`](../../src/sevn/config/sections/config_archive.py). CLI section helpers live in the [`cli/config_sections/`](../../src/sevn/cli/config_sections/) package ([`config_sections/__init__.py`](../../src/sevn/cli/config_sections/__init__.py)) and expose stable slugs for **`sevn config <slug>`** (for example `sevn config gateway`).
+
+**`config_archive` retention** ([`ConfigArchiveWorkspaceConfig`](../../src/sevn/config/sections/config_archive.py); runtime in [`sevn_json_backup.py`](../../src/sevn/config/sevn_json_backup.py)): `config_archive.keep_count` (default `5`) caps archived `sevn.json.v*` files under `sevn.json.archive/`; optional `config_archive.retention_days` drops backups older than N whole days (mtime), matching `logging.retention_days` semantics. Legacy beside-config backups migrate into the archive directory on the next write.
 
 **Schema vs Pydantic gaps:** typed models may include subtrees not yet reflected in [`infra/sevn.schema.json`](../../infra/sevn.schema.json). Notably [`provisioning`](../../src/sevn/config/sections/provisioning.py) (host-dependency auto-install allowlist) and [`coding_agents`](../../src/sevn/config/sections/coding_agents.py) (Coding Agents hub) parse from raw JSON via Pydantic but have **no** top-level schema entries today — validate with `sevn config validate` for schema-covered keys and read the section modules for the full contract.
 

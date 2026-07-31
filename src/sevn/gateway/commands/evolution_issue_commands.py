@@ -103,7 +103,9 @@ class FileIssueCommandHandler:
         gh = issue.github or {}
         gh_note = ""
         if gh.get("number") is not None:
-            gh_note = f" GitHub #{gh['number']}."
+            gh_note = f" GitHub issue #{gh['number']}."
+        elif gh.get("url"):
+            gh_note = f" {gh['url']}"
         return f"Filed {issue.kind} issue `{issue.id}`: {issue.title}.{gh_note}"
 
 

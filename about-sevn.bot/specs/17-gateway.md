@@ -7,8 +7,8 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
-last_updated: '2026-07-27'
-fingerprint: sha256:f2917500381bc27cb16da54a35eaa5df427f8dfcd6687f4e7026452c646674e2
+last_updated: '2026-07-30'
+fingerprint: sha256:c15df45fa876025ced3f45f58c6b59418a36fd2a4c86f6fe6e4c6ae20cc6f321
 related: []
 sources:
 - src/sevn/gateway/**
@@ -234,6 +234,9 @@ interfaces:
 - name: FileLinkCallbackHandler
   file: src/sevn/gateway/commands/file_link_callback_handler.py
   symbol: FileLinkCallbackHandler
+- name: form_prompt_with_cancel
+  file: src/sevn/gateway/commands/form_prompts.py
+  symbol: form_prompt_with_cancel
 - name: MenuActionRouter
   file: src/sevn/gateway/commands/menu_action_router.py
   symbol: MenuActionRouter
@@ -435,6 +438,15 @@ interfaces:
 - name: wait_for_proxy_boot_health
   file: src/sevn/gateway/http_server.py
   symbol: wait_for_proxy_boot_health
+- name: bot_self_reply_reference_block
+  file: src/sevn/gateway/inbound/referenced_context.py
+  symbol: bot_self_reply_reference_block
+- name: explicit_referenced_message_block
+  file: src/sevn/gateway/inbound/referenced_context.py
+  symbol: explicit_referenced_message_block
+- name: prefix_inbound_referenced_context
+  file: src/sevn/gateway/inbound/referenced_context.py
+  symbol: prefix_inbound_referenced_context
 - name: ingest_gateway_message_row
   file: src/sevn/gateway/lcm/lcm_ingest.py
   symbol: ingest_gateway_message_row
@@ -1580,6 +1592,17 @@ Sub-agent L1 registration/finalize hooks in `_run_guarded` (spec-36).
 `session_manager.enqueue_dispatch` classifies busy input via relatedness labels
 and may spawn concurrent L1 tier-B runs (`src/sevn/gateway/queue/queue_multi.py`).
 `routing_footer.py` tags parallel L1 replies with short sub-agent ids.
+
+## Amendments (open-issues-sweep W7 — #70)
+
+When ``multi`` queue mode spawns a new turn because the relatedness classifier
+timed out, queue internals never surface as user-visible text on an unrelated
+turn — no operator notice via ``notify_operator`` / ``route_outgoing``, and no
+edit into a prior turn's placeholder bubble. Routing extras
+(``relatedness_classifier_fallback``, ``chat_id``) are still preserved for the
+spawned turn; the decision is logged as
+``gateway.queue_classifier_timeout_spawned`` with ``prior_turn_id``,
+``new_turn_id``, ``timeout_s``, and ``routing_action``.
 
 ## Amendments (telegram-menu-redesign W9)
 

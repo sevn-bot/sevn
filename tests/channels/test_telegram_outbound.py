@@ -125,7 +125,7 @@ async def test_classifier_timeout_preserves_chat_id_for_outbound_send() -> None:
         assert routing["chat_id"] == 1001
         assert routing["channel"] == "telegram"
         assert routing.get("relatedness_classifier_fallback") is True
-        assert any("timed out" in n.lower() for n in notices)
+        assert not notices
     finally:
         release.set()
         await sessions.drain()
