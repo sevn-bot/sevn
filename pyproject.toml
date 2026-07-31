@@ -333,6 +333,7 @@ known-first-party = ["sevn"]
 # CDP browser engine: a transport-facing client where per-call timeout args are the
 # intended API (mirrors httpx/aiohttp); ASYNC109 would force asyncio.timeout ceremony.
 "src/sevn/browser/**" = ["ASYNC109"]
+"src/sevn/golden_llm/**" = ["TC003"]
 "src/sevn/logging/**" = ["TC003"]
 "tests/triggers/**" = ["TC001", "TC003", "ASYNC240"]
 "src/sevn/storage/**" = ["TC003"]

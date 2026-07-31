@@ -13,6 +13,8 @@ Exports:
     resolve_mcp_tool_definitions_lazy — lazy MCP discovery when deferral enabled.
     SessionRegistryTurnCache — opt-in per-turn registry snapshot cache (W15 seam).
     session_registry_cache_key — fingerprint for registry cache hits.
+    TurnRegistryPrep — registry build outputs for one turn.
+    prepare_turn_session_registry — build or reuse session registry at turn start.
 """
 
 from __future__ import annotations
@@ -353,13 +355,133 @@ async def resolve_mcp_tool_definitions_lazy(
         return defs
 
 
+@dataclass(slots=True)
+class TurnRegistryPrep:
+    """Outputs from turn-startup registry preparation (W30 / #78)."""
+
+    session_exe: Any
+    session_tool_set: Any
+    startup_timings: TurnStartupTimings
+    registry_cache_hit: bool
+
+
+async def prepare_turn_session_registry(
+    *,
+    workspace: WorkspaceConfig,
+    layout: Any,
+    bindings: Any,
+    trace: Any,
+    session_id: str,
+    agent_name: str,
+    mcp_defs_box: list[tuple[ToolDefinition, ...]],
+    mcp_servers_map: dict[str, dict[str, Any]],
+    bootstrap_active: bool,
+    registry_cache: SessionRegistryTurnCache,
+) -> TurnRegistryPrep:
+    """Resolve MCP defs, build or reuse session registry, sync tools catalog (W30 seam).
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace config.
+        layout (Any): Workspace layout (content root + paths).
+        bindings (Any): Runtime tool bindings for registry construction.
+        trace (Any): Gateway trace sink.
+        session_id (str): Active gateway session id.
+        agent_name (str): Agent name for ``tools.md`` sync.
+        mcp_defs_box (list[tuple[ToolDefinition, ...]]): Mutable MCP defs holder.
+        mcp_servers_map (dict[str, dict[str, Any]]): Effective MCP server map.
+        bootstrap_active (bool): Whether bootstrap tools are included this turn.
+        registry_cache (SessionRegistryTurnCache): Opt-in registry snapshot cache.
+
+    Returns:
+        TurnRegistryPrep: Executor, tool set, startup timings, and cache-hit flag.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(prepare_turn_session_registry)
+        True
+    """
+    from sevn.config.sections.accessors import (
+        cache_session_registry_enabled,
+        defer_mcp_discovery_enabled,
+    )
+    from sevn.tools.registry import build_session_registry
+
+    resolved_mcp_defs = await resolve_mcp_tool_definitions_lazy(
+        workspace=workspace,
+        content_root=layout.content_root,
+        mcp_defs_box=mcp_defs_box,
+        mcp_servers_map=mcp_servers_map,
+    )
+    cache_key: str | None = None
+    cached_registry: tuple[Any, Any] | None = None
+    if cache_session_registry_enabled(workspace):
+        ws_fp = str(getattr(bindings, "registry_fingerprint", None) or workspace.schema_version)
+        cache_key = session_registry_cache_key(
+            workspace_fingerprint=ws_fp,
+            mcp_tool_names=tuple(d.name for d in resolved_mcp_defs),
+            include_bootstrap_tools=bootstrap_active,
+        )
+        cached_registry = registry_cache.get(cache_key)
+    if cached_registry is not None:
+        session_exe, session_tool_set = cached_registry
+        build_registry_ms = 0.0
+        registry_cache_hit = True
+    else:
+        registry_started_ns = time_ns()
+        session_exe, session_tool_set = await asyncio.to_thread(
+            build_session_registry,
+            workspace_config=workspace,
+            runtime_bindings=bindings,
+            extra_mcp=resolved_mcp_defs,
+            workspace_root=layout.content_root,
+            layout=layout,
+            trace_sink=trace,
+            include_bootstrap_tools=bootstrap_active,
+        )
+        build_registry_ms = max(0.1, (time_ns() - registry_started_ns) / 1_000_000)
+        if cache_key is not None:
+            registry_cache.put(cache_key, (session_exe, session_tool_set))
+        registry_cache_hit = False
+
+    def _sync_tools_md_catalog() -> None:
+        from sevn.workspace.tools_md import sync_tools_md
+
+        sync_tools_md(
+            layout.content_root,
+            session_tool_set,
+            agent_name=agent_name,
+        )
+
+    sync_started_ns = time_ns()
+    await asyncio.to_thread(_sync_tools_md_catalog)
+    sync_tools_md_ms = max(0.1, (time_ns() - sync_started_ns) / 1_000_000)
+    startup_timings = TurnStartupTimings(
+        build_session_registry_ms=build_registry_ms,
+        sync_tools_md_ms=sync_tools_md_ms,
+    )
+    log_turn_startup_timings(
+        session_id=session_id,
+        timings=startup_timings,
+        defer_mcp=defer_mcp_discovery_enabled(workspace),
+        cache_hit=registry_cache_hit,
+    )
+    return TurnRegistryPrep(
+        session_exe=session_exe,
+        session_tool_set=session_tool_set,
+        startup_timings=startup_timings,
+        registry_cache_hit=registry_cache_hit,
+    )
+
+
 __all__ = [
     "TTFT_SPAN_KIND",
     "DeferredTurnResult",
     "SessionRegistryTurnCache",
+    "TurnRegistryPrep",
     "TurnStartupTimings",
     "extract_ttft_ms_from_events",
     "log_turn_startup_timings",
+    "prepare_turn_session_registry",
     "record_ttft_sample",
     "resolve_mcp_tool_definitions_lazy",
     "run_turn_with_deferred_mcp_discovery",

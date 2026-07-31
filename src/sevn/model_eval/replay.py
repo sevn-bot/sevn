@@ -15,9 +15,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any
 
-from tests.fixtures.golden_llm.eval_runner import run_golden_eval_report
-from tests.fixtures.golden_llm.harness import load_recording
-
+from sevn.golden_llm.eval_runner import run_golden_eval_report
+from sevn.golden_llm.harness import load_recording
 from sevn.model_eval.config import D21_DECISION
 from sevn.model_eval.suite import hermes_eval_suite_case_ids, scenario_for_case
 

@@ -14,7 +14,10 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from sevn.config.workspace_config import WorkspaceConfig, parse_workspace_config
+from sevn.triggers.dispatcher import assistant_texts_for_session
 from sevn.workspace.layout import WorkspaceLayout
+
+_ACP_TURN_FAILED = "[sevn acp] turn completed without assistant output"
 
 
 class _TurnContext(NamedTuple):
@@ -88,34 +91,7 @@ def _load_turn_context(session_id: str, config: dict[str, Any]) -> _TurnContext:
     return _TurnContext(ws=ws, layout=layout, correlation_id=f"acp-{session_id}")
 
 
-def _assistant_text_from_trigger_log(layout: WorkspaceLayout, correlation_id: str) -> str | None:
-    """Read assistant text from a trigger LOG result file when present.
-
-    Args:
-        layout (WorkspaceLayout): Workspace layout for log path resolution.
-        correlation_id (str): Trigger correlation id.
-
-    Returns:
-        str | None: Joined assistant messages or ``None``.
-
-    Examples:
-        >>> _assistant_text_from_trigger_log.__name__
-        '_assistant_text_from_trigger_log'
-    """
-    from sevn.triggers.delivery import trigger_runs_dir
-
-    log_path = trigger_runs_dir(layout.content_root) / f"{correlation_id}.json"
-    if not log_path.is_file():
-        return None
-    body = json.loads(log_path.read_text(encoding="utf-8"))
-    messages = body.get("assistant_messages")
-    if not isinstance(messages, list):
-        return None
-    joined = " ".join(str(m) for m in messages if str(m).strip())
-    return joined.strip() or None
-
-
-async def _dispatch_prompt_turn(ctx: _TurnContext, session_id: str, prompt: str) -> None:
+async def _dispatch_prompt_turn(ctx: _TurnContext, session_id: str, prompt: str) -> str | None:
     """Run one agent turn via the shared trigger dispatch path.
 
     Args:
@@ -124,7 +100,7 @@ async def _dispatch_prompt_turn(ctx: _TurnContext, session_id: str, prompt: str)
         prompt (str): User prompt text.
 
     Returns:
-        None
+        str | None: Joined assistant text, or ``None`` when dispatch produced no reply.
 
     Examples:
         >>> import inspect
@@ -158,7 +134,7 @@ async def _dispatch_prompt_turn(ctx: _TurnContext, session_id: str, prompt: str)
             media=media,
         )
         run_turn = build_agent_run_turn(router, conn, ctx.ws, ctx.layout, NullTraceSink())
-        await dispatch_run(
+        handle = await dispatch_run(
             DispatchRequest(
                 prompt=prompt,
                 result_channel=ResultChannel(kind="LOG"),
@@ -172,6 +148,11 @@ async def _dispatch_prompt_turn(ctx: _TurnContext, session_id: str, prompt: str)
             run_turn=run_turn,
             session_manager=router.session_manager,
         )
+        if not handle.session_id:
+            return None
+        texts = assistant_texts_for_session(conn, handle.session_id)
+        joined = " ".join(t.strip() for t in texts if t.strip()).strip()
+        return joined or None
     finally:
         conn.close()
 
@@ -199,9 +180,10 @@ def run_acp_prompt_turn(session_id: str, prompt: str, workspace_config: dict[str
     from sevn.triggers.delivery import trigger_runs_dir
 
     trigger_runs_dir(ctx.layout.content_root).mkdir(parents=True, exist_ok=True)
-    asyncio.run(_dispatch_prompt_turn(ctx, session_id, prompt))
-    assistant = _assistant_text_from_trigger_log(ctx.layout, ctx.correlation_id)
-    return assistant if assistant else _stub_turn_reply(prompt)
+    assistant = asyncio.run(_dispatch_prompt_turn(ctx, session_id, prompt))
+    if assistant:
+        return assistant
+    return _ACP_TURN_FAILED
 
 
 __all__ = ["run_acp_prompt_turn"]

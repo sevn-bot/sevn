@@ -84,10 +84,7 @@ from sevn.config.model_resolution import (
     resolve_model_slot,
     resolve_transport_for_model_id,
 )
-from sevn.config.sections.accessors import (
-    cache_session_registry_enabled,
-    defer_mcp_discovery_enabled,
-)
+from sevn.config.sections.accessors import defer_mcp_discovery_enabled
 from sevn.config.sections.subagents import Role as SubAgentRole
 from sevn.config.settings import ProcessSettings
 from sevn.config.sevn_repo import resolve_sevn_checkout_for_workspace
@@ -147,11 +144,10 @@ from sevn.gateway.telegram.telegram_quick_actions import (
 )
 from sevn.gateway.telemetry.ttft import (
     SessionRegistryTurnCache,
-    TurnStartupTimings,
     log_turn_startup_timings,
+    prepare_turn_session_registry,
     record_ttft_sample,
     resolve_mcp_tool_definitions_lazy,
-    session_registry_cache_key,
 )
 from sevn.gateway.triage.triage_audit import persist_triage_decision
 from sevn.gateway.triage.triage_context import (
@@ -1599,84 +1595,23 @@ def build_agent_run_turn(
             triage_ctx = triage_ctx.model_copy(
                 update={"bootstrap_capture_active": bootstrap_active},
             )
-        resolved_mcp_defs = await resolve_mcp_tool_definitions_lazy(
+        registry_prep = await prepare_turn_session_registry(
             workspace=workspace,
-            content_root=layout.content_root,
+            layout=layout,
+            bindings=bindings,
+            trace=trace,
+            session_id=session_id,
+            agent_name=agent_name,
             mcp_defs_box=mcp_defs_box,
             mcp_servers_map=mcp_servers_map,
+            bootstrap_active=bootstrap_active,
+            registry_cache=_SESSION_REGISTRY_TURN_CACHE,
         )
-        cache_key: str | None = None
-        cached_registry: tuple[Any, Any] | None = None
-        if cache_session_registry_enabled(workspace):
-            ws_fp = str(getattr(bindings, "registry_fingerprint", None) or workspace.schema_version)
-            cache_key = session_registry_cache_key(
-                workspace_fingerprint=ws_fp,
-                mcp_tool_names=tuple(d.name for d in resolved_mcp_defs),
-                include_bootstrap_tools=bootstrap_active,
-            )
-            cached_registry = _SESSION_REGISTRY_TURN_CACHE.get(cache_key)
-        if cached_registry is not None:
-            session_exe, session_tool_set = cached_registry
-            build_registry_ms = 0.0
-            registry_cache_hit = True
-        else:
-            registry_started_ns = time_ns()
-            session_exe, session_tool_set = await asyncio.to_thread(
-                build_session_registry,
-                workspace_config=workspace,
-                runtime_bindings=bindings,
-                extra_mcp=resolved_mcp_defs,
-                workspace_root=layout.content_root,
-                layout=layout,
-                trace_sink=trace,
-                include_bootstrap_tools=bootstrap_active,
-            )
-            build_registry_ms = max(0.1, (time_ns() - registry_started_ns) / 1_000_000)
-            if cache_key is not None:
-                _SESSION_REGISTRY_TURN_CACHE.put(cache_key, (session_exe, session_tool_set))
-            registry_cache_hit = False
-
-        effective_skill_allowlist: frozenset[str] | None = None
-        if routing_bundle is not None and routing_bundle.skill_allowlist is not None:
-            effective_skill_allowlist = routing_bundle.skill_allowlist
-        topic_skills_raw = route_meta.get("topic_skills")
-        if isinstance(topic_skills_raw, list):
-            topic_skills = frozenset(
-                str(skill).strip() for skill in topic_skills_raw if str(skill).strip()
-            )
-            if topic_skills:
-                if effective_skill_allowlist is None:
-                    effective_skill_allowlist = topic_skills
-                else:
-                    effective_skill_allowlist = effective_skill_allowlist & topic_skills
-        from sevn.config.routing import filter_tool_set_skills
-
-        filtered_tool_set = filter_tool_set_skills(session_tool_set, effective_skill_allowlist)
-        effective_tool_set = filtered_tool_set or session_tool_set
-
-        def _sync_tools_md_catalog() -> None:
-            from sevn.workspace.tools_md import sync_tools_md
-
-            sync_tools_md(
-                layout.content_root,
-                effective_tool_set,
-                agent_name=agent_name,
-            )
-
-        sync_started_ns = time_ns()
-        await asyncio.to_thread(_sync_tools_md_catalog)
-        sync_tools_md_ms = max(0.1, (time_ns() - sync_started_ns) / 1_000_000)
-        startup_timings = TurnStartupTimings(
-            build_session_registry_ms=build_registry_ms,
-            sync_tools_md_ms=sync_tools_md_ms,
-        )
-        log_turn_startup_timings(
-            session_id=session_id,
-            timings=startup_timings,
-            defer_mcp=defer_mcp_discovery_enabled(workspace),
-            cache_hit=registry_cache_hit,
-        )
-        registry = registry_snapshot_from_tool_set(
+        resolved_mcp_defs = mcp_defs_box[0] if mcp_defs_box else ()
+        session_exe = registry_prep.session_exe
+        session_tool_set = registry_prep.session_tool_set
+        startup_timings = registry_prep.startup_timings
+        registry_cache_hit = registry_prep.registry_cache_hit        registry = registry_snapshot_from_tool_set(
             effective_tool_set,
             workspace=workspace,
             content_root=layout.content_root,

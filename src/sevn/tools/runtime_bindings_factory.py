@@ -43,6 +43,8 @@ def build_runtime_tool_bindings(
     proxy_url: str | None = None,
     session_token: str | None = None,
     proxy_shared_secret: str | None = None,
+    oauth_credentials: Mapping[str, Mapping[str, Any]] | None = None,
+    registry_fingerprint: str | None = None,
 ) -> RuntimeToolBindings:
     """Build the unified runtime hook bundle for gateway boot (W2/W3/W6 seam).
 
@@ -56,6 +58,8 @@ def build_runtime_tool_bindings(
         proxy_url (str | None): Egress proxy URL (W2 integration + W3 sandbox net caps).
         session_token (str | None, optional): Per-run ``SEVN_SESSION_TOKEN`` for proxy auth.
         proxy_shared_secret (str | None, optional): Optional ``SEVN_PROXY_SHARED_SECRET``.
+        oauth_credentials (Mapping[str, Mapping[str, Any]] | None): Pre-loaded MCP OAuth blobs.
+        registry_fingerprint (str | None): Digest for session-registry cache invalidation.
 
     Returns:
         RuntimeToolBindings: Frozen bundle passed to ``build_agent_run_turn``.
@@ -76,12 +80,16 @@ def build_runtime_tool_bindings(
         if built is not None:
             resolved_integration = cast("IntegrationProxyClient", built)
     sandbox: SandboxExecutorClient | None = build_sandbox_executor_client(cfg, proxy_url=proxy_url)
-    mcp: McpStdioClient | None = build_mcp_stdio_client(mcp_servers)
+    mcp: McpStdioClient | None = build_mcp_stdio_client(
+        mcp_servers,
+        oauth_credentials=oauth_credentials,
+    )
     bindings = RuntimeToolBindings(
         integration=resolved_integration,
         sandbox=sandbox,
         mcp=mcp,
         mcp_servers=dict(mcp_servers),
+        registry_fingerprint=registry_fingerprint,
     )
     apply_readiness_from_bindings(bindings, cfg)
     return bindings

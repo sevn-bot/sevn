@@ -246,6 +246,7 @@ class RuntimeToolBindings:
     sandbox: SandboxExecutorClient | None = None
     mcp: McpStdioClient | None = None
     mcp_servers: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    registry_fingerprint: str | None = None
 
 
 def _server_id_for_tool(tool_name: str) -> str:
@@ -579,6 +580,12 @@ class McpStdioTool(FunctionTool):
             except Exception as exc:
                 return enveloped_failure(
                     f"MCP stdio call failed: {exc}",
+                    code=ToolResultCode.MCP_UNAVAILABLE,
+                    data={"tool": definition_obj.name, "server_id": self._server_id},
+                )
+            if isinstance(payload, dict) and payload.get("error"):
+                return enveloped_failure(
+                    str(payload["error"]),
                     code=ToolResultCode.MCP_UNAVAILABLE,
                     data={"tool": definition_obj.name, "server_id": self._server_id},
                 )

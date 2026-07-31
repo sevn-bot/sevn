@@ -52,8 +52,12 @@ are cut into a dated, versioned section at release time.
 - [2026-07-30] `sevn.json` versioned backups now land in `sevn.json.archive/` beside the active config and are pruned by `config_archive.keep_count` (default 5) — fixes #62 (unbounded `sevn.json.v*` pile beside every `/config` toggle); legacy beside-config backups migrate into the archive on the next write
 - [2026-07-30] Telegram `/config` form wizards re-prompt on validation failure and advertise `cancel`/`abort` on every value-required first ask — fixes #71 (trapped tunnel mode prompt); `quick` tunnel alias now normalizes to `cloudflare_quick`
 <<<<<<< HEAD
+<<<<<<< HEAD
 - [2026-07-31] Batch C Thermos hardening: owner-gate Telegram skill-setup confirm, run installs via canonical ``collect_install_run``, share core-skill discovery gates between scan and cache, validate cache ``registry_fingerprint``, preserve stacked-skill order at tier-B load (#69, #84, #87)
 =======
+=======
+- [2026-07-31] Batch F Thermos hardening: MCP OAuth credentials and profile ``mcp_enabled`` filtering wired at gateway boot; MCP ``isError`` responses surface as tool failures; ACP turn bridge reads assistant text from the session DB; Buzz relay URL resolution no longer aliases webhook secrets; browser persistence markers written at CDP spawn; golden_llm harness lives under ``src/sevn/golden_llm`` for model_eval imports
+>>>>>>> f9e7158e (fix(integrations): address F-Thermos review findings for batch F)
 - [2026-07-31] MCP catalog preset apply now reports success after merge helpers replace ``mcp_servers``; batch F doctest examples aligned with secrets-chain and workspace validation
 >>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)
 - [2026-07-29] Tier-B harness skill staging uses a per-turn process tempdir — avoids accumulating ``.sevn-harness-skills/`` under long-lived workspaces

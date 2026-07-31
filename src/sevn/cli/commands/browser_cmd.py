@@ -73,12 +73,19 @@ def register(app: typer.Typer) -> None:
                 ),
             )
             return
+        from sevn.browser.redaction import redact_browser_credential_paths
+
         removed = summary.get("removed") or []
         closed = summary.get("sessions_closed", 0)
         scope = f"session {session_id}" if session_id else "all sessions"
+        redacted_count = len(removed)
         typer.echo(
-            f"Cleared browser auth for {scope}: {len(removed)} artefact(s), {closed} browser(s) closed."
+            f"Cleared browser auth for {scope}: {redacted_count} artefact(s), {closed} browser(s) closed."
         )
+        for path in removed[:5]:
+            typer.echo(f"  removed: {redact_browser_credential_paths(str(path))}")
+        if len(removed) > 5:
+            typer.echo(f"  … and {len(removed) - 5} more")
 
 
 __all__ = ["register"]

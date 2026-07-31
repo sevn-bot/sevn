@@ -64,7 +64,6 @@ from sevn.channels.webchat import (
 from sevn.cli.repo_sync import RepoSyncError
 from sevn.cli.workspace import sevn_home_dir
 from sevn.code_understanding.code_index import generate_code_index
-from sevn.code_understanding.graphify_mcp import build_effective_mcp_servers
 from sevn.config.defaults import (
     DEFAULT_DISPATCHER_CALLBACKS_TTL_SECONDS,
     DEFAULT_GATEWAY_RATE_LIMIT_CAPACITY,
@@ -1318,7 +1317,23 @@ def create_app(
             ),
         )
         # W3: single RuntimeToolBindings factory (integration W2, sandbox W3, MCP W6).
-        _mcp_servers_map = build_effective_mcp_servers(ws, ly.content_root)
+        from sevn.tools.mcp_boot import (
+            compute_mcp_registry_fingerprint,
+            effective_mcp_servers_for_workspace,
+            load_mcp_oauth_credentials,
+        )
+
+        _mcp_servers_map = effective_mcp_servers_for_workspace(ws, ly.content_root)
+        _mcp_oauth = await load_mcp_oauth_credentials(
+            ly.content_root,
+            _mcp_servers_map,
+            secrets_backend=ws.secrets_backend,
+        )
+        _registry_fp = compute_mcp_registry_fingerprint(
+            _mcp_servers_map,
+            _mcp_oauth,
+            schema_version=ws.schema_version,
+        )
         from sevn.config.sections.accessors import defer_mcp_discovery_enabled
 
         if defer_mcp_discovery_enabled(ws):
@@ -1331,6 +1346,7 @@ def create_app(
             _mcp_tool_defs = await discover_mcp_tool_definitions(
                 _mcp_servers_map,
                 workspace_path=ly.content_root,
+                oauth_credentials=_mcp_oauth,
             )
         _proxy_url = (effective_process.proxy_url if effective_process else None) or None
         _runtime_bindings = build_runtime_tool_bindings(
@@ -1340,6 +1356,8 @@ def create_app(
             session_token=(
                 effective_process.session_token if effective_process is not None else None
             ),
+            oauth_credentials=_mcp_oauth,
+            registry_fingerprint=_registry_fp,
         )
         # Persistent deployment id (`specs/17-gateway.md` §10.14 TE-1) — surfaced
         # via ``/status`` and the Logs section in `/config`.

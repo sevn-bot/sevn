@@ -125,12 +125,6 @@ class BuzzChannelAdapter(ChannelAdapter):
         """
         if self._identity is not None:
             return self._identity
-        import os
-
-        private_key = str(os.environ.get("BUZZ_PRIVATE_KEY") or "").strip()
-        relay_url = str(os.environ.get("BUZZ_RELAY_URL") or "").strip()
-        if private_key and relay_url:
-            return BuzzIdentity(relay_url=relay_url.rstrip("/"), private_key=private_key)
         if not self._content_root:
             return None
         return await resolve_buzz_identity(self._workspace, content_root=self._content_root)

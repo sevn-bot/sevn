@@ -60,6 +60,7 @@ class RunHandle:
 
     run_id: str
     correlation_id: str
+    session_id: str | None = None
 
 
 @dataclass(frozen=True)

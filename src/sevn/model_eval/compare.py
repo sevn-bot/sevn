@@ -43,8 +43,8 @@ def _golden_eval_imports() -> tuple[Any, Any, Any, Any, Any, Any]:
         >>> len(_golden_eval_imports())
         6
     """
-    from tests.fixtures.golden_llm.evaluators import GoldenRunOutput, build_case_evaluators
-    from tests.fixtures.golden_llm.harness import (
+    from sevn.golden_llm.evaluators import GoldenRunOutput, build_case_evaluators
+    from sevn.golden_llm.harness import (
         authoritative_tool_names_for_outcome,
         discover_cases,
         prepare_workspace,

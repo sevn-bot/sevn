@@ -166,6 +166,7 @@ class McpOAuthFlow:
     state: str
     code_verifier: str
     authorize_url: str
+    redirect_uri: str
 
 
 def _flow_lock(server_id: str) -> asyncio.Lock:
@@ -235,6 +236,7 @@ def begin_mcp_oauth_flow(
         state=state,
         code_verifier=pkce.verifier,
         authorize_url=url,
+        redirect_uri=redirect_uri,
     )
 
 
@@ -315,7 +317,7 @@ async def complete_mcp_oauth_flow(
         payload: dict[str, str] = {
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": "http://127.0.0.1:1455/auth/callback",
+            "redirect_uri": flow.redirect_uri,
             "client_id": client_id,
             "code_verifier": flow.code_verifier,
         }

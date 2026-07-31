@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 
 from sevn.browser import HAS_CDP
-from sevn.browser.chrome import resolve_profile_dir
+from sevn.browser.persistence import resolve_browser_profile_dir
 from sevn.browser.redaction import redact_browser_tool_payload
 from sevn.tools.base import enveloped_failure, enveloped_success, maybe_spill_large_payload
 from sevn.tools.codes import ToolResultCode
@@ -72,7 +72,7 @@ def _redact_browser_envelope(
     """
     import json
 
-    profile = resolve_profile_dir(content_root, session_id)
+    profile = resolve_browser_profile_dir(content_root, session_id)
     safe = redact_browser_tool_payload(envelope, profile_dir=profile)
     return json.dumps(safe)
 
@@ -1317,7 +1317,8 @@ async def browser_tool(
         result = await _dispatch(ctx, page, dom, working_target, action=action, params=params)
         return _redact_browser_envelope(content_root, session_id, result)
     except Exception as exc:
-        return enveloped_failure(f"{action} failed: {exc}", code=ToolResultCode.INTERNAL_ERROR)
+        failure = enveloped_failure(f"{action} failed: {exc}", code=ToolResultCode.INTERNAL_ERROR)
+        return _redact_browser_envelope(content_root, session_id, failure)
 
 
 def register_browser_tool(executor: ToolExecutor, cfg: WorkspaceConfig | None = None) -> None:

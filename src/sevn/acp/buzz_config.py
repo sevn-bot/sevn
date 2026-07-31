@@ -161,10 +161,7 @@ async def resolve_buzz_identity(
         )
         or str(cfg.bot_token_ref or "").strip()
     )
-    url_ref = (
-        _ref_from_blob(blob, "relay_url_ref", "buzz_relay_url_ref", "webhook_secret_ref")
-        or str(cfg.webhook_secret_ref or "").strip()
-    )
+    url_ref = _ref_from_blob(blob, "relay_url_ref", "buzz_relay_url_ref")
 
     private_key = ""
     relay_url = ""
