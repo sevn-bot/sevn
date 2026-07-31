@@ -536,7 +536,7 @@ class MenuFormHandler:
         elif target == "tunnel:setup":
             prompt = _PROMPT_TUNNEL_SETUP
         elif target == "skills:setup":
-            prompt = "Send the skill id to set up (e.g. job-ops or yt-dlp):
+            prompt = "Send the skill id to set up (e.g. job-ops or yt-dlp):"
         elif target == "migrate:import":
             prompt = "Send foreign workspace path to import, or empty for in-place schema upgrade:"
         elif target == "deploy:check":
