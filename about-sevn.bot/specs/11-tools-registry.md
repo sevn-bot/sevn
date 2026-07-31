@@ -653,4 +653,47 @@ Gateway browser sessions persist cookies and login state via Chrome ``user-data-
 | OAuth | Credential JSON at ``oauth.mcp.<server_id>`` via secrets chain; ``mcp_servers.*.oauth`` holds metadata/refs only |
 | Logs | Structured JSON lines appended to ``<workspace>/logs/mcp.log`` on discover/call events |
 | Catalog | ``list_mcp_catalog_presets()`` surfaced read-only on Mission Control ``GET /api/v1/agent/mcp-servers`` |
+<<<<<<< HEAD
 >>>>>>> afb21033 (feat(tools)!: standardize MCP tool naming and add OAuth, logs, presets)
+=======
+
+### 10.4 open-issues-sweep W34 — Playwright E2E park verdict (#37, D12) — append-only
+
+**Context:** Wave W6 of ``playwright-removal-x-browser-parity`` deleted ``tests/e2e/**`` (Playwright TS harness). Issue **#37** tracks three parked journey families (**C7–C9**). This section records the W34 decision wave verdict per **D12** (decision, not rebuild). Re-homing implementation is **out of scope** unless the operator opens a dedicated follow-up wave plan.
+
+**Operator sign-off (2026-07-31):** All three families are **accepted as parked**. This spec row plus issue **#37** close-out comment constitute the park-vs-rebuild sign-off required by convention 12. No silent coverage drop — gaps are listed explicitly below.
+
+**Working precedent for live browser journeys:** ``src/sevn/browser/recipes/telegram_menu_walk.py`` + ``telegram_checks.py``; Makefile gates ``make telegram-menu-e2e`` (``SEVN_TELEGRAM_MENU_E2E=1``) and ``make telegram-checks`` at ``Makefile:572–589``.
+
+#### C7 — webchat journeys
+
+| | |
+|---|---|
+| **Former surface** | ``tests/e2e/login.spec.ts``, ``dispatch-turn.spec.ts`` (headed Playwright login → chat → dispatch) |
+| **Current coverage** | ``tests/gateway/test_webchat_ws.py`` (login GET/POST, JWT mint, WS auth, message persist through router); ``tests/channels/test_webchat.py``; ``tests/ui/dashboard/test_chat_console.py`` (MC in-dashboard chat token + WS round-trip); ``tests/gateway/test_http_server.py`` (webchat session in OpenUI path) |
+| **Gaps (accepted)** | Headed browser journey (login page → chat UI → send in real Chrome); visual/CSS snapshot regression |
+| **Verdict** | **Accept park** — API/WS dispatch path is fully exercised in-process; a browser recipe would duplicate the ``telegram_menu_walk`` pattern with low marginal value vs maintenance |
+| **Hypothetical re-home recipe** | ``webchat_journey.py`` (navigate ``/login`` → mint token → WS send) — **not scheduled** |
+
+#### C8 — onboarding journeys
+
+| | |
+|---|---|
+| **Former surface** | ``tests/e2e/onboarding*.spec.ts`` (multi-step wizard click-through in browser) |
+| **Current coverage** | ``tests/onboarding/`` (34 files, 200+ tests); ``tests/onboarding/test_web_wizard_steps.py`` (step order, HTML, payload merge); ``tests/onboarding/test_browser_automation.py`` (mocked CDP start/stop); ``tests/onboarding/test_onboarding.py`` (52 tests); optional live gate ``make onboard-telegram-e2e`` (``SEVN_ONBOARD_E2E=1`` → ``tests/onboarding/test_telegram_onboarding.py -m onboard_e2e``) |
+| **Gaps (accepted)** | Full multi-step wizard click-through in headed browser (all steps welcome→finish); visual snapshots; non-Telegram onboarding paths in live browser |
+| **Verdict** | **Accept park** — server-side wizard logic and Telegram CDP smoke gate cover the high-risk paths; full browser walk deferred |
+| **Hypothetical re-home recipe** | ``onboarding_wizard_walk.py`` — **not scheduled** |
+
+#### C9 — Mission Control tab specs + snapshots
+
+| | |
+|---|---|
+| **Former surface** | ``tests/e2e/mission-control/**`` (tab navigation + Playwright visual snapshots) |
+| **Current coverage** | ``tests/ui/dashboard/`` (38 files, ~250 tests: MC5–MC11 tab APIs, auth, shell, chat console); ``tests/gateway/test_mission_spa_mount.py`` (SPA mount, deep links, CSP); ``tests/gateway/test_mission_api.py`` (legacy 410 stubs); ``tests/ui/dashboard/test_dashboard_shell.py`` (static shell markup/CSS parity); ``scripts/seed_mc_e2e_workspace.py`` (API fixture seeder) |
+| **Gaps (accepted)** | Playwright visual snapshot parity; headed browser tab navigation + screenshot diff; live health-badge WS updates in browser |
+| **Verdict** | **Accept park** — API-first MC coverage is comprehensive; snapshot E2E replaced by structural shell tests + per-tab API tests |
+| **Hypothetical re-home recipe** | ``mission_control_walk.py`` — **not scheduled** |
+
+**Follow-up:** Operator override to re-home any family requires a **dedicated wave plan** (not absorbed into open-issues-sweep). Close **#37** when this row is merged.
+>>>>>>> 532e6a0e (docs(tests): record park-or-rehome verdict for retired E2E families)
