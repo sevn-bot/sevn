@@ -8,8 +8,7 @@ summary: 'Define the runtime ontology for Triager output and related labels acro
   the agent core: canonical field names, closed enums, typing conventions, and how
   they compose with executor dispatch described '
 last_updated: '2026-08-01'
-fingerprint: sha256:b3fedd4b274d9a2fbdfe8e80cdb93c30c770e6548dd23a8494951a3bc57b0747
-related: []
+fingerprint: sha256:b3fedd4b274d9a2fbdfe8e80cdb93c30c770e6548dd23a8494951a3bc57b0747related: []
 sources:
 - src/sevn/config/**
 parent_prd: prd-04-getting-things-done
@@ -350,6 +349,9 @@ interfaces:
 - name: browser_settings
   file: src/sevn/config/sections/accessors.py
   symbol: browser_settings
+- name: cache_session_registry_enabled
+  file: src/sevn/config/sections/accessors.py
+  symbol: cache_session_registry_enabled
 - name: cascade_budget_s
   file: src/sevn/config/sections/accessors.py
   symbol: cascade_budget_s
@@ -359,6 +361,9 @@ interfaces:
 - name: complexity_clamp_short_word_limit
   file: src/sevn/config/sections/accessors.py
   symbol: complexity_clamp_short_word_limit
+- name: defer_mcp_discovery_enabled
+  file: src/sevn/config/sections/accessors.py
+  symbol: defer_mcp_discovery_enabled
 - name: google_workspace_settings
   file: src/sevn/config/sections/accessors.py
   symbol: google_workspace_settings

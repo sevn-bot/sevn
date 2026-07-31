@@ -51,7 +51,11 @@ are cut into a dated, versioned section at release time.
 - [2026-07-30] Telegram quoted replies now bind to the referenced turn — bot-self-replies carry `referenced_message_id` through ingest, inbound quotes are wrapped in explicit `[Referenced message]` blocks, outbound `reply_to_message_id` follows the turn being answered (not the latest user row), and issue-filing confirmations stay neutral until GitHub mirror succeeds — fixes #67 and #68
 - [2026-07-30] `sevn.json` versioned backups now land in `sevn.json.archive/` beside the active config and are pruned by `config_archive.keep_count` (default 5) — fixes #62 (unbounded `sevn.json.v*` pile beside every `/config` toggle); legacy beside-config backups migrate into the archive on the next write
 - [2026-07-30] Telegram `/config` form wizards re-prompt on validation failure and advertise `cancel`/`abort` on every value-required first ask — fixes #71 (trapped tunnel mode prompt); `quick` tunnel alias now normalizes to `cloudflare_quick`
+<<<<<<< HEAD
 - [2026-07-31] Batch C Thermos hardening: owner-gate Telegram skill-setup confirm, run installs via canonical ``collect_install_run``, share core-skill discovery gates between scan and cache, validate cache ``registry_fingerprint``, preserve stacked-skill order at tier-B load (#69, #84, #87)
+=======
+- [2026-07-31] MCP catalog preset apply now reports success after merge helpers replace ``mcp_servers``; batch F doctest examples aligned with secrets-chain and workspace validation
+>>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)
 - [2026-07-29] Tier-B harness skill staging uses a per-turn process tempdir — avoids accumulating ``.sevn-harness-skills/`` under long-lived workspaces
 - [2026-07-29] Tier-B history compaction honors ``agent.history_compaction.target_tokens`` from ``sevn.json`` — previously validated in schema but silently ignored at capability assembly
 - [2026-07-29] Thermos tier-B hardening: human-gated tools stay native outside CodeMode; D9 opt-in toggles wired through ``agent.history_compaction`` / ``agent.cache_stability`` / ``agent.codemode.dynamic_catalog``; fail-loud async CodeMode backend probe

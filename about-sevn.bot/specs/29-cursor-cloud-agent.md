@@ -7,8 +7,8 @@ owner: Alex
 summary: Let operators and agents launch, poll, and inspect Cursor Cloud Agents against
   any GitHub/GitLab repo when skills.cursor_cloud.enabled is true, returning PR URLs,
   dashboard links (remote desktop), and
-last_updated: '2026-07-18'
-fingerprint: sha256:1374de9d249d1fb6588d478d4e445d680a03a1d157247bc6ff6becce6c044c32
+last_updated: '2026-07-31'
+fingerprint: sha256:c53bc9b53c583d3a3230ca65133f58a8c2a60dce1ef30fa84a55465f8f9b8cf0
 related: []
 sources:
 - src/sevn/integrations/**
@@ -217,6 +217,60 @@ interfaces:
 - name: integration_post_sync
   file: src/sevn/integrations/proxy_client.py
   symbol: integration_post_sync
+- name: RedditKarmaConfig
+  file: src/sevn/integrations/reddit_karma/config.py
+  symbol: RedditKarmaConfig
+- name: reddit_karma_loop_enabled
+  file: src/sevn/integrations/reddit_karma/config.py
+  symbol: reddit_karma_loop_enabled
+- name: resolve_reddit_karma_config
+  file: src/sevn/integrations/reddit_karma/config.py
+  symbol: resolve_reddit_karma_config
+- name: RedditDecisionLog
+  file: src/sevn/integrations/reddit_karma/log.py
+  symbol: RedditDecisionLog
+- name: build_discovery_browser_plan
+  file: src/sevn/integrations/reddit_karma/loop.py
+  symbol: build_discovery_browser_plan
+- name: render_comment_draft
+  file: src/sevn/integrations/reddit_karma/loop.py
+  symbol: render_comment_draft
+- name: run_draft_loop
+  file: src/sevn/integrations/reddit_karma/loop.py
+  symbol: run_draft_loop
+- name: RedditCandidate
+  file: src/sevn/integrations/reddit_karma/quality_gate.py
+  symbol: RedditCandidate
+- name: candidate_from_dict
+  file: src/sevn/integrations/reddit_karma/quality_gate.py
+  symbol: candidate_from_dict
+- name: evaluate_candidate
+  file: src/sevn/integrations/reddit_karma/quality_gate.py
+  symbol: evaluate_candidate
+- name: enforce_reddit_rate_limits
+  file: src/sevn/integrations/reddit_karma/runtime.py
+  symbol: enforce_reddit_rate_limits
+- name: reddit_post_modes
+  file: src/sevn/integrations/reddit_karma/runtime.py
+  symbol: reddit_post_modes
+- name: require_reddit_post_confirm
+  file: src/sevn/integrations/reddit_karma/runtime.py
+  symbol: require_reddit_post_confirm
+- name: strip_disallowed_links
+  file: src/sevn/integrations/reddit_karma/runtime.py
+  symbol: strip_disallowed_links
+- name: write_err
+  file: src/sevn/integrations/reddit_karma/runtime.py
+  symbol: write_err
+- name: reconcile_reddit_karma_cron_job
+  file: src/sevn/integrations/reddit_karma/scheduler.py
+  symbol: reconcile_reddit_karma_cron_job
+- name: register_reddit_karma_cron_handler
+  file: src/sevn/integrations/reddit_karma/scheduler.py
+  symbol: register_reddit_karma_cron_handler
+- name: run_reddit_karma_cron
+  file: src/sevn/integrations/reddit_karma/scheduler.py
+  symbol: run_reddit_karma_cron
 - name: build_capabilities_matrix
   file: src/sevn/integrations/social_media/capabilities.py
   symbol: build_capabilities_matrix

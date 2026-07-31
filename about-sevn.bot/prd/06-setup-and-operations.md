@@ -6,13 +6,10 @@ status: ready
 owner: Alex
 summary: Local-first bots are judged in the first ten minutes—clone, three setup commands,
   and a Telegram reply, or the operator returns to a hosted assistant.
-<<<<<<< HEAD
 last_updated: '2026-08-01'
-fingerprint: sha256:99f16a556774452f725a055069dc25aeb1c6af33a009025ab55293f859a8bafe
-=======
-last_updated: '2026-07-31'
-fingerprint: sha256:9dcd0ae7167b64ed240b6f365faa30bb1a77db2aa4ca4d1b0fcd305180dbf88e
->>>>>>> afb21033 (feat(tools)!: standardize MCP tool naming and add OAuth, logs, presets)
+fingerprint: sha256:99f16a556774452f725a055069dc25aeb1c6af33a009025ab55293f859a8bafe=======
+fingerprint: sha256:31aba95fa352acf7a5fee4f41d53fd1f2ac2f2fbb91f40e6d4e067f9b28a956b
+>>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)
 related:
 - prd-07-mission-control
 sources:

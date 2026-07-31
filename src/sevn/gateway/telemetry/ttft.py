@@ -186,8 +186,8 @@ def session_registry_cache_key(
         ...     workspace_fingerprint="abc",
         ...     mcp_tool_names=("mcp__demo__ping",),
         ...     include_bootstrap_tools=False,
-        ... )[:8]
-        'd4f2f843'
+        ...         )[:8]
+        'cd0a4cc7'
     """
     payload = "|".join(
         (

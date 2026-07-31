@@ -1605,8 +1605,8 @@ def build_agent_run_turn(
             mcp_defs_box=mcp_defs_box,
             mcp_servers_map=mcp_servers_map,
         )
-        registry_cache_hit = False
         cache_key: str | None = None
+        cached_registry: tuple[Any, Any] | None = None
         if cache_session_registry_enabled(workspace):
             ws_fp = str(getattr(bindings, "registry_fingerprint", None) or workspace.schema_version)
             cache_key = session_registry_cache_key(
@@ -1615,10 +1615,11 @@ def build_agent_run_turn(
                 include_bootstrap_tools=bootstrap_active,
             )
             cached_registry = _SESSION_REGISTRY_TURN_CACHE.get(cache_key)
-            if cached_registry is not None:
-                session_exe, session_tool_set = cached_registry
-                registry_cache_hit = True
-        if not registry_cache_hit:
+        if cached_registry is not None:
+            session_exe, session_tool_set = cached_registry
+            build_registry_ms = 0.0
+            registry_cache_hit = True
+        else:
             registry_started_ns = time_ns()
             session_exe, session_tool_set = await asyncio.to_thread(
                 build_session_registry,
@@ -1633,8 +1634,7 @@ def build_agent_run_turn(
             build_registry_ms = max(0.1, (time_ns() - registry_started_ns) / 1_000_000)
             if cache_key is not None:
                 _SESSION_REGISTRY_TURN_CACHE.put(cache_key, (session_exe, session_tool_set))
-        else:
-            build_registry_ms = 0.0
+            registry_cache_hit = False
 
         effective_skill_allowlist: frozenset[str] | None = None
         if routing_bundle is not None and routing_bundle.skill_allowlist is not None:

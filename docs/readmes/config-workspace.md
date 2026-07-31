@@ -9,12 +9,7 @@
 
 ## Level 1 — Overview (non-technical)
 
-<<<<<<< HEAD
 **Config & workspace** is how sevn.bot knows *your* install: where files live, which models and channels are enabled, and what the gateway may touch. Everything operator-facing rolls up to **`sevn.json`** at the workspace root (bound path: `~/.sevn/workspace/sevn.json` when using the default operator home). The workspace directory holds prompts, skills, memory files, and SQLite state under `.sevn/`.
-=======
-**Config & workspace** is how sevn.bot knows *your* install: where files live, which models, channels, and MCP servers are enabled, and what the gateway may touch. Everything operator-facing rolls up to **`sevn.json`** at the workspace root (bound path: `~/.sevn/workspace/sevn.json` when using the default operator home). The workspace directory holds prompts, skills, memory files, SQLite state, and (by default) persistent browser skill profiles under `.sevn/`.
->>>>>>> afb21033 (feat(tools)!: standardize MCP tool naming and add OAuth, logs, presets)
-
 Edit `sevn.json` through Mission Control, Telegram `/config`, the onboarding wizard, or by hand — then validate before restarting the gateway. When a write replaces the live file, sevn moves the previous copy into **`sevn.json.archive/`** beside it (as `sevn.json.v*`) and prunes that archive using optional **`config_archive`** settings — by default keep the five newest backups (`keep_count: 5`; `retention_days: 0` disables day-based expiry).
 
 You can also declare **deny rules** in config — permanent blocks on named tools (optionally narrowed by command pattern, domain, or path) that still apply even when a session is otherwise permissive. Edit `sevn.json` through Mission Control, Telegram `/config`, the onboarding wizard, or by hand — then validate before restarting the gateway.
@@ -40,7 +35,6 @@ Config spans [`src/sevn/config/`](../../src/sevn/config/), workspace layout in [
 **`config_archive` retention** ([`ConfigArchiveWorkspaceConfig`](../../src/sevn/config/sections/config_archive.py); runtime in [`sevn_json_backup.py`](../../src/sevn/config/sevn_json_backup.py)): `config_archive.keep_count` (default `5`) caps archived `sevn.json.v*` files under `sevn.json.archive/`; optional `config_archive.retention_days` drops backups older than N whole days (mtime), matching `logging.retention_days` semantics. Legacy beside-config backups migrate into the archive directory on the next write.
 
 The `permissions` subtree is a JSON object on the root document ([`root.py`](../../src/sevn/config/sections/root.py#L109)). **`permissions.deny_rules`:** optional array of `{tool?, pattern?, domain?, path?, reason?}` objects in [`infra/sevn.schema.json`](../../infra/sevn.schema.json). Each rule is additive deny — match by tool name plus optional command/pattern, domain, or path. Rules apply even in permissive ABAC owner sessions unless you session-ack the tool.
-
 `skills.hermes_model_eval` in [`infra/sevn.schema.json`](../../infra/sevn.schema.json) is an opt-in advisory skill flag (default via [`DEFAULT_HERMES_MODEL_EVAL_ENABLED`](../../src/sevn/config/defaults.py#L256) — **false**). Set `enabled` to turn it on; it does not change routing defaults. Optional `models` is a list of `{label, model_id}` aliases for comparison reports. No dedicated section module — the blob lives on the skills map like other opt-in skill flags.
 
 `skills.reddit_karma_loop` in [`infra/sevn.schema.json`](../../infra/sevn.schema.json) is an opt-in draft-only skill flag (default via [`DEFAULT_REDDIT_KARMA_LOOP_ENABLED`](../../src/sevn/config/defaults.py#L257) — **false**). Set `enabled` to turn it on; knobs cover target `subreddits`/`topics`, grounding `source_paths`, `cron_expr`, daily/cooldown caps, and draft gates (`allow_links`, `ask_before_post`, `stop_on_mod_action`). No dedicated section module — same skills-map blob pattern.

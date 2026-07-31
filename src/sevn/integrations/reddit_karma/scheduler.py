@@ -41,7 +41,14 @@ def run_reddit_karma_cron(*, workspace: Path | None = None) -> dict[str, Any]:
         dict[str, Any]: Loop summary envelope.
 
     Examples:
-        >>> run_reddit_karma_cron(workspace=__import__("pathlib").Path("."))["ok"]
+        >>> import json, tempfile
+        >>> from pathlib import Path
+        >>> with tempfile.TemporaryDirectory() as tmp:
+        ...     ws = Path(tmp)
+        ...     _ = (ws / "sevn.json").write_text(
+        ...         json.dumps({"schema_version": 1, "gateway": {"token": "t"}})
+        ...     )
+        ...     run_reddit_karma_cron(workspace=ws)["ok"]
         True
     """
     from sevn.config.loader import load_workspace

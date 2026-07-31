@@ -111,7 +111,10 @@ def resolve_hermes_eval_models(workspace: WorkspaceConfig) -> tuple[HermesEvalMo
 
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
-        >>> specs = resolve_hermes_eval_models(WorkspaceConfig.minimal())
+        >>> ws = WorkspaceConfig.minimal(
+        ...     providers={"tier_default": {"triager": "m", "tier_b": "m"}},
+        ... )
+        >>> specs = resolve_hermes_eval_models(ws)
         >>> len(specs) >= 1
         True
     """

@@ -6,13 +6,10 @@ status: ready
 owner: Alex
 summary: The operator talks to sevn where they already chat—Telegram on phone, web/Mission
   Control on laptop—with shared sessions, voice, and one gateway turn spine.
-<<<<<<< HEAD
 last_updated: '2026-08-01'
-fingerprint: sha256:cab3be0b0e329c3290a9f999e027dd9b21053e7c7b462a87c7ff4aaa88c13274
-=======
-last_updated: '2026-07-31'
-fingerprint: sha256:b00cbf43fecc5232ddfb22420d641c71c8ca9557b01f7485aef24f9b57e3b861
->>>>>>> afb21033 (feat(tools)!: standardize MCP tool naming and add OAuth, logs, presets)
+fingerprint: sha256:cab3be0b0e329c3290a9f999e027dd9b21053e7c7b462a87c7ff4aaa88c13274=======
+fingerprint: sha256:0fe9d98c3cb01182f37e3dd83f769ded67e24800cdfc206d7efc0740102064da
+>>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)
 related:
 - prd-07-mission-control
 - prd-10-generated-ui

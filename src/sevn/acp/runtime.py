@@ -117,9 +117,11 @@ def run_acp_stdio_session(
         str: Concatenated outbound NDJSON lines written during the session.
 
     Examples:
+        >>> import io
         >>> out = run_acp_stdio_session(
         ...     stdin_text='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}\\n',
         ...     workspace_config={},
+        ...     stdout=io.StringIO(),
         ... )
         >>> "protocolVersion" in out
         True

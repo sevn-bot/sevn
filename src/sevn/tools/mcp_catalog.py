@@ -76,7 +76,11 @@ def apply_catalog_preset_to_doc(
         bool: ``True`` when a preset was applied.
 
     Examples:
-        >>> doc: dict[str, object] = {"mcp_servers": {}}
+        >>> doc: dict[str, object] = {
+        ...     "schema_version": 1,
+        ...     "gateway": {"token": "test"},
+        ...     "mcp_servers": {},
+        ... }
         >>> apply_catalog_preset_to_doc(doc, "code_review_read_only")
         True
         >>> "code_review_graph" in doc["mcp_servers"]
@@ -110,7 +114,8 @@ def apply_catalog_preset_to_doc(
             workspace=WorkspaceConfig.model_validate(config_doc),
             content_root=Path(config_doc.get("workspace_root") or "."),
         )
-        return server_id in servers
+        applied = config_doc.get("mcp_servers")
+        return isinstance(applied, dict) and server_id in applied
     if preset_id == "graphify_query":
         cu = config_doc.setdefault("code_understanding", {})
         if isinstance(cu, dict):
@@ -125,11 +130,14 @@ def apply_catalog_preset_to_doc(
             workspace=WorkspaceConfig.model_validate(config_doc),
             content_root=Path(config_doc.get("workspace_root") or "."),
         )
-        row = servers.get(server_id)
+        applied = config_doc.get("mcp_servers")
+        if not isinstance(applied, dict):
+            return False
+        row = applied.get(server_id)
         if isinstance(row, dict):
             row["catalog_preset"] = preset_id
             row["tool_preset"] = preset["tool_preset"]
-        return server_id in servers
+        return server_id in applied
     return False
 
 

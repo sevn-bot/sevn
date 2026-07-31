@@ -7,13 +7,10 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
-<<<<<<< HEAD
 last_updated: '2026-08-01'
-fingerprint: sha256:081c650916d0c0786463d9f18402828be65b4949f038ebf6de16bb59cc2d08b3
-=======
-last_updated: '2026-07-31'
-fingerprint: sha256:32e3d781575223a6455e33e97aae2bccaa376062a0959a412235eb867f892850
->>>>>>> afb21033 (feat(tools)!: standardize MCP tool naming and add OAuth, logs, presets)
+fingerprint: sha256:081c650916d0c0786463d9f18402828be65b4949f038ebf6de16bb59cc2d08b3=======
+fingerprint: sha256:b998c90107d48af5975e4ecfe5563f9e9f03f8344fa0385a8a4c3beefc33d8a5
+>>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)
 related: []
 sources:
 - src/sevn/gateway/**
@@ -1271,6 +1268,33 @@ interfaces:
 - name: ensure_webhook_secret_token
   file: src/sevn/gateway/telegram/telegram_webhook_secret.py
   symbol: ensure_webhook_secret_token
+- name: DeferredTurnResult
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: DeferredTurnResult
+- name: SessionRegistryTurnCache
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: SessionRegistryTurnCache
+- name: TurnStartupTimings
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: TurnStartupTimings
+- name: extract_ttft_ms_from_events
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: extract_ttft_ms_from_events
+- name: log_turn_startup_timings
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: log_turn_startup_timings
+- name: record_ttft_sample
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: record_ttft_sample
+- name: resolve_mcp_tool_definitions_lazy
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: resolve_mcp_tool_definitions_lazy
+- name: run_turn_with_deferred_mcp_discovery
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: run_turn_with_deferred_mcp_discovery
+- name: session_registry_cache_key
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: session_registry_cache_key
 - name: persist_triage_decision
   file: src/sevn/gateway/triage/triage_audit.py
   symbol: persist_triage_decision
@@ -1674,6 +1698,16 @@ replies via the configured relay REST API. ACP runtime bridge
 (`src/sevn/acp/turn_bridge.py`) delegates ``session/prompt`` to
 ``dispatch_run`` / ``build_agent_run_turn`` when a workspace is bound, or a
 deterministic stub for stdio unit tests.
+
+## Amendments (open-issues-sweep W30 — #78 TTFT)
+
+``gateway.turn.ttft`` trace spans measure first-token latency per turn;
+``log_turn_startup_timings`` emits structured before/after contributor timings
+for ``build_session_registry``, ``sync_tools_md``, triage, and MCP discovery.
+Opt-in ``gateway.defer_mcp_discovery`` (default off, D9) moves MCP subprocess
+discovery off the boot critical path without changing turn output.
+Opt-in ``gateway.cache_session_registry`` reuses in-process registry snapshots
+via the W15 fingerprint seam. Mission Control samples TTFT per stage when wired.
 
 ## Amendments (telegram-menu-redesign W9)
 

@@ -146,6 +146,7 @@ async def resolve_buzz_identity(
 
     Examples:
         >>> import asyncio
+        >>> from sevn.config.workspace_config import WorkspaceConfig
         >>> asyncio.run(resolve_buzz_identity(WorkspaceConfig.minimal())) is None
         True
     """
@@ -206,6 +207,7 @@ def resolve_buzz_identity_sync(
         BuzzIdentity | None: Resolved identity or ``None`` when incomplete.
 
     Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
         >>> resolve_buzz_identity_sync(WorkspaceConfig.minimal()) is None
         True
     """

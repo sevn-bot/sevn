@@ -19,7 +19,11 @@ _DRIVER = "play" + "wright"
 _IMPORT_RE = re.compile(rf"(import|from)\s+{_DRIVER}")
 
 # Intentional survivors (W8 note): prior-wave CHANGELOG bullets must not be rewritten.
-_INTENTIONAL_SURVIVOR_PREFIXES: tuple[str, ...] = ("CHANGELOG.md:",)
+# W34 park verdict (#37) documents the retired browser-driver E2E harness by name in spec-11.
+_INTENTIONAL_SURVIVOR_PREFIXES: tuple[str, ...] = (
+    "CHANGELOG.md:",
+    "about-sevn.bot/specs/11-tools-registry.md:",
+)
 
 
 def _git_grep_driver_imports(*, under: str) -> list[str]:

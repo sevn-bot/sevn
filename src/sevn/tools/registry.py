@@ -139,6 +139,10 @@ DEFAULT_TOOL_MANIFESTS: Final[dict[str, str]] = {
 
 DEFAULT_SKILL_MANIFESTS: Final[dict[str, str]] = {
     "browser-harness": "Thin CDP harness with extendable helpers.py for open-ended browser control.",
+    "buzz": (
+        "Buzz workspace integration — relay status, send replies, and ACP runtime "
+        "command hints for buzz-cli / buzz-acp hosts."
+    ),
     "canvas": "Bundled OpenUI compose helpers for analytical layouts (pairs with openui_render).",
     "code_graph_rag": "CGR export reader + allowlisted cgr CLI scripts.",
     "computer-use": (
@@ -166,6 +170,10 @@ DEFAULT_SKILL_MANIFESTS: Final[dict[str, str]] = {
     "gh-pr": "Pull request lifecycle — list, view, create, merge, close via integration_call.",
     "github-manager": "Advanced GitHub — branches, Actions, secrets, envs via integration_call.",
     "graphify": "Knowledge-graph orientation for code (Graphify CLI subprocess or dry-run plan).",
+    "hermes-model-eval": (
+        "Cross-model eval on the golden_llm pydantic-evals suite — advisory replay "
+        "reports and opt-in live comparison (D21; default off)."
+    ),
     "job-ops": (
         "Discover jobs across global + Europe boards, AI fit-score against resume, "
         "and optionally tailor a CV summary (JobOps port)."
@@ -183,6 +191,13 @@ DEFAULT_SKILL_MANIFESTS: Final[dict[str, str]] = {
     ),
     "proton-management": (
         "Proton suite CLI (Python port) — Pass vaults/items with E2EE; Mail/Drive/Calendar/Contacts planned."
+    ),
+    "reddit-karma-loop": (
+        "Draft-only Reddit karma loop — browser discovery, quality gate, grounded drafts, "
+        "caps/cooldowns, and confirm-gated posts (D11; no auto_post)."
+    ),
+    "reddit_karma_loop": (
+        "Alias bundled layout for reddit-karma-loop scripts (underscore directory name)."
     ),
     "roam_code": "Lightweight roam-code path Q&A without a persistent graph DB.",
     "scheduling": "Cron/reminder authoring via bundled scripts.",

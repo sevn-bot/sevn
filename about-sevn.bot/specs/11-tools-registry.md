@@ -12,8 +12,12 @@ last_updated: '2026-08-01'
 fingerprint: sha256:e6e90434d4162f106513af12a3caad4262964fb1a54a2c2ab085e09b91da4a5a
 =======
 last_updated: '2026-07-31'
+<<<<<<< HEAD
 fingerprint: sha256:ea51e4918e2ab7b3e4b79e9a4d315f76cbb930d7cbbf2eb684db19081d69b70c
 >>>>>>> afb21033 (feat(tools)!: standardize MCP tool naming and add OAuth, logs, presets)
+=======
+fingerprint: sha256:9e39cf9c95077024d5b6efa0a63eda0f3aa44352ee0cebb87c10c7710a345c96
+>>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)
 related: []
 sources:
 - src/sevn/tools/**
@@ -241,6 +245,54 @@ interfaces:
 - name: tail_log_lines
   file: src/sevn/tools/log_query.py
   symbol: tail_log_lines
+- name: apply_catalog_preset_to_doc
+  file: src/sevn/tools/mcp_catalog.py
+  symbol: apply_catalog_preset_to_doc
+- name: list_mcp_catalog_presets
+  file: src/sevn/tools/mcp_catalog.py
+  symbol: list_mcp_catalog_presets
+- name: append_mcp_log
+  file: src/sevn/tools/mcp_logging.py
+  symbol: append_mcp_log
+- name: format_mcp_tool_name
+  file: src/sevn/tools/mcp_naming.py
+  symbol: format_mcp_tool_name
+- name: mcp_server_id_from_tool_name
+  file: src/sevn/tools/mcp_naming.py
+  symbol: mcp_server_id_from_tool_name
+- name: parse_mcp_qualified_name
+  file: src/sevn/tools/mcp_naming.py
+  symbol: parse_mcp_qualified_name
+- name: upstream_mcp_tool_name
+  file: src/sevn/tools/mcp_naming.py
+  symbol: upstream_mcp_tool_name
+- name: McpOAuthFlow
+  file: src/sevn/tools/mcp_oauth.py
+  symbol: McpOAuthFlow
+- name: begin_mcp_oauth_flow
+  file: src/sevn/tools/mcp_oauth.py
+  symbol: begin_mcp_oauth_flow
+- name: capture_mcp_oauth_callback
+  file: src/sevn/tools/mcp_oauth.py
+  symbol: capture_mcp_oauth_callback
+- name: complete_mcp_oauth_flow
+  file: src/sevn/tools/mcp_oauth.py
+  symbol: complete_mcp_oauth_flow
+- name: load_mcp_oauth_credential
+  file: src/sevn/tools/mcp_oauth.py
+  symbol: load_mcp_oauth_credential
+- name: mcp_oauth_secret_alias
+  file: src/sevn/tools/mcp_oauth.py
+  symbol: mcp_oauth_secret_alias
+- name: persist_mcp_oauth_credential
+  file: src/sevn/tools/mcp_oauth.py
+  symbol: persist_mcp_oauth_credential
+- name: resolve_mcp_oauth_env
+  file: src/sevn/tools/mcp_oauth.py
+  symbol: resolve_mcp_oauth_env
+- name: resolve_mcp_servers_for_profile
+  file: src/sevn/tools/mcp_profile_policy.py
+  symbol: resolve_mcp_servers_for_profile
 - name: SevnMcpStdioClient
   file: src/sevn/tools/mcp_stdio_client.py
   symbol: SevnMcpStdioClient

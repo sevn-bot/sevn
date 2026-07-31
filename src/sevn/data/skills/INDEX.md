@@ -53,6 +53,7 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | openwiki | LLM-generated agent wiki for a codebase (LangChain OpenWiki CLI). |
 | pdf | Render markdown/HTML to workspace PDFs; extract text/tables; structured load/chunk. |
 | printing-press-library | Starter-pack Printing Press CLIs — ESPN, flights, movies, recipes (Go binaries on PATH). |
+| reddit-karma-loop | Draft-only Reddit karma loop — browser discovery, quality gate, grounded drafts, caps/cooldowns, confirm-gated posts (D11; no auto_post). |
 | roam_code | Lightweight roam-code path Q&A (`specs/28-code-understanding.md` §2.2). |
 | scheduling | Cron jobs and one-shot reminders via workspace trigger store (`specs/30-non-interactive-triggers.md`). |
 | social_media_manager | Browser-first social monitoring across six platforms via the social_media_manager L2 specialist; unified X ops over browser\|twexapi; TwexAPI optional on X only (spec 36). |

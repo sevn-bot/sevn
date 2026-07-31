@@ -10,7 +10,7 @@ Exports:
 
 Examples:
     >>> redact_browser_credential_paths("cookies from /tmp/.sevn/browser-profiles/x/Default/Cookies")
-    '<redacted-browser-path>'
+    'cookies from <redacted-browser-path>'
 """
 
 from __future__ import annotations

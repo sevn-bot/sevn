@@ -198,10 +198,9 @@ def resolve_login_grade_chrome_args(cfg: WorkspaceConfig | None = None) -> tuple
         >>> "AutomationControlled" in str(resolve_login_grade_chrome_args(None))
         True
     """
-    args = list(_LOGIN_GRADE_CHROME_ARGS)
     if resolve_password_store(cfg) == "basic":
-        args.append("--password-store=basic")
-    return tuple(args)
+        return (*_LOGIN_GRADE_CHROME_ARGS, "--password-store=basic")
+    return _LOGIN_GRADE_CHROME_ARGS
 
 
 def cdp_port_seed(session_id: str) -> int:
