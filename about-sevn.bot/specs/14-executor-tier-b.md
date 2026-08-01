@@ -8,7 +8,7 @@ summary: 'Tier B is the default “do work” executor for messages the Triager 
   as complexity == B (prd-04-getting-things-done §5.2): a single pydantic-ai Agent
   loop over the user’s incoming_text, with t'
 last_updated: '2026-08-01'
-fingerprint: sha256:92adce15f63479b51e9aaeedda058b7293b00ac0d8a0b91d22ab2ca4ccf233a9
+fingerprint: sha256:af28bf20e39a0297086b6ef77968f66564acb34cb7518997a2cee8d2f5c58708
 related: []
 sources:
 - src/sevn/agent/**
@@ -1540,3 +1540,13 @@ Tier B runs on **pydantic-ai** `>=2.14.1,<3` (resolved 2.20.0) and **pydantic-ai
 - **Model transport:** OpenAI Chat Completions `FunctionModel` bridge + MiniMax wrapper migrated in place (`tier_b_model.py`); provider-prefixed model names via `normalize_tier_b_model_name`.
 - **Lazy tools:** `PrepareTools(prepare_lazy_tool_definitions)` + `SevnRegistryToolset` re-entry through `ToolExecutor.dispatch`.
 - **Deferred (see §10.1–10.2):** harness `SubAgents`, `DynamicWorkflow`, `Memory`.
+
+### 10.8 open-issues-sweep aug-2026 W11 — post-`load_skill` output retry (#126) — append-only
+
+When pydantic-ai raises ``Exceeded maximum output retries`` after a successful
+``load_skill`` dispatch, ``run_b_turn`` must not leave the operator with bare retry
+boilerplate. The harness enriches ``failure_detail`` with the loaded skill id(s),
+emits an operator report via ``format_tier_b_operator_failure_report`` (skill context +
+actionable retry guidance), and the gateway treats the fault as deterministic —
+``_is_deterministic_harness_failure`` / ``_tier_b_full_index_retry_warranted`` skip the
+widened full-index retry that would reproduce the same empty output.

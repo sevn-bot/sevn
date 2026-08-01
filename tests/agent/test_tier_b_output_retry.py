@@ -178,7 +178,6 @@ async def _run_load_skill_scenario(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W11: tier-B completes after load_skill (#126)", strict=False)
 async def test_tier_b_completes_after_successful_load_skill_when_model_recovers(
     tmp_path: Path,
 ) -> None:
@@ -198,9 +197,6 @@ async def test_tier_b_completes_after_successful_load_skill_when_model_recovers(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W11: bounded provider calls post load_skill (#126)", strict=False
-)
 async def test_tier_b_post_load_skill_empty_output_is_bounded(tmp_path: Path) -> None:
     """After ``load_skill`` succeeds, empty assistant bodies must not storm the provider."""
     empty_plan = [_openai_assistant_empty() for _ in range(6)]
@@ -210,7 +206,6 @@ async def test_tier_b_post_load_skill_empty_output_is_bounded(tmp_path: Path) ->
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W11: actionable failure summary (#126)", strict=False)
 async def test_tier_b_post_load_skill_failure_summary_is_not_raw_output_retries(
     tmp_path: Path,
 ) -> None:

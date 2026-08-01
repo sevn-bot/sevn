@@ -132,6 +132,7 @@ from sevn.agent.triager.routing_policy import (
     is_identity_or_capability_message,
     is_log_provenance_intent_message,
 )
+from sevn.agent.triager.run import _is_empty_output_retry_error
 from sevn.config.defaults import (
     DEFAULT_CODEMODE_DYNAMIC_CATALOG,
     DEFAULT_TIER_B_CACHE_STABILITY_MONITOR_ENABLED,
@@ -1779,12 +1780,27 @@ async def run_b_turn(
             ),
         )
         if isinstance(exc, Exception):
+            failure_detail = str(exc)
+            final_messages: tuple[ChannelPayload, ...] = ()
+            if _is_empty_output_retry_error(exc):
+                skills = frozenset(deps.successful_skills_called or deps.loaded_skills)
+                load_skill_ok = "load_skill" in deps.successful_tools_called
+                if load_skill_ok or skills:
+                    if skills:
+                        skill_tag = ",".join(sorted(skills))
+                        failure_detail = f"{failure_detail} after load_skill({skill_tag})"
+                    report = format_tier_b_operator_failure_report(
+                        failure_detail=failure_detail,
+                        loaded_skills=skills if skills else None,
+                        load_skill_succeeded=load_skill_ok,
+                    )
+                    final_messages = (ChannelPayload(text=report),)
             return BTurnOutcome(
                 status="failed",
-                final_messages=(),
+                final_messages=final_messages,
                 escalation=None,
                 rounds_used=provider_rounds[0],
-                failure_detail=str(exc),
+                failure_detail=failure_detail,
                 **cast("Any", _outcome_tool_fields(deps)),
             )
         raise
