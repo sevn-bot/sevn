@@ -22,7 +22,7 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: alexhawat/mergeCraft@f98aeb0063b387a51960503a758351608d377002 # pre-0.0.1
+      - uses: alexhawat/mergeCraft@a7510af0ab4d7deb863c043e85f8e5365082f07d # pre-0.0.1 (Codex harness)
 """
 
 
@@ -110,7 +110,7 @@ def test_check_mergecraft_ref_parity_reads_default_branch_not_worktree(tmp_path:
     # Corrupt the working-tree copy: if the gate read the file from disk it would
     # report drift. It reads `main:` instead, so this must stay green.
     (tmp_path / ".github" / "workflows" / "mergecraft.yml").write_text(
-        WORKFLOW_STUB.replace("f98aeb0063b387a51960503a758351608d377002", "worktree-only-ref"),
+        WORKFLOW_STUB.replace("a7510af0ab4d7deb863c043e85f8e5365082f07d", "worktree-only-ref"),
         encoding="utf-8",
     )
     proc = _run(tmp_path, {"SEVN_MERGECRAFT_WORKFLOW_REF": "main"})
