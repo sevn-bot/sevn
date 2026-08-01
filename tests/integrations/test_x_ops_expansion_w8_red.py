@@ -62,7 +62,6 @@ def test_w13_expansion_ops_exported_on_x_ops_facade(op_name: str) -> None:
 
 
 @pytest.mark.parametrize("op_name", W14_ONLY_EXPANSION_OPS)
-@pytest.mark.xfail(reason="green after W14: expansion op exported on facade (#129)", strict=False)
 def test_w14_expansion_ops_exported_on_x_ops_facade(op_name: str) -> None:
     """Each planned #129 discovery op is a callable on the facade."""
     x_ops = _import_x_ops()
@@ -120,7 +119,6 @@ async def test_w13_expansion_op_returns_structured_envelope(op_name: str) -> Non
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("op_name", W14_ONLY_EXPANSION_OPS)
-@pytest.mark.xfail(reason="green after W14: stubbed envelope contract (#129)", strict=False)
 async def test_w14_expansion_op_stub_returns_structured_envelope(op_name: str) -> None:
     """Stubbed discovery dispatch returns ``{ok, medium, op, data}`` (+ optional ``error``/``code``)."""
     x_ops = _import_x_ops()
@@ -188,9 +186,6 @@ async def test_w13_read_ops_dry_run_returns_planned_envelope(op_name: str) -> No
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("op_name", W14_DISCOVERY_OPS)
-@pytest.mark.xfail(
-    reason="green after W14: discovery ops expose rate-limit codes (#129)", strict=False
-)
 async def test_w14_discovery_ops_rate_limit_envelope(op_name: str) -> None:
     """Discovery strategies return machine-readable backoff when caps exceeded."""
     x_ops = _import_x_ops()

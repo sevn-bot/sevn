@@ -410,13 +410,34 @@ on `medium=twexapi` it substitutes TwexAPI `timeline_page`.
 | `fetch_article_markdown` | **twexapi** | no | `tweet_id` | browser → `BROWSER_OP_UNSUPPORTED` (no article extract SocialRecipe) |
 | `home_timeline_collect` | both | no | `screen_name?` | browser `home_feed`; twexapi `timeline_page` |
 | `session_status` | both | no | — | CDP reachability, profile, login probe, `twexapi_key_present` (boolean only) |
+| `comment_on_tweet` | both | yes | `tweet_id`, `text` | browser `reply`; twexapi `create_tweet_or_reply`; honors `dry_run` (D11) |
+| `react_tweet` | **twexapi** | yes | `tweet_id` | twexapi alias `like_tweet`; honors `dry_run` |
+| `get_new_comments_on_tweet` | both | no | `tweet_id`, `since_id?` | browser `read_replies`; twexapi `replies_page`; filters by `since_id` |
+| `get_tweet_stats` | both | no | `tweet_id` | browser `read`; twexapi `tweet_detail` |
+| `collect_tweet_replies` | both | no | `tweet_id`, `next_cursor?` | browser `read_replies`; twexapi `replies_page` |
+| `discover_followers` | both | no | `username` / `screen_name`, `max_items?` | browser search heuristic; twexapi `users` seed lookup |
+| `discover_topic_accounts` | both | no | `query` / `searchTerms`, `max_items?` | browser search; twexapi `search_page` |
+| `discover_mutual_graph` | both | no | `usernames` (≥2) | browser search heuristic; twexapi `users` batch lookup |
 
 Browser `SocialRecipe` ops are only: `read` \| `post` \| `reply` \| `read_replies` \| `search` \| `timeline_collect` \| `home_feed`.
 
+### Discovery guardrails (#129, D11)
+
+Discovery ops are **read-only** strategies — they never auto-follow, auto-post, or
+DM without operator confirm.
+
+| Guardrail | Behavior |
+|-----------|----------|
+| `dry_run=true` | Returns `code=DRY_RUN` with planned task (no live fetches) |
+| Rate caps | Pass `max_items` to bound result size; default pagination via `next_cursor` |
+| Backoff | On cap exceeded, envelope returns `code=RATE_LIMITED` or `BACKOFF_REQUIRED` with `data.retry_after_s` |
+| No auto_post | Posting/engagement ops require explicit operator confirm — never chained from discovery |
+
 ```
-run_skill_script social_media_manager x_ops.py home_timeline_collect --medium browser
-run_skill_script social_media_manager x_tweet_actions.py like_tweet --tweet-id 1 --medium twexapi
-run_skill_script social_media_manager x_timeline.py home_timeline_collect --medium browser
+run_skill_script social_media_manager x_ops.py discover_topic_accounts \
+  --task '{"query":"ai agents","dry_run":true}' --medium twexapi
+run_skill_script social_media_manager x_ops.py discover_followers \
+  --task '{"username":"alice","max_items":50}' --medium browser
 ```
 
 When triage selects the `social_media_manager` skill, the gateway auto-grants this

@@ -18,6 +18,9 @@ Exports:
     pack_auto_cookie_body — pool-cookie post body.
     pack_users_body — usernames list body.
     pack_follow_body — follow-user body.
+    pack_discover_followers_body — follower-discovery username list body.
+    pack_discover_topic_body — topic-account search body.
+    pack_discover_mutual_body — mutual-graph usernames list body.
     pack_timeline_path — timeline screen_name path params.
     pack_tweet_detail_body — tweet lookup array body.
     pack_replies_body — replies-page body with optional cursor.
@@ -36,6 +39,9 @@ __all__ = [
     "pack_comment_body",
     "pack_create_body",
     "pack_delete_body",
+    "pack_discover_followers_body",
+    "pack_discover_mutual_body",
+    "pack_discover_topic_body",
     "pack_empty_body",
     "pack_follow_body",
     "pack_hashtags_body",
@@ -355,6 +361,85 @@ def pack_replies_body(task: dict[str, Any]) -> dict[str, Any]:
             body["next_cursor"] = str(raw).strip()
             break
     return body
+
+
+def pack_discover_followers_body(task: dict[str, Any]) -> list[Any]:
+    """Pack follower-discovery body as a single-username list for TwexAPI ``users``.
+
+    Args:
+        task (dict[str, Any]): Task with ``username`` / ``screen_name`` / ``query``.
+
+    Returns:
+        list[Any]: Single-element username list.
+
+    Raises:
+        ValueError: When no username/screen_name is provided.
+
+    Examples:
+        >>> pack_discover_followers_body({"username": "@alice"})
+        ['alice']
+    """
+    username = str(
+        task.get("username") or task.get("screen_name") or task.get("query") or ""
+    ).lstrip("@")
+    if not username:
+        msg = "username is required for discover_followers"
+        raise ValueError(msg)
+    return [username]
+
+
+def pack_discover_topic_body(task: dict[str, Any]) -> dict[str, Any] | None:
+    """Pack topic-account discovery body from ``query`` / ``searchTerms``.
+
+    Args:
+        task (dict[str, Any]): Task with topic query fields.
+
+    Returns:
+        dict[str, Any] | None: Search body or ``None`` when empty.
+
+    Examples:
+        >>> pack_discover_topic_body({"query": "ai agents"})["searchTerms"]
+        ['ai agents']
+    """
+    body = pack_advanced_search_body(task)
+    if body is None:
+        return None
+    for key in ("max_items",):
+        raw = task.get(key)
+        if raw is not None:
+            body[key] = raw
+    return body
+
+
+def pack_discover_mutual_body(task: dict[str, Any]) -> list[Any]:
+    """Pack mutual-graph discovery body from ``usernames`` / ``query``.
+
+    Args:
+        task (dict[str, Any]): Task with at least two usernames when possible.
+
+    Returns:
+        list[Any]: Username strings for batch lookup.
+
+    Raises:
+        ValueError: When fewer than two usernames are provided.
+
+    Examples:
+        >>> pack_discover_mutual_body({"usernames": ["a", "b"]})
+        ['a', 'b']
+    """
+    names = task.get("usernames")
+    if isinstance(names, str):
+        names = [n.strip().lstrip("@") for n in names.split(",") if n.strip()]
+    if isinstance(names, list):
+        cleaned = [str(n).strip().lstrip("@") for n in names if str(n).strip()]
+    else:
+        cleaned = []
+    if len(cleaned) < 2 and task.get("query"):
+        cleaned = [str(n).strip().lstrip("@") for n in str(task["query"]).split(",") if n.strip()]
+    if len(cleaned) < 2:
+        msg = "discover_mutual_graph requires at least two usernames"
+        raise ValueError(msg)
+    return cleaned
 
 
 def pack_timeline_path(task: dict[str, Any]) -> dict[str, str]:

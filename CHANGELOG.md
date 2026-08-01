@@ -11,6 +11,7 @@ are cut into a dated, versioned section at release time.
 ## [Unreleased]
 
 ### Added
+- [2026-08-02] X discovery ops `discover_followers`, `discover_topic_accounts`, and `discover_mutual_graph` on the `x_ops` facade with D11 dry-run and rate-limit backoff envelopes (#129, open-issues-sweep W14)
 - [2026-08-02] X timeline/comment ops `get_new_comments_on_tweet`, `get_tweet_stats`, and `collect_tweet_replies` on the `x_ops` facade with D11 dry-run for read paths (#129, open-issues-sweep W13)
 - [2026-08-02] X engagement ops `comment_on_tweet` and `react_tweet` on the `x_ops` facade with D11 dry-run gates for write actions (#129, open-issues-sweep W12)
 - [2026-07-31] User-defined `permissions.deny_rules` block destructive or sensitive tool calls by tool name and optional command/pattern, domain, or path — rules apply even in permissive ABAC owner sessions (additive-deny, D15), return the configured reason to the model, and log redacted audit lines; Mission Control approval `deny` verdicts accept an optional operator reason (#80, open-issues-sweep W26)
