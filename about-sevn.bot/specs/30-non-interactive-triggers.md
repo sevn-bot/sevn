@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver non-interactive dispatch: external events (“something happened”)
   and schedules (“tick”) compile to DispatchRequest, optionally pass through notify_only
   (zero LLM, zero sandbox boot), otherwise'
-last_updated: '2026-07-30'
-fingerprint: sha256:6c8f7ab3f6e4a9a64fd53142b55bddc28098b05dbad752eb756bd40767d97207
+last_updated: '2026-08-01'
+fingerprint: sha256:5cb1679d572735f927bfa4f524738ea44d8d4e26c93e563b4cb641516f386a2f
 related: []
 sources:
 - src/sevn/triggers/**
@@ -217,6 +217,9 @@ interfaces:
 - name: verify_github_payload
   file: src/sevn/triggers/sources/github.py
   symbol: verify_github_payload
+- name: verify_github_webhook_freshness
+  file: src/sevn/triggers/sources/github.py
+  symbol: verify_github_webhook_freshness
 - name: build_webhook_router
   file: src/sevn/triggers/webhook_router.py
   symbol: build_webhook_router

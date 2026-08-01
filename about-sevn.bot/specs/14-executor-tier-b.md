@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Tier B is the default “do work” executor for messages the Triager classifies
   as complexity == B (prd-04-getting-things-done §5.2): a single pydantic-ai Agent
   loop over the user’s incoming_text, with t'
-last_updated: '2026-07-31'
-fingerprint: sha256:09be3814087f948ca4ea55e06c588884329d5c18e0fca41c251bc2b9448834be
+last_updated: '2026-08-01'
+fingerprint: sha256:92adce15f63479b51e9aaeedda058b7293b00ac0d8a0b91d22ab2ca4ccf233a9
 related: []
 sources:
 - src/sevn/agent/**
@@ -130,6 +130,9 @@ interfaces:
 - name: provider_supports_native_web_search
   file: src/sevn/agent/adapters/tier_b_capabilities.py
   symbol: provider_supports_native_web_search
+- name: provider_supports_reasoning_capability
+  file: src/sevn/agent/adapters/tier_b_capabilities.py
+  symbol: provider_supports_reasoning_capability
 - name: registry_tool_names_owned_by_web_capabilities
   file: src/sevn/agent/adapters/tier_b_capabilities.py
   symbol: registry_tool_names_owned_by_web_capabilities
@@ -388,6 +391,9 @@ interfaces:
 - name: install_tool_approval_bridge
   file: src/sevn/agent/adapters/tool_approval_bridge.py
   symbol: install_tool_approval_bridge
+- name: log_approval_decision
+  file: src/sevn/agent/adapters/tool_approval_bridge.py
+  symbol: log_approval_decision
 - name: reset_tool_approval_bridge_for_tests
   file: src/sevn/agent/adapters/tool_approval_bridge.py
   symbol: reset_tool_approval_bridge_for_tests
@@ -733,6 +739,15 @@ interfaces:
 - name: tier_b_workspace_roots_prompt
   file: src/sevn/agent/persona.py
   symbol: tier_b_workspace_roots_prompt
+- name: PromptOverlaySource
+  file: src/sevn/agent/prompt_overlays.py
+  symbol: PromptOverlaySource
+- name: TurnPromptOverlays
+  file: src/sevn/agent/prompt_overlays.py
+  symbol: TurnPromptOverlays
+- name: resolve_turn_prompt_overlays
+  file: src/sevn/agent/prompt_overlays.py
+  symbol: resolve_turn_prompt_overlays
 - name: BudgetRegime
   file: src/sevn/agent/providers/budget.py
   symbol: BudgetRegime
