@@ -10,8 +10,13 @@
 # mergeCraft reads the native GITHUB_EVENT_PATH, so the workflow just passes a
 # prompt — no ~mergecraft JSON payload needed.
 #
-# Auth: only CLAUDE_CODE_OAUTH_TOKEN is required (Claude subscription); the job
-# skips gracefully when it is absent (e.g. fork PRs).
+# Auth (any one is enough; same-repo only — forks skip):
+#   - CLAUDE_CODE_OAUTH_TOKEN — Claude Pro/Max (`mergecraft auth claude`)
+#   - CODEX_AUTH_JSON — ChatGPT/Codex subscription (`mergecraft auth codex`)
+#   - OPENAI_API_KEY — OpenAI API key (same Codex harness as CODEX_AUTH_JSON)
+# The job skips gracefully when none are set (e.g. fork PRs).
+# MiniMax is NOT Codex: it needs OPENCODE_API_KEY + model opencode/minimax-*
+# (separate OpenCode path; not wired here).
 #
 # Trigger: pull_request_target (not pull_request). GitHub skips pull_request
 # workflows when refs/pull/N/merge cannot be built (merge conflicts), which
@@ -189,7 +194,9 @@ jobs:
     timeout-minutes: 30
     env:
       IS_SAME_REPO: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
+      # Prefer Claude when its OAuth secret is present; otherwise Codex/OpenAI.
       HAS_CLAUDE_CODE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
+      HAS_AUTH: ${{ (secrets.CLAUDE_CODE_OAUTH_TOKEN != '' || secrets.CODEX_AUTH_JSON != '' || secrets.OPENAI_API_KEY != '') && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
 
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
@@ -216,13 +223,13 @@ jobs:
             git branch -f "${base}" "origin/${base}"
           fi
 
-      - name: Skip when Claude subscription auth is not configured
-        if: env.HAS_CLAUDE_CODE != 'true'
+      - name: Skip when provider auth is not configured
+        if: env.HAS_AUTH != 'true'
         run: |
           if [ "${{ env.IS_SAME_REPO }}" != "true" ]; then
             echo "::notice title=mergecraft skipped::Fork PR — review skipped (same as before)."
           else
-            echo "::notice title=mergecraft skipped::Configure CLAUDE_CODE_OAUTH_TOKEN to enable mergeCraft reviews."
+            echo '::notice title=mergecraft skipped::Configure CLAUDE_CODE_OAUTH_TOKEN (`mergecraft auth claude`) or CODEX_AUTH_JSON (`mergecraft auth codex`) to enable mergeCraft reviews.'
           fi
 
       # Composed in a step rather than inline in `with:` so the CI-context clause
@@ -231,7 +238,7 @@ jobs:
       # prompt.
       - name: Compose review prompt
         id: prompt
-        if: env.HAS_CLAUDE_CODE == 'true'
+        if: env.HAS_AUTH == 'true'
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
@@ -269,8 +276,8 @@ jobs:
             echo "MERGECRAFT_PROMPT_EOF"
           } >> "${GITHUB_OUTPUT}"
 
-      - name: mergeCraft PR review (Claude subscription)
-        if: env.HAS_CLAUDE_CODE == 'true'
+      - name: mergeCraft PR review
+        if: env.HAS_AUTH == 'true'
         id: mergecraft
         continue-on-error: true
         # mergeCraft — full SHA pinned to the alexhawat/mergeCraft `pre-0.0.1` head.
@@ -280,7 +287,8 @@ jobs:
         # full-length commit SHA") before the review step runs. Bump this SHA and
         # `MERGECRAFT_REF` in the Makefile together — `make mergecraft-ref-check`
         # fails on one-sided bumps.
-        uses: alexhawat/mergeCraft@f98aeb0063b387a51960503a758351608d377002 # pre-0.0.1
+        # bumped past f98aeb0 for Codex harness + @openai/codex image; after main merge bump trunk Makefile MERGECRAFT_REF (main-first)
+        uses: alexhawat/mergeCraft@a7510af0ab4d7deb863c043e85f8e5365082f07d # pre-0.0.1 (Codex harness)
         with:
           prompt: ${{ steps.prompt.outputs.text }}
           # Must stay BELOW the job's timeout-minutes: when GitHub kills the job
@@ -288,17 +296,19 @@ jobs:
           # only diagnostic is lost. Leaving 5 min of headroom lets it exit
           # cleanly and report failure instead.
           timeout: 25m
-          model: anthropic/claude-opus
+          model: ${{ env.HAS_CLAUDE_CODE == 'true' && 'anthropic/claude-opus' || 'openai/gpt-codex' }}
           push: disabled
           shell: disabled
           status_checks: enabled
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
       - name: mergeCraft review incomplete (non-fatal)
-        if: env.HAS_CLAUDE_CODE == 'true' && steps.mergecraft.outcome != 'success'
+        if: env.HAS_AUTH == 'true' && steps.mergecraft.outcome != 'success'
         run: |
-          echo "::notice title=mergecraft incomplete::Review step did not finish successfully (see its log — e.g. Claude session limit or a runtime error). Approval enforcement skipped."
+          echo "::notice title=mergecraft incomplete::Review step did not finish successfully (see its log — e.g. provider session limit or a runtime error). Approval enforcement skipped."
 
       - name: Fail when mergeCraft would not approve
         # Gate directly on the `mergecraft-approval` check-run, decoupled from the
@@ -307,7 +317,7 @@ jobs:
         # PR where auth is present.
         if: >-
           github.event_name == 'pull_request_target' &&
-          env.HAS_CLAUDE_CODE == 'true'
+          env.HAS_AUTH == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
