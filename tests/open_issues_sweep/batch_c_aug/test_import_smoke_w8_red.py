@@ -51,7 +51,6 @@ def test_social_browser_module_is_not_restored_on_trunk() -> None:
     assert spec is None
 
 
-@pytest.mark.xfail(reason="green after W9: legacy x-use import migration (#128)", strict=False)
 def test_legacy_x_use_import_migration_helper_exists() -> None:
     """Operator workspaces with old ``x-use`` imports get a documented migration seam."""
     from sevn.skills import social_browser_migration as migration
@@ -59,9 +58,6 @@ def test_legacy_x_use_import_migration_helper_exists() -> None:
     assert callable(getattr(migration, "rewrite_legacy_imports", None))
 
 
-@pytest.mark.xfail(
-    reason="green after W9: operator x-use stub → social_media_manager (#128)", strict=False
-)
 def test_operator_x_use_stub_skill_manifest_points_at_social_stack(tmp_path: Path) -> None:
     """Thin operator ``skills/x-use/`` stub (if present) references ``social_media_manager``."""
     stub_root = tmp_path / "skills" / "user" / "x-use"
@@ -85,9 +81,6 @@ def test_operator_x_use_stub_skill_manifest_points_at_social_stack(tmp_path: Pat
     assert report["target_skill"] == "social_media_manager"
 
 
-@pytest.mark.xfail(
-    reason="green after W9: readiness drops social_browser-only SSOT (#128)", strict=False
-)
 def test_readiness_profile_resolution_prefers_social_media_manager_config() -> None:
     """Readiness/browser profile must not require ``skills.social_browser`` alone."""
     from sevn.integrations.social_media.readiness import social_browser_config_deprecated

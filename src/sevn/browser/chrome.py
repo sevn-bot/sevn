@@ -129,8 +129,8 @@ def resolve_profile_dir(
     """Resolve the persistent Chrome profile directory for a gateway session (D1).
 
     Precedence: ``SEVN_BROWSER_PROFILE_DIR`` → ``skills.browser.profile_dir`` →
-    ``skills.social_browser.profile_dir`` →
-    ``<content_root>/.sevn/browser-profiles/<session_id|default>``.
+    ``skills.social_media_manager.profile_dir`` → ``skills.social_browser.profile_dir``
+    (deprecated) → ``<content_root>/.sevn/browser-profiles/<session_id|default>``.
 
     Args:
         content_root (Path): Workspace content root (not shadow workspace).
@@ -150,6 +150,8 @@ def resolve_profile_dir(
     if env_raw:
         return Path(env_raw).expanduser().resolve()
     from_cfg = _read_profile_from_cfg(cfg, "browser")
+    if from_cfg is None:
+        from_cfg = _read_profile_from_cfg(cfg, "social_media_manager")
     if from_cfg is None:
         from_cfg = _read_profile_from_cfg(cfg, "social_browser")
     if from_cfg is not None:

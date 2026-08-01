@@ -4,12 +4,13 @@ Module: sevn.integrations.social_media.readiness
 Depends: sevn.browser.recipes.social, sevn.integrations.twexapi.config, sevn.skills.browser_session
 
 Exports:
-    twexapi_key_configured — boolean TwexAPI key presence (no secret values).
-    format_browser_session_hint — one-line CDP/profile caption for Telegram.
-    site_login_probe — cheap per-site login hint without headless login in CI.
-    platform_readiness_fields — per-platform readiness slice for capabilities matrix.
     build_social_media_readiness — async TwexAPI + browser (+ optional site) snapshot.
     build_social_media_readiness_sync — sync readiness snapshot for worker matrix.
+    format_browser_session_hint — one-line CDP/profile caption for Telegram.
+    platform_readiness_fields — per-platform readiness slice for capabilities matrix.
+    site_login_probe — cheap per-site login hint without headless login in CI.
+    social_browser_config_deprecated — legacy ``skills.social_browser`` deprecation flag.
+    twexapi_key_configured — boolean TwexAPI key presence (no secret values).
 """
 
 from __future__ import annotations
@@ -42,6 +43,7 @@ __all__ = [
     "format_browser_session_hint",
     "platform_readiness_fields",
     "site_login_probe",
+    "social_browser_config_deprecated",
     "twexapi_key_configured",
 ]
 
@@ -259,6 +261,23 @@ async def _browser_readiness_block(
     return await asyncio.to_thread(_browser_readiness_block_sync, content_root, cfg)
 
 
+def social_browser_config_deprecated() -> bool:
+    """Return whether ``skills.social_browser`` is a legacy-only config path (#128 / D7).
+
+    Browser profile SSOT for ``social_media_manager`` is ``skills.browser.profile_dir``
+    (or env overrides). ``skills.social_browser.profile_dir`` remains a read-only fallback
+    for migrated operator workspaces until removed in a future release.
+
+    Returns:
+        bool: Always ``True`` on current trunk (deprecated, not required).
+
+    Examples:
+        >>> social_browser_config_deprecated()
+        True
+    """
+    return True
+
+
 def format_browser_session_hint(
     cfg: WorkspaceConfig | None,
     content_root: Path | None,
@@ -283,7 +302,7 @@ def format_browser_session_hint(
     if profile_env:
         return f"Browser profile: {profile_env}"
     if cfg is not None and isinstance(cfg.skills, dict):
-        for block_key in ("social_browser", "browser"):
+        for block_key in ("browser", "social_media_manager", "social_browser"):
             block = cfg.skills.get(block_key)
             if isinstance(block, dict):
                 raw = block.get("profile_dir")

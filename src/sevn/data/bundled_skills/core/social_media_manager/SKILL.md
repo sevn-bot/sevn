@@ -230,9 +230,29 @@ separate social-media auth stack.
 |--------|------------|---------|
 | `SEVN_CDP_URL` | Highest | Attach to an existing Chrome/Brave CDP endpoint |
 | `SEVN_BROWSER_PROFILE_DIR` | Env override | Persistent Chrome profile directory |
-| `skills.browser.profile_dir` | Config | Workspace profile path |
-| `skills.social_browser.profile_dir` | Config | Social-browser profile path |
+| `skills.browser.profile_dir` | Config | Workspace profile path (SSOT) |
+| `skills.social_media_manager.profile_dir` | Config | Optional override (same semantics as browser) |
+| `skills.social_browser.profile_dir` | Config | **Deprecated** legacy path — migrate to `skills.browser` |
 | `<workspace>/.sevn/browser-profiles/<session_id>` | Default | Session-scoped profile |
+
+### Migrating from `x-use` / `social_browser` (#128)
+
+Bundled **`x-use`**, **`facebook-use`**, and **`sevn.skills.social_browser`** were removed
+(2026-07-16). Use this skill + native **`browser`** (`action=social`) instead.
+
+**Operator workspace cleanup**
+
+1. Remove or replace `skills/x-use/` with a thin stub whose `SKILL.md` lists
+   `see_also: [social_media_manager]` and points agents at `run_skill_script
+   social_media_manager …` or `browser action=social site=x op=search`.
+2. Rewrite Python scripts that still import `sevn.skills.social_browser` with
+   `sevn.skills.social_browser_migration.rewrite_legacy_imports(source)` — targets
+   `sevn.integrations.social_media`, `sevn.browser.recipes.social`, and
+   `sevn.skills.browser_session`.
+3. Move `skills.social_browser.profile_dir` to `skills.browser.profile_dir` in
+   `sevn.json` (legacy key still read as fallback only).
+
+Validate an operator stub: `sevn.skills.x_use_migration.validate_operator_stub(path)`.
 
 Run `scripts/session_status.py` (or `run_skill_script social_media_manager
 session_status.py`) for TwexAPI key **yes/no**, CDP URL or profile dir, and optional
