@@ -49,6 +49,7 @@ from sevn.config.defaults import DEFAULT_VOICE_LOCAL_TTS_ENGINE, DEFAULT_VOICE_S
 from sevn.config.model_resolution import (
     ModelSlot,
     apply_model_to_picker_slot,
+    fill_missing_model_slots_from_triager,
     list_catalog_model_ids,
     resolve_model_slot,
 )
@@ -570,6 +571,8 @@ class MenuActionRouter:
 
                 def _apply_toggle(doc: dict[str, Any]) -> None:
                     _set_nested(doc, target, parsed_val)
+                    if target == "providers.use_main_model_for_all" and parsed_val is False:
+                        fill_missing_model_slots_from_triager(doc)
                     if target == "second_brain.layout" and parsed_val == "para":
                         sb_obj = doc.get("second_brain")
                         if isinstance(sb_obj, dict) and "para" not in sb_obj:

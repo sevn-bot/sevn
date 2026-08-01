@@ -83,10 +83,6 @@ def _build_unified_router(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W4: fill_missing_model_slots_from_triager on unified toggle-off",
-    strict=False,
-)
 async def test_unified_toggle_off_seeds_all_tier_slots_from_triager(tmp_path: Path) -> None:
     """#116: disabling unified mode copies triager model into unset B/C/D slots."""
     router, cap, root = _build_unified_router(tmp_path, unified=True)
@@ -110,10 +106,6 @@ async def test_unified_toggle_off_seeds_all_tier_slots_from_triager(tmp_path: Pa
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W4: preserve explicit slot overrides on unified toggle-off",
-    strict=False,
-)
 async def test_unified_toggle_off_preserves_explicit_slot_overrides(tmp_path: Path) -> None:
     """Seeding must not overwrite slots that already have a distinct model id."""
     custom_b = "test/custom-b"
