@@ -8,7 +8,7 @@ summary: 'Define the runtime ontology for Triager output and related labels acro
   the agent core: canonical field names, closed enums, typing conventions, and how
   they compose with executor dispatch described '
 last_updated: '2026-08-01'
-fingerprint: sha256:f0028385b0321d680e1e8c4b3a28a0ecc52083d6aeb68e5248ed242ccadd5972
+fingerprint: sha256:2b8413cea519fe3d4d56a9ea1fb2fea0c691839b5d98ce3717cccae59451a455
 related: []
 sources:
 - src/sevn/config/**
@@ -449,6 +449,9 @@ interfaces:
 - name: TelegramWebappConfig
   file: src/sevn/config/sections/channels.py
   symbol: TelegramWebappConfig
+- name: VoiceActivationConfig
+  file: src/sevn/config/sections/channels.py
+  symbol: VoiceActivationConfig
 - name: VoiceConfig
   file: src/sevn/config/sections/channels.py
   symbol: VoiceConfig

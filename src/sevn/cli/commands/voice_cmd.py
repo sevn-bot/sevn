@@ -19,6 +19,13 @@ from sevn.cli.json_util import emit_json_failure, emit_json_success
 from sevn.cli.workspace import load_bound_workspace
 from sevn.config.defaults import DEFAULT_VOICE_STT_PROVIDERS, DEFAULT_VOICE_TTS_PROVIDERS
 from sevn.config.workspace_config import WorkspaceConfig
+from sevn.gateway.config_io.workspace_config_io import mutate_sevn_json
+from sevn.onboarding.web_app import _set_nested
+from sevn.voice.activation import (
+    activation_status_payload,
+    format_activation_status,
+    voice_activation_config_enabled,
+)
 
 
 def _voice_settings_snapshot(workspace: WorkspaceConfig) -> dict[str, Any]:
@@ -135,6 +142,29 @@ def _format_voice_status(rows: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _apply_activation_enabled(*, enabled: bool) -> WorkspaceConfig:
+    """Persist ``voice.activation.enabled`` and return the reloaded workspace.
+
+    Args:
+        enabled (bool): Target activation flag.
+
+    Returns:
+        WorkspaceConfig: Parsed workspace after the mutation.
+
+    Examples:
+        >>> _apply_activation_enabled(enabled=False)  # doctest: +SKIP
+    """
+    bound = load_bound_workspace()
+
+    def _mutate(doc: dict[str, Any]) -> None:
+        if enabled and doc.get("voice") is None:
+            _set_nested(doc, "voice.enabled", True)
+        _set_nested(doc, "voice.activation.enabled", enabled)
+
+    mutate_sevn_json(bound.layout.sevn_json_path, _mutate)
+    return load_bound_workspace().config
+
+
 def register(app: typer.Typer) -> None:
     """Attach ``sevn voice`` to ``app``.
 
@@ -198,6 +228,90 @@ def register(app: typer.Typer) -> None:
             emit_json_success(command=command, data={"providers": rows, "raw": body})
             return
         typer.echo(_format_voice_status(rows))
+
+    activation = typer.Typer(
+        help="Opt-in wake-word activation (default-off; mic opens only when enabled).",
+    )
+    voice.add_typer(activation, name="activation")
+
+    @activation.command("status")
+    def voice_activation_status(
+        json_out: bool = typer.Option(False, "--json", help="Emit JSON envelope on stdout."),
+    ) -> None:
+        """Report wake-word listening state and availability verdict."""
+        command = "sevn voice activation status"
+        try:
+            bound = load_bound_workspace()
+        except CliPreconditionError as exc:
+            if json_out:
+                emit_json_failure(
+                    command=command,
+                    error_code="PRECONDITION",
+                    message=str(exc),
+                    exit_code=exc.exit_code,
+                )
+            else:
+                typer.secho(str(exc), err=True)
+            raise typer.Exit(exc.exit_code) from exc
+        data = activation_status_payload(bound.config)
+        if json_out:
+            emit_json_success(command=command, data=data)
+            return
+        typer.echo(format_activation_status(data))
+
+    @activation.command("enable")
+    def voice_activation_enable(
+        json_out: bool = typer.Option(False, "--json", help="Emit JSON envelope on stdout."),
+    ) -> None:
+        """Enable wake-word activation in ``sevn.json`` (restart gateway to listen)."""
+        command = "sevn voice activation enable"
+        try:
+            ws = _apply_activation_enabled(enabled=True)
+        except CliPreconditionError as exc:
+            if json_out:
+                emit_json_failure(
+                    command=command,
+                    error_code="PRECONDITION",
+                    message=str(exc),
+                    exit_code=exc.exit_code,
+                )
+            else:
+                typer.secho(str(exc), err=True)
+            raise typer.Exit(exc.exit_code) from exc
+        data = activation_status_payload(ws)
+        if json_out:
+            emit_json_success(command=command, data=data)
+            return
+        typer.echo("Wake-word activation enabled in sevn.json.")
+        typer.echo(format_activation_status(data))
+        typer.echo("Restart the gateway to open the microphone when prerequisites are met.")
+
+    @activation.command("disable")
+    def voice_activation_disable(
+        json_out: bool = typer.Option(False, "--json", help="Emit JSON envelope on stdout."),
+    ) -> None:
+        """Disable wake-word activation and keep the mic closed (D24)."""
+        command = "sevn voice activation disable"
+        try:
+            ws = _apply_activation_enabled(enabled=False)
+        except CliPreconditionError as exc:
+            if json_out:
+                emit_json_failure(
+                    command=command,
+                    error_code="PRECONDITION",
+                    message=str(exc),
+                    exit_code=exc.exit_code,
+                )
+            else:
+                typer.secho(str(exc), err=True)
+            raise typer.Exit(exc.exit_code) from exc
+        data = activation_status_payload(ws)
+        if json_out:
+            emit_json_success(command=command, data=data)
+            return
+        typer.echo("Wake-word activation disabled.")
+        if not voice_activation_config_enabled(ws):
+            typer.echo("listening_state: disabled (mic closed)")
 
 
 def _voice_show(*, json_out: bool) -> None:

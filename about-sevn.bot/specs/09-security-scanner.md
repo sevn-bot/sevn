@@ -425,6 +425,13 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
 
+## Amendments (open-issues-sweep Batch G W36 — ``scan_voice``)
+
+``security.scanner.scan_voice`` was **dormant through W36**. Batch G W37 wires it for
+**post-activation utterances** only via ``WakeWordListener._scan_activation_transcript``
+(``src/sevn/voice/activation.py``); ambient wake-word frames are never scanned (D24). Do
+not add a second voice-scan config key.
+
 ## Human-input needed
 
 Prose body not yet authored (W9 scope). Normative contract requires operator or

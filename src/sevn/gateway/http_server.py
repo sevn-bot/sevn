@@ -1232,6 +1232,11 @@ def create_app(
         await asyncio.to_thread(_boot_warn_pdf_render_degraded)
         vr = voice_runtime_settings(ws)
         await maybe_preload_local_tts(ws)
+        _activation_state = getattr(app.state, "voice_activation", None)
+        if not isinstance(_activation_state, dict):
+            _activation_state = {}
+            app.state.voice_activation = _activation_state
+        _activation_state["trace"] = trace
         await asyncio.to_thread(
             lambda: prune_stale_tts_files(
                 content_root=ly.content_root,
@@ -1271,6 +1276,16 @@ def create_app(
         scanner_ws = ws.model_copy()
         scanner_ws.trace_sink = trace  # type: ignore[attr-defined]
         scanner = LLMGuardScanner(ly.content_root, scanner_ws)
+        _activation_state["scanner"] = scanner
+        from sevn.voice.activation import maybe_start_wake_word_listener
+
+        await maybe_start_wake_word_listener(
+            app_state=_activation_state,
+            workspace=ws,
+            trace=trace,
+            content_root=ly.content_root,
+            scanner=scanner,
+        )
         rate = TokenBucketLimiter(
             capacity=DEFAULT_GATEWAY_RATE_LIMIT_CAPACITY,
             refill_per_second=DEFAULT_GATEWAY_RATE_LIMIT_REFILL_PER_SECOND,
@@ -1295,6 +1310,7 @@ def create_app(
             owner_user_ids=owner_user_ids_from_workspace(ws),
             steer_store=steer_store,
         )
+        gateway_router._voice_activation_runtime = _activation_state
         from sevn.infrastructure.tunnel_manager import default_manager, tunnel_pid_file
 
         default_manager.attach_pid_file(tunnel_pid_file(ly.content_root))
@@ -1698,6 +1714,15 @@ def create_app(
         gateway_router._subagent_supervisor = getattr(app.state, "subagent_supervisor", None)
         gateway_router._mission_control_state = mission_control_state
         yield
+        _activation_shutdown_state = getattr(app.state, "voice_activation", {})
+        if not isinstance(_activation_shutdown_state, dict):
+            _activation_shutdown_state = {}
+        from sevn.voice.activation import maybe_stop_wake_word_listener
+
+        await maybe_stop_wake_word_listener(
+            app_state=_activation_shutdown_state,
+            shutdown_timeout_s=_shutdown_timeout_s(ws),
+        )
         await _emit_gateway_trace(trace, kind="gateway.shutdown", status="ok")
         cursor_sched = getattr(app.state, "cursor_poll_scheduler", None)
         if isinstance(cursor_sched, CursorPollScheduler):

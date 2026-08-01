@@ -525,6 +525,8 @@ class ChannelRouter:
         # Populated by ``http_server.create_app`` via
         # :func:`sevn.config.version_id.ensure_version_id` (issue #30 / plan D1-D2).
         self._version_id: str | None = None
+        # Populated by ``http_server.create_app`` lifespan for wake-word runtime (Batch G W38).
+        self._voice_activation_runtime: dict[str, Any] | None = None
         self._telegram_typing_tasks: dict[str, asyncio.Task[None]] = {}
         self._replay_job_event_fanout: Any | None = None
         self._session_inbound_voice_flag: dict[str, bool] = {}

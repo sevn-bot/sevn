@@ -8,7 +8,7 @@ summary: 'Provide a single, testable configuration surface before storage, traci
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
 last_updated: '2026-08-01'
-fingerprint: sha256:f0028385b0321d680e1e8c4b3a28a0ecc52083d6aeb68e5248ed242ccadd5972
+fingerprint: sha256:2b8413cea519fe3d4d56a9ea1fb2fea0c691839b5d98ce3717cccae59451a455
 related: []
 sources:
 - src/sevn/config/**
@@ -440,6 +440,9 @@ interfaces:
 - name: TelegramWebappConfig
   file: src/sevn/config/sections/channels.py
   symbol: TelegramWebappConfig
+- name: VoiceActivationConfig
+  file: src/sevn/config/sections/channels.py
+  symbol: VoiceActivationConfig
 - name: VoiceConfig
   file: src/sevn/config/sections/channels.py
   symbol: VoiceConfig
@@ -999,6 +1002,17 @@ and routing-profile ``reasoning_effort`` keys overlay the workspace default for 
 ``resolve_reasoning_for_turn`` checks provider capability and logs a degradation note rather
 than sending an unsupported wire parameter. The triager slot always receives ``None`` from
 that resolver — thinking/reasoning never reaches triage.
+
+## Amendments (open-issues-sweep Batch G W36 — #102 wake-word activation)
+
+| Key | Default | Notes |
+|-----|---------|-------|
+| ``voice.activation.enabled`` | ``false`` | Opt-in wake-word listener (D24) |
+| ``voice.activation.engine`` | ``openwakeword`` | Offline engine id — W37 implements capture |
+| ``voice.activation.wake_word`` | ``hey jarvis`` | Bundled openWakeWord phrase (fail-closed when no model) |
+
+Schema maintainer note (W36.2, do not fix here): ``stt_providers`` still appears as a
+**top-level** key in ``infra/sevn.schema.json`` while runtime reads ``voice.stt_providers``.
 
 ## Test Strategy
 

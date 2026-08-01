@@ -1571,6 +1571,28 @@
           "type": "number",
           "default": 0.7,
           "$comment": "Maintainer: the design docs S1 — below-threshold STT confidence triggers gateway re-prompt; Triager not run until user confirms; default 0.7."
+        },
+        "activation": {
+          "type": "object",
+          "description": "Opt-in wake-word activation (default-off; Batch G #102).",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Open a local wake-word listener when true and host prerequisites are met (D24)."
+            },
+            "engine": {
+              "type": "string",
+              "default": "openwakeword",
+              "description": "Offline wake-word engine id (W37 implements capture)."
+            },
+            "wake_word": {
+              "type": "string",
+              "default": "hey jarvis",
+              "description": "Phrase the local engine listens for when supported."
+            }
+          }
         }
       },
       "additionalProperties": true

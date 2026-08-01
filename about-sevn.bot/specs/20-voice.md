@@ -6,8 +6,8 @@ status: scaffold
 owner: Alex
 summary: 'Own the provider-chain facades for speech-to-text and text-to-speech so
   the gateway can:'
-last_updated: '2026-07-30'
-fingerprint: sha256:465a1380c5aaa0f2edc54b6811c494148cceec21d28164f20a432f026096487a
+last_updated: '2026-08-01'
+fingerprint: sha256:94ea2a7c8cf7eb5ba8cc5575949d25aaea088bfcb253185ed33d7fa2c961e6e3
 related: []
 sources:
 - src/sevn/voice/**
@@ -21,6 +21,66 @@ depends_on:
 - spec-17-gateway
 build_phase: null
 interfaces:
+- name: OpenWakeWordEngine
+  file: src/sevn/voice/_openwakeword_engine.py
+  symbol: OpenWakeWordEngine
+- name: WakeModelLoadError
+  file: src/sevn/voice/_openwakeword_engine.py
+  symbol: WakeModelLoadError
+- name: normalise_wake_model_name
+  file: src/sevn/voice/_openwakeword_engine.py
+  symbol: normalise_wake_model_name
+- name: wake_word_model_loadable
+  file: src/sevn/voice/_openwakeword_engine.py
+  symbol: wake_word_model_loadable
+- name: AudioFrameSource
+  file: src/sevn/voice/activation.py
+  symbol: AudioFrameSource
+- name: VoiceActivationSettings
+  file: src/sevn/voice/activation.py
+  symbol: VoiceActivationSettings
+- name: WakeWordListener
+  file: src/sevn/voice/activation.py
+  symbol: WakeWordListener
+- name: activation_config_key_paths
+  file: src/sevn/voice/activation.py
+  symbol: activation_config_key_paths
+- name: activation_status_payload
+  file: src/sevn/voice/activation.py
+  symbol: activation_status_payload
+- name: available_wake_word_models
+  file: src/sevn/voice/activation.py
+  symbol: available_wake_word_models
+- name: build_wake_word_listener
+  file: src/sevn/voice/activation.py
+  symbol: build_wake_word_listener
+- name: format_activation_status
+  file: src/sevn/voice/activation.py
+  symbol: format_activation_status
+- name: maybe_start_wake_word_listener
+  file: src/sevn/voice/activation.py
+  symbol: maybe_start_wake_word_listener
+- name: maybe_stop_wake_word_listener
+  file: src/sevn/voice/activation.py
+  symbol: maybe_stop_wake_word_listener
+- name: probe_voice_activation
+  file: src/sevn/voice/activation.py
+  symbol: probe_voice_activation
+- name: reload_voice_activation_runtime
+  file: src/sevn/voice/activation.py
+  symbol: reload_voice_activation_runtime
+- name: resolve_listening_state
+  file: src/sevn/voice/activation.py
+  symbol: resolve_listening_state
+- name: resolve_voice_activation_settings
+  file: src/sevn/voice/activation.py
+  symbol: resolve_voice_activation_settings
+- name: voice_activation_config_enabled
+  file: src/sevn/voice/activation.py
+  symbol: voice_activation_config_enabled
+- name: voice_activation_enabled
+  file: src/sevn/voice/activation.py
+  symbol: voice_activation_enabled
 - name: EdgeTtsBackend
   file: src/sevn/voice/backends.py
   symbol: EdgeTtsBackend
@@ -57,6 +117,15 @@ interfaces:
 - name: whisper_cpp_missing_prereqs
   file: src/sevn/voice/backends.py
   symbol: whisper_cpp_missing_prereqs
+- name: activation_supported_platform
+  file: src/sevn/voice/capture_prerequisites.py
+  symbol: activation_supported_platform
+- name: has_input_device
+  file: src/sevn/voice/capture_prerequisites.py
+  symbol: has_input_device
+- name: voice_wake_extra_installed
+  file: src/sevn/voice/capture_prerequisites.py
+  symbol: voice_wake_extra_installed
 - name: voice_http_base_url
   file: src/sevn/voice/egress.py
   symbol: voice_http_base_url
@@ -87,6 +156,12 @@ interfaces:
 - name: voice_runtime_settings
   file: src/sevn/voice/factory.py
   symbol: voice_runtime_settings
+- name: LiveMicFrameSource
+  file: src/sevn/voice/frame_sources.py
+  symbol: LiveMicFrameSource
+- name: build_live_frame_source
+  file: src/sevn/voice/frame_sources.py
+  symbol: build_live_frame_source
 - name: maybe_resolve_whisper_model_env
   file: src/sevn/voice/host_deps.py
   symbol: maybe_resolve_whisper_model_env
@@ -126,6 +201,15 @@ interfaces:
 - name: speak_placeholder
   file: src/sevn/voice/tts.py
   symbol: speak_placeholder
+- name: NullWakeWordEngine
+  file: src/sevn/voice/wake_engine.py
+  symbol: NullWakeWordEngine
+- name: WakeWordEngine
+  file: src/sevn/voice/wake_engine.py
+  symbol: WakeWordEngine
+- name: build_wake_word_engine
+  file: src/sevn/voice/wake_engine.py
+  symbol: build_wake_word_engine
 - name: WhisperModelSpec
   file: src/sevn/voice/whisper_model_provisioner.py
   symbol: WhisperModelSpec
@@ -227,6 +311,52 @@ Live Telegram `/config → Voice` spoken-reply E2E remains deferred (no creds /
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Amendments (open-issues-sweep Batch G W36 — #102 wake-word activation)
+
+Wake-word activation is **opt-in and default-off** under ``voice.activation.*`` (never
+``voice_trigger_keywords`` — that key gates TTS output on request text). The master
+``voice.enabled`` switch is conjunctive: disabling voice disables activation even when
+``voice.activation.enabled`` is true.
+
+### Platform support matrix (D25)
+
+| Platform | Activation mode | Verdict when prerequisites missing |
+|----------|-----------------|--------------------------------------|
+| macOS host (bare metal) | Local offline wake word (W37) | ``unavailable`` with reason via ``sevn doctor`` / ``probe_voice_activation`` — no gateway crash |
+| Linux host (bare metal) | Local offline wake word (W37) | Same as macOS |
+| Docker / container | Not supported | ``unavailable`` — no input device; gateway boots |
+| Remote / headless host | Not supported | ``unavailable`` — treat absent mic as normal (D25), not an error |
+
+Default engine (W37): **openWakeWord** (Apache-2.0), fully offline, no account/key (D23).
+Optional extra: ``uv sync --extra voice-wake``.
+
+### ``security.scanner.scan_voice`` (W36.6 / W37)
+
+The existing ``security.scanner.scan_voice`` flag is honored for **post-activation**
+utterances in ``WakeWordListener`` (G-Thermos). Inbound voice *attachments* already pass
+through ``LLMGuardScanner`` on the existing file-based STT path; ambient wake-word frames
+must never reach the scanner (D24).
+
+### Operator surfaces (Batch G W38 — #102)
+
+**CLI:** ``sevn voice activation status|enable|disable`` reports the D24
+``listening_state`` (`disabled` | `enabled_listening` | `enabled_unavailable`),
+availability verdict, wake phrase, and privacy guardrails. Enable/disable mutates
+``voice.activation.enabled`` in ``sevn.json``; restart the gateway to open or close
+the microphone.
+
+**Telegram:** ``/config`` → Chat → Voice exposes a wake-word toggle
+(``cfg:toggle:voice.activation.enabled``), status row (``act:voice:activation:status``),
+and wake-phrase cycle when the engine exposes bundled models.
+
+**Wake-word selection:** openWakeWord phrases are derived from bundled models
+(``available_wake_word_models``); custom phrases outside the bundle are not supported.
+
+**Privacy (D24):** activation is opt-in and default-off. Ambient audio stays in memory
+until the wake word; only post-activation utterances may be written under
+``channel_files/`` and transcribed. Raw audio and non-activated transcripts are never
+logged or traced. Disable activation or stop the gateway to verify the mic is closed.
 
 ## Human-input needed
 

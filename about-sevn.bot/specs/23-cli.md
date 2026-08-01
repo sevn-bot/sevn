@@ -8,7 +8,7 @@ summary: Deliver the primary operator and automation surface for install, upgrad
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
 last_updated: '2026-08-01'
-fingerprint: sha256:91b6e9c5a4048abab538180bef1e2b1646fd3c921b95a2f7339de869c4dd167d
+fingerprint: sha256:8e90a6de0b7a37a48396917a5266b8769a04896fac8630b13a18eb17dc9b2414
 related: []
 sources:
 - src/sevn/cli/**
@@ -857,6 +857,14 @@ Root CLI ``rich_help_panel`` groups mirror the eight Telegram ``/config`` tiles
 (``sevn.cli.help.panels.PANEL_ORDER``). ``sevn config sections`` lists the same eight
 slugs derived from ``menu_registry`` (``config_paths.menu_registry_root_slugs()``).
 ``make cli-help-docs-check`` gates panel drift.
+
+## Amendments (open-issues-sweep Batch G W38 — #102 wake-word activation)
+
+``sevn voice activation status`` reports ``listening_state``
+(``disabled`` | ``enabled_listening`` | ``enabled_unavailable``), availability
+verdict, wake phrase, and privacy notes. ``sevn voice activation enable|disable``
+mutates ``voice.activation.enabled`` (default-off, D24). Restart the gateway after
+toggling so the microphone opens or closes.
 
 ## Human-input needed
 

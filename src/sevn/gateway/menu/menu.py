@@ -1084,7 +1084,9 @@ def _build_voice_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str
         'act:voice:show'
         >>> rows[-2][0]["callback_data"]
         'act:voice:status'
-        >>> rows[-3][0]["callback_data"]
+        >>> rows[6][0]["callback_data"]
+        'act:voice:activation:status'
+        >>> rows[4][0]["callback_data"]
         'cfg:voice:stt:next'
     """
     mode = _voice_tts_mode(workspace)
@@ -1105,6 +1107,48 @@ def _build_voice_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str
     rows.append(
         [{"text": f"STT: {_voice_stt_active(workspace)} 🔁", "callback_data": "cfg:voice:stt:next"}]
     )
+    from sevn.voice.activation import (
+        available_wake_word_models,
+        resolve_listening_state,
+        resolve_voice_activation_settings,
+        voice_activation_config_enabled,
+    )
+
+    act_enabled = voice_activation_config_enabled(workspace)
+    listen_state = resolve_listening_state(workspace)
+    state_labels = {
+        "disabled": "off",
+        "enabled_listening": "listening",
+        "enabled_unavailable": "unavailable",
+    }
+    rows.append(
+        [
+            _config_bool_toggle_button(
+                "Wake word",
+                "voice.activation.enabled",
+                enabled=act_enabled,
+            ),
+        ],
+    )
+    rows.append(
+        [
+            {
+                "text": f"Activation: {state_labels.get(listen_state, listen_state)}",
+                "callback_data": "act:voice:activation:status",
+            },
+        ],
+    )
+    settings = resolve_voice_activation_settings(workspace)
+    models = available_wake_word_models(engine_id=settings.engine)
+    if models:
+        rows.append(
+            [
+                {
+                    "text": f"Wake phrase: {settings.wake_word} 🔁",
+                    "callback_data": "cfg:voice:activation:wake:next",
+                },
+            ],
+        )
     rows.append([{"text": "🔊 Probe backends", "callback_data": "act:voice:status"}])
     rows.append([{"text": "📋 Voice settings", "callback_data": "act:voice:show"}])
     return rows
@@ -5063,10 +5107,21 @@ def config_menu_message_text(
         lines.append(f"Sub-agents: {'on' if _subagents_enabled(workspace) else 'off'}")
         return "\n".join(lines)
     if section == "chat_voice":
+        from sevn.voice.activation import activation_status_payload, voice_activation_config_enabled
+
+        status = activation_status_payload(workspace)
+        activation_lines = [
+            f"Wake-word activation: {'on' if voice_activation_config_enabled(workspace) else 'off'}",
+            f"Listening state: {str(status.get('listening_state', 'disabled')).replace('_', ' ')}",
+            f"Wake phrase: {status.get('wake_word')}",
+        ]
         return (
             f"Voice\n\nGlobal TTS mode: {_voice_tts_mode(workspace)}\n"
             f"Active TTS engine: {_voice_tts_engine(workspace)}\n"
             f"Active STT provider: {_voice_stt_active(workspace)}\n"
+            f"{'\n'.join(activation_lines)}\n\n"
+            "Opt-in wake word (default-off). Ambient audio stays in memory; only "
+            "post-activation utterances may be stored or transcribed.\n"
             "Per-chat override: /voice on|off|when_asked|reset"
         )
     if section == "chat_qa":

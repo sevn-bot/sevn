@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-08-01'
-fingerprint: sha256:f58f74387ece13c523c61063957a2725eebf7febc38e4b0cc066f8d2c65449f2
+fingerprint: sha256:2ce767d713421be47b40ba9cc37d7a25baa94b9667bf94ef479dc538ad7e4b74
 related: []
 sources:
 - src/sevn/gateway/**
@@ -1712,6 +1712,19 @@ Opt-in ``gateway.defer_mcp_discovery`` (default off, D9) moves MCP subprocess
 discovery off the boot critical path without changing turn output.
 Opt-in ``gateway.cache_session_registry`` reuses in-process registry snapshots
 via the W15 fingerprint seam. Mission Control samples TTFT per stage when wired.
+
+## Amendments (voice activation W37)
+
+Gateway lifespan starts an optional wake-word listener when ``voice.enabled`` and
+``voice.activation.enabled`` are both true **and** ``probe_voice_activation`` reports
+``available`` (``voice-wake`` extra installed, supported platform, input device present).
+Startup and shutdown hooks live in ``maybe_start_wake_word_listener`` /
+``maybe_stop_wake_word_listener`` (``src/sevn/voice/activation.py``), wired from the
+FastAPI lifespan in ``http_server.py`` beside ``maybe_preload_local_tts``. The listener
+does **not** open an input stream when activation is disabled or unavailable (D24/D25);
+shutdown drains the background task with ``gateway.shutdown_timeout_s``. Ambient frames
+stay in memory only; post-activation utterances reuse the existing STT chain and attachment
+caps.
 
 ## Amendments (telegram-menu-redesign W9)
 
