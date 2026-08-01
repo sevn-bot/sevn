@@ -85,10 +85,6 @@ def _build_triager_picker_router(
     return router, cap, root, ws
 
 
-@pytest.mark.xfail(
-    reason="green after W4: triager catalog non-empty when only tier_default set",
-    strict=False,
-)
 def test_triager_picker_catalog_includes_resolved_triager_when_models_empty(
     tmp_path: Path,
 ) -> None:
@@ -103,7 +99,6 @@ def test_triager_picker_catalog_includes_resolved_triager_when_models_empty(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W4: triager pick persists via menu callback", strict=False)
 async def test_triager_model_pick_persists_to_sevn_json(tmp_path: Path) -> None:
     """Selecting a triager row writes ``providers.tier_default.triager`` and acks."""
     router, cap, root, ws = _build_triager_picker_router(tmp_path)
@@ -136,7 +131,6 @@ async def test_triager_model_pick_persists_to_sevn_json(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W4: triager picker renders pick rows", strict=False)
 async def test_triager_picker_page_shows_pick_callbacks(tmp_path: Path) -> None:
     """Triager picker frame must expose ``cfg:models:pick:triager:*`` buttons."""
     router, cap, _root, _ws = _build_triager_picker_router(tmp_path)
