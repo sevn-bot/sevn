@@ -6,8 +6,8 @@ status: scaffold
 owner: Alex
 summary: 'Own the provider-chain facades for speech-to-text and text-to-speech so
   the gateway can:'
-last_updated: '2026-07-31'
-fingerprint: sha256:ab2ef74615a91c04f65ce074c1b040c2ef640e1a15578d8d4f80f69c8a719e8f
+last_updated: '2026-08-01'
+fingerprint: sha256:94ea2a7c8cf7eb5ba8cc5575949d25aaea088bfcb253185ed33d7fa2c961e6e3
 related: []
 sources:
 - src/sevn/voice/**
@@ -24,6 +24,15 @@ interfaces:
 - name: OpenWakeWordEngine
   file: src/sevn/voice/_openwakeword_engine.py
   symbol: OpenWakeWordEngine
+- name: WakeModelLoadError
+  file: src/sevn/voice/_openwakeword_engine.py
+  symbol: WakeModelLoadError
+- name: normalise_wake_model_name
+  file: src/sevn/voice/_openwakeword_engine.py
+  symbol: normalise_wake_model_name
+- name: wake_word_model_loadable
+  file: src/sevn/voice/_openwakeword_engine.py
+  symbol: wake_word_model_loadable
 - name: AudioFrameSource
   file: src/sevn/voice/activation.py
   symbol: AudioFrameSource
@@ -39,9 +48,6 @@ interfaces:
 - name: activation_status_payload
   file: src/sevn/voice/activation.py
   symbol: activation_status_payload
-- name: activation_supported_platform
-  file: src/sevn/voice/activation.py
-  symbol: activation_supported_platform
 - name: available_wake_word_models
   file: src/sevn/voice/activation.py
   symbol: available_wake_word_models
@@ -51,9 +57,6 @@ interfaces:
 - name: format_activation_status
   file: src/sevn/voice/activation.py
   symbol: format_activation_status
-- name: has_input_device
-  file: src/sevn/voice/activation.py
-  symbol: has_input_device
 - name: maybe_start_wake_word_listener
   file: src/sevn/voice/activation.py
   symbol: maybe_start_wake_word_listener
@@ -63,6 +66,9 @@ interfaces:
 - name: probe_voice_activation
   file: src/sevn/voice/activation.py
   symbol: probe_voice_activation
+- name: reload_voice_activation_runtime
+  file: src/sevn/voice/activation.py
+  symbol: reload_voice_activation_runtime
 - name: resolve_listening_state
   file: src/sevn/voice/activation.py
   symbol: resolve_listening_state
@@ -75,9 +81,6 @@ interfaces:
 - name: voice_activation_enabled
   file: src/sevn/voice/activation.py
   symbol: voice_activation_enabled
-- name: voice_wake_extra_installed
-  file: src/sevn/voice/activation.py
-  symbol: voice_wake_extra_installed
 - name: EdgeTtsBackend
   file: src/sevn/voice/backends.py
   symbol: EdgeTtsBackend
@@ -114,6 +117,15 @@ interfaces:
 - name: whisper_cpp_missing_prereqs
   file: src/sevn/voice/backends.py
   symbol: whisper_cpp_missing_prereqs
+- name: activation_supported_platform
+  file: src/sevn/voice/capture_prerequisites.py
+  symbol: activation_supported_platform
+- name: has_input_device
+  file: src/sevn/voice/capture_prerequisites.py
+  symbol: has_input_device
+- name: voice_wake_extra_installed
+  file: src/sevn/voice/capture_prerequisites.py
+  symbol: voice_wake_extra_installed
 - name: voice_http_base_url
   file: src/sevn/voice/egress.py
   symbol: voice_http_base_url
