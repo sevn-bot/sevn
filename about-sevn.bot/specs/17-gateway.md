@@ -1694,6 +1694,20 @@ spawned turn; the decision is logged as
 ``gateway.queue_classifier_timeout_spawned`` with ``prior_turn_id``,
 ``new_turn_id``, ``timeout_s``, and ``routing_action``.
 
+## Amendments (open-issues-sweep-aug-2026 W2 — #119 duplicate of #70, D5)
+
+Aug-2026 sweep issue **#119** reports the same user-visible classifier-timeout
+notice as closed **#70**. On ``origin/pre-0.0.1`` the fix is already present:
+``session_manager.enqueue_dispatch`` returns after
+``gateway.queue_classifier_timeout_spawned`` without calling
+``notify_operator`` on the classifier-fallback spawn path
+(``session_manager.py`` ~1197–1221). **#119 closes as duplicate of #70** at
+program Z1 — no reimplementation. Regression guard:
+``scripts/check_gateway_classifier_timeout_user_text.py`` (wired into ``make lint``)
+forbids user-facing ``classifier timed out`` / ``queuing this message as its own
+turn`` strings under ``src/sevn/gateway/``; runtime contract pinned by
+``tests/gateway/test_classifier_timeout.py`` and ``test_queue_multi.py``.
+
 ## Amendments (open-issues-sweep W31, #72)
 
 ``BuzzChannelAdapter`` (`src/sevn/channels/buzz.py`) parses Buzz relay mention

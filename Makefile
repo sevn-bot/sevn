@@ -140,6 +140,7 @@ lint: ## Ruff check + formatting + ADR docstring inventory + import-linter
 	$(UV) run python scripts/check_docstrings.py src/sevn scripts
 	$(UV) run python scripts/check_cli_help_no_spec_refs.py
 	$(UV) run python scripts/check_loguru_only.py
+	$(UV) run python scripts/check_gateway_classifier_timeout_user_text.py
 	$(MAKE) lint-imports
 
 format: ## Auto-format with Ruff

@@ -31,6 +31,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 
+- [2026-08-01] `make lint` runs `check_gateway_classifier_timeout_user_text.py` — forbids user-facing classifier-timeout copy under `src/sevn/gateway/`; aug-2026 sweep W2 verifies #119 as duplicate of closed #70 (D5)
 - [2026-07-30] `make ci-resume` now walks `mergecraft-ref-check` — the mergeCraft pin gate is in `CI_STEPS` alongside the other `ci-parity` steps, and tier↔resume parity is enforced by `tests/infra/test_ci_steps_tier_parity.py` instead of a Makefile comment alone
 - [2026-07-31] Routing profile isolation hardened on the gateway turn spine — triager receives routing-profile model precedence (cheap-model shortcut skipped when a profile model is active); tier-B uses filtered skill inventories end-to-end; full-index retry skipped when a profile skill allowlist applies; tier C/D reuse filtered tool sets and permissions; `secrets_scope` prefixes logical keys during turns; explicit `skills: []` denies all skills; `/model --once` validates against the configured catalog; spawned L1 tier-B inherits routing overlays and handles route deny (B-Thermos)
 - [2026-07-31] Stacked slash-skill invocation — parse multiple leading ``/skill`` tokens (e.g. ``/research /writing compare notes``), validate against ``SkillsManager`` inventory, merge loaded skills into triage with later-token-wins conflict resolution, and wire ``type: skill`` shortcuts through the same path (#87)
