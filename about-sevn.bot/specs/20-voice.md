@@ -348,7 +348,9 @@ the microphone.
 
 **Telegram:** ``/config`` → Chat → Voice exposes a wake-word toggle
 (``cfg:toggle:voice.activation.enabled``), status row (``act:voice:activation:status``),
-and wake-phrase cycle when the engine exposes bundled models.
+wake-phrase cycle when the engine exposes bundled models, and **Setup wake-word**
+(``act:voice:activation:setup``) — doctor subset + ``voice-wake`` install guidance without
+gateway ``uv sync`` (aug-2026 W5 / #124, D9).
 
 **Wake-word selection:** openWakeWord phrases are derived from bundled models
 (``available_wake_word_models``); custom phrases outside the bundle are not supported.

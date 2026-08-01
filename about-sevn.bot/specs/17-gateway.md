@@ -1708,6 +1708,18 @@ forbids user-facing ``classifier timed out`` / ``queuing this message as its own
 turn`` strings under ``src/sevn/gateway/``; runtime contract pinned by
 ``tests/gateway/test_classifier_timeout.py`` and ``test_queue_multi.py``.
 
+## Amendments (open-issues-sweep-aug-2026 W4 — #115, #116)
+
+Telegram ``/config`` unified-model toggle-off
+(``cfg:toggle:providers.use_main_model_for_all:false``) seeds unset tier slots from
+triager via ``fill_missing_model_slots_from_triager`` inside
+``menu_action_router._apply_toggle`` — same seeding contract as onboarding web
+``_apply_unified_model_cleanup`` / ``maybe_split_unified_model_on_config_set``.
+Agent captions show resolved model ids so the triager picker stays usable when only
+triager is configured. Regression:
+``tests/gateway/test_model_menu_unified_toggle.py``,
+``tests/gateway/test_models_picker_menu.py``.
+
 ## Amendments (open-issues-sweep W31, #72)
 
 ``BuzzChannelAdapter`` (`src/sevn/channels/buzz.py`) parses Buzz relay mention

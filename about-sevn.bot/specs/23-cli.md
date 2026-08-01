@@ -858,6 +858,16 @@ Root CLI ``rich_help_panel`` groups mirror the eight Telegram ``/config`` tiles
 slugs derived from ``menu_registry`` (``config_paths.menu_registry_root_slugs()``).
 ``make cli-help-docs-check`` gates panel drift.
 
+## Amendments (open-issues-sweep-aug-2026 W3 — #123, D8)
+
+``resolve_cli_version_string()`` (``src/sevn/cli/version.py``) prefers
+``<branch>-<commit8>`` from git when the process runs inside a checkout
+(``git rev-parse --abbrev-ref HEAD`` + ``git rev-parse --short=8 HEAD``);
+falls back to ``importlib.metadata.version("sevn")`` for installed wheels or
+when git metadata is unavailable. Wired to ``sevn --version`` and
+``sevn version`` / ``--json`` (``src/sevn/cli/app.py``). Regression:
+``tests/cli/test_version_format.py``.
+
 ## Amendments (open-issues-sweep Batch G W38 — #102 wake-word activation)
 
 ``sevn voice activation status`` reports ``listening_state``
