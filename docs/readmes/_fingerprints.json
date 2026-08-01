@@ -116,8 +116,8 @@
     },
     "root": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-01T17:05:24Z",
-      "digest": "0424d7e0e59d4ab66f410e069cc06c4e8a6af438d7bd3c215c606d2e30cea01a",
+      "computed_at": "2026-08-01T22:28:31Z",
+      "digest": "aa153124bf47cfa181a1ae2d34a7acdb254e5b4bf9c579f993dab1ddf0542f7e",
       "source_globs": [
         "pyproject.toml",
         "CLAUDE.md",

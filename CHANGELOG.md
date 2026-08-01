@@ -11,6 +11,7 @@ are cut into a dated, versioned section at release time.
 ## [Unreleased]
 
 ### Added
+- [2026-08-02] Brand visual identity guide in `docs/brand/README.md` documents the ASCII-style 7 mark, authoritative token/logo paths, typography, and agent image-generation guardrails (not a fox/wolf mascot); cross-linked from `about-sevn.bot/ARCHITECTURE.md` (#118, open-issues-sweep-aug-2026 W7)
 - [2026-08-01] CI gate `make removed-browser-skills-check` blocks reintroduced Playwright-era bundled skills (`playwright-browser`, `x-use`, `facebook-use`, `linkedin-use`) under `src/sevn/data/bundled_skills/`; operator docs cover workspace cleanup via `sevn sync` and manual deletes (#117, #127, open-issues-sweep-aug-2026 W6)
 - [2026-08-01] Craft release evaluation runbook and evaluation-only `.craft.yml` scaffold document Sentry Craft prepare/publish against the current manual release flow — Craft CI adoption deferred pending operator gate (#110, open-issues-sweep W15)
 - [2026-07-31] User-defined `permissions.deny_rules` block destructive or sensitive tool calls by tool name and optional command/pattern, domain, or path — rules apply even in permissive ABAC owner sessions (additive-deny, D15), return the configured reason to the model, and log redacted audit lines; Mission Control approval `deny` verdicts accept an optional operator reason (#80, open-issues-sweep W26)
