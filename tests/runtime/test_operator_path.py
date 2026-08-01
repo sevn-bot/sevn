@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from sevn.runtime.operator_path import (
     augment_macos_dyld_library_path,
     augment_operator_path,
     operator_path_prefixes,
 )
+
+if TYPE_CHECKING:
+    import pytest
 
 
 def test_operator_path_prefixes_includes_local_bin(tmp_path: Path) -> None:
@@ -49,6 +53,28 @@ def test_augment_operator_path_seeds_system_dirs_when_path_absent(tmp_path: Path
     assert str(local_bin) in parts
     assert "/usr/bin" in parts
     assert "/bin" in parts
+
+
+def test_augment_operator_path_prepends_sys_prefix_bin_without_virtual_env(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Daemon launches without VIRTUAL_ENV still get the active venv bin on PATH."""
+    import sys
+
+    from sevn.runtime import operator_path as op
+
+    fake_prefix = tmp_path / "venv"
+    fake_bin = fake_prefix / "bin"
+    fake_bin.mkdir(parents=True)
+    (fake_prefix / "pyvenv.cfg").write_text("home = /usr\n", encoding="utf-8")
+    monkeypatch.setattr(sys, "prefix", str(fake_prefix))
+    monkeypatch.delenv("VIRTUAL_ENV", raising=False)
+
+    merged = op.augment_operator_path({"PATH": "/usr/bin"}, home=tmp_path)
+    parts = merged["PATH"].split(":")
+    assert str(fake_bin) in parts
+    assert parts.index(str(fake_bin)) < parts.index("/usr/bin")
 
 
 def test_dyld_augment_noop_off_macos() -> None:

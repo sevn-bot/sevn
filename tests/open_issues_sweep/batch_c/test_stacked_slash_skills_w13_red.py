@@ -139,6 +139,18 @@ def test_parser_defers_core_slash_commands(text: str) -> None:
     assert result.deferred_to_core_handler is True
 
 
+def test_parser_errors_when_core_command_follows_skill() -> None:
+    """A reserved core command after a skill must not silently fall through to prose."""
+    result = _parse_stacked_slash_skills(
+        "/research /new project notes",
+        known_skill_ids=frozenset({"research"}),
+    )
+    assert result.skill_ids == ()
+    assert result.deferred_to_core_handler is False
+    assert result.errors
+    assert "cannot follow slash skills" in result.errors[0]
+
+
 def test_stacked_slash_skills_surface_loaded_metadata_in_order() -> None:
     """Ordered context load exposes which skills were loaded for the turn."""
     from sevn.gateway.slash_skills import build_slash_skill_turn_overlay

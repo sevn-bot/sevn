@@ -155,6 +155,14 @@ def parse_stacked_slash_skills(
             break
         slash_body = token.lstrip("/")
         if "/" not in slash_body and slash_body.lower() in reserved:
+            if skill_ids:
+                # Core handler already declined (first token was a skill). Emitting
+                # an explicit error avoids silently dropping the skill chain into prose.
+                return StackedSlashSkillParseResult(
+                    (),
+                    "",
+                    (f"core command `/{slash_body}` cannot follow slash skills",),
+                )
             return StackedSlashSkillParseResult(
                 (),
                 stripped,
