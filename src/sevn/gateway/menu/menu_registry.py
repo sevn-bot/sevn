@@ -369,6 +369,15 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         owner_only=True,
         notes="Cycles engine-supported wake phrases (W38.4); owner-only — reloads listener",
     )
+    add(
+        "C3.11",
+        _exact("act:voice:activation:setup"),
+        "C",
+        "chat_voice",
+        "Setup wake-word",
+        implemented=True,
+        notes="Doctor subset + voice-wake install hint (D9); no gateway uv sync",
+    )
 
     # --- C4. Models ---
     add(

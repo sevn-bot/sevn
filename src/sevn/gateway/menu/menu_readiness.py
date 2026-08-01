@@ -99,6 +99,10 @@ _READY_SPEC_IDS: frozenset[str] = frozenset(
         "C3.5",
         "C3.6",
         "C3.7",
+        "C3.8",
+        "C3.9",
+        "C3.10",
+        "C3.11",
         # Channels (routing footer + reply keyboard + DM policy)
         "C5.1",
         "C5.2",

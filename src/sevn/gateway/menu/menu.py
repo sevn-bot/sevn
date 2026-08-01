@@ -1149,6 +1149,14 @@ def _build_voice_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str
                 },
             ],
         )
+    rows.append(
+        [
+            {
+                "text": "🎤 Setup wake-word",
+                "callback_data": "act:voice:activation:setup",
+            },
+        ],
+    )
     rows.append([{"text": "🔊 Probe backends", "callback_data": "act:voice:status"}])
     rows.append([{"text": "📋 Voice settings", "callback_data": "act:voice:show"}])
     return rows

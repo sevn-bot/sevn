@@ -41,20 +41,16 @@ def _import_voice_activation_module() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W5: voice activation toggle answers Telegram callback",
-    strict=False,
-)
 async def test_voice_activation_toggle_answers_callback(tmp_path: Path) -> None:
     """``cfg:toggle:voice.activation.enabled`` must ack (not silent no-op)."""
     _import_voice_activation_module()
+    router, cap, _ws = _build_router(tmp_path)
     root = tmp_path / "w"
-    root.mkdir()
     (root / "sevn.json").write_text(
         json.dumps(_activation_workspace_doc(enabled=False)),
         encoding="utf-8",
     )
-    router, cap, _ws = _build_router(tmp_path)
+    router._menu_action_router._reload_workspace()
     await router.route_incoming(
         _config_callback("cfg:section:chat_voice", callback_query_id="cq-voice-nav"),
     )
@@ -71,10 +67,6 @@ async def test_voice_activation_toggle_answers_callback(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W5: wake phrase cycle answers when runtime missing",
-    strict=False,
-)
 async def test_wake_phrase_cycle_answers_when_runtime_dict_missing(tmp_path: Path) -> None:
     """Without ``_voice_activation_runtime``, wake cycle must not fail silently."""
     _import_voice_activation_module()
@@ -88,10 +80,6 @@ async def test_wake_phrase_cycle_answers_when_runtime_dict_missing(tmp_path: Pat
     assert cap.answered or cap.edited, "wake phrase cycle must produce user-visible feedback"
 
 
-@pytest.mark.xfail(
-    reason="green after W5: Setup wake-word menu button in voice section",
-    strict=False,
-)
 def test_voice_keyboard_includes_setup_wake_word_button() -> None:
     """D9: menu-first setup entry — not gateway ``uv sync``."""
     from sevn.config.workspace_config import WorkspaceConfig
@@ -108,10 +96,6 @@ def test_voice_keyboard_includes_setup_wake_word_button() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W5: setup button posts doctor guidance without uv sync",
-    strict=False,
-)
 async def test_voice_activation_setup_posts_doctor_guidance(tmp_path: Path) -> None:
     """Setup action runs doctor subset and documents ``voice-wake`` extra — no ``uv sync``."""
     _import_voice_activation_module()
