@@ -260,7 +260,8 @@ session_status.py`) for TwexAPI key **yes/no**, CDP URL or profile dir, and opti
 
 **Login tool:** use native `browser` with `action=login` and `credentials_ref`
 pointing at a workspace secrets alias (never inline passwords). See
-`sevn.browser.auth`.
+`sevn.browser.auth` and **X login troubleshooting** below for phone/SMS and
+account-picker handoffs.
 
 **Cookie export/import:** seed-only portability via `browser` `action=export_cookies`
 / `action=import_cookies` — not a required persistence layer for this specialist.
@@ -269,6 +270,82 @@ Map exported cookies into TwexAPI write bodies with
 `post_tweet_auto_cookie` uses TwexAPI's **pool** cookie on `medium=twexapi`; on
 `medium=browser` it coerces to `create_tweet_or_reply` using the CDP profile session
 (`code=COERCED_BROWSER_CREATE`).
+
+## X login troubleshooting (#125)
+
+X login often stops at steps the generic `browser action=login` scaffold cannot
+complete alone. Treat every verification challenge as an **operator handoff** — never
+guess, bypass, or store codes in skill docs, commits, or logs.
+
+### Prerequisites
+
+1. **Persistent profile** — set `skills.browser.profile_dir` (or attach via
+   `SEVN_CDP_URL`). Cookies persist in the Chrome profile directory; reusing the same
+   profile avoids repeat login.
+2. **Credentials in secrets** — `browser action=login site=x credentials_ref=<alias>`
+   loads username/password from the workspace secrets store (never inline passwords).
+3. **Check readiness** — `run_skill_script social_media_manager session_status.py
+   --site x` reports CDP reachability and a cheap login probe (boolean only; no
+   secrets).
+
+### Typical flow
+
+```
+browser action=login site=x credentials_ref=SEVN_SECRET_X_CREDENTIALS
+```
+
+When X accepts credentials, the session is logged in and cookies remain in the profile.
+When X shows a challenge screen, the tool returns **`HUMAN_REQUIRED`** with a screenshot
+and `operator_message` — pause automation and coordinate with the operator.
+
+### Phone / SMS verification
+
+After username/password, X often sends a **phone or SMS verification code**.
+
+1. **Stop and ask the operator** for the current code via the active channel (Telegram,
+   dashboard, etc.). Do **not** invent codes or retry with stale values.
+2. **Enter the code in the browser** using `browser action=fill` on the verification
+   input (commonly `[data-testid='ocfEnterTextTextInput']`) followed by the submit/next
+   control, **or** ask the operator to type it directly in the headed Chrome window.
+3. **Never log the code** — do not echo it in tool results, agent replies, screenshot
+   filenames, or workspace files. Use it once for the current step only.
+4. Call `browser action=resume_login site=x` after entry to re-check login state.
+
+### Account picker ("Choose an account")
+
+After verification, X may show a **Choose an account** page listing display names and
+handles (e.g. `alexhawat / @alexhawat`).
+
+1. **Confirm the target handle** with the operator when multiple accounts appear.
+2. **Click the matching row** (display name or `@handle`) to continue — use
+   `browser action=click` with a text hint, or have the operator click in the browser.
+3. Call `browser action=resume_login site=x` again until `login_state` reports
+   `logged_in` or `[data-testid='SideNav_AccountSwitcher_Button']` is visible.
+
+### Cookie persistence
+
+Successful login writes session cookies into the **persistent Chrome profile**
+(`skills.browser.profile_dir` or `SEVN_BROWSER_PROFILE_DIR`). Subsequent
+`browser action=social site=x …` calls reuse that session without re-entering codes.
+
+Optional portability (seed-only):
+
+```
+browser action=export_cookies cookies_path=cookies/x-export.json
+browser action=import_cookies cookies_path=cookies/x-export.json
+```
+
+Cookie **values** must never appear in logs or agent output — only counts/paths.
+
+### Privacy rules
+
+- **No verification codes** in SKILL.md examples, git commits, issue comments, or log
+  lines.
+- **No passwords inline** — always `credentials_ref` pointing at workspace secrets.
+- **`session_status`** and login probes return booleans/hints only, never cookie or
+  token values.
+- Redact screenshots shared outside the operator channel if they show verification UI
+  with partially entered codes.
 
 ## Unified X ops facade (`x_ops`)
 
