@@ -8,7 +8,7 @@ summary: 'Tier B is the default “do work” executor for messages the Triager 
   as complexity == B (prd-04-getting-things-done §5.2): a single pydantic-ai Agent
   loop over the user’s incoming_text, with t'
 last_updated: '2026-08-01'
-fingerprint: sha256:6b20d0cd09f363c8296300048bb15e29b947d9758d7984d40a137328187f1623
+fingerprint: sha256:b09d7a6a83a3069880797a0c5b5b50c268f5c0f5bcdba042ffa67b9448afbe36
 related: []
 sources:
 - src/sevn/agent/**
@@ -391,6 +391,9 @@ interfaces:
 - name: install_tool_approval_bridge
   file: src/sevn/agent/adapters/tool_approval_bridge.py
   symbol: install_tool_approval_bridge
+- name: log_approval_decision
+  file: src/sevn/agent/adapters/tool_approval_bridge.py
+  symbol: log_approval_decision
 - name: reset_tool_approval_bridge_for_tests
   file: src/sevn/agent/adapters/tool_approval_bridge.py
   symbol: reset_tool_approval_bridge_for_tests

@@ -7,8 +7,8 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
-last_updated: '2026-07-31'
-fingerprint: sha256:6eaf6b5ce9419c5163d54a77682cd3a8bd0412fc6af82ac35c48bba119f46e50
+last_updated: '2026-08-01'
+fingerprint: sha256:2d25ec29ec6bf512b0e6aba8398bf0b8ad1a9fdea10e6a559f945d51996b749e
 related: []
 sources:
 - src/sevn/gateway/**
@@ -123,6 +123,9 @@ interfaces:
 - name: verify_telegram_secret
   file: src/sevn/gateway/auth.py
   symbol: verify_telegram_secret
+- name: verify_telegram_webhook_freshness
+  file: src/sevn/gateway/auth.py
+  symbol: verify_telegram_webhook_freshness
 - name: verify_webchat_jwt
   file: src/sevn/gateway/auth.py
   symbol: verify_webchat_jwt

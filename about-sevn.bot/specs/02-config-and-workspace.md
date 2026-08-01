@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Provide a single, testable configuration surface before storage, tracing,
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
-last_updated: '2026-07-31'
-fingerprint: sha256:cade67eeabc85de5a9a6e655d6ea01c620ddc9d4ee030fda773f823d22575128
+last_updated: '2026-08-01'
+fingerprint: sha256:b3fedd4b274d9a2fbdfe8e80cdb93c30c770e6548dd23a8494951a3bc57b0747
 related: []
 sources:
 - src/sevn/config/**
@@ -671,6 +671,9 @@ interfaces:
 - name: routing_section_dict
   file: src/sevn/config/sections/routing.py
   symbol: routing_section_dict
+- name: BitwardenBackendEntry
+  file: src/sevn/config/sections/secrets.py
+  symbol: BitwardenBackendEntry
 - name: EncryptedFileBackendEntry
   file: src/sevn/config/sections/secrets.py
   symbol: EncryptedFileBackendEntry
@@ -683,6 +686,9 @@ interfaces:
 - name: MacOSKeychainBackendEntry
   file: src/sevn/config/sections/secrets.py
   symbol: MacOSKeychainBackendEntry
+- name: OnePasswordBackendEntry
+  file: src/sevn/config/sections/secrets.py
+  symbol: OnePasswordBackendEntry
 - name: OpenBaoBackendEntry
   file: src/sevn/config/sections/secrets.py
   symbol: OpenBaoBackendEntry

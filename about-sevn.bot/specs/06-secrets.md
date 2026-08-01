@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver a single trust boundary for credentials: backend modules + TTL cache
   under src/sevn/security/, wired exclusively by the egress proxy (src/sevn/proxy/)
   so agent-facing processes never see raw k'
-last_updated: '2026-07-31'
-fingerprint: sha256:536494a42242b4b08323c9e2e5740e886e85ac3d4472c316fa548dabf563ce52
+last_updated: '2026-08-01'
+fingerprint: sha256:47a57b87fdbf7a2098ab3259c8365268c1f5492e2ddd24439a2cb532a72eb038
 related: []
 sources:
 - src/sevn/security/secrets/**
@@ -18,6 +18,9 @@ depends_on:
 - spec-02-config-and-workspace
 build_phase: null
 interfaces:
+- name: BitwardenCliBackend
+  file: src/sevn/security/secrets/backends/bitwarden.py
+  symbol: BitwardenCliBackend
 - name: EncryptedFileBackend
   file: src/sevn/security/secrets/backends/encrypted_file.py
   symbol: EncryptedFileBackend
@@ -30,6 +33,9 @@ interfaces:
 - name: MacOSKeychainBackend
   file: src/sevn/security/secrets/backends/macos_keychain.py
   symbol: MacOSKeychainBackend
+- name: OnePasswordCliBackend
+  file: src/sevn/security/secrets/backends/one_password.py
+  symbol: OnePasswordCliBackend
 - name: OpenBaoBackend
   file: src/sevn/security/secrets/backends/openbao.py
   symbol: OpenBaoBackend
@@ -102,6 +108,15 @@ interfaces:
 - name: SecretsBackend
   file: src/sevn/security/secrets/protocol.py
   symbol: SecretsBackend
+- name: SecretProvenanceReport
+  file: src/sevn/security/secrets/provenance.py
+  symbol: SecretProvenanceReport
+- name: provenance_for_cache_entry
+  file: src/sevn/security/secrets/provenance.py
+  symbol: provenance_for_cache_entry
+- name: resolve_secret_provenance
+  file: src/sevn/security/secrets/provenance.py
+  symbol: resolve_secret_provenance
 - name: bind_routing_secrets_scope
   file: src/sevn/security/secrets/routing_scope.py
   symbol: bind_routing_secrets_scope
