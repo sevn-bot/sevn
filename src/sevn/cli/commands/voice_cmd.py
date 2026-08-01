@@ -157,9 +157,9 @@ def _apply_activation_enabled(*, enabled: bool) -> WorkspaceConfig:
     bound = load_bound_workspace()
 
     def _mutate(doc: dict[str, Any]) -> None:
-        _set_nested(doc, "voice.activation.enabled", enabled)
         if enabled and doc.get("voice") is None:
             _set_nested(doc, "voice.enabled", True)
+        _set_nested(doc, "voice.activation.enabled", enabled)
 
     mutate_sevn_json(bound.layout.sevn_json_path, _mutate)
     return load_bound_workspace().config
