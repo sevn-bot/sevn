@@ -8,7 +8,7 @@ summary: Deliver the primary operator and automation surface for install, upgrad
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
 last_updated: '2026-08-01'
-fingerprint: sha256:8e90a6de0b7a37a48396917a5266b8769a04896fac8630b13a18eb17dc9b2414
+fingerprint: sha256:d8da840268bcd9fa136a0ddfe05d7bfd2c784fa4bb54bc71f19b06a184aa64b4
 related: []
 sources:
 - src/sevn/cli/**
@@ -708,6 +708,9 @@ interfaces:
 - name: uvicorn_program_argv
   file: src/sevn/cli/uvicorn_argv.py
   symbol: uvicorn_program_argv
+- name: resolve_cli_version_string
+  file: src/sevn/cli/version.py
+  symbol: resolve_cli_version_string
 - name: BoundWorkspace
   file: src/sevn/cli/workspace.py
   symbol: BoundWorkspace

@@ -1,7 +1,4 @@
-"""Batch A W1.2 — ``sevn --version`` branch-commit format (#123, D8).
-
-``resolve_cli_version_string()`` lands in W3; these tests stay RED (xfail) until then.
-"""
+"""Batch A W1.2 — ``sevn --version`` branch-commit format (#123, D8)."""
 
 from __future__ import annotations
 
@@ -100,7 +97,7 @@ def test_resolve_cli_version_string_from_git(tmp_path: Path) -> None:
 
 
 def test_version_json_still_collects_on_baseline(runner: ClickCliRunner) -> None:
-    """Baseline smoke — JSON envelope shape unchanged until W3 swaps ``cli_version`` value."""
+    """JSON envelope shape includes ``cli_version`` and ``python_version``."""
     result = runner.invoke(get_command(app), ["version", "--json"])
     assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)

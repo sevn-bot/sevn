@@ -113,7 +113,7 @@ def _root(
     """Handle global options before subcommands run.
     Args:
         ctx (typer.Context): Typer invocation context.
-        print_version (bool): When True, print semver and exit.
+        print_version (bool): When True, print branch-commit or package semver and exit.
         log_file (Path | None): Optional log file path.
         no_color (bool): Disable Rich/ANSI when True.
         no_cli_log (bool): Disable ``cli.log`` activity sink when True.

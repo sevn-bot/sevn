@@ -7,7 +7,7 @@ owner: Alex
 summary: 'Own the provider-chain facades for speech-to-text and text-to-speech so
   the gateway can:'
 last_updated: '2026-08-01'
-fingerprint: sha256:94ea2a7c8cf7eb5ba8cc5575949d25aaea088bfcb253185ed33d7fa2c961e6e3
+fingerprint: sha256:0d197ff98ec6f362e8fe3d045f6c2d4d69d689aa6c14c5eea421ce3374392f9e
 related: []
 sources:
 - src/sevn/voice/**
@@ -57,6 +57,12 @@ interfaces:
 - name: format_activation_status
   file: src/sevn/voice/activation.py
   symbol: format_activation_status
+- name: format_voice_activation_operator_reason
+  file: src/sevn/voice/activation.py
+  symbol: format_voice_activation_operator_reason
+- name: format_voice_activation_setup_guide
+  file: src/sevn/voice/activation.py
+  symbol: format_voice_activation_setup_guide
 - name: maybe_start_wake_word_listener
   file: src/sevn/voice/activation.py
   symbol: maybe_start_wake_word_listener
@@ -81,6 +87,9 @@ interfaces:
 - name: voice_activation_enabled
   file: src/sevn/voice/activation.py
   symbol: voice_activation_enabled
+- name: voice_activation_offline_reload_note
+  file: src/sevn/voice/activation.py
+  symbol: voice_activation_offline_reload_note
 - name: EdgeTtsBackend
   file: src/sevn/voice/backends.py
   symbol: EdgeTtsBackend

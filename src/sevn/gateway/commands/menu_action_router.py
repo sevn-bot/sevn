@@ -1445,16 +1445,9 @@ class MenuActionRouter:
         """
         runtime = getattr(self._router, "_voice_activation_runtime", None)
         if not isinstance(runtime, dict):
-            from sevn.voice.activation import probe_voice_activation
+            from sevn.voice.activation import voice_activation_offline_reload_note
 
-            verdict = probe_voice_activation(self._workspace)
-            reason = str(verdict.get("reason") or "").strip()
-            if reason:
-                return (
-                    "Listener offline — config saved. "
-                    f"{reason.replace('uv sync --extra ', 'install optional extra ')}"
-                )
-            return "Listener offline — config saved; run Setup wake-word or sevn doctor."
+            return voice_activation_offline_reload_note(self._workspace)
         from sevn.voice.activation import reload_voice_activation_runtime
 
         trace = runtime.get("trace")
@@ -1573,33 +1566,10 @@ class MenuActionRouter:
             True
         """
         _ = callback_data
-        from sevn.config.defaults import VOICE_WAKE_OPTIONAL_EXTRA
         from sevn.gateway.diagnostics.diagnostics import format_for_telegram
-        from sevn.voice.activation import probe_voice_activation, voice_activation_config_enabled
+        from sevn.voice.activation import format_voice_activation_setup_guide
 
-        probe = probe_voice_activation(self._workspace)
-        status = str(probe.get("status") or "unknown")
-        reason = str(probe.get("reason") or "").strip()
-        available = bool(probe.get("available"))
-        lines = [
-            "Wake-word setup (sevn doctor subset)",
-            "",
-            f"Status: {status}",
-        ]
-        if not voice_activation_config_enabled(self._workspace):
-            lines.append("Enable Wake word above, then tap Setup wake-word again.")
-        if reason:
-            safe_reason = reason.replace("uv sync --extra ", "install optional extra ")
-            lines.append(safe_reason)
-        if not available:
-            lines.extend(
-                [
-                    "",
-                    f"Install optional extra `{VOICE_WAKE_OPTIONAL_EXTRA}` on the gateway host.",
-                    "Run `sevn doctor` for the full voice activation check list.",
-                ],
-            )
-        body = "\n".join(lines)
+        body = format_voice_activation_setup_guide(self._workspace)
         await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
         await self._answer_chat_action(msg, "Wake-word setup guide sent")
         return None
