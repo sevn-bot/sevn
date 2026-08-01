@@ -42,8 +42,10 @@ from sevn.integrations.social_media.x_ops_pack import (
     pack_follow_body,
     pack_hashtags_body,
     pack_quote_body,
+    pack_replies_body,
     pack_thread_body,
     pack_timeline_path,
+    pack_tweet_detail_body,
     pack_tweet_id_path,
     pack_users_body,
     thread_items,
@@ -202,6 +204,26 @@ _OP_SPECS: dict[str, _OpSpec] = {
             is_write=True,
             pack_path=pack_tweet_id_path,
             pack_body=pack_empty_body,
+        ),
+        _OpSpec(
+            "collect_tweet_replies",
+            twex_key="replies_page",
+            browser_social_op="read_replies",
+            pack_path=pack_tweet_id_path,
+            pack_body=pack_replies_body,
+        ),
+        _OpSpec(
+            "get_tweet_stats",
+            twex_key="tweet_detail",
+            browser_social_op="read",
+            pack_body=pack_tweet_detail_body,
+        ),
+        _OpSpec(
+            "get_new_comments_on_tweet",
+            twex_key="replies_page",
+            browser_social_op="read_replies",
+            pack_path=pack_tweet_id_path,
+            pack_body=pack_replies_body,
         ),
     )
 }
@@ -429,7 +451,7 @@ def _task_dry_run(task: dict[str, Any]) -> bool:
 
 
 def _dry_run_envelope(op: str, medium: str, task: dict[str, Any]) -> dict[str, Any]:
-    """Build a planned-action envelope for write ops under dry-run (D11).
+    """Build a planned-action envelope for write/read ops under dry-run (D11).
 
     Args:
         op (str): Facade op name.
@@ -444,13 +466,116 @@ def _dry_run_envelope(op: str, medium: str, task: dict[str, Any]) -> dict[str, A
         'DRY_RUN'
     """
     safe_task = {k: v for k, v in task.items() if k not in ("cookie", "export_cookies", "cookies")}
+    planned: dict[str, Any] = {"dry_run": True, "planned": True, "task": safe_task}
+    if op in W13_TIMELINE_OPS:
+        planned["read"] = True
     return envelope(
         ok=True,
         medium=medium,
         op=op,
-        data={"dry_run": True, "planned": True, "task": safe_task},
+        data=planned,
         code="DRY_RUN",
     )
+
+
+def _reply_item_id(item: Any) -> str | None:
+    """Extract a reply tweet id from a TwexAPI/browser reply item.
+
+    Args:
+        item (Any): Reply record.
+
+    Returns:
+        str | None: Tweet id when present.
+
+    Examples:
+        >>> _reply_item_id({"id": "9"})
+        '9'
+    """
+    if not isinstance(item, dict):
+        return None
+    for key in ("id", "tweet_id", "rest_id", "id_str"):
+        raw = item.get(key)
+        if raw is not None and str(raw).strip():
+            return str(raw).strip()
+    return None
+
+
+def _extract_reply_items(data: Any) -> list[Any]:
+    """Return a reply list from common TwexAPI/browser payload shapes.
+
+    Args:
+        data (Any): API or parsed browser payload.
+
+    Returns:
+        list[Any]: Reply items (may be empty).
+
+    Examples:
+        >>> _extract_reply_items({"replies": [{"id": "1"}]})[0]["id"]
+        '1'
+    """
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict):
+        for key in ("replies", "comments", "items", "tweets", "data"):
+            raw = data.get(key)
+            if isinstance(raw, list):
+                return raw
+    return []
+
+
+def _filter_new_comments(data: Any, task: dict[str, Any]) -> Any:
+    """Keep only replies newer than ``since_id`` / ``last_seen_id`` when set.
+
+    Args:
+        data (Any): Raw replies payload.
+        task (dict[str, Any]): Task with optional ``since_id`` / ``last_seen_id``.
+
+    Returns:
+        Any: Filtered payload (same top-level shape when possible).
+
+    Examples:
+        >>> out = _filter_new_comments(
+        ...     {"replies": [{"id": "2"}, {"id": "1"}]},
+        ...     {"since_id": "1"},
+        ... )
+        >>> out["replies"][0]["id"]
+        '2'
+    """
+    since_raw = (
+        task.get("since_id") if task.get("since_id") is not None else task.get("last_seen_id")
+    )
+    if since_raw is None or not str(since_raw).strip():
+        return data
+    since_s = str(since_raw).strip()
+    items = _extract_reply_items(data)
+    if not items:
+        return data
+    filtered: list[Any] = []
+    for item in items:
+        reply_id = _reply_item_id(item)
+        if reply_id is None:
+            filtered.append(item)
+            continue
+        try:
+            if int(reply_id) > int(since_s):
+                filtered.append(item)
+        except ValueError:
+            if reply_id != since_s:
+                filtered.append(item)
+    if isinstance(data, list):
+        return filtered
+    if isinstance(data, dict):
+        out = dict(data)
+        for key in ("replies", "comments", "items", "tweets", "data"):
+            if key in out and isinstance(out[key], list):
+                out[key] = filtered
+                break
+        else:
+            out["items"] = filtered
+        out["filtered_since_id"] = since_s
+        out["new_count"] = len(filtered)
+        return out
+    return data
 
 
 def resolve_content_root(task: dict[str, Any]) -> Path:
@@ -500,6 +625,17 @@ def _browser_plan(op: str, task: dict[str, Any], site: str, social_op: str) -> d
     url = task.get("url") or task.get("tweet_url") or ""
     if op == "comment_on_tweet" and tweet_id and not url:
         url = f"https://x.com/i/status/{tweet_id}"
+    if (
+        tweet_id
+        and not url
+        and op
+        in (
+            "collect_tweet_replies",
+            "get_tweet_stats",
+            "get_new_comments_on_tweet",
+        )
+    ):
+        url = f"https://x.com/i/status/{tweet_id}"
     plan: dict[str, Any] = {
         "action": "social",
         "site": site,
@@ -522,6 +658,10 @@ def _browser_plan(op: str, task: dict[str, Any], site: str, social_op: str) -> d
         plan["texts"] = items
         if items and not body:
             plan["body"] = items[0]
+    if op == "get_new_comments_on_tweet":
+        for key in ("since_id", "since_cursor", "last_seen_id", "last_seen_at"):
+            if task.get(key) is not None:
+                plan[key] = task[key]
     return plan
 
 
@@ -618,6 +758,9 @@ async def _dispatch(
     medium = resolve_social_medium(task, smm_cfg(cfg), site)
 
     if is_write and _task_dry_run(task):
+        return _dry_run_envelope(op, medium, task)
+
+    if op in W13_TIMELINE_OPS and _task_dry_run(task):
         return _dry_run_envelope(op, medium, task)
 
     if op == "post_tweet_auto_cookie" and medium == "browser":
@@ -725,6 +868,8 @@ async def _dispatch(
                     body=body,
                     path_params=path_params,
                 )
+            if op == "get_new_comments_on_tweet":
+                data = _filter_new_comments(data, task)
             return envelope(ok=True, medium=medium, op=op, data=data)
         except TwexApiError as exc:
             return envelope(

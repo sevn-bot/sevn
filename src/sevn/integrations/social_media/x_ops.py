@@ -23,6 +23,7 @@ __all__ = [
     "FACADE_OPS",
     "advanced_search_page",
     "bookmark",
+    "collect_tweet_replies",
     "comment_on_tweet",
     "cookie_bridge_log_safe",
     "cookies_for_twexapi",
@@ -34,6 +35,8 @@ __all__ = [
     "delete_tweets",
     "fetch_article_markdown",
     "follow_user",
+    "get_new_comments_on_tweet",
+    "get_tweet_stats",
     "get_users_by_usernames",
     "home_timeline_collect",
     "like_tweet",
@@ -99,3 +102,6 @@ home_timeline_collect = _wrap("home_timeline_collect")
 session_status = _wrap("session_status")
 comment_on_tweet = _wrap("comment_on_tweet")
 react_tweet = _wrap("react_tweet")
+collect_tweet_replies = _wrap("collect_tweet_replies")
+get_tweet_stats = _wrap("get_tweet_stats")
+get_new_comments_on_tweet = _wrap("get_new_comments_on_tweet")

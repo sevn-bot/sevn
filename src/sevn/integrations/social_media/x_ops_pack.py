@@ -19,6 +19,8 @@ Exports:
     pack_users_body — usernames list body.
     pack_follow_body — follow-user body.
     pack_timeline_path — timeline screen_name path params.
+    pack_tweet_detail_body — tweet lookup array body.
+    pack_replies_body — replies-page body with optional cursor.
 """
 
 from __future__ import annotations
@@ -38,8 +40,10 @@ __all__ = [
     "pack_follow_body",
     "pack_hashtags_body",
     "pack_quote_body",
+    "pack_replies_body",
     "pack_thread_body",
     "pack_timeline_path",
+    "pack_tweet_detail_body",
     "pack_tweet_id_path",
     "pack_users_body",
     "thread_items",
@@ -306,6 +310,51 @@ def pack_follow_body(task: dict[str, Any]) -> dict[str, Any]:
     """
     username = str(task.get("username") or task.get("query") or "").lstrip("@")
     return {"username": username}
+
+
+def pack_tweet_detail_body(task: dict[str, Any]) -> list[str]:
+    """Pack TwexAPI ``tweet_detail`` array body from ``tweet_id``.
+
+    Args:
+        task (dict[str, Any]): Task with required ``tweet_id``.
+
+    Returns:
+        list[str]: Single-element tweet id list.
+
+    Raises:
+        ValueError: When ``tweet_id`` is missing or blank.
+
+    Examples:
+        >>> pack_tweet_detail_body({"tweet_id": "9"})
+        ['9']
+    """
+    tweet_id = str(task.get("tweet_id") or "").strip()
+    if not tweet_id:
+        msg = "tweet_id is required"
+        raise ValueError(msg)
+    return [tweet_id]
+
+
+def pack_replies_body(task: dict[str, Any]) -> dict[str, Any]:
+    """Pack TwexAPI ``replies_page`` body (pagination cursor optional).
+
+    Args:
+        task (dict[str, Any]): Task payload.
+
+    Returns:
+        dict[str, Any]: Sparse replies-page body.
+
+    Examples:
+        >>> pack_replies_body({"next_cursor": "abc"})["next_cursor"]
+        'abc'
+    """
+    body: dict[str, Any] = {}
+    for key in ("next_cursor", "cursor"):
+        raw = task.get(key)
+        if raw is not None and str(raw).strip():
+            body["next_cursor"] = str(raw).strip()
+            break
+    return body
 
 
 def pack_timeline_path(task: dict[str, Any]) -> dict[str, str]:
