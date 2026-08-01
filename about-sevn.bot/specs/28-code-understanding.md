@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the code-orientation stack the coding companion PRD names: five
   orthogonal capabilities (MYCODE, Memgraph CGR, code-review-graph (SQLite MCP), roam-code,
   Graphify) that Triager and executors c'
-last_updated: '2026-07-12'
-fingerprint: sha256:5a97e9841a414ba088717f40956b00e55c59c77add891779e0555da9bb2c9f93
+last_updated: '2026-07-30'
+fingerprint: sha256:020c0a42746098915a9305e685fdabd07350df6503316abfa2dfd5d454421d7d
 related: []
 sources:
 - src/sevn/code_understanding/**
@@ -263,11 +263,7 @@ interfaces:
 - name: orientation_block_for_workspace
   file: src/sevn/code_understanding/triager_orientation.py
   symbol: orientation_block_for_workspace
-specs: []
-personas: []
-prd_profile: null
 ---
-
 
 ## Purpose
 

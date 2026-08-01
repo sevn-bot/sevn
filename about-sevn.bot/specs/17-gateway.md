@@ -7,8 +7,8 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
-last_updated: '2026-07-31'
-fingerprint: sha256:013b318ebb0ff915601ff828bb48d9186999030437d4840c4993417553dcc2f2
+last_updated: '2026-08-01'
+fingerprint: sha256:2d25ec29ec6bf512b0e6aba8398bf0b8ad1a9fdea10e6a559f945d51996b749e
 related: []
 sources:
 - src/sevn/gateway/**
@@ -1029,12 +1029,18 @@ interfaces:
 - name: clear_dispatch_routing
   file: src/sevn/gateway/session_manager.py
   symbol: clear_dispatch_routing
+- name: clear_model_once_override
+  file: src/sevn/gateway/session_manager.py
+  symbol: clear_model_once_override
 - name: dispatch_routing_for
   file: src/sevn/gateway/session_manager.py
   symbol: dispatch_routing_for
 - name: format_lcm_status_lines
   file: src/sevn/gateway/session_manager.py
   symbol: format_lcm_status_lines
+- name: get_model_once_override
+  file: src/sevn/gateway/session_manager.py
+  symbol: get_model_once_override
 - name: get_tts_mode_override
   file: src/sevn/gateway/session_manager.py
   symbol: get_tts_mode_override
@@ -1050,6 +1056,9 @@ interfaces:
 - name: outbound_routing_for_session
   file: src/sevn/gateway/session_manager.py
   symbol: outbound_routing_for_session
+- name: set_model_once_override
+  file: src/sevn/gateway/session_manager.py
+  symbol: set_model_once_override
 - name: set_tts_mode_override
   file: src/sevn/gateway/session_manager.py
   symbol: set_tts_mode_override
@@ -1607,23 +1616,32 @@ spawned turn; the decision is logged as
 ``gateway.queue_classifier_timeout_spawned`` with ``prior_turn_id``,
 ``new_turn_id``, ``timeout_s``, and ``routing_action``.
 
+## Amendments (open-issues-sweep W10 — #88)
+
+`/model --once <provider/model>` stages a one-turn model override in
+`gateway_sessions.metadata_json` (`model_once_override`). The next agent turn
+consumes it via `SessionManager.take_model_once_override` at turn start and
+clears any remainder in `clear_model_once_override_after_turn` on all exit
+paths — mirroring `take_regen_target` lifecycle. Persisted
+`providers.tier_default.B` is unchanged; `/status` shows staged vs persisted
+model when an override is pending.
+
+## Amendments (open-issues-sweep W12 — #79)
+
+When `routing.enabled` is true, `build_agent_run_turn` resolves one routing
+profile per turn from `routing.channel_map` + session scope key, threads
+overrides through model resolution (session → routing profile → channel →
+workspace), prompt overlays, skill registry filtering, persona/memory namespace,
+permissions, and logs `routing_profile` on turn metadata. Unknown routes with
+`routing.unknown_route: deny` reject the turn before triage. `TopicConfig.skills`
+from Telegram inbound metadata intersects the profile skill allowlist.
+
 ## Amendments (telegram-menu-redesign W9)
 
 Telegram `/config` callback routing serves the redesigned eight-tile tree via
 `build_config_menu_keyboard()` and `MenuActionRouter`; stale `cfg:section:*` ids
 resolve through `_SECTION_ALIASES`. Section dispatch and action handlers are shared
 with the menu E2E walker recipe (`src/sevn/browser/recipes/telegram_menu.py`).
-
-## Amendments (open-issues-sweep W24, #81)
-
-`create_app` wraps the FastAPI surface in `IngressBodyLimitMiddleware`
-(`src/sevn/gateway/ingress_policy.py`) with `DEFAULT_MAX_INGRESS_BODY_BYTES`
-(1 MiB). Oversized HTTP bodies return **413** before route handlers; webchat
-`/ws/webchat` closes with code **1009** when the first auth frame exceeds the
-cap. Telegram and bearer-authenticated `/webhook/{channel}` handlers bind
-`bind_webhook_minimal_host_env()` so webhook-triggered subprocesses inherit a
-redacted host env. Signed GitHub webhooks reject stale
-`X-Hub-Signature-Timestamp` values (**401**) after HMAC verification.
 
 ## Test Strategy
 

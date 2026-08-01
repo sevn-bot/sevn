@@ -14,6 +14,9 @@ Exports:
     outbound_routing_for_session — best-effort session routing for operator notices.
     get_tts_mode_override — session-level TTS mode override reader.
     set_tts_mode_override — session-level TTS mode override writer.
+    get_model_once_override — one-turn model override reader (#88).
+    set_model_once_override — one-turn model override writer (#88).
+    clear_model_once_override — clear staged one-turn model override (#88).
     format_lcm_status_lines — LCM ingest/compaction hints for ``/status``.
     latest_messages — message-row dump helper for assertions.
     unanswered_tail_message_id — read ``unanswered_tail_message_id`` for tests.
@@ -574,6 +577,78 @@ class SessionManager:
             >>> sm.set_tts_mode_override("s", "all")  # doctest: +SKIP
         """
         set_tts_mode_override(self._conn, session_id, mode)
+
+    def set_model_once_override(self, session_id: str, model_id: str) -> None:
+        """Stage a one-shot tier-B model override for the next agent turn (#88).
+
+        Args:
+            session_id (str): Gateway session id.
+            model_id (str): Catalog model id (``provider/model``).
+
+        Examples:
+            >>> import sqlite3
+            >>> sm = SessionManager(sqlite3.connect(":memory:"))
+            >>> sm.set_model_once_override("s", "openai/gpt-4o")  # doctest: +SKIP
+        """
+        set_model_once_override(self._conn, session_id, model_id)
+
+    def peek_model_once_override(self, session_id: str) -> str | None:
+        """Return staged one-turn model override without consuming it.
+
+        Args:
+            session_id (str): Gateway session id.
+
+        Returns:
+            str | None: Staged model id, or ``None`` when unset.
+
+        Examples:
+            >>> import sqlite3
+            >>> from sevn.storage.migrate import apply_migrations
+            >>> c = sqlite3.connect(":memory:")
+            >>> apply_migrations(c)
+            >>> sm = SessionManager(c)
+            >>> sm.peek_model_once_override("s") is None
+            True
+        """
+        return get_model_once_override(self._conn, session_id)
+
+    def take_model_once_override(self, session_id: str) -> str | None:
+        """Return + clear the one-shot model override staged for the next turn.
+
+        Mirrors :meth:`take_regen_target` consume-and-clear semantics.
+
+        Args:
+            session_id (str): Gateway session id.
+
+        Returns:
+            str | None: Staged model id, or ``None`` when unset.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.isfunction(SessionManager.take_model_once_override)
+            True
+        """
+        value = get_model_once_override(self._conn, session_id)
+        if value is not None:
+            clear_model_once_override(self._conn, session_id)
+        return value
+
+    def clear_model_once_override_after_turn(self, session_id: str, *, success: bool) -> None:
+        """Ensure no one-turn model override survives turn end (success or failure).
+
+        Idempotent safety net when :meth:`take_model_once_override` already ran.
+
+        Args:
+            session_id (str): Gateway session id.
+            success (bool): Whether the turn finished without error.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.isfunction(SessionManager.clear_model_once_override_after_turn)
+            True
+        """
+        _ = success
+        clear_model_once_override(self._conn, session_id)
 
     def set_regen_target(
         self,
@@ -1528,6 +1603,7 @@ def format_lcm_status_lines(
 
 
 _TTS_MODE_OVERRIDE_KEY = "tts_mode_override"
+_MODEL_ONCE_OVERRIDE_KEY = "model_once_override"
 _VALID_TTS_MODES = frozenset({"off", "all", "when_asked"})
 
 
@@ -1661,6 +1737,94 @@ def set_tts_mode_override(
             raise ValueError(msg)
         meta[_TTS_MODE_OVERRIDE_KEY] = normalized
     _save_session_metadata(conn, session_id, meta)
+
+
+def get_model_once_override(conn: sqlite3.Connection, session_id: str) -> str | None:
+    """Return staged one-turn model override from ``metadata_json`` (#88).
+
+    Args:
+        conn (sqlite3.Connection): Open SQLite handle.
+        session_id (str): Target session id.
+
+    Returns:
+        str | None: Catalog model id when set.
+
+    Examples:
+        >>> import sqlite3
+        >>> from sevn.storage.migrate import apply_migrations
+        >>> c = sqlite3.connect(":memory:")
+        >>> apply_migrations(c)
+        >>> get_model_once_override(c, "s") is None
+        True
+    """
+    raw = _load_session_metadata(conn, session_id).get(_MODEL_ONCE_OVERRIDE_KEY)
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    return None
+
+
+def set_model_once_override(
+    conn: sqlite3.Connection,
+    session_id: str,
+    model_id: str,
+) -> None:
+    """Stage a one-turn model override in session metadata (#88).
+
+    Args:
+        conn (sqlite3.Connection): Open SQLite handle.
+        session_id (str): Target session id.
+        model_id (str): Catalog model id (``provider/model``).
+
+    Raises:
+        ValueError: When ``model_id`` is empty after strip.
+
+    Examples:
+        >>> import sqlite3
+        >>> from sevn.storage.migrate import apply_migrations
+        >>> c = sqlite3.connect(":memory:")
+        >>> apply_migrations(c)
+        >>> _ = c.execute(
+        ...     "INSERT INTO gateway_sessions(session_id, scope_key, channel, user_id, created_at, updated_at) VALUES (?,?,?,?,?,?)",
+        ...     ("s", "k", "telegram", "1", "t", "t"),
+        ... )
+        >>> c.commit()
+        >>> set_model_once_override(c, "s", "openai/gpt-4o")
+        >>> get_model_once_override(c, "s")
+        'openai/gpt-4o'
+    """
+    model = model_id.strip()
+    if not model:
+        msg = "model_once_override requires a non-empty model id"
+        raise ValueError(msg)
+    meta = _load_session_metadata(conn, session_id)
+    meta[_MODEL_ONCE_OVERRIDE_KEY] = model
+    _save_session_metadata(conn, session_id, meta)
+
+
+def clear_model_once_override(conn: sqlite3.Connection, session_id: str) -> bool:
+    """Clear staged one-turn model override when present.
+
+    Args:
+        conn (sqlite3.Connection): Open SQLite handle.
+        session_id (str): Target session id.
+
+    Returns:
+        bool: ``True`` when a value was cleared.
+
+    Examples:
+        >>> import sqlite3
+        >>> from sevn.storage.migrate import apply_migrations
+        >>> c = sqlite3.connect(":memory:")
+        >>> apply_migrations(c)
+        >>> clear_model_once_override(c, "missing")
+        False
+    """
+    meta = _load_session_metadata(conn, session_id)
+    if _MODEL_ONCE_OVERRIDE_KEY not in meta:
+        return False
+    meta.pop(_MODEL_ONCE_OVERRIDE_KEY, None)
+    _save_session_metadata(conn, session_id, meta)
+    return True
 
 
 def load_session_row(conn: sqlite3.Connection, session_id: str) -> SessionRow | None:

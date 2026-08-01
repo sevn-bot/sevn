@@ -28,7 +28,9 @@ Exports:
     resolve_llm_request_params — agent+model+transport → filtered request kwargs.
     resolve_reasoning_params — resolved reasoning config for one call.
     resolve_reasoning_request — optional provider ``thinking`` body (B/C, default off).
+    resolve_reasoning_for_turn — turn-scoped reasoning wire body with provider degradation.
     resolve_minimax_thinking_request — deprecated alias for :func:`resolve_reasoning_request`.
+    provider_supports_reasoning_wire — whether a model accepts MiniMax-style ``thinking`` body.
     load_or_create_llm_params_doc — read workspace params or copy built-in defaults.
     write_llm_params_doc — validate and atomically persist ``LLM_params_config.json``.
     set_agent_model_max_output_tokens — set agent- or model-level ``max_output_tokens``.
@@ -50,6 +52,8 @@ import copy
 import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Final
+
+from loguru import logger
 
 from sevn.config.defaults import (
     DREAMING_MAX_OUTPUT_TOKENS,
@@ -89,6 +93,9 @@ REASONING_AGENTS: Final[frozenset[str]] = frozenset({"tier_b", "tier_cd"})
 MINIMAX_THINKING_AGENTS: Final[frozenset[str]] = REASONING_AGENTS
 
 _REASONING_TYPES: Final[frozenset[str]] = frozenset({"adaptive", "enabled"})
+REASONING_EFFORT_LEVELS: Final[frozenset[str]] = frozenset(
+    {"minimal", "low", "medium", "high", "xhigh"}
+)
 
 # MiniMax officially recommended sampling values (plan D4).
 _MINIMAX_SAMPLING_DEFAULTS: Final[dict[str, float | int]] = {
@@ -188,6 +195,7 @@ class ReasoningParams:
         enabled (bool): When ``True``, emit a provider ``thinking`` body.
         type (str): ``adaptive`` or ``enabled`` (MiniMax extended thinking).
         budget_tokens (int | None): Token budget when ``type`` is ``enabled``.
+        effort (str | None): Named effort level (``minimal`` … ``xhigh``) when set.
 
     Examples:
         >>> ReasoningParams().as_thinking_request() is None
@@ -197,6 +205,7 @@ class ReasoningParams:
     enabled: bool = False
     type: str = "adaptive"
     budget_tokens: int | None = None
+    effort: str | None = None
 
     def as_thinking_request(self) -> dict[str, object] | None:
         """Return provider ``thinking`` body when enabled.
@@ -341,6 +350,11 @@ def _validate_reasoning_block(block: object, where: str) -> None:
             raise ValueError(msg)
         if reasoning_type != "enabled":
             msg = f"{where}.reasoning.budget_tokens requires reasoning.type == 'enabled'"
+            raise ValueError(msg)
+    if "effort" in block and block["effort"] is not None:
+        effort = block.get("effort")
+        if not isinstance(effort, str) or effort.strip().lower() not in REASONING_EFFORT_LEVELS:
+            msg = f"{where}.reasoning.effort must be one of {sorted(REASONING_EFFORT_LEVELS)}"
             raise ValueError(msg)
 
 
@@ -794,20 +808,64 @@ def resolve_effective_max_output_tokens(
     return min(positive) if positive else 1
 
 
+def _normalize_reasoning_effort(value: object) -> str | None:
+    """Return a validated effort label when ``value`` is a known level.
+
+    Args:
+        value (object): Candidate effort string.
+
+    Returns:
+        str | None: Normalized effort or ``None`` when absent/invalid.
+
+    Examples:
+        >>> _normalize_reasoning_effort(" High ")
+        'high'
+        >>> _normalize_reasoning_effort("bogus") is None
+        True
+    """
+    if not isinstance(value, str) or not value.strip():
+        return None
+    normalized = value.strip().lower()
+    if normalized not in REASONING_EFFORT_LEVELS:
+        return None
+    return normalized
+
+
+def provider_supports_reasoning_wire(model_id: str) -> bool:
+    """Return whether ``model_id`` accepts a MiniMax-style ``thinking`` request body.
+
+    Args:
+        model_id (str): Resolved catalog model id.
+
+    Returns:
+        bool: ``True`` for MiniMax catalog ids on the anthropic wire today.
+
+    Examples:
+        >>> provider_supports_reasoning_wire("minimax/MiniMax-M2.7")
+        True
+        >>> provider_supports_reasoning_wire("anthropic/claude-sonnet-4-20250514")
+        False
+    """
+    return is_minimax_catalog_model(model_id)
+
+
 def resolve_reasoning_params(
     agent: str,
     model_id: str,
     *,
     content_root: Path | None = None,
+    route_reasoning_effort: str | None = None,
 ) -> ReasoningParams:
     """Resolve extended-reasoning config for ``agent`` + ``model_id``.
 
-    Only tier B/C agents on MiniMax catalog ids may return an enabled config.
+    Tier B/C agents may return an enabled config; the triager is always excluded.
+    Provider capability is checked at request time via :func:`resolve_reasoning_for_turn`.
 
     Args:
         agent (str): One of :data:`AGENT_NAMES`.
         model_id (str): Resolved model id for the call.
         content_root (Path | None): Workspace content root for overrides.
+        route_reasoning_effort (str | None): Turn-scoped effort overlay (**W11** / W9).
 
     Returns:
         ReasoningParams: Resolved reasoning bundle (disabled when inapplicable).
@@ -816,7 +874,7 @@ def resolve_reasoning_params(
         >>> resolve_reasoning_params("triager", "minimax/MiniMax-M2").enabled
         False
     """
-    if agent not in REASONING_AGENTS or not is_minimax_catalog_model(model_id):
+    if agent not in REASONING_AGENTS:
         return ReasoningParams()
     values = _merged_agent_values(agent, model_id, content_root=content_root)
     raw = values.get("reasoning")
@@ -826,11 +884,57 @@ def resolve_reasoning_params(
     reasoning_type = str(raw.get("type", "adaptive"))
     budget_raw = raw.get("budget_tokens")
     budget_tokens = budget_raw if isinstance(budget_raw, int) else None
+    effort = _normalize_reasoning_effort(route_reasoning_effort)
+    if effort is None:
+        effort = _normalize_reasoning_effort(raw.get("effort"))
     return ReasoningParams(
         enabled=enabled,
         type=reasoning_type,
         budget_tokens=budget_tokens,
+        effort=effort,
     )
+
+
+def resolve_reasoning_for_turn(
+    agent: str,
+    model_id: str,
+    *,
+    content_root: Path | None = None,
+    route_reasoning_effort: str | None = None,
+) -> dict[str, object] | None:
+    """Resolve optional provider ``thinking`` body for one turn (#89 / W11).
+
+    Unsupported providers log a degradation note and return ``None`` rather than
+    emitting an unsupported wire parameter. The triager never sends thinking.
+
+    Args:
+        agent (str): Agent key (``tier_b`` or ``tier_cd`` when thinking may apply).
+        model_id (str): Resolved model id for the call.
+        content_root (Path | None): Workspace content root for overrides.
+        route_reasoning_effort (str | None): Turn-scoped effort overlay.
+
+    Returns:
+        dict[str, object] | None: Provider ``thinking`` body when enabled and supported.
+
+    Examples:
+        >>> resolve_reasoning_for_turn("triager", "minimax/MiniMax-M2") is None
+        True
+    """
+    params = resolve_reasoning_params(
+        agent,
+        model_id,
+        content_root=content_root,
+        route_reasoning_effort=route_reasoning_effort,
+    )
+    if not params.enabled:
+        return None
+    if not provider_supports_reasoning_wire(model_id):
+        logger.info(
+            "reasoning unsupported for model %r — degrading (skipping wire thinking param)",
+            model_id,
+        )
+        return None
+    return params.as_thinking_request()
 
 
 def resolve_reasoning_request(
@@ -858,9 +962,7 @@ def resolve_reasoning_request(
         >>> resolve_reasoning_request("tier_b", "minimax/MiniMax-M2") is None
         True
     """
-    return resolve_reasoning_params(
-        agent, model_id, content_root=content_root
-    ).as_thinking_request()
+    return resolve_reasoning_for_turn(agent, model_id, content_root=content_root)
 
 
 def resolve_minimax_thinking_request(

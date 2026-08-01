@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the primary daily-driver channel for personal messaging: a ChannelAdapter
   implementation that normalises Telegram Updates into spec-17-gateway IncomingMessage
   / OutgoingMessage and implements '
-last_updated: '2026-07-31'
-fingerprint: sha256:8b387643bdeac57e14abd497e9a673d52b25e7f7cc4bbfb24b8961fceb7ff128
+last_updated: '2026-08-01'
+fingerprint: sha256:ecd84d73a0b721d49c7a68228a0a490e60418410341c6348a84d0e731798da09
 related: []
 sources:
 - src/sevn/channels/**
@@ -533,6 +533,21 @@ persona/display-name — not the run inventory. Menu-action callback toasts use 
 `TelegramAdapter.answer_callback` (with `_api("answerCallbackQuery")` fallback); when the
 inline answer fails, identity buttons (Version id / Deployment id) still emit chat fallback
 text. Slash `/stop` kill callbacks re-edit the picker message and ack the callback query.
+
+## Amendments (open-issues-sweep W10 — #88)
+
+Slash `/model --once <provider/model>` sets a one-turn model override for the
+active chat session without persisting to `sevn.json`. The operator sees staged
+vs persisted model on `/status`; the menu registry notes `/model toggle` and
+`--once` on the B8 slash row.
+
+## Amendments (open-issues-sweep W9 — #86)
+
+``TopicConfig.system_prompt`` and ``TopicConfig.skills`` (forum topics) are wired from
+Telegram inbound metadata into turn-scoped prompt and skill overlays. Per-channel
+``channels.telegram.model`` / ``.system_prompt`` and per-topic overrides participate in
+the W9 precedence chain; unset keys leave resolution identical to pre-batch behavior
+(**D9**).
 
 ## Amendments (telegram-menu-redesign W9)
 

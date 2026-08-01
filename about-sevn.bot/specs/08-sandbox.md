@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / safebash
   (when routed through the execution sandbox), process when configured for sandbox
   routing, and skill subprocesses spawned b
-last_updated: '2026-07-31'
-fingerprint: sha256:95d3b292d439ca974288e775bcc65ba5a57e97470442104afc7ada3fdc563ccc
+last_updated: '2026-08-01'
+fingerprint: sha256:d3f4d5940a854912157bee118849ef01f110eda349f8cd3ee2340c38c35429e3
 related: []
 sources:
 - src/sevn/security/**
@@ -316,6 +316,18 @@ interfaces:
 - name: resolve_secret_provenance
   file: src/sevn/security/secrets/provenance.py
   symbol: resolve_secret_provenance
+- name: bind_routing_secrets_scope
+  file: src/sevn/security/secrets/routing_scope.py
+  symbol: bind_routing_secrets_scope
+- name: current_routing_secrets_scope
+  file: src/sevn/security/secrets/routing_scope.py
+  symbol: current_routing_secrets_scope
+- name: reset_routing_secrets_scope
+  file: src/sevn/security/secrets/routing_scope.py
+  symbol: reset_routing_secrets_scope
+- name: scoped_secret_logical_key
+  file: src/sevn/security/secrets/routing_scope.py
+  symbol: scoped_secret_logical_key
 - name: EnvUnresolvedError
   file: src/sevn/security/secrets/value_expand.py
   symbol: EnvUnresolvedError

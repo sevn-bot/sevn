@@ -89,6 +89,7 @@ class NativeModelContext:
     workspace_id: str | None = None
     executor_tier: str | None = None
     triager_bound_tool_choice: TriagerBoundToolChoiceContext | None = None
+    route_reasoning_effort: str | None = None
 
 
 def _transport_name_for_model(
@@ -394,6 +395,7 @@ def _minimax_hygiene_context(ctx: NativeModelContext) -> MiniMaxHygieneContext:
         workspace_id=ctx.workspace_id,
         executor_tier=ctx.executor_tier or ctx.tier,
         triager_bound_tool_choice=ctx.triager_bound_tool_choice,
+        route_reasoning_effort=ctx.route_reasoning_effort,
     )
 
 
@@ -627,6 +629,7 @@ def default_native_model_context(
     workspace_id: str | None = None,
     executor_tier: str | None = None,
     triager_bound_tool_choice: TriagerBoundToolChoiceContext | None = None,
+    route_reasoning_effort: str | None = None,
 ) -> NativeModelContext:
     """Convenience builder for :class:`NativeModelContext` with proxy secret resolution.
 
@@ -652,6 +655,7 @@ def default_native_model_context(
         executor_tier (str | None): Executor tier label for MiniMax ``metadata``.
         triager_bound_tool_choice (TriagerBoundToolChoiceContext | None): Per-turn
             triager-bound ``tool_choice`` escalation for native MiniMax models.
+        route_reasoning_effort (str | None): Turn-scoped reasoning effort overlay (**W11**).
 
     Returns:
         NativeModelContext: Context ready for :func:`resolve_pydantic_model_for_slot`.
@@ -691,6 +695,7 @@ def default_native_model_context(
         workspace_id=workspace_id,
         executor_tier=executor_tier,
         triager_bound_tool_choice=triager_bound_tool_choice,
+        route_reasoning_effort=route_reasoning_effort,
     )
 
 

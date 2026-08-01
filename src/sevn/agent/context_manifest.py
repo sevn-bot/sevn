@@ -243,6 +243,7 @@ def tier_b_system_prompt_builders(
     triager_bound_tool_picks: Sequence[str] = (),
     skill_descriptions: Mapping[str, str] | None = None,
     workspace: object | None = None,
+    extra_instructions: str | None = None,
 ) -> list[str]:
     """Build ordered tier-B full-turn ``system_prompt`` parts with conditional blocks.
 
@@ -255,6 +256,7 @@ def tier_b_system_prompt_builders(
         triager_bound_tool_picks (Sequence[str]): Triager-narrowed tool ids.
         skill_descriptions (Mapping[str, str] | None): Skill summaries for persona block.
         workspace (object | None): Workspace config for repo-access block.
+        extra_instructions (str | None): Turn-scoped channel/topic system prompt overlay.
 
     Returns:
         list[str]: Prompt fragments honoring ``TIER_B_SYSTEM_BLOCK_IDS`` conditionals.
@@ -307,6 +309,8 @@ def tier_b_system_prompt_builders(
             parts.append(tier_b_repo_access_prompt(workspace, content_root))  # type: ignore[arg-type]
             continue
         parts.append(_TIER_B_BUILDERS[block_id](content_root))
+    if extra_instructions and extra_instructions.strip():
+        parts.append(extra_instructions.strip())
     return parts
 
 

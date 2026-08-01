@@ -7,8 +7,8 @@ owner: Alex
 summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–§5.2):
   a single, tool-less outbound generation step that emits validated TriageResult consumed
   by tier dispatch (A / B / C / D), MCP e'
-last_updated: '2026-07-31'
-fingerprint: sha256:12e61f0fb422cdd25cbcc4fcbb2d7215698c5d8bf2d3b5736844552157fbf58b
+last_updated: '2026-08-01'
+fingerprint: sha256:b09d7a6a83a3069880797a0c5b5b50c268f5c0f5bcdba042ffa67b9448afbe36
 related: []
 sources:
 - src/sevn/agent/**
@@ -128,6 +128,9 @@ interfaces:
 - name: provider_supports_native_web_search
   file: src/sevn/agent/adapters/tier_b_capabilities.py
   symbol: provider_supports_native_web_search
+- name: provider_supports_reasoning_capability
+  file: src/sevn/agent/adapters/tier_b_capabilities.py
+  symbol: provider_supports_reasoning_capability
 - name: registry_tool_names_owned_by_web_capabilities
   file: src/sevn/agent/adapters/tier_b_capabilities.py
   symbol: registry_tool_names_owned_by_web_capabilities
@@ -734,6 +737,15 @@ interfaces:
 - name: tier_b_workspace_roots_prompt
   file: src/sevn/agent/persona.py
   symbol: tier_b_workspace_roots_prompt
+- name: PromptOverlaySource
+  file: src/sevn/agent/prompt_overlays.py
+  symbol: PromptOverlaySource
+- name: TurnPromptOverlays
+  file: src/sevn/agent/prompt_overlays.py
+  symbol: TurnPromptOverlays
+- name: resolve_turn_prompt_overlays
+  file: src/sevn/agent/prompt_overlays.py
+  symbol: resolve_turn_prompt_overlays
 - name: BudgetRegime
   file: src/sevn/agent/providers/budget.py
   symbol: BudgetRegime
@@ -1458,3 +1470,7 @@ The triager adapter runs on the same **pydantic-ai v2** stack as tier B (monty-0
 ### 10.3 open-issues-sweep W7 — classifier-timeout spawn notice — append-only
 
 On relatedness classifier timeout in ``multi`` queue mode, ``classify_relatedness`` returns ``new_task`` with ``fallback=True`` (D15). The gateway spawns a concurrent L1 tier-B turn and preserves dispatch routing extras — but does **not** emit a user-facing timeout notice on the in-flight turn's bubble or as a standalone assistant row (#70). Operators diagnose the fallback via ``gateway.queue_classifier_timeout_spawned`` (prior/new turn ids, ``timeout_s``, ``routing_action``) plus the existing ``relatedness_classifier_timeout`` log from ``classify_relatedness``.
+
+### 10.4 open-issues-sweep W11 — triager excludes reasoning wire — append-only
+
+When reasoning-effort routing is enabled workspace-wide (**#89**), ``resolve_reasoning_for_turn("triager", …)`` always returns ``None`` — the triager never sends thinking/reasoning wire parameters regardless of channel, profile, or ``LLM_params_config.json`` effort settings. Channel-aware model resolution still applies via ``resolve_model_slot_for_turn`` at the triager read site.

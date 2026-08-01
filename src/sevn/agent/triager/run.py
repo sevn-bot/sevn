@@ -91,6 +91,7 @@ from sevn.config.model_resolution import (
     ModelSlot,
     native_model_enabled,
     resolve_main_model_id,
+    resolve_model_slot_for_turn,
     resolve_transport_for_model_id,
 )
 from sevn.config.sections.providers import providers_section_dict
@@ -244,6 +245,10 @@ def resolve_triager_model_id_for_turn(
     *,
     triage_context: TriagePromptContext,
     triager_cfg: TriagerWorkspaceConfig,
+    channel: str = "",
+    scope_key: str | None = None,
+    session_once_model: str | None = None,
+    routing_profile_model: str | None = None,
 ) -> str:
     """Pick triager model id for this turn (main or optional cheap continuation model).
 
@@ -251,10 +256,17 @@ def resolve_triager_model_id_for_turn(
     short continuation, route triage through the cheaper model while tier-B/C/D
     executors keep their own ``providers.tier_default`` slots.
 
+    Channel/topic overlays apply via :func:`resolve_model_slot_for_turn` when
+    the cheap-model shortcut does not fire (**W9**).
+
     Args:
         workspace (Workspace): Validated workspace config.
         triage_context (TriagePromptContext): Per-call suffix inputs.
         triager_cfg (TriagerWorkspaceConfig): Resolved triager knobs.
+        channel (str): Active channel adapter name.
+        scope_key (str | None): Session scope key for topic-level overrides.
+        session_once_model (str | None): One-turn session model override (**W10** hook).
+        routing_profile_model (str | None): Named routing profile model (**W12** hook).
 
     Returns:
         str: Model id for the structured triage LLM call.
@@ -269,15 +281,28 @@ def resolve_triager_model_id_for_turn(
         'anthropic:claude-3-5-haiku'
     """
     cheap = triager_cfg.cheap_model_id
+    profile_model = (
+        routing_profile_model.strip()
+        if isinstance(routing_profile_model, str) and routing_profile_model.strip()
+        else ""
+    )
     if (
         cheap
         and cheap.strip()
+        and not profile_model
         and is_obvious_continuation_message(triage_context.current_message)
         and not triage_context.is_first_session
         and not triage_context.bootstrap_capture_active
     ):
         return cheap.strip()
-    return resolve_triager_model_id(workspace)
+    return resolve_model_slot_for_turn(
+        workspace,
+        ModelSlot.triager,
+        channel=channel,
+        scope_key=scope_key,
+        session_once_model=session_once_model,
+        routing_profile_model=routing_profile_model,
+    ).model_id
 
 
 def resolve_triager_model_id(workspace: Workspace) -> str:
@@ -1178,6 +1203,10 @@ async def triage_turn(
     content_root: Path | None = None,
     trace: TraceSink | None = None,
     turn_span_id: str | None = None,
+    channel: str = "",
+    scope_key: str | None = None,
+    session_once_model: str | None = None,
+    routing_profile_model: str | None = None,
 ) -> TriageResult:
     """Run one structured routing pass (`specs/13` §2).
     Args:
@@ -1191,6 +1220,10 @@ async def triage_turn(
         content_root (Path | None): Workspace content root for persona ``system_prompt``.
         trace (TraceSink | None): Optional gateway trace sink for ``triage.*`` spans.
         turn_span_id (str | None): Turn root span id (``gateway.turn.start`` parent).
+        channel (str): Active channel adapter name for turn-scoped model overlays.
+        scope_key (str | None): Session scope key for topic-level model overrides.
+        session_once_model (str | None): One-turn session model override (**W10** hook).
+        routing_profile_model (str | None): Named routing profile model (**W12** hook).
     Returns:
         TriageResult: Validated and finalised triage result (after caps,
             filtering, and coercion rules).
@@ -1223,6 +1256,10 @@ async def triage_turn(
             workspace,
             triage_context=triage_context,
             triager_cfg=cfg,
+            channel=channel,
+            scope_key=scope_key,
+            session_once_model=session_once_model,
+            routing_profile_model=routing_profile_model,
         )
     except TriagerUnavailable:
         model_id = "unknown"
@@ -1428,6 +1465,10 @@ async def triage_turn(
             workspace,
             triage_context=merged_ctx,
             triager_cfg=cfg,
+            channel=channel,
+            scope_key=scope_key,
+            session_once_model=session_once_model,
+            routing_profile_model=routing_profile_model,
         )
         providers = providers_section_dict(workspace.providers)
         transport_name = resolve_triager_transport_name(providers, call_model_id)

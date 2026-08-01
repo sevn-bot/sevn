@@ -148,6 +148,9 @@ class TelegramChannelConfig(BaseModel):
     commands_locale: list[str] | None = None
     parse_mode: str | None = None
     owner_scanner_overrides: OwnerScannerOverrides = Field(default_factory=OwnerScannerOverrides)
+    model: str | None = None
+    system_prompt: str | None = None
+    reasoning_effort: str | None = None
 
 
 class WebChatChannelConfig(BaseModel):
@@ -163,6 +166,9 @@ class WebChatChannelConfig(BaseModel):
     jwt_secret: str | None = None
     jwt_secret_ref: str | None = None
     telegram_bot_token_ref: str | None = None
+    model: str | None = None
+    system_prompt: str | None = None
+    reasoning_effort: str | None = None
 
 
 class VoiceConfig(BaseModel):

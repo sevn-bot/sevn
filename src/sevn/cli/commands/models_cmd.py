@@ -48,7 +48,14 @@ def _format_llm_params(body: dict[str, Any]) -> str:
             if isinstance(val, dict):
                 temp = val.get("temperature")
                 top_p = val.get("top_p")
-                lines.append(f"  {key}: temperature={temp!r} top_p={top_p!r}")
+                reasoning = val.get("reasoning")
+                line = f"  {key}: temperature={temp!r} top_p={top_p!r}"
+                if isinstance(reasoning, dict):
+                    effort = reasoning.get("effort")
+                    enabled = reasoning.get("enabled")
+                    rtype = reasoning.get("type")
+                    line += f" reasoning={{enabled={enabled!r}, type={rtype!r}, effort={effort!r}}}"
+                lines.append(line)
             else:
                 lines.append(f"  {key}: {val!r}")
     return "\n".join(lines)

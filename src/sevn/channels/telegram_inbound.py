@@ -293,6 +293,52 @@ class TelegramInboundMixin(TelegramSendHost):
             return None
         return bool(tcfg.disable_link_preview)
 
+    def _topic_system_prompt(self, topic_id: int | None) -> str | None:
+        """Return per-topic system prompt when configured (**W9.5**).
+
+        ``TopicConfig.skills`` remains unwired here — profile/skill routing is W12.
+
+        Args:
+            topic_id (int | None): Normalised forum topic id.
+
+        Returns:
+            str | None: Topic system prompt, or ``None`` when unset.
+
+        Examples:
+            >>> from sevn.channels.telegram import TelegramAdapter
+            >>> adapter = TelegramAdapter(resolved_bot_token="t")
+            >>> adapter._topic_system_prompt(None) is None
+            True
+        """
+        if topic_id is None:
+            return None
+        tcfg = self._cfg.topics.get(topic_id)
+        if tcfg is None or not tcfg.system_prompt:
+            return None
+        return tcfg.system_prompt.strip() or None
+
+    def _topic_skills(self, topic_id: int | None) -> list[str]:
+        """Return per-topic skill allowlist when configured (**W12**).
+
+        Args:
+            topic_id (int | None): Normalised forum topic id.
+
+        Returns:
+            list[str]: Skill ids from ``TopicConfig.skills``, or empty when unset.
+
+        Examples:
+            >>> from sevn.channels.telegram import TelegramAdapter
+            >>> adapter = TelegramAdapter(resolved_bot_token="t")
+            >>> adapter._topic_skills(None)
+            []
+        """
+        if topic_id is None:
+            return []
+        tcfg = self._cfg.topics.get(topic_id)
+        if tcfg is None or not tcfg.skills:
+            return []
+        return [str(s).strip() for s in tcfg.skills if str(s).strip()]
+
     def _attachment_descriptors(self, msg: dict[str, Any]) -> list[dict[str, Any]]:
         """Project attachments from a Telegram message into ``IncomingMessage`` rows.
         Picks the largest photo entry (last in the Telegram ``photo`` list)
@@ -600,6 +646,12 @@ class TelegramInboundMixin(TelegramSendHost):
             "callback_data": data,
             "telegram_chat_id": str(chat_id),
         }
+        topic_prompt = self._topic_system_prompt(topic_id)
+        if topic_prompt:
+            meta["topic_system_prompt"] = topic_prompt
+        topic_skills = self._topic_skills(topic_id)
+        if topic_skills:
+            meta["topic_skills"] = topic_skills
         return IncomingMessage(
             channel=self.name,
             user_id=str(uid),
@@ -870,6 +922,12 @@ class TelegramInboundMixin(TelegramSendHost):
             "session_scope_override": _session_scope_override(chat_id, topic_id),
             "telegram_chat_id": str(chat_id),
         }
+        topic_prompt = self._topic_system_prompt(topic_id)
+        if topic_prompt:
+            meta["topic_system_prompt"] = topic_prompt
+        topic_skills = self._topic_skills(topic_id)
+        if topic_skills:
+            meta["topic_skills"] = topic_skills
         meta.update(meta_extras)
         if suppress_bot_self_quote:
             meta["reply_to_quote"] = None

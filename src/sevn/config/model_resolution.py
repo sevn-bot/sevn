@@ -8,6 +8,9 @@ Exports:
     use_main_model_for_all — read unified-model flag (default true).
     resolve_main_model_id — ``providers.tier_default.triager``.
     resolve_model_slot — slot-specific id with unified / override rules.
+    ModelResolutionSource — provenance for turn-scoped model resolution.
+    ModelResolutionResult — resolved model id + source for one turn.
+    resolve_model_slot_for_turn — turn overlay: session → channel → workspace.
     resolve_transport_for_model_id — transport label from ``providers.models`` / ``minimax/`` default.
     is_minimax_catalog_model — True when catalog id uses ``minimax/`` prefix.
     is_minimax_model — True for MiniMax by catalog id or bare vendor wire name.
@@ -39,9 +42,11 @@ Exports:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from sevn.config.channel_overrides import resolve_channel_model_override
 from sevn.config.defaults import (
     DEFAULT_CODEMODE_DYNAMIC_CATALOG,
     DEFAULT_CODEMODE_ENABLED,
@@ -338,6 +343,101 @@ def resolve_model_slot(cfg: object, slot: ModelSlot) -> str:
     if override is not None:
         return override
     return resolve_main_model_id(cfg)
+
+
+class ModelResolutionSource(StrEnum):
+    """Provenance label for :func:`resolve_model_slot_for_turn`."""
+
+    default = "default"
+    workspace = "workspace"
+    channel = "channel"
+    routing_profile = "routing_profile"
+    session = "session"
+
+
+@dataclass(frozen=True)
+class ModelResolutionResult:
+    """Turn-scoped model resolution with provenance (#86 / W9)."""
+
+    model_id: str
+    source: ModelResolutionSource
+
+
+def _workspace_model_source(cfg: object, slot: ModelSlot) -> ModelResolutionSource:
+    """Label workspace-level provenance when no turn overlay applies.
+
+    Args:
+        cfg (object): Parsed workspace settings.
+        slot (ModelSlot): Target slot.
+
+    Returns:
+        ModelResolutionSource: ``workspace`` or ``default``.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> _workspace_model_source(WorkspaceConfig.minimal(), ModelSlot.tier_b)
+        <ModelResolutionSource.default: 'default'>
+    """
+    if use_main_model_for_all(cfg):
+        return ModelResolutionSource.default
+    if _slot_override(cfg, slot) is not None:
+        return ModelResolutionSource.workspace
+    return ModelResolutionSource.default
+
+
+def resolve_model_slot_for_turn(
+    cfg: object,
+    slot: ModelSlot,
+    *,
+    channel: str = "",
+    scope_key: str | None = None,
+    session_once_model: str | None = None,
+    routing_profile_model: str | None = None,
+) -> ModelResolutionResult:
+    """Resolve a model slot with turn-scoped overlays (session → profile → channel → workspace).
+
+    When no overlay applies, behavior matches :func:`resolve_model_slot` (**D9**
+    default-off).
+
+    Args:
+        cfg (object): Parsed workspace settings.
+        slot (ModelSlot): Target slot (typically ``tier_b`` or ``triager``).
+        channel (str): Active channel adapter name.
+        scope_key (str | None): Session scope key for topic-level overrides.
+        session_once_model (str | None): One-turn session override (**W10** hook).
+        routing_profile_model (str | None): Named routing profile model (**W12** hook).
+
+    Returns:
+        ModelResolutionResult: Resolved model id and winning provenance level.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> cfg = WorkspaceConfig.minimal(
+        ...     channels={"telegram": {"model": "openai/gpt-4.1"}},
+        ... )
+        >>> r = resolve_model_slot_for_turn(
+        ...     cfg, ModelSlot.tier_b, channel="telegram", scope_key=None
+        ... )
+        >>> r.model_id
+        'openai/gpt-4.1'
+        >>> r.source
+        <ModelResolutionSource.channel: 'channel'>
+    """
+    once = session_once_model.strip() if isinstance(session_once_model, str) else ""
+    if once:
+        return ModelResolutionResult(once, ModelResolutionSource.session)
+    profile_model = (
+        routing_profile_model.strip()
+        if isinstance(routing_profile_model, str) and routing_profile_model.strip()
+        else ""
+    )
+    if profile_model:
+        return ModelResolutionResult(profile_model, ModelResolutionSource.routing_profile)
+    channel_model = resolve_channel_model_override(cfg, channel=channel, scope_key=scope_key)
+    if channel_model is not None:
+        return ModelResolutionResult(channel_model, ModelResolutionSource.channel)
+    base = resolve_model_slot(cfg, slot)
+    return ModelResolutionResult(base, _workspace_model_source(cfg, slot))
 
 
 def is_minimax_catalog_model(model_id: str) -> bool:

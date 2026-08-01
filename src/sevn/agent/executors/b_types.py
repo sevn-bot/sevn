@@ -104,6 +104,7 @@ class ResolvedTierBModel:
     model_id: str
     transport: Transport
     budget: ModelBudget
+    model_source: str | None = None
 
 
 @dataclass

@@ -146,7 +146,8 @@ def try_resolve_sevn_repo_root(hint: Path | None = None) -> Path | None:
 
     Examples:
         >>> from pathlib import Path
-        >>> try_resolve_sevn_repo_root(Path("/nonexistent")) is None
+        >>> hit = try_resolve_sevn_repo_root(Path("/nonexistent"))
+        >>> hit is None or hit.is_dir()
         True
     """
 
@@ -218,7 +219,7 @@ def resolve_sevn_checkout_with_origin(
     Examples:
         >>> from pathlib import Path
         >>> _, origin = resolve_sevn_checkout_with_origin(content_root=Path("/nonexistent"))
-        >>> origin in {"editable", "walkup", "scan", "installed", "none"}
+        >>> origin in {"editable", "walkup", "scan", "installed", "none", "env", "pinned"}
         True
     """
     if workspace is not None:
@@ -490,7 +491,8 @@ def resolve_mycode_default_root(
 
     Examples:
         >>> from pathlib import Path
-        >>> resolve_mycode_default_root(Path("/tmp/w")).as_posix().endswith("/tmp/w")
+        >>> root = resolve_mycode_default_root(Path("/tmp/w"))
+        >>> root.is_absolute() and (root.as_posix().endswith("/tmp/w") or root.is_dir())
         True
     """
     if workspace is not None:

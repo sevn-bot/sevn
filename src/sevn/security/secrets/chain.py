@@ -195,12 +195,15 @@ async def get_secret_resilient(chain: SecretsChain, key: str) -> str | None:
         >>> True
         True
     """
-    env_val = os.environ.get(key, "").strip()
+    from sevn.security.secrets.routing_scope import scoped_secret_logical_key
+
+    scoped_key = scoped_secret_logical_key(key)
+    env_val = os.environ.get(scoped_key, "").strip()
     if env_val:
         return env_val
     for backend in chain.backends:
         try:
-            value = await backend.get(key)
+            value = await backend.get(scoped_key)
         except SecretsStoreCorruptError as exc:
             # A *locked* backend (no key material) is skipped so the next chain entry can answer.
             # A *wrong-key* / *corrupt* store re-raises: silently skipping it degrades resolution

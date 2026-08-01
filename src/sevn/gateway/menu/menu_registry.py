@@ -146,7 +146,7 @@ def _build_menu_button_specs() -> tuple[MenuButtonSpec, ...]:
         ("B12", "/agents", True, "Running L1/L2 inventory slash + pin (#28)"),
         ("B6", "/config", True, None),
         ("B7", "/voice", True, "PARTIAL; menu execute in TMF Wave 2"),
-        ("B8", "/model", True, "PARTIAL; menu execute in TMF Wave 2"),
+        ("B8", "/model", True, "/model toggle + --once one-turn override (#88)"),
         ("B9", "/shortcut", False, "User shortcuts; form wizard TMF Wave 3"),
         ("B10", "/logs", True, "Tail gateway/proxy logs; owner-only (TE-3)"),
         ("B11", "/traces", True, "Recent traces / span lookup; owner-only (TE-3)"),

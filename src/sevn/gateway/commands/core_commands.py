@@ -238,7 +238,7 @@ class CoreCommandHandler:
         if cmd == "/voice":
             return self._handle_voice(args, session_id=session_id)
         if cmd == "/model":
-            return self._handle_model(args)
+            return self._handle_model(args, session_id=session_id)
         if cmd == "/ask-config":
             return self._handle_ask_config(args)
         if cmd.startswith("/"):
@@ -418,6 +418,11 @@ class CoreCommandHandler:
         from sevn.gateway.session_manager import format_lcm_status_lines
 
         model_id = resolve_model_slot(self._workspace, ModelSlot.tier_b)
+        once_override = self._sessions.peek_model_once_override(session_id)
+        if once_override:
+            model_line = f"Model: {once_override} (next turn only; persisted: {model_id})"
+        else:
+            model_line = f"Model: {model_id}"
         voice_mode = _voice_mode_label(self._workspace)
         chat_override = self._sessions.get_tts_mode_override(session_id)
         effective = resolve_effective_tts_mode(
@@ -430,7 +435,7 @@ class CoreCommandHandler:
         voice_line += ")"
         lines = [
             f"Session: {session_id}",
-            f"Model: {model_id}",
+            model_line,
             voice_line,
         ]
         lines.extend(
@@ -556,11 +561,12 @@ class CoreCommandHandler:
             )
         return "Open /config > Voice or use /voice on|off|when_asked|reset."
 
-    def _handle_model(self, args: str) -> str:
+    def _handle_model(self, args: str, *, session_id: str) -> str:
         """Apply ``/model`` subcommands per design §10a.2.
 
         Args:
             args (str): Trailing args after ``/model``.
+            session_id (str): Active gateway session id.
 
         Returns:
             str: User-visible result or picker hint.
@@ -575,6 +581,29 @@ class CoreCommandHandler:
             model_id = resolve_model_slot(self._workspace, ModelSlot.tier_b)
             return f"Current model: {model_id}\nUse /model <name> or /model toggle."
         low = arg.lower()
+        if low.startswith("--once"):
+            rest = arg[6:].strip()
+            if not rest:
+                return (
+                    "Usage: /model --once <provider/model> — "
+                    "applies to the next turn only; persisted setting unchanged."
+                )
+            from sevn.config.model_resolution import list_catalog_model_ids
+
+            catalog = set(list_catalog_model_ids(self._workspace))
+            if rest not in catalog:
+                known = ", ".join(sorted(catalog)[:8])
+                suffix = "…" if len(catalog) > 8 else ""
+                return (
+                    f"Unknown model {rest!r}. "
+                    f"Choose from configured catalog (e.g. {known}{suffix})."
+                )
+            self._sessions.set_model_once_override(session_id, rest)
+            persisted = resolve_model_slot(self._workspace, ModelSlot.tier_b)
+            return (
+                f"One-turn model override set to {rest} "
+                f"(next turn only; persisted tier-B model remains {persisted})."
+            )
         if low == "toggle":
             doc = load_raw_sevn_json(self._sevn_json)
             current = resolve_model_slot(self._workspace, ModelSlot.tier_b)
