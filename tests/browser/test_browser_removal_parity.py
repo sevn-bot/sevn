@@ -20,9 +20,15 @@ _IMPORT_RE = re.compile(rf"(import|from)\s+{_DRIVER}")
 
 # Intentional survivors (W8 note): prior-wave CHANGELOG bullets must not be rewritten.
 # W34 park verdict (#37) documents the retired browser-driver E2E harness by name in spec-11.
+# W6 aug-2026 gate (#117, #127) documents removed bundled skill ids + CI guard in specs/Makefile.
 _INTENTIONAL_SURVIVOR_PREFIXES: tuple[str, ...] = (
     "CHANGELOG.md:",
     "about-sevn.bot/specs/11-tools-registry.md:",
+    "about-sevn.bot/specs/12-skills-system.md:",
+    "scripts/check_removed_browser_skill_ids.py:",
+    "scripts/ci_lib.py:",
+    "Makefile:",
+    "tests/browser/test_browser_removal_parity.py:",
 )
 
 
