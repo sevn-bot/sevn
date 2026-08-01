@@ -92,10 +92,12 @@ from sevn.config.sections.ops import (
 from sevn.config.sections.root import JsonDict, WorkspaceConfig
 from sevn.config.sections.secrets import (
     BackendEntry,
+    BitwardenBackendEntry,
     EncryptedFileBackendEntry,
     EncryptedFileSubtreeDefaults,
     LinuxSecretServiceBackendEntry,
     MacOSKeychainBackendEntry,
+    OnePasswordBackendEntry,
     OpenBaoBackendEntry,
     ProtonPassBackendEntry,
     SecretsBackendSectionConfig,
@@ -191,6 +193,7 @@ def parse_workspace_config(data: JsonDict) -> WorkspaceConfig:
 
 __all__ = [
     "BackendEntry",
+    "BitwardenBackendEntry",
     "BrowserWorkspaceConfig",
     "ChannelsWorkspaceSectionConfig",
     "ConfigArchiveWorkspaceConfig",
@@ -235,6 +238,7 @@ __all__ = [
     "MySevnSyncWorkspaceConfig",
     "MySevnWorkspaceConfig",
     "OnboardingWorkspaceSectionConfig",
+    "OnePasswordBackendEntry",
     "OpenBaoBackendEntry",
     "OpenUIWorkspaceConfig",
     "OwnerScannerOverrides",

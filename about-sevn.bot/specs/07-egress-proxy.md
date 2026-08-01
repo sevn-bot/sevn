@@ -7,8 +7,8 @@ owner: Alex
 summary: Product pairing (v1). Deployment, paired daemon install, onboarding validation,
   and Mission Control management of the proxy are specified in prd-06-setup-and-operations
   and prd-07-mission-control §5.1
-last_updated: '2026-07-21'
-fingerprint: sha256:a2ad0d78b19ea74ccf88285824347327b48f3d7f88fd12bfa6dd108099244e81
+last_updated: '2026-07-31'
+fingerprint: sha256:2041876411e30f58da851157d8740519fd4e7333f63c36ee4f4a5bb5d6611345
 related: []
 sources:
 - src/sevn/proxy/**
@@ -203,6 +203,12 @@ Map to existing tests under `tests/` that cover this subsystem; add Makefile-onl
 |-------|-------|
 | `tests/proxy/test_codex_aggregation.py` | Truncated-stream retry; high-latency stage naming; slow-turn Still working… route |
 | `tests/proxy/test_codex_aggregation_w1_red.py` | Turn-progress scheduler + MC stage-latency unwired log |
+
+## Amendments (open-issues-sweep W24, #81)
+
+The egress proxy ASGI app (`src/sevn/proxy/app.py`) applies the same
+`IngressBodyLimitMiddleware` cap as the gateway (`DEFAULT_MAX_INGRESS_BODY_BYTES`).
+`POST /llm/*` and other proxy ingress routes return **413** before upstream forward.
 
 ## Human-input needed
 

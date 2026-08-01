@@ -23,19 +23,23 @@ from typing import TYPE_CHECKING
 from sevn.config.defaults import DEFAULT_ENCRYPTED_FILE_KEY_SOURCE
 from sevn.config.workspace_config import (
     BackendEntry,
+    BitwardenBackendEntry,
     EncryptedFileBackendEntry,
     LinuxSecretServiceBackendEntry,
     MacOSKeychainBackendEntry,
+    OnePasswordBackendEntry,
     OpenBaoBackendEntry,
     ProtonPassBackendEntry,
     SecretsBackendSectionConfig,
 )
+from sevn.security.secrets.backends.bitwarden import BitwardenCliBackend
 from sevn.security.secrets.backends.encrypted_file import (
     EncryptedFileBackend,
     default_encrypted_store_path,
 )
 from sevn.security.secrets.backends.linux_secret_service import LinuxSecretServiceBackend
 from sevn.security.secrets.backends.macos_keychain import MacOSKeychainBackend
+from sevn.security.secrets.backends.one_password import OnePasswordCliBackend
 from sevn.security.secrets.backends.openbao import OpenBaoBackend
 from sevn.security.secrets.backends.proton_pass import ProtonPassCliBackend
 from sevn.security.secrets.chain import SecretsChain
@@ -241,6 +245,25 @@ def _build_backend(
                 cli_path=entry.cli_path,
                 vault=entry.vault,
                 item_selector=entry.item_selector,
+            ),
+            entry.type,
+        )
+    if isinstance(entry, OnePasswordBackendEntry):
+        return (
+            OnePasswordCliBackend(
+                cli_path=entry.cli_path,
+                vault=entry.vault,
+                account=entry.account,
+                field=entry.field,
+            ),
+            entry.type,
+        )
+    if isinstance(entry, BitwardenBackendEntry):
+        return (
+            BitwardenCliBackend(
+                cli_path=entry.cli_path,
+                collection=entry.collection,
+                field=entry.field,
             ),
             entry.type,
         )

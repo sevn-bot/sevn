@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from sevn.agent.tracing.sink import TraceSink
     from sevn.code_understanding.models import GraphifyProfile
     from sevn.plugins.runner import PluginHookChain
+    from sevn.tools.deny_rules import DenyRule
     from sevn.tools.permissions import PermissionPolicy
 
 
@@ -160,6 +161,8 @@ class ToolContext:
     subagent_remaining_budget_s: Callable[[], float] | None = None
     """Zero-arg callable returning the parent turn's remaining ``CascadeBudget``
     seconds (D11); used to bound ``spawn_subagent(..., wait=True)``."""
+    deny_rules: tuple[DenyRule, ...] = ()
+    """Operator deny rules from ``permissions.deny_rules`` (W26 / #80)."""
 
 
 __all__ = ["ToolContext"]

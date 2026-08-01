@@ -12,6 +12,7 @@ Exports:
     verify_login_gateway_token — operator login body validation (§17 `/login`).
     login_page_html — minimal HTML shell for gateway bearer entry.
     verify_telegram_secret — webhook ``X-Telegram-Bot-Api-Secret-Token``.
+    verify_telegram_webhook_freshness — optional request timestamp skew check.
     mint_webchat_jwt — HS256 JWT mint for ``aud=webchat`` (§2.3).
     verify_webchat_jwt — HS256 JWT verify, returns :class:`JWTClaims` or ``None``.
     refresh_webchat_access_token — mint a replacement JWT from claims or gateway bearer.
@@ -28,6 +29,8 @@ import json
 import time
 from dataclasses import dataclass
 from urllib.parse import parse_qsl
+
+from sevn.config.defaults import DEFAULT_SIGNED_WEBHOOK_MAX_SKEW_SECONDS
 
 _JWT_AUD: str = "webchat"
 _JWT_ALG: str = "HS256"
@@ -288,6 +291,48 @@ def verify_telegram_secret(*, configured: str | None, header_value: str | None) 
     return secrets_compare(configured.strip(), header_value.strip())
 
 
+def verify_telegram_webhook_freshness(
+    headers: dict[str, str],
+    *,
+    max_skew_seconds: int = DEFAULT_SIGNED_WEBHOOK_MAX_SKEW_SECONDS,
+    now: int | None = None,
+) -> bool:
+    """Return ``False`` when an optional Telegram webhook timestamp is stale.
+
+    Telegram's static secret header has no signed timestamp. When operators or
+    relays attach ``X-Telegram-Request-Timestamp`` (epoch seconds), reject
+    deliveries outside ``max_skew_seconds``. Missing timestamp headers are
+    accepted (no replay protection beyond the static secret).
+
+    Args:
+        headers (dict[str, str]): Raw request headers (any casing).
+        max_skew_seconds (int): Maximum allowed skew in seconds.
+        now (int | None): Override current epoch seconds (tests).
+
+    Returns:
+        bool: ``True`` when no timestamp is present or the timestamp is fresh.
+
+    Examples:
+        >>> verify_telegram_webhook_freshness({})
+        True
+    """
+    lower = {str(k).lower(): str(v) for k, v in headers.items()}
+    raw_ts = lower.get("x-telegram-request-timestamp", "").strip()
+    issued_at: int | None = None
+    if raw_ts:
+        try:
+            issued_at = int(raw_ts)
+        except ValueError:
+            return False
+    if issued_at is None:
+        return True
+    current = int(time.time()) if now is None else int(now)
+    age = current - issued_at
+    if age < 0:
+        age = -age
+    return age <= int(max_skew_seconds)
+
+
 def mint_webchat_jwt(
     *,
     secret: str,
@@ -526,7 +571,9 @@ def verify_telegram_init_data(
     if not provided:
         return None
     data_check_string = "\n".join(f"{k}={fields[k]}" for k in sorted(fields))
+    # codeql[py/weak-sensitive-data-hashing]
     secret_key = hmac.new(b"WebAppData", bot_token.encode("utf-8"), hashlib.sha256).digest()
+    # codeql[py/weak-sensitive-data-hashing]
     expected_hex = hmac.new(
         secret_key, data_check_string.encode("utf-8"), hashlib.sha256
     ).hexdigest()

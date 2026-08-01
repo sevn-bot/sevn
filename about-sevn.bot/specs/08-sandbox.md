@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / safebash
   (when routed through the execution sandbox), process when configured for sandbox
   routing, and skill subprocesses spawned b
-last_updated: '2026-07-19'
-fingerprint: sha256:a6ab99283d4c7cef37f0fbd24bc1d0b18e53d7eaa33dffcd4f53252d090fbab4
+last_updated: '2026-07-31'
+fingerprint: sha256:95d3b292d439ca974288e775bcc65ba5a57e97470442104afc7ada3fdc563ccc
 related: []
 sources:
 - src/sevn/security/**
@@ -34,6 +34,21 @@ interfaces:
 - name: write_macos_pf_ruleset
   file: src/sevn/security/egress_firewall.py
   symbol: write_macos_pf_ruleset
+- name: IngressBodyLimitMiddleware
+  file: src/sevn/security/ingress_policy.py
+  symbol: IngressBodyLimitMiddleware
+- name: first_ws_frame_within_limit
+  file: src/sevn/security/ingress_policy.py
+  symbol: first_ws_frame_within_limit
+- name: ingress_body_too_large_response
+  file: src/sevn/security/ingress_policy.py
+  symbol: ingress_body_too_large_response
+- name: read_limited_body
+  file: src/sevn/security/ingress_policy.py
+  symbol: read_limited_body
+- name: wire_ingress_body_limit
+  file: src/sevn/security/ingress_policy.py
+  symbol: wire_ingress_body_limit
 - name: BlockReason
   file: src/sevn/security/llm_guard_scanner.py
   symbol: BlockReason
@@ -202,6 +217,9 @@ interfaces:
 - name: sweep_orphan_labels
   file: src/sevn/security/sandbox_sweeper.py
   symbol: sweep_orphan_labels
+- name: BitwardenCliBackend
+  file: src/sevn/security/secrets/backends/bitwarden.py
+  symbol: BitwardenCliBackend
 - name: EncryptedFileBackend
   file: src/sevn/security/secrets/backends/encrypted_file.py
   symbol: EncryptedFileBackend
@@ -214,6 +232,9 @@ interfaces:
 - name: MacOSKeychainBackend
   file: src/sevn/security/secrets/backends/macos_keychain.py
   symbol: MacOSKeychainBackend
+- name: OnePasswordCliBackend
+  file: src/sevn/security/secrets/backends/one_password.py
+  symbol: OnePasswordCliBackend
 - name: OpenBaoBackend
   file: src/sevn/security/secrets/backends/openbao.py
   symbol: OpenBaoBackend
@@ -286,6 +307,15 @@ interfaces:
 - name: SecretsBackend
   file: src/sevn/security/secrets/protocol.py
   symbol: SecretsBackend
+- name: SecretProvenanceReport
+  file: src/sevn/security/secrets/provenance.py
+  symbol: SecretProvenanceReport
+- name: provenance_for_cache_entry
+  file: src/sevn/security/secrets/provenance.py
+  symbol: provenance_for_cache_entry
+- name: resolve_secret_provenance
+  file: src/sevn/security/secrets/provenance.py
+  symbol: resolve_secret_provenance
 - name: EnvUnresolvedError
   file: src/sevn/security/secrets/value_expand.py
   symbol: EnvUnresolvedError
@@ -298,6 +328,24 @@ interfaces:
 - name: expand_secret_refs
   file: src/sevn/security/secrets/value_expand.py
   symbol: expand_secret_refs
+- name: augment_operator_path_for_subprocess
+  file: src/sevn/security/trigger_spawn_env.py
+  symbol: augment_operator_path_for_subprocess
+- name: bind_webhook_minimal_host_env
+  file: src/sevn/security/trigger_spawn_env.py
+  symbol: bind_webhook_minimal_host_env
+- name: host_env_base_for_subprocess
+  file: src/sevn/security/trigger_spawn_env.py
+  symbol: host_env_base_for_subprocess
+- name: is_webhook_trigger_scope
+  file: src/sevn/security/trigger_spawn_env.py
+  symbol: is_webhook_trigger_scope
+- name: minimal_webhook_host_env
+  file: src/sevn/security/trigger_spawn_env.py
+  symbol: minimal_webhook_host_env
+- name: redact_telegram_bot_token
+  file: src/sevn/security/trigger_spawn_env.py
+  symbol: redact_telegram_bot_token
 ---
 
 ## Purpose

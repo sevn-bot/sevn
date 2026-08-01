@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Tier B is the default “do work” executor for messages the Triager classifies
   as complexity == B (prd-04-getting-things-done §5.2): a single pydantic-ai Agent
   loop over the user’s incoming_text, with t'
-last_updated: '2026-07-29'
-fingerprint: sha256:71b7c8889a302835169e10dfcef10ab6c20e112d4a6c0be4607f6f0ed2cb1465
+last_updated: '2026-07-31'
+fingerprint: sha256:12e61f0fb422cdd25cbcc4fcbb2d7215698c5d8bf2d3b5736844552157fbf58b
 related: []
 sources:
 - src/sevn/agent/**
@@ -388,6 +388,9 @@ interfaces:
 - name: install_tool_approval_bridge
   file: src/sevn/agent/adapters/tool_approval_bridge.py
   symbol: install_tool_approval_bridge
+- name: log_approval_decision
+  file: src/sevn/agent/adapters/tool_approval_bridge.py
+  symbol: log_approval_decision
 - name: reset_tool_approval_bridge_for_tests
   file: src/sevn/agent/adapters/tool_approval_bridge.py
   symbol: reset_tool_approval_bridge_for_tests
@@ -1498,3 +1501,9 @@ Tier B runs on **pydantic-ai** `>=2.14.1,<3` (resolved 2.20.0) and **pydantic-ai
 - **Model transport:** OpenAI Chat Completions `FunctionModel` bridge + MiniMax wrapper migrated in place (`tier_b_model.py`); provider-prefixed model names via `normalize_tier_b_model_name`.
 - **Lazy tools:** `PrepareTools(prepare_lazy_tool_definitions)` + `SevnRegistryToolset` re-entry through `ToolExecutor.dispatch`.
 - **Deferred (see §10.1–10.2):** harness `SubAgents`, `DynamicWorkflow`, `Memory`.
+
+### 10.8 open-issues-sweep W26 — deny-rule guardrails (#80) — append-only
+
+**Pre-dispatch:** `TierBPermissionGuardrail.check_tool_access` calls `check_permission_before_dispatch(deps, tool_name, args=…)` so pattern/domain/path deny rules see validated args.
+
+**Deferred approval:** `TierBApprovalGuardrail.resolve` returns `ToolDenied` with the operator denial reason (Mission Control `reason` field or a default operator-denied message) so the model can revise.

@@ -10,6 +10,18 @@ are cut into a dated, versioned section at release time.
 
 ## [Unreleased]
 
+### Added
+
+- [2026-07-31] User-defined `permissions.deny_rules` block destructive or sensitive tool calls by tool name and optional command/pattern, domain, or path — rules apply even in permissive ABAC owner sessions (additive-deny, D15), return the configured reason to the model, and log redacted audit lines; Mission Control approval `deny` verdicts accept an optional operator reason (#80, open-issues-sweep W26)
+- [2026-07-31] Pluggable 1Password (`one_password`) and Bitwarden (`bitwarden`) secret backends (CLI bridges — unit-tested stubs; live vault resolution requires operator `op`/`bw` credentials), deterministic precedence and provenance reporting without value leakage (#82, open-issues-sweep W25)
+
+### Fixed
+
+- [2026-07-31] Operator approval denial reasons propagate through the sync ``check_tool_access`` / ``SkipToolExecution`` path as well as the deferred ``ToolDenied`` path (#80, open-issues-sweep E-Thermos)
+- [2026-07-31] Queued Telegram and channel webhook agent turns bind webhook-minimal host env before dispatch task creation so asyncio child tasks inherit the filtered subprocess environment (#81, open-issues-sweep E-Thermos)
+- [2026-07-31] Webhook-minimal host env now covers queued agent turns (not just the HTTP handler), uses an allowlist instead of a suffix blocklist, and approval denial reasons return per-verdict tuples instead of shared bridge state; WebSocket frames after auth respect the 1 MiB ingress cap; Telegram freshness no longer trusts spoofable HTTP `Date` headers (#81, #80, open-issues-sweep E-Thermos)
+- [2026-07-31] Gateway and egress-proxy HTTP ingress reject bodies over 1 MiB (**413**); signed GitHub webhooks reject stale timestamps; Telegram transport errors and API failure logs redact bot tokens; webhook-triggered subprocesses inherit a minimized host env (#81, open-issues-sweep W24)
+
 ### Changed
 
 - [2026-07-30] `make ci-resume` now walks `mergecraft-ref-check` — the mergeCraft pin gate is in `CI_STEPS` alongside the other `ci-parity` steps, and tier↔resume parity is enforced by `tests/infra/test_ci_steps_tier_parity.py` instead of a Makefile comment alone

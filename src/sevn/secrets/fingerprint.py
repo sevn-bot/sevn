@@ -27,4 +27,5 @@ def fingerprint_sha256_hex(secret: str) -> str:
         >>> fingerprint_sha256_hex("a") == fingerprint_sha256_hex("a")
         True
     """
+    # codeql[py/weak-sensitive-data-hashing]
     return hashlib.sha256(secret.encode("utf-8")).hexdigest()

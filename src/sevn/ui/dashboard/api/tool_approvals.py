@@ -36,6 +36,10 @@ class ToolApprovalVerdictBody(BaseModel):
     verdict: Literal["once", "session", "always", "deny"] = Field(
         description="Operator approval scope or deny.",
     )
+    reason: str | None = Field(
+        default=None,
+        description="Optional operator denial reason fed back to the model.",
+    )
 
 
 def _bridge(request: Request) -> ToolApprovalBridge | None:
@@ -158,7 +162,11 @@ async def tool_approval_decide(
         except (ValidationError, ValueError, OSError) as exc:
             return config_validation_error(exc)
 
-    accepted = await bridge.submit_verdict(decision_id, verdict)
+    accepted = await bridge.submit_verdict(
+        decision_id,
+        verdict,
+        deny_reason=body.reason if verdict == "deny" else None,
+    )
     if not accepted:
         return JSONResponse(
             status_code=404,

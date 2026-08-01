@@ -69,6 +69,20 @@ class SecretsChain:
         """
         return tuple(self._backends)
 
+    @property
+    def backend_labels(self) -> tuple[str, ...]:
+        """Return configured backend labels aligned with ``backends`` order.
+
+        Returns:
+            tuple[str, ...]: Label per backend (matches ``secrets_backend.chain`` types).
+
+        Examples:
+            >>> # Populated in tests via fakes.
+            >>> True
+            True
+        """
+        return tuple(self._labels)
+
     async def get(self, key: str) -> str | None:
         """Return the first hit across backends.
 

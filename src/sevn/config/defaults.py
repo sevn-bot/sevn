@@ -526,6 +526,10 @@ DEFAULT_TRIGGERS_MAX_CONCURRENT: Final[int] = 4
 DEFAULT_TRIGGERS_MAX_INLINE_BYTES: Final[int] = 65536
 DEFAULT_TRIGGERS_WEBHOOK_DEDUPE_TTL_S: Final[int] = 7 * 24 * 3600
 DEFAULT_TRIGGERS_INBOX_SPILL_MAX_FILES: Final[int] = 500
+# Gateway/proxy HTTP ingress body cap (`specs/17-gateway.md`, issue #81 / W24).
+DEFAULT_MAX_INGRESS_BODY_BYTES: Final[int] = 1_048_576
+# Signed webhook timestamp skew window (`specs/30-non-interactive-triggers.md`, issue #81).
+DEFAULT_SIGNED_WEBHOOK_MAX_SKEW_SECONDS: Final[int] = 300
 
 # Self-improve loop (`specs/33-self-improvement.md` §5).
 DEFAULT_SELF_IMPROVE_ENABLED: Final[bool] = True

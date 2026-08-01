@@ -108,7 +108,7 @@ async def test_bridge_submit_unblocks_waiter(tmp_path: Path) -> None:
         bridge: ToolApprovalBridge = client.app.state.tool_approval_bridge
         bridge.timeout_s = 2.0
 
-        async def waiter() -> str:
+        async def waiter() -> tuple[str, str | None]:
             return await bridge.await_operator_verdict(
                 session_id="sess-1",
                 turn_id="turn-1",
@@ -133,7 +133,7 @@ async def test_bridge_submit_unblocks_waiter(tmp_path: Path) -> None:
         assert resp.json()["verdict"] == "once"
 
         verdict = await asyncio.wait_for(task, timeout=2.0)
-        assert verdict == "once"
+        assert verdict == ("once", None)
         assert bridge.list_pending() == []
 
 
@@ -143,7 +143,7 @@ async def test_approval_always_persists_human_preapproved(tmp_path: Path) -> Non
         bridge: ToolApprovalBridge = client.app.state.tool_approval_bridge
         bridge.timeout_s = 2.0
 
-        async def waiter() -> str:
+        async def waiter() -> tuple[str, str | None]:
             return await bridge.await_operator_verdict(
                 session_id="sess-2",
                 turn_id="turn-2",
@@ -163,7 +163,7 @@ async def test_approval_always_persists_human_preapproved(tmp_path: Path) -> Non
             headers=_csrf_headers(client),
         )
         assert resp.status_code == 200
-        assert await asyncio.wait_for(task, timeout=2.0) == "always"
+        assert await asyncio.wait_for(task, timeout=2.0) == ("always", None)
 
         sevn_json = tmp_path / "sevn.json"
         body = sevn_json.read_text(encoding="utf-8")
@@ -177,7 +177,7 @@ async def test_approval_deny_returns_verdict(tmp_path: Path) -> None:
         bridge: ToolApprovalBridge = client.app.state.tool_approval_bridge
         bridge.timeout_s = 2.0
 
-        async def waiter() -> str:
+        async def waiter() -> tuple[str, str | None]:
             return await bridge.await_operator_verdict(
                 session_id="sess-3",
                 turn_id="turn-3",
@@ -197,7 +197,7 @@ async def test_approval_deny_returns_verdict(tmp_path: Path) -> None:
             headers=_csrf_headers(client),
         )
         assert resp.status_code == 200
-        assert await asyncio.wait_for(task, timeout=2.0) == "deny"
+        assert await asyncio.wait_for(task, timeout=2.0) == ("deny", None)
 
 
 def test_install_tool_approval_bridge_on_app() -> None:

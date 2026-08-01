@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver a single trust boundary for credentials: backend modules + TTL cache
   under src/sevn/security/, wired exclusively by the egress proxy (src/sevn/proxy/)
   so agent-facing processes never see raw k'
-last_updated: '2026-07-21'
-fingerprint: sha256:9bc55fa915f549f8360cce43ab6c02e4c9966968e8ac98ab7283e92cc542294c
+last_updated: '2026-07-31'
+fingerprint: sha256:d52a0bdec9030f18b2fe55e8164b03ace98303be66964fac968871a3caeee1fb
 related: []
 sources:
 - src/sevn/security/secrets/**
@@ -18,6 +18,9 @@ depends_on:
 - spec-02-config-and-workspace
 build_phase: null
 interfaces:
+- name: BitwardenCliBackend
+  file: src/sevn/security/secrets/backends/bitwarden.py
+  symbol: BitwardenCliBackend
 - name: EncryptedFileBackend
   file: src/sevn/security/secrets/backends/encrypted_file.py
   symbol: EncryptedFileBackend
@@ -30,6 +33,9 @@ interfaces:
 - name: MacOSKeychainBackend
   file: src/sevn/security/secrets/backends/macos_keychain.py
   symbol: MacOSKeychainBackend
+- name: OnePasswordCliBackend
+  file: src/sevn/security/secrets/backends/one_password.py
+  symbol: OnePasswordCliBackend
 - name: OpenBaoBackend
   file: src/sevn/security/secrets/backends/openbao.py
   symbol: OpenBaoBackend
@@ -102,6 +108,15 @@ interfaces:
 - name: SecretsBackend
   file: src/sevn/security/secrets/protocol.py
   symbol: SecretsBackend
+- name: SecretProvenanceReport
+  file: src/sevn/security/secrets/provenance.py
+  symbol: SecretProvenanceReport
+- name: provenance_for_cache_entry
+  file: src/sevn/security/secrets/provenance.py
+  symbol: provenance_for_cache_entry
+- name: resolve_secret_provenance
+  file: src/sevn/security/secrets/provenance.py
+  symbol: resolve_secret_provenance
 - name: EnvUnresolvedError
   file: src/sevn/security/secrets/value_expand.py
   symbol: EnvUnresolvedError
@@ -118,13 +133,18 @@ interfaces:
 
 ## Purpose
 
-Deliver a single trust boundary for credentials: backend modules + TTL cache under src/sevn/security/, wired exclusively by the egress proxy (src/sevn/proxy/) so agent-facing processes never see raw k
+Deliver a single trust boundary for credentials: backend modules + TTL cache under
+`src/sevn/security/secrets/`, wired exclusively by the egress proxy (`src/sevn/proxy/`) so
+agent-facing processes never see raw key material.
 
-Primary code trees: [`src/sevn/secrets`](src/sevn/secrets/__init__.py).
+**Environment baseline (W0.6 / #82, verified W25):** process environment is the first-class
+secret source via `${ENV:VAR}` expansion in `expand_env_refs` (`value_expand.py`). Only the
+real process environ is consulted — `ProcessSettings` deliberately sets `env_file=None` and
+never loads per-directory `.env` files (`settings.py`), matching the issue goal of avoiding
+implicit `.env` injection.
 
-Initial draft for **Purpose** — grounded in extracted interfaces; confirm normative wording.
-
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Purpose — acceptance criteria and edge cases. -->
+Primary code trees: [`src/sevn/security/secrets`](src/sevn/security/secrets/__init__.py),
+legacy migration helpers under [`src/sevn/secrets`](src/sevn/secrets/__init__.py).
 ## Public Interface
 
 Initial draft for **Public Interface** — grounded in extracted interfaces; confirm normative wording.
@@ -162,11 +182,46 @@ Initial draft for **Data Model** — grounded in extracted interfaces; confirm n
 See **Implemented by** and [`src/sevn/secrets`](src/sevn/secrets/__init__.py).
 ## Behavior
 
-Initial draft for **Behavior** — grounded in extracted interfaces; confirm normative wording.
+### Resolution precedence (deterministic)
 
-<!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Behavior — acceptance criteria and edge cases. -->
+When resolving a logical secret id, order is fixed:
 
-Trace control flow starting from the load-bearing symbols in **Implemented by** (below) and cross-check against [`src/sevn/secrets`](src/sevn/secrets/__init__.py).
+1. **Process environment** — for resilient reads (`get_secret_resilient`), a non-empty
+   `os.environ[logical_key]` wins before any configured backend. For config expansion,
+   `${ENV:VAR}` segments substitute from process env only (`expand_env_refs`).
+2. **`${SECRET:source:logical_key}`** — the `source` segment names a backend label in
+   `secrets_backend.chain`; the proxy cache key is `(source, logical_key)`. When the source
+   backend misses, expansion fails (`SecretUnresolvedError`) rather than falling through to
+   another backend label.
+3. **Chain order** — `SecretsChain.get` walks `secrets_backend.chain` top-to-bottom; the
+   first backend returning a non-`None` value wins. Earlier entries shadow later ones.
+4. **Default chain** — when `chain` is omitted: macOS → `[macos_keychain, encrypted_file]`;
+   Linux → `[linux_secret_service, encrypted_file]`; CI (`CI=1`) → `[encrypted_file]` only.
+
+### Provenance (no value leakage)
+
+`resolve_secret_provenance(chain, logical_key)` returns a `SecretProvenanceReport` with
+`source` (backend label) and `logical_key` only — `value` is always `None`. `ResolvedSecretsCache`
+stores plaintext under TTL but records provenance separately; `provenance_for_cache_entry` and
+`str(report)` never include decrypted material.
+
+### Pluggable backends
+
+| `chain[].type` | Implementation | Notes |
+|----------------|----------------|-------|
+| `encrypted_file` | `EncryptedFileBackend` | Default fallback; PBKDF2 or master-key unlock |
+| `macos_keychain` | `MacOSKeychainBackend` | macOS only |
+| `linux_secret_service` | `LinuxSecretServiceBackend` | libsecret / GNOME Keyring |
+| `openbao` | `OpenBaoBackend` | OSS KV v2; Vault Enterprise not supported |
+| `proton_pass` | `ProtonPassCliBackend` | Proton Pass CLI dialects |
+| `one_password` | `OnePasswordCliBackend` | 1Password CLI (`op`); requires signed-in account or `OP_SERVICE_ACCOUNT_TOKEN` |
+| `bitwarden` | `BitwardenCliBackend` | Bitwarden CLI (`bw`); requires `BW_SESSION` |
+
+1Password and Bitwarden backends are CLI bridges validated by unit tests with fakes; live vault
+resolution requires operator-installed CLIs and credentials (not exercised in CI).
+
+Trace control flow from `secrets_chain_from_workspace` → `ResolvedSecretsCache.get_resolved` →
+`expand_refs_env_then_secret` in the proxy credential path.
 ## Failure Modes
 
 Initial draft for **Failure Modes** — grounded in extracted interfaces; confirm normative wording.

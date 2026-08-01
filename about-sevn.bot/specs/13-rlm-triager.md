@@ -7,8 +7,8 @@ owner: Alex
 summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–§5.2):
   a single, tool-less outbound generation step that emits validated TriageResult consumed
   by tier dispatch (A / B / C / D), MCP e'
-last_updated: '2026-07-30'
-fingerprint: sha256:71b7c8889a302835169e10dfcef10ab6c20e112d4a6c0be4607f6f0ed2cb1465
+last_updated: '2026-07-31'
+fingerprint: sha256:12e61f0fb422cdd25cbcc4fcbb2d7215698c5d8bf2d3b5736844552157fbf58b
 related: []
 sources:
 - src/sevn/agent/**
@@ -386,6 +386,9 @@ interfaces:
 - name: install_tool_approval_bridge
   file: src/sevn/agent/adapters/tool_approval_bridge.py
   symbol: install_tool_approval_bridge
+- name: log_approval_decision
+  file: src/sevn/agent/adapters/tool_approval_bridge.py
+  symbol: log_approval_decision
 - name: reset_tool_approval_bridge_for_tests
   file: src/sevn/agent/adapters/tool_approval_bridge.py
   symbol: reset_tool_approval_bridge_for_tests

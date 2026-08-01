@@ -5,7 +5,7 @@ When a ``requires_human`` gate blocks tool execution, the bridge publishes a
 ``POST /api/v1/agent/approvals/{decision_id}``.
 
 Module: sevn.agent.adapters.tool_approval_bridge
-Depends: asyncio, json, re, uuid, sevn.agent.tracing.sink, sevn.ui.dashboard.ws
+Depends: asyncio, json, re, uuid, loguru, sevn.agent.tracing.sink, sevn.logging.log_redact, sevn.ui.dashboard.ws
 
 Exports:
     PendingToolApproval — one in-flight operator approval decision.
@@ -15,6 +15,7 @@ Exports:
     reset_tool_approval_bridge_for_tests — clear process-wide bridge (tests).
     summarize_tool_args — redacted args summary for approval cards.
     ack_tool_on_deps — mutate ``human_acknowledged_tools`` on ``BTierDeps``.
+    log_approval_decision — redacted audit log for operator verdicts.
 """
 
 from __future__ import annotations
@@ -27,7 +28,10 @@ import uuid
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Literal
 
+from loguru import logger
+
 from sevn.agent.tracing.sink import TraceEvent, TraceSink
+from sevn.logging.log_redact import redact_log_line
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -126,6 +130,48 @@ def summarize_tool_args(args: dict[str, Any], *, max_len: int = 400) -> str:
     return raw[: max_len - 3] + "..."
 
 
+def log_approval_decision(
+    *,
+    tool_name: str,
+    session_id: str,
+    verdict: ApprovalVerdict,
+    args_summary: str,
+    reason: str | None = None,
+) -> None:
+    """Emit a redacted audit log line for an operator approval verdict.
+
+    Args:
+        tool_name (str): Registry tool name.
+        session_id (str): Active gateway session id.
+        verdict (ApprovalVerdict): Operator approval choice.
+        args_summary (str): Redacted argument summary from the approval card.
+        reason (str | None): Optional operator denial reason.
+
+    Returns:
+        None: Side-effect only.
+
+    Examples:
+        >>> log_approval_decision(
+        ...     tool_name="delete",
+        ...     session_id="s1",
+        ...     verdict="deny",
+        ...     args_summary='{"path":"x"}',
+        ...     reason="no ticket",
+        ... ) is None
+        True
+    """
+    safe_summary = redact_log_line(args_summary)
+    safe_reason = redact_log_line(reason) if reason else ""
+    logger.info(
+        "tool approval verdict={} tool={} session={} reason={} args={}",
+        verdict,
+        tool_name,
+        session_id,
+        safe_reason,
+        safe_summary,
+    )
+
+
 def ack_tool_on_deps(deps: BTierDeps, tool_name: str) -> None:
     """Add ``tool_name`` to the turn template ``human_acknowledged_tools`` set.
 
@@ -174,6 +220,7 @@ class PendingToolApproval:
     args_summary: str
     event: asyncio.Event = field(default_factory=asyncio.Event)
     verdict: ApprovalVerdict | None = None
+    deny_reason: str | None = None
 
 
 @dataclass
@@ -256,12 +303,19 @@ class ToolApprovalBridge:
         bucket = self._session_acks.setdefault(session_id, set())
         bucket.add(tool_name)
 
-    async def submit_verdict(self, decision_id: str, verdict: ApprovalVerdict) -> bool:
+    async def submit_verdict(
+        self,
+        decision_id: str,
+        verdict: ApprovalVerdict,
+        *,
+        deny_reason: str | None = None,
+    ) -> bool:
         """Apply an operator verdict to one pending decision.
 
         Args:
             decision_id (str): Pending decision uuid.
             verdict (ApprovalVerdict): Operator choice.
+            deny_reason (str | None): Optional human-readable denial reason.
 
         Returns:
             bool: ``True`` when the decision existed and was updated.
@@ -286,6 +340,8 @@ class ToolApprovalBridge:
             if row is None or row.verdict is not None:
                 return False
             row.verdict = verdict
+            if verdict == "deny" and deny_reason:
+                row.deny_reason = deny_reason.strip() or None
             row.event.set()
             return True
 
@@ -297,7 +353,7 @@ class ToolApprovalBridge:
         tool_name: str,
         args_summary: str,
         trace: TraceSink | None = None,
-    ) -> ApprovalVerdict:
+    ) -> tuple[ApprovalVerdict, str | None]:
         """Publish a pending approval and block until verdict or timeout.
 
         Args:
@@ -308,7 +364,7 @@ class ToolApprovalBridge:
             trace (TraceSink | None): Optional trace sink for audit rows.
 
         Returns:
-            ApprovalVerdict: Operator verdict, or ``deny`` on timeout.
+            tuple[ApprovalVerdict, str | None]: Operator verdict and optional denial reason.
 
         Examples:
             >>> import asyncio
@@ -321,7 +377,7 @@ class ToolApprovalBridge:
             ...         args_summary='{"path":"x"}',
             ...     )
             ... )
-            'deny'
+            ('deny', None)
         """
 
         decision_id = str(uuid.uuid4())
@@ -375,6 +431,15 @@ class ToolApprovalBridge:
         else:
             verdict = row.verdict or "deny"
 
+        deny_reason = row.deny_reason if verdict == "deny" else None
+        log_approval_decision(
+            tool_name=tool_name,
+            session_id=session_id,
+            verdict=verdict,
+            args_summary=args_summary,
+            reason=deny_reason,
+        )
+
         if trace is not None:
             now = time.time_ns()
             await trace.emit(
@@ -412,7 +477,7 @@ class ToolApprovalBridge:
                 },
             )
 
-        return verdict
+        return verdict, deny_reason
 
 
 __all__ = [
@@ -422,6 +487,7 @@ __all__ = [
     "ack_tool_on_deps",
     "get_tool_approval_bridge",
     "install_tool_approval_bridge",
+    "log_approval_decision",
     "reset_tool_approval_bridge_for_tests",
     "summarize_tool_args",
 ]

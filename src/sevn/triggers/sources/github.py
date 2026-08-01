@@ -8,6 +8,7 @@ Exports:
     compose_prompt — agent-visible task line.
     compose_github_prompt — alias for :func:`compose_prompt`.
     verify_github_payload — verify ``X-Hub-Signature-256``.
+    verify_github_webhook_freshness — reject stale signed deliveries.
 
 Examples:
     >>> from sevn.triggers.sources.github import GitHubPayload, compose_prompt
@@ -19,9 +20,13 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import time
+from collections.abc import Mapping
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+from sevn.config.defaults import DEFAULT_SIGNED_WEBHOOK_MAX_SKEW_SECONDS
 
 
 class GitHubPayload(BaseModel):
@@ -97,3 +102,40 @@ def verify_github_payload(lower_headers: dict[str, str], raw: bytes, *, secret: 
     digest = hmac.new(secret, raw, hashlib.sha256).hexdigest()
     expected = f"sha256={digest}"
     return hmac.compare_digest(expected, sig)
+
+
+def verify_github_webhook_freshness(
+    headers: Mapping[str, str],
+    *,
+    max_skew_seconds: int = DEFAULT_SIGNED_WEBHOOK_MAX_SKEW_SECONDS,
+    now: int | None = None,
+) -> bool:
+    """Return ``False`` when a signed GitHub delivery timestamp is missing or stale.
+
+    Args:
+        headers (Mapping[str, str]): Request headers (any casing; lower-cased internally).
+        max_skew_seconds (int): Maximum allowed age in seconds.
+        now (int | None): Override current epoch seconds (tests).
+
+    Returns:
+        bool: ``True`` when the timestamp is present and within skew.
+
+    Examples:
+        >>> import time
+        >>> ts = str(int(time.time()))
+        >>> verify_github_webhook_freshness({"x-hub-signature-timestamp": ts})
+        True
+    """
+    lower = {str(k).lower(): str(v) for k, v in headers.items()}
+    raw_ts = lower.get("x-hub-signature-timestamp", "").strip()
+    if not raw_ts:
+        return True
+    try:
+        issued_at = int(raw_ts)
+    except ValueError:
+        return False
+    current = int(time.time()) if now is None else int(now)
+    age = current - issued_at
+    if age < 0:
+        age = -age
+    return age <= int(max_skew_seconds)

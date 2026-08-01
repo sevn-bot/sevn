@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Define the runtime ontology for Triager output and related labels across
   the agent core: canonical field names, closed enums, typing conventions, and how
   they compose with executor dispatch described '
-last_updated: '2026-07-30'
-fingerprint: sha256:e7871bf4fe3bf2ef08a3404c1826eafe79470bf0afa8fb071b586bc48adc745a
+last_updated: '2026-07-31'
+fingerprint: sha256:b0fa577a145d18ab47e3d3589cb2b46ad94f8986cdf1afcf6a69cec28483b8ae
 related: []
 sources:
 - src/sevn/config/**
@@ -605,6 +605,9 @@ interfaces:
 - name: WorkspaceConfig
   file: src/sevn/config/sections/root.py
   symbol: WorkspaceConfig
+- name: BitwardenBackendEntry
+  file: src/sevn/config/sections/secrets.py
+  symbol: BitwardenBackendEntry
 - name: EncryptedFileBackendEntry
   file: src/sevn/config/sections/secrets.py
   symbol: EncryptedFileBackendEntry
@@ -617,6 +620,9 @@ interfaces:
 - name: MacOSKeychainBackendEntry
   file: src/sevn/config/sections/secrets.py
   symbol: MacOSKeychainBackendEntry
+- name: OnePasswordBackendEntry
+  file: src/sevn/config/sections/secrets.py
+  symbol: OnePasswordBackendEntry
 - name: OpenBaoBackendEntry
   file: src/sevn/config/sections/secrets.py
   symbol: OpenBaoBackendEntry

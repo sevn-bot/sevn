@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver non-interactive dispatch: external events (“something happened”)
   and schedules (“tick”) compile to DispatchRequest, optionally pass through notify_only
   (zero LLM, zero sandbox boot), otherwise'
-last_updated: '2026-07-21'
-fingerprint: sha256:cba9dff781c745b124968af4cd49ca19317fbd0d15090408648dccc08517e6b6
+last_updated: '2026-07-31'
+fingerprint: sha256:de4a492f2fbe966907a9ffda8d0755817295aa34922d2fc6b2f5767c04a5a59e
 related: []
 sources:
 - src/sevn/triggers/**
@@ -193,6 +193,9 @@ interfaces:
 - name: verify_github_payload
   file: src/sevn/triggers/sources/github.py
   symbol: verify_github_payload
+- name: verify_github_webhook_freshness
+  file: src/sevn/triggers/sources/github.py
+  symbol: verify_github_webhook_freshness
 - name: build_webhook_router
   file: src/sevn/triggers/webhook_router.py
   symbol: build_webhook_router
@@ -282,6 +285,14 @@ Trace control flow starting from the load-bearing symbols in **Implemented by** 
 | `tests/skills/gh_issues/test_issue_watch.py` | Track/watch diffs + cron handler registration |
 | `tests/gateway/test_lifecycle_w1_red.py` | `cron_tick` → `_CRON_JOB_HANDLERS` + operator-notify → `route_outgoing` |
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Amendments (open-issues-sweep W24, #81)
+
+Signed provider webhooks (`/webhook/github`) verify HMAC then
+`verify_github_webhook_freshness` on optional `X-Hub-Signature-Timestamp`
+(`DEFAULT_SIGNED_WEBHOOK_MAX_SKEW_SECONDS`, 300 s). Stale timestamps return
+**401**; delivery-id dedupe remains the second replay layer. Webhook agent-pass
+dispatch binds `bind_webhook_minimal_host_env()` for subprocess env redaction.
 
 ## Human-input needed
 

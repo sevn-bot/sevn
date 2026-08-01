@@ -166,6 +166,7 @@ from sevn.prompts.fallbacks import (  # re-exported for backward compatibility
 from sevn.tools.base import ToolDefinition
 from sevn.tools.cache import LoadedBodyCache
 from sevn.tools.context import ToolContext
+from sevn.tools.deny_rules import load_deny_rules_from_workspace
 from sevn.tools.permissions import (
     AllowAllPermissionPolicy,
     AttributeBasedPermissionPolicy,
@@ -4336,6 +4337,7 @@ def _tool_context_for_turn(
     from sevn.workspace.artifact_output import artifact_output_prefix
 
     output_prefix = artifact_output_prefix(workspace, session_id)
+    deny_rules = load_deny_rules_from_workspace(workspace)
     return ToolContext(
         session_id=session_id,
         workspace_path=layout.content_root,
@@ -4368,6 +4370,7 @@ def _tool_context_for_turn(
         subagent_parent_id=subagent_parent_id,
         subagent_specialist_grants=subagent_specialist_grants,
         subagent_remaining_budget_s=subagent_remaining_budget_s,
+        deny_rules=deny_rules,
     )
 
 

@@ -20,9 +20,13 @@ from fastapi.responses import JSONResponse
 from loguru import logger
 
 from sevn.agent.tracing.sink import TraceEvent, TraceSink
-from sevn.config.defaults import DEFAULT_TRIGGERS_WEBHOOK_DEDUPE_TTL_S
+from sevn.config.defaults import (
+    DEFAULT_SIGNED_WEBHOOK_MAX_SKEW_SECONDS,
+    DEFAULT_TRIGGERS_WEBHOOK_DEDUPE_TTL_S,
+)
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.runtime.background_tasks import spawn_logged
+from sevn.security.trigger_spawn_env import bind_webhook_minimal_host_env
 from sevn.triggers.dedupe import try_insert_webhook_dedupe
 from sevn.triggers.dispatcher import (
     TriggerDispatchGate,
@@ -36,6 +40,7 @@ from sevn.triggers.sources.github import (
     GithubWebhookPayload,
     compose_github_prompt,
     verify_github_payload,
+    verify_github_webhook_freshness,
 )
 from sevn.triggers.webhook_secret import resolve_webhook_signing_secret
 from sevn.workspace.layout import WorkspaceLayout
@@ -176,6 +181,11 @@ async def _dispatch_signed_webhook(*, source: str, request: Request) -> JSONResp
                 ),
             )
             raise HTTPException(status_code=401)
+        if not verify_github_webhook_freshness(
+            lower_headers,
+            max_skew_seconds=DEFAULT_SIGNED_WEBHOOK_MAX_SKEW_SECONDS,
+        ):
+            raise HTTPException(status_code=401)
         try:
             payload = GithubWebhookPayload.model_validate_json(raw.decode("utf-8"))
         except ValueError as exc:
@@ -277,25 +287,26 @@ async def _dispatch_signed_webhook(*, source: str, request: Request) -> JSONResp
     async def background() -> None:
         await gate.acquire_background()
         try:
-            if disp_req.delivery_mode == "notify_only":
-                await dispatch_notify_only(
-                    disp_req,
-                    workspace=ws,
-                    content_root=layout.content_root,
-                    trace=trace,
-                    hooks=hooks,
-                    invoke_receive_hooks=False,
-                )
-            else:
-                await dispatch_run(
-                    disp_req,
-                    workspace=ws,
-                    content_root=layout.content_root,
-                    trace=trace,
-                    hooks=hooks,
-                    invoke_receive_hooks=False,
-                    **agent_dispatch_kwargs(getattr(request.app.state, "gateway_router", None)),
-                )
+            with bind_webhook_minimal_host_env():
+                if disp_req.delivery_mode == "notify_only":
+                    await dispatch_notify_only(
+                        disp_req,
+                        workspace=ws,
+                        content_root=layout.content_root,
+                        trace=trace,
+                        hooks=hooks,
+                        invoke_receive_hooks=False,
+                    )
+                else:
+                    await dispatch_run(
+                        disp_req,
+                        workspace=ws,
+                        content_root=layout.content_root,
+                        trace=trace,
+                        hooks=hooks,
+                        invoke_receive_hooks=False,
+                        **agent_dispatch_kwargs(getattr(request.app.state, "gateway_router", None)),
+                    )
         except Exception:
             logger.exception("webhook_dispatch_failed correlation_id={}", correlation_id)
         finally:

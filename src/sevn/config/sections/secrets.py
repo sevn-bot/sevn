@@ -10,6 +10,8 @@ Exports:
     LinuxSecretServiceBackendEntry — libsecret chain entry.
     OpenBaoBackendEntry — OpenBao KV chain entry.
     ProtonPassBackendEntry — Proton Pass CLI chain entry.
+    OnePasswordBackendEntry — 1Password CLI chain entry.
+    BitwardenBackendEntry — Bitwarden CLI chain entry.
     SecretsBackendSectionConfig — ``secrets_backend`` subtree (``specs/06-secrets.md`` §5).
     effective_encrypted_file_key_source — resolve encrypted-file unlock mechanism.
 """
@@ -138,12 +140,37 @@ class ProtonPassBackendEntry(BaseModel):
     cli_path: str | None = None
 
 
+class OnePasswordBackendEntry(BaseModel):
+    """``type``: ``one_password`` (1Password CLI ``op``)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["one_password"] = "one_password"
+    cli_path: str | None = None
+    vault: str | None = None
+    account: str | None = None
+    field: str = "password"
+
+
+class BitwardenBackendEntry(BaseModel):
+    """``type``: ``bitwarden`` (Bitwarden CLI ``bw``)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["bitwarden"] = "bitwarden"
+    cli_path: str | None = None
+    collection: str | None = None
+    field: str = "password"
+
+
 BackendEntry = Annotated[
     EncryptedFileBackendEntry
     | MacOSKeychainBackendEntry
     | LinuxSecretServiceBackendEntry
     | OpenBaoBackendEntry
-    | ProtonPassBackendEntry,
+    | ProtonPassBackendEntry
+    | OnePasswordBackendEntry
+    | BitwardenBackendEntry,
     Discriminator("type"),
 ]
 
@@ -159,6 +186,8 @@ class SecretsBackendSectionConfig(BaseModel):
     encrypted_file: EncryptedFileSubtreeDefaults | None = None
     openbao: JsonDict | None = None
     proton_pass: JsonDict | None = None
+    one_password: JsonDict | None = None
+    bitwarden: JsonDict | None = None
 
     @field_validator("chain", mode="before")
     @classmethod

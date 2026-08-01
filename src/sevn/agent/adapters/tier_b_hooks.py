@@ -324,12 +324,17 @@ def apply_load_tool_grant(deps: BTierDeps, loaded_name: str) -> None:
             steer.inject_pending(steer_for_codemode_loaded_tool(loaded_name))
 
 
-def check_permission_before_dispatch(deps: BTierDeps, tool_name: str) -> str | None:
+def check_permission_before_dispatch(
+    deps: BTierDeps,
+    tool_name: str,
+    args: dict[str, Any] | None = None,
+) -> str | None:
     """Return a denial envelope when permission or human gates block ``tool_name``.
 
     Args:
         deps (BTierDeps): Per-run dependency bag.
         tool_name (str): Candidate tool name.
+        args (dict[str, Any] | None): Validated tool arguments for deny-rule matching.
 
     Returns:
         str | None: Raw failure envelope when blocked; ``None`` when allowed.
@@ -379,6 +384,24 @@ def check_permission_before_dispatch(deps: BTierDeps, tool_name: str) -> str | N
             "Permission denied for tool invocation",
             code=ToolResultCode.PERMISSION_DENIED,
         )
+    from sevn.tools.deny_rules import deny_envelope_from_rules, parse_deny_rules
+    from sevn.tools.permissions import AllowAllPermissionPolicy
+
+    if deps.workspace_permissions is not None:
+        rules = parse_deny_rules(deps.workspace_permissions.get("deny_rules"))
+    else:
+        rules = tool_ctx.deny_rules
+    payload_args = args if args is not None else {}
+    deny = deny_envelope_from_rules(
+        tool_name=tool_name,
+        args=payload_args,
+        rules=rules,
+        session_id=tool_ctx.session_id,
+        operator_overrides=tool_ctx.human_acknowledged_tools,
+        base_policy=permission_gate if permission_gate is not None else AllowAllPermissionPolicy(),
+    )
+    if deny is not None:
+        return deny
     definition = deps.tool_executor.snapshot_definition(tool_name)
     if definition is None:
         return None
@@ -703,11 +726,12 @@ async def await_human_tool_approval(
         bound_tool_names=frozenset(),
         triager_first_reply="",
     )
-    return await approval_guardrail(hook_config).resolve_approval(
+    approved, _deny_reason = await approval_guardrail(hook_config).resolve_approval(
         ctx,
         tool_name=tool_name,
         args=args,
     )
+    return approved
 
 
 async def permission_before_tool_execute(

@@ -23,6 +23,8 @@ import httpx
 from loguru import logger
 
 from sevn.channels.telegram_send_host import TelegramSendHost
+from sevn.logging.log_redact import redact_log_line
+from sevn.security.trigger_spawn_env import redact_telegram_bot_token
 
 _BOT_API = "https://api.telegram.org"
 _TELEGRAM_API_HOST = "api.telegram.org"
@@ -30,6 +32,39 @@ _HTTP_READ_TIMEOUT_S = 60.0
 _MAX_SEND_RETRIES = 4
 # Match the gateway typing loop resend interval (`channel_router._schedule_telegram_typing`).
 _CHAT_ACTION_COALESCE_WINDOW_S = 4.0
+
+
+def _sanitize_telegram_transport_error(exc: BaseException, token: str) -> BaseException:
+    """Return a transport error whose string form never embeds the bot token.
+
+    Args:
+        exc (BaseException): Original httpx or network error.
+        token (str): Telegram bot token that must be redacted.
+
+    Returns:
+        BaseException: Sanitized exception safe to log or re-raise.
+
+    Examples:
+        >>> err = _sanitize_telegram_transport_error(ValueError("token=abc"), "abc")
+        >>> "abc" not in str(err)
+        True
+    """
+    if not token:
+        return exc
+    rendered = str(exc)
+    if token not in rendered and "/bot" not in rendered.lower():
+        return exc
+    safe_text = redact_telegram_bot_token(rendered, token)
+    if isinstance(exc, httpx.ConnectError) and exc.request is not None:
+        safe_url = httpx.URL(redact_telegram_bot_token(str(exc.request.url), token))
+        sanitized: BaseException = httpx.ConnectError(
+            safe_text,
+            request=httpx.Request(exc.request.method, safe_url),
+        )
+    else:
+        sanitized = type(exc)(safe_text)
+    sanitized.__cause__ = exc
+    return sanitized
 
 
 class TelegramApiMixin(TelegramSendHost):
@@ -129,7 +164,7 @@ class TelegramApiMixin(TelegramSendHost):
                 last_err = exc
                 await asyncio.sleep(0.5 * (2**attempt) + 0.05)
         if last_err:
-            raise last_err
+            raise _sanitize_telegram_transport_error(last_err, token) from last_err
         return {}
 
     async def answer_callback(
@@ -254,7 +289,7 @@ class TelegramApiMixin(TelegramSendHost):
                 last_err = exc
                 await asyncio.sleep(0.5 * (2**attempt) + 0.05)
         if last_err:
-            raise last_err
+            raise _sanitize_telegram_transport_error(last_err, token) from last_err
         return {}
 
     def _log_send_api_error(self, method: str, res: dict[str, Any]) -> None:
@@ -272,7 +307,7 @@ class TelegramApiMixin(TelegramSendHost):
         logger.info(
             "telegram_send_api_error method={} description={} error_code={}",
             method,
-            res.get("description"),
+            redact_log_line(str(res.get("description") or "")),
             res.get("error_code"),
         )
 
