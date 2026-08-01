@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -24,7 +25,30 @@ def runner() -> ClickCliRunner:
     return ClickCliRunner()
 
 
-@pytest.mark.xfail(reason="green after W3: resolve_cli_version_string git format", strict=False)
+def _init_git_repo(root: Path, *, commit_message: str = "init") -> None:
+    subprocess.run(["git", "init"], cwd=root, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "test"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    )
+    (root / "README").write_text("x\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README"], cwd=root, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", commit_message],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    )
+
+
 def test_root_version_flag_uses_branch_commit_format(runner: ClickCliRunner) -> None:
     """``sevn --version`` emits ``<branch>-<commit8>`` inside a git checkout."""
     result = runner.invoke(get_command(app), ["--version"])
@@ -34,7 +58,6 @@ def test_root_version_flag_uses_branch_commit_format(runner: ClickCliRunner) -> 
     assert _BRANCH_COMMIT_RE.match(version), f"unexpected version format: {version!r}"
 
 
-@pytest.mark.xfail(reason="green after W3: resolve_cli_version_string git format", strict=False)
 def test_version_subcommand_uses_branch_commit_format(runner: ClickCliRunner) -> None:
     """``sevn version`` matches root ``--version`` format."""
     result = runner.invoke(get_command(app), ["version"])
@@ -43,7 +66,6 @@ def test_version_subcommand_uses_branch_commit_format(runner: ClickCliRunner) ->
     assert _BRANCH_COMMIT_RE.match(version), f"unexpected version format: {version!r}"
 
 
-@pytest.mark.xfail(reason="green after W3: resolve_cli_version_string json field", strict=False)
 def test_version_json_includes_branch_commit_cli_version(runner: ClickCliRunner) -> None:
     """``sevn version --json`` exposes branch-commit ``cli_version``."""
     result = runner.invoke(get_command(app), ["version", "--json"])
@@ -53,7 +75,6 @@ def test_version_json_includes_branch_commit_cli_version(runner: ClickCliRunner)
     assert _BRANCH_COMMIT_RE.match(cli_version), f"unexpected cli_version: {cli_version!r}"
 
 
-@pytest.mark.xfail(reason="green after W3: metadata fallback when git unavailable", strict=False)
 def test_resolve_cli_version_string_falls_back_to_package_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -67,11 +88,11 @@ def test_resolve_cli_version_string_falls_back_to_package_metadata(
     assert resolve_cli_version_string() == "0.0.1"
 
 
-@pytest.mark.xfail(reason="green after W3: resolve_cli_version_string unit helper", strict=False)
 def test_resolve_cli_version_string_from_git(tmp_path: Path) -> None:
     """Unit: helper prefers git-derived ``<branch>-<commit8>`` when repo root is known."""
     from sevn.cli.version import resolve_cli_version_string
 
+    _init_git_repo(tmp_path)
     version = resolve_cli_version_string(repo_root=tmp_path)
     assert isinstance(version, str)
     assert version
