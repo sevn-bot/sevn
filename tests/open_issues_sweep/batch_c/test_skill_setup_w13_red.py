@@ -9,14 +9,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
+from sevn.media.yt_dlp_skill import yt_dlp_available
+from sevn.runtime.operator_path import augment_operator_path
 from tests.open_issues_sweep.batch_c.conftest import (
     install_fake_yt_dlp,
     skills_manager_for_tree,
     write_min_skill,
 )
-
-from sevn.media.yt_dlp_skill import yt_dlp_available
-from sevn.runtime.operator_path import augment_operator_path
 
 _JOBSPY_SCRIPTS = (
     Path(__file__).resolve().parents[3]

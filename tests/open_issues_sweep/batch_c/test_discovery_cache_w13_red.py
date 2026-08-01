@@ -7,13 +7,13 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
+from sevn.skills.errors import SKILL_QUARANTINED
+from sevn.skills.manager import SkillsManager, _scan_skills_tree
 from tests.open_issues_sweep.batch_c.conftest import (
     skills_manager_for_tree,
     write_min_skill,
 )
-
-from sevn.skills.errors import SKILL_QUARANTINED
-from sevn.skills.manager import SkillsManager, _scan_skills_tree
 
 
 def _reload_with_discovery_cache(
