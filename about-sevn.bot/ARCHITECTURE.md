@@ -13,6 +13,10 @@ Canonical evolution orientation for agents. Deep folder contract and read order 
 
 Normative requirements remain in the local-only design docs (PRDs and specs).
 
+## Brand & visual identity
+
+Human-readable logo, palette, typography, and agent guardrails: [`docs/brand/README.md`](../docs/brand/README.md) (repo root). Authoritative tokens and SVGs live under `styles/sevn/style/`; Telegram menu branding in `src/sevn/gateway/menu/menu_branding.py`. The mark is an **ASCII-style abstract 7** — not a fox/wolf mascot.
+
 ## Concept index
 
 Curated map of the load-bearing concepts and their primary source files.
