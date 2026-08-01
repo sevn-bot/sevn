@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own everything under workspace/skills/: how skills are discovered, validated,
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
-last_updated: '2026-07-31'
-fingerprint: sha256:eeb851d2a96484f022b411eb29a39f72c6ac7b5d9e0c17eea7f96f87d7717f06
+last_updated: '2026-08-01'
+fingerprint: sha256:4a121d313360f6013f032ef06ee382da2ca741bda999fd64f70a1a177ebbb942
 related: []
 sources:
 - src/sevn/skills/**
@@ -176,6 +176,12 @@ interfaces:
 - name: gate_cursor_cloud_core_skill
   file: src/sevn/skills/cursor_cloud.py
   symbol: gate_cursor_cloud_core_skill
+- name: SkillDependencies
+  file: src/sevn/skills/dependencies.py
+  symbol: SkillDependencies
+- name: coerce_skill_dependencies
+  file: src/sevn/skills/dependencies.py
+  symbol: coerce_skill_dependencies
 - name: discogs_config_enabled
   file: src/sevn/skills/discogs.py
   symbol: discogs_config_enabled
@@ -188,6 +194,15 @@ interfaces:
 - name: merge_discogs_proc_env
   file: src/sevn/skills/discogs_secrets.py
   symbol: merge_discogs_proc_env
+- name: discovery_cache_enabled
+  file: src/sevn/skills/discovery_cache.py
+  symbol: discovery_cache_enabled
+- name: discovery_cache_file
+  file: src/sevn/skills/discovery_cache.py
+  symbol: discovery_cache_file
+- name: reload_skills_with_cache
+  file: src/sevn/skills/discovery_cache.py
+  symbol: reload_skills_with_cache
 - name: EmailAccount
   file: src/sevn/skills/email_management.py
   symbol: EmailAccount
@@ -422,6 +437,9 @@ interfaces:
 - name: SkillsManager
   file: src/sevn/skills/manager.py
   symbol: SkillsManager
+- name: core_skill_discovery_skipped
+  file: src/sevn/skills/manager.py
+  symbol: core_skill_discovery_skipped
 - name: did_you_mean_skill_script
   file: src/sevn/skills/manager.py
   symbol: did_you_mean_skill_script
@@ -566,6 +584,21 @@ interfaces:
 - name: write_workspace_scan_summary
   file: src/sevn/skills/security_scan.py
   symbol: write_workspace_scan_summary
+- name: InstallConfirmationRequired
+  file: src/sevn/skills/setup.py
+  symbol: InstallConfirmationRequired
+- name: execute_skill_setup
+  file: src/sevn/skills/setup.py
+  symbol: execute_skill_setup
+- name: skill_setup_requirements
+  file: src/sevn/skills/setup.py
+  symbol: skill_setup_requirements
+- name: skill_setup_status
+  file: src/sevn/skills/setup.py
+  symbol: skill_setup_status
+- name: skill_setup_telegram_summary
+  file: src/sevn/skills/setup.py
+  symbol: skill_setup_telegram_summary
 - name: gate_social_media_manager_core_skill
   file: src/sevn/skills/social_media_manager.py
   symbol: gate_social_media_manager_core_skill
@@ -650,6 +683,40 @@ Document observable failure surfaces from the implementing modules (exceptions, 
 **Proton polish CLI (proton-cli):** `status` and `api` are runnable leaf groups (`invoke_without_command`); `status` reports `session_file` / `session_exists` via `session_store.session_path` (legacy `~/.config/proton-cli/session.json` for the default profile); `settings set <key>` rejects a missing value before authenticate.
 
 **Proton deferred surfaces (proton-cli):** Mail `_classify_recipient` consults `ContactsService.pinned_keys_for` before `/core/v4/keys/all`; unexpected HV-helper crashes in `cli_hv_resolver` log at warning (with detail) before falling back to `ErrHVUnavailable`, while `HVUnavailableError` (helper not installed) remains quiet. Calendar events create/respond, contacts groups/pin-key, and mail attach/attachments flows are covered by mocked behavioral tests (live RSVP/attachment/HV-webview E2E deferred without credentials).
+
+## Amendments (open-issues-sweep W14, #69 / #93)
+
+`SkillManifest.dependencies` (`SkillDependencies`: `uv_extras`, `executables`) is the
+canonical setup contract (D7). Skills without the field mean **no setup required**.
+`sevn skills setup-status` / `sevn skills setup --yes` and Telegram ``form:skills:setup``
+(with confirmation gate) call `execute_skill_setup`, which reuses onboarding
+`resolve_install_plan` / `uv sync --extra …` actions from `onboarding_capabilities.json`.
+Post-install, `augment_operator_path` prepends the active venv ``bin`` so uv-extra
+console scripts (e.g. ``yt-dlp``) resolve in skill subprocesses without manual PATH fixes.
+
+## Amendments (open-issues-sweep W15, #84)
+
+Opt-in signature cache for skill tree discovery (`skills.discovery_cache.enabled`, **D9**
+default-off). When enabled, ``SkillsManager.reload()`` may reuse
+``<content_root>/.sevn/skills-discovery.cache.json`` when the filesystem tree signature and
+``registry_version`` match; manifest/script edits and registry bumps invalidate. Missing or
+corrupt cache degrades to a full scan. Quarantine records from parse failures and
+hard-excluded core ids are preserved in cached rows. Representative benchmark (bundled skills
+root): cold full scan ~45–120 ms; warm cache reload ~0.5–2 ms (local dev, 2026-07-30).
+
+## Amendments (open-issues-sweep W16, #87)
+
+Stacked slash-skill invocation is parsed in ``src/sevn/gateway/slash_skills.py`` and wired
+into gateway dispatch **after** the existing core/menu slash handler chain
+(``build_agent_run_turn`` → ``_route_incoming_with_menu``). Messages like
+``/research /writing compare notes`` load ``research`` then ``writing`` in order;
+the remainder text becomes the user prompt. Unknown ``/tokens`` produce explicit
+errors (never silent prose). Metadata conflicts across stacked skills resolve with
+**later token wins** (``effective_skill_id``). Shortcut rows with ``type: skill`` and
+menu callbacks with ``kind: skill`` rewrite to slash-skill text and route through the
+same parser. Turn overlay is stored on the user message metadata key
+``slash_skill_overlay`` and merged into ``TriageResult.skills`` before tier dispatch.
+
 ## Amendments (spec-36-sub-agents)
 
 Bundled `media_generation` skill binds to the `media_generator` specialist via

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import platform as _platform
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
@@ -58,11 +59,46 @@ _DEFAULT_SYSTEM_PATH: Final[tuple[str, ...]] = (
 )
 
 
-def operator_path_prefixes(*, home: Path | None = None) -> tuple[Path, ...]:
+def _venv_bin_prefixes(*, env: Mapping[str, str] | None = None) -> tuple[Path, ...]:
+    """Return the active virtualenv ``bin`` directory when present.
+
+    Args:
+        env (Mapping[str, str] | None): Base environment; defaults to ``os.environ``.
+
+    Returns:
+        tuple[Path, ...]: Existing venv bin dirs in prepend order.
+
+    Examples:
+        >>> isinstance(_venv_bin_prefixes(env={}), tuple)
+        True
+    """
+    base = os.environ if env is None else env
+    venv = str(base.get("VIRTUAL_ENV", "")).strip()
+    if venv:
+        bin_dir = Path(venv) / "bin"
+        if bin_dir.is_dir():
+            return (bin_dir,)
+    # Daemon / launchd often runs ``.venv/bin/python`` without ``VIRTUAL_ENV``.
+    # Prefer the active interpreter's prefix when it looks like a venv, even when
+    # callers pass a populated ``env`` mapping (``augment_operator_path`` always does).
+    prefix = Path(sys.prefix)
+    pyvenv = prefix / "pyvenv.cfg"
+    prefix_bin = prefix / "bin"
+    if pyvenv.is_file() and prefix_bin.is_dir():
+        return (prefix_bin,)
+    return ()
+
+
+def operator_path_prefixes(
+    *,
+    home: Path | None = None,
+    env: Mapping[str, str] | None = None,
+) -> tuple[Path, ...]:
     """Return candidate operator bin directories to prepend to PATH.
 
     Args:
         home (Path | None, optional): Operator home; defaults to ``Path.home()``.
+        env (Mapping[str, str] | None): Base environment for venv detection.
 
     Returns:
         tuple[Path, ...]: Existing directories only, in prepend order.
@@ -72,7 +108,8 @@ def operator_path_prefixes(*, home: Path | None = None) -> tuple[Path, ...]:
         True
     """
     root = home if home is not None else Path.home()
-    candidates: list[Path] = [root / rel for rel in _DEFAULT_PREFIX_REL]
+    candidates: list[Path] = [*_venv_bin_prefixes(env=env)]
+    candidates.extend(root / rel for rel in _DEFAULT_PREFIX_REL)
     candidates.extend(
         (
             Path("/opt/homebrew/bin"),
@@ -108,7 +145,7 @@ def augment_operator_path(
     parts = [part for part in current.split(os.pathsep) if part]
     known = set(parts)
     prepend: list[str] = []
-    for prefix in operator_path_prefixes(home=home):
+    for prefix in operator_path_prefixes(home=home, env=merged):
         entry = str(prefix)
         if entry not in known:
             prepend.append(entry)

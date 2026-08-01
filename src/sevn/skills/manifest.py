@@ -30,12 +30,13 @@ import itertools
 import json
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 
 import yaml
 
+from sevn.skills.dependencies import SkillDependencies, coerce_skill_dependencies
 from sevn.skills.errors import SKILL_VALIDATION, SkillExecutionError
 
 if TYPE_CHECKING:
@@ -87,6 +88,7 @@ class SkillManifest:
     python_version: str | None = None
     max_wall_seconds: int | None = None
     quarantine_flag: bool | None = None
+    dependencies: SkillDependencies = field(default_factory=SkillDependencies)
 
     def effective_quarantine(self, provenance: ProvenanceKind) -> bool:
         """Return runtime quarantine (default ``True`` under ``generated/``).
@@ -441,6 +443,7 @@ def manifest_from_mapping(
         max_wall_i = mxs
     pyv = pv.strip() if isinstance(pv, str) and pv.strip() else None
     scripts_part = _coerce_scripts(data.get("scripts"))
+    deps = coerce_skill_dependencies(data.get("dependencies"))
     return SkillManifest(
         name=name_raw.strip(),
         description=desc_raw.strip(),
@@ -451,6 +454,7 @@ def manifest_from_mapping(
         python_version=pyv,
         max_wall_seconds=max_wall_i,
         quarantine_flag=mq_flag,
+        dependencies=deps,
     )
 
 
@@ -575,6 +579,7 @@ def downgrade_manifest(
             python_version=m.python_version,
             max_wall_seconds=m.max_wall_seconds,
             quarantine_flag=m.quarantine_flag,
+            dependencies=m.dependencies,
         )
     return m, tuple(errs)
 

@@ -1225,7 +1225,29 @@ def build_agent_run_turn(
                     ),
                 )
             return
-        if core_handler.matches_slash(msg):
+        slash_text = (msg.text or "").strip()
+        skill_shortcut_row = None
+        from sevn.gateway.slash_skills import (
+            preprocess_stacked_slash_skills_inbound,
+            resolve_skill_shortcut_slash,
+            skill_shortcut_slash_text,
+        )
+
+        if slash_text.startswith("/"):
+            skill_shortcut_row = resolve_skill_shortcut_slash(slash_text, layout.content_root)
+            if skill_shortcut_row is not None:
+                trailing = slash_text.split(maxsplit=1)[1] if len(slash_text.split()) > 1 else ""
+                slash_text = skill_shortcut_slash_text(skill_shortcut_row, trailing_args=trailing)
+                md = dict(msg.metadata) if isinstance(msg.metadata, dict) else {}
+                msg = IncomingMessage(
+                    channel=msg.channel,
+                    user_id=msg.user_id,
+                    text=slash_text,
+                    metadata=md,
+                    raw=msg.raw,
+                    attachments=list(msg.attachments),
+                )
+        if core_handler.matches_slash(msg) and skill_shortcut_row is None:
             owner = router._resolve_owner_flag(msg)
             if not router.slash_command_allowed(msg, is_owner=owner):
                 adapter = router._adapters.get(msg.channel)
@@ -1276,6 +1298,33 @@ def build_agent_run_turn(
                         ),
                     )
             return
+        if slash_text.startswith("/"):
+            pre = preprocess_stacked_slash_skills_inbound(
+                msg,
+                slash_text=slash_text,
+                content_root=layout.content_root,
+                workspace=workspace,
+                layout=layout,
+            )
+            if pre.reply_text:
+                adapter = router._adapters.get(msg.channel)
+                if adapter is not None:
+                    from sevn.gateway.channel_router import (
+                        OutgoingMessage,
+                        _telegram_reply_metadata,
+                    )
+
+                    await adapter.send(
+                        OutgoingMessage(
+                            channel=msg.channel,
+                            user_id=msg.user_id,
+                            text=pre.reply_text,
+                            session_id=session_id,
+                            metadata=dict(_telegram_reply_metadata(msg)),
+                        ),
+                    )
+                return
+            msg = pre.msg
         await _orig_route_incoming(msg)
 
     router.route_incoming = _route_incoming_with_menu  # type: ignore[method-assign]
@@ -1682,6 +1731,34 @@ def build_agent_run_turn(
                 status="completed",
                 attrs={"complexity": str(triage.complexity), "disregard": triage.disregard},
             )
+        slash_overlay = await asyncio.to_thread(
+            _slash_skill_overlay_for_turn,
+            conn,
+            session_id,
+            correlation_id,
+        )
+        if slash_overlay:
+            from sevn.gateway.slash_skills import merge_slash_skills_into_triage
+
+            merged_skills = merge_slash_skills_into_triage(list(triage.skills), slash_overlay)
+            if merged_skills != list(triage.skills):
+                triage = triage.model_copy(update={"skills": merged_skills})
+            loaded = slash_overlay.get("loaded_skills")
+            if isinstance(loaded, list):
+                await _emit_gateway_span(
+                    trace,
+                    kind="gateway.slash_skills.loaded",
+                    session_id=session_id,
+                    turn_id=correlation_id,
+                    status="completed",
+                    attrs={
+                        "skill_ids": [
+                            str(row.get("skill_id")) for row in loaded if isinstance(row, dict)
+                        ],
+                        "effective_skill_id": slash_overlay.get("effective_skill_id"),
+                        "conflict_resolution": slash_overlay.get("conflict_resolution"),
+                    },
+                )
         if regen_suggested_tier in ("C", "D"):
             forced = ComplexityTier.C if regen_suggested_tier == "C" else ComplexityTier.D
             if triage.complexity != forced:
@@ -4147,6 +4224,51 @@ def _user_message_text_for_turn(
     if row is not None and str(row[0] or "").strip():
         return str(row[0])
     return _latest_user_message_text(conn, session_id)
+
+
+def _slash_skill_overlay_for_turn(
+    conn: sqlite3.Connection,
+    session_id: str,
+    turn_id: str,
+) -> dict[str, Any] | None:
+    """Return slash-skill overlay metadata stored on the turn's user message row.
+
+    Args:
+        conn (sqlite3.Connection): Gateway SQLite handle.
+        session_id (str): Owning session id.
+        turn_id (str): Gateway turn correlation id.
+
+    Returns:
+        dict[str, Any] | None: Parsed overlay dict, or ``None`` when absent.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.isfunction(_slash_skill_overlay_for_turn)
+        True
+    """
+    row = conn.execute(
+        """
+        SELECT extras_json FROM gateway_messages
+        WHERE session_id = ? AND turn_id = ? AND role = 'user' AND kind = 'message'
+        ORDER BY id DESC LIMIT 1
+        """,
+        (session_id, turn_id),
+    ).fetchone()
+    if row is None:
+        return None
+    raw = row[0]
+    if not isinstance(raw, str) or not raw.strip():
+        return None
+    try:
+        meta = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(meta, dict):
+        return None
+    from sevn.gateway.slash_skills import SLASH_SKILL_OVERLAY_META_KEY
+
+    overlay = meta.get(SLASH_SKILL_OVERLAY_META_KEY)
+    return overlay if isinstance(overlay, dict) else None
 
 
 def _latest_user_message_text(conn: sqlite3.Connection, session_id: str) -> str:

@@ -102,6 +102,26 @@ async def idempotent_check_satisfied(
     return (await proc.wait()) == 0
 
 
+def _checkout_has_dev_group(install_root: Path) -> bool:
+    """Return whether the checkout ``pyproject.toml`` declares a dev dependency group.
+
+    Args:
+        install_root (Path): sevn.bot checkout root.
+
+    Returns:
+        bool: ``True`` when a ``[dependency-groups] dev`` block is declared.
+
+    Examples:
+        >>> isinstance(_checkout_has_dev_group(Path(".")), bool)
+        True
+    """
+    pyproject = install_root / "pyproject.toml"
+    if not pyproject.is_file():
+        return False
+    text = pyproject.read_text(encoding="utf-8")
+    return "\ndev = [" in text or text.startswith("dev = [")
+
+
 async def execute_install_action(
     action: InstallAction,
     *,
@@ -217,10 +237,13 @@ async def execute_install_action(
         return
 
     if action.kind == "uv_extra":
+        argv = ["uv", "sync", "--extra", *action.argv]
+        if _checkout_has_dev_group(cwd):
+            argv.extend(["--group", "dev"])
         async for event in _run_subprocess_stream(
             action,
             capability_id=capability_id,
-            argv=["uv", "sync", "--extra", *action.argv],
+            argv=argv,
             cwd=cwd,
         ):
             yield event

@@ -6,8 +6,8 @@ status: scaffold
 owner: Alex
 summary: 'Harness discipline: background task logging, operator PATH augmentation,
   and gateway/agent harness hooks under agent/harness/.'
-last_updated: '2026-07-14'
-fingerprint: sha256:3d1bd9050c4ccabc3c76b79dd616114e44c5ef0033271a6d372eb9a5b0741101
+last_updated: '2026-08-01'
+fingerprint: sha256:15733a8d62acaeb88082f7af061aefd7b977c7e6f024718039a3aa51b834498c
 related: []
 sources:
 - src/sevn/agent/harness/**

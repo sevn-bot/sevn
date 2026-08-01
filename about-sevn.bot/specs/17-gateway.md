@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-08-01'
-fingerprint: sha256:2d25ec29ec6bf512b0e6aba8398bf0b8ad1a9fdea10e6a559f945d51996b749e
+fingerprint: sha256:1375dc484a8aecc9e4f2a38d080abd62faa042ab08c55ae9365564b2e05fed68
 related: []
 sources:
 - src/sevn/gateway/**
@@ -1068,6 +1068,36 @@ interfaces:
 - name: validate_dispatch_routing_identity
   file: src/sevn/gateway/session_manager.py
   symbol: validate_dispatch_routing_identity
+- name: SlashSkillInboundPreprocessResult
+  file: src/sevn/gateway/slash_skills.py
+  symbol: SlashSkillInboundPreprocessResult
+- name: StackedSlashSkillParseResult
+  file: src/sevn/gateway/slash_skills.py
+  symbol: StackedSlashSkillParseResult
+- name: build_slash_skill_turn_overlay
+  file: src/sevn/gateway/slash_skills.py
+  symbol: build_slash_skill_turn_overlay
+- name: format_slash_skill_errors
+  file: src/sevn/gateway/slash_skills.py
+  symbol: format_slash_skill_errors
+- name: known_skill_ids_from_manager
+  file: src/sevn/gateway/slash_skills.py
+  symbol: known_skill_ids_from_manager
+- name: merge_slash_skills_into_triage
+  file: src/sevn/gateway/slash_skills.py
+  symbol: merge_slash_skills_into_triage
+- name: parse_stacked_slash_skills
+  file: src/sevn/gateway/slash_skills.py
+  symbol: parse_stacked_slash_skills
+- name: preprocess_stacked_slash_skills_inbound
+  file: src/sevn/gateway/slash_skills.py
+  symbol: preprocess_stacked_slash_skills_inbound
+- name: resolve_skill_shortcut_slash
+  file: src/sevn/gateway/slash_skills.py
+  symbol: resolve_skill_shortcut_slash
+- name: skill_shortcut_slash_text
+  file: src/sevn/gateway/slash_skills.py
+  symbol: skill_shortcut_slash_text
 - name: build_announce_back_hook
   file: src/sevn/gateway/subagents/subagents_announce.py
   symbol: build_announce_back_hook

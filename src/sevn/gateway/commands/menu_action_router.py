@@ -136,6 +136,7 @@ _DEV_SHELL_COMMANDS: dict[str, str] = {
 _OWNER_ONLY_ACTION_TARGETS: frozenset[str] = frozenset(
     {
         "skills:sync",
+        "skills:setup:confirm",
         "second_brain:setup",
         "second_brain:reindex",
         "dreaming:undo",
@@ -612,6 +613,11 @@ class MenuActionRouter:
             if target in _OWNER_ONLY_ACTION_TARGETS and not self._router._resolve_owner_flag(msg):
                 await self._answer_owner_only(msg)
                 return None
+            if target.startswith("skills:setup:confirm:") and not self._router._resolve_owner_flag(
+                msg,
+            ):
+                await self._answer_owner_only(msg)
+                return None
             if target == "dashboard:refresh_pin":
                 return await self._handle_dashboard_refresh_pin(msg, raw)
             if target == "dashboard:create_pin":
@@ -646,6 +652,11 @@ class MenuActionRouter:
                 return await self._handle_skills_sync(msg, raw)
             if target == "skills:security-scan":
                 return await self._handle_skills_security_scan(msg, raw)
+            if target == "skills:setup:cancel":
+                return "Skill setup cancelled."
+            if target.startswith("skills:setup:confirm:"):
+                skill_id = target.removeprefix("skills:setup:confirm:").strip()
+                return await self._handle_skills_setup_confirm(msg, raw, skill_id=skill_id)
             if target == "tools:health":
                 return await self._handle_tools_health(msg, raw)
             if target == "memory:search":
@@ -735,7 +746,24 @@ class MenuActionRouter:
             )
             if restart_handled is not None:
                 return restart_handled
-        if kind in {"skill", "action", "scene"}:
+        if kind == "skill":
+            from sevn.gateway.channel_router import IncomingMessage
+
+            skill_id = target.strip()
+            if not skill_id:
+                return "Unknown skill shortcut."
+            prompt = (value or "").strip()
+            slash_text = f"/{skill_id} {prompt}".strip()
+            await self._router.route_incoming(
+                IncomingMessage(
+                    channel=msg.channel,
+                    user_id=msg.user_id,
+                    text=slash_text,
+                    metadata=dict(md),
+                ),
+            )
+            return None
+        if kind in {"action", "scene"}:
             token = f"ds:{secrets.token_hex(8)}"
             payload = json.dumps(
                 {"v": 1, "kind": kind, "target": target, "value": value},
@@ -1850,6 +1878,56 @@ class MenuActionRouter:
         await self._answer_chat_action(
             msg,
             "Scan complete" if exit_code == 0 else "Scan found issues",
+        )
+        return None
+
+    async def _handle_skills_setup_confirm(
+        self,
+        msg: IncomingMessage,
+        callback_data: str,
+        *,
+        skill_id: str,
+    ) -> str | None:
+        """Run confirmation-gated skill dependency setup (W14).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+            skill_id (str): Skill id from callback suffix.
+
+        Returns:
+            str | None: Toast on failure, else ``None`` after posting to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_skills_setup_confirm)
+            True
+        """
+        _ = callback_data
+        import asyncio
+
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.skills.setup import execute_skill_setup
+
+        if not skill_id.strip():
+            return "Skill id missing."
+        if not self._router._resolve_owner_flag(msg):
+            await self._answer_owner_only(msg)
+            return None
+        result = await asyncio.to_thread(
+            execute_skill_setup,
+            skill_id.strip(),
+            workspace_root=self._content_root,
+            confirmed=True,
+        )
+        lines = [str(result.get("message", ""))]
+        if result.get("reload_required"):
+            lines.append("Gateway reload/restart recommended for subprocess PATH updates.")
+        body = "\n".join(line for line in lines if line)
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(
+            msg,
+            "Setup complete" if result.get("ok") else "Setup failed",
         )
         return None
 

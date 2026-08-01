@@ -534,21 +534,6 @@ persona/display-name — not the run inventory. Menu-action callback toasts use 
 inline answer fails, identity buttons (Version id / Deployment id) still emit chat fallback
 text. Slash `/stop` kill callbacks re-edit the picker message and ack the callback query.
 
-## Amendments (open-issues-sweep W10 — #88)
-
-Slash `/model --once <provider/model>` sets a one-turn model override for the
-active chat session without persisting to `sevn.json`. The operator sees staged
-vs persisted model on `/status`; the menu registry notes `/model toggle` and
-`--once` on the B8 slash row.
-
-## Amendments (open-issues-sweep W9 — #86)
-
-``TopicConfig.system_prompt`` and ``TopicConfig.skills`` (forum topics) are wired from
-Telegram inbound metadata into turn-scoped prompt and skill overlays. Per-channel
-``channels.telegram.model`` / ``.system_prompt`` and per-topic overrides participate in
-the W9 precedence chain; unset keys leave resolution identical to pre-batch behavior
-(**D9**).
-
 ## Amendments (telegram-menu-redesign W9)
 
 Telegram `/config` ships an eight-tile root keyboard (Chat, Agent, Skills & Tools, Memory,
@@ -584,6 +569,15 @@ Quoted-message handling splits **verbatim quote suppression** from **turn identi
   ``_outbound_routing_metadata(..., turn_id=correlation_id)``, not the latest user row.
 
 ``format_reply_quote`` and callback-query ingest (no reply context) remain unchanged.
+
+
+## Amendments (open-issues-sweep W14, #69 / #93)
+
+Skills & Tools tile adds **Skill setup** (`form:skills:setup`): operator enters a skill id,
+reviews manifest-declared requirements, and confirms via `act:skills:setup:confirm:<id>`
+before installs run. `cfg:skills:refresh` still refreshes the keyboard only; successful
+setup calls `SkillsManager.reload()` and surfaces reload/restart guidance when uv extras
+changed.
 
 - [`PlatformChannelConfig`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`
 - [`busy_input_mode_for_channel`](src/sevn/channels/_common.py) — `src/sevn/channels/_common.py`

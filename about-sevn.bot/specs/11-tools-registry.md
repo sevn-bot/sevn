@@ -7,7 +7,7 @@ owner: Alex
 summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that every
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
-last_updated: '2026-07-31'
+last_updated: '2026-08-01'
 fingerprint: sha256:858bb5689d3c9341849ce49564af16e7d098b47bbdab9fb117e53282ec717d7c
 related: []
 sources:
@@ -616,10 +616,10 @@ reusing ``TelegramWeb`` inline-keyboard primitives. Destructive menu rows are de
 
 **CodeMode (W3/W7):** Registry tools marked `code_mode=True` are eligible for the Monty `run_code` sandbox when triage enables CodeMode. Host-side tool calls from sandboxed snippets re-enter `ToolExecutor.dispatch` via the harness function catalog. `SevnAsyncCodeMode` is the tier-B backend; Monty `ResourceLimits` are injected at pool checkout (`_monty_limits.py`, D5/D6). Opt-in `dynamic_catalog` (default off, D9) keeps the `run_code` tool definition byte-stable across lazy tool discovery.
 
-### 10.2 open-issues-sweep W26 — user-defined deny rules (#80) — append-only
+### 10.2 open-issues-sweep W15 — discovery cache + registry_version — append-only
 
-**Config:** `permissions.deny_rules` — list of `{tool?, pattern?, domain?, path?, reason}` entries extending the existing permissions subtree (additive-deny only, D15).
-
-**Evaluation:** `check_permission_before_dispatch` (`tier_b_hooks.py`) and defense-in-depth `ToolExecutor.dispatch` (`base.py`) via `sevn.tools.deny_rules`. Deny rules apply even when the session ABAC profile is owner-permissive unless the operator session-acks the tool.
-
-**Feedback:** Denials return `PERMISSION_DENIED` envelopes with a `message` field carrying the configured or operator-supplied reason. Mission Control approval POST accepts optional `reason` on `deny` verdicts; audit logs redact args.
+Skill discovery cache invalidation reuses the existing registry fingerprint machinery:
+``_registry_fingerprint_lines`` + ``_sha256_lines`` + ``_bump_if_changed`` drive
+``LoadedBodyCache`` invalidation keyed by ``registry_version``. The W15 on-disk cache stores
+``registry_seq`` and rejects warm hits when the global tool/schema version bumps, keeping
+callable-tool rows consistent with the live ``ToolSet``.

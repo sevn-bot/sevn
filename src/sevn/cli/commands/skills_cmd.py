@@ -290,3 +290,105 @@ def register(app: typer.Typer) -> None:
                 if isinstance(row, dict):
                     name = row.get("name") or row.get("skill_name") or "?"
                     typer.echo(f"  {name}")
+
+    @skills_app.command("setup-status")
+    def skills_setup_status(
+        skill_id: str = typer.Argument(..., help="Skill id to inspect."),
+        workspace: Path = typer.Option(
+            ...,
+            "--workspace",
+            envvar="SEVN_WORKSPACE",
+            help="Workspace content root (or set SEVN_WORKSPACE).",
+        ),
+        json_out: bool = typer.Option(False, "--json", help="Emit JSON envelope on stdout."),
+    ) -> None:
+        """List declared setup requirements for one skill."""
+        from sevn.cli.json_util import emit_json_failure, emit_json_success
+        from sevn.skills.manager import SkillsManager
+        from sevn.skills.setup import skill_setup_requirements, skill_setup_status
+        from sevn.workspace.layout import WorkspaceLayout
+
+        command = f"sevn skills setup-status {skill_id}"
+        layout = WorkspaceLayout(sevn_json_path=workspace / "sevn.json", content_root=workspace)
+        manager = SkillsManager.shared(workspace, layout=layout)
+        try:
+            record = manager.get_record(skill_id)
+        except Exception as exc:
+            if json_out:
+                emit_json_failure(
+                    command=command,
+                    error_code="SKILL_NOT_FOUND",
+                    message=str(exc),
+                    exit_code=1,
+                )
+            else:
+                typer.secho(str(exc), err=True)
+            raise typer.Exit(1) from exc
+        status = skill_setup_status(record.manifest)
+        requirements = skill_setup_requirements(record.manifest)
+        data = {
+            "skill_id": skill_id,
+            "status": status,
+            "requirements": requirements,
+        }
+        if json_out:
+            emit_json_success(command=command, data=data)
+            return
+        typer.echo(f"{skill_id}: {status}")
+        for row in requirements:
+            mark = "ok" if row.get("satisfied") else "missing"
+            typer.echo(f"  [{mark}] {row.get('kind')} {row.get('name')}")
+
+    @skills_app.command("setup")
+    def skills_setup(
+        skill_id: str = typer.Argument(..., help="Skill id to set up."),
+        workspace: Path = typer.Option(
+            ...,
+            "--workspace",
+            envvar="SEVN_WORKSPACE",
+            help="Workspace content root (or set SEVN_WORKSPACE).",
+        ),
+        yes: bool = typer.Option(False, "--yes", help="Confirm installs without prompting."),
+        json_out: bool = typer.Option(False, "--json", help="Emit JSON envelope on stdout."),
+    ) -> None:
+        """Install or repair declared dependencies for one skill."""
+        from sevn.cli.json_util import emit_json_failure, emit_json_success
+        from sevn.skills.setup import InstallConfirmationRequired, execute_skill_setup
+
+        command = f"sevn skills setup {skill_id}"
+        try:
+            result = execute_skill_setup(
+                skill_id,
+                workspace_root=workspace,
+                confirmed=yes,
+            )
+        except InstallConfirmationRequired as exc:
+            if json_out:
+                emit_json_failure(
+                    command=command,
+                    error_code="CONFIRMATION_REQUIRED",
+                    message=str(exc),
+                    exit_code=2,
+                )
+            else:
+                typer.secho(str(exc), err=True)
+                typer.secho("Re-run with --yes to confirm.", err=True)
+            raise typer.Exit(2) from exc
+        if json_out:
+            if result.get("ok"):
+                emit_json_success(command=command, data=result)
+            else:
+                emit_json_failure(
+                    command=command,
+                    error_code="SETUP_FAILED",
+                    message=str(result.get("message", "setup failed")),
+                    exit_code=1,
+                    details=result,
+                )
+            raise typer.Exit(0 if result.get("ok") else 1)
+        typer.echo(str(result.get("message", "")))
+        if result.get("reload_required"):
+            typer.echo(
+                "Gateway reload/restart recommended so subprocess PATH picks up new installs."
+            )
+        raise typer.Exit(0 if result.get("ok") else 1)

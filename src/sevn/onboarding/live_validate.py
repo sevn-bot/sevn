@@ -57,6 +57,7 @@ from sevn.config.workspace_config import (
     parse_workspace_config,
 )
 from sevn.onboarding.github_oauth import GITHUB_TOKEN_LOGICAL_KEY, fetch_github_user
+from sevn.onboarding.uv_extra_probes import UV_EXTRA_IMPORT_PROBE
 from sevn.onboarding.wizard_credentials import credentials_status, get_wizard_credential
 from sevn.security.secrets import resolve_backend
 from sevn.security.secrets.errors import (
@@ -1398,19 +1399,6 @@ async def run_live_validation(
     return report
 
 
-_UV_EXTRA_IMPORT_PROBE: dict[str, str] = {
-    "browser-cdp": "import websockets",
-    "web-fetch": "import brotli",
-    "web-extract": "import readability",
-    "pdf": "import pypdf",
-    "yt-dlp": "import yt_dlp",
-    "graphify": "import graphify",
-    "code-review-graph": "import code_review_graph",
-    "code-graph-rag": "import code_graph_rag",
-    "bedrock": "import aiobotocore",
-    "skillspector": "import skillspector",
-}
-
 _CAPABILITY_CLI_PROBE: dict[str, list[str]] = {
     "cli.roam_code": ["roam-code", "--help"],
     "cli.cgr": ["cgr", "--help"],
@@ -1608,7 +1596,7 @@ async def _probe_install_action(
 
     if action.kind == "uv_extra" and action.argv:
         extra = str(action.argv[0])
-        import_probe = _UV_EXTRA_IMPORT_PROBE.get(extra)
+        import_probe = UV_EXTRA_IMPORT_PROBE.get(extra)
         if import_probe:
             satisfied = await idempotent_check_satisfied(import_probe, cwd=install_root)
             detail = (

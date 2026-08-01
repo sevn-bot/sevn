@@ -9,6 +9,7 @@ Exports:
         SkillsManager — Discover skills, build payloads, run scripts/runnables.
     Functions:
         did_you_mean_skill_script — fuzzy declared script paths for tool errors.
+        core_skill_discovery_skipped — shared core-skill gate for scan and cache signatures.
 """
 
 from __future__ import annotations
@@ -97,6 +98,48 @@ _PROV_ORDER: Final[dict[ProvenanceKind, int]] = {
 _RUNTIME_QUARANTINED_CORE_SKILL_IDS: Final[frozenset[str]] = frozenset(
     {"discogs-shared", "kokoro-tts"},
 )
+
+
+def core_skill_discovery_skipped(child_name: str, cfg: WorkspaceConfig | None) -> bool:
+    """Return whether a core skill directory is excluded from discovery scans.
+
+    Shared by :func:`_scan_skills_tree` and discovery-cache tree signatures so gate
+    policy cannot drift between full scans and cache invalidation.
+
+    Args:
+        child_name (str): Core skill directory name under ``skills/*/core/``.
+        cfg (WorkspaceConfig | None): Workspace config for gating flags.
+
+    Returns:
+        bool: ``True`` when the skill would be skipped during discovery.
+
+    Examples:
+        >>> core_skill_discovery_skipped("kokoro-tts", None)
+        True
+    """
+    if child_name == COMPUTER_USE_SKILL_ID and gate_computer_use_core_skill(cfg) == "skip":
+        return True
+    if child_name == CUA_AGENT_SKILL_ID and gate_cua_agent_core_skill(cfg) == "skip":
+        return True
+    if child_name == LUME_SKILL_ID and gate_lume_core_skill(cfg) == "skip":
+        return True
+    if child_name == CURSOR_CLOUD_SKILL_ID and gate_cursor_cloud_core_skill(cfg) == "skip":
+        return True
+    if (
+        child_name == SOCIAL_MEDIA_MANAGER_SKILL_ID
+        and gate_social_media_manager_core_skill(cfg) == "skip"
+    ):
+        return True
+    if child_name == OPENWIKI_SKILL_ID and gate_openwiki_core_skill(cfg) == "skip":
+        return True
+    if child_name == OBSIDIAN_CLI_SKILL_ID and gate_obsidian_cli_core_skill(cfg) == "skip":
+        return True
+    if child_name in DISCOGS_SKILL_IDS:
+        if gate_discogs_core_skills(cfg) == "skip":
+            return True
+        if not discogs_skill_enabled(cfg, child_name):
+            return True
+    return child_name in _RUNTIME_QUARANTINED_CORE_SKILL_IDS
 
 
 def _skill_trace_event(kind: str, attrs: Mapping[str, object]) -> TraceEvent:
@@ -719,54 +762,7 @@ def _scan_skills_tree(
                 continue
             if sub == "generated" and child.name == "draft":
                 continue
-            if (
-                sub == "core"
-                and child.name == COMPUTER_USE_SKILL_ID
-                and gate_computer_use_core_skill(cfg) == "skip"
-            ):
-                continue
-            if (
-                sub == "core"
-                and child.name == CUA_AGENT_SKILL_ID
-                and gate_cua_agent_core_skill(cfg) == "skip"
-            ):
-                continue
-            if (
-                sub == "core"
-                and child.name == LUME_SKILL_ID
-                and gate_lume_core_skill(cfg) == "skip"
-            ):
-                continue
-            if (
-                sub == "core"
-                and child.name == CURSOR_CLOUD_SKILL_ID
-                and gate_cursor_cloud_core_skill(cfg) == "skip"
-            ):
-                continue
-            if (
-                sub == "core"
-                and child.name == SOCIAL_MEDIA_MANAGER_SKILL_ID
-                and gate_social_media_manager_core_skill(cfg) == "skip"
-            ):
-                continue
-            if (
-                sub == "core"
-                and child.name == OPENWIKI_SKILL_ID
-                and gate_openwiki_core_skill(cfg) == "skip"
-            ):
-                continue
-            if (
-                sub == "core"
-                and child.name == OBSIDIAN_CLI_SKILL_ID
-                and gate_obsidian_cli_core_skill(cfg) == "skip"
-            ):
-                continue
-            if sub == "core" and child.name in DISCOGS_SKILL_IDS:
-                if gate_discogs_core_skills(cfg) == "skip":
-                    continue
-                if not discogs_skill_enabled(cfg, child.name):
-                    continue
-            if sub == "core" and child.name in _RUNTIME_QUARANTINED_CORE_SKILL_IDS:
+            if sub == "core" and core_skill_discovery_skipped(child.name, cfg):
                 continue
             try:
                 prov_t: ProvenanceKind = prov  # type: ignore[assignment]
@@ -841,7 +837,7 @@ class SkillsManager:
         self._index = SkillsIndex(lines={})
         self._registry_seq = 0
         self._last_digest = ""
-        self.reload()
+        self.reload_uncached()
 
     @classmethod
     def shared(
@@ -952,6 +948,18 @@ class SkillsManager:
             >>> sig = inspect.signature(SkillsManager.reload)
             >>> sig.return_annotation
             'dict[str, int]'
+        """
+        from sevn.skills.discovery_cache import discovery_cache_enabled, reload_skills_with_cache
+
+        return reload_skills_with_cache(self, enabled=discovery_cache_enabled(self._config))
+
+    def reload_uncached(self) -> dict[str, int]:
+        """Full filesystem rescan without the opt-in discovery cache (**D9** default path).
+        Returns:
+            dict[str, int]: ``prev_count``, ``new_count`` for tracing hooks.
+        Examples:
+            >>> callable(getattr(SkillsManager, "reload_uncached", None))
+            True
         """
         prev = len(self._records)
         discovered: list[tuple[int, SkillRecord]] = []

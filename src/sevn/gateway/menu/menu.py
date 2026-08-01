@@ -4588,6 +4588,7 @@ def _build_skills_tools_keyboard_rows(
         [{"text": "📋 Skills list", "callback_data": "act:skills:list"}],
         [{"text": "🔄 Sync skills index", "callback_data": "act:skills:sync"}],
         [{"text": "🛡 Security scan", "callback_data": "act:skills:security-scan"}],
+        [{"text": "⚙ Skill setup", "callback_data": "form:skills:setup"}],
     ]
     rows.extend(_build_skills_keyboard_rows(workspace, content_root))
     _append_nav_section_rows(

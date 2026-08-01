@@ -64,8 +64,10 @@
 | `cua_agent` | [`../../src/sevn/skills/cua_agent.py`](../../src/sevn/skills/cua_agent.py) | Module `src/sevn/skills/cua_agent.py`. |
 | `cua_doctor_check` | [`../../src/sevn/skills/cua_doctor_check.py`](../../src/sevn/skills/cua_doctor_check.py) | Module `src/sevn/skills/cua_doctor_check.py`. |
 | `cursor_cloud` | [`../../src/sevn/skills/cursor_cloud.py`](../../src/sevn/skills/cursor_cloud.py) | Module `src/sevn/skills/cursor_cloud.py`. |
+| `dependencies` | [`../../src/sevn/skills/dependencies.py`](../../src/sevn/skills/dependencies.py) | Module `src/sevn/skills/dependencies.py`. |
 | `discogs` | [`../../src/sevn/skills/discogs.py`](../../src/sevn/skills/discogs.py) | Module `src/sevn/skills/discogs.py`. |
 | `discogs_secrets` | [`../../src/sevn/skills/discogs_secrets.py`](../../src/sevn/skills/discogs_secrets.py) | Module `src/sevn/skills/discogs_secrets.py`. |
+| `discovery_cache` | [`../../src/sevn/skills/discovery_cache.py`](../../src/sevn/skills/discovery_cache.py) | Module `src/sevn/skills/discovery_cache.py`. |
 | `email_management` | [`../../src/sevn/skills/email_management.py`](../../src/sevn/skills/email_management.py) | Module `src/sevn/skills/email_management.py`. |
 | `entrypoints` | [`../../src/sevn/skills/entrypoints.py`](../../src/sevn/skills/entrypoints.py) | Module `src/sevn/skills/entrypoints.py`. |
 | `errors` | [`../../src/sevn/skills/errors.py`](../../src/sevn/skills/errors.py) | Module `src/sevn/skills/errors.py`. |
@@ -84,4 +86,5 @@
 | `openwiki_secrets` | [`../../src/sevn/skills/openwiki_secrets.py`](../../src/sevn/skills/openwiki_secrets.py) | Module `src/sevn/skills/openwiki_secrets.py`. |
 | `proton_management` | [`../../src/sevn/skills/proton_management.py`](../../src/sevn/skills/proton_management.py) | Module `src/sevn/skills/proton_management.py`. |
 | `security_scan` | [`../../src/sevn/skills/security_scan.py`](../../src/sevn/skills/security_scan.py) | Module `src/sevn/skills/security_scan.py`. |
+| `setup` | [`../../src/sevn/skills/setup.py`](../../src/sevn/skills/setup.py) | Module `src/sevn/skills/setup.py`. |
 | `social_media_manager` | [`../../src/sevn/skills/social_media_manager.py`](../../src/sevn/skills/social_media_manager.py) | Module `src/sevn/skills/social_media_manager.py`. |

@@ -2,8 +2,8 @@
   "entries": {
     "agent": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-01T12:28:26Z",
-      "digest": "b09d7a6a83a3069880797a0c5b5b50c268f5c0f5bcdba042ffa67b9448afbe36",
+      "computed_at": "2026-08-01T13:42:25Z",
+      "digest": "d8a335b3594483d5ddf400dd81ccd4c8054bfe2cb5604560088275bad746a4f0",
       "source_globs": [
         "src/sevn/agent/**"
       ]
@@ -26,8 +26,8 @@
     },
     "config-workspace": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-01T12:28:33Z",
-      "digest": "4646ad331f2a721cb529f4e5015345da2c0a4c4c46818a11cd146dc759035511",
+      "computed_at": "2026-08-01T13:42:25Z",
+      "digest": "04870176ff401ffbf11e19e3eb832c105f42f098ddb02719214c829024b044bf",
       "source_globs": [
         "src/sevn/config/**",
         "src/sevn/workspace/**",
@@ -57,8 +57,8 @@
     },
     "gateway": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-01T12:28:32Z",
-      "digest": "2d25ec29ec6bf512b0e6aba8398bf0b8ad1a9fdea10e6a559f945d51996b749e",
+      "computed_at": "2026-08-01T13:42:25Z",
+      "digest": "1375dc484a8aecc9e4f2a38d080abd62faa042ab08c55ae9365564b2e05fed68",
       "source_globs": [
         "src/sevn/gateway/**"
       ]
@@ -90,8 +90,8 @@
     },
     "onboarding": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-30T17:43:27Z",
-      "digest": "d0fa6c5dd50845ac071a826c3779004a24ffee16e0350205f668bfeada963e05",
+      "computed_at": "2026-08-01T13:42:26Z",
+      "digest": "46a54878c061704bb79c46b1651a0d0287940dceeace7a0a9602595afbbdc0e8",
       "source_globs": [
         "src/sevn/onboarding/**",
         "src/sevn/cli/commands/onboard.py",
@@ -161,8 +161,8 @@
     },
     "skills": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-07-31T07:58:30Z",
-      "digest": "b2469933a56c2c3d5b293497dbe39509612edc131b6765430f7718a48079afe1",
+      "computed_at": "2026-08-01T13:42:25Z",
+      "digest": "02b674d1db2d37031db09fc265c7a45031f6c8123c9122c7c834399cb74fca05",
       "source_globs": [
         "src/sevn/skills/**",
         "src/sevn/data/bundled_skills/**",
