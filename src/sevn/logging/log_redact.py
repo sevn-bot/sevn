@@ -17,8 +17,8 @@ from __future__ import annotations
 import re
 
 _LOG_REDACT = re.compile(
-    r"(?i)(bearer\s+[a-z0-9._\-]+|api[_-]?key[=:\s]+[a-z0-9._\-]+|token[=:\s]+[a-z0-9._\-]+|"
-    r"password[=:\s]+\S+|secret[=:\s]+\S+)"
+    r"(?i)(bearer\s+[a-z0-9._\-]+|api[_-]?key[=:\s\"]+[a-z0-9._\-]+|token[=:\s\"]+[a-z0-9._\-]+|"
+    r"password[=:\s\"]+\S+|secret[=:\s\"]+\S+)"
 )
 
 

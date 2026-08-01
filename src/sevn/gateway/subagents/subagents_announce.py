@@ -162,40 +162,35 @@ def load_subagent_result_for_announce(conn: sqlite3.Connection, run_id: str) -> 
 
 def _mark_subagent_delivered_if_confirmed(
     *,
-    router: ChannelRouter,
     conn: sqlite3.Connection,
     run_id: str,
+    obligation: dict[str, object] | None,
 ) -> bool:
-    """Mark one sub-agent result delivered when the latest outbound obligation confirmed.
+    """Mark one sub-agent result delivered when an outbound obligation confirmed.
 
     Args:
-        router (ChannelRouter): Gateway router that recorded ``last_delivery_obligation``.
         conn (sqlite3.Connection): Gateway SQLite handle.
         run_id (str): Target sub-agent run id.
+        obligation (dict[str, object] | None): Delivery obligation from ``route_outgoing``.
 
     Returns:
         bool: ``True`` when ``result_delivered_at_ns`` was set.
 
     Examples:
         >>> import sqlite3
-        >>> from sevn.gateway.channel_router import ChannelRouter
         >>> _mark_subagent_delivered_if_confirmed(
-        ...     router=ChannelRouter.__new__(ChannelRouter),
         ...     conn=sqlite3.connect(":memory:"),
         ...     run_id="missing",
+        ...     obligation=None,
         ... )
         False
     """
-    last_ob = getattr(router, "last_delivery_obligation", None)
-    if not isinstance(last_ob, dict):
+    if not isinstance(obligation, dict):
         return False
-    message_id_raw = last_ob.get("message_id")
-    if message_id_raw is None:
+    message_id_raw = obligation.get("message_id")
+    if not isinstance(message_id_raw, int):
         return False
-    try:
-        message_id = int(message_id_raw)
-    except (TypeError, ValueError):
-        return False
+    message_id = message_id_raw
     if not is_delivery_confirmed(conn, message_id):
         return False
     mark_subagent_result_delivered(conn, run_id)
@@ -242,7 +237,7 @@ async def deliver_subagent_result_through_ledger(
         conn=conn,
         content_root=getattr(router, "_content_root", None),
     )
-    await router.route_outgoing(
+    obligation = await router.route_outgoing(
         OutgoingMessage(
             channel=session.channel,
             user_id=session.user_id,
@@ -251,7 +246,11 @@ async def deliver_subagent_result_through_ledger(
             metadata={"subagent_id": run.id},
         ),
     )
-    return _mark_subagent_delivered_if_confirmed(router=router, conn=conn, run_id=run.id)
+    return _mark_subagent_delivered_if_confirmed(
+        conn=conn,
+        run_id=run.id,
+        obligation=obligation,
+    )
 
 
 def build_announce_back_hook(
@@ -305,14 +304,22 @@ def build_announce_back_hook(
         if running and store is not None:
             try:
                 store.steer_inject_for(run.session_id).inject_pending(text)
-                mark_subagent_result_delivered(conn, run.id)
-                return
             except Exception:
                 logger.exception(
                     "subagent_announce_back_steer_inject_failed run_id={} session_id={}",
                     run.id,
                     run.session_id,
                 )
+            else:
+                try:
+                    mark_subagent_result_delivered(conn, run.id)
+                except Exception:
+                    logger.exception(
+                        "subagent_announce_back_mark_delivered_failed run_id={} session_id={}",
+                        run.id,
+                        run.session_id,
+                    )
+                return
         sess = load_session_row(conn, run.session_id)
         if sess is None:
             logger.warning(
@@ -322,7 +329,7 @@ def build_announce_back_hook(
             )
             return
         try:
-            await router.route_outgoing(
+            obligation = await router.route_outgoing(
                 OutgoingMessage(
                     channel=sess.channel,
                     user_id=sess.user_id,
@@ -331,7 +338,11 @@ def build_announce_back_hook(
                     metadata={"subagent_id": run.id},
                 ),
             )
-            _mark_subagent_delivered_if_confirmed(router=router, conn=conn, run_id=run.id)
+            _mark_subagent_delivered_if_confirmed(
+                conn=conn,
+                run_id=run.id,
+                obligation=obligation,
+            )
         except Exception:
             logger.exception("subagent_announce_back_send_failed run_id={}", run.id)
 

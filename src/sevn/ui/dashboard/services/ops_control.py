@@ -72,6 +72,7 @@ from sevn.triggers.cron import (
 )
 from sevn.triggers.cron_runs import (
     complete_cron_run_event,
+    cron_has_in_flight_run,
     cron_run_to_dict,
     insert_cron_run_event,
     list_recent_cron_runs,
@@ -507,6 +508,20 @@ async def dispatch_cron_job_now(request: Request, *, job_id: str) -> dict[str, o
         rc = ResultChannel(kind="LOG")
     correlation_id = str(uuid.uuid4())
     claimed_at = time.time_ns()
+    if row.overlap_policy == "skip" and cron_has_in_flight_run(conn, row.job_id):
+        complete_cron_run_event(
+            conn,
+            job_id=row.job_id,
+            run_id=correlation_id,
+            claimed_at=claimed_at,
+            status="skipped",
+            result_summary="overlap_policy=skip",
+        )
+        return {
+            "correlation_id": correlation_id,
+            "status": "skipped",
+            "reason": "overlap_policy=skip",
+        }
     insert_cron_run_event(
         conn,
         job_id=row.job_id,

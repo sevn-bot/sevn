@@ -28,6 +28,8 @@ import json
 import sqlite3
 from typing import TYPE_CHECKING, cast
 
+from loguru import logger
+
 from sevn.agent.subagents import (
     SubAgentLimitExceeded,
     SubAgentSpec,
@@ -237,19 +239,23 @@ async def spawn_subagent_tool(
         run = await supervisor.registry.get(run_id_box["id"])
         transcript = None
         if run is not None:
-            from sevn.agent.subagents.transcript import SubagentTranscriptWriter
+            try:
+                from sevn.agent.subagents.transcript import SubagentTranscriptWriter
 
-            conn = None
-            router = ctx.channel_router
-            if router is not None and getattr(router, "_sessions", None) is not None:
-                conn = router._sessions.connection
-            transcript = SubagentTranscriptWriter(
-                content_root=ctx.workspace_path,
-                run=run,
-                conn=conn if isinstance(conn, sqlite3.Connection) else None,
-            )
-            transcript.append_prompt(f"spawn_subagent task: {task_text}")
-            transcript.append_status("running")
+                conn = None
+                router = ctx.channel_router
+                if router is not None and getattr(router, "_sessions", None) is not None:
+                    conn = router._sessions.connection
+                transcript = SubagentTranscriptWriter(
+                    content_root=ctx.workspace_path,
+                    run=run,
+                    conn=conn if isinstance(conn, sqlite3.Connection) else None,
+                )
+                transcript.append_prompt(f"spawn_subagent task: {task_text}")
+                transcript.append_status("running")
+            except Exception:
+                logger.exception("subagent_transcript_init_failed run_id={}", run.id)
+                transcript = None
         try:
             text = await _specialist_worker_body(
                 ctx,
@@ -259,13 +265,25 @@ async def spawn_subagent_tool(
             )
         except Exception as exc:  # recorded for the wait=True path below
             if transcript is not None:
-                transcript.append_status("failed")
-                transcript.append_summary(str(exc))
+                try:
+                    transcript.append_status("failed")
+                    transcript.append_summary(str(exc))
+                except Exception:
+                    logger.exception(
+                        "subagent_transcript_failed_status run_id={}",
+                        run_id_box.get("id", "?"),
+                    )
             outcome["error"] = str(exc)
             raise
         if transcript is not None:
-            transcript.append_status("done")
-            transcript.append_summary(text)
+            try:
+                transcript.append_status("done")
+                transcript.append_summary(text)
+            except Exception:
+                logger.exception(
+                    "subagent_transcript_done_status run_id={}",
+                    run_id_box.get("id", "?"),
+                )
         outcome["result"] = text
         return text
 

@@ -363,12 +363,11 @@ async def finalize_failure_through_ledger(
     text: str,
     turn_id: str,
 ) -> dict[str, Any] | None:
-    """Prepare a delivery obligation before the tier-B failure fallback send.
+    """Persist a delivery obligation row for tests and direct ledger wiring.
 
-    When the finalizer cannot edit the placeholder, the fallback path routes through
-    ``ChannelRouter.route_outgoing``. This helper pre-creates the assistant row and
-    ledger entry when a SQLite connection is available (unit/integration tests and
-    production router wiring).
+    Production tier-B failure fallback uses :meth:`ChannelRouter.route_outgoing`,
+    which already creates obligations. This helper exists for integration tests
+    that exercise ledger persistence without a full router stack.
 
     Args:
         conn (sqlite3.Connection | None): Gateway SQLite handle, or ``None`` when unwired.

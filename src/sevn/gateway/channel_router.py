@@ -2037,10 +2037,12 @@ class ChannelRouter:
             status="completed",
         )
 
-    async def route_outgoing(self, msg: OutgoingMessage) -> None:
+    async def route_outgoing(self, msg: OutgoingMessage) -> dict[str, Any] | None:
         """Outbound spine per §4.4 (Telegram streaming + TTS).
         Args:
             msg (OutgoingMessage): Agent-emitted reply ready for delivery.
+        Returns:
+            dict[str, Any] | None: Delivery obligation snapshot when persisted.
         Raises:
             ValueError: When ``msg.session_id`` is empty.
         Examples:
@@ -2168,7 +2170,7 @@ class ChannelRouter:
                 turn_id=correlation_id,
                 status="intentional_silence",
             )
-            return
+            return None
         assistant_extras: dict[str, Any] = {}
         provider_rows = out_meta.get(PROVIDER_TURN_MESSAGES_KEY)
         if isinstance(provider_rows, list) and provider_rows:
@@ -2209,7 +2211,7 @@ class ChannelRouter:
                 turn_id=correlation_id,
                 status="unknown_adapter",
             )
-            return
+            return None
         post_send_keyboard = False
         if msg.channel == "telegram":
             will_split = len(chunk_text(filtered)) > 1
@@ -2306,7 +2308,7 @@ class ChannelRouter:
                 turn_id=correlation_id,
                 status="send_error",
             )
-            return
+            return None
         self._platform_runtime.record_outbound_success(msg.channel)
         confirm_delivery_after_send(
             self._sessions.connection,
@@ -2387,6 +2389,7 @@ class ChannelRouter:
             status="sent",
             attrs={"chunks": len(chunks)},
         )
+        return refreshed if refreshed is not None else obligation
 
 
 _OUTBOUND_ROUTING_METADATA_KEYS = (

@@ -25,6 +25,7 @@ from sevn.agent.tracing.redacting_sink import (
     key_denied,
     redact_text_value,
 )
+from sevn.agent.tracing.sink_factory import trace_redaction_policy_for
 from sevn.gateway.session.sessions_query import parse_session_metadata
 from sevn.gateway.turn.turn_bundle import (
     list_turn_export_candidates,
@@ -34,6 +35,36 @@ from sevn.gateway.turn.turn_bundle import (
 from sevn.storage.paths import turn_bundle_index_path, turn_bundles_dir
 
 _EXPORT_REDACTED = "[REDACTED]"
+
+
+def _export_redaction_policy(content_root: Path | None) -> TraceRedactionPolicy:
+    """Resolve workspace ``tracing.redaction`` for offline export reads.
+
+    Args:
+        content_root (Path | None): Bound workspace root when known.
+
+    Returns:
+        TraceRedactionPolicy: Operator-configured policy or shipped defaults.
+
+    Examples:
+        >>> _export_redaction_policy(None).enabled
+        True
+    """
+    if content_root is None:
+        return TraceRedactionPolicy.from_defaults()
+    import json
+
+    from sevn.config.loader import find_sevn_json
+    from sevn.config.workspace_config import parse_workspace_config
+
+    candidate = content_root / "sevn.json"
+    sevn_json_path: Path | None = (
+        candidate if candidate.is_file() else find_sevn_json(start=content_root)
+    )
+    if sevn_json_path is None:
+        return TraceRedactionPolicy.from_defaults()
+    cfg = parse_workspace_config(json.loads(sevn_json_path.read_text(encoding="utf-8")))
+    return trace_redaction_policy_for(cfg)
 
 
 def _utc_now_iso() -> str:
@@ -698,7 +729,7 @@ def export_sessions(
     else:
         dot_sevn = dot_sevn or (content_root / ".sevn")
 
-    policy = TraceRedactionPolicy.from_defaults()
+    policy = _export_redaction_policy(content_root)
     formats = _normalize_formats(fmt)
     export_id = uuid.uuid4().hex
     out_dir = Path(output) if output is not None else None
