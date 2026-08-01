@@ -31,7 +31,9 @@ PANEL_ORDER: tuple[str, ...] = (
 
 ROOT_COMMAND_PANELS: dict[str, str] = {
     "about-docs": "Help",
+    "acp": "Chat",
     "agent": "Agent",
+    "browser": "Skills & Tools",
     "channels": "Chat",
     "completion": "Help",
     "config": "Deployment",

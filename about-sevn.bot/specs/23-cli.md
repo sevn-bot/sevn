@@ -8,7 +8,7 @@ summary: Deliver the primary operator and automation surface for install, upgrad
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
 last_updated: '2026-08-01'
-fingerprint: sha256:d1957467c6c2c40ee56704e979e2c2d088d3cdbbbb399c199cacf286a6ec3b71
+fingerprint: sha256:91b6e9c5a4048abab538180bef1e2b1646fd3c921b95a2f7339de869c4dd167d
 related: []
 sources:
 - src/sevn/cli/**
@@ -49,7 +49,13 @@ interfaces:
   file: src/sevn/cli/commands/about_docs_cmd.py
   symbol: register
 - name: register
+  file: src/sevn/cli/commands/acp_cmd.py
+  symbol: register
+- name: register
   file: src/sevn/cli/commands/agent_cmd.py
+  symbol: register
+- name: register
+  file: src/sevn/cli/commands/browser_cmd.py
   symbol: register
 - name: register
   file: src/sevn/cli/commands/channels_cmd.py
@@ -845,7 +851,6 @@ Map to existing tests under `tests/` that cover this subsystem; add Makefile-onl
 filtering by ``--channel``, ``--profile``, ``--session``, ``--since``, and
 ``--until``. Implementation: ``src/sevn/cli/session_export.py`` +
 ``src/sevn/cli/commands/sessions.py``.
-
 ## Amendments (telegram-menu-redesign W9)
 
 Root CLI ``rich_help_panel`` groups mirror the eight Telegram ``/config`` tiles

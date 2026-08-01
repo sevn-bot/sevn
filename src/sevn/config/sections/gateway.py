@@ -27,6 +27,8 @@ from sevn.config.defaults import (
     DEFAULT_CASCADE_BUDGET_S,
     DEFAULT_DISPATCHER_STATE_TTL_SECONDS,
     DEFAULT_GATEWAY_AUTO_RESUME_B,
+    DEFAULT_GATEWAY_CACHE_SESSION_REGISTRY,
+    DEFAULT_GATEWAY_DEFER_MCP_DISCOVERY,
     DEFAULT_HARNESS_SNAPSHOT_TRIAGER_TIER_A,
     DEFAULT_REPLAY_MAX_PER_DAY,
     DEFAULT_TIER_B_EXECUTOR_TIMEOUT_S,
@@ -257,6 +259,20 @@ class GatewayConfig(BaseModel):
         description=(
             "When true, ``run_skill_script`` / ``run_skill_runnable`` with a registered "
             "tool name auto-dispatch that tool (default off; error + redirect first)."
+        ),
+    )
+    defer_mcp_discovery: bool = Field(
+        default=DEFAULT_GATEWAY_DEFER_MCP_DISCOVERY,
+        description=(
+            "When true, MCP tool discovery runs off the boot critical path and resolves "
+            "lazily on the first turn that needs MCP tools (#78, D9 default off)."
+        ),
+    )
+    cache_session_registry: bool = Field(
+        default=DEFAULT_GATEWAY_CACHE_SESSION_REGISTRY,
+        description=(
+            "When true, reuse ``build_session_registry`` snapshots when inputs are "
+            "unchanged (shares fingerprint seam with W15 discovery cache; D9 default off)."
         ),
     )
 

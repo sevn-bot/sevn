@@ -665,9 +665,9 @@ async def _spawn_or_attach_unlocked(
         cdp_reachable,
         default_cdp_url,
         resolve_browser_headless,
-        resolve_profile_dir,
         spawn_chrome,
     )
+    from sevn.browser.persistence import persist_browser_session_marker, resolve_browser_profile_dir
     from sevn.browser.registry import (
         BrowserSessionRegistry,
         clear_registry,
@@ -684,7 +684,8 @@ async def _spawn_or_attach_unlocked(
     if row is not None and row.cdp_url.strip() and cdp_reachable(row.cdp_url):
         return await CDPBrowserSession.attach(row.cdp_url.rstrip("/"))
 
-    profile_dir = resolve_profile_dir(content_root, session_id, cfg=cfg)
+    profile_dir = resolve_browser_profile_dir(content_root, session_id, cfg=cfg)
+    persist_browser_session_marker(profile_dir, {"session_id": session_id, "transport": "cdp"})
     headless = resolve_browser_headless(cfg)
     log_path = _chrome_log_path(content_root, session_id)
     log_dir = log_path.parent

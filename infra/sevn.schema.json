@@ -275,6 +275,11 @@
       "long_description": "Process-level preference for which Chromium-compatible family to resolve when `SEVN_CHROME_EXECUTABLE` is unset. Wins over `skills.browser.engine` in sevn.json. `auto` prefers Chrome/Chromium before Brave so host Chrome installs keep working; set `brave` in Docker/browser images."
     },
     {
+      "name": "SEVN_BROWSER_PASSWORD_STORE",
+      "description": "Override `skills.browser.password_store` (`basic` or `system`).",
+      "long_description": "When `basic` (default), Chrome spawn passes `--password-store=basic` so credentials stay in the profile without OS keychain — required for headless CI/Docker. When `system`, the flag is omitted so Chrome uses the platform keychain. Wins over `skills.browser.password_store` in sevn.json."
+    },
+    {
       "name": "SEVN_SKILL_FULL_WORKSPACE",
       "description": "Proposed opt-in for vetted core skills only (architecture-questions-skills.md); not normative v1.",
       "long_description": "Hypothesized escape hatch discussed in skills Q&A: a deliberately scary env var that would allow a tiny allowlist of core skills to see the real workspace instead of the shadow tree. v1 normative posture is shadow-only with no opt-out from inside the skill process. If ever implemented, would require explicit operator acknowledgement in SKILL.md and strict gateway checks; schema retains the name so design discussions and future validators stay synchronized."
@@ -1500,11 +1505,48 @@
           "args": {
             "type": "array",
             "items": { "type": "string" }
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "$comment": "Static subprocess env entries merged before OAuth-resolved vars (W29)."
+          },
+          "oauth": {
+            "type": "object",
+            "properties": {
+              "env_var": { "type": "string" },
+              "refresh_env_var": { "type": "string" },
+              "authorize_url_template": { "type": "string" },
+              "token_url": { "type": "string" },
+              "client_id_ref": { "type": "string" },
+              "client_secret_ref": { "type": "string" },
+              "scopes": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            },
+            "additionalProperties": false,
+            "$comment": "OAuth metadata only — tokens live at oauth.mcp.<server_id> in the secrets chain (W29 #90)."
           }
         },
         "additionalProperties": true
       },
       "$comment": "Maintainer: the design docs example — map server id -> {command, args} for MCPServerStdio; keys referenced by mcp_enabled / channels.*.mcp_enabled / session override."
+    },
+    "routing_profiles": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "mcp_disabled_servers": {
+            "type": "array",
+            "items": { "type": "string" },
+            "$comment": "Profile-level MCP deny list layered on workspace mcp_enabled (W29 #90)."
+          }
+        },
+        "additionalProperties": true
+      },
+      "$comment": "W29 routing profile overlays (distinct from routing.profiles W12 namespace when both present)."
     },
     "mcp_enabled": {
       "type": "array",
@@ -2173,6 +2215,96 @@
           },
           "$comment": "Maintainer: the design docs — opt-in `lume` skill (VM lifecycle). Default false. macOS Apple-Silicon only; fail fast at load when enabled on unsupported hosts."
         },
+        "hermes_model_eval": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Opt-in Hermes 4 / cross-model eval skill (advisory; does not change routing defaults)."
+            },
+            "models": {
+              "type": "array",
+              "description": "Provider-agnostic model aliases to compare in live eval runs.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["label", "model_id"],
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "description": "Short label in comparison reports."
+                  },
+                  "model_id": {
+                    "type": "string",
+                    "description": "Catalog model id (e.g. openrouter/nousresearch/hermes-4-70b)."
+                  }
+                }
+              }
+            }
+          },
+          "$comment": "Maintainer: #91 hermes-model-eval bundled skill — golden_llm harness only (W32 D21). Default false."
+        },
+        "reddit_karma_loop": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Opt-in draft-only Reddit karma loop skill (#74, D11)."
+            },
+            "subreddits": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Target subreddits (without r/ prefix)."
+            },
+            "topics": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Discovery topic keywords."
+            },
+            "source_paths": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Approved grounding sources (wiki, second_brain)."
+            },
+            "cron_expr": {
+              "type": "string",
+              "default": "0 9,15 * * *",
+              "description": "Cron schedule for loop discovery (UTC)."
+            },
+            "max_comments_per_day": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 5,
+              "description": "Daily cap on recorded Reddit actions."
+            },
+            "cooldown_seconds": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 3600,
+              "description": "Minimum spacing between actions."
+            },
+            "allow_links": {
+              "type": "boolean",
+              "default": false,
+              "description": "When false, strip URLs from drafts."
+            },
+            "ask_before_post": {
+              "type": "boolean",
+              "default": false,
+              "description": "Scaffold only (D11); --confirm is the write gate."
+            },
+            "stop_on_mod_action": {
+              "type": "boolean",
+              "default": true,
+              "description": "Halt loop when mod removal/feedback is logged."
+            }
+          },
+          "$comment": "Maintainer: #74 reddit-karma-loop bundled skill — draft-only (W33 D11). Default false."
+        },
         "browser": {
           "type": "object",
           "additionalProperties": true,
@@ -2199,6 +2331,17 @@
               "enum": ["auto", "chrome", "chromium", "brave"],
               "default": "auto",
               "description": "Which Chromium-compatible browser to prefer when resolving the spawn binary (`auto`: Chrome/Chromium before Brave)."
+            },
+            "password_store": {
+              "type": "string",
+              "enum": ["basic", "system"],
+              "default": "basic",
+              "description": "Chrome credential store: `basic` (no OS keychain; default for CI/Docker) or `system` (platform keychain)."
+            },
+            "persist_auth": {
+              "type": "boolean",
+              "default": true,
+              "description": "When true (default), gateway sessions reuse persistent Chrome profiles under `.sevn/browser-profiles/`."
             }
           },
           "$comment": "Maintainer: browser-session-lifecycle W5 — D8 idle TTL, D13 headed default, Brave multi-arch Docker; registry under `.sevn/browser-sessions/`."

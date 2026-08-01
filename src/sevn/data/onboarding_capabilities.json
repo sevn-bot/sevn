@@ -386,6 +386,26 @@
       ]
     },
     {
+      "capability_id": "skill.buzz",
+      "group": "B",
+      "label": "buzz",
+      "description": "Buzz workspace integration — configure buzz-cli / buzz-acp, join channels, send replies, and run the sevn ACP runtime for managed agent membership.",
+      "config_paths": [
+        "channels.buzz.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.buzz.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
       "capability_id": "skill.canvas",
       "group": "B",
       "label": "canvas",
@@ -826,6 +846,26 @@
       ]
     },
     {
+      "capability_id": "skill.hermes_model_eval",
+      "group": "B",
+      "label": "hermes-model-eval",
+      "description": "Advisory cross-model eval on the golden_llm harness — compare Hermes 4 and other configured aliases for tool-call reliability, coding, summarization, and policy/approval scenarios.",
+      "config_paths": [
+        "skills.hermes_model_eval.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.hermes_model_eval.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
       "capability_id": "skill.json_canvas",
       "group": "B",
       "label": "json-canvas",
@@ -1178,6 +1218,26 @@
       "install_actions": [
         {
           "id": "skill.proton_management.noop",
+          "kind": "noop",
+          "argv": [],
+          "fatal": false
+        }
+      ]
+    },
+    {
+      "capability_id": "skill.reddit_karma_loop",
+      "group": "B",
+      "label": "reddit_karma_loop",
+      "description": "Draft-only Reddit karma loop — browser discovery, quality gate, grounded comment drafts, rate limits, and structured logging.",
+      "config_paths": [
+        "skills.reddit_karma_loop.enabled"
+      ],
+      "control": "checkbox",
+      "default": false,
+      "profile_overridable": true,
+      "install_actions": [
+        {
+          "id": "skill.reddit_karma_loop.noop",
           "kind": "noop",
           "argv": [],
           "fatal": false

@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-08-01'
-fingerprint: sha256:081c650916d0c0786463d9f18402828be65b4949f038ebf6de16bb59cc2d08b3
+fingerprint: sha256:f58f74387ece13c523c61063957a2725eebf7febc38e4b0cc066f8d2c65449f2
 related: []
 sources:
 - src/sevn/gateway/**
@@ -1266,6 +1266,39 @@ interfaces:
 - name: ensure_webhook_secret_token
   file: src/sevn/gateway/telegram/telegram_webhook_secret.py
   symbol: ensure_webhook_secret_token
+- name: DeferredTurnResult
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: DeferredTurnResult
+- name: SessionRegistryTurnCache
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: SessionRegistryTurnCache
+- name: TurnRegistryPrep
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: TurnRegistryPrep
+- name: TurnStartupTimings
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: TurnStartupTimings
+- name: extract_ttft_ms_from_events
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: extract_ttft_ms_from_events
+- name: log_turn_startup_timings
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: log_turn_startup_timings
+- name: prepare_turn_session_registry
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: prepare_turn_session_registry
+- name: record_ttft_sample
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: record_ttft_sample
+- name: resolve_mcp_tool_definitions_lazy
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: resolve_mcp_tool_definitions_lazy
+- name: run_turn_with_deferred_mcp_discovery
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: run_turn_with_deferred_mcp_discovery
+- name: session_registry_cache_key
+  file: src/sevn/gateway/telemetry/ttft.py
+  symbol: session_registry_cache_key
 - name: persist_triage_decision
   file: src/sevn/gateway/triage/triage_audit.py
   symbol: persist_triage_decision
@@ -1661,20 +1694,31 @@ spawned turn; the decision is logged as
 ``gateway.queue_classifier_timeout_spawned`` with ``prior_turn_id``,
 ``new_turn_id``, ``timeout_s``, and ``routing_action``.
 
+## Amendments (open-issues-sweep W31, #72)
+
+``BuzzChannelAdapter`` (`src/sevn/channels/buzz.py`) parses Buzz relay mention
+webhooks into :class:`~sevn.gateway.channel_types.IncomingMessage` and sends
+replies via the configured relay REST API. ACP runtime bridge
+(`src/sevn/acp/turn_bridge.py`) delegates ``session/prompt`` to
+``dispatch_run`` / ``build_agent_run_turn`` when a workspace is bound, or a
+deterministic stub for stdio unit tests.
+
+## Amendments (open-issues-sweep W30 — #78 TTFT)
+
+``gateway.turn.ttft`` trace spans measure first-token latency per turn;
+``log_turn_startup_timings`` emits structured before/after contributor timings
+for ``build_session_registry``, ``sync_tools_md``, triage, and MCP discovery.
+Opt-in ``gateway.defer_mcp_discovery`` (default off, D9) moves MCP subprocess
+discovery off the boot critical path without changing turn output.
+Opt-in ``gateway.cache_session_registry`` reuses in-process registry snapshots
+via the W15 fingerprint seam. Mission Control samples TTFT per stage when wired.
+
 ## Amendments (telegram-menu-redesign W9)
 
 Telegram `/config` callback routing serves the redesigned eight-tile tree via
 `build_config_menu_keyboard()` and `MenuActionRouter`; stale `cfg:section:*` ids
 resolve through `_SECTION_ALIASES`. Section dispatch and action handlers are shared
 with the menu E2E walker recipe (`src/sevn/browser/recipes/telegram_menu.py`).
-
-## Amendments (open-issues-sweep W18, #75)
-
-Outbound delivery persists a `delivery_obligations` ledger row before
-`adapter.send` and records the platform message id on confirmation. Boot replay
-via `sweep_outbound_retries` skips resend when the obligation is already
-confirmed, closing the double-send window after a crash between send and status
-update. Tier-B finalizer failure paths participate through `route_outgoing`.
 
 ## Test Strategy
 

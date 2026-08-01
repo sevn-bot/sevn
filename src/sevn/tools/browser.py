@@ -28,6 +28,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 
 from sevn.browser import HAS_CDP
+from sevn.browser.persistence import resolve_browser_profile_dir
+from sevn.browser.redaction import redact_browser_tool_payload
 from sevn.tools.base import enveloped_failure, enveloped_success, maybe_spill_large_payload
 from sevn.tools.codes import ToolResultCode
 from sevn.tools.context import ToolContext
@@ -42,6 +44,38 @@ if TYPE_CHECKING:
 
 # Process-wide gate for the raw ``eval`` action (D8); set by register_browser_tool.
 _EVAL_ALLOWED: bool = False
+
+
+def _redact_browser_envelope(
+    content_root: Path,
+    session_id: str,
+    envelope: str,
+) -> str:
+    """Apply credential-path redaction to a browser tool JSON envelope.
+
+    Args:
+        content_root (Path): Workspace content root.
+        session_id (str): Gateway session id.
+        envelope (str): JSON envelope string.
+
+    Returns:
+        str: Redacted JSON envelope string.
+
+    Examples:
+        >>> import json, tempfile
+        >>> from pathlib import Path
+        >>> root = Path(tempfile.mkdtemp())
+        >>> env = json.dumps({"ok": True, "data": {}})
+        >>> out = _redact_browser_envelope(root, "s1", env)
+        >>> json.loads(out)["ok"]
+        True
+    """
+    import json
+
+    profile = resolve_browser_profile_dir(content_root, session_id)
+    safe = redact_browser_tool_payload(envelope, profile_dir=profile)
+    return json.dumps(safe)
+
 
 _EXTRACT_TEXT_MAX: Final[int] = 8_000
 _EXTRACT_HTML_MAX: Final[int] = 32_000
@@ -1280,9 +1314,11 @@ async def browser_tool(
         )
     page, dom, working_target = resolved
     try:
-        return await _dispatch(ctx, page, dom, working_target, action=action, params=params)
+        result = await _dispatch(ctx, page, dom, working_target, action=action, params=params)
+        return _redact_browser_envelope(content_root, session_id, result)
     except Exception as exc:
-        return enveloped_failure(f"{action} failed: {exc}", code=ToolResultCode.INTERNAL_ERROR)
+        failure = enveloped_failure(f"{action} failed: {exc}", code=ToolResultCode.INTERNAL_ERROR)
+        return _redact_browser_envelope(content_root, session_id, failure)
 
 
 def register_browser_tool(executor: ToolExecutor, cfg: WorkspaceConfig | None = None) -> None:

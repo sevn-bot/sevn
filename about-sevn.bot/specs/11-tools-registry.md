@@ -8,7 +8,7 @@ summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that eve
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
 last_updated: '2026-08-01'
-fingerprint: sha256:e6e90434d4162f106513af12a3caad4262964fb1a54a2c2ab085e09b91da4a5a
+fingerprint: sha256:63ebfb3e931a68326acc10344a01eaeb8db893a14261e00e3cf1d6653344b7ea
 related: []
 sources:
 - src/sevn/tools/**
@@ -236,6 +236,63 @@ interfaces:
 - name: tail_log_lines
   file: src/sevn/tools/log_query.py
   symbol: tail_log_lines
+- name: compute_mcp_registry_fingerprint
+  file: src/sevn/tools/mcp_boot.py
+  symbol: compute_mcp_registry_fingerprint
+- name: effective_mcp_servers_for_workspace
+  file: src/sevn/tools/mcp_boot.py
+  symbol: effective_mcp_servers_for_workspace
+- name: load_mcp_oauth_credentials
+  file: src/sevn/tools/mcp_boot.py
+  symbol: load_mcp_oauth_credentials
+- name: apply_catalog_preset_to_doc
+  file: src/sevn/tools/mcp_catalog.py
+  symbol: apply_catalog_preset_to_doc
+- name: list_mcp_catalog_presets
+  file: src/sevn/tools/mcp_catalog.py
+  symbol: list_mcp_catalog_presets
+- name: append_mcp_log
+  file: src/sevn/tools/mcp_logging.py
+  symbol: append_mcp_log
+- name: format_mcp_tool_name
+  file: src/sevn/tools/mcp_naming.py
+  symbol: format_mcp_tool_name
+- name: mcp_server_id_from_tool_name
+  file: src/sevn/tools/mcp_naming.py
+  symbol: mcp_server_id_from_tool_name
+- name: parse_mcp_qualified_name
+  file: src/sevn/tools/mcp_naming.py
+  symbol: parse_mcp_qualified_name
+- name: upstream_mcp_tool_name
+  file: src/sevn/tools/mcp_naming.py
+  symbol: upstream_mcp_tool_name
+- name: McpOAuthFlow
+  file: src/sevn/tools/mcp_oauth.py
+  symbol: McpOAuthFlow
+- name: begin_mcp_oauth_flow
+  file: src/sevn/tools/mcp_oauth.py
+  symbol: begin_mcp_oauth_flow
+- name: capture_mcp_oauth_callback
+  file: src/sevn/tools/mcp_oauth.py
+  symbol: capture_mcp_oauth_callback
+- name: complete_mcp_oauth_flow
+  file: src/sevn/tools/mcp_oauth.py
+  symbol: complete_mcp_oauth_flow
+- name: load_mcp_oauth_credential
+  file: src/sevn/tools/mcp_oauth.py
+  symbol: load_mcp_oauth_credential
+- name: mcp_oauth_secret_alias
+  file: src/sevn/tools/mcp_oauth.py
+  symbol: mcp_oauth_secret_alias
+- name: persist_mcp_oauth_credential
+  file: src/sevn/tools/mcp_oauth.py
+  symbol: persist_mcp_oauth_credential
+- name: resolve_mcp_oauth_env
+  file: src/sevn/tools/mcp_oauth.py
+  symbol: resolve_mcp_oauth_env
+- name: resolve_mcp_servers_for_profile
+  file: src/sevn/tools/mcp_profile_policy.py
+  symbol: resolve_mcp_servers_for_profile
 - name: SevnMcpStdioClient
   file: src/sevn/tools/mcp_stdio_client.py
   symbol: SevnMcpStdioClient
@@ -618,3 +675,71 @@ reusing ``TelegramWeb`` inline-keyboard primitives. Destructive menu rows are de
 **Skills (W5):** Tier B exposes operator skills as harness deferred `Skills` capabilities (`tier_b_skills.build_tier_b_skill_capabilities`). Triager-named skill ids scope the include list; each `SKILL.md` is staged to an ephemeral `.sevn-harness-skills/` tree with frontmatter preserved. Script dispatch stays on `sevn_run_skill_script` → `ToolExecutor.dispatch` (same registry contract as native tools).
 
 **CodeMode (W3/W7):** Registry tools marked `code_mode=True` are eligible for the Monty `run_code` sandbox when triage enables CodeMode. Host-side tool calls from sandboxed snippets re-enter `ToolExecutor.dispatch` via the harness function catalog. `SevnAsyncCodeMode` is the tier-B backend; Monty `ResourceLimits` are injected at pool checkout (`_monty_limits.py`, D5/D6). Opt-in `dynamic_catalog` (default off, D9) keeps the `run_code` tool definition byte-stable across lazy tool discovery.
+
+### 10.2 open-issues-sweep W28 — browser auth persistence (#92) — append-only
+
+Gateway browser sessions persist cookies and login state via Chrome ``user-data-dir`` profiles
+(``resolve_profile_dir`` in ``src/sevn/browser/chrome.py``). Precedence:
+``SEVN_BROWSER_PROFILE_DIR`` → ``skills.browser.profile_dir`` →
+``skills.social_browser.profile_dir`` → ``<content_root>/.sevn/browser-profiles/<session_id>``.
+
+**W28 decisions (2026-07-31):**
+
+| Topic | Decision |
+|-------|----------|
+| Per-session default | **Kept** — isolation by session id; operators set ``skills.browser.profile_dir`` for a shared stable profile across sessions |
+| Password store | **Configurable** — ``skills.browser.password_store`` / ``SEVN_BROWSER_PASSWORD_STORE``: ``basic`` (default, CI/Docker-safe) or ``system`` (OS keychain) |
+| Reset | ``sevn browser clear-auth`` — closes sevn-spawned browsers and removes profile trees + CDP registries |
+| Redaction | ``sevn.browser.redaction`` scrubs cookie/profile paths from logs and browser tool JSON envelopes |
+| Ephemeral mode | ``resolve_browser_profile_dir(..., ephemeral=True)`` under ``.sevn/browser-ephemeral/`` |
+| Onboarding split | Onboarding uses ``~/.sevn/onboarding-chrome-profile`` (``src/sevn/onboarding/browser_automation.py``) — intentionally separate from gateway session profiles; my.telegram.org cookies do not share Telegram Web session profiles |
+
+### 10.3 open-issues-sweep W29 — MCP naming, OAuth, logs, catalog (#90) — append-only
+
+| Topic | Decision |
+|-------|----------|
+| Tool naming | **Breaking:** qualified MCP tools use ``mcp__<server>__<tool>``; legacy ``server.tool`` dispatch still resolves |
+| Profile MCP | ``routing_profiles.<id>.mcp_disabled_servers`` subtracts from workspace ``mcp_enabled`` |
+| OAuth | Credential JSON at ``oauth.mcp.<server_id>`` via secrets chain; ``mcp_servers.*.oauth`` holds metadata/refs only |
+| Logs | Structured JSON lines appended to ``<workspace>/logs/mcp.log`` on discover/call events |
+| Catalog | ``list_mcp_catalog_presets()`` surfaced read-only on Mission Control ``GET /api/v1/agent/mcp-servers`` |
+
+### 10.4 open-issues-sweep W34 — Playwright E2E park verdict (#37, D12) — append-only
+
+**Context:** Wave W6 of ``playwright-removal-x-browser-parity`` deleted ``tests/e2e/**`` (Playwright TS harness). Issue **#37** tracks three parked journey families (**C7–C9**). This section records the W34 decision wave verdict per **D12** (decision, not rebuild). Re-homing implementation is **out of scope** unless the operator opens a dedicated follow-up wave plan.
+
+**Operator sign-off (2026-07-31):** All three families are **accepted as parked**. This spec row plus issue **#37** close-out comment constitute the park-vs-rebuild sign-off required by convention 12. No silent coverage drop — gaps are listed explicitly below.
+
+**Working precedent for live browser journeys:** ``src/sevn/browser/recipes/telegram_menu_walk.py`` + ``telegram_checks.py``; Makefile gates ``make telegram-menu-e2e`` (``SEVN_TELEGRAM_MENU_E2E=1``) and ``make telegram-checks`` at ``Makefile:572–589``.
+
+#### C7 — webchat journeys
+
+| | |
+|---|---|
+| **Former surface** | ``tests/e2e/login.spec.ts``, ``dispatch-turn.spec.ts`` (headed Playwright login → chat → dispatch) |
+| **Current coverage** | ``tests/gateway/test_webchat_ws.py`` (login GET/POST, JWT mint, WS auth, message persist through router); ``tests/channels/test_webchat.py``; ``tests/ui/dashboard/test_chat_console.py`` (MC in-dashboard chat token + WS round-trip); ``tests/gateway/test_http_server.py`` (webchat session in OpenUI path) |
+| **Gaps (accepted)** | Headed browser journey (login page → chat UI → send in real Chrome); visual/CSS snapshot regression |
+| **Verdict** | **Accept park** — API/WS dispatch path is fully exercised in-process; a browser recipe would duplicate the ``telegram_menu_walk`` pattern with low marginal value vs maintenance |
+| **Hypothetical re-home recipe** | ``webchat_journey.py`` (navigate ``/login`` → mint token → WS send) — **not scheduled** |
+
+#### C8 — onboarding journeys
+
+| | |
+|---|---|
+| **Former surface** | ``tests/e2e/onboarding*.spec.ts`` (multi-step wizard click-through in browser) |
+| **Current coverage** | ``tests/onboarding/`` (34 files, 200+ tests); ``tests/onboarding/test_web_wizard_steps.py`` (step order, HTML, payload merge); ``tests/onboarding/test_browser_automation.py`` (mocked CDP start/stop); ``tests/onboarding/test_onboarding.py`` (52 tests); optional live gate ``make onboard-telegram-e2e`` (``SEVN_ONBOARD_E2E=1`` → ``tests/onboarding/test_telegram_onboarding.py -m onboard_e2e``) |
+| **Gaps (accepted)** | Full multi-step wizard click-through in headed browser (all steps welcome→finish); visual snapshots; non-Telegram onboarding paths in live browser |
+| **Verdict** | **Accept park** — server-side wizard logic and Telegram CDP smoke gate cover the high-risk paths; full browser walk deferred |
+| **Hypothetical re-home recipe** | ``onboarding_wizard_walk.py`` — **not scheduled** |
+
+#### C9 — Mission Control tab specs + snapshots
+
+| | |
+|---|---|
+| **Former surface** | ``tests/e2e/mission-control/**`` (tab navigation + Playwright visual snapshots) |
+| **Current coverage** | ``tests/ui/dashboard/`` (38 files, ~250 tests: MC5–MC11 tab APIs, auth, shell, chat console); ``tests/gateway/test_mission_spa_mount.py`` (SPA mount, deep links, CSP); ``tests/gateway/test_mission_api.py`` (legacy 410 stubs); ``tests/ui/dashboard/test_dashboard_shell.py`` (static shell markup/CSS parity); ``scripts/seed_mc_e2e_workspace.py`` (API fixture seeder) |
+| **Gaps (accepted)** | Playwright visual snapshot parity; headed browser tab navigation + screenshot diff; live health-badge WS updates in browser |
+| **Verdict** | **Accept park** — API-first MC coverage is comprehensive; snapshot E2E replaced by structural shell tests + per-tab API tests |
+| **Hypothetical re-home recipe** | ``mission_control_walk.py`` — **not scheduled** |
+
+**Follow-up:** Operator override to re-home any family requires a **dedicated wave plan** (not absorbed into open-issues-sweep). Close **#37** when this row is merged.

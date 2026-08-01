@@ -17,11 +17,11 @@ In everyday use, integrations helps Sevn do its job reliably: you interact throu
 
 ### Components and layout
 
-Implementation lives under `src/sevn/integrations/`. The package contains 31 Python module(s); primary entry points include `src/sevn/integrations/__init__.py`, `src/sevn/integrations/code_graph_rag/__init__.py`, `src/sevn/integrations/cursor_cloud/__init__.py`, `src/sevn/integrations/cursor_cloud/client.py`, `src/sevn/integrations/cursor_cloud/config.py`, `src/sevn/integrations/cursor_cloud/errors.py`, and 25 more.
+Implementation lives under `src/sevn/integrations/`. The package contains 38 Python module(s); primary entry points include `src/sevn/integrations/__init__.py`, `src/sevn/integrations/code_graph_rag/__init__.py`, `src/sevn/integrations/cursor_cloud/__init__.py`, `src/sevn/integrations/cursor_cloud/client.py`, `src/sevn/integrations/cursor_cloud/config.py`, `src/sevn/integrations/cursor_cloud/errors.py`, and 32 more.
 
 ### Data and control flow
 
-Integrations is organized around `  init  `, `  init  `, `  init  `, `client`, and 2 more under `src/sevn/integrations/` with 31 Python module(s) in the scanned tree. Primary entry points include client.py (create_cloud_agent), config.py (load_cursor_cloud_settings), jobs.py (insert_job), oauth.py (begin_oauth).
+Integrations is organized around `  init  `, `  init  `, `  init  `, `client`, and 2 more under `src/sevn/integrations/` with 38 Python module(s) in the scanned tree. Primary entry points include client.py (create_cloud_agent), config.py (load_cursor_cloud_settings), jobs.py (insert_job), oauth.py (begin_oauth).
 
 ### Configuration
 
@@ -50,7 +50,7 @@ Initial draft for **Purpose** — grounded in extracted interfaces; confirm norm
 
 ## Level 3 — Deep dive (low-level, technical)
 
-Primary source tree: [`src/sevn/integrations`](../../src/sevn/integrations/) (31 Python files). Normative design: [`29-cursor-cloud-agent.md`](../../about-sevn.bot/specs/29-cursor-cloud-agent.md).
+Primary source tree: [`src/sevn/integrations`](../../src/sevn/integrations/) (38 Python files). Normative design: [`29-cursor-cloud-agent.md`](../../about-sevn.bot/specs/29-cursor-cloud-agent.md).
 
 ### Module inventory
 
@@ -112,7 +112,7 @@ Authenticated gh CLI helpers for issue create/view (W5/W6 fast path).
 Working with [`gh_cli.py`](../../src/sevn/integrations/github_skill/gh_cli.py): inspect the public entry points below.
 Start with [`map_gh_cli_error`](../../src/sevn/integrations/github_skill/gh_cli.py#L38), then [`run_gh`](../../src/sevn/integrations/github_skill/gh_cli.py#L96), [`create_issue_via_gh`](../../src/sevn/integrations/github_skill/gh_cli.py#L133), [`view_issue_via_gh`](../../src/sevn/integrations/github_skill/gh_cli.py#L205).
 
-19 more Python files under [`src/sevn/integrations`](../../src/sevn/integrations/) — including `src/sevn/integrations/github_skill/gh_issues.py`, `src/sevn/integrations/github_skill/gh_pr.py`, `src/sevn/integrations/github_skill/github_manager.py`, `src/sevn/integrations/github_skill/hooks.py`.
+26 more Python files under [`src/sevn/integrations`](../../src/sevn/integrations/) — including `src/sevn/integrations/github_skill/gh_issues.py`, `src/sevn/integrations/github_skill/gh_pr.py`, `src/sevn/integrations/github_skill/github_manager.py`, `src/sevn/integrations/github_skill/hooks.py`.
 
 ### Extension and invariants
 

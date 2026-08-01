@@ -80,6 +80,12 @@
       "reviewed": "2026-06-17"
     },
     {
+      "skill_path": "src/sevn/data/bundled_skills/core/buzz",
+      "rule_id": "PE3",
+      "reason": "SKILL.md documents Buzz relay signing keys via secrets chain only (W31/D5); no plaintext credential storage",
+      "reviewed": "2026-07-31"
+    },
+    {
       "skill_path": "src/sevn/data/bundled_skills/core/cua-agent",
       "rule_id": "OH1",
       "reason": "run_agent.py relays upstream cua-agent output; opt-in + per-run approval gate (D5)",

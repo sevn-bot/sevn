@@ -84,6 +84,7 @@ from sevn.config.model_resolution import (
     resolve_model_slot,
     resolve_transport_for_model_id,
 )
+from sevn.config.sections.accessors import defer_mcp_discovery_enabled
 from sevn.config.sections.subagents import Role as SubAgentRole
 from sevn.config.settings import ProcessSettings
 from sevn.config.sevn_repo import resolve_sevn_checkout_for_workspace
@@ -141,6 +142,12 @@ from sevn.gateway.telegram.telegram_quick_actions import (
     GATEWAY_OUTBOUND_PHASE_KEY,
     QuickActionCallbackHandler,
 )
+from sevn.gateway.telemetry.ttft import (
+    SessionRegistryTurnCache,
+    log_turn_startup_timings,
+    prepare_turn_session_registry,
+    resolve_mcp_tool_definitions_lazy,
+)
 from sevn.gateway.triage.triage_audit import persist_triage_decision
 from sevn.gateway.triage.triage_context import (
     is_triager_enabled,
@@ -178,6 +185,8 @@ from sevn.tools.permissions import (
 from sevn.tools.registry import build_session_registry
 from sevn.tools.runtime_dispatch import RuntimeToolBindings
 from sevn.workspace.layout import WorkspaceLayout
+
+_SESSION_REGISTRY_TURN_CACHE = SessionRegistryTurnCache()
 
 # Typed reason → user-facing line lives in ``sevn.prompts.fallbacks.NO_ANSWER_MESSAGES``.
 # Re-exported here for tests that import ``_NO_ANSWER_MESSAGES`` from this module.
@@ -905,6 +914,8 @@ def build_agent_run_turn(
 
     process = process_settings or ProcessSettings()
     bindings = runtime_bindings or RuntimeToolBindings()
+    mcp_defs_box: list[tuple[ToolDefinition, ...]] = [mcp_tool_definitions]
+    mcp_servers_map = dict(getattr(runtime_bindings, "mcp_servers", None) or {})
     mcp_defs: tuple[ToolDefinition, ...] = mcp_tool_definitions
     plan_registry = PlanGateWaitRegistry()
     plan_handler = PlanGateCallbackHandler(conn, plan_registry)
@@ -1572,16 +1583,22 @@ def build_agent_run_turn(
             triage_ctx = triage_ctx.model_copy(
                 update={"bootstrap_capture_active": bootstrap_active},
             )
-        session_exe, session_tool_set = await asyncio.to_thread(
-            build_session_registry,
-            workspace_config=workspace,
-            runtime_bindings=bindings,
-            extra_mcp=mcp_defs,
-            workspace_root=layout.content_root,
+        registry_prep = await prepare_turn_session_registry(
+            workspace=workspace,
             layout=layout,
-            trace_sink=trace,
-            include_bootstrap_tools=bootstrap_active,
+            bindings=bindings,
+            trace=trace,
+            session_id=session_id,
+            agent_name=agent_name,
+            mcp_defs_box=mcp_defs_box,
+            mcp_servers_map=mcp_servers_map,
+            bootstrap_active=bootstrap_active,
+            registry_cache=_SESSION_REGISTRY_TURN_CACHE,
         )
+        session_exe = registry_prep.session_exe
+        session_tool_set = registry_prep.session_tool_set
+        startup_timings = registry_prep.startup_timings
+        registry_cache_hit = registry_prep.registry_cache_hit
 
         effective_skill_allowlist: frozenset[str] | None = None
         if routing_bundle is not None and routing_bundle.skill_allowlist is not None:
@@ -1601,16 +1618,18 @@ def build_agent_run_turn(
         filtered_tool_set = filter_tool_set_skills(session_tool_set, effective_skill_allowlist)
         effective_tool_set = filtered_tool_set or session_tool_set
 
-        def _sync_tools_md_catalog() -> None:
-            from sevn.workspace.tools_md import sync_tools_md
+        if effective_tool_set is not session_tool_set:
 
-            sync_tools_md(
-                layout.content_root,
-                effective_tool_set,
-                agent_name=agent_name,
-            )
+            def _sync_tools_md_catalog() -> None:
+                from sevn.workspace.tools_md import sync_tools_md
 
-        await asyncio.to_thread(_sync_tools_md_catalog)
+                sync_tools_md(
+                    layout.content_root,
+                    effective_tool_set,
+                    agent_name=agent_name,
+                )
+
+            await asyncio.to_thread(_sync_tools_md_catalog)
         registry = registry_snapshot_from_tool_set(
             effective_tool_set,
             workspace=workspace,
@@ -1687,6 +1706,13 @@ def build_agent_run_turn(
                 )
                 triager_ms = max(1, int((time_ns() - triage_started_ns) / 1_000_000))
                 l1_state.triager_ms = triager_ms
+                startup_timings.triage_ms = float(triager_ms)
+                log_turn_startup_timings(
+                    session_id=session_id,
+                    timings=startup_timings,
+                    defer_mcp=defer_mcp_discovery_enabled(workspace),
+                    cache_hit=registry_cache_hit,
+                )
             except TriagerUnavailable:
                 if triager_run_id is not None and triager_registry is not None:
                     await triager_registry.mark_failed(triager_run_id)
@@ -3041,11 +3067,17 @@ def build_agent_run_turn(
                 )
                 route_meta["routing_profile"] = spawn_routing_bundle.profile_name
                 spawn_secrets_token = bind_routing_secrets_scope(spawn_routing_bundle.secrets_scope)
+            spawn_mcp_defs = await resolve_mcp_tool_definitions_lazy(
+                workspace=workspace_local,
+                content_root=layout.content_root,
+                mcp_defs_box=mcp_defs_box,
+                mcp_servers_map=mcp_servers_map,
+            )
             session_exe, session_tool_set = await asyncio.to_thread(
                 build_session_registry,
                 workspace_config=workspace_local,
                 runtime_bindings=bindings,
-                extra_mcp=mcp_defs,
+                extra_mcp=spawn_mcp_defs,
                 workspace_root=layout.content_root,
                 layout=layout,
                 trace_sink=trace,

@@ -169,6 +169,13 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
 
+## Amendments (open-issues-sweep W31, #72)
+
+ACP stdio runtime (`sevn acp`) is the Buzz-managed agent entrypoint; channel
+plugin ``buzz`` loads ``BuzzChannelAdapter`` from ``sevn.channels`` when
+``channels.buzz.enabled`` is true. Bundled ``buzz`` skill documents relay URL,
+private key, membership, and runtime command wiring.
+
 ## Human-input needed
 
 Prose body not yet authored (W9 scope). Normative contract requires operator or

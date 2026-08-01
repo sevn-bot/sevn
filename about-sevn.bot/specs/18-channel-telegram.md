@@ -8,7 +8,7 @@ summary: 'Deliver the primary daily-driver channel for personal messaging: a Cha
   implementation that normalises Telegram Updates into spec-17-gateway IncomingMessage
   / OutgoingMessage and implements '
 last_updated: '2026-08-01'
-fingerprint: sha256:ecd84d73a0b721d49c7a68228a0a490e60418410341c6348a84d0e731798da09
+fingerprint: sha256:f27ed06fc4c868b7bf43311708c1d4665682da53414a489945dacb1c2961c551
 related: []
 sources:
 - src/sevn/channels/**
@@ -40,6 +40,9 @@ interfaces:
 - name: session_reset_policy_for_channel
   file: src/sevn/channels/_common.py
   symbol: session_reset_policy_for_channel
+- name: BuzzChannelAdapter
+  file: src/sevn/channels/buzz.py
+  symbol: BuzzChannelAdapter
 - name: resolve_dispatcher_overflow_callback_data
   file: src/sevn/channels/callback_overflow.py
   symbol: resolve_dispatcher_overflow_callback_data

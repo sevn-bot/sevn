@@ -522,6 +522,8 @@ def _collect_skills() -> list[dict[str, str]]:
     if not core.is_dir():
         return rows
     for skill_md in sorted(core.glob("*/SKILL.md")):
+        if skill_md.parent.is_symlink():
+            continue
         meta = _parse_skill_front_matter(skill_md)
         name = meta.get("name") or skill_md.parent.name
         desc = overrides.get(name)

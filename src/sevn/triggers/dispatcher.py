@@ -8,6 +8,7 @@ Exports:
     agent_dispatch_kwargs — build ``run_turn`` kwargs from gateway router.
     dispatch_notify_only — template render + LOG channel + traces.
     dispatch_run — agent-pass via shared ``RunTurnFn`` when wired at gateway boot.
+    assistant_texts_for_session — read assistant reply text after trigger dispatch.
 """
 
 from __future__ import annotations
@@ -368,6 +369,24 @@ def _trigger_scope_key(req: DispatchRequest) -> str:
     return f"trigger:{transport}:{req.correlation_id}"
 
 
+def assistant_texts_for_session(conn: Any, session_id: str) -> list[str]:
+    """Collect assistant message bodies after agent dispatch completes.
+
+    Args:
+        conn (Any): Open SQLite handle (gateway ``sevn.db``).
+        session_id (str): Trigger session id.
+
+    Returns:
+        list[str]: Assistant-visible text lines in history order.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.isfunction(assistant_texts_for_session)
+        True
+    """
+    return _assistant_texts_for_session(conn, session_id)
+
+
 def _assistant_texts_for_session(conn: Any, session_id: str) -> list[str]:
     """Collect assistant message bodies after agent dispatch completes.
 
@@ -668,4 +687,8 @@ async def dispatch_run(
             status="ok",
         )
 
-    return RunHandle(run_id=req.correlation_id, correlation_id=req.correlation_id)
+    return RunHandle(
+        run_id=req.correlation_id,
+        correlation_id=req.correlation_id,
+        session_id=session_id,
+    )

@@ -18,6 +18,7 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | name | description |
 |------|-------------|
 | browser-harness | Thin CDP harness with extendable helpers.py for open-ended browser control. |
+| buzz | Buzz workspace integration — configure buzz-cli / buzz-acp, join channels, send replies, and run the sevn ACP runtime for managed agent membership. |
 | canvas | Cursor Canvas and rich analytical layouts via OpenUI compose helpers (`specs/11-tools-registry.md` §3.4, `specs/37-openui.md`). |
 | code_graph_rag | CGR export reader + allowlisted cgr CLI (`specs/28-code-understanding.md` §2.2). |
 | computer-use | Drive a computer via trycua/cua — host cua-driver MCP passthrough plus sandbox providers (docker/cloud/lume) through the cua CLI; opt-in; macOS-only |
@@ -37,6 +38,7 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | github-manager | Advanced GitHub operations — branches, Actions, CI/CD secrets, environments, deployments via integration_call. |
 | google-workspace | Gmail, Calendar, Drive, Contacts, Sheets, and Docs via OAuth2 Google Workspace APIs. |
 | graphify | Knowledge-graph orientation for code (`specs/28-code-understanding.md` §2.4). |
+| hermes-model-eval | Advisory cross-model eval on the golden_llm harness — compare Hermes 4 and other configured aliases for tool-call reliability, coding, summarization, and policy/approval scenarios. Results inform routing; they never change defaults (D9). |
 | json-canvas | Create and edit Obsidian JSON Canvas `.canvas` files with nodes, edges, groups, and connections. |
 | job-ops | Discover jobs across global + Europe boards, AI fit-score them against your resume, and optionally tailor a CV summary (JobOps port). |
 | kokoro-tts | Local Kokoro ONNX text-to-speech engine backing the voice TTS pipeline (kokoro backend). Not a model-facing research skill. |
@@ -51,6 +53,7 @@ columns are for human / LLM-prompt rendering and ignored by the parser.
 | openwiki | LLM-generated agent wiki for a codebase (LangChain OpenWiki CLI). |
 | pdf | Render markdown/HTML to workspace PDFs; extract text/tables; structured load/chunk. |
 | printing-press-library | Starter-pack Printing Press CLIs — ESPN, flights, movies, recipes (Go binaries on PATH). |
+| reddit-karma-loop | Draft-only Reddit karma loop — browser discovery, quality gate, grounded drafts, caps/cooldowns, confirm-gated posts (D11; no auto_post). |
 | roam_code | Lightweight roam-code path Q&A (`specs/28-code-understanding.md` §2.2). |
 | scheduling | Cron jobs and one-shot reminders via workspace trigger store (`specs/30-non-interactive-triggers.md`). |
 | social_media_manager | Browser-first social monitoring across six platforms via the social_media_manager L2 specialist; unified X ops over browser\|twexapi; TwexAPI optional on X only (spec 36). |

@@ -8,7 +8,7 @@ summary: 'Own everything under workspace/skills/: how skills are discovered, val
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
 last_updated: '2026-08-01'
-fingerprint: sha256:4a121d313360f6013f032ef06ee382da2ca741bda999fd64f70a1a177ebbb942
+fingerprint: sha256:3c6627151e6cdae345bf10729ec4f2103d21a6da9445c236cd6b61fe45513aa8
 related: []
 sources:
 - src/sevn/skills/**
@@ -723,6 +723,23 @@ Bundled `media_generation` skill binds to the `media_generator` specialist via
 `spawn_subagent(..., wait=true)` (`src/sevn/data/bundled_skills/core/media_generation/`).
 Skills may declare `requires_specialist` in SKILL front matter; triager/tier B route
 media asks through the specialist grant path (D8/D16).
+
+## Amendments (open-issues-sweep W32 — Hermes model eval #91)
+
+Bundled ``hermes-model-eval`` runs a fixed ``golden_llm`` pydantic-evals suite
+(tool-call, coding, summarization, policy/approval) via ``sevn.model_eval.replay``.
+Results are advisory only (D9 default off); Hermes aliases are provider-configurable.
+**D21:** ``spy_hermes`` / ``make spy-hermes-*`` are absent — eval uses
+``tests/fixtures/golden_llm/`` only; live cross-model comparison is opt-in via
+``SEVN_HERMES_MODEL_EVAL=1``.
+
+## Amendments (open-issues-sweep W33 — Reddit karma loop #74, D11)
+
+Bundled ``reddit-karma-loop`` discovers threads via the existing browser Reddit
+path, applies quality gates, drafts wiki/second-brain-grounded comments, enforces
+per-day caps and cooldowns, logs decisions to
+``.sevn/reddit-karma-loop/decisions.jsonl``, and requires ``--confirm`` before
+any post. ``auto_post`` is not implemented — draft-only per **D11**.
 
 ## Implemented by
 

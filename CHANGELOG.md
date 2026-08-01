@@ -43,6 +43,7 @@ are cut into a dated, versioned section at release time.
 
 ### Fixed
 
+- [2026-08-01] Batch F rebase: gateway turn spine keeps batch-B routing-profile skill filtering and ``resolve_model_slot_for_turn`` while wiring TTFT ``prepare_turn_session_registry`` and deferred MCP discovery (#108)
 - [2026-07-30] Batch A Thermos pass — config backup migration preserves colliding legacy archives, Telegram menu forms re-prompt with cancel on remaining validation paths, referenced-message context extracted to `gateway/inbound/referenced_context.py`, and turn-scoped outbound metadata lookup falls back when no turn-bound row exists
 - [2026-07-30] Classifier timeouts in `multi` queue mode no longer append a timeout notice to the prior turn's reply — the new turn still spawns with routing extras preserved, and the decision is logged as `gateway.queue_classifier_timeout_spawned`; fixes #70
 - [2026-07-30] Voice replies no longer speak routing diagnostics — when `show_routing` is on, TTS input strips the `_intent=… · tier=… · conf=…_` footer while chat text keeps it; fixes #66

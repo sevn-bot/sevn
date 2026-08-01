@@ -24,7 +24,7 @@ def test_all_case_files_validate() -> None:
     cases = discover_cases()
     assert len(cases) >= 20
     categories = {c.category for c in cases}
-    assert categories >= {"tools", "skills", "input", "codemode"}
+    assert categories >= {"tools", "skills", "input", "codemode", "eval"}
 
 
 def test_cases_to_dataset_bridge() -> None:

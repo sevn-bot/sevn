@@ -180,6 +180,10 @@ def _register_builtin_cron_jobs() -> None:
         reconcile_my_sevn_issues_sync_cron_job,
         reconcile_my_sevn_sync_cron_job,
     )
+    from sevn.integrations.reddit_karma.scheduler import (
+        reconcile_reddit_karma_cron_job,
+        register_reddit_karma_cron_handler,
+    )
     from sevn.memory.dreaming.scheduler import reconcile_dreaming_cron_job
     from sevn.triggers.issue_watch_cron import (
         ensure_issue_watch_cron_job,
@@ -187,10 +191,12 @@ def _register_builtin_cron_jobs() -> None:
     )
 
     register_issue_watch_cron_handler()
+    register_reddit_karma_cron_handler()
     register_cron_job("dreaming", reconcile_dreaming_cron_job, priority=0)
     register_cron_job("my_sevn_sync", reconcile_my_sevn_sync_cron_job, priority=10)
     register_cron_job("my_sevn_issues_sync", reconcile_my_sevn_issues_sync_cron_job, priority=20)
     register_cron_job("gh_issue_watch", ensure_issue_watch_cron_job, priority=30)
+    register_cron_job("reddit_karma_loop", reconcile_reddit_karma_cron_job, priority=40)
 
 
 _register_builtin_cron_jobs()

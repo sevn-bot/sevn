@@ -20,6 +20,8 @@ Exports:
     tool_debug_result_max_chars — effective ``logging.tool_debug_result_max_chars``.
     tier_b_answer_mode — effective ``gateway.output.tier_b_answer_mode``.
     show_intent_footer — effective ``gateway.output.show_intent_footer``.
+    defer_mcp_discovery_enabled — effective ``gateway.defer_mcp_discovery``.
+    cache_session_registry_enabled — effective ``gateway.cache_session_registry``.
     browser_settings — effective ``skills.browser.*``.
     google_workspace_settings — effective ``skills.google_workspace.*``.
     social_media_manager_settings — effective ``skills.social_media_manager.*``.
@@ -464,3 +466,39 @@ def show_intent_footer(cfg: WorkspaceConfig | None) -> bool:
     if cfg is None or cfg.gateway is None or cfg.gateway.output is None:
         return False
     return bool(cfg.gateway.output.show_intent_footer)
+
+
+def defer_mcp_discovery_enabled(cfg: WorkspaceConfig | None) -> bool:
+    """Return effective ``gateway.defer_mcp_discovery`` (#78, D9 default off).
+
+    Args:
+        cfg (WorkspaceConfig | None): Parsed workspace document.
+
+    Returns:
+        bool: ``True`` when MCP discovery is deferred off the boot critical path.
+
+    Examples:
+        >>> defer_mcp_discovery_enabled(None)
+        False
+    """
+    if cfg is None or cfg.gateway is None:
+        return False
+    return bool(cfg.gateway.defer_mcp_discovery)
+
+
+def cache_session_registry_enabled(cfg: WorkspaceConfig | None) -> bool:
+    """Return effective ``gateway.cache_session_registry`` (#78, D9 default off).
+
+    Args:
+        cfg (WorkspaceConfig | None): Parsed workspace document.
+
+    Returns:
+        bool: ``True`` when per-turn registry snapshots may be reused.
+
+    Examples:
+        >>> cache_session_registry_enabled(None)
+        False
+    """
+    if cfg is None or cfg.gateway is None:
+        return False
+    return bool(cfg.gateway.cache_session_registry)

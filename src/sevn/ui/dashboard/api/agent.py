@@ -54,6 +54,7 @@ from sevn.onboarding.promote import promote_draft
 from sevn.onboarding.validate import validate_workspace_document
 from sevn.skills import SkillExecutionError
 from sevn.skills.manager import SkillsManager
+from sevn.tools.mcp_catalog import list_mcp_catalog_presets
 from sevn.ui.dashboard.api._config_persist import (
     config_error,
     config_validation_error,
@@ -667,7 +668,12 @@ def _mcp_servers_payload(workspace: WorkspaceConfig, layout: WorkspaceLayout) ->
                 "synthetic": bool(spec.get("synthetic")),
             },
         )
-    return {"servers": servers, "mcp_enabled": enabled, "count": len(servers)}
+    return {
+        "servers": servers,
+        "mcp_enabled": enabled,
+        "count": len(servers),
+        "catalog_presets": list_mcp_catalog_presets(),
+    }
 
 
 @router.put("/mcp-servers")

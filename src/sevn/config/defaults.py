@@ -127,6 +127,10 @@ DEFAULT_GATEWAY_RATE_LIMIT_CAPACITY: Final[float] = 30.0
 DEFAULT_GATEWAY_RATE_LIMIT_REFILL_PER_SECOND: Final[float] = 1.5
 DEFAULT_GATEWAY_SHUTDOWN_DRAIN_TIMEOUT_S: Final[float] = 20.0
 
+# Turn startup / TTFT perf toggles (#78, W30; D9 default-off).
+DEFAULT_GATEWAY_DEFER_MCP_DISCOVERY: Final[bool] = False
+DEFAULT_GATEWAY_CACHE_SESSION_REGISTRY: Final[bool] = False
+
 # ``dispatcher_callbacks`` dedupe row retention (`specs/17-gateway.md` §3.4).
 DEFAULT_DISPATCHER_CALLBACKS_TTL_SECONDS: Final[int] = 7 * 24 * 3600
 
@@ -248,6 +252,10 @@ DEFAULT_CUA_AGENT_ENABLED: Final[bool] = False
 DEFAULT_CUA_AGENT_REQUIRE_COMPUTER_USE: Final[bool] = True
 DEFAULT_CUA_AGENT_APPROVAL: Final[str] = "per_run"
 DEFAULT_LUME_ENABLED: Final[bool] = False
+
+# Hermes 4 cross-model eval skill (#91, W32) — advisory only; default off (D9).
+DEFAULT_HERMES_MODEL_EVAL_ENABLED: Final[bool] = False
+DEFAULT_REDDIT_KARMA_LOOP_ENABLED: Final[bool] = False
 
 # Tool registry + spill knobs (`specs/11-tools-registry.md`).
 LOADED_BODY_CACHE_DEFAULT_CAP: Final[int] = 64
