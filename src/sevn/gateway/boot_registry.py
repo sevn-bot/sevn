@@ -201,7 +201,8 @@ import sevn.gateway.replay.replay_worker_hooks  # noqa: E402 — Batch D lane #5
 import sevn.gateway.runtime.telemetry_boot  # noqa: E402 — CW-2 lane #1 channel boot hooks
 import sevn.gateway.subagents.subagents_boot  # noqa: E402 — W3 sub-agent supervisor boot activation
 import sevn.gateway.turn.turn_bundle_hooks  # noqa: E402 — turn-bundle W1
-import sevn.gateway.user.user_model_hooks  # noqa: E402, F401 — Batch D lane #6
+import sevn.gateway.user.user_model_hooks  # noqa: E402 — Batch D lane #6
+import sevn.triggers.cron_boot  # noqa: E402, F401 — W21 cron audit stale-claim recovery
 
 __all__ = [
     "BootContext",

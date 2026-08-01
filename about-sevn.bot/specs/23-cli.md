@@ -8,7 +8,7 @@ summary: Deliver the primary operator and automation surface for install, upgrad
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
 last_updated: '2026-08-01'
-fingerprint: sha256:711eadcf6ad22d808881b84a21b00b97626d7726d6dac621c22793e795261b97
+fingerprint: sha256:d1957467c6c2c40ee56704e979e2c2d088d3cdbbbb399c199cacf286a6ec3b71
 related: []
 sources:
 - src/sevn/cli/**
@@ -618,6 +618,18 @@ interfaces:
 - name: unit_is_active
   file: src/sevn/cli/service_manager.py
   symbol: unit_is_active
+- name: export_sessions
+  file: src/sevn/cli/session_export.py
+  symbol: export_sessions
+- name: record_session_export_job
+  file: src/sevn/cli/session_export.py
+  symbol: record_session_export_job
+- name: redact_export_text
+  file: src/sevn/cli/session_export.py
+  symbol: redact_export_text
+- name: redact_export_value
+  file: src/sevn/cli/session_export.py
+  symbol: redact_export_value
 - name: resolve_shell_history_path
   file: src/sevn/cli/shell_history.py
   symbol: resolve_shell_history_path
@@ -827,18 +839,19 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
 
+## Amendments (open-issues-sweep W22, #83)
+
+``sevn sessions export`` writes redacted markdown and/or JSONL under ``--output``,
+filtering by ``--channel``, ``--profile``, ``--session``, ``--since``, and
+``--until``. Implementation: ``src/sevn/cli/session_export.py`` +
+``src/sevn/cli/commands/sessions.py``.
+
 ## Amendments (telegram-menu-redesign W9)
 
 Root CLI ``rich_help_panel`` groups mirror the eight Telegram ``/config`` tiles
 (``sevn.cli.help.panels.PANEL_ORDER``). ``sevn config sections`` lists the same eight
 slugs derived from ``menu_registry`` (``config_paths.menu_registry_root_slugs()``).
 ``make cli-help-docs-check`` gates panel drift.
-
-## Amendments (open-issues-sweep W14, #69 / #93)
-
-``sevn skills setup-status <skill>`` lists manifest-declared uv extras and executables;
-``sevn skills setup <skill> --yes`` runs confirmation-gated installs via the onboarding
-install orchestrator. Unsupported requirements return a manual next-step message.
 
 ## Human-input needed
 

@@ -548,6 +548,85 @@ _MIGRATION_24: Final[tuple[str, ...]] = (
     "CREATE INDEX IF NOT EXISTS ix_telegram_chat_names_updated_at ON telegram_chat_names(updated_at)",
 )
 
+# First-class delivery-obligation ledger (#75; `specs/03-storage.md` amendments).
+# Adapter-confirmed platform ids let boot replay skip double-send when status lags.
+_MIGRATION_25: Final[tuple[str, ...]] = (
+    """CREATE TABLE IF NOT EXISTS delivery_obligations (
+        message_id INTEGER PRIMARY KEY NOT NULL
+            REFERENCES gateway_messages(id) ON DELETE CASCADE,
+        session_id TEXT NOT NULL,
+        channel TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        payload_hash TEXT NOT NULL,
+        adapter_message_id TEXT,
+        status TEXT NOT NULL DEFAULT 'pending'
+            CHECK (status IN ('pending', 'confirmed', 'failed')),
+        error_details TEXT,
+        created_at_ns INTEGER NOT NULL,
+        updated_at_ns INTEGER NOT NULL
+    )""",
+    "CREATE INDEX IF NOT EXISTS ix_delivery_obligations_session ON delivery_obligations(session_id)",
+    "CREATE INDEX IF NOT EXISTS ix_delivery_obligations_status ON delivery_obligations(status)",
+)
+
+# Durable subagent result body (#76; `specs/36-sub-agents.md` §10.11). Persists level-2
+# completion text for boot replay through the delivery-obligation ledger (W18).
+_MIGRATION_26: Final[tuple[str, ...]] = (
+    "ALTER TABLE subagent_runs ADD COLUMN result_body TEXT",
+    "ALTER TABLE subagent_runs ADD COLUMN result_delivered_at_ns INTEGER",
+)
+
+# Live per-run subagent transcripts (#77; `specs/36-sub-agents.md`). Stores the
+# workspace-relative JSONL path under ``subagents/transcripts/<run_id>.jsonl``.
+_MIGRATION_27: Final[tuple[str, ...]] = (
+    "ALTER TABLE subagent_runs ADD COLUMN transcript_path TEXT",
+)
+
+# Cron execution audit history (#85; `specs/30-non-interactive-triggers.md`).
+_MIGRATION_28: Final[tuple[str, ...]] = (
+    """CREATE TABLE IF NOT EXISTS cron_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id TEXT NOT NULL,
+    run_id TEXT NOT NULL,
+    claimed_at INTEGER NOT NULL,
+    completed_at INTEGER,
+    status TEXT NOT NULL
+        CHECK (status IN (
+            'claimed', 'running', 'ok', 'completed', 'failed', 'error',
+            'skipped', 'stale', 'recovered'
+        )),
+    transcript_path TEXT,
+    result_summary TEXT,
+    error TEXT
+)""",
+    "CREATE INDEX IF NOT EXISTS ix_cron_runs_job_claimed ON cron_runs(job_id, claimed_at DESC)",
+    "CREATE INDEX IF NOT EXISTS ix_cron_runs_run_id ON cron_runs(run_id, claimed_at DESC)",
+    """CREATE INDEX IF NOT EXISTS ix_cron_runs_in_flight
+    ON cron_runs(job_id, status)
+    WHERE completed_at IS NULL""",
+)
+
+# Session export audit metadata (#83; ``specs/03-storage.md``). Optional operator trail for
+# offline ``sevn sessions export`` runs — not required for export correctness.
+_MIGRATION_29: Final[tuple[str, ...]] = (
+    """CREATE TABLE IF NOT EXISTS session_export_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    export_id TEXT NOT NULL UNIQUE,
+    session_id TEXT,
+    channel TEXT,
+    profile TEXT,
+    since TEXT,
+    until TEXT,
+    formats TEXT NOT NULL,
+    output_path TEXT,
+    row_count INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL CHECK (status IN ('completed', 'failed')),
+    created_at TEXT NOT NULL,
+    error TEXT
+)""",
+    "CREATE INDEX IF NOT EXISTS ix_session_export_jobs_created ON session_export_jobs(created_at DESC)",
+)
+
 MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (1, _MIGRATION_1),
     (2, _MIGRATION_2),
@@ -573,6 +652,11 @@ MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (22, _MIGRATION_22),
     (23, _MIGRATION_23),
     (24, _MIGRATION_24),
+    (25, _MIGRATION_25),
+    (26, _MIGRATION_26),
+    (27, _MIGRATION_27),
+    (28, _MIGRATION_28),
+    (29, _MIGRATION_29),
 )
 
 MIGRATION_HEAD_VERSION: Final[int] = max(v for v, _ in MIGRATIONS)

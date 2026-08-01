@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own application persistence: connection setup (WAL, foreign keys), versioned
   migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence
   contracts for crash-resume and (w'
-last_updated: '2026-07-15'
-fingerprint: sha256:e137b7d914427fd13aa35a7b3326888c676fb1518e5948eefaad855c36678f55
+last_updated: '2026-07-30'
+fingerprint: sha256:fd0b7cbdcf542049178b7df814cd0a272357ff84239c8ac3ffbcd816501c8fa5
 related: []
 sources:
 - src/sevn/storage/**
@@ -28,6 +28,36 @@ interfaces:
 - name: D1StorageBackend
   file: src/sevn/storage/d1_backend.py
   symbol: D1StorageBackend
+- name: adapter_message_id_from_chunks
+  file: src/sevn/storage/delivery.py
+  symbol: adapter_message_id_from_chunks
+- name: confirm_delivery_after_send
+  file: src/sevn/storage/delivery.py
+  symbol: confirm_delivery_after_send
+- name: confirm_delivery_obligation
+  file: src/sevn/storage/delivery.py
+  symbol: confirm_delivery_obligation
+- name: count_open_obligations
+  file: src/sevn/storage/delivery.py
+  symbol: count_open_obligations
+- name: create_delivery_obligation
+  file: src/sevn/storage/delivery.py
+  symbol: create_delivery_obligation
+- name: fail_delivery_obligation
+  file: src/sevn/storage/delivery.py
+  symbol: fail_delivery_obligation
+- name: get_delivery_obligation
+  file: src/sevn/storage/delivery.py
+  symbol: get_delivery_obligation
+- name: hash_delivery_payload
+  file: src/sevn/storage/delivery.py
+  symbol: hash_delivery_payload
+- name: is_delivery_confirmed
+  file: src/sevn/storage/delivery.py
+  symbol: is_delivery_confirmed
+- name: reconcile_confirmed_obligation
+  file: src/sevn/storage/delivery.py
+  symbol: reconcile_confirmed_obligation
 - name: MigrationError
   file: src/sevn/storage/errors.py
   symbol: MigrationError
@@ -144,6 +174,38 @@ Document observable failure surfaces from the implementing modules (exceptions, 
 Adds `subagent_runs` table (migration 23) mirroring the in-memory registry for
 restart reconciliation, Mission Control recent history, and
 `sevn subagents list --all`. Boot orphan sweep marks stale `running` → `orphaned`.
+
+## Amendments (open-issues-sweep W18, #75)
+
+Adds `delivery_obligations` table (migration 25): a first-class delivery-obligation
+ledger with adapter-confirmed platform message ids. `ChannelRouter.route_outgoing`
+persists a pending obligation before `adapter.send` and confirms it on success;
+`sweep_outbound_retries` reconciles confirmed obligations without double-send when
+`gateway_messages.status` lags after a crash.
+
+## Amendments (open-issues-sweep W19, #76)
+
+Adds `subagent_runs.result_body` and `result_delivered_at_ns` (migration 26).
+Level-2 completion text is persisted at finish, delivered through the W18
+delivery-obligation ledger, and replayed on boot when a crash prevented announce-back.
+
+## Amendments (open-issues-sweep W20, #77)
+
+Adds `subagent_runs.transcript_path` (migration 27). Each run writes a tailable
+redacted JSONL transcript under `subagents/transcripts/<run_id>.jsonl` in the
+workspace content root; completion updates include the path for operators.
+
+## Amendments (open-issues-sweep W21, #85)
+
+Adds `cron_runs` table (migration 28): append-only audit rows at claim and
+completion, stale in-flight claims reconciled at gateway boot, and `overlap_policy`
+enforced in `cron_tick`. Recent history is exposed on Mission Control cron ops APIs.
+
+## Amendments (open-issues-sweep W22, #83)
+
+Adds `session_export_jobs` (migration 29) for optional offline export audit
+metadata. `sevn sessions export` gathers redacted history from SQLite,
+workspace session mirror JSONL, turn metadata, and turn bundles.
 
 ## Implemented by
 

@@ -7,8 +7,8 @@ owner: Alex
 summary: Provide durable trace sinks that implement TraceSink without ever throwing
   through emit, so instrumentation stays off the critical path. SQLite layout matches
   Mission Control query patterns (prd-07-mi
-last_updated: '2026-07-19'
-fingerprint: sha256:91152ca49d6747fc3349e041d9bd35c78365c0791ad351de90680fb9f24e8ff4
+last_updated: '2026-07-31'
+fingerprint: sha256:1bc9a6c5b932151f3eaf40fdc9d56f40bcb6ff8806b9c7b6c230cb777ff58774
 related: []
 sources:
 - src/sevn/agent/tracing/**
@@ -89,12 +89,18 @@ interfaces:
 - name: TraceRedactionPolicy
   file: src/sevn/agent/tracing/redacting_sink.py
   symbol: TraceRedactionPolicy
+- name: key_denied
+  file: src/sevn/agent/tracing/redacting_sink.py
+  symbol: key_denied
 - name: redact
   file: src/sevn/agent/tracing/redacting_sink.py
   symbol: redact
 - name: redact_attrs
   file: src/sevn/agent/tracing/redacting_sink.py
   symbol: redact_attrs
+- name: redact_text_value
+  file: src/sevn/agent/tracing/redacting_sink.py
+  symbol: redact_text_value
 - name: apply_trace_redaction_to_sevn_doc
   file: src/sevn/agent/tracing/redaction_config.py
   symbol: apply_trace_redaction_to_sevn_doc

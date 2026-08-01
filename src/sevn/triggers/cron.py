@@ -16,6 +16,7 @@ Exports:
     add_reminder — one-shot reminder row (cron at absolute datetime).
     register_cron_job_handler — bind a job_id to a sync handler (no magic forks).
     cron_tick — gateway lifespan hook (loads due jobs; dispatch is injected).
+    cron_tick_with_overlap_gate — :func:`cron_tick` with explicit overlap gate (tests).
 
 Issue-watch cron lives in :mod:`sevn.triggers.issue_watch_cron` (imported at boot).
 """
@@ -39,6 +40,12 @@ from loguru import logger
 
 from sevn.agent.tracing.sink import TraceEvent, TraceSink
 from sevn.config.workspace_config import WorkspaceConfig
+from sevn.triggers.cron_runs import (
+    complete_cron_run_event,
+    cron_has_in_flight_run,
+    insert_cron_run_event,
+    recover_stale_cron_claims,
+)
 from sevn.triggers.request import DeliveryMode, DispatchRequest, ResultChannel, RoutingMode
 
 # job_id → sync handler ``(*, workspace: Path) -> None`` (avoids magic forks in cron_tick).
@@ -1053,6 +1060,7 @@ async def cron_tick(
     content_root: Path,
     trace: TraceSink,
     dispatch: Callable[[DispatchRequest], Coroutine[Any, Any, None]],
+    overlap_gate: dict[str, Any] | None = None,
 ) -> None:
     """Load due cron rows, invoke ``dispatch`` for each, and bump schedules.
     When ``triggers.paused`` is set, emits ``trigger.paused`` and returns without work.
@@ -1062,6 +1070,7 @@ async def cron_tick(
         content_root (Path): Passed through to dispatch (inbox, secrets).
         trace (TraceSink): Gateway trace sink.
         dispatch (Callable): Async callable taking :class:`~sevn.triggers.request.DispatchRequest`.
+        overlap_gate (dict[str, Any] | None, optional): Test hook with ``in_flight`` bool.
     Examples:
         >>> import inspect
         >>> from sevn.triggers.cron import cron_tick
@@ -1086,6 +1095,7 @@ async def cron_tick(
         return
     now_ns = time.time_ns()
     due = cron_store.list_due(now_ns)
+    conn = cron_store._conn
 
     def _bump_schedule(*, job_id: str, cron_expr: str, tz_name: str, status: str) -> None:
         nxt = compute_next_fire_ns(
@@ -1100,22 +1110,88 @@ async def cron_tick(
             last_status=status,
         )
 
+    def _should_skip_overlap(*, job_id: str, overlap_policy: str) -> bool:
+        if overlap_policy != "skip":
+            return False
+        if overlap_gate is not None and overlap_gate.get("in_flight"):
+            return True
+        return cron_has_in_flight_run(conn, job_id)
+
+    def _record_claim(*, job_id: str, run_id: str, claimed_at: int) -> None:
+        insert_cron_run_event(
+            conn,
+            job_id=job_id,
+            run_id=run_id,
+            claimed_at=claimed_at,
+            status="running",
+        )
+
+    def _record_completion(
+        *,
+        job_id: str,
+        run_id: str,
+        claimed_at: int,
+        status: str,
+        result_summary: str | None = None,
+        error: str | None = None,
+    ) -> None:
+        complete_cron_run_event(
+            conn,
+            job_id=job_id,
+            run_id=run_id,
+            claimed_at=claimed_at,
+            status=status,
+            result_summary=result_summary,
+            error=error,
+        )
+
     for row in due:
         correlation_id = str(uuid.uuid4())
+        claimed_at = time.time_ns()
+        if _should_skip_overlap(job_id=row.job_id, overlap_policy=row.overlap_policy):
+            _record_completion(
+                job_id=row.job_id,
+                run_id=correlation_id,
+                claimed_at=claimed_at,
+                status="skipped",
+                result_summary="overlap_policy=skip",
+            )
+            _bump_schedule(
+                job_id=row.job_id,
+                cron_expr=row.cron_expr,
+                tz_name=row.timezone,
+                status="skipped",
+            )
+            continue
         handler = _CRON_JOB_HANDLERS.get(row.job_id)
         if handler is not None:
+            _record_claim(job_id=row.job_id, run_id=correlation_id, claimed_at=claimed_at)
             try:
                 # Sync handlers (e.g. issue-watch ``gh`` / subprocess) must not
                 # block the gateway event loop.
                 await asyncio.to_thread(handler, workspace=content_root)
+                _record_completion(
+                    job_id=row.job_id,
+                    run_id=correlation_id,
+                    claimed_at=claimed_at,
+                    status="ok",
+                    result_summary="handler_completed",
+                )
                 _bump_schedule(
                     job_id=row.job_id,
                     cron_expr=row.cron_expr,
                     tz_name=row.timezone,
                     status="ok",
                 )
-            except Exception:
+            except Exception as exc:
                 logger.exception("cron_handler_failed job_id={}", row.job_id)
+                _record_completion(
+                    job_id=row.job_id,
+                    run_id=correlation_id,
+                    claimed_at=claimed_at,
+                    status="failed",
+                    error=str(exc)[:500],
+                )
                 _bump_schedule(
                     job_id=row.job_id,
                     cron_expr=row.cron_expr,
@@ -1131,9 +1207,9 @@ async def cron_tick(
         prompt = row.payload_template or f"cron job {row.job_id}"
         req = DispatchRequest(
             prompt=prompt,
-            routing_mode=row.routing_mode,
-            delivery_mode=row.delivery_mode,
-            permission_template_ref=row.permission_template_ref,
+            routing_mode=_normalize_routing_mode(str(row.routing_mode)),
+            delivery_mode=_normalize_delivery_mode(str(row.delivery_mode)),
+            permission_template_ref=str(row.permission_template_ref or "default"),
             allow_tier_cd=row.allow_tier_cd,
             result_channel=rc,
             correlation_id=correlation_id,
@@ -1145,19 +1221,90 @@ async def cron_tick(
             },
             notify_template=row.payload_template if row.delivery_mode == "notify_only" else None,
         )
+        _record_claim(job_id=row.job_id, run_id=correlation_id, claimed_at=claimed_at)
         try:
             await asyncio.wait_for(dispatch(req), timeout=600.0)
+            _record_completion(
+                job_id=row.job_id,
+                run_id=correlation_id,
+                claimed_at=claimed_at,
+                status="ok",
+                result_summary="dispatch_completed",
+            )
             _bump_schedule(
                 job_id=row.job_id,
                 cron_expr=row.cron_expr,
                 tz_name=row.timezone,
                 status="ok",
             )
-        except Exception:
+        except Exception as exc:
             logger.exception("cron_job_dispatch_failed job_id={}", row.job_id)
+            _record_completion(
+                job_id=row.job_id,
+                run_id=correlation_id,
+                claimed_at=claimed_at,
+                status="failed",
+                error=str(exc)[:500],
+            )
             _bump_schedule(
                 job_id=row.job_id,
                 cron_expr=row.cron_expr,
                 tz_name=row.timezone,
                 status="error",
             )
+
+
+async def cron_tick_with_overlap_gate(
+    *,
+    cron_store: SqliteCronStore,
+    workspace: WorkspaceConfig,
+    content_root: Path,
+    trace: TraceSink,
+    dispatch: Callable[[DispatchRequest], Coroutine[Any, Any, None]],
+    overlap_gate: dict[str, Any] | None = None,
+) -> None:
+    """Run :func:`cron_tick` with an explicit overlap gate (tests and tooling).
+
+    Args:
+        cron_store (SqliteCronStore): Persistence for ``trigger_cron_jobs``.
+        workspace (WorkspaceConfig): Workspace (pause flag).
+        content_root (Path): Passed through to dispatch (inbox, secrets).
+        trace (TraceSink): Gateway trace sink.
+        dispatch (Callable): Async dispatch callable.
+        overlap_gate (dict[str, Any] | None, optional): When ``in_flight`` is true and
+            ``overlap_policy`` is ``skip``, dispatch is suppressed.
+
+    Examples:
+        >>> import inspect
+        >>> from sevn.triggers.cron import cron_tick_with_overlap_gate
+        >>> inspect.iscoroutinefunction(cron_tick_with_overlap_gate)
+        True
+    """
+    await cron_tick(
+        cron_store=cron_store,
+        workspace=workspace,
+        content_root=content_root,
+        trace=trace,
+        dispatch=dispatch,
+        overlap_gate=overlap_gate,
+    )
+
+
+__all__ = [
+    "CronJobDetail",
+    "CronJobRow",
+    "SqliteCronStore",
+    "add_cron_job",
+    "add_reminder",
+    "compute_next_fire_ns",
+    "cron_job_to_dict",
+    "cron_job_to_list_dict",
+    "cron_tick",
+    "cron_tick_with_overlap_gate",
+    "delete_cron_job",
+    "edit_cron_job",
+    "format_next_fire_at_iso",
+    "list_cron_jobs",
+    "recover_stale_cron_claims",
+    "register_cron_job_handler",
+]

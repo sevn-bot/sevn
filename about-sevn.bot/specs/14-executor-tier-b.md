@@ -8,7 +8,7 @@ summary: 'Tier B is the default “do work” executor for messages the Triager 
   as complexity == B (prd-04-getting-things-done §5.2): a single pydantic-ai Agent
   loop over the user’s incoming_text, with t'
 last_updated: '2026-08-01'
-fingerprint: sha256:d8a335b3594483d5ddf400dd81ccd4c8054bfe2cb5604560088275bad746a4f0
+fingerprint: sha256:92adce15f63479b51e9aaeedda058b7293b00ac0d8a0b91d22ab2ca4ccf233a9
 related: []
 sources:
 - src/sevn/agent/**
@@ -982,12 +982,21 @@ interfaces:
 - name: list_recent_subagent_runs
   file: src/sevn/agent/subagents/storage.py
   symbol: list_recent_subagent_runs
+- name: load_subagent_result_body
+  file: src/sevn/agent/subagents/storage.py
+  symbol: load_subagent_result_body
+- name: mark_subagent_result_delivered
+  file: src/sevn/agent/subagents/storage.py
+  symbol: mark_subagent_result_delivered
 - name: persist_subagent_run
   file: src/sevn/agent/subagents/storage.py
   symbol: persist_subagent_run
 - name: prune_subagent_runs
   file: src/sevn/agent/subagents/storage.py
   symbol: prune_subagent_runs
+- name: restore_pending_subagent_deliveries
+  file: src/sevn/agent/subagents/storage.py
+  symbol: restore_pending_subagent_deliveries
 - name: sqlite_persist_hook
   file: src/sevn/agent/subagents/storage.py
   symbol: sqlite_persist_hook
@@ -1003,6 +1012,18 @@ interfaces:
 - name: SubAgentSupervisor
   file: src/sevn/agent/subagents/supervisor.py
   symbol: SubAgentSupervisor
+- name: SubagentTranscriptWriter
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: SubagentTranscriptWriter
+- name: load_subagent_transcript_path
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: load_subagent_transcript_path
+- name: transcript_path_for_run
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: transcript_path_for_run
+- name: transcript_relpath_for_run
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: transcript_relpath_for_run
 - name: TemplateEntry
   file: src/sevn/agent/templates/registry.py
   symbol: TemplateEntry
@@ -1081,12 +1102,18 @@ interfaces:
 - name: TraceRedactionPolicy
   file: src/sevn/agent/tracing/redacting_sink.py
   symbol: TraceRedactionPolicy
+- name: key_denied
+  file: src/sevn/agent/tracing/redacting_sink.py
+  symbol: key_denied
 - name: redact
   file: src/sevn/agent/tracing/redacting_sink.py
   symbol: redact
 - name: redact_attrs
   file: src/sevn/agent/tracing/redacting_sink.py
   symbol: redact_attrs
+- name: redact_text_value
+  file: src/sevn/agent/tracing/redacting_sink.py
+  symbol: redact_text_value
 - name: apply_trace_redaction_to_sevn_doc
   file: src/sevn/agent/tracing/redaction_config.py
   symbol: apply_trace_redaction_to_sevn_doc
@@ -1513,8 +1540,3 @@ Tier B runs on **pydantic-ai** `>=2.14.1,<3` (resolved 2.20.0) and **pydantic-ai
 - **Model transport:** OpenAI Chat Completions `FunctionModel` bridge + MiniMax wrapper migrated in place (`tier_b_model.py`); provider-prefixed model names via `normalize_tier_b_model_name`.
 - **Lazy tools:** `PrepareTools(prepare_lazy_tool_definitions)` + `SevnRegistryToolset` re-entry through `ToolExecutor.dispatch`.
 - **Deferred (see §10.1–10.2):** harness `SubAgents`, `DynamicWorkflow`, `Memory`.
-
-### 10.8 open-issues-sweep W9/W11 — turn overlays — append-only
-
-- **Model + prompt (W9 / #86):** tier-B model id comes from ``resolve_model_slot_for_turn``; channel/topic/routing-profile system prompts merge through ``resolve_turn_prompt_overlays`` → ``extra_instructions`` / ``tier_b_system_prompt_builders`` — no parallel prompt path.
-- **Reasoning effort (W11 / #89):** ``resolve_thinking_effort`` and ``build_web_thinking_extra_capabilities`` honor an explicitly configured ``reasoning.effort`` and route-level overlays; ``resolve_reasoning_for_turn`` applies provider-capability gating before the wire body reaches ``tier_b_model`` / MiniMax wrapper.

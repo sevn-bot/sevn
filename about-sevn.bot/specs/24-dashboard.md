@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver Mission Control: a same-process dashboard (prd-07-mission-control)
   so the owner can inspect traces, costs, provider health, in-flight runs, proxy status,
   and config without opening SQLite from'
-last_updated: '2026-07-31'
-fingerprint: sha256:0f799a68bf271c141e55dd03de5cf616f86ae1c77b1492717e827dd74536dde4
+last_updated: '2026-08-01'
+fingerprint: sha256:c5534787fb3c8ac8217cef58c78f663e507cc0fd80258163b902f452f108180f
 related: []
 sources:
 - src/sevn/ui/**
@@ -312,6 +312,9 @@ interfaces:
 - name: cron_jobs_list
   file: src/sevn/ui/dashboard/api/ops.py
   symbol: cron_jobs_list
+- name: cron_runs_list
+  file: src/sevn/ui/dashboard/api/ops.py
+  symbol: cron_runs_list
 - name: mission_subagent_kill
   file: src/sevn/ui/dashboard/api/ops.py
   symbol: mission_subagent_kill
@@ -723,6 +726,9 @@ interfaces:
 - name: cron_job_payload
   file: src/sevn/ui/dashboard/services/ops_control.py
   symbol: cron_job_payload
+- name: cron_runs_payload
+  file: src/sevn/ui/dashboard/services/ops_control.py
+  symbol: cron_runs_payload
 - name: daemon_control
   file: src/sevn/ui/dashboard/services/ops_control.py
   symbol: daemon_control

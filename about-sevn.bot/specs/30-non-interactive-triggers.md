@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver non-interactive dispatch: external events (“something happened”)
   and schedules (“tick”) compile to DispatchRequest, optionally pass through notify_only
   (zero LLM, zero sandbox boot), otherwise'
-last_updated: '2026-07-31'
-fingerprint: sha256:de4a492f2fbe966907a9ffda8d0755817295aa34922d2fc6b2f5767c04a5a59e
+last_updated: '2026-08-01'
+fingerprint: sha256:5cb1679d572735f927bfa4f524738ea44d8d4e26c93e563b4cb641516f386a2f
 related: []
 sources:
 - src/sevn/triggers/**
@@ -85,6 +85,9 @@ interfaces:
 - name: cron_tick
   file: src/sevn/triggers/cron.py
   symbol: cron_tick
+- name: cron_tick_with_overlap_gate
+  file: src/sevn/triggers/cron.py
+  symbol: cron_tick_with_overlap_gate
 - name: delete_cron_job
   file: src/sevn/triggers/cron.py
   symbol: delete_cron_job
@@ -100,6 +103,27 @@ interfaces:
 - name: register_cron_job_handler
   file: src/sevn/triggers/cron.py
   symbol: register_cron_job_handler
+- name: reconcile_stale_cron_claims
+  file: src/sevn/triggers/cron_boot.py
+  symbol: reconcile_stale_cron_claims
+- name: complete_cron_run_event
+  file: src/sevn/triggers/cron_runs.py
+  symbol: complete_cron_run_event
+- name: cron_has_in_flight_run
+  file: src/sevn/triggers/cron_runs.py
+  symbol: cron_has_in_flight_run
+- name: cron_run_to_dict
+  file: src/sevn/triggers/cron_runs.py
+  symbol: cron_run_to_dict
+- name: insert_cron_run_event
+  file: src/sevn/triggers/cron_runs.py
+  symbol: insert_cron_run_event
+- name: list_recent_cron_runs
+  file: src/sevn/triggers/cron_runs.py
+  symbol: list_recent_cron_runs
+- name: recover_stale_cron_claims
+  file: src/sevn/triggers/cron_runs.py
+  symbol: recover_stale_cron_claims
 - name: prune_webhook_dedupe_expired
   file: src/sevn/triggers/dedupe.py
   symbol: prune_webhook_dedupe_expired
@@ -286,13 +310,13 @@ Trace control flow starting from the load-bearing symbols in **Implemented by** 
 | `tests/gateway/test_lifecycle_w1_red.py` | `cron_tick` → `_CRON_JOB_HANDLERS` + operator-notify → `route_outgoing` |
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
 
-## Amendments (open-issues-sweep W24, #81)
+## Amendments (open-issues-sweep W21, #85)
 
-Signed provider webhooks (`/webhook/github`) verify HMAC then
-`verify_github_webhook_freshness` on optional `X-Hub-Signature-Timestamp`
-(`DEFAULT_SIGNED_WEBHOOK_MAX_SKEW_SECONDS`, 300 s). Stale timestamps return
-**401**; delivery-id dedupe remains the second replay layer. Webhook agent-pass
-dispatch binds `bind_webhook_minimal_host_env()` for subprocess env redaction.
+Adds `cron_runs` audit history (migration 28): `cron_tick` writes claim and
+completion rows, gateway boot reconciles stale in-flight claims via
+`cron_boot.reconcile_stale_cron_claims`, and `overlap_policy` (`skip`|`queue`|`allow`)
+is enforced before dispatch. Mission Control exposes recent runs on
+`GET /api/v1/cron/runs` and `recent_runs` in the cron ops payload.
 
 ## Human-input needed
 

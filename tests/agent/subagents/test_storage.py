@@ -5,6 +5,8 @@ from __future__ import annotations
 import sqlite3
 from typing import TYPE_CHECKING
 
+import pytest
+
 from sevn.agent.subagents.models import SubAgentRun, SubAgentStatus
 from sevn.agent.subagents.registry import SubAgentRegistry
 from sevn.agent.subagents.storage import (
@@ -16,7 +18,6 @@ from sevn.agent.subagents.storage import (
 from sevn.storage.migrate import apply_migrations
 
 if TYPE_CHECKING:
-    import pytest
     from loguru import Message
 
 
@@ -167,7 +168,7 @@ def test_persist_subagent_run_success_emits_no_error_log() -> None:
 
 
 def test_persist_subagent_run_sqlite_error_logged_once() -> None:
-    """D1: real SQL failures log once via ``sqlite3.Error`` — not bare ``Exception`` spam."""
+    """D1: real SQL failures log once via ``sqlite3.Error`` then propagate."""
     from loguru import logger as loguru_logger
 
     conn = _migrated_conn()
@@ -175,7 +176,8 @@ def test_persist_subagent_run_sqlite_error_logged_once() -> None:
     captured, sink_id = _capture_loguru(level="ERROR")
     conn.close()
     try:
-        persist_subagent_run(conn, run)
+        with pytest.raises(sqlite3.ProgrammingError):
+            persist_subagent_run(conn, run)
     finally:
         loguru_logger.remove(sink_id)
     assert len(captured) == 1

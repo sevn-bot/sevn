@@ -58,7 +58,7 @@ _OUTBOUND_CAPTURE_SINK: ContextVar[list[str] | None] = ContextVar(
 class _OutboundCaptureState:
     """Refcounted ``route_outgoing`` wrapper state for one router (finding-7)."""
 
-    original: Callable[[Any], Awaitable[None]]
+    original: Callable[[Any], Awaitable[object | None]]
     depth: int = 0
 
 

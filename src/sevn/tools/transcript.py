@@ -13,6 +13,7 @@ Depends: sevn.tools.base, sevn.tools.context, sevn.tools.decorator,
 Exports:
     history_tool — ``@sevn_tool`` gateway session history (inline bounded rows).
     read_transcript_tool — ``@sevn_tool`` JSONL transcript reader for the active session.
+    read_subagent_transcript — run-scoped sub-agent JSONL tail reader (#77).
 """
 
 from __future__ import annotations
@@ -861,4 +862,62 @@ async def read_transcript_tool(
     return enveloped_success(result)
 
 
-__all__ = ["history_tool", "read_transcript_tool"]
+def read_subagent_transcript(
+    *,
+    content_root: Path,
+    run_id: str,
+    tail_lines: int = 20,
+) -> str:
+    """Return the trailing lines from one sub-agent run transcript file (#77).
+
+    Args:
+        content_root (Path): Workspace content root.
+        run_id (str): Target sub-agent run id.
+        tail_lines (int): Maximum trailing lines to return.
+
+    Returns:
+        str: Redacted transcript tail text (may be empty when missing).
+
+    Examples:
+        >>> from pathlib import Path
+        >>> from sevn.agent.subagents.models import SubAgentRun, SubAgentStatus
+        >>> from sevn.agent.subagents.transcript import SubagentTranscriptWriter
+        >>> from sevn.tools.transcript import read_subagent_transcript
+        >>> root = Path("/tmp/ws-example")
+        >>> run = SubAgentRun(
+        ...     id="run-t1", level=2, role="tier_b", specialist=None, parent_id="p1",
+        ...     session_id="s", channel="c", task_summary="t",
+        ...     status=SubAgentStatus.RUNNING, started_at=1, finished_at=None, trace_id=None,
+        ... )
+        >>> writer = SubagentTranscriptWriter(content_root=root, run=run)
+        >>> writer.append_summary("visible summary")
+        >>> "visible summary" in read_subagent_transcript(content_root=root, run_id=run.id)
+        True
+    """
+    from sevn.agent.subagents.models import SubAgentRun, SubAgentStatus
+
+    stub = SubAgentRun(
+        id=run_id,
+        level=2,
+        role="tier_b",
+        specialist=None,
+        parent_id=None,
+        session_id="",
+        channel="",
+        task_summary="",
+        status=SubAgentStatus.RUNNING,
+        started_at=0,
+        finished_at=None,
+        trace_id=None,
+    )
+    path = (content_root / "subagents" / "transcripts" / f"{stub.id}.jsonl").resolve()
+    if not path.is_file():
+        return ""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if tail_lines <= 0:
+        return ""
+    tail = lines[-tail_lines:]
+    return "\n".join(tail)
+
+
+__all__ = ["history_tool", "read_subagent_transcript", "read_transcript_tool"]

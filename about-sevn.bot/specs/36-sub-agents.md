@@ -7,8 +7,8 @@ owner: Alex
 summary: Level-1 sub-agents (tracked, concurrent, killable role runs) that may spawn
   level-2 workers (incl. specialists); multi queue mode; limits, tracing, kill surfaces,
   media_generation skill.
-last_updated: '2026-07-30'
-fingerprint: sha256:79b48623733460c8c6611717d94442952744a5ae7b4a448c617ea4b7078f2419
+last_updated: '2026-08-01'
+fingerprint: sha256:557f851553fa29340018d542b3e97a5c2055f4b9062170e73ef9f799b70aea03
 related: []
 sources:
 - src/sevn/agent/subagents/**
@@ -173,12 +173,21 @@ interfaces:
 - name: list_recent_subagent_runs
   file: src/sevn/agent/subagents/storage.py
   symbol: list_recent_subagent_runs
+- name: load_subagent_result_body
+  file: src/sevn/agent/subagents/storage.py
+  symbol: load_subagent_result_body
+- name: mark_subagent_result_delivered
+  file: src/sevn/agent/subagents/storage.py
+  symbol: mark_subagent_result_delivered
 - name: persist_subagent_run
   file: src/sevn/agent/subagents/storage.py
   symbol: persist_subagent_run
 - name: prune_subagent_runs
   file: src/sevn/agent/subagents/storage.py
   symbol: prune_subagent_runs
+- name: restore_pending_subagent_deliveries
+  file: src/sevn/agent/subagents/storage.py
+  symbol: restore_pending_subagent_deliveries
 - name: sqlite_persist_hook
   file: src/sevn/agent/subagents/storage.py
   symbol: sqlite_persist_hook
@@ -194,6 +203,18 @@ interfaces:
 - name: SubAgentSupervisor
   file: src/sevn/agent/subagents/supervisor.py
   symbol: SubAgentSupervisor
+- name: SubagentTranscriptWriter
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: SubagentTranscriptWriter
+- name: load_subagent_transcript_path
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: load_subagent_transcript_path
+- name: transcript_path_for_run
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: transcript_path_for_run
+- name: transcript_relpath_for_run
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: transcript_relpath_for_run
 - name: register
   file: src/sevn/cli/commands/subagents_cmd.py
   symbol: register
@@ -588,3 +609,11 @@ Docs gate: `make subagents-chart-check` (deterministic SVG); `make ci-docs`.
 - [x] TwexAPI X-only guard + browser CDP plan return path (2026-07-15 ✅: worker + `src/sevn/integrations/twexapi/`)
 - [x] Telegram `/config → Skills → Social Media Manager` menu (2026-07-15 ✅: `src/sevn/gateway/menu/social_media_manager_menu.py`)
 - [x] Bundled skill + onboarding opt-in (`default: false`) + normative docs (2026-07-15 ✅: W5 spec/PRD/SKILL/onboarding)
+
+### 10.11 Durable background subagent results — append-only
+
+- [x] Persist level-2 completion text in `subagent_runs.result_body` (migration 26); write at finish in `SubAgentSupervisor._announce`; deliver through W18 ledger; boot replay via `restore_pending_subagent_deliveries` (#76, open-issues-sweep W19) (2026-07-30 ✅: cbce9bf9)
+
+### 10.12 Live subagent transcripts — append-only
+
+- [x] Persist workspace-relative transcript path in `subagent_runs.transcript_path` (migration 27); append redacted JSONL events via `SubagentTranscriptWriter`; specialist workers write through `_specialist_worker_body`; parent announce-back reports location via `format_transcript_reference`; run-scoped reads via `read_subagent_transcript` (#77, open-issues-sweep W20) (2026-07-30 ✅: a533a686)

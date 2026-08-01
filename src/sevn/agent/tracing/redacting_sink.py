@@ -4,7 +4,9 @@ Module: sevn.agent.tracing.redacting_sink
 Depends: copy, dataclasses, re, sevn.agent.tracing.sink, sevn.config.defaults
 Exports:
     TraceRedactionPolicy — deny-key and pattern rules for one emit pass.
+    key_denied — public deny-key matcher for export redaction.
     redact_attrs — redact one attrs mapping without building a ``TraceEvent``.
+    redact_text_value — redact one text blob with a configurable placeholder.
     redact — return a copy of ``TraceEvent`` with redacted ``attrs``.
     RedactingSink — ``TraceSink`` decorator that redacts once then delegates.
 Examples:
@@ -42,11 +44,14 @@ from sevn.config.defaults import (
     DEFAULT_TRACE_REDACTION_DENY_VALUE_PATTERNS,
     DEFAULT_TRACE_REDACTION_ENABLED,
 )
+from sevn.logging.log_redact import redact_log_line
 
 if TYPE_CHECKING:
     from sevn.agent.tracing.sink import TraceEvent, TraceSink
 
 _REDACTED = "<redacted>"
+_SK_TOKEN_PATTERN = re.compile(r"sk-[A-Za-z0-9-]{8,}")
+_GHP_TOKEN_PATTERN = re.compile(r"ghp_[A-Za-z0-9]{20,}")
 
 
 @dataclass(frozen=True)
@@ -90,6 +95,23 @@ class TraceRedactionPolicy:
             deny_value_patterns=DEFAULT_TRACE_REDACTION_DENY_VALUE_PATTERNS,
             _compiled_patterns=(),
         )
+
+
+def key_denied(key: object, deny_keys: tuple[str, ...]) -> bool:
+    """Return whether ``key`` matches any deny-list substring.
+
+    Args:
+        key (object): Attribute or metadata key name.
+        deny_keys (tuple[str, ...]): Lowercase substrings to match.
+
+    Returns:
+        bool: ``True`` when the key should be redacted.
+
+    Examples:
+        >>> key_denied("api_key", ("api_key",))
+        True
+    """
+    return _key_denied(key, deny_keys)
 
 
 def _key_denied(key: object, deny_keys: tuple[str, ...]) -> bool:
@@ -154,6 +176,43 @@ def _redact_mapping(attrs: dict[str, object], policy: TraceRedactionPolicy) -> d
         else:
             out[str(key)] = _redact_value(value, policy)
     return out
+
+
+def redact_text_value(
+    text: str,
+    policy: TraceRedactionPolicy,
+    *,
+    placeholder: str = _REDACTED,
+) -> str:
+    """Apply log-line and trace-pattern redaction to one text blob.
+
+    Args:
+        text (str): Raw operator/model text.
+        policy (TraceRedactionPolicy): Active redaction rules.
+        placeholder (str): Replacement string for matched secrets.
+
+    Returns:
+        str: Redacted text safe for persistence or export.
+
+    Examples:
+        >>> policy = TraceRedactionPolicy.from_defaults()
+        >>> redact_text_value("token=abc123", policy)
+        '<redacted>'
+    """
+    line = text
+    for _ in range(3):
+        next_line = redact_log_line(line).replace("<redacted>", placeholder)
+        if next_line == line:
+            break
+        line = next_line
+    if policy.enabled:
+        for pattern in policy._compiled_patterns:
+            line = pattern.sub(placeholder, line)
+        line = _SK_TOKEN_PATTERN.sub(placeholder, line)
+        line = _GHP_TOKEN_PATTERN.sub(placeholder, line)
+        redacted = redact_attrs({"text": line}, policy)
+        line = str(redacted.get("text", line)).replace("<redacted>", placeholder)
+    return line
 
 
 def redact_attrs(attrs: dict[str, object], policy: TraceRedactionPolicy) -> dict[str, object]:
@@ -268,4 +327,11 @@ class RedactingSink:
         await self._inner.close()
 
 
-__all__ = ["RedactingSink", "TraceRedactionPolicy", "redact", "redact_attrs"]
+__all__ = [
+    "RedactingSink",
+    "TraceRedactionPolicy",
+    "key_denied",
+    "redact",
+    "redact_attrs",
+    "redact_text_value",
+]

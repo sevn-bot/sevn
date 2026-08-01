@@ -8,7 +8,7 @@ summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–�
   a single, tool-less outbound generation step that emits validated TriageResult consumed
   by tier dispatch (A / B / C / D), MCP e'
 last_updated: '2026-08-01'
-fingerprint: sha256:d8a335b3594483d5ddf400dd81ccd4c8054bfe2cb5604560088275bad746a4f0
+fingerprint: sha256:92adce15f63479b51e9aaeedda058b7293b00ac0d8a0b91d22ab2ca4ccf233a9
 related: []
 sources:
 - src/sevn/agent/**
@@ -980,12 +980,21 @@ interfaces:
 - name: list_recent_subagent_runs
   file: src/sevn/agent/subagents/storage.py
   symbol: list_recent_subagent_runs
+- name: load_subagent_result_body
+  file: src/sevn/agent/subagents/storage.py
+  symbol: load_subagent_result_body
+- name: mark_subagent_result_delivered
+  file: src/sevn/agent/subagents/storage.py
+  symbol: mark_subagent_result_delivered
 - name: persist_subagent_run
   file: src/sevn/agent/subagents/storage.py
   symbol: persist_subagent_run
 - name: prune_subagent_runs
   file: src/sevn/agent/subagents/storage.py
   symbol: prune_subagent_runs
+- name: restore_pending_subagent_deliveries
+  file: src/sevn/agent/subagents/storage.py
+  symbol: restore_pending_subagent_deliveries
 - name: sqlite_persist_hook
   file: src/sevn/agent/subagents/storage.py
   symbol: sqlite_persist_hook
@@ -1001,6 +1010,18 @@ interfaces:
 - name: SubAgentSupervisor
   file: src/sevn/agent/subagents/supervisor.py
   symbol: SubAgentSupervisor
+- name: SubagentTranscriptWriter
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: SubagentTranscriptWriter
+- name: load_subagent_transcript_path
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: load_subagent_transcript_path
+- name: transcript_path_for_run
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: transcript_path_for_run
+- name: transcript_relpath_for_run
+  file: src/sevn/agent/subagents/transcript.py
+  symbol: transcript_relpath_for_run
 - name: TemplateEntry
   file: src/sevn/agent/templates/registry.py
   symbol: TemplateEntry
@@ -1079,12 +1100,18 @@ interfaces:
 - name: TraceRedactionPolicy
   file: src/sevn/agent/tracing/redacting_sink.py
   symbol: TraceRedactionPolicy
+- name: key_denied
+  file: src/sevn/agent/tracing/redacting_sink.py
+  symbol: key_denied
 - name: redact
   file: src/sevn/agent/tracing/redacting_sink.py
   symbol: redact
 - name: redact_attrs
   file: src/sevn/agent/tracing/redacting_sink.py
   symbol: redact_attrs
+- name: redact_text_value
+  file: src/sevn/agent/tracing/redacting_sink.py
+  symbol: redact_text_value
 - name: apply_trace_redaction_to_sevn_doc
   file: src/sevn/agent/tracing/redaction_config.py
   symbol: apply_trace_redaction_to_sevn_doc
@@ -1470,7 +1497,3 @@ The triager adapter runs on the same **pydantic-ai v2** stack as tier B (monty-0
 ### 10.3 open-issues-sweep W7 — classifier-timeout spawn notice — append-only
 
 On relatedness classifier timeout in ``multi`` queue mode, ``classify_relatedness`` returns ``new_task`` with ``fallback=True`` (D15). The gateway spawns a concurrent L1 tier-B turn and preserves dispatch routing extras — but does **not** emit a user-facing timeout notice on the in-flight turn's bubble or as a standalone assistant row (#70). Operators diagnose the fallback via ``gateway.queue_classifier_timeout_spawned`` (prior/new turn ids, ``timeout_s``, ``routing_action``) plus the existing ``relatedness_classifier_timeout`` log from ``classify_relatedness``.
-
-### 10.4 open-issues-sweep W11 — triager excludes reasoning wire — append-only
-
-When reasoning-effort routing is enabled workspace-wide (**#89**), ``resolve_reasoning_for_turn("triager", …)`` always returns ``None`` — the triager never sends thinking/reasoning wire parameters regardless of channel, profile, or ``LLM_params_config.json`` effort settings. Channel-aware model resolution still applies via ``resolve_model_slot_for_turn`` at the triager read site.

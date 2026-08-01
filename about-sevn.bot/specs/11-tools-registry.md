@@ -8,7 +8,7 @@ summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that eve
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
 last_updated: '2026-08-01'
-fingerprint: sha256:858bb5689d3c9341849ce49564af16e7d098b47bbdab9fb117e53282ec717d7c
+fingerprint: sha256:e6e90434d4162f106513af12a3caad4262964fb1a54a2c2ab085e09b91da4a5a
 related: []
 sources:
 - src/sevn/tools/**
@@ -473,6 +473,9 @@ interfaces:
 - name: history_tool
   file: src/sevn/tools/transcript.py
   symbol: history_tool
+- name: read_subagent_transcript
+  file: src/sevn/tools/transcript.py
+  symbol: read_subagent_transcript
 - name: read_transcript_tool
   file: src/sevn/tools/transcript.py
   symbol: read_transcript_tool
@@ -615,11 +618,3 @@ reusing ``TelegramWeb`` inline-keyboard primitives. Destructive menu rows are de
 **Skills (W5):** Tier B exposes operator skills as harness deferred `Skills` capabilities (`tier_b_skills.build_tier_b_skill_capabilities`). Triager-named skill ids scope the include list; each `SKILL.md` is staged to an ephemeral `.sevn-harness-skills/` tree with frontmatter preserved. Script dispatch stays on `sevn_run_skill_script` → `ToolExecutor.dispatch` (same registry contract as native tools).
 
 **CodeMode (W3/W7):** Registry tools marked `code_mode=True` are eligible for the Monty `run_code` sandbox when triage enables CodeMode. Host-side tool calls from sandboxed snippets re-enter `ToolExecutor.dispatch` via the harness function catalog. `SevnAsyncCodeMode` is the tier-B backend; Monty `ResourceLimits` are injected at pool checkout (`_monty_limits.py`, D5/D6). Opt-in `dynamic_catalog` (default off, D9) keeps the `run_code` tool definition byte-stable across lazy tool discovery.
-
-### 10.2 open-issues-sweep W15 — discovery cache + registry_version — append-only
-
-Skill discovery cache invalidation reuses the existing registry fingerprint machinery:
-``_registry_fingerprint_lines`` + ``_sha256_lines`` + ``_bump_if_changed`` drive
-``LoadedBodyCache`` invalidation keyed by ``registry_version``. The W15 on-disk cache stores
-``registry_seq`` and rejects warm hits when the global tool/schema version bumps, keeping
-callable-tool rows consistent with the live ``ToolSet``.

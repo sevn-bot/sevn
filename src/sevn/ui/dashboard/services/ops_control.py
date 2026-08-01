@@ -23,6 +23,7 @@ Exports:
     uninstall_user_skill — remove skills/user/<name>/ only.
     set_user_skill_quarantine — enable/disable user skill via quarantine flag.
     cron_job_payload — cron list response builder.
+    cron_runs_payload — cron audit history response builder.
 """
 
 from __future__ import annotations
@@ -68,6 +69,13 @@ from sevn.triggers.cron import (
     compute_next_fire_ns,
     cron_job_to_dict,
     list_cron_jobs,
+)
+from sevn.triggers.cron_runs import (
+    complete_cron_run_event,
+    cron_has_in_flight_run,
+    cron_run_to_dict,
+    insert_cron_run_event,
+    list_recent_cron_runs,
 )
 from sevn.triggers.request import DispatchRequest, ResultChannel
 from sevn.ui.dashboard.services.mission_audit import emit_mission_audit
@@ -499,6 +507,28 @@ async def dispatch_cron_job_now(request: Request, *, job_id: str) -> dict[str, o
     except Exception:
         rc = ResultChannel(kind="LOG")
     correlation_id = str(uuid.uuid4())
+    claimed_at = time.time_ns()
+    if row.overlap_policy == "skip" and cron_has_in_flight_run(conn, row.job_id):
+        complete_cron_run_event(
+            conn,
+            job_id=row.job_id,
+            run_id=correlation_id,
+            claimed_at=claimed_at,
+            status="skipped",
+            result_summary="overlap_policy=skip",
+        )
+        return {
+            "correlation_id": correlation_id,
+            "status": "skipped",
+            "reason": "overlap_policy=skip",
+        }
+    insert_cron_run_event(
+        conn,
+        job_id=row.job_id,
+        run_id=correlation_id,
+        claimed_at=claimed_at,
+        status="running",
+    )
     prompt = row.payload_template or f"cron job {row.job_id}"
     req = DispatchRequest(
         prompt=prompt,
@@ -517,7 +547,26 @@ async def dispatch_cron_job_now(request: Request, *, job_id: str) -> dict[str, o
         notify_template=row.payload_template if row.delivery_mode == "notify_only" else None,
     )
     trace = getattr(request.app.state, "gateway_trace", None)
-    await asyncio.wait_for(dispatch_fn(req), timeout=600.0)
+    try:
+        await asyncio.wait_for(dispatch_fn(req), timeout=600.0)
+    except Exception as exc:
+        complete_cron_run_event(
+            conn,
+            job_id=row.job_id,
+            run_id=correlation_id,
+            claimed_at=claimed_at,
+            status="failed",
+            error=str(exc)[:500],
+        )
+        raise
+    complete_cron_run_event(
+        conn,
+        job_id=row.job_id,
+        run_id=correlation_id,
+        claimed_at=claimed_at,
+        status="ok",
+        result_summary="manual_dispatch_completed",
+    )
     nxt = compute_next_fire_ns(
         cron_expr=row.cron_expr,
         tz_name=row.timezone,
@@ -781,7 +830,7 @@ def cron_job_payload(conn: Any, ws: WorkspaceConfig) -> dict[str, object]:
         ws (WorkspaceConfig): Workspace config.
 
     Returns:
-        dict[str, object]: Jobs list and paused flag.
+        dict[str, object]: Jobs list, recent audit rows, and paused flag.
 
     Examples:
         >>> import inspect
@@ -789,8 +838,39 @@ def cron_job_payload(conn: Any, ws: WorkspaceConfig) -> dict[str, object]:
         True
     """
     jobs = [cron_job_to_dict(job) for job in list_cron_jobs(conn)]
+    recent_runs = [cron_run_to_dict(row) for row in list_recent_cron_runs(conn, limit=50)]
     paused = bool(ws.triggers and ws.triggers.paused)
-    return {"jobs": jobs, "count": len(jobs), "triggers_paused": paused}
+    return {
+        "jobs": jobs,
+        "count": len(jobs),
+        "recent_runs": recent_runs,
+        "recent_run_count": len(recent_runs),
+        "triggers_paused": paused,
+    }
+
+
+def cron_runs_payload(
+    conn: Any, *, job_id: str | None = None, limit: int = 50
+) -> dict[str, object]:
+    """Build cron audit history payload for ops APIs.
+
+    Args:
+        conn (Any): SQLite connection.
+        job_id (str | None, optional): Filter to one cron job.
+        limit (int): Maximum rows to return.
+
+    Returns:
+        dict[str, object]: Recent audit rows with concise error summaries.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.isfunction(cron_runs_payload)
+        True
+    """
+    runs = [
+        cron_run_to_dict(row) for row in list_recent_cron_runs(conn, limit=limit, job_id=job_id)
+    ]
+    return {"runs": runs, "count": len(runs), "job_id": job_id}
 
 
 __all__ = [
@@ -800,6 +880,7 @@ __all__ = [
     "confirm_token_valid",
     "create_workspace_snapshot",
     "cron_job_payload",
+    "cron_runs_payload",
     "daemon_control",
     "dispatch_cron_job_now",
     "enqueue_self_improve_cycle",
