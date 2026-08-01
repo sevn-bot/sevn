@@ -292,9 +292,9 @@ jobs:
         # full-length commit SHA") before the review step runs. Bump this SHA and
         # `MERGECRAFT_REF` in the Makefile together — `make mergecraft-ref-check`
         # fails on one-sided bumps.
-        # bumped past f98aeb0 for Codex harness + @openai/codex image; 0840bed enables
-        # Codex read-only sandbox network_access for localhost mergecraft MCP (checkout_pr).
-        uses: alexhawat/mergeCraft@0840bedeebc66f23af9ddca7edb1ccc7a52a0c80 # pre-0.0.1 (Codex MCP network)
+        # bumped past f98aeb0 for Codex harness + @openai/codex image; 349f948 uses
+        # Codex permission profiles so read-only PR reviews can reach localhost MCP.
+        uses: alexhawat/mergeCraft@349f9489da34515a09997142ae75acbc24797227 # pre-0.0.1 (Codex MCP permission profiles)
         with:
           prompt: ${{ steps.prompt.outputs.text }}
           # Must stay BELOW the job's timeout-minutes: when GitHub kills the job
@@ -358,7 +358,7 @@ jobs:
           )
         id: mergecraft_codex
         continue-on-error: true
-        uses: alexhawat/mergeCraft@0840bedeebc66f23af9ddca7edb1ccc7a52a0c80 # pre-0.0.1 (Codex MCP network)
+        uses: alexhawat/mergeCraft@349f9489da34515a09997142ae75acbc24797227 # pre-0.0.1 (Codex MCP permission profiles)
         with:
           prompt: ${{ steps.prompt.outputs.text }}
           timeout: 25m
