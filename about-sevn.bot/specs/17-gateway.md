@@ -8,9 +8,8 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-08-01'
-fingerprint: sha256:081c650916d0c0786463d9f18402828be65b4949f038ebf6de16bb59cc2d08b3=======
-fingerprint: sha256:b998c90107d48af5975e4ecfe5563f9e9f03f8344fa0385a8a4c3beefc33d8a5
->>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)related: []
+fingerprint: sha256:345ff9a158bf38b24f63955fa378a1353c9426b27e215c38ad4936f84ccc57fb
+related: []
 sources:
 - src/sevn/gateway/**
 parent_prd: prd-01-conversational-experience
@@ -61,15 +60,6 @@ interfaces:
 - name: register_admin_secrets_routes
   file: src/sevn/gateway/admin/admin_secrets.py
   symbol: register_admin_secrets_routes
-- name: build_agent_run_turn
-  file: src/sevn/gateway/agent_turn.py
-  symbol: build_agent_run_turn
-- name: build_intro_extra_instructions
-  file: src/sevn/gateway/agent_turn.py
-  symbol: build_intro_extra_instructions
-- name: turn_progress_signal_text
-  file: src/sevn/gateway/agent_turn.py
-  symbol: turn_progress_signal_text
 - name: build_echo_run_turn
   file: src/sevn/gateway/api/e2e_echo.py
   symbol: build_echo_run_turn
@@ -1720,14 +1710,6 @@ Telegram `/config` callback routing serves the redesigned eight-tile tree via
 `build_config_menu_keyboard()` and `MenuActionRouter`; stale `cfg:section:*` ids
 resolve through `_SECTION_ALIASES`. Section dispatch and action handlers are shared
 with the menu E2E walker recipe (`src/sevn/browser/recipes/telegram_menu.py`).
-
-## Amendments (open-issues-sweep W18, #75)
-
-Outbound delivery persists a `delivery_obligations` ledger row before
-`adapter.send` and records the platform message id on confirmation. Boot replay
-via `sweep_outbound_retries` skips resend when the obligation is already
-confirmed, closing the double-send window after a crash between send and status
-update. Tier-B finalizer failure paths participate through `route_outgoing`.
 
 ## Test Strategy
 

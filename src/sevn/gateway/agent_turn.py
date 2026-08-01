@@ -13,7 +13,6 @@ Exports:
 from __future__ import annotations
 
 import asyncio
-import contextvars
 import dataclasses
 import json
 import sqlite3
@@ -175,7 +174,6 @@ from sevn.prompts.fallbacks import (  # re-exported for backward compatibility
 from sevn.tools.base import ToolDefinition
 from sevn.tools.cache import LoadedBodyCache
 from sevn.tools.context import ToolContext
-from sevn.tools.deny_rules import load_deny_rules_from_workspace
 from sevn.tools.permissions import (
     AllowAllPermissionPolicy,
     AttributeBasedPermissionPolicy,
@@ -849,7 +847,6 @@ class _L1TurnState:
     session_id: str = ""
     correlation_id: str = ""
     progress_task: asyncio.Task[None] | None = None
-    secrets_scope_token: contextvars.Token[str | None] | None = None
 
 
 def _l1_task_summary(triage: TriageResult | None, user_text: str) -> str:
@@ -1245,29 +1242,7 @@ def build_agent_run_turn(
                     ),
                 )
             return
-        slash_text = (msg.text or "").strip()
-        skill_shortcut_row = None
-        from sevn.gateway.slash_skills import (
-            preprocess_stacked_slash_skills_inbound,
-            resolve_skill_shortcut_slash,
-            skill_shortcut_slash_text,
-        )
-
-        if slash_text.startswith("/"):
-            skill_shortcut_row = resolve_skill_shortcut_slash(slash_text, layout.content_root)
-            if skill_shortcut_row is not None:
-                trailing = slash_text.split(maxsplit=1)[1] if len(slash_text.split()) > 1 else ""
-                slash_text = skill_shortcut_slash_text(skill_shortcut_row, trailing_args=trailing)
-                md = dict(msg.metadata) if isinstance(msg.metadata, dict) else {}
-                msg = IncomingMessage(
-                    channel=msg.channel,
-                    user_id=msg.user_id,
-                    text=slash_text,
-                    metadata=md,
-                    raw=msg.raw,
-                    attachments=list(msg.attachments),
-                )
-        if core_handler.matches_slash(msg) and skill_shortcut_row is None:
+        if core_handler.matches_slash(msg):
             owner = router._resolve_owner_flag(msg)
             if not router.slash_command_allowed(msg, is_owner=owner):
                 adapter = router._adapters.get(msg.channel)
@@ -1318,33 +1293,6 @@ def build_agent_run_turn(
                         ),
                     )
             return
-        if slash_text.startswith("/"):
-            pre = preprocess_stacked_slash_skills_inbound(
-                msg,
-                slash_text=slash_text,
-                content_root=layout.content_root,
-                workspace=workspace,
-                layout=layout,
-            )
-            if pre.reply_text:
-                adapter = router._adapters.get(msg.channel)
-                if adapter is not None:
-                    from sevn.gateway.channel_router import (
-                        OutgoingMessage,
-                        _telegram_reply_metadata,
-                    )
-
-                    await adapter.send(
-                        OutgoingMessage(
-                            channel=msg.channel,
-                            user_id=msg.user_id,
-                            text=pre.reply_text,
-                            session_id=session_id,
-                            metadata=dict(_telegram_reply_metadata(msg)),
-                        ),
-                    )
-                return
-            msg = pre.msg
         await _orig_route_incoming(msg)
 
     router.route_incoming = _route_incoming_with_menu  # type: ignore[method-assign]
@@ -1387,13 +1335,6 @@ def build_agent_run_turn(
         regen_target = router._sessions.take_regen_target(session_id)
         regen_edit_message_id: int | None = None
         regen_suggested_tier: str | None = None
-        session_once_model = router._sessions.take_model_once_override(session_id)
-        if session_once_model:
-            logger.info(
-                "agent_turn model_once_override session_id={} model_id={} source=session",
-                session_id,
-                session_once_model,
-            )
         if replay_target is not None and replay_target[0].strip():
             user_text = replay_target[0]
             replay_attrs = {
@@ -1485,67 +1426,6 @@ def build_agent_run_turn(
         from sevn.gateway.session_manager import merge_dispatch_routing
 
         route_meta = merge_dispatch_routing(route_meta, session_id, correlation_id)
-        from sevn.config.routing import (
-            RoutingProfileBundle,
-            RoutingProfileDenied,
-            resolve_routing_profile_bundle,
-            resolve_routing_profile_for_turn,
-            routing_profiles_active,
-        )
-
-        routing_bundle: RoutingProfileBundle | None = None
-        if routing_profiles_active(workspace):
-            try:
-                profile_name = resolve_routing_profile_for_turn(
-                    workspace,
-                    channel=sess.channel,
-                    scope_key=sess.scope_key,
-                )
-                routing_bundle = resolve_routing_profile_bundle(
-                    workspace,
-                    profile_name=profile_name,
-                    channel=sess.channel,
-                    user_id=sess.user_id,
-                )
-                route_meta["routing_profile"] = routing_bundle.profile_name
-                route_meta["routing_memory_namespace"] = routing_bundle.memory_namespace
-                if routing_bundle.secrets_scope:
-                    route_meta["routing_secrets_scope"] = routing_bundle.secrets_scope
-                if routing_bundle.permissions_profile:
-                    route_meta["routing_permissions_profile"] = routing_bundle.permissions_profile
-                logger.info(
-                    "agent_turn routing_profile={} channel={} scope_key={} memory_namespace={}",
-                    routing_bundle.profile_name,
-                    sess.channel,
-                    sess.scope_key,
-                    routing_bundle.memory_namespace,
-                )
-            except RoutingProfileDenied as exc:
-                logger.warning(
-                    "routing_profile_denied channel={} scope_key={} detail={}",
-                    sess.channel,
-                    sess.scope_key,
-                    exc,
-                )
-                adapter = router.adapter_named(sess.channel)
-                if adapter is not None:
-                    from sevn.gateway.channel_router import OutgoingMessage
-
-                    await adapter.send(
-                        OutgoingMessage(
-                            channel=sess.channel,
-                            user_id=sess.user_id,
-                            text="This route is not permitted by routing policy.",
-                            session_id=session_id,
-                            metadata=dict(route_meta),
-                        ),
-                    )
-                return
-        from sevn.security.secrets.routing_scope import bind_routing_secrets_scope
-
-        l1_state.secrets_scope_token = bind_routing_secrets_scope(
-            routing_bundle.secrets_scope if routing_bundle is not None else None
-        )
         triage_ctx = triage_context_from_session(
             conn,
             session_id,
@@ -1555,7 +1435,6 @@ def build_agent_run_turn(
             turn_id=correlation_id,
             channel=sess.channel,
             user_id=sess.user_id,
-            memory_namespace=routing_bundle.memory_namespace if routing_bundle else None,
         )
         first_session_intro = triage_ctx.is_first_session
         from sevn.onboarding.seed import resolve_agent_display_name
@@ -1611,8 +1490,9 @@ def build_agent_run_turn(
         session_exe = registry_prep.session_exe
         session_tool_set = registry_prep.session_tool_set
         startup_timings = registry_prep.startup_timings
-        registry_cache_hit = registry_prep.registry_cache_hit        registry = registry_snapshot_from_tool_set(
-            effective_tool_set,
+        registry_cache_hit = registry_prep.registry_cache_hit
+        registry = registry_snapshot_from_tool_set(
+            session_tool_set,
             workspace=workspace,
             content_root=layout.content_root,
         )
@@ -1678,12 +1558,6 @@ def build_agent_run_turn(
                     content_root=layout.content_root,
                     trace=trace,
                     turn_span_id=turn_span_id,
-                    channel=sess.channel,
-                    scope_key=sess.scope_key,
-                    session_once_model=session_once_model,
-                    routing_profile_model=(
-                        routing_bundle.model if routing_bundle is not None else None
-                    ),
                 )
                 triager_ms = max(1, int((time_ns() - triage_started_ns) / 1_000_000))
                 l1_state.triager_ms = triager_ms
@@ -1738,34 +1612,6 @@ def build_agent_run_turn(
                 status="completed",
                 attrs={"complexity": str(triage.complexity), "disregard": triage.disregard},
             )
-        slash_overlay = await asyncio.to_thread(
-            _slash_skill_overlay_for_turn,
-            conn,
-            session_id,
-            correlation_id,
-        )
-        if slash_overlay:
-            from sevn.gateway.slash_skills import merge_slash_skills_into_triage
-
-            merged_skills = merge_slash_skills_into_triage(list(triage.skills), slash_overlay)
-            if merged_skills != list(triage.skills):
-                triage = triage.model_copy(update={"skills": merged_skills})
-            loaded = slash_overlay.get("loaded_skills")
-            if isinstance(loaded, list):
-                await _emit_gateway_span(
-                    trace,
-                    kind="gateway.slash_skills.loaded",
-                    session_id=session_id,
-                    turn_id=correlation_id,
-                    status="completed",
-                    attrs={
-                        "skill_ids": [
-                            str(row.get("skill_id")) for row in loaded if isinstance(row, dict)
-                        ],
-                        "effective_skill_id": slash_overlay.get("effective_skill_id"),
-                        "conflict_resolution": slash_overlay.get("conflict_resolution"),
-                    },
-                )
         if regen_suggested_tier in ("C", "D"):
             forced = ComplexityTier.C if regen_suggested_tier == "C" else ComplexityTier.D
             if triage.complexity != forced:
@@ -1992,11 +1838,6 @@ def build_agent_run_turn(
                 subagent_parent_id=l1_state.run_id,
                 subagent_specialist_grants=_specialist_grants_for_triage(triage, workspace),
                 subagent_remaining_budget_s=budget.remaining_s,
-                permissions_profile=(
-                    routing_bundle.permissions_profile if routing_bundle is not None else None
-                ),
-                effective_tool_set=effective_tool_set,
-                session_exe=session_exe,
             )
             if await _bootstrap_capture_after_turn(
                 bootstrap_active=bootstrap_active,
@@ -2038,19 +1879,8 @@ def build_agent_run_turn(
         if tier_b_bundle_factory is not None:
             bundle = await tier_b_bundle_factory(workspace)
         else:
-            bundle = _resolve_tier_b_bundle(
-                workspace,
-                process,
-                channel=sess.channel,
-                scope_key=sess.scope_key,
-                session_once_model=session_once_model,
-                routing_profile_model=(
-                    routing_bundle.model if routing_bundle is not None else None
-                ),
-            )
-            if bundle.model_source:
-                route_meta["model_resolution_source"] = bundle.model_source
-        exe, tool_set = session_exe, effective_tool_set
+            bundle = _resolve_tier_b_bundle(workspace, process)
+        exe, tool_set = session_exe, session_tool_set
         if first_task is not None:
             await first_task
         steer_buffer = _steer_buffer_for(router, session_id)
@@ -2159,34 +1989,6 @@ def build_agent_run_turn(
             if is_routing_footer_query(user_text):
                 extra_parts.append(tier_b_routing_footer_inject())
             extra_parts.append(tier_b_repo_access_prompt(workspace, layout.content_root))
-        from sevn.agent.prompt_overlays import resolve_turn_prompt_overlays
-
-        topic_prompt = route_meta.get("topic_system_prompt")
-        overlays = resolve_turn_prompt_overlays(
-            workspace,
-            channel=sess.channel,
-            scope_key=sess.scope_key,
-            metadata_topic_prompt=topic_prompt if isinstance(topic_prompt, str) else None,
-            routing_profile_prompt=(
-                routing_bundle.system_prompt if routing_bundle is not None else None
-            ),
-        )
-        if overlays.system_prompt:
-            extra_parts.append(overlays.system_prompt)
-        route_meta["prompt_overlay_source"] = overlays.source.value
-        from sevn.config.channel_overrides import resolve_channel_reasoning_effort_override
-
-        route_effort = (
-            routing_bundle.reasoning_effort
-            if routing_bundle is not None and routing_bundle.reasoning_effort
-            else resolve_channel_reasoning_effort_override(
-                workspace,
-                channel=sess.channel,
-                scope_key=sess.scope_key,
-            )
-        )
-        if route_effort is not None:
-            route_meta["route_reasoning_effort"] = route_effort
         extra_instructions = "\n\n".join(p for p in extra_parts if p.strip())
 
         tier_b_tool_context = _tool_context_for_turn(
@@ -2195,7 +1997,7 @@ def build_agent_run_turn(
             workspace=workspace,
             layout=layout,
             trace=trace,
-            tool_set=effective_tool_set,
+            tool_set=tool_set,
             channel=sess.channel,
             channel_adapter=channel_adapter,
             channel_router=router,
@@ -2209,10 +2011,6 @@ def build_agent_run_turn(
             subagent_parent_id=l1_state.run_id,
             subagent_specialist_grants=_specialist_grants_for_triage(triage, workspace),
             subagent_remaining_budget_s=budget.remaining_s,
-            permissions_profile=(
-                routing_bundle.permissions_profile if routing_bundle is not None else None
-            ),
-            filtered_tool_set=effective_tool_set,
         )
 
         # Retry-storm guard (`specs/17-gateway.md` §3.4): the narrow first pass keeps the
@@ -2378,15 +2176,6 @@ def build_agent_run_turn(
                 no_answer_reason=no_answer_reason,
                 outcome=outcome,
             )
-        if retry_warranted and effective_skill_allowlist is not None:
-            logger.info(
-                "agent_turn.full_index_retry_skipped_routing_profile session_id={} "
-                "correlation_id={} reason={}",
-                session_id,
-                correlation_id,
-                no_answer_reason or "missing_outcome",
-            )
-            retry_warranted = False
         if retry_warranted:
             logger.info(
                 "agent_turn.full_index_retry_start session_id={} correlation_id={} reason={}",
@@ -2455,10 +2244,6 @@ def build_agent_run_turn(
                 subagent_parent_id=l1_state.run_id,
                 subagent_specialist_grants=_specialist_grants_for_triage(triage, workspace),
                 subagent_remaining_budget_s=budget.remaining_s,
-                permissions_profile=(
-                    routing_bundle.permissions_profile if routing_bundle is not None else None
-                ),
-                filtered_tool_set=effective_tool_set,
             )
             _log_b_turn_pass(
                 b_turn_kind="full_index",
@@ -2512,11 +2297,6 @@ def build_agent_run_turn(
                     subagent_parent_id=l1_state.run_id,
                     subagent_specialist_grants=_specialist_grants_for_triage(triage, workspace),
                     subagent_remaining_budget_s=budget.remaining_s,
-                    permissions_profile=(
-                        routing_bundle.permissions_profile if routing_bundle is not None else None
-                    ),
-                    effective_tool_set=effective_tool_set,
-                    session_exe=session_exe,
                 )
                 return
             # Retry produced an outcome — fall through to the regular outcome
@@ -2796,11 +2576,6 @@ def build_agent_run_turn(
             subagent_parent_id=l1_state.run_id,
             subagent_specialist_grants=_specialist_grants_for_triage(triage, workspace),
             subagent_remaining_budget_s=budget.remaining_s,
-            permissions_profile=(
-                routing_bundle.permissions_profile if routing_bundle is not None else None
-            ),
-            effective_tool_set=effective_tool_set,
-            session_exe=session_exe,
         )
 
     async def _run_guarded(session_id: str, correlation_id: str) -> None:
@@ -2918,11 +2693,6 @@ def build_agent_run_turn(
                 reason="unhandled_exception",
             )
         finally:
-            from sevn.security.secrets.routing_scope import reset_routing_secrets_scope
-
-            if l1_state.secrets_scope_token is not None:
-                reset_routing_secrets_scope(l1_state.secrets_scope_token)
-                l1_state.secrets_scope_token = None
             # W3.1: finalize the tier B/C/D executor's level-1 registry row here — a
             # single choke point that covers every one of ``_run``'s exit paths (many
             # bare ``return`` statements plus C/D escalation from within the B branch)
@@ -2979,10 +2749,6 @@ def build_agent_run_turn(
             )
             from sevn.gateway.session_manager import clear_dispatch_routing
 
-            router._sessions.clear_model_once_override_after_turn(
-                session_id,
-                success=(terminal_status == "ok"),
-            )
             clear_dispatch_routing(session_id, correlation_id)
             router._active_l1_turn_state = None  # type: ignore[attr-defined]
 
@@ -2993,9 +2759,6 @@ def build_agent_run_turn(
         subagent_id: str,
     ) -> str:
         """Execute one supervisor-spawned level-1 tier-B turn (D11 fresh budget)."""
-        from sevn.security.secrets.routing_scope import reset_routing_secrets_scope
-
-        spawn_secrets_token = None
         try:
             sess = await asyncio.to_thread(load_session_row, conn, session_id)
             if sess is None:
@@ -3032,7 +2795,8 @@ def build_agent_run_turn(
                 content_root=layout.content_root,
                 mcp_defs_box=mcp_defs_box,
                 mcp_servers_map=mcp_servers_map,
-            )            session_exe, session_tool_set = await asyncio.to_thread(
+            )
+            session_exe, session_tool_set = await asyncio.to_thread(
                 build_session_registry,
                 workspace_config=workspace_local,
                 runtime_bindings=bindings,
@@ -3042,24 +2806,11 @@ def build_agent_run_turn(
                 trace_sink=trace,
                 include_bootstrap_tools=False,
             )
-            spawn_skill_allowlist = (
-                spawn_routing_bundle.skill_allowlist if spawn_routing_bundle is not None else None
-            )
-            spawn_tool_set = filter_tool_set_skills(session_tool_set, spawn_skill_allowlist)
-            spawn_effective_tool_set = spawn_tool_set or session_tool_set
             exe = session_exe
             if tier_b_bundle_factory is not None:
                 bundle = await tier_b_bundle_factory(workspace_local)
             else:
-                bundle = _resolve_tier_b_bundle(
-                    workspace_local,
-                    process,
-                    channel=sess.channel,
-                    scope_key=sess.scope_key,
-                    routing_profile_model=(
-                        spawn_routing_bundle.model if spawn_routing_bundle is not None else None
-                    ),
-                )
+                bundle = _resolve_tier_b_bundle(workspace_local, process)
             triage_ctx = triage_context_from_session(
                 conn,
                 session_id,
@@ -3069,9 +2820,6 @@ def build_agent_run_turn(
                 turn_id=correlation_id,
                 channel=sess.channel,
                 user_id=sess.user_id,
-                memory_namespace=(
-                    spawn_routing_bundle.memory_namespace if spawn_routing_bundle else None
-                ),
             )
             steer_buffer = _steer_buffer_for(router, session_id)
             turn_span_id = uuid.uuid4().hex
@@ -3084,7 +2832,7 @@ def build_agent_run_turn(
                 workspace=workspace_local,
                 layout=layout,
                 trace=trace,
-                tool_set=spawn_effective_tool_set,
+                tool_set=session_tool_set,
                 channel=sess.channel,
                 channel_adapter=router.adapter_named(sess.channel),
                 channel_router=router,
@@ -3098,12 +2846,6 @@ def build_agent_run_turn(
                 subagent_parent_id=subagent_id,
                 subagent_specialist_grants=frozenset(),
                 subagent_remaining_budget_s=budget.remaining_s,
-                permissions_profile=(
-                    spawn_routing_bundle.permissions_profile
-                    if spawn_routing_bundle is not None
-                    else None
-                ),
-                filtered_tool_set=spawn_effective_tool_set,
             )
             outcome = await asyncio.wait_for(
                 run_b_turn(
@@ -3112,7 +2854,7 @@ def build_agent_run_turn(
                     turn_id=correlation_id,
                     triage=triage,
                     incoming_text=user_text,
-                    tool_set=spawn_effective_tool_set,
+                    tool_set=session_tool_set,
                     body_cache=LoadedBodyCache(capacity=8),
                     tool_executor=exe,
                     transport_bundle=bundle,
@@ -3158,8 +2900,6 @@ def build_agent_run_turn(
             )
             return reply
         finally:
-            if spawn_secrets_token is not None:
-                reset_routing_secrets_scope(spawn_secrets_token)
             from sevn.gateway.session_manager import clear_dispatch_routing
 
             clear_dispatch_routing(session_id, correlation_id)
@@ -3270,8 +3010,6 @@ async def _run_full_index_retry(
     subagent_parent_id: str | None = None,
     subagent_specialist_grants: frozenset[str] = frozenset(),
     subagent_remaining_budget_s: Callable[[], float] | None = None,
-    permissions_profile: str | None = None,
-    filtered_tool_set: Any | None = None,
 ) -> tuple[Any | None, str | None]:
     """Run one tier-B retry with the full skills/INDEX exposed (`PROBLEMS.md` 1(e)).
 
@@ -3321,8 +3059,6 @@ async def _run_full_index_retry(
             granted this turn (D8/W3.4).
         subagent_remaining_budget_s (Callable[[], float] | None): Zero-arg callable
             returning the parent turn's remaining ``CascadeBudget`` seconds (D11).
-        permissions_profile (str | None): Routing-profile permissions key (**W12**).
-        filtered_tool_set (Any | None): Skill-filtered ``ToolSet`` when routing applies.
 
     Returns:
         tuple[BTurnOutcome | None, str | None]: ``(outcome, None)`` on success
@@ -3379,8 +3115,6 @@ async def _run_full_index_retry(
                     subagent_parent_id=subagent_parent_id,
                     subagent_specialist_grants=subagent_specialist_grants,
                     subagent_remaining_budget_s=subagent_remaining_budget_s,
-                    permissions_profile=permissions_profile,
-                    filtered_tool_set=filtered_tool_set or tool_set,
                 ),
                 max_rounds=expanded_rounds,
                 streaming_sink=streaming_sink,
@@ -3634,9 +3368,6 @@ async def _run_cd_dispatch(
     subagent_parent_id: str | None = None,
     subagent_specialist_grants: frozenset[str] = frozenset(),
     subagent_remaining_budget_s: Callable[[], float] | None = None,
-    permissions_profile: str | None = None,
-    effective_tool_set: Any | None = None,
-    session_exe: Any | None = None,
 ) -> None:
     """Execute ``run_cd_turn`` and map ``CdTurnOutcome`` payloads outbound.
 
@@ -3676,9 +3407,6 @@ async def _run_cd_dispatch(
             granted this turn (D8/W3.4).
         subagent_remaining_budget_s (Callable[[], float] | None): Zero-arg callable
             returning the parent turn's remaining ``CascadeBudget`` seconds (D11).
-        permissions_profile (str | None): Routing-profile permissions key (**W12**).
-        effective_tool_set (Any | None): Pre-built filtered ``ToolSet`` from the turn spine.
-        session_exe (Any | None): Pre-built ``ToolExecutor`` paired with *effective_tool_set*.
 
     Examples:
         >>> import inspect
@@ -3686,18 +3414,15 @@ async def _run_cd_dispatch(
         True
     """
     bundle = _resolve_cd_outer_models(workspace, process, triage.complexity)
-    if effective_tool_set is not None and session_exe is not None:
-        exe, tool_set = session_exe, effective_tool_set
-    else:
-        exe, tool_set = await asyncio.to_thread(
-            build_session_registry,
-            workspace_config=workspace,
-            runtime_bindings=bindings,
-            extra_mcp=mcp_tool_definitions,
-            workspace_root=layout.content_root,
-            layout=layout,
-            trace_sink=trace,
-        )
+    exe, tool_set = await asyncio.to_thread(
+        build_session_registry,
+        workspace_config=workspace,
+        runtime_bindings=bindings,
+        extra_mcp=mcp_tool_definitions,
+        workspace_root=layout.content_root,
+        layout=layout,
+        trace_sink=trace,
+    )
     channel_adapter = router.adapter_named(sess_channel)
     plan_gate = _plan_gate_for_turn(
         conn=conn,
@@ -3747,8 +3472,6 @@ async def _run_cd_dispatch(
                     subagent_parent_id=subagent_parent_id,
                     subagent_specialist_grants=subagent_specialist_grants,
                     subagent_remaining_budget_s=subagent_remaining_budget_s,
-                    permissions_profile=permissions_profile,
-                    filtered_tool_set=effective_tool_set or tool_set,
                 ),
             ),
             timeout=timeout_s if timeout_s is not None else tier_cd_executor_timeout_s(workspace),
@@ -4217,51 +3940,6 @@ def _user_message_text_for_turn(
     return _latest_user_message_text(conn, session_id)
 
 
-def _slash_skill_overlay_for_turn(
-    conn: sqlite3.Connection,
-    session_id: str,
-    turn_id: str,
-) -> dict[str, Any] | None:
-    """Return slash-skill overlay metadata stored on the turn's user message row.
-
-    Args:
-        conn (sqlite3.Connection): Gateway SQLite handle.
-        session_id (str): Owning session id.
-        turn_id (str): Gateway turn correlation id.
-
-    Returns:
-        dict[str, Any] | None: Parsed overlay dict, or ``None`` when absent.
-
-    Examples:
-        >>> import inspect
-        >>> inspect.isfunction(_slash_skill_overlay_for_turn)
-        True
-    """
-    row = conn.execute(
-        """
-        SELECT extras_json FROM gateway_messages
-        WHERE session_id = ? AND turn_id = ? AND role = 'user' AND kind = 'message'
-        ORDER BY id DESC LIMIT 1
-        """,
-        (session_id, turn_id),
-    ).fetchone()
-    if row is None:
-        return None
-    raw = row[0]
-    if not isinstance(raw, str) or not raw.strip():
-        return None
-    try:
-        meta = json.loads(raw)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(meta, dict):
-        return None
-    from sevn.gateway.slash_skills import SLASH_SKILL_OVERLAY_META_KEY
-
-    overlay = meta.get(SLASH_SKILL_OVERLAY_META_KEY)
-    return overlay if isinstance(overlay, dict) else None
-
-
 def _latest_user_message_text(conn: sqlite3.Connection, session_id: str) -> str:
     """Return the newest user ``message`` row content for ``session_id``.
     Args:
@@ -4461,20 +4139,11 @@ def _providers_mapping(workspace: WorkspaceConfig) -> dict[str, Any]:
 def _resolve_tier_b_bundle(
     workspace: WorkspaceConfig,
     process: ProcessSettings,
-    *,
-    channel: str = "",
-    scope_key: str | None = None,
-    session_once_model: str | None = None,
-    routing_profile_model: str | None = None,
 ) -> ResolvedTierBModel:
     """Resolve tier-B model + transport for ``run_b_turn``.
     Args:
         workspace (WorkspaceConfig): Parsed workspace configuration.
         process (ProcessSettings): Process settings (proxy URL).
-        channel (str): Active channel adapter name for turn overlays.
-        scope_key (str | None): Session scope key for topic-level overrides.
-        session_once_model (str | None): One-turn session model override (**W10** hook).
-        routing_profile_model (str | None): Named routing profile model override (**W12**).
     Returns:
         ResolvedTierBModel: Bundle passed to the tier-B harness.
     Examples:
@@ -4482,17 +4151,7 @@ def _resolve_tier_b_bundle(
         >>> inspect.isfunction(_resolve_tier_b_bundle)
         True
     """
-    from sevn.config.model_resolution import resolve_model_slot_for_turn
-
-    resolved = resolve_model_slot_for_turn(
-        workspace,
-        ModelSlot.tier_b,
-        channel=channel,
-        scope_key=scope_key,
-        session_once_model=session_once_model,
-        routing_profile_model=routing_profile_model,
-    )
-    model_id = resolved.model_id
+    model_id = resolve_model_slot(workspace, ModelSlot.tier_b)
     transport_name = resolve_transport_for_model_id(_providers_mapping(workspace), model_id)
     _, transport = resolve_model(
         model_id=model_id,
@@ -4503,7 +4162,6 @@ def _resolve_tier_b_bundle(
         model_id=model_id,
         transport=transport,
         budget=ModelBudget(model_id=model_id, regime=BudgetRegime.PER_TOKEN),
-        model_source=resolved.source.value,
     )
 
 
@@ -4564,9 +4222,8 @@ def _permission_policy_from_workspace(
     *,
     channel: str = "",
     user_id: str = "",
-    permissions_profile: str | None = None,
 ) -> PermissionPolicy:
-    """Resolve the session permission ceiling from ``permissions`` profiles.
+    """Resolve the session permission ceiling from ``permissions.default_profile``.
 
     Supported profile modes (``permissions.profiles.<key>.mode``):
 
@@ -4578,9 +4235,6 @@ def _permission_policy_from_workspace(
     - ``deny_tools`` list — static deny-by-name policy.
     - (default) — :class:`~sevn.tools.permissions.AllowAllPermissionPolicy`.
 
-    When *permissions_profile* is set (**W12** routing profile), that named profile
-    wins over ``permissions.default_profile``.
-
     The default when no ``permissions`` block is configured is always
     :class:`~sevn.tools.permissions.AllowAllPermissionPolicy`, preserving today's
     behaviour for loopback / owner-DM Telegram and local-Web sessions (D4).
@@ -4589,7 +4243,6 @@ def _permission_policy_from_workspace(
         workspace (WorkspaceConfig): Parsed workspace configuration.
         channel (str): Session channel key forwarded for ABAC principal resolution.
         user_id (str): Session user id forwarded for ABAC principal resolution.
-        permissions_profile (str | None): Routing-profile permissions override (**W12**).
 
     Returns:
         PermissionPolicy: Profile-backed deny list, deny-all, ABAC, or permissive default.
@@ -4603,15 +4256,6 @@ def _permission_policy_from_workspace(
         >>> _permission_policy_from_workspace(cfg, channel="telegram", user_id="9").may_invoke("web_search")
         False
     """
-    from sevn.config.routing import permission_policy_for_permissions_profile
-
-    if isinstance(permissions_profile, str) and permissions_profile.strip():
-        return permission_policy_for_permissions_profile(
-            workspace,
-            permissions_profile.strip(),
-            channel=channel,
-            user_id=user_id,
-        )
     raw = workspace.permissions if isinstance(workspace.permissions, dict) else {}
     profile_key = raw.get("default_profile")
     profiles = raw.get("profiles")
@@ -4667,8 +4311,6 @@ def _tool_context_for_turn(
     subagent_parent_id: str | None = None,
     subagent_specialist_grants: frozenset[str] = frozenset(),
     subagent_remaining_budget_s: Callable[[], float] | None = None,
-    permissions_profile: str | None = None,
-    filtered_tool_set: Any | None = None,
 ) -> ToolContext:
     """Build the tier-B ``ToolContext`` template for one gateway dispatch.
     Args:
@@ -4695,8 +4337,6 @@ def _tool_context_for_turn(
             granted this turn (D8/W3.4).
         subagent_remaining_budget_s (Callable[[], float] | None): Zero-arg callable
             returning the parent turn's remaining ``CascadeBudget`` seconds (D11).
-        permissions_profile (str | None): Routing-profile permissions key (**W12**).
-        filtered_tool_set (Any | None): Skill-filtered ``ToolSet`` when routing applies.
     Returns:
         ToolContext: Cloned per tool dispatch inside ``run_b_turn``.
     Examples:
@@ -4731,14 +4371,10 @@ def _tool_context_for_turn(
         if graphify_settings.enabled
         else []
     )
-    known_tool_names = frozenset(
-        td.name
-        for td in (*((filtered_tool_set or tool_set).native), *(filtered_tool_set or tool_set).mcp)
-    )
+    known_tool_names = frozenset(td.name for td in (*tool_set.native, *tool_set.mcp))
     from sevn.workspace.artifact_output import artifact_output_prefix
 
     output_prefix = artifact_output_prefix(workspace, session_id)
-    deny_rules = load_deny_rules_from_workspace(workspace)
     return ToolContext(
         session_id=session_id,
         workspace_path=layout.content_root,
@@ -4750,7 +4386,6 @@ def _tool_context_for_turn(
             workspace,
             channel=channel,
             user_id=outbound_user_id,
-            permissions_profile=permissions_profile,
         ),
         sandbox_client=runtime_bindings.sandbox,
         channel_adapter=channel_adapter,
@@ -4772,7 +4407,6 @@ def _tool_context_for_turn(
         subagent_parent_id=subagent_parent_id,
         subagent_specialist_grants=subagent_specialist_grants,
         subagent_remaining_budget_s=subagent_remaining_budget_s,
-        deny_rules=deny_rules,
     )
 
 

@@ -7,25 +7,8 @@ owner: Alex
 summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that every
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
-<<<<<<< HEAD
 last_updated: '2026-08-01'
-fingerprint: sha256:e6e90434d4162f106513af12a3caad4262964fb1a54a2c2ab085e09b91da4a5a
-=======
-last_updated: '2026-07-31'
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-fingerprint: sha256:ea51e4918e2ab7b3e4b79e9a4d315f76cbb930d7cbbf2eb684db19081d69b70c
->>>>>>> afb21033 (feat(tools)!: standardize MCP tool naming and add OAuth, logs, presets)
-=======
-fingerprint: sha256:9e39cf9c95077024d5b6efa0a63eda0f3aa44352ee0cebb87c10c7710a345c96
->>>>>>> d6e9c20e (chore(integrations): finalize batch F open-issues sweep)
-=======
-fingerprint: sha256:3144901b220aacb1a78346a5257bdf0e628468d867526f70b99e32fadf8da836
->>>>>>> 7f52e7d1 (fix(ci): refresh about-docs, onboarding manifest, bandit nosec)
-=======
-fingerprint: sha256:8f822f7540ca296863b471a9be0db0f659ccaa3c5f93ac9edf42d37ac0a1a93f
->>>>>>> 27e91673 (fix(ci): repair doctests, CodeQL ignore, and about-docs fingerprints)
+fingerprint: sha256:63ebfb3e931a68326acc10344a01eaeb8db893a14261e00e3cf1d6653344b7ea
 related: []
 sources:
 - src/sevn/tools/**
@@ -692,8 +675,6 @@ reusing ``TelegramWeb`` inline-keyboard primitives. Destructive menu rows are de
 **Skills (W5):** Tier B exposes operator skills as harness deferred `Skills` capabilities (`tier_b_skills.build_tier_b_skill_capabilities`). Triager-named skill ids scope the include list; each `SKILL.md` is staged to an ephemeral `.sevn-harness-skills/` tree with frontmatter preserved. Script dispatch stays on `sevn_run_skill_script` → `ToolExecutor.dispatch` (same registry contract as native tools).
 
 **CodeMode (W3/W7):** Registry tools marked `code_mode=True` are eligible for the Monty `run_code` sandbox when triage enables CodeMode. Host-side tool calls from sandboxed snippets re-enter `ToolExecutor.dispatch` via the harness function catalog. `SevnAsyncCodeMode` is the tier-B backend; Monty `ResourceLimits` are injected at pool checkout (`_monty_limits.py`, D5/D6). Opt-in `dynamic_catalog` (default off, D9) keeps the `run_code` tool definition byte-stable across lazy tool discovery.
-<<<<<<< HEAD
-=======
 
 ### 10.2 open-issues-sweep W28 — browser auth persistence (#92) — append-only
 
@@ -722,9 +703,6 @@ Gateway browser sessions persist cookies and login state via Chrome ``user-data-
 | OAuth | Credential JSON at ``oauth.mcp.<server_id>`` via secrets chain; ``mcp_servers.*.oauth`` holds metadata/refs only |
 | Logs | Structured JSON lines appended to ``<workspace>/logs/mcp.log`` on discover/call events |
 | Catalog | ``list_mcp_catalog_presets()`` surfaced read-only on Mission Control ``GET /api/v1/agent/mcp-servers`` |
-<<<<<<< HEAD
->>>>>>> afb21033 (feat(tools)!: standardize MCP tool naming and add OAuth, logs, presets)
-=======
 
 ### 10.4 open-issues-sweep W34 — Playwright E2E park verdict (#37, D12) — append-only
 
@@ -765,4 +743,3 @@ Gateway browser sessions persist cookies and login state via Chrome ``user-data-
 | **Hypothetical re-home recipe** | ``mission_control_walk.py`` — **not scheduled** |
 
 **Follow-up:** Operator override to re-home any family requires a **dedicated wave plan** (not absorbed into open-issues-sweep). Close **#37** when this row is merged.
->>>>>>> 532e6a0e (docs(tests): record park-or-rehome verdict for retired E2E families)
