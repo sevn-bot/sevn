@@ -2,11 +2,11 @@
 """Static guard: removed Playwright skill trees must not reappear (#117, #127, D6).
 
 Fails when ``src/sevn/data/bundled_skills/`` contains forbidden skill package
-directories or ``playwright-browser`` / ``playwright_browser`` substrings, or when
+directories or removed-id / ``playwright_browser`` substrings, or when
 ``src/sevn/tools/registry.py`` lists a removed skill id.
 
 Module: scripts.check_removed_browser_skill_ids
-Depends: pathlib, sys
+Depends: pathlib, sys, scripts.removed_browser_skill_policy
 
 Exports:
     main — CLI entry; scans bundled skills and tools registry for removed ids.
@@ -21,23 +21,20 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[1]
+_REPO = Path(__file__).resolve().parents[1]
+if str(_REPO) not in sys.path:
+    sys.path.insert(0, str(_REPO))
+
+from scripts.removed_browser_skill_policy import (  # noqa: E402
+    FORBIDDEN_SUBSTRINGS,
+    REMOVED_SKILL_IDS,
+)
+
+REPO = _REPO
 BUNDLED_ROOT = REPO / "src" / "sevn" / "data" / "bundled_skills"
 TOOLS_REGISTRY = REPO / "src" / "sevn" / "tools" / "registry.py"
 
-REMOVED_SKILL_IDS = frozenset(
-    {
-        "playwright-browser",
-        "x-use",
-        "facebook-use",
-        "linkedin-use",
-    }
-)
-
-FORBIDDEN_SUBSTRINGS = (
-    "playwright-browser",
-    "playwright_browser",
-)
+_BINARY_SUFFIXES = frozenset({".pyc", ".png", ".jpg", ".jpeg", ".gif", ".webp"})
 
 
 def _scan_bundled_tree() -> list[str]:
@@ -54,20 +51,13 @@ def _scan_bundled_tree() -> list[str]:
         return [f"missing bundled skills tree {BUNDLED_ROOT.relative_to(REPO)}"]
 
     bad: list[str] = []
-    for core_root in (BUNDLED_ROOT / "core", BUNDLED_ROOT):
-        if not core_root.is_dir():
-            continue
-        for child in sorted(core_root.iterdir()):
-            if child.is_dir() and child.name in REMOVED_SKILL_IDS:
-                bad.append(
-                    f"removed skill directory {child.relative_to(REPO)} "
-                    f"(forbidden id {child.name!r})"
-                )
-
     for path in sorted(BUNDLED_ROOT.rglob("*")):
-        if not path.is_file():
+        if path.is_dir() and path.name in REMOVED_SKILL_IDS:
+            bad.append(
+                f"removed skill directory {path.relative_to(REPO)} (forbidden id {path.name!r})"
+            )
             continue
-        if path.suffix in {".pyc", ".png", ".jpg", ".jpeg", ".gif", ".webp"}:
+        if not path.is_file() or path.suffix in _BINARY_SUFFIXES:
             continue
         try:
             text = path.read_text(encoding="utf-8")

@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from scripts.removed_browser_skill_policy import BROWSER_REMOVAL_PARITY_SURVIVOR_PREFIXES
 
 from sevn.browser.cdp import CDPConnection, CDPSession
 from sevn.browser.element import Dom
@@ -18,18 +19,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DRIVER = "play" + "wright"
 _IMPORT_RE = re.compile(rf"(import|from)\s+{_DRIVER}")
 
-# Intentional survivors (W8 note): prior-wave CHANGELOG bullets must not be rewritten.
-# W34 park verdict (#37) documents the retired browser-driver E2E harness by name in spec-11.
-# W6 aug-2026 gate (#117, #127) documents removed bundled skill ids + CI guard in specs/Makefile.
-_INTENTIONAL_SURVIVOR_PREFIXES: tuple[str, ...] = (
-    "CHANGELOG.md:",
-    "about-sevn.bot/specs/11-tools-registry.md:",
-    "about-sevn.bot/specs/12-skills-system.md:",
-    "scripts/check_removed_browser_skill_ids.py:",
-    "scripts/ci_lib.py:",
-    "Makefile:",
-    "tests/browser/test_browser_removal_parity.py:",
-)
+_INTENTIONAL_SURVIVOR_PREFIXES = BROWSER_REMOVAL_PARITY_SURVIVOR_PREFIXES
 
 
 def _git_grep_driver_imports(*, under: str) -> list[str]:

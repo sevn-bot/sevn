@@ -108,6 +108,7 @@ PATH_RULES: tuple[PathRule, ...] = (
             "src/sevn/data/bundled_skills/**",
             "src/sevn/tools/registry.py",
             "scripts/check_removed_browser_skill_ids.py",
+            "scripts/removed_browser_skill_policy.py",
         ),
         "removed-browser-skills-check",
     ),
