@@ -35,6 +35,7 @@ EXPANSION_OPS: tuple[tuple[str, ...], ...] = (
     W14_DISCOVERY_OPS,
 )
 ALL_EXPANSION_OPS: tuple[str, ...] = tuple(op for group in EXPANSION_OPS for op in group)
+W13_W14_EXPANSION_OPS: tuple[str, ...] = W13_TIMELINE_OPS + W14_DISCOVERY_OPS
 
 
 def _import_x_ops() -> Any:
@@ -43,23 +44,53 @@ def _import_x_ops() -> Any:
     return x_ops
 
 
-@pytest.mark.parametrize("op_name", ALL_EXPANSION_OPS)
+@pytest.mark.parametrize("op_name", W12_ENGAGEMENT_OPS)
+def test_w12_expansion_ops_exported_on_x_ops_facade(op_name: str) -> None:
+    """W12 #129 engagement ops are callables on ``sevn.integrations.social_media.x_ops``."""
+    x_ops = _import_x_ops()
+    fn = getattr(x_ops, op_name, None)
+    assert callable(fn), f"missing W12 expansion facade op: {op_name}"
+
+
+@pytest.mark.parametrize("op_name", W13_W14_EXPANSION_OPS)
 @pytest.mark.xfail(
-    reason="green after W12+/W13+/W14: expansion op exported on facade (#129)", strict=False
+    reason="green after W13+/W14: expansion op exported on facade (#129)", strict=False
 )
-def test_expansion_ops_exported_on_x_ops_facade(op_name: str) -> None:
-    """Each planned #129 op is a callable on ``sevn.integrations.social_media.x_ops``."""
+def test_w13_w14_expansion_ops_exported_on_x_ops_facade(op_name: str) -> None:
+    """Each planned #129 timeline/discovery op is a callable on the facade."""
     x_ops = _import_x_ops()
     fn = getattr(x_ops, op_name, None)
     assert callable(fn), f"missing expansion facade op: {op_name}"
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("op_name", ALL_EXPANSION_OPS)
-@pytest.mark.xfail(
-    reason="green after W12+/W13+/W14: stubbed envelope contract (#129)", strict=False
-)
-async def test_expansion_op_stub_returns_structured_envelope(op_name: str) -> None:
+@pytest.mark.parametrize("op_name", W12_ENGAGEMENT_OPS)
+async def test_w12_expansion_op_returns_structured_envelope(op_name: str) -> None:
+    """W12 engagement dispatch returns ``{ok, medium, op, data}`` (+ optional ``error``/``code``)."""
+    x_ops = _import_x_ops()
+    fn = getattr(x_ops, op_name)
+    with patch(
+        "sevn.integrations.social_media.x_ops_dispatch.resolve_social_medium",
+        return_value="twexapi",
+    ):
+        result = await fn(
+            task={"medium": "twexapi", "tweet_id": "123", "text": "hi", "dry_run": True},
+            cfg={"integrations": {"twexapi": {"enabled": True}}},
+            site="x",
+        )
+    assert isinstance(result, dict)
+    assert _ENVELOPE_KEYS.issubset(result.keys())
+    assert result["op"] == op_name
+    assert result["medium"] in ("browser", "twexapi")
+    assert result["ok"] in (True, False)
+    if result["ok"] is False:
+        assert result.get("error") or result.get("code")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("op_name", W13_W14_EXPANSION_OPS)
+@pytest.mark.xfail(reason="green after W13+/W14: stubbed envelope contract (#129)", strict=False)
+async def test_w13_w14_expansion_op_stub_returns_structured_envelope(op_name: str) -> None:
     """Stubbed dispatch returns ``{ok, medium, op, data}`` (+ optional ``error``/``code``)."""
     x_ops = _import_x_ops()
     fn = getattr(x_ops, op_name)
@@ -83,7 +114,6 @@ async def test_expansion_op_stub_returns_structured_envelope(op_name: str) -> No
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("op_name", W12_ENGAGEMENT_OPS)
-@pytest.mark.xfail(reason="green after W12: write ops honor dry_run gate (#129, D11)", strict=False)
 async def test_w12_write_ops_dry_run_returns_planned_envelope(op_name: str) -> None:
     """Posting/engagement ops must dry-run without live writes (D11 guardrail)."""
     x_ops = _import_x_ops()

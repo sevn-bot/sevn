@@ -11,6 +11,7 @@ Exports:
     pack_advanced_search_body — search_page body.
     pack_hashtags_body — hashtags body.
     pack_create_body — create/reply body.
+    pack_comment_body — comment/reply body with reply_tweet_id.
     pack_quote_body — quote-tweet body.
     pack_thread_body — create-thread body.
     pack_delete_body — delete-tweets body.
@@ -30,6 +31,7 @@ __all__ = [
     "TwexPathPacker",
     "pack_advanced_search_body",
     "pack_auto_cookie_body",
+    "pack_comment_body",
     "pack_create_body",
     "pack_delete_body",
     "pack_empty_body",
@@ -170,6 +172,31 @@ def pack_create_body(task: dict[str, Any]) -> dict[str, Any]:
     for key in ("reply_tweet_id", "media_url"):
         if task.get(key):
             body[key] = task[key]
+    return body
+
+
+def pack_comment_body(task: dict[str, Any]) -> dict[str, Any]:
+    """Pack comment/reply body with ``reply_tweet_id`` from ``tweet_id``.
+
+    Args:
+        task (dict[str, Any]): Task with ``text`` and target ``tweet_id``.
+
+    Returns:
+        dict[str, Any]: TwexAPI create-reply body.
+
+    Raises:
+        ValueError: When ``tweet_id`` is missing or blank.
+
+    Examples:
+        >>> pack_comment_body({"tweet_id": "9", "text": "hi"})["reply_tweet_id"]
+        '9'
+    """
+    tweet_id = str(task.get("tweet_id") or "").strip()
+    if not tweet_id:
+        msg = "tweet_id is required for comment_on_tweet"
+        raise ValueError(msg)
+    body = pack_create_body(task)
+    body["reply_tweet_id"] = tweet_id
     return body
 
 

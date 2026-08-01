@@ -35,6 +35,7 @@ from sevn.integrations.social_media.x_ops_pack import (
     TwexPathPacker,
     pack_advanced_search_body,
     pack_auto_cookie_body,
+    pack_comment_body,
     pack_create_body,
     pack_delete_body,
     pack_empty_body,
@@ -59,7 +60,11 @@ from sevn.integrations.twexapi.config import (
 )
 
 __all__ = [
+    "EXPANSION_OPS",
     "FACADE_OPS",
+    "W12_ENGAGEMENT_OPS",
+    "W13_TIMELINE_OPS",
+    "W14_DISCOVERY_OPS",
     "cookie_bridge_log_safe",
     "cookies_for_twexapi",
     "envelope",
@@ -184,10 +189,34 @@ _OP_SPECS: dict[str, _OpSpec] = {
             pack_body=pack_empty_body,
         ),
         _OpSpec("session_status"),
+        _OpSpec(
+            "comment_on_tweet",
+            twex_key="create_tweet_or_reply",
+            browser_social_op="reply",
+            is_write=True,
+            pack_body=pack_comment_body,
+        ),
+        _OpSpec(
+            "react_tweet",
+            twex_key="like_tweet",
+            is_write=True,
+            pack_path=pack_tweet_id_path,
+            pack_body=pack_empty_body,
+        ),
     )
 }
 
 FACADE_OPS: frozenset[str] = frozenset(_OP_SPECS)
+
+# W12-W14 #129 expansion ops (incremental ship per D11).
+W12_ENGAGEMENT_OPS: frozenset[str] = frozenset({"comment_on_tweet", "react_tweet"})
+W13_TIMELINE_OPS: frozenset[str] = frozenset(
+    {"get_new_comments_on_tweet", "get_tweet_stats", "collect_tweet_replies"}
+)
+W14_DISCOVERY_OPS: frozenset[str] = frozenset(
+    {"discover_followers", "discover_topic_accounts", "discover_mutual_graph"}
+)
+EXPANSION_OPS: frozenset[str] = W12_ENGAGEMENT_OPS | W13_TIMELINE_OPS | W14_DISCOVERY_OPS
 
 
 def cookies_for_twexapi(export_payload: dict[str, Any]) -> str:
@@ -380,6 +409,50 @@ def _task_proxy(task: dict[str, Any]) -> str | None:
     return None
 
 
+def _task_dry_run(task: dict[str, Any]) -> bool:
+    """Return whether the task requests a dry-run (no live writes).
+
+    Args:
+        task (dict[str, Any]): Task payload.
+
+    Returns:
+        bool: True when ``dry_run`` is truthy.
+
+    Examples:
+        >>> _task_dry_run({"dry_run": True})
+        True
+    """
+    raw = task.get("dry_run")
+    if isinstance(raw, str):
+        return raw.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(raw)
+
+
+def _dry_run_envelope(op: str, medium: str, task: dict[str, Any]) -> dict[str, Any]:
+    """Build a planned-action envelope for write ops under dry-run (D11).
+
+    Args:
+        op (str): Facade op name.
+        medium (str): Resolved medium.
+        task (dict[str, Any]): Task payload (secrets omitted from ``data.task``).
+
+    Returns:
+        dict[str, Any]: Success envelope with ``code=DRY_RUN``.
+
+    Examples:
+        >>> _dry_run_envelope("react_tweet", "browser", {"dry_run": True})["code"]
+        'DRY_RUN'
+    """
+    safe_task = {k: v for k, v in task.items() if k not in ("cookie", "export_cookies", "cookies")}
+    return envelope(
+        ok=True,
+        medium=medium,
+        op=op,
+        data={"dry_run": True, "planned": True, "task": safe_task},
+        code="DRY_RUN",
+    )
+
+
 def resolve_content_root(task: dict[str, Any]) -> Path:
     """Resolve workspace content root from the task or cwd.
 
@@ -423,15 +496,19 @@ def _browser_plan(op: str, task: dict[str, Any], site: str, social_op: str) -> d
         else:
             query = f"#{str(tags).lstrip('#')}" if tags else ""
     body = task.get("text") or task.get("tweet_content") or ""
+    tweet_id = str(task.get("tweet_id") or "")
+    url = task.get("url") or task.get("tweet_url") or ""
+    if op == "comment_on_tweet" and tweet_id and not url:
+        url = f"https://x.com/i/status/{tweet_id}"
     plan: dict[str, Any] = {
         "action": "social",
         "site": site,
         "op": social_op,
         "facade_op": op,
         "query": query,
-        "url": task.get("url") or task.get("tweet_url") or "",
+        "url": url,
         "body": body,
-        "tweet_id": task.get("tweet_id") or "",
+        "tweet_id": tweet_id,
         "username": task.get("username") or "",
         "hint": (
             f"Invoke browser tool action=social site={site} for facade op={op} "
@@ -539,6 +616,9 @@ async def _dispatch(
     spec = _OP_SPECS[op]
     is_write = spec.is_write
     medium = resolve_social_medium(task, smm_cfg(cfg), site)
+
+    if is_write and _task_dry_run(task):
+        return _dry_run_envelope(op, medium, task)
 
     if op == "post_tweet_auto_cookie" and medium == "browser":
         coerced = await _dispatch(
@@ -665,13 +745,20 @@ async def _dispatch(
                 code="TWEXAPI_ERROR",
             )
 
-    if op == "create_tweet_thread" and not thread_items(task):
+    if op in ("create_tweet_thread", "comment_on_tweet") and not (
+        thread_items(task) if op == "create_tweet_thread" else str(task.get("text") or "").strip()
+    ):
+        err = (
+            "create_tweet_thread on browser requires items/texts in the task"
+            if op == "create_tweet_thread"
+            else "comment_on_tweet on browser requires text in the task"
+        )
         return envelope(
             ok=False,
             medium="browser",
             op=op,
             data={},
-            error="create_tweet_thread on browser requires items/texts in the task",
+            error=err,
             code="BROWSER_OP_UNSUPPORTED",
         )
     social_op = spec.browser_social_op

@@ -26,6 +26,8 @@ _ACTIONS = (
     "create_tweet_thread",
     "delete_tweets",
     "post_tweet_auto_cookie",
+    "comment_on_tweet",
+    "react_tweet",
 )
 
 

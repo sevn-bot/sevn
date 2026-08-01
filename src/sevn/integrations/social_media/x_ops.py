@@ -23,6 +23,7 @@ __all__ = [
     "FACADE_OPS",
     "advanced_search_page",
     "bookmark",
+    "comment_on_tweet",
     "cookie_bridge_log_safe",
     "cookies_for_twexapi",
     "create_quote_tweet",
@@ -37,6 +38,7 @@ __all__ = [
     "home_timeline_collect",
     "like_tweet",
     "post_tweet_auto_cookie",
+    "react_tweet",
     "retweet",
     "search_hashtags",
     "session_status",
@@ -95,3 +97,5 @@ follow_user = _wrap("follow_user")
 fetch_article_markdown = _wrap("fetch_article_markdown")
 home_timeline_collect = _wrap("home_timeline_collect")
 session_status = _wrap("session_status")
+comment_on_tweet = _wrap("comment_on_tweet")
+react_tweet = _wrap("react_tweet")
