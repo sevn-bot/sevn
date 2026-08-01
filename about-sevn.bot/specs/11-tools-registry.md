@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that every
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
-last_updated: '2026-07-27'
-fingerprint: sha256:bdeda49c216744bbdf764d14cb2c54eb5c41613402e21e6a1704e39505bf6e8e
+last_updated: '2026-08-01'
+fingerprint: sha256:858bb5689d3c9341849ce49564af16e7d098b47bbdab9fb117e53282ec717d7c
 related: []
 sources:
 - src/sevn/tools/**
@@ -83,6 +83,33 @@ interfaces:
 - name: tool_from_decorated
   file: src/sevn/tools/decorator.py
   symbol: tool_from_decorated
+- name: DenyDecision
+  file: src/sevn/tools/deny_rules.py
+  symbol: DenyDecision
+- name: DenyRule
+  file: src/sevn/tools/deny_rules.py
+  symbol: DenyRule
+- name: check_deny_rules_for_dispatch
+  file: src/sevn/tools/deny_rules.py
+  symbol: check_deny_rules_for_dispatch
+- name: deny_envelope_from_rules
+  file: src/sevn/tools/deny_rules.py
+  symbol: deny_envelope_from_rules
+- name: enveloped_deny_with_reason
+  file: src/sevn/tools/deny_rules.py
+  symbol: enveloped_deny_with_reason
+- name: evaluate_deny_rules
+  file: src/sevn/tools/deny_rules.py
+  symbol: evaluate_deny_rules
+- name: load_deny_rules_from_workspace
+  file: src/sevn/tools/deny_rules.py
+  symbol: load_deny_rules_from_workspace
+- name: log_deny_decision
+  file: src/sevn/tools/deny_rules.py
+  symbol: log_deny_decision
+- name: parse_deny_rules
+  file: src/sevn/tools/deny_rules.py
+  symbol: parse_deny_rules
 - name: reserved_plugin_row
   file: src/sevn/tools/entrypoints.py
   symbol: reserved_plugin_row

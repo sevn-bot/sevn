@@ -8,7 +8,7 @@ summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–�
   a single, tool-less outbound generation step that emits validated TriageResult consumed
   by tier dispatch (A / B / C / D), MCP e'
 last_updated: '2026-08-01'
-fingerprint: sha256:b09d7a6a83a3069880797a0c5b5b50c268f5c0f5bcdba042ffa67b9448afbe36
+fingerprint: sha256:d8a335b3594483d5ddf400dd81ccd4c8054bfe2cb5604560088275bad746a4f0
 related: []
 sources:
 - src/sevn/agent/**
