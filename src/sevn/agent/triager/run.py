@@ -1467,6 +1467,8 @@ async def triage_turn(
             triager_cfg=cfg,
             channel=channel,
             scope_key=scope_key,
+            session_once_model=session_once_model,
+            routing_profile_model=routing_profile_model,
         )
         providers = providers_section_dict(workspace.providers)
         transport_name = resolve_triager_transport_name(providers, call_model_id)
