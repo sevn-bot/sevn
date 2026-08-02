@@ -8,7 +8,7 @@ summary: Let operators and agents launch, poll, and inspect Cursor Cloud Agents 
   any GitHub/GitLab repo when skills.cursor_cloud.enabled is true, returning PR URLs,
   dashboard links (remote desktop), and
 last_updated: '2026-08-02'
-fingerprint: sha256:7c52fdde6f433b5f946be45a1a66c880cb117c718a8ca6d12c0818fbc63239eb
+fingerprint: sha256:9e4a9ec63680cfa381dcc53734aae02bf2b3330240c23cf74f90af2254b58529
 related: []
 sources:
 - src/sevn/integrations/**
@@ -337,6 +337,9 @@ interfaces:
 - name: twexapi_key_configured
   file: src/sevn/integrations/social_media/readiness.py
   symbol: twexapi_key_configured
+- name: browser_plan
+  file: src/sevn/integrations/social_media/x_ops_browser_plan.py
+  symbol: browser_plan
 - name: cookie_bridge_log_safe
   file: src/sevn/integrations/social_media/x_ops_dispatch.py
   symbol: cookie_bridge_log_safe
@@ -355,6 +358,24 @@ interfaces:
 - name: smm_cfg
   file: src/sevn/integrations/social_media/x_ops_dispatch.py
   symbol: smm_cfg
+- name: apply_pre_dispatch_guards
+  file: src/sevn/integrations/social_media/x_ops_guardrails.py
+  symbol: apply_pre_dispatch_guards
+- name: dry_run_envelope
+  file: src/sevn/integrations/social_media/x_ops_guardrails.py
+  symbol: dry_run_envelope
+- name: filter_new_comments
+  file: src/sevn/integrations/social_media/x_ops_guardrails.py
+  symbol: filter_new_comments
+- name: rate_limit_envelope
+  file: src/sevn/integrations/social_media/x_ops_guardrails.py
+  symbol: rate_limit_envelope
+- name: task_dry_run
+  file: src/sevn/integrations/social_media/x_ops_guardrails.py
+  symbol: task_dry_run
+- name: task_force_rate_limit
+  file: src/sevn/integrations/social_media/x_ops_guardrails.py
+  symbol: task_force_rate_limit
 - name: pack_advanced_search_body
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_advanced_search_body

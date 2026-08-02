@@ -8,7 +8,7 @@ summary: 'Tier B is the default “do work” executor for messages the Triager 
   as complexity == B (prd-04-getting-things-done §5.2): a single pydantic-ai Agent
   loop over the user’s incoming_text, with t'
 last_updated: '2026-08-02'
-fingerprint: sha256:e7a1a5bb2d77bf3442923b065fd23b34827e4333c8ddc9618d4e7d57dbd38baf
+fingerprint: sha256:57bd70ef180b9fece3a2aec7373a075c27cbfe82fe14e0af171644f392d118ff
 related: []
 sources:
 - src/sevn/agent/**
@@ -541,6 +541,9 @@ interfaces:
 - name: update_pending_plan_status
   file: src/sevn/agent/executors/plan_gate_store.py
   symbol: update_pending_plan_status
+- name: is_empty_output_retry_error
+  file: src/sevn/agent/executors/retry_errors.py
+  symbol: is_empty_output_retry_error
 - name: append_output_truncation_notice
   file: src/sevn/agent/grounding.py
   symbol: append_output_truncation_notice
