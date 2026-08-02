@@ -744,8 +744,8 @@ Gateway browser sessions persist cookies and login state via Chrome ``user-data-
 
 **Follow-up:** Operator override to re-home any family requires a **dedicated wave plan** (not absorbed into open-issues-sweep). Close **#37** when this row is merged.
 
-### 10.5 open-issues-sweep-aug-2026 W6 — removed Playwright skills gate (#117, #127, D6) — append-only
+### 10.5 open-issues-sweep product W7 / aug-2026 W6 — removed Playwright skills gate (#117, #127, D6) — append-only
 
-- [x] Repo-wide grep: no ``playwright-browser`` / ``playwright_browser`` / stale ``x-use`` doc refs in tracked sources except ``CHANGELOG.md`` history (2026-08-01 ✅: baseline @ ``9ac9a059``).
-- [x] CI gate ``make removed-browser-skills-check`` scans ``src/sevn/data/bundled_skills/`` + ``src/sevn/tools/registry.py`` (2026-08-01 ✅: ``scripts/check_removed_browser_skill_ids.py``).
-- [x] Operator workspace cleanup documented in ``about-sevn.bot/specs/12-skills-system.md`` W6 amendment — ``sevn sync`` + manual delete of stale ``skills/user/`` trees (2026-08-01 ✅).
+- [x] Repo-wide grep: no ``playwright-browser`` / ``playwright_browser`` / stale ``x-use`` doc refs in tracked sources except ``CHANGELOG.md`` history (2026-08-01 ✅: baseline @ ``9ac9a059``; product W7 replay verified 2026-08-03 on ``wave/product-b-docs``).
+- [x] CI gate ``make removed-browser-skills-check`` scans ``src/sevn/data/bundled_skills/`` + ``src/sevn/tools/registry.py`` (2026-08-01 ✅: ``scripts/check_removed_browser_skill_ids.py``; in ``make ci-skills``).
+- [x] Operator workspace cleanup documented in ``about-sevn.bot/specs/12-skills-system.md`` amendment — ``sevn sync`` + manual delete of stale ``skills/user/`` trees (2026-08-01 ✅).
