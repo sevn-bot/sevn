@@ -205,6 +205,14 @@ turn-scoped overlays. Provider capability is checked per model id — unsupporte
 omit the wire parameter and emit a logged degradation note. MiniMax ``minimax_thinking``
 legacy aliases remain valid. Triager requests never receive a reasoning wire body.
 
+## Amendments (open-issues-sweep Batch F W17 — #153 Nous Portal)
+
+Nous Portal routes through the existing **OpenAI chat-completions** proxy path
+(``/llm/openai/chat/completions``). ``providers.nous.base_url`` resolves to
+``https://inference-api.nousresearch.com/v1``; wire model id is forwarded unchanged
+(``deepseek/deepseek-v4-flash``). No new transport adapter — D15 reuses OpenAI-compat
+forwarding and bearer auth from ``providers.nous.api_key``.
+
 ## Human-input needed
 
 Prose body not yet authored (W9 scope). Normative contract requires operator or
