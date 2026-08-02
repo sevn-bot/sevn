@@ -49,6 +49,7 @@ from sevn.config.defaults import DEFAULT_VOICE_LOCAL_TTS_ENGINE, DEFAULT_VOICE_S
 from sevn.config.model_resolution import (
     ModelSlot,
     apply_model_to_picker_slot,
+    fill_missing_model_slots_from_triager,
     list_catalog_model_ids,
     resolve_model_slot,
 )
@@ -570,6 +571,8 @@ class MenuActionRouter:
 
                 def _apply_toggle(doc: dict[str, Any]) -> None:
                     _set_nested(doc, target, parsed_val)
+                    if target == "providers.use_main_model_for_all" and parsed_val is False:
+                        fill_missing_model_slots_from_triager(doc)
                     if target == "second_brain.layout" and parsed_val == "para":
                         sb_obj = doc.get("second_brain")
                         if isinstance(sb_obj, dict) and "para" not in sb_obj:
@@ -587,8 +590,9 @@ class MenuActionRouter:
 
                 mutate_sevn_json(self._sevn_json, _apply_toggle)
                 self._reload_workspace()
+                reload_note: str | None = None
                 if target == "voice.activation.enabled":
-                    await self._reload_voice_activation_runtime()
+                    reload_note = await self._reload_voice_activation_runtime()
                 if target == "second_brain.layout":
                     from sevn.config.loader import load_workspace
                     from sevn.second_brain.bootstrap import ensure_second_brain_scope_layout
@@ -601,6 +605,8 @@ class MenuActionRouter:
                         scope_root = resolve_scope_root(self._content_root, sb_cfg, scope)
                         ensure_second_brain_scope_layout(scope_root, cfg=cfg)
                 toast = "✅ Updated."
+                if reload_note:
+                    toast = f"{toast} {reload_note}"
             answered = await self._refresh_config_menu_after_action(msg, raw, toast=toast)
             return None if answered else toast
         if kind == "prompt":
@@ -634,6 +640,8 @@ class MenuActionRouter:
                 return await self._handle_voice_status(msg, raw)
             if target == "voice:activation:status":
                 return await self._handle_voice_activation_status(msg, raw)
+            if target == "voice:activation:setup":
+                return await self._handle_voice_activation_setup(msg, raw)
             if target == "voice:show":
                 return await self._handle_voice_show(msg, raw)
             if target == "channels:status":
@@ -1424,8 +1432,11 @@ class MenuActionRouter:
             return bool(runtime.get("listening"))
         return None
 
-    async def _reload_voice_activation_runtime(self) -> None:
+    async def _reload_voice_activation_runtime(self) -> str | None:
         """Apply activation toggle to the live gateway listener without restart.
+
+        Returns:
+            str | None: Operator-facing note when live runtime is missing or unavailable.
 
         Examples:
             >>> import inspect
@@ -1434,7 +1445,9 @@ class MenuActionRouter:
         """
         runtime = getattr(self._router, "_voice_activation_runtime", None)
         if not isinstance(runtime, dict):
-            return
+            from sevn.voice.activation import voice_activation_offline_reload_note
+
+            return voice_activation_offline_reload_note(self._workspace)
         from sevn.voice.activation import reload_voice_activation_runtime
 
         trace = runtime.get("trace")
@@ -1444,6 +1457,7 @@ class MenuActionRouter:
             trace=trace,
             content_root=self._content_root,
         )
+        return None
 
     async def _handle_voice_activation_status(
         self, msg: IncomingMessage, callback_data: str
@@ -1525,11 +1539,57 @@ class MenuActionRouter:
 
         mutate_sevn_json(self._sevn_json, _apply)
         self._reload_workspace()
+        reload_note: str | None = None
         if resolve_voice_activation_settings(self._workspace).enabled:
-            await self._reload_voice_activation_runtime()
+            reload_note = await self._reload_voice_activation_runtime()
         toast = f"Wake phrase: {new_word}"
+        if reload_note:
+            toast = f"{toast} {reload_note}"
         answered = await self._refresh_config_menu_after_action(msg, callback_data, toast=toast)
         return None if answered else toast
+
+    async def _handle_voice_activation_setup(
+        self, msg: IncomingMessage, callback_data: str
+    ) -> str | None:
+        """Post wake-word doctor subset and install guidance (``act:voice:activation:setup`` — D9).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            callback_data (str): Raw ``callback_data`` string.
+
+        Returns:
+            str | None: Always ``None`` after posting guidance to chat.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter._handle_voice_activation_setup)
+            True
+        """
+        _ = callback_data
+        from sevn.gateway.diagnostics.diagnostics import format_for_telegram
+        from sevn.voice.activation import format_voice_activation_setup_guide
+
+        body = format_voice_activation_setup_guide(self._workspace)
+        await self._send_logs_chunks(msg, format_for_telegram(body, redaction=None))
+        await self._answer_chat_action(msg, "Wake-word setup guide sent")
+        return None
+
+    async def route(self, msg: IncomingMessage, *, session_id: str = "") -> str | None:
+        """Dispatch one menu action callback (test and tooling alias for :meth:`handle`).
+
+        Args:
+            msg (IncomingMessage): Inbound callback envelope.
+            session_id (str): Active gateway session id (optional for direct calls).
+
+        Returns:
+            str | None: Toast text when the handler did not edit the config menu in place.
+
+        Examples:
+            >>> import inspect
+            >>> inspect.iscoroutinefunction(MenuActionRouter.route)
+            True
+        """
+        return await self.handle(msg, session_id=session_id)
 
     def _mission_runtime_channel_map(self) -> dict[str, Any]:
         """Return live channel health from gateway mission state when wired.

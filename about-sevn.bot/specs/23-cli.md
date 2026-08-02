@@ -8,7 +8,7 @@ summary: Deliver the primary operator and automation surface for install, upgrad
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
 last_updated: '2026-08-01'
-fingerprint: sha256:8e90a6de0b7a37a48396917a5266b8769a04896fac8630b13a18eb17dc9b2414
+fingerprint: sha256:d8da840268bcd9fa136a0ddfe05d7bfd2c784fa4bb54bc71f19b06a184aa64b4
 related: []
 sources:
 - src/sevn/cli/**
@@ -708,6 +708,9 @@ interfaces:
 - name: uvicorn_program_argv
   file: src/sevn/cli/uvicorn_argv.py
   symbol: uvicorn_program_argv
+- name: resolve_cli_version_string
+  file: src/sevn/cli/version.py
+  symbol: resolve_cli_version_string
 - name: BoundWorkspace
   file: src/sevn/cli/workspace.py
   symbol: BoundWorkspace
@@ -857,6 +860,16 @@ Root CLI ``rich_help_panel`` groups mirror the eight Telegram ``/config`` tiles
 (``sevn.cli.help.panels.PANEL_ORDER``). ``sevn config sections`` lists the same eight
 slugs derived from ``menu_registry`` (``config_paths.menu_registry_root_slugs()``).
 ``make cli-help-docs-check`` gates panel drift.
+
+## Amendments (open-issues-sweep-aug-2026 W3 — #123, D8)
+
+``resolve_cli_version_string()`` (``src/sevn/cli/version.py``) prefers
+``<branch>-<commit8>`` from git when the process runs inside a checkout
+(``git rev-parse --abbrev-ref HEAD`` + ``git rev-parse --short=8 HEAD``);
+falls back to ``importlib.metadata.version("sevn")`` for installed wheels or
+when git metadata is unavailable. Wired to ``sevn --version`` and
+``sevn version`` / ``--json`` (``src/sevn/cli/app.py``). Regression:
+``tests/cli/test_version_format.py``.
 
 ## Amendments (open-issues-sweep Batch G W38 — #102 wake-word activation)
 

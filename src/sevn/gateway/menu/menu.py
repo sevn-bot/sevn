@@ -1149,6 +1149,14 @@ def _build_voice_keyboard_rows(workspace: WorkspaceConfig) -> list[list[dict[str
                 },
             ],
         )
+    rows.append(
+        [
+            {
+                "text": "🎤 Setup wake-word",
+                "callback_data": "act:voice:activation:setup",
+            },
+        ],
+    )
     rows.append([{"text": "🔊 Probe backends", "callback_data": "act:voice:status"}])
     rows.append([{"text": "📋 Voice settings", "callback_data": "act:voice:show"}])
     return rows
@@ -5002,7 +5010,7 @@ def _telegram_root_config_caption(
         True
     """
     from sevn.cli.config_paths import section_by_slug
-    from sevn.cli.config_sections import nested_get
+    from sevn.gateway.menu.caption_display import telegram_config_dot_path_display
 
     sec = section_by_slug(slug)
     if sec is None:
@@ -5013,8 +5021,7 @@ def _telegram_root_config_caption(
         lines.append("(no toggle paths registered for this section yet)")
     else:
         for path in sec.dot_paths:
-            value = nested_get(raw_doc, path)
-            lines.append(f"{path}: {value!r}")
+            lines.append(f"{path}: {telegram_config_dot_path_display(workspace, raw_doc, path)}")
     return "\n".join(lines)
 
 
