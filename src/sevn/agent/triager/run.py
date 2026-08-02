@@ -49,6 +49,7 @@ from sevn.agent.adapters.native_model import (
 from sevn.agent.adapters.tier_b_model import build_tier_b_function_model
 from sevn.agent.adapters.tool_part_filter import filter_tool_call_parts
 from sevn.agent.executors.b_types import ResolvedTierBModel
+from sevn.agent.executors.retry_errors import is_empty_output_retry_error
 from sevn.agent.persona import load_persona_block
 from sevn.agent.providers.budget import BudgetRegime, ModelBudget
 from sevn.agent.providers.resolve import resolve_model
@@ -130,7 +131,7 @@ def _is_empty_output_retry_error(exc: BaseException) -> bool:
         >>> _is_empty_output_retry_error(ValueError("bad json"))
         False
     """
-    return "maximum output retries" in str(exc).lower()
+    return is_empty_output_retry_error(exc)
 
 
 def _triager_budget_regime() -> str:

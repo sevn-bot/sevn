@@ -1,14 +1,16 @@
 """Rewrite legacy ``sevn.skills.social_browser`` imports for operator workspaces (#128 / D7).
 
 Module: sevn.skills.social_browser_migration
-Depends: re
+Depends: importlib, re
 
 Exports:
     rewrite_legacy_imports — rewrite Python source text to the social stack.
+    validate_symbol_targets — ensure every mapped symbol resolves at import time.
 """
 
 from __future__ import annotations
 
+import importlib
 import re
 from collections import defaultdict
 from typing import Final
@@ -18,20 +20,20 @@ LEGACY_MODULE: Final[str] = "sevn.skills.social_browser"
 # Closest SSOT homes after retired x-use skill tree removal (D7).
 SYMBOL_TARGET_MODULES: Final[dict[str, str]] = {
     "host_allowed": "sevn.browser.recipes.base",
-    "validate_social_url": "sevn.browser.recipes.base",
+    "validate_social_url": "sevn.integrations.social_media.legacy_compat",
     "validate_egress": "sevn.browser.recipes.base",
-    "resolve_browser_profile": "sevn.browser.chrome",
+    "resolve_browser_profile": "sevn.integrations.social_media.legacy_compat",
     "resolve_profile_dir": "sevn.browser.chrome",
     "dry_run_requested": "sevn.integrations.social_media.legacy_compat",
     "cdp_reachable": "sevn.skills.browser_session",
     "default_cdp_url": "sevn.skills.browser_session",
-    "session_status_payload": "sevn.skills.browser_session",
-    "merge_social_browser_proc_env": "sevn.skills.browser_session",
+    "session_status_payload": "sevn.integrations.social_media.legacy_compat",
+    "merge_social_browser_proc_env": "sevn.integrations.social_media.legacy_compat",
     "merge_browser_proc_env": "sevn.skills.browser_session",
-    "logged_in_browser_page": "sevn.skills.browser_session",
-    "fetch_page_snapshot": "sevn.browser.recipes.social",
-    "x_search_url": "sevn.browser.recipes.social",
-    "facebook_search_url": "sevn.browser.recipes.social",
+    "logged_in_browser_page": "sevn.integrations.social_media.legacy_compat",
+    "fetch_page_snapshot": "sevn.integrations.social_media.legacy_compat",
+    "x_search_url": "sevn.integrations.social_media.legacy_compat",
+    "facebook_search_url": "sevn.integrations.social_media.legacy_compat",
     "SocialRecipe": "sevn.browser.recipes.social",
     "social_write_allowed": "sevn.browser.recipes.social",
     "parse_post_html": "sevn.browser.recipes.social",
@@ -56,6 +58,7 @@ __all__ = [
     "LEGACY_MODULE",
     "SYMBOL_TARGET_MODULES",
     "rewrite_legacy_imports",
+    "validate_symbol_targets",
 ]
 
 
@@ -103,14 +106,35 @@ def _format_from_import(module: str, symbols: list[str], indent: str) -> str:
     return f"{indent}from {module} import {joined}"
 
 
+def validate_symbol_targets() -> list[str]:
+    """Return unresolved ``(module, symbol)`` pairs from :data:`SYMBOL_TARGET_MODULES`.
+
+    Returns:
+        list[str]: Human-readable errors; empty when every mapped symbol imports cleanly.
+
+    Examples:
+        >>> validate_symbol_targets()
+        []
+    """
+    errors: list[str] = []
+    for symbol, module in SYMBOL_TARGET_MODULES.items():
+        try:
+            mod = importlib.import_module(module)
+        except ImportError as exc:
+            errors.append(f"{symbol}: module {module!r} failed: {exc}")
+            continue
+        if not hasattr(mod, symbol):
+            errors.append(f"{symbol}: missing from {module}")
+    return errors
+
+
 def rewrite_legacy_imports(source: str) -> str:
     """Rewrite deleted ``social_browser`` imports to the social_media_manager stack.
 
     Replaces ``from sevn.skills.social_browser import …`` with grouped imports from
     :mod:`sevn.integrations.social_media`, :mod:`sevn.browser.recipes.social`, and
-    :mod:`sevn.skills.browser_session`. Bare ``import sevn.skills.social_browser`` lines
-    become a migration comment. Non-import references to ``LEGACY_MODULE`` are left for
-    manual review.
+    :mod:`sevn.skills.browser_session``. Bare ``import sevn.skills.social_browser`` lines
+    become a migration comment. Unknown symbols become manual-review comments.
 
     Args:
         source (str): Python source text (typically an operator skill script).
@@ -130,16 +154,20 @@ def rewrite_legacy_imports(source: str) -> str:
         indent = match.group(1)
         symbols = _split_import_names(match.group(2))
         by_module: dict[str, list[str]] = defaultdict(list)
+        manual: list[str] = []
         for symbol in symbols:
-            target = SYMBOL_TARGET_MODULES.get(
-                symbol, "sevn.integrations.social_media.legacy_compat"
-            )
+            target = SYMBOL_TARGET_MODULES.get(symbol)
+            if target is None:
+                manual.append(
+                    f"{indent}# MIGRATION(#128): unknown legacy symbol {symbol!r} — migrate manually"
+                )
+                continue
             by_module[target].append(symbol)
         lines = [
             _format_from_import(module, names, indent)
             for module, names in sorted(by_module.items())
         ]
-        return "\n".join(lines)
+        return "\n".join([*manual, *lines])
 
     updated = _FROM_IMPORT_RE.sub(_replace_from, source)
 

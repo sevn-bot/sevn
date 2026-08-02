@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own everything under workspace/skills/: how skills are discovered, validated,
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
-last_updated: '2026-08-01'
-fingerprint: sha256:3b30e572d8fcc6650c404b5ae6955f05b90c55c5638ddfe29cce150d89dd9725
+last_updated: '2026-08-02'
+fingerprint: sha256:60fb2b546fded0d42a0820aa72837cdbadf9d9f8130ff51e9124c825256f9a2d
 related: []
 sources:
 - src/sevn/skills/**
@@ -602,6 +602,9 @@ interfaces:
 - name: rewrite_legacy_imports
   file: src/sevn/skills/social_browser_migration.py
   symbol: rewrite_legacy_imports
+- name: validate_symbol_targets
+  file: src/sevn/skills/social_browser_migration.py
+  symbol: validate_symbol_targets
 - name: gate_social_media_manager_core_skill
   file: src/sevn/skills/social_media_manager.py
   symbol: gate_social_media_manager_core_skill

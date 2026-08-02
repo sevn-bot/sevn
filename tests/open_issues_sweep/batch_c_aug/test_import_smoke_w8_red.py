@@ -56,6 +56,17 @@ def test_legacy_x_use_import_migration_helper_exists() -> None:
     from sevn.skills import social_browser_migration as migration
 
     assert callable(getattr(migration, "rewrite_legacy_imports", None))
+    assert migration.validate_symbol_targets() == []
+
+
+def test_rewrite_legacy_imports_maps_resolve_browser_profile() -> None:
+    """#128: common legacy symbols rewrite to importable modules."""
+    from sevn.skills import social_browser_migration as migration
+
+    source = "from sevn.skills.social_browser import resolve_browser_profile, x_search_url\n"
+    rewritten = migration.rewrite_legacy_imports(source)
+    assert "sevn.integrations.social_media.legacy_compat" in rewritten
+    assert "sevn.skills.social_browser" not in rewritten.split("migrate manually")[0]
 
 
 def test_operator_x_use_stub_skill_manifest_points_at_social_stack(tmp_path: Path) -> None:

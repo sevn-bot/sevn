@@ -130,7 +130,8 @@ def resolve_profile_dir(
 
     Precedence: ``SEVN_BROWSER_PROFILE_DIR`` → ``skills.browser.profile_dir`` →
     ``skills.social_media_manager.profile_dir`` → ``skills.social_browser.profile_dir``
-    (deprecated) → ``<content_root>/.sevn/browser-profiles/<session_id|default>``.
+    (deprecated; prefer ``social_media_manager`` during x-use migration) →
+    ``<content_root>/.sevn/browser-profiles/<session_id|default>``.
 
     Args:
         content_root (Path): Workspace content root (not shadow workspace).

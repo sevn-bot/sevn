@@ -98,6 +98,7 @@ from sevn.agent.executors.b_types import (
     SessionHandle,
     SteerInject,
 )
+from sevn.agent.executors.retry_errors import is_empty_output_retry_error
 from sevn.agent.grounding import (
     append_output_truncation_notice,
     apply_file_delivery_grounding_guard,
@@ -132,7 +133,6 @@ from sevn.agent.triager.routing_policy import (
     is_identity_or_capability_message,
     is_log_provenance_intent_message,
 )
-from sevn.agent.triager.run import _is_empty_output_retry_error
 from sevn.config.defaults import (
     DEFAULT_CODEMODE_DYNAMIC_CATALOG,
     DEFAULT_TIER_B_CACHE_STABILITY_MONITOR_ENABLED,
@@ -1782,7 +1782,7 @@ async def run_b_turn(
         if isinstance(exc, Exception):
             failure_detail = str(exc)
             final_messages: tuple[ChannelPayload, ...] = ()
-            if _is_empty_output_retry_error(exc):
+            if is_empty_output_retry_error(exc):
                 skills = frozenset(deps.successful_skills_called or deps.loaded_skills)
                 load_skill_ok = "load_skill" in deps.successful_tools_called
                 if load_skill_ok or skills:
@@ -2238,11 +2238,24 @@ async def run_b_turn(
                 attrs={"rounds_used": provider_rounds[0]},
             ),
         )
-        report = format_tier_b_operator_failure_report(
-            failure_detail="no assistant output produced",
-            tool_name=deps.last_tool_failure_name,
-            tool_error=deps.last_tool_failure_detail,
-        )
+        skills = frozenset(deps.successful_skills_called or deps.loaded_skills)
+        load_skill_ok = "load_skill" in deps.successful_tools_called
+        failure_detail = "no assistant output produced"
+        if load_skill_ok or skills:
+            if skills:
+                skill_tag = ",".join(sorted(skills))
+                failure_detail = f"{failure_detail} after load_skill({skill_tag})"
+            report = format_tier_b_operator_failure_report(
+                failure_detail=failure_detail,
+                loaded_skills=skills if skills else None,
+                load_skill_succeeded=load_skill_ok,
+            )
+        else:
+            report = format_tier_b_operator_failure_report(
+                failure_detail=failure_detail,
+                tool_name=deps.last_tool_failure_name,
+                tool_error=deps.last_tool_failure_detail,
+            )
         return BTurnOutcome(
             status="failed",
             final_messages=(ChannelPayload(text=report),),

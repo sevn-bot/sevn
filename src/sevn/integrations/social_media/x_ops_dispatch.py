@@ -30,6 +30,18 @@ from sevn.integrations.social_media.readiness import (
     build_social_media_readiness_sync,
     twexapi_key_configured,
 )
+from sevn.integrations.social_media.x_ops_browser_plan import browser_plan
+from sevn.integrations.social_media.x_ops_guardrails import (
+    DISCOVERY_OPS,
+    ENGAGEMENT_OPS,
+    EXPANSION_OPS,
+    TIMELINE_READ_OPS,
+    W12_ENGAGEMENT_OPS,
+    W13_TIMELINE_OPS,
+    W14_DISCOVERY_OPS,
+    apply_pre_dispatch_guards,
+    filter_new_comments,
+)
 from sevn.integrations.social_media.x_ops_pack import (
     TwexBodyPacker,
     TwexPathPacker,
@@ -65,8 +77,11 @@ from sevn.integrations.twexapi.config import (
 )
 
 __all__ = [
+    "DISCOVERY_OPS",
+    "ENGAGEMENT_OPS",
     "EXPANSION_OPS",
     "FACADE_OPS",
+    "TIMELINE_READ_OPS",
     "W12_ENGAGEMENT_OPS",
     "W13_TIMELINE_OPS",
     "W14_DISCOVERY_OPS",
@@ -103,6 +118,19 @@ class _OpSpec:
             'search_page'
         """
         return self.twex_key or self.name
+
+    @property
+    def dry_run_eligible(self) -> bool:
+        """Return whether this op supports ``dry_run`` guardrails (D11).
+
+        Returns:
+            bool: ``True`` for writes, timeline reads, and discovery ops.
+
+        Examples:
+            >>> _OpSpec("react_tweet", is_write=True).dry_run_eligible
+            True
+        """
+        return self.is_write or self.name in TIMELINE_READ_OPS or self.name in DISCOVERY_OPS
 
 
 _OP_SPECS: dict[str, _OpSpec] = {
@@ -250,16 +278,6 @@ _OP_SPECS: dict[str, _OpSpec] = {
 }
 
 FACADE_OPS: frozenset[str] = frozenset(_OP_SPECS)
-
-# W12-W14 #129 expansion ops (incremental ship per D11).
-W12_ENGAGEMENT_OPS: frozenset[str] = frozenset({"comment_on_tweet", "react_tweet"})
-W13_TIMELINE_OPS: frozenset[str] = frozenset(
-    {"get_new_comments_on_tweet", "get_tweet_stats", "collect_tweet_replies"}
-)
-W14_DISCOVERY_OPS: frozenset[str] = frozenset(
-    {"discover_followers", "discover_topic_accounts", "discover_mutual_graph"}
-)
-EXPANSION_OPS: frozenset[str] = W12_ENGAGEMENT_OPS | W13_TIMELINE_OPS | W14_DISCOVERY_OPS
 
 
 def cookies_for_twexapi(export_payload: dict[str, Any]) -> str:
@@ -452,200 +470,6 @@ def _task_proxy(task: dict[str, Any]) -> str | None:
     return None
 
 
-def _task_force_rate_limit(task: dict[str, Any]) -> bool:
-    """Return whether the task simulates a rate-limit response (tests / guardrails).
-
-    Args:
-        task (dict[str, Any]): Task payload.
-
-    Returns:
-        bool: True when ``force_rate_limit`` is truthy.
-
-    Examples:
-        >>> _task_force_rate_limit({"force_rate_limit": True})
-        True
-    """
-    raw = task.get("force_rate_limit")
-    if isinstance(raw, str):
-        return raw.strip().lower() in {"1", "true", "yes", "on"}
-    return bool(raw)
-
-
-def _rate_limit_envelope(op: str, medium: str, *, retry_after_s: int = 30) -> dict[str, Any]:
-    """Build a machine-readable rate-limit envelope for discovery ops (D11).
-
-    Args:
-        op (str): Facade op name.
-        medium (str): Resolved medium.
-        retry_after_s (int): Suggested backoff seconds.
-
-    Returns:
-        dict[str, Any]: Failure envelope with ``code=RATE_LIMITED``.
-
-    Examples:
-        >>> _rate_limit_envelope("discover_followers", "twexapi")["code"]
-        'RATE_LIMITED'
-    """
-    return envelope(
-        ok=False,
-        medium=medium,
-        op=op,
-        data={"retry_after_s": retry_after_s},
-        error="rate limited — retry after backoff",
-        code="RATE_LIMITED",
-    )
-
-
-def _task_dry_run(task: dict[str, Any]) -> bool:
-    """Return whether the task requests a dry-run (no live writes).
-
-    Args:
-        task (dict[str, Any]): Task payload.
-
-    Returns:
-        bool: True when ``dry_run`` is truthy.
-
-    Examples:
-        >>> _task_dry_run({"dry_run": True})
-        True
-    """
-    raw = task.get("dry_run")
-    if isinstance(raw, str):
-        return raw.strip().lower() in {"1", "true", "yes", "on"}
-    return bool(raw)
-
-
-def _dry_run_envelope(op: str, medium: str, task: dict[str, Any]) -> dict[str, Any]:
-    """Build a planned-action envelope for write/read ops under dry-run (D11).
-
-    Args:
-        op (str): Facade op name.
-        medium (str): Resolved medium.
-        task (dict[str, Any]): Task payload (secrets omitted from ``data.task``).
-
-    Returns:
-        dict[str, Any]: Success envelope with ``code=DRY_RUN``.
-
-    Examples:
-        >>> _dry_run_envelope("react_tweet", "browser", {"dry_run": True})["code"]
-        'DRY_RUN'
-    """
-    safe_task = {k: v for k, v in task.items() if k not in ("cookie", "export_cookies", "cookies")}
-    planned: dict[str, Any] = {"dry_run": True, "planned": True, "task": safe_task}
-    if op in W13_TIMELINE_OPS:
-        planned["read"] = True
-    if op in W14_DISCOVERY_OPS:
-        planned["read"] = True
-        planned["discovery"] = True
-    return envelope(
-        ok=True,
-        medium=medium,
-        op=op,
-        data=planned,
-        code="DRY_RUN",
-    )
-
-
-def _reply_item_id(item: Any) -> str | None:
-    """Extract a reply tweet id from a TwexAPI/browser reply item.
-
-    Args:
-        item (Any): Reply record.
-
-    Returns:
-        str | None: Tweet id when present.
-
-    Examples:
-        >>> _reply_item_id({"id": "9"})
-        '9'
-    """
-    if not isinstance(item, dict):
-        return None
-    for key in ("id", "tweet_id", "rest_id", "id_str"):
-        raw = item.get(key)
-        if raw is not None and str(raw).strip():
-            return str(raw).strip()
-    return None
-
-
-def _extract_reply_items(data: Any) -> list[Any]:
-    """Return a reply list from common TwexAPI/browser payload shapes.
-
-    Args:
-        data (Any): API or parsed browser payload.
-
-    Returns:
-        list[Any]: Reply items (may be empty).
-
-    Examples:
-        >>> _extract_reply_items({"replies": [{"id": "1"}]})[0]["id"]
-        '1'
-    """
-    if isinstance(data, list):
-        return data
-    if isinstance(data, dict):
-        for key in ("replies", "comments", "items", "tweets", "data"):
-            raw = data.get(key)
-            if isinstance(raw, list):
-                return raw
-    return []
-
-
-def _filter_new_comments(data: Any, task: dict[str, Any]) -> Any:
-    """Keep only replies newer than ``since_id`` / ``last_seen_id`` when set.
-
-    Args:
-        data (Any): Raw replies payload.
-        task (dict[str, Any]): Task with optional ``since_id`` / ``last_seen_id``.
-
-    Returns:
-        Any: Filtered payload (same top-level shape when possible).
-
-    Examples:
-        >>> out = _filter_new_comments(
-        ...     {"replies": [{"id": "2"}, {"id": "1"}]},
-        ...     {"since_id": "1"},
-        ... )
-        >>> out["replies"][0]["id"]
-        '2'
-    """
-    since_raw = (
-        task.get("since_id") if task.get("since_id") is not None else task.get("last_seen_id")
-    )
-    if since_raw is None or not str(since_raw).strip():
-        return data
-    since_s = str(since_raw).strip()
-    items = _extract_reply_items(data)
-    if not items:
-        return data
-    filtered: list[Any] = []
-    for item in items:
-        reply_id = _reply_item_id(item)
-        if reply_id is None:
-            filtered.append(item)
-            continue
-        try:
-            if int(reply_id) > int(since_s):
-                filtered.append(item)
-        except ValueError:
-            if reply_id != since_s:
-                filtered.append(item)
-    if isinstance(data, list):
-        return filtered
-    if isinstance(data, dict):
-        out = dict(data)
-        for key in ("replies", "comments", "items", "tweets", "data"):
-            if key in out and isinstance(out[key], list):
-                out[key] = filtered
-                break
-        else:
-            out["items"] = filtered
-        out["filtered_since_id"] = since_s
-        out["new_count"] = len(filtered)
-        return out
-    return data
-
-
 def resolve_content_root(task: dict[str, Any]) -> Path:
     """Resolve workspace content root from the task or cwd.
 
@@ -663,92 +487,6 @@ def resolve_content_root(task: dict[str, Any]) -> Path:
     if content_root_raw:
         return Path(str(content_root_raw)).expanduser().resolve()
     return Path.cwd()
-
-
-def _browser_plan(op: str, task: dict[str, Any], site: str, social_op: str) -> dict[str, Any]:
-    """Build a CDP ``browser`` tool plan for the parent turn.
-
-    Args:
-        op (str): Facade op name.
-        task (dict[str, Any]): Task args.
-        site (str): Site key.
-        social_op (str): Mapped ``SocialRecipe`` op.
-
-    Returns:
-        dict[str, Any]: Plan payload for ``action=social``.
-
-    Examples:
-        >>> _browser_plan("home_timeline_collect", {}, "x", "home_feed")["action"]
-        'social'
-    """
-    query = task.get("query") or task.get("text") or ""
-    if op == "search_hashtags":
-        tags = task.get("hashtags") or task.get("query") or ""
-        if isinstance(tags, list):
-            query = " ".join(f"#{str(t).lstrip('#')}" for t in tags)
-        else:
-            query = f"#{str(tags).lstrip('#')}" if tags else ""
-    if op == "discover_followers":
-        username = str(
-            task.get("username") or task.get("screen_name") or task.get("query") or ""
-        ).lstrip("@")
-        query = f"followers:{username}" if username else query
-    if op == "discover_mutual_graph":
-        names = task.get("usernames")
-        if isinstance(names, list):
-            handles = [str(n).strip().lstrip("@") for n in names if str(n).strip()]
-            if len(handles) >= 2:
-                query = f"mutual followers {' '.join(handles[:2])}"
-        elif task.get("query"):
-            query = f"mutual followers {task['query']}"
-    body = task.get("text") or task.get("tweet_content") or ""
-    tweet_id = str(task.get("tweet_id") or "")
-    url = task.get("url") or task.get("tweet_url") or ""
-    if op == "comment_on_tweet" and tweet_id and not url:
-        url = f"https://x.com/i/status/{tweet_id}"
-    if (
-        tweet_id
-        and not url
-        and op
-        in (
-            "collect_tweet_replies",
-            "get_tweet_stats",
-            "get_new_comments_on_tweet",
-        )
-    ):
-        url = f"https://x.com/i/status/{tweet_id}"
-    plan: dict[str, Any] = {
-        "action": "social",
-        "site": site,
-        "op": social_op,
-        "facade_op": op,
-        "query": query,
-        "url": url,
-        "body": body,
-        "tweet_id": tweet_id,
-        "username": task.get("username") or "",
-        "hint": (
-            f"Invoke browser tool action=social site={site} for facade op={op} "
-            f"(mapped social op={social_op}). Write ops need "
-            f"tools.browser.social.{site}.allow_write=true."
-        ),
-    }
-    if op == "create_tweet_thread":
-        items = thread_items(task)
-        plan["items"] = items
-        plan["texts"] = items
-        if items and not body:
-            plan["body"] = items[0]
-    if op == "get_new_comments_on_tweet":
-        for key in ("since_id", "since_cursor", "last_seen_id", "last_seen_at"):
-            if task.get(key) is not None:
-                plan[key] = task[key]
-    if op in W14_DISCOVERY_OPS:
-        plan["discovery"] = True
-        for key in ("max_items", "next_cursor", "cursor", "usernames"):
-            if task.get(key) is not None:
-                plan[key] = task[key]
-    return plan
 
 
 async def _session_status(
@@ -840,22 +578,11 @@ async def _dispatch(
         return await _session_status(task, cfg, site)
 
     spec = _OP_SPECS[op]
-    is_write = spec.is_write
     medium = resolve_social_medium(task, smm_cfg(cfg), site)
 
-    if op in W14_DISCOVERY_OPS and _task_force_rate_limit(task):
-        retry_raw = task.get("retry_after_s")
-        retry_after_s = int(retry_raw) if retry_raw is not None else 30
-        return _rate_limit_envelope(op, medium, retry_after_s=retry_after_s)
-
-    if is_write and _task_dry_run(task):
-        return _dry_run_envelope(op, medium, task)
-
-    if op in W13_TIMELINE_OPS and _task_dry_run(task):
-        return _dry_run_envelope(op, medium, task)
-
-    if op in W14_DISCOVERY_OPS and _task_dry_run(task):
-        return _dry_run_envelope(op, medium, task)
+    guarded = apply_pre_dispatch_guards(op, spec, task, medium)
+    if guarded is not None:
+        return guarded
 
     if op == "post_tweet_auto_cookie" and medium == "browser":
         coerced = await _dispatch(
@@ -892,7 +619,7 @@ async def _dispatch(
         )
 
     if (
-        is_write
+        spec.is_write
         and medium == "browser"
         and not social_write_allowed(site, browser_tools=_browser_tools_section(cfg))
     ):
@@ -934,7 +661,7 @@ async def _dispatch(
             body = twexapi_body
             path_params = twexapi_path_params
             params = twexapi_params
-            write_via_helper = is_write and twex_key in TWEXAPI_WRITE_OPS
+            write_via_helper = spec.is_write and twex_key in TWEXAPI_WRITE_OPS
             if write_via_helper:
                 cookie = _task_cookie(task)
                 proxy = _task_proxy(task)
@@ -963,7 +690,7 @@ async def _dispatch(
                     path_params=path_params,
                 )
             if op == "get_new_comments_on_tweet":
-                data = _filter_new_comments(data, task)
+                data = filter_new_comments(data, task)
             return envelope(ok=True, medium=medium, op=op, data=data)
         except TwexApiError as exc:
             return envelope(
@@ -1010,7 +737,7 @@ async def _dispatch(
             error=f"{op} has no browser SocialRecipe mapping — use medium=twexapi",
             code="BROWSER_OP_UNSUPPORTED",
         )
-    plan = _browser_plan(op, task, site, social_op)
+    plan = browser_plan(op, task, site, social_op)
     return envelope(ok=True, medium="browser", op=op, data={"browser_plan": plan})
 
 
@@ -1054,15 +781,11 @@ async def run_op(
     if op not in _OP_SPECS:
         msg = f"unknown facade op: {op!r}"
         raise KeyError(msg)
-    medium = resolve_social_medium(task_d, smm_cfg(cfg_d), site)
-    if op in W14_DISCOVERY_OPS:
-        if _task_force_rate_limit(task_d):
-            retry_raw = task_d.get("retry_after_s")
-            retry_after_s = int(retry_raw) if retry_raw is not None else 30
-            return _rate_limit_envelope(op, medium, retry_after_s=retry_after_s)
-        if _task_dry_run(task_d):
-            return _dry_run_envelope(op, medium, task_d)
     spec = _OP_SPECS[op]
+    medium = resolve_social_medium(task_d, smm_cfg(cfg_d), site)
+    guarded = apply_pre_dispatch_guards(op, spec, task_d, medium)
+    if guarded is not None:
+        return guarded
     try:
         body = twexapi_body
         if body is None and spec.pack_body is not None:
