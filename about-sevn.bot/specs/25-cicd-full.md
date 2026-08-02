@@ -440,6 +440,8 @@ and docs/skills/infra checks that block regressions before merge.
 | `make ci-quality` | Advisory (ruff ratchet, vulture, codespell — not in `make ci`) |
 | `.github/workflows/ci.yml` | Primary CI workflow |
 | `.github/workflows/ci-cd.yml` | Release / CD workflow |
+| `.craft.yml` | Sentry Craft config scaffold (evaluation-only; #110 / W15 — not wired to CI) |
+| `about-sevn.bot/decisions/0003-craft-release-management-runbook.md` | Maintainer release runbook + Craft evaluation |
 | `scripts/ci_resume.sh` | Ordered `CI_STEPS` driver |
 
 Docs tooling in scope: `src/sevn/docs/about/check.py` (`check_about_docs`),
@@ -522,3 +524,22 @@ Wave agents: mid-wave **`make ci-affected`** only; wave boundary **`make ci`** o
 | `tests/docs/about/` | About-docs contracts |
 | `spec-kit-wave/tests/` | skw validators + sync contracts (`make spec-kit-wave-test` in `ci-docs`; `spec-check` / `prd-check` wired via `about-docs-check`) |
 | `.github/workflows/*.yml` | CI orchestration smoke on every push |
+
+## Amendments (open-issues-sweep-aug-2026 W15 — append-only)
+
+Craft evaluation for [#110](https://github.com/sevn-bot/sevn/issues/110) — plan **D10**
+(evaluate-then-adopt). Scaffold and docs land in W15; wiring Craft into `make release` or
+`.github/workflows/` requires **operator sign-off** at the W15 gate.
+
+- [x] **W15.1** Current release flow vs Craft capabilities documented in
+  `about-sevn.bot/decisions/0003-craft-release-management-runbook.md` § Current release flow + § Craft evaluation.
+  (2026-08-01 ✅: runbook)
+- [x] **W15.2** Evaluation-only `.craft.yml` scaffold (`github` + `pypi` targets,
+  `changelog.policy: simple`) plus dry-run instructions (`craft prepare|publish --dry-run`,
+  `CRAFT_DRY_RUN`) in runbook § Dry-run instructions. Not referenced by Makefile or Actions.
+  (2026-08-01 ✅: `.craft.yml` + runbook)
+- [x] **W15.3** Maintainer release checklist (manual flow today + future Craft path) in runbook
+  § Maintainer checklist. (2026-08-01 ✅: `about-sevn.bot/decisions/0003-craft-release-management-runbook.md`)
+- [ ] **W15-adopt (operator gate)** Add `getsentry/craft@v2` workflow and/or `make release-*`
+  wrappers; resolve duplicate GitHub Release ownership with `ci-cd.yml` phase6 before live
+  `craft publish`. (2026-08-01 deferred: D10 — operator sign-off required)

@@ -11,6 +11,7 @@ are cut into a dated, versioned section at release time.
 ## [Unreleased]
 
 ### Added
+- [2026-08-01] Craft release evaluation runbook and evaluation-only `.craft.yml` scaffold document Sentry Craft prepare/publish against the current manual release flow — Craft CI adoption deferred pending operator gate (#110, open-issues-sweep W15)
 - [2026-07-31] User-defined `permissions.deny_rules` block destructive or sensitive tool calls by tool name and optional command/pattern, domain, or path — rules apply even in permissive ABAC owner sessions (additive-deny, D15), return the configured reason to the model, and log redacted audit lines; Mission Control approval `deny` verdicts accept an optional operator reason (#80, open-issues-sweep W26)
 - [2026-07-31] Pluggable 1Password (`one_password`) and Bitwarden (`bitwarden`) secret backends (CLI bridges — unit-tested stubs; live vault resolution requires operator `op`/`bw` credentials), deterministic precedence and provenance reporting without value leakage (#82, open-issues-sweep W25)
 - [2026-07-30] Named routing profiles under `routing.profiles` with `routing.channel_map` route keys — turn-scoped model, prompt, skills, memory namespace, secrets scope prefix, and `permissions_profile` isolation; `routing.enabled` default-off (**D9**); distinct from `permissions.profiles` and other legacy *profile* keys (**D14**); `TopicConfig.skills` wired from Telegram inbound metadata (#79)

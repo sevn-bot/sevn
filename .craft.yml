@@ -1,0 +1,44 @@
+# Sentry Craft release scaffold for sevn.bot (#110, open-issues-sweep W15).
+#
+# STATUS: evaluation-only — NOT wired into CI or `make release` (plan D10).
+# Operator must sign off before:
+#   - adding `getsentry/craft@v2` to `.github/workflows/`
+#   - replacing manual tag pushes with `craft publish`
+#   - enabling PyPI publish credentials in CI
+#
+# Docs: about-sevn.bot/decisions/0003-craft-release-management-runbook.md
+# Upstream: https://github.com/getsentry/craft
+
+minVersion: '2.21.0'
+
+github:
+  owner: sevn-bot
+  repo: sevn
+
+releaseBranchPrefix: release
+
+versioning:
+  policy: manual
+
+changelog:
+  filePath: CHANGELOG.md
+  # Keep-a-Changelog + datestamped Unreleased bullets are enforced by `make changelog-check`.
+  # Use `simple` until operator chooses to migrate Unreleased → Craft `auto` + `.github/release.yml`.
+  policy: simple
+
+# Phase 6 of ci-cd.yml already creates GitHub releases on `v*` tag push via
+# softprops/action-gh-release. Enabling the github target here would duplicate
+# that step unless ci-cd.yml is refactored — see the runbook gap analysis.
+targets:
+  - name: github
+    tagPrefix: v
+    previewReleases: true
+
+  # Hatchling project — Craft bumps `[project].version` in pyproject.toml when prepare runs.
+  # PyPI publish stays disabled until operator configures trusted publishing / API tokens.
+  - name: pypi
+    # distName: sevn  # uncomment when adopting PyPI
+
+# Multi-image GHCR publish (sandbox/proxy/gateway/browser/gui) lives in
+# `.github/workflows/ci-cd.yml` `publish-ghcr` — not expressible as a single Craft
+# docker target without custom scripting. Defer to a follow-up if Craft is adopted.
