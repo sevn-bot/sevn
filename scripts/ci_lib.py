@@ -234,6 +234,7 @@ TARGET_ORDER: tuple[str, ...] = (
     "onboarding-profiles-schema",
     "infra-check",
     "skills-core-check",
+    "removed-browser-skills-check",
     "skillspector-check",
     "skills-index-check",
     "tools-skills-inventory-check",

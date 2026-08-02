@@ -3,9 +3,14 @@
 Consumed by ``scripts/check_removed_browser_skill_ids.py`` and
 ``tests/browser/test_browser_removal_parity.py`` so survivor allowlists and gate
 needles stay in one place.
+
+Exports:
+    contains_forbidden_substring — word-boundary substring scan helper
 """
 
 from __future__ import annotations
+
+import re
 
 REMOVED_SKILL_IDS: frozenset[str] = frozenset(
     {
@@ -17,6 +22,29 @@ REMOVED_SKILL_IDS: frozenset[str] = frozenset(
 )
 
 FORBIDDEN_SUBSTRINGS: tuple[str, ...] = (*tuple(sorted(REMOVED_SKILL_IDS)), "playwright_browser")
+
+
+def contains_forbidden_substring(text: str, needle: str) -> bool:
+    """Return True when *needle* appears as a standalone token in *text*.
+
+    Hyphenated ids such as ``x-use`` must not match inside unrelated words
+    (e.g. ``max-users``).
+
+    Args:
+        text (str): File or registry body to scan.
+        needle (str): Forbidden skill id or legacy alias substring.
+
+    Returns:
+        bool: ``True`` when *needle* matches as a standalone token.
+
+    Examples:
+        >>> contains_forbidden_substring("see also x-use migration", "x-use")
+        True
+        >>> contains_forbidden_substring("configure max-users limit", "x-use")
+        False
+    """
+    return re.search(rf"(?<![\w-]){re.escape(needle)}(?![\w-])", text) is not None
+
 
 # Repo-wide ``playwright`` driver grep survivors — artifacts that document removal.
 BROWSER_REMOVAL_PARITY_SURVIVOR_PREFIXES: tuple[str, ...] = (

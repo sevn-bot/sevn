@@ -60,3 +60,21 @@ def test_removed_browser_skill_ids_check_detects_forbidden_substring(
         check, "TOOLS_REGISTRY", tmp_path / "src" / "sevn" / "tools" / "registry.py"
     )
     assert check.main() == 1
+
+
+def test_removed_browser_skill_ids_check_ignores_false_positive_substring(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    skill_root = tmp_path / "src" / "sevn" / "data" / "bundled_skills" / "core" / "demo-skill"
+    skill_root.mkdir(parents=True)
+    (skill_root / "SKILL.md").write_text("configure max-users limit\n", encoding="utf-8")
+    check = importlib.import_module("scripts.check_removed_browser_skill_ids")
+    monkeypatch.setattr(check, "REPO", tmp_path)
+    monkeypatch.setattr(
+        check, "BUNDLED_ROOT", tmp_path / "src" / "sevn" / "data" / "bundled_skills"
+    )
+    monkeypatch.setattr(
+        check, "TOOLS_REGISTRY", tmp_path / "src" / "sevn" / "tools" / "registry.py"
+    )
+    assert check.main() == 0

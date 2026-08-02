@@ -28,6 +28,7 @@ if str(_REPO) not in sys.path:
 from scripts.removed_browser_skill_policy import (  # noqa: E402
     FORBIDDEN_SUBSTRINGS,
     REMOVED_SKILL_IDS,
+    contains_forbidden_substring,
 )
 
 REPO = _REPO
@@ -64,7 +65,7 @@ def _scan_bundled_tree() -> list[str]:
         except UnicodeDecodeError:
             continue
         for needle in FORBIDDEN_SUBSTRINGS:
-            if needle in text:
+            if contains_forbidden_substring(text, needle):
                 bad.append(f"{path.relative_to(REPO)}: contains forbidden substring {needle!r}")
                 break
     return bad
@@ -85,7 +86,7 @@ def _scan_tools_registry() -> list[str]:
     text = TOOLS_REGISTRY.read_text(encoding="utf-8")
     bad: list[str] = []
     for skill_id in sorted(REMOVED_SKILL_IDS):
-        if skill_id in text:
+        if contains_forbidden_substring(text, skill_id):
             bad.append(f"{TOOLS_REGISTRY.relative_to(REPO)}: lists removed skill id {skill_id!r}")
     return bad
 
