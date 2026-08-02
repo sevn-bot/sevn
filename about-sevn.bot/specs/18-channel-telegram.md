@@ -537,6 +537,28 @@ persona/display-name — not the run inventory. Menu-action callback toasts use 
 inline answer fails, identity buttons (Version id / Deployment id) still emit chat fallback
 text. Slash `/stop` kill callbacks re-edit the picker message and ack the callback query.
 
+## Amendments (open-issues-sweep-aug-2026 W4 — #115, #116)
+
+When ``providers.use_main_model_for_all`` toggles **off** via
+``cfg:toggle:providers.use_main_model_for_all:false``, the menu toggle handler
+(``menu_action_router._apply_toggle``) calls
+``fill_missing_model_slots_from_triager`` so unset tier slots inherit the triager
+model — mirroring onboarding ``maybe_split_unified_model_on_config_set`` semantics.
+Agent section captions resolve slot ids via ``_telegram_config_dot_path_display`` so
+the triager model picker stays non-empty when only triager is configured.
+Regression: ``tests/gateway/test_model_menu_unified_toggle.py``,
+``tests/gateway/test_models_picker_menu.py``.
+
+## Amendments (open-issues-sweep-aug-2026 W5 — #124, D9)
+
+Chat → Voice wake-word toggles (``cfg:toggle:voice.activation.enabled``,
+``cfg:voice:activation:wake:*``) ack via ``_refresh_config_menu_after_action`` with
+toasts; when the gateway runtime dict is missing,
+``_reload_voice_activation_runtime`` surfaces the probe reason instead of a silent
+no-op. **Setup wake-word** (``act:voice:activation:setup``) posts a doctor subset and
+``voice-wake`` extra install guidance — no gateway ``uv sync``. Regression:
+``tests/gateway/test_voice_activation_menu.py``; ``make telegram-menu-docs-check``.
+
 ## Amendments (open-issues-sweep Batch G W38 — #102 wake-word activation)
 
 Chat → Voice adds wake-word activation controls: toggle

@@ -12,6 +12,8 @@ Exports:
     available_wake_word_models — engine-derived wake phrase choices (W38).
     build_wake_word_listener — factory when enabled and available.
     format_activation_status — plain-text activation status (W38).
+    format_voice_activation_operator_reason — Telegram-safe probe reason text (D9).
+    format_voice_activation_setup_guide — Setup wake-word doctor subset body (D9).
     maybe_start_wake_word_listener — gateway lifespan startup hook.
     maybe_stop_wake_word_listener — gateway lifespan shutdown hook.
     probe_voice_activation — structured availability verdict (D25).
@@ -20,6 +22,7 @@ Exports:
     resolve_voice_activation_settings — merge config with defaults.
     voice_activation_config_enabled — ``voice.activation.enabled`` alone.
     voice_activation_enabled — conjunctive ``voice.enabled`` + activation.
+    voice_activation_offline_reload_note — toast when listener runtime missing (D9).
 """
 
 from __future__ import annotations
@@ -462,6 +465,83 @@ def probe_voice_activation(ws: WorkspaceConfig) -> dict[str, Any]:
         "status": "available",
         "reason": f"engine={settings.engine}; wake_word={settings.wake_word!r}",
     }
+
+
+def format_voice_activation_operator_reason(reason: str) -> str:
+    """Sanitize probe ``reason`` for Telegram toasts (no raw ``uv sync`` copy).
+
+    Args:
+        reason (str): ``probe_voice_activation`` reason text.
+
+    Returns:
+        str: Operator-facing reason safe for inline toasts.
+
+    Examples:
+        >>> format_voice_activation_operator_reason("run: uv sync --extra voice-wake")
+        'run: install optional extra voice-wake'
+    """
+    return reason.replace("uv sync --extra ", "install optional extra ").strip()
+
+
+def voice_activation_offline_reload_note(ws: WorkspaceConfig) -> str:
+    """Toast suffix when the live listener runtime dict is missing (D9).
+
+    Args:
+        ws (WorkspaceConfig): Parsed workspace document.
+
+    Returns:
+        str: Short operator note; includes probe reason when available.
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> note = voice_activation_offline_reload_note(WorkspaceConfig.minimal())
+        >>> note.startswith("Listener offline")
+        True
+    """
+    verdict = probe_voice_activation(ws)
+    reason = str(verdict.get("reason") or "").strip()
+    if reason:
+        return f"Listener offline — config saved. {format_voice_activation_operator_reason(reason)}"
+    return "Listener offline — config saved; run Setup wake-word or sevn doctor."
+
+
+def format_voice_activation_setup_guide(ws: WorkspaceConfig) -> str:
+    """Doctor subset body for Telegram Setup wake-word action (D9).
+
+    Args:
+        ws (WorkspaceConfig): Parsed workspace document.
+
+    Returns:
+        str: Plain-text guidance posted to chat (no gateway ``uv sync``).
+
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> body = format_voice_activation_setup_guide(WorkspaceConfig.minimal())
+        >>> "Wake-word setup" in body
+        True
+    """
+    probe = probe_voice_activation(ws)
+    status = str(probe.get("status") or "unknown")
+    reason = str(probe.get("reason") or "").strip()
+    available = bool(probe.get("available"))
+    lines = [
+        "Wake-word setup (sevn doctor subset)",
+        "",
+        f"Status: {status}",
+    ]
+    if not voice_activation_config_enabled(ws):
+        lines.append("Enable Wake word above, then tap Setup wake-word again.")
+    if reason:
+        lines.append(format_voice_activation_operator_reason(reason))
+    if not available:
+        lines.extend(
+            [
+                "",
+                f"Install optional extra `{VOICE_WAKE_OPTIONAL_EXTRA}` on the gateway host.",
+                "Run `sevn doctor` for the full voice activation check list.",
+            ],
+        )
+    return "\n".join(lines)
 
 
 class WakeWordListener:
@@ -1085,6 +1165,8 @@ __all__ = [
     "available_wake_word_models",
     "build_wake_word_listener",
     "format_activation_status",
+    "format_voice_activation_operator_reason",
+    "format_voice_activation_setup_guide",
     "has_input_device",
     "maybe_start_wake_word_listener",
     "maybe_stop_wake_word_listener",
@@ -1094,5 +1176,6 @@ __all__ = [
     "resolve_voice_activation_settings",
     "voice_activation_config_enabled",
     "voice_activation_enabled",
+    "voice_activation_offline_reload_note",
     "voice_wake_extra_installed",
 ]
