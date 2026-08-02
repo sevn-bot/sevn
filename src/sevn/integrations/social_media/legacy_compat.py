@@ -13,7 +13,7 @@ Exports:
     host_allowed — suffix match against an egress allowlist.
     x_search_url — build an X search URL from a query string.
     facebook_search_url — build a Facebook search URL from a query string.
-    logged_in_browser_page — legacy Playwright-era helper (raises with migration guidance).
+    logged_in_browser_page — legacy browser-driver-era helper (raises with migration guidance).
     fetch_page_snapshot — legacy page snapshot helper (dry-run or migration error).
 """
 
@@ -327,7 +327,7 @@ def _content_root_from_env() -> Path:
 
 @asynccontextmanager
 async def logged_in_browser_page(*, profile_dir: Path) -> AsyncIterator[Any]:
-    """Legacy Playwright page helper — migrate to ``browser`` tool ``action=social``.
+    """Legacy browser page helper — migrate to ``browser`` tool ``action=social``.
 
     Args:
         profile_dir (Path): Legacy parameter (ignored).
@@ -339,7 +339,7 @@ async def logged_in_browser_page(*, profile_dir: Path) -> AsyncIterator[Any]:
         AsyncIterator[Any]: Async context manager (always raises).
 
     Raises:
-        RuntimeError: Always — Playwright social_browser stack was removed.
+        RuntimeError: Always — legacy browser-driver social_browser stack was removed.
 
     Examples:
         >>> import asyncio
@@ -349,15 +349,15 @@ async def logged_in_browser_page(*, profile_dir: Path) -> AsyncIterator[Any]:
         ...         async with logged_in_browser_page(profile_dir=Path("/tmp/p")):
         ...             pass
         ...     except RuntimeError as exc:
-        ...         return "Playwright" in str(exc)
+        ...         return "social_media_manager" in str(exc)
         ...     return False
         >>> asyncio.run(_probe())
         True
     """
     _ = profile_dir
     msg = (
-        "logged_in_browser_page removed with Playwright — use social_media_manager + "
-        "browser tool action=social (see bundled skill migration docs)."
+        "logged_in_browser_page removed with the legacy browser-driver stack — use "
+        "social_media_manager + browser tool action=social (see bundled skill migration docs)."
     )
     raise RuntimeError(msg)
     yield  # pragma: no cover — unreachable; satisfies async context manager protocol
@@ -374,7 +374,7 @@ async def fetch_page_snapshot(
 ) -> dict[str, object]:
     """Navigate to ``url`` and return a compact text snapshot from the logged-in session.
 
-    Live mode requires Playwright (removed). Dry-run returns a plan payload for migration.
+    Live mode requires the removed legacy browser-driver stack. Dry-run returns a plan payload.
 
     Args:
         skill_id (str): Bundled skill id.
@@ -388,7 +388,7 @@ async def fetch_page_snapshot(
         dict[str, object]: Snapshot metadata (dry-run) or raises for live mode.
 
     Raises:
-        RuntimeError: When live mode is requested without Playwright migration path.
+        RuntimeError: When live mode is requested without a CDP/browser migration path.
 
     Examples:
         >>> import asyncio, tempfile
@@ -417,7 +417,7 @@ async def fetch_page_snapshot(
         }
     _ = _content_root_from_env()
     msg = (
-        "fetch_page_snapshot live mode removed with Playwright — use browser tool "
+        "fetch_page_snapshot live mode removed with the legacy browser-driver stack — use browser tool "
         "action=social or pass dry_run=True while migrating operator scripts."
     )
     raise RuntimeError(msg)
