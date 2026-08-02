@@ -750,6 +750,27 @@ per-day caps and cooldowns, logs decisions to
 ``.sevn/reddit-karma-loop/decisions.jsonl``, and requires ``--confirm`` before
 any post. ``auto_post`` is not implemented — draft-only per **D11**.
 
+## Amendments (open-issues-sweep-aug-2026 W6 — removed Playwright skills #117 / #127, D6)
+
+Bundled Playwright skill trees were removed on 2026-07-16: ``playwright-browser``,
+``x-use``, ``facebook-use``, ``linkedin-use``. Browser automation uses the native
+``browser`` tool (CDP) plus ``social_media_manager`` / ``browser-harness`` — not
+Playwright drivers or resurrected ``x-use/`` packages.
+
+| Gate | Contract |
+|------|----------|
+| CI | ``make removed-browser-skills-check`` — fails when forbidden ids or ``playwright-browser`` / ``playwright_browser`` substrings reappear under ``src/sevn/data/bundled_skills/`` or when ``src/sevn/tools/registry.py`` lists a removed id |
+| Baseline | Trunk @ ``origin/pre-0.0.1`` had no bundled residue; only ``CHANGELOG.md`` retains historical mentions |
+
+**Operator workspace cleanup** (stale copies installed before removal):
+
+1. Delete obsolete trees under ``<workspace>/skills/user/`` or ``<workspace>/skills/core/`` when present: ``playwright-browser``, ``x-use``, ``facebook-use``, ``linkedin-use``.
+2. Refresh shipped core packages: ``sevn sync`` (runs ``refresh_bundled_core_skills`` — replaces ``skills/core/<id>`` from the bundled tree).
+3. Append missing ``skills/INDEX.md`` starter rows only: ``sevn skills sync`` or Telegram ``/config`` → Skills → **Sync skills index** (``act:skills:sync``).
+4. Replace ``sevn.skills.social_browser`` imports in custom operator skills with ``integrations/social_media/`` helpers (see Batch C W9 / #128).
+
+Do **not** run ``git clean -x`` / ``-X`` in the operator checkout — use targeted deletes above.
+
 ## Amendments (open-issues-sweep aug-2026 Batch C — #128, #125, #126, #129)
 
 **W9 (#128 / D7):** Legacy ``sevn.skills.social_browser`` and operator ``skills/x-use/`` imports

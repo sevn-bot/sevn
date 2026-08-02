@@ -106,6 +106,15 @@ PATH_RULES: tuple[PathRule, ...] = (
     PathRule(
         (
             "src/sevn/data/bundled_skills/**",
+            "src/sevn/tools/registry.py",
+            "scripts/check_removed_browser_skill_ids.py",
+            "scripts/removed_browser_skill_policy.py",
+        ),
+        "removed-browser-skills-check",
+    ),
+    PathRule(
+        (
+            "src/sevn/data/bundled_skills/**",
             "skills/**",
             "scripts/check_skillspector.py",
         ),
@@ -225,6 +234,7 @@ TARGET_ORDER: tuple[str, ...] = (
     "onboarding-profiles-schema",
     "infra-check",
     "skills-core-check",
+    "removed-browser-skills-check",
     "skillspector-check",
     "skills-index-check",
     "tools-skills-inventory-check",
