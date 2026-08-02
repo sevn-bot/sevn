@@ -65,9 +65,10 @@ from sevn.security.sandbox_runtime import (
 from sevn.skills import SkillExecutionError
 from sevn.skills.manager import SkillsManager
 from sevn.triggers.cron import (
+    CronJobRow,
     SqliteCronStore,
-    compute_next_fire_ns,
     cron_job_to_dict,
+    finalize_cron_agent_dispatch,
     list_cron_jobs,
 )
 from sevn.triggers.cron_runs import (
@@ -547,37 +548,50 @@ async def dispatch_cron_job_now(request: Request, *, job_id: str) -> dict[str, o
         notify_template=row.payload_template if row.delivery_mode == "notify_only" else None,
     )
     trace = getattr(request.app.state, "gateway_trace", None)
-    try:
-        await asyncio.wait_for(dispatch_fn(req), timeout=600.0)
-    except Exception as exc:
-        complete_cron_run_event(
-            conn,
-            job_id=row.job_id,
-            run_id=correlation_id,
-            claimed_at=claimed_at,
-            status="failed",
-            error=str(exc)[:500],
-        )
-        raise
-    complete_cron_run_event(
-        conn,
+    layout = getattr(request.app.state, "layout", None)
+    content_root = layout.content_root if layout is not None else Path(".")
+    cron_row = CronJobRow(
         job_id=row.job_id,
-        run_id=correlation_id,
-        claimed_at=claimed_at,
-        status="ok",
-        result_summary="manual_dispatch_completed",
-    )
-    nxt = compute_next_fire_ns(
         cron_expr=row.cron_expr,
-        tz_name=row.timezone,
-        from_ns=time.time_ns(),
+        timezone=row.timezone,
+        next_fire_at_ns=row.next_fire_at_ns,
+        routing_mode=row.routing_mode,
+        delivery_mode=row.delivery_mode,
+        permission_template_ref=row.permission_template_ref,
+        allow_tier_cd=row.allow_tier_cd,
+        overlap_policy=row.overlap_policy,
+        result_channel_json=row.result_channel_json,
+        payload_template=row.payload_template or "",
     )
     store.update_schedule(
         job_id=row.job_id,
-        next_fire_at_ns=nxt,
+        next_fire_at_ns=row.next_fire_at_ns,
         last_correlation_id=correlation_id,
-        last_status="ok",
+        last_status="dispatched",
     )
+    try:
+        outcome = await asyncio.wait_for(dispatch_fn(req), timeout=600.0)
+        finalize_cron_agent_dispatch(
+            conn=conn,
+            cron_store=store,
+            row=cron_row,
+            correlation_id=correlation_id,
+            claimed_at=claimed_at,
+            outcome=outcome,
+            content_root=content_root,
+        )
+    except Exception as exc:
+        finalize_cron_agent_dispatch(
+            conn=conn,
+            cron_store=store,
+            row=cron_row,
+            correlation_id=correlation_id,
+            claimed_at=claimed_at,
+            outcome=None,
+            content_root=content_root,
+            dispatch_error=exc,
+        )
+        raise
     conn.commit()
     await emit_mission_audit(
         request,
@@ -587,7 +601,14 @@ async def dispatch_cron_job_now(request: Request, *, job_id: str) -> dict[str, o
         extra={"job_id": job_id, "correlation_id": correlation_id},
     )
     _ = trace
-    return {"ok": True, "job_id": job_id, "correlation_id": correlation_id}
+    refreshed = store.get_job(job_id)
+    last_status = refreshed.last_status if refreshed is not None else "completed"
+    return {
+        "ok": last_status == "completed",
+        "job_id": job_id,
+        "correlation_id": correlation_id,
+        "last_status": last_status,
+    }
 
 
 def daemon_control(

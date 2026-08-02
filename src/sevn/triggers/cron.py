@@ -15,6 +15,7 @@ Exports:
     delete_cron_job — remove a cron job row.
     add_reminder — one-shot reminder row (cron at absolute datetime).
     register_cron_job_handler — bind a job_id to a sync handler (no magic forks).
+    finalize_cron_agent_dispatch — record cron audit + schedule from dispatch outcome.
     cron_tick — gateway lifespan hook (loads due jobs; dispatch is injected).
     cron_tick_with_overlap_gate — :func:`cron_tick` with explicit overlap gate (tests).
 
@@ -46,10 +47,97 @@ from sevn.triggers.cron_runs import (
     insert_cron_run_event,
     recover_stale_cron_claims,
 )
+from sevn.triggers.dispatch_outcome import DispatchOutcome, notify_cron_dispatch_failure
 from sevn.triggers.request import DeliveryMode, DispatchRequest, ResultChannel, RoutingMode
 
 # job_id → sync handler ``(*, workspace: Path) -> None`` (avoids magic forks in cron_tick).
 _CRON_JOB_HANDLERS: dict[str, Callable[..., Any]] = {}
+
+CronDispatchFn = Callable[[DispatchRequest], Coroutine[Any, Any, DispatchOutcome | None]]
+
+
+def _handler_last_status(*, ok: bool) -> str:
+    """Map built-in cron handler success to ``last_status`` labels.
+
+    Args:
+        ok (bool): Whether the sync handler completed without error.
+
+    Returns:
+        str: ``completed`` or ``agent_failed``.
+
+    Examples:
+        >>> _handler_last_status(ok=True)
+        'completed'
+    """
+    return "completed" if ok else "agent_failed"
+
+
+def finalize_cron_agent_dispatch(
+    *,
+    conn: sqlite3.Connection,
+    cron_store: SqliteCronStore,
+    row: CronJobRow,
+    correlation_id: str,
+    claimed_at: int,
+    outcome: DispatchOutcome | None,
+    content_root: Path,
+    dispatch_error: BaseException | None = None,
+) -> None:
+    """Record cron audit + schedule metadata from a dispatch outcome (#135).
+
+    Args:
+        conn (sqlite3.Connection): Open ``sevn.db`` handle.
+        cron_store (SqliteCronStore): Cron persistence helper.
+        row (CronJobRow): Due job row being finalized.
+        correlation_id (str): Run correlation id.
+        claimed_at (int): Claim instant in nanoseconds.
+        outcome (DispatchOutcome | None): Assessed dispatch result when available.
+        content_root (Path): Workspace root for operator notify LOG fallback.
+        dispatch_error (BaseException | None, optional): Transport-level failure.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.isfunction(finalize_cron_agent_dispatch)
+        True
+    """
+    if dispatch_error is not None and outcome is None:
+        outcome = DispatchOutcome(
+            agent_ok=False,
+            delivery_ok=False,
+            error=str(dispatch_error)[:500],
+        )
+    if not isinstance(outcome, DispatchOutcome):
+        outcome = DispatchOutcome(agent_ok=True, delivery_ok=True)
+
+    last_status = outcome.cron_last_status()
+    audit_status = outcome.cron_audit_status()
+    complete_cron_run_event(
+        conn,
+        job_id=row.job_id,
+        run_id=correlation_id,
+        claimed_at=claimed_at,
+        status=audit_status,
+        result_summary=f"cron_{last_status}",
+        error=outcome.error,
+    )
+    nxt = compute_next_fire_ns(
+        cron_expr=row.cron_expr,
+        tz_name=row.timezone,
+        from_ns=time.time_ns(),
+    )
+    cron_store.update_schedule(
+        job_id=row.job_id,
+        next_fire_at_ns=nxt,
+        last_correlation_id=correlation_id,
+        last_status=last_status,
+    )
+    if last_status != "completed":
+        notify_cron_dispatch_failure(
+            job_id=row.job_id,
+            correlation_id=correlation_id,
+            outcome=outcome,
+            content_root=content_root,
+        )
 
 
 def register_cron_job_handler(job_id: str, handler: Callable[..., Any]) -> None:
@@ -1059,7 +1147,7 @@ async def cron_tick(
     workspace: WorkspaceConfig,
     content_root: Path,
     trace: TraceSink,
-    dispatch: Callable[[DispatchRequest], Coroutine[Any, Any, None]],
+    dispatch: CronDispatchFn,
     overlap_gate: dict[str, Any] | None = None,
 ) -> None:
     """Load due cron rows, invoke ``dispatch`` for each, and bump schedules.
@@ -1181,7 +1269,7 @@ async def cron_tick(
                     job_id=row.job_id,
                     cron_expr=row.cron_expr,
                     tz_name=row.timezone,
-                    status="ok",
+                    status=_handler_last_status(ok=True),
                 )
             except Exception as exc:
                 logger.exception("cron_handler_failed job_id={}", row.job_id)
@@ -1196,7 +1284,17 @@ async def cron_tick(
                     job_id=row.job_id,
                     cron_expr=row.cron_expr,
                     tz_name=row.timezone,
-                    status="error",
+                    status=_handler_last_status(ok=False),
+                )
+                notify_cron_dispatch_failure(
+                    job_id=row.job_id,
+                    correlation_id=correlation_id,
+                    outcome=DispatchOutcome(
+                        agent_ok=False,
+                        delivery_ok=False,
+                        error=str(exc)[:500],
+                    ),
+                    content_root=content_root,
                 )
             continue
         try:
@@ -1222,35 +1320,34 @@ async def cron_tick(
             notify_template=row.payload_template if row.delivery_mode == "notify_only" else None,
         )
         _record_claim(job_id=row.job_id, run_id=correlation_id, claimed_at=claimed_at)
+        cron_store.update_schedule(
+            job_id=row.job_id,
+            next_fire_at_ns=row.next_fire_at_ns,
+            last_correlation_id=correlation_id,
+            last_status="dispatched",
+        )
         try:
-            await asyncio.wait_for(dispatch(req), timeout=600.0)
-            _record_completion(
-                job_id=row.job_id,
-                run_id=correlation_id,
+            outcome = await asyncio.wait_for(dispatch(req), timeout=600.0)
+            finalize_cron_agent_dispatch(
+                conn=conn,
+                cron_store=cron_store,
+                row=row,
+                correlation_id=correlation_id,
                 claimed_at=claimed_at,
-                status="ok",
-                result_summary="dispatch_completed",
-            )
-            _bump_schedule(
-                job_id=row.job_id,
-                cron_expr=row.cron_expr,
-                tz_name=row.timezone,
-                status="ok",
+                outcome=outcome,
+                content_root=content_root,
             )
         except Exception as exc:
             logger.exception("cron_job_dispatch_failed job_id={}", row.job_id)
-            _record_completion(
-                job_id=row.job_id,
-                run_id=correlation_id,
+            finalize_cron_agent_dispatch(
+                conn=conn,
+                cron_store=cron_store,
+                row=row,
+                correlation_id=correlation_id,
                 claimed_at=claimed_at,
-                status="failed",
-                error=str(exc)[:500],
-            )
-            _bump_schedule(
-                job_id=row.job_id,
-                cron_expr=row.cron_expr,
-                tz_name=row.timezone,
-                status="error",
+                outcome=None,
+                content_root=content_root,
+                dispatch_error=exc,
             )
 
 
@@ -1260,7 +1357,7 @@ async def cron_tick_with_overlap_gate(
     workspace: WorkspaceConfig,
     content_root: Path,
     trace: TraceSink,
-    dispatch: Callable[[DispatchRequest], Coroutine[Any, Any, None]],
+    dispatch: CronDispatchFn,
     overlap_gate: dict[str, Any] | None = None,
 ) -> None:
     """Run :func:`cron_tick` with an explicit overlap gate (tests and tooling).
@@ -1300,9 +1397,9 @@ __all__ = [
     "cron_job_to_dict",
     "cron_job_to_list_dict",
     "cron_tick",
-    "cron_tick_with_overlap_gate",
     "delete_cron_job",
     "edit_cron_job",
+    "finalize_cron_agent_dispatch",
     "format_next_fire_at_iso",
     "list_cron_jobs",
     "recover_stale_cron_claims",
