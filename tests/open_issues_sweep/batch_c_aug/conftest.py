@@ -39,4 +39,6 @@ def load_smm_script(script_name: str) -> Any:
         sys.modules.pop(stale, None)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
+    for stale in ("_common", "x_ops"):
+        sys.modules.pop(stale, None)
     return mod

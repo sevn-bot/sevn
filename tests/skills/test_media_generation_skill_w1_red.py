@@ -86,6 +86,8 @@ def _load_script(script_name: str) -> Any:
     assert spec is not None
     assert spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
+    for stale in ("_common",):
+        sys.modules.pop(stale, None)
     if str(_SCRIPTS) not in sys.path:
         sys.path.insert(0, str(_SCRIPTS))
     spec.loader.exec_module(mod)

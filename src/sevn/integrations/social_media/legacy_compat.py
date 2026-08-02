@@ -80,6 +80,7 @@ def resolve_browser_profile(
 
     Examples:
         >>> import tempfile
+        >>> from pathlib import Path
         >>> root = Path(tempfile.mkdtemp())
         >>> resolve_browser_profile(root).name
         'default'

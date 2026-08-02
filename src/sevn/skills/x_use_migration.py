@@ -1,4 +1,4 @@
-"""Validate operator ``skills/x-use/`` stubs after Playwright skill removal (#128 / D7).
+"""Validate operator ``skills/x-use/`` stubs after x-use skill removal (#128 / D7).
 
 Module: sevn.skills.x_use_migration
 Depends: pathlib, sevn.skills.manifest
@@ -36,11 +36,13 @@ def validate_operator_stub(stub_root: Path) -> dict[str, Any]:
 
     Examples:
         >>> import tempfile
+        >>> from pathlib import Path
         >>> root = Path(tempfile.mkdtemp()) / "x-use"
         >>> root.mkdir()
-        >>> (root / "SKILL.md").write_text(
-        ...     "---\\nname: x-use\\nsee_also:\\n  - social_media_manager\\n---\\n"
-        ...     "Use social_media_manager.\\n",
+        >>> _ = (root / "SKILL.md").write_text(
+        ...     "---\\nname: x-use\\ndescription: legacy alias\\nversion: 0.0.0\\n"
+        ...     "see_also:\\n  - social_media_manager\\n---\\n"
+        ...     "Use social_media_manager + browser action=social.\\n",
         ...     encoding="utf-8",
         ... )
         >>> validate_operator_stub(root)["ok"]

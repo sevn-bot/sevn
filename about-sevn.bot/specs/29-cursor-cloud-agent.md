@@ -7,8 +7,8 @@ owner: Alex
 summary: Let operators and agents launch, poll, and inspect Cursor Cloud Agents against
   any GitHub/GitLab repo when skills.cursor_cloud.enabled is true, returning PR URLs,
   dashboard links (remote desktop), and
-last_updated: '2026-07-31'
-fingerprint: sha256:c53bc9b53c583d3a3230ca65133f58a8c2a60dce1ef30fa84a55465f8f9b8cf0
+last_updated: '2026-08-01'
+fingerprint: sha256:9552a5ccf666c2d89ad8f2cefef27f1564e0d991b0f35c78cb2b3c14299a742e
 related: []
 sources:
 - src/sevn/integrations/**
@@ -280,6 +280,12 @@ interfaces:
 - name: validate_config_cycle_mutation
   file: src/sevn/integrations/social_media/cycle_validation.py
   symbol: validate_config_cycle_mutation
+- name: dry_run_requested
+  file: src/sevn/integrations/social_media/legacy_compat.py
+  symbol: dry_run_requested
+- name: resolve_browser_profile
+  file: src/sevn/integrations/social_media/legacy_compat.py
+  symbol: resolve_browser_profile
 - name: allowed_media_for_site
   file: src/sevn/integrations/social_media/medium.py
   symbol: allowed_media_for_site
@@ -301,6 +307,9 @@ interfaces:
 - name: site_login_probe
   file: src/sevn/integrations/social_media/readiness.py
   symbol: site_login_probe
+- name: social_browser_config_deprecated
+  file: src/sevn/integrations/social_media/readiness.py
+  symbol: social_browser_config_deprecated
 - name: twexapi_key_configured
   file: src/sevn/integrations/social_media/readiness.py
   symbol: twexapi_key_configured
@@ -328,12 +337,24 @@ interfaces:
 - name: pack_auto_cookie_body
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_auto_cookie_body
+- name: pack_comment_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_comment_body
 - name: pack_create_body
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_create_body
 - name: pack_delete_body
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_delete_body
+- name: pack_discover_followers_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_discover_followers_body
+- name: pack_discover_mutual_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_discover_mutual_body
+- name: pack_discover_topic_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_discover_topic_body
 - name: pack_empty_body
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_empty_body
@@ -346,12 +367,18 @@ interfaces:
 - name: pack_quote_body
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_quote_body
+- name: pack_replies_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_replies_body
 - name: pack_thread_body
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_thread_body
 - name: pack_timeline_path
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_timeline_path
+- name: pack_tweet_detail_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_tweet_detail_body
 - name: pack_tweet_id_path
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_tweet_id_path

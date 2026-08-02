@@ -11,6 +11,7 @@ are cut into a dated, versioned section at release time.
 ## [Unreleased]
 
 ### Added
+- [2026-08-02] X login troubleshooting in `social_media_manager/SKILL.md` — SMS/phone handoff, account picker, cookie persistence, and no-code-in-logs guidance (#125, open-issues-sweep W10)
 - [2026-08-02] X discovery ops `discover_followers`, `discover_topic_accounts`, and `discover_mutual_graph` on the `x_ops` facade with D11 dry-run and rate-limit backoff envelopes (#129, open-issues-sweep W14)
 - [2026-08-02] X timeline/comment ops `get_new_comments_on_tweet`, `get_tweet_stats`, and `collect_tweet_replies` on the `x_ops` facade with D11 dry-run for read paths (#129, open-issues-sweep W13)
 - [2026-08-02] X engagement ops `comment_on_tweet` and `react_tweet` on the `x_ops` facade with D11 dry-run gates for write actions (#129, open-issues-sweep W12)

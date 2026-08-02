@@ -15,7 +15,7 @@ from typing import Final
 
 LEGACY_MODULE: Final[str] = "sevn.skills.social_browser"
 
-# Closest SSOT homes after Playwright/x-use removal (D7).
+# Closest SSOT homes after retired x-use skill tree removal (D7).
 SYMBOL_TARGET_MODULES: Final[dict[str, str]] = {
     "host_allowed": "sevn.browser.recipes.base",
     "validate_social_url": "sevn.browser.recipes.base",
