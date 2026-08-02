@@ -230,9 +230,29 @@ separate social-media auth stack.
 |--------|------------|---------|
 | `SEVN_CDP_URL` | Highest | Attach to an existing Chrome/Brave CDP endpoint |
 | `SEVN_BROWSER_PROFILE_DIR` | Env override | Persistent Chrome profile directory |
-| `skills.browser.profile_dir` | Config | Workspace profile path |
-| `skills.social_browser.profile_dir` | Config | Social-browser profile path |
+| `skills.browser.profile_dir` | Config | Workspace profile path (SSOT) |
+| `skills.social_media_manager.profile_dir` | Config | Optional override (same semantics as browser) |
+| `skills.social_browser.profile_dir` | Config | **Deprecated** legacy path — migrate to `skills.browser` |
 | `<workspace>/.sevn/browser-profiles/<session_id>` | Default | Session-scoped profile |
+
+### Migrating from `x-use` / `social_browser` (#128)
+
+Bundled **`x-use`**, **`facebook-use`**, and **`sevn.skills.social_browser`** were removed
+(2026-07-16). Use this skill + native **`browser`** (`action=social`) instead.
+
+**Operator workspace cleanup**
+
+1. Remove or replace `skills/x-use/` with a thin stub whose `SKILL.md` lists
+   `see_also: [social_media_manager]` and points agents at `run_skill_script
+   social_media_manager …` or `browser action=social site=x op=search`.
+2. Rewrite Python scripts that still import `sevn.skills.social_browser` with
+   `sevn.skills.social_browser_migration.rewrite_legacy_imports(source)` — targets
+   `sevn.integrations.social_media`, `sevn.browser.recipes.social`, and
+   `sevn.skills.browser_session`.
+3. Move `skills.social_browser.profile_dir` to `skills.browser.profile_dir` in
+   `sevn.json` (legacy key still read as fallback only).
+
+Validate an operator stub: `sevn.skills.x_use_migration.validate_operator_stub(path)`.
 
 Run `scripts/session_status.py` (or `run_skill_script social_media_manager
 session_status.py`) for TwexAPI key **yes/no**, CDP URL or profile dir, and optional
@@ -240,7 +260,8 @@ session_status.py`) for TwexAPI key **yes/no**, CDP URL or profile dir, and opti
 
 **Login tool:** use native `browser` with `action=login` and `credentials_ref`
 pointing at a workspace secrets alias (never inline passwords). See
-`sevn.browser.auth`.
+`sevn.browser.auth` and **X login troubleshooting** below for phone/SMS and
+account-picker handoffs.
 
 **Cookie export/import:** seed-only portability via `browser` `action=export_cookies`
 / `action=import_cookies` — not a required persistence layer for this specialist.
@@ -249,6 +270,82 @@ Map exported cookies into TwexAPI write bodies with
 `post_tweet_auto_cookie` uses TwexAPI's **pool** cookie on `medium=twexapi`; on
 `medium=browser` it coerces to `create_tweet_or_reply` using the CDP profile session
 (`code=COERCED_BROWSER_CREATE`).
+
+## X login troubleshooting (#125)
+
+X login often stops at steps the generic `browser action=login` scaffold cannot
+complete alone. Treat every verification challenge as an **operator handoff** — never
+guess, bypass, or store codes in skill docs, commits, or logs.
+
+### Prerequisites
+
+1. **Persistent profile** — set `skills.browser.profile_dir` (or attach via
+   `SEVN_CDP_URL`). Cookies persist in the Chrome profile directory; reusing the same
+   profile avoids repeat login.
+2. **Credentials in secrets** — `browser action=login site=x credentials_ref=<alias>`
+   loads username/password from the workspace secrets store (never inline passwords).
+3. **Check readiness** — `run_skill_script social_media_manager session_status.py
+   --site x` reports CDP reachability and a cheap login probe (boolean only; no
+   secrets).
+
+### Typical flow
+
+```
+browser action=login site=x credentials_ref=SEVN_SECRET_X_CREDENTIALS
+```
+
+When X accepts credentials, the session is logged in and cookies remain in the profile.
+When X shows a challenge screen, the tool returns **`HUMAN_REQUIRED`** with a screenshot
+and `operator_message` — pause automation and coordinate with the operator.
+
+### Phone / SMS verification
+
+After username/password, X often sends a **phone or SMS verification code**.
+
+1. **Stop and ask the operator** for the current code via the active channel (Telegram,
+   dashboard, etc.). Do **not** invent codes or retry with stale values.
+2. **Enter the code in the browser** using `browser action=fill` on the verification
+   input (commonly `[data-testid='ocfEnterTextTextInput']`) followed by the submit/next
+   control, **or** ask the operator to type it directly in the headed Chrome window.
+3. **Never log the code** — do not echo it in tool results, agent replies, screenshot
+   filenames, or workspace files. Use it once for the current step only.
+4. Call `browser action=resume_login site=x` after entry to re-check login state.
+
+### Account picker ("Choose an account")
+
+After verification, X may show a **Choose an account** page listing display names and
+handles (e.g. `alexhawat / @alexhawat`).
+
+1. **Confirm the target handle** with the operator when multiple accounts appear.
+2. **Click the matching row** (display name or `@handle`) to continue — use
+   `browser action=click` with a text hint, or have the operator click in the browser.
+3. Call `browser action=resume_login site=x` again until `login_state` reports
+   `logged_in` or `[data-testid='SideNav_AccountSwitcher_Button']` is visible.
+
+### Cookie persistence
+
+Successful login writes session cookies into the **persistent Chrome profile**
+(`skills.browser.profile_dir` or `SEVN_BROWSER_PROFILE_DIR`). Subsequent
+`browser action=social site=x …` calls reuse that session without re-entering codes.
+
+Optional portability (seed-only):
+
+```
+browser action=export_cookies cookies_path=cookies/x-export.json
+browser action=import_cookies cookies_path=cookies/x-export.json
+```
+
+Cookie **values** must never appear in logs or agent output — only counts/paths.
+
+### Privacy rules
+
+- **No verification codes** in SKILL.md examples, git commits, issue comments, or log
+  lines.
+- **No passwords inline** — always `credentials_ref` pointing at workspace secrets.
+- **`session_status`** and login probes return booleans/hints only, never cookie or
+  token values.
+- Redact screenshots shared outside the operator channel if they show verification UI
+  with partially entered codes.
 
 ## Unified X ops facade (`x_ops`)
 
@@ -313,13 +410,34 @@ on `medium=twexapi` it substitutes TwexAPI `timeline_page`.
 | `fetch_article_markdown` | **twexapi** | no | `tweet_id` | browser → `BROWSER_OP_UNSUPPORTED` (no article extract SocialRecipe) |
 | `home_timeline_collect` | both | no | `screen_name?` | browser `home_feed`; twexapi `timeline_page` |
 | `session_status` | both | no | — | CDP reachability, profile, login probe, `twexapi_key_present` (boolean only) |
+| `comment_on_tweet` | both | yes | `tweet_id`, `text` | browser `reply`; twexapi `create_tweet_or_reply`; honors `dry_run` (D11) |
+| `react_tweet` | **twexapi** | yes | `tweet_id` | twexapi alias `like_tweet`; honors `dry_run` |
+| `get_new_comments_on_tweet` | both | no | `tweet_id`, `since_id?` | browser `read_replies`; twexapi `replies_page`; filters by `since_id` |
+| `get_tweet_stats` | both | no | `tweet_id` | browser `read`; twexapi `tweet_detail` |
+| `collect_tweet_replies` | both | no | `tweet_id`, `next_cursor?` | browser `read_replies`; twexapi `replies_page` |
+| `discover_followers` | both | no | `username` / `screen_name`, `max_items?` | browser search heuristic; twexapi `users` seed lookup |
+| `discover_topic_accounts` | both | no | `query` / `searchTerms`, `max_items?` | browser search; twexapi `search_page` |
+| `discover_mutual_graph` | both | no | `usernames` (≥2) | browser search heuristic; twexapi `users` batch lookup |
 
 Browser `SocialRecipe` ops are only: `read` \| `post` \| `reply` \| `read_replies` \| `search` \| `timeline_collect` \| `home_feed`.
 
+### Discovery guardrails (#129, D11)
+
+Discovery ops are **read-only** strategies — they never auto-follow, auto-post, or
+DM without operator confirm.
+
+| Guardrail | Behavior |
+|-----------|----------|
+| `dry_run=true` | Returns `code=DRY_RUN` with planned task (no live fetches) |
+| Rate caps | Pass `max_items` to bound result size; default pagination via `next_cursor` |
+| Backoff | On cap exceeded, envelope returns `code=RATE_LIMITED` or `BACKOFF_REQUIRED` with `data.retry_after_s` |
+| No auto_post | Posting/engagement ops require explicit operator confirm — never chained from discovery |
+
 ```
-run_skill_script social_media_manager x_ops.py home_timeline_collect --medium browser
-run_skill_script social_media_manager x_tweet_actions.py like_tweet --tweet-id 1 --medium twexapi
-run_skill_script social_media_manager x_timeline.py home_timeline_collect --medium browser
+run_skill_script social_media_manager x_ops.py discover_topic_accounts \
+  --task '{"query":"ai agents","dry_run":true}' --medium twexapi
+run_skill_script social_media_manager x_ops.py discover_followers \
+  --task '{"username":"alice","max_items":50}' --medium browser
 ```
 
 When triage selects the `social_media_manager` skill, the gateway auto-grants this

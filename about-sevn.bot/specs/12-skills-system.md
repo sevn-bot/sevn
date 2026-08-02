@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own everything under workspace/skills/: how skills are discovered, validated,
   indexed for routing (spec-10-schema-ontology TriageResult.skills holds names only
   — descriptions come from this subsystem)'
-last_updated: '2026-08-01'
-fingerprint: sha256:3c6627151e6cdae345bf10729ec4f2103d21a6da9445c236cd6b61fe45513aa8
+last_updated: '2026-08-02'
+fingerprint: sha256:60fb2b546fded0d42a0820aa72837cdbadf9d9f8130ff51e9124c825256f9a2d
 related: []
 sources:
 - src/sevn/skills/**
@@ -599,12 +599,21 @@ interfaces:
 - name: skill_setup_telegram_summary
   file: src/sevn/skills/setup.py
   symbol: skill_setup_telegram_summary
+- name: rewrite_legacy_imports
+  file: src/sevn/skills/social_browser_migration.py
+  symbol: rewrite_legacy_imports
+- name: validate_symbol_targets
+  file: src/sevn/skills/social_browser_migration.py
+  symbol: validate_symbol_targets
 - name: gate_social_media_manager_core_skill
   file: src/sevn/skills/social_media_manager.py
   symbol: gate_social_media_manager_core_skill
 - name: social_media_manager_config_enabled
   file: src/sevn/skills/social_media_manager.py
   symbol: social_media_manager_config_enabled
+- name: validate_operator_stub
+  file: src/sevn/skills/x_use_migration.py
+  symbol: validate_operator_stub
 ---
 
 ## Purpose
@@ -740,6 +749,23 @@ path, applies quality gates, drafts wiki/second-brain-grounded comments, enforce
 per-day caps and cooldowns, logs decisions to
 ``.sevn/reddit-karma-loop/decisions.jsonl``, and requires ``--confirm`` before
 any post. ``auto_post`` is not implemented — draft-only per **D11**.
+
+## Amendments (open-issues-sweep aug-2026 Batch C — #128, #125, #126, #129)
+
+**W9 (#128 / D7):** Legacy ``sevn.skills.social_browser`` and operator ``skills/x-use/`` imports
+re-home via ``social_browser_migration.rewrite_legacy_imports`` and
+``x_use_migration.validate_operator_stub`` — browser profile SSOT prefers
+``skills.browser``; bundled ``social_media_manager`` + ``browser action=social`` replace the
+deleted x-use / ``social_browser`` skill trees.
+
+**W10 (#125):** ``social_media_manager/SKILL.md`` documents X login troubleshooting (SMS/phone
+handoff, account picker, cookie persistence, no secrets in logs).
+
+**W12–W14 (#129 / D11):** ``x_ops`` facade expands with engagement (``comment_on_tweet``,
+``react_tweet``), timeline reads (``get_new_comments_on_tweet``, ``get_tweet_stats``,
+``collect_tweet_replies``), and discovery (``discover_followers``, ``discover_topic_accounts``,
+``discover_mutual_graph``) — write paths require dry-run or operator confirm; rate-limit backoff
+returns ``RATE_LIMITED`` envelopes.
 
 ## Implemented by
 

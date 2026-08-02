@@ -11,6 +11,10 @@ are cut into a dated, versioned section at release time.
 ## [Unreleased]
 
 ### Added
+- [2026-08-02] X login troubleshooting in `social_media_manager/SKILL.md` — SMS/phone handoff, account picker, cookie persistence, and no-code-in-logs guidance (#125, open-issues-sweep W10)
+- [2026-08-02] X discovery ops `discover_followers`, `discover_topic_accounts`, and `discover_mutual_graph` on the `x_ops` facade with D11 dry-run and rate-limit backoff envelopes (#129, open-issues-sweep W14)
+- [2026-08-02] X timeline/comment ops `get_new_comments_on_tweet`, `get_tweet_stats`, and `collect_tweet_replies` on the `x_ops` facade with D11 dry-run for read paths (#129, open-issues-sweep W13)
+- [2026-08-02] X engagement ops `comment_on_tweet` and `react_tweet` on the `x_ops` facade with D11 dry-run gates for write actions (#129, open-issues-sweep W12)
 - [2026-08-01] Craft release evaluation runbook and evaluation-only `.craft.yml` scaffold document Sentry Craft prepare/publish against the current manual release flow — Craft CI adoption deferred pending operator gate (#110, open-issues-sweep W15)
 - [2026-07-31] User-defined `permissions.deny_rules` block destructive or sensitive tool calls by tool name and optional command/pattern, domain, or path — rules apply even in permissive ABAC owner sessions (additive-deny, D15), return the configured reason to the model, and log redacted audit lines; Mission Control approval `deny` verdicts accept an optional operator reason (#80, open-issues-sweep W26)
 - [2026-07-31] Pluggable 1Password (`one_password`) and Bitwarden (`bitwarden`) secret backends (CLI bridges — unit-tested stubs; live vault resolution requires operator `op`/`bw` credentials), deterministic precedence and provenance reporting without value leakage (#82, open-issues-sweep W25)
@@ -19,6 +23,9 @@ are cut into a dated, versioned section at release time.
 - [2026-07-30] `/model --once <provider/model>` stages a one-turn tier-B model override in session metadata — consumed at the next agent turn (success or failure) without changing the persisted `providers.tier_default.B` setting; `/status` shows effective vs persisted model (#88)
 - [2026-07-30] Per-channel and per-topic model and system prompt overrides under `channels.<name>.model` / `channels.<name>.system_prompt` and `channels.telegram.topics.<id>.*` — turn-scoped resolution with session → channel → workspace precedence; `TopicConfig.system_prompt` wired from Telegram inbound metadata (#86)
 ### Fixed
+- [2026-08-02] C-Thermos: `social_browser` migration map validates import targets; legacy compat shims cover removed symbols; `x_ops_dispatch` guardrails extracted under 1k lines; tier-B empty-output path reports loaded skills (#128, #126, open-issues-sweep C-Thermos)
+- [2026-08-02] Tier-B turns that exhaust empty-output retries after a successful `load_skill` now report the loaded skill and actionable retry guidance instead of bare pydantic-ai retry boilerplate (#126, open-issues-sweep W11)
+- [2026-08-02] Legacy `sevn.skills.social_browser` / operator `x-use` imports re-home to `social_media_manager` + `browser` recipes — migration helpers, profile SSOT prefers `skills.browser`, and x-use stub validation (#128, open-issues-sweep W9)
 - [2026-08-02] Telegram `/config` → Chat → Voice wake-word toggles and wake-phrase cycle ack via menu refresh with toasts when the gateway listener is offline; **Setup wake-word** posts a doctor subset and `voice-wake` install guidance without gateway `uv sync` (#124, open-issues-sweep aug-2026 W5)
 - [2026-08-02] Telegram `/config` → Agent unified-model toggle-off seeds unset tier slots from triager via `fill_missing_model_slots_from_triager`, and agent captions show resolved model ids so the picker stays usable when only triager is configured (#115, #116, open-issues-sweep aug-2026 W4)
 - [2026-08-02] `sevn --version` and `sevn version` emit `<branch>-<commit8>` from git when inside a checkout, falling back to package metadata for installed wheels (#123, open-issues-sweep aug-2026 W3)

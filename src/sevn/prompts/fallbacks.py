@@ -162,6 +162,8 @@ def format_tier_b_operator_failure_report(
     failure_detail: str | None = None,
     tool_name: str | None = None,
     tool_error: str | None = None,
+    loaded_skills: frozenset[str] | None = None,
+    load_skill_succeeded: bool = False,
 ) -> str:
     """Build a no-answer operator report when tier-B stops without assistant text (D8).
 
@@ -169,6 +171,8 @@ def format_tier_b_operator_failure_report(
         failure_detail (str | None): Harness/machine label (e.g. ``no assistant output``).
         tool_name (str | None): Last tool that returned ``ok=false``, if any.
         tool_error (str | None): Error string from that tool envelope.
+        loaded_skills (frozenset[str] | None): Skill ids successfully loaded this turn.
+        load_skill_succeeded (bool): When ``True``, ``load_skill`` returned ``ok=true``.
 
     Returns:
         str: Actionable report naming what was attempted and inviting retry.
@@ -182,10 +186,25 @@ def format_tier_b_operator_failure_report(
         True
         >>> "no data" not in msg.lower() and "no history" not in msg.lower()
         True
+        >>> skill_msg = format_tier_b_operator_failure_report(
+        ...     failure_detail="Exceeded maximum output retries (3)",
+        ...     loaded_skills=frozenset({"min_echo"}),
+        ... )
+        >>> "min_echo" in skill_msg and "load_skill" in skill_msg
+        True
     """
     lines: list[str] = [
         "I couldn't finish a full answer on this turn.",
     ]
+    if loaded_skills:
+        names = ", ".join(f"`{name}`" for name in sorted(loaded_skills))
+        lines.append(
+            f"I loaded skill(s) {names} via `load_skill`, but the model returned no final answer.",
+        )
+    elif load_skill_succeeded:
+        lines.append(
+            "I ran `load_skill` successfully, but the model returned no final answer.",
+        )
     if tool_name:
         err = (tool_error or "ok=false").strip()
         lines.append(f"I tried `{tool_name}` and it failed: {err}.")

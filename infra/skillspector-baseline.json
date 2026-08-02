@@ -192,6 +192,12 @@
       "rule_id": "E2",
       "reason": "_discogs_runtime.py reads DISCOGS_* env injected by merge_discogs_proc_env; internal runtime only (D5/D6)",
       "reviewed": "2026-07-18"
+    },
+    {
+      "skill_path": "src/sevn/data/bundled_skills/core/social_media_manager",
+      "rule_id": "YR1",
+      "reason": "SKILL.md documents operator-controlled X login/cookie persistence (#125/W10); YR1 info_stealer false positive",
+      "reviewed": "2026-08-02"
     }
   ]
 }

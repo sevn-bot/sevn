@@ -11,13 +11,19 @@ Exports:
     pack_advanced_search_body — search_page body.
     pack_hashtags_body — hashtags body.
     pack_create_body — create/reply body.
+    pack_comment_body — comment/reply body with reply_tweet_id.
     pack_quote_body — quote-tweet body.
     pack_thread_body — create-thread body.
     pack_delete_body — delete-tweets body.
     pack_auto_cookie_body — pool-cookie post body.
     pack_users_body — usernames list body.
     pack_follow_body — follow-user body.
+    pack_discover_followers_body — follower-discovery username list body.
+    pack_discover_topic_body — topic-account search body.
+    pack_discover_mutual_body — mutual-graph usernames list body.
     pack_timeline_path — timeline screen_name path params.
+    pack_tweet_detail_body — tweet lookup array body.
+    pack_replies_body — replies-page body with optional cursor.
 """
 
 from __future__ import annotations
@@ -30,14 +36,20 @@ __all__ = [
     "TwexPathPacker",
     "pack_advanced_search_body",
     "pack_auto_cookie_body",
+    "pack_comment_body",
     "pack_create_body",
     "pack_delete_body",
+    "pack_discover_followers_body",
+    "pack_discover_mutual_body",
+    "pack_discover_topic_body",
     "pack_empty_body",
     "pack_follow_body",
     "pack_hashtags_body",
     "pack_quote_body",
+    "pack_replies_body",
     "pack_thread_body",
     "pack_timeline_path",
+    "pack_tweet_detail_body",
     "pack_tweet_id_path",
     "pack_users_body",
     "thread_items",
@@ -173,6 +185,31 @@ def pack_create_body(task: dict[str, Any]) -> dict[str, Any]:
     return body
 
 
+def pack_comment_body(task: dict[str, Any]) -> dict[str, Any]:
+    """Pack comment/reply body with ``reply_tweet_id`` from ``tweet_id``.
+
+    Args:
+        task (dict[str, Any]): Task with ``text`` and target ``tweet_id``.
+
+    Returns:
+        dict[str, Any]: TwexAPI create-reply body.
+
+    Raises:
+        ValueError: When ``tweet_id`` is missing or blank.
+
+    Examples:
+        >>> pack_comment_body({"tweet_id": "9", "text": "hi"})["reply_tweet_id"]
+        '9'
+    """
+    tweet_id = str(task.get("tweet_id") or "").strip()
+    if not tweet_id:
+        msg = "tweet_id is required for comment_on_tweet"
+        raise ValueError(msg)
+    body = pack_create_body(task)
+    body["reply_tweet_id"] = tweet_id
+    return body
+
+
 def pack_quote_body(task: dict[str, Any]) -> dict[str, Any]:
     """Pack quote-tweet body.
 
@@ -279,6 +316,130 @@ def pack_follow_body(task: dict[str, Any]) -> dict[str, Any]:
     """
     username = str(task.get("username") or task.get("query") or "").lstrip("@")
     return {"username": username}
+
+
+def pack_tweet_detail_body(task: dict[str, Any]) -> list[str]:
+    """Pack TwexAPI ``tweet_detail`` array body from ``tweet_id``.
+
+    Args:
+        task (dict[str, Any]): Task with required ``tweet_id``.
+
+    Returns:
+        list[str]: Single-element tweet id list.
+
+    Raises:
+        ValueError: When ``tweet_id`` is missing or blank.
+
+    Examples:
+        >>> pack_tweet_detail_body({"tweet_id": "9"})
+        ['9']
+    """
+    tweet_id = str(task.get("tweet_id") or "").strip()
+    if not tweet_id:
+        msg = "tweet_id is required"
+        raise ValueError(msg)
+    return [tweet_id]
+
+
+def pack_replies_body(task: dict[str, Any]) -> dict[str, Any]:
+    """Pack TwexAPI ``replies_page`` body (pagination cursor optional).
+
+    Args:
+        task (dict[str, Any]): Task payload.
+
+    Returns:
+        dict[str, Any]: Sparse replies-page body.
+
+    Examples:
+        >>> pack_replies_body({"next_cursor": "abc"})["next_cursor"]
+        'abc'
+    """
+    body: dict[str, Any] = {}
+    for key in ("next_cursor", "cursor"):
+        raw = task.get(key)
+        if raw is not None and str(raw).strip():
+            body["next_cursor"] = str(raw).strip()
+            break
+    return body
+
+
+def pack_discover_followers_body(task: dict[str, Any]) -> list[Any]:
+    """Pack follower-discovery body as a single-username list for TwexAPI ``users``.
+
+    Args:
+        task (dict[str, Any]): Task with ``username`` / ``screen_name`` / ``query``.
+
+    Returns:
+        list[Any]: Single-element username list.
+
+    Raises:
+        ValueError: When no username/screen_name is provided.
+
+    Examples:
+        >>> pack_discover_followers_body({"username": "@alice"})
+        ['alice']
+    """
+    username = str(
+        task.get("username") or task.get("screen_name") or task.get("query") or ""
+    ).lstrip("@")
+    if not username:
+        msg = "username is required for discover_followers"
+        raise ValueError(msg)
+    return [username]
+
+
+def pack_discover_topic_body(task: dict[str, Any]) -> dict[str, Any] | None:
+    """Pack topic-account discovery body from ``query`` / ``searchTerms``.
+
+    Args:
+        task (dict[str, Any]): Task with topic query fields.
+
+    Returns:
+        dict[str, Any] | None: Search body or ``None`` when empty.
+
+    Examples:
+        >>> pack_discover_topic_body({"query": "ai agents"})["searchTerms"]
+        ['ai agents']
+    """
+    body = pack_advanced_search_body(task)
+    if body is None:
+        return None
+    for key in ("max_items",):
+        raw = task.get(key)
+        if raw is not None:
+            body[key] = raw
+    return body
+
+
+def pack_discover_mutual_body(task: dict[str, Any]) -> list[Any]:
+    """Pack mutual-graph discovery body from ``usernames`` / ``query``.
+
+    Args:
+        task (dict[str, Any]): Task with at least two usernames when possible.
+
+    Returns:
+        list[Any]: Username strings for batch lookup.
+
+    Raises:
+        ValueError: When fewer than two usernames are provided.
+
+    Examples:
+        >>> pack_discover_mutual_body({"usernames": ["a", "b"]})
+        ['a', 'b']
+    """
+    names = task.get("usernames")
+    if isinstance(names, str):
+        names = [n.strip().lstrip("@") for n in names.split(",") if n.strip()]
+    if isinstance(names, list):
+        cleaned = [str(n).strip().lstrip("@") for n in names if str(n).strip()]
+    else:
+        cleaned = []
+    if len(cleaned) < 2 and task.get("query"):
+        cleaned = [str(n).strip().lstrip("@") for n in str(task["query"]).split(",") if n.strip()]
+    if len(cleaned) < 2:
+        msg = "discover_mutual_graph requires at least two usernames"
+        raise ValueError(msg)
+    return cleaned
 
 
 def pack_timeline_path(task: dict[str, Any]) -> dict[str, str]:

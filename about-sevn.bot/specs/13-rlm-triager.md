@@ -7,8 +7,8 @@ owner: Alex
 summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–§5.2):
   a single, tool-less outbound generation step that emits validated TriageResult consumed
   by tier dispatch (A / B / C / D), MCP e'
-last_updated: '2026-08-01'
-fingerprint: sha256:92adce15f63479b51e9aaeedda058b7293b00ac0d8a0b91d22ab2ca4ccf233a9
+last_updated: '2026-08-02'
+fingerprint: sha256:57bd70ef180b9fece3a2aec7373a075c27cbfe82fe14e0af171644f392d118ff
 related: []
 sources:
 - src/sevn/agent/**
@@ -539,6 +539,9 @@ interfaces:
 - name: update_pending_plan_status
   file: src/sevn/agent/executors/plan_gate_store.py
   symbol: update_pending_plan_status
+- name: is_empty_output_retry_error
+  file: src/sevn/agent/executors/retry_errors.py
+  symbol: is_empty_output_retry_error
 - name: append_output_truncation_notice
   file: src/sevn/agent/grounding.py
   symbol: append_output_truncation_notice

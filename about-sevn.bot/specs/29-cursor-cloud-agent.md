@@ -7,8 +7,8 @@ owner: Alex
 summary: Let operators and agents launch, poll, and inspect Cursor Cloud Agents against
   any GitHub/GitLab repo when skills.cursor_cloud.enabled is true, returning PR URLs,
   dashboard links (remote desktop), and
-last_updated: '2026-07-31'
-fingerprint: sha256:c53bc9b53c583d3a3230ca65133f58a8c2a60dce1ef30fa84a55465f8f9b8cf0
+last_updated: '2026-08-02'
+fingerprint: sha256:9e4a9ec63680cfa381dcc53734aae02bf2b3330240c23cf74f90af2254b58529
 related: []
 sources:
 - src/sevn/integrations/**
@@ -280,6 +280,36 @@ interfaces:
 - name: validate_config_cycle_mutation
   file: src/sevn/integrations/social_media/cycle_validation.py
   symbol: validate_config_cycle_mutation
+- name: dry_run_requested
+  file: src/sevn/integrations/social_media/legacy_compat.py
+  symbol: dry_run_requested
+- name: facebook_search_url
+  file: src/sevn/integrations/social_media/legacy_compat.py
+  symbol: facebook_search_url
+- name: fetch_page_snapshot
+  file: src/sevn/integrations/social_media/legacy_compat.py
+  symbol: fetch_page_snapshot
+- name: host_allowed
+  file: src/sevn/integrations/social_media/legacy_compat.py
+  symbol: host_allowed
+- name: logged_in_browser_page
+  file: src/sevn/integrations/social_media/legacy_compat.py
+  symbol: logged_in_browser_page
+- name: merge_social_browser_proc_env
+  file: src/sevn/integrations/social_media/legacy_compat.py
+  symbol: merge_social_browser_proc_env
+- name: resolve_browser_profile
+  file: src/sevn/integrations/social_media/legacy_compat.py
+  symbol: resolve_browser_profile
+- name: session_status_payload
+  file: src/sevn/integrations/social_media/legacy_compat.py
+  symbol: session_status_payload
+- name: validate_social_url
+  file: src/sevn/integrations/social_media/legacy_compat.py
+  symbol: validate_social_url
+- name: x_search_url
+  file: src/sevn/integrations/social_media/legacy_compat.py
+  symbol: x_search_url
 - name: allowed_media_for_site
   file: src/sevn/integrations/social_media/medium.py
   symbol: allowed_media_for_site
@@ -301,9 +331,15 @@ interfaces:
 - name: site_login_probe
   file: src/sevn/integrations/social_media/readiness.py
   symbol: site_login_probe
+- name: social_browser_config_deprecated
+  file: src/sevn/integrations/social_media/readiness.py
+  symbol: social_browser_config_deprecated
 - name: twexapi_key_configured
   file: src/sevn/integrations/social_media/readiness.py
   symbol: twexapi_key_configured
+- name: browser_plan
+  file: src/sevn/integrations/social_media/x_ops_browser_plan.py
+  symbol: browser_plan
 - name: cookie_bridge_log_safe
   file: src/sevn/integrations/social_media/x_ops_dispatch.py
   symbol: cookie_bridge_log_safe
@@ -322,18 +358,48 @@ interfaces:
 - name: smm_cfg
   file: src/sevn/integrations/social_media/x_ops_dispatch.py
   symbol: smm_cfg
+- name: apply_pre_dispatch_guards
+  file: src/sevn/integrations/social_media/x_ops_guardrails.py
+  symbol: apply_pre_dispatch_guards
+- name: dry_run_envelope
+  file: src/sevn/integrations/social_media/x_ops_guardrails.py
+  symbol: dry_run_envelope
+- name: filter_new_comments
+  file: src/sevn/integrations/social_media/x_ops_guardrails.py
+  symbol: filter_new_comments
+- name: rate_limit_envelope
+  file: src/sevn/integrations/social_media/x_ops_guardrails.py
+  symbol: rate_limit_envelope
+- name: task_dry_run
+  file: src/sevn/integrations/social_media/x_ops_guardrails.py
+  symbol: task_dry_run
+- name: task_force_rate_limit
+  file: src/sevn/integrations/social_media/x_ops_guardrails.py
+  symbol: task_force_rate_limit
 - name: pack_advanced_search_body
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_advanced_search_body
 - name: pack_auto_cookie_body
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_auto_cookie_body
+- name: pack_comment_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_comment_body
 - name: pack_create_body
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_create_body
 - name: pack_delete_body
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_delete_body
+- name: pack_discover_followers_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_discover_followers_body
+- name: pack_discover_mutual_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_discover_mutual_body
+- name: pack_discover_topic_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_discover_topic_body
 - name: pack_empty_body
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_empty_body
@@ -346,12 +412,18 @@ interfaces:
 - name: pack_quote_body
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_quote_body
+- name: pack_replies_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_replies_body
 - name: pack_thread_body
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_thread_body
 - name: pack_timeline_path
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_timeline_path
+- name: pack_tweet_detail_body
+  file: src/sevn/integrations/social_media/x_ops_pack.py
+  symbol: pack_tweet_detail_body
 - name: pack_tweet_id_path
   file: src/sevn/integrations/social_media/x_ops_pack.py
   symbol: pack_tweet_id_path
