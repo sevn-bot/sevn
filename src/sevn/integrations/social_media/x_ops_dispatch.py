@@ -30,19 +30,37 @@ from sevn.integrations.social_media.readiness import (
     build_social_media_readiness_sync,
     twexapi_key_configured,
 )
+from sevn.integrations.social_media.x_ops_browser_plan import browser_plan
+from sevn.integrations.social_media.x_ops_guardrails import (
+    DISCOVERY_OPS,
+    ENGAGEMENT_OPS,
+    EXPANSION_OPS,
+    TIMELINE_READ_OPS,
+    W12_ENGAGEMENT_OPS,
+    W13_TIMELINE_OPS,
+    W14_DISCOVERY_OPS,
+    apply_pre_dispatch_guards,
+    filter_new_comments,
+)
 from sevn.integrations.social_media.x_ops_pack import (
     TwexBodyPacker,
     TwexPathPacker,
     pack_advanced_search_body,
     pack_auto_cookie_body,
+    pack_comment_body,
     pack_create_body,
     pack_delete_body,
+    pack_discover_followers_body,
+    pack_discover_mutual_body,
+    pack_discover_topic_body,
     pack_empty_body,
     pack_follow_body,
     pack_hashtags_body,
     pack_quote_body,
+    pack_replies_body,
     pack_thread_body,
     pack_timeline_path,
+    pack_tweet_detail_body,
     pack_tweet_id_path,
     pack_users_body,
     thread_items,
@@ -59,7 +77,14 @@ from sevn.integrations.twexapi.config import (
 )
 
 __all__ = [
+    "DISCOVERY_OPS",
+    "ENGAGEMENT_OPS",
+    "EXPANSION_OPS",
     "FACADE_OPS",
+    "TIMELINE_READ_OPS",
+    "W12_ENGAGEMENT_OPS",
+    "W13_TIMELINE_OPS",
+    "W14_DISCOVERY_OPS",
     "cookie_bridge_log_safe",
     "cookies_for_twexapi",
     "envelope",
@@ -93,6 +118,19 @@ class _OpSpec:
             'search_page'
         """
         return self.twex_key or self.name
+
+    @property
+    def dry_run_eligible(self) -> bool:
+        """Return whether this op supports ``dry_run`` guardrails (D11).
+
+        Returns:
+            bool: ``True`` for writes, timeline reads, and discovery ops.
+
+        Examples:
+            >>> _OpSpec("react_tweet", is_write=True).dry_run_eligible
+            True
+        """
+        return self.is_write or self.name in TIMELINE_READ_OPS or self.name in DISCOVERY_OPS
 
 
 _OP_SPECS: dict[str, _OpSpec] = {
@@ -184,6 +222,58 @@ _OP_SPECS: dict[str, _OpSpec] = {
             pack_body=pack_empty_body,
         ),
         _OpSpec("session_status"),
+        _OpSpec(
+            "comment_on_tweet",
+            twex_key="create_tweet_or_reply",
+            browser_social_op="reply",
+            is_write=True,
+            pack_body=pack_comment_body,
+        ),
+        _OpSpec(
+            "react_tweet",
+            twex_key="like_tweet",
+            is_write=True,
+            pack_path=pack_tweet_id_path,
+            pack_body=pack_empty_body,
+        ),
+        _OpSpec(
+            "collect_tweet_replies",
+            twex_key="replies_page",
+            browser_social_op="read_replies",
+            pack_path=pack_tweet_id_path,
+            pack_body=pack_replies_body,
+        ),
+        _OpSpec(
+            "get_tweet_stats",
+            twex_key="tweet_detail",
+            browser_social_op="read",
+            pack_body=pack_tweet_detail_body,
+        ),
+        _OpSpec(
+            "get_new_comments_on_tweet",
+            twex_key="replies_page",
+            browser_social_op="read_replies",
+            pack_path=pack_tweet_id_path,
+            pack_body=pack_replies_body,
+        ),
+        _OpSpec(
+            "discover_followers",
+            twex_key="users",
+            browser_social_op="search",
+            pack_body=pack_discover_followers_body,
+        ),
+        _OpSpec(
+            "discover_topic_accounts",
+            twex_key="search_page",
+            browser_social_op="search",
+            pack_body=pack_discover_topic_body,
+        ),
+        _OpSpec(
+            "discover_mutual_graph",
+            twex_key="users",
+            browser_social_op="search",
+            pack_body=pack_discover_mutual_body,
+        ),
     )
 }
 
@@ -399,55 +489,6 @@ def resolve_content_root(task: dict[str, Any]) -> Path:
     return Path.cwd()
 
 
-def _browser_plan(op: str, task: dict[str, Any], site: str, social_op: str) -> dict[str, Any]:
-    """Build a CDP ``browser`` tool plan for the parent turn.
-
-    Args:
-        op (str): Facade op name.
-        task (dict[str, Any]): Task args.
-        site (str): Site key.
-        social_op (str): Mapped ``SocialRecipe`` op.
-
-    Returns:
-        dict[str, Any]: Plan payload for ``action=social``.
-
-    Examples:
-        >>> _browser_plan("home_timeline_collect", {}, "x", "home_feed")["action"]
-        'social'
-    """
-    query = task.get("query") or task.get("text") or ""
-    if op == "search_hashtags":
-        tags = task.get("hashtags") or task.get("query") or ""
-        if isinstance(tags, list):
-            query = " ".join(f"#{str(t).lstrip('#')}" for t in tags)
-        else:
-            query = f"#{str(tags).lstrip('#')}" if tags else ""
-    body = task.get("text") or task.get("tweet_content") or ""
-    plan: dict[str, Any] = {
-        "action": "social",
-        "site": site,
-        "op": social_op,
-        "facade_op": op,
-        "query": query,
-        "url": task.get("url") or task.get("tweet_url") or "",
-        "body": body,
-        "tweet_id": task.get("tweet_id") or "",
-        "username": task.get("username") or "",
-        "hint": (
-            f"Invoke browser tool action=social site={site} for facade op={op} "
-            f"(mapped social op={social_op}). Write ops need "
-            f"tools.browser.social.{site}.allow_write=true."
-        ),
-    }
-    if op == "create_tweet_thread":
-        items = thread_items(task)
-        plan["items"] = items
-        plan["texts"] = items
-        if items and not body:
-            plan["body"] = items[0]
-    return plan
-
-
 async def _session_status(
     task: dict[str, Any],
     cfg: dict[str, Any],
@@ -537,8 +578,11 @@ async def _dispatch(
         return await _session_status(task, cfg, site)
 
     spec = _OP_SPECS[op]
-    is_write = spec.is_write
     medium = resolve_social_medium(task, smm_cfg(cfg), site)
+
+    guarded = apply_pre_dispatch_guards(op, spec, task, medium)
+    if guarded is not None:
+        return guarded
 
     if op == "post_tweet_auto_cookie" and medium == "browser":
         coerced = await _dispatch(
@@ -575,7 +619,7 @@ async def _dispatch(
         )
 
     if (
-        is_write
+        spec.is_write
         and medium == "browser"
         and not social_write_allowed(site, browser_tools=_browser_tools_section(cfg))
     ):
@@ -617,7 +661,7 @@ async def _dispatch(
             body = twexapi_body
             path_params = twexapi_path_params
             params = twexapi_params
-            write_via_helper = is_write and twex_key in TWEXAPI_WRITE_OPS
+            write_via_helper = spec.is_write and twex_key in TWEXAPI_WRITE_OPS
             if write_via_helper:
                 cookie = _task_cookie(task)
                 proxy = _task_proxy(task)
@@ -645,6 +689,8 @@ async def _dispatch(
                     body=body,
                     path_params=path_params,
                 )
+            if op == "get_new_comments_on_tweet":
+                data = filter_new_comments(data, task)
             return envelope(ok=True, medium=medium, op=op, data=data)
         except TwexApiError as exc:
             return envelope(
@@ -665,13 +711,20 @@ async def _dispatch(
                 code="TWEXAPI_ERROR",
             )
 
-    if op == "create_tweet_thread" and not thread_items(task):
+    if op in ("create_tweet_thread", "comment_on_tweet") and not (
+        thread_items(task) if op == "create_tweet_thread" else str(task.get("text") or "").strip()
+    ):
+        err = (
+            "create_tweet_thread on browser requires items/texts in the task"
+            if op == "create_tweet_thread"
+            else "comment_on_tweet on browser requires text in the task"
+        )
         return envelope(
             ok=False,
             medium="browser",
             op=op,
             data={},
-            error="create_tweet_thread on browser requires items/texts in the task",
+            error=err,
             code="BROWSER_OP_UNSUPPORTED",
         )
     social_op = spec.browser_social_op
@@ -684,7 +737,7 @@ async def _dispatch(
             error=f"{op} has no browser SocialRecipe mapping — use medium=twexapi",
             code="BROWSER_OP_UNSUPPORTED",
         )
-    plan = _browser_plan(op, task, site, social_op)
+    plan = browser_plan(op, task, site, social_op)
     return envelope(ok=True, medium="browser", op=op, data={"browser_plan": plan})
 
 
@@ -729,6 +782,10 @@ async def run_op(
         msg = f"unknown facade op: {op!r}"
         raise KeyError(msg)
     spec = _OP_SPECS[op]
+    medium = resolve_social_medium(task_d, smm_cfg(cfg_d), site)
+    guarded = apply_pre_dispatch_guards(op, spec, task_d, medium)
+    if guarded is not None:
+        return guarded
     try:
         body = twexapi_body
         if body is None and spec.pack_body is not None:

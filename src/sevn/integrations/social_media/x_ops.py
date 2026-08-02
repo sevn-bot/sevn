@@ -23,6 +23,8 @@ __all__ = [
     "FACADE_OPS",
     "advanced_search_page",
     "bookmark",
+    "collect_tweet_replies",
+    "comment_on_tweet",
     "cookie_bridge_log_safe",
     "cookies_for_twexapi",
     "create_quote_tweet",
@@ -31,12 +33,18 @@ __all__ = [
     "delete_bookmark",
     "delete_retweet",
     "delete_tweets",
+    "discover_followers",
+    "discover_mutual_graph",
+    "discover_topic_accounts",
     "fetch_article_markdown",
     "follow_user",
+    "get_new_comments_on_tweet",
+    "get_tweet_stats",
     "get_users_by_usernames",
     "home_timeline_collect",
     "like_tweet",
     "post_tweet_auto_cookie",
+    "react_tweet",
     "retweet",
     "search_hashtags",
     "session_status",
@@ -89,9 +97,17 @@ create_tweet_or_reply = _wrap("create_tweet_or_reply")
 create_quote_tweet = _wrap("create_quote_tweet")
 create_tweet_thread = _wrap("create_tweet_thread")
 delete_tweets = _wrap("delete_tweets")
+discover_followers = _wrap("discover_followers")
+discover_mutual_graph = _wrap("discover_mutual_graph")
+discover_topic_accounts = _wrap("discover_topic_accounts")
 post_tweet_auto_cookie = _wrap("post_tweet_auto_cookie")
 get_users_by_usernames = _wrap("get_users_by_usernames")
 follow_user = _wrap("follow_user")
 fetch_article_markdown = _wrap("fetch_article_markdown")
 home_timeline_collect = _wrap("home_timeline_collect")
 session_status = _wrap("session_status")
+comment_on_tweet = _wrap("comment_on_tweet")
+react_tweet = _wrap("react_tweet")
+collect_tweet_replies = _wrap("collect_tweet_replies")
+get_tweet_stats = _wrap("get_tweet_stats")
+get_new_comments_on_tweet = _wrap("get_new_comments_on_tweet")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Thin wrappers for common X facade ops (search / timeline / session)."""
+"""Thin wrappers for common X facade ops (search / timeline / comments / session)."""
 
 from __future__ import annotations
 

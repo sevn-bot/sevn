@@ -1778,3 +1778,12 @@ with the menu E2E walker recipe (`src/sevn/browser/recipes/telegram_menu.py`).
 | `tests/channels/test_telegram_outbound.py` | D6/D7 enqueue `chat_id` + classifier-timeout dispatch routing |
 | `tests/gateway/test_version_id_control_w1_red.py`, `test_stop_l1_buttons.py` | Version-id `answer_callback` toast + fallback; `/stop` picker re-edit |
 | `make telegram-checks` | Host Telegram Bot-API smoke (`telegram_checks`; alias `make telegram-e2e`) |
+
+## Amendments (open-issues-sweep aug-2026 W11 — #126 output retry)
+
+Tier-B ``Exceeded maximum output retries`` after a successful ``load_skill`` is a
+deterministic harness failure: ``_is_deterministic_harness_failure`` matches the marker,
+``_tier_b_full_index_retry_warranted`` returns ``False``, and the summarize /
+partial-progress path may still run when tools succeeded without user text. Operator-facing
+copy comes from the harness failure report (loaded skill id + retry guidance), not raw
+pydantic-ai retry text alone.

@@ -91,4 +91,6 @@
 | `proton_management` | [`../../src/sevn/skills/proton_management.py`](../../src/sevn/skills/proton_management.py) | Module `src/sevn/skills/proton_management.py`. |
 | `security_scan` | [`../../src/sevn/skills/security_scan.py`](../../src/sevn/skills/security_scan.py) | Module `src/sevn/skills/security_scan.py`. |
 | `setup` | [`../../src/sevn/skills/setup.py`](../../src/sevn/skills/setup.py) | Module `src/sevn/skills/setup.py`. |
+| `social_browser_migration` | [`../../src/sevn/skills/social_browser_migration.py`](../../src/sevn/skills/social_browser_migration.py) | Module `src/sevn/skills/social_browser_migration.py`. |
 | `social_media_manager` | [`../../src/sevn/skills/social_media_manager.py`](../../src/sevn/skills/social_media_manager.py) | Module `src/sevn/skills/social_media_manager.py`. |
+| `x_use_migration` | [`../../src/sevn/skills/x_use_migration.py`](../../src/sevn/skills/x_use_migration.py) | Module `src/sevn/skills/x_use_migration.py`. |
