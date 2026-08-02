@@ -1497,3 +1497,9 @@ The triager adapter runs on the same **pydantic-ai v2** stack as tier B (monty-0
 ### 10.3 open-issues-sweep W30 — TTFT triage contributor (#78) — append-only
 
 ``triage_turn`` latency is a first-class TTFT contributor: ``agent_turn`` records ``triage_ms`` on the turn spine and emits ``gateway.turn.ttft`` spans via ``src/sevn/gateway/telemetry/ttft.py``. Structured ``gateway_turn_startup_timings`` logs attribute registry build, ``sync_tools_md``, triage, and MCP discovery separately so Mission Control and operator logs can compare before/after defer toggles (D9). Triager output and routing policy are unchanged — instrumentation only.
+
+### 10.4 open-issues-sweep-aug-2026 W2 — classifier timeout user text (#119) — append-only
+
+- [x] Relatedness classifier timeout on a busy ``multi`` queue turn spawns a new task without user-visible timeout copy on an unrelated in-flight turn (same contract as #70 / spec-17 W7 amendment). (2026-08-01 ✅: `session_manager.py:1197-1221` early return + structured log only)
+- [x] ``make lint`` runs ``scripts/check_gateway_classifier_timeout_user_text.py`` — forbids ``classifier timed out`` notice strings under ``src/sevn/gateway/``. (2026-08-01 ✅: `scripts/check_gateway_classifier_timeout_user_text.py` + Makefile `lint`)
+- [x] **#119** closes as **duplicate of #70** at program Z1 with W2 verification evidence — no triager or gateway reimplementation (D5). (2026-08-01 ✅: `.ignorelocal/waves/github-issues/drafts/sweep-2026-08-01/plans/119-duplicate-of-70.json`)

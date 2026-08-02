@@ -16,8 +16,6 @@ from __future__ import annotations
 import json
 import os
 import sys
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as pkg_version
 from pathlib import Path
 
 import typer
@@ -71,6 +69,7 @@ from sevn.cli.commands.voice_cmd import register as register_voice
 from sevn.cli.errors import CliAuthError, CliPreconditionError, CliUsageError
 from sevn.cli.help.panels import apply_root_panels
 from sevn.cli.render.console import configure_render
+from sevn.cli.version import resolve_cli_version_string
 
 app = typer.Typer(
     name="sevn",
@@ -92,7 +91,7 @@ def _root(
     print_version: bool = typer.Option(
         False,
         "--version",
-        help="Print CLI semver and exit.",
+        help="Print CLI version (branch-commit from git, else package semver) and exit.",
         is_eager=True,
     ),
     log_file: Path | None = typer.Option(
@@ -114,7 +113,7 @@ def _root(
     """Handle global options before subcommands run.
     Args:
         ctx (typer.Context): Typer invocation context.
-        print_version (bool): When True, print semver and exit.
+        print_version (bool): When True, print branch-commit or package semver and exit.
         log_file (Path | None): Optional log file path.
         no_color (bool): Disable Rich/ANSI when True.
         no_cli_log (bool): Disable ``cli.log`` activity sink when True.
@@ -154,11 +153,7 @@ def _root(
             raise typer.Exit(4) from exc
     log_cli_invocation(subcommand=ctx.invoked_subcommand)
     if print_version:
-        try:
-            v = pkg_version("sevn")
-        except PackageNotFoundError:
-            v = "0.0.0"
-        typer.echo(v)
+        typer.echo(resolve_cli_version_string())
         raise typer.Exit(0)
     if ctx.invoked_subcommand is None:
         typer.echo(ctx.get_help(), err=False)
@@ -190,10 +185,7 @@ def version_detail(
         ...         False
         True
     """
-    try:
-        cli_version = pkg_version("sevn")
-    except PackageNotFoundError:
-        cli_version = "0.0.0"
+    cli_version = resolve_cli_version_string()
     if json_out:
         payload = {
             "cli_version": cli_version,

@@ -7,8 +7,8 @@ owner: Alex
 summary: Run the long-lived gateway process that accepts channel ingress (Telegram
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
-last_updated: '2026-08-01'
-fingerprint: sha256:2ce767d713421be47b40ba9cc37d7a25baa94b9667bf94ef479dc538ad7e4b74
+last_updated: '2026-08-02'
+fingerprint: sha256:6a570e2c99bb7269a6668d3d1e8fb08253d485b3a38bf4b6c6a8d274648214c5
 related: []
 sources:
 - src/sevn/gateway/**
@@ -456,6 +456,9 @@ interfaces:
 - name: MediaStore
   file: src/sevn/gateway/media/media_store.py
   symbol: MediaStore
+- name: telegram_config_dot_path_display
+  file: src/sevn/gateway/menu/caption_display.py
+  symbol: telegram_config_dot_path_display
 - name: build_confirm_gate_keyboard
   file: src/sevn/gateway/menu/confirm_gates.py
   symbol: build_confirm_gate_keyboard
@@ -1693,6 +1696,32 @@ edit into a prior turn's placeholder bubble. Routing extras
 spawned turn; the decision is logged as
 ``gateway.queue_classifier_timeout_spawned`` with ``prior_turn_id``,
 ``new_turn_id``, ``timeout_s``, and ``routing_action``.
+
+## Amendments (open-issues-sweep-aug-2026 W2 — #119 duplicate of #70, D5)
+
+Aug-2026 sweep issue **#119** reports the same user-visible classifier-timeout
+notice as closed **#70**. On ``origin/pre-0.0.1`` the fix is already present:
+``session_manager.enqueue_dispatch`` returns after
+``gateway.queue_classifier_timeout_spawned`` without calling
+``notify_operator`` on the classifier-fallback spawn path
+(``session_manager.py`` ~1197–1221). **#119 closes as duplicate of #70** at
+program Z1 — no reimplementation. Regression guard:
+``scripts/check_gateway_classifier_timeout_user_text.py`` (wired into ``make lint``)
+forbids user-facing ``classifier timed out`` / ``queuing this message as its own
+turn`` strings under ``src/sevn/gateway/``; runtime contract pinned by
+``tests/gateway/test_classifier_timeout.py`` and ``test_queue_multi.py``.
+
+## Amendments (open-issues-sweep-aug-2026 W4 — #115, #116)
+
+Telegram ``/config`` unified-model toggle-off
+(``cfg:toggle:providers.use_main_model_for_all:false``) seeds unset tier slots from
+triager via ``fill_missing_model_slots_from_triager`` inside
+``menu_action_router._apply_toggle`` — same seeding contract as onboarding web
+``_apply_unified_model_cleanup`` / ``maybe_split_unified_model_on_config_set``.
+Agent captions show resolved model ids so the triager picker stays usable when only
+triager is configured. Regression:
+``tests/gateway/test_model_menu_unified_toggle.py``,
+``tests/gateway/test_models_picker_menu.py``.
 
 ## Amendments (open-issues-sweep W31, #72)
 
