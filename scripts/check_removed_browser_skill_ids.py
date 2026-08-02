@@ -27,6 +27,7 @@ if str(_REPO) not in sys.path:
 
 from scripts.removed_browser_skill_policy import (  # noqa: E402
     FORBIDDEN_SUBSTRINGS,
+    MIGRATION_DOC_REL_PATHS,
     REMOVED_SKILL_IDS,
     contains_forbidden_substring,
 )
@@ -59,6 +60,9 @@ def _scan_bundled_tree() -> list[str]:
             )
             continue
         if not path.is_file() or path.suffix in _BINARY_SUFFIXES:
+            continue
+        rel = path.relative_to(REPO).as_posix()
+        if rel in MIGRATION_DOC_REL_PATHS:
             continue
         try:
             text = path.read_text(encoding="utf-8")

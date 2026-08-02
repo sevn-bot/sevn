@@ -23,6 +23,13 @@ REMOVED_SKILL_IDS: frozenset[str] = frozenset(
 
 FORBIDDEN_SUBSTRINGS: tuple[str, ...] = (*tuple(sorted(REMOVED_SKILL_IDS)), "playwright_browser")
 
+# Bundled paths that may cite removed ids only for operator migration guidance (#128).
+MIGRATION_DOC_REL_PATHS: frozenset[str] = frozenset(
+    {
+        "src/sevn/data/bundled_skills/core/social_media_manager/SKILL.md",
+    }
+)
+
 
 def contains_forbidden_substring(text: str, needle: str) -> bool:
     """Return True when *needle* appears as a standalone token in *text*.

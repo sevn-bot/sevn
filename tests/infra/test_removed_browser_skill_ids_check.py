@@ -78,3 +78,22 @@ def test_removed_browser_skill_ids_check_ignores_false_positive_substring(
         check, "TOOLS_REGISTRY", tmp_path / "src" / "sevn" / "tools" / "registry.py"
     )
     assert check.main() == 0
+
+
+def test_removed_browser_skill_ids_check_skips_migration_doc_citations(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    rel = "src/sevn/data/bundled_skills/core/social_media_manager/SKILL.md"
+    skill_md = tmp_path / rel
+    skill_md.parent.mkdir(parents=True)
+    skill_md.write_text("Migrating from `x-use` and `facebook-use`\n", encoding="utf-8")
+    check = importlib.import_module("scripts.check_removed_browser_skill_ids")
+    monkeypatch.setattr(check, "REPO", tmp_path)
+    monkeypatch.setattr(
+        check, "BUNDLED_ROOT", tmp_path / "src" / "sevn" / "data" / "bundled_skills"
+    )
+    monkeypatch.setattr(
+        check, "TOOLS_REGISTRY", tmp_path / "src" / "sevn" / "tools" / "registry.py"
+    )
+    assert check.main() == 0
