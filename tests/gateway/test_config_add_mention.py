@@ -83,9 +83,6 @@ def _config_menu_matches_slash(text: str) -> bool:
         ),
     ],
 )
-@pytest.mark.xfail(
-    reason="green after W6: split /config from @bot suffix before slash-skill lookup", strict=False
-)
 def test_parse_stacked_slash_skills_defers_config_at_mention(case: _SlashMentionCase) -> None:
     """Parser must defer ``/config@bot`` to the core/config handler — never ``config@…`` skill error."""
     result = _parse_stacked_slash_skills(case.text)
@@ -101,7 +98,6 @@ def test_parse_stacked_slash_skills_defers_config_at_mention(case: _SlashMention
         "/config@MyBot add @someuser",
     ],
 )
-@pytest.mark.xfail(reason="green after W6: core handler recognizes /config@bot forms", strict=False)
 def test_core_command_handler_matches_config_with_bot_suffix(text: str) -> None:
     """``CoreCommandHandler`` must claim Telegram ``/config@bot …`` before slash-skill dispatch."""
     assert _core_matches_slash(text) is True
@@ -126,9 +122,6 @@ def test_core_command_handler_matches_config_add_with_space_args(text: str) -> N
         "/config@MyBot add @someuser",
     ],
 )
-@pytest.mark.xfail(
-    reason="green after W6: ConfigMenuHandler matches /config@bot slash variants", strict=False
-)
 def test_config_menu_handler_matches_slash_with_bot_suffix(text: str) -> None:
     """``ConfigMenuHandler`` opens the menu for ``/config@bot …`` lines."""
     assert _config_menu_matches_slash(text) is True
@@ -146,9 +139,6 @@ def test_config_menu_handler_matches_slash_add_with_space_args(text: str) -> Non
     assert _config_menu_matches_slash(text) is True
 
 
-@pytest.mark.xfail(
-    reason="green after W6: forbid unknown slash skill config@… on config add lines", strict=False
-)
 def test_parse_stacked_slash_skills_does_not_emit_config_at_skill_error() -> None:
     """Regression guard: forbid ``unknown slash skill `config@…``` on config add lines."""
     text = "/config@alexstestee_bot add channel:telegram"
@@ -160,10 +150,6 @@ def test_parse_stacked_slash_skills_does_not_emit_config_at_skill_error() -> Non
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W6: gateway routes /config@bot add to config menu, not slash-skill error",
-    strict=False,
-)
 async def test_route_incoming_config_at_bot_opens_config_menu_not_slash_skill_error(
     tmp_path: Path,
 ) -> None:
@@ -186,10 +172,6 @@ async def test_route_incoming_config_at_bot_opens_config_menu_not_slash_skill_er
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W6: preserve @mention token in config add args after command split",
-    strict=False,
-)
 async def test_route_incoming_config_add_preserves_at_mention_in_args(tmp_path: Path) -> None:
     """D12: ``@botname`` stays in the arg token after splitting command from Telegram suffix."""
     router, cap, _ws = _build_router(tmp_path)

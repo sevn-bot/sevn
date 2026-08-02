@@ -236,7 +236,9 @@ def _match_slash_command(cmd: str) -> Callable[[object], bool]:
         if not isinstance(t, str):
             return False
         t = t.strip()
-        return t == cmd or t.startswith(f"{cmd} ")
+        from sevn.gateway.access.slash_access import slash_command_head
+
+        return slash_command_head(t) == cmd.lower()
 
     return _inner
 
