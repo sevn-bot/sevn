@@ -11,7 +11,11 @@ from pathlib import Path
 import pytest
 
 from sevn.config.workspace_config import WorkspaceConfig
-from sevn.security.sandbox_runtime import DockerSandboxRuntime, _docker_resource_args
+from sevn.security.sandbox_runtime import (
+    DockerSandboxRuntime,
+    _docker_resource_args,
+    rewrite_proxy_url_for_sandbox_network,
+)
 
 
 async def _capture_docker_run_argv(
@@ -112,3 +116,105 @@ def test_docker_resource_args_non_empty_regression() -> None:
     assert "--cpus" in args
     assert "--memory" in args
     assert "--pids-limit" in args
+
+
+def test_rewrite_proxy_url_loopback_uses_docker_host_gateway() -> None:
+    out = rewrite_proxy_url_for_sandbox_network("http://127.0.0.1:8787")
+    assert "127.0.0.1" not in out
+    assert out.endswith(":8787") or "8787" in out
+
+
+def test_rewrite_proxy_url_compose_service_unchanged() -> None:
+    url = "http://sevn-proxy:8787"
+    assert rewrite_proxy_url_for_sandbox_network(url) == url
+
+
+@pytest.mark.asyncio
+async def test_docker_spawn_connects_proxy_to_sandbox_network(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    connect_calls: list[list[str]] = []
+
+    async def fake_docker_run(
+        argv: list[str],
+        *,
+        timeout_s: float | None = None,
+        stdin: bytes | None = None,
+    ) -> tuple[int, str, str]:
+        _ = timeout_s, stdin
+        if len(argv) >= 3 and argv[1:3] == ["network", "connect"]:
+            connect_calls.append(list(argv))
+            return 0, "", ""
+        if "pull" in argv:
+            return 0, "", ""
+        if argv[1:3] == ["network", "create"]:
+            return 0, "", ""
+        if len(argv) > 1 and argv[1] == "ps":
+            return 0, "docker-sevn-proxy-1\n", ""
+        return 0, "container-id-abc", ""
+
+    monkeypatch.setattr("sevn.security.sandbox_runtime._docker_run", fake_docker_run)
+    cfg = WorkspaceConfig(
+        schema_version=1, gateway={"token": "${SECRET:keychain:sevn.gateway.token}"}
+    )
+    rt = DockerSandboxRuntime(trace_sink=None, cfg=cfg, image="example/sandbox:test")
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+    (ws / ".llmignore").mkdir()
+    await rt.spawn(
+        run_id="audit-network-proxy-connect",
+        workspace=ws,
+        env={
+            "SEVN_PROXY_URL": "http://sevn-proxy:8787",
+            "SEVN_SESSION_TOKEN": "tok",
+            "SEVN_WORKSPACE": "/workspace",
+        },
+    )
+    assert connect_calls, "expected docker network connect for compose proxy"
+    assert connect_calls[0][1:4] == ["network", "connect", "sevn-sandbox"]
+    assert connect_calls[0][4] == "docker-sevn-proxy-1"
+
+
+@pytest.mark.asyncio
+async def test_docker_spawn_rewrites_loopback_proxy_env(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    captured: list[list[str]] = []
+
+    async def fake_docker_run(
+        argv: list[str],
+        *,
+        timeout_s: float | None = None,
+        stdin: bytes | None = None,
+    ) -> tuple[int, str, str]:
+        _ = timeout_s, stdin
+        captured.append(list(argv))
+        if "pull" in argv:
+            return 0, "", ""
+        if argv[1:3] == ["network", "create"]:
+            return 0, "", ""
+        return 0, "container-id-abc", ""
+
+    monkeypatch.setattr("sevn.security.sandbox_runtime._docker_run", fake_docker_run)
+    cfg = WorkspaceConfig(
+        schema_version=1, gateway={"token": "${SECRET:keychain:sevn.gateway.token}"}
+    )
+    rt = DockerSandboxRuntime(trace_sink=None, cfg=cfg, image="example/sandbox:test")
+    ws = tmp_path / "workspace"
+    ws.mkdir()
+    (ws / ".llmignore").mkdir()
+    await rt.spawn(
+        run_id="audit-network-proxy-rewrite",
+        workspace=ws,
+        env={
+            "SEVN_PROXY_URL": "http://127.0.0.1:8787",
+            "SEVN_SESSION_TOKEN": "tok",
+            "SEVN_WORKSPACE": "/workspace",
+        },
+    )
+    run_calls = [argv for argv in captured if "run" in argv]
+    joined = " ".join(run_calls[-1])
+    assert "127.0.0.1" not in joined
+    assert "SEVN_PROXY_URL=" in joined

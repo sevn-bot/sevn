@@ -8,7 +8,7 @@ summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / sa
   (when routed through the execution sandbox), process when configured for sandbox
   routing, and skill subprocesses spawned b
 last_updated: '2026-08-03'
-fingerprint: sha256:cfbbd3804b037abca6f978ef0d90b3b3d5f938d0a028f4ee2818ca859e1804ec
+fingerprint: sha256:57939b3a8a3ddd0db55b18330d80ee32dfbb6b6fc0f1a027cba36a3066f78490
 related: []
 sources:
 - src/sevn/security/**
@@ -178,6 +178,9 @@ interfaces:
 - name: docker_daemon_reachable
   file: src/sevn/security/sandbox_runtime.py
   symbol: docker_daemon_reachable
+- name: ensure_proxy_attached_to_sandbox_network
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: ensure_proxy_attached_to_sandbox_network
 - name: ensure_sandbox_docker_network
   file: src/sevn/security/sandbox_runtime.py
   symbol: ensure_sandbox_docker_network
@@ -205,6 +208,9 @@ interfaces:
 - name: resolve_sandbox_driver
   file: src/sevn/security/sandbox_runtime.py
   symbol: resolve_sandbox_driver
+- name: rewrite_proxy_url_for_sandbox_network
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: rewrite_proxy_url_for_sandbox_network
 - name: snapshot_tarball_format_supported
   file: src/sevn/security/sandbox_runtime.py
   symbol: snapshot_tarball_format_supported

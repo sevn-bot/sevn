@@ -19,6 +19,8 @@ Exports:
     prune_workspace_snapshots — prune old tarballs using ``snapshot_retention_count``.
     make_runtime_for_driver — instantiate runtime for a resolved ``SandboxDriver``.
     ensure_sandbox_docker_network — dedicated internal bridge for sandbox containers.
+    ensure_proxy_attached_to_sandbox_network — connect egress proxy to sandbox bridge.
+    rewrite_proxy_url_for_sandbox_network — loopback → docker-host gateway for containers.
     list_labeled_sandbox_containers — enumerate ``sevn.run_id`` docker rows.
     reap_stale_sandbox_containers — TTL reaper keyed on ``sevn.run_id`` labels.
 Examples:
@@ -976,6 +978,9 @@ _SANDBOX_NETWORK_NAME: Final[str] = "sevn-sandbox"
 _SANDBOX_RUN_USER: Final[str] = "10001:10001"
 _SANDBOX_SPAWN_TS_LABEL: Final[str] = "sevn.spawn_ts"
 _REPL_READY_MARKER: Final[str] = "__SEVN_REPL_OK__"
+_LOOPBACK_PROXY_HOSTS: Final[frozenset[str]] = frozenset({"127.0.0.1", "localhost", "::1"})
+_DEFAULT_LINUX_DOCKER_HOST_GATEWAY: Final[str] = "172.17.0.1"
+_DEFAULT_DARWIN_DOCKER_HOST_GATEWAY: Final[str] = "host.docker.internal"
 
 
 def _docker_bin() -> str:
@@ -1088,6 +1093,164 @@ async def ensure_sandbox_docker_network() -> str:
         msg = f"docker network create {name!r} failed (exit {rc}): {err.strip() or out.strip()}"
         raise SandboxConfigurationError(msg)
     return name
+
+
+def _docker_host_gateway_for_sandbox() -> str:
+    """Return a host endpoint sandboxes on ``sevn-sandbox`` can reach (§4.2).
+    Returns:
+        str: ``host.docker.internal`` on macOS, else bridge gateway (override via env).
+    Examples:
+        >>> isinstance(_docker_host_gateway_for_sandbox(), str)
+        True
+    """
+    override = os.environ.get("SEVN_DOCKER_HOST_GATEWAY", "").strip()
+    if override:
+        return override
+    if sys.platform == "darwin":
+        return _DEFAULT_DARWIN_DOCKER_HOST_GATEWAY
+    return _DEFAULT_LINUX_DOCKER_HOST_GATEWAY
+
+
+def _proxy_hostname_from_url(proxy_url: str) -> str | None:
+    """Parse hostname from a proxy origin URL.
+    Args:
+        proxy_url (str): ``SEVN_PROXY_URL`` value.
+    Returns:
+        str | None: Lowercase hostname when present.
+    Examples:
+        >>> _proxy_hostname_from_url("http://sevn-proxy:8787")
+        'sevn-proxy'
+    """
+    raw = str(proxy_url).strip()
+    if not raw:
+        return None
+    if "://" not in raw:
+        raw = f"http://{raw}"
+    from urllib.parse import urlparse
+
+    parsed = urlparse(raw)
+    host = parsed.hostname
+    return host.lower() if host else None
+
+
+def rewrite_proxy_url_for_sandbox_network(proxy_url: str) -> str:
+    """Rewrite loopback proxy origins for internal-network sandbox containers (§4.2).
+    Args:
+        proxy_url (str): Gateway/process ``SEVN_PROXY_URL``.
+    Returns:
+        str: Container-reachable origin (unchanged when already routable).
+    Examples:
+        >>> rewrite_proxy_url_for_sandbox_network("http://127.0.0.1:8787").startswith("http://")
+        True
+        >>> "127.0.0.1" not in rewrite_proxy_url_for_sandbox_network("http://127.0.0.1:8787")
+        True
+    """
+    raw = str(proxy_url).strip()
+    if not raw:
+        return raw
+    if "://" not in raw:
+        raw = f"http://{raw}"
+    from urllib.parse import urlparse, urlunparse
+
+    parsed = urlparse(raw)
+    host = (parsed.hostname or "").lower()
+    if host not in _LOOPBACK_PROXY_HOSTS:
+        return proxy_url
+    gateway = _docker_host_gateway_for_sandbox()
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    if (parsed.scheme == "http" and port == 80) or (parsed.scheme == "https" and port == 443):
+        netloc = gateway
+    else:
+        netloc = f"{gateway}:{port}"
+    return urlunparse(parsed._replace(netloc=netloc))
+
+
+def _apply_sandbox_proxy_env(child_env: dict[str, str], proxy_url: str) -> None:
+    """Set proxy-related env keys on ``child_env`` from a single origin.
+    Args:
+        child_env (dict[str, str]): Mutable spawn env (updated in place).
+        proxy_url (str): Rewritten or original proxy origin.
+    Returns:
+        None: Always ``None``.
+    Examples:
+        >>> env: dict[str, str] = {}
+        >>> _apply_sandbox_proxy_env(env, "http://host.docker.internal:8787")
+        >>> env["SEVN_PROXY_URL"]
+        'http://host.docker.internal:8787'
+    """
+    child_env["SEVN_PROXY_URL"] = proxy_url
+    child_env["HTTP_PROXY"] = proxy_url
+    child_env["HTTPS_PROXY"] = proxy_url
+
+
+async def _find_running_container_matching(name_fragment: str) -> str | None:
+    """Return the first running container whose name contains ``name_fragment``.
+    Args:
+        name_fragment (str): Compose service name or container substring.
+    Returns:
+        str | None: Docker container name, or ``None`` when no match.
+    Examples:
+        >>> isinstance(True, bool)
+        True
+    """
+    fragment = name_fragment.strip()
+    if not fragment:
+        return None
+    docker_bin = _docker_bin()
+    rc, out, _err = await _docker_run(
+        [docker_bin, "ps", "--filter", f"name={fragment}", "--format", "{{.Names}}"],
+        timeout_s=15.0,
+    )
+    if rc != 0:
+        return None
+    names = [line.strip() for line in out.splitlines() if line.strip()]
+    if not names:
+        return None
+    for name in names:
+        if name == fragment:
+            return name
+    return names[0]
+
+
+async def ensure_proxy_attached_to_sandbox_network(*, proxy_url: str) -> None:
+    """Attach the egress proxy container to ``sevn-sandbox`` when resolvable (§4.2).
+    Internal sandbox networks deny external routing; the proxy must share the bridge
+    (or the spawn path rewrites loopback URLs to ``host.docker.internal``).
+    Args:
+        proxy_url (str): Process ``SEVN_PROXY_URL`` before container rewrite.
+    Returns:
+        None: Always ``None`` (connect failures are logged, not fatal).
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(ensure_proxy_attached_to_sandbox_network)
+        True
+    """
+    override = os.environ.get("SEVN_PROXY_CONTAINER", "").strip()
+    host = _proxy_hostname_from_url(proxy_url)
+    container: str | None
+    if override:
+        container = override
+    elif host and host not in _LOOPBACK_PROXY_HOSTS and host != _docker_host_gateway_for_sandbox():
+        container = await _find_running_container_matching(host)
+    else:
+        return
+    if not container:
+        return
+    network_name = await ensure_sandbox_docker_network()
+    docker_bin = _docker_bin()
+    rc, out, err = await _docker_run(
+        [docker_bin, "network", "connect", network_name, container],
+        timeout_s=30.0,
+    )
+    combined = f"{out}\n{err}".lower()
+    if rc != 0 and "already" not in combined:
+        logger.warning(
+            "docker network connect {network} {container} failed (exit {rc}): {detail}",
+            network=network_name,
+            container=container,
+            rc=rc,
+            detail=err.strip() or out.strip(),
+        )
 
 
 def _seccomp_profile_path() -> str:
@@ -1485,6 +1648,12 @@ class DockerSandboxRuntime:
         child_env = dict(env)
         child_env.update(self._pre_env)
         child_env.setdefault("SEVN_WORKSPACE", _DOCKER_WORKSPACE_MOUNT)
+        proxy_raw = str(child_env.get("SEVN_PROXY_URL", "")).strip()
+        if proxy_raw:
+            await ensure_proxy_attached_to_sandbox_network(proxy_url=proxy_raw)
+            rewritten = rewrite_proxy_url_for_sandbox_network(proxy_raw)
+            if rewritten != proxy_raw:
+                _apply_sandbox_proxy_env(child_env, rewritten)
         network_rules = await asyncio.to_thread(
             _write_docker_network_policy,
             ws,

@@ -174,7 +174,7 @@ def test_sandbox_terminal_self_preservation_blocks_line() -> None:
     os.environ.get("CI") == "true",
     reason="local-open PTY websocket smoke hangs under GHA xdist (30m shard cancel)",
 )
-def test_terminal_ws_local_open_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_terminal_ws_authenticated_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("SEVN_DANGEROUS_HOST_SANDBOX", "1")
     monkeypatch.setattr(
