@@ -156,6 +156,15 @@ PATH_RULES: tuple[PathRule, ...] = (
     ),
     PathRule(
         (
+            "src/sevn/storage/**",
+            "scripts/dump_storage_golden.py",
+            "scripts/check_storage_migration_rehearsal.py",
+            "tests/fixtures/storage/**",
+        ),
+        "storage-migration-rehearsal-check",
+    ),
+    PathRule(
+        (
             "infra/onboarding_catalog.schema.json",
             "infra/onboarding_fragment.schema.json",
             "src/sevn/data/onboarding_profiles/**",

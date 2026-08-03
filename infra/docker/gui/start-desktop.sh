@@ -6,7 +6,7 @@ set -euo pipefail
 
 export DISPLAY="${DISPLAY:-:99}"
 
-Xvfb "${DISPLAY}" -screen 0 1280x720x24 -ac +extension GLX +render -noreset &
+Xvfb "${DISPLAY}" -screen 0 1280x720x24 +extension GLX +render -noreset &
 XVFB_PID=$!
 
 sleep 1
@@ -14,7 +14,11 @@ sleep 1
 openbox &
 OPENBOX_PID=$!
 
-x11vnc -display "${DISPLAY}" -forever -shared -rfbport 5900 -localhost -xkb &
+VNC_AUTH="${HOME}/.vnc/sevn-rfbauth"
+mkdir -p "$(dirname "${VNC_AUTH}")"
+x11vnc -storepasswd "${SEVN_VNC_PASSWORD:-$(openssl rand -hex 16)}" "${VNC_AUTH}" >/dev/null
+chmod 600 "${VNC_AUTH}"
+x11vnc -display "${DISPLAY}" -forever -shared -rfbport 5900 -localhost -xkb -rfbauth "${VNC_AUTH}" &
 VNC_PID=$!
 
 websockify --web /usr/share/novnc 127.0.0.1:6080 localhost:5900 &

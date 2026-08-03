@@ -448,6 +448,46 @@ def _effective_process_settings(
     return process.model_copy(update={"proxy_url": origin})
 
 
+def _proxy_readiness_required(
+    *,
+    process_settings_passed: bool,
+    resolved_process: ProcessSettings,
+    workspace: WorkspaceConfig,
+) -> bool:
+    """Return whether ``/ready`` must fail closed on egress proxy ``/healthz`` loss.
+
+    ``_effective_process_settings`` always fills a default loopback origin for
+    transports; readiness only probes when the operator (or an explicit test harness)
+    configured egress via ``SEVN_PROXY_URL``, a ``proxy`` block in ``sevn.json``, or
+    ``create_app(process_settings=...)`` (``specs/17-gateway.md`` §10.6).
+
+    Args:
+        process_settings_passed (bool): Whether ``create_app`` received ``process_settings=``.
+        resolved_process (ProcessSettings): Env-derived settings before workspace merge.
+        workspace (WorkspaceConfig): Parsed ``sevn.json``.
+
+    Returns:
+        bool: ``True`` when ``/ready`` should probe and fail on proxy loss.
+
+    Examples:
+        >>> from sevn.config.settings import ProcessSettings
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> ws = WorkspaceConfig.minimal()
+        >>> _proxy_readiness_required(
+        ...     process_settings_passed=False,
+        ...     resolved_process=ProcessSettings(),
+        ...     workspace=ws,
+        ... )
+        False
+    """
+    if (resolved_process.proxy_url or "").strip():
+        return True
+    proxy_section = workspace.proxy
+    if isinstance(proxy_section, dict) and bool(proxy_section):
+        return True
+    return process_settings_passed
+
+
 _DEFAULT_PROXY_BOOT_HEALTH_MAX_WAIT_S = 5.0
 _DEFAULT_PROXY_BOOT_HEALTH_POLL_INTERVAL_S = 0.5
 
@@ -526,6 +566,46 @@ async def _log_proxy_boot_health(process: ProcessSettings) -> None:
         True
     """
     await wait_for_proxy_boot_health(process)
+
+
+async def _deploy_readiness_body(
+    app: FastAPI,
+    *,
+    conn: sqlite3.Connection | None,
+) -> dict[str, Any]:
+    """Probe SQLite and optional egress proxy for deploy readiness.
+
+    Args:
+        app (FastAPI): Gateway application (``process_settings`` on ``app.state``).
+        conn (sqlite3.Connection | None): Open workspace DB from ``app.state.sqlite_conn``.
+
+    Returns:
+        dict[str, Any]: ``ready``, ``sqlite``, and optional ``proxy`` fields.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_deploy_readiness_body)
+        True
+    """
+    if conn is None:
+        return {"ready": False, "sqlite": False}
+    try:
+        conn.execute("SELECT 1").fetchone()
+    except sqlite3.Error:
+        return {"ready": False, "sqlite": False}
+    body: dict[str, Any] = {"ready": True, "sqlite": True}
+    proc: ProcessSettings = app.state.process_settings
+    if getattr(app.state, "proxy_readiness_required", False) and proc.proxy_url:
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                r = await client.get(proc.proxy_url.rstrip("/") + "/healthz")
+            proxy_ok = r.status_code < 400
+        except (httpx.HTTPError, OSError, ValueError):
+            proxy_ok = False
+        body["proxy"] = {"ok": proxy_ok}
+        if not proxy_ok:
+            body["ready"] = False
+    return body
 
 
 def _cached_gateway_token(request: Request) -> str | None:
@@ -1468,6 +1548,11 @@ def create_app(
         app.state.layout = ly
         app.state.effective_mcp_servers = _mcp_servers_map  # computed above at W6 boot
         app.state.process_settings = effective_process
+        app.state.proxy_readiness_required = _proxy_readiness_required(
+            process_settings_passed=process_settings is not None,
+            resolved_process=resolved_process,
+            workspace=ws,
+        )
         app.state.gateway_router = gateway_router
         app.state.gateway_sessions = sessions
         app.state.webchat_config = webchat_cfg
@@ -1483,7 +1568,10 @@ def create_app(
             resolved_login_password=resolved_dashboard_login_password,
             resolved_gateway_token=resolved_gateway_token,
         )
+        from sevn.storage.sqlite_write_lock import sqlite_write_lock
+
         app.state.trigger_dispatch_gate = TriggerDispatchGate(effective_max_concurrent(ws))
+        app.state.sqlite_write_lock = sqlite_write_lock()
         app.state.trigger_run_status = {}
         app.state.trigger_plugin_hooks = trigger_mux
         app.state.plugin_hook_chain = plugin_chain
@@ -1880,39 +1968,13 @@ def create_app(
         """Readiness: SQLite open + optional proxy ping.
         Failure modes (operators): **503 ``sqlite: false``** when ``sevn.db`` is not
         opened on ``app.state`` or ``SELECT 1`` raises — check disk permissions and
-        migration head. **``proxy.ok: false``** when ``ProcessSettings.proxy_url`` is
-        set but the proxy ``/health`` probe fails — egress or proxy process down
+        migration head. **503 ``ready: false``** when ``ProcessSettings.proxy_url`` is
+        set but the proxy ``/healthz`` probe fails — egress or proxy process down
         (`specs/07-egress-proxy.md`). See inline notes in ``specs/17-gateway.md`` §10.6.
         """
         conn_local: sqlite3.Connection | None = getattr(request.app.state, "sqlite_conn", None)
         trace_local: TraceSink | None = getattr(request.app.state, "gateway_trace", None)
-        if conn_local is None:
-            await _emit_gateway_trace(
-                trace_local,
-                kind="gateway.deploy_readiness",
-                status="error",
-                attrs={"ready": False, "sqlite": False},
-            )
-            return JSONResponse(status_code=503, content={"ready": False, "sqlite": False})
-        try:
-            conn_local.execute("SELECT 1").fetchone()
-        except sqlite3.Error:
-            await _emit_gateway_trace(
-                trace_local,
-                kind="gateway.deploy_readiness",
-                status="error",
-                attrs={"ready": False, "sqlite": False},
-            )
-            return JSONResponse(status_code=503, content={"ready": False, "sqlite": False})
-        body: dict[str, Any] = {"ready": True, "sqlite": True}
-        proc: ProcessSettings = request.app.state.process_settings
-        if proc.proxy_url:
-            try:
-                async with httpx.AsyncClient(timeout=2.0) as client:
-                    r = await client.get(proc.proxy_url.rstrip("/") + "/healthz")
-                body["proxy"] = {"ok": r.status_code < 400}
-            except (httpx.HTTPError, OSError, ValueError):
-                body["proxy"] = {"ok": False}
+        body = await _deploy_readiness_body(request.app, conn=conn_local)
         ready_status = "ok" if body.get("ready") else "error"
         await _emit_gateway_trace(
             trace_local,
@@ -1920,7 +1982,8 @@ def create_app(
             status=ready_status,
             attrs=body,
         )
-        return JSONResponse(body)
+        status_code = 200 if body.get("ready") else 503
+        return JSONResponse(status_code=status_code, content=body)
 
     @app.get("/metrics")
     async def metrics() -> PlainTextResponse:
@@ -1953,6 +2016,23 @@ def create_app(
         ):
             return
         raise HTTPException(status_code=401, detail="unauthorized")
+
+    @app.get("/diagnostics")
+    async def diagnostics(
+        request: Request,
+        _ok: None = Depends(enforce_gateway_auth),
+    ) -> JSONResponse:
+        """Authenticated deploy diagnostics (``specs/17-gateway.md`` §10.6).
+
+        Returns the same dependency probes as ``/ready`` plus configuration hints
+        for operators; unauthenticated callers receive ``401``.
+        """
+        conn_local: sqlite3.Connection | None = getattr(request.app.state, "sqlite_conn", None)
+        body = await _deploy_readiness_body(request.app, conn=conn_local)
+        proc: ProcessSettings = request.app.state.process_settings
+        body["proxy_url_configured"] = bool(proc.proxy_url)
+        status_code = 200 if body.get("ready") else 503
+        return JSONResponse(status_code=status_code, content=body)
 
     register_admin_secrets_routes(app, enforce_gateway_auth=enforce_gateway_auth)
     mount_gui_proxy(app, resolve_gateway_token=_cached_gateway_token)

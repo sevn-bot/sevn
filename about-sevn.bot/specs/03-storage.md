@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own application persistence: connection setup (WAL, foreign keys), versioned
   migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence
   contracts for crash-resume and (w'
-last_updated: '2026-07-30'
-fingerprint: sha256:fd0b7cbdcf542049178b7df814cd0a272357ff84239c8ac3ffbcd816501c8fa5
+last_updated: '2026-08-03'
+fingerprint: sha256:e4c1e19e5779562faf21cb0b1fa3a1d6bc9f98faee19cff2b759bc0923e21842
 related: []
 sources:
 - src/sevn/storage/**
@@ -19,6 +19,12 @@ depends_on:
 - spec-02-config-and-workspace
 build_phase: null
 interfaces:
+- name: backup_sevn_db
+  file: src/sevn/storage/backup.py
+  symbol: backup_sevn_db
+- name: restore_sevn_db
+  file: src/sevn/storage/backup.py
+  symbol: restore_sevn_db
 - name: D1Backend
   file: src/sevn/storage/d1.py
   symbol: D1Backend
@@ -97,12 +103,24 @@ interfaces:
 - name: open_sevn_sqlite
   file: src/sevn/storage/sqlite.py
   symbol: open_sevn_sqlite
+- name: run_sqlite_write
+  file: src/sevn/storage/sqlite_write_lock.py
+  symbol: run_sqlite_write
+- name: sqlite_write_lock
+  file: src/sevn/storage/sqlite_write_lock.py
+  symbol: sqlite_write_lock
 - name: get_telegram_chat_name
   file: src/sevn/storage/telegram_names.py
   symbol: get_telegram_chat_name
 - name: get_telegram_topic_name
   file: src/sevn/storage/telegram_names.py
   symbol: get_telegram_topic_name
+- name: get_trigger_run_status
+  file: src/sevn/storage/trigger_runs.py
+  symbol: get_trigger_run_status
+- name: upsert_trigger_run_status
+  file: src/sevn/storage/trigger_runs.py
+  symbol: upsert_trigger_run_status
 ---
 
 ## Purpose
@@ -206,6 +224,22 @@ enforced in `cron_tick`. Recent history is exposed on Mission Control cron ops A
 Adds `session_export_jobs` (migration 29) for optional offline export audit
 metadata. `sevn sessions export` gathers redacted history from SQLite,
 workspace session mirror JSONL, turn metadata, and turn bundles.
+
+## Amendments (release-audit W9, #147)
+
+SQLite connection setup (`connect_sqlite`) uses `timeout=30`, `busy_timeout=30000`,
+`synchronous=NORMAL`, and autocommit isolation (`isolation_level=None`) on top of
+WAL + foreign keys. The gateway serializes writes through a process-wide
+`asyncio.Lock` (`sqlite_write_lock`) — **single-process only**; multi-replica
+deployments must not share one writable `sevn.db` file.
+
+Adds `trigger_runs` (migration 30) so `GET /api/v1/runs/{run_id}` resolves status
+from SQLite instead of the process-local `trigger_run_status` dict.
+
+Operator CLI: `sevn db backup` / `sevn db restore` snapshot `.sevn/sevn.db` via
+SQLite online backup after WAL checkpoint. CI runs
+`make storage-migration-rehearsal-check` to restore the golden `migration_29.sql`
+fixture and migrate forward to the bundle head.
 
 ## Implemented by
 

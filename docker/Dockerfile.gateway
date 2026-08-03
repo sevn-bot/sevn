@@ -38,6 +38,13 @@ RUN if [ "$INSTALL_BRAVE" = "true" ]; then \
 
 ENV PATH="/opt/sevn/.venv/bin:${PATH}"
 
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin sevn \
+    && chown -R sevn:sevn /opt/sevn \
+    && mkdir -p /workspace \
+    && chown sevn:sevn /workspace
+
+USER sevn
+
 WORKDIR /workspace
 
 EXPOSE 3001

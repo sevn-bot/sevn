@@ -13,8 +13,25 @@
 # Profile `gui` adds noVNC. Profiles `browser` and `gui` are mutually exclusive.
 # Default `docker compose up` starts sevn-proxy + sevn-gateway.
 # Host-first headed browsing: run gateway on macOS with `uv sync --extra browser-cdp` instead.
+#
+# Gateway/proxy/browser images run as uid 10001 (`sevn`). Named volumes mount as root unless
+# normalized — ``sevn-operator-perms`` chowns ``sevn-state`` (and browser state) before services start.
 
 services:
+  sevn-operator-perms:
+    image: busybox:1.36
+    user: "0:0"
+    volumes:
+      - sevn-state:/operator
+      - sevn-browser-state:/browser-profiles
+    command:
+      - sh
+      - -ec
+      - |
+        chown -R 10001:10001 /operator
+        chown -R 10001:10001 /browser-profiles
+    restart: "no"
+
   sevn-proxy:
     build:
       context: ..
@@ -24,6 +41,9 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     volumes:
       - sevn-state:/operator
+    depends_on:
+      sevn-operator-perms:
+        condition: service_completed_successfully
     expose:
       - "8787"
     healthcheck:
@@ -54,6 +74,8 @@ services:
     ports:
       - "${SEVN_GATEWAY_BIND:-127.0.0.1}:${SEVN_GATEWAY_PORT:-3001}:3001"
     depends_on:
+      sevn-operator-perms:
+        condition: service_completed_successfully
       sevn-proxy:
         condition: service_healthy
     healthcheck:
@@ -81,14 +103,17 @@ services:
       SEVN_TELEGRAM_BOT_TOKEN: ${SEVN_TELEGRAM_BOT_TOKEN:-}
       SEVN_CHROME_EXECUTABLE: /usr/bin/brave-browser
       SEVN_BROWSER_ENGINE: brave
-      SEVN_BROWSER_EXTRA_ARGS: "--no-sandbox --disable-dev-shm-usage"
+      SEVN_BROWSER_EXTRA_ARGS: "--disable-dev-shm-usage"
     volumes:
       - sevn-state:/operator
+      - sevn-browser-state:/operator/workspace/.sevn/browser-profiles
       - ../infra/docker-onboard.json:/bootstrap/onboard-compose.json:ro
     working_dir: /operator/workspace
     ports:
       - "${SEVN_GATEWAY_BIND:-127.0.0.1}:${SEVN_GATEWAY_PORT:-3001}:3001"
     depends_on:
+      sevn-operator-perms:
+        condition: service_completed_successfully
       sevn-proxy:
         condition: service_healthy
     healthcheck:
@@ -126,6 +151,8 @@ services:
     ports:
       - "${SEVN_GATEWAY_BIND:-127.0.0.1}:${SEVN_GATEWAY_PORT:-3001}:3001"
     depends_on:
+      sevn-operator-perms:
+        condition: service_completed_successfully
       sevn-proxy:
         condition: service_healthy
     healthcheck:
@@ -143,3 +170,4 @@ services:
 
 volumes:
   sevn-state:
+  sevn-browser-state:

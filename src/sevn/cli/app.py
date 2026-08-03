@@ -30,6 +30,7 @@ from sevn.cli.commands.channels_cmd import register as register_channels
 from sevn.cli.commands.completion import register as register_completion
 from sevn.cli.commands.config_cmd import register as register_config
 from sevn.cli.commands.dashboard_cmd import register as register_dashboard
+from sevn.cli.commands.db_cmd import register as register_db
 from sevn.cli.commands.deploy_cmd import register as register_deploy
 from sevn.cli.commands.doctor import register as register_doctor
 from sevn.cli.commands.export_secrets_cmd import register as register_export_secrets
@@ -226,6 +227,7 @@ register_subagents(app)
 register_sync(app)
 register_turn_bundle(app)
 register_dashboard(app)
+register_db(app)
 register_agent(app)
 register_models(app)
 register_voice(app)

@@ -12,7 +12,12 @@ mkdir -p \
     "${WORKSPACE}/.sevn/browser-sessions" \
     "${WORKSPACE}/logs"
 
-# Prior root-run `--profile browser` sessions may leave root-owned profiles on the shared volume.
-chown -R sevnoperator:sevnoperator "${WORKSPACE}/.sevn" "${WORKSPACE}/logs" 2>/dev/null || true
+OWNERSHIP_SENTINEL="${WORKSPACE}/.sevn/.ownership-normalized"
+if [[ ! -f "${OWNERSHIP_SENTINEL}" ]]; then
+    # One-shot fix for prior root-run `--profile browser` sessions on a shared volume.
+    chown -R sevnoperator:sevnoperator "${WORKSPACE}/.sevn" "${WORKSPACE}/logs" 2>/dev/null || true
+    touch "${OWNERSHIP_SENTINEL}"
+    chown sevnoperator:sevnoperator "${OWNERSHIP_SENTINEL}" 2>/dev/null || true
+fi
 
 exec supervisord -c /opt/sevn/infra/docker/gui/supervisord.conf

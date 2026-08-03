@@ -4,6 +4,8 @@
 
 FROM python:3.12-slim-bookworm
 
+ARG BRAVE_VERSION=1.73.97
+
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /opt/sevn
@@ -27,14 +29,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY infra/docker/install-brave.sh /tmp/install-brave.sh
-RUN chmod +x /tmp/install-brave.sh && /tmp/install-brave.sh && rm /tmp/install-brave.sh
+RUN chmod +x /tmp/install-brave.sh && BRAVE_VERSION="$BRAVE_VERSION" /tmp/install-brave.sh && rm /tmp/install-brave.sh
 
 # Brave is the primary spawn binary; system/Brave Chromium is the only browser dep (browser-cdp).
 
 ENV PATH="/opt/sevn/.venv/bin:${PATH}"
 ENV SEVN_CHROME_EXECUTABLE=/usr/bin/brave-browser
 ENV SEVN_BROWSER_ENGINE=brave
-ENV SEVN_BROWSER_EXTRA_ARGS="--no-sandbox --disable-dev-shm-usage"
+ENV SEVN_BROWSER_EXTRA_ARGS="--disable-dev-shm-usage"
+
+RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin sevn \
+    && chown -R sevn:sevn /opt/sevn \
+    && mkdir -p /workspace \
+    && chown sevn:sevn /workspace
+
+USER sevn
 
 WORKDIR /workspace
 
