@@ -42,7 +42,7 @@ def dashboard_local_token_path(*, home: Path | None = None) -> Path:
         Path: ``{operator_home}/dashboard-local-token``.
 
     Examples:
-        >>> dashboard_local_token_path().__name__
+        >>> dashboard_local_token_path().name
         'dashboard-local-token'
     """
     root = home if home is not None else operator_home_dir()
@@ -59,7 +59,8 @@ def write_dashboard_local_token(*, home: Path | None = None) -> str:
         str: Plaintext token written to disk.
 
     Examples:
-        >>> token = write_dashboard_local_token(home=__import__('pathlib').Path('/tmp/x'))
+        >>> from pathlib import Path
+        >>> token = write_dashboard_local_token(home=Path('/tmp/sevn_w3_local_token_doctest'))
         >>> len(token) >= 32
         True
     """
