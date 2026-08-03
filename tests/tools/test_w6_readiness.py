@@ -185,8 +185,9 @@ def test_run_sync_returns_partial_on_timeout() -> None:
 
     child.expect.side_effect = _always_timeout
 
-    output, timed_out = _run_sync(child=child, command="sleep 999", timeout_s=0.05)
+    output, timed_out, exit_code = _run_sync(child=child, command="sleep 999", timeout_s=0.05)
     assert timed_out is True
+    assert exit_code is None
     assert "partial-output" in output
 
 
@@ -200,10 +201,12 @@ async def test_terminal_run_respects_raised_timeout(ctx: ToolContext) -> None:
 
     captured: dict[str, float] = {}
 
-    def _fake_run_sync(*, child: Any, command: str, timeout_s: float) -> tuple[str, bool]:
+    def _fake_run_sync(
+        *, child: Any, command: str, timeout_s: float
+    ) -> tuple[str, bool, int | None]:
         _ = (child, command)
         captured["timeout_s"] = timeout_s
-        return ("done", False)
+        return ("done", False, 0)
 
     with patch.object(terminal_mod, "_run_sync", side_effect=_fake_run_sync):
         from sevn.tools.terminal import terminal_run_tool

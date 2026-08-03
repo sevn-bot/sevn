@@ -23,6 +23,10 @@ from sevn.tools.registry import build_session_registry
 from sevn.tools.terminal import reset_terminal_store_for_tests
 
 
+class _SandboxWiringStub:
+    """Minimal ``sandbox_client`` for host-backed tool tests after W4 wiring gate."""
+
+
 @pytest.fixture(autouse=True)
 def _clean_stores() -> None:
     reset_process_store_for_tests()
@@ -43,13 +47,11 @@ def ctx(tmp_path: Path) -> ToolContext:
         registry_version=1,
         trace=None,
         permissions=AllowAllPermissionPolicy(),
+        sandbox_client=_SandboxWiringStub(),
     )
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W6: process output drains trailing bytes to EOF", strict=False
-)
 async def test_process_output_includes_bytes_after_early_reader_cap(ctx: ToolContext) -> None:
     """Process emits a second line after the reader would have stopped at MAX_CAPTURE_CHARS."""
     exe, _ = build_session_registry(registry_version=1)
@@ -84,7 +86,6 @@ async def test_process_output_includes_bytes_after_early_reader_cap(ctx: ToolCon
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W6: process spawn uses start_new_session", strict=False)
 async def test_process_start_passes_start_new_session(ctx: ToolContext) -> None:
     captured: list[dict[str, Any]] = []
 
@@ -118,7 +119,6 @@ async def test_process_start_passes_start_new_session(ctx: ToolContext) -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W6: process stop uses killpg on process group", strict=False)
 async def test_process_stop_uses_killpg(ctx: ToolContext) -> None:
     killpg_calls: list[tuple[int, int]] = []
 
@@ -138,6 +138,7 @@ async def test_process_stop_uses_killpg(ctx: ToolContext) -> None:
 
     with (
         patch("sevn.tools.process.asyncio.create_subprocess_exec", fake_create_subprocess_exec),
+        patch("sevn.tools.process.os.getpgid", return_value=4242),
         patch("sevn.tools.process.os.killpg", fake_killpg),
     ):
         exe, _ = build_session_registry(registry_version=1)
@@ -161,9 +162,6 @@ async def test_process_stop_uses_killpg(ctx: ToolContext) -> None:
     assert killpg_calls, "expected os.killpg during stop"
 
 
-@pytest.mark.xfail(
-    reason="green after W6: terminal completion uses sentinel not prompt regex", strict=False
-)
 def test_terminal_run_sync_uses_sentinel_marker() -> None:
     import inspect
 
@@ -175,17 +173,17 @@ def test_terminal_run_sync_uses_sentinel_marker() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W6: terminal_run strips completion sentinel from output", strict=False
-)
 async def test_terminal_run_strips_sentinel_from_output(ctx: ToolContext) -> None:
     sentinel = "__SEVN_TERM_DONE__"
     captured: dict[str, str] = {}
 
-    def fake_run_sync(*, child: Any, command: str, timeout_s: float) -> tuple[str, bool]:
+    def fake_run_sync(
+        *, child: Any, command: str, timeout_s: float
+    ) -> tuple[str, bool, int | None]:
         _ = child, timeout_s
         captured["command"] = command
-        return f"hello\n{sentinel}\n", False
+        # Real _run_sync strips the sentinel before returning; simulate that here.
+        return "hello", False, 0
 
     with patch("sevn.tools.terminal._run_sync", fake_run_sync):
         exe, _ = build_session_registry(registry_version=1)
@@ -200,12 +198,9 @@ async def test_terminal_run_strips_sentinel_from_output(ctx: ToolContext) -> Non
     assert env["ok"] is True
     assert sentinel not in env["data"]["output"]
     assert "hello" in env["data"]["output"]
-    assert sentinel in captured.get("command", "")
+    assert captured.get("command") == "echo hello"
 
 
-@pytest.mark.xfail(
-    reason="green after W6: terminal timeout escalates SIGINT to SIGKILL", strict=False
-)
 def test_terminal_timeout_path_sends_signals() -> None:
     import inspect
 

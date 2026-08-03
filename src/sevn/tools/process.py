@@ -24,13 +24,18 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 import shlex
+import signal
+import subprocess
+import time
 import uuid
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, Literal
 
-from sevn.runtime.operator_path import augment_operator_path
+from sevn.security.trigger_spawn_env import augment_operator_path_for_subprocess
 from sevn.tools.base import enveloped_failure, enveloped_success
 from sevn.tools.codes import ToolResultCode
 from sevn.tools.context import ToolContext
@@ -47,6 +52,10 @@ JobStatus = Literal["running", "completed", "stopped", "failed"]
 DEFAULT_OUTPUT_TAIL_LINES: Final[int] = 200
 MAX_OUTPUT_TAIL_LINES: Final[int] = 2000
 MAX_CAPTURE_CHARS: Final[int] = 256_000
+MAX_JOBS_PER_SESSION: Final[int] = 64
+JOB_TTL_S: Final[float] = 86_400.0
+_READER_DRAIN_TIMEOUT_S: Final[float] = 2.0
+_STOP_GRACE_S: Final[float] = 5.0
 
 # Model-facing aliases mapped before dispatch (D8). ``run`` stays unknown so
 # ``did_you_mean`` can offer start|output — it is ambiguous between them.
@@ -54,6 +63,7 @@ _ACTION_ALIASES: Final[dict[str, ProcessAction]] = {"read": "output"}
 
 _PROCESS_TOOLS: tuple[Any, ...] = ()
 _jobs_by_session: dict[str, dict[str, BackgroundJob]] = {}
+_background_reap_tasks: set[asyncio.Task[None]] = set()
 
 
 @dataclass
@@ -68,6 +78,7 @@ class BackgroundJob:
     stderr_parts: list[str] = field(default_factory=list)
     status: JobStatus = "running"
     returncode: int | None = None
+    created_at: float = field(default_factory=time.time)
     reader_tasks: list[asyncio.Task[None]] = field(default_factory=list, repr=False)
 
 
@@ -134,7 +145,10 @@ async def _read_stream(
     *,
     label: str,
 ) -> None:
-    """Append decoded chunks from ``stream`` into ``parts`` with a size cap.
+    """Drain ``stream`` to EOF; retain only the tail in ``parts``.
+
+    Never stop reading before EOF — a stalled reader fills the OS pipe and can
+    deadlock the child while ``proc.wait()`` is pending.
 
     Args:
         stream (asyncio.StreamReader | None): Pipe to drain.
@@ -152,18 +166,19 @@ async def _read_stream(
     _ = label
     if stream is None:
         return
-    total = sum(len(part) for part in parts)
+    ring: deque[str] = deque()
+    total = 0
     while True:
         chunk = await stream.read(4096)
         if not chunk:
             break
         text = chunk.decode("utf-8", errors="replace")
-        parts.append(text)
+        ring.append(text)
         total += len(text)
-        if total >= MAX_CAPTURE_CHARS:
-            overflow = total - MAX_CAPTURE_CHARS
-            parts[-1] = parts[-1][overflow:]
-            break
+        while total > MAX_CAPTURE_CHARS and len(ring) > 1:
+            total -= len(ring.popleft())
+    parts.clear()
+    parts.extend(ring)
 
 
 def _finalize_job_status(job: BackgroundJob) -> None:
@@ -215,7 +230,7 @@ async def _watch_job_exit(job: BackgroundJob) -> None:
         raise
     finally:
         _finalize_job_status(job)
-        _cancel_job_readers(job)
+        await _await_job_readers(job)
 
 
 def _parse_command(command: str | list[str]) -> list[str]:
@@ -273,6 +288,109 @@ def list_session_jobs(session_id: str) -> list[dict[str, object]]:
             },
         )
     return rows
+
+
+async def _dispose_job_async(job: BackgroundJob) -> None:
+    """Stop a running job and await its pipe readers (registry eviction helper).
+
+    Args:
+        job (BackgroundJob): Job to tear down.
+
+    Returns:
+        None
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_dispose_job_async)
+        True
+    """
+    proc = job.proc
+    if proc is not None and proc.returncode is None:
+        with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
+            pgid = os.getpgid(proc.pid)
+            os.killpg(pgid, signal.SIGTERM)
+        with contextlib.suppress(TimeoutError, ProcessLookupError):
+            await asyncio.wait_for(proc.wait(), timeout=_STOP_GRACE_S)
+    await _await_job_readers(job)
+
+
+def _reap_stale_jobs(session_id: str, *, now: float | None = None) -> None:
+    """Evict TTL-expired and LRU-excess jobs for ``session_id``.
+
+    Args:
+        session_id (str): Gateway session identifier.
+        now (float | None): Wall clock override for tests.
+
+    Returns:
+        None
+
+    Examples:
+        >>> reset_process_store_for_tests()
+        >>> _reap_stale_jobs("demo") is None
+        True
+    """
+    jobs = _session_jobs(session_id)
+    if not jobs:
+        return
+    clock = time.time() if now is None else now
+
+    for job_id in list(jobs):
+        job = jobs[job_id]
+        if job.status == "running":
+            continue
+        if (clock - job.created_at) > JOB_TTL_S:
+            jobs.pop(job_id, None)
+            _cancel_job_readers(job)
+
+    finished = sorted(
+        ((job_id, job) for job_id, job in jobs.items() if job.status != "running"),
+        key=lambda item: item[1].created_at,
+    )
+    while len(jobs) > MAX_JOBS_PER_SESSION and finished:
+        job_id, job = finished.pop(0)
+        jobs.pop(job_id, None)
+        _cancel_job_readers(job)
+
+    if len(jobs) <= MAX_JOBS_PER_SESSION:
+        return
+
+    running = sorted(
+        ((job_id, job) for job_id, job in jobs.items() if job.status == "running"),
+        key=lambda item: item[1].created_at,
+    )
+    while len(jobs) > MAX_JOBS_PER_SESSION and running:
+        job_id, job = running.pop(0)
+        evicted = jobs.pop(job_id, None)
+        if evicted is not None:
+            task = asyncio.create_task(_dispose_job_async(evicted))
+            _background_reap_tasks.add(task)
+            task.add_done_callback(_background_reap_tasks.discard)
+
+
+async def _await_job_readers(
+    job: BackgroundJob, *, timeout_s: float = _READER_DRAIN_TIMEOUT_S
+) -> None:
+    """Wait for stdout/stderr readers to drain, then cancel stragglers.
+
+    Args:
+        job (BackgroundJob): Job whose pipe readers should finish.
+        timeout_s (float): Per-reader wait budget in seconds.
+
+    Returns:
+        None
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_await_job_readers)
+        True
+    """
+    watch = asyncio.current_task()
+    for task in list(job.reader_tasks):
+        if task is watch or task.done():
+            continue
+        with contextlib.suppress(asyncio.CancelledError, asyncio.TimeoutError):
+            await asyncio.wait_for(asyncio.shield(task), timeout=timeout_s)
+    _cancel_job_readers(job)
 
 
 def _tail_text(parts: list[str], *, max_lines: int) -> str:
@@ -336,14 +454,19 @@ async def _start_job(
         except ValueError as exc:
             return enveloped_failure(str(exc), code=ToolResultCode.PERMISSION_DENIED)
 
+    _reap_stale_jobs(ctx.session_id)
+
     job_id = uuid.uuid4().hex[:12]
+    scrubbed_env = augment_operator_path_for_subprocess()
     try:
         proc = await asyncio.create_subprocess_exec(
             *argv,
             cwd=work_cwd,
-            env=augment_operator_path(),
+            stdin=subprocess.DEVNULL,
+            env=scrubbed_env,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            start_new_session=True,
         )
     except OSError as exc:
         return enveloped_failure(
@@ -403,18 +526,22 @@ async def _stop_job(ctx: ToolContext, *, job_id: str) -> str:
         )
 
     job.status = "stopped"
-    proc.terminate()
+    pgid: int | None = None
+    with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
+        pgid = os.getpgid(proc.pid)
+        os.killpg(pgid, signal.SIGTERM)
     try:
-        await asyncio.wait_for(proc.wait(), timeout=5.0)
+        await asyncio.wait_for(proc.wait(), timeout=_STOP_GRACE_S)
     except TimeoutError:
-        proc.kill()
+        if pgid is not None:
+            with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
+                os.killpg(pgid, signal.SIGKILL)
+        else:
+            proc.kill()
         with contextlib.suppress(ProcessLookupError):
             await proc.wait()
     job.returncode = proc.returncode
-    for task in list(job.reader_tasks):
-        with contextlib.suppress(asyncio.CancelledError, asyncio.TimeoutError):
-            await asyncio.wait_for(task, timeout=2.0)
-    job.reader_tasks.clear()
+    await _await_job_readers(job)
     return enveloped_success({"job_id": job_id, "status": job.status, "returncode": job.returncode})
 
 
@@ -614,6 +741,7 @@ async def process_tool(
         return await _start_job(ctx, command=cmd, cwd=cwd)
 
     if canonical == "list":
+        _reap_stale_jobs(ctx.session_id)
         return enveloped_success({"jobs": list_session_jobs(ctx.session_id)})
 
     if canonical == "stop":
