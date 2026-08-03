@@ -22,6 +22,7 @@ Exports:
 
 from __future__ import annotations
 
+import hashlib
 import sqlite3
 import time
 import uuid
@@ -36,6 +37,7 @@ JsonDict = dict[str, Any]
 _DEFAULT_MODEL = "sevn-agent"
 _TURN_TIMEOUT_S = 120
 _API_CHANNEL = "openai_api"
+_ALLOWED_MESSAGE_ROLES = frozenset({"system", "user", "assistant", "tool"})
 
 
 class ChatMessage(BaseModel):
@@ -61,6 +63,27 @@ class ChatCompletionRequest(BaseModel):
     model: str = _DEFAULT_MODEL
     messages: list[ChatMessage] = Field(default_factory=list)
     stream: bool = False
+
+
+def _caller_scope(bearer_token: str) -> tuple[str, str]:
+    """Derive stable session scope and user id from the authenticated bearer.
+
+    Args:
+        bearer_token (str): Verified gateway bearer secret.
+
+    Returns:
+        tuple[str, str]: ``(scope_key, user_id)`` for :meth:`SessionManager.ensure_session`.
+
+    Examples:
+        >>> sk1, uid1 = _caller_scope("secret-a")
+        >>> sk2, uid2 = _caller_scope("secret-b")
+        >>> sk1 == sk2
+        False
+        >>> _caller_scope("secret-a")[0].startswith('openai_api:')
+        True
+    """
+    digest = hashlib.sha256(bearer_token.encode("utf-8")).hexdigest()[:16]
+    return f"{_API_CHANNEL}:{digest}", f"openai_api:{digest}"
 
 
 def _last_assistant_text(conn: sqlite3.Connection, session_id: str) -> str:
@@ -89,6 +112,86 @@ def _last_assistant_text(conn: sqlite3.Connection, session_id: str) -> str:
     except sqlite3.OperationalError:
         return ""
     return str(row[0]) if row else ""
+
+
+def _clear_visible_messages(conn: sqlite3.Connection, session_id: str) -> None:
+    """Remove prior visible LLM history before syncing an OpenAI request batch.
+
+    Args:
+        conn (sqlite3.Connection): Open gateway SQLite handle.
+        session_id (str): Target session id.
+
+    Returns:
+        None: Mutates ``gateway_messages`` in place.
+
+    Examples:
+        >>> import sqlite3
+        >>> from sevn.storage.migrate import apply_migrations
+        >>> c = sqlite3.connect(":memory:")
+        >>> apply_migrations(c)
+        >>> _clear_visible_messages(c, "missing") is None
+        True
+        >>> c.close()
+    """
+    conn.execute(
+        "DELETE FROM gateway_messages WHERE session_id = ? AND visible_to_llm = 1",
+        (session_id,),
+    )
+    conn.commit()
+
+
+async def _sync_request_messages(
+    sessions: Any,
+    conn: sqlite3.Connection,
+    *,
+    session_id: str,
+    messages: list[ChatMessage],
+    correlation_id: str,
+) -> None:
+    """Replace visible session history with the OpenAI request message sequence.
+
+    Args:
+        sessions (Any): :class:`~sevn.gateway.session_manager.SessionManager`.
+        conn (sqlite3.Connection): Open gateway SQLite handle.
+        session_id (str): Target session id.
+        messages (list[ChatMessage]): Full OpenAI chat payload.
+        correlation_id (str): Turn correlation id for appended rows.
+
+    Returns:
+        None: Writes gateway message rows.
+
+    Raises:
+        HTTPException: When no supported role/content pairs are present.
+
+    Examples:
+        >>> _sync_request_messages.__name__
+        '_sync_request_messages'
+    """
+    import asyncio
+
+    await asyncio.to_thread(_clear_visible_messages, conn, session_id)
+    wrote_user = False
+    for msg in messages:
+        role = msg.role.strip().lower()
+        content = msg.content.strip()
+        if not content:
+            continue
+        if role not in _ALLOWED_MESSAGE_ROLES:
+            raise HTTPException(status_code=400, detail=f"unsupported_message_role:{role}")
+        visible_to_llm = 0 if role == "tool" else 1
+        if role == "user":
+            wrote_user = True
+        await sessions.add_message(
+            session_id,
+            role=role,
+            kind="message",
+            content=content,
+            visible_to_llm=visible_to_llm,
+            status="sent",
+            turn_id=correlation_id,
+        )
+    if not wrote_user:
+        raise HTTPException(status_code=400, detail="no_user_message")
 
 
 def build_openai_compat_router() -> APIRouter:
@@ -138,6 +241,9 @@ def build_openai_compat_router() -> APIRouter:
         directly to :func:`~sevn.gateway.agent_turn.build_agent_run_turn`'s
         ``RunTurnFn`` and reads the assistant reply from SQLite after the turn.
         """
+        if body.stream:
+            raise HTTPException(status_code=400, detail="streaming_not_implemented")
+
         gateway_token = getattr(request.app.state, "resolved_gateway_token", None)
         expected = str(gateway_token).strip() if gateway_token else ""
         if not expected:
@@ -152,54 +258,45 @@ def build_openai_compat_router() -> APIRouter:
         if router_local is None:
             raise HTTPException(status_code=503, detail="gateway_not_ready")
 
-        user_text = ""
-        for msg in reversed(body.messages):
-            if msg.role == "user" and msg.content.strip():
-                user_text = msg.content.strip()
-                break
-        if not user_text:
-            raise HTTPException(status_code=400, detail="no_user_message")
-
         run_turn = getattr(router_local, "_run_turn", None)
         conn: sqlite3.Connection | None = getattr(request.app.state, "sqlite_conn", None)
         sessions = getattr(request.app.state, "gateway_sessions", None)
+        if run_turn is None or conn is None or sessions is None:
+            raise HTTPException(status_code=503, detail="gateway_not_ready")
 
         completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
-        reply = ""
+        correlation_id = str(uuid.uuid4())
+        scope_key, user_id = _caller_scope(submitted)
+        session_id = await sessions.ensure_session(
+            scope_key=scope_key,
+            channel=_API_CHANNEL,
+            user_id=user_id,
+        )
+        await _sync_request_messages(
+            sessions,
+            conn,
+            session_id=session_id,
+            messages=body.messages,
+            correlation_id=correlation_id,
+        )
 
-        if run_turn is not None and conn is not None and sessions is not None:
-            correlation_id = str(uuid.uuid4())
-            session_id = await sessions.ensure_session(
-                scope_key=f"{_API_CHANNEL}:default",
-                channel=_API_CHANNEL,
-                user_id="openai_api",
-            )
-            await sessions.add_message(
-                session_id,
-                role="user",
-                kind="message",
-                content=user_text,
-                visible_to_llm=1,
-                status="sent",
-                turn_id=correlation_id,
-            )
-            try:
-                import asyncio
+        try:
+            import asyncio
 
-                await asyncio.wait_for(
-                    run_turn(session_id, correlation_id),
-                    timeout=_TURN_TIMEOUT_S,
-                )
-                reply = _last_assistant_text(conn, session_id)
-            except TimeoutError:
-                reply = "[turn timed out]"
-            except Exception:
-                reply = "[turn error — see gateway logs]"
-        else:
-            reply = (
-                "OpenAI-compatible gateway mounted; runtime not wired "
-                "(start the full gateway to enable agent dispatch)."
+            await asyncio.wait_for(
+                run_turn(session_id, correlation_id),
+                timeout=_TURN_TIMEOUT_S,
             )
+        except TimeoutError as exc:
+            raise HTTPException(status_code=504, detail="turn_timeout") from exc
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail="turn_error") from exc
+
+        reply = _last_assistant_text(conn, session_id)
+        if not reply.strip():
+            raise HTTPException(status_code=500, detail="empty_assistant_reply")
 
         return JSONResponse(
             {
@@ -214,7 +311,6 @@ def build_openai_compat_router() -> APIRouter:
                         "finish_reason": "stop",
                     }
                 ],
-                "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
             }
         )
 
@@ -231,4 +327,7 @@ def register_openai_compat_routes(app: Any) -> None:
         >>> register_openai_compat_routes.__name__
         'register_openai_compat_routes'
     """
+    from sevn.gateway.api.capabilities_api import register_capabilities_routes
+
+    register_capabilities_routes(app)
     app.include_router(build_openai_compat_router())

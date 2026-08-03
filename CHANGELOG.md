@@ -11,6 +11,7 @@ are cut into a dated, versioned section at release time.
 ## [Unreleased]
 
 ### Added
+- [2026-08-03] Channel capability inventory: `GET /capabilities` and `sevn capabilities` report each messaging channel as `implemented`, `stub`, or `unavailable` (#151, release-audit W13)
 - [2026-08-03] Quality-gate ratchet baselines for coverage (68% overall floor, 90% security/auth targets), xenon C/B targets, C901 blocking at measured max 221 with step-down plan, and dated import-linter exceptions; `make coverage-ratchet` / `make complexity-ratchet` advisory gates in `make ci-quality` (#150, release-audit W12)
 - [2026-08-03] `make update-cli` refuses dirty operator checkouts and prompts for confirmation unless `FORCE=1` (#150, release-audit W12)
 - [2026-08-03] Nous Portal provider config for DeepSeek V4 Flash (`deepseek/deepseek-v4-flash` via `providers.nous` + OpenAI-compat `https://inference-api.nousresearch.com/v1`) with schema/template docs and proxy smoke tests (#153, open-issues-sweep Batch F W17)
@@ -28,6 +29,7 @@ are cut into a dated, versioned section at release time.
 - [2026-07-30] `/model --once <provider/model>` stages a one-turn tier-B model override in session metadata — consumed at the next agent turn (success or failure) without changing the persisted `providers.tier_default.B` setting; `/status` shows effective vs persisted model (#88)
 - [2026-07-30] Per-channel and per-topic model and system prompt overrides under `channels.<name>.model` / `channels.<name>.system_prompt` and `channels.telegram.topics.<id>.*` — turn-scoped resolution with session → channel → workspace precedence; `TopicConfig.system_prompt` wired from Telegram inbound metadata (#86)
 ### Fixed
+- [2026-08-03] OpenAI-compatible gateway API: sync full message roles into session history, derive per-caller session scope from bearer token, reject `stream=true` with 400 until SSE exists, return non-2xx on turn timeout/error, and omit fake zero `usage` counts (#151, release-audit W13)
 - [2026-08-03] Packaging integrity: hatchling sdist includes `src/proton_cli`, Docker images COPY it for uv-sync builds, and CI `artifact-integrity-check` installs wheel+sdist in clean venvs running `sevn --version` and `proton-cli --version` (#148, release-audit W10)
 - [2026-08-03] `/ready` proxy probes run only when egress is explicitly configured (`SEVN_PROXY_URL`, `sevn.json` `proxy`, or `create_app(process_settings=…)`) so minimal HTTP tests stay sqlite-only while deploy fail-closed behavior is unchanged (#146, release-audit B)
 - [2026-08-03] Operator compose runs `sevn-operator-perms` before gateway/proxy to `chown` named volumes for uid 10001 — fixes fresh and upgraded non-root deploys (#145, release-audit B-Thermos)

@@ -34,6 +34,7 @@ ROOT_COMMAND_PANELS: dict[str, str] = {
     "acp": "Chat",
     "agent": "Agent",
     "browser": "Skills & Tools",
+    "capabilities": "Health",
     "channels": "Chat",
     "completion": "Help",
     "config": "Deployment",
