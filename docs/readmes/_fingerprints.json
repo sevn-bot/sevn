@@ -193,8 +193,8 @@
     },
     "tools": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-03T11:20:14Z",
-      "digest": "ba01112bf2d5398dc5bfdabe3020465072bb81c66e003d58eb80f55706372002",
+      "computed_at": "2026-08-03T13:58:04Z",
+      "digest": "cc82b001e34ad91c1a658e882e3255599b30d68ee4193dcad2028a6ec697b7bb",
       "source_globs": [
         "src/sevn/tools/**"
       ]
