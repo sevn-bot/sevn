@@ -33,7 +33,6 @@ services:
       dockerfile: docker/Dockerfile.gateway
     environment:
       SEVN_PROXY_URL: http://sevn-proxy:8787
-      SEVN_E2E_ECHO_TURN: "1"
     volumes:
       - ../infra/ci-workspace:/workspace
     working_dir: /workspace

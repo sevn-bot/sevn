@@ -81,9 +81,10 @@ services:
       SEVN_TELEGRAM_BOT_TOKEN: ${SEVN_TELEGRAM_BOT_TOKEN:-}
       SEVN_CHROME_EXECUTABLE: /usr/bin/brave-browser
       SEVN_BROWSER_ENGINE: brave
-      SEVN_BROWSER_EXTRA_ARGS: "--no-sandbox --disable-dev-shm-usage"
+      SEVN_BROWSER_EXTRA_ARGS: "--disable-dev-shm-usage"
     volumes:
       - sevn-state:/operator
+      - sevn-browser-state:/operator/workspace/.sevn/browser-profiles
       - ../infra/docker-onboard.json:/bootstrap/onboard-compose.json:ro
     working_dir: /operator/workspace
     ports:
@@ -143,3 +144,4 @@ services:
 
 volumes:
   sevn-state:
+  sevn-browser-state:

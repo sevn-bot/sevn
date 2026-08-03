@@ -528,6 +528,46 @@ async def _log_proxy_boot_health(process: ProcessSettings) -> None:
     await wait_for_proxy_boot_health(process)
 
 
+async def _deploy_readiness_body(
+    app: FastAPI,
+    *,
+    conn: sqlite3.Connection | None,
+) -> dict[str, Any]:
+    """Probe SQLite and optional egress proxy for deploy readiness.
+
+    Args:
+        app (FastAPI): Gateway application (``process_settings`` on ``app.state``).
+        conn (sqlite3.Connection | None): Open workspace DB from ``app.state.sqlite_conn``.
+
+    Returns:
+        dict[str, Any]: ``ready``, ``sqlite``, and optional ``proxy`` fields.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_deploy_readiness_body)
+        True
+    """
+    if conn is None:
+        return {"ready": False, "sqlite": False}
+    try:
+        conn.execute("SELECT 1").fetchone()
+    except sqlite3.Error:
+        return {"ready": False, "sqlite": False}
+    body: dict[str, Any] = {"ready": True, "sqlite": True}
+    proc: ProcessSettings = app.state.process_settings
+    if proc.proxy_url:
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                r = await client.get(proc.proxy_url.rstrip("/") + "/healthz")
+            proxy_ok = r.status_code < 400
+        except (httpx.HTTPError, OSError, ValueError):
+            proxy_ok = False
+        body["proxy"] = {"ok": proxy_ok}
+        if not proxy_ok:
+            body["ready"] = False
+    return body
+
+
 def _cached_gateway_token(request: Request) -> str | None:
     """Return the gateway bearer token resolved at boot (``app.state.resolved_gateway_token``).
 
@@ -1880,39 +1920,13 @@ def create_app(
         """Readiness: SQLite open + optional proxy ping.
         Failure modes (operators): **503 ``sqlite: false``** when ``sevn.db`` is not
         opened on ``app.state`` or ``SELECT 1`` raises — check disk permissions and
-        migration head. **``proxy.ok: false``** when ``ProcessSettings.proxy_url`` is
-        set but the proxy ``/health`` probe fails — egress or proxy process down
+        migration head. **503 ``ready: false``** when ``ProcessSettings.proxy_url`` is
+        set but the proxy ``/healthz`` probe fails — egress or proxy process down
         (`specs/07-egress-proxy.md`). See inline notes in ``specs/17-gateway.md`` §10.6.
         """
         conn_local: sqlite3.Connection | None = getattr(request.app.state, "sqlite_conn", None)
         trace_local: TraceSink | None = getattr(request.app.state, "gateway_trace", None)
-        if conn_local is None:
-            await _emit_gateway_trace(
-                trace_local,
-                kind="gateway.deploy_readiness",
-                status="error",
-                attrs={"ready": False, "sqlite": False},
-            )
-            return JSONResponse(status_code=503, content={"ready": False, "sqlite": False})
-        try:
-            conn_local.execute("SELECT 1").fetchone()
-        except sqlite3.Error:
-            await _emit_gateway_trace(
-                trace_local,
-                kind="gateway.deploy_readiness",
-                status="error",
-                attrs={"ready": False, "sqlite": False},
-            )
-            return JSONResponse(status_code=503, content={"ready": False, "sqlite": False})
-        body: dict[str, Any] = {"ready": True, "sqlite": True}
-        proc: ProcessSettings = request.app.state.process_settings
-        if proc.proxy_url:
-            try:
-                async with httpx.AsyncClient(timeout=2.0) as client:
-                    r = await client.get(proc.proxy_url.rstrip("/") + "/healthz")
-                body["proxy"] = {"ok": r.status_code < 400}
-            except (httpx.HTTPError, OSError, ValueError):
-                body["proxy"] = {"ok": False}
+        body = await _deploy_readiness_body(request.app, conn=conn_local)
         ready_status = "ok" if body.get("ready") else "error"
         await _emit_gateway_trace(
             trace_local,
@@ -1920,7 +1934,8 @@ def create_app(
             status=ready_status,
             attrs=body,
         )
-        return JSONResponse(body)
+        status_code = 200 if body.get("ready") else 503
+        return JSONResponse(status_code=status_code, content=body)
 
     @app.get("/metrics")
     async def metrics() -> PlainTextResponse:
@@ -1953,6 +1968,23 @@ def create_app(
         ):
             return
         raise HTTPException(status_code=401, detail="unauthorized")
+
+    @app.get("/diagnostics")
+    async def diagnostics(
+        request: Request,
+        _ok: None = Depends(enforce_gateway_auth),
+    ) -> JSONResponse:
+        """Authenticated deploy diagnostics (``specs/17-gateway.md`` §10.6).
+
+        Returns the same dependency probes as ``/ready`` plus configuration hints
+        for operators; unauthenticated callers receive ``401``.
+        """
+        conn_local: sqlite3.Connection | None = getattr(request.app.state, "sqlite_conn", None)
+        body = await _deploy_readiness_body(request.app, conn=conn_local)
+        proc: ProcessSettings = request.app.state.process_settings
+        body["proxy_url_configured"] = bool(proc.proxy_url)
+        status_code = 200 if body.get("ready") else 503
+        return JSONResponse(status_code=status_code, content=body)
 
     register_admin_secrets_routes(app, enforce_gateway_auth=enforce_gateway_auth)
     mount_gui_proxy(app, resolve_gateway_token=_cached_gateway_token)

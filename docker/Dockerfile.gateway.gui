@@ -4,6 +4,8 @@
 
 FROM python:3.12-slim-bookworm
 
+ARG BRAVE_VERSION=1.73.97
+
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /opt/sevn
@@ -33,7 +35,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN chmod +x /opt/sevn/infra/docker/install-brave.sh \
-    && /opt/sevn/infra/docker/install-brave.sh \
+    && BRAVE_VERSION="$BRAVE_VERSION" /opt/sevn/infra/docker/install-brave.sh \
     && chmod +x /opt/sevn/infra/docker/gui/start-desktop.sh \
     && chmod +x /opt/sevn/infra/docker/gui/entrypoint.sh
 
