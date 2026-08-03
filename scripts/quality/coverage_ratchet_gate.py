@@ -129,7 +129,7 @@ def measure_coverage(data_file: Path | None = None) -> tuple[float, dict[str, fl
             analysis = cov.analysis2(str(path))
         except coverage.CoverageException:
             continue
-        _, executable, missing, _, _ = analysis
+        _, executable, _excluded, missing, _ = analysis
         if not executable:
             continue
         covered = len(executable) - len(missing)

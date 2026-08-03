@@ -1342,6 +1342,8 @@ def _prepare_workspace_out_dir(workspace: Path, run_id: str) -> Path:
         True
     """
     ws = workspace.expanduser().resolve()
+    # Anchor mountpoint on the host tree so Docker can bind ``.out`` over a :ro workspace.
+    (ws / _DOCKER_OUT_SUBDIR).mkdir(exist_ok=True)
     out_dir = ws / ".sevn" / "docker-out" / run_id
     out_dir.mkdir(parents=True, exist_ok=True)
     return out_dir
@@ -1376,6 +1378,7 @@ def _discover_llmignore_mask_mounts(workspace: Path) -> list[tuple[Path, str]]:
             mounts.append((mask, f"{_DOCKER_WORKSPACE_MOUNT}/{rel}"))
             dirnames.remove(name)
     if not mounts:
+        (ws / ".llmignore").mkdir(exist_ok=True)
         mask = parent / f"llmignore-{uuid.uuid4().hex[:12]}"
         mask.mkdir(parents=True, exist_ok=True)
         mounts.append((mask, f"{_DOCKER_WORKSPACE_MOUNT}/.llmignore"))

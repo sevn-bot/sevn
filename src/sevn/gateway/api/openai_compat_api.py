@@ -22,6 +22,7 @@ Exports:
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import sqlite3
 import time
@@ -86,12 +87,18 @@ def _caller_scope(bearer_token: str) -> tuple[str, str]:
     return f"{_API_CHANNEL}:{digest}", f"openai_api:{digest}"
 
 
-def _last_assistant_text(conn: sqlite3.Connection, session_id: str) -> str:
+def _last_assistant_text(
+    conn: sqlite3.Connection,
+    session_id: str,
+    *,
+    after_message_id: int = 0,
+) -> str:
     """Return the most recent visible assistant message for ``session_id``.
 
     Args:
         conn (sqlite3.Connection): Open gateway SQLite handle.
         session_id (str): Target session id.
+        after_message_id (int): Ignore rows at or below this ``gateway_messages.id``.
 
     Returns:
         str: Assistant message content, or empty string when absent.
@@ -105,13 +112,40 @@ def _last_assistant_text(conn: sqlite3.Connection, session_id: str) -> str:
             """
             SELECT content FROM gateway_messages
             WHERE session_id = ? AND role = 'assistant' AND visible_to_llm = 1
+              AND id > ?
             ORDER BY id DESC LIMIT 1
             """,
-            (session_id,),
+            (session_id, after_message_id),
         ).fetchone()
     except sqlite3.OperationalError:
         return ""
     return str(row[0]) if row else ""
+
+
+def _max_message_id(conn: sqlite3.Connection, session_id: str) -> int:
+    """Return the highest ``gateway_messages.id`` for ``session_id`` (0 when empty).
+
+    Args:
+        conn (sqlite3.Connection): Open gateway SQLite handle.
+        session_id (str): Target session id.
+
+    Returns:
+        int: Latest row id, or ``0`` when the session has no messages.
+
+    Examples:
+        >>> _max_message_id(sqlite3.connect(":memory:"), "missing")
+        0
+    """
+    try:
+        row = conn.execute(
+            "SELECT MAX(id) FROM gateway_messages WHERE session_id = ?",
+            (session_id,),
+        ).fetchone()
+    except sqlite3.OperationalError:
+        return 0
+    if row is None or row[0] is None:
+        return 0
+    return int(row[0])
 
 
 def _clear_visible_messages(conn: sqlite3.Connection, session_id: str) -> None:
@@ -303,10 +337,9 @@ def build_openai_compat_router() -> APIRouter:
             messages=body.messages,
             correlation_id=correlation_id,
         )
+        baseline_message_id = await asyncio.to_thread(_max_message_id, conn, session_id)
 
         try:
-            import asyncio
-
             await asyncio.wait_for(
                 run_turn(session_id, correlation_id),
                 timeout=_TURN_TIMEOUT_S,
@@ -318,7 +351,11 @@ def build_openai_compat_router() -> APIRouter:
         except Exception as exc:
             raise HTTPException(status_code=500, detail="turn_error") from exc
 
-        reply = _last_assistant_text(conn, session_id)
+        reply = _last_assistant_text(
+            conn,
+            session_id,
+            after_message_id=baseline_message_id,
+        )
         if not reply.strip():
             raise HTTPException(status_code=500, detail="empty_assistant_reply")
 
