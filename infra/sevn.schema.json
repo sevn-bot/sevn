@@ -1133,6 +1133,7 @@
         "groq": { "$ref": "#/$defs/provider_registry_entry" },
         "anthropic": { "$ref": "#/$defs/provider_registry_entry" },
         "mistral": { "$ref": "#/$defs/provider_registry_entry" },
+        "nous": { "$ref": "#/$defs/provider_registry_entry" },
         "ollama": { "$ref": "#/$defs/provider_registry_entry" },
         "minimax": {
           "allOf": [

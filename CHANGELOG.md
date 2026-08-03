@@ -11,6 +11,7 @@ are cut into a dated, versioned section at release time.
 ## [Unreleased]
 
 ### Added
+- [2026-08-03] Nous Portal provider config for DeepSeek V4 Flash (`deepseek/deepseek-v4-flash` via `providers.nous` + OpenAI-compat `https://inference-api.nousresearch.com/v1`) with schema/template docs and proxy smoke tests (#153, open-issues-sweep Batch F W17)
 - [2026-08-02] Brand visual identity guide in `docs/brand/README.md` documents the ASCII-style 7 mark, authoritative token/logo paths, typography, and agent image-generation guardrails (not a fox/wolf mascot); cross-linked from `about-sevn.bot/ARCHITECTURE.md` (#118, open-issues-sweep-aug-2026 W7)
 - [2026-08-02] X login troubleshooting in `social_media_manager/SKILL.md` — SMS/phone handoff, account picker, cookie persistence, and no-code-in-logs guidance (#125, open-issues-sweep W10)
 - [2026-08-02] X discovery ops `discover_followers`, `discover_topic_accounts`, and `discover_mutual_graph` on the `x_ops` facade with D11 dry-run and rate-limit backoff envelopes (#129, open-issues-sweep W14)
@@ -26,6 +27,7 @@ are cut into a dated, versioned section at release time.
 - [2026-07-30] Per-channel and per-topic model and system prompt overrides under `channels.<name>.model` / `channels.<name>.system_prompt` and `channels.telegram.topics.<id>.*` — turn-scoped resolution with session → channel → workspace precedence; `TopicConfig.system_prompt` wired from Telegram inbound metadata (#86)
 ### Fixed
 - [2026-08-03] Cron ``last_status`` distinguishes dispatch from agent completion and Telegram delivery (`completed` / `agent_failed` / `delivery_failed` / `dispatched`), propagates ``dispatch_run`` outcomes, notifies operators on failure, and reconciles the HuggingNews daily job prompt to ``get_page_content`` instead of defuddle (#135, open-issues-sweep product W16)
+- [2026-08-03] Product sweep Batch B W7 replay confirms removed Playwright bundled skills stay absent — repo-wide grep clean, `make removed-browser-skills-check` + operator workspace cleanup guidance in spec 12 (#117, #127, open-issues-sweep-product W7)
 - [2026-08-03] Telegram group-chat `/logs@bot` and `/traces@bot` slash lines route to owner diagnostic commands instead of being silently swallowed by the dispatcher bypass
 - [2026-08-03] Telegram `/config@bot add @user` and similar slash lines route to the config menu instead of failing with unknown slash skill `config@…` (#134, open-issues-sweep-product W6)
 - [2026-08-02] Removed-browser-skills CI gate anchors hyphenated id scans with word boundaries so prose like `max-users` no longer false-positives on `x-use` (#131, open-issues-sweep-aug-2026 W6)

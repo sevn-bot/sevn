@@ -654,8 +654,11 @@ async def _build_provider_credentials_map(
         if name == "minimax":
             anthropic_url = anthropic_url or resolve_minimax_anthropic_base_url(base)
             openai_url = openai_url or resolve_minimax_openai_base_url(binding.openai_base_url)
-        elif base and not anthropic_url:
-            anthropic_url = base
+        else:
+            if base and not anthropic_url:
+                anthropic_url = base
+            if base and not openai_url:
+                openai_url = base
         by_name[name] = ProviderCredentialEntry(
             api_key=api_key,
             base_url=base,

@@ -94,18 +94,23 @@ def _is_deliverable(text: str | None) -> bool:
     return lowered not in _NO_OUTPUT_MARKERS and not lowered.startswith("(no output)")
 
 
-def _assistant_rows_for_turn(
+def _assistant_rows_for_dispatch(
     conn: sqlite3.Connection,
     *,
     session_id: str,
-    turn_id: str,
+    correlation_id: str,
 ) -> list[dict[str, Any]]:
-    """Load assistant message rows for one trigger turn.
+    """Load assistant message rows produced for one trigger dispatch.
+
+    ``route_outgoing`` mints a fresh per-send turn id, so assistant rows are
+    not keyed by ``DispatchRequest.correlation_id``. Anchor on the trigger
+    user row (which uses ``correlation_id``) and return subsequent assistant
+    rows in the same session.
 
     Args:
         conn (sqlite3.Connection): Gateway SQLite handle.
         session_id (str): Trigger session id.
-        turn_id (str): Correlation / turn id.
+        correlation_id (str): Dispatch correlation / trigger user ``turn_id``.
 
     Returns:
         list[dict[str, Any]]: Rows with ``id``, ``content``, and ``status``.
@@ -115,20 +120,30 @@ def _assistant_rows_for_turn(
         >>> from sevn.storage.migrate import apply_migrations
         >>> c = sqlite3.connect(":memory:")
         >>> apply_migrations(c)
-        >>> _assistant_rows_for_turn(c, session_id="s", turn_id="t")
+        >>> _assistant_rows_for_dispatch(c, session_id="s", correlation_id="t")
         []
     """
     cur = conn.execute(
         """
-        SELECT id, content, status
-        FROM gateway_messages
-        WHERE session_id = ?
-          AND turn_id = ?
-          AND role = 'assistant'
-          AND kind = 'message'
-        ORDER BY id ASC
+        SELECT a.id, a.content, a.status
+        FROM gateway_messages a
+        WHERE a.session_id = ?
+          AND a.role = 'assistant'
+          AND a.kind = 'message'
+          AND a.id > COALESCE(
+              (
+                SELECT MAX(u.id)
+                FROM gateway_messages u
+                WHERE u.session_id = ?
+                  AND u.turn_id = ?
+                  AND u.role = 'user'
+                  AND u.kind = 'message'
+              ),
+              0
+          )
+        ORDER BY a.id ASC
         """,
-        (session_id, turn_id),
+        (session_id, session_id, correlation_id),
     )
     return [
         {"id": int(r[0]), "content": str(r[1] or ""), "status": str(r[2] or "")}
@@ -234,7 +249,11 @@ def assess_agent_pass_outcome(
 
     rows: list[dict[str, Any]] = []
     if conn is not None:
-        rows = _assistant_rows_for_turn(conn, session_id=session_id, turn_id=req.correlation_id)
+        rows = _assistant_rows_for_dispatch(
+            conn,
+            session_id=session_id,
+            correlation_id=req.correlation_id,
+        )
 
     texts = list(assistant_texts or [])
     if not texts and rows:

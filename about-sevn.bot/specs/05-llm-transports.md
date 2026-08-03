@@ -7,8 +7,8 @@ owner: Alex
 summary: Normalize provider-shaped JSON over async HTTP to a single egress base URL
   (SEVN_PROXY_URL / ProcessSettings.proxy_url), so tier executors bind once per turn
   and never touch raw secrets. LiteLLM may r
-last_updated: '2026-07-31'
-fingerprint: sha256:2041876411e30f58da851157d8740519fd4e7333f63c36ee4f4a5bb5d6611345
+last_updated: '2026-08-03'
+fingerprint: sha256:248935a367734f4f55d36ff127e9cf05909d60f4a826109c6dcb88dc9f546be4
 related: []
 sources:
 - src/sevn/proxy/**
@@ -204,6 +204,14 @@ Reasoning/thinking wire bodies are assembled by ``resolve_reasoning_for_turn`` f
 turn-scoped overlays. Provider capability is checked per model id — unsupported providers
 omit the wire parameter and emit a logged degradation note. MiniMax ``minimax_thinking``
 legacy aliases remain valid. Triager requests never receive a reasoning wire body.
+
+## Amendments (open-issues-sweep Batch F W17 — #153 Nous Portal)
+
+Nous Portal routes through the existing **OpenAI chat-completions** proxy path
+(``/llm/openai/chat/completions``). ``providers.nous.base_url`` resolves to
+``https://inference-api.nousresearch.com/v1``; wire model id is forwarded unchanged
+(``deepseek/deepseek-v4-flash``). No new transport adapter — D15 reuses OpenAI-compat
+forwarding and bearer auth from ``providers.nous.api_key``.
 
 ## Human-input needed
 

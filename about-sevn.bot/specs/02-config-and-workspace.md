@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Provide a single, testable configuration surface before storage, tracing,
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
-last_updated: '2026-08-01'
-fingerprint: sha256:2b8413cea519fe3d4d56a9ea1fb2fea0c691839b5d98ce3717cccae59451a455
+last_updated: '2026-08-03'
+fingerprint: sha256:d9a2050d748fe7f6856ed3783bbcdddd94034d8528b6c12fbc36f5d59e299c1d
 related: []
 sources:
 - src/sevn/config/**
@@ -1013,6 +1013,41 @@ that resolver — thinking/reasoning never reaches triage.
 
 Schema maintainer note (W36.2, do not fix here): ``stt_providers`` still appears as a
 **top-level** key in ``infra/sevn.schema.json`` while runtime reads ``voice.stt_providers``.
+
+## Amendments (open-issues-sweep Batch F W17 — #153 Nous Portal / DeepSeek V4 Flash)
+
+Nous Portal exposes an **OpenAI-compatible** inference API. Operators add a ``providers.nous``
+registry entry and bind catalog model ids via ``providers.models.<id>.provider`` when the
+model slug prefix does not match the registry name (``deepseek/deepseek-v4-flash`` → ``nous``).
+
+| Field | Value (verified from Nous/Hermes docs, 2026-08-03) |
+|-------|------------------------------------------------------|
+| ``providers.nous.base_url`` | ``https://inference-api.nousresearch.com/v1`` |
+| DeepSeek V4 Flash model id | ``deepseek/deepseek-v4-flash`` |
+| Credential | ``providers.nous.api_key`` → ``${SECRET:SEVN_SECRET_NOUS}`` (inference JWT or API key from portal.nousresearch.com) |
+
+Example ``sevn.json`` fragment (tier B slot; triager or any slot works the same):
+
+```json
+{
+  "providers": {
+    "tier_default": {
+      "B": "deepseek/deepseek-v4-flash"
+    },
+    "nous": {
+      "api_key": "${SECRET:SEVN_SECRET_NOUS}",
+      "base_url": "https://inference-api.nousresearch.com/v1"
+    },
+    "models": {
+      "deepseek/deepseek-v4-flash": { "provider": "nous" }
+    }
+  }
+}
+```
+
+Store the plaintext key in the workspace secrets chain as ``SEVN_SECRET_NOUS``. Missing or
+invalid keys surface ``nous credential not configured`` (503) at the egress proxy before
+upstream call; upstream ``401`` responses pass through unchanged on chat-completions routes.
 
 ## Test Strategy
 

@@ -116,6 +116,15 @@
     "google": { "api_key": "${SECRET:keychain:providers.google.api_key}" },
     "groq": { "api_key": "${SECRET:keychain:providers.groq.api_key}" },
     "mistral": { "api_key": "${SECRET:keychain:providers.mistral.api_key}" },
+    // Nous Portal (OpenAI-compatible) — DeepSeek V4 Flash via subscription API key (#153).
+    // Model id deepseek/deepseek-v4-flash routes via providers.models override below.
+    "nous": {
+      "api_key": "${SECRET:SEVN_SECRET_NOUS}",
+      "base_url": "https://inference-api.nousresearch.com/v1"
+    },
+    "models": {
+      "deepseek/deepseek-v4-flash": { "provider": "nous" }
+    },
     "ollama": {},
     "model_budgets": {}
   },

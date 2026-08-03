@@ -136,6 +136,49 @@ def test_assess_agent_pass_outcome_empty_output_is_agent_failed() -> None:
     assert outcome.cron_last_status() == "agent_failed"
 
 
+def test_assess_agent_pass_outcome_telegram_sent_with_outbound_turn_id() -> None:
+    """Assistant rows use ``route_outgoing`` turn_id, not dispatch correlation_id."""
+    conn = sqlite3.connect(":memory:")
+    apply_migrations(conn)
+    conn.execute(
+        """
+        INSERT INTO gateway_sessions(
+            session_id, scope_key, channel, user_id, created_at, updated_at
+        ) VALUES ('sess', 'cron:job', 'telegram', '1', 'now', 'now')
+        """,
+    )
+    correlation_id = "cron-run-abc"
+    outbound_turn_id = "outbound-uuid-different"
+    conn.execute(
+        """
+        INSERT INTO gateway_messages (
+            session_id, turn_id, role, kind, content, visible_to_llm, status, created_at
+        ) VALUES (?, ?, 'user', 'message', 'do work', 1, 'sent', 'now')
+        """,
+        ("sess", correlation_id),
+    )
+    conn.execute(
+        """
+        INSERT INTO gateway_messages (
+            session_id, turn_id, role, kind, content, visible_to_llm, status, created_at
+        ) VALUES (?, ?, 'assistant', 'message', ?, 1, 'sent', 'now')
+        """,
+        ("sess", outbound_turn_id, "Here is the news summary"),
+    )
+    conn.commit()
+    outcome = assess_agent_pass_outcome(
+        conn,
+        req=DispatchRequest(
+            prompt="do work",
+            result_channel=ResultChannel(kind="TELEGRAM_TOPIC", telegram_topic_id=12345),
+            correlation_id=correlation_id,
+        ),
+        session_id="sess",
+        agent_exception=None,
+    )
+    assert outcome.cron_last_status() == "completed"
+
+
 def test_reconcile_huggingnews_replaces_defuddle_prompt() -> None:
     """Boot reconcile patches defuddle-based HuggingNews cron prompt (D14)."""
     conn = sqlite3.connect(":memory:")
