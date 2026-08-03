@@ -38,9 +38,6 @@ def _request(*, method: str = "GET", path: str = "/web/fetch", token: str | None
 
 @pytest.mark.parametrize("blocked_ip", [_METADATA_IP, *_PRIVATE_IPS])
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W4: block private/metadata IPs after DNS resolve", strict=False
-)
 async def test_web_fetch_blocks_resolved_private_ips(
     monkeypatch: pytest.MonkeyPatch,
     blocked_ip: str,
@@ -77,7 +74,6 @@ async def test_web_fetch_blocks_resolved_private_ips(
     ],
 )
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W4: reject literal private/metadata URLs", strict=False)
 async def test_web_fetch_rejects_literal_private_urls(literal_url: str) -> None:
     status, body = await web_fetch_json({"url": literal_url})
     assert status in (403, 422)
@@ -86,7 +82,6 @@ async def test_web_fetch_rejects_literal_private_urls(literal_url: str) -> None:
 
 
 @pytest.mark.parametrize("method", ["GET", "PUT", "DELETE", "PATCH"])
-@pytest.mark.xfail(reason="green after W4: proxy auth applies to all verbs (R9)", strict=False)
 def test_proxy_auth_rejects_non_post_without_token(method: str) -> None:
     resp = llm_post_auth_failure(_request(method=method, path="/web/fetch", token=None), "secret")
     assert resp is not None
@@ -95,9 +90,6 @@ def test_proxy_auth_rejects_non_post_without_token(method: str) -> None:
 
 
 @pytest.mark.anyio
-@pytest.mark.xfail(
-    reason="green after W4: proxy GET /web/fetch requires token when gated", strict=False
-)
 async def test_proxy_app_get_web_fetch_requires_token() -> None:
     from sevn.proxy.app import create_app
     from sevn.proxy.settings import ProxySettings

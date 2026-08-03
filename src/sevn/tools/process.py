@@ -319,6 +319,11 @@ async def _start_job(
         >>> inspect.iscoroutinefunction(_start_job)
         True
     """
+    if ctx.sandbox_client is None:
+        return enveloped_failure(
+            "process start requires a sandbox; no sandbox_client is wired",
+            code=ToolResultCode.TOOL_NOT_PROVISIONED,
+        )
     try:
         argv = _parse_command(command)
     except ValueError as exc:

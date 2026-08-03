@@ -21,6 +21,10 @@ from sevn.tools.terminal import (
 )
 
 
+class _SandboxWiringStub:
+    """Minimal ``sandbox_client`` for host-backed tool tests after W4 wiring gate."""
+
+
 @pytest.fixture(autouse=True)
 def _clean_terminal() -> None:
     reset_terminal_store_for_tests()
@@ -44,6 +48,7 @@ def ctx(workspace: Path) -> ToolContext:
         registry_version=1,
         trace=None,
         permissions=AllowAllPermissionPolicy(),
+        sandbox_client=_SandboxWiringStub(),
     )
 
 

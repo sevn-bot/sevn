@@ -38,12 +38,10 @@ def llm_post_auth_failure(request: Request, proxy_shared_secret: str | None) -> 
             >>> llm_post_auth_failure.__name__
             'llm_post_auth_failure'
     """
-    if not proxy_shared_secret:
-        return None
-    if request.method != "POST":
-        return None
     guarded_prefixes = ("/llm/", "/web/", "/integration/")
     if not any(request.url.path.startswith(prefix) for prefix in guarded_prefixes):
+        return None
+    if not proxy_shared_secret:
         return None
     token = request.headers.get(_PROXY_TOKEN_HEADER)
     if not hmac.compare_digest(token or "", proxy_shared_secret):

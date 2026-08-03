@@ -321,15 +321,15 @@ def _close_sync(session: TerminalSession) -> None:
             child.close(force=True)
 
 
-async def _sandbox_run_command(ctx: ToolContext, *, command: str) -> str | None:
-    """Run ``command`` via ``ctx.sandbox_client`` when configured.
+async def _sandbox_run_command(ctx: ToolContext, *, command: str) -> str:
+    """Run ``command`` via ``ctx.sandbox_client``.
 
     Args:
         ctx (ToolContext): Active tool runtime frame.
         command (str): Shell command to execute.
 
     Returns:
-        str | None: §3.1 JSON envelope when sandbox routing succeeds; else ``None``.
+        str: §3.1 JSON envelope when sandbox routing succeeds.
 
     Examples:
         >>> import inspect
@@ -338,7 +338,10 @@ async def _sandbox_run_command(ctx: ToolContext, *, command: str) -> str | None:
     """
     client = ctx.sandbox_client
     if client is None:
-        return None
+        return enveloped_failure(
+            "terminal_run requires a sandbox; no sandbox_client is wired",
+            code=ToolResultCode.TOOL_NOT_PROVISIONED,
+        )
     try:
         payload = await client.sandbox_exec(language="bash", code=command, ctx=ctx)
     except Exception as exc:
@@ -365,10 +368,6 @@ async def _sandbox_run_command(ctx: ToolContext, *, command: str) -> str | None:
     parameters={
         "type": "object",
         "properties": {
-            "shell": {
-                "type": "string",
-                "description": "Optional shell executable (default /bin/sh).",
-            },
             "cwd": {
                 "type": "string",
                 "description": "Workspace-relative working directory.",
@@ -388,7 +387,7 @@ async def terminal_spawn_tool(
 
     Args:
         ctx (ToolContext): Active tool runtime frame.
-        shell (str | None): Optional shell executable path.
+        shell (str | None): Deprecated; caller-selectable shells are rejected.
         cwd (str | None): Optional workspace-relative working directory.
 
     Returns:
@@ -399,6 +398,17 @@ async def terminal_spawn_tool(
         >>> inspect.iscoroutinefunction(terminal_spawn_tool)
         True
     """
+    if shell is not None and shell.strip():
+        return enveloped_failure(
+            "caller-selectable shell is not permitted",
+            code=ToolResultCode.VALIDATION_ERROR,
+            data={"shell": shell.strip()},
+        )
+    if ctx.sandbox_client is None:
+        return enveloped_failure(
+            "terminal_spawn requires a sandbox; no sandbox_client is wired",
+            code=ToolResultCode.TOOL_NOT_PROVISIONED,
+        )
     work_cwd = ctx.workspace_path
     if cwd:
         try:
@@ -511,9 +521,13 @@ async def terminal_run_tool(
         )
 
     if prefer_sandbox and ctx.sandbox_client is not None:
-        routed = await _sandbox_run_command(ctx, command=body)
-        if routed is not None:
-            return routed
+        return await _sandbox_run_command(ctx, command=body)
+
+    if ctx.sandbox_client is None:
+        return enveloped_failure(
+            "terminal_run requires a sandbox; no sandbox_client is wired",
+            code=ToolResultCode.TOOL_NOT_PROVISIONED,
+        )
 
     resolved = await _ensure_session_terminal(ctx, terminal_id=terminal_id)
     if isinstance(resolved, str):

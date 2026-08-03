@@ -291,6 +291,22 @@ def _deployment_profile_lower(cfg: WorkspaceConfig) -> str:
     return dep.profile.strip().lower()
 
 
+_DANGEROUS_HOST_SANDBOX_ENV: Final[str] = "SEVN_DANGEROUS_HOST_SANDBOX"
+
+
+def _dangerous_host_sandbox_enabled() -> bool:
+    """Return whether explicit host subprocess sandbox opt-in is active.
+
+    Returns:
+        bool: ``True`` when ``SEVN_DANGEROUS_HOST_SANDBOX=1``.
+
+    Examples:
+        >>> isinstance(_dangerous_host_sandbox_enabled(), bool)
+        True
+    """
+    return os.environ.get(_DANGEROUS_HOST_SANDBOX_ENV, "").strip() == "1"
+
+
 def resolve_sandbox_driver(cfg: WorkspaceConfig) -> SandboxDriver:
     """Pick driver per §4.2-4.3 and ``sandbox.enabled`` (§10.1).
     Args:
@@ -308,7 +324,6 @@ def resolve_sandbox_driver(cfg: WorkspaceConfig) -> SandboxDriver:
     production = profile == "production"
     docker_ok = docker_daemon_reachable()
     allow_fb = _allow_subprocess_fallback(cfg)
-    enabled = _sandbox_enabled(cfg)
     if production:
         if not docker_ok:
             msg = (
@@ -318,30 +333,24 @@ def resolve_sandbox_driver(cfg: WorkspaceConfig) -> SandboxDriver:
             )
             raise SandboxConfigurationError(msg)
         return SandboxDriver.docker
-    if not docker_ok and allow_fb:
-        return SandboxDriver.subprocess
-    if not docker_ok and not allow_fb:
-        msg = (
-            "Docker daemon not reachable; install Docker or set "
-            "security.sandbox.allow_subprocess_fallback=true for non-production "
-            "development only (specs/08-sandbox.md §4.3)"
-        )
-        raise SandboxConfigurationError(msg)
-    if docker_ok and enabled:
-        return SandboxDriver.docker
-    if docker_ok and not enabled and allow_fb:
-        return SandboxDriver.subprocess
-    if docker_ok and not enabled and not allow_fb:
-        msg = (
-            "Docker is available but sandbox.enabled is false and "
-            "security.sandbox.allow_subprocess_fallback is false; "
-            "enable sandbox.enabled for Docker isolation or allow subprocess fallback "
-            "in non-production (specs/08-sandbox.md §10.1)"
-        )
-        raise SandboxConfigurationError(msg)
     if docker_ok:
         return SandboxDriver.docker
-    return SandboxDriver.subprocess
+    if allow_fb:
+        if not _dangerous_host_sandbox_enabled():
+            msg = (
+                "subprocess sandbox requires explicit dangerous opt-in: set "
+                f"{_DANGEROUS_HOST_SANDBOX_ENV}=1 and "
+                "security.sandbox.allow_subprocess_fallback=true for non-production "
+                "development only (specs/08-sandbox.md §4.3)"
+            )
+            raise SandboxConfigurationError(msg)
+        return SandboxDriver.subprocess
+    msg = (
+        "Docker daemon not reachable; install Docker or set "
+        "security.sandbox.allow_subprocess_fallback=true for non-production "
+        "development only (specs/08-sandbox.md §4.3)"
+    )
+    raise SandboxConfigurationError(msg)
 
 
 def _snapshot_trace_event(kind: str, attrs: Mapping[str, object]) -> TraceEvent:

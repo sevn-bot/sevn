@@ -47,10 +47,6 @@ def ctx(tmp_path: Path) -> ToolContext:
     )
 
 
-@pytest.mark.xfail(
-    reason="green after W4: subprocess fallback requires SEVN_DANGEROUS_HOST_SANDBOX=1",
-    strict=False,
-)
 def test_resolve_sandbox_driver_rejects_subprocess_without_dangerous_opt_in(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -71,10 +67,6 @@ def test_resolve_sandbox_driver_rejects_subprocess_without_dangerous_opt_in(
         resolve_sandbox_driver(cfg)
 
 
-@pytest.mark.xfail(
-    reason="green after W4: no docker→subprocess degrade without dangerous opt-in",
-    strict=False,
-)
 def test_resolve_sandbox_driver_does_not_degrade_to_subprocess_when_docker_up(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -95,7 +87,6 @@ def test_resolve_sandbox_driver_does_not_degrade_to_subprocess_when_docker_up(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W4: terminal_run refuses host without sandbox", strict=False)
 async def test_terminal_run_rejects_host_path_without_sandbox(ctx: ToolContext) -> None:
     exe, _ = build_session_registry(registry_version=1)
     raw = await exe.dispatch(
@@ -109,9 +100,6 @@ async def test_terminal_run_rejects_host_path_without_sandbox(ctx: ToolContext) 
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W4: process start refuses host without sandbox", strict=False
-)
 async def test_process_start_rejects_host_path_without_sandbox(ctx: ToolContext) -> None:
     exe, _ = build_session_registry(registry_version=1)
     raw = await exe.dispatch(
@@ -131,9 +119,6 @@ async def test_process_start_rejects_host_path_without_sandbox(ctx: ToolContext)
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    reason="green after W4: terminal_spawn rejects caller-selected shell", strict=False
-)
 async def test_terminal_spawn_rejects_custom_shell(ctx: ToolContext) -> None:
     exe, _ = build_session_registry(registry_version=1)
     raw = await exe.dispatch(

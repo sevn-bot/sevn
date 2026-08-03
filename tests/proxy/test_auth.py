@@ -39,8 +39,11 @@ def test_llm_post_auth_failure_skips_when_no_secret() -> None:
     assert llm_post_auth_failure(_request(), "") is None
 
 
-def test_llm_post_auth_failure_skips_non_post() -> None:
-    assert llm_post_auth_failure(_request(method="GET"), "secret") is None
+def test_llm_post_auth_failure_rejects_non_post_without_token() -> None:
+    resp = llm_post_auth_failure(_request(method="GET"), "secret")
+    assert resp is not None
+    assert resp.status_code == 401
+    assert resp.body == b'{"detail":"unauthorized"}'
 
 
 def test_llm_post_auth_failure_skips_unguarded_path() -> None:
