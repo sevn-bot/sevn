@@ -11,15 +11,14 @@ name: Docker
 
 on:
   pull_request:
-    branches: [main, develop, test-pre]
+    branches: [main, develop, test-pre, pre-0.0.1]
     paths:
       - "docker/Dockerfile*"
       - ".dockerignore"
       - "docker/docker-compose*.yml"
       - "pyproject.toml"
       - "uv.lock"
-      - "src/sevn/gateway/**"
-      - "src/sevn/proxy/**"
+      - "src/sevn/**"
       - "infra/docker/**"
       - "infra/ci-mock-openai/**"
       - "infra/ci-workspace/**"
@@ -29,7 +28,7 @@ on:
       - ".github/workflows/docker.yml"
       - ".github/actions/**"
   push:
-    branches: [main, develop, test-pre]
+    branches: [main, develop, test-pre, pre-0.0.1]
   workflow_dispatch:
 
 permissions:
