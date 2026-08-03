@@ -36,23 +36,18 @@ def _compose_default_services() -> list[str]:
     return [line.strip() for line in proc.stdout.splitlines() if line.strip()]
 
 
-@pytest.mark.xfail(reason="green after W2: default compose includes sevn-gateway", strict=False)
 def test_default_compose_services_include_gateway_and_proxy() -> None:
     services = _compose_default_services()
     assert "sevn-proxy" in services
     assert "sevn-gateway" in services
 
 
-@pytest.mark.xfail(reason="green after W2: remove negated compose profiles", strict=False)
 def test_compose_yaml_forbids_negated_profiles() -> None:
     text = _COMPOSE_FILE.read_text(encoding="utf-8")
     matches = _NEGATED_PROFILE_RE.findall(text)
     assert matches == [], f"negated profiles forbidden, found: {matches}"
 
 
-@pytest.mark.xfail(
-    reason="green after W2: strip OPENAI_API_KEY from gateway services", strict=False
-)
 def test_gateway_compose_services_do_not_receive_openai_api_key() -> None:
     text = _COMPOSE_FILE.read_text(encoding="utf-8")
     blocks = re.split(r"(?=^\s{2}\w)", text, flags=re.MULTILINE)

@@ -11,7 +11,7 @@
 #
 # Browser CDP (Brave + browser-cdp): optional profile `browser` swaps in Dockerfile.gateway.browser.
 # Profile `gui` adds noVNC. Profiles `browser` and `gui` are mutually exclusive.
-# Default `docker compose up` stays slim.
+# Default `docker compose up` starts sevn-proxy + sevn-gateway.
 # Host-first headed browsing: run gateway on macOS with `uv sync --extra browser-cdp` instead.
 
 services:
@@ -26,11 +26,20 @@ services:
       - sevn-state:/operator
     expose:
       - "8787"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   sevn-gateway:
-    profiles:
-      - "!browser"
-      - "!gui"
     build:
       context: ..
       dockerfile: docker/Dockerfile.gateway
@@ -38,15 +47,15 @@ services:
       SEVN_HOME: /operator
       SEVN_PROXY_URL: http://sevn-proxy:8787
       SEVN_TELEGRAM_BOT_TOKEN: ${SEVN_TELEGRAM_BOT_TOKEN:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     volumes:
       - sevn-state:/operator
       - ../infra/docker-onboard.json:/bootstrap/onboard-compose.json:ro
     working_dir: /operator/workspace
     ports:
-      - "${SEVN_GATEWAY_PORT:-3001}:3001"
+      - "${SEVN_GATEWAY_BIND:-127.0.0.1}:${SEVN_GATEWAY_PORT:-3001}:3001"
     depends_on:
-      - sevn-proxy
+      sevn-proxy:
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -63,7 +72,6 @@ services:
   sevn-gateway-browser:
     profiles:
       - browser
-      - "!gui"
     build:
       context: ..
       dockerfile: docker/Dockerfile.gateway.browser
@@ -71,7 +79,6 @@ services:
       SEVN_HOME: /operator
       SEVN_PROXY_URL: http://sevn-proxy:8787
       SEVN_TELEGRAM_BOT_TOKEN: ${SEVN_TELEGRAM_BOT_TOKEN:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       SEVN_CHROME_EXECUTABLE: /usr/bin/brave-browser
       SEVN_BROWSER_ENGINE: brave
       SEVN_BROWSER_EXTRA_ARGS: "--no-sandbox --disable-dev-shm-usage"
@@ -80,9 +87,10 @@ services:
       - ../infra/docker-onboard.json:/bootstrap/onboard-compose.json:ro
     working_dir: /operator/workspace
     ports:
-      - "${SEVN_GATEWAY_PORT:-3001}:3001"
+      - "${SEVN_GATEWAY_BIND:-127.0.0.1}:${SEVN_GATEWAY_PORT:-3001}:3001"
     depends_on:
-      - sevn-proxy
+      sevn-proxy:
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -99,7 +107,6 @@ services:
   sevn-gateway-gui:
     profiles:
       - gui
-      - "!browser"
     build:
       context: ..
       dockerfile: docker/Dockerfile.gateway.gui
@@ -107,7 +114,6 @@ services:
       SEVN_HOME: /operator
       SEVN_PROXY_URL: http://sevn-proxy:8787
       SEVN_TELEGRAM_BOT_TOKEN: ${SEVN_TELEGRAM_BOT_TOKEN:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       SEVN_CHROME_EXECUTABLE: /usr/bin/brave-browser
       SEVN_BROWSER_ENGINE: brave
       SEVN_BROWSER_HEADLESS: "0"
@@ -118,9 +124,10 @@ services:
       - ../infra/docker-onboard.json:/bootstrap/onboard-compose.json:ro
     working_dir: /operator/workspace
     ports:
-      - "${SEVN_GATEWAY_PORT:-3001}:3001"
+      - "${SEVN_GATEWAY_BIND:-127.0.0.1}:${SEVN_GATEWAY_PORT:-3001}:3001"
     depends_on:
-      - sevn-proxy
+      sevn-proxy:
+        condition: service_healthy
     healthcheck:
       test:
         [
