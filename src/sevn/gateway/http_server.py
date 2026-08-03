@@ -448,6 +448,46 @@ def _effective_process_settings(
     return process.model_copy(update={"proxy_url": origin})
 
 
+def _proxy_readiness_required(
+    *,
+    process_settings_passed: bool,
+    resolved_process: ProcessSettings,
+    workspace: WorkspaceConfig,
+) -> bool:
+    """Return whether ``/ready`` must fail closed on egress proxy ``/healthz`` loss.
+
+    ``_effective_process_settings`` always fills a default loopback origin for
+    transports; readiness only probes when the operator (or an explicit test harness)
+    configured egress via ``SEVN_PROXY_URL``, a ``proxy`` block in ``sevn.json``, or
+    ``create_app(process_settings=...)`` (``specs/17-gateway.md`` §10.6).
+
+    Args:
+        process_settings_passed (bool): Whether ``create_app`` received ``process_settings=``.
+        resolved_process (ProcessSettings): Env-derived settings before workspace merge.
+        workspace (WorkspaceConfig): Parsed ``sevn.json``.
+
+    Returns:
+        bool: ``True`` when ``/ready`` should probe and fail on proxy loss.
+
+    Examples:
+        >>> from sevn.config.settings import ProcessSettings
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> ws = WorkspaceConfig.minimal()
+        >>> _proxy_readiness_required(
+        ...     process_settings_passed=False,
+        ...     resolved_process=ProcessSettings(),
+        ...     workspace=ws,
+        ... )
+        False
+    """
+    if (resolved_process.proxy_url or "").strip():
+        return True
+    proxy_section = workspace.proxy
+    if isinstance(proxy_section, dict) and bool(proxy_section):
+        return True
+    return process_settings_passed
+
+
 _DEFAULT_PROXY_BOOT_HEALTH_MAX_WAIT_S = 5.0
 _DEFAULT_PROXY_BOOT_HEALTH_POLL_INTERVAL_S = 0.5
 
@@ -555,7 +595,7 @@ async def _deploy_readiness_body(
         return {"ready": False, "sqlite": False}
     body: dict[str, Any] = {"ready": True, "sqlite": True}
     proc: ProcessSettings = app.state.process_settings
-    if proc.proxy_url:
+    if getattr(app.state, "proxy_readiness_required", False) and proc.proxy_url:
         try:
             async with httpx.AsyncClient(timeout=2.0) as client:
                 r = await client.get(proc.proxy_url.rstrip("/") + "/healthz")
@@ -1508,6 +1548,11 @@ def create_app(
         app.state.layout = ly
         app.state.effective_mcp_servers = _mcp_servers_map  # computed above at W6 boot
         app.state.process_settings = effective_process
+        app.state.proxy_readiness_required = _proxy_readiness_required(
+            process_settings_passed=process_settings is not None,
+            resolved_process=resolved_process,
+            workspace=ws,
+        )
         app.state.gateway_router = gateway_router
         app.state.gateway_sessions = sessions
         app.state.webchat_config = webchat_cfg
