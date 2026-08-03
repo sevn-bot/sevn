@@ -55,7 +55,6 @@ async def _capture_docker_run_argv(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W5: docker spawn uses isolated network", strict=False)
 async def test_docker_spawn_uses_dedicated_network(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -67,7 +66,6 @@ async def test_docker_spawn_uses_dedicated_network(
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W5: workspace bind is read-only", strict=False)
 async def test_docker_spawn_workspace_mount_is_read_only(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

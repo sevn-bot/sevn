@@ -18,6 +18,9 @@ Exports:
     snapshot_tarball_format_supported — True when manifest version is supported (§10.2).
     prune_workspace_snapshots — prune old tarballs using ``snapshot_retention_count``.
     make_runtime_for_driver — instantiate runtime for a resolved ``SandboxDriver``.
+    ensure_sandbox_docker_network — dedicated internal bridge for sandbox containers.
+    list_labeled_sandbox_containers — enumerate ``sevn.run_id`` docker rows.
+    reap_stale_sandbox_containers — TTL reaper keyed on ``sevn.run_id`` labels.
 Examples:
     >>> check_self_preservation_argv(["echo", "hi"]) is None
     True
@@ -968,6 +971,10 @@ def _cfg_max_lifetime_s(cfg: WorkspaceConfig) -> float:
 
 
 _DOCKER_WORKSPACE_MOUNT: Final[str] = "/workspace"
+_DOCKER_OUT_SUBDIR: Final[str] = ".out"
+_SANDBOX_NETWORK_NAME: Final[str] = "sevn-sandbox"
+_SANDBOX_RUN_USER: Final[str] = "10001:10001"
+_SANDBOX_SPAWN_TS_LABEL: Final[str] = "sevn.spawn_ts"
 _REPL_READY_MARKER: Final[str] = "__SEVN_REPL_OK__"
 
 
@@ -1049,21 +1056,248 @@ def _write_docker_network_policy(
     return None
 
 
-def _prepare_llmignore_mask_dir(workspace: Path) -> Path:
-    """Create an empty host directory masking ``.llmignore/`` inside the container.
-    Args:
-        workspace (Path): Real workspace root (unused except for parent temp placement).
+def _sandbox_network_name() -> str:
+    """Return the dedicated internal Docker network for sandbox containers.
     Returns:
-        Path: Empty directory bind-mounted over ``/workspace/.llmignore``.
+        str: Network name (deny-by-default bridge; proxy attaches separately).
+    Examples:
+        >>> _sandbox_network_name() == "sevn-sandbox"
+        True
+    """
+    return _SANDBOX_NETWORK_NAME
+
+
+async def ensure_sandbox_docker_network() -> str:
+    """Create the dedicated internal sandbox network if missing (§4.2).
+    Returns:
+        str: Network name passed to ``docker run --network``.
+    Raises:
+        SandboxConfigurationError: When ``docker network create`` fails unexpectedly.
+    Examples:
+        >>> isinstance(_sandbox_network_name(), str)
+        True
+    """
+    docker_bin = _docker_bin()
+    name = _sandbox_network_name()
+    rc, out, err = await _docker_run(
+        [docker_bin, "network", "create", "--internal", name],
+        timeout_s=30.0,
+    )
+    combined = f"{out}\n{err}".lower()
+    if rc != 0 and "already exists" not in combined:
+        msg = f"docker network create {name!r} failed (exit {rc}): {err.strip() or out.strip()}"
+        raise SandboxConfigurationError(msg)
+    return name
+
+
+def _seccomp_profile_path() -> str:
+    """Resolve seccomp JSON path for ``docker run --security-opt seccomp=…``.
+    Returns:
+        str: Host filesystem path to the bundled profile.
+    Examples:
+        >>> Path(_seccomp_profile_path()).suffix == ".json"
+        True
+    """
+    override = os.environ.get("SEVN_SANDBOX_SECCOMP_PROFILE", "").strip()
+    if override:
+        return override
+    dev = Path(__file__).resolve().parent.parent / "data" / "docker" / "sandbox-seccomp.json"
+    if dev.is_file():
+        return str(dev)
+    from importlib.resources import as_file, files
+
+    ref = files("sevn.data.docker") / "sandbox-seccomp.json"
+    cache = Path(tempfile.gettempdir()) / "sevn-sandbox-seccomp.json"
+    with as_file(ref) as src:
+        if not cache.is_file() or cache.stat().st_mtime < src.stat().st_mtime:
+            shutil.copy2(src, cache)
+    return str(cache)
+
+
+def _docker_isolation_args() -> list[str]:
+    """Build kernel isolation flags for ``docker run`` (§4.2).
+    Returns:
+        list[str]: ``--user``, cap-drop, seccomp, and ulimit flags.
+    Examples:
+        >>> "--cap-drop" in _docker_isolation_args()
+        True
+    """
+    seccomp = _seccomp_profile_path()
+    return [
+        "--user",
+        _SANDBOX_RUN_USER,
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges",
+        "--security-opt",
+        f"seccomp={seccomp}",
+        "--ulimit",
+        "fsize=268435456",
+    ]
+
+
+async def _resolve_digest_pinned_image(image: str) -> str:
+    """Resolve a tag to a digest-pinned reference when inspect succeeds (§4.2).
+    Args:
+        image (str): Image tag or digest reference from config.
+    Returns:
+        str: ``repo@sha256:…`` when available, else the original ``image``.
+    Examples:
+        >>> isinstance("@sha256:" in "x@sha256:abc", bool)
+        True
+    """
+    if "@sha256:" in image:
+        return image
+    docker_bin = _docker_bin()
+    rc, out, _ = await _docker_run(
+        [docker_bin, "image", "inspect", "--format", "{{index .RepoDigests 0}}", image],
+        timeout_s=60.0,
+    )
+    digest_ref = out.strip()
+    if rc == 0 and digest_ref:
+        return digest_ref
+    rc2, out2, _ = await _docker_run(
+        [docker_bin, "image", "inspect", "--format", "{{.Id}}", image],
+        timeout_s=60.0,
+    )
+    image_id = out2.strip()
+    if rc2 == 0 and image_id:
+        return image_id
+    return image
+
+
+def _prepare_workspace_out_dir(workspace: Path, run_id: str) -> Path:
+    """Create per-run writable ``.out`` host directory (§4.2 narrow rw surface).
+    Args:
+        workspace (Path): Host workspace root.
+        run_id (str): Correlation id for the sandbox run.
+    Returns:
+        Path: Host directory bind-mounted at ``/workspace/.out``.
     Examples:
         >>> isinstance(True, bool)
         True
     """
-    parent = workspace.expanduser().resolve() / ".sevn" / "docker-mask"
+    ws = workspace.expanduser().resolve()
+    out_dir = ws / ".sevn" / "docker-out" / run_id
+    out_dir.mkdir(parents=True, exist_ok=True)
+    return out_dir
+
+
+def _discover_llmignore_mask_mounts(workspace: Path) -> list[tuple[Path, str]]:
+    """Create empty host dirs masking every ``.llmignore/`` subtree (§4.2, nested).
+    Args:
+        workspace (Path): Real workspace root.
+    Returns:
+        list[tuple[Path, str]]: ``(host_mask, container_mount_path)`` pairs.
+    Examples:
+        >>> isinstance(True, bool)
+        True
+    """
+    ws = workspace.expanduser().resolve()
+    parent = ws / ".sevn" / "docker-mask"
     parent.mkdir(parents=True, exist_ok=True)
-    mask = parent / f"llmignore-{uuid.uuid4().hex[:12]}"
-    mask.mkdir(parents=True, exist_ok=True)
-    return mask
+    mounts: list[tuple[Path, str]] = []
+    for root, dirnames, _ in os.walk(ws):
+        root_path = Path(root)
+        rel_parts = root_path.relative_to(ws).parts
+        if ".sevn" in rel_parts:
+            dirnames.clear()
+            continue
+        for name in list(dirnames):
+            if name != ".llmignore":
+                continue
+            rel = (root_path.relative_to(ws) / ".llmignore").as_posix()
+            mask = parent / f"llmignore-{uuid.uuid4().hex[:12]}"
+            mask.mkdir(parents=True, exist_ok=True)
+            mounts.append((mask, f"{_DOCKER_WORKSPACE_MOUNT}/{rel}"))
+            dirnames.remove(name)
+    if not mounts:
+        mask = parent / f"llmignore-{uuid.uuid4().hex[:12]}"
+        mask.mkdir(parents=True, exist_ok=True)
+        mounts.append((mask, f"{_DOCKER_WORKSPACE_MOUNT}/.llmignore"))
+    return mounts
+
+
+async def list_labeled_sandbox_containers() -> list[dict[str, str]]:
+    """Return docker rows carrying ``sevn.run_id`` labels.
+    Returns:
+        list[dict[str, str]]: Rows with ``container_id``, ``run_id``, ``spawn_ts``.
+    Examples:
+        >>> isinstance(list_labeled_sandbox_containers.__name__, str)
+        True
+    """
+    docker_bin = _docker_bin()
+    rc, out, err = await _docker_run(
+        [
+            docker_bin,
+            "ps",
+            "-a",
+            "--filter",
+            "label=sevn.run_id",
+            "--format",
+            '{{.ID}}\t{{.Label "sevn.run_id"}}\t{{.Label "sevn.spawn_ts"}}',
+        ],
+        timeout_s=30.0,
+    )
+    if rc != 0:
+        logger.warning("docker ps label filter failed: {}", err.strip() or out.strip())
+        return []
+    rows: list[dict[str, str]] = []
+    for line in out.splitlines():
+        parts = line.strip().split("\t")
+        if len(parts) < 2:
+            continue
+        rows.append(
+            {
+                "container_id": parts[0],
+                "run_id": parts[1],
+                "spawn_ts": parts[2] if len(parts) > 2 else "",
+            }
+        )
+    return rows
+
+
+async def reap_stale_sandbox_containers(
+    *,
+    max_lifetime_s: float,
+    active_run_ids: frozenset[str] | None = None,
+    now_unix_s: float | None = None,
+) -> list[str]:
+    """Kill labeled sandbox containers past TTL (§4.5 out-of-band reaper).
+    Args:
+        max_lifetime_s (float): Configured ``sandbox.max_lifetime`` cap.
+        active_run_ids (frozenset[str] | None): Run ids still leased by the gateway.
+        now_unix_s (float | None): Wall clock override for tests.
+    Returns:
+        list[str]: Removed container ids.
+    Examples:
+        >>> isinstance(True, bool)
+        True
+    """
+    if max_lifetime_s <= 0:
+        return []
+    now = float(now_unix_s if now_unix_s is not None else time.time())
+    live = active_run_ids or frozenset()
+    doomed: list[str] = []
+    docker_bin = _docker_bin()
+    for row in await list_labeled_sandbox_containers():
+        run_id = row["run_id"]
+        if run_id in live:
+            continue
+        spawn_raw = row.get("spawn_ts", "")
+        try:
+            spawn_ts = float(spawn_raw) if spawn_raw else 0.0
+        except ValueError:
+            spawn_ts = 0.0
+        if spawn_ts <= 0:
+            continue
+        if (now - spawn_ts) <= max_lifetime_s:
+            continue
+        cid = row["container_id"]
+        await _docker_run([docker_bin, "rm", "-f", cid], timeout_s=60.0)
+        doomed.append(cid)
+    return doomed
 
 
 async def _docker_run(
@@ -1203,6 +1437,31 @@ class DockerSandboxRuntime:
         self._pre_env = dict(pre_spawn_env or {})
         self._records: dict[str, dict[str, Any]] = {}
 
+    def active_run_ids(self) -> frozenset[str]:
+        """Return run ids still leased by this runtime instance.
+        Returns:
+            frozenset[str]: ``sevn.run_id`` values for live containers.
+        Examples:
+            >>> isinstance(True, bool)
+            True
+        """
+        return frozenset(
+            str(rec["run_id"]) for rec in self._records.values() if rec.get("run_id") is not None
+        )
+
+    async def reap_stale_containers(self) -> list[str]:
+        """Remove labeled containers past TTL not tracked in ``self._records``.
+        Returns:
+            list[str]: Removed container ids.
+        Examples:
+            >>> isinstance(True, bool)
+            True
+        """
+        return await reap_stale_sandbox_containers(
+            max_lifetime_s=self._lifetime_s,
+            active_run_ids=self.active_run_ids(),
+        )
+
     async def spawn(self, *, run_id: str, workspace: Path, env: dict[str, str]) -> str:
         """Pull image, bind-mount workspace with ``.llmignore/`` masked, start container.
         Args:
@@ -1231,14 +1490,18 @@ class DockerSandboxRuntime:
             ws,
             child_env=child_env,
         )
-        mask_dir = await asyncio.to_thread(_prepare_llmignore_mask_dir, ws)
+        network_name = await ensure_sandbox_docker_network()
+        llmignore_mounts = await asyncio.to_thread(_discover_llmignore_mask_mounts, ws)
+        out_dir = await asyncio.to_thread(_prepare_workspace_out_dir, ws, run_id)
+        spawn_ts = int(time.time())
+        pinned_image = await _resolve_digest_pinned_image(self._image)
         pull_rc, pull_out, pull_err = await _docker_run(
-            [docker_bin, "pull", self._image],
+            [docker_bin, "pull", pinned_image],
             timeout_s=600.0,
         )
         if pull_rc != 0:
             msg = (
-                f"docker pull {self._image!r} failed (exit {pull_rc}): "
+                f"docker pull {pinned_image!r} failed (exit {pull_rc}): "
                 f"{pull_err.strip() or pull_out.strip()}"
             )
             raise SandboxConfigurationError(msg)
@@ -1249,22 +1512,29 @@ class DockerSandboxRuntime:
             "-d",
             "--name",
             name,
+            "--network",
+            network_name,
             "--label",
             f"sevn.run_id={run_id}",
+            "--label",
+            f"{_SANDBOX_SPAWN_TS_LABEL}={spawn_ts}",
+            *_docker_isolation_args(),
             "--read-only",
             "--tmpfs",
             "/tmp:rw,noexec,nosuid,size=256m",  # nosec B108 — Docker tmpfs mount, not host tempfile
             "-v",
-            f"{ws}:{_DOCKER_WORKSPACE_MOUNT}:rw",
+            f"{ws}:{_DOCKER_WORKSPACE_MOUNT}:ro",
             "-v",
-            f"{mask_dir}:{_DOCKER_WORKSPACE_MOUNT}/.llmignore:ro",
+            f"{out_dir}:{_DOCKER_WORKSPACE_MOUNT}/{_DOCKER_OUT_SUBDIR}:rw",
             "-w",
             _DOCKER_WORKSPACE_MOUNT,
             *_docker_resource_args(self._cfg),
         ]
+        for mask_dir, container_path in llmignore_mounts:
+            run_argv.extend(["-v", f"{mask_dir}:{container_path}:ro"])
         for key, val in child_env.items():
             run_argv.extend(["-e", f"{key}={val}"])
-        run_argv.extend([self._image, "sleep", "infinity"])
+        run_argv.extend([pinned_image, "sleep", "infinity"])
         rc, out, err = await _docker_run(run_argv, timeout_s=120.0)
         container_id = out.strip()
         if rc != 0 or not container_id:
@@ -1275,17 +1545,18 @@ class DockerSandboxRuntime:
             "run_id": run_id,
             "container_id": container_id,
             "container_name": name,
-            "mask_dir": mask_dir,
+            "mask_dirs": [mask for mask, _ in llmignore_mounts],
+            "out_dir": out_dir,
             "workspace": ws,
             "child_env": child_env,
         }
         runtime_attrs: dict[str, object] = {
             "driver": SandboxDriver.docker,
-            "image": self._image,
+            "image": pinned_image,
             "run_id": run_id,
             "sandbox_max_lifetime_s": self._lifetime_s,
             "sandbox_id": sid,
-            "network_mode": "bridge",
+            "network_mode": network_name,
         }
         if network_rules is not None:
             runtime_attrs["network_policy_path"] = str(network_rules)
@@ -1434,14 +1705,22 @@ class DockerSandboxRuntime:
             name = str(rec.get("container_name", ""))
             if name:
                 await _docker_run([docker_bin, "rm", "-f", name], timeout_s=60.0)
-            mask_dir = rec.get("mask_dir")
-            if isinstance(mask_dir, Path):
 
-                def _rm_mask() -> None:
-                    if mask_dir.exists():
-                        shutil.rmtree(mask_dir, ignore_errors=True)
+            def _rm_paths() -> None:
+                mask_dirs = rec.get("mask_dirs")
+                if isinstance(mask_dirs, list):
+                    for mask_dir in mask_dirs:
+                        if isinstance(mask_dir, Path) and mask_dir.exists():
+                            shutil.rmtree(mask_dir, ignore_errors=True)
+                else:
+                    legacy = rec.get("mask_dir")
+                    if isinstance(legacy, Path) and legacy.exists():
+                        shutil.rmtree(legacy, ignore_errors=True)
+                out_dir = rec.get("out_dir")
+                if isinstance(out_dir, Path) and out_dir.exists():
+                    shutil.rmtree(out_dir, ignore_errors=True)
 
-                await asyncio.to_thread(_rm_mask)
+            await asyncio.to_thread(_rm_paths)
         await _emit_sink(
             self._sink,
             "sandbox.teardown",
