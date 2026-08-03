@@ -53,7 +53,6 @@ def test_connect_sqlite_keeps_wal_and_foreign_keys(tmp_path: Path) -> None:
         conn.close()
 
 
-@pytest.mark.xfail(reason="green after W9: PRAGMA busy_timeout=30000", strict=False)
 def test_connect_sqlite_sets_busy_timeout_floor(tmp_path: Path) -> None:
     """Concurrent writers wait 30s for the lock instead of raising ``database is locked``."""
     conn = connect_sqlite(tmp_path / "db" / "busy.sqlite")
@@ -63,7 +62,6 @@ def test_connect_sqlite_sets_busy_timeout_floor(tmp_path: Path) -> None:
         conn.close()
 
 
-@pytest.mark.xfail(reason="green after W9: PRAGMA synchronous=NORMAL", strict=False)
 def test_connect_sqlite_sets_synchronous_normal(tmp_path: Path) -> None:
     """WAL + ``synchronous=NORMAL`` is the documented durability/throughput trade."""
     conn = connect_sqlite(tmp_path / "db" / "sync.sqlite")
@@ -73,7 +71,6 @@ def test_connect_sqlite_sets_synchronous_normal(tmp_path: Path) -> None:
         conn.close()
 
 
-@pytest.mark.xfail(reason="green after W9: autocommit isolation for explicit txns", strict=False)
 def test_connect_sqlite_uses_autocommit_isolation(tmp_path: Path) -> None:
     """``isolation_level=None`` keeps ``BEGIN IMMEDIATE`` in the migration runner honest."""
     conn = connect_sqlite(tmp_path / "db" / "iso.sqlite")
@@ -83,13 +80,11 @@ def test_connect_sqlite_uses_autocommit_isolation(tmp_path: Path) -> None:
         conn.close()
 
 
-@pytest.mark.xfail(reason="green after W9: _MIGRATION_30 adds trigger_runs", strict=False)
 def test_migration_head_advances_to_trigger_runs_version() -> None:
     """D13: ``trigger_runs`` takes the next free version, one migration for this wave."""
     assert MIGRATION_HEAD_VERSION == _TRIGGER_RUNS_HEAD_VERSION
 
 
-@pytest.mark.xfail(reason="green after W9: trigger_runs table", strict=False)
 def test_trigger_runs_table_has_required_columns(tmp_path: Path) -> None:
     """Durable trigger state replaces the process-local ``app.state`` dict."""
     conn = _migrated_conn(tmp_path / "db" / "triggers.sqlite")
@@ -100,7 +95,6 @@ def test_trigger_runs_table_has_required_columns(tmp_path: Path) -> None:
         conn.close()
 
 
-@pytest.mark.xfail(reason="green after W9: trigger_runs.run_id unique", strict=False)
 def test_trigger_runs_rejects_duplicate_run_id(tmp_path: Path) -> None:
     """Edge: a retried dispatch must not fork a second row for the same run."""
     conn = _migrated_conn(tmp_path / "db" / "dupe.sqlite")
@@ -112,7 +106,6 @@ def test_trigger_runs_rejects_duplicate_run_id(tmp_path: Path) -> None:
         conn.close()
 
 
-@pytest.mark.xfail(reason="green after W9: trigger status survives restart", strict=False)
 def test_trigger_run_status_survives_process_restart(tmp_path: Path) -> None:
     """The status written by one process is readable after the gateway restarts."""
     db_path = tmp_path / "db" / "restart.sqlite"
@@ -134,7 +127,6 @@ def test_trigger_run_status_survives_process_restart(tmp_path: Path) -> None:
         second.close()
 
 
-@pytest.mark.xfail(reason="green after W9: migration fixture replays to head 30", strict=False)
 def test_pre_trigger_runs_database_migrates_forward(tmp_path: Path) -> None:
     """Migration fixture: a DB stopped one version short replays to the new head."""
     db_path = tmp_path / "db" / "upgrade.sqlite"

@@ -59,7 +59,6 @@ def test_unknown_run_id_reports_unknown(migrated_conn: sqlite3.Connection) -> No
     assert resp.json() == {"run_id": "never-dispatched", "status": "unknown"}
 
 
-@pytest.mark.xfail(reason="green after W9: run status read from trigger_runs", strict=False)
 def test_run_status_survives_restart(migrated_conn: sqlite3.Connection) -> None:
     """A run recorded before the restart is still reported after the status map is lost."""
     migrated_conn.execute(

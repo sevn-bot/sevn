@@ -38,7 +38,6 @@ def test_hardened_dockerfile_present(dockerfile: str) -> None:
     assert (_DOCKER_DIR / dockerfile).is_file()
 
 
-@pytest.mark.xfail(reason="green after W8: USER sevn in gateway/proxy/browser images", strict=False)
 @pytest.mark.parametrize("dockerfile", _HARDENED_IMAGES)
 def test_dockerfile_switches_to_non_root_user(dockerfile: str) -> None:
     """Each Gate B image ends on a non-root ``USER`` instruction."""
@@ -47,7 +46,6 @@ def test_dockerfile_switches_to_non_root_user(dockerfile: str) -> None:
     assert users[-1] == _NON_ROOT_USER, f"{dockerfile} last USER is {users[-1]!r}"
 
 
-@pytest.mark.xfail(reason="green after W8: uid 10001 sevn account created", strict=False)
 @pytest.mark.parametrize("dockerfile", _HARDENED_IMAGES)
 def test_dockerfile_creates_non_root_account_at_pinned_uid(dockerfile: str) -> None:
     """The runtime account is created explicitly at uid ``10001`` (stable bind-mount owner)."""
@@ -56,7 +54,6 @@ def test_dockerfile_creates_non_root_account_at_pinned_uid(dockerfile: str) -> N
     assert _NON_ROOT_UID in text, f"{dockerfile} does not pin uid {_NON_ROOT_UID}"
 
 
-@pytest.mark.xfail(reason="green after W8: USER switch precedes CMD", strict=False)
 @pytest.mark.parametrize("dockerfile", _HARDENED_IMAGES)
 def test_user_switch_precedes_cmd(dockerfile: str) -> None:
     """The drop to ``sevn`` happens before the entrypoint so the process is never root."""
@@ -68,7 +65,6 @@ def test_user_switch_precedes_cmd(dockerfile: str) -> None:
     assert user_matches[-1].start() < cmd_match.start()
 
 
-@pytest.mark.xfail(reason="green after W8: browser image keeps the Chromium sandbox", strict=False)
 def test_browser_image_does_not_disable_chromium_sandbox() -> None:
     """``--no-sandbox`` is removed once the browser image runs as a non-root uid."""
     text = _dockerfile_text("Dockerfile.gateway.browser")

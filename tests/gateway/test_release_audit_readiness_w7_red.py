@@ -130,14 +130,12 @@ def test_health_stays_200_when_proxy_is_down(proxy_down_client: TestClient) -> N
     assert resp.json() == {"status": "ok"}
 
 
-@pytest.mark.xfail(reason="green after W8: /ready 503 when a dependency is down", strict=False)
 def test_ready_returns_503_when_proxy_is_down(proxy_down_client: TestClient) -> None:
     """Readiness fails closed so load balancers drain a gateway with no egress."""
     resp = proxy_down_client.get("/ready")
     assert resp.status_code == 503
 
 
-@pytest.mark.xfail(reason="green after W8: /ready body reports ready=false", strict=False)
 def test_ready_body_reports_not_ready_when_proxy_is_down(proxy_down_client: TestClient) -> None:
     """The failing dependency is named in the body, and ``ready`` reflects it."""
     body = proxy_down_client.get("/ready").json()

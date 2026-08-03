@@ -17,7 +17,6 @@ from sevn.storage import (
 )
 
 
-@pytest.mark.xfail(reason="green after W9: _MIGRATION_30 adds trigger_runs", strict=False)
 def test_migration_head_matches_bundle() -> None:
     assert MIGRATION_HEAD_VERSION == 30
 
