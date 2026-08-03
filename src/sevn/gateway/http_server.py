@@ -190,6 +190,7 @@ from sevn.tools.spill_gc import prune_orphan_tool_result_dirs
 from sevn.triggers.api_router import build_api_router
 from sevn.triggers.cron import SqliteCronStore, cron_tick
 from sevn.triggers.dedupe import prune_webhook_dedupe_expired
+from sevn.triggers.dispatch_outcome import DispatchOutcome
 from sevn.triggers.dispatcher import (
     TriggerDispatchGate,
     agent_dispatch_kwargs,
@@ -1563,7 +1564,7 @@ def create_app(
         await asyncio.to_thread(_boot_prune_dedupe, conn)
         prune_inbox_spill(content_root=ly.content_root)
 
-        async def _dispatch_trigger(req: DispatchRequest) -> None:
+        async def _dispatch_trigger(req: DispatchRequest) -> DispatchOutcome:
             if (
                 req.trigger_meta.get("transport") == "cron"
                 and req.trigger_meta.get("cron_job_id") == DREAMING_CRON_JOB_ID
@@ -1572,7 +1573,7 @@ def create_app(
                 if eng is not None:
                     st = app.state
                     await eng.run_scheduled(workspace_root=st.layout.content_root, ws=st.workspace)
-                return
+                return DispatchOutcome(agent_ok=True, delivery_ok=True)
             if (
                 req.trigger_meta.get("transport") == "cron"
                 and req.trigger_meta.get("cron_job_id") == MY_SEVN_SYNC_CRON_JOB_ID
@@ -1599,7 +1600,12 @@ def create_app(
                         status="error",
                         detail=str(exc),
                     )
-                return
+                    return DispatchOutcome(
+                        agent_ok=False,
+                        delivery_ok=False,
+                        error=str(exc)[:500],
+                    )
+                return DispatchOutcome(agent_ok=True, delivery_ok=True)
             if (
                 req.trigger_meta.get("transport") == "cron"
                 and req.trigger_meta.get("cron_job_id") == MY_SEVN_ISSUES_SYNC_CRON_JOB_ID
@@ -1607,9 +1613,14 @@ def create_app(
                 st = app.state
                 try:
                     await run_scheduled_issues_sync(st.layout, st.workspace)
-                except Exception:
+                except Exception as exc:
                     logger.exception("my_sevn issues sync cron failed")
-                return
+                    return DispatchOutcome(
+                        agent_ok=False,
+                        delivery_ok=False,
+                        error=str(exc)[:500],
+                    )
+                return DispatchOutcome(agent_ok=True, delivery_ok=True)
             hooks = getattr(app.state, "trigger_plugin_hooks", None)
             if req.delivery_mode == "notify_only":
                 await dispatch_notify_only(
@@ -1619,15 +1630,18 @@ def create_app(
                     trace=trace,
                     hooks=hooks,
                 )
-            else:
-                await dispatch_run(
-                    req,
-                    workspace=ws,
-                    content_root=ly.content_root,
-                    trace=trace,
-                    hooks=hooks,
-                    **agent_dispatch_kwargs(gateway_router),
-                )
+                return DispatchOutcome(agent_ok=True, delivery_ok=True)
+            handle = await dispatch_run(
+                req,
+                workspace=ws,
+                content_root=ly.content_root,
+                trace=trace,
+                hooks=hooks,
+                **agent_dispatch_kwargs(gateway_router),
+            )
+            if handle.outcome is not None:
+                return handle.outcome
+            return DispatchOutcome(agent_ok=True, delivery_ok=True)
 
         app.state.dispatch_trigger = _dispatch_trigger
 

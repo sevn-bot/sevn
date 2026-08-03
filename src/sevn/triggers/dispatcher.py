@@ -30,6 +30,7 @@ from sevn.agent.tracing.sink import TraceEvent, TraceSink
 from sevn.config.defaults import DEFAULT_TRIGGERS_WEBHOOK_DEDUPE_TTL_S
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.triggers.delivery import write_log_result
+from sevn.triggers.dispatch_outcome import assess_agent_pass_outcome
 from sevn.triggers.hooks_protocol import TriggerPluginHookSurface
 from sevn.triggers.inbox import maybe_spill_prompt_to_inbox
 from sevn.triggers.request import DispatchRequest, NotifyHandle, RunHandle
@@ -608,6 +609,8 @@ async def dispatch_run(
     agent_status = "stub"
     log_body: dict[str, object] = {"status": "stub", "executor": "unwired"}
     session_id: str | None = None
+    agent_exception: Exception | None = None
+    assistant_texts: list[str] = []
 
     if run_turn is not None and session_manager is not None:
         try:
@@ -628,7 +631,8 @@ async def dispatch_run(
                 "session_id": session_id,
                 "assistant_messages": assistant_texts,
             }
-        except Exception:
+        except Exception as exc:
+            agent_exception = exc
             agent_status = "error"
             log_body = {
                 "status": "error",
@@ -679,16 +683,28 @@ async def dispatch_run(
         ),
     )
 
+    conn = session_manager.connection if session_manager is not None else None
+    outcome = assess_agent_pass_outcome(
+        conn,
+        req=req,
+        session_id=session_id,
+        agent_exception=agent_exception,
+        assistant_texts=assistant_texts,
+    )
+
     if hooks is not None:
         await hooks.trigger_after_dispatch(
             transport=str(req.trigger_meta.get("transport", "unknown")),
             correlation_id=req.correlation_id,
             trigger_meta=dict(req.trigger_meta),
-            status="ok",
+            status="ok"
+            if outcome.cron_last_status() == "completed"
+            else outcome.cron_last_status(),
         )
 
     return RunHandle(
         run_id=req.correlation_id,
         correlation_id=req.correlation_id,
         session_id=session_id,
+        outcome=outcome,
     )

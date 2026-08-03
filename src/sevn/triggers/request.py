@@ -18,9 +18,12 @@ Examples:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from sevn.triggers.dispatch_outcome import DispatchOutcome
 
 RoutingMode = Literal["fixed", "auto_route"]
 DeliveryMode = Literal["agent_pass", "notify_only"]
@@ -61,6 +64,7 @@ class RunHandle:
     run_id: str
     correlation_id: str
     session_id: str | None = None
+    outcome: DispatchOutcome | None = None
 
 
 @dataclass(frozen=True)
