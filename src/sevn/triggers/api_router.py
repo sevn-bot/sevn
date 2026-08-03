@@ -85,11 +85,12 @@ async def _publish_run_event(request: Request, run_id: str, status: str) -> None
     )
 
 
-def _enforce_triggers_api_auth(request: Request) -> None:
+def _enforce_triggers_api_auth(request: Request, *, require_write_scope: bool = False) -> None:
     """Raise ``401`` when triggers API credentials are missing or invalid.
 
     Args:
         request (Request): Active FastAPI request.
+        require_write_scope (bool): When ``True``, JWT must carry ``session:write``.
 
     Raises:
         HTTPException: When auth is required and verification fails.
@@ -105,6 +106,7 @@ def _enforce_triggers_api_auth(request: Request) -> None:
         authorization_header=request.headers.get("Authorization"),
         gateway_token=_resolved_gateway_token(request),
         webchat_jwt_secret=webchat_secret,
+        require_write_scope=require_write_scope,
     ):
         raise HTTPException(status_code=401, detail="unauthorized")
 
@@ -136,7 +138,7 @@ def build_api_router() -> APIRouter:
         if ws.triggers and ws.triggers.paused:
             raise HTTPException(status_code=503, detail={"error": "triggers_paused"})
 
-        _enforce_triggers_api_auth(request)
+        _enforce_triggers_api_auth(request, require_write_scope=True)
 
         gate = request.app.state.trigger_dispatch_gate
         await gate.acquire_api_slot()

@@ -139,11 +139,14 @@ def build_openai_compat_router() -> APIRouter:
         ``RunTurnFn`` and reads the assistant reply from SQLite after the turn.
         """
         gateway_token = getattr(request.app.state, "resolved_gateway_token", None)
-        if gateway_token:
-            auth = request.headers.get("Authorization", "")
-            bearer = auth.removeprefix("Bearer ").strip() if auth.startswith("Bearer ") else ""
-            if bearer != str(gateway_token).strip():
-                raise HTTPException(status_code=401, detail="invalid_api_key")
+        expected = str(gateway_token).strip() if gateway_token else ""
+        if not expected:
+            raise HTTPException(status_code=503, detail="auth_not_configured")
+        from sevn.gateway.auth import extract_bearer, secrets_compare
+
+        submitted = extract_bearer(request.headers.get("Authorization"))
+        if submitted is None or not secrets_compare(expected, submitted):
+            raise HTTPException(status_code=401, detail="invalid_api_key")
 
         router_local = getattr(request.app.state, "gateway_router", None)
         if router_local is None:

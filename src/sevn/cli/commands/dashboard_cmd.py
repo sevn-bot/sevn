@@ -23,6 +23,10 @@ from sevn.ui.dashboard.services.auth import (
     dashboard_local_open_configured,
     tunnel_active,
 )
+from sevn.ui.dashboard.services.local_token import (
+    DASHBOARD_LOCAL_TOKEN_QUERY,
+    read_dashboard_local_token,
+)
 
 
 def _dashboard_enabled(workspace: WorkspaceConfig) -> bool:
@@ -164,6 +168,10 @@ def register(app: typer.Typer) -> None:
         local_open = dashboard_local_open_configured(workspace)
         tunnel = tunnel_active(workspace)
         auth_required = not local_open
+        local_token = read_dashboard_local_token()
+        if local_open and local_token:
+            sep = "&" if "?" in url else "?"
+            url = f"{url}{sep}{DASHBOARD_LOCAL_TOKEN_QUERY}={local_token}"
 
         if json_out:
             emit_json_success(

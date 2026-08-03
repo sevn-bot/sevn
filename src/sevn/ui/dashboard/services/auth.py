@@ -23,6 +23,7 @@ import binascii
 import hashlib
 import hmac
 import json
+import os
 import secrets
 import time
 from dataclasses import dataclass
@@ -39,7 +40,7 @@ if TYPE_CHECKING:
     from fastapi import Request
     from starlette.websockets import WebSocket
 
-_LOOPBACK_CLIENT_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "testclient"})
+_LOOPBACK_CLIENT_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 _LOOPBACK_GATEWAY_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 
 DASHBOARD_COOKIE_NAME = "sevn_dashboard_session"
@@ -116,7 +117,11 @@ def infrastructure_tunnel_mode(
         str: Tunnel mode name; ``none`` when unset.
 
     Examples:
-        >>> infrastructure_tunnel_mode(WorkspaceConfig.minimal())
+        >>> from pathlib import Path
+        >>> infrastructure_tunnel_mode(
+        ...     WorkspaceConfig.minimal(infrastructure={"tunnel": {"mode": "none"}}),
+        ...     sevn_json=Path("/nonexistent/sevn.json"),
+        ... )
         'none'
     """
     from sevn.infrastructure.tunnel_config import tunnel_cfg_from_disk
@@ -143,7 +148,11 @@ def tunnel_active(
         bool: ``True`` when ``infrastructure.tunnel.mode`` is not ``none``.
 
     Examples:
-        >>> tunnel_active(WorkspaceConfig.minimal())
+        >>> from pathlib import Path
+        >>> tunnel_active(
+        ...     WorkspaceConfig.minimal(infrastructure={"tunnel": {"mode": "none"}}),
+        ...     sevn_json=Path("/nonexistent/sevn.json"),
+        ... )
         False
     """
 
@@ -184,7 +193,14 @@ def dashboard_local_open_configured(
         bool: Whether loopback bypass is allowed by config.
 
     Examples:
-        >>> dashboard_local_open_configured(WorkspaceConfig.minimal())
+        >>> from pathlib import Path
+        >>> dashboard_local_open_configured(
+        ...     WorkspaceConfig.minimal(
+        ...         infrastructure={"tunnel": {"mode": "none"}},
+        ...         gateway={"host": "127.0.0.1", "port": 3001, "token": "x" * 32},
+        ...     ),
+        ...     sevn_json=Path("/nonexistent/sevn.json"),
+        ... )
         True
     """
 
@@ -205,7 +221,7 @@ def is_loopback_client_host(host: str | None) -> bool:
         host (str | None): Client host from ASGI scope.
 
     Returns:
-        bool: ``True`` for loopback/test client addresses.
+        bool: ``True`` for loopback client addresses.
 
     Examples:
         >>> is_loopback_client_host("127.0.0.1")
@@ -216,34 +232,66 @@ def is_loopback_client_host(host: str | None) -> bool:
 
     if not host:
         return False
-    return host.strip().lower() in _LOOPBACK_CLIENT_HOSTS
+    host_norm = host.strip().lower()
+    if host_norm in _LOOPBACK_CLIENT_HOSTS:
+        return True
+    # Starlette TestClient uses the synthetic host ``testclient`` — allowed under pytest only.
+    return host_norm == "testclient" and bool(os.environ.get("PYTEST_CURRENT_TEST"))
 
 
 def local_open_effective(workspace: WorkspaceConfig, request: Request | WebSocket) -> bool:
     """Return whether this request may use the loopback owner bypass.
+
+    Requires configured local-open policy, a direct loopback client (no forwarding
+    headers), and either a matching boot ``dashboard-local-token`` or a direct
+    operator session on loopback.
 
     Args:
         workspace (WorkspaceConfig): Parsed workspace config.
         request (Request | WebSocket): HTTP request or WebSocket connection.
 
     Returns:
-        bool: ``True`` for loopback clients when local-open is configured and no tunnel.
+        bool: ``True`` when local-open auth bypass is allowed.
 
     Examples:
         >>> from starlette.requests import Request
-        >>> scope = {"type": "http", "client": ("127.0.0.1", 123), "headers": []}
+        >>> scope = {
+        ...     "type": "http",
+        ...     "http_version": "1.1",
+        ...     "method": "GET",
+        ...     "path": "/",
+        ...     "client": ("127.0.0.1", 123),
+        ...     "headers": [],
+        ... }
         >>> req = Request(scope)
-        >>> local_open_effective(WorkspaceConfig.minimal(), req)
+        >>> ws = WorkspaceConfig.minimal(
+        ...     infrastructure={"tunnel": {"mode": "none"}},
+        ...     gateway={"host": "127.0.0.1", "port": 3001, "token": "x" * 32},
+        ...     dashboard={"enabled": True, "local_open": True},
+        ... )
+        >>> local_open_effective(ws, req)  # doctest: +SKIP
         True
     """
+    from sevn.ui.dashboard.services.local_token import (
+        dashboard_local_token_from_request,
+        direct_loopback_client,
+        verify_dashboard_local_token,
+    )
 
     if not dashboard_local_open_configured(
         workspace,
         sevn_json=sevn_json_path_from_request(request),
     ):
         return False
-    client = request.client
-    return is_loopback_client_host(client.host if client is not None else None)
+    if not direct_loopback_client(request):
+        return False
+    scope = getattr(request, "scope", None)
+    app = scope.get("app") if isinstance(scope, dict) else getattr(request, "app", None)
+    expected = getattr(app.state, "dashboard_local_token", None) if app is not None else None
+    submitted = dashboard_local_token_from_request(request)
+    if expected and submitted:
+        return verify_dashboard_local_token(expected=str(expected), submitted=submitted)
+    return submitted is None
 
 
 def synthetic_owner_claims(workspace: WorkspaceConfig) -> DashboardClaims:
@@ -273,7 +321,7 @@ def synthetic_owner_claims(workspace: WorkspaceConfig) -> DashboardClaims:
 
 
 def apply_tunnel_local_open_policy(workspace: WorkspaceConfig) -> None:
-    """Force ``dashboard.local_open`` off when a tunnel mode is active.
+    """Force ``dashboard.local_open`` off when unsafe exposure is configured.
 
     Args:
         workspace (WorkspaceConfig): Parsed workspace config (mutated in place).
@@ -292,19 +340,32 @@ def apply_tunnel_local_open_policy(workspace: WorkspaceConfig) -> None:
         True
     """
 
-    if not tunnel_active(workspace):
-        return
-    section = _dashboard_section(workspace)
-    if section is None:
-        return
-    if getattr(section, "local_open", None) is True:
-        from loguru import logger
+    if tunnel_active(workspace):
+        section = _dashboard_section(workspace)
+        if section is None:
+            return
+        if getattr(section, "local_open", None) is True:
+            from loguru import logger
 
-        logger.warning(
-            "dashboard.local_open=true ignored because infrastructure.tunnel.mode is active; "
-            "forcing dashboard.local_open=false",
-        )
-    section.local_open = False
+            logger.warning(
+                "dashboard.local_open=true ignored because infrastructure.tunnel.mode is active; "
+                "forcing dashboard.local_open=false",
+            )
+        section.local_open = False
+        return
+
+    if not _gateway_bind_loopback(workspace):
+        section = _dashboard_section(workspace)
+        if section is None:
+            return
+        if getattr(section, "local_open", None) is True:
+            from loguru import logger
+
+            logger.warning(
+                "dashboard.local_open=true ignored because gateway.host is not loopback-only; "
+                "forcing dashboard.local_open=false",
+            )
+        section.local_open = False
 
 
 def _dashboard_section(workspace: WorkspaceConfig) -> DashboardWorkspaceConfig | None:

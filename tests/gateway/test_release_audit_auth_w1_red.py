@@ -9,7 +9,6 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 
@@ -32,7 +31,7 @@ _GATEWAY_TOKEN = "required-token-at-least-32-characters-long"
 def _openai_compat_client(*, gateway_token: str | None) -> TestClient:
     app = FastAPI()
     router = build_openai_compat_router()
-    app.include_router(router, prefix="/v1")
+    app.include_router(router)
     app.state.resolved_gateway_token = gateway_token
     app.state.gateway_router = None
     app.state.sqlite_conn = None
@@ -40,7 +39,6 @@ def _openai_compat_client(*, gateway_token: str | None) -> TestClient:
     return TestClient(app)
 
 
-@pytest.mark.xfail(reason="green after W3: OpenAI compat 503 when token unconfigured", strict=False)
 def test_openai_compat_chat_completions_503_when_token_unconfigured() -> None:
     client = _openai_compat_client(gateway_token=None)
     resp = client.post(
@@ -51,16 +49,10 @@ def test_openai_compat_chat_completions_503_when_token_unconfigured() -> None:
     assert resp.json().get("detail") == "auth_not_configured"
 
 
-@pytest.mark.xfail(
-    reason="green after W3: triggers auth required even without secrets", strict=False
-)
 def test_triggers_api_auth_required_when_unconfigured() -> None:
     assert triggers_api_auth_required(gateway_token=None, webchat_jwt_secret=None) is True
 
 
-@pytest.mark.xfail(
-    reason="green after W3: triggers reject missing bearer when unconfigured", strict=False
-)
 def test_triggers_api_rejects_missing_bearer_when_unconfigured() -> None:
     assert (
         verify_triggers_api_bearer(
@@ -72,7 +64,6 @@ def test_triggers_api_rejects_missing_bearer_when_unconfigured() -> None:
     )
 
 
-@pytest.mark.xfail(reason="green after W3: GUI proxy rejects when token unconfigured", strict=False)
 def test_gui_proxy_rejects_when_token_unconfigured() -> None:
     assert (
         _verify_gui_gateway_access(
@@ -85,10 +76,7 @@ def test_gui_proxy_rejects_when_token_unconfigured() -> None:
     )
 
 
-@pytest.mark.xfail(
-    reason="green after W3: GUI HTTP route returns 401 when token unconfigured", strict=False
-)
-def test_gui_http_route_401_when_token_unconfigured(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_gui_http_route_401_when_token_unconfigured(monkeypatch) -> None:
     monkeypatch.setenv("SEVN_NOVNC_UPSTREAM", "http://127.0.0.1:6080")
     app = FastAPI()
     mount_gui_proxy(app, resolve_gateway_token=lambda _request: None)
@@ -97,21 +85,18 @@ def test_gui_http_route_401_when_token_unconfigured(monkeypatch: pytest.MonkeyPa
     assert resp.status_code == 401
 
 
-@pytest.mark.xfail(
-    reason="green after W3: login rejects when gateway token unconfigured", strict=False
-)
 def test_login_rejects_when_gateway_token_unconfigured() -> None:
     assert verify_login_gateway_token(configured=None, submitted="any-token") is False
     assert verify_login_gateway_token(configured=None, submitted="") is False
 
 
-@pytest.mark.xfail(
-    reason="green after W3: login POST rejects when token unconfigured", strict=False
-)
-def test_login_post_rejects_when_gateway_token_unconfigured(tmp_path: Path) -> None:
+def test_login_post_rejects_when_gateway_token_unconfigured(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("SEVN_GATEWAY_TOKEN", raising=False)
     sevn_json = tmp_path / "sevn.json"
     sevn_json.write_text(
-        '{"schema_version": 1, "workspace_root": ".", "gateway": {"token": ""}}',
+        '{"schema_version": 1, "workspace_root": ".", '
+        '"gateway": {"host": "127.0.0.1", "port": 3001, '
+        '"token": "${SECRET:keychain:sevn.gateway.token}"}}',
         encoding="utf-8",
     )
     cfg = WorkspaceConfig(
@@ -120,7 +105,11 @@ def test_login_post_rejects_when_gateway_token_unconfigured(tmp_path: Path) -> N
         security=SecurityWorkspaceConfig(
             scanner=SecurityScannerSubConfig(heuristic_only=True),
         ),
-        gateway={"token": ""},
+        gateway={
+            "host": "127.0.0.1",
+            "port": 3001,
+            "token": "${SECRET:keychain:sevn.gateway.token}",
+        },
     )
     layout = WorkspaceLayout.from_config(sevn_json, cfg)
 

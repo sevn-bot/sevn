@@ -19,24 +19,27 @@ TRIGGERS_API_OPENAPI_BEARER_SCOPES: tuple[str, ...] = ("session:read", "session:
 def triggers_api_auth_required(
     *, gateway_token: str | None, webchat_jwt_secret: str | None
 ) -> bool:
-    """Return True when ``POST /api/v1/run`` expects an ``Authorization`` header.
+    """Return True when triggers HTTP API routes expect an ``Authorization`` header.
 
     Args:
         gateway_token (str | None): Effective gateway bearer when configured.
         webchat_jwt_secret (str | None): Webchat JWT signing secret when configured.
 
     Returns:
-        bool: ``False`` only when neither credential surface is configured.
+        bool: Always ``True`` — triggers API auth is fail-closed even when secrets
+        are unresolved at boot.
 
     Examples:
         >>> triggers_api_auth_required(gateway_token=None, webchat_jwt_secret=None)
-        False
+        True
         >>> triggers_api_auth_required(gateway_token="tok", webchat_jwt_secret=None)
         True
     """
-    if gateway_token and gateway_token.strip():
-        return True
-    return bool(webchat_jwt_secret and webchat_jwt_secret.strip())
+    _ = gateway_token, webchat_jwt_secret
+    return True
+
+
+TRIGGERS_API_WRITE_SCOPES: tuple[str, ...] = ("session:write",)
 
 
 def verify_triggers_api_bearer(
@@ -44,21 +47,22 @@ def verify_triggers_api_bearer(
     authorization_header: str | None,
     gateway_token: str | None,
     webchat_jwt_secret: str | None,
+    require_write_scope: bool = False,
 ) -> bool:
     """Verify gateway bearer or webchat JWT for triggers HTTP API routes.
 
-    When no gateway token and no webchat JWT secret are configured, auth is
-    disabled (dev laptops). Otherwise accept either the configured gateway
-    bearer or a valid ``aud=webchat`` JWT carrying ``session:read`` and/or
-    ``session:write`` — the same scope model as ``channels.webchat.public``.
+    Auth is always required. Accept the configured gateway bearer or a valid
+    ``aud=webchat`` JWT. ``GET /runs/{id}`` accepts ``session:read`` or
+    ``session:write``; ``POST /run`` requires ``session:write`` (or gateway bearer).
 
     Args:
         authorization_header (str | None): Raw ``Authorization`` header value.
         gateway_token (str | None): Effective gateway bearer when configured.
         webchat_jwt_secret (str | None): Webchat JWT signing secret when configured.
+        require_write_scope (bool): When ``True``, JWT must include ``session:write``.
 
     Returns:
-        bool: ``True`` when the caller is authorized or auth is disabled.
+        bool: ``True`` when the caller is authorized.
 
     Examples:
         >>> verify_triggers_api_bearer(
@@ -66,7 +70,7 @@ def verify_triggers_api_bearer(
         ...     gateway_token=None,
         ...     webchat_jwt_secret=None,
         ... )
-        True
+        False
         >>> verify_triggers_api_bearer(
         ...     authorization_header="Bearer nope",
         ...     gateway_token="secret",
@@ -78,7 +82,7 @@ def verify_triggers_api_bearer(
         gateway_token=gateway_token,
         webchat_jwt_secret=webchat_jwt_secret,
     ):
-        return True
+        return False
 
     bearer = extract_bearer(authorization_header)
     if bearer is None:
@@ -92,6 +96,8 @@ def verify_triggers_api_bearer(
     if secret:
         claims = verify_webchat_jwt(secret=secret, token=bearer)
         if claims is not None and claims.aud == "webchat":
+            if require_write_scope:
+                return "session:write" in claims.scope
             allowed = set(TRIGGERS_API_OPENAPI_BEARER_SCOPES)
             if allowed.intersection(claims.scope):
                 return True
@@ -100,6 +106,7 @@ def verify_triggers_api_bearer(
 
 __all__ = [
     "TRIGGERS_API_OPENAPI_BEARER_SCOPES",
+    "TRIGGERS_API_WRITE_SCOPES",
     "triggers_api_auth_required",
     "verify_triggers_api_bearer",
 ]

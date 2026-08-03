@@ -140,7 +140,7 @@ def _verify_gui_gateway_access(
     from sevn.gateway.auth import secrets_compare
 
     if not configured:
-        return True
+        return False
     expected = configured.strip()
     credentials = _gui_gateway_credentials(
         authorization_header=authorization_header,
