@@ -163,7 +163,7 @@ def _delivery_failed_for_messages(conn: sqlite3.Connection, message_ids: list[in
         WHERE message_id IN ({placeholders})
           AND status = 'failed'
         LIMIT 1
-        """,
+        """,  # nosec B608 — placeholders are bound ? only
         tuple(message_ids),
     ).fetchone()
     return row is not None

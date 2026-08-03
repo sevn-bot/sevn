@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver non-interactive dispatch: external events (“something happened”)
   and schedules (“tick”) compile to DispatchRequest, optionally pass through notify_only
   (zero LLM, zero sandbox boot), otherwise'
-last_updated: '2026-08-01'
-fingerprint: sha256:b3ffc49bac1b1913302347805fa5e4a7871ffd063c1641b876c94b24ebb26d3e
+last_updated: '2026-08-03'
+fingerprint: sha256:5a448a69c88a30ce67134140faee3c9a8b39201cbfda0a3a8b42275baa61517f
 related: []
 sources:
 - src/sevn/triggers/**
@@ -94,6 +94,9 @@ interfaces:
 - name: edit_cron_job
   file: src/sevn/triggers/cron.py
   symbol: edit_cron_job
+- name: finalize_cron_agent_dispatch
+  file: src/sevn/triggers/cron.py
+  symbol: finalize_cron_agent_dispatch
 - name: format_next_fire_at_iso
   file: src/sevn/triggers/cron.py
   symbol: format_next_fire_at_iso
@@ -136,6 +139,18 @@ interfaces:
 - name: write_log_result
   file: src/sevn/triggers/delivery.py
   symbol: write_log_result
+- name: DispatchOutcome
+  file: src/sevn/triggers/dispatch_outcome.py
+  symbol: DispatchOutcome
+- name: assess_agent_pass_outcome
+  file: src/sevn/triggers/dispatch_outcome.py
+  symbol: assess_agent_pass_outcome
+- name: cron_failure_notify_text
+  file: src/sevn/triggers/dispatch_outcome.py
+  symbol: cron_failure_notify_text
+- name: notify_cron_dispatch_failure
+  file: src/sevn/triggers/dispatch_outcome.py
+  symbol: notify_cron_dispatch_failure
 - name: TriggerDispatchGate
   file: src/sevn/triggers/dispatcher.py
   symbol: TriggerDispatchGate
@@ -154,6 +169,9 @@ interfaces:
 - name: TriggerPluginHookSurface
   file: src/sevn/triggers/hooks_protocol.py
   symbol: TriggerPluginHookSurface
+- name: reconcile_huggingnews_cron_job
+  file: src/sevn/triggers/huggingnews_cron.py
+  symbol: reconcile_huggingnews_cron_job
 - name: inbox_dir
   file: src/sevn/triggers/inbox.py
   symbol: inbox_dir
