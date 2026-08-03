@@ -1,19 +1,21 @@
 # SPDX-License-Identifier: MIT
 # Compose stack for Phase 1 CI: mock upstream + egress proxy + gateway (specs/25-cicd-full.md §4.4).
 volumes:
-  sevn-ci-state:
+  sevn-ci-workspace:
 
 services:
-  sevn-ci-perms:
+  sevn-ci-init:
     image: busybox:1.36
     user: "0:0"
     volumes:
-      - sevn-ci-state:/sevn-state
+      - ../infra/ci-workspace:/seed:ro
+      - sevn-ci-workspace:/workspace
     command:
       - sh
       - -ec
       - |
-        chown -R 10001:10001 /sevn-state
+        cp -a /seed/. /workspace/
+        chown -R 10001:10001 /workspace
     restart: "no"
 
   mock-openai:
@@ -49,14 +51,13 @@ services:
     environment:
       SEVN_PROXY_URL: http://sevn-proxy:8787
     volumes:
-      - ../infra/ci-workspace:/workspace
-      # Gateway runs as uid 10001; overlay writable state without widening the seed tree.
-      - sevn-ci-state:/workspace/.sevn
+      # Gateway runs as uid 10001; seed from infra/ci-workspace into a writable volume.
+      - sevn-ci-workspace:/workspace
     working_dir: /workspace
     ports:
       - "13001:3001"
     depends_on:
-      sevn-ci-perms:
+      sevn-ci-init:
         condition: service_completed_successfully
       sevn-proxy:
         condition: service_started
