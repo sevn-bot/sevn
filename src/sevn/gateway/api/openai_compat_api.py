@@ -231,8 +231,6 @@ async def _sync_request_messages(
         >>> _sync_request_messages.__name__
         '_sync_request_messages'
     """
-    import asyncio
-
     _validate_request_messages(messages)
     await asyncio.to_thread(_clear_visible_messages, conn, session_id)
     for msg in messages:
