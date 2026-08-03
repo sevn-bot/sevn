@@ -627,6 +627,18 @@ _MIGRATION_29: Final[tuple[str, ...]] = (
     "CREATE INDEX IF NOT EXISTS ix_session_export_jobs_created ON session_export_jobs(created_at DESC)",
 )
 
+# Durable trigger run status (#147; `specs/30-non-interactive-triggers.md`).
+_MIGRATION_30: Final[tuple[str, ...]] = (
+    """CREATE TABLE IF NOT EXISTS trigger_runs (
+    run_id TEXT PRIMARY KEY NOT NULL,
+    correlation_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+)""",
+    "CREATE INDEX IF NOT EXISTS ix_trigger_runs_correlation ON trigger_runs(correlation_id)",
+)
+
 MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (1, _MIGRATION_1),
     (2, _MIGRATION_2),
@@ -657,6 +669,7 @@ MIGRATIONS: Final[tuple[tuple[int, tuple[str, ...]], ...]] = (
     (27, _MIGRATION_27),
     (28, _MIGRATION_28),
     (29, _MIGRATION_29),
+    (30, _MIGRATION_30),
 )
 
 MIGRATION_HEAD_VERSION: Final[int] = max(v for v, _ in MIGRATIONS)

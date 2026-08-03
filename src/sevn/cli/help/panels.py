@@ -38,6 +38,7 @@ ROOT_COMMAND_PANELS: dict[str, str] = {
     "completion": "Help",
     "config": "Deployment",
     "dashboard": "Deployment",
+    "db": "Health",
     "deploy": "Deployment",
     "doctor": "Health",
     "export-secrets": "Access",

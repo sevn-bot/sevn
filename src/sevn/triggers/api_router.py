@@ -10,13 +10,15 @@ Exports:
 
 from __future__ import annotations
 
+import sqlite3
 import uuid
-from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from sevn.config.workspace_config import WorkspaceConfig
+from sevn.storage.sqlite_write_lock import run_sqlite_write
+from sevn.storage.trigger_runs import get_trigger_run_status, upsert_trigger_run_status
 from sevn.triggers.auth import TRIGGERS_API_OPENAPI_BEARER_SCOPES, verify_triggers_api_bearer
 from sevn.triggers.dispatcher import (
     agent_dispatch_kwargs,
@@ -111,6 +113,41 @@ def _enforce_triggers_api_auth(request: Request, *, require_write_scope: bool = 
         raise HTTPException(status_code=401, detail="unauthorized")
 
 
+async def _persist_trigger_run_status(
+    request: Request,
+    *,
+    run_id: str,
+    correlation_id: str,
+    status: str,
+) -> None:
+    """Write one trigger run status row under the gateway SQLite write lock.
+
+    Args:
+        request (Request): Active FastAPI request.
+        run_id (str): Run identifier.
+        correlation_id (str): Caller correlation id.
+        status (str): Coarse status label.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_persist_trigger_run_status)
+        True
+    """
+    conn: sqlite3.Connection | None = getattr(request.app.state, "sqlite_conn", None)
+    if conn is None:
+        return
+
+    def _write() -> None:
+        upsert_trigger_run_status(
+            conn,
+            run_id=run_id,
+            correlation_id=correlation_id,
+            status=status,
+        )
+
+    await run_sqlite_write(_write)
+
+
 def build_api_router() -> APIRouter:
     """Return the versioned HTTP API router for trigger runs.
 
@@ -144,6 +181,12 @@ def build_api_router() -> APIRouter:
         await gate.acquire_api_slot()
         try:
             cid = body.correlation_id or str(uuid.uuid4())
+            await _persist_trigger_run_status(
+                request,
+                run_id=cid,
+                correlation_id=cid,
+                status="accepted",
+            )
             await _publish_run_event(request, cid, "accepted")
             hooks: TriggerPluginHookSurface | None = getattr(
                 request.app.state,
@@ -180,8 +223,12 @@ def build_api_router() -> APIRouter:
                     hooks=hooks,
                     **agent_dispatch_kwargs(getattr(request.app.state, "gateway_router", None)),
                 )
-            status: dict[str, Any] = request.app.state.trigger_run_status
-            status[cid] = "completed"
+            await _persist_trigger_run_status(
+                request,
+                run_id=cid,
+                correlation_id=cid,
+                status="completed",
+            )
             await _publish_run_event(request, cid, "completed")
         finally:
             gate.release_api_slot()
@@ -194,8 +241,12 @@ def build_api_router() -> APIRouter:
     )
     async def get_run(run_id: str, request: Request) -> dict[str, object]:
         _enforce_triggers_api_auth(request)
-        status_map: dict[str, Any] = request.app.state.trigger_run_status
-        st = status_map.get(run_id, "unknown")
+        conn: sqlite3.Connection | None = getattr(request.app.state, "sqlite_conn", None)
+        st = "unknown"
+        if conn is not None:
+            persisted = get_trigger_run_status(conn, run_id)
+            if persisted is not None:
+                st = persisted
         return {"run_id": run_id, "status": st}
 
     return router

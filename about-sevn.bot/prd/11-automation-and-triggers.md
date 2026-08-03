@@ -7,7 +7,7 @@ owner: Alex
 summary: Events and schedules—not chat—start work via webhooks, cron, dedupe, and
   notify-only paths so operators automate digests, alerts, and agent runs safely.
 last_updated: '2026-08-03'
-fingerprint: sha256:c6b65dbed62f8b6715e51f36bda29321d1286c3639426c72626a15645532a002
+fingerprint: sha256:83bce591302ee4ffb484374ab74dd16146512ff3abd7545e8f12c4341037b493
 related:
 - prd-07-mission-control
 - prd-13-extensibility

@@ -1523,7 +1523,10 @@ def create_app(
             resolved_login_password=resolved_dashboard_login_password,
             resolved_gateway_token=resolved_gateway_token,
         )
+        from sevn.storage.sqlite_write_lock import sqlite_write_lock
+
         app.state.trigger_dispatch_gate = TriggerDispatchGate(effective_max_concurrent(ws))
+        app.state.sqlite_write_lock = sqlite_write_lock()
         app.state.trigger_run_status = {}
         app.state.trigger_plugin_hooks = trigger_mux
         app.state.plugin_hook_chain = plugin_chain
