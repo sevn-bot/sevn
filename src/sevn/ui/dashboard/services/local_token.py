@@ -27,9 +27,9 @@ if TYPE_CHECKING:
     from fastapi import Request
     from starlette.websockets import WebSocket
 
-DASHBOARD_LOCAL_TOKEN_HEADER = "X-Sevn-Dashboard-Local-Token"
-DASHBOARD_LOCAL_TOKEN_QUERY = "local_token"
-_DASHBOARD_LOCAL_TOKEN_FILENAME = "dashboard-local-token"
+DASHBOARD_LOCAL_TOKEN_HEADER = "X-Sevn-Dashboard-Local-Token"  # nosec B105
+DASHBOARD_LOCAL_TOKEN_QUERY = "local_token"  # nosec B105
+_DASHBOARD_LOCAL_TOKEN_FILENAME = "dashboard-local-token"  # nosec B105
 
 
 def dashboard_local_token_path(*, home: Path | None = None) -> Path:
