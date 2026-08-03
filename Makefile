@@ -456,9 +456,13 @@ styles-build: ## Copy ``styles/sevn/style/`` into packaged ``src/sevn/ui/style/`
 build: styles-build ## Build wheel and sdist (``uv build``)
 	$(UV) build
 
-ci-static: lockcheck lint typecheck pyright doctest build doctor-solutions-check ## Static/build tier (ci-core minus test & security) — PR gate
+artifact-integrity-check: build ## Install wheel+sdist in clean venvs; run ``sevn`` + ``proton-cli`` --version (#148)
+	@chmod +x scripts/check-artifact-integrity.sh 2>/dev/null || true
+	@./scripts/check-artifact-integrity.sh
 
-ci-core: lockcheck lint typecheck pyright test doctest security build doctor-solutions-check ## Core verify tier (~tests + typecheck)
+ci-static: lockcheck lint typecheck pyright doctest build artifact-integrity-check doctor-solutions-check ## Static/build tier (ci-core minus test & security) — PR gate
+
+ci-core: lockcheck lint typecheck pyright test doctest security build artifact-integrity-check doctor-solutions-check ## Core verify tier (~tests + typecheck)
 
 ci-infra: config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards check-compose-default agent-context-manifest-check storage-migration-rehearsal-check ## Schema / infra drift tier
 
@@ -472,7 +476,7 @@ ci: ci-core ci-infra ci-docs ci-skills ci-parity ## Full gate (same as CI)
 
 # Ordered expansion of `make ci`, consumed by the resumable runner (scripts/ci_resume.sh).
 # Tier↔CI_STEPS parity enforced by tests/infra/test_ci_steps_tier_parity.py.
-CI_STEPS := lockcheck lint typecheck pyright test doctest security build doctor-solutions-check \
+CI_STEPS := lockcheck lint typecheck pyright test doctest security build artifact-integrity-check doctor-solutions-check \
 	config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards check-compose-default agent-context-manifest-check storage-migration-rehearsal-check \
 	telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema spec-kit-wave-test changelog-check faq-check \
 	skills-core-check skillspector-check skills-index-check removed-browser-skills-check dreaming-allowlist-check \

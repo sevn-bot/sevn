@@ -188,7 +188,14 @@ artifacts = [
 "infra/sevn.schema.json" = "sevn/data/sevn.schema.json"
 
 [tool.hatch.build.targets.sdist]
-include = ["src/sevn", "tests", "README.md", "pyproject.toml", "infra/sevn.schema.json"]
+include = [
+    "src/sevn",
+    "src/proton_cli",
+    "tests",
+    "README.md",
+    "pyproject.toml",
+    "infra/sevn.schema.json",
+]
 
 [tool.importlinter]
 root_packages = ["sevn"]
