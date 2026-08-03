@@ -7,8 +7,8 @@ owner: Alex
 summary: Operators delegate real work only when prompt injection, secrets, sandbox,
   and approvals are bounded—scan hostile input, isolate credentials and egress, and
   gate risky tools.
-last_updated: '2026-08-01'
-fingerprint: sha256:54924a6f5af600284e3f9ef14f58fba35736a9ad84ad2d50edd7101cc5d82c65
+last_updated: '2026-08-03'
+fingerprint: sha256:a2f7ac8144b4f1e14faf704bb95aee1b90bacf5b14a49adcc27b68e77420dd6a
 related:
 - prd-07-mission-control
 sources:

@@ -17,8 +17,10 @@ Examples:
 
 from __future__ import annotations
 
+import ipaddress
+import socket
 from typing import Any, Final
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from loguru import logger
@@ -41,6 +43,28 @@ _DEFAULT_UA: Final[str] = (
 _DEFAULT_ACCEPT: Final[str] = "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8"
 _DEFAULT_ACCEPT_LANGUAGE: Final[str] = "en-US,en;q=0.9"
 _BRAVE_SEARCH_URL: Final[str] = "https://api.search.brave.com/res/v1/web/search"
+_MAX_FETCH_REDIRECTS: Final[int] = 3
+_BLOCKED_NETS: Final[tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]] = tuple(
+    ipaddress.ip_network(net)
+    for net in (
+        "0.0.0.0/8",
+        "10.0.0.0/8",
+        "127.0.0.0/8",
+        "169.254.0.0/16",
+        "172.16.0.0/12",
+        "192.0.0.0/24",
+        "192.168.0.0/16",
+        "198.18.0.0/15",
+        "224.0.0.0/4",
+        "240.0.0.0/4",
+        "::1/128",
+        "fc00::/7",
+        "fe80::/10",
+        "ff00::/8",
+        "::/128",
+    )
+)
+_REDIRECT_STATUS_CODES: Final[frozenset[int]] = frozenset({301, 302, 303, 307, 308})
 
 
 def _validate_fetch_url(url: str) -> str | None:
@@ -64,6 +88,176 @@ def _validate_fetch_url(url: str) -> str | None:
     if not parsed.netloc:
         return "url must include a host"
     return None
+
+
+def _egress_block_status(detail: str) -> int:
+    """Map SSRF validation errors to HTTP status codes.
+
+    Args:
+        detail (str): Human-readable validation failure.
+
+    Returns:
+        int: ``403`` for blocked destinations, else ``422``.
+
+    Examples:
+        >>> _egress_block_status("destination 127.0.0.1 is in a blocked range")
+        403
+    """
+    lower = detail.lower()
+    if "blocked" in lower or "private" in lower or "metadata" in lower:
+        return 403
+    return 422
+
+
+def _is_blocked_ip(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Return whether ``ip`` falls in a disallowed egress range.
+
+    Args:
+        ip (ipaddress.IPv4Address | ipaddress.IPv6Address): Resolved destination.
+
+    Returns:
+        bool: ``True`` when the address is private, metadata, or otherwise blocked.
+
+    Examples:
+        >>> _is_blocked_ip(ipaddress.ip_address("127.0.0.1"))
+        True
+    """
+    return any(ip in net for net in _BLOCKED_NETS)
+
+
+def _resolve_and_validate(url: str) -> tuple[str, list[str]] | str:
+    """Resolve ``url`` and return ``(hostname, pinned_ips)`` or an error string.
+
+    Args:
+        url (str): Candidate outbound URL.
+
+    Returns:
+        tuple[str, list[str]] | str: Pinning metadata or a validation error.
+
+    Examples:
+        >>> err = _resolve_and_validate("file:///etc/passwd")
+        >>> err is not None and "http" in err
+        True
+    """
+    parsed = urlparse(url.strip())
+    if parsed.scheme not in ("http", "https"):
+        return "url must use http or https"
+    hostname = parsed.hostname
+    if not hostname:
+        return "url must include a host"
+    try:
+        literal_ip = ipaddress.ip_address(hostname)
+        if _is_blocked_ip(literal_ip):
+            return f"destination {literal_ip} is in a blocked range"
+    except ValueError:
+        pass
+    if parsed.port is not None and parsed.port not in (80, 443):
+        return "only ports 80 and 443 are permitted"
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    try:
+        infos = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
+    except socket.gaierror as exc:
+        return f"dns resolution failed: {exc}"
+    ips: list[str] = []
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if _is_blocked_ip(ip):
+            return f"destination {ip} is in a blocked range"
+        ip_s = str(ip)
+        if ip_s not in ips:
+            ips.append(ip_s)
+    if not ips:
+        return "no usable address"
+    return hostname, ips
+
+
+def _build_pinned_request_url(url: str, pinned_ip: str) -> str:
+    """Rewrite ``url`` to connect to ``pinned_ip`` while preserving path/query.
+
+    Args:
+        url (str): Original outbound URL.
+        pinned_ip (str): Validated address from :func:`_resolve_and_validate`.
+
+    Returns:
+        str: URL whose authority is ``pinned_ip``.
+
+    Examples:
+        >>> _build_pinned_request_url("https://example.com/path", "93.184.216.34")
+        'https://93.184.216.34/path'
+        >>> _build_pinned_request_url("https://example.com/path", "2606:2800:220:1:248:1893:25c8:1946")
+        'https://[2606:2800:220:1:248:1893:25c8:1946]/path'
+    """
+    parsed = urlparse(url.strip())
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    host = f"[{pinned_ip}]" if ":" in pinned_ip else pinned_ip
+    netloc = host if port in (80, 443) else f"{host}:{port}"
+    path = parsed.path or "/"
+    if parsed.params:
+        path = f"{path};{parsed.params}"
+    rebuilt = f"{parsed.scheme}://{netloc}{path}"
+    if parsed.query:
+        rebuilt = f"{rebuilt}?{parsed.query}"
+    if parsed.fragment:
+        rebuilt = f"{rebuilt}#{parsed.fragment}"
+    return rebuilt
+
+
+def _pin_request_headers(headers: dict[str, str], hostname: str) -> dict[str, str]:
+    """Clone ``headers`` and set the upstream ``Host`` for pinned requests.
+
+    Args:
+        headers (dict[str, str]): Caller-provided outbound headers.
+        hostname (str): Original hostname from the requested URL.
+
+    Returns:
+        dict[str, str]: Headers including ``Host``.
+
+    Examples:
+        >>> _pin_request_headers({"User-Agent": "x"}, "example.com")["Host"]
+        'example.com'
+    """
+    outbound = dict(headers)
+    outbound["Host"] = hostname
+    return outbound
+
+
+def _httpx_pin_extensions(hostname: str) -> dict[str, str]:
+    """Return httpx TLS extensions for SNI when connecting to a pinned IP.
+
+    Args:
+        hostname (str): Original hostname for certificate validation.
+
+    Returns:
+        dict[str, str]: httpx ``extensions`` mapping.
+
+    Examples:
+        >>> _httpx_pin_extensions("example.com")["sni_hostname"]
+        'example.com'
+    """
+    return {"sni_hostname": hostname}
+
+
+def _redirect_target(current_url: str, response: httpx.Response) -> str | None:
+    """Return the next redirect URL when ``response`` is a redirect.
+
+    Args:
+        current_url (str): URL that produced ``response``.
+        response (httpx.Response): Upstream response with optional ``Location``.
+
+    Returns:
+        str | None: Absolute redirect target, or ``None`` when not redirecting.
+
+    Examples:
+        >>> import httpx
+        >>> _redirect_target("https://a/", httpx.Response(200)) is None
+        True
+    """
+    if response.status_code not in _REDIRECT_STATUS_CODES:
+        return None
+    location = response.headers.get("location")
+    if not location:
+        return None
+    return str(urljoin(current_url, location))
 
 
 def _parse_chunk_params(payload: dict[str, Any]) -> tuple[int | None, int | None]:
@@ -302,31 +496,145 @@ async def _fetch_upstream_streaming(
         True
     """
     char_cap = max_chars if max_chars is not None else MAX_HTML_FETCH_CHARS
-    buf = bytearray()
-    status_code = 0
-    content_type = ""
-    response_headers: dict[str, str] = {}
     request_timeout = request_timeout or build_proxy_upstream_timeout(max_html_chars=char_cap)
-    async with client.stream(
-        "GET",
-        url,
-        headers=headers,
-        follow_redirects=True,
-        timeout=request_timeout,
-    ) as resp:
-        status_code = resp.status_code
-        content_type = resp.headers.get("content-type", "")
-        response_headers = _response_headers_dict(resp.headers)
-        async for chunk in resp.aiter_bytes():
-            buf.extend(chunk)
-            text_so_far = bytes(buf).decode("utf-8", errors="replace")
-            if len(text_so_far) >= char_cap:
-                break
+    current_url = url
+    redirect_count = 0
+
+    while True:
+        resolved = _resolve_and_validate(current_url)
+        if isinstance(resolved, str):
+            raise ValueError(resolved)
+        host, pinned_ips = resolved
+        request_url = _build_pinned_request_url(current_url, pinned_ips[0])
+        outbound_headers = _pin_request_headers(headers, host)
+        extensions = _httpx_pin_extensions(host)
+
+        buf = bytearray()
+        status_code = 0
+        content_type = ""
+        response_headers: dict[str, str] = {}
+        async with client.stream(
+            "GET",
+            request_url,
+            headers=outbound_headers,
+            follow_redirects=False,
+            timeout=request_timeout,
+            extensions=extensions,
+        ) as resp:
+            status_code = resp.status_code
+            content_type = resp.headers.get("content-type", "")
+            response_headers = _response_headers_dict(resp.headers)
+            redirect_target = _redirect_target(current_url, resp)
+            if redirect_target is not None:
+                if redirect_count >= _MAX_FETCH_REDIRECTS:
+                    raise ValueError("redirect limit exceeded")
+                current_url = redirect_target
+                redirect_count += 1
+                continue
+            async for chunk in resp.aiter_bytes():
+                buf.extend(chunk)
+                text_so_far = bytes(buf).decode("utf-8", errors="replace")
+                if len(text_so_far) >= char_cap:
+                    break
+        text = bytes(buf).decode("utf-8", errors="replace")
+        truncated = len(text) > char_cap
+        if truncated:
+            text = text[:char_cap]
+        return status_code, content_type, text, truncated, response_headers
+
+
+async def _read_response_text_streaming(
+    response: httpx.Response,
+    *,
+    max_chars: int | None,
+) -> tuple[str, bool]:
+    """Decode an upstream response body with a character cap.
+
+    Args:
+        response (httpx.Response): Upstream response object.
+        max_chars (int | None): Character cap; ``None`` uses ``MAX_HTML_FETCH_CHARS``.
+
+    Returns:
+        tuple[str, bool]: Decoded text and whether it was truncated.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_read_response_text_streaming)
+        True
+    """
+    char_cap = max_chars if max_chars is not None else MAX_HTML_FETCH_CHARS
+    if not hasattr(response, "aiter_bytes"):
+        text = response.text
+        truncated = len(text) > char_cap
+        if truncated:
+            text = text[:char_cap]
+        return text, truncated
+    buf = bytearray()
+    async for chunk in response.aiter_bytes():
+        buf.extend(chunk)
+        text_so_far = bytes(buf).decode("utf-8", errors="replace")
+        if len(text_so_far) >= char_cap:
+            break
     text = bytes(buf).decode("utf-8", errors="replace")
     truncated = len(text) > char_cap
     if truncated:
         text = text[:char_cap]
-    return status_code, content_type, text, truncated, response_headers
+    return text, truncated
+
+
+async def _request_upstream(
+    client: httpx.AsyncClient,
+    *,
+    method: str,
+    url: str,
+    headers: dict[str, str],
+    content: str | None,
+    request_timeout: httpx.Timeout,
+) -> httpx.Response:
+    """Issue one pinned upstream request with bounded redirect re-validation.
+
+    Args:
+        client (httpx.AsyncClient): Shared or short-lived httpx client.
+        method (str): HTTP verb.
+        url (str): Original outbound URL.
+        headers (dict[str, str]): Outbound request headers.
+        content (str | None): Optional request body.
+        request_timeout (httpx.Timeout): Per-request timeout budget.
+
+    Returns:
+        httpx.Response: Final upstream response after redirect handling.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_request_upstream)
+        True
+    """
+    current_url = url
+    redirect_count = 0
+    while True:
+        resolved = _resolve_and_validate(current_url)
+        if isinstance(resolved, str):
+            raise ValueError(resolved)
+        host, pinned_ips = resolved
+        request_url = _build_pinned_request_url(current_url, pinned_ips[0])
+        outbound_headers = _pin_request_headers(headers, host)
+        extensions = _httpx_pin_extensions(host)
+        response = await client.request(
+            method,
+            request_url,
+            headers=outbound_headers,
+            content=content,
+            timeout=request_timeout,
+            follow_redirects=False,
+            extensions=extensions,
+        )
+        redirect_target = _redirect_target(current_url, response)
+        if redirect_target is None:
+            return response
+        if redirect_count >= _MAX_FETCH_REDIRECTS:
+            raise ValueError("redirect limit exceeded")
+        current_url = redirect_target
+        redirect_count += 1
 
 
 def _build_fetch_response(
@@ -424,6 +732,9 @@ async def web_fetch_json(
     url_err = _validate_fetch_url(url)
     if url_err is not None:
         return 422, {"detail": url_err}
+    resolved = _resolve_and_validate(url)
+    if isinstance(resolved, str):
+        return _egress_block_status(resolved), {"detail": resolved}
 
     method = str(payload.get("method") or "GET").upper()
     if method not in ALLOWED_FETCH_METHODS:
@@ -517,13 +828,18 @@ async def web_fetch_json(
                 low_content=low_content,
             )
 
-        response = await http.request(
-            method,
-            url,
-            headers=range_headers,
-            content=content,
-            timeout=request_timeout,
-        )
+        try:
+            response = await _request_upstream(
+                http,
+                method=method,
+                url=url,
+                headers=range_headers,
+                content=content,
+                request_timeout=request_timeout,
+            )
+        except ValueError as exc:
+            detail = str(exc)
+            return _egress_block_status(detail), {"detail": detail}
 
         if chunk_mode and chunk_length is not None and byte_offset is not None:
             range_unsupported = response.status_code == 416 or (
@@ -531,17 +847,22 @@ async def web_fetch_json(
             )
             if range_unsupported:
                 fallback_cap = MAX_HTML_FETCH_CHARS
-                fallback = await http.request(
-                    method,
-                    url,
-                    headers=headers,
-                    content=content,
-                    timeout=request_timeout,
+                try:
+                    fallback = await _request_upstream(
+                        http,
+                        method=method,
+                        url=url,
+                        headers=headers,
+                        content=content,
+                        request_timeout=request_timeout,
+                    )
+                except ValueError as exc:
+                    detail = str(exc)
+                    return _egress_block_status(detail), {"detail": detail}
+                text, truncated = await _read_response_text_streaming(
+                    fallback,
+                    max_chars=fallback_cap,
                 )
-                text = fallback.text
-                truncated = len(text) > fallback_cap
-                if truncated:
-                    text = text[:fallback_cap]
                 bytes_returned = len(text.encode("utf-8"))
                 return 200, _build_fetch_response(
                     url=url,
@@ -555,8 +876,11 @@ async def web_fetch_json(
                     eof=True,
                 )
 
-            text = response.text
-            bytes_returned = len(response.content)
+            text, _truncated = await _read_response_text_streaming(
+                response,
+                max_chars=chunk_length,
+            )
+            bytes_returned = len(text.encode("utf-8"))
             eof = bytes_returned < chunk_length or bytes_returned == 0
             return 200, _build_fetch_response(
                 url=url,
@@ -570,10 +894,7 @@ async def web_fetch_json(
                 eof=eof,
             )
 
-        text = response.text
-        truncated = cap is not None and len(text) > cap
-        if truncated:
-            text = text[:cap]
+        text, truncated = await _read_response_text_streaming(response, max_chars=cap)
 
         return 200, _build_fetch_response(
             url=url,
@@ -590,9 +911,12 @@ async def web_fetch_json(
         async with httpx.AsyncClient(
             timeout=request_timeout,
             limits=PROXY_HTTP_LIMITS,
-            follow_redirects=True,
+            follow_redirects=False,
         ) as short_client:
             return await _execute(short_client)
+    except ValueError as exc:
+        detail = str(exc)
+        return _egress_block_status(detail), {"detail": detail}
     except httpx.HTTPError as exc:
         return 502, {"detail": f"upstream fetch failed: {exc}"}
 

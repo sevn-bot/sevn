@@ -26,13 +26,15 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import time
+import re
+import secrets
+import signal
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 
-from sevn.runtime.operator_path import augment_operator_path
+from sevn.security.trigger_spawn_env import augment_operator_path_for_subprocess
 from sevn.tools.base import enveloped_failure, enveloped_success
 from sevn.tools.codes import ToolResultCode
 from sevn.tools.context import ToolContext
@@ -209,7 +211,7 @@ def _spawn_sync(*, shell: str, cwd: Path) -> Any:
     """
     import pexpect
 
-    env = augment_operator_path()
+    env = augment_operator_path_for_subprocess()
     child = pexpect.spawn(
         shell,
         encoding="utf-8",
@@ -248,10 +250,11 @@ def _probe_spawn_health(child: Any, *, timeout_s: float = 5.0) -> tuple[bool, st
     return True, ""
 
 
-def _run_sync(*, child: Any, command: str, timeout_s: float) -> tuple[str, bool]:
-    """Send ``command`` to ``child`` and return captured output before the prompt.
+def _run_sync(*, child: Any, command: str, timeout_s: float) -> tuple[str, bool, int | None]:
+    """Send ``command`` to ``child`` and return captured output before the sentinel.
 
-    Polls with short expect intervals so partial output is preserved on timeout.
+    Uses a per-command nonce sentinel so prompt-shaped output cannot spoof completion.
+    On timeout, escalates SIGINT then SIGKILL before returning partial output.
 
     Args:
         child (Any): ``pexpect.spawn`` instance.
@@ -259,7 +262,7 @@ def _run_sync(*, child: Any, command: str, timeout_s: float) -> tuple[str, bool]
         timeout_s (float): Expect timeout in seconds.
 
     Returns:
-        tuple[str, bool]: Combined output and whether the expect deadline was hit.
+        tuple[str, bool, int | None]: Output (sentinel stripped), timeout flag, exit code.
 
     Examples:
         >>> import inspect
@@ -268,32 +271,33 @@ def _run_sync(*, child: Any, command: str, timeout_s: float) -> tuple[str, bool]
     """
     import pexpect
 
-    child.sendline(command)
-    chunks: list[str] = []
-    deadline = time.monotonic() + timeout_s
+    nonce = secrets.token_hex(12)
+    sentinel = f"__SEVN_DONE_{nonce}__"
+    wrapped = f"{command}\nprintf '%s:%d\\n' '{sentinel}' \"$?\""
+    child.sendline(wrapped)
+    pattern = re.compile(rf"{re.escape(sentinel)}:(\d+)")
     timed_out = False
+    exit_code: int | None = None
 
-    while time.monotonic() < deadline:
-        remaining = max(0.05, deadline - time.monotonic())
-        try:
-            child.expect([r"[$#>]", pexpect.EOF], timeout=min(0.5, remaining))
-            chunk = str(getattr(child, "before", "") or "")
-            if chunk:
-                chunks.append(chunk)
-            break
-        except pexpect.exceptions.TIMEOUT:
-            chunk = str(getattr(child, "before", "") or "")
-            if chunk:
-                chunks.append(chunk)
-            continue
-    else:
+    try:
+        child.expect(pattern, timeout=timeout_s)
+        if child.match is not None:
+            exit_code = int(child.match.group(1))
+    except pexpect.exceptions.TIMEOUT:
         timed_out = True
-        chunk = str(getattr(child, "before", "") or "")
-        if chunk:
-            chunks.append(chunk)
+        child.sendintr()
+        try:
+            child.expect(pattern, timeout=5.0)
+            if child.match is not None:
+                exit_code = int(child.match.group(1))
+                timed_out = False
+        except pexpect.exceptions.TIMEOUT:
+            with contextlib.suppress(Exception):
+                child.kill(signal.SIGKILL)
 
-    output = "".join(chunks).strip()
-    return output, timed_out
+    output = str(getattr(child, "before", "") or "")
+    output = re.sub(rf"\n?{re.escape(sentinel)}:\d+\n?", "\n", output).strip()
+    return output, timed_out, exit_code
 
 
 def _close_sync(session: TerminalSession) -> None:
@@ -321,15 +325,15 @@ def _close_sync(session: TerminalSession) -> None:
             child.close(force=True)
 
 
-async def _sandbox_run_command(ctx: ToolContext, *, command: str) -> str | None:
-    """Run ``command`` via ``ctx.sandbox_client`` when configured.
+async def _sandbox_run_command(ctx: ToolContext, *, command: str) -> str:
+    """Run ``command`` via ``ctx.sandbox_client``.
 
     Args:
         ctx (ToolContext): Active tool runtime frame.
         command (str): Shell command to execute.
 
     Returns:
-        str | None: §3.1 JSON envelope when sandbox routing succeeds; else ``None``.
+        str: §3.1 JSON envelope when sandbox routing succeeds.
 
     Examples:
         >>> import inspect
@@ -338,7 +342,10 @@ async def _sandbox_run_command(ctx: ToolContext, *, command: str) -> str | None:
     """
     client = ctx.sandbox_client
     if client is None:
-        return None
+        return enveloped_failure(
+            "terminal_run requires a sandbox; no sandbox_client is wired",
+            code=ToolResultCode.TOOL_NOT_PROVISIONED,
+        )
     try:
         payload = await client.sandbox_exec(language="bash", code=command, ctx=ctx)
     except Exception as exc:
@@ -365,10 +372,6 @@ async def _sandbox_run_command(ctx: ToolContext, *, command: str) -> str | None:
     parameters={
         "type": "object",
         "properties": {
-            "shell": {
-                "type": "string",
-                "description": "Optional shell executable (default /bin/sh).",
-            },
             "cwd": {
                 "type": "string",
                 "description": "Workspace-relative working directory.",
@@ -388,7 +391,7 @@ async def terminal_spawn_tool(
 
     Args:
         ctx (ToolContext): Active tool runtime frame.
-        shell (str | None): Optional shell executable path.
+        shell (str | None): Deprecated; caller-selectable shells are rejected.
         cwd (str | None): Optional workspace-relative working directory.
 
     Returns:
@@ -399,6 +402,17 @@ async def terminal_spawn_tool(
         >>> inspect.iscoroutinefunction(terminal_spawn_tool)
         True
     """
+    if shell is not None and shell.strip():
+        return enveloped_failure(
+            "caller-selectable shell is not permitted",
+            code=ToolResultCode.VALIDATION_ERROR,
+            data={"shell": shell.strip()},
+        )
+    if ctx.sandbox_client is None:
+        return enveloped_failure(
+            "terminal_spawn requires a sandbox; no sandbox_client is wired",
+            code=ToolResultCode.TOOL_NOT_PROVISIONED,
+        )
     work_cwd = ctx.workspace_path
     if cwd:
         try:
@@ -511,9 +525,13 @@ async def terminal_run_tool(
         )
 
     if prefer_sandbox and ctx.sandbox_client is not None:
-        routed = await _sandbox_run_command(ctx, command=body)
-        if routed is not None:
-            return routed
+        return await _sandbox_run_command(ctx, command=body)
+
+    if ctx.sandbox_client is None:
+        return enveloped_failure(
+            "terminal_run requires a sandbox; no sandbox_client is wired",
+            code=ToolResultCode.TOOL_NOT_PROVISIONED,
+        )
 
     resolved = await _ensure_session_terminal(ctx, terminal_id=terminal_id)
     if isinstance(resolved, str):
@@ -526,7 +544,7 @@ async def terminal_run_tool(
         else min(max(1.0, timeout_s), MAX_TERMINAL_TIMEOUT_S)
     )
     try:
-        output, timed_out = await asyncio.to_thread(
+        output, timed_out, exit_code = await asyncio.to_thread(
             _run_sync,
             child=session.child,
             command=body,
@@ -543,6 +561,8 @@ async def terminal_run_tool(
         "command": body,
         "output": output,
     }
+    if exit_code is not None:
+        payload["exit_code"] = exit_code
     if timed_out:
         payload["timed_out"] = True
         payload["partial"] = True

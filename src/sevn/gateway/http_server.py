@@ -16,6 +16,7 @@ import concurrent.futures
 import contextlib
 import json
 import os
+import secrets
 import sqlite3
 import time
 import uuid
@@ -66,6 +67,7 @@ from sevn.cli.workspace import sevn_home_dir
 from sevn.code_understanding.code_index import generate_code_index
 from sevn.config.defaults import (
     DEFAULT_DISPATCHER_CALLBACKS_TTL_SECONDS,
+    DEFAULT_GATEWAY_HOST,
     DEFAULT_GATEWAY_RATE_LIMIT_CAPACITY,
     DEFAULT_GATEWAY_RATE_LIMIT_REFILL_PER_SECOND,
     DEFAULT_GATEWAY_SHUTDOWN_DRAIN_TIMEOUT_S,
@@ -1111,20 +1113,41 @@ def create_app(
             content_root=ly.content_root,
             process=effective_process,
         )
-        resolved_gateway_token = (resolved_gateway_token or "").strip()
-        if not resolved_gateway_token:
+        resolved_gateway_token = (resolved_gateway_token or "").strip() or None
+        gw_host = (
+            ((ws.gateway.host if ws.gateway and ws.gateway.host else None) or DEFAULT_GATEWAY_HOST)
+            .strip()
+            .lower()
+        )
+        loopback_bind = gw_host in {"127.0.0.1", "localhost", "::1"}
+        if not resolved_gateway_token and not loopback_bind:
             configured = ws.gateway is not None and bool((ws.gateway.token or "").strip())
             if configured:
                 msg = (
                     "gateway.token is configured but could not be resolved — "
-                    "unlock the secrets store or set SEVN_GATEWAY_TOKEN"
+                    "unlock the secrets store or set SEVN_GATEWAY_TOKEN "
+                    f"(gateway.host={gw_host!r} is not loopback-only)"
                 )
             else:
                 msg = (
                     "gateway.token is not configured — "
-                    "run `sevn gateway set-gateway-token` or set SEVN_GATEWAY_TOKEN"
+                    "run `sevn gateway set-gateway-token` or set SEVN_GATEWAY_TOKEN "
+                    f"(gateway.host={gw_host!r} is not loopback-only)"
                 )
             raise RuntimeError(msg)
+        if (
+            not loopback_bind
+            and ws.dashboard is not None
+            and getattr(ws.dashboard, "local_open", None) is True
+        ):
+            msg = (
+                "dashboard.local_open=true requires loopback-only gateway.host — "
+                f"refusing to start with gateway.host={gw_host!r}"
+            )
+            raise RuntimeError(msg)
+        from sevn.ui.dashboard.services.local_token import write_dashboard_local_token
+
+        dashboard_local_token = write_dashboard_local_token()
         from sevn.ui.dashboard.dashboard_password import resolve_dashboard_login_password_ref
 
         resolved_dashboard_login_password = await resolve_dashboard_login_password_ref(
@@ -1292,7 +1315,7 @@ def create_app(
             refill_per_second=DEFAULT_GATEWAY_RATE_LIMIT_REFILL_PER_SECOND,
         )
         media = MediaStore(conn, ly.content_root)
-        openui_secret = resolved_gateway_token
+        openui_secret = resolved_gateway_token or secrets.token_urlsafe(32)
         openui_store = OpenUIStore(conn)
         await asyncio.to_thread(
             lambda: (openui_store.reap_expired_sqlite(), openui_store.load_from_sqlite())
@@ -1440,6 +1463,7 @@ def create_app(
         tele = gateway_router.adapter_named("telegram")
         app.state.sqlite_conn = conn
         app.state.resolved_gateway_token = resolved_gateway_token
+        app.state.dashboard_local_token = dashboard_local_token
         app.state.workspace = ws
         app.state.layout = ly
         app.state.effective_mcp_servers = _mcp_servers_map  # computed above at W6 boot

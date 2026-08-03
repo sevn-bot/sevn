@@ -15,16 +15,16 @@ def test_openapi_scopes_match_webchat_jwt() -> None:
     assert TRIGGERS_API_OPENAPI_BEARER_SCOPES == ("session:read", "session:write")
 
 
-def test_auth_disabled_when_no_secrets() -> None:
-    """Dev laptops without tokens skip bearer enforcement."""
-    assert triggers_api_auth_required(gateway_token=None, webchat_jwt_secret=None) is False
+def test_auth_always_required_even_without_secrets() -> None:
+    """Triggers API auth is fail-closed even when secrets are unresolved."""
+    assert triggers_api_auth_required(gateway_token=None, webchat_jwt_secret=None) is True
     assert (
         verify_triggers_api_bearer(
             authorization_header=None,
             gateway_token=None,
             webchat_jwt_secret=None,
         )
-        is True
+        is False
     )
 
 

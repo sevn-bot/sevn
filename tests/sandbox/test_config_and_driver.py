@@ -36,7 +36,7 @@ def test_non_production_does_not_raise_on_subprocess_fallback() -> None:
 
 
 @pytest.mark.parametrize(
-    ("reachable", "allow_fb", "enabled", "deployment_profile", "expected"),
+    ("reachable", "allow_fb", "enabled", "deployment_profile", "expected", "dangerous_opt_in"),
     [
         (
             False,
@@ -44,6 +44,7 @@ def test_non_production_does_not_raise_on_subprocess_fallback() -> None:
             False,
             None,
             SandboxDriver.subprocess,
+            True,
         ),
         (
             True,
@@ -51,13 +52,15 @@ def test_non_production_does_not_raise_on_subprocess_fallback() -> None:
             True,
             None,
             SandboxDriver.docker,
+            False,
         ),
         (
             True,
             True,
             False,
             None,
-            SandboxDriver.subprocess,
+            SandboxDriver.docker,
+            False,
         ),
         (
             True,
@@ -65,6 +68,7 @@ def test_non_production_does_not_raise_on_subprocess_fallback() -> None:
             True,
             None,
             SandboxDriver.docker,
+            False,
         ),
     ],
 )
@@ -75,7 +79,12 @@ def test_resolve_sandbox_driver_dev_matrix(
     enabled: bool,
     deployment_profile: str | None,
     expected: SandboxDriver,
+    dangerous_opt_in: bool,
 ) -> None:
+    if dangerous_opt_in:
+        monkeypatch.setenv("SEVN_DANGEROUS_HOST_SANDBOX", "1")
+    else:
+        monkeypatch.delenv("SEVN_DANGEROUS_HOST_SANDBOX", raising=False)
     monkeypatch.setattr(
         "sevn.security.sandbox_runtime.docker_daemon_reachable",
         lambda timeout_s=5.0: reachable,
@@ -108,7 +117,9 @@ def test_resolve_raises_when_no_paths_available(monkeypatch: pytest.MonkeyPatch)
         resolve_sandbox_driver(cfg)
 
 
-def test_resolve_raises_when_docker_but_no_explicit_choice(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_uses_docker_when_daemon_reachable_without_subprocess_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         "sevn.security.sandbox_runtime.docker_daemon_reachable",
         lambda timeout_s=5.0: True,
@@ -117,8 +128,7 @@ def test_resolve_raises_when_docker_but_no_explicit_choice(monkeypatch: pytest.M
     cfg = parse_workspace_config(
         {"schema_version": 1, "gateway": {"token": "${SECRET:keychain:sevn.gateway.token}"}}
     )
-    with pytest.raises(SandboxConfigurationError, match="sandbox\\.enabled"):
-        resolve_sandbox_driver(cfg)
+    assert resolve_sandbox_driver(cfg) is SandboxDriver.docker
 
 
 def test_resolve_production_requires_reachable(monkeypatch: pytest.MonkeyPatch) -> None:

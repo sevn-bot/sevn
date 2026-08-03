@@ -140,8 +140,7 @@ def secrets_compare(expected: str, received: str) -> bool:
 def verify_login_gateway_token(*, configured: str | None, submitted: str | None) -> bool:
     """Validate operator login token for ``POST /login`` (`specs/17-gateway.md` §2.1).
 
-    When ``configured`` is unset (no gateway bearer enforcement), any non-empty
-    submitted token is accepted so local dev can proceed to ``/webapp/``.
+    When ``configured`` is unset, login is rejected (fail-closed).
 
     Args:
         configured (str | None): Effective merged gateway token.
@@ -155,17 +154,17 @@ def verify_login_gateway_token(*, configured: str | None, submitted: str | None)
         True
         >>> verify_login_gateway_token(configured="tok", submitted="bad")
         False
+        >>> verify_login_gateway_token(configured=None, submitted="any")
+        False
         >>> verify_login_gateway_token(configured=None, submitted="")
         False
-        >>> verify_login_gateway_token(configured=None, submitted="any")
-        True
     """
 
-    if configured:
-        if submitted is None:
-            return False
-        return secrets_compare(configured.strip(), submitted.strip())
-    return bool(submitted and submitted.strip())
+    if not configured:
+        return False
+    if submitted is None:
+        return False
+    return secrets_compare(configured.strip(), submitted.strip())
 
 
 def login_page_html(*, gateway_auth_required: bool) -> str:

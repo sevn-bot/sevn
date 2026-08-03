@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver a single scanner subsystem that runs in the gateway process so hostile
   content is filtered before the Triager or any routing model sees user-visible text,
   transcripts, or selected tool output.
-last_updated: '2026-08-01'
-fingerprint: sha256:d3f4d5940a854912157bee118849ef01f110eda349f8cd3ee2340c38c35429e3
+last_updated: '2026-08-03'
+fingerprint: sha256:57939b3a8a3ddd0db55b18330d80ee32dfbb6b6fc0f1a027cba36a3066f78490
 related: []
 sources:
 - src/sevn/security/**
@@ -171,6 +171,15 @@ interfaces:
 - name: docker_daemon_reachable
   file: src/sevn/security/sandbox_runtime.py
   symbol: docker_daemon_reachable
+- name: ensure_proxy_attached_to_sandbox_network
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: ensure_proxy_attached_to_sandbox_network
+- name: ensure_sandbox_docker_network
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: ensure_sandbox_docker_network
+- name: list_labeled_sandbox_containers
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: list_labeled_sandbox_containers
 - name: load_snapshot_manifest_version
   file: src/sevn/security/sandbox_runtime.py
   symbol: load_snapshot_manifest_version
@@ -186,9 +195,15 @@ interfaces:
 - name: prune_workspace_snapshots
   file: src/sevn/security/sandbox_runtime.py
   symbol: prune_workspace_snapshots
+- name: reap_stale_sandbox_containers
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: reap_stale_sandbox_containers
 - name: resolve_sandbox_driver
   file: src/sevn/security/sandbox_runtime.py
   symbol: resolve_sandbox_driver
+- name: rewrite_proxy_url_for_sandbox_network
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: rewrite_proxy_url_for_sandbox_network
 - name: snapshot_tarball_format_supported
   file: src/sevn/security/sandbox_runtime.py
   symbol: snapshot_tarball_format_supported

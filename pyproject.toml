@@ -181,6 +181,7 @@ artifacts = [
     "src/sevn/data/branding/*.png",
     "src/sevn/docs/readme/templates/**/*.j2",
     "src/sevn/docs/readme/prompts/**/*.toml",
+    "src/sevn/data/docker/*.json",
 ]
 
 [tool.hatch.build.targets.wheel.force-include]

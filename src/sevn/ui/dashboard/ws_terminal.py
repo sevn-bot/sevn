@@ -27,7 +27,6 @@ from sevn.config.workspace_config import WorkspaceConfig
 from sevn.ui.dashboard.services.auth import (
     DASHBOARD_CSRF_COOKIE_NAME,
     DashboardAuthService,
-    local_open_effective,
 )
 from sevn.ui.dashboard.services.sandbox_terminal import (
     SandboxTerminalError,
@@ -214,6 +213,56 @@ async def _pty_writer(
             )
 
 
+async def _authenticate_terminal_ws(websocket: WebSocket) -> str | None:
+    """Validate owner JWT + CSRF + upgrade ticket before opening the PTY session.
+
+    Args:
+        websocket (WebSocket): Pending terminal WebSocket (not yet accepted).
+
+    Returns:
+        str | None: Consumed upgrade ``session_id`` when authorized.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_authenticate_terminal_ws)
+        True
+    """
+    service: DashboardAuthService = websocket.app.state.dashboard_auth_service
+    await websocket.accept()
+    try:
+        raw = await asyncio.wait_for(websocket.receive_text(), timeout=15.0)
+    except (TimeoutError, WebSocketDisconnect):
+        await websocket.close(code=4401)
+        return None
+    try:
+        frame = json.loads(raw)
+    except (TypeError, ValueError):
+        await websocket.close(code=4401)
+        return None
+    if not isinstance(frame, dict) or frame.get("type") != "auth":
+        await websocket.close(code=4401)
+        return None
+    token = frame.get("token")
+    csrf = frame.get("csrf")
+    session_id = frame.get("session_id")
+    if not isinstance(token, str) or not isinstance(csrf, str) or not isinstance(session_id, str):
+        await websocket.close(code=4401)
+        return None
+    claims = service.verify_dashboard_jwt(token)
+    if claims is None:
+        await websocket.close(code=4401)
+        return None
+    cookie_csrf = websocket.cookies.get(DASHBOARD_CSRF_COOKIE_NAME)
+    if not service.verify_csrf(cookie=cookie_csrf, header=csrf):
+        await websocket.close(code=4403)
+        return None
+    ticket = terminal_session_registry.consume(session_id, owner_sub=claims.sub)
+    if ticket is None:
+        await websocket.close(code=4403)
+        return None
+    return session_id
+
+
 async def dashboard_terminal_ws_endpoint(websocket: WebSocket) -> None:
     """Handle ``GET /ws/dashboard/terminal`` with owner JWT + CSRF + upgrade ticket.
 
@@ -228,50 +277,12 @@ async def dashboard_terminal_ws_endpoint(websocket: WebSocket) -> None:
         >>> inspect.iscoroutinefunction(dashboard_terminal_ws_endpoint)
         True
     """
-    await websocket.accept()
     workspace: WorkspaceConfig = websocket.app.state.workspace
     layout: WorkspaceLayout = websocket.app.state.layout
-    service: DashboardAuthService = websocket.app.state.dashboard_auth_service
 
-    if not local_open_effective(workspace, websocket):
-        try:
-            raw = await asyncio.wait_for(websocket.receive_text(), timeout=15.0)
-        except (TimeoutError, WebSocketDisconnect):
-            await websocket.close(code=4401)
-            return
-        try:
-            frame = json.loads(raw)
-        except (TypeError, ValueError):
-            await websocket.close(code=4401)
-            return
-        if not isinstance(frame, dict) or frame.get("type") != "auth":
-            await websocket.close(code=4401)
-            return
-        token = frame.get("token")
-        csrf = frame.get("csrf")
-        session_id = frame.get("session_id")
-        if (
-            not isinstance(token, str)
-            or not isinstance(csrf, str)
-            or not isinstance(session_id, str)
-        ):
-            await websocket.close(code=4401)
-            return
-        claims = service.verify_dashboard_jwt(token)
-        if claims is None:
-            await websocket.close(code=4401)
-            return
-        cookie_csrf = websocket.cookies.get(DASHBOARD_CSRF_COOKIE_NAME)
-        if not service.verify_csrf(cookie=cookie_csrf, header=csrf):
-            await websocket.close(code=4403)
-            return
-        ticket = terminal_session_registry.consume(session_id, owner_sub=claims.sub)
-        if ticket is None:
-            await websocket.close(code=4403)
-            return
-        ws_session_id = session_id
-    else:
-        ws_session_id = uuid.uuid4().hex
+    ws_session_id = await _authenticate_terminal_ws(websocket)
+    if ws_session_id is None:
+        return
 
     proxy_url = str(getattr(websocket.app.state, "proxy_public_url", "") or "")
     try:
