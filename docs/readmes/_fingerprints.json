@@ -57,8 +57,8 @@
     },
     "gateway": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-03T18:15:21Z",
-      "digest": "d0962471ae61ddd65e7bbd100618edecf6efaa325457542ff74c8de1caf66aa3",
+      "computed_at": "2026-08-03T18:29:34Z",
+      "digest": "ac1feb2c146f99d2fda58e7eb214cff3a9cabbb2344f27fe48470d177572c53c",
       "source_globs": [
         "src/sevn/gateway/**"
       ]

@@ -97,7 +97,15 @@ def build_channel_capabilities_inventory() -> dict[str, Any]:
         )
 
     rows.sort(key=lambda row: str(row["name"]))
-    return {"channels": rows, "generated_at": int(time.time())}
+    return {
+        "channels": rows,
+        "openai_compat": {
+            "streaming": "not_implemented",
+            "usage_reporting": "omitted",
+            "tool_messages": "stored_not_visible_to_llm",
+        },
+        "generated_at": int(time.time()),
+    }
 
 
 __all__ = ["ChannelStatus", "build_channel_capabilities_inventory"]

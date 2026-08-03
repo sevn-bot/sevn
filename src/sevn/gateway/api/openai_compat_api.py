@@ -140,6 +140,36 @@ def _clear_visible_messages(conn: sqlite3.Connection, session_id: str) -> None:
     conn.commit()
 
 
+def _validate_request_messages(messages: list[ChatMessage]) -> None:
+    """Reject invalid OpenAI payloads before mutating session history.
+
+    Args:
+        messages (list[ChatMessage]): Full OpenAI chat payload.
+
+    Returns:
+        None: Raises on invalid input only.
+
+    Raises:
+        HTTPException: When roles are unsupported or no user message is present.
+
+    Examples:
+        >>> _validate_request_messages([ChatMessage(role="user", content="hi")]) is None
+        True
+    """
+    wrote_user = False
+    for msg in messages:
+        role = msg.role.strip().lower()
+        content = msg.content.strip()
+        if not content:
+            continue
+        if role not in _ALLOWED_MESSAGE_ROLES:
+            raise HTTPException(status_code=400, detail=f"unsupported_message_role:{role}")
+        if role == "user":
+            wrote_user = True
+    if not wrote_user:
+        raise HTTPException(status_code=400, detail="no_user_message")
+
+
 async def _sync_request_messages(
     sessions: Any,
     conn: sqlite3.Connection,
@@ -169,18 +199,14 @@ async def _sync_request_messages(
     """
     import asyncio
 
+    _validate_request_messages(messages)
     await asyncio.to_thread(_clear_visible_messages, conn, session_id)
-    wrote_user = False
     for msg in messages:
         role = msg.role.strip().lower()
         content = msg.content.strip()
         if not content:
             continue
-        if role not in _ALLOWED_MESSAGE_ROLES:
-            raise HTTPException(status_code=400, detail=f"unsupported_message_role:{role}")
         visible_to_llm = 0 if role == "tool" else 1
-        if role == "user":
-            wrote_user = True
         await sessions.add_message(
             session_id,
             role=role,
@@ -190,8 +216,6 @@ async def _sync_request_messages(
             status="sent",
             turn_id=correlation_id,
         )
-    if not wrote_user:
-        raise HTTPException(status_code=400, detail="no_user_message")
 
 
 def build_openai_compat_router() -> APIRouter:
