@@ -8,7 +8,7 @@ summary: 'Deliver Mission Control: a same-process dashboard (prd-07-mission-cont
   so the owner can inspect traces, costs, provider health, in-flight runs, proxy status,
   and config without opening SQLite from'
 last_updated: '2026-08-03'
-fingerprint: sha256:8a87ad6a914827d1f2bdd1e8e5bdf09e1eef7250eea3a03ab014aacadcea03e5
+fingerprint: sha256:7b52aaf8e51ee18730051e68f5ea3dc5b22080c17010e2afb89dc69a87c7796d
 related: []
 sources:
 - src/sevn/ui/**
@@ -702,6 +702,24 @@ interfaces:
 - name: validation_errors_from_exception
   file: src/sevn/ui/dashboard/services/config_full.py
   symbol: validation_errors_from_exception
+- name: dashboard_local_token_from_request
+  file: src/sevn/ui/dashboard/services/local_token.py
+  symbol: dashboard_local_token_from_request
+- name: dashboard_local_token_path
+  file: src/sevn/ui/dashboard/services/local_token.py
+  symbol: dashboard_local_token_path
+- name: direct_loopback_client
+  file: src/sevn/ui/dashboard/services/local_token.py
+  symbol: direct_loopback_client
+- name: read_dashboard_local_token
+  file: src/sevn/ui/dashboard/services/local_token.py
+  symbol: read_dashboard_local_token
+- name: verify_dashboard_local_token
+  file: src/sevn/ui/dashboard/services/local_token.py
+  symbol: verify_dashboard_local_token
+- name: write_dashboard_local_token
+  file: src/sevn/ui/dashboard/services/local_token.py
+  symbol: write_dashboard_local_token
 - name: emit_mission_audit
   file: src/sevn/ui/dashboard/services/mission_audit.py
   symbol: emit_mission_audit
