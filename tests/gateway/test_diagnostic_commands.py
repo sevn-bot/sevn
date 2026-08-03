@@ -100,6 +100,21 @@ def test_diagnostic_handler_matches_slash() -> None:
     assert not h.matches_slash(_slash("/log"))
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "/logs@sevn_bot",
+        "/logs@MyBot tail gateway",
+        "/traces@sevn_bot",
+        "/traces@MyBot recent 5",
+    ],
+)
+def test_diagnostic_handler_matches_slash_with_bot_suffix(text: str) -> None:
+    """Telegram group chats append ``@bot``; handler must claim before dispatcher bypass."""
+    h = DiagnosticCommandHandler.__new__(DiagnosticCommandHandler)
+    assert h.matches_slash(_slash(text)) is True
+
+
 def test_dispatcher_recognises_logs_and_traces() -> None:
     spec_names = {spec.name for spec in DEFAULT_COMMAND_SPECS}
     assert "logs" in spec_names

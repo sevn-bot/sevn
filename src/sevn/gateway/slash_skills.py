@@ -81,6 +81,27 @@ def known_skill_ids_from_manager(manager: SkillsManager) -> frozenset[str]:
     return frozenset(manager.advertised_skill_descriptions())
 
 
+def _slash_token_body(token: str) -> str:
+    """Return slash token name without leading ``/`` or Telegram ``@bot`` suffix.
+
+    Args:
+        token (str): One inbound slash token (e.g. ``/config@MyBot``).
+
+    Returns:
+        str: Command or skill name body.
+
+    Examples:
+        >>> _slash_token_body("/config@alexstestee_bot")
+        'config'
+        >>> _slash_token_body("/research")
+        'research'
+    """
+    raw = token.lstrip("/").strip()
+    if "@" in raw:
+        raw = raw.split("@", 1)[0]
+    return raw
+
+
 def _resolve_known_skill(token: str, known_skill_ids: frozenset[str]) -> str | None:
     """Match one slash token to a canonical skill id (case-insensitive).
 
@@ -97,7 +118,7 @@ def _resolve_known_skill(token: str, known_skill_ids: frozenset[str]) -> str | N
         >>> _resolve_known_skill("/nope", frozenset({"research"})) is None
         True
     """
-    raw = token.lstrip("/").strip()
+    raw = _slash_token_body(token)
     if not raw:
         return None
     if raw in known_skill_ids:
@@ -153,7 +174,7 @@ def parse_stacked_slash_skills(
         token = tokens[index]
         if not token.startswith("/"):
             break
-        slash_body = token.lstrip("/")
+        slash_body = _slash_token_body(token)
         if "/" not in slash_body and slash_body.lower() in reserved:
             if skill_ids:
                 # Core handler already declined (first token was a skill). Emitting
@@ -171,7 +192,7 @@ def parse_stacked_slash_skills(
             )
         resolved = _resolve_known_skill(token, known_skill_ids)
         if resolved is None:
-            unknown = token.lstrip("/")
+            unknown = _slash_token_body(token)
             return StackedSlashSkillParseResult(
                 (),
                 "",

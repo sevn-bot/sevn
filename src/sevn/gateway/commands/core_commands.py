@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any
 
 from sevn.config.model_resolution import ModelSlot, resolve_model_slot
 from sevn.config.workspace_config import WorkspaceConfig
+from sevn.gateway.access.slash_access import slash_command_head
 from sevn.gateway.commands.ask_config import format_ask_config_reply, parse_ask_config_query
 from sevn.gateway.commands.shortcuts_store import find_shortcut
 from sevn.gateway.config_io.workspace_config_io import load_raw_sevn_json, mutate_sevn_json
@@ -179,7 +180,7 @@ class CoreCommandHandler:
         text = (msg.text or "").strip()
         if not text.startswith("/"):
             return False
-        cmd = text.split(maxsplit=1)[0].lower()
+        cmd = slash_command_head(text)
         if cmd in {
             "/start",
             "/help",
@@ -218,8 +219,8 @@ class CoreCommandHandler:
             True
         """
         text = (msg.text or "").strip()
+        cmd = slash_command_head(text)
         parts = text.split(maxsplit=1)
-        cmd = parts[0].lower()
         args = parts[1].strip() if len(parts) > 1 else ""
         if cmd == "/start":
             return await self._handle_start(msg, args=args)

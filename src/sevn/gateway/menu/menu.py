@@ -5628,7 +5628,9 @@ def config_callback_matches(msg: object) -> bool:
     text = getattr(msg, "text", "") or ""
     if isinstance(text, str):
         t = text.strip()
-        if t == "/config" or t.startswith("/config "):
+        from sevn.gateway.access.slash_access import slash_command_head
+
+        if slash_command_head(t) == "/config":
             return True
     md = getattr(msg, "metadata", None)
     if not isinstance(md, dict):
@@ -5715,7 +5717,9 @@ class ConfigMenuHandler:
             True
         """
         text = (msg.text or "").strip()
-        return text == "/config" or text.startswith("/config ")
+        from sevn.gateway.access.slash_access import slash_command_head
+
+        return slash_command_head(text) == "/config"
 
     async def handle_slash(self, msg: IncomingMessage, *, session_id: str) -> None:
         """Open a new ``/config`` message with the root inline keyboard.

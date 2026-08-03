@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from sevn.agent.tracing.sink_factory import trace_redaction_policy_for
+from sevn.gateway.access.slash_access import slash_command_head
 from sevn.gateway.diagnostics.diagnostics import (
     format_for_telegram,
     format_traces_for_telegram,
@@ -95,10 +96,7 @@ class DiagnosticCommandHandler:
             ... )
             False
         """
-        text = (msg.text or "").strip().lower()
-        if text in ("/logs", "/traces"):
-            return True
-        return text.startswith(("/logs ", "/traces "))
+        return slash_command_head(msg.text or "") in ("/logs", "/traces")
 
     async def handle(
         self,
@@ -131,10 +129,10 @@ class DiagnosticCommandHandler:
         if not self._router._resolve_owner_flag(msg):
             return [OWNER_ONLY_REFUSAL]
         text = (msg.text or "").strip()
-        lowered = text.lower()
-        if lowered == "/logs" or lowered.startswith("/logs "):
+        cmd = slash_command_head(text)
+        if cmd == "/logs":
             return self._handle_logs(text)
-        if lowered == "/traces" or lowered.startswith("/traces "):
+        if cmd == "/traces":
             return self._handle_traces(text)
         return [OWNER_ONLY_REFUSAL]
 

@@ -7,7 +7,7 @@ owner: Alex
 summary: The operator talks to sevn where they already chat—Telegram on phone, web/Mission
   Control on laptop—with shared sessions, voice, and one gateway turn spine.
 last_updated: '2026-08-03'
-fingerprint: sha256:120ebbfcf66ec0cc0e914a246d8f66030f90df28b9d32e95478dc3df8011ca3e
+fingerprint: sha256:db431f96657a23c558f3d7cc9078a5f17446036f50e4ba3420d18ac4f552ba02
 related:
 - prd-07-mission-control
 - prd-10-generated-ui
