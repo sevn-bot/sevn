@@ -118,3 +118,14 @@ def test_web_forward_validate_fetch_url_allows_public_https_regression() -> None
     from sevn.proxy.web_forward import _validate_fetch_url
 
     assert _validate_fetch_url("https://example.com/path") is None
+
+
+def test_build_pinned_request_url_brackets_ipv6_literals() -> None:
+    """IPv6 pinned addresses must be bracketed or httpx raises InvalidURL."""
+    from sevn.proxy.web_forward import _build_pinned_request_url
+
+    ipv6 = "2606:2800:220:1:248:1893:25c8:1946"
+    assert _build_pinned_request_url("https://example.com/path", ipv6) == (f"https://[{ipv6}]/path")
+    assert _build_pinned_request_url("https://example.com:8443/path", ipv6) == (
+        f"https://[{ipv6}]:8443/path"
+    )

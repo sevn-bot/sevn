@@ -184,10 +184,13 @@ def _build_pinned_request_url(url: str, pinned_ip: str) -> str:
     Examples:
         >>> _build_pinned_request_url("https://example.com/path", "93.184.216.34")
         'https://93.184.216.34/path'
+        >>> _build_pinned_request_url("https://example.com/path", "2606:2800:220:1:248:1893:25c8:1946")
+        'https://[2606:2800:220:1:248:1893:25c8:1946]/path'
     """
     parsed = urlparse(url.strip())
     port = parsed.port or (443 if parsed.scheme == "https" else 80)
-    netloc = pinned_ip if port in (80, 443) else f"{pinned_ip}:{port}"
+    host = f"[{pinned_ip}]" if ":" in pinned_ip else pinned_ip
+    netloc = host if port in (80, 443) else f"{host}:{port}"
     path = parsed.path or "/"
     if parsed.params:
         path = f"{path};{parsed.params}"
