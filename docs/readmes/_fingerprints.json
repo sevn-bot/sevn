@@ -57,8 +57,8 @@
     },
     "gateway": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-03T17:54:26Z",
-      "digest": "1b85c571a2321ee57cb12cd86b8c4cf100f764285d16a102c8c040e4b904e10a",
+      "computed_at": "2026-08-03T18:15:21Z",
+      "digest": "d0962471ae61ddd65e7bbd100618edecf6efaa325457542ff74c8de1caf66aa3",
       "source_globs": [
         "src/sevn/gateway/**"
       ]
@@ -116,8 +116,8 @@
     },
     "root": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-03T11:10:58Z",
-      "digest": "8292a0a4ca22279a405f4b447fbee3f03115183973235d5a33921d1ef5b0a801",
+      "computed_at": "2026-08-03T18:15:21Z",
+      "digest": "c8051a51ff7c6f3fdeb643659915850c4e018c6f2ce6ea7dd60052b8d3706a2c",
       "source_globs": [
         "pyproject.toml",
         "CLAUDE.md",
