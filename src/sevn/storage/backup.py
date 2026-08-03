@@ -22,6 +22,7 @@ Examples:
     >>> dest = root / "backup.sqlite"
     >>> backup_sevn_db(dot / "sevn.db", dest)
     >>> restore_sevn_db(dest, dot / "sevn.db")
+    >>> dot.joinpath("sevn.db").is_file()
     True
 """
 

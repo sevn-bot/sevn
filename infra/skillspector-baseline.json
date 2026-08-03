@@ -198,6 +198,12 @@
       "rule_id": "YR1",
       "reason": "SKILL.md documents operator-controlled X login/cookie persistence (#125/W10); YR1 info_stealer false positive",
       "reviewed": "2026-08-02"
+    },
+    {
+      "skill_path": ".claude/skills/github-issue-triage",
+      "rule_id": "OH1",
+      "reason": "spec-kit-wave maintainer gh CLI scripts; json.loads on gh stdout is operator-trusted",
+      "reviewed": "2026-08-03"
     }
   ]
 }

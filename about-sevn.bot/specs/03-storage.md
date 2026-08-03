@@ -8,7 +8,7 @@ summary: 'Own application persistence: connection setup (WAL, foreign keys), ver
   migrations, canonical sevn.db path, optional traces.db path helper, and typed persistence
   contracts for crash-resume and (w'
 last_updated: '2026-08-03'
-fingerprint: sha256:85c3651383a205de36e65b245e8ace809ca85d5a676a831d9613665739b9f7c3
+fingerprint: sha256:e4c1e19e5779562faf21cb0b1fa3a1d6bc9f98faee19cff2b759bc0923e21842
 related: []
 sources:
 - src/sevn/storage/**
@@ -19,6 +19,12 @@ depends_on:
 - spec-02-config-and-workspace
 build_phase: null
 interfaces:
+- name: backup_sevn_db
+  file: src/sevn/storage/backup.py
+  symbol: backup_sevn_db
+- name: restore_sevn_db
+  file: src/sevn/storage/backup.py
+  symbol: restore_sevn_db
 - name: D1Backend
   file: src/sevn/storage/d1.py
   symbol: D1Backend
@@ -97,12 +103,24 @@ interfaces:
 - name: open_sevn_sqlite
   file: src/sevn/storage/sqlite.py
   symbol: open_sevn_sqlite
+- name: run_sqlite_write
+  file: src/sevn/storage/sqlite_write_lock.py
+  symbol: run_sqlite_write
+- name: sqlite_write_lock
+  file: src/sevn/storage/sqlite_write_lock.py
+  symbol: sqlite_write_lock
 - name: get_telegram_chat_name
   file: src/sevn/storage/telegram_names.py
   symbol: get_telegram_chat_name
 - name: get_telegram_topic_name
   file: src/sevn/storage/telegram_names.py
   symbol: get_telegram_topic_name
+- name: get_trigger_run_status
+  file: src/sevn/storage/trigger_runs.py
+  symbol: get_trigger_run_status
+- name: upsert_trigger_run_status
+  file: src/sevn/storage/trigger_runs.py
+  symbol: upsert_trigger_run_status
 ---
 
 ## Purpose
