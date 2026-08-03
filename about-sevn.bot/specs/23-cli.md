@@ -8,7 +8,7 @@ summary: Deliver the primary operator and automation surface for install, upgrad
   health checks, workspace + daemon lifecycle, and scriptable inspection. The CLI
   is not the agent’s in-harness tool API and no
 last_updated: '2026-08-03'
-fingerprint: sha256:ac74088c1c5bb653b82bc69712a5853c3f5fcd4ed5b7a59f42beb1f502198071
+fingerprint: sha256:494bd8cab75b68b530cb81b4176eb716f1255e80e3233726ec9071a85422ac73
 related: []
 sources:
 - src/sevn/cli/**
@@ -56,6 +56,9 @@ interfaces:
   symbol: register
 - name: register
   file: src/sevn/cli/commands/browser_cmd.py
+  symbol: register
+- name: register
+  file: src/sevn/cli/commands/capabilities_cmd.py
   symbol: register
 - name: register
   file: src/sevn/cli/commands/channels_cmd.py

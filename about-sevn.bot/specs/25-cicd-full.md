@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict delivery
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
-last_updated: '2026-07-30'
-fingerprint: sha256:41a2e395b7f1fd3dd630a0a3fadce09ca1023065ad0e73b9721f178b63112fd4
+last_updated: '2026-08-03'
+fingerprint: sha256:6892916a2c6f662557ba7403e96787a3d684e58b6eb4b14f849074f102ac5e10
 related: []
 sources:
 - .github/workflows/**

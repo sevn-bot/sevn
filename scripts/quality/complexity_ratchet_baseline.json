@@ -1,0 +1,25 @@
+{
+  "generated": "2026-08-03",
+  "measured": "2026-08-03",
+  "issue": "#150",
+  "xenon_baseline": {
+    "absolute": "F",
+    "modules": "F",
+    "average": "A",
+    "max_average_num": 5
+  },
+  "xenon_target": {
+    "absolute": "C",
+    "modules": "B",
+    "average": "A",
+    "max_average_num": 5
+  },
+  "c901_max_complexity_baseline": 221,
+  "c901_max_complexity_ratchet_steps": [200, 175, 150, 125, 100],
+  "c901_worst_functions": {
+    "sevn.gateway.http_server:create_app": 221,
+    "sevn.onboarding.web_app:create_onboarding_app": 189,
+    "sevn.gateway.agent_turn:build_agent_run_turn": 190
+  },
+  "flip_blocking_when": "xenon_target passes and c901 count is zero at next ratchet step (D11 advisory until then)"
+}

@@ -8,6 +8,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /opt/sevn
 COPY pyproject.toml uv.lock README.md ./
 COPY src/sevn ./src/sevn
+COPY src/proton_cli ./src/proton_cli
 # Required by the hatchling wheel force-include in pyproject.toml.
 COPY infra/sevn.schema.json ./infra/sevn.schema.json
 

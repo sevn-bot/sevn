@@ -188,7 +188,14 @@ artifacts = [
 "infra/sevn.schema.json" = "sevn/data/sevn.schema.json"
 
 [tool.hatch.build.targets.sdist]
-include = ["src/sevn", "tests", "README.md", "pyproject.toml", "infra/sevn.schema.json"]
+include = [
+    "src/sevn",
+    "src/proton_cli",
+    "tests",
+    "README.md",
+    "pyproject.toml",
+    "infra/sevn.schema.json",
+]
 
 [tool.importlinter]
 root_packages = ["sevn"]
@@ -219,13 +226,15 @@ type = "forbidden"
 source_modules = ["sevn.tools", "sevn.skills"]
 forbidden_modules = ["sevn.channels"]
 ignore_imports = [
-    # TODO(ci-quality): burn down — outbound tool reaches channel layer directly and via gateway
+    # 2026-08-03 #150 (C3/W12): burn down — outbound tool reaches channel layer directly
     "sevn.tools.outbound -> sevn.channels.telegram",
+    # 2026-08-03 #150 (C3/W12): burn down — outbound tool reaches gateway router
     "sevn.tools.outbound -> sevn.gateway.channel_router",
-    # W2 (D1): menu walker derives expected tree from gateway menu builders at runtime
+    # 2026-08-03 #150 (C3/W12): menu walker derives expected tree from gateway menu builders
     "sevn.browser.recipes.telegram_menu -> sevn.gateway.menu.menu",
     "sevn.browser.recipes.telegram_menu -> sevn.gateway.menu.menu_readiness",
     "sevn.browser.recipes.telegram_menu -> sevn.gateway.menu.menu_registry",
+    # 2026-08-03 #150 (C3/W12): browser tool dispatches telegram menu E2E recipe
     "sevn.tools.browser -> sevn.browser.recipes.telegram_menu",
 ]
 
@@ -301,12 +310,11 @@ ignore = [
     "ERA",
     "ISC",
     "ICN",
-    "C901",
 ]
 
 [tool.ruff.lint.mccabe]
-# Highest observed complexity in current tree (187); C901 advisory via ignore above
-max-complexity = 187
+# #150 (C3/W12): measured worst 221 (`create_app`); ratchet via complexity_ratchet_baseline.json
+max-complexity = 221
 
 [tool.ruff.lint.isort]
 known-first-party = ["sevn"]
@@ -414,6 +422,8 @@ exclude_lines = [
 ]
 show_missing = true
 skip_empty = true
+# #150 (C3/W12): blocking floor stays 0 until 90% security/auth targets met (D11).
+# Advisory floors: scripts/quality/coverage_ratchet_baseline.json + `make coverage-ratchet`.
 fail_under = 0
 
 [tool.mypy]
@@ -451,12 +461,14 @@ exclude = [
 ignore_names = ["if", "try"]
 
 [tool.radon]
-# Xenon ceilings for `make complexity` (D5 baseline). Observed 2026-06-17 on `src/`:
-# max block CC 137 (`b_harness.run_b_turn`); average CC ~4.44.
+# Xenon ceilings for `make complexity` (#150 C3/W12). Baseline observed 2026-08-03 on `src/`.
+# Release target: absolute C / modules B (D11 — flip blocking only after `make complexity-target` passes).
 xenon_max_absolute = "F"
 xenon_max_modules = "F"
 xenon_max_average = "A"
 xenon_max_average_num = 5
+xenon_target_absolute = "C"
+xenon_target_modules = "B"
 exclude = ["*/bundled_skills/*"]
 
 [tool.codespell]

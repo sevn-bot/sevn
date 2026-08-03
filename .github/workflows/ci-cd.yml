@@ -5,7 +5,9 @@
 # Six-phase delivery pipeline.
 # Normative spec: specs/25-cicd-full.md (Phase 5 of the build).
 #
-# publish-ghcr: pushes sandbox/proxy/gateway images to GHCR on main and v* tags.
+# publish-ghcr: pushes sandbox/proxy/gateway images to GHCR on main, v* tags,
+# and workflow_dispatch (manual chain rehearsal). Digests are job outputs for
+# downstream phases and container-supply-chain (cosign, syft, trivy).
 #
 # Trigger → phase mapping (specs/25-cicd-full.md §2.3):
 #   push to main         → phase1 → phase2 → phase3        (build/deploy Dev + smoke)
@@ -64,20 +66,32 @@ jobs:
     name: Publish container images to GHCR
     needs: [phase1]
     if: >-
-      github.event_name == 'push' && (
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && (
         github.ref == 'refs/heads/main' ||
         startsWith(github.ref, 'refs/tags/v')
-      )
+      ))
     runs-on: ubuntu-latest
     environment: ${{ startsWith(github.ref, 'refs/tags/v') && 'production' || 'development' }}
     permissions:
       contents: read
       packages: write
+    outputs:
+      image_repository: ${{ steps.image_repo.outputs.repository }}
+      sandbox_digest: ${{ steps.sandbox.outputs.digest }}
+      proxy_digest: ${{ steps.proxy.outputs.digest }}
+      gateway_digest: ${{ steps.gateway.outputs.digest }}
+      gateway_browser_digest: ${{ steps.gateway_browser.outputs.digest }}
+      gateway_gui_digest: ${{ steps.gateway_gui.outputs.digest }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Set lowercase image prefix
-        run: echo "IMAGE_REPOSITORY=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+        id: image_repo
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          echo "repository=$repo" >> "$GITHUB_OUTPUT"
+          echo "IMAGE_REPOSITORY=$repo" >> "$GITHUB_ENV"
 
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
@@ -89,6 +103,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push sandbox image
+        id: sandbox
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
@@ -102,6 +117,7 @@ jobs:
             ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/sandbox:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
 
       - name: Build and push proxy image
+        id: proxy
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
@@ -115,6 +131,7 @@ jobs:
             ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/proxy:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
 
       - name: Build and push gateway image
+        id: gateway
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
@@ -128,6 +145,7 @@ jobs:
             ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/gateway:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
 
       - name: Build and push gateway browser image
+        id: gateway_browser
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
@@ -142,6 +160,7 @@ jobs:
             ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/gateway.browser:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
 
       - name: Build and push gateway GUI image
+        id: gateway_gui
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
@@ -155,25 +174,89 @@ jobs:
             ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.gui:latest
             ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/gateway.gui:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
 
+  container-supply-chain:
+    name: Container supply chain (cosign, syft, trivy)
+    needs: [publish-ghcr]
+    if: needs.publish-ghcr.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    env:
+      IMAGE_REPOSITORY: ${{ needs.publish-ghcr.outputs.image_repository }}
+    steps:
+      - name: Install cosign
+        uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
+
+      - name: Install syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/v1.18.1/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Install trivy
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/v0.58.1/contrib/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sign, SBOM, and scan published images
+        env:
+          SANDBOX_DIGEST: ${{ needs.publish-ghcr.outputs.sandbox_digest }}
+          PROXY_DIGEST: ${{ needs.publish-ghcr.outputs.proxy_digest }}
+          GATEWAY_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_digest }}
+          GATEWAY_BROWSER_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_browser_digest }}
+          GATEWAY_GUI_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_gui_digest }}
+        run: |
+          set -euo pipefail
+          mkdir -p sboms
+          scan_image() {
+            local name="$1"
+            local digest="$2"
+            local ref="ghcr.io/${IMAGE_REPOSITORY}/${name}@${digest}"
+            echo "=== ${ref} ==="
+            cosign sign --yes "$ref"
+            syft "$ref" -o spdx-json > "sboms/${name}.spdx.json"
+            # Report CRITICAL/HIGH; do not block publish until base images are baselined (#149).
+            trivy image --exit-code 0 --severity CRITICAL,HIGH --ignore-unfixed "$ref"
+          }
+          scan_image sandbox "$SANDBOX_DIGEST"
+          scan_image proxy "$PROXY_DIGEST"
+          scan_image gateway "$GATEWAY_DIGEST"
+          scan_image gateway.browser "$GATEWAY_BROWSER_DIGEST"
+          scan_image gateway.gui "$GATEWAY_GUI_DIGEST"
+
   phase2:
-    name: Phase 2 — Build & Deploy → Dev (STUB)
-    needs: [phase1]
+    name: Phase 2 — Build & Deploy → Dev (needs-implementation)
+    needs: [phase1, publish-ghcr, container-supply-chain]
     environment: development
     # Only on main push or manual dispatch; tag pushes skip Dev and go to prod.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
+    env:
+      IMAGE_REPOSITORY: ${{ needs.publish-ghcr.outputs.image_repository }}
     steps:
-      - name: Stub — build artefacts and deploy to Dev environment
+      - name: needs-implementation — build artefacts and deploy to Dev environment
+        env:
+          SANDBOX_DIGEST: ${{ needs.publish-ghcr.outputs.sandbox_digest }}
+          PROXY_DIGEST: ${{ needs.publish-ghcr.outputs.proxy_digest }}
+          GATEWAY_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_digest }}
         run: |
-          echo "::warning title=Stub phase::Phase 2 is a stub — no real Dev deployment performed (specs/25-cicd-full.md §2.1)"
-          echo "STUB: build artefacts (wheel/sdist; sandbox image when Dockerfile lands)"
-          echo "STUB: deploy to GitHub Environment 'development'"
-          echo "See specs/25-cicd-full.md §2.1 (Phase 2) and §4.5 (artefact-only default)"
+          echo "Pinned images for Dev deploy (digest, not :latest):"
+          echo "  sandbox:  ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}"
+          echo "  proxy:    ghcr.io/${IMAGE_REPOSITORY}/proxy@${PROXY_DIGEST}"
+          echo "  gateway:  ghcr.io/${IMAGE_REPOSITORY}/gateway@${GATEWAY_DIGEST}"
+          echo "::error title=needs-implementation::Phase 2 (Build & Deploy → Dev) is not implemented — see specs/25-cicd-full.md §2.1"
+          exit 1
 
   phase3:
-    name: Phase 3 — Test Dev (STUB)
+    name: Phase 3 — Test Dev (needs-implementation)
     needs: [phase2]
     environment: development
     if: >-
@@ -181,15 +264,14 @@ jobs:
       (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     steps:
-      - name: Stub — smoke Dev topology
+      - name: needs-implementation — smoke Dev topology
         run: |
-          echo "::warning title=Stub phase::Phase 3 is a stub — no real Dev smoke performed (specs/25-cicd-full.md §2.1)"
-          echo "STUB: smoke deployed Dev (health, one critical journey, webhook sample)"
-          echo "STUB: NOT a repeat of Phase 1 (specs/25-cicd-full.md §2.1)"
+          echo "::error title=needs-implementation::Phase 3 (Test Dev) is not implemented — see specs/25-cicd-full.md §2.1"
+          exit 1
 
   phase4:
-    name: Phase 4 — Deploy → Production (STUB)
-    needs: [phase1, publish-ghcr]
+    name: Phase 4 — Deploy → Production (needs-implementation)
+    needs: [phase1, publish-ghcr, container-supply-chain]
     environment: production
     # Production deploy is tag-gated by default (specs/25-cicd-full.md §2.3).
     # On manual dispatch we also allow this so the full chain is exercisable.
@@ -197,16 +279,29 @@ jobs:
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
+    env:
+      IMAGE_REPOSITORY: ${{ needs.publish-ghcr.outputs.image_repository }}
     steps:
-      - name: Stub — deploy tagged SHA to Production environment
+      - name: needs-implementation — deploy tagged SHA to Production environment
+        env:
+          SANDBOX_DIGEST: ${{ needs.publish-ghcr.outputs.sandbox_digest }}
+          PROXY_DIGEST: ${{ needs.publish-ghcr.outputs.proxy_digest }}
+          GATEWAY_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_digest }}
+          GATEWAY_BROWSER_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_browser_digest }}
+          GATEWAY_GUI_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_gui_digest }}
         run: |
-          echo "::warning title=Stub phase::Phase 4 is a stub — no real Production deployment performed (specs/25-cicd-full.md §2.1)"
-          echo "STUB: deploy tagged SHA to GitHub Environment 'production'"
+          echo "Pinned images for Production deploy (digest, not :latest):"
+          echo "  sandbox:         ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}"
+          echo "  proxy:           ghcr.io/${IMAGE_REPOSITORY}/proxy@${PROXY_DIGEST}"
+          echo "  gateway:         ghcr.io/${IMAGE_REPOSITORY}/gateway@${GATEWAY_DIGEST}"
+          echo "  gateway.browser: ghcr.io/${IMAGE_REPOSITORY}/gateway.browser@${GATEWAY_BROWSER_DIGEST}"
+          echo "  gateway.gui:     ghcr.io/${IMAGE_REPOSITORY}/gateway.gui@${GATEWAY_GUI_DIGEST}"
           echo "Tag: ${{ github.ref }}"
-          echo "See specs/25-cicd-full.md §2.1 (Phase 4) and §2.3 (tag eligibility)"
+          echo "::error title=needs-implementation::Phase 4 (Deploy → Production) is not implemented — see specs/25-cicd-full.md §2.1 and §2.3"
+          exit 1
 
   phase5:
-    name: Phase 5 — Test Production (STUB)
+    name: Phase 5 — Test Production (needs-implementation)
     needs: [phase4]
     environment: production
     if: >-
@@ -214,16 +309,15 @@ jobs:
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     steps:
-      - name: Stub — read-only production probes
+      - name: needs-implementation — read-only production probes
         run: |
-          echo "::warning title=Stub phase::Phase 5 is a stub — no real Production probes performed (specs/25-cicd-full.md §2.1)"
-          echo "STUB: read-only probes (health, version, getMe-style, webhook echo)"
-          echo "STUB: optional synthetic / shadow path (no mutation of real user data)"
-          echo "See specs/25-cicd-full.md §2.1 (Phase 5)"
+          echo "::error title=needs-implementation::Phase 5 (Test Production) is not implemented — see specs/25-cicd-full.md §2.1"
+          exit 1
 
   phase6:
     name: Phase 6 — Release
-    needs: [phase5]
+    # Decoupled from deploy phases so tag releases succeed while phase4/5 remain stubs (#149).
+    needs: [phase1, publish-ghcr, container-supply-chain]
     environment: production
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -239,3 +333,60 @@ jobs:
           name: ${{ github.ref_name }}
           generate_release_notes: true
           draft: false
+
+  delivery-chain:
+    name: Delivery chain gate (required)
+    needs:
+      - phase1
+      - publish-ghcr
+      - container-supply-chain
+      - phase2
+      - phase3
+      - phase4
+      - phase5
+      - phase6
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify delivery chain results
+        env:
+          PHASE1: ${{ needs.phase1.result }}
+          PUBLISH: ${{ needs.publish-ghcr.result }}
+          SUPPLY: ${{ needs.container-supply-chain.result }}
+          PHASE2: ${{ needs.phase2.result }}
+          PHASE3: ${{ needs.phase3.result }}
+          PHASE4: ${{ needs.phase4.result }}
+          PHASE5: ${{ needs.phase5.result }}
+          PHASE6: ${{ needs.phase6.result }}
+        run: |
+          set -euo pipefail
+          ok() { case "$1" in success|skipped) return 0;; *) return 1;; esac; }
+          needs_impl_ok() { case "$1" in success|skipped|failure) return 0;; *) return 1;; esac; }
+          fail=0
+          require() {
+            local label="$1" result="$2"
+            if ok "$result"; then
+              echo "OK  $label ($result)"
+            else
+              echo "::error title=Delivery chain::$label result=$result"
+              fail=1
+            fi
+          }
+          require_needs_impl() {
+            local label="$1" result="$2"
+            if needs_impl_ok "$result"; then
+              echo "OK  $label ($result — needs-implementation stub allowed)"
+            else
+              echo "::error title=Delivery chain::$label result=$result"
+              fail=1
+            fi
+          }
+          require "phase1" "$PHASE1"
+          require "publish-ghcr" "$PUBLISH"
+          require "container-supply-chain" "$SUPPLY"
+          require_needs_impl "phase2" "$PHASE2"
+          require_needs_impl "phase3" "$PHASE3"
+          require_needs_impl "phase4" "$PHASE4"
+          require_needs_impl "phase5" "$PHASE5"
+          require "phase6" "$PHASE6"
+          exit "$fail"

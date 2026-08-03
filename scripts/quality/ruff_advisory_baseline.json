@@ -51,7 +51,8 @@
     "TRY201": 1,
     "TRY203": 6,
     "TRY300": 15,
-    "TRY301": 8
+    "TRY301": 8,
+    "C901": 0
   },
   "select": "SLF,BLE,PTH,C4,PERF,FURB,TRY,EM,ARG,N,PL,FBT,ERA,ISC,ICN,C901"
 }

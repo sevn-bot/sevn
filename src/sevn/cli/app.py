@@ -26,6 +26,7 @@ from sevn.cli.commands.about_docs_cmd import register as register_about_docs
 from sevn.cli.commands.acp_cmd import register as register_acp
 from sevn.cli.commands.agent_cmd import register as register_agent
 from sevn.cli.commands.browser_cmd import register as register_browser
+from sevn.cli.commands.capabilities_cmd import register as register_capabilities
 from sevn.cli.commands.channels_cmd import register as register_channels
 from sevn.cli.commands.completion import register as register_completion
 from sevn.cli.commands.config_cmd import register as register_config
@@ -233,6 +234,7 @@ register_models(app)
 register_voice(app)
 register_acp(app)
 register_channels(app)
+register_capabilities(app)
 register_browser(app)
 register_tools(app)
 register_usage(app)

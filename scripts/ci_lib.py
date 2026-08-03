@@ -50,6 +50,14 @@ PATH_RULES: tuple[PathRule, ...] = (
     PathRule(("pyproject.toml",), "security"),
     PathRule(
         (
+            "pyproject.toml",
+            "docker/Dockerfile.*",
+            "scripts/check-artifact-integrity.sh",
+        ),
+        "artifact-integrity-check",
+    ),
+    PathRule(
+        (
             "src/sevn/gateway/menu/**",
             "about-sevn.bot/Telegram Menu.html",
             "about-sevn.bot/Telegram*",
