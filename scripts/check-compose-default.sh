@@ -22,9 +22,9 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 
 services="$(docker compose -f "$compose_file" config --services | sort | tr '\n' ' ')"
-expected="sevn-gateway sevn-proxy "
+expected="sevn-gateway sevn-operator-perms sevn-proxy "
 if [ "$services" != "$expected" ]; then
-  echo "default compose profile must be exactly {sevn-proxy, sevn-gateway}, got: $services" >&2
+  echo "default compose profile must be exactly {sevn-operator-perms, sevn-proxy, sevn-gateway}, got: $services" >&2
   exit 1
 fi
 
