@@ -10,6 +10,7 @@ Exports:
     policy_for_message — resolve policy for one inbound message.
     policy_from_channel_extra — build policy from channel config blob.
     slash_allowed_for_actor — combined admin + config tier gate.
+    slash_command_head — normalize first slash token without Telegram @bot suffix.
 """
 
 from __future__ import annotations
@@ -99,6 +100,33 @@ class SlashAccessPolicy:
         return canonical_cmd in self.user_allowed_commands
 
 
+def slash_command_head(text: str) -> str:
+    """Return normalized first slash token without Telegram ``@bot`` suffix.
+
+    Telegram group chats append the bot username to slash commands
+    (``/config@MyBot add …``). Strip that suffix before command routing.
+
+    Args:
+        text (str): Inbound message text.
+
+    Returns:
+        str: Lowercase command token including leading ``/``, or empty when not slash.
+
+    Examples:
+        >>> slash_command_head("/config@MyBot add @user")
+        '/config'
+        >>> slash_command_head("/help")
+        '/help'
+    """
+    raw = (text or "").strip()
+    if not raw.startswith("/"):
+        return ""
+    first = raw.split(maxsplit=1)[0].lower()
+    if "@" in first:
+        first = first.split("@", 1)[0]
+    return first
+
+
 def is_admin_slash_command(text: str) -> bool:
     """Return ``True`` when text is an admin-tier slash command.
 
@@ -114,11 +142,7 @@ def is_admin_slash_command(text: str) -> bool:
         >>> is_admin_slash_command("/help")
         False
     """
-    stripped = (text or "").strip()
-    if not stripped.startswith("/"):
-        return False
-    head = stripped.split(maxsplit=1)[0].lower()
-    return head in ADMIN_SLASH_COMMANDS
+    return slash_command_head(text) in ADMIN_SLASH_COMMANDS
 
 
 def canonical_slash_command(text: str) -> str:
@@ -133,11 +157,10 @@ def canonical_slash_command(text: str) -> str:
     Examples:
         >>> canonical_slash_command("/Platform list")
         'platform'
+        >>> canonical_slash_command("/config@MyBot add")
+        'config'
     """
-    raw = (text or "").strip()
-    if not raw.startswith("/"):
-        return ""
-    return raw.split(maxsplit=1)[0].lstrip("/").lower()
+    return slash_command_head(text).lstrip("/")
 
 
 def _coerce_id_list(raw: Any) -> frozenset[str]:
@@ -322,4 +345,5 @@ __all__ = [
     "policy_for_message",
     "policy_from_channel_extra",
     "slash_allowed_for_actor",
+    "slash_command_head",
 ]
