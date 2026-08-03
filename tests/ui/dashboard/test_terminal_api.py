@@ -176,6 +176,11 @@ def test_sandbox_terminal_self_preservation_blocks_line() -> None:
 )
 def test_terminal_ws_local_open_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("SEVN_DANGEROUS_HOST_SANDBOX", "1")
+    monkeypatch.setattr(
+        "sevn.security.sandbox_runtime.docker_daemon_reachable",
+        lambda **_kwargs: False,
+    )
 
     def _alarm_handler(_signum: int, _frame: object) -> None:
         raise TimeoutError("terminal WS smoke exceeded 45s")
@@ -185,26 +190,44 @@ def test_terminal_ws_local_open_smoke(tmp_path: Path, monkeypatch: pytest.Monkey
     previous = signal.signal(signal.SIGALRM, _alarm_handler)
     signal.alarm(45)
     try:
-        with (
-            _client(tmp_path, local_open=True) as client,
-            client.websocket_connect(
-                "/ws/dashboard/terminal",
-            ) as ws,
-        ):
-            ready = json.loads(ws.receive_text())
-            assert ready["type"] == "ready"
-            assert ready["driver"] in {"subprocess", "docker"}
-            stdin = base64.b64encode(b"echo mc_w8_ok\n").decode("ascii")
-            ws.send_text(json.dumps({"type": "stdin", "data": stdin}))
-            saw_output = False
-            for _ in range(40):
-                frame = json.loads(ws.receive_text())
-                if frame.get("type") == "stdout" and "mc_w8_ok" in base64.b64decode(
-                    frame["data"],
-                ).decode("utf-8", errors="replace"):
-                    saw_output = True
-                    break
-            assert saw_output
+        with _client(tmp_path, local_open=True) as client:
+            _login(client)
+            session_resp = client.post(
+                "/api/v1/terminal/session",
+                json={},
+                headers=_csrf_headers(client),
+            )
+            assert session_resp.status_code == 200
+            session_id = session_resp.json()["session_id"]
+            jwt = client.cookies.get("sevn_dashboard_session")
+            csrf = client.cookies.get(DASHBOARD_CSRF_COOKIE_NAME)
+            assert jwt
+            assert csrf
+            with client.websocket_connect("/ws/dashboard/terminal") as ws:
+                ws.send_text(
+                    json.dumps(
+                        {
+                            "type": "auth",
+                            "token": jwt,
+                            "csrf": csrf,
+                            "session_id": session_id,
+                        },
+                    ),
+                )
+                ready = json.loads(ws.receive_text())
+                assert ready["type"] == "ready"
+                assert ready["driver"] in {"subprocess", "docker"}
+                stdin = base64.b64encode(b"echo mc_w8_ok\n").decode("ascii")
+                ws.send_text(json.dumps({"type": "stdin", "data": stdin}))
+                saw_output = False
+                for _ in range(40):
+                    frame = json.loads(ws.receive_text())
+                    if frame.get("type") == "stdout" and "mc_w8_ok" in base64.b64decode(
+                        frame["data"],
+                    ).decode("utf-8", errors="replace"):
+                        saw_output = True
+                        break
+                assert saw_output
     finally:
         signal.alarm(0)
         signal.signal(signal.SIGALRM, previous)

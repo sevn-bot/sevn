@@ -22,8 +22,10 @@ _GATEWAY_TOKEN = "required-token-at-least-32-characters-long"
 def gui_client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("SEVN_NOVNC_UPSTREAM", "http://127.0.0.1:6080")
     app = FastAPI()
-    mount_gui_proxy(app, resolve_gateway_token=lambda _request: None)
-    return TestClient(app)
+    mount_gui_proxy(app, resolve_gateway_token=lambda _request: _GATEWAY_TOKEN)
+    client = TestClient(app)
+    client.cookies.set(GUI_SESSION_COOKIE, _GATEWAY_TOKEN)
+    return client
 
 
 def test_upstream_ws_url_builds_ws_scheme() -> None:
