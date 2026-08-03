@@ -25,6 +25,7 @@ are cut into a dated, versioned section at release time.
 - [2026-07-30] `/model --once <provider/model>` stages a one-turn tier-B model override in session metadata — consumed at the next agent turn (success or failure) without changing the persisted `providers.tier_default.B` setting; `/status` shows effective vs persisted model (#88)
 - [2026-07-30] Per-channel and per-topic model and system prompt overrides under `channels.<name>.model` / `channels.<name>.system_prompt` and `channels.telegram.topics.<id>.*` — turn-scoped resolution with session → channel → workspace precedence; `TopicConfig.system_prompt` wired from Telegram inbound metadata (#86)
 ### Fixed
+- [2026-08-03] Product sweep Batch B W7 replay confirms removed Playwright bundled skills stay absent — repo-wide grep clean, `make removed-browser-skills-check` + operator workspace cleanup guidance in spec 12 (#117, #127, open-issues-sweep-product W7)
 - [2026-08-03] Telegram group-chat `/logs@bot` and `/traces@bot` slash lines route to owner diagnostic commands instead of being silently swallowed by the dispatcher bypass
 - [2026-08-03] Telegram `/config@bot add @user` and similar slash lines route to the config menu instead of failing with unknown slash skill `config@…` (#134, open-issues-sweep-product W6)
 - [2026-08-02] Removed-browser-skills CI gate anchors hyphenated id scans with word boundaries so prose like `max-users` no longer false-positives on `x-use` (#131, open-issues-sweep-aug-2026 W6)

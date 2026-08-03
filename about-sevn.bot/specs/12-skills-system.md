@@ -750,7 +750,7 @@ per-day caps and cooldowns, logs decisions to
 ``.sevn/reddit-karma-loop/decisions.jsonl``, and requires ``--confirm`` before
 any post. ``auto_post`` is not implemented — draft-only per **D11**.
 
-## Amendments (open-issues-sweep-aug-2026 W6 — removed Playwright skills #117 / #127, D6)
+## Amendments (open-issues-sweep product W7 / aug-2026 W6 — removed Playwright skills #117 / #127, D6)
 
 Bundled Playwright skill trees were removed on 2026-07-16: ``playwright-browser``,
 ``x-use``, ``facebook-use``, ``linkedin-use``. Browser automation uses the native
