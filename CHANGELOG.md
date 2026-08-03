@@ -26,6 +26,7 @@ are cut into a dated, versioned section at release time.
 - [2026-07-30] `/model --once <provider/model>` stages a one-turn tier-B model override in session metadata — consumed at the next agent turn (success or failure) without changing the persisted `providers.tier_default.B` setting; `/status` shows effective vs persisted model (#88)
 - [2026-07-30] Per-channel and per-topic model and system prompt overrides under `channels.<name>.model` / `channels.<name>.system_prompt` and `channels.telegram.topics.<id>.*` — turn-scoped resolution with session → channel → workspace precedence; `TopicConfig.system_prompt` wired from Telegram inbound metadata (#86)
 ### Fixed
+- [2026-08-03] Background `process` jobs expose live stdout/stderr while still running so polling `process output` works before exit (#160, release-audit A)
 - [2026-08-03] Proxy SSRF IP pinning brackets IPv6 literals in pinned request URLs so dual-stack hosts do not raise unhandled `InvalidURL` (#141, release-audit A)
 - [2026-08-03] Docker sandbox egress: attach compose proxy to internal `sevn-sandbox` network and rewrite loopback `SEVN_PROXY_URL` to a docker-host gateway so sandbox containers reach the egress proxy (#142, release-audit A-Thermos)
 - [2026-08-03] Docker sandbox network policy: dedicated internal `sevn-sandbox` network, read-only workspace bind with narrow `.out` rw volume, `--user`/`--cap-drop ALL`/seccomp/`no-new-privileges`, digest-pinned image pull, nested `.llmignore` masks, and TTL reaper on `sevn.run_id` labels (#142, release-audit W5)

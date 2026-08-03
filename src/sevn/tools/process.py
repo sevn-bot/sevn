@@ -177,8 +177,8 @@ async def _read_stream(
         total += len(text)
         while total > MAX_CAPTURE_CHARS and len(ring) > 1:
             total -= len(ring.popleft())
-    parts.clear()
-    parts.extend(ring)
+        parts.clear()
+        parts.extend(ring)
 
 
 def _finalize_job_status(job: BackgroundJob) -> None:
