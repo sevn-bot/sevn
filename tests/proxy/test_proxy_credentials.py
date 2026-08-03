@@ -8,6 +8,10 @@ from pathlib import Path
 
 import pytest
 
+from sevn.config.defaults import (
+    DEFAULT_NOUS_INFERENCE_BASE_URL,
+    NOUS_PORTAL_DEEPSEEK_V4_FLASH_MODEL_ID,
+)
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.proxy.credentials import ProviderCredentials, build_proxy_settings
 from sevn.proxy.settings import ProxySettings
@@ -83,6 +87,30 @@ async def test_minimax_catalog_sets_anthropic_base_url(tmp_path: Path) -> None:
     )
     assert out.anthropic_base_url == "https://custom.minimax.example/anthropic/v1"
     assert out.openai_base_url == "https://api.openai.com/v1"
+
+
+@pytest.mark.anyio
+async def test_nous_catalog_sets_openai_base_url(tmp_path: Path) -> None:
+    """``providers.nous.base_url`` derives ``openai_base_url`` at boot."""
+    cfg = WorkspaceConfig(
+        schema_version=1,
+        providers={
+            "tier_default": {"triager": NOUS_PORTAL_DEEPSEEK_V4_FLASH_MODEL_ID},
+            "nous": {"base_url": DEFAULT_NOUS_INFERENCE_BASE_URL},
+            "models": {NOUS_PORTAL_DEEPSEEK_V4_FLASH_MODEL_ID: {"provider": "nous"}},
+        },
+        gateway={"token": "${SECRET:keychain:sevn.gateway.token}"},
+    )
+    out = await build_proxy_settings(
+        workspace_config=cfg,
+        content_root=tmp_path,
+        env_settings=ProxySettings(),
+    )
+    provider_map = getattr(out, "provider_credentials", None)
+    assert isinstance(provider_map, ProviderCredentials)
+    nous_entry = provider_map.by_name["nous"]
+    assert nous_entry.base_url == DEFAULT_NOUS_INFERENCE_BASE_URL
+    assert nous_entry.openai_base_url == DEFAULT_NOUS_INFERENCE_BASE_URL
 
 
 @pytest.mark.anyio

@@ -706,6 +706,9 @@ DEFAULT_PROXY_PORT: Final[int] = 8787
 DEFAULT_MINIMAX_ANTHROPIC_BASE_URL: Final[str] = "https://api.minimax.io/anthropic/v1"
 DEFAULT_MINIMAX_OPENAI_BASE_URL: Final[str] = "https://api.minimax.io/v1"
 DEFAULT_MINIMAX_TRANSPORT: Final[str] = "chat_completions"
+# Nous Portal inference API (OpenAI-compatible) — Hermes/Nous docs #153 W17.
+DEFAULT_NOUS_INFERENCE_BASE_URL: Final[str] = "https://inference-api.nousresearch.com/v1"
+NOUS_PORTAL_DEEPSEEK_V4_FLASH_MODEL_ID: Final[str] = "deepseek/deepseek-v4-flash"
 
 # Sub-agents (L1/L2) — `subagents` subtree (`specs/36-sub-agents.md` D2).
 DEFAULT_SUBAGENTS_ENABLED: Final[bool] = True

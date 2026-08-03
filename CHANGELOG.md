@@ -11,6 +11,7 @@ are cut into a dated, versioned section at release time.
 ## [Unreleased]
 
 ### Added
+- [2026-08-03] Nous Portal provider config for DeepSeek V4 Flash (`deepseek/deepseek-v4-flash` via `providers.nous` + OpenAI-compat `https://inference-api.nousresearch.com/v1`) with schema/template docs and proxy smoke tests (#153, open-issues-sweep Batch F W17)
 - [2026-08-02] Brand visual identity guide in `docs/brand/README.md` documents the ASCII-style 7 mark, authoritative token/logo paths, typography, and agent image-generation guardrails (not a fox/wolf mascot); cross-linked from `about-sevn.bot/ARCHITECTURE.md` (#118, open-issues-sweep-aug-2026 W7)
 - [2026-08-02] X login troubleshooting in `social_media_manager/SKILL.md` — SMS/phone handoff, account picker, cookie persistence, and no-code-in-logs guidance (#125, open-issues-sweep W10)
 - [2026-08-02] X discovery ops `discover_followers`, `discover_topic_accounts`, and `discover_mutual_graph` on the `x_ops` facade with D11 dry-run and rate-limit backoff envelopes (#129, open-issues-sweep W14)

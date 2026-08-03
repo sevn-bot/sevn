@@ -211,6 +211,19 @@
       "how_to_collect": "Mistral console.",
       "secret_label": "providers.mistral.api_key"
     },
+    "providers.nous.api_key": {
+      "long_description": "Nous Portal inference API key (OpenAI-compatible bearer). Routes chat-completions to https://inference-api.nousresearch.com/v1 when a catalog model id is bound to provider nous (typically via providers.models.<id>.provider).",
+      "how_to_collect": "Sign in at https://portal.nousresearch.com/ — create or copy an inference API key (or complete Hermes Portal OAuth and export NOUS_API_KEY). Store as ${SECRET:SEVN_SECRET_NOUS}; never commit plaintext.",
+      "secret_label": "providers.nous.api_key"
+    },
+    "providers.nous.base_url": {
+      "long_description": "OpenAI-compatible Nous Portal inference base URL. Defaults to https://inference-api.nousresearch.com/v1 per Nous/Hermes documentation; override only for staging (NOUS_INFERENCE_BASE_URL in Hermes).",
+      "how_to_collect": "Leave at default unless Nous docs specify a staging host."
+    },
+    "providers.models.deepseek/deepseek-v4-flash.provider": {
+      "long_description": "Provider registry override for DeepSeek V4 Flash on Nous Portal. Without this, deepseek/* prefix would route to a native DeepSeek provider instead of Nous.",
+      "how_to_collect": "Set provider to nous when using Nous Portal subscription for deepseek/deepseek-v4-flash."
+    },
     "providers.ollama": {
       "long_description": "Usually empty object — local Ollama needs no key; optional base_url in nested keys per code.",
       "how_to_collect": "If remote Ollama, set endpoint"
