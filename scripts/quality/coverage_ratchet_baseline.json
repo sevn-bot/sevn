@@ -1,0 +1,36 @@
+{
+  "generated": "2026-08-03",
+  "measured": "2026-08-03",
+  "issue": "#150",
+  "overall_observed_pct": 70.0,
+  "overall_floor_pct": 68.0,
+  "security_auth_target_pct": 90.0,
+  "modules": {
+    "sevn.proxy": {
+      "observed_pct": 68.0,
+      "floor_pct": 66.0,
+      "target_pct": 90.0
+    },
+    "sevn.security": {
+      "observed_pct": 66.0,
+      "floor_pct": 64.0,
+      "target_pct": 90.0
+    },
+    "sevn.gateway.auth": {
+      "observed_pct": 74.0,
+      "floor_pct": 72.0,
+      "target_pct": 90.0
+    },
+    "sevn.triggers.auth": {
+      "observed_pct": 85.0,
+      "floor_pct": 83.0,
+      "target_pct": 90.0
+    },
+    "sevn.ui.dashboard.services.auth": {
+      "observed_pct": 83.0,
+      "floor_pct": 81.0,
+      "target_pct": 90.0
+    }
+  },
+  "flip_blocking_when": "overall and all module floors meet target_pct (D11 advisory until then)"
+}
