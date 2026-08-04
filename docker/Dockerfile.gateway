@@ -16,6 +16,7 @@ COPY src/sevn ./src/sevn
 COPY src/proton_cli ./src/proton_cli
 # Required by the hatchling wheel force-include in pyproject.toml.
 COPY infra/sevn.schema.json ./infra/sevn.schema.json
+COPY infra/docker ./infra/docker
 
 RUN uv sync --frozen --no-dev
 
@@ -42,7 +43,9 @@ ENV PATH="/opt/sevn/.venv/bin:${PATH}"
 RUN useradd --create-home --uid 10001 --shell /usr/sbin/nologin sevn \
     && chown -R sevn:sevn /opt/sevn \
     && mkdir -p /workspace \
-    && chown sevn:sevn /workspace
+    && chown sevn:sevn /workspace \
+    && chmod +x /opt/sevn/infra/docker/gateway-entrypoint.sh \
+    && chmod +x /opt/sevn/infra/docker/compose-bootstrap.py
 
 USER sevn
 
@@ -50,4 +53,5 @@ WORKDIR /workspace
 
 EXPOSE 3001
 
+ENTRYPOINT ["/opt/sevn/infra/docker/gateway-entrypoint.sh"]
 CMD ["uvicorn", "sevn.gateway.http_server:create_app", "--factory", "--host", "0.0.0.0", "--port", "3001"]

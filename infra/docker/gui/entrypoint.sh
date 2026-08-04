@@ -12,6 +12,11 @@ mkdir -p \
     "${WORKSPACE}/.sevn/browser-sessions" \
     "${WORKSPACE}/logs"
 
+if [[ ! -f "${WORKSPACE}/sevn.json" ]]; then
+    echo "gui entrypoint: ${WORKSPACE}/sevn.json missing — running compose bootstrap"
+    python /opt/sevn/infra/docker/compose-bootstrap.py
+fi
+
 OWNERSHIP_SENTINEL="${WORKSPACE}/.sevn/.ownership-normalized"
 if [[ ! -f "${OWNERSHIP_SENTINEL}" ]]; then
     # One-shot fix for prior root-run `--profile browser` sessions on a shared volume.

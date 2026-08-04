@@ -34,7 +34,7 @@ PIP_AUDIT_CACHE ?= $(CURDIR)/.cache/pip-audit
 MERGECRAFT_REF ?= $(if $(SEVN_MERGECRAFT_REF),$(SEVN_MERGECRAFT_REF),349f9489da34515a09997142ae75acbc24797227)
 PRE_COMMIT ?= $(UV) run pre-commit
 
-.PHONY: help setup install install-git-guards check-git-guards check-compose-default snapshot-local install-snapshot-timer install-cli install-cli-browser sync-cli update-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover coverage-ratchet complexity-ratchet complexity-target stale-xfail-check md-links-check doctest security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check removed-browser-skills-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh storage-migration-rehearsal-check styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage mergecraft-ref-check review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-browser-up compose-gui-up compose-down compose-logs compose-restart log-explore telegram-checks telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-curate readme-curate-prompt readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate spec-check prd-check spec-sync prd-sync logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve faq-generate faq-check
+.PHONY: help setup install install-git-guards check-git-guards check-compose-default snapshot-local install-snapshot-timer install-cli install-cli-browser sync-cli update-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover coverage-ratchet complexity-ratchet complexity-target stale-xfail-check md-links-check doctest security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check removed-browser-skills-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh storage-migration-rehearsal-check styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage mergecraft-ref-check review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-browser-up compose-gui-up compose-down compose-logs compose-restart verify-compose-profiles verify-stack-health verify-sandbox-spawn verify-runtime verify-deployment log-explore telegram-checks telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-curate readme-curate-prompt readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate spec-check prd-check spec-sync prd-sync logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve faq-generate faq-check
 
 
 PROXY_ENV_FILE ?= .env.proxy
@@ -603,6 +603,23 @@ compose-logs: ## Follow logs from operator compose stack
 
 compose-restart: ## Restart operator compose services
 	docker compose $(COMPOSE_FILES) restart
+
+VERIFY_DRIVER = $(UV) run python scripts/verify_deployment.py
+
+verify-compose-profiles: ## /verify driver: assert every documented compose invocation (#164, #165)
+	$(VERIFY_DRIVER) compose-profiles
+
+verify-stack-health: ## /verify driver: boot operator stack under a private project, probe /health + /ready, tear down (#166, #177)
+	$(VERIFY_DRIVER) stack-health
+
+verify-sandbox-spawn: ## /verify driver: tier-B sandbox spawn against the real docker CLI (#170; needs make docker-build-ci)
+	$(VERIFY_DRIVER) sandbox-spawn
+
+verify-runtime: ## /verify driver: sevn CLI + HTTP /health + /ready against a running gateway
+	$(VERIFY_DRIVER) runtime
+
+verify-deployment: ## /verify: run every deployment driver; evidence under evidence/verify/ (exit 2 = driver_unavailable)
+	$(VERIFY_DRIVER) all
 
 log-explore: ## Explore gateway.log (CMD=signal|turns|tools|errors|tool-usage|context-drift|failures [LOG=gateway.log])
 	$(UV) run python tools/explore_gateway_log.py $(CMD) $(or $(LOG),gateway.log)
