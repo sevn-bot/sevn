@@ -543,3 +543,21 @@ Craft evaluation for [#110](https://github.com/sevn-bot/sevn/issues/110) — pla
 - [ ] **W15-adopt (operator gate)** Add `getsentry/craft@v2` workflow and/or `make release-*`
   wrappers; resolve duplicate GitHub Release ownership with `ci-cd.yml` phase6 before live
   `craft publish`. (2026-08-01 deferred: D10 — operator sign-off required)
+
+## Amendments (post-audit-0.0.1 W2 — append-only)
+
+Operator gateway variants (**#164**, **#165**, plan **D9** / **D10**) use Compose override
+files instead of profiles. Each documented invocation must resolve to exactly
+`{sevn-operator-perms, sevn-proxy, sevn-gateway}` with a single publisher of
+``${SEVN_GATEWAY_PORT}``.
+
+| Invocation | `-f` set | Gateway image |
+|------------|----------|---------------|
+| Default | `docker/docker-compose.yml` | `Dockerfile.gateway` |
+| Browser CDP | base + `docker/docker-compose.browser.yml` | `Dockerfile.gateway.browser` |
+| Headed GUI + noVNC | base + `docker/docker-compose.gui.yml` | `Dockerfile.gateway.gui` |
+
+``make check-compose-default`` (in ``ci-infra``) validates all three file sets via
+``scripts/check-compose-default.sh``. Makefile targets ``compose-up``,
+``compose-browser-up``, and ``compose-gui-up`` route through the matching `-f` set;
+``COMPOSE_PROFILES`` browser+gui mutual exclusion remains a regression net for legacy callers.

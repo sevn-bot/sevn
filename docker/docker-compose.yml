@@ -9,10 +9,11 @@
 #   /operator/workspace/logs/gateway.log  (resolve_service_log_path / diagnostics)
 #   /operator/workspace/.sevn/traces.db
 #
-# Browser CDP (Brave + browser-cdp): optional profile `browser` swaps in Dockerfile.gateway.browser.
-# Profile `gui` adds noVNC. Profiles `browser` and `gui` are mutually exclusive.
-# Default `docker compose up` starts sevn-proxy + sevn-gateway.
-# Host-first headed browsing: run gateway on macOS with `uv sync --extra browser-cdp` instead.
+# Default stack: sevn-operator-perms + sevn-proxy + sevn-gateway (Dockerfile.gateway).
+# Browser CDP and headed GUI variants use override files (same service name, one gateway):
+#   -f docker/docker-compose.browser.yml  (Brave + browser-cdp)
+#   -f docker/docker-compose.gui.yml       (Brave + noVNC on 6080)
+# Host-first headed browsing: run gateway on macOS with `uv sync --extra browser` instead.
 #
 # Gateway/proxy/browser images run as uid 10001 (`sevn`). Named volumes mount as root unless
 # normalized — ``sevn-operator-perms`` chowns ``sevn-state`` (and browser state) before services start.
@@ -90,83 +91,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 45s
-
-  sevn-gateway-browser:
-    profiles:
-      - browser
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.gateway.browser
-    environment:
-      SEVN_HOME: /operator
-      SEVN_PROXY_URL: http://sevn-proxy:8787
-      SEVN_TELEGRAM_BOT_TOKEN: ${SEVN_TELEGRAM_BOT_TOKEN:-}
-      SEVN_CHROME_EXECUTABLE: /usr/bin/brave-browser
-      SEVN_BROWSER_ENGINE: brave
-      SEVN_BROWSER_EXTRA_ARGS: "--disable-dev-shm-usage"
-    volumes:
-      - sevn-state:/operator
-      - sevn-browser-state:/operator/workspace/.sevn/browser-profiles
-      - ../infra/docker-onboard.json:/bootstrap/onboard-compose.json:ro
-    working_dir: /operator/workspace
-    ports:
-      - "${SEVN_GATEWAY_BIND:-127.0.0.1}:${SEVN_GATEWAY_PORT:-3001}:3001"
-    depends_on:
-      sevn-operator-perms:
-        condition: service_completed_successfully
-      sevn-proxy:
-        condition: service_healthy
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3001/ready', timeout=3)",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 90s
-
-  sevn-gateway-gui:
-    profiles:
-      - gui
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.gateway.gui
-    environment:
-      SEVN_HOME: /operator
-      SEVN_PROXY_URL: http://sevn-proxy:8787
-      SEVN_TELEGRAM_BOT_TOKEN: ${SEVN_TELEGRAM_BOT_TOKEN:-}
-      SEVN_CHROME_EXECUTABLE: /usr/bin/brave-browser
-      SEVN_BROWSER_ENGINE: brave
-      SEVN_BROWSER_HEADLESS: "0"
-      DISPLAY: ":99"
-      SEVN_BROWSER_EXTRA_ARGS: "--disable-dev-shm-usage"
-    volumes:
-      - sevn-state:/operator
-      - ../infra/docker-onboard.json:/bootstrap/onboard-compose.json:ro
-    working_dir: /operator/workspace
-    ports:
-      - "${SEVN_GATEWAY_BIND:-127.0.0.1}:${SEVN_GATEWAY_PORT:-3001}:3001"
-    depends_on:
-      sevn-operator-perms:
-        condition: service_completed_successfully
-      sevn-proxy:
-        condition: service_healthy
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3001/ready', timeout=3); urllib.request.urlopen('http://127.0.0.1:6080/vnc.html', timeout=3)",
-        ]
-      interval: 15s
-      timeout: 5s
-      retries: 8
-      start_period: 120s
 
 volumes:
   sevn-state:

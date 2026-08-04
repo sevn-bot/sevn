@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: MIT
+# Browser CDP gateway override — merges with docker-compose.yml (replaces sevn-gateway).
+#
+# Run from repo root:
+#   docker compose -f docker/docker-compose.yml -f docker/docker-compose.browser.yml up -d --build
+# or: make compose-browser-up
+
+services:
+  sevn-gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gateway.browser
+    environment:
+      SEVN_HOME: /operator
+      SEVN_PROXY_URL: http://sevn-proxy:8787
+      SEVN_TELEGRAM_BOT_TOKEN: ${SEVN_TELEGRAM_BOT_TOKEN:-}
+      SEVN_CHROME_EXECUTABLE: /usr/bin/brave-browser
+      SEVN_BROWSER_ENGINE: brave
+      SEVN_BROWSER_EXTRA_ARGS: "--disable-dev-shm-usage"
+    volumes:
+      - sevn-state:/operator
+      - sevn-browser-state:/operator/workspace/.sevn/browser-profiles
+      - ../infra/docker-onboard.json:/bootstrap/onboard-compose.json:ro
+    working_dir: /operator/workspace
+    ports:
+      - "${SEVN_GATEWAY_BIND:-127.0.0.1}:${SEVN_GATEWAY_PORT:-3001}:3001"
+    depends_on:
+      sevn-operator-perms:
+        condition: service_completed_successfully
+      sevn-proxy:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3001/ready', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
