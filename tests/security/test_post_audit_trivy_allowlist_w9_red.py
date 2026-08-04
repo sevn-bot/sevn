@@ -15,8 +15,6 @@ import textwrap
 from datetime import date, timedelta
 from pathlib import Path
 
-import pytest
-
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _TRIVY_ALLOWLIST = _REPO_ROOT / "security" / "trivy-allowlist.toml"
 _TRIVY_IGNORE_SCRIPT = _REPO_ROOT / "scripts" / "trivy_ignore_args.py"
@@ -45,7 +43,6 @@ def _run_trivy_ignore_args(*, allowlist: Path | None = None) -> subprocess.Compl
     )
 
 
-@pytest.mark.xfail(reason="green after W11", strict=False)
 def test_trivy_allowlist_file_exists_and_parses() -> None:
     """W9.4: allowlist is the single source of truth for time-boxed image CVE exceptions."""
     assert _TRIVY_ALLOWLIST.is_file(), "security/trivy-allowlist.toml missing until W11"
@@ -60,7 +57,6 @@ def test_trivy_allowlist_file_exists_and_parses() -> None:
     assert isinstance(rows, list)
 
 
-@pytest.mark.xfail(reason="green after W11", strict=False)
 def test_trivy_ignore_args_emits_active_ignore_flags(tmp_path: Path) -> None:
     """W9.4: helper prints ignore args for non-expired rows (mirrors pip-audit helper)."""
     future = (date.today() + timedelta(days=30)).isoformat()
@@ -83,7 +79,6 @@ def test_trivy_ignore_args_emits_active_ignore_flags(tmp_path: Path) -> None:
     assert "CVE-2026-TEST-001" in proc.stdout or "--ignorefile" in proc.stdout
 
 
-@pytest.mark.xfail(reason="green after W11", strict=False)
 def test_trivy_ignore_args_fails_on_expired_review_by(tmp_path: Path) -> None:
     """W9.4: expired ``review_by`` rows fail closed (mirrors pip-audit expiry enforcement)."""
     allowlist = tmp_path / "trivy-allowlist.toml"
@@ -105,7 +100,6 @@ def test_trivy_ignore_args_fails_on_expired_review_by(tmp_path: Path) -> None:
     assert "expired" in proc.stderr.lower() or "review_by" in proc.stderr.lower()
 
 
-@pytest.mark.xfail(reason="green after W11", strict=False)
 def test_scan_image_runs_trivy_before_cosign_sign() -> None:
     """W9.5 / D23: scan must block signing — trivy precedes ``cosign sign`` in ``scan_image()``."""
     body = _scan_image_body()
@@ -116,7 +110,6 @@ def test_scan_image_runs_trivy_before_cosign_sign() -> None:
     assert trivy_pos < cosign_pos
 
 
-@pytest.mark.xfail(reason="green after W11", strict=False)
 def test_scan_image_trivy_uses_blocking_exit_code() -> None:
     """W9.5 / D23: trivy scan uses ``--exit-code 1`` for CRITICAL/HIGH findings."""
     body = _scan_image_body()
