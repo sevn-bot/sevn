@@ -8,7 +8,7 @@ summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict de
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
 last_updated: '2026-08-04'
-fingerprint: sha256:344d7dcc48da8590de385559d6029d6e69e519def211fa07cee2fa7a29bafdc4
+fingerprint: sha256:ae20240b5b95933b42e5fd7eefae0e3d8b389180eaf618dce74af51425dc99b3
 related: []
 sources:
 - .github/workflows/**
@@ -437,7 +437,8 @@ and docs/skills/infra checks that block regressions before merge.
 | `make ci-skills` | skillspector + skill inventory checks |
 | `make ci-parity` | code-index, deploy report parity, mergecraft pin gate |
 | `make ci-affected` / `make ci-changed` | Path-aware partial gates |
-| `make ci-quality` | Advisory (ruff ratchet, vulture, codespell — not in `make ci`) |
+| `make ci-quality` | Advisory (ruff ratchet, vulture, codespell — not in `make ci`; daily cron in `ci-supplementary.yml`) |
+| `make ci-quality-coverage` | Advisory (`coverage`, `diff-cover`, `coverage-ratchet`; sibling job in `ci-supplementary.yml`) |
 | `.github/workflows/ci.yml` | Primary CI workflow |
 | `.github/workflows/ci-cd.yml` | Container artifact publication + draft release on `v*` tags |
 | `.craft.yml` | Sentry Craft config scaffold (evaluation-only; #110 / W15 — not wired to CI) |
@@ -463,7 +464,7 @@ Tier↔resume parity is enforced by `tests/infra/test_ci_steps_tier_parity.py` (
 | Workflow | Purpose |
 |----------|---------|
 | `ci.yml` | Main CI (invokes make targets) |
-| `ci-supplementary.yml` | Supplementary checks |
+| `ci-supplementary.yml` | Supplementary checks (daily security audit, advisory `ci-quality` / `ci-quality-coverage`, weekly image rebuild) |
 | `ci-cd.yml` | Container artifact publication + draft release on `v*` tags (phases 2–5 deploy stubs) |
 | `docker.yml` | Container build validation |
 | `style-guide-pages.yml` | Style guide site |
@@ -508,6 +509,8 @@ Wave agents: mid-wave **`make ci-affected`** only; wave boundary **`make ci`** o
 | Git guard missing | `make check-git-guards` fails (blocks destructive clean) |
 | Tag build with deploy stubs failing | `delivery-chain` required check red; phase6 does not run; no published release |
 | Tag build while deploy phases succeed | Draft GitHub Release only (`draft: true`); no production deploy until phases 4–5 ship |
+| Advisory quality tier member fails | `make ci-quality` runs every member target (non-short-circuit via `scripts/ci_quality.py`); job red on first failure but log shows all member results |
+| Coverage gate after install-action sync | `make ci-quality-coverage` requires W12 dev-extra preservation; `make coverage` exits 2 when optional `dev` is pruned mid-suite |
 
 ## Amendments (telegram-menu-redesign W9)
 
@@ -593,3 +596,19 @@ future ``review_by`` date.
 | Expiry gate | ``scripts/trivy_ignore_args.py`` + ``make trivy-allowlist-check`` (``ci-core`` via ``make security``) | Fails closed on expired rows; emits ``--ignorefile`` for Actions |
 | Blocking scan | ``scan_image()`` in ``ci-cd.yml`` | ``trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed`` then cosign + syft |
 | Reports | ``sboms/`` artifact + phase6 release attachments | Trivy JSON/SARIF + SPDX SBOM per image |
+
+## Amendments (post-audit-0.0.1 W13 — append-only)
+
+Advisory quality tier revival (**#178**, plan **D33**). ``make ci-quality`` and
+``make ci-quality-coverage`` are **not** in ``make ci`` or sharded ``ci.yml`` —
+they run on the daily ``ci-supplementary.yml`` cron (``17 5 * * *``) and
+``workflow_dispatch``.
+
+| Target | Members / steps | Runner behaviour |
+|--------|-----------------|------------------|
+| ``make ci-quality`` | ``ruff-extra``, ``typecheck-strict``, ``deadcode``, ``complexity``, ``complexity-ratchet``, ``spell``, ``deps-check``, ``docstring-coverage``, ``stale-xfail-check``, ``md-links-check`` | Non-short-circuit: ``scripts/ci_quality.py`` invokes every member via ``run_make_targets()`` and returns the first non-zero exit while printing all failures |
+| ``make ci-quality-coverage`` | ``coverage``, ``diff-cover``, ``coverage-ratchet`` | Separate supplementary job on an unsharded runner; depends on W12 preserving optional ``dev`` during in-test ``uv sync`` (**D32**) |
+
+``scripts/quality/ruff_advisory_baseline.json`` is refreshed with
+``uv run python scripts/quality/ruff_advisory_gate.py --write-baseline``;
+the ``generated`` date is emitted dynamically at write time.

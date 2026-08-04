@@ -516,7 +516,8 @@ ci-affected: ## Path-aware partial gate (Python + mapped make targets); set SEVN
 
 partial-ci: ci-affected ## Alias for ci-affected (per-wave local gate)
 
-ci-quality: ruff-extra typecheck-strict deadcode complexity complexity-ratchet spell deps-check docstring-coverage stale-xfail-check md-links-check ## Advisory quality tier (baseline + ratchet; not in `ci`)
+ci-quality: ## Advisory quality tier (baseline + ratchet; not in `ci`; non-short-circuit via scripts/ci_quality.py)
+	$(UV) run python scripts/ci_quality.py
 
 ci-quality-coverage: coverage diff-cover coverage-ratchet ## Advisory coverage + diff-cover + security/auth ratchet
 ruff-extra: ## Ruff advisory families ratchet (D3; `scripts/quality/ruff_advisory_gate.py`)

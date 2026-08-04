@@ -40,6 +40,20 @@ class PathRule:
     target: str
 
 
+# Ordered members of ``make ci-quality`` (non-short-circuit runner in ``scripts/ci_quality.py``).
+CI_QUALITY_TARGETS: tuple[str, ...] = (
+    "ruff-extra",
+    "typecheck-strict",
+    "deadcode",
+    "complexity",
+    "complexity-ratchet",
+    "spell",
+    "deps-check",
+    "docstring-coverage",
+    "stale-xfail-check",
+    "md-links-check",
+)
+
 # Order matters for logging only; targets are deduped before execution.
 PATH_RULES: tuple[PathRule, ...] = (
     PathRule(
@@ -538,7 +552,10 @@ def run_step(label: str, cmd: list[str], *, prefix: str = "ci-changed") -> int:
 
 
 def run_make_targets(targets: list[str], *, prefix: str = "ci-affected") -> int:
-    """Run ``make`` targets in order; stop aggregating failures.
+    """Run ``make`` targets in order; return the first non-zero exit.
+
+    Every target runs even when an earlier one fails so callers (notably
+    ``make ci-quality``) can print the full failure set.
 
     Args:
         targets (list[str]): ``make`` target names.
