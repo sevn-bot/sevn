@@ -92,6 +92,11 @@ def _isolate_wizard_and_proxy_env() -> Iterator[None]:
         LEGACY_PROVIDER_API_KEY,
         *_provider_secret_env_keys(),
     )
+    # Compose CI sets SEVN_CI_PROXY_URL + SEVN_PROXY_SHARED_SECRET for the live
+    # proxy round-trip; keep the shared secret so transport.auth_header can attach
+    # X-Sevn-Proxy-Token (see tests/integration/test_proxy_transport_compose_roundtrip.py).
+    if os.environ.get("SEVN_CI_PROXY_URL", "").strip():
+        keys_at_start = tuple(k for k in keys_at_start if k != "SEVN_PROXY_SHARED_SECRET")
     saved = {k: os.environ[k] for k in keys_at_start if k in os.environ}
     for key in keys_at_start:
         os.environ.pop(key, None)
@@ -102,6 +107,8 @@ def _isolate_wizard_and_proxy_env() -> Iterator[None]:
         LEGACY_PROVIDER_API_KEY,
         *_provider_secret_env_keys(),
     )
+    if os.environ.get("SEVN_CI_PROXY_URL", "").strip():
+        keys_at_end = tuple(k for k in keys_at_end if k != "SEVN_PROXY_SHARED_SECRET")
     for key in keys_at_end:
         os.environ.pop(key, None)
     for key, value in saved.items():
