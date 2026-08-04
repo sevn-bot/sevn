@@ -9,13 +9,15 @@ services:
     user: "0:0"
     volumes:
       - ../infra/ci-workspace:/seed:ro
-      - sevn-ci-workspace:/workspace
+      - sevn-ci-workspace:/operator
     command:
       - sh
       - -ec
       - |
-        cp -a /seed/. /workspace/
-        chown -R 10001:10001 /workspace
+        mkdir -p /operator/workspace
+        cp -a /seed/sevn.json /operator/workspace/sevn.json
+        if [ -d /seed/.sevn ]; then cp -a /seed/.sevn /operator/workspace/.sevn; fi
+        chown -R 10001:10001 /operator
     restart: "no"
 
   mock-openai:
@@ -49,11 +51,13 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.gateway
     environment:
+      SEVN_HOME: /operator
+      HOME: /operator/workspace
       SEVN_PROXY_URL: http://sevn-proxy:8787
     volumes:
       # Gateway runs as uid 10001; seed from infra/ci-workspace into a writable volume.
-      - sevn-ci-workspace:/workspace
-    working_dir: /workspace
+      - sevn-ci-workspace:/operator
+    working_dir: /operator/workspace
     ports:
       - "13001:3001"
     depends_on:
