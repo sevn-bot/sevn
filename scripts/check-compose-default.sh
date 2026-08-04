@@ -31,6 +31,27 @@ _check_override_file_conflict() {
   return 0
 }
 
+_check_legacy_profile_without_override() {
+  local profiles="${1:-}"
+  shift
+  local has_browser_override=0 has_gui_override=0 file
+  for file in "$@"; do
+    case "$file" in
+      *docker-compose.browser.yml*) has_browser_override=1 ;;
+      *docker-compose.gui.yml*) has_gui_override=1 ;;
+    esac
+  done
+  if [[ "$profiles" == *browser* && $has_browser_override -eq 0 ]]; then
+    echo "error: browser profile requires -f docker/docker-compose.browser.yml (legacy --profile/COMPOSE_PROFILES invocations removed)" >&2
+    return 1
+  fi
+  if [[ "$profiles" == *gui* && $has_gui_override -eq 0 ]]; then
+    echo "error: gui profile requires -f docker/docker-compose.gui.yml (legacy --profile/COMPOSE_PROFILES invocations removed)" >&2
+    return 1
+  fi
+  return 0
+}
+
 _cli_profiles=""
 _compose_files=()
 while [[ $# -gt 0 ]]; do
@@ -56,11 +77,22 @@ _check_profile_conflict "$_combined_profiles" || exit 1
 if ((${#_compose_files[@]} > 0)); then
   _check_override_file_conflict "${_compose_files[@]}" || exit 1
 fi
+if [[ -n "$_combined_profiles" ]]; then
+  _guard_files=("${_compose_files[@]}")
+  if ((${#_guard_files[@]} == 0)); then
+    _guard_files=("$compose_base")
+  fi
+  _check_legacy_profile_without_override "$_combined_profiles" "${_guard_files[@]}" || exit 1
+fi
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker CLI not on PATH — skipping compose default check" >&2
   exit 0
 fi
+
+# Static compose validation only — not a runtime secret. Operator stacks must set
+# SEVN_GATEWAY_TOKEN in .env (see .env.example); bootstrap rejects known sentinels.
+export SEVN_GATEWAY_TOKEN="${SEVN_GATEWAY_TOKEN:-check-compose-default-placeholder-token-32chars}"
 
 _expected_services="sevn-gateway sevn-operator-perms sevn-proxy "
 
@@ -129,5 +161,15 @@ fi
 
 if _check_override_file_conflict "$compose_base" "$compose_browser" "$compose_gui" 2>/dev/null; then
   echo "mutual exclusion guard broken: browser+gui override files should be rejected" >&2
+  exit 1
+fi
+
+if _check_legacy_profile_without_override "browser" "$compose_base" 2>/dev/null; then
+  echo "legacy profile guard broken: browser profile without override should be rejected" >&2
+  exit 1
+fi
+
+if _check_legacy_profile_without_override "gui" "$compose_base" 2>/dev/null; then
+  echo "legacy profile guard broken: gui profile without override should be rejected" >&2
   exit 1
 fi

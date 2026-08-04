@@ -134,14 +134,16 @@ INVOCATIONS: tuple[Invocation, ...] = (
         files=(OPERATOR_COMPOSE,),
         profiles=(),
         env_profiles="browser",
-        source="COMPOSE_PROFILES env form (scripts/check-compose-default.sh)",
+        source="legacy COMPOSE_PROFILES=browser without override (rejected by check-compose-default.sh)",
+        mutually_exclusive=True,
     ),
     Invocation(
         name="gui-env",
         files=(OPERATOR_COMPOSE,),
         profiles=(),
         env_profiles="gui",
-        source="COMPOSE_PROFILES env form (scripts/check-compose-default.sh)",
+        source="legacy COMPOSE_PROFILES=gui without override (rejected by check-compose-default.sh)",
+        mutually_exclusive=True,
     ),
     Invocation(
         name="prod-overlay-browser",
@@ -163,7 +165,23 @@ INVOCATIONS: tuple[Invocation, ...] = (
         files=(OPERATOR_COMPOSE,),
         profiles=("browser", "gui"),
         env_profiles="",
-        source="docker/docker-compose.yml:13 (documented as mutually exclusive)",
+        source="legacy --profile browser --profile gui (mutually exclusive)",
+        mutually_exclusive=True,
+    ),
+    Invocation(
+        name="legacy-browser-profile-flag",
+        files=(OPERATOR_COMPOSE,),
+        profiles=("browser",),
+        env_profiles="",
+        source="legacy --profile browser without override (rejected by check-compose-default.sh)",
+        mutually_exclusive=True,
+    ),
+    Invocation(
+        name="legacy-gui-profile-flag",
+        files=(OPERATOR_COMPOSE,),
+        profiles=("gui",),
+        env_profiles="",
+        source="legacy --profile gui without override (rejected by check-compose-default.sh)",
         mutually_exclusive=True,
     ),
     Invocation(
@@ -610,6 +628,10 @@ def drive_stack_health() -> DriverResult:
     env = dict(os.environ)
     env["SEVN_GATEWAY_PORT"] = port
     env["SEVN_GATEWAY_BIND"] = "127.0.0.1"
+    env.setdefault(
+        "SEVN_GATEWAY_TOKEN",
+        "verify-stack-health-gateway-token-32chars-minimum-length",
+    )
     env.pop("COMPOSE_PROFILES", None)
     base = ["docker", "compose", "-p", project, "-f", OPERATOR_COMPOSE]
 

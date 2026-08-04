@@ -13,6 +13,25 @@ import sys
 from pathlib import Path
 from typing import Any
 
+# Known weak defaults — bootstrap must refuse these when passed via compose env.
+_GATEWAY_TOKEN_SENTINELS = frozenset(
+    {
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "change-me",
+    }
+)
+
+
+def _assert_gateway_token_not_sentinel() -> None:
+    """Refuse compose boot when ``SEVN_GATEWAY_TOKEN`` is a shipped weak default."""
+    token = os.environ.get("SEVN_GATEWAY_TOKEN", "").strip()
+    if token and token in _GATEWAY_TOKEN_SENTINELS:
+        msg = (
+            "SEVN_GATEWAY_TOKEN is a known weak default — set a unique secret "
+            "in .env (see .env.example) before starting the operator stack"
+        )
+        raise ValueError(msg)
+
 
 def _dockerize_config_doc(config_doc: dict[str, Any]) -> None:
     """Adjust onboard JSON for container-first boot (env-backed token, optional Telegram)."""
@@ -33,6 +52,7 @@ def _dockerize_config_doc(config_doc: dict[str, Any]) -> None:
 
 def bootstrap_compose_workspace() -> Path:
     """Promote workspace config when ``sevn.json`` is absent under ``SEVN_HOME``."""
+    _assert_gateway_token_not_sentinel()
     os.environ.setdefault("SEVN_HOME", "/operator")
     from sevn.cli.workspace import bound_sevn_json_path, bound_workspace_dir
     from sevn.config.provider_secrets import apply_provider_credential_bindings
