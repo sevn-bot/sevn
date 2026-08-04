@@ -5,6 +5,7 @@ Depends: httpx, urllib.parse, sevn.security.secrets.cache, sevn.security.secrets
 
 Constants:
     GITHUB_TOKEN_SECRET — proxy secrets key for the GitHub PAT.
+    GITHUB_METHODS — allowlist of dotted methods this forwarder accepts.
 
 Exports:
     dispatch_github — route ``service=github`` integration methods to api.github.com.
@@ -27,6 +28,69 @@ GITHUB_TOKEN_SECRET: str = "integration.github.token"
 _GITHUB_API: str = "https://api.github.com"
 _DEFAULT_TIMEOUT_S: float = 60.0
 _API_VERSION: str = "2022-11-28"
+
+GITHUB_METHODS: tuple[str, ...] = (
+    "actions.create_or_update_environment_for_repo",
+    "actions.create_or_update_repo_secret",
+    "actions.create_or_update_repo_variable",
+    "actions.create_workflow_dispatch",
+    "actions.get_workflow_run",
+    "actions.list_environments_for_repo",
+    "actions.list_jobs_for_workflow_run",
+    "actions.list_repo_secrets",
+    "actions.list_repo_variables",
+    "actions.list_repo_workflows",
+    "deployments.create",
+    "git.create_ref",
+    "git.delete_ref",
+    "issues.create",
+    "issues.create_comment",
+    "issues.get",
+    "issues.list_for_repo",
+    "pulls.create",
+    "pulls.get",
+    "pulls.list",
+    "pulls.merge",
+    "pulls.request_reviewers",
+    "pulls.update",
+    "repos.get",
+    "repos.list_branches",
+)
+
+
+def _unknown_method_response(method: str) -> JSONResponse:
+    """Build the 422 for an unsupported method, naming every supported method.
+
+    Callers are LLM executors that otherwise re-guess octokit or raw-REST spellings
+    (``repos.get_content``, ``GET /repos/{owner}/{repo}``) one round at a time until the
+    turn times out. Enumerating the allowlist makes a single response terminal.
+
+    Args:
+        method (str): Rejected method identifier.
+
+    Returns:
+        JSONResponse: 422 body with ``detail``, ``method``, and ``supported``.
+
+    Examples:
+        >>> resp = _unknown_method_response("repos.get_content")
+        >>> resp.status_code
+        422
+        >>> b"supported github methods" in resp.body
+        True
+    """
+    return JSONResponse(
+        {
+            "detail": (
+                f"unknown github method: {method}. "
+                f"supported github methods: {', '.join(GITHUB_METHODS)}. "
+                "Only these dotted methods are forwarded — raw REST paths and octokit "
+                "aliases are not accepted."
+            ),
+            "method": method,
+            "supported": list(GITHUB_METHODS),
+        },
+        status_code=422,
+    )
 
 
 async def _resolve_github_token(cache: ResolvedSecretsCache | None) -> str | None:
@@ -209,6 +273,9 @@ async def dispatch_github(
             },
             status_code=503,
         )
+
+    if method not in GITHUB_METHODS:
+        return _unknown_method_response(method)
 
     pair = _owner_repo(args)
     if isinstance(pair, JSONResponse):
@@ -506,7 +573,7 @@ async def dispatch_github(
         )
         return JSONResponse(_wrap_list_payload(data), status_code=status)
 
-    return JSONResponse({"detail": f"unknown github method: {method}"}, status_code=422)
+    return _unknown_method_response(method)
 
 
-__all__ = ["GITHUB_TOKEN_SECRET", "dispatch_github"]
+__all__ = ["GITHUB_METHODS", "GITHUB_TOKEN_SECRET", "dispatch_github"]
