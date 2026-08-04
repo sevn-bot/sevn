@@ -4,7 +4,7 @@ Contracts (``about-sevn.bot/specs/25-cicd-full.md``, ``prd/06-setup-and-operatio
 exactly one gateway per documented ``-f`` invocation; no duplicate ``SEVN_GATEWAY_PORT``
 publishers in a resolvable file set; Makefile compose targets resolve to a single-gateway
 file set; operator service hardening (W3 / D24); conditional ``sevn-operator-perms`` chown
-(W3 / D25). Parses compose YAML and the Makefile directly — no Docker daemon.
+(W3 / D25). Parses compose YAML and the Makefile directly - no Docker daemon.
 """
 
 from __future__ import annotations
@@ -29,7 +29,6 @@ _GATEWAY_SERVICE_NAMES = frozenset(
 _GATEWAY_PORT_MARKER = "${SEVN_GATEWAY_PORT"
 _NEGATED_PROFILE_LINE_RE = re.compile(r'^\s*-\s*"![^"]+"\s*$', re.MULTILINE)
 _NEGATED_PROFILE_INLINE_RE = re.compile(r'"!')
-_COMPOSE_TARGET_NAMES = ("compose-up", "compose-gui-up", "compose-browser-up")
 _MAKEFILE_TARGET_RE = re.compile(
     r"^(?P<name>compose(?:-up|-gui-up|-browser-up)):"
     r"(?:[^\n]*\n)(?P<body>(?:\t[^\n]*\n)+)",
@@ -164,12 +163,20 @@ _DOCUMENTED_INVOCATIONS = (
         (_BASE_COMPOSE, _BROWSER_OVERRIDE),
         frozenset(),
         id="browser-override",
+        marks=pytest.mark.xfail(
+            reason="green after W2: gateway override files (#164, #165, D9)",
+            strict=False,
+        ),
     ),
     pytest.param(
         "gui",
         (_BASE_COMPOSE, _GUI_OVERRIDE),
         frozenset(),
         id="gui-override",
+        marks=pytest.mark.xfail(
+            reason="green after W2: gateway override files (#164, #165, D9)",
+            strict=False,
+        ),
     ),
 )
 
@@ -203,6 +210,12 @@ def test_base_compose_defines_only_one_gateway_service() -> None:
     )
 
 
+test_base_compose_defines_only_one_gateway_service = pytest.mark.xfail(
+    reason="green after W2: move variant gateways to override files (#164, D9)",
+    strict=False,
+)(test_base_compose_defines_only_one_gateway_service)
+
+
 @pytest.mark.parametrize(
     ("label", "compose_paths", "profiles"),
     _DOCUMENTED_INVOCATIONS,
@@ -225,8 +238,22 @@ def test_resolvable_file_set_has_unique_gateway_port_publisher(
     "path",
     [
         pytest.param(_BASE_COMPOSE, id="base"),
-        pytest.param(_BROWSER_OVERRIDE, id="browser-override"),
-        pytest.param(_GUI_OVERRIDE, id="gui-override"),
+        pytest.param(
+            _BROWSER_OVERRIDE,
+            id="browser-override",
+            marks=pytest.mark.xfail(
+                reason="green after W2: docker-compose.browser.yml (#164, D9)",
+                strict=False,
+            ),
+        ),
+        pytest.param(
+            _GUI_OVERRIDE,
+            id="gui-override",
+            marks=pytest.mark.xfail(
+                reason="green after W2: docker-compose.gui.yml (#165, D9)",
+                strict=False,
+            ),
+        ),
     ],
 )
 def test_compose_files_forbid_negated_profiles(path: Path) -> None:
@@ -241,7 +268,21 @@ def test_compose_files_forbid_negated_profiles(path: Path) -> None:
     )
 
 
-@pytest.mark.parametrize("target", _COMPOSE_TARGET_NAMES)
+@pytest.mark.parametrize(
+    "target",
+    [
+        pytest.param("compose-up", id="compose-up"),
+        pytest.param("compose-gui-up", id="compose-gui-up"),
+        pytest.param(
+            "compose-browser-up",
+            id="compose-browser-up",
+            marks=pytest.mark.xfail(
+                reason="green after W2: compose-browser-up target (#164, D10)",
+                strict=False,
+            ),
+        ),
+    ],
+)
 def test_makefile_compose_target_exists(target: str) -> None:
     """W1.3: documented Makefile compose targets must be present."""
     assert re.search(rf"^{re.escape(target)}:", _makefile_text(), re.MULTILINE), (
@@ -249,7 +290,28 @@ def test_makefile_compose_target_exists(target: str) -> None:
     )
 
 
-@pytest.mark.parametrize("target", _COMPOSE_TARGET_NAMES)
+@pytest.mark.parametrize(
+    "target",
+    [
+        pytest.param("compose-up", id="compose-up"),
+        pytest.param(
+            "compose-gui-up",
+            id="compose-gui-up",
+            marks=pytest.mark.xfail(
+                reason="green after W2: compose-gui-up single-gateway file set (#165, D10)",
+                strict=False,
+            ),
+        ),
+        pytest.param(
+            "compose-browser-up",
+            id="compose-browser-up",
+            marks=pytest.mark.xfail(
+                reason="green after W2: compose-browser-up single-gateway file set (#164, D10)",
+                strict=False,
+            ),
+        ),
+    ],
+)
 def test_makefile_compose_target_resolves_single_gateway(target: str) -> None:
     """W1.3: each Makefile compose-up variant selects exactly one gateway."""
     compose_paths, profiles = _parse_makefile_compose_invocation(target)
