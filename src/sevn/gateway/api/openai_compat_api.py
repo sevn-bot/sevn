@@ -67,13 +67,14 @@ class ChatCompletionRequest(BaseModel):
 
 
 def _caller_scope(bearer_token: str) -> tuple[str, str]:
-    """Derive stable session scope and user id from the authenticated bearer.
+    """Derive authorization scope and user id from the authenticated bearer.
 
     Args:
         bearer_token (str): Verified gateway bearer secret.
 
     Returns:
-        tuple[str, str]: ``(scope_key, user_id)`` for :meth:`SessionManager.ensure_session`.
+        tuple[str, str]: ``(scope_key, user_id)`` for authorization; each request
+            mints a fresh ephemeral session under a unique scope suffix (D17).
 
     Examples:
         >>> sk1, uid1 = _caller_scope("secret-a")
@@ -85,6 +86,58 @@ def _caller_scope(bearer_token: str) -> tuple[str, str]:
     """
     digest = hashlib.sha256(bearer_token.encode("utf-8")).hexdigest()[:16]
     return f"{_API_CHANNEL}:{digest}", f"openai_api:{digest}"
+
+
+def _require_bearer(request: Request) -> str:
+    """Verify the gateway bearer token and return the submitted secret.
+
+    Args:
+        request (Request): Incoming HTTP request.
+
+    Returns:
+        str: Verified bearer token.
+
+    Raises:
+        HTTPException: When auth is missing, misconfigured, or invalid.
+
+    Examples:
+        >>> _require_bearer.__name__
+        '_require_bearer'
+    """
+    gateway_token = getattr(request.app.state, "resolved_gateway_token", None)
+    expected = str(gateway_token).strip() if gateway_token else ""
+    if not expected:
+        raise HTTPException(status_code=503, detail="auth_not_configured")
+    from sevn.gateway.auth import extract_bearer, secrets_compare
+
+    submitted = extract_bearer(request.headers.get("Authorization"))
+    if submitted is None or not secrets_compare(expected, submitted):
+        raise HTTPException(status_code=401, detail="invalid_api_key")
+    return submitted
+
+
+def _reap_ephemeral_session(conn: sqlite3.Connection, session_id: str) -> None:
+    """Delete a single-request OpenAI-compat session and its messages (D17).
+
+    Args:
+        conn (sqlite3.Connection): Open gateway SQLite handle.
+        session_id (str): Ephemeral session id to remove.
+
+    Returns:
+        None
+
+    Examples:
+        >>> import sqlite3
+        >>> from sevn.storage.migrate import apply_migrations
+        >>> c = sqlite3.connect(":memory:")
+        >>> apply_migrations(c)
+        >>> _reap_ephemeral_session(c, "missing") is None
+        True
+        >>> c.close()
+    """
+    conn.execute("DELETE FROM gateway_messages WHERE session_id = ?", (session_id,))
+    conn.execute("DELETE FROM gateway_sessions WHERE session_id = ?", (session_id,))
+    conn.commit()
 
 
 def _last_assistant_text(
@@ -232,7 +285,6 @@ async def _sync_request_messages(
         '_sync_request_messages'
     """
     _validate_request_messages(messages)
-    await asyncio.to_thread(_clear_visible_messages, conn, session_id)
     for msg in messages:
         role = msg.role.strip().lower()
         content = msg.content.strip()
@@ -264,8 +316,9 @@ def build_openai_compat_router() -> APIRouter:
     router = APIRouter(prefix="/v1", tags=["openai-compat"])
 
     @router.get("/models")
-    async def list_models() -> JSONResponse:
+    async def list_models(request: Request) -> JSONResponse:
         """List available models (single sevn-agent entry)."""
+        _require_bearer(request)
         return JSONResponse(
             {
                 "object": "list",
@@ -281,10 +334,9 @@ def build_openai_compat_router() -> APIRouter:
         )
 
     @router.get("/health")
-    async def health(request: Request) -> JSONResponse:
-        """Return gateway readiness for OpenAI clients."""
-        router_local = getattr(request.app.state, "gateway_router", None)
-        return JSONResponse({"status": "ok", "gateway": router_local is not None})
+    async def health() -> JSONResponse:
+        """Return liveness for OpenAI clients (unauthenticated)."""
+        return JSONResponse({"status": "ok"})
 
     @router.post("/chat/completions")
     async def chat_completions(
@@ -300,15 +352,7 @@ def build_openai_compat_router() -> APIRouter:
         if body.stream:
             raise HTTPException(status_code=400, detail="streaming_not_implemented")
 
-        gateway_token = getattr(request.app.state, "resolved_gateway_token", None)
-        expected = str(gateway_token).strip() if gateway_token else ""
-        if not expected:
-            raise HTTPException(status_code=503, detail="auth_not_configured")
-        from sevn.gateway.auth import extract_bearer, secrets_compare
-
-        submitted = extract_bearer(request.headers.get("Authorization"))
-        if submitted is None or not secrets_compare(expected, submitted):
-            raise HTTPException(status_code=401, detail="invalid_api_key")
+        submitted = _require_bearer(request)
 
         router_local = getattr(request.app.state, "gateway_router", None)
         if router_local is None:
@@ -323,55 +367,59 @@ def build_openai_compat_router() -> APIRouter:
         completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
         correlation_id = str(uuid.uuid4())
         scope_key, user_id = _caller_scope(submitted)
+        ephemeral_scope = f"{scope_key}:ephemeral:{uuid.uuid4().hex}"
         session_id = await sessions.ensure_session(
-            scope_key=scope_key,
+            scope_key=ephemeral_scope,
             channel=_API_CHANNEL,
             user_id=user_id,
         )
-        await _sync_request_messages(
-            sessions,
-            conn,
-            session_id=session_id,
-            messages=body.messages,
-            correlation_id=correlation_id,
-        )
-        baseline_message_id = await asyncio.to_thread(_max_message_id, conn, session_id)
-
         try:
-            await asyncio.wait_for(
-                run_turn(session_id, correlation_id),
-                timeout=_TURN_TIMEOUT_S,
+            await _sync_request_messages(
+                sessions,
+                conn,
+                session_id=session_id,
+                messages=body.messages,
+                correlation_id=correlation_id,
             )
-        except TimeoutError as exc:
-            raise HTTPException(status_code=504, detail="turn_timeout") from exc
-        except HTTPException:
-            raise
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail="turn_error") from exc
+            baseline_message_id = await asyncio.to_thread(_max_message_id, conn, session_id)
 
-        reply = _last_assistant_text(
-            conn,
-            session_id,
-            after_message_id=baseline_message_id,
-        )
-        if not reply.strip():
-            raise HTTPException(status_code=500, detail="empty_assistant_reply")
+            try:
+                await asyncio.wait_for(
+                    run_turn(session_id, correlation_id),
+                    timeout=_TURN_TIMEOUT_S,
+                )
+            except TimeoutError as exc:
+                raise HTTPException(status_code=504, detail="turn_timeout") from exc
+            except HTTPException:
+                raise
+            except Exception as exc:
+                raise HTTPException(status_code=500, detail="turn_error") from exc
 
-        return JSONResponse(
-            {
-                "id": completion_id,
-                "object": "chat.completion",
-                "created": int(time.time()),
-                "model": body.model or _DEFAULT_MODEL,
-                "choices": [
-                    {
-                        "index": 0,
-                        "message": {"role": "assistant", "content": reply},
-                        "finish_reason": "stop",
-                    }
-                ],
-            }
-        )
+            reply = _last_assistant_text(
+                conn,
+                session_id,
+                after_message_id=baseline_message_id,
+            )
+            if not reply.strip():
+                raise HTTPException(status_code=500, detail="empty_assistant_reply")
+
+            return JSONResponse(
+                {
+                    "id": completion_id,
+                    "object": "chat.completion",
+                    "created": int(time.time()),
+                    "model": _DEFAULT_MODEL,
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {"role": "assistant", "content": reply},
+                            "finish_reason": "stop",
+                        }
+                    ],
+                }
+            )
+        finally:
+            await asyncio.to_thread(_reap_ephemeral_session, conn, session_id)
 
     return router
 
