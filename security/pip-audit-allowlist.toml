@@ -120,3 +120,24 @@ package = "pydantic-settings"
 reason = "Allowlisted to keep CI passing until dependency upgrade to >=2.14.2."
 ticket = "https://github.com/advisories/GHSA-4xgf-cpjx-pc3j"
 review_by = "2027-05-15"
+
+[[ignore]]
+vuln_id = "CVE-2026-69247"
+package = "cryptography"
+reason = "Allowlisted until cryptography upgrade to >=50.0.0 per OSV fix_versions."
+ticket = "https://osv.dev/vulnerability/CVE-2026-69247"
+review_by = "2027-06-01"
+
+[[ignore]]
+vuln_id = "CVE-2026-69248"
+package = "cryptography"
+reason = "Allowlisted until cryptography upgrade to >=49.0.0 per OSV fix_versions."
+ticket = "https://osv.dev/vulnerability/CVE-2026-69248"
+review_by = "2027-06-01"
+
+[[ignore]]
+vuln_id = "CVE-2026-69249"
+package = "cryptography"
+reason = "Allowlisted until cryptography upgrade to >=49.0.0 per OSV fix_versions."
+ticket = "https://osv.dev/vulnerability/CVE-2026-69249"
+review_by = "2027-06-01"
