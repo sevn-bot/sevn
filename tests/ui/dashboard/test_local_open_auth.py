@@ -96,8 +96,16 @@ def test_auth_status_local_open_loopback(tmp_path: Path) -> None:
 
 
 def test_sessions_without_login_on_loopback(tmp_path: Path) -> None:
+    """Loopback owner access requires the boot local token, not a password login."""
+    from sevn.ui.dashboard.services.local_token import DASHBOARD_LOCAL_TOKEN_QUERY
+
     with _client(tmp_path) as client:
-        resp = client.get("/api/v1/sessions?limit=5")
+        boot_token = client.app.state.dashboard_local_token
+        assert isinstance(boot_token, str)
+        assert boot_token.strip()
+        resp = client.get(
+            f"/api/v1/sessions?limit=5&{DASHBOARD_LOCAL_TOKEN_QUERY}={boot_token}",
+        )
         assert resp.status_code == 200
         assert resp.json() == {"items": [], "next_cursor": None, "has_more": False}
 
@@ -195,7 +203,14 @@ def test_system_logging_put_without_csrf_on_loopback(tmp_path: Path) -> None:
 
 
 def test_local_open_effective_unit() -> None:
+    from starlette.applications import Starlette
+    from starlette.requests import Request
+
     ws = _workspace()
+    expected = "boot-local-token-for-unit-test"
+    starlette_app = Starlette()
+    starlette_app.state.dashboard_local_token = expected
+
     scope = {
         "type": "http",
         "http_version": "1.1",
@@ -203,10 +218,13 @@ def test_local_open_effective_unit() -> None:
         "path": "/",
         "headers": [],
         "client": ("127.0.0.1", 1),
+        "app": starlette_app,
     }
-    from starlette.requests import Request
+    scope_with_token = {**scope, "query_string": f"local_token={expected}".encode()}
+    assert local_open_effective(ws, Request(scope_with_token)) is True
 
-    req = Request(scope)
-    assert local_open_effective(ws, req) is True
+    scope_wrong_token = {**scope, "query_string": b"local_token=wrong-token"}
+    assert local_open_effective(ws, Request(scope_wrong_token)) is False
+
     scope_remote = {**scope, "client": ("203.0.113.1", 1)}
     assert local_open_effective(ws, Request(scope_remote)) is False
