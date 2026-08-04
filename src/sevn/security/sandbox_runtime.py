@@ -476,9 +476,9 @@ def build_sandbox_child_env(
         "SEVN_WORKSPACE": w,
     }
     for key in _FORBIDDEN_SANDBOX_CHILD_ENV_KEYS:
-        assert key not in env, f"build_sandbox_child_env must not emit {key!r}"
+        assert key not in env, f"build_sandbox_child_env must not emit {key!r}"  # nosec B101
     for value in env.values():
-        assert "SEVN_PROXY_SHARED_SECRET" not in value
+        assert "SEVN_PROXY_SHARED_SECRET" not in value  # nosec B101
     return env
 
 

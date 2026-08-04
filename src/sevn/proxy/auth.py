@@ -33,7 +33,7 @@ from starlette.responses import JSONResponse
 
 _PROXY_TOKEN_HEADER = "x-sevn-proxy-token"  # nosec B105
 _SESSION_TOKEN_HEADER = "x-sevn-session-token"  # nosec B105
-_SESSION_TOKEN_VERSION = "v1"
+_SESSION_TOKEN_VERSION = "v1"  # nosec B105 — token format version label, not a credential
 _GUARDED_PREFIXES = ("/llm/", "/web/", "/integration/")
 PROXY_UNCONFIGURED_DETAIL = "proxy authentication not configured"
 SESSION_SCOPE_SANDBOX = "sandbox"
