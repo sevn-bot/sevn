@@ -89,7 +89,6 @@ async def _mock_docker_spawn(
     return captured, sink.events if sink else []
 
 
-@pytest.mark.xfail(reason="green after W7: pull-then-pin digest flow", strict=False)
 @pytest.mark.asyncio
 async def test_fresh_image_pulls_tag_then_runs_with_repo_digest(
     monkeypatch: pytest.MonkeyPatch,
@@ -115,7 +114,6 @@ async def test_fresh_image_pulls_tag_then_runs_with_repo_digest(
     assert "@sha256:" in str(runtime[-1].attrs.get("image", ""))
 
 
-@pytest.mark.xfail(reason="green after W7: fail closed on empty RepoDigests", strict=False)
 @pytest.mark.asyncio
 async def test_empty_repo_digests_raises_without_id_fallback_pull(
     monkeypatch: pytest.MonkeyPatch,
@@ -167,7 +165,6 @@ async def test_empty_repo_digests_raises_without_id_fallback_pull(
     assert not any(t.startswith("sha256:") for t in pull_targets)
 
 
-@pytest.mark.xfail(reason="green after W7: fail closed on empty RepoDigests", strict=False)
 @pytest.mark.asyncio
 async def test_resolve_digest_pinned_image_raises_when_no_repo_digests(
     monkeypatch: pytest.MonkeyPatch,
@@ -180,6 +177,8 @@ async def test_resolve_digest_pinned_image_raises_when_no_repo_digests(
     ) -> tuple[int, str, str]:
         _ = timeout_s, stdin
         joined = " ".join(argv)
+        if "pull" in argv:
+            return 0, "", ""
         if "RepoDigests" in joined:
             return 0, "", ""
         if ".Id" in joined:
@@ -191,7 +190,6 @@ async def test_resolve_digest_pinned_image_raises_when_no_repo_digests(
         await _resolve_digest_pinned_image("local-built:latest")
 
 
-@pytest.mark.xfail(reason="green after W7: @sha256 config skips pull", strict=False)
 @pytest.mark.asyncio
 async def test_digest_config_skips_pull(
     monkeypatch: pytest.MonkeyPatch,
