@@ -9,6 +9,13 @@ Run from the **repository root**:
 make compose-up
 # or: docker compose -f docker/docker-compose.yml up -d --build
 
+# First boot: gateway entrypoint auto-materializes workspace/sevn.json from
+# infra/docker-onboard.json (mounted at /bootstrap/onboard-compose.json).
+# Optional manual path:
+#   docker compose run --rm sevn-gateway sevn onboard \
+#     --config /bootstrap/onboard-compose.json --profile good_value_docker \
+#     --no-install-daemon --no-start-services --no-prompt-bot-name --bot-name Sevn
+
 # CI smoke (mock upstream + proxy + gateway)
 make compose-ci-smoke
 # or: docker compose -f docker/docker-compose.ci.yml up -d --build
@@ -19,6 +26,7 @@ make compose-ci-smoke
 | Target | Purpose |
 |--------|---------|
 | `make compose-up` | Start operator `sevn-proxy` + default `sevn-gateway` |
+| `make compose-browser-up` | Operator stack with **browser CDP** gateway (Brave) |
 | `make compose-gui-up` | Operator stack with **GUI** gateway (noVNC on port 6080) |
 | `make compose-down` | Stop operator stack and remove containers |
 | `make compose-logs` | Follow operator stack logs (`--tail=200`) |
@@ -26,40 +34,45 @@ make compose-ci-smoke
 | `make compose-ci-smoke` | Build + health-check `docker-compose.ci.yml` |
 | `make docker-build-ci` | Build sandbox, proxy, gateway, browser, and gui images |
 
-All operator targets use `COMPOSE_FILE=docker/docker-compose.yml` and fail fast when
-`.env` is missing (`cp .env.example .env` first).
+Default operator targets use `COMPOSE_FILES=-f docker/docker-compose.yml` (via
+`COMPOSE_FILE=docker/docker-compose.yml`) and fail fast when `.env` is missing
+(`cp .env.example .env` first). Variant targets pass the full `-f` set inline so
+exactly one gateway service binds `${SEVN_GATEWAY_PORT}`.
 
-## Compose profiles
+## Gateway variant override files
 
-Optional gateway variants swap Dockerfiles via profiles (mutually exclusive):
+Browser and GUI gateways are **override files** that replace `sevn-gateway` (same
+service name — never a second gateway on port 3001):
 
 ```bash
-# Browser CDP gateway (Brave + browser-cdp) — profile browser
-docker compose -f docker/docker-compose.yml --profile browser up -d --build
+# Browser CDP gateway (Brave + browser-cdp)
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.browser.yml up -d --build
+# or: make compose-browser-up
 
-# Headed GUI gateway + noVNC — profile gui
-docker compose -f docker/docker-compose.yml --profile gui up -d --build
+# Headed GUI gateway + noVNC
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.gui.yml up -d --build
 # or: make compose-gui-up
 ```
 
-Default `docker compose up` (no profile) uses the slim `Dockerfile.gateway` image.
-Profiles `browser` and `gui` each exclude the other.
+Default `docker compose -f docker/docker-compose.yml up` uses the slim
+`Dockerfile.gateway` image. Do not combine the browser and GUI override files in
+one invocation — each file set defines its own `sevn-gateway` variant.
 
-Production resource limits overlay:
+Production resource limits overlay (W3 updates service keys in `docker-compose.prod.yml`):
 
 ```bash
-docker compose -f docker/docker-compose.yml -f docker/docker-compose.prod.yml --profile browser up -d
+docker compose -f docker/docker-compose.yml -f docker/docker-compose.browser.yml -f docker/docker-compose.prod.yml up -d
 ```
 
 ## Environment prerequisites
 
 Copy [`.env.example`](../.env.example) to `.env` in the repo root before
-`make compose-up` or profile invocations. Minimum operator vars:
+`make compose-up` or variant invocations. Minimum operator vars:
 
 | Variable | Purpose |
 |----------|---------|
 | `SEVN_TELEGRAM_BOT_TOKEN` | Telegram bot token (optional for local HTTP-only dev) |
-| `OPENAI_API_KEY` | Provider key injected into the proxy container |
+| `OPENAI_API_KEY` | Provider key injected into the proxy container as a **plain env var** (`docker-compose.yml` `sevn-proxy.environment`). Docker secrets / mounted secret files are a tracked follow-up — not shipped in this stack. |
 | `SEVN_GATEWAY_PORT` | Host port for gateway HTTP (default `3001`) |
 | `SEVN_GATEWAY_TOKEN` | Gateway bearer for `/login` and authenticated routes |
 | `SEVN_SECRETS_PASSPHRASE` | Secrets-store passphrase fallback |
@@ -77,9 +90,11 @@ the guard (dev-only).
 | `Dockerfile.gateway` | HTTP gateway image |
 | `Dockerfile.proxy` | Egress proxy image |
 | `Dockerfile.sandbox` | Tier-B sandbox image |
-| `Dockerfile.gateway.browser` | Gateway + Brave/browser-cdp (profile `browser`) |
-| `Dockerfile.gateway.gui` | Gateway + noVNC (profile `gui`) |
-| `docker-compose.yml` | Operator local stack |
+| `Dockerfile.gateway.browser` | Gateway + Brave/browser-cdp (browser override) |
+| `Dockerfile.gateway.gui` | Gateway + noVNC (gui override) |
+| `docker-compose.yml` | Operator local stack (default gateway) |
+| `docker-compose.browser.yml` | Browser CDP gateway override (`sevn-gateway` replacement) |
+| `docker-compose.gui.yml` | Headed GUI gateway override (`sevn-gateway` replacement) |
 | `docker-compose.ci.yml` | CI integration stack |
 | `docker-compose.prod.yml` | Production resource limits overlay |
 | `docker-compose.improve-evals.yml` | Self-improve eval graph |

@@ -30,6 +30,9 @@ reason = "Supplier-disputed CVE-2025-45768 (JWT key length is application-contro
 ticket = "https://osv.dev/vulnerability/PYSEC-2025-183"
 review_by = "2026-11-01"
 
+# A-Thermos M4 deferral (2026-08-04, post-audit Batch A): cryptography 48→50 upgrade
+# deferred to post-0.0.1 dependency sweep — GHSA/CVE rows below are time-boxed until review_by.
+
 [[ignore]]
 vuln_id = "GHSA-537c-gmf6-5ccf"
 package = "cryptography"
@@ -120,3 +123,24 @@ package = "pydantic-settings"
 reason = "Allowlisted to keep CI passing until dependency upgrade to >=2.14.2."
 ticket = "https://github.com/advisories/GHSA-4xgf-cpjx-pc3j"
 review_by = "2027-05-15"
+
+[[ignore]]
+vuln_id = "CVE-2026-69247"
+package = "cryptography"
+reason = "Allowlisted until cryptography upgrade to >=50.0.0 per OSV fix_versions."
+ticket = "https://osv.dev/vulnerability/CVE-2026-69247"
+review_by = "2027-06-01"
+
+[[ignore]]
+vuln_id = "CVE-2026-69248"
+package = "cryptography"
+reason = "Allowlisted until cryptography upgrade to >=49.0.0 per OSV fix_versions."
+ticket = "https://osv.dev/vulnerability/CVE-2026-69248"
+review_by = "2027-06-01"
+
+[[ignore]]
+vuln_id = "CVE-2026-69249"
+package = "cryptography"
+reason = "Allowlisted until cryptography upgrade to >=49.0.0 per OSV fix_versions."
+ticket = "https://osv.dev/vulnerability/CVE-2026-69249"
+review_by = "2027-06-01"

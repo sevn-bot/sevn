@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
-# Normalize workspace ownership for sevnoperator before GUI stack boot.
+# Normalize workspace layout for sevnoperator before GUI stack boot.
 
 set -euo pipefail
 
@@ -12,12 +12,11 @@ mkdir -p \
     "${WORKSPACE}/.sevn/browser-sessions" \
     "${WORKSPACE}/logs"
 
-OWNERSHIP_SENTINEL="${WORKSPACE}/.sevn/.ownership-normalized"
-if [[ ! -f "${OWNERSHIP_SENTINEL}" ]]; then
-    # One-shot fix for prior root-run `--profile browser` sessions on a shared volume.
-    chown -R sevnoperator:sevnoperator "${WORKSPACE}/.sevn" "${WORKSPACE}/logs" 2>/dev/null || true
-    touch "${OWNERSHIP_SENTINEL}"
-    chown sevnoperator:sevnoperator "${OWNERSHIP_SENTINEL}" 2>/dev/null || true
+if [[ ! -f "${WORKSPACE}/sevn.json" ]]; then
+    echo "gui entrypoint: ${WORKSPACE}/sevn.json missing — running compose bootstrap"
+    python /opt/sevn/infra/docker/compose-bootstrap.py
 fi
+
+# Ownership normalization is handled by sevn-operator-perms (D25); no chown here.
 
 exec supervisord -c /opt/sevn/infra/docker/gui/supervisord.conf
