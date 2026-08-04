@@ -585,7 +585,7 @@ compose-ci-smoke: ## Build and smoke docker/docker-compose.ci.yml + proxy transp
 	@sleep 8
 	curl -fsS http://127.0.0.1:18787/healthz >/dev/null
 	curl -fsS http://127.0.0.1:13001/health >/dev/null
-	SEVN_CI_PROXY_URL=http://127.0.0.1:18787 $(PYTEST) tests/integration/test_proxy_transport_compose_roundtrip.py -v --tb=short --strict-markers -m integration
+	SEVN_CI_PROXY_URL=http://127.0.0.1:18787 SEVN_PROXY_SHARED_SECRET=ci-compose-proxy-secret $(PYTEST) tests/integration/test_proxy_transport_compose_roundtrip.py -v --tb=short --strict-markers -m integration
 	docker compose -f docker/docker-compose.ci.yml down -v
 
 COMPOSE_FILE ?= docker/docker-compose.yml

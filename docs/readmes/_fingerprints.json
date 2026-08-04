@@ -2,8 +2,8 @@
   "entries": {
     "agent": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-03T00:50:28Z",
-      "digest": "57bd70ef180b9fece3a2aec7373a075c27cbfe82fe14e0af171644f392d118ff",
+      "computed_at": "2026-08-04T20:30:12Z",
+      "digest": "c92ca39549efcbfe502ae106f24d155abfc6910241249a139e3faaef018d8a00",
       "source_globs": [
         "src/sevn/agent/**"
       ]
@@ -57,8 +57,8 @@
     },
     "gateway": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-04T10:14:59Z",
-      "digest": "eee7b969522c60ffe8c2e406f31806c1cfddb4cd2f34cd35dfdf4adbef92dc35",
+      "computed_at": "2026-08-04T20:30:12Z",
+      "digest": "cebe708f4e55bdf0bb9fcaef601777a15b9d73cfee27b3d85d926d95b03a844e",
       "source_globs": [
         "src/sevn/gateway/**"
       ]
@@ -108,8 +108,8 @@
     },
     "proxy-egress": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-04T10:50:01Z",
-      "digest": "ef94cbe3ec9aaceba03b3c4a55c4c827cad0dc7c297a23725277ec4d982a5724",
+      "computed_at": "2026-08-04T20:30:12Z",
+      "digest": "86c93ed39251f5cc2bc1b95ec43665f814e224895221919595c616e7000b8410",
       "source_globs": [
         "src/sevn/proxy/**"
       ]
@@ -145,8 +145,8 @@
     },
     "security": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-04T10:49:36Z",
-      "digest": "95d86426362d0c0138b0968f5acf1bfef5242475fb23cbafff6037cb03d9c365",
+      "computed_at": "2026-08-04T20:30:12Z",
+      "digest": "b631d0cf2956c8f760f85d027f593dc802dbbab0f22feed3a1b0847c80161f85",
       "source_globs": [
         "src/sevn/security/**"
       ]

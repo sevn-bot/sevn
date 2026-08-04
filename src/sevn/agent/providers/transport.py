@@ -21,6 +21,7 @@ Examples:
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -594,7 +595,7 @@ class _ProxyTransport:
             raise NotImplementedError(msg)
 
     def auth_header(self, model_id: str) -> dict[str, str]:
-        """Return extra headers for the proxy (token injection happens server-side).
+        """Return egress proxy headers including ``X-Sevn-Proxy-Token`` when configured.
 
                 Args:
         model_id (str): Resolved catalog id (unused in Phase 1).
@@ -607,7 +608,11 @@ class _ProxyTransport:
                     True
         """
         _ = model_id
-        return dict(self._extra_headers)
+        headers = dict(self._extra_headers)
+        secret = os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip()
+        if secret:
+            headers["X-Sevn-Proxy-Token"] = secret
+        return headers
 
     def tokens_used(self, response: dict[str, object]) -> tuple[int, int]:
         """Extract token counts from a parsed completion response.
