@@ -13,9 +13,12 @@ import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlparse
 
-import pytest
+if TYPE_CHECKING:
+    import pytest
+
 from click.testing import CliRunner as ClickCliRunner
 from starlette.testclient import TestClient
 from typer.main import get_command
@@ -108,10 +111,6 @@ def _boot_local_token(client: TestClient) -> str:
     return token
 
 
-@pytest.mark.xfail(
-    reason="green after W18: tokenless loopback denied when local-open effective",
-    strict=False,
-)
 def test_tokenless_loopback_denied_when_local_open_effective(tmp_path: Path) -> None:
     """W17.1 — no local token must not grant owner access on direct loopback."""
     with _client(tmp_path) as client:
@@ -134,10 +133,6 @@ def test_loopback_with_boot_token_succeeds_wrong_token_denied(tmp_path: Path) ->
         assert bad.status_code == 401
 
 
-@pytest.mark.xfail(
-    reason="green after W18: local_open_trust_address opt-in restores tokenless loopback",
-    strict=False,
-)
 def test_tokenless_loopback_allowed_when_trust_address_opt_in(tmp_path: Path) -> None:
     """W17.3 — explicit ``local_open_trust_address: true`` allows tokenless loopback (D26)."""
     ws = _workspace(local_open=True, local_open_trust_address=True)
