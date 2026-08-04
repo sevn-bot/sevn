@@ -9,6 +9,13 @@ Run from the **repository root**:
 make compose-up
 # or: docker compose -f docker/docker-compose.yml up -d --build
 
+# First boot: gateway entrypoint auto-materializes workspace/sevn.json from
+# infra/docker-onboard.json (mounted at /bootstrap/onboard-compose.json).
+# Optional manual path:
+#   docker compose run --rm sevn-gateway sevn onboard \
+#     --config /bootstrap/onboard-compose.json --profile good_value_docker \
+#     --no-install-daemon --no-start-services --no-prompt-bot-name --bot-name Sevn
+
 # CI smoke (mock upstream + proxy + gateway)
 make compose-ci-smoke
 # or: docker compose -f docker/docker-compose.ci.yml up -d --build
@@ -65,7 +72,7 @@ Copy [`.env.example`](../.env.example) to `.env` in the repo root before
 | Variable | Purpose |
 |----------|---------|
 | `SEVN_TELEGRAM_BOT_TOKEN` | Telegram bot token (optional for local HTTP-only dev) |
-| `OPENAI_API_KEY` | Provider key injected into the proxy container |
+| `OPENAI_API_KEY` | Provider key injected into the proxy container as a **plain env var** (`docker-compose.yml` `sevn-proxy.environment`). Docker secrets / mounted secret files are a tracked follow-up — not shipped in this stack. |
 | `SEVN_GATEWAY_PORT` | Host port for gateway HTTP (default `3001`) |
 | `SEVN_GATEWAY_TOKEN` | Gateway bearer for `/login` and authenticated routes |
 | `SEVN_SECRETS_PASSPHRASE` | Secrets-store passphrase fallback |

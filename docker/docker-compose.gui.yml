@@ -10,10 +10,13 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.gateway.gui
+    # Xvfb + Brave headed: --no-sandbox / --disable-dev-shm-usage avoid extra capabilities.
     environment:
       SEVN_HOME: /operator
+      HOME: /operator/workspace
       SEVN_PROXY_URL: http://sevn-proxy:8787
       SEVN_TELEGRAM_BOT_TOKEN: ${SEVN_TELEGRAM_BOT_TOKEN:-}
+      SEVN_GATEWAY_TOKEN: ${SEVN_GATEWAY_TOKEN:-0000000000000000000000000000000000000000000000000000000000000000}
       SEVN_CHROME_EXECUTABLE: /usr/bin/brave-browser
       SEVN_BROWSER_ENGINE: brave
       SEVN_BROWSER_HEADLESS: "0"
