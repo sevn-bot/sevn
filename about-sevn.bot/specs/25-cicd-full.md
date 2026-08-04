@@ -8,7 +8,7 @@ summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict de
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
 last_updated: '2026-08-04'
-fingerprint: sha256:58e1f97fda26455c1d36865932d262d3ee2b653ecac4736399333ef4a6859104
+fingerprint: sha256:344d7dcc48da8590de385559d6029d6e69e519def211fa07cee2fa7a29bafdc4
 related: []
 sources:
 - .github/workflows/**
@@ -579,3 +579,17 @@ and signs/scans them, but does **not** deploy to Dev or Production.
 ``delivery-chain`` (required): on tag builds, phase4/phase5 ``failure`` fails the gate;
 ``needs_impl_ok`` tolerance applies **only** on ``workflow_dispatch``. Phase6
 ``needs`` phase4 and phase5 so a failing deploy stub blocks release creation.
+
+## Amendments (post-audit-0.0.1 W11 — append-only)
+
+Container CVE baseline (**#173**, plan **D23**). ``container-supply-chain`` scans
+each published GHCR image with Trivy **before** ``cosign sign``; CRITICAL/HIGH
+findings fail the job unless listed in ``security/trivy-allowlist.toml`` with a
+future ``review_by`` date.
+
+| Control | Location | Behaviour |
+|---------|----------|-----------|
+| Allowlist file | ``security/trivy-allowlist.toml`` | Time-boxed ``[[ignore]]`` rows: ``vuln_id``, ``image``, ``reason``, ``ticket``, ``review_by`` |
+| Expiry gate | ``scripts/trivy_ignore_args.py`` + ``make trivy-allowlist-check`` (``ci-core`` via ``make security``) | Fails closed on expired rows; emits ``--ignorefile`` for Actions |
+| Blocking scan | ``scan_image()`` in ``ci-cd.yml`` | ``trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed`` then cosign + syft |
+| Reports | ``sboms/`` artifact + phase6 release attachments | Trivy JSON/SARIF + SPDX SBOM per image |

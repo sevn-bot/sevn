@@ -14,6 +14,7 @@ are cut into a dated, versioned section at release time.
 - [2026-08-04] Pre-commit blocks commits from the primary checkout unless `SEVN_ALLOW_PRIMARY_COMMIT=1`; `make check-git-guards` asserts `git` resolves to repo `bin/git` without direnv; Cursor rules and hooks document linked-worktree workflow (D1)
 
 ### Security
+- [2026-08-04] Container supply chain: Trivy blocks CRITICAL/HIGH before cosign sign; time-boxed CVE allowlist in `security/trivy-allowlist.toml` (#173, post-audit Batch C W11)
 - [2026-08-04] Bump `cryptography` to 50.0.0 (CVE-2026-69247, CVE-2026-69248, CVE-2026-69249)
 - [2026-08-03] `GET /capabilities` and `sevn capabilities` document OpenAI-compat limits (`streaming`, `usage_reporting`, `tool_messages`) alongside channel inventory (#151, release-audit C-Thermos)
 - [2026-08-03] Channel capability inventory: `GET /capabilities` and `sevn capabilities` report each messaging channel as `implemented`, `stub`, or `unavailable` (#151, release-audit W13)

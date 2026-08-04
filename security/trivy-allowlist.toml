@@ -1,0 +1,30 @@
+# Trivy container-image CVE allowlist
+#
+# Normative spec: specs/25-cicd-full.md §3.2 (Artefacts → CVE allowlist) and
+# §10.3 (Configuration & defaults → CVE allowlist file).
+#
+# Policy (do not delete this header):
+#   - This file is the SINGLE source of truth for accepted, time-boxed
+#     container-image CVE exceptions. ``container-supply-chain`` in
+#     ``.github/workflows/ci-cd.yml`` reads entries via
+#     ``scripts/trivy_ignore_args.py`` and passes ``--ignorefile`` to Trivy.
+#   - Every entry MUST include:
+#       * the CVE id (`vuln_id`),
+#       * the affected GHCR image name (`image`, e.g. `sandbox`),
+#       * a tracking-ticket reference (issue link or id),
+#       * a `review_by` date (YYYY-MM-DD) — entries past this date are
+#         treated as expired and MUST be re-evaluated, not silently kept.
+#   - Adding an entry is a security-review decision, not a build-fix shortcut.
+#
+# Example shape for additional rows:
+#
+#   [[ignore]]
+#   vuln_id    = "CVE-2026-00000"
+#   image      = "gateway"
+#   reason     = "Base image patch pending; mitigated by X in our deployment."
+#   ticket     = "https://github.com/<org>/<repo>/issues/123"
+#   review_by  = "2026-07-01"
+#
+# W11 seed note (2026-08-04): Trivy CLI was unavailable in the Batch C worktree,
+# so this allowlist starts empty. The first CI scan with ``--exit-code 1`` is the
+# correct signal until findings are baselined here (D23).

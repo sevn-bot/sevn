@@ -188,6 +188,8 @@ jobs:
     env:
       IMAGE_REPOSITORY: ${{ needs.publish-ghcr.outputs.image_repository }}
     steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
       - name: Install cosign
         uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
 
@@ -206,7 +208,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sign, SBOM, and scan published images
+      - name: Scan, sign, and SBOM published images
         env:
           SANDBOX_DIGEST: ${{ needs.publish-ghcr.outputs.sandbox_digest }}
           PROXY_DIGEST: ${{ needs.publish-ghcr.outputs.proxy_digest }}
@@ -216,21 +218,34 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p sboms
+          ignorefile="$(mktemp)"
+          python3 scripts/trivy_ignore_args.py --output "$ignorefile"
           scan_image() {
             local name="$1"
             local digest="$2"
-            local ref="ghcr.io/${IMAGE_REPOSITORY}/${name}@${digest}"
-            echo "=== ${ref} ==="
+            local ref="ghcr.io/$IMAGE_REPOSITORY/$name@$digest"
+            echo "=== $ref ==="
+            # Block on new CRITICAL/HIGH findings; allowlist via security/trivy-allowlist.toml (#173, D23).
+            trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed \
+              --ignorefile "$ignorefile" \
+              --format json -o "sboms/$name.trivy.json" \
+              "$ref"
+            trivy convert --format sarif --output "sboms/$name.trivy.sarif" "sboms/$name.trivy.json"
             cosign sign --yes "$ref"
-            syft "$ref" -o spdx-json > "sboms/${name}.spdx.json"
-            # Report CRITICAL/HIGH; do not block publish until base images are baselined (#149).
-            trivy image --exit-code 0 --severity CRITICAL,HIGH --ignore-unfixed "$ref"
+            syft "$ref" -o spdx-json > "sboms/$name.spdx.json"
           }
           scan_image sandbox "$SANDBOX_DIGEST"
           scan_image proxy "$PROXY_DIGEST"
           scan_image gateway "$GATEWAY_DIGEST"
           scan_image gateway.browser "$GATEWAY_BROWSER_DIGEST"
           scan_image gateway.gui "$GATEWAY_GUI_DIGEST"
+
+      - name: Upload supply-chain reports
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: container-supply-chain-${{ github.sha }}
+          path: sboms/
+          if-no-files-found: error
 
   phase2:
     name: Phase 2 — Build & Deploy → Dev (needs-implementation)
@@ -329,6 +344,12 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
+      - name: Download supply-chain reports
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: container-supply-chain-${{ github.sha }}
+          path: sboms
+
       - name: Create GitHub Release (tagged build)
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         with:
@@ -336,12 +357,15 @@ jobs:
           name: ${{ github.ref_name }}
           generate_release_notes: true
           draft: true
+          files: sboms/**
           body: |
             **Draft release — no production deploy occurred.**
 
             Phases 4–5 (production deploy and smoke) are not yet implemented.
             Container images were published to GHCR; this release is for artifact
             tracking only until deploy phases land.
+
+            Attached: Trivy JSON/SARIF reports and SPDX SBOMs from container-supply-chain.
 
   delivery-chain:
     name: Delivery chain gate (required)
