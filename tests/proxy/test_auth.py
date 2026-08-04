@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from unittest.mock import MagicMock
 
 import httpx
@@ -11,10 +12,13 @@ from starlette.requests import Request
 from sevn.proxy.app import create_app
 from sevn.proxy.auth import (
     PROXY_UNCONFIGURED_DETAIL,
+    SESSION_SCOPE_SANDBOX,
     _is_guarded_path,
     llm_post_auth_failure,
     log_proxy_allow_unauthenticated_boot_warning,
+    mint_session_token,
     proxy_allow_unauthenticated,
+    validate_session_token,
 )
 from sevn.proxy.settings import ProxySettings
 
@@ -197,3 +201,69 @@ def test_log_proxy_allow_unauthenticated_boot_warning_emits_when_opt_in(
         logger.remove(sink_id)
     joined = " ".join(warnings).lower()
     assert "unauthenticated" in joined or "allow_unauthenticated" in joined
+
+
+_SIGNING_KEY = "unit-test-signing-key-at-least-32-chars"
+
+
+def test_session_scope_sandbox_constant() -> None:
+    assert SESSION_SCOPE_SANDBOX == "sandbox"
+
+
+def test_validate_session_token_accepts_in_scope_web_path() -> None:
+    token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id="run-1",
+        expires_at=int(time.time()) + 3600,
+    )
+    assert validate_session_token(token, signing_key=_SIGNING_KEY, path="/web/fetch") is True
+
+
+def test_validate_session_token_rejects_wrong_scope_for_llm_path() -> None:
+    token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id="run-1",
+        expires_at=int(time.time()) + 3600,
+    )
+    assert (
+        validate_session_token(
+            token,
+            signing_key=_SIGNING_KEY,
+            path="/llm/openai/chat/completions",
+        )
+        is False
+    )
+
+
+def test_validate_session_token_rejects_expired() -> None:
+    token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id="run-1",
+        expires_at=int(time.time()) - 60,
+    )
+    assert validate_session_token(token, signing_key=_SIGNING_KEY, path="/web/fetch") is False
+
+
+def test_validate_session_token_rejects_forged_signature() -> None:
+    token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id="run-1",
+        expires_at=int(time.time()) + 3600,
+    )
+    forged = token[:-4] + "dead"
+    assert validate_session_token(forged, signing_key=_SIGNING_KEY, path="/web/fetch") is False
+
+
+def test_validate_session_token_rejects_empty_token_or_signing_key() -> None:
+    token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id="run-1",
+        expires_at=int(time.time()) + 3600,
+    )
+    assert validate_session_token("", signing_key=_SIGNING_KEY, path="/web/fetch") is False
+    assert validate_session_token(token, signing_key="", path="/web/fetch") is False

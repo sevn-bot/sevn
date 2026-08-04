@@ -30,8 +30,6 @@ _SERVICE_SECRET = "long-lived-service-secret-at-least-32-chars"
 _SIGNING_KEY = _SERVICE_SECRET
 _SANDBOX_SCOPE = "sandbox"
 
-_XFAIL_W6_SESSION = pytest.mark.xfail(reason="green after W6: scoped session tokens", strict=False)
-
 
 def _request(
     *,
@@ -155,7 +153,6 @@ async def test_allow_unauthenticated_opt_in_passes_and_warns(
 
 
 @pytest.mark.anyio
-@_XFAIL_W6_SESSION
 async def test_valid_sandbox_session_token_accepted_on_web_route() -> None:
     token = _mint_session_token(signing_key=_SIGNING_KEY, scope=_SANDBOX_SCOPE)
     app = create_app(
@@ -177,7 +174,6 @@ async def test_valid_sandbox_session_token_accepted_on_web_route() -> None:
 
 
 @pytest.mark.anyio
-@_XFAIL_W6_SESSION
 async def test_session_token_rejects_wrong_scope_on_llm_route() -> None:
     token = _mint_session_token(signing_key=_SIGNING_KEY, scope=_SANDBOX_SCOPE)
     app = create_app(
@@ -199,7 +195,6 @@ async def test_session_token_rejects_wrong_scope_on_llm_route() -> None:
 
 
 @pytest.mark.anyio
-@_XFAIL_W6_SESSION
 async def test_session_token_rejects_expired() -> None:
     token = _mint_session_token(
         signing_key=_SIGNING_KEY,
@@ -225,7 +220,6 @@ async def test_session_token_rejects_expired() -> None:
 
 
 @pytest.mark.anyio
-@_XFAIL_W6_SESSION
 async def test_session_token_rejects_forged_signature() -> None:
     token = _mint_session_token(signing_key=_SIGNING_KEY, scope=_SANDBOX_SCOPE)
     forged = token[:-4] + "dead"
@@ -248,7 +242,6 @@ async def test_session_token_rejects_forged_signature() -> None:
 
 
 @pytest.mark.anyio
-@_XFAIL_W6_SESSION
 async def test_concurrent_same_session_token_requests_consistent() -> None:
     """Same scoped credential — both replies must agree (no race bypass)."""
     token = _mint_session_token(signing_key=_SIGNING_KEY, scope=_SANDBOX_SCOPE)
@@ -290,7 +283,6 @@ def test_build_sandbox_child_env_never_injects_service_secret() -> None:
         assert value != _SERVICE_SECRET
 
 
-@pytest.mark.xfail(reason="green after W6: drop fake proxy env vars", strict=False)
 def test_build_sandbox_child_env_omits_forward_proxy_vars() -> None:
     env = build_sandbox_child_env(
         proxy_url="http://127.0.0.1:8787",
@@ -302,7 +294,6 @@ def test_build_sandbox_child_env_omits_forward_proxy_vars() -> None:
     assert "NO_PROXY" not in env
 
 
-@pytest.mark.xfail(reason="green after W6: drop fake proxy env vars", strict=False)
 @pytest.mark.parametrize("var_name", ["HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY"])
 def test_build_sandbox_child_env_proxy_var_absent(var_name: str) -> None:
     env = build_sandbox_child_env(
