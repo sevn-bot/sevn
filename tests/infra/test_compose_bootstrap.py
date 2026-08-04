@@ -277,14 +277,10 @@ def test_entrypoint_guard_materializes_config_before_command_exec(
     assert cmd_ran
 
 
-@pytest.mark.xfail(
-    reason="green after F2: GUI sevnoperator UID must not collide with gateway 10001",
-    strict=False,
-)
-def test_gui_dockerfile_sevnoperator_uid_distinct_from_gateway() -> None:
-    """F2 regression: GUI operator UID must not collide with gateway UID 10001."""
+def test_gui_dockerfile_sevnoperator_uid_matches_operator_perms() -> None:
+    """F2 regression: GUI sevnoperator UID must match operator-perms chown target 10001."""
     text = (_DOCKER_DIR / "Dockerfile.gateway.gui").read_text(encoding="utf-8")
-    assert "useradd --create-home --uid 10002" in text
+    assert "useradd --create-home --uid 10001" in text
     assert "sevnoperator" in text
     gateway_text = (_DOCKER_DIR / "Dockerfile.gateway").read_text(encoding="utf-8")
     assert "useradd --create-home --uid 10001" in gateway_text
