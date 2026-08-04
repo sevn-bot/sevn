@@ -79,6 +79,54 @@ def _parse_allowlist(path: Path) -> list[dict[str, str]]:
     return out
 
 
+def _image_short_name(image: str) -> str:
+    """Normalize allowlist ``image`` to a short GHCR component name.
+
+    Args:
+        image (str): Row ``image`` field (``gateway`` or full ref suffix).
+
+    Returns:
+        str: Short name used by ``scan_image()`` (e.g. ``gateway``).
+
+    Examples:
+        >>> _image_short_name("ghcr.io/sevn-bot/sevn/gateway")
+        'gateway'
+        >>> _image_short_name("sandbox")
+        'sandbox'
+    """
+    trimmed = image.strip()
+    if not trimmed:
+        return ""
+    if "/" in trimmed:
+        return trimmed.rsplit("/", 1)[-1]
+    return trimmed
+
+
+def _row_matches_image(row: dict[str, str], image_filter: str | None) -> bool:
+    """Return whether an allowlist row applies to the requested image.
+
+    Args:
+        row (dict[str, str]): Parsed allowlist row.
+        image_filter (str | None): Short image name from ``scan_image()``, or
+            ``None`` to include every row (``make trivy-allowlist-check``).
+
+    Returns:
+        bool: True when the row should contribute to the ignore file.
+
+    Examples:
+        >>> _row_matches_image({"image": "gateway"}, "gateway")
+        True
+        >>> _row_matches_image({"image": "gateway"}, "proxy")
+        False
+    """
+    if not image_filter:
+        return True
+    row_image = row.get("image", "").strip()
+    if not row_image:
+        return False
+    return _image_short_name(row_image) == image_filter.strip()
+
+
 def _write_ignorefile(path: Path, vuln_ids: list[str]) -> None:
     """Write Trivy ignore entries (one CVE id per line).
 
@@ -120,9 +168,15 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_OUTPUT,
         help=f"Generated Trivy ignore file (default: {DEFAULT_OUTPUT})",
     )
+    parser.add_argument(
+        "--image",
+        default="",
+        help="Short GHCR image name (e.g. gateway) — emit ignores for that image only",
+    )
     args = parser.parse_args(argv)
 
     today = date.today()  # noqa: DTZ011
+    image_filter = args.image.strip() or None
     active_ids: list[str] = []
     expired: list[str] = []
     for row in _parse_allowlist(_allowlist_path()):
@@ -130,18 +184,26 @@ def main(argv: list[str] | None = None) -> int:
         review_raw = row.get("review_by", "").strip()
         if not vuln_id:
             continue
-        if review_raw:
-            try:
-                review_by = date.fromisoformat(review_raw)
-            except ValueError:
-                print(
-                    f"trivy allowlist: invalid review_by for {vuln_id!r}: {review_raw}",
-                    file=sys.stderr,
-                )
-                return 1
-            if review_by < today:
-                expired.append(f"{vuln_id} (review_by {review_raw})")
-                continue
+        if not _row_matches_image(row, image_filter):
+            continue
+        if not review_raw:
+            print(
+                f"trivy allowlist: missing review_by for {vuln_id!r} "
+                f"(image={row.get('image', '')!r})",
+                file=sys.stderr,
+            )
+            return 1
+        try:
+            review_by = date.fromisoformat(review_raw)
+        except ValueError:
+            print(
+                f"trivy allowlist: invalid review_by for {vuln_id!r}: {review_raw}",
+                file=sys.stderr,
+            )
+            return 1
+        if review_by < today:
+            expired.append(f"{vuln_id} (review_by {review_raw})")
+            continue
         active_ids.append(vuln_id)
     if expired:
         print("trivy allowlist expired — re-evaluate or extend review_by:", file=sys.stderr)

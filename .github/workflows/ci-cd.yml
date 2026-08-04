@@ -218,12 +218,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p sboms
-          ignorefile="$(mktemp)"
-          python3 scripts/trivy_ignore_args.py --output "$ignorefile"
           scan_image() {
             local name="$1"
             local digest="$2"
             local ref="ghcr.io/$IMAGE_REPOSITORY/$name@$digest"
+            local ignorefile
+            ignorefile="$(mktemp)"
+            python3 scripts/trivy_ignore_args.py --image "$name" --output "$ignorefile"
             echo "=== $ref ==="
             # Block on new CRITICAL/HIGH findings; allowlist via security/trivy-allowlist.toml (#173, D23).
             trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed \
