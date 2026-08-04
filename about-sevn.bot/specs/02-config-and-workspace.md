@@ -1058,3 +1058,12 @@ upstream call; upstream ``401`` responses pass through unchanged on chat-complet
 | `tests/onboarding/` | `validate_workspace_document` |
 | `make about-docs-check` | Frontmatter ↔ code fingerprint |
 | `sevn config validate` | Operator smoke |
+
+## Amendments (post-audit-0.0.1 W18 — #169)
+
+``dashboard.local_open_trust_address`` (boolean, default ``false``): when ``true``,
+``local_open_effective`` allows tokenless direct-loopback dashboard access (legacy
+behaviour). When ``false`` (default), loopback clients must present the boot
+``dashboard-local-token`` even when ``dashboard.local_open`` is effective.
+Schema: ``infra/sevn.schema.json`` under ``dashboard``; model:
+``DashboardWorkspaceConfig.local_open_trust_address``.

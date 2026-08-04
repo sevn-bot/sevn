@@ -676,6 +676,11 @@
           "type": "boolean",
           "description": "Allow loopback clients to skip dashboard login when effective (the design docs). Default true when gateway.host is loopback-only and infrastructure.tunnel.mode is none; forced false when a tunnel is active."
         },
+        "local_open_trust_address": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, allow tokenless direct loopback dashboard access (legacy behavior). Default false — loopback clients must present the boot dashboard-local-token."
+        },
         "login_password": {
           "type": "string",
           "description": "Owner password for tunneled/remote Mission Control login (prefer ${SECRET:...} indirection)."

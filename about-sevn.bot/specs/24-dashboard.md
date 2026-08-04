@@ -1086,6 +1086,15 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
 
+## Amendments (post-audit-0.0.1 W18 — #169)
+
+When ``dashboard.local_open`` is effective, ``local_open_effective`` returns
+``True`` only when the request presents the boot ``dashboard-local-token`` and
+``verify_dashboard_local_token`` succeeds. Tokenless direct-loopback access is
+denied by default. The only escape is explicit
+``dashboard.local_open_trust_address: true`` (default ``false``), which restores
+legacy trust-by-address for direct loopback clients.
+
 ## Human-input needed
 
 Prose body not yet authored (W9 scope). Normative contract requires operator or

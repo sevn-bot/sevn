@@ -502,6 +502,14 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
 
+## Amendments (post-audit-0.0.1 W18 — #169)
+
+Dashboard HTTP and WebSocket surfaces that honour ``local_open_effective`` require
+the boot ``dashboard-local-token`` for direct loopback clients unless
+``dashboard.local_open_trust_address`` is explicitly ``true``. This applies to
+Mission Control REST routes and ``/ws/dashboard`` the same way as password login
+would for remote clients.
+
 ## Human-input needed
 
 Prose body not yet authored (W9 scope). Normative contract requires operator or
