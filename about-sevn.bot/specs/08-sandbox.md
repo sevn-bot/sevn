@@ -8,7 +8,7 @@ summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / sa
   (when routed through the execution sandbox), process when configured for sandbox
   routing, and skill subprocesses spawned b
 last_updated: '2026-08-04'
-fingerprint: sha256:3c8d228969a853ba22b56234ab9aeb255ecaf0a2fdf7891ec1a8d60353100bda
+fingerprint: sha256:61db902354116680bb9229a2ab81f4ed58a565d2931158a9ee7e900955a759b4
 related: []
 sources:
 - src/sevn/security/**
@@ -446,6 +446,20 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Amendments (post-audit-0.0.1 W8 — #171)
+
+Docker spawn enforces egress via the dedicated ``--internal`` network
+``sevn-sandbox`` (``ensure_sandbox_docker_network``). The spawn path does
+**not** write ``.sevn/sandbox-egress.*.rules`` files or emit
+``network_policy_path`` telemetry — ``sandbox.runtime`` carries
+``network_enforcement: "docker_internal"`` beside ``network_mode`` instead (D15).
+``_write_docker_network_policy`` and ``apply_namespace_egress_firewall`` remain
+for subprocess/namespace mode and operator reference.
+
+**Known tradeoff:** ``ensure_proxy_attached_to_sandbox_network`` attaches the
+**whole** egress-proxy container to ``sevn-sandbox`` so sandboxes can reach the
+reverse-proxy API; the proxy shares the internal bridge with sandboxes.
 
 ## Amendments (post-audit-0.0.1 W6 — #168)
 

@@ -1740,11 +1740,6 @@ class DockerSandboxRuntime:
             rewritten = rewrite_proxy_url_for_sandbox_network(proxy_raw)
             if rewritten != proxy_raw:
                 _apply_sandbox_proxy_env(child_env, rewritten)
-        network_rules = await asyncio.to_thread(
-            _write_docker_network_policy,
-            ws,
-            child_env=child_env,
-        )
         network_name = await ensure_sandbox_docker_network()
         llmignore_mounts = await asyncio.to_thread(_discover_llmignore_mask_mounts, ws)
         out_dir = await asyncio.to_thread(_prepare_workspace_out_dir, ws, run_id)
@@ -1802,9 +1797,8 @@ class DockerSandboxRuntime:
             "sandbox_max_lifetime_s": self._lifetime_s,
             "sandbox_id": sid,
             "network_mode": network_name,
+            "network_enforcement": "docker_internal",
         }
-        if network_rules is not None:
-            runtime_attrs["network_policy_path"] = str(network_rules)
         hp = _proxy_host_port_from_env(child_env)
         if hp is not None:
             runtime_attrs["proxy_host_port"] = hp
