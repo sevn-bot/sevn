@@ -163,20 +163,12 @@ _DOCUMENTED_INVOCATIONS = (
         (_BASE_COMPOSE, _BROWSER_OVERRIDE),
         frozenset(),
         id="browser-override",
-        marks=pytest.mark.xfail(
-            reason="green after W2: gateway override files (#164, #165, D9)",
-            strict=False,
-        ),
     ),
     pytest.param(
         "gui",
         (_BASE_COMPOSE, _GUI_OVERRIDE),
         frozenset(),
         id="gui-override",
-        marks=pytest.mark.xfail(
-            reason="green after W2: gateway override files (#164, #165, D9)",
-            strict=False,
-        ),
     ),
 )
 
@@ -210,12 +202,6 @@ def test_base_compose_defines_only_one_gateway_service() -> None:
     )
 
 
-test_base_compose_defines_only_one_gateway_service = pytest.mark.xfail(
-    reason="green after W2: move variant gateways to override files (#164, D9)",
-    strict=False,
-)(test_base_compose_defines_only_one_gateway_service)
-
-
 @pytest.mark.parametrize(
     ("label", "compose_paths", "profiles"),
     _DOCUMENTED_INVOCATIONS,
@@ -238,22 +224,8 @@ def test_resolvable_file_set_has_unique_gateway_port_publisher(
     "path",
     [
         pytest.param(_BASE_COMPOSE, id="base"),
-        pytest.param(
-            _BROWSER_OVERRIDE,
-            id="browser-override",
-            marks=pytest.mark.xfail(
-                reason="green after W2: docker-compose.browser.yml (#164, D9)",
-                strict=False,
-            ),
-        ),
-        pytest.param(
-            _GUI_OVERRIDE,
-            id="gui-override",
-            marks=pytest.mark.xfail(
-                reason="green after W2: docker-compose.gui.yml (#165, D9)",
-                strict=False,
-            ),
-        ),
+        pytest.param(_BROWSER_OVERRIDE, id="browser-override"),
+        pytest.param(_GUI_OVERRIDE, id="gui-override"),
     ],
 )
 def test_compose_files_forbid_negated_profiles(path: Path) -> None:
@@ -273,14 +245,7 @@ def test_compose_files_forbid_negated_profiles(path: Path) -> None:
     [
         pytest.param("compose-up", id="compose-up"),
         pytest.param("compose-gui-up", id="compose-gui-up"),
-        pytest.param(
-            "compose-browser-up",
-            id="compose-browser-up",
-            marks=pytest.mark.xfail(
-                reason="green after W2: compose-browser-up target (#164, D10)",
-                strict=False,
-            ),
-        ),
+        pytest.param("compose-browser-up", id="compose-browser-up"),
     ],
 )
 def test_makefile_compose_target_exists(target: str) -> None:
@@ -294,22 +259,8 @@ def test_makefile_compose_target_exists(target: str) -> None:
     "target",
     [
         pytest.param("compose-up", id="compose-up"),
-        pytest.param(
-            "compose-gui-up",
-            id="compose-gui-up",
-            marks=pytest.mark.xfail(
-                reason="green after W2: compose-gui-up single-gateway file set (#165, D10)",
-                strict=False,
-            ),
-        ),
-        pytest.param(
-            "compose-browser-up",
-            id="compose-browser-up",
-            marks=pytest.mark.xfail(
-                reason="green after W2: compose-browser-up single-gateway file set (#164, D10)",
-                strict=False,
-            ),
-        ),
+        pytest.param("compose-gui-up", id="compose-gui-up"),
+        pytest.param("compose-browser-up", id="compose-browser-up"),
     ],
 )
 def test_makefile_compose_target_resolves_single_gateway(target: str) -> None:
