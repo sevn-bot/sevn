@@ -93,7 +93,6 @@ def test_workflow_header_honest_while_deploy_phases_are_stubs() -> None:
     )
 
 
-@pytest.mark.xfail(reason="green after W12", strict=False)
 def test_uv_extra_install_sync_preserves_optional_dev_extra() -> None:
     """W9.6 / #179 / D32: ``uv_extra`` sync must pass ``--extra dev`` when dev group exists."""
     block = _uv_extra_sync_block()
