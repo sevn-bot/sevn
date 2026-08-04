@@ -8,7 +8,7 @@ summary: Normalize provider-shaped JSON over async HTTP to a single egress base 
   (SEVN_PROXY_URL / ProcessSettings.proxy_url), so tier executors bind once per turn
   and never touch raw secrets. LiteLLM may r
 last_updated: '2026-08-04'
-fingerprint: sha256:e70391a6264900900d9c1ac860a852137573b68c614f547e761d6bb485adf436
+fingerprint: sha256:68898a1a381139107a854c63bcea05ca7e2f4008eeba8ccc548b95d0bdbeae49
 related: []
 sources:
 - src/sevn/proxy/**
@@ -30,9 +30,15 @@ interfaces:
 - name: log_proxy_allow_unauthenticated_boot_warning
   file: src/sevn/proxy/auth.py
   symbol: log_proxy_allow_unauthenticated_boot_warning
+- name: mint_session_token
+  file: src/sevn/proxy/auth.py
+  symbol: mint_session_token
 - name: proxy_allow_unauthenticated
   file: src/sevn/proxy/auth.py
   symbol: proxy_allow_unauthenticated
+- name: validate_session_token
+  file: src/sevn/proxy/auth.py
+  symbol: validate_session_token
 - name: converse_via_bedrock
   file: src/sevn/proxy/bedrock_converse.py
   symbol: converse_via_bedrock
