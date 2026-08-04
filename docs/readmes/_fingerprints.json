@@ -57,8 +57,8 @@
     },
     "gateway": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-04T09:07:36Z",
-      "digest": "f46a44472db78437e3ee61af3ce2e323986ca88df9285dc9ae6aef025bb0d239",
+      "computed_at": "2026-08-04T10:14:59Z",
+      "digest": "eee7b969522c60ffe8c2e406f31806c1cfddb4cd2f34cd35dfdf4adbef92dc35",
       "source_globs": [
         "src/sevn/gateway/**"
       ]
@@ -90,8 +90,8 @@
     },
     "onboarding": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-04T09:07:45Z",
-      "digest": "b5ebcf3490fd2c871db13e9a2c0b78e058c7bd11803ea9d38ace24ae83b05d9a",
+      "computed_at": "2026-08-04T10:15:01Z",
+      "digest": "82ec1853bef9dfe38af4e6f98a5b9e2c70c782aff7f3feb3a067001050115675",
       "source_globs": [
         "src/sevn/onboarding/**",
         "src/sevn/cli/commands/onboard.py",
