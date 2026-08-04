@@ -15,6 +15,7 @@ Examples:
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -72,7 +73,19 @@ def main() -> int:
         return 1
 
     env = os.environ.copy()
-    env["PATH"] = f"{repo / 'bin'}:{env.get('PATH', '')}"
+    bin_prefix = f"{repo / 'bin'}"
+    env["PATH"] = f"{bin_prefix}:{env.get('PATH', '')}"
+    resolved_bin_git = bin_git.resolve()
+    which_git = shutil.which("git", path=env["PATH"])
+    if which_git is None or Path(which_git).resolve() != resolved_bin_git:
+        print(
+            "check-git-guards: FAIL — `git` on PATH must resolve to "
+            f"{resolved_bin_git} (got {which_git!r}); run make install-git-guards "
+            "and prepend repo bin/ to PATH (direnv allow or "
+            'export PATH="$PWD/bin:$PATH")',
+            file=sys.stderr,
+        )
+        return 1
     probe = subprocess.run(
         ["git", "clean", "-fdx", "--dry-run"],
         check=False,

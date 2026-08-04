@@ -126,6 +126,14 @@ repos:
         language: system
         stages: [commit-msg]
 
+
+      - id: sevn-primary-checkout-commit
+        name: Block commits from primary checkout (D1 — use linked worktree)
+        entry: uv run python scripts/check_primary_checkout_commit.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
       - id: sevn-check-agents
         name: Agent definitions valid (.claude / .cursor / spec-kit-wave)
         entry: uv run python scripts/check_agents.py
