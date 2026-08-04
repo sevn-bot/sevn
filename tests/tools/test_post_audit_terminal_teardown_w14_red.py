@@ -53,7 +53,6 @@ def ctx(tmp_path: Path) -> ToolContext:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W15: terminal timeout session_destroyed", strict=False)
 async def test_terminal_run_timeout_sigkill_sets_session_destroyed(ctx: ToolContext) -> None:
     """W14.2: SIGKILL timeout path must expose ``session_destroyed: true`` in the envelope."""
     live_child = MagicMock()
@@ -87,7 +86,6 @@ async def test_terminal_run_timeout_sigkill_sets_session_destroyed(ctx: ToolCont
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W15: terminal timeout drops registry row", strict=False)
 async def test_terminal_run_timeout_removes_session_from_registry(ctx: ToolContext) -> None:
     """W14.2: after SIGKILL timeout the terminal session must not remain in the registry."""
     live_child = MagicMock()
@@ -131,7 +129,6 @@ async def test_terminal_run_timeout_removes_session_from_registry(ctx: ToolConte
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W15: dead default session isalive guard", strict=False)
 async def test_ensure_session_terminal_recreates_when_default_child_dead(
     ctx: ToolContext,
 ) -> None:

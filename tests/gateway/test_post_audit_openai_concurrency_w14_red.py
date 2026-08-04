@@ -57,7 +57,6 @@ def _openai_compat_client(*, run_turn: RunTurnFn) -> tuple[TestClient, sqlite3.C
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W16: concurrent same-bearer isolation", strict=False)
 async def test_concurrent_same_bearer_completions_isolated_replies() -> None:
     """W14.4: two concurrent same-bearer requests each get their own correct reply."""
     conn_holder: dict[str, sqlite3.Connection] = {}
@@ -129,7 +128,6 @@ def _bare_openai_client() -> TestClient:
     return TestClient(app)
 
 
-@pytest.mark.xfail(reason="green after W16: /v1/models bearer gate", strict=False)
 def test_v1_models_requires_bearer_401_without() -> None:
     """W14.5 (D18): ``GET /v1/models`` rejects unauthenticated callers with 401."""
     client = _bare_openai_client()
@@ -138,7 +136,6 @@ def test_v1_models_requires_bearer_401_without() -> None:
     assert resp.json().get("detail") == "invalid_api_key"
 
 
-@pytest.mark.xfail(reason="green after W16: /v1/health liveness-only body", strict=False)
 def test_v1_health_public_returns_status_ok_only() -> None:
     """W14.5 (D18): ``GET /v1/health`` stays public and omits internal gateway fields."""
     client = _bare_openai_client()

@@ -92,7 +92,6 @@ def _sigterm_ignoring_proc(*, pid: int) -> MagicMock:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W15: dispose_job_async SIGKILL escalation", strict=False)
 async def test_dispose_job_async_sigkill_when_child_ignores_sigterm() -> None:
     """W14.1: ``_dispose_job_async`` must SIGKILL a SIGTERM-ignoring process group."""
     killpg_calls: list[tuple[int, int]] = []
@@ -116,7 +115,6 @@ async def test_dispose_job_async_sigkill_when_child_ignores_sigterm() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(reason="green after W15: LRU eviction SIGKILL escalation", strict=False)
 async def test_lru_eviction_kills_sigterm_ignoring_running_child(ctx: ToolContext) -> None:
     """W14.1: LRU eviction must SIGKILL a SIGTERM-ignoring child via ``_dispose_job_async``."""
     killpg_calls: list[tuple[int, int]] = []
