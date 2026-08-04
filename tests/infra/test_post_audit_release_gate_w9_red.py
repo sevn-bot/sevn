@@ -68,14 +68,12 @@ def _uv_extra_sync_block() -> str:
     return text.split(marker, 1)[1].split("\n    if action.kind", 1)[0]
 
 
-@pytest.mark.xfail(reason="green after W10", strict=False)
 def test_phase6_release_step_sets_draft_true() -> None:
     """W9.1 / #172: tagged releases must stay draft until deploy phases are honest."""
     step = _phase6_release_step()
     assert step.get("with", {}).get("draft") is True
 
 
-@pytest.mark.xfail(reason="green after W10", strict=False)
 @pytest.mark.parametrize("phase", ["phase4", "phase5"])
 def test_delivery_chain_rejects_deploy_phase_failure_on_tag_build(phase: str) -> None:
     """W9.2 / D22: ``needs_impl_ok`` tolerance is dispatch-only, not on ``refs/tags/v*``."""
@@ -85,7 +83,6 @@ def test_delivery_chain_rejects_deploy_phase_failure_on_tag_build(phase: str) ->
     )
 
 
-@pytest.mark.xfail(reason="green after W10", strict=False)
 def test_workflow_header_honest_while_deploy_phases_are_stubs() -> None:
     """W9.3 / D21: do not advertise a full six-phase pipeline while phase4/5 are stubs."""
     text = _workflow_text()
