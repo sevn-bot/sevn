@@ -64,7 +64,7 @@ async def test_terminal_run_timeout_sigkill_sets_session_destroyed(ctx: ToolCont
         patch("sevn.tools.terminal._probe_spawn_health", return_value=(True, "")),
         patch(
             "sevn.tools.terminal._run_sync",
-            return_value=("partial output", True, None),
+            return_value=("partial output", True, None, True),
         ),
     ):
         exe, _ = build_session_registry(registry_version=1)
@@ -98,7 +98,10 @@ async def test_terminal_run_timeout_removes_session_from_registry(ctx: ToolConte
         patch("sevn.tools.terminal._probe_spawn_health", return_value=(True, "")),
         patch(
             "sevn.tools.terminal._run_sync",
-            return_value=("partial output", True, None),
+            side_effect=[
+                ("warm", False, 0, False),
+                ("partial output", True, None, True),
+            ],
         ),
     ):
         exe, _ = build_session_registry(registry_version=1)

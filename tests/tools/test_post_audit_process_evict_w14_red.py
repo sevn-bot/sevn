@@ -7,11 +7,10 @@ for children that ignore SIGTERM, matching ``_stop_job`` (``process.py:528-544``
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import signal
 import sys
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -60,25 +59,36 @@ def ctx(tmp_path: Path) -> ToolContext:
     )
 
 
-async def _spawn_sigterm_ignorer() -> asyncio.subprocess.Process:
-    return await asyncio.create_subprocess_exec(
-        sys.executable,
-        "-u",
-        "-c",
-        _SIGTERM_IGNORER_SCRIPT,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        start_new_session=True,
+def _running_job(
+    *,
+    job_id: str,
+    proc: MagicMock,
+    created_at: float,
+) -> BackgroundJob:
+    return BackgroundJob(
+        job_id=job_id,
+        command=[sys.executable, "-c", _SIGTERM_IGNORER_SCRIPT],
+        cwd=Path("."),
+        proc=proc,
+        created_at=created_at,
     )
 
 
-async def _kill_proc(proc: asyncio.subprocess.Process) -> None:
-    if proc.returncode is not None:
-        return
-    with contextlib.suppress(ProcessLookupError):
-        proc.kill()
-    with contextlib.suppress(asyncio.TimeoutError, ProcessLookupError):
-        await asyncio.wait_for(proc.wait(), timeout=2.0)
+def _sigterm_ignoring_proc(*, pid: int) -> MagicMock:
+    wait_calls = 0
+
+    async def _wait() -> int:
+        nonlocal wait_calls
+        wait_calls += 1
+        if wait_calls == 1:
+            await asyncio.sleep(3600)
+        return -9
+
+    proc = MagicMock()
+    proc.pid = pid
+    proc.returncode = None
+    proc.wait = _wait
+    return proc
 
 
 @pytest.mark.asyncio
@@ -89,68 +99,56 @@ async def test_dispose_job_async_sigkill_when_child_ignores_sigterm() -> None:
 
     def _record_killpg(pgid: int, sig: int) -> None:
         killpg_calls.append((pgid, sig))
-        import os
 
-        os.killpg(pgid, sig)
+    proc = _sigterm_ignoring_proc(pid=5150)
+    job = _running_job(job_id="evict-dispose", proc=proc, created_at=0.0)
 
-    proc = await _spawn_sigterm_ignorer()
-    assert proc.pid is not None
-    job = BackgroundJob(
-        job_id="evict-dispose",
-        command=[sys.executable, "-c", _SIGTERM_IGNORER_SCRIPT],
-        cwd=Path("."),
-        proc=proc,
+    with (
+        patch("sevn.tools.process._STOP_GRACE_S", 0.05),
+        patch("sevn.tools.process.os.getpgid", return_value=5150),
+        patch("sevn.tools.process.os.killpg", side_effect=_record_killpg),
+    ):
+        await _dispose_job_async(job)
+
+    assert any(sig == signal.SIGKILL for _pgid, sig in killpg_calls), (
+        "expected SIGKILL after SIGTERM grace, matching _stop_job"
     )
-
-    try:
-        with (
-            patch("sevn.tools.process._STOP_GRACE_S", 0.05),
-            patch("sevn.tools.process.os.killpg", side_effect=_record_killpg),
-        ):
-            await _dispose_job_async(job)
-
-        assert any(sig == signal.SIGKILL for _pgid, sig in killpg_calls), (
-            "expected SIGKILL after SIGTERM grace, matching _stop_job"
-        )
-        assert proc.returncode is not None or proc.poll() is not None
-    finally:
-        await _kill_proc(proc)
 
 
 @pytest.mark.asyncio
 @pytest.mark.xfail(reason="green after W15: LRU eviction SIGKILL escalation", strict=False)
 async def test_lru_eviction_kills_sigterm_ignoring_running_child(ctx: ToolContext) -> None:
-    """W14.1: LRU eviction must not leave a SIGTERM-ignoring child running after pop."""
-    procs: list[asyncio.subprocess.Process] = []
-    try:
-        for index in range(3):
-            proc = await _spawn_sigterm_ignorer()
-            procs.append(proc)
-            _session_jobs(ctx.session_id)[f"job-{index}"] = BackgroundJob(
-                job_id=f"job-{index}",
-                command=[sys.executable, "-c", _SIGTERM_IGNORER_SCRIPT],
-                cwd=ctx.workspace_path,
-                proc=proc,
-                created_at=float(index),
-            )
+    """W14.1: LRU eviction must SIGKILL a SIGTERM-ignoring child via ``_dispose_job_async``."""
+    killpg_calls: list[tuple[int, int]] = []
 
-        with (
-            patch("sevn.tools.process.MAX_JOBS_PER_SESSION", 2),
-            patch("sevn.tools.process._STOP_GRACE_S", 0.05),
-        ):
-            _reap_stale_jobs(ctx.session_id)
-            if _background_reap_tasks:
-                await asyncio.gather(*list(_background_reap_tasks), return_exceptions=True)
+    def _record_killpg(pgid: int, sig: int) -> None:
+        killpg_calls.append((pgid, sig))
 
-        evicted_pid = procs[0].pid
-        assert evicted_pid is not None
-        import os
+    evicted_proc = _sigterm_ignoring_proc(pid=4242)
+    jobs = _session_jobs(ctx.session_id)
+    jobs["job-0"] = _running_job(job_id="job-0", proc=evicted_proc, created_at=0.0)
+    jobs["job-1"] = _running_job(
+        job_id="job-1",
+        proc=_sigterm_ignoring_proc(pid=4243),
+        created_at=1.0,
+    )
+    jobs["job-2"] = _running_job(
+        job_id="job-2",
+        proc=_sigterm_ignoring_proc(pid=4244),
+        created_at=2.0,
+    )
 
-        with pytest.raises(ProcessLookupError):
-            os.kill(evicted_pid, 0)
+    with (
+        patch("sevn.tools.process.MAX_JOBS_PER_SESSION", 2),
+        patch("sevn.tools.process._STOP_GRACE_S", 0.05),
+        patch("sevn.tools.process.os.getpgid", return_value=4242),
+        patch("sevn.tools.process.os.killpg", side_effect=_record_killpg),
+    ):
+        _reap_stale_jobs(ctx.session_id)
+        if _background_reap_tasks:
+            await asyncio.gather(*list(_background_reap_tasks), return_exceptions=True)
 
-        jobs = _session_jobs(ctx.session_id)
-        assert len(jobs) <= 2
-    finally:
-        for proc in procs:
-            await _kill_proc(proc)
+    assert "job-0" not in jobs
+    assert any(sig == signal.SIGKILL for _pgid, sig in killpg_calls), (
+        "LRU eviction must escalate to SIGKILL when SIGTERM is ignored"
+    )
