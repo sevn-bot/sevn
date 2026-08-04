@@ -8,7 +8,7 @@ summary: Deliver a single scanner subsystem that runs in the gateway process so 
   content is filtered before the Triager or any routing model sees user-visible text,
   transcripts, or selected tool output.
 last_updated: '2026-08-04'
-fingerprint: sha256:61db902354116680bb9229a2ab81f4ed58a565d2931158a9ee7e900955a759b4
+fingerprint: sha256:95d86426362d0c0138b0968f5acf1bfef5242475fb23cbafff6037cb03d9c365
 related: []
 sources:
 - src/sevn/security/**
