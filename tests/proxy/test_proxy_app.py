@@ -2,22 +2,32 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import httpx
 import pytest
+from tests.proxy.conftest import (
+    proxy_auth_headers,
+    proxy_test_settings,
+)
 
 from sevn.config.defaults import DEFAULT_MINIMAX_OPENAI_BASE_URL
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.proxy.app import create_app
-from sevn.proxy.settings import ProxySettings
+
+if TYPE_CHECKING:
+    from sevn.proxy.settings import ProxySettings
 
 
 def _settings(**kwargs: str | None) -> ProxySettings:
     """Build settings with empty strings mapped to None where tests need no env."""
-    return ProxySettings(
-        anthropic_api_key=kwargs.get("anthropic_api_key"),
-        openai_api_key=kwargs.get("openai_api_key"),
-        proxy_shared_secret=kwargs.get("proxy_shared_secret"),
-    )
+    data = {
+        "anthropic_api_key": kwargs.get("anthropic_api_key"),
+        "openai_api_key": kwargs.get("openai_api_key"),
+    }
+    if "proxy_shared_secret" in kwargs:
+        data["proxy_shared_secret"] = kwargs.get("proxy_shared_secret")
+    return proxy_test_settings(**data)
 
 
 @pytest.mark.anyio
@@ -54,7 +64,11 @@ async def test_bedrock_503_without_aws_credentials() -> None:
     app = create_app(settings=_settings(anthropic_api_key="a", openai_api_key="o"))
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.post("/llm/bedrock/converse", json={"modelId": "m"})
+        resp = await client.post(
+            "/llm/bedrock/converse",
+            json={"modelId": "m"},
+            headers=proxy_auth_headers(),
+        )
     assert resp.status_code == 503
 
 
@@ -63,14 +77,18 @@ async def test_anthropic_503_without_key(monkeypatch: pytest.MonkeyPatch) -> Non
     """Anthropic route503 when ANTHROPIC_API_KEY unset."""
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     app = create_app(
-        settings=ProxySettings(
+        settings=proxy_test_settings(
             anthropic_api_key=None,
             openai_api_key="sk-test",
         ),
     )
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.post("/llm/anthropic/messages", json={"model": "claude"})
+        resp = await client.post(
+            "/llm/anthropic/messages",
+            json={"model": "claude"},
+            headers=proxy_auth_headers(),
+        )
     assert resp.status_code == 503
 
 
@@ -98,6 +116,7 @@ async def test_anthropic_forwards_via_post_json(monkeypatch: pytest.MonkeyPatch)
         resp = await client.post(
             "/llm/anthropic/messages",
             json={"model": "claude-3", "messages": []},
+            headers=proxy_auth_headers(),
         )
     assert resp.status_code == 200
     assert resp.json()["usage"]["input_tokens"] == 1
@@ -134,6 +153,7 @@ async def test_anthropic_normalizes_dual_system_before_forward(
                     {"role": "user", "content": "hi"},
                 ],
             },
+            headers=proxy_auth_headers(),
         )
     assert resp.status_code == 200
     body = captured["body"]
@@ -155,7 +175,7 @@ async def test_openai_chat_forwards_with_bearer(monkeypatch: pytest.MonkeyPatch)
 
     monkeypatch.setattr("sevn.proxy.app.post_json", capture_post_json)
     app = create_app(
-        settings=ProxySettings(
+        settings=proxy_test_settings(
             anthropic_api_key=None,
             openai_api_key="sk-openai",
             openai_base_url="https://api.openai.com/v1",
@@ -166,6 +186,7 @@ async def test_openai_chat_forwards_with_bearer(monkeypatch: pytest.MonkeyPatch)
         resp = await client.post(
             "/llm/openai/chat/completions",
             json={"model": "gpt-4", "messages": []},
+            headers=proxy_auth_headers(),
         )
     assert resp.status_code == 200
     assert resp.json()["id"] == "chatcmpl"
@@ -205,7 +226,7 @@ async def test_openai_chat_minimax_routes_to_minimax_base_url(
 
     monkeypatch.setattr("sevn.proxy.app.post_json", capture_post_json)
     app = create_app(
-        settings=ProxySettings(
+        settings=proxy_test_settings(
             anthropic_api_key=None,
             openai_api_key="sk-minimax-key",
             openai_base_url="https://api.openai.com/v1",
@@ -216,6 +237,7 @@ async def test_openai_chat_minimax_routes_to_minimax_base_url(
         resp = await client.post(
             "/llm/openai/chat/completions",
             json={"model": "minimax/MiniMax-M3", "messages": [{"role": "user", "content": "hi"}]},
+            headers=proxy_auth_headers(),
         )
     assert resp.status_code == 200
     assert captured["url"] == f"{DEFAULT_MINIMAX_OPENAI_BASE_URL}/chat/completions"
@@ -243,7 +265,7 @@ async def test_openai_chat_minimax_with_workspace_custom_url(
         providers={"minimax": {"openai_base_url": "https://custom.minimax.io/v1"}},
     )
     app = create_app(
-        settings=ProxySettings(
+        settings=proxy_test_settings(
             anthropic_api_key=None,
             openai_api_key="sk-test",
             openai_base_url="https://api.openai.com/v1",
@@ -255,6 +277,7 @@ async def test_openai_chat_minimax_with_workspace_custom_url(
         resp = await client.post(
             "/llm/openai/chat/completions",
             json={"model": "minimax/MiniMax-M2.7", "messages": []},
+            headers=proxy_auth_headers(),
         )
     assert resp.status_code == 200
     assert captured["url"] == "https://custom.minimax.io/v1/chat/completions"
@@ -273,7 +296,7 @@ async def test_openai_chat_non_minimax_unchanged(monkeypatch: pytest.MonkeyPatch
 
     monkeypatch.setattr("sevn.proxy.app.post_json", capture_post_json)
     app = create_app(
-        settings=ProxySettings(
+        settings=proxy_test_settings(
             anthropic_api_key=None,
             openai_api_key="sk-openai",
             openai_base_url="https://api.openai.com/v1",
@@ -284,6 +307,7 @@ async def test_openai_chat_non_minimax_unchanged(monkeypatch: pytest.MonkeyPatch
         resp = await client.post(
             "/llm/openai/chat/completions",
             json={"model": "gpt-4o", "messages": [{"role": "user", "content": "hi"}]},
+            headers=proxy_auth_headers(),
         )
     assert resp.status_code == 200
     assert captured["url"] == "https://api.openai.com/v1/chat/completions"
@@ -308,7 +332,7 @@ async def test_openai_chat_minimax_key_fallback_to_anthropic(
 
     monkeypatch.setattr("sevn.proxy.app.post_json", capture_post_json)
     app = create_app(
-        settings=ProxySettings(
+        settings=proxy_test_settings(
             anthropic_api_key="ak-fallback",
             openai_api_key="sk-primary",
             openai_base_url="https://api.openai.com/v1",
@@ -319,6 +343,7 @@ async def test_openai_chat_minimax_key_fallback_to_anthropic(
         resp = await client.post(
             "/llm/openai/chat/completions",
             json={"model": "minimax/MiniMax-M3", "messages": []},
+            headers=proxy_auth_headers(),
         )
     assert resp.status_code == 200
     hdrs = captured["headers"]

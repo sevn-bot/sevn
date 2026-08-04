@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 import httpx
 from starlette.testclient import TestClient
+from tests.proxy.conftest import proxy_auth_headers
 
 from sevn.config.workspace_config import parse_workspace_config
 from sevn.proxy.app import create_app
@@ -43,6 +44,7 @@ def test_factory_boot_loads_provider_key_from_secrets(tmp_path: Path) -> None:
     backend = EncryptedFileBackend(store, master_key=mk)
     chain = SecretsChain([backend], backend_labels=["encrypted_file"])
     asyncio.run(chain.set("SEVN_SECRET_MINIMAX", "PLACEHOLDER_PROVIDER"))
+    asyncio.run(chain.set("SEVN_PROXY_SHARED_SECRET", "test"))
 
     sevn_json = {
         "schema_version": 1,
@@ -85,6 +87,7 @@ def test_factory_boot_loads_provider_key_from_secrets(tmp_path: Path) -> None:
             resp = client.post(
                 "/llm/anthropic/messages",
                 json={"model": "minimax/MiniMax-M2.7", "messages": []},
+                headers=proxy_auth_headers(),
             )
         assert resp.status_code == 200
         assert captured["x-api-key"] == "PLACEHOLDER_PROVIDER"

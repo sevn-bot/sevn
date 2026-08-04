@@ -9,10 +9,14 @@ import pytest
 from starlette.requests import Request
 
 from sevn.proxy.app import create_app
-from sevn.proxy.auth import llm_post_auth_failure
+from sevn.proxy.auth import (
+    PROXY_UNCONFIGURED_DETAIL,
+    _is_guarded_path,
+    llm_post_auth_failure,
+    log_proxy_allow_unauthenticated_boot_warning,
+    proxy_allow_unauthenticated,
+)
 from sevn.proxy.settings import ProxySettings
-
-_XFAIL_W5 = pytest.mark.xfail(reason="green after W5: fail-closed proxy auth", strict=False)
 
 
 def _request(
@@ -36,7 +40,6 @@ def _request(
     return Request(scope)
 
 
-@_XFAIL_W5
 def test_llm_post_auth_failure_503_when_no_secret() -> None:
     resp = llm_post_auth_failure(_request(), None)
     assert resp is not None
@@ -127,7 +130,6 @@ async def test_proxy_app_rejects_wrong_token() -> None:
 
 
 @pytest.mark.anyio
-@_XFAIL_W5
 async def test_proxy_app_503_when_secret_unconfigured() -> None:
     app = create_app(
         settings=ProxySettings(anthropic_api_key="ak", openai_api_key="ok"),
@@ -136,4 +138,62 @@ async def test_proxy_app_503_when_secret_unconfigured() -> None:
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         resp = await client.post("/llm/openai/chat/completions", json={"model": "x"})
     assert resp.status_code == 503
-    assert resp.json() == {"detail": "proxy authentication not configured"}
+    assert resp.json() == {"detail": PROXY_UNCONFIGURED_DETAIL}
+
+
+def test_proxy_allow_unauthenticated_false_by_default() -> None:
+    assert proxy_allow_unauthenticated(env={}) is False
+    assert proxy_allow_unauthenticated(env={"SEVN_PROXY_ALLOW_UNAUTHENTICATED": "0"}) is False
+
+
+def test_proxy_allow_unauthenticated_true_when_opt_in() -> None:
+    assert proxy_allow_unauthenticated(env={"SEVN_PROXY_ALLOW_UNAUTHENTICATED": "1"}) is True
+
+
+def test_proxy_unconfigured_detail_constant() -> None:
+    assert PROXY_UNCONFIGURED_DETAIL == "proxy authentication not configured"
+
+
+@pytest.mark.parametrize(
+    ("path", "guarded"),
+    [
+        ("/llm/openai/chat/completions", True),
+        ("/web/fetch", True),
+        ("/integration", True),
+        ("/healthz", False),
+        ("/metrics", False),
+    ],
+)
+def test_is_guarded_path(path: str, guarded: bool) -> None:
+    assert _is_guarded_path(path) is guarded
+
+
+def test_log_proxy_allow_unauthenticated_boot_warning_noop_without_opt_in(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from loguru import logger
+
+    monkeypatch.delenv("SEVN_PROXY_ALLOW_UNAUTHENTICATED", raising=False)
+    warnings: list[str] = []
+    sink_id = logger.add(lambda rec: warnings.append(str(rec)), level="WARNING")
+    try:
+        log_proxy_allow_unauthenticated_boot_warning()
+    finally:
+        logger.remove(sink_id)
+    assert warnings == []
+
+
+def test_log_proxy_allow_unauthenticated_boot_warning_emits_when_opt_in(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from loguru import logger
+
+    monkeypatch.setenv("SEVN_PROXY_ALLOW_UNAUTHENTICATED", "1")
+    warnings: list[str] = []
+    sink_id = logger.add(lambda rec: warnings.append(str(rec)), level="WARNING")
+    try:
+        log_proxy_allow_unauthenticated_boot_warning()
+    finally:
+        logger.remove(sink_id)
+    joined = " ".join(warnings).lower()
+    assert "unauthenticated" in joined or "allow_unauthenticated" in joined

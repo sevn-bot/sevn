@@ -30,7 +30,6 @@ _SERVICE_SECRET = "long-lived-service-secret-at-least-32-chars"
 _SIGNING_KEY = _SERVICE_SECRET
 _SANDBOX_SCOPE = "sandbox"
 
-_XFAIL_W5 = pytest.mark.xfail(reason="green after W5: fail-closed proxy auth", strict=False)
 _XFAIL_W6_SESSION = pytest.mark.xfail(reason="green after W6: scoped session tokens", strict=False)
 
 
@@ -85,7 +84,6 @@ def _mint_session_token(
         ("POST", "/integration"),
     ],
 )
-@_XFAIL_W5
 def test_guarded_routes_503_when_secret_unconfigured(method: str, path: str) -> None:
     """Deleting the fail-closed branch must break this test (P4a / D11)."""
     resp = llm_post_auth_failure(_request(method=method, path=path), None)
@@ -95,7 +93,6 @@ def test_guarded_routes_503_when_secret_unconfigured(method: str, path: str) -> 
 
 
 @pytest.mark.parametrize("secret", [None, ""])
-@_XFAIL_W5
 def test_guarded_routes_503_when_secret_empty(secret: str | None) -> None:
     resp = llm_post_auth_failure(_request(path="/web/fetch"), secret)
     assert resp is not None
@@ -116,7 +113,6 @@ def test_unguarded_healthz_still_open_when_secret_unconfigured() -> None:
         ("POST", "/integration"),
     ],
 )
-@_XFAIL_W5
 async def test_proxy_app_503_on_guarded_routes_without_secret(method: str, path: str) -> None:
     app = create_app(
         settings=ProxySettings(anthropic_api_key="ak", openai_api_key="ok"),
@@ -134,7 +130,6 @@ async def test_proxy_app_503_on_guarded_routes_without_secret(method: str, path:
 
 
 @pytest.mark.anyio
-@_XFAIL_W5
 async def test_allow_unauthenticated_opt_in_passes_and_warns(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
