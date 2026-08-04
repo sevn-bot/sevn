@@ -90,8 +90,8 @@
     },
     "onboarding": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-04T10:15:01Z",
-      "digest": "82ec1853bef9dfe38af4e6f98a5b9e2c70c782aff7f3feb3a067001050115675",
+      "computed_at": "2026-08-04T22:30:47Z",
+      "digest": "35d19674089f2715d1e4b1756746449707a2692cc985627e86350afc0eb90582",
       "source_globs": [
         "src/sevn/onboarding/**",
         "src/sevn/cli/commands/onboard.py",
