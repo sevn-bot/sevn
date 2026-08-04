@@ -599,6 +599,16 @@ async def store_wizard_credentials(
         await chain.set(_GATEWAY_TOKEN_LOGICAL_KEY, gw_tok)
         written[_GATEWAY_TOKEN_LOGICAL_KEY] = True
     proxy_secret = (proxy_shared_secret or "").strip()
+    if not proxy_secret and (
+        gw_tok
+        or (bot_token or "").strip()
+        or provider_api_keys
+        or (github_token or "").strip()
+        or (openwiki_llm_api_key or "").strip()
+    ):
+        from sevn.gateway.runtime.gateway_token import generate_gateway_token
+
+        proxy_secret = generate_gateway_token()
     if proxy_secret:
         await chain.set(_PROXY_SHARED_SECRET_LOGICAL_KEY, proxy_secret)
         written[_PROXY_SHARED_SECRET_LOGICAL_KEY] = True

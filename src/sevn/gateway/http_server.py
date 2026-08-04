@@ -712,10 +712,14 @@ async def _prime_proxy_shared_secret_env(
     """
     if os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip():
         return
+    from sevn.security.secrets.errors import SecretsStoreCorruptError
     from sevn.security.secrets.factory import secrets_chain_from_workspace
 
     chain = secrets_chain_from_workspace(content_root, workspace.secrets_backend)
-    proxy_secret = await chain.get_resilient("SEVN_PROXY_SHARED_SECRET")
+    try:
+        proxy_secret = await chain.get_resilient("SEVN_PROXY_SHARED_SECRET")
+    except SecretsStoreCorruptError:
+        return
     if proxy_secret and proxy_secret.strip():
         os.environ["SEVN_PROXY_SHARED_SECRET"] = proxy_secret.strip()
 
