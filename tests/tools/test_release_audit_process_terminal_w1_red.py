@@ -179,11 +179,11 @@ async def test_terminal_run_strips_sentinel_from_output(ctx: ToolContext) -> Non
 
     def fake_run_sync(
         *, child: Any, command: str, timeout_s: float
-    ) -> tuple[str, bool, int | None]:
+    ) -> tuple[str, bool, int | None, bool]:
         _ = child, timeout_s
         captured["command"] = command
         # Real _run_sync strips the sentinel before returning; simulate that here.
-        return "hello", False, 0
+        return "hello", False, 0, False
 
     with patch("sevn.tools.terminal._run_sync", fake_run_sync):
         exe, _ = build_session_registry(registry_version=1)
