@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / safebash
   (when routed through the execution sandbox), process when configured for sandbox
   routing, and skill subprocesses spawned b
-last_updated: '2026-08-03'
-fingerprint: sha256:e947ce6d6a26d9e8e6ccee5f2b59d7f6a0a902e2dba261e486cb6cc929a2bcb9
+last_updated: '2026-08-04'
+fingerprint: sha256:3c8d228969a853ba22b56234ab9aeb255ecaf0a2fdf7891ec1a8d60353100bda
 related: []
 sources:
 - src/sevn/security/**
@@ -446,6 +446,16 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Amendments (post-audit-0.0.1 W6 — #168)
+
+``build_sandbox_child_env`` (§2.2) emits only ``SEVN_PROXY_URL``,
+``SEVN_SESSION_TOKEN``, and ``SEVN_WORKSPACE``. It **never** injects
+``SEVN_PROXY_SHARED_SECRET``, ``X-Sevn-Proxy-Token``, or forward-proxy env vars
+(``HTTP_PROXY`` / ``HTTPS_PROXY`` / ``NO_PROXY``) — the egress proxy is a reverse
+path-prefix API, not a CONNECT forward proxy (D13). ``SEVN_SESSION_TOKEN`` carries
+a scoped per-run ``X-Sevn-Session-Token`` minted at spawn (``mint_session_token``,
+``sandbox`` scope); see spec-07 W6 amendment for validation semantics.
 
 ## Human-input needed
 

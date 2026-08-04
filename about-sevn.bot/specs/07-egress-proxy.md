@@ -8,7 +8,7 @@ summary: Product pairing (v1). Deployment, paired daemon install, onboarding val
   and Mission Control management of the proxy are specified in prd-06-setup-and-operations
   and prd-07-mission-control §5.1
 last_updated: '2026-08-04'
-fingerprint: sha256:e70391a6264900900d9c1ac860a852137573b68c614f547e761d6bb485adf436
+fingerprint: sha256:68898a1a381139107a854c63bcea05ca7e2f4008eeba8ccc548b95d0bdbeae49
 related: []
 sources:
 - src/sevn/proxy/**
@@ -32,9 +32,15 @@ interfaces:
 - name: log_proxy_allow_unauthenticated_boot_warning
   file: src/sevn/proxy/auth.py
   symbol: log_proxy_allow_unauthenticated_boot_warning
+- name: mint_session_token
+  file: src/sevn/proxy/auth.py
+  symbol: mint_session_token
 - name: proxy_allow_unauthenticated
   file: src/sevn/proxy/auth.py
   symbol: proxy_allow_unauthenticated
+- name: validate_session_token
+  file: src/sevn/proxy/auth.py
+  symbol: validate_session_token
 - name: converse_via_bedrock
   file: src/sevn/proxy/bedrock_converse.py
   symbol: converse_via_bedrock
@@ -225,6 +231,20 @@ is explicit ``SEVN_PROXY_ALLOW_UNAUTHENTICATED=1``, which logs a loud warning at
 proxy boot and on every guarded request. Onboarding stores
 ``SEVN_PROXY_SHARED_SECRET`` in the workspace secrets chain; gateway and proxy
 resolve it at boot (``resolve_proxy_shared_secret`` reads process env unchanged).
+
+## Amendments (post-audit-0.0.1 W6 — #168)
+
+Two credentials authenticate guarded proxy routes (D12):
+
+| Header | Holder | Scope |
+|--------|--------|-------|
+| ``X-Sevn-Proxy-Token`` | Gateway → proxy | Long-lived ``SEVN_PROXY_SHARED_SECRET``; all guarded prefixes |
+| ``X-Sevn-Session-Token`` | Sandbox / tool → proxy | Per-run HMAC token minted by ``mint_session_token``; ``sandbox`` scope covers ``/web/*`` and ``/integration``; ``llm`` scope covers ``/llm/*`` |
+
+Session tokens carry ``exp`` (unix expiry) and ``run_id`` in a ``v1.<payload>.<sig>``
+envelope signed with the same ``SEVN_PROXY_SHARED_SECRET``. Either header alone
+satisfies the guard for its route family. The service secret is **never** injected
+into sandbox child env (``build_sandbox_child_env``).
 
 ## Human-input needed
 

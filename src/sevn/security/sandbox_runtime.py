@@ -425,38 +425,90 @@ def _emit_sink_blocking(sink: TraceSink | None, kind: str, attrs: Mapping[str, o
         logger.bind(kind=kind).debug("trace emit skipped inside running loop")
 
 
+_FORBIDDEN_SANDBOX_CHILD_ENV_KEYS: frozenset[str] = frozenset(
+    {
+        "SEVN_PROXY_SHARED_SECRET",
+        "X-SEVN-PROXY-TOKEN",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+    }
+)
+
+
 def build_sandbox_child_env(
     *,
     proxy_url: str,
     session_token: str,
     workspace_mount_path: str | os.PathLike[str],
 ) -> dict[str, str]:
-    """Build §2.2 child environment (never injects raw provider keys).
+    """Build §2.2 child environment (never injects raw provider keys or service secret).
+
+    Emits ``SEVN_PROXY_URL``, scoped ``SEVN_SESSION_TOKEN``, and ``SEVN_WORKSPACE`` only.
+    Forward-proxy env vars (``HTTP_PROXY`` / ``HTTPS_PROXY`` / ``NO_PROXY``) are omitted —
+    the egress proxy is a reverse path-prefix API, not a CONNECT forward proxy (D13).
+
     Args:
         proxy_url (str): Base URL for unified egress proxy.
-        session_token (str): Opaque per-boot session token.
+        session_token (str): Scoped per-run ``X-Sevn-Session-Token`` credential.
         workspace_mount_path (str | os.PathLike[str]): Shadow or container path.
+
     Returns:
         dict[str, str]: Env vars to merge over a sanitized base.
+
+    Raises:
+        AssertionError: When a forbidden key would be emitted (regression guard, W6.2).
+
     Examples:
         >>> e = build_sandbox_child_env(
         ...     proxy_url="http://127.0.0.1:9",
         ...     session_token="t",
         ...     workspace_mount_path="/w",
         ... )
-        >>> e["NO_PROXY"]
-        'localhost,127.0.0.1'
+        >>> set(e.keys()) == {"SEVN_PROXY_URL", "SEVN_SESSION_TOKEN", "SEVN_WORKSPACE"}
+        True
     """
     p = str(proxy_url).strip()
     w = os.fspath(workspace_mount_path)
-    return {
+    env = {
         "SEVN_PROXY_URL": p,
         "SEVN_SESSION_TOKEN": session_token,
-        "HTTP_PROXY": p,
-        "HTTPS_PROXY": p,
-        "NO_PROXY": "localhost,127.0.0.1",
         "SEVN_WORKSPACE": w,
     }
+    for key in _FORBIDDEN_SANDBOX_CHILD_ENV_KEYS:
+        assert key not in env, f"build_sandbox_child_env must not emit {key!r}"
+    for value in env.values():
+        assert "SEVN_PROXY_SHARED_SECRET" not in value
+    return env
+
+
+def _resolve_spawn_session_token(*, run_id: str, env: Mapping[str, str]) -> str:
+    """Return an existing ``SEVN_SESSION_TOKEN`` or mint a scoped per-run token.
+
+    Args:
+        run_id (str): Sandbox correlation id embedded in minted tokens.
+        env (Mapping[str, str]): Upstream spawn env (may already carry a token).
+
+    Returns:
+        str: Token text for ``build_sandbox_child_env`` (possibly empty).
+
+    Examples:
+        >>> _resolve_spawn_session_token(run_id="r", env={"SEVN_SESSION_TOKEN": "keep"})
+        'keep'
+    """
+    existing = str(env.get("SEVN_SESSION_TOKEN", "")).strip()
+    if existing:
+        return existing
+    secret = os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip()
+    if not secret:
+        return ""
+    from sevn.proxy.auth import SESSION_SCOPE_SANDBOX, mint_session_token
+
+    return mint_session_token(
+        signing_key=secret,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id=run_id,
+    )
 
 
 def _llmignore_excluded_relative(rel: str) -> bool:
@@ -809,6 +861,9 @@ class SubprocessSandboxRuntime:
         )
         sid = uuid.uuid4().hex
         child_env = dict(env)
+        token = _resolve_spawn_session_token(run_id=run_id, env=child_env)
+        if token:
+            child_env["SEVN_SESSION_TOKEN"] = token
         child_env.update(
             build_sandbox_child_env(
                 proxy_url=child_env.get("SEVN_PROXY_URL", ""),
@@ -1179,8 +1234,6 @@ def _apply_sandbox_proxy_env(child_env: dict[str, str], proxy_url: str) -> None:
         'http://host.docker.internal:8787'
     """
     child_env["SEVN_PROXY_URL"] = proxy_url
-    child_env["HTTP_PROXY"] = proxy_url
-    child_env["HTTPS_PROXY"] = proxy_url
 
 
 async def _find_running_container_matching(name_fragment: str) -> str | None:
@@ -1649,6 +1702,9 @@ class DockerSandboxRuntime:
 
         ws = await asyncio.to_thread(_resolve_workspace)
         child_env = dict(env)
+        token = _resolve_spawn_session_token(run_id=run_id, env=child_env)
+        if token:
+            child_env["SEVN_SESSION_TOKEN"] = token
         child_env.update(self._pre_env)
         child_env.setdefault("SEVN_WORKSPACE", _DOCKER_WORKSPACE_MOUNT)
         proxy_raw = str(child_env.get("SEVN_PROXY_URL", "")).strip()

@@ -260,7 +260,8 @@ async def create_sandbox_terminal_session(
         layout (WorkspaceLayout): Workspace paths (``content_root`` is cwd).
         cfg (WorkspaceConfig): Parsed workspace config for driver resolution.
         proxy_url (str): §2.2 proxy URL injected into sandbox child env.
-        session_token (str): Opaque sandbox session token for child env.
+        session_token (str): Scoped per-run ``X-Sevn-Session-Token`` for sandbox egress;
+            minted at spawn when unset (not the gateway ``SEVN_PROXY_SHARED_SECRET``).
 
     Returns:
         SandboxTerminalSession: Live PTY session handle.
@@ -281,9 +282,24 @@ async def create_sandbox_terminal_session(
     runtime = make_runtime_for_driver(driver, layout=layout, cfg=cfg, trace_sink=None)
     workspace = layout.content_root.resolve()
     run_id = f"mc-terminal-{uuid.uuid4().hex[:12]}"
+    if session_token.strip():
+        resolved_token = session_token.strip()
+    else:
+        from sevn.proxy.auth import SESSION_SCOPE_SANDBOX, mint_session_token
+
+        secret = os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip()
+        resolved_token = (
+            mint_session_token(
+                signing_key=secret,
+                scope=SESSION_SCOPE_SANDBOX,
+                run_id=run_id,
+            )
+            if secret
+            else uuid.uuid4().hex
+        )
     child_env = {
         "SEVN_PROXY_URL": proxy_url,
-        "SEVN_SESSION_TOKEN": session_token or uuid.uuid4().hex,
+        "SEVN_SESSION_TOKEN": resolved_token,
     }
     try:
         sandbox_id = await runtime.spawn(run_id=run_id, workspace=workspace, env=child_env)

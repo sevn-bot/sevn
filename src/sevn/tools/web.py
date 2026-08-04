@@ -105,7 +105,8 @@ def build_egress_web_headers(
 
     Args:
         proxy_url (str | None): Resolved ``SEVN_PROXY_URL`` (must be non-empty to call).
-        session_token (str | None): Per-run ``SEVN_SESSION_TOKEN`` when set.
+        session_token (str | None): Scoped per-run ``SEVN_SESSION_TOKEN`` sent as
+            ``X-Sevn-Session-Token`` — not the long-lived gateway service secret.
         proxy_shared_secret (str | None): Optional ``SEVN_PROXY_SHARED_SECRET`` guard value.
 
     Returns:
