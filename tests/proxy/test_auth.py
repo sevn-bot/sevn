@@ -12,6 +12,8 @@ from sevn.proxy.app import create_app
 from sevn.proxy.auth import llm_post_auth_failure
 from sevn.proxy.settings import ProxySettings
 
+_XFAIL_W5 = pytest.mark.xfail(reason="green after W5: fail-closed proxy auth", strict=False)
+
 
 def _request(
     *,
@@ -34,9 +36,16 @@ def _request(
     return Request(scope)
 
 
-def test_llm_post_auth_failure_skips_when_no_secret() -> None:
-    assert llm_post_auth_failure(_request(), None) is None
-    assert llm_post_auth_failure(_request(), "") is None
+@_XFAIL_W5
+def test_llm_post_auth_failure_503_when_no_secret() -> None:
+    resp = llm_post_auth_failure(_request(), None)
+    assert resp is not None
+    assert resp.status_code == 503
+    assert resp.body == b'{"detail":"proxy authentication not configured"}'
+    resp_empty = llm_post_auth_failure(_request(), "")
+    assert resp_empty is not None
+    assert resp_empty.status_code == 503
+    assert resp_empty.body == b'{"detail":"proxy authentication not configured"}'
 
 
 def test_llm_post_auth_failure_rejects_non_post_without_token() -> None:
@@ -118,11 +127,13 @@ async def test_proxy_app_rejects_wrong_token() -> None:
 
 
 @pytest.mark.anyio
-async def test_proxy_app_skips_guard_without_secret() -> None:
+@_XFAIL_W5
+async def test_proxy_app_503_when_secret_unconfigured() -> None:
     app = create_app(
         settings=ProxySettings(anthropic_api_key="ak", openai_api_key="ok"),
     )
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         resp = await client.post("/llm/openai/chat/completions", json={"model": "x"})
-    assert resp.json().get("detail") != "unauthorized"
+    assert resp.status_code == 503
+    assert resp.json() == {"detail": "proxy authentication not configured"}
