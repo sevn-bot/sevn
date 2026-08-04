@@ -35,6 +35,9 @@ are cut into a dated, versioned section at release time.
 - [2026-07-30] `/model --once <provider/model>` stages a one-turn tier-B model override in session metadata — consumed at the next agent turn (success or failure) without changing the persisted `providers.tier_default.B` setting; `/status` shows effective vs persisted model (#88)
 - [2026-07-30] Per-channel and per-topic model and system prompt overrides under `channels.<name>.model` / `channels.<name>.system_prompt` and `channels.telegram.topics.<id>.*` — turn-scoped resolution with session → channel → workspace precedence; `TopicConfig.system_prompt` wired from Telegram inbound metadata (#86)
 ### Fixed
+- [2026-08-05] OpenAI-compatible `POST /v1/chat/completions` uses a fresh ephemeral session per request so concurrent same-bearer clients no longer overwrite each other's history; `GET /v1/models` requires the gateway bearer and `/v1/health` stays a public liveness probe (#174, post-audit Batch D)
+- [2026-08-05] Background `process` jobs that ignore SIGTERM are SIGKILLed on TTL expiry and LRU eviction, matching explicit stop (#175, post-audit Batch D)
+- [2026-08-05] Timed-out `terminal_run` commands set `session_destroyed: true` and remove the shell session so the next call must spawn again (#176, post-audit Batch D)
 - [2026-08-04] Onboarding wizard credential storage auto-generates `SEVN_PROXY_SHARED_SECRET` when other secrets are written; gateway lifespan proxy-env priming tolerates corrupt encrypted stores (#167, post-audit B-Final)
 - [2026-08-04] Docker sandbox spawn reports `network_enforcement: docker_internal` on `sandbox.runtime` traces instead of writing unapplied egress rules files or emitting `network_policy_path` (#171, post-audit W8)
 - [2026-08-04] Docker sandbox image pinning pulls tagged images then resolves `RepoDigests` only — locally built images without registry digests fail closed instead of passing a bare image ID to `docker pull` (#170, post-audit W7)

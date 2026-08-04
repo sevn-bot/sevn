@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-08-04'
-fingerprint: sha256:cebe708f4e55bdf0bb9fcaef601777a15b9d73cfee27b3d85d926d95b03a844e
+fingerprint: sha256:7625f850a672d229e32c2c8a345ed9beb390fcf1a86d970d50f5d95cdc4a05ad
 related: []
 sources:
 - src/sevn/gateway/**
@@ -1799,3 +1799,23 @@ deterministic harness failure: ``_is_deterministic_harness_failure`` matches the
 partial-progress path may still run when tools succeeded without user text. Operator-facing
 copy comes from the harness failure report (loaded skill id + retry guidance), not raw
 pydantic-ai retry text alone.
+
+## Amendments (post-audit-0.0.1 W16 — #174, D16–D19)
+
+**OpenAI-compat session isolation (#174, D17).** ``POST /v1/chat/completions`` mints a
+fresh ephemeral ``gateway_sessions`` row per request under ``openai_api:<digest>:ephemeral:<uuid>``,
+runs one agent turn, and reaps the session (and its messages) before returning. Concurrent
+same-bearer requests do not share history. Per-caller authorization scope still derives from
+the bearer digest (predecessor W13).
+
+**Auth surfaces (D18).** ``GET /v1/models`` requires the gateway bearer; ``GET /v1/health``
+stays public and returns only ``{"status": "ok"}`` (no internal gateway metadata).
+
+**Model echo (D19).** The response ``model`` field is always the configured default id,
+regardless of the request body.
+
+**Honesty guard (D16).** ``stream=true → 400``, omitted ``usage``, and tool messages stored
+at ``visible_to_llm=0`` remain declared limitations — do not revert when editing this surface.
+
+Regression: ``tests/gateway/test_post_audit_openai_concurrency_w14_red.py``,
+``tests/gateway/test_release_audit_api_honesty_w13.py`` (guard, unmodified).
