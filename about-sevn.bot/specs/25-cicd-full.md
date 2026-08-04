@@ -439,7 +439,7 @@ and docs/skills/infra checks that block regressions before merge.
 | `make ci-affected` / `make ci-changed` | Path-aware partial gates |
 | `make ci-quality` | Advisory (ruff ratchet, vulture, codespell — not in `make ci`) |
 | `.github/workflows/ci.yml` | Primary CI workflow |
-| `.github/workflows/ci-cd.yml` | Release / CD workflow |
+| `.github/workflows/ci-cd.yml` | Container artifact publication + draft release on `v*` tags |
 | `.craft.yml` | Sentry Craft config scaffold (evaluation-only; #110 / W15 — not wired to CI) |
 | `about-sevn.bot/decisions/0003-craft-release-management-runbook.md` | Maintainer release runbook + Craft evaluation |
 | `scripts/ci_resume.sh` | Ordered `CI_STEPS` driver |
@@ -464,7 +464,7 @@ Tier↔resume parity is enforced by `tests/infra/test_ci_steps_tier_parity.py` (
 |----------|---------|
 | `ci.yml` | Main CI (invokes make targets) |
 | `ci-supplementary.yml` | Supplementary checks |
-| `ci-cd.yml` | CD / release |
+| `ci-cd.yml` | Container artifact publication + draft release on `v*` tags (phases 2–5 deploy stubs) |
 | `docker.yml` | Container build validation |
 | `style-guide-pages.yml` | Style guide site |
 
@@ -506,6 +506,8 @@ Wave agents: mid-wave **`make ci-affected`** only; wave boundary **`make ci`** o
 | Schema drift | `make config-schema` fails |
 | Doc regression | `make about-docs-check`, `make spec-check`, `make prd-check`, or `make readme-check` fails |
 | Git guard missing | `make check-git-guards` fails (blocks destructive clean) |
+| Tag build with deploy stubs failing | `delivery-chain` required check red; phase6 does not run; no published release |
+| Tag build while deploy phases succeed | Draft GitHub Release only (`draft: true`); no production deploy until phases 4–5 ship |
 
 ## Amendments (telegram-menu-redesign W9)
 
@@ -561,3 +563,19 @@ files instead of profiles. Each documented invocation must resolve to exactly
 ``scripts/check-compose-default.sh``. Makefile targets ``compose-up``,
 ``compose-browser-up``, and ``compose-gui-up`` route through the matching `-f` set;
 ``COMPOSE_PROFILES`` browser+gui mutual exclusion remains a regression net for legacy callers.
+
+## Amendments (post-audit-0.0.1 W10 — append-only)
+
+Release gate honesty (**#172**, plan **D21** / **D22**). Phases 2–5 remain
+``needs-implementation`` stubs; the workflow publishes container images to GHCR
+and signs/scans them, but does **not** deploy to Dev or Production.
+
+| Trigger | What runs today | Release outcome |
+|---------|-----------------|-----------------|
+| `push` to `main` | phase1 → publish-ghcr → supply-chain; phase2/3 stubs fail (tolerated on main path) | No GitHub Release |
+| `push` tag `v*` | phase1 → publish-ghcr → supply-chain → phase4/5 stubs **must succeed** for phase6 | Draft release only (`draft: true`); body states no production deploy |
+| `workflow_dispatch` | Full chain rehearsal; stub phase failures tolerated via `needs_impl_ok` | Draft release on tag ref only |
+
+``delivery-chain`` (required): on tag builds, phase4/phase5 ``failure`` fails the gate;
+``needs_impl_ok`` tolerance applies **only** on ``workflow_dispatch``. Phase6
+``needs`` phase4 and phase5 so a failing deploy stub blocks release creation.

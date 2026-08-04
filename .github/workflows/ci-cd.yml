@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 #
-# Six-phase delivery pipeline.
+# Container artifact publication pipeline (phases 2–5 deploy stubs).
 # Normative spec: specs/25-cicd-full.md (Phase 5 of the build).
 #
 # publish-ghcr: pushes sandbox/proxy/gateway images to GHCR on main, v* tags,
@@ -10,9 +10,11 @@
 # downstream phases and container-supply-chain (cosign, syft, trivy).
 #
 # Trigger → phase mapping (specs/25-cicd-full.md §2.3):
-#   push to main         → phase1 → phase2 → phase3        (build/deploy Dev + smoke)
-#   push tag 'v*'        → phase4 → phase5 → phase6        (production deploy + release)
-#   workflow_dispatch    → full chain phase1…phase6        (manual / break-glass)
+#   push to main         → phase1 → publish-ghcr → supply-chain → phase2 → phase3
+#                          (Dev deploy/test stubs — phase2/3 fail until implemented)
+#   push tag 'v*'        → phase1 → publish-ghcr → supply-chain → phase4 → phase5 → phase6
+#                          (Production deploy/test stubs block release; phase6 is draft-only)
+#   workflow_dispatch    → full chain phase1…phase6        (manual / break-glass rehearsal)
 #
 # Pull requests are intentionally NOT triggered here. The single PR verify gate
 # is `.github/workflows/ci.yml` (Option A from the Phase 5 brief), which gates
@@ -35,7 +37,7 @@
 #   can run for a given tag/branch at a time. `cancel-in-progress: false` so
 #   a tag-push deploy is never killed by an overlapping main-push run.
 
-name: CI/CD (six-phase delivery)
+name: CI/CD (artifact publication)
 
 on:
   push:
@@ -316,8 +318,9 @@ jobs:
 
   phase6:
     name: Phase 6 — Release
-    # Decoupled from deploy phases so tag releases succeed while phase4/5 remain stubs (#149).
-    needs: [phase1, publish-ghcr, container-supply-chain]
+    # Tag releases require successful deploy/test phases (D22). Phase6 stays draft-only
+    # until phases 4–5 are implemented (#172, D21).
+    needs: [phase1, publish-ghcr, container-supply-chain, phase4, phase5]
     environment: production
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -364,10 +367,13 @@ jobs:
           PHASE4: ${{ needs.phase4.result }}
           PHASE5: ${{ needs.phase5.result }}
           PHASE6: ${{ needs.phase6.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF: ${{ github.ref }}
         run: |
           set -euo pipefail
           ok() { case "$1" in success|skipped) return 0;; *) return 1;; esac; }
           needs_impl_ok() { case "$1" in success|skipped|failure) return 0;; *) return 1;; esac; }
+          is_tag_build() { case "$GITHUB_REF" in refs/tags/v*) return 0;; *) return 1;; esac; }
           fail=0
           require() {
             local label="$1" result="$2"
@@ -390,9 +396,17 @@ jobs:
           require "phase1" "$PHASE1"
           require "publish-ghcr" "$PUBLISH"
           require "container-supply-chain" "$SUPPLY"
-          require_needs_impl "phase2" "$PHASE2"
-          require_needs_impl "phase3" "$PHASE3"
-          require_needs_impl "phase4" "$PHASE4"
-          require_needs_impl "phase5" "$PHASE5"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            require_needs_impl "phase2" "$PHASE2"
+            require_needs_impl "phase3" "$PHASE3"
+            require_needs_impl "phase4" "$PHASE4"
+            require_needs_impl "phase5" "$PHASE5"
+          elif is_tag_build; then
+            require "phase4" "$PHASE4"
+            require "phase5" "$PHASE5"
+          else
+            require_needs_impl "phase2" "$PHASE2"
+            require_needs_impl "phase3" "$PHASE3"
+          fi
           require "phase6" "$PHASE6"
           exit "$fail"
