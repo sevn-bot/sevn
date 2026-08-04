@@ -290,6 +290,36 @@ def list_session_jobs(session_id: str) -> list[dict[str, object]]:
     return rows
 
 
+async def _shutdown_process_group(proc: asyncio.subprocess.Process) -> None:
+    """SIGTERM a process group, wait, then SIGKILL on grace timeout.
+
+    Args:
+        proc (asyncio.subprocess.Process): Running child process.
+
+    Returns:
+        None
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_shutdown_process_group)
+        True
+    """
+    pgid: int | None = None
+    with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
+        pgid = os.getpgid(proc.pid)
+        os.killpg(pgid, signal.SIGTERM)
+    try:
+        await asyncio.wait_for(proc.wait(), timeout=_STOP_GRACE_S)
+    except TimeoutError:
+        if pgid is not None:
+            with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
+                os.killpg(pgid, signal.SIGKILL)
+        else:
+            proc.kill()
+        with contextlib.suppress(ProcessLookupError):
+            await proc.wait()
+
+
 async def _dispose_job_async(job: BackgroundJob) -> None:
     """Stop a running job and await its pipe readers (registry eviction helper).
 
@@ -306,11 +336,7 @@ async def _dispose_job_async(job: BackgroundJob) -> None:
     """
     proc = job.proc
     if proc is not None and proc.returncode is None:
-        with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
-            pgid = os.getpgid(proc.pid)
-            os.killpg(pgid, signal.SIGTERM)
-        with contextlib.suppress(TimeoutError, ProcessLookupError):
-            await asyncio.wait_for(proc.wait(), timeout=_STOP_GRACE_S)
+        await _shutdown_process_group(proc)
     await _await_job_readers(job)
 
 
@@ -526,20 +552,7 @@ async def _stop_job(ctx: ToolContext, *, job_id: str) -> str:
         )
 
     job.status = "stopped"
-    pgid: int | None = None
-    with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
-        pgid = os.getpgid(proc.pid)
-        os.killpg(pgid, signal.SIGTERM)
-    try:
-        await asyncio.wait_for(proc.wait(), timeout=_STOP_GRACE_S)
-    except TimeoutError:
-        if pgid is not None:
-            with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
-                os.killpg(pgid, signal.SIGKILL)
-        else:
-            proc.kill()
-        with contextlib.suppress(ProcessLookupError):
-            await proc.wait()
+    await _shutdown_process_group(proc)
     job.returncode = proc.returncode
     await _await_job_readers(job)
     return enveloped_success({"job_id": job_id, "status": job.status, "returncode": job.returncode})
