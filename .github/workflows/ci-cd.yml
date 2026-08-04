@@ -332,7 +332,13 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           generate_release_notes: true
-          draft: false
+          draft: true
+          body: |
+            **Draft release — no production deploy occurred.**
+
+            Phases 4–5 (production deploy and smoke) are not yet implemented.
+            Container images were published to GHCR; this release is for artifact
+            tracking only until deploy phases land.
 
   delivery-chain:
     name: Delivery chain gate (required)
