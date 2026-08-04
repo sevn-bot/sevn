@@ -85,12 +85,13 @@ def _client(
 
 
 def test_auth_status_local_open_loopback(tmp_path: Path) -> None:
+    """Tokenless loopback reports auth required until boot local token is supplied."""
     with _client(tmp_path) as client:
         resp = client.get("/api/v1/auth/status")
         assert resp.status_code == 200
         assert resp.json() == {
-            "auth_required": False,
-            "local_open": True,
+            "auth_required": True,
+            "local_open": False,
             "tunnel_active": False,
         }
 
@@ -111,8 +112,12 @@ def test_sessions_without_login_on_loopback(tmp_path: Path) -> None:
 
 
 def test_dashboard_nav_without_login_on_loopback(tmp_path: Path) -> None:
+    from sevn.ui.dashboard.services.local_token import DASHBOARD_LOCAL_TOKEN_QUERY
+
     with _client(tmp_path) as client:
-        resp = client.get("/api/v1/dashboard/nav")
+        boot_token = client.app.state.dashboard_local_token
+        assert isinstance(boot_token, str)
+        resp = client.get(f"/api/v1/dashboard/nav?{DASHBOARD_LOCAL_TOKEN_QUERY}={boot_token}")
         assert resp.status_code == 200
         assert resp.json()["tab_count"] == 46
 
@@ -193,9 +198,13 @@ def test_local_open_false_requires_login_on_loopback(tmp_path: Path) -> None:
 
 
 def test_system_logging_put_without_csrf_on_loopback(tmp_path: Path) -> None:
+    from sevn.ui.dashboard.services.local_token import DASHBOARD_LOCAL_TOKEN_QUERY
+
     with _client(tmp_path) as client:
+        boot_token = client.app.state.dashboard_local_token
+        assert isinstance(boot_token, str)
         resp = client.put(
-            "/api/v1/system/logging",
+            f"/api/v1/system/logging?{DASHBOARD_LOCAL_TOKEN_QUERY}={boot_token}",
             json={"retention_days": 10, "archive_mode": "copy"},
         )
         assert resp.status_code == 200
