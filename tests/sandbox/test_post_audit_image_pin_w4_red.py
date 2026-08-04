@@ -207,7 +207,6 @@ async def test_digest_config_skips_pull(
     assert pinned in " ".join(run_argv[-1])
 
 
-@pytest.mark.xfail(reason="green after W8: network_enforcement telemetry", strict=False)
 @pytest.mark.asyncio
 async def test_docker_spawn_emits_network_enforcement_without_policy_path(
     monkeypatch: pytest.MonkeyPatch,
