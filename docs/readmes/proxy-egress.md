@@ -11,7 +11,7 @@
 
 The **egress proxy** is a small ASGI service that holds **provider API keys** and forwards outbound HTTP on sevn's behalf. Tier B/C/D executors talk to one base URL (`SEVN_PROXY_URL`) with normalized JSON shapes — they never see raw Anthropic/OpenAI/Bedrock credentials.
 
-When configured, a **shared secret** (`SEVN_PROXY_SHARED_SECRET`) gates every `POST` to `/llm/*`, `/web/*`, and `/integration` via the `X-Sevn-Proxy-Token` header. The gateway and proxy run as a paired install; provider keys resolve here, channel tokens resolve in the gateway.
+When configured, a **shared secret** (`SEVN_PROXY_SHARED_SECRET`) gates every `POST` to `/llm/*`, `/web/*`, and `/integration` via the `X-Sevn-Proxy-Token` header. Onboarding auto-generates and stores the secret in the workspace secrets chain; both gateway and proxy resolve it at boot. Guarded routes return **503** when the secret is unset unless the operator sets explicit dev-only opt-in `SEVN_PROXY_ALLOW_UNAUTHENTICATED=1` (logged at boot and on every guarded request).
 
 ## Level 2 — How it works (technical)
 
@@ -34,7 +34,7 @@ Registered in [`app.py`](../../src/sevn/proxy/app.py) (see routes list ~L436):
 
 ### Shared-secret auth
 
-[`llm_post_auth_failure`](../../src/sevn/proxy/auth.py#L26) checks `X-Sevn-Proxy-Token` against `proxy_shared_secret` from [`ProxySettings`](../../src/sevn/proxy/settings.py) (env alias `SEVN_PROXY_SHARED_SECRET`). Empty/unset secret skips the guard (dev-only). Guarded prefixes: `/llm/`, `/web/`, `/integration/`.
+[`llm_post_auth_failure`](../../src/sevn/proxy/auth.py#L26) checks `X-Sevn-Proxy-Token` against `proxy_shared_secret` from [`ProxySettings`](../../src/sevn/proxy/settings.py) (env alias `SEVN_PROXY_SHARED_SECRET`, resolved from the workspace secrets chain at boot when env is unset). When the secret is unset or empty, guarded prefixes return **503** `{"detail":"proxy authentication not configured"}` unless `SEVN_PROXY_ALLOW_UNAUTHENTICATED=1` (explicit opt-in with loud warnings). Guarded prefixes: `/llm/`, `/web/`, `/integration/`.
 
 ### Credential injection
 

@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the merge + validation + promotion pipeline every setup path shares
   so sevn.json stays the single source of truth (prd-06-setup-and-operations §5.4,
   spec-02-config-and-workspace): shipped pres'
-last_updated: '2026-08-01'
-fingerprint: sha256:6b6fa54f270bf82e42d67fa79f20935f1a29eccc935be9ebc61939ced9cebd6d
+last_updated: '2026-08-04'
+fingerprint: sha256:833457ceb478eaccf9c28f30e667bc1e65972f314583978a05d76ea748fb6f32
 related: []
 sources:
 - src/sevn/onboarding/**
@@ -644,6 +644,14 @@ Map to existing tests under `tests/` that cover this subsystem; add Makefile-onl
 (``src/sevn/onboarding/migrate.py``) share ``backup_previous_sevn_json`` —
 versioned backups live under ``sevn.json.archive/`` with retention from
 ``config_archive.*`` (see ``about-sevn.bot/specs/02-config-and-workspace.md``).
+
+## Amendments (post-audit-0.0.1 W5 — #167)
+
+The web and TUI wizards auto-generate ``SEVN_PROXY_SHARED_SECRET`` alongside the
+gateway bearer token (same seam as ``_wizard_gateway_token_plaintext``) and
+persist it through ``store_wizard_credentials`` under the logical id
+``SEVN_PROXY_SHARED_SECRET``. Handoff requires the secret to be present before
+promote.
 
 ## Human-input needed
 

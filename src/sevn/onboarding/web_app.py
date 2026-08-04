@@ -773,6 +773,39 @@ def _wizard_gateway_token_plaintext(fields: dict[str, Any]) -> str:
     return generate_gateway_token()
 
 
+def _wizard_proxy_shared_secret_plaintext(fields: dict[str, Any]) -> str:
+    """Return wizard proxy shared-secret plaintext, auto-generating when omitted.
+
+    Args:
+        fields (dict[str, Any]): Wizard ``fields`` map from the request body.
+
+    Returns:
+        str: Validated proxy guard token (min 32 chars).
+
+    Examples:
+        >>> from sevn.gateway.runtime.gateway_token import GATEWAY_TOKEN_MIN_CHARS
+        >>> len(_wizard_proxy_shared_secret_plaintext({})) >= GATEWAY_TOKEN_MIN_CHARS
+        True
+    """
+    from sevn.gateway.runtime.gateway_token import (
+        GATEWAY_TOKEN_MIN_CHARS,
+        generate_gateway_token,
+    )
+
+    raw = fields.get("wizard.proxy_shared_secret")
+    if isinstance(raw, str) and raw.strip():
+        text = raw.strip()
+        if len(text) < GATEWAY_TOKEN_MIN_CHARS:
+            msg = (
+                f"proxy shared secret must be at least {GATEWAY_TOKEN_MIN_CHARS} characters "
+                f"({GATEWAY_TOKEN_MIN_CHARS * 2} hex chars recommended; "
+                "generate with: openssl rand -hex 32)"
+            )
+            raise ValueError(msg)
+        return text
+    return generate_gateway_token()
+
+
 def _provider_api_keys_from_fields(fields: dict[str, Any]) -> dict[str, str] | None:
     """Collect per-provider API keys from wizard ``fields`` (``wizard.provider_api_key.<name>``).
 
@@ -1910,6 +1943,7 @@ def create_onboarding_app(
         await store_wizard_credentials(
             layout.content_root,
             gateway_token=_wizard_gateway_token_plaintext(fields),
+            proxy_shared_secret=_wizard_proxy_shared_secret_plaintext(fields),
             github_token=_str_field("wizard.github_token"),
             openwiki_llm_api_key=_str_field("wizard.openwiki_llm_api_key"),
             bot_token=_str_field("wizard.telegram_bot_token"),
@@ -2062,6 +2096,7 @@ def create_onboarding_app(
             await store_wizard_credentials(
                 _content_root_for_wizard(),
                 gateway_token=_wizard_gateway_token_plaintext(fields),
+                proxy_shared_secret=_wizard_proxy_shared_secret_plaintext(fields),
                 github_token=_str_field("wizard.github_token"),
                 openwiki_llm_api_key=_str_field("wizard.openwiki_llm_api_key"),
                 bot_token=_str_field("wizard.telegram_bot_token"),
@@ -2295,9 +2330,16 @@ def create_onboarding_app(
             section = None
         gateway_raw = data.get("gateway_token")
         gateway_tok = gateway_raw if isinstance(gateway_raw, str) and gateway_raw.strip() else None
+        proxy_raw = data.get("proxy_shared_secret")
+        proxy_tok = proxy_raw if isinstance(proxy_raw, str) and proxy_raw.strip() else None
+        if gateway_tok and not proxy_tok:
+            from sevn.gateway.runtime.gateway_token import generate_gateway_token
+
+            proxy_tok = generate_gateway_token()
         written = await store_wizard_credentials(
             _content_root_for_wizard(),
             gateway_token=gateway_tok,
+            proxy_shared_secret=proxy_tok,
             github_token=data.get("github_token")
             if isinstance(data.get("github_token"), str)
             else None,

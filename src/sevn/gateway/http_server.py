@@ -691,6 +691,35 @@ async def _resolve_webchat_jwt_secret(
     return resolved if resolved else None
 
 
+async def _prime_proxy_shared_secret_env(
+    workspace: WorkspaceConfig,
+    *,
+    content_root: Path,
+) -> None:
+    """Prime ``SEVN_PROXY_SHARED_SECRET`` from the workspace secrets chain when unset.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed ``sevn.json``.
+        content_root (Path): Workspace content root for secrets chain resolution.
+
+    Returns:
+        None: May set ``os.environ['SEVN_PROXY_SHARED_SECRET']``.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_prime_proxy_shared_secret_env)
+        True
+    """
+    if os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip():
+        return
+    from sevn.security.secrets.factory import secrets_chain_from_workspace
+
+    chain = secrets_chain_from_workspace(content_root, workspace.secrets_backend)
+    proxy_secret = await chain.get_resilient("SEVN_PROXY_SHARED_SECRET")
+    if proxy_secret and proxy_secret.strip():
+        os.environ["SEVN_PROXY_SHARED_SECRET"] = proxy_secret.strip()
+
+
 async def _prime_unlock_env_and_warn(workspace: WorkspaceConfig, *, content_root: Path) -> None:
     """Self-unlock the encrypted store from the OS keychain, then warn loudly if still locked.
 
@@ -1184,6 +1213,7 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         ws, ly = _bootstrap_config()
         await _prime_unlock_env_and_warn(ws, content_root=ly.content_root)
+        await _prime_proxy_shared_secret_env(ws, content_root=ly.content_root)
         apply_tunnel_local_open_policy(ws)
         effective_process = _effective_process_settings(ws, resolved_process)
         from sevn.gateway.runtime.gateway_token import resolve_gateway_token_ref

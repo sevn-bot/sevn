@@ -41,7 +41,10 @@ from sevn.config.sections.providers import resolve_auth_mode
 from sevn.config.workspace_config import SecretsBackendSectionConfig, WorkspaceConfig
 from sevn.logging.setup import maybe_boot_service_logging
 from sevn.proxy.anthropic_body import normalize_anthropic_request_body
-from sevn.proxy.auth import llm_post_auth_failure
+from sevn.proxy.auth import (
+    llm_post_auth_failure,
+    log_proxy_allow_unauthenticated_boot_warning,
+)
 from sevn.proxy.bedrock_converse import converse_via_bedrock
 from sevn.proxy.codex_translation import (
     aggregate_responses_sse,
@@ -568,6 +571,7 @@ def create_app(
             ttl_seconds=eff.cache_ttl_seconds,
         )
     application.add_middleware(GuardMiddleware, settings=resolved)
+    log_proxy_allow_unauthenticated_boot_warning()
     from sevn.config.defaults import DEFAULT_MAX_INGRESS_BODY_BYTES
     from sevn.security.ingress_policy import IngressBodyLimitMiddleware
 

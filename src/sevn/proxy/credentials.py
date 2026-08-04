@@ -798,7 +798,35 @@ async def build_proxy_settings(
         brave_key = await _resolve_brave_key(chain)
         if brave_key:
             updates["brave_api_key"] = brave_key
+    if not settings.proxy_shared_secret:
+        proxy_secret = await _resolve_proxy_shared_secret(chain)
+        if proxy_secret:
+            updates["proxy_shared_secret"] = proxy_secret
+            if not os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip():
+                os.environ["SEVN_PROXY_SHARED_SECRET"] = proxy_secret
     return settings.model_copy(update=updates)
+
+
+async def _resolve_proxy_shared_secret(chain: SecretsChain) -> str | None:
+    """Resolve ``SEVN_PROXY_SHARED_SECRET`` from the workspace secrets chain.
+
+    Args:
+        chain (SecretsChain): Workspace secrets chain.
+
+    Returns:
+        str | None: Trimmed shared secret when stored under the logical id.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_resolve_proxy_shared_secret)
+        True
+    """
+    try:
+        value = await chain.get_resilient("SEVN_PROXY_SHARED_SECRET")
+    except SecretUnresolvedError:
+        return None
+    trimmed = (value or "").strip()
+    return trimmed or None
 
 
 async def _resolve_brave_key(chain: SecretsChain) -> str | None:

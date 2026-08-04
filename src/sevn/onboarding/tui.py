@@ -57,6 +57,7 @@ from sevn.onboarding.validate import validate_workspace_document
 from sevn.onboarding.web_app import (
     _merge_wizard_payload,
     _wizard_gateway_token_plaintext,
+    _wizard_proxy_shared_secret_plaintext,
     apply_model_slot_policy,
     normalize_secrets_backend_section,
 )
@@ -1037,6 +1038,7 @@ class OnboardApp(App[int]):
             await store_wizard_credentials(
                 bound_workspace_dir(),
                 gateway_token=_wizard_gateway_token_plaintext(self.fields),
+                proxy_shared_secret=_wizard_proxy_shared_secret_plaintext(self.fields),
                 github_token=self._field_str("wizard.github_token") or None,
                 openwiki_llm_api_key=self._field_str("wizard.openwiki_llm_api_key") or None,
                 bot_token=self._field_str("wizard.telegram_bot_token") or None,

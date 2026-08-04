@@ -7,8 +7,8 @@ owner: Alex
 summary: Operators choose how they pay for models—API keys, ChatGPT subscription via
   OAuth, and multi-provider slots—with spend visible and graceful degradation when
   a vendor fails.
-last_updated: '2026-08-03'
-fingerprint: sha256:9417c9752ac835739830ecddc6ad2cbee185ac97b677f50dd662fc15942f8f85
+last_updated: '2026-08-04'
+fingerprint: sha256:e86c2d81920792cbfcddeea37bca4d650ccbe9d8bc71728bfb36ddf62a228aa4
 related: []
 sources:
 - src/sevn/proxy/**
