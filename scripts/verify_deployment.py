@@ -57,6 +57,8 @@ STATUS_UNAVAILABLE = "driver_unavailable"
 EXIT_CODES = {STATUS_PASS: 0, STATUS_FAIL: 1, STATUS_UNAVAILABLE: 2}
 
 OPERATOR_COMPOSE = "docker/docker-compose.yml"
+BROWSER_COMPOSE = "docker/docker-compose.browser.yml"
+GUI_COMPOSE = "docker/docker-compose.gui.yml"
 PROD_COMPOSE = "docker/docker-compose.prod.yml"
 CI_COMPOSE = "docker/docker-compose.ci.yml"
 EVALS_COMPOSE = "docker/docker-compose.improve-evals.yml"
@@ -112,18 +114,20 @@ INVOCATIONS: tuple[Invocation, ...] = (
         expect_services=DEFAULT_SERVICES,
     ),
     Invocation(
-        name="browser-flag",
-        files=(OPERATOR_COMPOSE,),
-        profiles=("browser",),
+        name="browser-override",
+        files=(OPERATOR_COMPOSE, BROWSER_COMPOSE),
+        profiles=(),
         env_profiles="",
-        source="docker/README.md:38",
+        source="Makefile compose-browser-up; docker/README.md:49",
+        expect_services=DEFAULT_SERVICES,
     ),
     Invocation(
-        name="gui-flag",
-        files=(OPERATOR_COMPOSE,),
-        profiles=("gui",),
+        name="gui-override",
+        files=(OPERATOR_COMPOSE, GUI_COMPOSE),
+        profiles=(),
         env_profiles="",
-        source="Makefile compose-gui-up; docker/README.md:41",
+        source="Makefile compose-gui-up; docker/README.md:53",
+        expect_services=DEFAULT_SERVICES,
     ),
     Invocation(
         name="browser-env",
@@ -141,10 +145,18 @@ INVOCATIONS: tuple[Invocation, ...] = (
     ),
     Invocation(
         name="prod-overlay-browser",
-        files=(OPERATOR_COMPOSE, PROD_COMPOSE),
-        profiles=("browser",),
+        files=(OPERATOR_COMPOSE, BROWSER_COMPOSE, PROD_COMPOSE),
+        profiles=(),
         env_profiles="",
-        source="docker/README.md:51",
+        source="docker/README.md:64",
+    ),
+    Invocation(
+        name="browser-gui-override",
+        files=(OPERATOR_COMPOSE, BROWSER_COMPOSE, GUI_COMPOSE),
+        profiles=(),
+        env_profiles="",
+        source="docker/README.md:58 (documented as mutually exclusive)",
+        mutually_exclusive=True,
     ),
     Invocation(
         name="browser-gui-flag",
@@ -515,13 +527,18 @@ def drive_compose_profiles() -> DriverResult:
         )
 
         if inv.mutually_exclusive:
-            # Run the guard exactly as this invocation would reach it: the CLI-flag
-            # form leaves COMPOSE_PROFILES unset, which is the whole of #165.
+            # Run the guard with the same -f / --profile args the invocation uses so
+            # CLI-profile and override-file bypass paths (#165) are covered.
             guard_env = dict(os.environ)
             guard_env.pop("COMPOSE_PROFILES", None)
             if inv.env_profiles:
                 guard_env["COMPOSE_PROFILES"] = inv.env_profiles
-            guard_code, guard_out = _run(["bash", COMPOSE_GUARD], env=guard_env, timeout=180.0)
+            guard_argv = ["bash", COMPOSE_GUARD]
+            for file in inv.files:
+                guard_argv += ["-f", file]
+            for profile in inv.profiles:
+                guard_argv += ["--profile", profile]
+            guard_code, guard_out = _run(guard_argv, env=guard_env, timeout=180.0)
             rejected = bool(collisions) or guard_code != 0
             prefix = f"COMPOSE_PROFILES={inv.env_profiles} " if inv.env_profiles else ""
             result.checks.append(
@@ -533,7 +550,7 @@ def drive_compose_profiles() -> DriverResult:
                         if rejected
                         else "browser+gui resolved cleanly and no guard refused it"
                     ),
-                    command=f"{prefix}bash {COMPOSE_GUARD}",
+                    command=f"{prefix}{' '.join(guard_argv)}",
                     output=guard_out.strip()[:800],
                 )
             )

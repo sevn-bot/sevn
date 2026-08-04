@@ -16,7 +16,46 @@ _check_profile_conflict() {
   return 0
 }
 
-_check_profile_conflict "${COMPOSE_PROFILES:-}" || exit 1
+_check_override_file_conflict() {
+  local has_browser=0 has_gui=0 file
+  for file in "$@"; do
+    case "$file" in
+      *docker-compose.browser.yml*) has_browser=1 ;;
+      *docker-compose.gui.yml*) has_gui=1 ;;
+    esac
+  done
+  if [[ $has_browser -eq 1 && $has_gui -eq 1 ]]; then
+    echo "error: browser and gui compose override files are mutually exclusive (both replace sevn-gateway on port 3001)" >&2
+    return 1
+  fi
+  return 0
+}
+
+_cli_profiles=""
+_compose_files=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --profile)
+      _cli_profiles="${_cli_profiles},${2:-}"
+      shift 2
+      ;;
+    -f)
+      _compose_files+=("${2:-}")
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+
+_combined_profiles="${COMPOSE_PROFILES:-}${_cli_profiles}"
+_combined_profiles="${_combined_profiles#,}"
+
+_check_profile_conflict "$_combined_profiles" || exit 1
+if ((${#_compose_files[@]} > 0)); then
+  _check_override_file_conflict "${_compose_files[@]}" || exit 1
+fi
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "docker CLI not on PATH — skipping compose default check" >&2
@@ -85,5 +124,10 @@ done
 # Self-test: mutual-exclusion guard must reject browser+gui together.
 if _check_profile_conflict "browser,gui" 2>/dev/null; then
   echo "mutual exclusion guard broken: browser+gui should be rejected" >&2
+  exit 1
+fi
+
+if _check_override_file_conflict "$compose_base" "$compose_browser" "$compose_gui" 2>/dev/null; then
+  echo "mutual exclusion guard broken: browser+gui override files should be rejected" >&2
   exit 1
 fi

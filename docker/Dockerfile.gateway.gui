@@ -41,9 +41,9 @@ RUN chmod +x /opt/sevn/infra/docker/install-brave.sh \
     && chmod +x /opt/sevn/infra/docker/gui/entrypoint.sh
 
 
-RUN useradd --create-home --uid 10002 --shell /bin/bash sevnoperator \
+RUN useradd --create-home --uid 10001 --shell /bin/bash sevnoperator \
     && mkdir -p /var/log/supervisor /operator/workspace \
-    && chown -R sevnoperator:sevnoperator /operator/workspace /home/sevnoperator
+    && chown -R sevnoperator:sevnoperator /operator/workspace /home/sevnoperator /var/log/supervisor
 
 ENV PATH="/opt/sevn/.venv/bin:${PATH}"
 ENV SEVN_HOME=/operator
@@ -53,6 +53,8 @@ ENV SEVN_BROWSER_HEADLESS=0
 ENV DISPLAY=:99
 ENV SEVN_NOVNC_UPSTREAM=http://127.0.0.1:6080
 ENV SEVN_BROWSER_EXTRA_ARGS="--disable-dev-shm-usage"
+
+USER sevnoperator
 
 WORKDIR /operator/workspace
 
