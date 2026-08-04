@@ -276,10 +276,6 @@ def test_makefile_compose_target_resolves_single_gateway(target: str) -> None:
     assert len(publishers) == 1, f"{target}: expected one port publisher, got {publishers}"
 
 
-@pytest.mark.xfail(
-    reason="green after W3: operator service hardening (#166, D24)",
-    strict=False,
-)
 @pytest.mark.parametrize(
     "service",
     [
@@ -303,10 +299,6 @@ def test_operator_services_declare_hardening_keys(service: str) -> None:
     assert limits.get("memory"), f"{service}: deploy.resources.limits.memory required"
 
 
-@pytest.mark.xfail(
-    reason="green after W3: sevn-proxy read_only rootfs (#166, D24)",
-    strict=False,
-)
 def test_sevn_proxy_read_only_with_tmpfs() -> None:
     """W1.4: sevn-proxy runs read-only with tmpfs for writable paths."""
     cfg = _load_services(_BASE_COMPOSE)["sevn-proxy"]
@@ -315,10 +307,6 @@ def test_sevn_proxy_read_only_with_tmpfs() -> None:
     assert tmpfs, "sevn-proxy must declare tmpfs mounts for writable paths"
 
 
-@pytest.mark.xfail(
-    reason="green after W3: conditional operator-perms chown (#166, D25)",
-    strict=False,
-)
 def test_operator_perms_has_no_unconditional_chown() -> None:
     """W1.5: sevn-operator-perms must not run unconditional ``chown -R``."""
     command = _operator_perms_command_text()
@@ -329,10 +317,6 @@ def test_operator_perms_has_no_unconditional_chown() -> None:
     assert unconditional == [], "unconditional chown -R forbidden; use find ! -user 10001 predicate"
 
 
-@pytest.mark.xfail(
-    reason="green after W3: conditional operator-perms chown (#166, D25)",
-    strict=False,
-)
 def test_operator_perms_uses_conditional_find_chown() -> None:
     """W1.5: sevn-operator-perms scopes chown with ``! -user 10001``."""
     command = _operator_perms_command_text()
