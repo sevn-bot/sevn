@@ -13,7 +13,7 @@ authors = [{ name = "Alex" }]
 dependencies = [
     "croniter==6.2.2",
     "fastapi==0.136.1",
-    "cryptography==48.0.0",
+    "cryptography==50.0.0",
     "jinja2==3.1.6",
     "loguru==0.7.3",
     "httpx==0.28.1",

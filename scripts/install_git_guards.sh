@@ -84,3 +84,6 @@ HOOK
   chmod +x "$hook"
   echo "install-git-guards: refreshed pre-push to use git-common-dir (main checkout)"
 fi
+
+echo "  primary-checkout commits: blocked by pre-commit hook unless SEVN_ALLOW_PRIMARY_COMMIT=1"
+echo "  wave work: use a linked worktree (see .cursor/rules/no-primary-checkout-work.mdc)"

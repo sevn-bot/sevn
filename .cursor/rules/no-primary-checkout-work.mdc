@@ -1,0 +1,32 @@
+---
+description: Primary checkout is read-only for wave work — use linked worktrees (D1)
+globs:
+alwaysApply: true
+---
+
+# Primary checkout — no wave implementation commits
+
+The **primary checkout** (where `git rev-parse --git-dir` equals `git rev-parse --git-common-dir`) is for:
+
+- `git fetch` / `git status` / branch inspection
+- Reading docs, wave plans, and operator notes under `.ignorelocal/`
+- `make install-git-guards`, `sevn doctor`, and other read-mostly ops
+
+**Do not** implement waves, edit product code for PRs, or commit from the primary checkout. Pre-commit blocks those commits unless `SEVN_ALLOW_PRIMARY_COMMIT=1` (emergency only).
+
+## Linked worktree workflow
+
+```bash
+git worktree add ../sevn-<topic> -b feature/<topic> origin/pre-0.0.1
+cd ../sevn-<topic>
+# edit, commit, push, open PR
+```
+
+Before your first edit in a wave-plan-executor or test-creator run, assert you are in a linked worktree:
+
+```bash
+test "$(git rev-parse --path-format=absolute --git-dir)" != \
+     "$(git rev-parse --path-format=absolute --git-common-dir)"
+```
+
+Remove the worktree when the PR merges: `git worktree remove ../sevn-<topic>`.

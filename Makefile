@@ -58,7 +58,7 @@ setup: ensure-uv ## Fresh checkout: sync deps, native PDF libs, pre-commit hooks
 	$(MAKE) install-git-guards
 	$(MAKE) install-cli
 
-install-git-guards: ## Block `git clean -x`/`-X` (protects gitignored plan/specs/prd)
+install-git-guards: ## Block git clean -x/-X; prepends bin/git (primary-checkout commits need SEVN_ALLOW_PRIMARY_COMMIT=1 or a worktree)
 	@chmod +x scripts/git_clean_guard.sh scripts/install_git_guards.sh
 	@./scripts/install_git_guards.sh
 

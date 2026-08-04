@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": "bash .cursor/hooks/destructive-fs-gate.sh",
+        "failClosed": true
+      },
+      {
+        "command": "bash .cursor/hooks/git-pr-gate.sh",
+        "matcher": "gh pr create"
+      }
+    ]
+  }
+}
