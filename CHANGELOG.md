@@ -12,6 +12,9 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 - [2026-08-04] Pre-commit blocks commits from the primary checkout unless `SEVN_ALLOW_PRIMARY_COMMIT=1`; `make check-git-guards` asserts `git` resolves to repo `bin/git` without direnv; Cursor rules and hooks document linked-worktree workflow (D1)
+
+### Security
+- [2026-08-04] Bump `cryptography` to 50.0.0 (CVE-2026-69247, CVE-2026-69248, CVE-2026-69249)
 - [2026-08-03] `GET /capabilities` and `sevn capabilities` document OpenAI-compat limits (`streaming`, `usage_reporting`, `tool_messages`) alongside channel inventory (#151, release-audit C-Thermos)
 - [2026-08-03] Channel capability inventory: `GET /capabilities` and `sevn capabilities` report each messaging channel as `implemented`, `stub`, or `unavailable` (#151, release-audit W13)
 - [2026-08-03] Quality-gate ratchet baselines for coverage (68% overall floor, 90% security/auth targets), xenon C/B targets, C901 blocking at measured max 221 with step-down plan, and dated import-linter exceptions; `make coverage-ratchet` / `make complexity-ratchet` advisory gates in `make ci-quality` (#150, release-audit W12)
