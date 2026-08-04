@@ -1354,33 +1354,60 @@ def _docker_isolation_args() -> list[str]:
 
 
 async def _resolve_digest_pinned_image(image: str) -> str:
-    """Resolve a tag to a digest-pinned reference when inspect succeeds (§4.2).
+    """Pull (when tagged) and resolve to a registry digest reference (§4.2, D14).
+
+    When ``image`` already contains ``@sha256:``, verify it exists locally and
+    return unchanged (no pull). Otherwise ``docker pull`` the tag, inspect
+    ``RepoDigests``, and return ``repo@sha256:…``. Locally built images without
+    registry digests raise ``SandboxConfigurationError``.
+
     Args:
         image (str): Image tag or digest reference from config.
+
     Returns:
-        str: ``repo@sha256:…`` when available, else the original ``image``.
+        str: Digest-pinned ``repo@sha256:…`` reference for ``docker run``.
+
+    Raises:
+        SandboxConfigurationError: When pull/inspect fails or no ``RepoDigests``.
+
     Examples:
         >>> isinstance("@sha256:" in "x@sha256:abc", bool)
         True
     """
-    if "@sha256:" in image:
-        return image
     docker_bin = _docker_bin()
+    if "@sha256:" in image:
+        rc, _, err = await _docker_run(
+            [docker_bin, "image", "inspect", image],
+            timeout_s=60.0,
+        )
+        if rc != 0:
+            msg = (
+                f"configured sandbox image {image!r} is not present locally "
+                f"(docker image inspect exit {rc}): {err.strip()}"
+            )
+            raise SandboxConfigurationError(msg)
+        return image
+    pull_rc, pull_out, pull_err = await _docker_run(
+        [docker_bin, "pull", image],
+        timeout_s=600.0,
+    )
+    if pull_rc != 0:
+        msg = (
+            f"docker pull {image!r} failed (exit {pull_rc}): {pull_err.strip() or pull_out.strip()}"
+        )
+        raise SandboxConfigurationError(msg)
     rc, out, _ = await _docker_run(
         [docker_bin, "image", "inspect", "--format", "{{index .RepoDigests 0}}", image],
         timeout_s=60.0,
     )
     digest_ref = out.strip()
-    if rc == 0 and digest_ref:
-        return digest_ref
-    rc2, out2, _ = await _docker_run(
-        [docker_bin, "image", "inspect", "--format", "{{.Id}}", image],
-        timeout_s=60.0,
-    )
-    image_id = out2.strip()
-    if rc2 == 0 and image_id:
-        return image_id
-    return image
+    if rc != 0 or not digest_ref:
+        msg = (
+            f"sandbox image {image!r} has no RepoDigests after pull; "
+            "push the image to a registry or pin by digest (@sha256:…) in config"
+        )
+        raise SandboxConfigurationError(msg)
+    return digest_ref
 
 
 def _prepare_workspace_out_dir(workspace: Path, run_id: str) -> Path:
@@ -1723,16 +1750,6 @@ class DockerSandboxRuntime:
         out_dir = await asyncio.to_thread(_prepare_workspace_out_dir, ws, run_id)
         spawn_ts = int(time.time())
         pinned_image = await _resolve_digest_pinned_image(self._image)
-        pull_rc, pull_out, pull_err = await _docker_run(
-            [docker_bin, "pull", pinned_image],
-            timeout_s=600.0,
-        )
-        if pull_rc != 0:
-            msg = (
-                f"docker pull {pinned_image!r} failed (exit {pull_rc}): "
-                f"{pull_err.strip() or pull_out.strip()}"
-            )
-            raise SandboxConfigurationError(msg)
         name = f"sevn-sb-{uuid.uuid4().hex[:12]}"
         run_argv: list[str] = [
             docker_bin,
