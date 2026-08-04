@@ -719,6 +719,10 @@ async def _prime_proxy_shared_secret_env(
     try:
         proxy_secret = await chain.get_resilient("SEVN_PROXY_SHARED_SECRET")
     except SecretsStoreCorruptError:
+        logger.warning(
+            "encrypted secrets store corrupt while priming SEVN_PROXY_SHARED_SECRET; "
+            "proxy guarded routes will fail closed until unlocked"
+        )
         return
     if proxy_secret and proxy_secret.strip():
         os.environ["SEVN_PROXY_SHARED_SECRET"] = proxy_secret.strip()

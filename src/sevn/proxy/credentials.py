@@ -55,7 +55,7 @@ from sevn.security.oauth.constants import CODEX_RESPONSES_BASE_URL
 from sevn.security.oauth.credential import CodexOAuthCredential, resolution_probe_credential
 from sevn.security.secrets.cache import ResolvedSecretsCache
 from sevn.security.secrets.chain import SecretsChain, get_secret_resilient
-from sevn.security.secrets.errors import SecretUnresolvedError
+from sevn.security.secrets.errors import SecretsStoreCorruptError, SecretUnresolvedError
 from sevn.security.secrets.factory import secrets_chain_from_workspace
 from sevn.security.secrets.passphrase_prime import reconcile_unlock_env_with_keychain
 from sevn.security.secrets.value_expand import (
@@ -824,6 +824,8 @@ async def _resolve_proxy_shared_secret(chain: SecretsChain) -> str | None:
     try:
         value = await chain.get_resilient("SEVN_PROXY_SHARED_SECRET")
     except SecretUnresolvedError:
+        return None
+    except SecretsStoreCorruptError:
         return None
     trimmed = (value or "").strip()
     return trimmed or None

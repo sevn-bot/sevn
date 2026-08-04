@@ -44,6 +44,7 @@ from sevn.proxy.anthropic_body import normalize_anthropic_request_body
 from sevn.proxy.auth import (
     llm_post_auth_failure,
     log_proxy_allow_unauthenticated_boot_warning,
+    proxy_allow_unauthenticated,
 )
 from sevn.proxy.bedrock_converse import converse_via_bedrock
 from sevn.proxy.codex_translation import (
@@ -529,7 +530,13 @@ def create_app(
             request: Request,
             call_next: Callable[[Request], Awaitable[Response]],
         ) -> Response:
-            blocked = llm_post_auth_failure(request, self._settings.proxy_shared_secret)
+            blocked = llm_post_auth_failure(
+                request,
+                self._settings.proxy_shared_secret,
+                allow_unauthenticated=(
+                    self._settings.proxy_allow_unauthenticated or proxy_allow_unauthenticated()
+                ),
+            )
             if blocked is not None:
                 return blocked
             return await call_next(request)

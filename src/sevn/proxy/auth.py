@@ -95,9 +95,14 @@ def _is_guarded_path(path: str) -> bool:
         >>> _is_guarded_path("/healthz")
         False
     """
-    if path == "/integration":
+    import posixpath
+
+    normalized = posixpath.normpath(path)
+    if normalized in {"/web", "/llm"}:
         return True
-    return any(path.startswith(prefix) for prefix in _GUARDED_PREFIXES)
+    if normalized == "/integration":
+        return True
+    return any(normalized.startswith(prefix) for prefix in ("/llm/", "/web/", "/integration/"))
 
 
 def _scope_allows_path(scope: str, path: str) -> bool:
@@ -221,7 +226,12 @@ def validate_session_token(
     return _scope_allows_path(scope, path)
 
 
-def llm_post_auth_failure(request: Request, proxy_shared_secret: str | None) -> JSONResponse | None:
+def llm_post_auth_failure(
+    request: Request,
+    proxy_shared_secret: str | None,
+    *,
+    allow_unauthenticated: bool | None = None,
+) -> JSONResponse | None:
     """Enforce ``X-Sevn-Proxy-Token`` or scoped ``X-Sevn-Session-Token`` on guarded routes.
 
     ``X-Sevn-Proxy-Token`` carries the long-lived gateway→proxy service secret and
@@ -234,6 +244,8 @@ def llm_post_auth_failure(request: Request, proxy_shared_secret: str | None) -> 
     Args:
         request (Request): ASGI request (path + method + headers).
         proxy_shared_secret (str | None): Expected service secret; unset fails closed.
+        allow_unauthenticated (bool | None): Override for ``SEVN_PROXY_ALLOW_UNAUTHENTICATED``;
+            defaults to env when ``None``.
 
     Returns:
         JSONResponse | None: ``503`` when auth is unconfigured; ``401`` when blocked;
@@ -248,12 +260,12 @@ def llm_post_auth_failure(request: Request, proxy_shared_secret: str | None) -> 
     if not isinstance(path, str) or not _is_guarded_path(path):
         return None
     if not proxy_shared_secret:
-        if proxy_allow_unauthenticated():
-            logger.warning(
-                "proxy allow_unauthenticated opt-in: guarded request permitted without "
-                "SEVN_PROXY_SHARED_SECRET (path={})",
-                request.url.path,
-            )
+        unauth_ok = (
+            proxy_allow_unauthenticated()
+            if allow_unauthenticated is None
+            else allow_unauthenticated
+        )
+        if unauth_ok:
             return None
         return JSONResponse({"detail": PROXY_UNCONFIGURED_DETAIL}, status_code=503)
     proxy_token = request.headers.get(_PROXY_TOKEN_HEADER)
