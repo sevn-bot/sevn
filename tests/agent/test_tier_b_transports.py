@@ -34,6 +34,13 @@ from sevn.agent.providers.transport import (
 )
 
 _FIXTURES = Path(__file__).resolve().parent.parent / "fixtures" / "llm"
+_TRANSPORT_SECRET = "tier-b-transport-proxy-secret-32chars!"
+
+
+@pytest.fixture(autouse=True)
+def _provision_proxy_shared_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail-closed auth_header requires a resolved secret on stream/complete paths."""
+    monkeypatch.setenv("SEVN_PROXY_SHARED_SECRET", _TRANSPORT_SECRET)
 
 
 def _load(name: str) -> dict[str, Any]:

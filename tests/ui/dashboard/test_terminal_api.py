@@ -200,6 +200,13 @@ def test_sandbox_terminal_self_preservation_blocks_line() -> None:
 def test_terminal_ws_authenticated_smoke(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("SEVN_DANGEROUS_HOST_SANDBOX", "1")
+    # Sandbox terminal mints a session token via resolve_effective_proxy_shared_secret
+    # (Thermos T3 / A-R3); provision env so WS can reach type=ready.
+    monkeypatch.setenv(
+        "SEVN_PROXY_SHARED_SECRET",
+        "dashboard-terminal-proxy-secret-32c!",
+    )
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path))
     monkeypatch.setattr(
         "sevn.security.sandbox_runtime.docker_daemon_reachable",
         lambda **_kwargs: False,
