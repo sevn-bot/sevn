@@ -7,7 +7,8 @@
 # duplicate ``typecheck`` later per ``specs/25-cicd-full.md`` §11.
 
 UV ?= $(shell command -v uv 2>/dev/null || echo $(HOME)/.local/bin/uv)
-# Pinned uv release for ``make ensure-uv`` (C11.2 / D47). Bump deliberately.
+# Pinned uv release for ``make ensure-uv`` (C11.2 / D47). Bump deliberately with
+# PINNED_UV_VERSION + UV_SHA256_* in scripts/install_uv_verified.sh (in-repo pins).
 UV_VERSION ?= 0.12.1
 # Operator source checkout used by gateway + editable `uv tool install sevn`.
 SEVN_OPERATOR_REPO ?= $(HOME)/Documents/sevn
@@ -46,11 +47,10 @@ help: ## Show this help
 
 ensure-uv: ## Install uv on PATH when missing (pinned + checksum-verified; C11.2 / D47)
 	@if command -v uv >/dev/null 2>&1; then exit 0; fi
-	@# C11.2 / D47: pin UV_VERSION and checksum-verify the GitHub release archive
-	@# before extracting (never pipe a downloader into a shell). See
-	@# scripts/install_uv_verified.sh.
+	@# C11.2 / D47: UV_VERSION pin + in-repo sha256 verify via install_uv_verified.sh
+	@# (never pipe a downloader into a shell; never trust release sha256.sum alone).
 	@UV_VERSION=$(UV_VERSION); \
-	  echo "uv not found — installing uv $$UV_VERSION (checksum-verified GitHub release) ..."; \
+	  echo "uv not found — installing uv $$UV_VERSION (in-repo sha256 pin) ..."; \
 	  chmod +x scripts/install_uv_verified.sh; \
 	  UV_VERSION=$$UV_VERSION ./scripts/install_uv_verified.sh
 	@test -x "$(HOME)/.local/bin/uv" || (echo "uv install failed: $(HOME)/.local/bin/uv missing" >&2; exit 1)

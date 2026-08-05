@@ -3,15 +3,16 @@
 #
 # Scans the same surfaces as tests/infra/test_prod_ready_release_pipeline_w9_red.py
 # (W9.5). Wired into ``make ci-infra`` / ``CI_STEPS`` so new pipes fail the gate
-# before merge. Includes a self-test that a deliberate pipe-to-shell sample is caught.
+# before merge. Includes a self-test that deliberate pipe-to-shell samples are caught.
 #
 # Note: avoid writing the forbidden pattern as contiguous text in comments on scanned
 # surfaces (Makefile / .github/) — the scanner matches source text literally.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-# Same pattern as the W9.5 RED suite (extended regex).
-pattern='(curl|wget)[[:alnum:][:space:]./_:=%@?&#+~,-]*\|[[:space:]]*(sudo[[:space:]]+)?(ba)?sh'
+# Align with W9.5 RED suite: any chars up to the pipe (quotes, $(), etc.), not a
+# narrow URL charset that missed ``curl "…" | sh`` and ``curl $(…) | sh``.
+pattern='(curl|wget)[^|]*\|[[:space:]]*(sudo[[:space:]]+)?(ba)?sh'
 
 offenders=()
 _scan_file() {
@@ -29,12 +30,21 @@ done < <(
     -type f -print0 2>/dev/null
 )
 
-# Self-test: the gate must reject a deliberately reintroduced pipe-to-shell sample.
-_sample=$'#!/bin/sh\ncurl -LsSf https://example.invalid/install.sh | sh\n'
-if ! printf '%s' "${_sample}" | grep -nE "${pattern}" >/dev/null 2>&1; then
-  echo "check_no_curl_pipe_sh: self-test failed — pattern no longer matches pipe-to-shell" >&2
-  exit 1
-fi
+# Self-test: the gate must reject common pipe-to-shell spellings (including ones
+# that bypass a URL-charset-only pattern).
+_self_test_samples=(
+  $'curl -LsSf https://example.invalid/install.sh | sh\n'
+  $'curl -LsSf "https://example.invalid/install.sh" | sh\n'
+  $'curl -fsSL $(echo https://example.invalid/install.sh) | bash\n'
+  $'wget -qO- https://example.invalid/install.sh | sudo sh\n'
+)
+for _sample in "${_self_test_samples[@]}"; do
+  if ! printf '%s' "${_sample}" | grep -nE "${pattern}" >/dev/null 2>&1; then
+    echo "check_no_curl_pipe_sh: self-test failed — pattern missed:" >&2
+    printf '  %q\n' "${_sample}" >&2
+    exit 1
+  fi
+done
 
 if ((${#offenders[@]} > 0)); then
   echo "check_no_curl_pipe_sh: downloader-piped-to-shell still present in:" >&2

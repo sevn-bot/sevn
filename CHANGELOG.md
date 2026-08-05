@@ -21,7 +21,7 @@ are cut into a dated, versioned section at release time.
 - [2026-08-05] CLI dashboard reads (`sevn models`, `sevn agent config`, `sevn channels status`, and related commands) append the boot `local_token` when calling loopback Mission Control with effective local-open (#169, post-audit Batch E W18)
 
 ### Security
-- [2026-08-05] Release tooling installers are pinned and verified: syft/trivy via SHA-pinned Actions, `make ensure-uv` checksum-verifies a pinned GitHub release, and `make check-no-curl-pipe-sh` rejects new downloader-piped-to-shell patterns under `.github/` and the Makefile (C11.1, C11.2, C11.3)
+- [2026-08-05] Release tooling installers are pinned and verified: syft/trivy via SHA-pinned Actions, `make ensure-uv` verifies a pinned GitHub release against **in-repo** `UV_SHA256_*` pins, and `make check-no-curl-pipe-sh` rejects downloader-piped-to-shell patterns (including quoted/`$()` forms) under `.github/` and the Makefile (C11.1, C11.2, C11.3)
 - [2026-08-04] Bump `cryptography` to 50.0.0 (CVE-2026-69247, CVE-2026-69248, CVE-2026-69249)
 - [2026-08-03] `GET /capabilities` and `sevn capabilities` document OpenAI-compat limits (`streaming`, `usage_reporting`, `tool_messages`) alongside channel inventory (#151, release-audit C-Thermos)
 - [2026-08-03] Channel capability inventory: `GET /capabilities` and `sevn capabilities` report each messaging channel as `implemented`, `stub`, or `unavailable` (#151, release-audit W13)

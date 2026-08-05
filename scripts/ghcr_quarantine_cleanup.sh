@@ -44,13 +44,16 @@ delete_quarantine_tags() {
       echo "Deleting ${pkg} version ${version_id} (tags=${tags})"
       gh api --method DELETE "${api_base}/versions/${version_id}" >/dev/null
     done < <(
+      # Do not swallow API errors: a silent skip leaves unscanned quarantine tags
+      # (W11.5). The workflow step uses continue-on-error so cleanup noise cannot
+      # mask the original supply-chain failure.
       gh api --paginate "${api_base}/versions" \
         --jq ".[]
           | select(.metadata.container.tags != null)
           | select(.metadata.container.tags | index(\"${qtag}\"))
           | select([.metadata.container.tags[] | startswith(\"quarantine-\")] | all)
           | [.id, (.metadata.container.tags | join(\",\"))]
-          | @tsv" 2>/dev/null || true
+          | @tsv"
     )
   done
 }

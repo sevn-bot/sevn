@@ -670,3 +670,11 @@ both SHA-pinned like cosign. CLI versions remain ``syft v1.18.1`` and
 ``scripts/install_uv_verified.sh``. ``make check-no-curl-pipe-sh``
 (``ci-infra`` / ``CI_STEPS``) rejects new downloader-piped-to-shell patterns under
 ``.github/`` and the ``Makefile``.
+
+## Amendments (prod-readiness-0.0.1 C-Thermos — append-only)
+
+Hardened W12 installers after review: ``install_uv_verified.sh`` compares the
+archive to **in-repo** ``UV_SHA256_*`` pins (release ``sha256.sum`` alone is TOFU);
+``check_no_curl_pipe_sh.sh`` uses the W9.5 ``[^|]*`` charset so quoted URLs and
+``$()`` forms cannot bypass the gate; quarantine cleanup no longer swallows GHCR
+API errors with ``|| true``.

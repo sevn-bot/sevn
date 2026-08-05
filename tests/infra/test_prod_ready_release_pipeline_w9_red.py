@@ -314,6 +314,30 @@ def test_uv_installer_is_version_pinned_and_checksum_verified() -> None:
         "ensure-uv still uses curl|sh without pin+verify (C11.2 / D47)"
     )
     assert _UV_VERSION_PIN_RE.search(block), "ensure-uv must pin a uv version (C11.2 / D47)"
-    assert _CHECKSUM_VERIFY_RE.search(block), (
-        "ensure-uv must checksum-verify the installer before running it (C11.2 / D47)"
+    # Require a real verifier script reference — a comment containing "checksum" alone
+    # must not satisfy C11.2 / D47 (TOFU / comment-only compliance).
+    assert "install_uv_verified.sh" in block, (
+        "ensure-uv must invoke scripts/install_uv_verified.sh (C11.2 / D47)"
+    )
+    installer = _REPO_ROOT / "scripts" / "install_uv_verified.sh"
+    assert installer.is_file(), "scripts/install_uv_verified.sh missing (C11.2 / D47)"
+    installer_text = installer.read_text(encoding="utf-8")
+    assert not _CURL_PIPE_SH_RE.search(installer_text), (
+        "install_uv_verified.sh must not pipe curl/wget to sh (C11.2)"
+    )
+    assert re.search(r"\b(sha256sum|shasum)\b", installer_text), (
+        "install_uv_verified.sh must invoke sha256sum/shasum (C11.2 / D47)"
+    )
+    # In-repo 64-hex pins (not trusting the release's sha256.sum alone — TOFU).
+    pinned_hex = re.findall(
+        r'^UV_SHA256_[A-Za-z0-9_]+=["\']?([0-9a-fA-F]{64})["\']?',
+        installer_text,
+        re.MULTILINE,
+    )
+    assert len(pinned_hex) >= 2, (
+        "install_uv_verified.sh must embed in-repo UV_SHA256_* pins for supported "
+        f"archives (C11.2 / D47); found {len(pinned_hex)}"
+    )
+    assert "PINNED_UV_VERSION" in installer_text, (
+        "install_uv_verified.sh must gate UV_VERSION against PINNED_UV_VERSION"
     )
