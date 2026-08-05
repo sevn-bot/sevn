@@ -23,6 +23,10 @@ Exports:
     rewrite_proxy_url_for_sandbox_network — loopback → docker-host gateway for containers.
     list_labeled_sandbox_containers — enumerate ``sevn.run_id`` docker rows.
     reap_stale_sandbox_containers — TTL reaper keyed on ``sevn.run_id`` labels.
+    sandbox_image_stamp_missing — True when the release digest stamp was never applied.
+
+Module constant ``DEFAULT_SANDBOX_IMAGE`` (C4.1 / D42) is the single build-stamped
+digest-pinned default consumed by the Docker runtime, factory, and RLM REPL path.
 Examples:
     >>> check_self_preservation_argv(["echo", "hi"]) is None
     True
@@ -75,6 +79,54 @@ _MANIFEST_NAME = "snapshot-manifest.json"
 _FORMAT_VERSION_KEY = "format_version"
 _SNAPSHOT_FORMAT_VERSION: Final[int] = 1
 SUPPORTED_SNAPSHOT_FORMAT_VERSIONS: Final[frozenset[int]] = frozenset({_SNAPSHOT_FORMAT_VERSION})
+
+# Default sandbox image — single source for the three former ``:dev`` literal sites (C4.1 / D42).
+# Release builds stamp a real digest via ``scripts/stamp_default_sandbox_image.py`` (replaces
+# ``sha256:UNSTAMPED``) or set ``SEVN_SANDBOX_IMAGE_DIGEST`` at gateway image build/runtime.
+# Never fall back to a mutable tag when the stamp is missing — spawn fails closed (W7.4).
+_SANDBOX_IMAGE_REPO: Final[str] = "ghcr.io/sevn-bot/sevn/sandbox"
+_UNSTAMPED_SANDBOX_DIGEST: Final[str] = "sha256:UNSTAMPED"
+# Literal replaced by ``scripts/stamp_default_sandbox_image.py`` at release build.
+_SANDBOX_IMAGE_DIGEST_STAMP: str = "sha256:UNSTAMPED"
+
+
+def _resolve_default_sandbox_image() -> str:
+    """Build the digest-pinned default image ref from stamp or env override.
+
+    Returns:
+        str: ``ghcr.io/sevn-bot/sevn/sandbox@sha256:…`` (may still be ``UNSTAMPED``).
+
+    Examples:
+        >>> _resolve_default_sandbox_image().startswith("ghcr.io/sevn-bot/sevn/sandbox@sha256:")
+        True
+    """
+    env_digest = os.environ.get("SEVN_SANDBOX_IMAGE_DIGEST", "").strip()
+    digest = env_digest or _SANDBOX_IMAGE_DIGEST_STAMP
+    if digest.startswith("sha256:"):
+        return f"{_SANDBOX_IMAGE_REPO}@{digest}"
+    return f"{_SANDBOX_IMAGE_REPO}@sha256:{digest}"
+
+
+DEFAULT_SANDBOX_IMAGE: Final[str] = _resolve_default_sandbox_image()
+
+
+def sandbox_image_stamp_missing(image: str | None = None) -> bool:
+    """Return whether ``image`` still carries the unstamped release sentinel.
+
+    Args:
+        image (str | None): Image ref to inspect; defaults to ``DEFAULT_SANDBOX_IMAGE``.
+
+    Returns:
+        bool: ``True`` when the digest stamp was never applied at release build.
+
+    Examples:
+        >>> sandbox_image_stamp_missing("ghcr.io/sevn-bot/sevn/sandbox@sha256:UNSTAMPED")
+        True
+        >>> sandbox_image_stamp_missing("ghcr.io/sevn-bot/sevn/sandbox@sha256:" + ("a" * 64))
+        False
+    """
+    ref = DEFAULT_SANDBOX_IMAGE if image is None else image
+    return _UNSTAMPED_SANDBOX_DIGEST in ref
 
 
 class SandboxDriver(StrEnum):
@@ -1461,12 +1513,21 @@ async def _resolve_digest_pinned_image(image: str) -> str:
         str: Digest-pinned ``repo@sha256:…`` reference for ``docker run``.
 
     Raises:
-        SandboxConfigurationError: When pull/inspect fails or no ``RepoDigests``.
+        SandboxConfigurationError: When pull/inspect fails, no ``RepoDigests``,
+            or the release digest stamp is still ``sha256:UNSTAMPED`` (W7.4).
 
     Examples:
         >>> isinstance("@sha256:" in "x@sha256:abc", bool)
         True
     """
+    if sandbox_image_stamp_missing(image):
+        msg = (
+            f"sandbox image {image!r} is unstamped (digest sentinel "
+            f"{_UNSTAMPED_SANDBOX_DIGEST!r}); stamp via "
+            "scripts/stamp_default_sandbox_image.py or SEVN_SANDBOX_IMAGE_DIGEST "
+            "— refusing mutable-tag fallback"
+        )
+        raise SandboxConfigurationError(msg)
     docker_bin = _docker_bin()
     if "@sha256:" in image:
         rc, _, err = await _docker_run(
@@ -1753,7 +1814,7 @@ class DockerSandboxRuntime:
         trace_sink: TraceSink | None,
         cfg: WorkspaceConfig,
         sandbox_max_lifetime_s: float | None = None,
-        image: str = "ghcr.io/sevn-bot/sevn/sandbox:dev",
+        image: str = DEFAULT_SANDBOX_IMAGE,
         pre_spawn_env: dict[str, str] | None = None,
     ) -> None:
         """Bind Docker image + workspace config for spawn/exec/teardown.
@@ -1761,7 +1822,7 @@ class DockerSandboxRuntime:
             trace_sink (TraceSink | None): Telemetry injection port.
             cfg (WorkspaceConfig): Workspace configuration for lifetime knobs.
             sandbox_max_lifetime_s (float | None): Optional override for traces.
-            image (str): Sandbox base image tag (``rlm.docker_image`` override).
+            image (str): Sandbox base image (``rlm.docker_image`` or ``DEFAULT_SANDBOX_IMAGE``).
             pre_spawn_env (dict[str, str] | None): Extra env merged after §2.2 shim.
         Returns:
             None: Always ``None``.
@@ -2097,10 +2158,7 @@ def make_runtime_for_driver(
     if rlm_img is None:
         blob = rlm_json_dict(cfg)
         cand = blob.get("docker_image")
-        if isinstance(cand, str) and cand.strip():
-            rlm_img = cand.strip()
-        else:
-            rlm_img = "ghcr.io/sevn-bot/sevn/sandbox:dev"
+        rlm_img = cand.strip() if isinstance(cand, str) and cand.strip() else DEFAULT_SANDBOX_IMAGE
     if driver == SandboxDriver.docker:
         return DockerSandboxRuntime(
             trace_sink=trace_sink,

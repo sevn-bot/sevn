@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver a single scanner subsystem that runs in the gateway process so hostile
   content is filtered before the Triager or any routing model sees user-visible text,
   transcripts, or selected tool output.
-last_updated: '2026-08-04'
-fingerprint: sha256:b631d0cf2956c8f760f85d027f593dc802dbbab0f22feed3a1b0847c80161f85
+last_updated: '2026-08-05'
+fingerprint: sha256:4710b12f2076e9c61d8f38ad1afd694d81810458a9ecde81b5e0bed7e3f1e299
 related: []
 sources:
 - src/sevn/security/**
@@ -204,6 +204,9 @@ interfaces:
 - name: rewrite_proxy_url_for_sandbox_network
   file: src/sevn/security/sandbox_runtime.py
   symbol: rewrite_proxy_url_for_sandbox_network
+- name: sandbox_image_stamp_missing
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: sandbox_image_stamp_missing
 - name: snapshot_tarball_format_supported
   file: src/sevn/security/sandbox_runtime.py
   symbol: snapshot_tarball_format_supported

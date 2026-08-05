@@ -414,7 +414,7 @@
     "sandbox": {
       "type": "object",
       "additionalProperties": true,
-      "description": "Tool/skill sandbox resource caps (the design docs).",
+      "description": "Tool/skill sandbox resource caps (the design docs). Image override: only rlm.docker_image is honoured — sandbox.docker_image does not exist (not a valid key).",
       "properties": {
         "mode": {
           "type": "string",
@@ -1216,7 +1216,7 @@
         },
         "docker_image": {
           "type": "string",
-          "description": "Override base image tag for DSPy Docker REPL (the design docs)."
+          "description": "Authoritative override for the sandbox/REPL Docker image (digest or tag). There is no sandbox.docker_image key — only rlm.docker_image is honoured."
         },
         "repl_lifetime": {
           "type": "string",

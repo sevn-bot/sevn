@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / safebash
   (when routed through the execution sandbox), process when configured for sandbox
   routing, and skill subprocesses spawned b
-last_updated: '2026-08-04'
-fingerprint: sha256:b631d0cf2956c8f760f85d027f593dc802dbbab0f22feed3a1b0847c80161f85
+last_updated: '2026-08-05'
+fingerprint: sha256:4710b12f2076e9c61d8f38ad1afd694d81810458a9ecde81b5e0bed7e3f1e299
 related: []
 sources:
 - src/sevn/security/**
@@ -211,6 +211,9 @@ interfaces:
 - name: rewrite_proxy_url_for_sandbox_network
   file: src/sevn/security/sandbox_runtime.py
   symbol: rewrite_proxy_url_for_sandbox_network
+- name: sandbox_image_stamp_missing
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: sandbox_image_stamp_missing
 - name: snapshot_tarball_format_supported
   file: src/sevn/security/sandbox_runtime.py
   symbol: snapshot_tarball_format_supported
@@ -460,6 +463,29 @@ for subprocess/namespace mode and operator reference.
 **Known tradeoff:** ``ensure_proxy_attached_to_sandbox_network`` attaches the
 **whole** egress-proxy container to ``sevn-sandbox`` so sandboxes can reach the
 reverse-proxy API; the proxy shares the internal bridge with sandboxes.
+
+## Amendments (prod-readiness-0.0.1 W7 — C4.1, C4.3, D42)
+
+The default sandbox image is a **single** module constant
+``DEFAULT_SANDBOX_IMAGE`` in ``src/sevn/security/sandbox_runtime.py``, consumed by
+``DockerSandboxRuntime.__init__``, ``make_runtime_for_driver``, and
+``agent/runtimes/sandbox._default_repl_image``. The shipped form is a digest pin
+(``ghcr.io/sevn-bot/sevn/sandbox@sha256:…``), never a mutable ``:dev`` / ``:latest``
+tag.
+
+**Build stamp (W7.4):** release builds replace the ``sha256:UNSTAMPED`` literal on
+``_SANDBOX_IMAGE_DIGEST_STAMP`` via ``scripts/stamp_default_sandbox_image.py``
+(after the sandbox image digest is known), or set ``SEVN_SANDBOX_IMAGE_DIGEST`` at
+gateway process start. **Failure mode when the stamp is missing:** spawn /
+``_resolve_digest_pinned_image`` raises ``SandboxConfigurationError`` and does
+**not** fall back to a mutable tag (D43 spirit). Release CI may also pass
+``--require-stamped`` to ``scripts/check_sandbox_mutable_image_tags.py``.
+
+**Operator override:** only ``rlm.docker_image`` is honoured. There is **no**
+``sandbox.docker_image`` key (documented in ``infra/sevn.schema.json``).
+
+**CI (C4.3):** ``make sandbox-image-check`` (wired into ``ci-infra``) rejects any
+``ghcr.io/sevn-bot/sevn/sandbox:(dev|latest|…)`` literal under ``src/``.
 
 ## Amendments (post-audit-0.0.1 W6 — #168)
 

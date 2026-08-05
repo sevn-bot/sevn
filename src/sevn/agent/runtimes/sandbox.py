@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 
 from sevn.config.workspace_config import WorkspaceConfig, rlm_json_dict
 from sevn.security.sandbox_runtime import (
+    DEFAULT_SANDBOX_IMAGE,
     DockerSandboxRuntime,
     build_sandbox_child_env,
     docker_daemon_reachable,
@@ -51,7 +52,7 @@ class SevnDockerInterpreter:
         """Bind image and optional workspace for ``DockerSandboxRuntime`` REPL exec.
 
         Args:
-            image (str): ``rlm.docker_image`` override or operator default tag.
+            image (str): ``rlm.docker_image`` override or ``DEFAULT_SANDBOX_IMAGE``.
             cfg (WorkspaceConfig | None): Workspace config for resource caps.
             workspace (Path | None): Host workspace root; ephemeral dir when omitted.
             child_env (dict[str, str] | None): §2.2 env merged at spawn.
@@ -288,13 +289,13 @@ def _rlm_blob(cfg: WorkspaceConfig) -> dict[str, object]:
 
 
 def _default_repl_image(cfg: WorkspaceConfig) -> str:
-    """Resolve ``rlm.docker_image`` or fall back to shipped base tag.
+    """Resolve ``rlm.docker_image`` or fall back to ``DEFAULT_SANDBOX_IMAGE``.
 
     Args:
         cfg (WorkspaceConfig): Workspace root model.
 
     Returns:
-        str: Non-empty docker image coordinate.
+        str: Non-empty docker image coordinate (digest-pinned default when unset).
 
     Examples:
         >>> from sevn.config.workspace_config import WorkspaceConfig
@@ -305,7 +306,7 @@ def _default_repl_image(cfg: WorkspaceConfig) -> str:
     cand = blob.get("docker_image")
     if isinstance(cand, str) and cand.strip():
         return cand.strip()
-    return "ghcr.io/sevn-bot/sevn/sandbox:dev"
+    return DEFAULT_SANDBOX_IMAGE
 
 
 def build_rlm_interpreter(workspace: object) -> object:
