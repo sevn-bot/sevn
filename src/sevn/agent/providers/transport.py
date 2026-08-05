@@ -26,7 +26,6 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from sevn.agent.providers import transport_http
-from sevn.config.settings import ProcessSettings
 
 
 @dataclass(frozen=True)
@@ -609,9 +608,24 @@ class _ProxyTransport:
         """
         _ = model_id
         headers = dict(self._extra_headers)
-        secret = (ProcessSettings().proxy_shared_secret or "").strip()
-        if secret:
-            headers["X-Sevn-Proxy-Token"] = secret
+        existing = (headers.get("X-Sevn-Proxy-Token") or "").strip()
+        if existing:
+            return headers
+        # ProcessSettings is env-only; Compose default leaves env blank and relies on
+        # the generate-once file under SEVN_HOME (C1.2 / D37). Do not import
+        # sevn.tools here — transport sits below tools in the import graph.
+        from sevn.proxy.bootstrap_secret import resolve_effective_proxy_shared_secret
+
+        secret = (resolve_effective_proxy_shared_secret() or "").strip()
+        if not secret:
+            msg = (
+                "SEVN_PROXY_SHARED_SECRET is not configured; set it in the process "
+                "environment, put it via ``sevn secrets put SEVN_PROXY_SHARED_SECRET``, "
+                "generate it during compose bootstrap, or complete onboarding so the "
+                "gateway can inject the resolved value"
+            )
+            raise RuntimeError(msg)
+        headers["X-Sevn-Proxy-Token"] = secret
         return headers
 
     def tokens_used(self, response: dict[str, object]) -> tuple[int, int]:

@@ -599,6 +599,7 @@ async def store_wizard_credentials(
         await chain.set(_GATEWAY_TOKEN_LOGICAL_KEY, gw_tok)
         written[_GATEWAY_TOKEN_LOGICAL_KEY] = True
     proxy_secret = (proxy_shared_secret or "").strip()
+    explicit_proxy_secret = bool(proxy_secret)
     # C1.2 / D37: converge host onboarding with Compose on ``{SEVN_HOME}/.sevn/proxy-shared-secret``.
     from sevn.config.loader import operator_home_dir
     from sevn.proxy.bootstrap_secret import (
@@ -622,7 +623,13 @@ async def store_wizard_credentials(
 
             proxy_secret = generate_gateway_token()
     if proxy_secret:
-        ensure_proxy_shared_secret_file(state_root, secret=proxy_secret)
+        # Explicit operator rotation must overwrite the generate-once file; otherwise
+        # file-before-chain resolution keeps the stale value (Thermos finding).
+        ensure_proxy_shared_secret_file(
+            state_root,
+            secret=proxy_secret,
+            overwrite=explicit_proxy_secret,
+        )
         await chain.set(_PROXY_SHARED_SECRET_LOGICAL_KEY, proxy_secret)
         written[_PROXY_SHARED_SECRET_LOGICAL_KEY] = True
     gh_tok = (github_token or "").strip()

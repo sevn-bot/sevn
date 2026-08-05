@@ -169,7 +169,12 @@ def build_egress_web_headers(
 
 
 def _resolve_process_egress() -> tuple[str | None, str | None, str | None]:
-    """Read proxy URL, session token, and shared secret from ``ProcessSettings``.
+    """Read proxy URL, session token, and shared secret for egress callers.
+
+    URL and session token come from ``ProcessSettings`` (env). The shared secret
+    uses env → generate-once file resolution so Compose default (blank env +
+    ``{SEVN_HOME}/.sevn/proxy-shared-secret``) works without re-introducing an
+    ``os.environ`` write-back (C1.2 / D37 / D41).
 
     Returns:
         tuple[str | None, str | None, str | None]: ``(proxy_url, session_token, shared_secret)``.
@@ -178,10 +183,12 @@ def _resolve_process_egress() -> tuple[str | None, str | None, str | None]:
         >>> isinstance(_resolve_process_egress(), tuple)
         True
     """
+    from sevn.proxy.bootstrap_secret import resolve_effective_proxy_shared_secret
+
     ps = ProcessSettings()
     proxy_url = (ps.proxy_url or "").strip() or None
     session_token = (ps.session_token or "").strip() or None
-    shared_secret = (ps.proxy_shared_secret or "").strip() or None
+    shared_secret = resolve_effective_proxy_shared_secret()
     return proxy_url, session_token, shared_secret
 
 

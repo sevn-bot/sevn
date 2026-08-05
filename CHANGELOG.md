@@ -25,6 +25,9 @@ are cut into a dated, versioned section at release time.
 - [2026-08-05] **Breaking:** Mission Control `local_open` on loopback now requires the boot-written `local_token` query parameter — tokenless loopback no longer grants owner session claims; set `dashboard.local_open_trust_address: true` to restore address-only trust (#169, post-audit Batch E)
 - [2026-08-05] CLI dashboard reads (`sevn models`, `sevn agent config`, `sevn channels status`, and related commands) append the boot `local_token` when calling loopback Mission Control with effective local-open (#169, post-audit Batch E W18)
 
+### Fixed
+- [2026-08-05] Stock Compose with a blank ``SEVN_PROXY_SHARED_SECRET`` now uses the generate-once file for LLM proxy auth, web egress, sandbox session minting, and dashboard terminals — not only the proxy healthcheck path
+
 ### Security
 - [2026-08-06] Failed or cancelled GHCR publishes clean their own quarantine tags (not only supply-chain failures); quarantine cleanup fails closed on non-404 GHCR probe/list errors; `make check-no-curl-pipe-sh` scans all `.github/` text files (not an extension allowlist) and rejects backslash-continued `curl|sh` spellings
 - [2026-08-05] Release tooling installers are pinned and verified: syft/trivy via SHA-pinned Actions, `make ensure-uv` verifies a pinned GitHub release against **in-repo** `UV_SHA256_*` pins, and `make check-no-curl-pipe-sh` rejects downloader-piped-to-shell patterns (including quoted/`$()` forms) under `.github/` and the Makefile (C11.1, C11.2, C11.3)

@@ -75,7 +75,9 @@ services:
       - |
         mkdir -p /operator /operator/.sevn /operator/workspace /operator/workspace/logs /operator/workspace/.sevn /operator/workspace/.sevn/browser-profiles /operator/workspace/.sevn/browser-sessions /browser-profiles
         # C1.2 / D37: generate-once proxy shared secret (same path as ensure_proxy_shared_secret_file).
-        if [ ! -f /operator/.sevn/proxy-shared-secret ]; then
+        # Treat blank existing file as absent so generate-once cannot stick on empty.
+        if [ ! -s /operator/.sevn/proxy-shared-secret ]; then
+          rm -f /operator/.sevn/proxy-shared-secret
           umask 077
           head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n\r' > /operator/.sevn/proxy-shared-secret
           chmod 600 /operator/.sevn/proxy-shared-secret
@@ -114,7 +116,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import os, urllib.error, urllib.request; from pathlib import Path; urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=3); s=(os.environ.get('SEVN_PROXY_SHARED_SECRET') or '').strip(); p=Path('/operator/.sevn/proxy-shared-secret'); s=s or (p.read_text(encoding='utf-8').strip() if p.is_file() else ''); req=urllib.request.Request('http://127.0.0.1:8787/web/auth-check', headers={'X-Sevn-Proxy-Token': s});\ntry:\n urllib.request.urlopen(req, timeout=3)\nexcept urllib.error.HTTPError as e:\n raise SystemExit(1) if e.code in (401, 503) else (_ for _ in ()).throw(e)",
+          "import os, urllib.error, urllib.request\nfrom pathlib import Path\nwith urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=3) as r:\n r.read(0)\ns = (os.environ.get('SEVN_PROXY_SHARED_SECRET') or '').strip()\np = Path('/operator/.sevn/proxy-shared-secret')\nif not s and p.is_file():\n s = p.read_text(encoding='utf-8').strip()\nreq = urllib.request.Request('http://127.0.0.1:8787/web/auth-check', headers={'X-Sevn-Proxy-Token': s})\ntry:\n with urllib.request.urlopen(req, timeout=3) as r:\n  r.read(0)\nexcept urllib.error.HTTPError as e:\n if e.code in (401, 503):\n  raise SystemExit(1)\n raise\n",
         ]
       interval: 10s
       timeout: 5s

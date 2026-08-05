@@ -285,18 +285,20 @@ async def create_sandbox_terminal_session(
     if session_token.strip():
         resolved_token = session_token.strip()
     else:
-        from sevn.config.settings import ProcessSettings
         from sevn.proxy.auth import SESSION_SCOPE_SANDBOX, mint_session_token
+        from sevn.proxy.bootstrap_secret import resolve_effective_proxy_shared_secret
 
-        secret = (ProcessSettings().proxy_shared_secret or "").strip()
-        resolved_token = (
-            mint_session_token(
-                signing_key=secret,
-                scope=SESSION_SCOPE_SANDBOX,
-                run_id=run_id,
+        secret = (resolve_effective_proxy_shared_secret() or "").strip()
+        if not secret:
+            raise SandboxTerminalError(
+                "SEVN_PROXY_SHARED_SECRET is not configured; set env, generate-once "
+                "file under SEVN_HOME, or complete onboarding before minting a "
+                "sandbox terminal session token"
             )
-            if secret
-            else uuid.uuid4().hex
+        resolved_token = mint_session_token(
+            signing_key=secret,
+            scope=SESSION_SCOPE_SANDBOX,
+            run_id=run_id,
         )
     child_env = {
         "SEVN_PROXY_URL": proxy_url,

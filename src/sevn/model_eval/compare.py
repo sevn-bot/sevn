@@ -135,7 +135,7 @@ class LiveComparisonReport:
 
 
 def _proxy_headers() -> dict[str, str]:
-    """Build optional proxy auth headers from ``ProcessSettings``.
+    """Build optional proxy auth headers from env → generate-once file resolution.
 
     Returns:
         dict[str, str]: Header map (may be empty).
@@ -144,10 +144,10 @@ def _proxy_headers() -> dict[str, str]:
         >>> isinstance(_proxy_headers(), dict)
         True
     """
-    from sevn.config.settings import ProcessSettings
+    from sevn.proxy.bootstrap_secret import resolve_effective_proxy_shared_secret
 
     headers: dict[str, str] = {}
-    secret = (ProcessSettings().proxy_shared_secret or "").strip()
+    secret = (resolve_effective_proxy_shared_secret() or "").strip()
     if secret:
         headers["X-Sevn-Proxy-Token"] = secret
     session_token = os.environ.get("SEVN_SESSION_TOKEN", "").strip()

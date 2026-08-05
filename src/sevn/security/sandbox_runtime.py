@@ -843,19 +843,22 @@ def _resolve_spawn_session_token(*, run_id: str, env: Mapping[str, str]) -> str:
         env (Mapping[str, str]): Upstream spawn env (may already carry a token).
 
     Returns:
-        str: Token text for ``build_sandbox_child_env`` (possibly empty).
+        str: Token text for ``build_sandbox_child_env``.
 
     Raises:
-        SandboxConfigurationError: When an existing token fails scope validation.
+        SandboxConfigurationError: When an existing token fails scope validation,
+            or when no token is present and the shared secret cannot be resolved
+            (env or generate-once file) to mint one.
 
     Examples:
         >>> _resolve_spawn_session_token(run_id="r", env={"SEVN_SESSION_TOKEN": "keep"})
         'keep'
     """
     existing = str(env.get("SEVN_SESSION_TOKEN", "")).strip()
-    from sevn.config.settings import ProcessSettings
+    from sevn.proxy.bootstrap_secret import resolve_effective_proxy_shared_secret
 
-    secret = (ProcessSettings().proxy_shared_secret or "").strip()
+    # ProcessSettings is env-only; Compose default uses the generate-once file.
+    secret = (resolve_effective_proxy_shared_secret() or "").strip()
     if existing:
         if secret:
             from sevn.proxy.auth import validate_session_token
@@ -869,7 +872,11 @@ def _resolve_spawn_session_token(*, run_id: str, env: Mapping[str, str]) -> str:
                 raise SandboxConfigurationError(msg)
         return existing
     if not secret:
-        return ""
+        msg = (
+            "SEVN_PROXY_SHARED_SECRET is not configured; cannot mint a sandbox "
+            "session token (set env, generate-once file under SEVN_HOME, or onboard)"
+        )
+        raise SandboxConfigurationError(msg)
     from sevn.proxy.auth import SESSION_SCOPE_SANDBOX, mint_session_token
 
     return mint_session_token(

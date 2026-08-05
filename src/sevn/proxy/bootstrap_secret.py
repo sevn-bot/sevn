@@ -59,13 +59,21 @@ def ensure_proxy_shared_secret_file(
     state_root: Path | str,
     *,
     secret: str | None = None,
+    overwrite: bool = False,
 ) -> Path:
-    """Create the proxy shared-secret file when absent; never regenerate.
+    """Create the proxy shared-secret file when absent; never regenerate by default.
+
+    A blank existing file is treated as absent so generate-once cannot stick on an
+    empty path (silent-empty). Pass ``overwrite=True`` when an operator explicitly
+    rotates the secret (onboarding wizard with a non-empty argument).
 
     Args:
         state_root (Path | str): Operator state root (``SEVN_HOME`` / ``/operator``).
-        secret (str | None): Optional plaintext to write when the file is absent;
-            when omitted, a high-entropy value is generated.
+        secret (str | None): Optional plaintext to write when the file is absent
+            (or when ``overwrite`` is true); when omitted, a high-entropy value is
+            generated.
+        overwrite (bool): When ``True``, replace an existing file with ``secret``
+            (or a freshly generated value). Default ``False`` preserves generate-once.
 
     Returns:
         Path: Path to the existing or newly created secret file.
@@ -80,8 +88,15 @@ def ensure_proxy_shared_secret_file(
         True
     """
     path = proxy_shared_secret_path(state_root)
-    if path.is_file():
-        return path
+    if path.is_file() and not overwrite:
+        try:
+            if path.read_text(encoding="utf-8").strip():
+                return path
+        except OSError:
+            return path
+        path.unlink(missing_ok=True)
+    elif path.is_file() and overwrite:
+        path.unlink(missing_ok=True)
     path.parent.mkdir(parents=True, exist_ok=True)
     value = (secret or "").strip() or secrets.token_urlsafe(32)
     if len(value) < _MIN_SECRET_CHARS:
@@ -142,6 +157,7 @@ def resolve_effective_proxy_shared_secret(
             or ``~/.sevn`` (same default as ``operator_home_dir``). When ``env`` is an
             explicit mapping without ``SEVN_HOME``, the file fallback is skipped so
             callers that pass ``env={}`` do not pick up a host generate-once file.
+            Always pass ``state_root=`` when using ``env={}`` (gateway boot does this).
 
     Returns:
         str | None: Effective secret, or ``None`` when neither source provides one.
@@ -152,6 +168,8 @@ def resolve_effective_proxy_shared_secret(
         ...     state_root="/tmp",
         ... )
         'explicit'
+        >>> resolve_effective_proxy_shared_secret(env={}) is None
+        True
     """
     mapping = os.environ if env is None else env
     raw = mapping.get(_ENV_NAME, "")

@@ -745,8 +745,12 @@ async def _prime_proxy_shared_secret_env(
     Historical gateway boot primed the process environ from the secrets chain so
     call sites could re-read the shared secret from the environment. That write-back
     is deleted; use :func:`_with_resolved_proxy_shared_secret` and inject via
-    ``build_runtime_tool_bindings`` instead. Kept as a named symbol so older call
-    sites / imports fail closed without mutating global state.
+    ``build_runtime_tool_bindings``, or resolve via
+    ``sevn.proxy.bootstrap_secret.resolve_effective_proxy_shared_secret``.
+
+    Kept as a named no-op so older imports do not mutate global state. Callers that
+    still invoke this symbol should migrate; raising here is deferred (Thermos low —
+    follow-up issue) because Batch A RED currently pins the no-op contract.
 
     Args:
         workspace (WorkspaceConfig): Parsed ``sevn.json`` (unused).
