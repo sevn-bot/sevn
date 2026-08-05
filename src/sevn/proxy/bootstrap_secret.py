@@ -185,8 +185,13 @@ def main(argv: list[str] | None = None) -> int:
 
     Examples:
         >>> import tempfile
+        >>> from contextlib import redirect_stdout
+        >>> from io import StringIO
         >>> root = tempfile.mkdtemp()
-        >>> main([root]) == 0
+        >>> buf = StringIO()
+        >>> with redirect_stdout(buf):
+        ...     code = main([root])
+        >>> code == 0 and "proxy-shared-secret" in buf.getvalue()
         True
     """
     args = list(sys.argv[1:] if argv is None else argv)
