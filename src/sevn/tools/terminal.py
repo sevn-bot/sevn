@@ -14,6 +14,7 @@ Exports:
     terminal_close_tool — tear down a session.
     register_terminal_tools — register terminal tools on a ``ToolExecutor``.
     reset_terminal_store_for_tests — clear in-memory sessions (tests only).
+    dispose_session_terminals — close and drop all terminals for one session (reap helper).
 
 Examples:
     >>> from sevn.tools.terminal import reset_terminal_store_for_tests
@@ -97,6 +98,27 @@ def _session_map(session_id: str) -> dict[str, TerminalSession]:
         True
     """
     return _sessions_by_gateway.setdefault(session_id, {})
+
+
+async def dispose_session_terminals(session_id: str) -> None:
+    """Close and drop all pexpect terminals for ``session_id`` (session reap helper).
+
+    Args:
+        session_id (str): Gateway session whose terminals should be torn down.
+
+    Returns:
+        None
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(dispose_session_terminals)
+        True
+    """
+    sessions = _sessions_by_gateway.pop(session_id, None)
+    if not sessions:
+        return
+    for session in list(sessions.values()):
+        await asyncio.to_thread(_close_sync, session)
 
 
 async def _ensure_session_terminal(
@@ -648,6 +670,7 @@ def register_terminal_tools(executor: ToolExecutor) -> None:
 
 
 __all__ = [
+    "dispose_session_terminals",
     "register_terminal_tools",
     "reset_terminal_store_for_tests",
     "terminal_close_tool",

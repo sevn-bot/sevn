@@ -7,7 +7,7 @@ Exposes:
   GET  /v1/models            — list available models (sevn-agent)
   POST /v1/chat/completions  — OpenAI Chat Completions format; dispatches to
                                the gateway agent turn spine and awaits the reply
-  GET  /health               — lightweight liveness probe
+  GET  /v1/health           — unauthenticated liveness probe (``{"status": "ok"}`` only)
 
 Any OpenAI-compatible frontend (Open WebUI, LobeChat, LibreChat, etc.) can
 connect by pointing at ``http://host:port/v1`` and authenticating with the
@@ -23,6 +23,7 @@ Exports:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import sqlite3
 import time
@@ -117,7 +118,7 @@ def _require_bearer(request: Request) -> str:
 
 
 def _reap_ephemeral_session(conn: sqlite3.Connection, session_id: str) -> None:
-    """Delete a single-request OpenAI-compat session and its messages (D17).
+    """Delete a single-request OpenAI-compat session and dependent SQLite rows (D17).
 
     Args:
         conn (sqlite3.Connection): Open gateway SQLite handle.
@@ -135,9 +136,37 @@ def _reap_ephemeral_session(conn: sqlite3.Connection, session_id: str) -> None:
         True
         >>> c.close()
     """
-    conn.execute("DELETE FROM gateway_messages WHERE session_id = ?", (session_id,))
+    conn.execute(
+        "DELETE FROM gateway_turn_metadata WHERE session_id = ?",
+        (session_id,),
+    )
     conn.execute("DELETE FROM gateway_sessions WHERE session_id = ?", (session_id,))
     conn.commit()
+
+
+async def _reap_ephemeral_session_resources(
+    conn: sqlite3.Connection,
+    session_id: str,
+) -> None:
+    """Tear down in-memory tool state and SQLite rows for one ephemeral session (D17).
+
+    Args:
+        conn (sqlite3.Connection): Open gateway SQLite handle.
+        session_id (str): Ephemeral session id to remove.
+
+    Returns:
+        None
+
+    Examples:
+        >>> _reap_ephemeral_session_resources.__name__
+        '_reap_ephemeral_session_resources'
+    """
+    from sevn.tools.process import dispose_session_background_jobs
+    from sevn.tools.terminal import dispose_session_terminals
+
+    await dispose_session_background_jobs(session_id)
+    await dispose_session_terminals(session_id)
+    _reap_ephemeral_session(conn, session_id)
 
 
 def _last_assistant_text(
@@ -199,32 +228,6 @@ def _max_message_id(conn: sqlite3.Connection, session_id: str) -> int:
     if row is None or row[0] is None:
         return 0
     return int(row[0])
-
-
-def _clear_visible_messages(conn: sqlite3.Connection, session_id: str) -> None:
-    """Remove prior visible LLM history before syncing an OpenAI request batch.
-
-    Args:
-        conn (sqlite3.Connection): Open gateway SQLite handle.
-        session_id (str): Target session id.
-
-    Returns:
-        None: Mutates ``gateway_messages`` in place.
-
-    Examples:
-        >>> import sqlite3
-        >>> from sevn.storage.migrate import apply_migrations
-        >>> c = sqlite3.connect(":memory:")
-        >>> apply_migrations(c)
-        >>> _clear_visible_messages(c, "missing") is None
-        True
-        >>> c.close()
-    """
-    conn.execute(
-        "DELETE FROM gateway_messages WHERE session_id = ? AND visible_to_llm = 1",
-        (session_id,),
-    )
-    conn.commit()
 
 
 def _validate_request_messages(messages: list[ChatMessage]) -> None:
@@ -383,12 +386,12 @@ def build_openai_compat_router() -> APIRouter:
             )
             baseline_message_id = await asyncio.to_thread(_max_message_id, conn, session_id)
 
+            turn_task = asyncio.create_task(run_turn(session_id, correlation_id))
             try:
-                await asyncio.wait_for(
-                    run_turn(session_id, correlation_id),
-                    timeout=_TURN_TIMEOUT_S,
-                )
+                await asyncio.wait_for(turn_task, timeout=_TURN_TIMEOUT_S)
             except TimeoutError as exc:
+                with contextlib.suppress(asyncio.CancelledError):
+                    await turn_task
                 raise HTTPException(status_code=504, detail="turn_timeout") from exc
             except HTTPException:
                 raise
@@ -419,7 +422,7 @@ def build_openai_compat_router() -> APIRouter:
                 }
             )
         finally:
-            await asyncio.to_thread(_reap_ephemeral_session, conn, session_id)
+            await _reap_ephemeral_session_resources(conn, session_id)
 
     return router
 

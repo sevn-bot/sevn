@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that every
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
-last_updated: '2026-08-04'
-fingerprint: sha256:d916a08405eb959819324e4f5870007f79df051b68ca44aad1837473fa5d6b7b
+last_updated: '2026-08-05'
+fingerprint: sha256:0a3999e2ce1aba302e4fba5816db558efba1d07b9354a2569155fd33630b3639
 related: []
 sources:
 - src/sevn/tools/**
@@ -401,6 +401,9 @@ interfaces:
 - name: BackgroundJob
   file: src/sevn/tools/process.py
   symbol: BackgroundJob
+- name: dispose_session_background_jobs
+  file: src/sevn/tools/process.py
+  symbol: dispose_session_background_jobs
 - name: list_session_jobs
   file: src/sevn/tools/process.py
   symbol: list_session_jobs
@@ -512,6 +515,9 @@ interfaces:
 - name: TerminalSession
   file: src/sevn/tools/terminal.py
   symbol: TerminalSession
+- name: dispose_session_terminals
+  file: src/sevn/tools/terminal.py
+  symbol: dispose_session_terminals
 - name: register_terminal_tools
   file: src/sevn/tools/terminal.py
   symbol: register_terminal_tools

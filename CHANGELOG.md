@@ -35,6 +35,7 @@ are cut into a dated, versioned section at release time.
 - [2026-07-30] `/model --once <provider/model>` stages a one-turn tier-B model override in session metadata — consumed at the next agent turn (success or failure) without changing the persisted `providers.tier_default.B` setting; `/status` shows effective vs persisted model (#88)
 - [2026-07-30] Per-channel and per-topic model and system prompt overrides under `channels.<name>.model` / `channels.<name>.system_prompt` and `channels.telegram.topics.<id>.*` — turn-scoped resolution with session → channel → workspace precedence; `TopicConfig.system_prompt` wired from Telegram inbound metadata (#86)
 ### Fixed
+- [2026-08-05] OpenAI-compatible ephemeral session reap deletes `gateway_turn_metadata` before session rows, disposes in-memory process/terminal state, and drains cancelled turns before reap so real agent turns no longer 500 on FK violation (#174, post-audit Batch D D-Thermos)
 - [2026-08-05] OpenAI-compatible `POST /v1/chat/completions` uses a fresh ephemeral session per request so concurrent same-bearer clients no longer overwrite each other's history; `GET /v1/models` requires the gateway bearer and `/v1/health` stays a public liveness probe (#174, post-audit Batch D)
 - [2026-08-05] Background `process` jobs that ignore SIGTERM are SIGKILLed on TTL expiry and LRU eviction, matching explicit stop (#175, post-audit Batch D)
 - [2026-08-05] Timed-out `terminal_run` commands set `session_destroyed: true` and remove the shell session so the next call must spawn again (#176, post-audit Batch D)
