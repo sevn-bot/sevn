@@ -802,8 +802,6 @@ async def build_proxy_settings(
         proxy_secret = await _resolve_proxy_shared_secret(chain)
         if proxy_secret:
             updates["proxy_shared_secret"] = proxy_secret
-            if not os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip():
-                os.environ["SEVN_PROXY_SHARED_SECRET"] = proxy_secret
     return settings.model_copy(update=updates)
 
 

@@ -1,7 +1,7 @@
 """Injectable hooks for bundled GitHub skill scripts.
 
 Module: sevn.integrations.github_skill.hooks
-Depends: httpx, os, sevn.config.settings, sevn.tools.integration_gh_repo, sevn.tools.web
+Depends: httpx, sevn.config.settings, sevn.tools.integration_gh_repo, sevn.tools.web
 
 Exports:
     GithubSkillHooks — integration delegate for GitHub REST via proxy.
@@ -12,7 +12,6 @@ Exports:
 
 from __future__ import annotations
 
-import os
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
@@ -75,7 +74,7 @@ def integration_call_from_mapping(client: dict[str, Any]) -> IntegrationCallFn:
 
 
 def _resolve_process_egress() -> tuple[str | None, str | None, str | None]:
-    """Read proxy URL, session token, and shared secret from process env.
+    """Read proxy URL, session token, and shared secret from ``ProcessSettings``.
 
     Returns:
         tuple[str | None, str | None, str | None]: ``(proxy_url, session_token, shared_secret)``.
@@ -87,7 +86,7 @@ def _resolve_process_egress() -> tuple[str | None, str | None, str | None]:
     ps = ProcessSettings()
     proxy_url = (ps.proxy_url or "").strip() or None
     session_token = (ps.session_token or "").strip() or None
-    shared_secret = os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip() or None
+    shared_secret = (ps.proxy_shared_secret or "").strip() or None
     return proxy_url, session_token, shared_secret
 
 

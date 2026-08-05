@@ -21,12 +21,12 @@ Examples:
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from sevn.agent.providers import transport_http
+from sevn.config.settings import ProcessSettings
 
 
 @dataclass(frozen=True)
@@ -609,7 +609,7 @@ class _ProxyTransport:
         """
         _ = model_id
         headers = dict(self._extra_headers)
-        secret = os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip()
+        secret = (ProcessSettings().proxy_shared_secret or "").strip()
         if secret:
             headers["X-Sevn-Proxy-Token"] = secret
         return headers

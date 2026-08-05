@@ -8,7 +8,7 @@ summary: Product pairing (v1). Deployment, paired daemon install, onboarding val
   and Mission Control management of the proxy are specified in prd-06-setup-and-operations
   and prd-07-mission-control §5.1
 last_updated: '2026-08-05'
-fingerprint: sha256:9f3bf9ce0598eea0e9af6d9a68cc4f1d9f0a402b4c5bb18b0dc5b4f2165f6e09
+fingerprint: sha256:39fdf8242ed668d08c6ed9a9b3feb2ee5180b6a18c1fa7713a7b58710916d495
 related: []
 sources:
 - src/sevn/proxy/**
@@ -245,6 +245,26 @@ Session tokens carry ``exp`` (unix expiry) and ``run_id`` in a ``v1.<payload>.<s
 envelope signed with the same ``SEVN_PROXY_SHARED_SECRET``. Either header alone
 satisfies the guard for its route family. The service secret is **never** injected
 into sandbox child env (``build_sandbox_child_env``).
+
+## Amendments (prod-readiness-0.0.1 W3 — C3.2, C3.3)
+
+Exactly one configuration authority resolves ``SEVN_PROXY_SHARED_SECRET`` for
+in-process gateway and proxy clients:
+
+| Process | Authority |
+|---------|-----------|
+| Proxy | ``ProxySettings.proxy_shared_secret`` via env alias and/or secrets-chain merge in ``build_proxy_settings`` (``settings.model_copy`` only — **no** ``os.environ`` write-back) |
+| Gateway | ``ProcessSettings.proxy_shared_secret`` (env allowlist) then secrets chain via ``resolve_proxy_shared_secret``; value is injected into ``build_runtime_tool_bindings(proxy_shared_secret=…)`` |
+
+Guarded-route **clients** (``build_egress_web_headers``, web/integration callers) raise
+``ProxySharedSecretUnconfiguredError`` when the resolved shared secret is empty,
+naming ``SEVN_PROXY_SHARED_SECRET`` and a remedy (set env / ``sevn secrets put`` /
+generate / onboard). They must not send an empty ``X-Sevn-Proxy-Token`` and surface
+an opaque 401.
+
+The sole remaining ``os.environ.get("SEVN_PROXY_SHARED_SECRET")`` under ``src/`` is
+the sandbox child-env seam
+(``data/bundled_skills/core/job-ops/scripts/lib/llm.py``), which runs out-of-process.
 
 ## Human-input needed
 

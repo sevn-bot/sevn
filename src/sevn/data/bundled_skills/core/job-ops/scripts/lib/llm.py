@@ -6,6 +6,12 @@ No shipped "LLM-from-script" helper exists, so this wires directly into the same
 transport stack the tier executors use (``resolve_model`` + egress proxy). When the
 proxy environment is unavailable it raises :class:`LlmUnavailable` so callers can
 fall back to agent-side scoring (``needs_agent_scoring``).
+
+Sandbox child-env contract (prod-readiness W3 / C3.2): this module runs **inside** a
+sandbox subprocess, not the gateway. It may read ``SEVN_PROXY_SHARED_SECRET`` from
+``os.environ`` when an operator/test harness injects that key into the child env.
+Gateway and in-process tool clients must **not** fall back to ``os.environ`` — they
+receive the secret by injection from ``ProcessSettings`` / ``build_runtime_tool_bindings``.
 """
 
 from __future__ import annotations
@@ -83,6 +89,12 @@ def _first_object(text: str) -> str:
 
 
 def _proxy_headers() -> dict[str, str]:
+    """Build proxy auth headers from sandbox child env (not a gateway fallback).
+
+    Reads ``SEVN_PROXY_SHARED_SECRET`` / ``SEVN_SESSION_TOKEN`` from the child
+    process environment — the documented sandbox child-env seam for job-ops
+    scripts. Gateway code must inject the shared secret instead of re-reading env.
+    """
     headers: dict[str, str] = {}
     secret = os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip()
     if secret:

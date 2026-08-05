@@ -692,41 +692,70 @@ async def _resolve_webchat_jwt_secret(
     return resolved if resolved else None
 
 
+async def _with_resolved_proxy_shared_secret(
+    process: ProcessSettings,
+    workspace: WorkspaceConfig,
+    *,
+    content_root: Path,
+) -> ProcessSettings:
+    """Merge ``proxy_shared_secret`` from env or the workspace secrets chain.
+
+    Does **not** write ``os.environ`` (D41). Gateway callers inject the resolved
+    value via ``build_runtime_tool_bindings(proxy_shared_secret=…)``.
+
+    Args:
+        process (ProcessSettings): Env-derived process settings (possibly with URL merge).
+        workspace (WorkspaceConfig): Parsed ``sevn.json``.
+        content_root (Path): Workspace content root for secrets chain resolution.
+
+    Returns:
+        ProcessSettings: ``process`` or a copy with ``proxy_shared_secret`` filled.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_with_resolved_proxy_shared_secret)
+        True
+    """
+    if (process.proxy_shared_secret or "").strip():
+        return process
+    from sevn.agent.adapters.egress_bridge import resolve_proxy_shared_secret
+    from sevn.security.secrets.factory import secrets_chain_from_workspace
+
+    chain = secrets_chain_from_workspace(content_root, workspace.secrets_backend)
+    # Env already empty on ProcessSettings; force the chain awaitable path.
+    resolved = resolve_proxy_shared_secret(env={}, chain=chain)
+    proxy_secret = await resolved if asyncio.iscoroutine(resolved) else resolved
+    if proxy_secret and str(proxy_secret).strip():
+        return process.model_copy(update={"proxy_shared_secret": str(proxy_secret).strip()})
+    return process
+
+
 async def _prime_proxy_shared_secret_env(
     workspace: WorkspaceConfig,
     *,
     content_root: Path,
 ) -> None:
-    """Prime ``SEVN_PROXY_SHARED_SECRET`` from the workspace secrets chain when unset.
+    """Deprecated no-op: shared secret is no longer written to ``os.environ`` (D41).
+
+    Historical gateway boot primed the process environ from the secrets chain so
+    call sites could ``os.environ.get("SEVN_PROXY_SHARED_SECRET")``. That write-back
+    is deleted; use :func:`_with_resolved_proxy_shared_secret` and inject via
+    ``build_runtime_tool_bindings`` instead. Kept as a named symbol so older call
+    sites / imports fail closed without mutating global state.
 
     Args:
-        workspace (WorkspaceConfig): Parsed ``sevn.json``.
-        content_root (Path): Workspace content root for secrets chain resolution.
+        workspace (WorkspaceConfig): Parsed ``sevn.json`` (unused).
+        content_root (Path): Workspace content root (unused).
 
     Returns:
-        None: May set ``os.environ['SEVN_PROXY_SHARED_SECRET']``.
+        None
 
     Examples:
         >>> import inspect
         >>> inspect.iscoroutinefunction(_prime_proxy_shared_secret_env)
         True
     """
-    if os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip():
-        return
-    from sevn.security.secrets.errors import SecretsStoreCorruptError
-    from sevn.security.secrets.factory import secrets_chain_from_workspace
-
-    chain = secrets_chain_from_workspace(content_root, workspace.secrets_backend)
-    try:
-        proxy_secret = await chain.get_resilient("SEVN_PROXY_SHARED_SECRET")
-    except SecretsStoreCorruptError:
-        logger.warning(
-            "encrypted secrets store corrupt while priming SEVN_PROXY_SHARED_SECRET; "
-            "proxy guarded routes will fail closed until unlocked"
-        )
-        return
-    if proxy_secret and proxy_secret.strip():
-        os.environ["SEVN_PROXY_SHARED_SECRET"] = proxy_secret.strip()
+    _ = workspace, content_root
 
 
 async def _prime_unlock_env_and_warn(workspace: WorkspaceConfig, *, content_root: Path) -> None:
@@ -1222,9 +1251,13 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         ws, ly = _bootstrap_config()
         await _prime_unlock_env_and_warn(ws, content_root=ly.content_root)
-        await _prime_proxy_shared_secret_env(ws, content_root=ly.content_root)
         apply_tunnel_local_open_policy(ws)
         effective_process = _effective_process_settings(ws, resolved_process)
+        effective_process = await _with_resolved_proxy_shared_secret(
+            effective_process,
+            ws,
+            content_root=ly.content_root,
+        )
         from sevn.gateway.runtime.gateway_token import resolve_gateway_token_ref
 
         resolved_gateway_token = await resolve_gateway_token_ref(
@@ -1514,6 +1547,9 @@ def create_app(
             proxy_url=_proxy_url,
             session_token=(
                 effective_process.session_token if effective_process is not None else None
+            ),
+            proxy_shared_secret=(
+                effective_process.proxy_shared_secret if effective_process is not None else None
             ),
             oauth_credentials=_mcp_oauth,
             registry_fingerprint=_registry_fp,

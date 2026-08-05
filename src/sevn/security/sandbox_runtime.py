@@ -853,7 +853,9 @@ def _resolve_spawn_session_token(*, run_id: str, env: Mapping[str, str]) -> str:
         'keep'
     """
     existing = str(env.get("SEVN_SESSION_TOKEN", "")).strip()
-    secret = os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip()
+    from sevn.config.settings import ProcessSettings
+
+    secret = (ProcessSettings().proxy_shared_secret or "").strip()
     if existing:
         if secret:
             from sevn.proxy.auth import validate_session_token

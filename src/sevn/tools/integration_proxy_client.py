@@ -1,7 +1,7 @@
 """Egress-paired ``/integration`` client for gateway ``integration_call`` (Wave W2).
 
 Module: sevn.tools.integration_proxy_client
-Depends: os, sevn.config.settings, sevn.tools.context, sevn.tools.web
+Depends: sevn.config.settings, sevn.tools.context, sevn.tools.web
 
 Exports:
     IntegrationCredentialRequired — typed error when proxy secrets lack a provider token.
@@ -15,7 +15,6 @@ Examples:
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -180,8 +179,6 @@ def build_integration_proxy_client(
     if not url:
         return None
     secret = (proxy_shared_secret or "").strip() or None
-    if secret is None:
-        secret = os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip() or None
     token = (session_token or "").strip() or None
     return EgressIntegrationProxyClient(
         proxy_url=url,

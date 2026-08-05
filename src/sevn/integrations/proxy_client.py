@@ -1,7 +1,7 @@
 """Shared egress proxy ``/integration`` POST helper for skill libraries.
 
 Module: sevn.integrations.proxy_client
-Depends: httpx, os, sevn.config.settings, sevn.tools.web
+Depends: httpx, sevn.config.settings, sevn.tools.web
 
 Exports:
     integration_post_async — async POST to proxy ``/integration``.
@@ -11,7 +11,6 @@ Exports:
 from __future__ import annotations
 
 import asyncio
-import os
 from typing import Any
 
 from sevn.config.settings import ProcessSettings
@@ -21,7 +20,7 @@ _PROXY_INTEGRATION_PATH = "/integration"
 
 
 def _resolve_process_egress() -> tuple[str | None, str | None, str | None]:
-    """Read proxy URL, session token, and shared secret from process env.
+    """Read proxy URL, session token, and shared secret from ``ProcessSettings``.
 
     Returns:
         tuple[str | None, str | None, str | None]: Egress triple.
@@ -33,7 +32,7 @@ def _resolve_process_egress() -> tuple[str | None, str | None, str | None]:
     ps = ProcessSettings()
     proxy_url = (ps.proxy_url or "").strip() or None
     session_token = (ps.session_token or "").strip() or None
-    shared_secret = os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip() or None
+    shared_secret = (ps.proxy_shared_secret or "").strip() or None
     return proxy_url, session_token, shared_secret
 
 

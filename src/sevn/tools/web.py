@@ -8,6 +8,7 @@ Depends: asyncio, httpx, markdownify, sevn.config.settings, sevn.tools.base,
     sevn.tools.context, sevn.tools.decorator
 
 Exports:
+    ProxySharedSecretUnconfiguredError — guarded-route client missing shared secret.
     serp_tool — DuckDuckGo search via ``ddgs``.
     web_search_tool — Brave search via ``POST /web/brave/search`` on the egress proxy.
     get_page_content_tool — Fetch URL markdown via proxy + ``markdownify``.
@@ -33,7 +34,6 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import json
-import os
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlparse
 
@@ -94,6 +94,36 @@ _PROXY_HTTP_CLIENT_KEY: tuple[str, str, str] | None = None
 
 _WEB_TOOLS: tuple[Any, ...] = ()
 
+_PROXY_SECRET_UNCONFIGURED_MSG: Final[str] = (
+    "SEVN_PROXY_SHARED_SECRET is not configured; set it in the process environment, "
+    "put it via ``sevn secrets put SEVN_PROXY_SHARED_SECRET``, generate it during "
+    "compose bootstrap, or complete onboarding so the gateway can inject the resolved value"
+)
+
+
+class ProxySharedSecretUnconfiguredError(RuntimeError):
+    """Raised when a guarded-route client has no resolved ``SEVN_PROXY_SHARED_SECRET``.
+
+    Callers must not send an empty ``X-Sevn-Proxy-Token``; configure the secret
+    through process settings / the secrets chain / onboarding, then inject it.
+    """
+
+    def __init__(self, message: str | None = None) -> None:
+        """Name the variable and a concrete remedy in the error text.
+
+        Args:
+            message (str | None): Optional override; default names ``SEVN_PROXY_SHARED_SECRET``.
+
+        Returns:
+            None
+
+        Examples:
+            >>> err = ProxySharedSecretUnconfiguredError()
+            >>> "SEVN_PROXY_SHARED_SECRET" in str(err)
+            True
+        """
+        super().__init__(message or _PROXY_SECRET_UNCONFIGURED_MSG)
+
 
 def build_egress_web_headers(
     *,
@@ -101,16 +131,20 @@ def build_egress_web_headers(
     session_token: str | None,
     proxy_shared_secret: str | None,
 ) -> dict[str, str]:
-    """Build auth headers for egress proxy ``/web/*`` routes.
+    """Build auth headers for egress proxy ``/web/*`` / ``/integration`` routes.
 
     Args:
         proxy_url (str | None): Resolved ``SEVN_PROXY_URL`` (must be non-empty to call).
         session_token (str | None): Scoped per-run ``SEVN_SESSION_TOKEN`` sent as
             ``X-Sevn-Session-Token`` — not the long-lived gateway service secret.
-        proxy_shared_secret (str | None): Optional ``SEVN_PROXY_SHARED_SECRET`` guard value.
+        proxy_shared_secret (str | None): Resolved ``SEVN_PROXY_SHARED_SECRET`` guard value
+            (injected by the gateway; must be non-empty for guarded routes).
 
     Returns:
         dict[str, str]: Headers to merge on proxy POST requests.
+
+    Raises:
+        ProxySharedSecretUnconfiguredError: When ``proxy_shared_secret`` is missing/blank.
 
     Examples:
         >>> hdrs = build_egress_web_headers(
@@ -124,16 +158,18 @@ def build_egress_web_headers(
         'sec'
     """
     _ = proxy_url
+    secret = (proxy_shared_secret or "").strip()
+    if not secret:
+        raise ProxySharedSecretUnconfiguredError
     headers: dict[str, str] = {"Content-Type": "application/json"}
     if session_token and session_token.strip():
         headers[_SESSION_TOKEN_HEADER] = session_token.strip()
-    if proxy_shared_secret and proxy_shared_secret.strip():
-        headers[_PROXY_TOKEN_HEADER] = proxy_shared_secret.strip()
+    headers[_PROXY_TOKEN_HEADER] = secret
     return headers
 
 
 def _resolve_process_egress() -> tuple[str | None, str | None, str | None]:
-    """Read proxy URL, session token, and shared secret from process env.
+    """Read proxy URL, session token, and shared secret from ``ProcessSettings``.
 
     Returns:
         tuple[str | None, str | None, str | None]: ``(proxy_url, session_token, shared_secret)``.
@@ -145,7 +181,7 @@ def _resolve_process_egress() -> tuple[str | None, str | None, str | None]:
     ps = ProcessSettings()
     proxy_url = (ps.proxy_url or "").strip() or None
     session_token = (ps.session_token or "").strip() or None
-    shared_secret = os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip() or None
+    shared_secret = (ps.proxy_shared_secret or "").strip() or None
     return proxy_url, session_token, shared_secret
 
 
@@ -628,11 +664,24 @@ async def web_search_tool(
             error_envelope=_proxy_required_error(tool_name="web_search"),
         )
 
-    headers = build_egress_web_headers(
-        proxy_url=proxy_url,
-        session_token=session_token,
-        proxy_shared_secret=shared_secret,
-    )
+    try:
+        headers = build_egress_web_headers(
+            proxy_url=proxy_url,
+            session_token=session_token,
+            proxy_shared_secret=shared_secret,
+        )
+    except ProxySharedSecretUnconfiguredError as exc:
+        return await _serp_fallback_or_error(
+            ctx,
+            query=needle,
+            count=count,
+            reason=str(exc),
+            error_envelope=enveloped_failure(
+                str(exc),
+                code=ToolResultCode.PERMISSION_DENIED,
+                data={"fallback_tool": "serp"},
+            ),
+        )
     status, data = await proxy_post_json(
         proxy_url=proxy_url,
         path=_PROXY_BRAVE_PATH,
@@ -1122,6 +1171,7 @@ __all__ = [
     "DEFAULT_WEB_FETCH_MAX_CHARS",
     "HTML_FETCH_CHUNK_CHARS",
     "MAX_HTML_FETCH_CHARS",
+    "ProxySharedSecretUnconfiguredError",
     "build_egress_web_headers",
     "get_page_content_tool",
     "proxy_post_json",

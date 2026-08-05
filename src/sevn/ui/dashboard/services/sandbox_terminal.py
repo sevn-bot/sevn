@@ -285,9 +285,10 @@ async def create_sandbox_terminal_session(
     if session_token.strip():
         resolved_token = session_token.strip()
     else:
+        from sevn.config.settings import ProcessSettings
         from sevn.proxy.auth import SESSION_SCOPE_SANDBOX, mint_session_token
 
-        secret = os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip()
+        secret = (ProcessSettings().proxy_shared_secret or "").strip()
         resolved_token = (
             mint_session_token(
                 signing_key=secret,
