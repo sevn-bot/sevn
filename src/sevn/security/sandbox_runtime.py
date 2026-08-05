@@ -851,8 +851,23 @@ def _resolve_spawn_session_token(*, run_id: str, env: Mapping[str, str]) -> str:
             (env or generate-once file) to mint one.
 
     Examples:
-        >>> _resolve_spawn_session_token(run_id="r", env={"SEVN_SESSION_TOKEN": "keep"})
-        'keep'
+        Opaque env tokens are rejected when a signing key resolves (fail-closed):
+
+        >>> import os
+        >>> from sevn.security.sandbox_errors import SandboxConfigurationError
+        >>> _prev = os.environ.get("SEVN_PROXY_SHARED_SECRET")
+        >>> os.environ["SEVN_PROXY_SHARED_SECRET"] = "doctest-spawn-signing-key-32chars!!"
+        >>> _ok = False
+        >>> try:
+        ...     _resolve_spawn_session_token(run_id="r", env={"SEVN_SESSION_TOKEN": "keep"})
+        ... except SandboxConfigurationError as exc:
+        ...     _ok = "out of sandbox scope" in str(exc)
+        >>> if _prev is None:
+        ...     del os.environ["SEVN_PROXY_SHARED_SECRET"]
+        ... else:
+        ...     os.environ["SEVN_PROXY_SHARED_SECRET"] = _prev
+        >>> _ok
+        True
     """
     existing = str(env.get("SEVN_SESSION_TOKEN", "")).strip()
     from sevn.proxy.bootstrap_secret import resolve_effective_proxy_shared_secret
