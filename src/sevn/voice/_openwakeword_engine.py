@@ -83,7 +83,7 @@ def wake_word_model_loadable(wake_word: str) -> bool:
     """
     try:
         OpenWakeWordEngine(wake_word=wake_word)
-    except (WakeModelLoadError, ImportError):
+    except (WakeModelLoadError, ImportError, OSError, RuntimeError, TypeError, ValueError):
         return False
     return True
 
