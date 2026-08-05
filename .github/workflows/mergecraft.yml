@@ -310,6 +310,35 @@ jobs:
             echo "MERGECRAFT_PROMPT_EOF"
           } >> "${GITHUB_OUTPUT}"
 
+      - name: Record mergecraft-approval baseline before the Codex review
+        id: approval_baseline
+        # The fallback below must judge THIS Codex attempt, not a verdict an
+        # earlier run left on the same head SHA (a re-run, or the enforce step's
+        # own retry loop). Capturing the newest check-run id first makes "did
+        # Codex post a verdict?" answerable by identity rather than by recency.
+        if: >-
+          env.HAS_CODEX == 'true' &&
+          env.HAS_NOUS == 'true' &&
+          github.event_name == 'pull_request_target'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          id=""
+          for attempt in $(seq 1 3); do
+            if id="$(gh api "/repos/${REPO}/commits/${HEAD_SHA}/check-runs" \
+                --jq '[.check_runs[]? | select(.name == "mergecraft-approval")]
+                      | sort_by(.completed_at // .started_at) | last | .id // ""')"; then
+              break
+            fi
+            echo "check-runs baseline query failed (attempt ${attempt}/3); retrying in 3s…" >&2
+            sleep 3
+          done
+          echo "baseline mergecraft-approval check-run: ${id:-none}"
+          echo "id=${id}" >> "${GITHUB_OUTPUT}"
+
       - name: mergeCraft PR review (Codex)
         if: env.HAS_CODEX == 'true'
         id: mergecraft_codex
@@ -337,41 +366,57 @@ jobs:
           CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-      - name: Decide Nous fallback after Codex failure
+      - name: Decide Nous fallback after Codex
         id: fallback
+        # Deliberately NOT gated on steps.mergecraft_codex.outcome. The failure
+        # this fallback exists for — mergecraft-approval=neutral, the MCP
+        # handshake symptom — leaves the action exiting 0 while posting no
+        # usable verdict. Gating on a non-success outcome would skip the
+        # fallback in exactly that case and hand the enforce step a
+        # fail-closed no-verdict. Route on the verdict itself instead.
         if: >-
           env.HAS_CODEX == 'true' &&
-          steps.mergecraft_codex.outcome != 'success' &&
           env.HAS_NOUS == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           EVENT_NAME: ${{ github.event_name }}
+          BASELINE_ID: ${{ steps.approval_baseline.outputs.id }}
+          CODEX_OUTCOME: ${{ steps.mergecraft_codex.outcome }}
         run: |
           set -euo pipefail
           need="false"
           if [ "${EVENT_NAME}" = "pull_request_target" ]; then
-            conclusion=""
+            latest=""
             for attempt in $(seq 1 3); do
-              if conclusion="$(gh api "/repos/${REPO}/commits/${HEAD_SHA}/check-runs" \
+              if latest="$(gh api "/repos/${REPO}/commits/${HEAD_SHA}/check-runs" \
                   --jq '[.check_runs[]? | select(.name == "mergecraft-approval")]
-                        | sort_by(.completed_at // .started_at) | last | .conclusion // ""')"; then
+                        | sort_by(.completed_at // .started_at) | last
+                        | "\(.id // "")|\(.conclusion // "")"')"; then
                 break
               fi
               echo "check-runs query failed (attempt ${attempt}/3); retrying in 3s…" >&2
               sleep 3
             done
+            id="${latest%%|*}"
+            conclusion="${latest#*|}"
+            # A verdict only counts when the check-run is NOT the one that was
+            # already there before this Codex attempt ran.
+            if [ -n "${id}" ] && [ "${id}" = "${BASELINE_ID}" ]; then
+              echo "mergecraft-approval ${id} predates this Codex attempt — treating as no verdict."
+              conclusion=""
+            fi
             case "${conclusion}" in
               failure|success)
-                echo "mergecraft-approval=${conclusion} — Codex review completed; not falling back to Nous."
+                echo "mergecraft-approval=${conclusion} — Codex review posted a verdict; not falling back to Nous."
                 ;;
               *)
                 need="true"
-                echo "::notice title=mergecraft Nous fallback::Codex review did not complete; retrying with nous/deepseek/deepseek-v4-flash."
+                echo "::notice title=mergecraft Nous fallback::Codex review posted no verdict (action outcome: ${CODEX_OUTCOME}); retrying with nous/deepseek/deepseek-v4-flash."
                 ;;
             esac
-          else
+          elif [ "${CODEX_OUTCOME}" != "success" ]; then
             need="true"
             echo "::notice title=mergecraft Nous fallback::Codex review failed; retrying with nous/deepseek/deepseek-v4-flash."
           fi
