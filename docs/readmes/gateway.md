@@ -68,6 +68,18 @@ Key knobs (full schema: [`infra/sevn.schema.json`](../../infra/sevn.schema.json)
 
 Validate after edits: `sevn config validate`; `sevn doctor` for install health.
 
+### OpenAI-compatible API (`/v1`, #174)
+
+[`openai_compat_api.py`](../../src/sevn/gateway/api/openai_compat_api.py) mounts an OpenAI-shaped HTTP surface for external clients (Open WebUI, LobeChat, etc.).
+
+| Route | Auth | Behavior |
+| --- | --- | --- |
+| `POST /v1/chat/completions` | Bearer (`gateway.token`) | Stateless: each request mints a fresh ephemeral session, runs one agent turn, returns the assistant reply, then reaps the session row |
+| `GET /v1/models` | Bearer | Lists the configured default model id |
+| `GET /v1/health` | None | Liveness probe — `{"status": "ok"}` only |
+
+Concurrent requests with the **same** bearer token do not share chat history. Per-caller authorization scope still derives from the bearer digest (W13). `stream=true` returns 400 until SSE exists; `usage` counts and tool-role message sync follow the honesty limits documented in `GET /capabilities`.
+
 ### Key modules
 
 - [`agent_turn.py`](../../src/sevn/gateway/agent_turn.py) — [`build_agent_run_turn`](../../src/sevn/gateway/agent_turn.py#L706): production turn dispatch glue from triage through tier B/C/D

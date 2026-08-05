@@ -108,7 +108,7 @@ The agent should run `git status` / `git diff`, read recent `git log --oneline`,
 make commit-msg-check MSG='feat(scope): summary'
 ```
 
-**Repo rules:** `CLAUDE.md` and `.cursor/rules/sevn-coding-standards.mdc` point here for Python work; commit format is documented in `CLAUDE.md` as well.
+**Repo rules:** `CLAUDE.md` (gitignored locally) and operator-local `.cursor/rules/sevn-coding-standards.mdc` point here; Cursor hook templates: `docs/cursor-local-setup.md` for Python work; commit format is documented in `CLAUDE.md` as well.
 
 ## Using with Claude Code
 

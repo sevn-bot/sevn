@@ -86,4 +86,4 @@ HOOK
 fi
 
 echo "  primary-checkout commits: blocked by pre-commit hook unless SEVN_ALLOW_PRIMARY_COMMIT=1"
-echo "  wave work: use a linked worktree (see .cursor/rules/no-primary-checkout-work.mdc)"
+echo "  wave work: use a linked worktree (see docs/cursor-local-setup.md)"

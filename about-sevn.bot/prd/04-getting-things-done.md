@@ -7,8 +7,8 @@ owner: Alex
 summary: A general-purpose AI assistant earns its keep by doing things—answering questions,
   fetching pages, opening PRs, and acting on the operator's behalf via tools, skills,
   and tiered executors.
-last_updated: '2026-08-04'
-fingerprint: sha256:e42cdd115a4e781af3a9b1f7a8e455b18cb2b001ed69e1dc381836dc34e8f191
+last_updated: '2026-08-05'
+fingerprint: sha256:06e7660ca748a9c43a8ecd3c80fb0112cf87b01e19107888393df5e6ea51a423
 related:
 - prd-03-trust-and-control
 - prd-08-coding-companion

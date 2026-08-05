@@ -14,6 +14,7 @@ Exports:
     terminal_close_tool — tear down a session.
     register_terminal_tools — register terminal tools on a ``ToolExecutor``.
     reset_terminal_store_for_tests — clear in-memory sessions (tests only).
+    dispose_session_terminals — close and drop all terminals for one session (reap helper).
 
 Examples:
     >>> from sevn.tools.terminal import reset_terminal_store_for_tests
@@ -99,6 +100,27 @@ def _session_map(session_id: str) -> dict[str, TerminalSession]:
     return _sessions_by_gateway.setdefault(session_id, {})
 
 
+async def dispose_session_terminals(session_id: str) -> None:
+    """Close and drop all pexpect terminals for ``session_id`` (session reap helper).
+
+    Args:
+        session_id (str): Gateway session whose terminals should be torn down.
+
+    Returns:
+        None
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(dispose_session_terminals)
+        True
+    """
+    sessions = _sessions_by_gateway.pop(session_id, None)
+    if not sessions:
+        return
+    for session in list(sessions.values()):
+        await asyncio.to_thread(_close_sync, session)
+
+
 async def _ensure_session_terminal(
     ctx: ToolContext,
     *,
@@ -132,7 +154,10 @@ async def _ensure_session_terminal(
 
     existing = sessions.get(DEFAULT_SESSION_TERMINAL_ID)
     if existing is not None:
-        return DEFAULT_SESSION_TERMINAL_ID, existing
+        child = existing.child
+        if child is not None and child.isalive():
+            return DEFAULT_SESSION_TERMINAL_ID, existing
+        sessions.pop(DEFAULT_SESSION_TERMINAL_ID, None)
 
     work_cwd = ctx.workspace_path
     shell_path = _resolve_shell(None)
@@ -250,7 +275,7 @@ def _probe_spawn_health(child: Any, *, timeout_s: float = 5.0) -> tuple[bool, st
     return True, ""
 
 
-def _run_sync(*, child: Any, command: str, timeout_s: float) -> tuple[str, bool, int | None]:
+def _run_sync(*, child: Any, command: str, timeout_s: float) -> tuple[str, bool, int | None, bool]:
     """Send ``command`` to ``child`` and return captured output before the sentinel.
 
     Uses a per-command nonce sentinel so prompt-shaped output cannot spoof completion.
@@ -262,7 +287,8 @@ def _run_sync(*, child: Any, command: str, timeout_s: float) -> tuple[str, bool,
         timeout_s (float): Expect timeout in seconds.
 
     Returns:
-        tuple[str, bool, int | None]: Output (sentinel stripped), timeout flag, exit code.
+        tuple[str, bool, int | None, bool]: Output (sentinel stripped), timeout flag,
+            exit code, and whether SIGKILL was used on the shell.
 
     Examples:
         >>> import inspect
@@ -278,6 +304,7 @@ def _run_sync(*, child: Any, command: str, timeout_s: float) -> tuple[str, bool,
     pattern = re.compile(rf"{re.escape(sentinel)}:(\d+)")
     timed_out = False
     exit_code: int | None = None
+    shell_killed = False
 
     try:
         child.expect(pattern, timeout=timeout_s)
@@ -294,10 +321,11 @@ def _run_sync(*, child: Any, command: str, timeout_s: float) -> tuple[str, bool,
         except pexpect.exceptions.TIMEOUT:
             with contextlib.suppress(Exception):
                 child.kill(signal.SIGKILL)
+                shell_killed = True
 
     output = str(getattr(child, "before", "") or "")
     output = re.sub(rf"\n?{re.escape(sentinel)}:\d+\n?", "\n", output).strip()
-    return output, timed_out, exit_code
+    return output, timed_out, exit_code, shell_killed
 
 
 def _close_sync(session: TerminalSession) -> None:
@@ -544,7 +572,7 @@ async def terminal_run_tool(
         else min(max(1.0, timeout_s), MAX_TERMINAL_TIMEOUT_S)
     )
     try:
-        output, timed_out, exit_code = await asyncio.to_thread(
+        output, timed_out, exit_code, shell_killed = await asyncio.to_thread(
             _run_sync,
             child=session.child,
             command=body,
@@ -556,6 +584,8 @@ async def terminal_run_tool(
             code=ToolResultCode.INTERNAL_ERROR,
             data={"terminal_id": terminal_id, "command": body},
         )
+    if shell_killed:
+        _session_map(ctx.session_id).pop(terminal_id, None)
     payload: dict[str, object] = {
         "terminal_id": terminal_id,
         "command": body,
@@ -566,6 +596,8 @@ async def terminal_run_tool(
     if timed_out:
         payload["timed_out"] = True
         payload["partial"] = True
+    if shell_killed:
+        payload["session_destroyed"] = True
     return enveloped_success(payload)
 
 
@@ -638,6 +670,7 @@ def register_terminal_tools(executor: ToolExecutor) -> None:
 
 
 __all__ = [
+    "dispose_session_terminals",
     "register_terminal_tools",
     "reset_terminal_store_for_tests",
     "terminal_close_tool",

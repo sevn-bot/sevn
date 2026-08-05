@@ -28,9 +28,15 @@ This README separates **registered tool names** (what the model sees) from **mod
 | `sandbox_exec` | Sandboxed command execution | [`runtime_dispatch.py`](../../src/sevn/tools/runtime_dispatch.py) |
 | `memory_store`, `memory_get`, `memory_search` | Short-term memory K/V | [`memory_tools.py`](../../src/sevn/tools/memory_tools.py) |
 | `load_skill`, `run_skill_script` | Skills subprocess runners | [`skills_register.py`](../../src/sevn/tools/skills_register.py) |
+| `process`, `process output`, `process list`, `process kill` | Background shell jobs (bounded LRU + TTL) | [`process.py`](../../src/sevn/tools/process.py) |
+| `terminal_spawn`, `terminal_run`, `terminal_close` | Persistent interactive shell sessions | [`terminal.py`](../../src/sevn/tools/terminal.py) |
 | `log_query`, `semantic_search`, `llm_guard_scan` | Gateway observability / Witchcraft | respective modules under [`src/sevn/tools/`](../../src/sevn/tools/) |
 
 [`runtime_dispatch.py`](../../src/sevn/tools/runtime_dispatch.py): [`IntegrationProxyClient.integration_call`](../../src/sevn/tools/runtime_dispatch.py#L148) dispatches through the egress proxy [`POST /integration`](../../src/sevn/proxy/integration/router.py) route when enabled.
+
+**Process eviction (#175).** Background jobs share one shutdown path: SIGTERM to the process group, a grace wait, then SIGKILL. Explicit `process kill`, TTL expiry, and LRU eviction all call the same helper — a child that ignores SIGTERM cannot survive registry eviction.
+
+**Terminal timeout (#176).** When a `terminal_run` command exceeds its timeout, the shell receives SIGKILL. The JSON envelope sets `timed_out`, `partial`, and **`session_destroyed: true`**; the session is removed from the registry so the next call must `terminal_spawn` again. Dead default sessions are recreated transparently on the next `terminal_run`.
 
 Tools registered **outside** `source_globs` but wired at boot: [`register_code_understanding_tools`](../../src/sevn/code_understanding/tools_register.py) (e.g. legacy [`roam_code_tool`](../../src/sevn/code_understanding/tools_register.py#L228)), [`register_second_brain_tools`](../../src/sevn/second_brain/__init__.py#L562), [`register_openui_tools`](../../src/sevn/ui/openui/tools_register.py).
 

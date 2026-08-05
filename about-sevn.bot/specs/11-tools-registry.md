@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that every
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
-last_updated: '2026-08-04'
-fingerprint: sha256:bcc3f7ab28419655d21a4ca021de78d34d39d6b81d916b9dda528963ed130542
+last_updated: '2026-08-05'
+fingerprint: sha256:0c008a802f8807185dcdb635b8b3e82ea42c2b065e416c1763b4a8d9c2f7adce
 related: []
 sources:
 - src/sevn/tools/**
@@ -401,6 +401,9 @@ interfaces:
 - name: BackgroundJob
   file: src/sevn/tools/process.py
   symbol: BackgroundJob
+- name: dispose_session_background_jobs
+  file: src/sevn/tools/process.py
+  symbol: dispose_session_background_jobs
 - name: list_session_jobs
   file: src/sevn/tools/process.py
   symbol: list_session_jobs
@@ -512,6 +515,9 @@ interfaces:
 - name: TerminalSession
   file: src/sevn/tools/terminal.py
   symbol: TerminalSession
+- name: dispose_session_terminals
+  file: src/sevn/tools/terminal.py
+  symbol: dispose_session_terminals
 - name: register_terminal_tools
   file: src/sevn/tools/terminal.py
   symbol: register_terminal_tools
@@ -749,3 +755,17 @@ Gateway browser sessions persist cookies and login state via Chrome ``user-data-
 - [x] Repo-wide grep: no ``playwright-browser`` / ``playwright_browser`` / stale ``x-use`` doc refs in tracked sources except ``CHANGELOG.md`` history (2026-08-01 ✅: baseline @ ``9ac9a059``; product W7 replay verified 2026-08-03 on ``wave/product-b-docs``).
 - [x] CI gate ``make removed-browser-skills-check`` scans ``src/sevn/data/bundled_skills/`` + ``src/sevn/tools/registry.py`` (2026-08-01 ✅: ``scripts/check_removed_browser_skill_ids.py``; in ``make ci-skills``).
 - [x] Operator workspace cleanup documented in ``about-sevn.bot/specs/12-skills-system.md`` amendment — ``sevn sync`` + manual delete of stale ``skills/user/`` trees (2026-08-01 ✅).
+
+## Amendments (post-audit-0.0.1 W15 — #175, #176)
+
+**Process eviction (#175).** Background jobs registered by the ``process`` tool share
+``_shutdown_process_group`` (SIGTERM → grace → SIGKILL) across explicit stop, TTL cleanup,
+and LRU eviction. A child that ignores SIGTERM cannot outlive registry eviction.
+
+**Terminal teardown (#176).** When ``terminal_run`` hits its timeout and the shell receives
+SIGKILL, the tool envelope sets ``session_destroyed: true`` and removes the session from
+the registry. The next ``terminal_run`` must ``terminal_spawn`` again. ``_ensure_session_terminal``
+recreates a dead default session instead of returning a stale child.
+
+Regression: ``tests/tools/test_post_audit_process_evict_w14_red.py``,
+``tests/tools/test_post_audit_terminal_teardown_w14_red.py``.

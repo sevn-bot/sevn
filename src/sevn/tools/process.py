@@ -12,6 +12,7 @@ Exports:
     register_process_tools — register ``process`` on a ``ToolExecutor``.
     reset_process_store_for_tests — clear in-memory job tables (tests only).
     list_session_jobs — testable job listing helper.
+    dispose_session_background_jobs — stop and drop all jobs for one session (reap helper).
 
 Examples:
     >>> from sevn.tools.process import reset_process_store_for_tests
@@ -290,6 +291,59 @@ def list_session_jobs(session_id: str) -> list[dict[str, object]]:
     return rows
 
 
+async def _shutdown_process_group(proc: asyncio.subprocess.Process) -> None:
+    """SIGTERM a process group, wait, then SIGKILL on grace timeout.
+
+    Args:
+        proc (asyncio.subprocess.Process): Running child process.
+
+    Returns:
+        None
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_shutdown_process_group)
+        True
+    """
+    pgid: int | None = None
+    with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
+        pgid = os.getpgid(proc.pid)
+        os.killpg(pgid, signal.SIGTERM)
+    try:
+        await asyncio.wait_for(proc.wait(), timeout=_STOP_GRACE_S)
+    except TimeoutError:
+        if pgid is not None:
+            with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
+                os.killpg(pgid, signal.SIGKILL)
+        else:
+            proc.kill()
+        with contextlib.suppress(ProcessLookupError):
+            await proc.wait()
+
+
+async def dispose_session_background_jobs(session_id: str) -> None:
+    """Stop and drop all background jobs for ``session_id`` (session reap helper).
+
+    Args:
+        session_id (str): Gateway session whose jobs should be torn down.
+
+    Returns:
+        None
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(dispose_session_background_jobs)
+        True
+    """
+    jobs = _jobs_by_session.pop(session_id, None)
+    if not jobs:
+        return
+    await asyncio.gather(
+        *(_dispose_job_async(job) for job in jobs.values()),
+        return_exceptions=True,
+    )
+
+
 async def _dispose_job_async(job: BackgroundJob) -> None:
     """Stop a running job and await its pipe readers (registry eviction helper).
 
@@ -306,11 +360,7 @@ async def _dispose_job_async(job: BackgroundJob) -> None:
     """
     proc = job.proc
     if proc is not None and proc.returncode is None:
-        with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
-            pgid = os.getpgid(proc.pid)
-            os.killpg(pgid, signal.SIGTERM)
-        with contextlib.suppress(TimeoutError, ProcessLookupError):
-            await asyncio.wait_for(proc.wait(), timeout=_STOP_GRACE_S)
+        await _shutdown_process_group(proc)
     await _await_job_readers(job)
 
 
@@ -526,20 +576,7 @@ async def _stop_job(ctx: ToolContext, *, job_id: str) -> str:
         )
 
     job.status = "stopped"
-    pgid: int | None = None
-    with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
-        pgid = os.getpgid(proc.pid)
-        os.killpg(pgid, signal.SIGTERM)
-    try:
-        await asyncio.wait_for(proc.wait(), timeout=_STOP_GRACE_S)
-    except TimeoutError:
-        if pgid is not None:
-            with contextlib.suppress(ProcessLookupError, PermissionError, OSError):
-                os.killpg(pgid, signal.SIGKILL)
-        else:
-            proc.kill()
-        with contextlib.suppress(ProcessLookupError):
-            await proc.wait()
+    await _shutdown_process_group(proc)
     job.returncode = proc.returncode
     await _await_job_readers(job)
     return enveloped_success({"job_id": job_id, "status": job.status, "returncode": job.returncode})
@@ -790,6 +827,7 @@ def register_process_tools(executor: ToolExecutor) -> None:
 __all__ = [
     "ProcessAction",
     "ProcessActionInput",
+    "dispose_session_background_jobs",
     "list_session_jobs",
     "process_tool",
     "register_process_tools",
