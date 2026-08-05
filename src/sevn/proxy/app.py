@@ -234,6 +234,24 @@ def create_app(
     async def healthz(_request: Request) -> JSONResponse:
         return JSONResponse({"status": "ok"})
 
+    async def web_auth_check(_request: Request) -> JSONResponse:
+        """Guarded no-op for Compose authenticated healthchecks (C1.4 / D39).
+
+        Auth middleware enforces ``X-Sevn-Proxy-Token`` on ``/web/*``. This route
+        returns 200 without calling providers so the probe consumes no quota.
+
+        Args:
+            _request (Request): ASGI request (auth already enforced upstream).
+
+        Returns:
+            JSONResponse: ``{"status": "ok", "probe": "auth-check"}``.
+
+        Examples:
+            >>> web_auth_check.__name__
+            'web_auth_check'
+        """
+        return JSONResponse({"status": "ok", "probe": "auth-check"})
+
     async def bedrock_converse(request: Request) -> JSONResponse:
         cfg: ProxySettings = request.app.state.settings
         try:
@@ -547,6 +565,8 @@ def create_app(
         Route("/llm/openai/chat/completions", openai_chat_completions, methods=["POST"]),
         Route("/llm/openai/responses", openai_responses, methods=["POST"]),
         Route("/llm/bedrock/converse", bedrock_converse, methods=["POST"]),
+        # C1.4 / D39: guarded no-op for authenticated Compose healthcheck (no provider quota).
+        Route("/web/auth-check", web_auth_check, methods=["GET"]),
         Route("/web/fetch", web_fetch, methods=["POST"]),
         Route("/web/brave/search", web_brave_search, methods=["POST"]),
         Route("/integration", integration_post, methods=["POST"]),

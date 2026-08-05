@@ -24,6 +24,15 @@
 # ``SEVN_PROXY_SHARED_SECRET`` is unset; an explicitly set env value still wins.
 # Reuses sevn-operator-perms (not a sibling) so ``check-compose-default`` keeps the
 # three-service set and generation runs before ownership normalization.
+#
+# C1.3 / D38: ``make compose-up`` runs ``scripts/check_compose_operator_secrets.py``
+# before ``docker compose up``. Blank ``SEVN_PROXY_SHARED_SECRET`` is allowed so this
+# generate-once path satisfies the preflight (W5.3); explicit ``change-me`` / short
+# values for any of the three operator secrets still fail closed.
+#
+# C1.4 / D39: ``sevn-proxy`` healthcheck keeps ``/healthz`` (liveness) and probes
+# guarded ``GET /web/auth-check`` with ``X-Sevn-Proxy-Token`` (resolved env or file).
+# 503/401 → unhealthy. ``/web/auth-check`` is a no-op (no provider quota).
 
 x-operator-service-hardening: &operator-service-hardening
   security_opt:
@@ -97,12 +106,15 @@ services:
     expose:
       - "8787"
     healthcheck:
+      # Liveness: /healthz. Authenticated function (C1.4 / D39): GET /web/auth-check
+      # with X-Sevn-Proxy-Token from env or generate-once file; 401/503 → unhealthy.
+      # /web/auth-check is a guarded no-op — no provider quota.
       test:
         [
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=3)",
+          "import os, urllib.error, urllib.request; from pathlib import Path; urllib.request.urlopen('http://127.0.0.1:8787/healthz', timeout=3); s=(os.environ.get('SEVN_PROXY_SHARED_SECRET') or '').strip(); p=Path('/operator/.sevn/proxy-shared-secret'); s=s or (p.read_text(encoding='utf-8').strip() if p.is_file() else ''); req=urllib.request.Request('http://127.0.0.1:8787/web/auth-check', headers={'X-Sevn-Proxy-Token': s});\ntry:\n urllib.request.urlopen(req, timeout=3)\nexcept urllib.error.HTTPError as e:\n raise SystemExit(1) if e.code in (401, 503) else (_ for _ in ()).throw(e)",
         ]
       interval: 10s
       timeout: 5s

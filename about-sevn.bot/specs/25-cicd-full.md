@@ -432,7 +432,7 @@ and docs/skills/infra checks that block regressions before merge.
 | `make ci` | Full pre-merge gate (all tiers) |
 | `make ci-resume` / `make ci-reset` | Resumable / reset CI checkpoint |
 | `make ci-core` | lockcheck, lint, typecheck, pyright, test, doctest, security, build, doctor |
-| `make ci-infra` | config-schema, onboarding schemas, git guards, pipe-to-shell installer gate, manifests |
+| `make ci-infra` | config-schema, onboarding schemas, git guards, compose default + operator-secret preflight, pipe-to-shell installer gate, sandbox image tag check, manifests |
 | `make ci-docs` | about-site, readme, changelog, FAQ, skw spec/prd gates, telegram menu docs |
 | `make ci-skills` | skillspector + skill inventory checks |
 | `make ci-parity` | code-index, deploy report parity, mergecraft pin gate |
@@ -451,7 +451,7 @@ Docs tooling in scope: `src/sevn/docs/about/check.py` (`check_about_docs`),
 
 ## Data Model
 
-### `CI_STEPS` (39 ordered steps)
+### `CI_STEPS` (41 ordered steps)
 
 Defined in root `Makefile` — consumed by `make ci-resume` via `scripts/ci_resume.sh`.
 First infra step includes `make config-schema` against `infra/sevn.schema.json` goldens.
@@ -587,8 +587,14 @@ files instead of profiles. Each documented invocation must resolve to exactly
 | Headed GUI + noVNC | base + `docker/docker-compose.gui.yml` | `Dockerfile.gateway.gui` |
 
 ``make check-compose-default`` (in ``ci-infra``) validates all three file sets via
-``scripts/check-compose-default.sh``. Makefile targets ``compose-up``,
-``compose-browser-up``, and ``compose-gui-up`` route through the matching `-f` set;
+``scripts/check-compose-default.sh``. ``make check-compose-operator-secrets``
+(also ``ci-infra`` / ``CI_STEPS``) runs
+``scripts/check_compose_operator_secrets.py --self-check`` so empty /
+``change-me`` / short operator secrets cannot silently drift past the gate (C1.3 /
+D38). Makefile targets ``compose-up``, ``compose-browser-up``, and
+``compose-gui-up`` route through the matching `-f` set (variants call
+``compose-up`` with ``COMPOSE_FILES`` overridden) and run the same preflight
+against ``.env`` before containers start;
 ``COMPOSE_PROFILES`` browser+gui mutual exclusion remains a regression net for legacy callers.
 
 ## Amendments (post-audit-0.0.1 W10 — append-only)
