@@ -65,10 +65,12 @@ def test_build_egress_web_headers_raises_on_empty_secret() -> None:
 
 @pytest.mark.anyio
 async def test_web_process_egress_raises_when_secret_empty(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """W1.4 / tools/web.py: call-time failure before any proxy POST."""
     monkeypatch.setenv("SEVN_PROXY_URL", "http://127.0.0.1:8787")
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path))
     monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
     monkeypatch.delenv("SEVN_SESSION_TOKEN", raising=False)
 
@@ -82,6 +84,27 @@ async def test_web_process_egress_raises_when_secret_empty(
         await web_mod._proxy_web_fetch_single(url="https://example.com/page")
     post.assert_not_awaited()
     _assert_actionable(caught.value)
+
+
+def test_resolve_process_egress_reads_generate_once_file_when_env_blank(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Thermos T3: ProcessSettings env blank still resolves the SEVN_HOME generate-once file."""
+    from sevn.proxy.bootstrap_secret import ensure_proxy_shared_secret_file
+    from sevn.tools.web import _resolve_process_egress
+
+    file_secret = "file-backed-egress-secret-value-32b"
+    monkeypatch.setenv("SEVN_PROXY_URL", "http://127.0.0.1:8787")
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path))
+    monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
+    monkeypatch.delenv("SEVN_SESSION_TOKEN", raising=False)
+    ensure_proxy_shared_secret_file(tmp_path, secret=file_secret)
+
+    proxy_url, session_token, shared_secret = _resolve_process_egress()
+    assert proxy_url == "http://127.0.0.1:8787"
+    assert session_token is None
+    assert shared_secret == file_secret
 
 
 @pytest.mark.anyio
@@ -121,10 +144,12 @@ async def test_integration_proxy_client_raises_on_empty_secret() -> None:
 
 @pytest.mark.anyio
 async def test_integrations_proxy_client_raises_on_empty_secret(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """W1.4 / integrations/proxy_client.py: skill helper refuses empty secret."""
     monkeypatch.setenv("SEVN_PROXY_URL", "http://127.0.0.1:8787")
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path))
     monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
 
     from sevn.integrations import proxy_client as pc
@@ -141,10 +166,12 @@ async def test_integrations_proxy_client_raises_on_empty_secret(
 
 @pytest.mark.anyio
 async def test_github_hooks_raise_on_empty_secret(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """W1.4 / integrations/github_skill/hooks.py: GitHub proxy caller refuses empty secret."""
     monkeypatch.setenv("SEVN_PROXY_URL", "http://127.0.0.1:8787")
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path))
     monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
 
     from sevn.integrations.github_skill import hooks

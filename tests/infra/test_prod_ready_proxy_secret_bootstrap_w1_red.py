@@ -177,3 +177,46 @@ def test_explicit_env_takes_precedence_over_generated_file(
     monkeypatch.setenv("SEVN_PROXY_SHARED_SECRET", "explicit-operator-secret")
     effective = resolve(env=os.environ, state_root=operator_root)
     assert effective == "explicit-operator-secret"
+
+
+def test_ensure_helper_regenerates_blank_existing_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Thermos silent-empty: a blank generate-once file is treated as absent and rewritten."""
+    monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
+    module = _load_ensure_helper()
+    ensure = getattr(module, "ensure_proxy_shared_secret_file", None)
+    assert callable(ensure)
+    operator_root = tmp_path / "operator"
+    operator_root.mkdir()
+    path = Path(ensure(operator_root))
+    path.write_text("\n", encoding="utf-8")
+    assert path.read_text(encoding="utf-8").strip() == ""
+
+    rewritten = Path(ensure(operator_root))
+    assert rewritten == path
+    assert len(path.read_text(encoding="utf-8").strip()) >= 24
+
+
+def test_ensure_helper_overwrite_replaces_existing_secret(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Thermos T5: overwrite=True replaces an existing generate-once value (wizard rotation)."""
+    monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
+    module = _load_ensure_helper()
+    ensure = getattr(module, "ensure_proxy_shared_secret_file", None)
+    assert callable(ensure)
+    operator_root = tmp_path / "operator"
+    operator_root.mkdir()
+    first_secret = "a" * 32
+    second_secret = "b" * 32
+    path = Path(ensure(operator_root, secret=first_secret))
+    assert path.read_text(encoding="utf-8").strip() == first_secret
+
+    Path(ensure(operator_root, secret=second_secret, overwrite=True))
+    assert path.read_text(encoding="utf-8").strip() == second_secret
+    # Default generate-once must not clobber after rotation.
+    Path(ensure(operator_root))
+    assert path.read_text(encoding="utf-8").strip() == second_secret

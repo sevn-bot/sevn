@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
+
+import pytest
 
 from sevn.proxy.auth import SESSION_SCOPE_SANDBOX, mint_session_token, validate_session_token
+from sevn.proxy.bootstrap_secret import ensure_proxy_shared_secret_file
+from sevn.security.sandbox_errors import SandboxConfigurationError
 from sevn.security.sandbox_runtime import _resolve_spawn_session_token
-
-if TYPE_CHECKING:
-    import pytest
 
 _SIGNING_KEY = "spawn-test-signing-key-at-least-32-chars"
 
@@ -40,11 +41,28 @@ def test_resolve_spawn_session_token_mints_sandbox_scope_when_secret_set(
     )
 
 
-def test_resolve_spawn_session_token_returns_empty_without_secret(
+def test_resolve_spawn_session_token_raises_without_secret(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Fail-closed: no env and no generate-once file → SandboxConfigurationError (Thermos T2)."""
     monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
-    assert _resolve_spawn_session_token(run_id="run-empty", env={}) == ""
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path))
+    with pytest.raises(SandboxConfigurationError, match="SEVN_PROXY_SHARED_SECRET"):
+        _resolve_spawn_session_token(run_id="run-empty", env={})
+
+
+def test_resolve_spawn_session_token_mints_from_generate_once_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Compose default: blank env + generate-once file under SEVN_HOME still mints (T2)."""
+    monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path))
+    ensure_proxy_shared_secret_file(tmp_path, secret=_SIGNING_KEY)
+    token = _resolve_spawn_session_token(run_id="run-file", env={})
+    assert token.startswith("v1.")
+    assert validate_session_token(token, signing_key=_SIGNING_KEY, path="/web/fetch") is True
 
 
 def test_resolve_spawn_session_token_embeds_run_id_in_minted_payload(
