@@ -7,39 +7,43 @@
 # confirmed "success" (outstanding feedback, no check posted at all, and an
 # unreachable check-runs API after retries all fail closed — see that step).
 #
-# Provider priority (2026-08-05): Claude is primary again; Codex is the
-# one-shot fallback when Claude is absent or incomplete. Codex-only was tried
-# while Claude was disabled, but Codex 0.146 repeatedly reports the localhost
-# mergecraft MCP as "not ready" and posts mergecraft-approval=neutral
-# (alexhawat/mergeCraft#40) — that blocks every gated PR. DeepSeek V4 (via the
-# Nous Portal OpenAI-compatible endpoint — same model sevn.bot's own runtime
-# uses, see src/sevn/proxy/credentials.py) was investigated as the intended
-# first-choice reviewer and found NOT wireable from this workflow alone:
-#   - mergeCraft routes any model whose provider isn't anthropic/openai/google/
-#     cursor to its `opencode` harness (src/mergecraft/utils/agent_resolve.py
-#     resolve_runtime_agent()), which — while OpenCode CLI itself does support
-#     arbitrary custom OpenAI-compatible providers with a `baseURL` override —
-#     is not even installed in mergeCraft's production Docker image (its
-#     Dockerfile installs only @anthropic-ai/claude-code, @openai/codex, and
-#     @google/gemini-cli; no `opencode`/`opencode-ai` package).
-#   - Neither the Codex nor the OpenCode harness reads a base-URL override from
-#     any environment variable — both would need mergeCraft to write it into
-#     the CLI's own config (Codex's config.toml `model_providers`/
-#     `openai_base_url`, or OpenCode's `opencode.json` `provider.*.options.
-#     baseURL`), which mergeCraft's harness code does not currently expose via
-#     any action input/env var. Filed upstream: alexhawat/mergeCraft#71.
+# Provider priority: OpenAI (Codex) is primary; DeepSeek V4 Flash via the Nous
+# Portal is the one-shot fallback when Codex is absent or its review posts no
+# verdict. Claude is not used.
+#
+# Codex reviews previously posted mergecraft-approval=neutral because every tool
+# call failed with "MCP server 'mergecraft' was not ready for this step". Root
+# cause was in mergeCraft, not Codex: its MCP endpoint answered the
+# `notifications/initialized` NOTIFICATION with a JSON-RPC response object
+# carrying `"id": null`, which Codex's rmcp client cannot deserialize — the
+# transport worker quit fatally mid-handshake, so the server was never ready for
+# the rest of the session. Fixed upstream in alexhawat/mergeCraft#78 (the
+# endpoint now returns 202 with no body for notification-only POSTs).
+#
+# DeepSeek V4 Flash runs through the Nous Portal OpenAI-compatible endpoint — the
+# same model sevn.bot's own runtime uses (DEFAULT_NOUS_INFERENCE_BASE_URL /
+# NOUS_PORTAL_DEEPSEEK_V4_FLASH_MODEL_ID in src/sevn/config/defaults.py). It
+# reaches mergeCraft's `opencode` harness, not the Codex one: mergeCraft routes
+# any model whose provider isn't anthropic/openai/google/cursor to opencode
+# (src/mergecraft/utils/agent_resolve.py resolve_runtime_agent()), and the Codex
+# harness cannot stand in because Codex 0.146 dropped `wire_api = "chat"`
+# ("no longer supported; set wire_api = \"responses\"") while Nous Portal serves
+# only chat-completions. Both blockers are fixed upstream in
+# alexhawat/mergeCraft#79 (closes #57 and #71): the image now installs
+# `opencode-ai`, and the harness registers a custom OpenAI-compatible provider
+# from MERGECRAFT_CUSTOM_PROVIDER_BASE_URL + MERGECRAFT_CUSTOM_PROVIDER_API_KEY.
+# The provider id comes from the model prefix, so `nous/deepseek/deepseek-v4-flash`
+# registers provider `nous` serving `deepseek/deepseek-v4-flash`.
 #
 # mergeCraft reads the native GITHUB_EVENT_PATH, so the workflow just passes a
 # prompt — no ~mergecraft JSON payload needed.
 #
 # Auth (same-repo only — forks skip):
-#   - CLAUDE_CODE_OAUTH_TOKEN — Claude Pro/Max (`mergecraft auth claude`) — primary
-#   - CODEX_AUTH_JSON — ChatGPT/Codex subscription (`mergecraft auth codex`) — fallback
+#   - CODEX_AUTH_JSON — ChatGPT/Codex subscription (`mergecraft auth codex`) — primary
 #   - OPENAI_API_KEY — OpenAI API key (same Codex harness as CODEX_AUTH_JSON)
-# The job skips gracefully when none are set (e.g. fork PRs).
-# MiniMax is NOT Codex: it needs OPENCODE_API_KEY + model opencode/minimax-*
-# (separate OpenCode path; not wired here — see the opencode-harness note above,
-# which applies equally to MiniMax).
+#   - NOUS_API_KEY — Nous Portal API key — fallback (DeepSeek V4 Flash)
+# The job skips gracefully when none are set (e.g. fork PRs). Without
+# NOUS_API_KEY the fallback is inert and Codex is the only reviewer.
 #
 # Trigger: pull_request_target (not pull_request). GitHub skips pull_request
 # workflows when refs/pull/N/merge cannot be built (merge conflicts), which
@@ -218,11 +222,11 @@ jobs:
     timeout-minutes: 30
     env:
       IS_SAME_REPO: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
-      # Claude primary; Codex fallback when Claude auth is absent or the Claude
-      # review does not post a mergecraft-approval verdict (session limit, etc.).
-      HAS_CLAUDE_CODE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
+      # Codex primary; Nous/DeepSeek fallback when Codex auth is absent or the
+      # Codex review does not post a mergecraft-approval verdict.
       HAS_CODEX: ${{ (secrets.CODEX_AUTH_JSON != '' || secrets.OPENAI_API_KEY != '') && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
-      HAS_AUTH: ${{ (secrets.CLAUDE_CODE_OAUTH_TOKEN != '' || secrets.CODEX_AUTH_JSON != '' || secrets.OPENAI_API_KEY != '') && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
+      HAS_NOUS: ${{ secrets.NOUS_API_KEY != '' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
+      HAS_AUTH: ${{ (secrets.CODEX_AUTH_JSON != '' || secrets.OPENAI_API_KEY != '' || secrets.NOUS_API_KEY != '') && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
 
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
@@ -255,7 +259,7 @@ jobs:
           if [ "${{ env.IS_SAME_REPO }}" != "true" ]; then
             echo "::notice title=mergecraft skipped::Fork PR — review skipped (same as before)."
           else
-            echo '::notice title=mergecraft skipped::Configure CLAUDE_CODE_OAUTH_TOKEN (`mergecraft auth claude`) or CODEX_AUTH_JSON (`mergecraft auth codex`) to enable mergeCraft reviews.'
+            echo '::notice title=mergecraft skipped::Configure CODEX_AUTH_JSON (`mergecraft auth codex`), OPENAI_API_KEY, or NOUS_API_KEY to enable mergeCraft reviews.'
           fi
 
       # Composed in a step rather than inline in `with:` so the CI-context clause
@@ -306,9 +310,38 @@ jobs:
             echo "MERGECRAFT_PROMPT_EOF"
           } >> "${GITHUB_OUTPUT}"
 
-      - name: mergeCraft PR review (Claude)
-        if: env.HAS_CLAUDE_CODE == 'true'
-        id: mergecraft_claude
+      - name: Record mergecraft-approval baseline before the Codex review
+        id: approval_baseline
+        # The fallback below must judge THIS Codex attempt, not a verdict an
+        # earlier run left on the same head SHA (a re-run, or the enforce step's
+        # own retry loop). Capturing the newest check-run id first makes "did
+        # Codex post a verdict?" answerable by identity rather than by recency.
+        if: >-
+          env.HAS_CODEX == 'true' &&
+          env.HAS_NOUS == 'true' &&
+          github.event_name == 'pull_request_target'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          id=""
+          for attempt in $(seq 1 3); do
+            if id="$(gh api "/repos/${REPO}/commits/${HEAD_SHA}/check-runs" \
+                --jq '[.check_runs[]? | select(.name == "mergecraft-approval")]
+                      | sort_by(.completed_at // .started_at) | last | .id // ""')"; then
+              break
+            fi
+            echo "check-runs baseline query failed (attempt ${attempt}/3); retrying in 3s…" >&2
+            sleep 3
+          done
+          echo "baseline mergecraft-approval check-run: ${id:-none}"
+          echo "id=${id}" >> "${GITHUB_OUTPUT}"
+
+      - name: mergeCraft PR review (Codex)
+        if: env.HAS_CODEX == 'true'
+        id: mergecraft_codex
         continue-on-error: true
         # mergeCraft — full SHA pinned to the alexhawat/mergeCraft `pre-0.0.1` head.
         # The pin is MANDATORY, not a preference: sevn-bot enforces Actions SHA
@@ -317,75 +350,13 @@ jobs:
         # full-length commit SHA") before the review step runs. Bump this SHA and
         # `MERGECRAFT_REF` in the Makefile together — `make mergecraft-ref-check`
         # fails on one-sided bumps.
-        # bumped past f98aeb0 for Codex harness + @openai/codex image; 349f948 uses
-        # Codex permission profiles so read-only PR reviews can reach localhost MCP.
-        uses: alexhawat/mergeCraft@e5896a971068ad262ff06947dac4a7de4fa9929c # pre-0.0.1 (Codex no-GitHub-plugin preamble)
+        uses: alexhawat/mergeCraft@5d91dd1709746cbf7316d94395268ebf654b6c7b # pre-0.0.1
         with:
           prompt: ${{ steps.prompt.outputs.text }}
           # Must stay BELOW the job's timeout-minutes: when GitHub kills the job
           # first, the action never posts its `mergecraft` completion check and the
           # only diagnostic is lost. Leaving 5 min of headroom lets it exit
           # cleanly and report failure instead.
-          timeout: 25m
-          model: anthropic/claude-opus
-          push: disabled
-          shell: disabled
-          status_checks: enabled
-        env:
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-
-      - name: Decide Codex fallback after Claude failure
-        id: fallback
-        if: >-
-          env.HAS_CLAUDE_CODE == 'true' &&
-          steps.mergecraft_claude.outcome != 'success' &&
-          env.HAS_CODEX == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          EVENT_NAME: ${{ github.event_name }}
-        run: |
-          set -euo pipefail
-          need="false"
-          if [ "${EVENT_NAME}" = "pull_request_target" ]; then
-            conclusion=""
-            for attempt in $(seq 1 3); do
-              if conclusion="$(gh api "/repos/${REPO}/commits/${HEAD_SHA}/check-runs" \
-                  --jq '[.check_runs[]? | select(.name == "mergecraft-approval")]
-                        | sort_by(.completed_at // .started_at) | last | .conclusion // ""')"; then
-                break
-              fi
-              echo "check-runs query failed (attempt ${attempt}/3); retrying in 3s…" >&2
-              sleep 3
-            done
-            case "${conclusion}" in
-              failure|success)
-                echo "mergecraft-approval=${conclusion} — Claude review completed; not falling back to Codex."
-                ;;
-              *)
-                need="true"
-                echo "::notice title=mergecraft Codex fallback::Claude review did not complete (e.g. session limit); retrying with openai/gpt-codex."
-                ;;
-            esac
-          else
-            need="true"
-            echo "::notice title=mergecraft Codex fallback::Claude review failed; retrying with openai/gpt-codex."
-          fi
-          echo "need=${need}" >> "${GITHUB_OUTPUT}"
-
-      - name: mergeCraft PR review (Codex)
-        if: >-
-          env.HAS_AUTH == 'true' &&
-          (
-            env.HAS_CLAUDE_CODE != 'true' ||
-            steps.fallback.outputs.need == 'true'
-          )
-        id: mergecraft_codex
-        continue-on-error: true
-        uses: alexhawat/mergeCraft@e5896a971068ad262ff06947dac4a7de4fa9929c # pre-0.0.1 (Codex no-GitHub-plugin preamble)
-        with:
-          prompt: ${{ steps.prompt.outputs.text }}
           timeout: 25m
           model: openai/gpt-codex
           push: disabled
@@ -395,23 +366,102 @@ jobs:
           CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
+      - name: Decide Nous fallback after Codex
+        id: fallback
+        # Deliberately NOT gated on steps.mergecraft_codex.outcome. The failure
+        # this fallback exists for — mergecraft-approval=neutral, the MCP
+        # handshake symptom — leaves the action exiting 0 while posting no
+        # usable verdict. Gating on a non-success outcome would skip the
+        # fallback in exactly that case and hand the enforce step a
+        # fail-closed no-verdict. Route on the verdict itself instead.
+        if: >-
+          env.HAS_CODEX == 'true' &&
+          env.HAS_NOUS == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASELINE_ID: ${{ steps.approval_baseline.outputs.id }}
+          CODEX_OUTCOME: ${{ steps.mergecraft_codex.outcome }}
+        run: |
+          set -euo pipefail
+          need="false"
+          if [ "${EVENT_NAME}" = "pull_request_target" ]; then
+            latest=""
+            for attempt in $(seq 1 3); do
+              if latest="$(gh api "/repos/${REPO}/commits/${HEAD_SHA}/check-runs" \
+                  --jq '[.check_runs[]? | select(.name == "mergecraft-approval")]
+                        | sort_by(.completed_at // .started_at) | last
+                        | "\(.id // "")|\(.conclusion // "")"')"; then
+                break
+              fi
+              echo "check-runs query failed (attempt ${attempt}/3); retrying in 3s…" >&2
+              sleep 3
+            done
+            id="${latest%%|*}"
+            conclusion="${latest#*|}"
+            # A verdict only counts when the check-run is NOT the one that was
+            # already there before this Codex attempt ran.
+            if [ -n "${id}" ] && [ "${id}" = "${BASELINE_ID}" ]; then
+              echo "mergecraft-approval ${id} predates this Codex attempt — treating as no verdict."
+              conclusion=""
+            fi
+            case "${conclusion}" in
+              failure|success)
+                echo "mergecraft-approval=${conclusion} — Codex review posted a verdict; not falling back to Nous."
+                ;;
+              *)
+                need="true"
+                echo "::notice title=mergecraft Nous fallback::Codex review posted no verdict (action outcome: ${CODEX_OUTCOME}); retrying with nous/deepseek/deepseek-v4-flash."
+                ;;
+            esac
+          elif [ "${CODEX_OUTCOME}" != "success" ]; then
+            need="true"
+            echo "::notice title=mergecraft Nous fallback::Codex review failed; retrying with nous/deepseek/deepseek-v4-flash."
+          fi
+          echo "need=${need}" >> "${GITHUB_OUTPUT}"
+
+      - name: mergeCraft PR review (Nous DeepSeek V4 Flash)
+        if: >-
+          env.HAS_NOUS == 'true' &&
+          (
+            env.HAS_CODEX != 'true' ||
+            steps.fallback.outputs.need == 'true'
+          )
+        id: mergecraft_nous
+        continue-on-error: true
+        uses: alexhawat/mergeCraft@5d91dd1709746cbf7316d94395268ebf654b6c7b # pre-0.0.1
+        with:
+          prompt: ${{ steps.prompt.outputs.text }}
+          timeout: 25m
+          # Provider prefix `nous/` selects the opencode harness and names the
+          # provider registered from the MERGECRAFT_CUSTOM_PROVIDER_* env vars.
+          model: nous/deepseek/deepseek-v4-flash
+          push: disabled
+          shell: disabled
+          status_checks: enabled
+        env:
+          MERGECRAFT_CUSTOM_PROVIDER_BASE_URL: https://inference-api.nousresearch.com/v1
+          MERGECRAFT_CUSTOM_PROVIDER_API_KEY: ${{ secrets.NOUS_API_KEY }}
+
       - name: mergeCraft review incomplete (non-fatal)
         if: >-
           env.HAS_AUTH == 'true' &&
           (
             (
-              env.HAS_CLAUDE_CODE == 'true' &&
-              steps.mergecraft_claude.outcome != 'success' &&
+              env.HAS_CODEX == 'true' &&
+              steps.mergecraft_codex.outcome != 'success' &&
               steps.fallback.outputs.need != 'true'
             ) ||
             (
-              env.HAS_CLAUDE_CODE == 'true' &&
+              env.HAS_CODEX == 'true' &&
               steps.fallback.outputs.need == 'true' &&
-              steps.mergecraft_codex.outcome != 'success'
+              steps.mergecraft_nous.outcome != 'success'
             ) ||
             (
-              env.HAS_CLAUDE_CODE != 'true' &&
-              steps.mergecraft_codex.outcome != 'success'
+              env.HAS_CODEX != 'true' &&
+              steps.mergecraft_nous.outcome != 'success'
             )
           )
         run: |
@@ -423,10 +473,10 @@ jobs:
         # hiccup even when the review + approval check posted fine). Runs on every
         # PR where auth is present.
         #
-        # FAIL CLOSED on every non-success outcome. PR #194 showed both Claude
-        # (weekly session limit) and Codex (bwrap sandbox namespace failure) can
-        # fail in the same run, posting no `mergecraft-approval` check at all — the
-        # prior version treated that ("no check posted") and a check-runs API
+        # FAIL CLOSED on every non-success outcome. PR #194 showed the review can
+        # fail outright (there, a bwrap sandbox namespace failure), posting no
+        # `mergecraft-approval` check at all — the prior version treated that
+        # ("no check posted") and a check-runs API
         # outage identically as fail-open, so a PR could merge with zero review
         # signal and nothing visibly red. The only passing outcome now is a
         # definitive conclusion=success: a review that actually ran and approved.
@@ -475,11 +525,10 @@ jobs:
               exit 1
               ;;
             *)
-              # No mergecraft-approval check at all: the review pipeline (Claude,
-              # and on fallback, Codex) failed to produce any verdict — e.g.
-              # PR #194, where a Claude rate limit and a Codex sandbox crash left
-              # zero review signal. Fail closed rather than merge unreviewed.
-              echo "::error title=mergecraft review incomplete::No mergecraft-approval check on ${HEAD_SHA} — the review did not complete (both providers may have failed; see the review job's logs). Failing closed: this gate only passes once mergeCraft has actually reviewed and approved."
+              # No mergecraft-approval check at all: the review failed to produce
+              # any verdict — e.g. PR #194, where a Codex sandbox crash left zero
+              # review signal. Fail closed rather than merge unreviewed.
+              echo "::error title=mergecraft review incomplete::No mergecraft-approval check on ${HEAD_SHA} — the review did not complete (see the review job's logs). Failing closed: this gate only passes once mergeCraft has actually reviewed and approved."
               exit 1
               ;;
           esac
