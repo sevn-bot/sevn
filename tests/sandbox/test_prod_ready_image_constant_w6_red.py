@@ -6,7 +6,7 @@ Contracts (``about-sevn.bot/specs/08-sandbox.md``):
 - Schema either defines ``sandbox.docker_image`` or documents that only ``rlm.docker_image``
   is honoured — a plausible silent no-op key is the defect.
 
-W6.1-W6.3 green after W7; W6.4-W6.7 remain xfail -> W8 in sibling suite.
+W6.1-W6.3 green after W7; W6.4-W6.7 green after W8 (sibling suite).
 """
 
 from __future__ import annotations

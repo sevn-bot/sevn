@@ -9,12 +9,11 @@ Contracts (``about-sevn.bot/specs/08-sandbox.md``):
 
 Hard constraint (D43): pull-then-pin and the empty-``RepoDigests`` fail-closed path stay
 unchanged — covered by ``tests/sandbox/test_post_audit_image_pin_w4_red.py`` (W6.8).
-
-xfail → W8.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -37,9 +36,19 @@ _RELEASE_DIGEST = (
 
 def _workspace(tmp_path: Path) -> Path:
     ws = tmp_path / "workspace"
-    ws.mkdir()
-    (ws / ".llmignore").mkdir()
+    ws.mkdir(parents=True, exist_ok=True)
+    (ws / ".llmignore").mkdir(exist_ok=True)
     return ws
+
+
+@pytest.fixture(autouse=True)
+def _clear_sandbox_image_digest_cache() -> Iterator[None]:
+    """Isolate process-lifetime cache from sibling suites sharing the same mock tag."""
+    from sevn.security import sandbox_runtime as mod
+
+    mod._SANDBOX_IMAGE_DIGEST_CACHE.clear()
+    yield
+    mod._SANDBOX_IMAGE_DIGEST_CACHE.clear()
 
 
 async def _spawn_once(
@@ -122,7 +131,6 @@ def _import_image_ready_api() -> Any:
     return ensure, refresh
 
 
-@pytest.mark.xfail(reason="green after W8: N spawns produce exactly one docker pull", strict=False)
 @pytest.mark.asyncio
 async def test_w6_4_n_spawns_produce_exactly_one_pull(
     monkeypatch: pytest.MonkeyPatch,
@@ -144,10 +152,6 @@ async def test_w6_4_n_spawns_produce_exactly_one_pull(
     )
 
 
-@pytest.mark.xfail(
-    reason="green after W8: resolve once at startup; local digest spawn pulls zero",
-    strict=False,
-)
 @pytest.mark.asyncio
 async def test_w6_5_startup_resolves_once_and_local_digest_skips_pull(
     monkeypatch: pytest.MonkeyPatch,
@@ -166,12 +170,16 @@ async def test_w6_5_startup_resolves_once_and_local_digest_skips_pull(
         _ = timeout_s, stdin
         captured.append(list(argv))
         joined = " ".join(argv)
+        if "network" in argv and argv[1:3] == ["network", "create"]:
+            return 0, "", ""
         if "pull" in argv:
             return 0, "", ""
         if "image" in argv and "inspect" in argv:
             if "RepoDigests" in joined or _DIGEST in joined or _TAG in joined:
                 return 0, _DIGEST, ""
             return 0, _DIGEST, ""
+        if len(argv) > 1 and argv[1] == "run":
+            return 0, "container-id-abc", ""
         return 0, "", ""
 
     monkeypatch.setattr("sevn.security.sandbox_runtime._docker_run", fake_docker_run)
@@ -199,10 +207,6 @@ async def test_w6_5_startup_resolves_once_and_local_digest_skips_pull(
     )
 
 
-@pytest.mark.xfail(
-    reason="green after W8: explicit refresh_sandbox_image is the only cache refresh path",
-    strict=False,
-)
 @pytest.mark.asyncio
 async def test_w6_6_explicit_image_update_is_only_cache_refresh(
     monkeypatch: pytest.MonkeyPatch,
@@ -241,10 +245,6 @@ async def test_w6_6_explicit_image_update_is_only_cache_refresh(
     assert pull_targets.count(_TAG) == 2
 
 
-@pytest.mark.xfail(
-    reason="green after W8: startup refuses when release digest absent and pull fails",
-    strict=False,
-)
 @pytest.mark.asyncio
 async def test_w6_7_startup_refuses_when_release_digest_absent(
     monkeypatch: pytest.MonkeyPatch,

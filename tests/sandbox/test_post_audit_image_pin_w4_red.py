@@ -7,6 +7,7 @@ Contracts: pull-then-pin with ``RepoDigests`` only; fail closed when digests mis
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,16 @@ from sevn.security.sandbox_runtime import (
 _DIGEST = "example/sandbox@sha256:abc123deadbeef0123456789abcdef0123456789abcdef0123456789ab"
 _TAG = "fresh-registry.example/sandbox:v1"
 _IMAGE_ID = "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+
+
+@pytest.fixture(autouse=True)
+def _clear_sandbox_image_digest_cache() -> Iterator[None]:
+    """W8 process-lifetime cache must not leak across pin-contract cases (D43)."""
+    from sevn.security import sandbox_runtime as mod
+
+    mod._SANDBOX_IMAGE_DIGEST_CACHE.clear()
+    yield
+    mod._SANDBOX_IMAGE_DIGEST_CACHE.clear()
 
 
 class _RecordingTraceSink(TraceSink):
