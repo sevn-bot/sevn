@@ -29,7 +29,7 @@ import sys
 from collections.abc import Mapping
 from pathlib import Path
 
-PROXY_SHARED_SECRET_RELPATH = ".sevn/proxy-shared-secret"
+PROXY_SHARED_SECRET_RELPATH = ".sevn/proxy-shared-secret"  # nosec B105 — path segment, not a credential
 """Path under the operator state root (``SEVN_HOME`` / compose ``/operator``)."""
 
 OPERATOR_SECRET_UID = 10001
