@@ -57,10 +57,6 @@ async def test_create_app_fail_closed_503_without_bootstrap_file_or_env(
 
 
 @pytest.mark.anyio
-@pytest.mark.xfail(
-    reason="green after A-V1: create_app loads bootstrap secret without workspace",
-    strict=False,
-)
 async def test_create_app_loads_bootstrap_secret_file_without_workspace(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
