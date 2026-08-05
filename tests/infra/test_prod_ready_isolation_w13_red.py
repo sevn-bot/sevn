@@ -228,7 +228,6 @@ def _env_mapping(cfg: dict[str, Any]) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W14: remove --no-sandbox from overlays (C8.1)", strict=False)
 def test_no_compose_file_passes_no_sandbox() -> None:
     """W13.2 / C8.1: every compose YAML must not set ``--no-sandbox`` outside comments."""
     offenders: list[str] = []
@@ -251,9 +250,6 @@ def test_no_compose_file_passes_no_sandbox() -> None:
         pytest.param(_GUI_OVERRIDE, id="gui-override"),
     ],
 )
-@pytest.mark.xfail(
-    reason="green after W14: delete stale --no-sandbox comments (C8.2)", strict=False
-)
 def test_browser_gui_overrides_drop_stale_no_sandbox_comments(path: Path) -> None:
     """W13.3 / C8.2: browser/gui overrides must not claim Brave runs with ``--no-sandbox``."""
     assert path.is_file(), f"missing override {path}"
@@ -271,10 +267,6 @@ def test_browser_gui_overrides_drop_stale_no_sandbox_comments(path: Path) -> Non
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    reason="green after W14: re-justify or drop IsolateOrigins site-per-process (C8.4)",
-    strict=False,
-)
 def test_site_isolation_flag_removed_or_documented() -> None:
     """W13.4 / C8.4: login-grade IsolateOrigins is gone or justified in docs."""
     assert _site_isolation_justified(), (
