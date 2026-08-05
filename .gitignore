@@ -21,6 +21,9 @@ docs/*
 !docs/faq/
 !docs/faq/**
 !docs/FAQ.md
+!docs/cursor-local-setup.md
+!docs/templates/
+!docs/templates/**
 
 # --- Operator-private (details not listed here) ---
 .ignorelocal/
