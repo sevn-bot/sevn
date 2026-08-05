@@ -735,10 +735,10 @@ async def _prime_proxy_shared_secret_env(
     *,
     content_root: Path,
 ) -> None:
-    """Deprecated no-op: shared secret is no longer written to ``os.environ`` (D41).
+    """Deprecated no-op: shared secret is no longer written into process environ (D41).
 
     Historical gateway boot primed the process environ from the secrets chain so
-    call sites could ``os.environ.get("SEVN_PROXY_SHARED_SECRET")``. That write-back
+    call sites could re-read the shared secret from the environment. That write-back
     is deleted; use :func:`_with_resolved_proxy_shared_secret` and inject via
     ``build_runtime_tool_bindings`` instead. Kept as a named symbol so older call
     sites / imports fail closed without mutating global state.
