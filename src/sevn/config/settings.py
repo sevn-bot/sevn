@@ -31,6 +31,7 @@ PROCESS_SETTINGS_ENV_VAR_NAMES: frozenset[str] = frozenset(
         "SEVN_GATEWAY_TOKEN",
         "SEVN_GATEWAY_URL",
         "SEVN_PROXY_URL",
+        "SEVN_PROXY_SHARED_SECRET",
         "SEVN_SESSION_TOKEN",
         "SEVN_WORKSPACE",
         "SEVN_UNSAFE_PARTIAL_HOOKS",
@@ -75,6 +76,14 @@ class ProcessSettings(BaseSettings):
     proxy_url: str | None = Field(
         default=None,
         validation_alias=AliasChoices("SEVN_PROXY_URL"),
+    )
+    proxy_shared_secret: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("SEVN_PROXY_SHARED_SECRET"),
+        description=(
+            "Gateway↔proxy shared secret for ``X-Sevn-Proxy-Token``; also resolvable "
+            "from the workspace secrets chain (``specs/06-secrets.md``, ``specs/07``)."
+        ),
     )
     session_token: str | None = Field(
         default=None,

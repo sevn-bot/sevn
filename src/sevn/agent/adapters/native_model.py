@@ -673,7 +673,11 @@ def default_native_model_context(
         >>> ctx.model_id
         'minimax/MiniMax-M2'
     """
-    secret = shared_secret if shared_secret is not None else resolve_proxy_shared_secret()
+    secret = (
+        shared_secret
+        if shared_secret is not None
+        else cast("str | None", resolve_proxy_shared_secret())
+    )
     return NativeModelContext(
         slot=slot,
         model_id=model_id,

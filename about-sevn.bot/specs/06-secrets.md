@@ -7,7 +7,7 @@ owner: Alex
 summary: 'Deliver a single trust boundary for credentials: backend modules + TTL cache
   under src/sevn/security/, wired exclusively by the egress proxy (src/sevn/proxy/)
   so agent-facing processes never see raw k'
-last_updated: '2026-08-01'
+last_updated: '2026-08-05'
 fingerprint: sha256:47a57b87fdbf7a2098ab3259c8365268c1f5492e2ddd24439a2cb532a72eb038
 related: []
 sources:
@@ -219,6 +219,17 @@ Pass foundation reads + write paths: mocked `PassService` / Typer paths in `test
 Telegram `/config` Access section lists, removes, and unlocks secrets from the menu;
 ``export-secrets`` bundle export uses a two-step confirm gate before writing the archive.
 Host-only secret flows post copy-paste CLI cards when the gateway cannot execute them (D17).
+
+## Amendments (prod-readiness-0.0.1 W2 — C1.5)
+
+Gateway and proxy share one logical id for the egress shared secret:
+``SEVN_PROXY_SHARED_SECRET``. Resolution order on both sides: non-empty process env
+(external secret managers) wins; otherwise the workspace secrets chain
+(``SecretsChain.get_resilient``). Gateway seam:
+``sevn.agent.adapters.egress_bridge.resolve_proxy_shared_secret(..., chain=…)``.
+Proxy seam: ``sevn.proxy.credentials._resolve_proxy_shared_secret`` via
+``build_proxy_settings``. ``ProxySettings.proxy_shared_secret`` keeps its
+``AliasChoices`` env binding so Compose / operators can still inject the env var.
 
 ## Human-input needed
 

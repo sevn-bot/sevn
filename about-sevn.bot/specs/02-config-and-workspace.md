@@ -8,7 +8,7 @@ summary: 'Provide a single, testable configuration surface before storage, traci
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
 last_updated: '2026-08-05'
-fingerprint: sha256:410bc60454e3d961d7eb35cd53250ba68de92d7a5ac15d091b9ac561b779828d
+fingerprint: sha256:4e144923b209fb4050a1ce7676dbee9d39707de2672d9fb48b9fc6edb47b3c1a
 related: []
 sources:
 - src/sevn/config/**
@@ -1067,3 +1067,13 @@ behaviour). When ``false`` (default), loopback clients must present the boot
 ``dashboard-local-token`` even when ``dashboard.local_open`` is effective.
 Schema: ``infra/sevn.schema.json`` under ``dashboard``; model:
 ``DashboardWorkspaceConfig.local_open_trust_address``.
+
+## Amendments (prod-readiness-0.0.1 W2 — C3.1)
+
+``SEVN_PROXY_SHARED_SECRET`` is a member of ``PROCESS_SETTINGS_ENV_VAR_NAMES`` and
+parses into ``ProcessSettings.proxy_shared_secret`` (env alias
+``SEVN_PROXY_SHARED_SECRET``). Schema mirrors the field via
+``x-sevn-process-settings-env`` and ``process_settings: true`` on the matching
+``x-sevn-env-allowlist`` row in ``infra/sevn.schema.json``. The variable remains
+valid outside ``sevn.json`` (runtime / Compose / secret managers); it is no longer
+beside the audited process-settings contract.

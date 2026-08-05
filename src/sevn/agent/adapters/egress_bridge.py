@@ -5,7 +5,7 @@ Depends: httpx, sevn.agent.providers.transport, sevn.agent.providers.transport_h
     sevn.agent.tracing.redacting_sink, sevn.agent.tracing.sink, sevn.proxy.forward
 
 Exports:
-    resolve_proxy_shared_secret — read ``SEVN_PROXY_SHARED_SECRET`` from process env.
+    resolve_proxy_shared_secret — env-first, then workspace secrets chain (gateway seam).
     EgressBridgeContext — trace + correlation fields for provider checkpoints.
     redact_llm_request_snapshot — redact headers/body like the proxy transport path.
     redact_httpx_request_snapshot — redact one outbound httpx request for trace attrs.
@@ -37,11 +37,13 @@ from sevn.agent.tracing.provider_call import emit_provider_call
 from sevn.agent.tracing.redacting_sink import TraceRedactionPolicy, redact_attrs
 from sevn.agent.tracing.sink import TraceEvent, TraceSink
 from sevn.proxy.forward import redact_headers
+from sevn.security.secrets.errors import SecretsStoreCorruptError, SecretUnresolvedError
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Coroutine, Mapping
 
     from sevn.agent.providers.transport import _ProxyTransport
+    from sevn.security.secrets.chain import SecretsChain
 
 PROXY_TOKEN_HEADER = "X-Sevn-Proxy-Token"  # nosec B105 — HTTP header name, not a secret
 """Header carrying the gateway→proxy shared secret (``specs/07-egress-proxy.md``)."""
@@ -52,14 +54,24 @@ _EGRESS_START_NS_EXTENSION_KEY = "sevn_egress_start_ns"
 _DEFAULT_TIMEOUT = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=10.0)
 
 
-def resolve_proxy_shared_secret(*, env: Mapping[str, str] | None = None) -> str | None:
-    """Return ``SEVN_PROXY_SHARED_SECRET`` when set and non-empty.
+def resolve_proxy_shared_secret(
+    *,
+    env: Mapping[str, str] | None = None,
+    chain: SecretsChain | None = None,
+) -> str | None | Coroutine[Any, Any, str | None]:
+    """Return ``SEVN_PROXY_SHARED_SECRET`` from process env, else the secrets chain.
+
+    Mirrors proxy ``_resolve_proxy_shared_secret``: explicit env (external secret
+    managers) wins; when env is empty and ``chain`` is provided, consult the
+    workspace secrets chain asynchronously.
 
     Args:
         env (mapping | None): Env mapping; defaults to ``os.environ``.
+        chain (SecretsChain | None): Optional workspace secrets chain.
 
     Returns:
-        str | None: Stripped secret text or ``None`` when unset.
+        str | None | Coroutine: Stripped secret, ``None`` when unset without a
+        chain, or an awaitable that resolves the chain when env is empty.
 
     Examples:
         >>> resolve_proxy_shared_secret(env={"SEVN_PROXY_SHARED_SECRET": "  tok  "})
@@ -70,7 +82,35 @@ def resolve_proxy_shared_secret(*, env: Mapping[str, str] | None = None) -> str 
     mapping = os.environ if env is None else env
     raw = mapping.get("SEVN_PROXY_SHARED_SECRET", "")
     text = raw.strip() if isinstance(raw, str) else ""
-    return text or None
+    if text:
+        return text
+    if chain is None:
+        return None
+    return _resolve_proxy_shared_secret_from_chain(chain)
+
+
+async def _resolve_proxy_shared_secret_from_chain(chain: SecretsChain) -> str | None:
+    """Resolve ``SEVN_PROXY_SHARED_SECRET`` from the workspace secrets chain.
+
+    Args:
+        chain (SecretsChain): Workspace secrets chain.
+
+    Returns:
+        str | None: Trimmed shared secret when stored under the logical id.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_resolve_proxy_shared_secret_from_chain)
+        True
+    """
+    try:
+        value = await chain.get_resilient("SEVN_PROXY_SHARED_SECRET")
+    except SecretUnresolvedError:
+        return None
+    except SecretsStoreCorruptError:
+        return None
+    trimmed = (value or "").strip()
+    return trimmed or None
 
 
 @dataclass(frozen=True)
