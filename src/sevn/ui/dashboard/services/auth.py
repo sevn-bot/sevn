@@ -285,13 +285,16 @@ def local_open_effective(workspace: WorkspaceConfig, request: Request | WebSocke
         return False
     if not direct_loopback_client(request):
         return False
+    section = _dashboard_section(workspace)
+    if section is not None and bool(getattr(section, "local_open_trust_address", False)):
+        return True
     scope = getattr(request, "scope", None)
     app = scope.get("app") if isinstance(scope, dict) else getattr(request, "app", None)
     expected = getattr(app.state, "dashboard_local_token", None) if app is not None else None
     submitted = dashboard_local_token_from_request(request)
-    if expected and submitted:
-        return verify_dashboard_local_token(expected=str(expected), submitted=submitted)
-    return submitted is None
+    if not expected or not submitted:
+        return False
+    return verify_dashboard_local_token(expected=str(expected), submitted=submitted)
 
 
 def synthetic_owner_claims(workspace: WorkspaceConfig) -> DashboardClaims:

@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import json
-import sqlite3
 
 import httpx
 import pytest
-from starlette.testclient import TestClient
+from tests.cli.dashboard_testutil import patch_dashboard_gateway
 from typer.testing import CliRunner
 
 import sevn.cli.dashboard_api_client as dashboard_api_client_mod
@@ -15,11 +14,7 @@ from sevn.cli.app import app
 from sevn.cli.commands.voice_cmd import _voice_settings_snapshot
 from sevn.cli.help.panels import panel_for
 from sevn.config.llm_params import LLM_PARAMS_FILENAME
-from sevn.config.settings import ProcessSettings
-from sevn.config.workspace_config import WorkspaceConfig, parse_workspace_config
-from sevn.gateway.http_server import create_app
-from sevn.storage.migrate import apply_migrations
-from sevn.workspace.layout import WorkspaceLayout
+from sevn.config.workspace_config import WorkspaceConfig
 
 
 @pytest.fixture
@@ -61,11 +56,8 @@ def _patch_dashboard_via_gateway(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path_factory: pytest.TempPathFactory,
     request: pytest.FixtureRequest,
-) -> TestClient:
-    home = tmp_path_factory.mktemp("home")
-    ws = home / "workspace"
-    ws.mkdir()
-    sevn_doc = {
+) -> None:
+    voice_doc = {
         "schema_version": 2,
         "providers": {
             "use_main_model_for_all": True,
@@ -78,48 +70,12 @@ def _patch_dashboard_via_gateway(
         },
         "gateway": {"token": "gw-token"},
     }
-    (ws / "sevn.json").write_text(json.dumps(sevn_doc), encoding="utf-8")
-    cfg = parse_workspace_config(sevn_doc)
-    layout = WorkspaceLayout.from_config(ws / "sevn.json", cfg)
-
-    def factory() -> sqlite3.Connection:
-        conn = sqlite3.connect(":memory:", check_same_thread=False)
-        apply_migrations(conn)
-        return conn
-
-    gw_app = create_app(
-        workspace=cfg,
-        layout=layout,
-        sqlite_connection_factory=factory,
-        process_settings=ProcessSettings(gateway_token="gw-token"),
+    patch_dashboard_gateway(
+        monkeypatch,
+        tmp_path_factory,
+        request,
+        sevn_doc=voice_doc,
     )
-    client_cm = TestClient(gw_app, raise_server_exceptions=True)
-    tc = client_cm.__enter__()
-    tc.get("/health")
-    request.addfinalizer(lambda: client_cm.__exit__(None, None, None))
-
-    def _via_test_client(
-        method: str,
-        path: str,
-        *,
-        json_body: dict[str, object] | None = None,
-        **kwargs: object,
-    ) -> httpx.Response:
-        _ = kwargs, json_body
-        if method.upper() != "GET":
-            msg = f"unsupported method {method}"
-            raise ValueError(msg)
-        starlette_resp = tc.get(path)
-        return httpx.Response(
-            status_code=starlette_resp.status_code,
-            json=starlette_resp.json() if starlette_resp.content else None,
-            request=httpx.Request("GET", path),
-        )
-
-    monkeypatch.setattr(dashboard_api_client_mod, "gateway_json_request", _via_test_client)
-    monkeypatch.setenv("SEVN_HOME", str(home))
-    monkeypatch.setenv("SEVN_GATEWAY_TOKEN", "gw-token")
-    return tc
 
 
 def test_sevn_agent_config_json(

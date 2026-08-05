@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver Mission Control: a same-process dashboard (prd-07-mission-control)
   so the owner can inspect traces, costs, provider health, in-flight runs, proxy status,
   and config without opening SQLite from'
-last_updated: '2026-08-04'
-fingerprint: sha256:5480be369e66a474080eb7413c1008c41b8e107b867b448ed3f1f5384397c7c3
+last_updated: '2026-08-05'
+fingerprint: sha256:742725d3706c40a6f5a5176f4ecae5f09066dba635bf9cf41761dac45586964e
 related: []
 sources:
 - src/sevn/ui/**
@@ -1085,6 +1085,15 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Amendments (post-audit-0.0.1 W18 — #169)
+
+When ``dashboard.local_open`` is effective, ``local_open_effective`` returns
+``True`` only when the request presents the boot ``dashboard-local-token`` and
+``verify_dashboard_local_token`` succeeds. Tokenless direct-loopback access is
+denied by default. The only escape is explicit
+``dashboard.local_open_trust_address: true`` (default ``false``), which restores
+legacy trust-by-address for direct loopback clients.
 
 ## Human-input needed
 

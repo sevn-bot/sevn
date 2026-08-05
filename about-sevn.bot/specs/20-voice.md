@@ -6,8 +6,8 @@ status: scaffold
 owner: Alex
 summary: 'Own the provider-chain facades for speech-to-text and text-to-speech so
   the gateway can:'
-last_updated: '2026-08-01'
-fingerprint: sha256:0d197ff98ec6f362e8fe3d045f6c2d4d69d689aa6c14c5eea421ce3374392f9e
+last_updated: '2026-08-05'
+fingerprint: sha256:8bbd0ed0ec4000d2049d2313d0838c1045abcd8b596a741cb57b1e17b19edae2
 related: []
 sources:
 - src/sevn/voice/**

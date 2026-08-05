@@ -23,6 +23,8 @@ from sevn.evolution.issues import create_issue, save_issue
 from sevn.evolution.spec_kit_runs import SpecKitRunRecord, append_spec_kit_run
 from sevn.gateway.http_server import create_app
 from sevn.storage.migrate import apply_migrations
+from sevn.ui.dashboard.services.auth import apply_tunnel_local_open_policy
+from sevn.ui.dashboard.services.local_token import DASHBOARD_LOCAL_TOKEN_QUERY
 from sevn.ui.dashboard.tab_registry import WIRED_SLUGS
 from sevn.workspace.layout import WorkspaceLayout
 
@@ -54,6 +56,7 @@ def _local_open_client(tmp_path: Path) -> Iterator[TestClient]:
             scanner=SecurityScannerSubConfig(heuristic_only=True),
         ),
     )
+    apply_tunnel_local_open_policy(cfg)
     layout = WorkspaceLayout.from_config(sevn_json, cfg)
 
     def factory() -> sqlite3.Connection:
@@ -66,6 +69,18 @@ def _local_open_client(tmp_path: Path) -> Iterator[TestClient]:
     app = create_app(workspace=cfg, layout=layout, sqlite_connection_factory=factory)
     with TestClient(app, client=("127.0.0.1", 0), raise_server_exceptions=True) as client:
         yield client
+
+
+def _boot_local_token(client: TestClient) -> str:
+    token = getattr(client.app.state, "dashboard_local_token", None)
+    assert isinstance(token, str)
+    assert token.strip()
+    return token
+
+
+def _with_local_token(path: str, token: str) -> str:
+    sep = "&" if "?" in path else "?"
+    return f"{path}{sep}{DASHBOARD_LOCAL_TOKEN_QUERY}={token}"
 
 
 def test_mc10_wired_slugs_include_evolution_tabs() -> None:
@@ -97,7 +112,12 @@ def test_mc10_evolution_apis_local_open_without_login(tmp_path: Path) -> None:
     save_issue(lay, issue)
 
     with _local_open_client(tmp_path) as client:
-        assert client.get("/api/v1/auth/status").json()["local_open"] is True
+        boot_token = _boot_local_token(client)
+        assert client.get("/api/v1/auth/status").json() == {
+            "auth_required": True,
+            "local_open": False,
+            "tunnel_active": False,
+        }
         for path in (
             "/api/v1/evolution/issues?limit=5",
             "/api/v1/evolution/pipelines",
@@ -108,16 +128,21 @@ def test_mc10_evolution_apis_local_open_without_login(tmp_path: Path) -> None:
             "/api/v1/spec-kit/options",
             "/api/v1/spec-kit/runs?limit=5",
         ):
-            resp = client.get(path)
+            resp = client.get(_with_local_token(path, boot_token))
             assert resp.status_code == 200, path
-        pipelines = client.get("/api/v1/evolution/pipelines").json()["items"]
+        pipelines = client.get(
+            _with_local_token("/api/v1/evolution/pipelines", boot_token),
+        ).json()["items"]
         assert any(row["issue_id"] == active.id for row in pipelines)
-        approvals = client.get("/api/v1/evolution/approvals").json()["items"]
+        approvals = client.get(
+            _with_local_token("/api/v1/evolution/approvals", boot_token),
+        ).json()["items"]
         assert any(row["id"] == approval.id for row in approvals)
 
 
 def test_spec_kit_runs_filter_by_job_and_issue(tmp_path: Path) -> None:
     with _local_open_client(tmp_path) as client:
+        boot_token = _boot_local_token(client)
         layout = client.app.state.layout
         dot = layout.dot_sevn
         dot.mkdir(parents=True, exist_ok=True)
@@ -162,29 +187,36 @@ def test_spec_kit_runs_filter_by_job_and_issue(tmp_path: Path) -> None:
                 owner_principal="owner",
             ),
         )
-        by_job = client.get("/api/v1/spec-kit/runs?job_id=job-a").json()["items"]
+        by_job = client.get(
+            _with_local_token("/api/v1/spec-kit/runs?job_id=job-a", boot_token),
+        ).json()["items"]
         assert len(by_job) == 1
         assert by_job[0]["run_id"] == "r-job"
         assert by_job[0]["improve_job_id"] == "job-a"
-        by_issue = client.get("/api/v1/spec-kit/runs?issue_id=iss-b").json()["items"]
+        by_issue = client.get(
+            _with_local_token("/api/v1/spec-kit/runs?issue_id=iss-b", boot_token),
+        ).json()["items"]
         assert len(by_issue) == 1
         assert by_issue[0]["issue_id"] == "iss-b"
 
 
 def test_evolution_issue_ws_local_open_receives_event(tmp_path: Path) -> None:
     topic = evolution_issue_ws_topic("iss-ws")
-    with _local_open_client(tmp_path) as client, client.websocket_connect("/ws/dashboard") as ws:
-        ready = json.loads(ws.receive_text())
-        assert ready["type"] == "ready"
-        ws.send_text(json.dumps({"type": "subscribe", "topics": [topic]}))
-        subscribed = json.loads(ws.receive_text())
-        assert subscribed["type"] == "subscribed"
-        assert topic in subscribed["topics"]
-        client.portal.call(
-            client.app.state.dashboard_hub.publish,
-            topic,
-            {"issue_id": "iss-ws", "event": "transition", "state": "implementing"},
-        )
-        event = json.loads(ws.receive_text())
-        assert event["topic"] == topic
-        assert event["payload"]["state"] == "implementing"
+    with _local_open_client(tmp_path) as client:
+        boot_token = _boot_local_token(client)
+        ws_path = _with_local_token("/ws/dashboard", boot_token)
+        with client.websocket_connect(ws_path) as ws:
+            ready = json.loads(ws.receive_text())
+            assert ready["type"] == "ready"
+            ws.send_text(json.dumps({"type": "subscribe", "topics": [topic]}))
+            subscribed = json.loads(ws.receive_text())
+            assert subscribed["type"] == "subscribed"
+            assert topic in subscribed["topics"]
+            client.portal.call(
+                client.app.state.dashboard_hub.publish,
+                topic,
+                {"issue_id": "iss-ws", "event": "transition", "state": "implementing"},
+            )
+            event = json.loads(ws.receive_text())
+            assert event["topic"] == topic
+            assert event["payload"]["state"] == "implementing"

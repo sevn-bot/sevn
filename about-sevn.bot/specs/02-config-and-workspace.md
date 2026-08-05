@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Provide a single, testable configuration surface before storage, tracing,
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
-last_updated: '2026-08-03'
-fingerprint: sha256:d9a2050d748fe7f6856ed3783bbcdddd94034d8528b6c12fbc36f5d59e299c1d
+last_updated: '2026-08-05'
+fingerprint: sha256:410bc60454e3d961d7eb35cd53250ba68de92d7a5ac15d091b9ac561b779828d
 related: []
 sources:
 - src/sevn/config/**
@@ -1058,3 +1058,12 @@ upstream call; upstream ``401`` responses pass through unchanged on chat-complet
 | `tests/onboarding/` | `validate_workspace_document` |
 | `make about-docs-check` | Frontmatter ↔ code fingerprint |
 | `sevn config validate` | Operator smoke |
+
+## Amendments (post-audit-0.0.1 W18 — #169)
+
+``dashboard.local_open_trust_address`` (boolean, default ``false``): when ``true``,
+``local_open_effective`` allows tokenless direct-loopback dashboard access (legacy
+behaviour). When ``false`` (default), loopback clients must present the boot
+``dashboard-local-token`` even when ``dashboard.local_open`` is effective.
+Schema: ``infra/sevn.schema.json`` under ``dashboard``; model:
+``DashboardWorkspaceConfig.local_open_trust_address``.

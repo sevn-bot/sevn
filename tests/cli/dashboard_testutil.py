@@ -17,7 +17,21 @@ from sevn.config.settings import ProcessSettings
 from sevn.config.workspace_config import parse_workspace_config
 from sevn.gateway.http_server import create_app
 from sevn.storage.migrate import apply_migrations
+from sevn.ui.dashboard.services.auth import apply_tunnel_local_open_policy
+from sevn.ui.dashboard.services.local_token import DASHBOARD_LOCAL_TOKEN_QUERY
 from sevn.workspace.layout import WorkspaceLayout
+
+
+def _boot_local_token(client: TestClient) -> str:
+    token = getattr(client.app.state, "dashboard_local_token", None)
+    assert isinstance(token, str)
+    assert token.strip()
+    return token
+
+
+def _with_local_token(path: str, token: str) -> str:
+    sep = "&" if "?" in path else "?"
+    return f"{path}{sep}{DASHBOARD_LOCAL_TOKEN_QUERY}={token}"
 
 
 def patch_dashboard_gateway(
@@ -51,6 +65,7 @@ def patch_dashboard_gateway(
     }
     (ws / "sevn.json").write_text(json.dumps(doc), encoding="utf-8")
     cfg = parse_workspace_config(doc)
+    apply_tunnel_local_open_policy(cfg)
     layout = WorkspaceLayout.from_config(ws / "sevn.json", cfg)
 
     def factory() -> sqlite3.Connection:
@@ -64,9 +79,10 @@ def patch_dashboard_gateway(
         sqlite_connection_factory=factory,
         process_settings=ProcessSettings(gateway_token="gw-token"),
     )
-    client_cm = TestClient(gw_app, raise_server_exceptions=True)
+    client_cm = TestClient(gw_app, client=("127.0.0.1", 0), raise_server_exceptions=True)
     tc = client_cm.__enter__()
     tc.get("/health")
+    boot_token = _boot_local_token(tc)
     request.addfinalizer(lambda: client_cm.__exit__(None, None, None))
 
     def _via_test_client(
@@ -80,7 +96,7 @@ def patch_dashboard_gateway(
         if method.upper() != "GET":
             msg = f"unsupported method {method}"
             raise ValueError(msg)
-        starlette_resp = tc.get(path)
+        starlette_resp = tc.get(_with_local_token(path, boot_token))
         return httpx.Response(
             status_code=starlette_resp.status_code,
             json=starlette_resp.json() if starlette_resp.content else None,

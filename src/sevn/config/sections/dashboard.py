@@ -33,6 +33,7 @@ class DashboardWorkspaceConfig(BaseModel):
 
     enabled: bool = False
     local_open: bool | None = None
+    local_open_trust_address: bool = False
     login_password: str | None = None
     jwt_secret: str | None = None
     jwt_ttl_seconds: int = Field(default=DEFAULT_DASHBOARD_JWT_TTL_SECONDS, ge=1)

@@ -84,6 +84,11 @@ When the egress proxy shared-secret guard is enabled, set matching
 generates and stores the secret automatically; without it, guarded routes return
 **503** unless `SEVN_PROXY_ALLOW_UNAUTHENTICATED=1` (dev-only, loudly logged).
 
+**Mission Control on loopback:** opening `http://127.0.0.1:${SEVN_GATEWAY_PORT}/mission/…`
+without the boot `dashboard-local-token` is denied when local-open is effective.
+Use `sevn dashboard` (CLI appends the token) or set `dashboard.local_open_trust_address:
+true` in `sevn.json` only when you intentionally want tokenless direct-loopback access.
+
 ## Image and compose files
 
 | File | Purpose |
