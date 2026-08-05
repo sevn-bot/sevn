@@ -209,7 +209,6 @@ def test_needs_impl_ok_escape_hatch_absent() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W11: stop writing :latest from main (C13.1)", strict=False)
 def test_publish_ghcr_does_not_write_latest_tag() -> None:
     """W9.3 / C13.1: while deploy phases are stubs, ``:latest`` is not published."""
     blocks = _publish_tag_blocks()
@@ -231,10 +230,6 @@ def test_publish_ghcr_does_not_write_latest_tag() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    reason="green after W11: quarantine-only publish then digest promote (C12.3, D45)",
-    strict=False,
-)
 def test_publish_ghcr_pushes_quarantine_tags_only() -> None:
     """W9.4 / C12.3 / D45: build-push writes quarantine tags, not consumable stables."""
     blocks = _publish_tag_blocks()
@@ -256,10 +251,6 @@ def test_publish_ghcr_pushes_quarantine_tags_only() -> None:
                 )
 
 
-@pytest.mark.xfail(
-    reason="green after W11: promote stable tags by digest after scan (C12.3, D45)",
-    strict=False,
-)
 def test_stable_tags_promoted_by_digest_after_scan() -> None:
     """W9.4 / D45: after container-supply-chain, promote SHA (etc.) by digest."""
     jobs = _load_ci_cd_workflow()["jobs"]
