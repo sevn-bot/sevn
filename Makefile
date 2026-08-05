@@ -601,10 +601,14 @@ COMPOSE_FILE ?= docker/docker-compose.yml
 COMPOSE_FILES = -f $(COMPOSE_FILE)
 
 compose-gui-up: ## Start operator stack with GUI gateway (noVNC on 6080)
-	@$(MAKE) compose-up COMPOSE_FILES="-f docker/docker-compose.yml -f docker/docker-compose.gui.yml"
+	@test -f .env || { printf 'Missing .env — copy .env.example and set tokens.\n' >&2; exit 1; }
+	$(UV) run python scripts/check_compose_operator_secrets.py
+	docker compose -f docker/docker-compose.yml -f docker/docker-compose.gui.yml up -d --build
 
 compose-browser-up: ## Start operator stack with browser CDP gateway (Brave)
-	@$(MAKE) compose-up COMPOSE_FILES="-f docker/docker-compose.yml -f docker/docker-compose.browser.yml"
+	@test -f .env || { printf 'Missing .env — copy .env.example and set tokens.\n' >&2; exit 1; }
+	$(UV) run python scripts/check_compose_operator_secrets.py
+	docker compose -f docker/docker-compose.yml -f docker/docker-compose.browser.yml up -d --build
 
 compose-ci-smoke: ## Build and smoke docker/docker-compose.ci.yml + proxy transport round-trip (needs Docker)
 	docker compose -f docker/docker-compose.ci.yml build

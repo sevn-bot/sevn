@@ -138,8 +138,10 @@ def resolve_effective_proxy_shared_secret(
     Args:
         env (mapping | None): Env mapping; defaults to ``os.environ``.
         state_root (Path | str | None): Operator state root for the file fallback.
-            When ``None``, uses ``SEVN_HOME`` from ``env`` / process environ, else
-            ``~/.sevn``.
+            When ``None`` and ``env`` is omitted (process environ), uses ``SEVN_HOME``
+            or ``~/.sevn`` (same default as ``operator_home_dir``). When ``env`` is an
+            explicit mapping without ``SEVN_HOME``, the file fallback is skipped so
+            callers that pass ``env={}`` do not pick up a host generate-once file.
 
     Returns:
         str | None: Effective secret, or ``None`` when neither source provides one.
@@ -162,7 +164,13 @@ def resolve_effective_proxy_shared_secret(
     else:
         home_raw = mapping.get("SEVN_HOME", "")
         home_text = home_raw.strip() if isinstance(home_raw, str) else ""
-        root = home_text or (Path.home() / ".sevn")
+        if home_text:
+            root = home_text
+        elif env is None:
+            # Match operator_home_dir(): SEVN_HOME defaults to ~/.sevn on host.
+            root = Path.home() / ".sevn"
+        else:
+            return None
     return read_proxy_shared_secret_file(root)
 
 
