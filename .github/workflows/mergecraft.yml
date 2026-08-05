@@ -7,13 +7,14 @@
 # confirmed "success" (outstanding feedback, no check posted at all, and an
 # unreachable check-runs API after retries all fail closed — see that step).
 #
-# Provider priority (operator request, 2026-08): Codex is currently the sole
-# active reviewer; Claude is temporarily DISABLED (see HAS_CLAUDE_CODE below —
-# forced to 'false', not deleted; restore the commented expression to
-# re-enable). DeepSeek V4 (via the Nous Portal OpenAI-compatible endpoint —
-# same model sevn.bot's own runtime uses, see src/sevn/proxy/credentials.py)
-# was investigated as the intended first-choice reviewer and found NOT wireable
-# from this workflow alone:
+# Provider priority (2026-08-05): Claude is primary again; Codex is the
+# one-shot fallback when Claude is absent or incomplete. Codex-only was tried
+# while Claude was disabled, but Codex 0.146 repeatedly reports the localhost
+# mergecraft MCP as "not ready" and posts mergecraft-approval=neutral
+# (alexhawat/mergeCraft#40) — that blocks every gated PR. DeepSeek V4 (via the
+# Nous Portal OpenAI-compatible endpoint — same model sevn.bot's own runtime
+# uses, see src/sevn/proxy/credentials.py) was investigated as the intended
+# first-choice reviewer and found NOT wireable from this workflow alone:
 #   - mergeCraft routes any model whose provider isn't anthropic/openai/google/
 #     cursor to its `opencode` harness (src/mergecraft/utils/agent_resolve.py
 #     resolve_runtime_agent()), which — while OpenCode CLI itself does support
@@ -32,10 +33,9 @@
 # prompt — no ~mergecraft JSON payload needed.
 #
 # Auth (same-repo only — forks skip):
-#   - CODEX_AUTH_JSON — ChatGPT/Codex subscription (`mergecraft auth codex`)
+#   - CLAUDE_CODE_OAUTH_TOKEN — Claude Pro/Max (`mergecraft auth claude`) — primary
+#   - CODEX_AUTH_JSON — ChatGPT/Codex subscription (`mergecraft auth codex`) — fallback
 #   - OPENAI_API_KEY — OpenAI API key (same Codex harness as CODEX_AUTH_JSON)
-#   - CLAUDE_CODE_OAUTH_TOKEN — Claude Pro/Max; currently unused while Claude
-#     is disabled above, kept wired so re-enabling is a one-line revert.
 # The job skips gracefully when none are set (e.g. fork PRs).
 # MiniMax is NOT Codex: it needs OPENCODE_API_KEY + model opencode/minimax-*
 # (separate OpenCode path; not wired here — see the opencode-harness note above,
@@ -218,22 +218,11 @@ jobs:
     timeout-minutes: 30
     env:
       IS_SAME_REPO: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
-      # Claude DISABLED for now (operator request) — forced to 'false' rather
-      # than deleted. To re-enable: delete the 'false' line and uncomment the
-      # expression below it (also restore its OR-term in HAS_AUTH below).
-      # HAS_CLAUDE_CODE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
-      HAS_CLAUDE_CODE: 'false'
-      # Codex is the sole active reviewer while Claude is disabled and DeepSeek
-      # V4 / Nous Portal is not wireable (see header comment). Every downstream
-      # `if:` that branches on HAS_CLAUDE_CODE already treats "Claude auth
-      # absent" as "go straight to Codex" / "Codex is the one that must
-      # succeed", so forcing HAS_CLAUDE_CODE above is sufficient — no other
-      # step conditions need to change to make Codex primary.
+      # Claude primary; Codex fallback when Claude auth is absent or the Claude
+      # review does not post a mergecraft-approval verdict (session limit, etc.).
+      HAS_CLAUDE_CODE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
       HAS_CODEX: ${{ (secrets.CODEX_AUTH_JSON != '' || secrets.OPENAI_API_KEY != '') && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
-      # Matches HAS_CODEX while Claude is disabled; restore the
-      # `secrets.CLAUDE_CODE_OAUTH_TOKEN != '' ||` OR-term alongside
-      # re-enabling HAS_CLAUDE_CODE above.
-      HAS_AUTH: ${{ (secrets.CODEX_AUTH_JSON != '' || secrets.OPENAI_API_KEY != '') && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
+      HAS_AUTH: ${{ (secrets.CLAUDE_CODE_OAUTH_TOKEN != '' || secrets.CODEX_AUTH_JSON != '' || secrets.OPENAI_API_KEY != '') && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
 
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
@@ -266,7 +255,7 @@ jobs:
           if [ "${{ env.IS_SAME_REPO }}" != "true" ]; then
             echo "::notice title=mergecraft skipped::Fork PR — review skipped (same as before)."
           else
-            echo '::notice title=mergecraft skipped::Configure CODEX_AUTH_JSON (`mergecraft auth codex`) or OPENAI_API_KEY to enable mergeCraft reviews (Claude is currently disabled — see the workflow header comment).'
+            echo '::notice title=mergecraft skipped::Configure CLAUDE_CODE_OAUTH_TOKEN (`mergecraft auth claude`) or CODEX_AUTH_JSON (`mergecraft auth codex`) to enable mergeCraft reviews.'
           fi
 
       # Composed in a step rather than inline in `with:` so the CI-context clause
@@ -346,11 +335,6 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
       - name: Decide Codex fallback after Claude failure
-        # Currently inert: HAS_CLAUDE_CODE is forced 'false' above (Claude
-        # disabled), so this `if:` never fires and `steps.fallback.outputs.need`
-        # stays unset — harmless, since every downstream reference already
-        # treats "HAS_CLAUDE_CODE != 'true'" as "go straight to Codex". Kept
-        # so re-enabling Claude only requires restoring HAS_CLAUDE_CODE above.
         id: fallback
         if: >-
           env.HAS_CLAUDE_CODE == 'true' &&
