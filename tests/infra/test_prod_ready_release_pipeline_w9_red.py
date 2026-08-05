@@ -166,7 +166,6 @@ def _step_is_sha_pinned_action_or_checksum_verified(step: dict[str, Any]) -> boo
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W10: aggregator rename (C2.1)", strict=False)
 def test_required_aggregator_name_states_publication_not_delivery() -> None:
     """W9.1 / C2.1: required check name must not imply deployment readiness."""
     name = _delivery_chain_job().get("name")
@@ -187,7 +186,6 @@ def test_required_aggregator_name_states_publication_not_delivery() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W10: delete phase2/3 + needs_impl_ok (D44)", strict=False)
 def test_phase2_and_phase3_jobs_absent() -> None:
     """W9.2 / D44: Dev deploy/smoke stubs are deleted, not permanently tolerated."""
     jobs = _load_ci_cd_workflow()["jobs"]
@@ -195,7 +193,6 @@ def test_phase2_and_phase3_jobs_absent() -> None:
     assert "phase3" not in jobs, "phase3 must be deleted (C2.2 / D44)"
 
 
-@pytest.mark.xfail(reason="green after W10: delete needs_impl_ok escape hatch (D44)", strict=False)
 def test_needs_impl_ok_escape_hatch_absent() -> None:
     """W9.2 / D44: required aggregator must not classify ``failure`` as OK."""
     script = _delivery_chain_run_script()
