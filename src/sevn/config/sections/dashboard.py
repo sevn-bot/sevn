@@ -33,7 +33,15 @@ class DashboardWorkspaceConfig(BaseModel):
 
     enabled: bool = False
     local_open: bool | None = None
-    local_open_trust_address: bool = False
+    local_open_trust_address: bool = Field(
+        default=False,
+        description=(
+            "Dangerous escape hatch: when true, allow tokenless direct-loopback "
+            "dashboard access (legacy trust-by-address). Default false. Forced "
+            "false when a tunnel is active or gateway.host is not loopback-only; "
+            "gateway logs a boot warning when enabled."
+        ),
+    )
     login_password: str | None = None
     jwt_secret: str | None = None
     jwt_ttl_seconds: int = Field(default=DEFAULT_DASHBOARD_JWT_TTL_SECONDS, ge=1)

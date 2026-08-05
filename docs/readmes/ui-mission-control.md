@@ -55,7 +55,7 @@ Spec: [`37-openui.md`](../../about-sevn.bot/specs/37-openui.md).
 
 - `login_password`, `jwt_secret` — owner auth ([`DashboardAuthService`](../../src/sevn/ui/dashboard/services/auth.py)); `${SECRET:…}` refs resolved at boot
 - `enabled`, bind/port via gateway HTTP server
-- **Loopback local-open:** when `dashboard.local_open` is effective, direct loopback clients must present the boot **`dashboard-local-token`** (query param or cookie). The gateway mints this token at boot; `sevn dashboard` appends it to the Mission Control URL automatically. Set `dashboard.local_open_trust_address: true` only to restore legacy tokenless trust-by-address (default **false**). Reverse proxies in front of a loopback bind must set forwarding headers so `direct_loopback_client` rejects proxied traffic, or disable local-open (`dashboard.local_open: false`).
+- **Loopback local-open:** when `dashboard.local_open` is effective, direct loopback clients must present the boot **`dashboard-local-token`** (query param or cookie). The gateway mints this token at boot; `sevn dashboard` appends it to the Mission Control URL automatically. Set `dashboard.local_open_trust_address: true` only to restore legacy tokenless trust-by-address (default **false**) — the gateway logs a loud boot warning when this escape is on, and `apply_tunnel_local_open_policy` forces it **off** whenever a tunnel is configured or `gateway.host` is not loopback-only (same refusal as `local_open`). Reverse proxies in front of a loopback bind must set forwarding headers so `direct_loopback_client` rejects proxied traffic, or disable local-open (`dashboard.local_open: false`).
 
 Validate: `sevn config validate`.
 
