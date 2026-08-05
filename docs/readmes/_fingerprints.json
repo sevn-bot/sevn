@@ -26,8 +26,8 @@
     },
     "config-workspace": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-03T00:50:28Z",
-      "digest": "9e6384e9a2a4cadc2425f4cb7c0905c37afe6709d8519def4670cd919bf86004",
+      "computed_at": "2026-08-05T00:43:16Z",
+      "digest": "30f3b9a88d2cda4407aebaa67e0448eb0fe4761c715e26766f6013715c690be5",
       "source_globs": [
         "src/sevn/config/**",
         "src/sevn/workspace/**",
@@ -116,8 +116,8 @@
     },
     "root": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-03T18:15:21Z",
-      "digest": "c8051a51ff7c6f3fdeb643659915850c4e018c6f2ce6ea7dd60052b8d3706a2c",
+      "computed_at": "2026-08-05T00:43:16Z",
+      "digest": "6985dccd516f20e86a211beafa605d69073b6e169802c0792291032f2be9602b",
       "source_globs": [
         "pyproject.toml",
         "CLAUDE.md",

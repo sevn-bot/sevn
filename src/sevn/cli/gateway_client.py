@@ -293,7 +293,9 @@ def gateway_get(
         >>> t = httpx.MockTransport(lambda r: httpx.Response(200, json={"ok": True}, request=r))
         >>> gateway_get(
         ...     "/health",
-        ...     workspace=WorkspaceConfig.minimal(),
+        ...     workspace=WorkspaceConfig.minimal(
+        ...         gateway={"token": "literal-gateway-token-at-least-32-chars"},
+        ...     ),
         ...     transport=t,
         ... ).status_code
         200
@@ -399,7 +401,9 @@ def gateway_json_request(
         >>> gateway_json_request(
         ...     "GET",
         ...     "/api/v1/admin/secrets",
-        ...     workspace=WorkspaceConfig.minimal(),
+        ...     workspace=WorkspaceConfig.minimal(
+        ...         gateway={"token": "literal-gateway-token-at-least-32-chars"},
+        ...     ),
         ...     transport=t,
         ...     require_token=False,
         ... ).status_code
