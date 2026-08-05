@@ -22,7 +22,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-import pytest
 import yaml
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -277,7 +276,6 @@ def test_stable_tags_promoted_by_digest_after_scan() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W12: reject curl|sh installers (C11.3)", strict=False)
 def test_no_curl_pipe_sh_under_github_or_makefile() -> None:
     """W9.5 / C11.3: ``curl|sh`` / ``wget|sh`` must not appear in release installers."""
     offenders: list[str] = []
@@ -294,10 +292,6 @@ def test_no_curl_pipe_sh_under_github_or_makefile() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    reason="green after W12: SHA-pinned syft/trivy actions (C11.1, D46)",
-    strict=False,
-)
 def test_syft_and_trivy_install_via_pinned_action_or_checksum() -> None:
     """W9.6 / C11.1 / D46: match the in-repo cosign SHA-pinned action pattern."""
     for tool in ("syft", "trivy"):
@@ -313,10 +307,6 @@ def test_syft_and_trivy_install_via_pinned_action_or_checksum() -> None:
             )
 
 
-@pytest.mark.xfail(
-    reason="green after W12: pin+verify uv installer (C11.2, D47)",
-    strict=False,
-)
 def test_uv_installer_is_version_pinned_and_checksum_verified() -> None:
     """W9.6 / C11.2 / D47: ``make ensure-uv`` must pin and verify before execution."""
     block = _ensure_uv_makefile_block()
