@@ -17,6 +17,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from sevn.config.workspace_config import (
     DashboardWorkspaceConfig,
+    GatewayConfig,
     SecuritySandboxSubConfig,
     SecurityScannerSubConfig,
     SecurityWorkspaceConfig,
@@ -25,7 +26,12 @@ from sevn.config.workspace_config import (
 from sevn.gateway.http_server import create_app
 from sevn.security.sandbox_runtime import SandboxDriver
 from sevn.storage.migrate import apply_migrations
-from sevn.ui.dashboard.services.auth import DASHBOARD_CSRF_COOKIE_NAME, DASHBOARD_CSRF_HEADER
+from sevn.ui.dashboard.services.auth import (
+    DASHBOARD_CSRF_COOKIE_NAME,
+    DASHBOARD_CSRF_HEADER,
+    apply_tunnel_local_open_policy,
+)
+from sevn.ui.dashboard.services.local_token import DASHBOARD_LOCAL_TOKEN_QUERY
 from sevn.ui.dashboard.services.sandbox_terminal import (
     SandboxTerminalSession,
     _subprocess_terminal_env,
@@ -47,6 +53,9 @@ def _dashboard_cfg(*, local_open: bool = True) -> WorkspaceConfig:
     return WorkspaceConfig(
         schema_version=1,
         workspace_root=".",
+        gateway=GatewayConfig(
+            host="127.0.0.1", port=3001, token="${SECRET:keychain:sevn.gateway.token}"
+        ),
         dashboard=DashboardWorkspaceConfig(
             enabled=True,
             login_password="pw",
@@ -54,7 +63,7 @@ def _dashboard_cfg(*, local_open: bool = True) -> WorkspaceConfig:
             local_open=local_open,
         ),
         security=security,
-        gateway={"token": "${SECRET:keychain:sevn.gateway.token}"},
+        infrastructure={"tunnel": {"mode": "none"}},
     )
 
 
@@ -66,6 +75,7 @@ def _client(tmp_path: Path, *, local_open: bool = True) -> Iterator[TestClient]:
         encoding="utf-8",
     )
     cfg = _dashboard_cfg(local_open=local_open)
+    apply_tunnel_local_open_policy(cfg)
     layout = WorkspaceLayout.from_config(sevn_json, cfg)
 
     def factory() -> sqlite3.Connection:
@@ -76,8 +86,20 @@ def _client(tmp_path: Path, *, local_open: bool = True) -> Iterator[TestClient]:
         return conn
 
     app = create_app(workspace=cfg, layout=layout, sqlite_connection_factory=factory)
-    with TestClient(app, raise_server_exceptions=True) as client:
+    with TestClient(app, client=("127.0.0.1", 0), raise_server_exceptions=True) as client:
         yield client
+
+
+def _boot_local_token(client: TestClient) -> str:
+    token = getattr(client.app.state, "dashboard_local_token", None)
+    assert isinstance(token, str)
+    assert token.strip()
+    return token
+
+
+def _with_local_token(path: str, token: str) -> str:
+    sep = "&" if "?" in path else "?"
+    return f"{path}{sep}{DASHBOARD_LOCAL_TOKEN_QUERY}={token}"
 
 
 def _login(client: TestClient) -> None:
@@ -100,7 +122,8 @@ def test_terminal_session_requires_csrf(tmp_path: Path) -> None:
 
 def test_terminal_session_mints_upgrade_ticket(tmp_path: Path) -> None:
     with _client(tmp_path, local_open=True) as client:
-        resp = client.post("/api/v1/terminal/session", json={})
+        boot_token = _boot_local_token(client)
+        resp = client.post(_with_local_token("/api/v1/terminal/session", boot_token), json={})
         assert resp.status_code == 200
         body = resp.json()
         assert body["session_id"]
