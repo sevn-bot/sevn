@@ -8,7 +8,7 @@ summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict de
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
 last_updated: '2026-08-05'
-fingerprint: sha256:d962ecd3f84a9b7c15b787df976e61002b62bb9ceedd34eeff24ce3badc4df24
+fingerprint: sha256:511fd283f888a72f432b55bb862b5e20c2e9e15fdc3a1ec93cbac9ce81969b70
 related: []
 sources:
 - .github/workflows/**
@@ -465,7 +465,7 @@ Tier↔resume parity is enforced by `tests/infra/test_ci_steps_tier_parity.py` (
 |----------|---------|
 | `ci.yml` | Main CI (invokes make targets) |
 | `ci-supplementary.yml` | Supplementary checks (daily security audit, advisory `ci-quality` / `ci-quality-coverage`, weekly image rebuild) |
-| `ci-cd.yml` | Container artifact publication + draft release on `v*` tags. Dev deploy/smoke jobs are **absent** (deleted with the `failure`-as-OK escape hatch). Production deploy/test (`phase4`/`phase5`) remain documented stubs that block tag releases. |
+| `ci-cd.yml` | Container artifact publication + draft release on `v*` tags. Dev deploy/smoke jobs are **absent** (deleted with the `failure`-as-OK escape hatch). Production deploy/test (`phase4`/`phase5`) remain documented stubs that block tag releases. Images push a quarantine tag first; SHA/version tags are promoted **by digest** only after Trivy→cosign (no `:latest` from `main` while stubs remain). |
 | `docker.yml` | Container build validation |
 | `style-guide-pages.yml` | Style guide site |
 
@@ -473,9 +473,18 @@ Tier↔resume parity is enforced by `tests/infra/test_ci_steps_tier_parity.py` (
 
 | Trigger | Jobs that run | Required gate (`delivery-chain` → **Artifact publication gate (required)**) |
 |---------|---------------|-----------------------------------------------------------------------------|
-| `push` to `main` | phase1 → publish-ghcr → container-supply-chain; phase4/5/6 **skipped** | Green when publication + supply-chain succeed; skipped deploy/release jobs are OK |
-| `push` tag `v*` | phase1 → publish-ghcr → supply-chain → phase4 → phase5 → phase6 | phase4/5 must succeed (stubs currently fail → gate red); draft release only when they succeed |
+| `push` to `main` | phase1 → publish-ghcr (quarantine tags) → container-supply-chain (scan→sign→promote SHA by digest); phase4/5/6 **skipped** | Green when publication + supply-chain succeed; skipped deploy/release jobs are OK; **no `:latest`** |
+| `push` tag `v*` | same, then promote version tag by digest → phase4 → phase5 → phase6 | phase4/5 must succeed (stubs currently fail → gate red); draft release only when they succeed |
 | `workflow_dispatch` | Same as tag path for phase4/5 when exercised; phase6 only on a `v*` ref | Stub `failure` fails the gate — no path classifies `failure` as OK |
+
+### Artefacts (GHCR tag lifecycle)
+
+| Artefact | Producer | Notes |
+|----------|----------|-------|
+| `:quarantine-<sha>` | `publish-ghcr` | Pre-scan only; not an operator pin target. Deleted on supply-chain failure/cancel when the version carries only quarantine tags. |
+| `:<sha>` / `:v*` | `container-supply-chain` promote-by-digest step | Written **after** Trivy (`--exit-code 1`) and `cosign sign`. |
+| `:latest` | *(none while phase4/5 stubs)* | Pre-existing registry `:latest` tags are **unverified**. Operator default is a digest pin (Batch B `DEFAULT_SANDBOX_IMAGE` / `rlm.docker_image` — single source of truth; see `docker/README.md`). |
+| `sboms/` artifact | `container-supply-chain` | Trivy JSON/SARIF + SPDX; also attached to draft releases on `v*`. |
 
 **Branch-protection expectation:** require the GitHub check named **Artifact publication gate (required)** (workflow job id `delivery-chain`). The previous display name was `Delivery chain gate (required)` — update any branch-protection / ruleset required-check list when this rename lands so the gate is not silently dropped.
 
@@ -507,8 +516,8 @@ Wave agents: mid-wave **`make ci-affected`** only; wave boundary **`make ci`** o
 5. **`make about-docs-check`** — about-sevn.bot doc integrity, status honesty, and skw folder gates (`spec-check`, `prd-check`).
 6. **`make changelog-check`** — Keep a Changelog + Unreleased datestamp rules (`skw.changelog_validate`).
 7. **`make ci-resume`** — stops at first failure; reruns skip passed steps (checkpoint not re-verifying earlier steps — finish with clean `make ci` before merge).
-8. **`ci-cd.yml` on `main`** — builds, pushes, scans, and signs GHCR images. Does **not** deploy to Dev or Production; Dev deploy/smoke is unimplemented and no longer pretended via tolerated failing jobs.
-9. **`ci-cd.yml` on `v*` tags** — same publication path, then production deploy/test stubs (`phase4`/`phase5`). A draft GitHub Release (`phase6`, `draft: true`) is created only when those stubs succeed; today they fail closed, so tag builds stay red until real deploy exists.
+8. **`ci-cd.yml` on `main`** — builds images to quarantine tags, scans/signs, then promotes SHA tags **by digest**. Does **not** write `:latest`, and does **not** deploy to Dev or Production; Dev deploy/smoke is unimplemented and no longer pretended via tolerated failing jobs.
+9. **`ci-cd.yml` on `v*` tags** — same quarantine→scan→sign→promote path (SHA + version tags), then production deploy/test stubs (`phase4`/`phase5`). A draft GitHub Release (`phase6`, `draft: true`) is created only when those stubs succeed; today they fail closed, so tag builds stay red until real deploy exists.
 10. **Required aggregator** — check name **Artifact publication gate (required)** accepts only `success` or `skipped` from its `needs`. A green check means artifact publication (and supply-chain) succeeded — not that production was deployed.
 
 ## Failure Modes
@@ -522,7 +531,8 @@ Wave agents: mid-wave **`make ci-affected`** only; wave boundary **`make ci`** o
 | Git guard missing | `make check-git-guards` fails (blocks destructive clean) |
 | Tag build with deploy stubs failing | **Artifact publication gate (required)** (`delivery-chain`) red; phase6 does not run; no published release |
 | Tag build while deploy phases succeed | Draft GitHub Release only (`draft: true`); no production deploy until phases 4–5 ship |
-| `main` push with publish or supply-chain failure | **Artifact publication gate (required)** red; no consumable claim of readiness |
+| `main` push with publish or supply-chain failure | **Artifact publication gate (required)** red; no consumable claim of readiness; quarantine tags cleaned when the package version carries only quarantine tags |
+| Failing Trivy scan | Job red before `cosign sign` and before digest promote — no SHA/version/`latest` tag is written |
 | Advisory quality tier member fails | `make ci-quality` runs every member target (non-short-circuit via `scripts/ci_quality.py`); job red on first failure but log shows all member results |
 | Coverage gate after install-action sync | `make ci-quality-coverage` requires W12 dev-extra preservation; `make coverage` exits 2 when optional `dev` is pruned mid-suite |
 
@@ -635,3 +645,15 @@ hatch are **deleted**. The required check display name is
 **Artifact publication gate (required)** (job id ``delivery-chain``). Production
 stubs ``phase4``/``phase5`` remain; a ``main`` push skips them so the gate stays
 green when publication succeeds. No required-check path classifies ``failure`` as OK.
+
+## Amendments (prod-readiness-0.0.1 W11 — append-only)
+
+Quarantine → scan → sign → promote by digest (**C12.3**, **C13.1**, **C13.2**, plan
+**D45**). ``publish-ghcr`` pushes only ``:quarantine-<sha>``. ``container-supply-chain``
+keeps Trivy ``--exit-code 1`` before ``cosign sign``, then promotes SHA (and ``:v*``
+on tag builds) with ``docker buildx imagetools create`` **by digest**. ``:latest`` is
+not written from ``main`` while phase4/5 are stubs; pre-existing ``:latest`` is
+unverified. Operator default is a digest pin — Batch B owns ``DEFAULT_SANDBOX_IMAGE``
+(D42); this batch documents the coupling in ``docker/README.md`` rather than adding a
+second constant. Failed/cancelled supply-chain runs delete quarantine-only package
+versions via ``scripts/ghcr_quarantine_cleanup.sh``.

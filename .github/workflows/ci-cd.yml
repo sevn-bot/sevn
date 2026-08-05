@@ -6,9 +6,11 @@
 # Container artifact publication pipeline (phase4/phase5 production deploy stubs).
 # Normative spec: about-sevn.bot/specs/25-cicd-full.md.
 #
-# publish-ghcr: pushes sandbox/proxy/gateway images to GHCR on main, v* tags,
-# and workflow_dispatch (manual chain rehearsal). Digests are job outputs for
-# downstream phases and container-supply-chain (cosign, syft, trivy).
+# publish-ghcr: builds sandbox/proxy/gateway images and pushes a quarantine tag
+# only (`:quarantine-<sha>`). Digests are job outputs for container-supply-chain
+# (trivy → cosign → syft → promote SHA / version tags by digest). No consumable
+# tag exists before the scan (C12.3 / D45). `:latest` is not written while
+# phase4/5 are stubs (C13.1).
 #
 # Trigger → phase mapping (specs/25-cicd-full.md Workflow matrix):
 #   push to main         → phase1 → publish-ghcr → supply-chain
@@ -111,6 +113,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Quarantine-only push (C12.3 / C13.1 / D45): no SHA, version, or :latest
+      # until container-supply-chain promotes by digest after scan → sign.
       - name: Build and push sandbox image
         id: sandbox
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -121,9 +125,7 @@ jobs:
           cache-from: type=gha,scope=sandbox
           cache-to: type=gha,mode=max,scope=sandbox
           tags: |
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/sandbox:${{ github.sha }}
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/sandbox:latest
-            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/sandbox:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/sandbox:quarantine-${{ github.sha }}
 
       - name: Build and push proxy image
         id: proxy
@@ -135,9 +137,7 @@ jobs:
           cache-from: type=gha,scope=proxy
           cache-to: type=gha,mode=max,scope=proxy
           tags: |
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/proxy:${{ github.sha }}
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/proxy:latest
-            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/proxy:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/proxy:quarantine-${{ github.sha }}
 
       - name: Build and push gateway image
         id: gateway
@@ -149,9 +149,7 @@ jobs:
           cache-from: type=gha,scope=gateway
           cache-to: type=gha,mode=max,scope=gateway
           tags: |
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway:${{ github.sha }}
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway:latest
-            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/gateway:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway:quarantine-${{ github.sha }}
 
       - name: Build and push gateway browser image
         id: gateway_browser
@@ -164,9 +162,7 @@ jobs:
           cache-from: type=gha,scope=gateway-browser
           cache-to: type=gha,mode=max,scope=gateway-browser
           tags: |
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.browser:${{ github.sha }}
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.browser:latest
-            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/gateway.browser:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.browser:quarantine-${{ github.sha }}
 
       - name: Build and push gateway GUI image
         id: gateway_gui
@@ -179,9 +175,7 @@ jobs:
           cache-from: type=gha,scope=gateway-gui
           cache-to: type=gha,mode=max,scope=gateway-gui
           tags: |
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.gui:${{ github.sha }}
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.gui:latest
-            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/gateway.gui:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.gui:quarantine-${{ github.sha }}
 
   container-supply-chain:
     name: Container supply chain (cosign, syft, trivy)
@@ -196,6 +190,8 @@ jobs:
       IMAGE_REPOSITORY: ${{ needs.publish-ghcr.outputs.image_repository }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
 
       - name: Install cosign
         uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
@@ -248,12 +244,53 @@ jobs:
           scan_image gateway.browser "$GATEWAY_BROWSER_DIGEST"
           scan_image gateway.gui "$GATEWAY_GUI_DIGEST"
 
+      - name: Promote stable tags by digest
+        env:
+          SANDBOX_DIGEST: ${{ needs.publish-ghcr.outputs.sandbox_digest }}
+          PROXY_DIGEST: ${{ needs.publish-ghcr.outputs.proxy_digest }}
+          GATEWAY_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_digest }}
+          GATEWAY_BROWSER_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_browser_digest }}
+          GATEWAY_GUI_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_gui_digest }}
+        run: |
+          set -euo pipefail
+          # C12.3 / D45: promote SHA (and version on v* tags) by digest after scan→sign.
+          # :latest is not written while phase4/5 are stubs (C13.1).
+          promote_by_digest() {
+            local name="$1"
+            local digest="$2"
+            local src="ghcr.io/${IMAGE_REPOSITORY}/${name}@${digest}"
+            local sha_tag="ghcr.io/${IMAGE_REPOSITORY}/${name}:${GITHUB_SHA}"
+            echo "Promote by digest: ${src} → ${sha_tag}"
+            docker buildx imagetools create --tag "${sha_tag}" "${src}"
+            if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+              local ver_tag="ghcr.io/${IMAGE_REPOSITORY}/${name}:${GITHUB_REF_NAME}"
+              echo "Promote by digest: ${src} → ${ver_tag}"
+              docker buildx imagetools create --tag "${ver_tag}" "${src}"
+            fi
+          }
+          promote_by_digest sandbox "$SANDBOX_DIGEST"
+          promote_by_digest proxy "$PROXY_DIGEST"
+          promote_by_digest gateway "$GATEWAY_DIGEST"
+          promote_by_digest gateway.browser "$GATEWAY_BROWSER_DIGEST"
+          promote_by_digest gateway.gui "$GATEWAY_GUI_DIGEST"
+
       - name: Upload supply-chain reports
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: container-supply-chain-${{ github.sha }}
           path: sboms/
           if-no-files-found: error
+
+      - name: Cleanup quarantine tags on failure
+        if: failure() || cancelled()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source scripts/ghcr_quarantine_cleanup.sh
+          delete_quarantine_tags "${IMAGE_REPOSITORY}" "${GITHUB_SHA}"
 
   # Dev deploy/smoke (former phase2/phase3) deleted with needs_impl_ok (D44 / C2.2).
   # Production stubs below remain so tag builds still require honest deploy/test success (C2.3).
