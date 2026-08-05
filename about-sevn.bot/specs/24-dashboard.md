@@ -8,7 +8,7 @@ summary: 'Deliver Mission Control: a same-process dashboard (prd-07-mission-cont
   so the owner can inspect traces, costs, provider health, in-flight runs, proxy status,
   and config without opening SQLite from'
 last_updated: '2026-08-05'
-fingerprint: sha256:bd5b59424cb15feedc0ac92b68778e6ae7e700499f807caeaa5c22cc75544127
+fingerprint: sha256:742725d3706c40a6f5a5176f4ecae5f09066dba635bf9cf41761dac45586964e
 related: []
 sources:
 - src/sevn/ui/**
