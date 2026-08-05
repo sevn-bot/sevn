@@ -7,6 +7,9 @@ Contracts (``about-sevn.bot/specs/08-sandbox.md``):
   is honoured — a plausible silent no-op key is the defect.
 
 W6.1-W6.3 green after W7; W6.4-W6.7 green after W8 (sibling suite).
+
+Digest-cache isolation for spawn suites lives in ``tests/sandbox/conftest.py`` (D43 —
+do not edit ``test_post_audit_image_pin_w4_red.py``).
 """
 
 from __future__ import annotations

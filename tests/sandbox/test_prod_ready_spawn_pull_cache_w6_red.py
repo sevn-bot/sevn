@@ -9,11 +9,12 @@ Contracts (``about-sevn.bot/specs/08-sandbox.md``):
 
 Hard constraint (D43): pull-then-pin and the empty-``RepoDigests`` fail-closed path stay
 unchanged — covered by ``tests/sandbox/test_post_audit_image_pin_w4_red.py`` (W6.8).
+Process-lifetime digest-cache isolation lives in ``tests/sandbox/conftest.py`` so that
+guard file stays unmodified (B-V2).
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,8 @@ import pytest
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.security.sandbox_errors import SandboxConfigurationError
 from sevn.security.sandbox_runtime import DockerSandboxRuntime
+
+# Digest-cache isolation: ``tests/sandbox/conftest.py`` autouse (keeps W4 pin suite unmodified).
 
 _TAG = "fresh-registry.example/sandbox:v1"
 _DIGEST = (
@@ -39,16 +42,6 @@ def _workspace(tmp_path: Path) -> Path:
     ws.mkdir(parents=True, exist_ok=True)
     (ws / ".llmignore").mkdir(exist_ok=True)
     return ws
-
-
-@pytest.fixture(autouse=True)
-def _clear_sandbox_image_digest_cache() -> Iterator[None]:
-    """Isolate process-lifetime cache from sibling suites sharing the same mock tag."""
-    from sevn.security import sandbox_runtime as mod
-
-    mod._SANDBOX_IMAGE_DIGEST_CACHE.clear()
-    yield
-    mod._SANDBOX_IMAGE_DIGEST_CACHE.clear()
 
 
 async def _spawn_once(
