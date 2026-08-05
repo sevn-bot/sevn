@@ -196,13 +196,23 @@ jobs:
       - name: Install cosign
         uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
 
+      # C11.1 / D46: SHA-pinned installers (same pattern as cosign above). Versions
+      # stay at syft v1.18.1 / trivy v0.58.1 so scan_image() + allowlist tooling keep
+      # working against the same CLI surface.
       - name: Install syft
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/v1.18.1/install.sh | sh -s -- -b /usr/local/bin
+        id: syft
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          syft-version: v1.18.1
+
+      - name: Add syft to PATH
+        run: echo "$(dirname '${{ steps.syft.outputs.cmd }}')" >> "$GITHUB_PATH"
 
       - name: Install trivy
-        run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/v0.58.1/contrib/install.sh | sh -s -- -b /usr/local/bin
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.58.1
+          cache: "true"
 
       - name: Log in to GHCR
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0

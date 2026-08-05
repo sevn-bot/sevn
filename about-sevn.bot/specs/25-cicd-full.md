@@ -8,7 +8,7 @@ summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict de
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
 last_updated: '2026-08-05'
-fingerprint: sha256:511fd283f888a72f432b55bb862b5e20c2e9e15fdc3a1ec93cbac9ce81969b70
+fingerprint: sha256:6486b2ca2b6c2406127d5cc96ba6a5e2de32046ef9bcac8df5992598e3c8139f
 related: []
 sources:
 - .github/workflows/**
@@ -432,7 +432,7 @@ and docs/skills/infra checks that block regressions before merge.
 | `make ci` | Full pre-merge gate (all tiers) |
 | `make ci-resume` / `make ci-reset` | Resumable / reset CI checkpoint |
 | `make ci-core` | lockcheck, lint, typecheck, pyright, test, doctest, security, build, doctor |
-| `make ci-infra` | config-schema, onboarding schemas, git guards, manifests |
+| `make ci-infra` | config-schema, onboarding schemas, git guards, pipe-to-shell installer gate, manifests |
 | `make ci-docs` | about-site, readme, changelog, FAQ, skw spec/prd gates, telegram menu docs |
 | `make ci-skills` | skillspector + skill inventory checks |
 | `make ci-parity` | code-index, deploy report parity, mergecraft pin gate |
@@ -451,7 +451,7 @@ Docs tooling in scope: `src/sevn/docs/about/check.py` (`check_about_docs`),
 
 ## Data Model
 
-### `CI_STEPS` (34 ordered steps)
+### `CI_STEPS` (39 ordered steps)
 
 Defined in root `Makefile` — consumed by `make ci-resume` via `scripts/ci_resume.sh`.
 First infra step includes `make config-schema` against `infra/sevn.schema.json` goldens.
@@ -465,7 +465,7 @@ Tier↔resume parity is enforced by `tests/infra/test_ci_steps_tier_parity.py` (
 |----------|---------|
 | `ci.yml` | Main CI (invokes make targets) |
 | `ci-supplementary.yml` | Supplementary checks (daily security audit, advisory `ci-quality` / `ci-quality-coverage`, weekly image rebuild) |
-| `ci-cd.yml` | Container artifact publication + draft release on `v*` tags. Dev deploy/smoke jobs are **absent** (deleted with the `failure`-as-OK escape hatch). Production deploy/test (`phase4`/`phase5`) remain documented stubs that block tag releases. Images push a quarantine tag first; SHA/version tags are promoted **by digest** only after Trivy→cosign (no `:latest` from `main` while stubs remain). |
+| `ci-cd.yml` | Container artifact publication + draft release on `v*` tags. Dev deploy/smoke jobs are **absent** (deleted with the `failure`-as-OK escape hatch). Production deploy/test (`phase4`/`phase5`) remain documented stubs that block tag releases. Images push a quarantine tag first; SHA/version tags are promoted **by digest** only after Trivy→cosign (no `:latest` from `main` while stubs remain). Release tooling (cosign / syft / trivy) installs via SHA-pinned Actions; `make ensure-uv` installs a version-pinned, checksum-verified GitHub release (no downloader-piped-to-shell). |
 | `docker.yml` | Container build validation |
 | `style-guide-pages.yml` | Style guide site |
 
@@ -657,3 +657,16 @@ unverified. Operator default is a digest pin — Batch B owns ``DEFAULT_SANDBOX_
 (D42); this batch documents the coupling in ``docker/README.md`` rather than adding a
 second constant. Failed/cancelled supply-chain runs delete quarantine-only package
 versions via ``scripts/ghcr_quarantine_cleanup.sh``.
+
+## Amendments (prod-readiness-0.0.1 W12 — append-only)
+
+Verified release-tooling installers (**C11.1**, **C11.2**, **C11.3**, plan **D46**,
+**D47**). ``container-supply-chain`` installs syft via
+``anchore/sbom-action/download-syft`` and trivy via ``aquasecurity/setup-trivy``,
+both SHA-pinned like cosign. CLI versions remain ``syft v1.18.1`` and
+``trivy v0.58.1`` so ``scripts/trivy_ignore_args.py`` /
+``security/trivy-allowlist.toml`` keep working. ``make ensure-uv`` pins
+``UV_VERSION`` and checksum-verifies the GitHub release archive through
+``scripts/install_uv_verified.sh``. ``make check-no-curl-pipe-sh``
+(``ci-infra`` / ``CI_STEPS``) rejects new downloader-piped-to-shell patterns under
+``.github/`` and the ``Makefile``.
