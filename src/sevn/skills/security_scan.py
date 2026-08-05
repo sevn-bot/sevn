@@ -97,6 +97,10 @@ class BaselineSuppression:
 def normalize_skill_path(path: str | Path, *, repo_root: Path | None = None) -> str:
     """Return a stable posix path without trailing slash for baseline keys.
 
+    When ``repo_root`` is set, prefer the unresolved path under the repo so
+    ``.claude/skills/<name>`` symlinks from ``install-skills`` keep baseline
+    keys stable instead of resolving into ``spec-kit-wave/skills/<name>``.
+
     Args:
         path (str | Path): Absolute or relative skill path.
         repo_root (Path | None): When set, relativize absolute paths under the repo.
@@ -110,10 +114,16 @@ def normalize_skill_path(path: str | Path, *, repo_root: Path | None = None) -> 
     """
     raw = Path(path)
     if repo_root is not None:
+        root = repo_root.resolve()
+        candidate = raw if raw.is_absolute() else (root / raw)
         try:
-            raw = raw.resolve().relative_to(repo_root.resolve())
+            # ``absolute()`` does not follow symlinks (unlike ``resolve()``).
+            raw = candidate.absolute().relative_to(root)
         except ValueError:
-            raw = raw.resolve()
+            try:
+                raw = candidate.resolve().relative_to(root)
+            except ValueError:
+                raw = candidate.resolve()
     return raw.as_posix().rstrip("/")
 
 

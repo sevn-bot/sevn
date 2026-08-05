@@ -204,6 +204,18 @@
       "rule_id": "OH1",
       "reason": "spec-kit-wave maintainer gh CLI scripts; json.loads on gh stdout is operator-trusted",
       "reviewed": "2026-08-03"
+    },
+    {
+      "skill_path": ".claude/skills/github-issue-triage",
+      "rule_id": "P1",
+      "reason": "fetch_issue_safe.py is maintainer-only gh CLI ingest with injection hardening; P1 prompt-injection false positive",
+      "reviewed": "2026-08-05"
+    },
+    {
+      "skill_path": ".claude/skills/github-issue-triage",
+      "rule_id": "P2",
+      "reason": "issue-wave-brief.template.md is an operator template, not model-facing runtime prompt; P2 false positive",
+      "reviewed": "2026-08-05"
     }
   ]
 }
