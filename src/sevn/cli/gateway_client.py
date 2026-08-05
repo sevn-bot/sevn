@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 import httpx
 
@@ -173,6 +173,72 @@ _GATEWAY_TOKEN_REQUIRED_MSG: str = (
 )
 
 
+def _redact_gateway_url_for_error(url: str) -> str:
+    """Return ``url`` with sensitive query params removed for operator-facing errors.
+
+    Args:
+        url (str): Full request URL that may carry ``local_token``.
+
+    Returns:
+        str: URL safe to embed in exceptions and stderr.
+
+    Examples:
+        >>> _redact_gateway_url_for_error("http://127.0.0.1:3001/x?local_token=secret")
+        'http://127.0.0.1:3001/x'
+    """
+    from sevn.ui.dashboard.services.local_token import DASHBOARD_LOCAL_TOKEN_QUERY
+
+    parsed = urlparse(url)
+    if not parsed.query:
+        return url
+    pairs = parse_qsl(parsed.query, keep_blank_values=True)
+    filtered = [(key, value) for key, value in pairs if key != DASHBOARD_LOCAL_TOKEN_QUERY]
+    if len(filtered) == len(pairs):
+        return url
+    return urlunparse(parsed._replace(query=urlencode(filtered)))
+
+
+def _append_dashboard_local_token(
+    url: str,
+    *,
+    workspace: WorkspaceConfig | None,
+    path: str,
+) -> str:
+    """Append boot ``local_token`` when loopback dashboard local-open is configured.
+
+    Args:
+        url (str): Gateway URL under test.
+        workspace (WorkspaceConfig | None): Parsed ``sevn.json`` for local-open policy.
+        path (str): Normalized gateway path (leading ``/``).
+
+    Returns:
+        str: ``url`` with ``local_token`` query param when applicable.
+
+    Examples:
+        >>> _append_dashboard_local_token(
+        ...     "http://127.0.0.1:3001/api/v1/x",
+        ...     workspace=WorkspaceConfig.minimal(),
+        ...     path="/api/v1/x",
+        ... )
+        'http://127.0.0.1:3001/api/v1/x'
+    """
+    if workspace is None or not path.startswith("/api/v1/"):
+        return url
+    from sevn.ui.dashboard.services.auth import dashboard_local_open_configured
+    from sevn.ui.dashboard.services.local_token import (
+        DASHBOARD_LOCAL_TOKEN_QUERY,
+        read_dashboard_local_token,
+    )
+
+    if not dashboard_local_open_configured(workspace):
+        return url
+    local_token = read_dashboard_local_token()
+    if not local_token:
+        return url
+    sep = "&" if "?" in url else "?"
+    return f"{url}{sep}{DASHBOARD_LOCAL_TOKEN_QUERY}={local_token}"
+
+
 def probe_gateway_listen_state(*, workspace: WorkspaceConfig | None = None) -> str:
     """Classify what is listening on the configured gateway port.
 
@@ -302,7 +368,12 @@ def gateway_get(
     """
     ps = process or ProcessSettings()
     base = resolve_gateway_base_url(process=ps, workspace=workspace)
-    url = base + (path if path.startswith("/") else f"/{path}")
+    normalized_path = path if path.startswith("/") else f"/{path}"
+    url = _append_dashboard_local_token(
+        base + normalized_path,
+        workspace=workspace,
+        path=normalized_path,
+    )
     auth_token = (
         token
         if token is not None
@@ -324,10 +395,12 @@ def gateway_get(
             with httpx.Client(timeout=timeout, transport=transport) as client:
                 r = client.get(url, headers=headers)
             if r.status_code in (401, 403):
-                raise CliAuthError(f"gateway auth failed ({r.status_code}) for {url}")
+                raise CliAuthError(
+                    f"gateway auth failed ({r.status_code}) for {_redact_gateway_url_for_error(url)}",
+                )
             if 400 <= r.status_code < 500:
                 raise CliPreconditionError(
-                    f"gateway HTTP {r.status_code}: {url}",
+                    f"gateway HTTP {r.status_code}: {_redact_gateway_url_for_error(url)}",
                     exit_code=4,
                 )
             if r.status_code >= 500:
@@ -345,7 +418,8 @@ def gateway_get(
                 time.sleep(CLI_GATEWAY_GET_RETRY_BACKOFF_S)
                 continue
             raise CliPreconditionError(
-                f"gateway HTTP error: {exc.response.status_code} {url}",
+                "gateway HTTP error: "
+                f"{exc.response.status_code} {_redact_gateway_url_for_error(url)}",
                 exit_code=4,
             ) from exc
         except (httpx.RequestError, OSError, ValueError) as exc:
@@ -354,11 +428,11 @@ def gateway_get(
                 time.sleep(CLI_GATEWAY_GET_RETRY_BACKOFF_S)
                 continue
             raise CliPreconditionError(
-                f"gateway unreachable: {url} ({exc})",
+                f"gateway unreachable: {_redact_gateway_url_for_error(url)} ({exc})",
                 exit_code=4,
             ) from exc
     raise CliPreconditionError(
-        f"gateway GET failed after retries: {url} ({last_exc})",
+        f"gateway GET failed after retries: {_redact_gateway_url_for_error(url)} ({last_exc})",
         exit_code=4,
     ) from last_exc
 
@@ -411,19 +485,12 @@ def gateway_json_request(
     """
     ps = process or ProcessSettings()
     base = resolve_gateway_base_url(process=ps, workspace=workspace)
-    url = base + (path if path.startswith("/") else f"/{path}")
-    if workspace is not None and path.startswith("/api/v1/"):
-        from sevn.ui.dashboard.services.auth import dashboard_local_open_configured
-        from sevn.ui.dashboard.services.local_token import (
-            DASHBOARD_LOCAL_TOKEN_QUERY,
-            read_dashboard_local_token,
-        )
-
-        if dashboard_local_open_configured(workspace):
-            local_token = read_dashboard_local_token()
-            if local_token:
-                sep = "&" if "?" in url else "?"
-                url = f"{url}{sep}{DASHBOARD_LOCAL_TOKEN_QUERY}={local_token}"
+    normalized_path = path if path.startswith("/") else f"/{path}"
+    url = _append_dashboard_local_token(
+        base + normalized_path,
+        workspace=workspace,
+        path=normalized_path,
+    )
     auth_token = resolve_gateway_token(
         process=ps,
         workspace=workspace,
@@ -441,14 +508,16 @@ def gateway_json_request(
             response = client.request(verb, url, headers=headers, json=json_body)
     except (httpx.RequestError, OSError, ValueError) as exc:
         raise CliPreconditionError(
-            f"gateway unreachable: {url} ({exc})",
+            f"gateway unreachable: {_redact_gateway_url_for_error(url)} ({exc})",
             exit_code=4,
         ) from exc
     if response.status_code in (401, 403):
-        raise CliAuthError(f"gateway auth failed ({response.status_code}) for {url}")
+        raise CliAuthError(
+            f"gateway auth failed ({response.status_code}) for {_redact_gateway_url_for_error(url)}",
+        )
     if response.status_code >= 500:
         raise CliPreconditionError(
-            f"gateway HTTP {response.status_code}: {url}",
+            f"gateway HTTP {response.status_code}: {_redact_gateway_url_for_error(url)}",
             exit_code=4,
         )
     return response
