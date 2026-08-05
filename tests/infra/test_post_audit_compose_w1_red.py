@@ -3,8 +3,9 @@
 Contracts (``about-sevn.bot/specs/25-cicd-full.md``, ``prd/06-setup-and-operations.md``):
 exactly one gateway per documented ``-f`` invocation; no duplicate ``SEVN_GATEWAY_PORT``
 publishers in a resolvable file set; Makefile compose targets resolve to a single-gateway
-file set; operator service hardening (W3 / D24); conditional ``sevn-operator-perms`` chown
-(W3 / D25). Parses compose YAML and the Makefile directly - no Docker daemon.
+file set; operator service hardening (W3 / D24); scoped ``sevn-operator-perms`` chown plus
+versioned init marker (prod-readiness C9.1-C9.3 / W13.1 -> green after W15). Parses compose
+YAML and the Makefile directly - no Docker daemon.
 """
 
 from __future__ import annotations
@@ -35,6 +36,17 @@ _MAKEFILE_TARGET_RE = re.compile(
     re.MULTILINE,
 )
 _COMPOSE_CMD_RE = re.compile(r"docker compose (.+)$")
+# Prod-readiness C9.1/C9.2/C9.3 (W15): known application-owned paths + versioned marker.
+_PERMS_MARKER = "/operator/.sevn/perms-v1"
+_SCOPED_APPLICATION_DIRS = (
+    "/operator/workspace",
+    "/operator/workspace/logs",
+    "/operator/workspace/.sevn",
+    "/operator/workspace/.sevn/browser-profiles",
+    "/operator/workspace/.sevn/browser-sessions",
+    "/browser-profiles",
+)
+_FULL_TREE_OPERATOR_FIND_RE = re.compile(r"find\s+/operator(?:\s|$)")
 
 
 def _load_services(path: Path) -> dict[str, Any]:
@@ -308,18 +320,38 @@ def test_sevn_proxy_read_only_with_tmpfs() -> None:
 
 
 def test_operator_perms_has_no_unconditional_chown() -> None:
-    """W1.5: sevn-operator-perms must not run unconditional ``chown -R``."""
+    """W1.5 / C9.1: sevn-operator-perms must not run unconditional ``chown -R``."""
     command = _operator_perms_command_text()
     unconditional = re.findall(
         r"chown\s+-R\s+10001:10001\s+/[^\s;]+",
         command,
     )
-    assert unconditional == [], "unconditional chown -R forbidden; use find ! -user 10001 predicate"
+    assert unconditional == [], (
+        "unconditional chown -R forbidden; scope chown to application-owned directories"
+    )
 
 
-def test_operator_perms_uses_conditional_find_chown() -> None:
-    """W1.5: sevn-operator-perms scopes chown with ``! -user 10001``."""
+@pytest.mark.xfail(
+    reason="green after W15: scoped dirs + versioned marker (C9.1/C9.2/C9.3)",
+    strict=False,
+)
+def test_operator_perms_scopes_chown_to_application_owned_dirs() -> None:
+    """C9.3 / C9.1: no full-tree ``find /operator``; chown only known application dirs."""
     command = _operator_perms_command_text()
-    assert "! -user 10001" in command, (
-        "sevn-operator-perms must use find ! -user 10001 -exec chown …"
+    assert _FULL_TREE_OPERATOR_FIND_RE.search(command) is None, (
+        "full-tree find /operator forbidden; chown known application-owned directories only"
+    )
+    for path in _SCOPED_APPLICATION_DIRS:
+        assert path in command, f"scoped application path {path} missing from sevn-operator-perms"
+
+
+@pytest.mark.xfail(
+    reason="green after W15: scoped dirs + versioned marker (C9.1/C9.2/C9.3)",
+    strict=False,
+)
+def test_operator_perms_writes_versioned_init_marker() -> None:
+    """C9.3 / C9.2: permissions init writes/checks ``/operator/.sevn/perms-v1``."""
+    command = _operator_perms_command_text()
+    assert _PERMS_MARKER in command, (
+        f"sevn-operator-perms must write/check versioned marker {_PERMS_MARKER}"
     )
