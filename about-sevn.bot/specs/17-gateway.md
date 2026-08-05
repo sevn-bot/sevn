@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-08-05'
-fingerprint: sha256:41a984321c70ae2d9bc9f2a82005c67779e9b9e083898be2770734fd0a4e33d5
+fingerprint: sha256:5c27eb8029a5f60b91a99222198153003812b6c6c6dce19950e3020d5bcb8e72
 related: []
 sources:
 - src/sevn/gateway/**
@@ -942,6 +942,12 @@ interfaces:
 - name: TokenBucketLimiter
   file: src/sevn/gateway/runtime/rate_limit.py
   symbol: TokenBucketLimiter
+- name: ensure_gateway_sandbox_image_ready
+  file: src/sevn/gateway/runtime/sandbox_image_boot.py
+  symbol: ensure_gateway_sandbox_image_ready
+- name: register_sandbox_image_boot_hooks
+  file: src/sevn/gateway/runtime/sandbox_image_boot.py
+  symbol: register_sandbox_image_boot_hooks
 - name: release_leaked_multiprocessing_semaphores
   file: src/sevn/gateway/runtime/shutdown_cleanup.py
   symbol: release_leaked_multiprocessing_semaphores

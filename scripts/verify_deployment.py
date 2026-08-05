@@ -19,7 +19,7 @@ Exports:
     Invocation — One documented way an operator or CI reaches the compose stack.
     drive_compose_profiles — Assert every documented compose invocation (#164, #165).
     drive_stack_health — Boot the operator stack, probe /health + /ready, tear down (#166).
-    drive_sandbox_spawn — Spawn a tier-B sandbox through the real docker CLI (#170).
+    drive_sandbox_spawn — Prove D43 fail-closed (or digest-pinned spawn) via real docker CLI.
     drive_runtime — sevn CLI invocation plus HTTP probes against a running gateway.
     main — CLI entry; runs one driver or all of them.
 
@@ -762,8 +762,8 @@ async def _spawn_through_docker(image: str) -> tuple[str, str]:
         tuple[str, str]: Resolved image reference and the spawned sandbox id.
 
     Examples:
-        >>> asyncio.run(_spawn_through_docker("sevn-sandbox:local"))  # doctest: +SKIP
-        ('sevn-sandbox:local', 'sevn-sb-...')
+        >>> asyncio.run(_spawn_through_docker("alpine:3.20.3"))  # doctest: +SKIP
+        ('alpine@sha256:…', 'sevn-sb-...')
     """
     from sevn.config.workspace_config import WorkspaceConfig
     from sevn.security.sandbox_runtime import (
@@ -785,12 +785,79 @@ async def _spawn_through_docker(image: str) -> tuple[str, str]:
             await runtime.teardown(sandbox_id)
 
 
-def drive_sandbox_spawn() -> DriverResult:
-    """Spawn a tier-B sandbox through the real ``docker`` CLI, not a stub.
+def _repo_digests_empty(image: str) -> tuple[bool, str]:
+    """Return whether ``image`` has an empty ``RepoDigests`` list locally.
 
-    Covers #170: ``_resolve_digest_pinned_image`` falls back to the image ``.Id``
-    when ``RepoDigests`` is empty (any locally built image), and that bare
-    ``sha256:…`` is handed straight to ``docker pull``, so spawn fails outright.
+    Args:
+        image (str): Local docker image reference.
+
+    Returns:
+        tuple[bool, str]: ``(True, detail)`` when digests are absent; else
+        ``(False, inspect output)``.
+
+    Examples:
+        >>> isinstance(_repo_digests_empty("missing:tag")[0], bool)
+        True
+    """
+    code, out = _run(
+        ["docker", "image", "inspect", "--format", "{{len .RepoDigests}}", image],
+        timeout=60.0,
+    )
+    detail = out.strip()
+    if code != 0:
+        return False, detail
+    return detail in ("0", ""), detail
+
+
+def _is_d43_fail_closed(exc: BaseException, image: str) -> bool:
+    """True when spawn raised the intentional empty-``RepoDigests`` refuse (D43).
+
+    Locally built tags (e.g. ``sevn-sandbox:local``) have no registry digests.
+    Post-W7/W8 product code raises ``SandboxConfigurationError`` on pull denial
+    or empty ``RepoDigests`` instead of handing a bare ``sha256:…`` ``.Id`` to
+    ``docker pull`` (#170 regression). That refuse is the pass criterion for the
+    default verify image; set ``SEVN_VERIFY_SANDBOX_IMAGE`` to a digest-pinned
+    registry ref to exercise a successful spawn instead.
+
+    Args:
+        exc (BaseException): Exception raised by ``_spawn_through_docker``.
+        image (str): Image reference passed to spawn.
+
+    Returns:
+        bool: Whether ``exc`` is the expected D43 fail-closed outcome.
+
+    Examples:
+        >>> from sevn.security.sandbox_errors import SandboxConfigurationError
+        >>> _is_d43_fail_closed(
+        ...     SandboxConfigurationError("docker pull 'x:local' failed (exit 1)"),
+        ...     "x:local",
+        ... )  # doctest: +SKIP
+        True
+    """
+    from sevn.security.sandbox_errors import SandboxConfigurationError
+
+    if not isinstance(exc, SandboxConfigurationError):
+        return False
+    msg = str(exc)
+    # #170 regression: bare image id handed to ``docker pull``.
+    if re.search(r"docker pull ['\"]sha256:", msg):
+        return False
+    empty, _ = _repo_digests_empty(image)
+    if "has no RepoDigests" in msg:
+        return True
+    if f"docker pull {image!r} failed" in msg or f"docker pull '{image}' failed" in msg:
+        return empty or "@sha256:" not in image
+    return False
+
+
+def drive_sandbox_spawn() -> DriverResult:
+    """Prove sandbox image pinning against the real ``docker`` CLI (D43 / #170).
+
+    Default image ``sevn-sandbox:local`` (from ``make docker-build-ci``) has no
+    ``RepoDigests``. The product must **fail closed** with
+    ``SandboxConfigurationError`` — that refuse is a **pass**. Override with
+    digest-pinned ``SEVN_VERIFY_SANDBOX_IMAGE`` (``repo@sha256:…``) to require a
+    successful spawn/teardown instead.
 
     Returns:
         DriverResult: Verdict plus image-resolution and real-spawn checks.
@@ -820,6 +887,37 @@ def drive_sandbox_spawn() -> DriverResult:
     try:
         resolved, sandbox_id = asyncio.run(_spawn_through_docker(image))
     except Exception as exc:
+        code2, out2 = _run(
+            ["docker", "image", "inspect", "--format", "{{json .RepoDigests}}", image],
+            timeout=60.0,
+        )
+        digests_detail = out2.strip()[:400]
+        if _is_d43_fail_closed(exc, image):
+            result.checks.append(
+                Check(
+                    name="image-resolution",
+                    status=STATUS_PASS,
+                    detail=(
+                        f"{image!r} has empty RepoDigests (local id {local_id}); "
+                        "product refused spawn instead of falling back to bare .Id (D43)"
+                    ),
+                    output=digests_detail,
+                )
+            )
+            result.checks.append(
+                Check(
+                    name="fail-closed",
+                    status=STATUS_PASS,
+                    detail=f"{type(exc).__name__}: {exc}",
+                    command=f"_resolve_digest_pinned_image({image!r})",
+                )
+            )
+            result.reason = (
+                f"D43 fail-closed confirmed for locally built {image!r} "
+                "(set SEVN_VERIFY_SANDBOX_IMAGE to a digest-pinned ref to spawn)"
+            )
+            return result
+
         result.status = STATUS_FAIL
         result.reason = f"real docker spawn of {image!r} failed: {type(exc).__name__}: {exc}"
         result.checks.append(
@@ -830,20 +928,15 @@ def drive_sandbox_spawn() -> DriverResult:
                 command=f"DockerSandboxRuntime(image={image!r}).spawn(...)",
             )
         )
-        code2, out2 = _run(
-            ["docker", "image", "inspect", "--format", "{{index .RepoDigests 0}}", image],
-            timeout=60.0,
-        )
         result.checks.append(
             Check(
                 name="image-resolution",
                 status=STATUS_FAIL,
                 detail=(
                     f"RepoDigests lookup exit {code2}; local image id {local_id} — "
-                    "a locally built image has no RepoDigests, so digest pinning "
-                    "falls back to the bare image id (#170)"
+                    "unexpected spawn failure (not D43 fail-closed)"
                 ),
-                output=out2.strip()[:400],
+                output=digests_detail,
             )
         )
         return result
@@ -856,11 +949,14 @@ def drive_sandbox_spawn() -> DriverResult:
             detail=(
                 f"{image!r} resolved to {resolved!r}"
                 if pullable
-                else f"{image!r} resolved to bare image id {resolved!r}, which `docker pull` cannot accept (#170)"
+                else (
+                    f"{image!r} resolved to bare image id {resolved!r}, "
+                    "which `docker pull` cannot accept (#170 regression)"
+                )
             ),
         )
     )
-    if pullable and resolved == image:
+    if pullable and resolved == image and "@sha256:" not in image:
         result.checks.append(
             Check(
                 name="digest-pinning",
