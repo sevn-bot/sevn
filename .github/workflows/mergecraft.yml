@@ -330,7 +330,7 @@ jobs:
         # fails on one-sided bumps.
         # bumped past f98aeb0 for Codex harness + @openai/codex image; 349f948 uses
         # Codex permission profiles so read-only PR reviews can reach localhost MCP.
-        uses: alexhawat/mergeCraft@349f9489da34515a09997142ae75acbc24797227 # pre-0.0.1 (Codex MCP permission profiles)
+        uses: alexhawat/mergeCraft@e5896a971068ad262ff06947dac4a7de4fa9929c # pre-0.0.1 (Codex no-GitHub-plugin preamble)
         with:
           prompt: ${{ steps.prompt.outputs.text }}
           # Must stay BELOW the job's timeout-minutes: when GitHub kills the job
@@ -399,7 +399,7 @@ jobs:
           )
         id: mergecraft_codex
         continue-on-error: true
-        uses: alexhawat/mergeCraft@349f9489da34515a09997142ae75acbc24797227 # pre-0.0.1 (Codex MCP permission profiles)
+        uses: alexhawat/mergeCraft@e5896a971068ad262ff06947dac4a7de4fa9929c # pre-0.0.1 (Codex no-GitHub-plugin preamble)
         with:
           prompt: ${{ steps.prompt.outputs.text }}
           timeout: 25m
