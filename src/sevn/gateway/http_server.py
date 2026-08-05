@@ -698,7 +698,7 @@ async def _with_resolved_proxy_shared_secret(
     *,
     content_root: Path,
 ) -> ProcessSettings:
-    """Merge ``proxy_shared_secret`` from env or the workspace secrets chain.
+    """Merge ``proxy_shared_secret`` from env, generate-once file, or secrets chain.
 
     Does **not** write ``os.environ`` (D41). Gateway callers inject the resolved
     value via ``build_runtime_tool_bindings(proxy_shared_secret=…)``.
@@ -719,11 +719,16 @@ async def _with_resolved_proxy_shared_secret(
     if (process.proxy_shared_secret or "").strip():
         return process
     from sevn.agent.adapters.egress_bridge import resolve_proxy_shared_secret
+    from sevn.config.loader import operator_home_dir
     from sevn.security.secrets.factory import secrets_chain_from_workspace
 
     chain = secrets_chain_from_workspace(content_root, workspace.secrets_backend)
-    # Env already empty on ProcessSettings; force the chain awaitable path.
-    resolved = resolve_proxy_shared_secret(env={}, chain=chain)
+    # Env already empty on ProcessSettings; try generate-once file then chain.
+    resolved = resolve_proxy_shared_secret(
+        env={},
+        chain=chain,
+        state_root=operator_home_dir(),
+    )
     proxy_secret = await resolved if asyncio.iscoroutine(resolved) else resolved
     if proxy_secret and str(proxy_secret).strip():
         return process.model_copy(update={"proxy_shared_secret": str(proxy_secret).strip()})

@@ -8,7 +8,7 @@ summary: Normalize provider-shaped JSON over async HTTP to a single egress base 
   (SEVN_PROXY_URL / ProcessSettings.proxy_url), so tier executors bind once per turn
   and never touch raw secrets. LiteLLM may r
 last_updated: '2026-08-05'
-fingerprint: sha256:9f3bf9ce0598eea0e9af6d9a68cc4f1d9f0a402b4c5bb18b0dc5b4f2165f6e09
+fingerprint: sha256:d4d2749f0e8e569b63bfb1df91a18b0e7ad256778f5b646a42095536cbcf6093
 related: []
 sources:
 - src/sevn/proxy/**

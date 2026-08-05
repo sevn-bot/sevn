@@ -12,6 +12,7 @@ are cut into a dated, versioned section at release time.
 
 ### Added
 - [2026-08-05] Stop tracking ``/.cursor`` (agents stay operator-local); add ``docs/cursor-local-setup.md`` and ``docs/templates/cursor/`` for hook and D1 rule bootstrap
+- [2026-08-05] Compose ``sevn-operator-perms`` generates ``/operator/.sevn/proxy-shared-secret`` on first boot; gateway/proxy resolve it when ``SEVN_PROXY_SHARED_SECRET`` is unset (explicit env still wins); host onboarding writes the same path
 - [2026-08-04] Pre-commit blocks commits from the primary checkout unless `SEVN_ALLOW_PRIMARY_COMMIT=1`; `make check-git-guards` asserts `git` resolves to repo `bin/git` without direnv (D1 primary-checkout guard)
 
 ### Changed

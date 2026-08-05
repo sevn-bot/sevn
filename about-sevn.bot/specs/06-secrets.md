@@ -231,6 +231,17 @@ Proxy seam: ``sevn.proxy.credentials._resolve_proxy_shared_secret`` via
 ``build_proxy_settings``. ``ProxySettings.proxy_shared_secret`` keeps its
 ``AliasChoices`` env binding so Compose / operators can still inject the env var.
 
+## Amendments (prod-readiness-0.0.1 W4 — C1.2)
+
+Compose ``sevn-operator-perms`` generates ``{SEVN_HOME}/.sevn/proxy-shared-secret``
+(mode ``0600``, uid ``10001`` after the scoped chown) on first boot when absent
+(D37). Helper: ``sevn.proxy.bootstrap_secret.ensure_proxy_shared_secret_file`` /
+``resolve_effective_proxy_shared_secret``. Resolution order is now: non-empty
+process env → generate-once file → workspace secrets chain. Host onboarding
+(``store_wizard_credentials``) writes the same path so host and Compose converge.
+``.env.example`` documents generation and must not ship a blank
+``SEVN_PROXY_SHARED_SECRET=`` assignment.
+
 ## Human-input needed
 
 Prose body not yet authored (W9 scope). Normative contract requires operator or

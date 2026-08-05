@@ -78,11 +78,15 @@ Copy [`.env.example`](../.env.example) to `.env` in the repo root before
 | `SEVN_SECRETS_PASSPHRASE` | Secrets-store passphrase fallback |
 | `SEVN_PROXY_URL` | Gateway → proxy base URL (compose sets `http://sevn-proxy:8787` internally) |
 
-When the egress proxy shared-secret guard is enabled, set matching
-`SEVN_PROXY_SHARED_SECRET` on **both** gateway and proxy (see
-[`docs/readmes/proxy-egress.md`](../docs/readmes/proxy-egress.md)). Onboarding
-generates and stores the secret automatically; without it, guarded routes return
-**503** unless `SEVN_PROXY_ALLOW_UNAUTHENTICATED=1` (dev-only, loudly logged).
+When the egress proxy shared-secret guard is enabled, Compose generates
+`/operator/.sevn/proxy-shared-secret` (mode `0600`, uid `10001`) on first boot via
+`sevn-operator-perms` when the file is absent. Gateway and proxy (including browser/gui
+overrides) resolve that file when `SEVN_PROXY_SHARED_SECRET` is unset; set the env var
+on both services only to **override** (external secret manager). Host onboarding writes
+the same path under `SEVN_HOME`. See
+[`docs/readmes/proxy-egress.md`](../docs/readmes/proxy-egress.md). Without a resolved
+secret, guarded routes return **503** unless `SEVN_PROXY_ALLOW_UNAUTHENTICATED=1`
+(dev-only, loudly logged).
 
 **Mission Control on loopback:** opening `http://127.0.0.1:${SEVN_GATEWAY_PORT}/mission/…`
 without the boot `dashboard-local-token` is denied when local-open is effective.

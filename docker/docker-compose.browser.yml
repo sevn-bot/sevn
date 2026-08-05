@@ -4,6 +4,9 @@
 # Run from repo root:
 #   docker compose -f docker/docker-compose.yml -f docker/docker-compose.browser.yml up -d --build
 # or: make compose-browser-up
+#
+# SEVN_PROXY_SHARED_SECRET: explicit env overrides the generate-once file at
+# /operator/.sevn/proxy-shared-secret (created by sevn-operator-perms on first boot).
 
 services:
   sevn-gateway:

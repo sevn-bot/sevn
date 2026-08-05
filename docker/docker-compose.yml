@@ -17,6 +17,13 @@
 #
 # Gateway/proxy/browser images run as uid 10001 (`sevn`). Named volumes mount as root unless
 # normalized — ``sevn-operator-perms`` chowns only paths whose ownership is wrong (D25).
+#
+# Proxy shared secret (C1.2 / D37): ``sevn-operator-perms`` generates
+# ``/operator/.sevn/proxy-shared-secret`` (mode 0600) on first boot when absent, then the
+# scoped chown pass owns it as uid 10001. Gateway and proxy resolve that file when
+# ``SEVN_PROXY_SHARED_SECRET`` is unset; an explicitly set env value still wins.
+# Reuses sevn-operator-perms (not a sibling) so ``check-compose-default`` keeps the
+# three-service set and generation runs before ownership normalization.
 
 x-operator-service-hardening: &operator-service-hardening
   security_opt:
@@ -57,7 +64,13 @@ services:
       - sh
       - -ec
       - |
-        mkdir -p /operator /operator/workspace /operator/workspace/logs /operator/workspace/.sevn /operator/workspace/.sevn/browser-profiles /operator/workspace/.sevn/browser-sessions /browser-profiles
+        mkdir -p /operator /operator/.sevn /operator/workspace /operator/workspace/logs /operator/workspace/.sevn /operator/workspace/.sevn/browser-profiles /operator/workspace/.sevn/browser-sessions /browser-profiles
+        # C1.2 / D37: generate-once proxy shared secret (same path as ensure_proxy_shared_secret_file).
+        if [ ! -f /operator/.sevn/proxy-shared-secret ]; then
+          umask 077
+          head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n\r' > /operator/.sevn/proxy-shared-secret
+          chmod 600 /operator/.sevn/proxy-shared-secret
+        fi
         find /operator ! -user 10001 -exec chown 10001:10001 {} +
         find /browser-profiles ! -user 10001 -exec chown 10001:10001 {} +
     restart: "no"

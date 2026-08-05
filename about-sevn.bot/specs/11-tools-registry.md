@@ -8,7 +8,7 @@ summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that eve
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
 last_updated: '2026-08-05'
-fingerprint: sha256:5505e86940e280659d9e15e8e35f840cf6ddc1aafe6e919894382d0ecd3c97a3
+fingerprint: sha256:0351cf243ee15ecc85865cc05543e839592d196cc659ee309bdb56f0d7bcaa8e
 related: []
 sources:
 - src/sevn/tools/**
@@ -551,6 +551,9 @@ interfaces:
 - name: validate_json_schema_subset
   file: src/sevn/tools/validation.py
   symbol: validate_json_schema_subset
+- name: ProxySharedSecretUnconfiguredError
+  file: src/sevn/tools/web.py
+  symbol: ProxySharedSecretUnconfiguredError
 - name: build_egress_web_headers
   file: src/sevn/tools/web.py
   symbol: build_egress_web_headers

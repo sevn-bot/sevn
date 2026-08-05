@@ -8,7 +8,7 @@ summary: Operators choose how they pay for models—API keys, ChatGPT subscripti
   OAuth, and multi-provider slots—with spend visible and graceful degradation when
   a vendor fails.
 last_updated: '2026-08-05'
-fingerprint: sha256:926b880d064308240e06da1a8323d9e86a909d73a3418716c01f66b31fa9e9c1
+fingerprint: sha256:3b1df19fe5cc633604299a6e4217af65c03d82b1d6fd4ff5438856d377024d4e
 related: []
 sources:
 - src/sevn/proxy/**

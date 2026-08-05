@@ -799,9 +799,15 @@ async def build_proxy_settings(
         if brave_key:
             updates["brave_api_key"] = brave_key
     if not settings.proxy_shared_secret:
-        proxy_secret = await _resolve_proxy_shared_secret(chain)
-        if proxy_secret:
-            updates["proxy_shared_secret"] = proxy_secret
+        from sevn.proxy.bootstrap_secret import resolve_effective_proxy_shared_secret
+
+        file_secret = resolve_effective_proxy_shared_secret()
+        if file_secret:
+            updates["proxy_shared_secret"] = file_secret
+        else:
+            proxy_secret = await _resolve_proxy_shared_secret(chain)
+            if proxy_secret:
+                updates["proxy_shared_secret"] = proxy_secret
     return settings.model_copy(update=updates)
 
 

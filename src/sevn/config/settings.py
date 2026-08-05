@@ -82,7 +82,8 @@ class ProcessSettings(BaseSettings):
         validation_alias=AliasChoices("SEVN_PROXY_SHARED_SECRET"),
         description=(
             "Gateway↔proxy shared secret for ``X-Sevn-Proxy-Token``; also resolvable "
-            "from the workspace secrets chain (``specs/06-secrets.md``, ``specs/07``)."
+            "from ``{SEVN_HOME}/.sevn/proxy-shared-secret`` or the workspace secrets "
+            "chain (``specs/06-secrets.md``, ``specs/07``)."
         ),
     )
     session_token: str | None = Field(
