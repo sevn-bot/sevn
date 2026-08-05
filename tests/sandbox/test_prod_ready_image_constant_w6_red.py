@@ -6,7 +6,7 @@ Contracts (``about-sevn.bot/specs/08-sandbox.md``):
 - Schema either defines ``sandbox.docker_image`` or documents that only ``rlm.docker_image``
   is honoured — a plausible silent no-op key is the defect.
 
-xfail → W7.
+W6.1-W6.3 green after W7; W6.4-W6.7 remain xfail -> W8 in sibling suite.
 """
 
 from __future__ import annotations
@@ -16,8 +16,6 @@ import inspect
 import json
 import re
 from pathlib import Path
-
-import pytest
 
 from sevn.agent.runtimes.sandbox import _default_repl_image
 from sevn.config.workspace_config import WorkspaceConfig
@@ -54,7 +52,6 @@ def _import_default_sandbox_image() -> str:
     return DEFAULT_SANDBOX_IMAGE
 
 
-@pytest.mark.xfail(reason="green after W7: no mutable sandbox image tags under src/", strict=False)
 def test_w6_1_no_mutable_tag_literals_under_src() -> None:
     """C4.1 / C4.3 — deleting the digest constant and reintroducing ``:dev`` must fail this."""
     hits = _mutable_sandbox_image_hits()
@@ -67,7 +64,6 @@ def test_w6_1_no_mutable_tag_literals_under_src() -> None:
     assert not constant.rstrip("/").endswith(":latest")
 
 
-@pytest.mark.xfail(reason="green after W7: three sites share DEFAULT_SANDBOX_IMAGE", strict=False)
 def test_w6_2_three_sites_resolve_from_same_constant(tmp_path: Path) -> None:
     """D42 — ``sandbox_runtime`` default, factory fallback, and REPL default share one object."""
     constant = _import_default_sandbox_image()
@@ -96,10 +92,6 @@ def test_w6_2_three_sites_resolve_from_same_constant(tmp_path: Path) -> None:
                 )
 
 
-@pytest.mark.xfail(
-    reason="green after W7: sandbox.docker_image defined or schema documents rlm-only",
-    strict=False,
-)
 def test_w6_3_schema_defines_or_documents_sandbox_docker_image() -> None:
     """D42 — either honour ``sandbox.docker_image`` or document that only ``rlm.docker_image`` is."""
     schema = json.loads(_SCHEMA.read_text(encoding="utf-8"))
