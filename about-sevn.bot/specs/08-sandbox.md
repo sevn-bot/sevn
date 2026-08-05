@@ -8,7 +8,7 @@ summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / sa
   (when routed through the execution sandbox), process when configured for sandbox
   routing, and skill subprocesses spawned b
 last_updated: '2026-08-05'
-fingerprint: sha256:4710b12f2076e9c61d8f38ad1afd694d81810458a9ecde81b5e0bed7e3f1e299
+fingerprint: sha256:887b3d554ef74a1dc0bb3ccb1d0bf4ded1f21623f7970b2d84eced41516d840b
 related: []
 sources:
 - src/sevn/security/**
@@ -175,6 +175,9 @@ interfaces:
 - name: check_self_preservation_argv
   file: src/sevn/security/sandbox_runtime.py
   symbol: check_self_preservation_argv
+- name: configured_sandbox_image
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: configured_sandbox_image
 - name: docker_daemon_reachable
   file: src/sevn/security/sandbox_runtime.py
   symbol: docker_daemon_reachable
@@ -184,6 +187,9 @@ interfaces:
 - name: ensure_sandbox_docker_network
   file: src/sevn/security/sandbox_runtime.py
   symbol: ensure_sandbox_docker_network
+- name: ensure_sandbox_image_ready
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: ensure_sandbox_image_ready
 - name: list_labeled_sandbox_containers
   file: src/sevn/security/sandbox_runtime.py
   symbol: list_labeled_sandbox_containers
@@ -205,6 +211,9 @@ interfaces:
 - name: reap_stale_sandbox_containers
   file: src/sevn/security/sandbox_runtime.py
   symbol: reap_stale_sandbox_containers
+- name: refresh_sandbox_image
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: refresh_sandbox_image
 - name: resolve_sandbox_driver
   file: src/sevn/security/sandbox_runtime.py
   symbol: resolve_sandbox_driver
@@ -463,6 +472,32 @@ for subprocess/namespace mode and operator reference.
 **Known tradeoff:** ``ensure_proxy_attached_to_sandbox_network`` attaches the
 **whole** egress-proxy container to ``sevn-sandbox`` so sandboxes can reach the
 reverse-proxy API; the proxy shares the internal bridge with sandboxes.
+
+## Amendments (prod-readiness-0.0.1 W8 — C4.2, C5.1–C5.3, D43)
+
+Gateway startup resolves and validates the configured sandbox image digest **once**
+(``ensure_sandbox_image_ready`` / ``ensure_gateway_sandbox_image_ready``) and caches
+it for the process lifetime, keyed by the configured image ref so an
+``rlm.docker_image`` change is not masked (C5.1). ``DockerSandboxRuntime.spawn``
+consumes that cache; ``docker run`` and the ``sandbox.runtime`` trace ``image``
+attribute carry the digest actually executed.
+
+**Local short circuit (C5.2):** a digest-pinned ref that is already present locally
+does not ``docker pull``. Tagged refs still pull on a cold process cache (deploy
+cold-start), then pin via ``RepoDigests``.
+
+**Explicit refresh (C5.3):** only ``refresh_sandbox_image`` invalidates the cache and
+re-pulls. Spawn never refreshes implicitly.
+
+**Pre-pull / refuse (C4.2):** ``make sandbox-image-pull`` pre-pulls
+``DEFAULT_SANDBOX_IMAGE`` at deploy. When Docker is reachable and the configured
+image is stamped, gateway lifespan calls ``ensure_gateway_sandbox_image_ready`` and
+**refuses to start** if the digest is absent and cannot be fetched. Unstamped
+local checkouts skip the boot ensure (spawn still fail-closes per W7.4).
+
+**Hard constraint (D43):** the pull-then-pin contract and the empty-``RepoDigests``
+fail-closed error in ``_resolve_digest_pinned_image`` are unchanged; the ``.Id``
+fallback stays deleted.
 
 ## Amendments (prod-readiness-0.0.1 W7 — C4.1, C4.3, D42)
 

@@ -19,6 +19,7 @@ are cut into a dated, versioned section at release time.
 - [2026-08-05] CLI dashboard reads (`sevn models`, `sevn agent config`, `sevn channels status`, and related commands) append the boot `local_token` when calling loopback Mission Control with effective local-open (#169, post-audit Batch E W18)
 
 ### Security
+- [2026-08-05] Sandbox image digest is resolved once at gateway startup and cached for the process lifetime; local digest-pinned images skip `docker pull`; `refresh_sandbox_image` is the only refresh path; `make sandbox-image-pull` pre-pulls the release digest (prod-readiness C4.2, C5.1–C5.3; #187)
 - [2026-08-05] Default Docker sandbox image is one build-stamped digest pin (`DEFAULT_SANDBOX_IMAGE`); CI `make sandbox-image-check` rejects `:dev` / `:latest` literals under `src/` (prod-readiness C4.1, C4.3)
 - [2026-08-04] Bump `cryptography` to 50.0.0 (CVE-2026-69247, CVE-2026-69248, CVE-2026-69249)
 - [2026-08-03] `GET /capabilities` and `sevn capabilities` document OpenAI-compat limits (`streaming`, `usage_reporting`, `tool_messages`) alongside channel inventory (#151, release-audit C-Thermos)

@@ -8,7 +8,7 @@ summary: Deliver a single scanner subsystem that runs in the gateway process so 
   content is filtered before the Triager or any routing model sees user-visible text,
   transcripts, or selected tool output.
 last_updated: '2026-08-05'
-fingerprint: sha256:4710b12f2076e9c61d8f38ad1afd694d81810458a9ecde81b5e0bed7e3f1e299
+fingerprint: sha256:887b3d554ef74a1dc0bb3ccb1d0bf4ded1f21623f7970b2d84eced41516d840b
 related: []
 sources:
 - src/sevn/security/**
@@ -168,6 +168,9 @@ interfaces:
 - name: check_self_preservation_argv
   file: src/sevn/security/sandbox_runtime.py
   symbol: check_self_preservation_argv
+- name: configured_sandbox_image
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: configured_sandbox_image
 - name: docker_daemon_reachable
   file: src/sevn/security/sandbox_runtime.py
   symbol: docker_daemon_reachable
@@ -177,6 +180,9 @@ interfaces:
 - name: ensure_sandbox_docker_network
   file: src/sevn/security/sandbox_runtime.py
   symbol: ensure_sandbox_docker_network
+- name: ensure_sandbox_image_ready
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: ensure_sandbox_image_ready
 - name: list_labeled_sandbox_containers
   file: src/sevn/security/sandbox_runtime.py
   symbol: list_labeled_sandbox_containers
@@ -198,6 +204,9 @@ interfaces:
 - name: reap_stale_sandbox_containers
   file: src/sevn/security/sandbox_runtime.py
   symbol: reap_stale_sandbox_containers
+- name: refresh_sandbox_image
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: refresh_sandbox_image
 - name: resolve_sandbox_driver
   file: src/sevn/security/sandbox_runtime.py
   symbol: resolve_sandbox_driver

@@ -133,6 +133,7 @@ from sevn.gateway.routing.outbound_sweep import sweep_outbound_retries
 from sevn.gateway.runtime.deployment_id import load_or_create_deployment_id
 from sevn.gateway.runtime.gateway_restart_ack import deliver_pending_gateway_restart_acks
 from sevn.gateway.runtime.rate_limit import TokenBucketLimiter
+from sevn.gateway.runtime.sandbox_image_boot import ensure_gateway_sandbox_image_ready
 from sevn.gateway.runtime.shutdown_cleanup import release_leaked_multiprocessing_semaphores
 from sevn.gateway.self_improve.self_improve_job_events import (
     SelfImproveJobEventFanout,
@@ -1858,18 +1859,20 @@ def create_app(
 
         cron_task = asyncio.create_task(_cron_minute_loop(app))
         app.state.triggers_cron_task = cron_task
-        await run_boot_hooks(
-            BootContext(
-                app=app,
-                workspace=ws,
-                layout=ly,
-                conn=conn,
-                trace=trace,
-                gateway_router=gateway_router,
-                process_settings=effective_process,
-                content_root=ly.content_root,
-            )
+        boot_hooks_ctx = BootContext(
+            app=app,
+            workspace=ws,
+            layout=ly,
+            conn=conn,
+            trace=trace,
+            gateway_router=gateway_router,
+            process_settings=effective_process,
+            content_root=ly.content_root,
         )
+        # C4.2 / C5.1: fail closed when the release digest is absent (run_boot_hooks
+        # swallows exceptions — call ensure directly so startup refuses).
+        await ensure_gateway_sandbox_image_ready(boot_hooks_ctx)
+        await run_boot_hooks(boot_hooks_ctx)
         # W3.1/W3.3: the subagents boot hook (priority 40) populates
         # `app.state.subagent_supervisor` above; `agent_turn.py` reads it lazily off
         # the router (`router._subagent_supervisor`) rather than as a
