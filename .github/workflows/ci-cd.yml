@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 #
-# Six-phase delivery pipeline.
+# Container artifact publication pipeline (phases 2–5 deploy stubs).
 # Normative spec: specs/25-cicd-full.md (Phase 5 of the build).
 #
 # publish-ghcr: pushes sandbox/proxy/gateway images to GHCR on main, v* tags,
@@ -10,9 +10,11 @@
 # downstream phases and container-supply-chain (cosign, syft, trivy).
 #
 # Trigger → phase mapping (specs/25-cicd-full.md §2.3):
-#   push to main         → phase1 → phase2 → phase3        (build/deploy Dev + smoke)
-#   push tag 'v*'        → phase4 → phase5 → phase6        (production deploy + release)
-#   workflow_dispatch    → full chain phase1…phase6        (manual / break-glass)
+#   push to main         → phase1 → publish-ghcr → supply-chain → phase2 → phase3
+#                          (Dev deploy/test stubs — phase2/3 fail until implemented)
+#   push tag 'v*'        → phase1 → publish-ghcr → supply-chain → phase4 → phase5 → phase6
+#                          (Production deploy/test stubs block release; phase6 is draft-only)
+#   workflow_dispatch    → full chain phase1…phase6        (manual / break-glass rehearsal)
 #
 # Pull requests are intentionally NOT triggered here. The single PR verify gate
 # is `.github/workflows/ci.yml` (Option A from the Phase 5 brief), which gates
@@ -35,7 +37,7 @@
 #   can run for a given tag/branch at a time. `cancel-in-progress: false` so
 #   a tag-push deploy is never killed by an overlapping main-push run.
 
-name: CI/CD (six-phase delivery)
+name: CI/CD (artifact publication)
 
 on:
   push:
@@ -186,6 +188,8 @@ jobs:
     env:
       IMAGE_REPOSITORY: ${{ needs.publish-ghcr.outputs.image_repository }}
     steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+
       - name: Install cosign
         uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
 
@@ -204,7 +208,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Sign, SBOM, and scan published images
+      - name: Scan, sign, and SBOM published images
         env:
           SANDBOX_DIGEST: ${{ needs.publish-ghcr.outputs.sandbox_digest }}
           PROXY_DIGEST: ${{ needs.publish-ghcr.outputs.proxy_digest }}
@@ -217,18 +221,32 @@ jobs:
           scan_image() {
             local name="$1"
             local digest="$2"
-            local ref="ghcr.io/${IMAGE_REPOSITORY}/${name}@${digest}"
-            echo "=== ${ref} ==="
+            local ref="ghcr.io/$IMAGE_REPOSITORY/$name@$digest"
+            local ignorefile
+            ignorefile="$(mktemp)"
+            python3 scripts/trivy_ignore_args.py --image "$name" --output "$ignorefile"
+            echo "=== $ref ==="
+            # Block on new CRITICAL/HIGH findings; allowlist via security/trivy-allowlist.toml (#173, D23).
+            trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed \
+              --ignorefile "$ignorefile" \
+              --format json -o "sboms/$name.trivy.json" \
+              "$ref"
+            trivy convert --format sarif --output "sboms/$name.trivy.sarif" "sboms/$name.trivy.json"
             cosign sign --yes "$ref"
-            syft "$ref" -o spdx-json > "sboms/${name}.spdx.json"
-            # Report CRITICAL/HIGH; do not block publish until base images are baselined (#149).
-            trivy image --exit-code 0 --severity CRITICAL,HIGH --ignore-unfixed "$ref"
+            syft "$ref" -o spdx-json > "sboms/$name.spdx.json"
           }
           scan_image sandbox "$SANDBOX_DIGEST"
           scan_image proxy "$PROXY_DIGEST"
           scan_image gateway "$GATEWAY_DIGEST"
           scan_image gateway.browser "$GATEWAY_BROWSER_DIGEST"
           scan_image gateway.gui "$GATEWAY_GUI_DIGEST"
+
+      - name: Upload supply-chain reports
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: container-supply-chain-${{ github.sha }}
+          path: sboms/
+          if-no-files-found: error
 
   phase2:
     name: Phase 2 — Build & Deploy → Dev (needs-implementation)
@@ -316,8 +334,9 @@ jobs:
 
   phase6:
     name: Phase 6 — Release
-    # Decoupled from deploy phases so tag releases succeed while phase4/5 remain stubs (#149).
-    needs: [phase1, publish-ghcr, container-supply-chain]
+    # Tag releases require successful deploy/test phases (D22). Phase6 stays draft-only
+    # until phases 4–5 are implemented (#172, D21).
+    needs: [phase1, publish-ghcr, container-supply-chain, phase4, phase5]
     environment: production
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -326,13 +345,28 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
+      - name: Download supply-chain reports
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: container-supply-chain-${{ github.sha }}
+          path: sboms
+
       - name: Create GitHub Release (tagged build)
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           generate_release_notes: true
-          draft: false
+          draft: true
+          files: sboms/**
+          body: |
+            **Draft release — no production deploy occurred.**
+
+            Phases 4–5 (production deploy and smoke) are not yet implemented.
+            Container images were published to GHCR; this release is for artifact
+            tracking only until deploy phases land.
+
+            Attached: Trivy JSON/SARIF reports and SPDX SBOMs from container-supply-chain.
 
   delivery-chain:
     name: Delivery chain gate (required)
@@ -358,10 +392,13 @@ jobs:
           PHASE4: ${{ needs.phase4.result }}
           PHASE5: ${{ needs.phase5.result }}
           PHASE6: ${{ needs.phase6.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          GITHUB_REF: ${{ github.ref }}
         run: |
           set -euo pipefail
           ok() { case "$1" in success|skipped) return 0;; *) return 1;; esac; }
           needs_impl_ok() { case "$1" in success|skipped|failure) return 0;; *) return 1;; esac; }
+          is_tag_build() { case "$GITHUB_REF" in refs/tags/v*) return 0;; *) return 1;; esac; }
           fail=0
           require() {
             local label="$1" result="$2"
@@ -384,9 +421,17 @@ jobs:
           require "phase1" "$PHASE1"
           require "publish-ghcr" "$PUBLISH"
           require "container-supply-chain" "$SUPPLY"
-          require_needs_impl "phase2" "$PHASE2"
-          require_needs_impl "phase3" "$PHASE3"
-          require_needs_impl "phase4" "$PHASE4"
-          require_needs_impl "phase5" "$PHASE5"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            require_needs_impl "phase2" "$PHASE2"
+            require_needs_impl "phase3" "$PHASE3"
+            require_needs_impl "phase4" "$PHASE4"
+            require_needs_impl "phase5" "$PHASE5"
+          elif is_tag_build; then
+            require "phase4" "$PHASE4"
+            require "phase5" "$PHASE5"
+          else
+            require_needs_impl "phase2" "$PHASE2"
+            require_needs_impl "phase3" "$PHASE3"
+          fi
           require "phase6" "$PHASE6"
           exit "$fail"

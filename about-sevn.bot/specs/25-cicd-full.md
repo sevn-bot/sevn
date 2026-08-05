@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict delivery
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
-last_updated: '2026-08-04'
-fingerprint: sha256:2fa7501b0e8412e5835675c12d7d87a9c30ab8ea7e00b43edf5333d3ce2a8962
+last_updated: '2026-08-05'
+fingerprint: sha256:e9c87ece7e5a5fa02be3efd8b5b0363c359a0563b276f31bced2578a4169220a
 related: []
 sources:
 - .github/workflows/**
@@ -437,9 +437,10 @@ and docs/skills/infra checks that block regressions before merge.
 | `make ci-skills` | skillspector + skill inventory checks |
 | `make ci-parity` | code-index, deploy report parity, mergecraft pin gate |
 | `make ci-affected` / `make ci-changed` | Path-aware partial gates |
-| `make ci-quality` | Advisory (ruff ratchet, vulture, codespell — not in `make ci`) |
+| `make ci-quality` | Advisory (ruff ratchet, vulture, codespell — not in `make ci`; daily cron in `ci-supplementary.yml`) |
+| `make ci-quality-coverage` | Advisory (`coverage`, `diff-cover`, `coverage-ratchet`; sibling job in `ci-supplementary.yml`) |
 | `.github/workflows/ci.yml` | Primary CI workflow |
-| `.github/workflows/ci-cd.yml` | Release / CD workflow |
+| `.github/workflows/ci-cd.yml` | Container artifact publication + draft release on `v*` tags |
 | `.craft.yml` | Sentry Craft config scaffold (evaluation-only; #110 / W15 — not wired to CI) |
 | `about-sevn.bot/decisions/0003-craft-release-management-runbook.md` | Maintainer release runbook + Craft evaluation |
 | `scripts/ci_resume.sh` | Ordered `CI_STEPS` driver |
@@ -463,8 +464,8 @@ Tier↔resume parity is enforced by `tests/infra/test_ci_steps_tier_parity.py` (
 | Workflow | Purpose |
 |----------|---------|
 | `ci.yml` | Main CI (invokes make targets) |
-| `ci-supplementary.yml` | Supplementary checks |
-| `ci-cd.yml` | CD / release |
+| `ci-supplementary.yml` | Supplementary checks (daily security audit, advisory `ci-quality` / `ci-quality-coverage`, weekly image rebuild) |
+| `ci-cd.yml` | Container artifact publication + draft release on `v*` tags (phases 2–5 deploy stubs) |
 | `docker.yml` | Container build validation |
 | `style-guide-pages.yml` | Style guide site |
 
@@ -506,6 +507,10 @@ Wave agents: mid-wave **`make ci-affected`** only; wave boundary **`make ci`** o
 | Schema drift | `make config-schema` fails |
 | Doc regression | `make about-docs-check`, `make spec-check`, `make prd-check`, or `make readme-check` fails |
 | Git guard missing | `make check-git-guards` fails (blocks destructive clean) |
+| Tag build with deploy stubs failing | `delivery-chain` required check red; phase6 does not run; no published release |
+| Tag build while deploy phases succeed | Draft GitHub Release only (`draft: true`); no production deploy until phases 4–5 ship |
+| Advisory quality tier member fails | `make ci-quality` runs every member target (non-short-circuit via `scripts/ci_quality.py`); job red on first failure but log shows all member results |
+| Coverage gate after install-action sync | `make ci-quality-coverage` requires W12 dev-extra preservation; `make coverage` exits 2 when optional `dev` is pruned mid-suite |
 
 ## Amendments (telegram-menu-redesign W9)
 
@@ -561,3 +566,49 @@ files instead of profiles. Each documented invocation must resolve to exactly
 ``scripts/check-compose-default.sh``. Makefile targets ``compose-up``,
 ``compose-browser-up``, and ``compose-gui-up`` route through the matching `-f` set;
 ``COMPOSE_PROFILES`` browser+gui mutual exclusion remains a regression net for legacy callers.
+
+## Amendments (post-audit-0.0.1 W10 — append-only)
+
+Release gate honesty (**#172**, plan **D21** / **D22**). Phases 2–5 remain
+``needs-implementation`` stubs; the workflow publishes container images to GHCR
+and signs/scans them, but does **not** deploy to Dev or Production.
+
+| Trigger | What runs today | Release outcome |
+|---------|-----------------|-----------------|
+| `push` to `main` | phase1 → publish-ghcr → supply-chain; phase2/3 stubs fail (tolerated on main path) | No GitHub Release |
+| `push` tag `v*` | phase1 → publish-ghcr → supply-chain → phase4/5 stubs **must succeed** for phase6 | Draft release only (`draft: true`); body states no production deploy |
+| `workflow_dispatch` | Full chain rehearsal; stub phase failures tolerated via `needs_impl_ok` | Draft release on tag ref only |
+
+``delivery-chain`` (required): on tag builds, phase4/phase5 ``failure`` fails the gate;
+``needs_impl_ok`` tolerance applies **only** on ``workflow_dispatch``. Phase6
+``needs`` phase4 and phase5 so a failing deploy stub blocks release creation.
+
+## Amendments (post-audit-0.0.1 W11 — append-only)
+
+Container CVE baseline (**#173**, plan **D23**). ``container-supply-chain`` scans
+each published GHCR image with Trivy **before** ``cosign sign``; CRITICAL/HIGH
+findings fail the job unless listed in ``security/trivy-allowlist.toml`` with a
+future ``review_by`` date.
+
+| Control | Location | Behaviour |
+|---------|----------|-----------|
+| Allowlist file | ``security/trivy-allowlist.toml`` | Time-boxed ``[[ignore]]`` rows: ``vuln_id``, ``image``, ``reason``, ``ticket``, ``review_by`` |
+| Expiry gate | ``scripts/trivy_ignore_args.py`` + ``make trivy-allowlist-check`` (``ci-core`` via ``make security``) | Fails closed on expired rows; emits ``--ignorefile`` for Actions |
+| Blocking scan | ``scan_image()`` in ``ci-cd.yml`` | ``trivy image --exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed`` then cosign + syft |
+| Reports | ``sboms/`` artifact + phase6 release attachments | Trivy JSON/SARIF + SPDX SBOM per image |
+
+## Amendments (post-audit-0.0.1 W13 — append-only)
+
+Advisory quality tier revival (**#178**, plan **D33**). ``make ci-quality`` and
+``make ci-quality-coverage`` are **not** in ``make ci`` or sharded ``ci.yml`` —
+they run on the daily ``ci-supplementary.yml`` cron (``17 5 * * *``) and
+``workflow_dispatch``.
+
+| Target | Members / steps | Runner behaviour |
+|--------|-----------------|------------------|
+| ``make ci-quality`` | ``ruff-extra``, ``typecheck-strict``, ``deadcode``, ``complexity``, ``complexity-ratchet``, ``spell``, ``deps-check``, ``docstring-coverage``, ``stale-xfail-check``, ``md-links-check`` | Non-short-circuit: ``scripts/ci_quality.py`` invokes every member via ``run_make_targets()`` and returns the first non-zero exit while printing all failures |
+| ``make ci-quality-coverage`` | ``coverage``, ``diff-cover``, ``coverage-ratchet`` | Separate supplementary job on an unsharded runner; depends on W12 preserving optional ``dev`` during in-test ``uv sync`` (**D32**) |
+
+``scripts/quality/ruff_advisory_baseline.json`` is refreshed with
+``uv run python scripts/quality/ruff_advisory_gate.py --write-baseline``;
+the ``generated`` date is emitted dynamically at write time.

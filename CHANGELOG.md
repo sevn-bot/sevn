@@ -14,6 +14,7 @@ are cut into a dated, versioned section at release time.
 - [2026-08-04] Pre-commit blocks commits from the primary checkout unless `SEVN_ALLOW_PRIMARY_COMMIT=1`; `make check-git-guards` asserts `git` resolves to repo `bin/git` without direnv; Cursor rules and hooks document linked-worktree workflow (D1)
 
 ### Security
+- [2026-08-04] Container supply chain: Trivy blocks CRITICAL/HIGH before cosign sign; time-boxed CVE allowlist in `security/trivy-allowlist.toml` (#173, post-audit Batch C W11)
 - [2026-08-04] Bump `cryptography` to 50.0.0 (CVE-2026-69247, CVE-2026-69248, CVE-2026-69249)
 - [2026-08-03] `GET /capabilities` and `sevn capabilities` document OpenAI-compat limits (`streaming`, `usage_reporting`, `tool_messages`) alongside channel inventory (#151, release-audit C-Thermos)
 - [2026-08-03] Channel capability inventory: `GET /capabilities` and `sevn capabilities` report each messaging channel as `implemented`, `stub`, or `unavailable` (#151, release-audit W13)
@@ -39,6 +40,9 @@ are cut into a dated, versioned section at release time.
 - [2026-08-04] Docker sandbox image pinning pulls tagged images then resolves `RepoDigests` only — locally built images without registry digests fail closed instead of passing a bare image ID to `docker pull` (#170, post-audit W7)
 - [2026-08-04] Scoped per-run `X-Sevn-Session-Token` credentials (`sandbox` / `llm` route-family scopes) validate beside the gateway service secret; sandbox child env drops non-functional `HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY` vars (#168, post-audit W6)
 - [2026-08-04] Egress proxy guarded routes (`/llm/*`, `/web/*`, `/integration`) return 503 when `SEVN_PROXY_SHARED_SECRET` is unset; explicit `SEVN_PROXY_ALLOW_UNAUTHENTICATED=1` opt-in logs loud warnings; onboarding auto-generates and stores the shared secret for gateway and proxy boot resolution (#167, post-audit W5)
+- [2026-08-04] Release workflow publishes tagged GitHub Releases as draft and blocks the delivery chain when deploy phases 4–5 fail on tag builds — no non-draft release while stub deploy jobs fail (#172, post-audit Batch C W10)
+- [2026-08-04] Advisory `make ci-quality` runs all member targets without Makefile short-circuit and is scheduled daily via `ci-supplementary.yml` alongside `make ci-quality-coverage`; ruff advisory baseline refreshed (#178, post-audit Batch C W13)
+- [2026-08-04] Skill setup `uv sync` during tests no longer prunes the optional `dev` extra, so `make coverage` and pytest-cov keep working after install actions (#179, post-audit Batch C W12)
 - [2026-08-04] A-Thermos close-out: reject legacy browser/gui compose profiles without override files; remove 64-zero `SEVN_GATEWAY_TOKEN` default with bootstrap sentinel guard; update Brave operator docs and GUI supervisord `HOME` (post-audit Batch A)
 - [2026-08-04] Compose guard rejects CLI `--profile browser --profile gui` and combined browser/gui override files; `verify_deployment` documents override-file invocations; GUI gateway runs as uid 10001 so operator volumes are writable (post-audit Batch A A-Verify F1/F2)
 - [2026-08-04] Operator compose hardens proxy/gateway (`cap_drop`, `no-new-privileges`, `pids_limit`, resource limits, `read_only`+tmpfs on proxy, `sevn-operator` network) and scopes `sevn-operator-perms` chown to wrong-ownership paths only (#166, post-audit Batch A W3)

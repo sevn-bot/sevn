@@ -237,9 +237,12 @@ async def execute_install_action(
         return
 
     if action.kind == "uv_extra":
-        argv = ["uv", "sync", "--extra", *action.argv]
+        argv = ["uv", "sync"]
         if _checkout_has_dev_group(cwd):
-            argv.extend(["--group", "dev"])
+            # [dependency-groups] dev is kept via --group dev; [project.optional-dependencies]
+            # dev (coverage, pytest-cov, …) needs --extra dev or uv sync prunes them mid-suite.
+            argv.extend(["--extra", "dev", "--group", "dev"])
+        argv.extend(["--extra", *action.argv])
         async for event in _run_subprocess_stream(
             action,
             capability_id=capability_id,

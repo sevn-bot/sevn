@@ -13,6 +13,8 @@
 #   - macos-keychain-smoke (weekly): macOS Keychain backend probe (macOS
 #     runners bill at 10× — a rarely-changing code path does not belong on the
 #     PR path).
+#   - ci-quality + ci-quality-coverage (daily): advisory ruff/vulture/codespell
+#     tier and full-suite coverage gates — kept OFF ci.yml (D33 / #178).
 #
 # Jobs are gated on which cron fired so the daily audit does not also trigger
 # the heavy weekly rebuild.
@@ -40,6 +42,30 @@ jobs:
 
       - name: bandit + pip-audit (OSV.dev)
         run: make security
+
+  ci-quality:
+    name: Advisory quality tier (ruff ratchet, vulture, codespell, …)
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 5 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: ./.github/actions/bootstrap
+
+      - name: make ci-quality
+        run: make ci-quality
+
+  ci-quality-coverage:
+    name: Advisory coverage + diff-cover + ratchet
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 5 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: ./.github/actions/bootstrap
+
+      - name: make ci-quality-coverage
+        run: make ci-quality-coverage
 
   cache-bust-rebuild:
     name: Weekly no-cache image rebuild (drift canary)

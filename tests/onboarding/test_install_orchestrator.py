@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 from pathlib import Path
 from unittest.mock import patch
@@ -145,3 +146,30 @@ def test_every_fatal_capability_has_install_actions() -> None:
             assert action.argv or action.kind == "secret_required", (
                 f"{cap.capability_id} action {action.id} missing argv"
             )
+
+
+@pytest.mark.asyncio
+async def test_uv_extra_sync_preserves_dev_optional_imports() -> None:
+    """W12.4 / #179: post-sync ``coverage`` and ``pytest_cov`` remain importable."""
+    from sevn.onboarding.install_actions.executors import _collect_events, execute_install_action
+
+    repo_root = Path(__file__).resolve().parents[2]
+    importlib.import_module("coverage")
+    importlib.import_module("pytest_cov")
+
+    action = InstallAction(
+        id="extra.browser_cdp.uv",
+        kind="uv_extra",
+        argv=["browser-cdp"],
+        fatal=True,
+    )
+    events = await _collect_events(
+        execute_install_action(
+            action,
+            install_root=repo_root,
+            capability_id="extra.browser_cdp",
+        )
+    )
+    assert events[-1]["status"] == "ok"
+    importlib.import_module("coverage")
+    importlib.import_module("pytest_cov")

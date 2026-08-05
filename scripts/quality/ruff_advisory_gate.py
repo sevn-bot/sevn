@@ -29,6 +29,7 @@ import re
 import subprocess
 import sys
 from collections import Counter
+from datetime import UTC, datetime
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -207,7 +208,7 @@ def write_baseline(path: Path = BASELINE_PATH) -> dict[str, int]:
     """
     counts = run_ruff_statistics()
     payload = {
-        "generated": "2026-06-17",
+        "generated": datetime.now(tz=UTC).date().isoformat(),
         "select": _ADVISORY_SELECT,
         "rules": counts,
     }
