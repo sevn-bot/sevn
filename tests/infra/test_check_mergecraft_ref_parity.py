@@ -16,13 +16,30 @@ REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / "scripts" / "check_mergecraft_ref_parity.py"
 WORKFLOW_PATH = ".github/workflows/mergecraft.yml"
 
+# Same Makefile pin regex as scripts/check_mergecraft_ref_parity.py — keep the
+# stub in lockstep with whatever MERGECRAFT_REF default the tree currently has.
+_MAKEFILE_RE = re.compile(
+    r"MERGECRAFT_REF\s*\?=\s*\$\(if\s*\$\(SEVN_MERGECRAFT_REF\)\s*,\s*"
+    r"\$\(SEVN_MERGECRAFT_REF\)\s*,\s*(?P<ref>[^),\s]+)\s*\)"
+)
+
+
+def _makefile_default_ref() -> str:
+    """Return the MERGECRAFT_REF default from the real repo Makefile."""
+    match = _MAKEFILE_RE.search((REPO / "Makefile").read_text(encoding="utf-8"))
+    assert match is not None, "test fixture must find MERGECRAFT_REF default in Makefile"
+    return match.group("ref")
+
+
 # A minimal stand-in for main's workflow: the gate only reads the `uses:` pin.
-WORKFLOW_STUB = """name: mergecraft
+# Built from the live Makefile pin so bumping MERGECRAFT_REF cannot desync the stub.
+_MAKEFILE_DEFAULT_REF = _makefile_default_ref()
+WORKFLOW_STUB = f"""name: mergecraft
 jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: alexhawat/mergeCraft@349f9489da34515a09997142ae75acbc24797227 # pre-0.0.1 (Codex MCP permission profiles)
+      - uses: alexhawat/mergeCraft@{_MAKEFILE_DEFAULT_REF} # pre-0.0.1 (Codex MCP permission profiles)
 """
 
 
@@ -110,7 +127,7 @@ def test_check_mergecraft_ref_parity_reads_default_branch_not_worktree(tmp_path:
     # Corrupt the working-tree copy: if the gate read the file from disk it would
     # report drift. It reads `main:` instead, so this must stay green.
     (tmp_path / ".github" / "workflows" / "mergecraft.yml").write_text(
-        WORKFLOW_STUB.replace("349f9489da34515a09997142ae75acbc24797227", "worktree-only-ref"),
+        WORKFLOW_STUB.replace(_MAKEFILE_DEFAULT_REF, "worktree-only-ref"),
         encoding="utf-8",
     )
     proc = _run(tmp_path, {"SEVN_MERGECRAFT_WORKFLOW_REF": "main"})
