@@ -226,8 +226,8 @@
     },
     "voice": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-03T00:50:28Z",
-      "digest": "0d197ff98ec6f362e8fe3d045f6c2d4d69d689aa6c14c5eea421ce3374392f9e",
+      "computed_at": "2026-08-05T05:08:56Z",
+      "digest": "8bbd0ed0ec4000d2049d2313d0838c1045abcd8b596a741cb57b1e17b19edae2",
       "source_globs": [
         "src/sevn/voice/**"
       ]
