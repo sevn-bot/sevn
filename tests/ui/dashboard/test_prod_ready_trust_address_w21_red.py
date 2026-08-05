@@ -5,12 +5,12 @@ Contracts (``about-sevn.bot/specs/24-dashboard.md``, ``19-channel-webui.md``,
 
 - **C6.2 / W21.1** - ``dashboard.local_open_trust_address`` is refused when a
   tunnel or reverse-proxy-style bind is configured, even when the key is
-  ``true`` (xfail → W22).
+  ``true`` (green after W22).
 - **C6.2 / W21.2** - enabling the escape logs a loud boot warning mirroring
-  ``SEVN_PROXY_ALLOW_UNAUTHENTICATED`` (xfail → W22).
+  ``SEVN_PROXY_ALLOW_UNAUTHENTICATED`` (green after W22).
 - **C6.4 / W21.3** - ``sevn dashboard`` no longer prints
   ``loopback access - no login required`` when a boot token is required
-  (xfail → W22).
+  (green after W22).
 - **W21.4 guard** - landed C6.1 / C6.3 tokenless-loopback denial stays green
   and the auth suites are not rewritten by this wave.
 """
@@ -22,9 +22,9 @@ import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import httpx
-import pytest
 from click.testing import CliRunner as ClickCliRunner
 from starlette.testclient import TestClient
 from typer.main import get_command
@@ -41,6 +41,9 @@ from sevn.gateway.http_server import create_app
 from sevn.storage.migrate import apply_migrations
 from sevn.ui.dashboard.services.auth import apply_tunnel_local_open_policy
 from sevn.workspace.layout import WorkspaceLayout
+
+if TYPE_CHECKING:
+    import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _LANDED_LOCAL_OPEN = _REPO_ROOT / "tests" / "ui" / "dashboard" / "test_local_open_auth.py"
@@ -164,11 +167,10 @@ def test_guard_c63_landed_auth_suites_unmodified() -> None:
 
 
 # ---------------------------------------------------------------------------
-# W21.1 - refuse trust-address under tunnel / reverse-proxy bind (→ W22)
+# W21.1 - refuse trust-address under tunnel / reverse-proxy bind
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W22: trust-address refused under tunnel", strict=False)
 def test_trust_address_forced_off_when_tunnel_configured() -> None:
     """W21.1 / C6.2 - tunnel active must clear ``local_open_trust_address``."""
     ws = _workspace(
@@ -183,10 +185,6 @@ def test_trust_address_forced_off_when_tunnel_configured() -> None:
     assert ws.dashboard.local_open is False
 
 
-@pytest.mark.xfail(
-    reason="green after W22: trust-address refused under non-loopback bind",
-    strict=False,
-)
 def test_trust_address_forced_off_when_gateway_not_loopback() -> None:
     """W21.1 / C6.2 - reverse-proxy-style bind refuses the escape hatch."""
     ws = _workspace(
@@ -204,8 +202,8 @@ def test_trust_address_forced_off_when_gateway_not_loopback() -> None:
 def test_tokenless_denied_under_tunnel_even_when_trust_address_true(tmp_path: Path) -> None:
     """W21.1 companion - tunnel policy already denies tokenless even if the escape is set.
 
-    The *new* W22 contract is forcing ``local_open_trust_address`` off (xfails above);
-    this assertion stays green on the batch base so deleting tunnel refusal regresses.
+    The W22 contract forces ``local_open_trust_address`` off (assertions above);
+    this assertion stays green so deleting tunnel refusal regresses.
     """
     ws = _workspace(
         local_open=True,
@@ -222,11 +220,10 @@ def test_tokenless_denied_under_tunnel_even_when_trust_address_true(tmp_path: Pa
 
 
 # ---------------------------------------------------------------------------
-# W21.2 - boot warning when trust-address enabled (→ W22)
+# W21.2 - boot warning when trust-address enabled
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W22: trust-address boot warning", strict=False)
 def test_trust_address_boot_warning_emitted_when_enabled() -> None:
     """W21.2 / C6.2 - loud warning when ``local_open_trust_address`` is on."""
     from loguru import logger
@@ -245,7 +242,6 @@ def test_trust_address_boot_warning_emitted_when_enabled() -> None:
     assert "trust" in joined or "dangerous" in joined or "escape" in joined
 
 
-@pytest.mark.xfail(reason="green after W22: trust-address boot warning noop", strict=False)
 def test_trust_address_boot_warning_noop_when_disabled() -> None:
     """W21.2 - no warning when the escape hatch is off (proxy-pattern mirror)."""
     from loguru import logger
@@ -263,11 +259,10 @@ def test_trust_address_boot_warning_noop_when_disabled() -> None:
 
 
 # ---------------------------------------------------------------------------
-# W21.3 - CLI message honesty when token is required (→ W22)
+# W21.3 - CLI message honesty when token is required
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W22: CLI no longer claims no login required", strict=False)
 def test_dashboard_cli_does_not_claim_no_login_required(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
