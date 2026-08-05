@@ -15,6 +15,7 @@ are cut into a dated, versioned section at release time.
 - [2026-08-04] Pre-commit blocks commits from the primary checkout unless `SEVN_ALLOW_PRIMARY_COMMIT=1`; `make check-git-guards` asserts `git` resolves to repo `bin/git` without direnv (D1 primary-checkout guard)
 
 ### Changed
+- [2026-08-05] CI/CD required check renamed to **Artifact publication gate (required)**; Dev deploy/smoke stubs and the `failure`-as-OK escape hatch removed so a green gate means GHCR publication + supply-chain only (C2.1, C2.2)
 - [2026-08-05] **Breaking:** Mission Control `local_open` on loopback now requires the boot-written `local_token` query parameter — tokenless loopback no longer grants owner session claims; set `dashboard.local_open_trust_address: true` to restore address-only trust (#169, post-audit Batch E)
 - [2026-08-05] CLI dashboard reads (`sevn models`, `sevn agent config`, `sevn channels status`, and related commands) append the boot `local_token` when calling loopback Mission Control with effective local-open (#169, post-audit Batch E W18)
 

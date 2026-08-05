@@ -1,25 +1,32 @@
-# Active delivery pipeline: triggers on push to main, v* tags, and manual dispatch.
+# Active artifact-publication pipeline: triggers on push to main, v* tags, and
+# manual dispatch.
 #
 # SPDX-License-Identifier: MIT
 #
-# Container artifact publication pipeline (phases 2–5 deploy stubs).
-# Normative spec: specs/25-cicd-full.md (Phase 5 of the build).
+# Container artifact publication pipeline (phase4/phase5 production deploy stubs).
+# Normative spec: about-sevn.bot/specs/25-cicd-full.md.
 #
 # publish-ghcr: pushes sandbox/proxy/gateway images to GHCR on main, v* tags,
 # and workflow_dispatch (manual chain rehearsal). Digests are job outputs for
 # downstream phases and container-supply-chain (cosign, syft, trivy).
 #
-# Trigger → phase mapping (specs/25-cicd-full.md §2.3):
-#   push to main         → phase1 → publish-ghcr → supply-chain → phase2 → phase3
-#                          (Dev deploy/test stubs — phase2/3 fail until implemented)
+# Trigger → phase mapping (specs/25-cicd-full.md Workflow matrix):
+#   push to main         → phase1 → publish-ghcr → supply-chain
+#                          (phase4/5/6 skipped — Dev deploy/smoke deleted, D44)
 #   push tag 'v*'        → phase1 → publish-ghcr → supply-chain → phase4 → phase5 → phase6
-#                          (Production deploy/test stubs block release; phase6 is draft-only)
-#   workflow_dispatch    → full chain phase1…phase6        (manual / break-glass rehearsal)
+#                          (Production deploy/test stubs must succeed; phase6 is draft-only)
+#   workflow_dispatch    → phase1 → publish-ghcr → supply-chain → phase4 → phase5
+#                          (+ phase6 when ref is a v* tag; stub failures fail the required gate)
+#
+# Required check (branch protection): job id `delivery-chain`, display name
+# "Artifact publication gate (required)". A green check proves phase1 + GHCR
+# publish + supply-chain succeeded (and, on tags, that phase4/5 did not fail).
+# It does NOT prove Dev/Prod deploy readiness — those phases are stubs or absent.
 #
 # Pull requests are intentionally NOT triggered here. The single PR verify gate
 # is `.github/workflows/ci.yml` (Option A from the Phase 5 brief), which gates
 # main/develop/test-pre. Re-running Phase 1 on PRs in two workflows would just
-# double-charge runners. This delivery DAG keys on `main` / `v*` only, so
+# double-charge runners. This publication DAG keys on `main` / `v*` only, so
 # `test-pre` activity never triggers a deploy.
 #
 # Fork safety (specs/25-cicd-full.md §2.4):
@@ -248,44 +255,8 @@ jobs:
           path: sboms/
           if-no-files-found: error
 
-  phase2:
-    name: Phase 2 — Build & Deploy → Dev (needs-implementation)
-    needs: [phase1, publish-ghcr, container-supply-chain]
-    environment: development
-    # Only on main push or manual dispatch; tag pushes skip Dev and go to prod.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
-    env:
-      IMAGE_REPOSITORY: ${{ needs.publish-ghcr.outputs.image_repository }}
-    steps:
-      - name: needs-implementation — build artefacts and deploy to Dev environment
-        env:
-          SANDBOX_DIGEST: ${{ needs.publish-ghcr.outputs.sandbox_digest }}
-          PROXY_DIGEST: ${{ needs.publish-ghcr.outputs.proxy_digest }}
-          GATEWAY_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_digest }}
-        run: |
-          echo "Pinned images for Dev deploy (digest, not :latest):"
-          echo "  sandbox:  ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}"
-          echo "  proxy:    ghcr.io/${IMAGE_REPOSITORY}/proxy@${PROXY_DIGEST}"
-          echo "  gateway:  ghcr.io/${IMAGE_REPOSITORY}/gateway@${GATEWAY_DIGEST}"
-          echo "::error title=needs-implementation::Phase 2 (Build & Deploy → Dev) is not implemented — see specs/25-cicd-full.md §2.1"
-          exit 1
-
-  phase3:
-    name: Phase 3 — Test Dev (needs-implementation)
-    needs: [phase2]
-    environment: development
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
-    steps:
-      - name: needs-implementation — smoke Dev topology
-        run: |
-          echo "::error title=needs-implementation::Phase 3 (Test Dev) is not implemented — see specs/25-cicd-full.md §2.1"
-          exit 1
+  # Dev deploy/smoke (former phase2/phase3) deleted with needs_impl_ok (D44 / C2.2).
+  # Production stubs below remain so tag builds still require honest deploy/test success (C2.3).
 
   phase4:
     name: Phase 4 — Deploy → Production (needs-implementation)
@@ -369,13 +340,13 @@ jobs:
             Attached: Trivy JSON/SARIF reports and SPDX SBOMs from container-supply-chain.
 
   delivery-chain:
-    name: Delivery chain gate (required)
+    # Branch-protection required check name (C2.1). Job id stays `delivery-chain`
+    # for stable references; the display name is what GitHub status checks show.
+    name: Artifact publication gate (required)
     needs:
       - phase1
       - publish-ghcr
       - container-supply-chain
-      - phase2
-      - phase3
       - phase4
       - phase5
       - phase6
@@ -387,51 +358,30 @@ jobs:
           PHASE1: ${{ needs.phase1.result }}
           PUBLISH: ${{ needs.publish-ghcr.result }}
           SUPPLY: ${{ needs.container-supply-chain.result }}
-          PHASE2: ${{ needs.phase2.result }}
-          PHASE3: ${{ needs.phase3.result }}
           PHASE4: ${{ needs.phase4.result }}
           PHASE5: ${{ needs.phase5.result }}
           PHASE6: ${{ needs.phase6.result }}
-          EVENT_NAME: ${{ github.event_name }}
-          GITHUB_REF: ${{ github.ref }}
         run: |
           set -euo pipefail
+          # Accept success or skipped only. A failed needed job fails this gate (P3 / D44).
+          # main push: phase4/5/6 are skipped by their `if` → skipped is fine.
+          # tag push: phase4/5 must succeed (stubs currently fail → gate red).
+          # workflow_dispatch: phase4/5 run as stubs; a failed stub fails this gate.
           ok() { case "$1" in success|skipped) return 0;; *) return 1;; esac; }
-          needs_impl_ok() { case "$1" in success|skipped|failure) return 0;; *) return 1;; esac; }
-          is_tag_build() { case "$GITHUB_REF" in refs/tags/v*) return 0;; *) return 1;; esac; }
           fail=0
           require() {
             local label="$1" result="$2"
             if ok "$result"; then
               echo "OK  $label ($result)"
             else
-              echo "::error title=Delivery chain::$label result=$result"
-              fail=1
-            fi
-          }
-          require_needs_impl() {
-            local label="$1" result="$2"
-            if needs_impl_ok "$result"; then
-              echo "OK  $label ($result — needs-implementation stub allowed)"
-            else
-              echo "::error title=Delivery chain::$label result=$result"
+              echo "::error title=Artifact publication::$label result=$result"
               fail=1
             fi
           }
           require "phase1" "$PHASE1"
           require "publish-ghcr" "$PUBLISH"
           require "container-supply-chain" "$SUPPLY"
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            require_needs_impl "phase2" "$PHASE2"
-            require_needs_impl "phase3" "$PHASE3"
-            require_needs_impl "phase4" "$PHASE4"
-            require_needs_impl "phase5" "$PHASE5"
-          elif is_tag_build; then
-            require "phase4" "$PHASE4"
-            require "phase5" "$PHASE5"
-          else
-            require_needs_impl "phase2" "$PHASE2"
-            require_needs_impl "phase3" "$PHASE3"
-          fi
+          require "phase4" "$PHASE4"
+          require "phase5" "$PHASE5"
           require "phase6" "$PHASE6"
           exit "$fail"

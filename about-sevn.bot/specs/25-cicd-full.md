@@ -8,7 +8,7 @@ summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict de
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
 last_updated: '2026-08-05'
-fingerprint: sha256:e9c87ece7e5a5fa02be3efd8b5b0363c359a0563b276f31bced2578a4169220a
+fingerprint: sha256:d962ecd3f84a9b7c15b787df976e61002b62bb9ceedd34eeff24ce3badc4df24
 related: []
 sources:
 - .github/workflows/**
@@ -465,9 +465,19 @@ Tier↔resume parity is enforced by `tests/infra/test_ci_steps_tier_parity.py` (
 |----------|---------|
 | `ci.yml` | Main CI (invokes make targets) |
 | `ci-supplementary.yml` | Supplementary checks (daily security audit, advisory `ci-quality` / `ci-quality-coverage`, weekly image rebuild) |
-| `ci-cd.yml` | Container artifact publication + draft release on `v*` tags (phases 2–5 deploy stubs) |
+| `ci-cd.yml` | Container artifact publication + draft release on `v*` tags. Dev deploy/smoke jobs are **absent** (deleted with the `failure`-as-OK escape hatch). Production deploy/test (`phase4`/`phase5`) remain documented stubs that block tag releases. |
 | `docker.yml` | Container build validation |
 | `style-guide-pages.yml` | Style guide site |
+
+`ci-cd.yml` trigger matrix:
+
+| Trigger | Jobs that run | Required gate (`delivery-chain` → **Artifact publication gate (required)**) |
+|---------|---------------|-----------------------------------------------------------------------------|
+| `push` to `main` | phase1 → publish-ghcr → container-supply-chain; phase4/5/6 **skipped** | Green when publication + supply-chain succeed; skipped deploy/release jobs are OK |
+| `push` tag `v*` | phase1 → publish-ghcr → supply-chain → phase4 → phase5 → phase6 | phase4/5 must succeed (stubs currently fail → gate red); draft release only when they succeed |
+| `workflow_dispatch` | Same as tag path for phase4/5 when exercised; phase6 only on a `v*` ref | Stub `failure` fails the gate — no path classifies `failure` as OK |
+
+**Branch-protection expectation:** require the GitHub check named **Artifact publication gate (required)** (workflow job id `delivery-chain`). The previous display name was `Delivery chain gate (required)` — update any branch-protection / ruleset required-check list when this rename lands so the gate is not silently dropped.
 
 ### Partial gate inputs
 
@@ -497,6 +507,9 @@ Wave agents: mid-wave **`make ci-affected`** only; wave boundary **`make ci`** o
 5. **`make about-docs-check`** — about-sevn.bot doc integrity, status honesty, and skw folder gates (`spec-check`, `prd-check`).
 6. **`make changelog-check`** — Keep a Changelog + Unreleased datestamp rules (`skw.changelog_validate`).
 7. **`make ci-resume`** — stops at first failure; reruns skip passed steps (checkpoint not re-verifying earlier steps — finish with clean `make ci` before merge).
+8. **`ci-cd.yml` on `main`** — builds, pushes, scans, and signs GHCR images. Does **not** deploy to Dev or Production; Dev deploy/smoke is unimplemented and no longer pretended via tolerated failing jobs.
+9. **`ci-cd.yml` on `v*` tags** — same publication path, then production deploy/test stubs (`phase4`/`phase5`). A draft GitHub Release (`phase6`, `draft: true`) is created only when those stubs succeed; today they fail closed, so tag builds stay red until real deploy exists.
+10. **Required aggregator** — check name **Artifact publication gate (required)** accepts only `success` or `skipped` from its `needs`. A green check means artifact publication (and supply-chain) succeeded — not that production was deployed.
 
 ## Failure Modes
 
@@ -507,8 +520,9 @@ Wave agents: mid-wave **`make ci-affected`** only; wave boundary **`make ci`** o
 | Schema drift | `make config-schema` fails |
 | Doc regression | `make about-docs-check`, `make spec-check`, `make prd-check`, or `make readme-check` fails |
 | Git guard missing | `make check-git-guards` fails (blocks destructive clean) |
-| Tag build with deploy stubs failing | `delivery-chain` required check red; phase6 does not run; no published release |
+| Tag build with deploy stubs failing | **Artifact publication gate (required)** (`delivery-chain`) red; phase6 does not run; no published release |
 | Tag build while deploy phases succeed | Draft GitHub Release only (`draft: true`); no production deploy until phases 4–5 ship |
+| `main` push with publish or supply-chain failure | **Artifact publication gate (required)** red; no consumable claim of readiness |
 | Advisory quality tier member fails | `make ci-quality` runs every member target (non-short-circuit via `scripts/ci_quality.py`); job red on first failure but log shows all member results |
 | Coverage gate after install-action sync | `make ci-quality-coverage` requires W12 dev-extra preservation; `make coverage` exits 2 when optional `dev` is pruned mid-suite |
 
@@ -612,3 +626,12 @@ they run on the daily ``ci-supplementary.yml`` cron (``17 5 * * *``) and
 ``scripts/quality/ruff_advisory_baseline.json`` is refreshed with
 ``uv run python scripts/quality/ruff_advisory_gate.py --write-baseline``;
 the ``generated`` date is emitted dynamically at write time.
+
+## Amendments (prod-readiness-0.0.1 W10 — append-only)
+
+Aggregator honesty (**C2.1**, **C2.2**, plan **D44**). Dev deploy/smoke jobs
+(``phase2``/``phase3``) and the ``needs_impl_ok`` / ``require_needs_impl`` escape
+hatch are **deleted**. The required check display name is
+**Artifact publication gate (required)** (job id ``delivery-chain``). Production
+stubs ``phase4``/``phase5`` remain; a ``main`` push skips them so the gate stays
+green when publication succeeds. No required-check path classifies ``failure`` as OK.
