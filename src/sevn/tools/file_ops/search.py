@@ -3,6 +3,9 @@
 Module: sevn.tools.file_ops.search
 Depends: sevn.tools.base, sevn.tools.context, sevn.tools.decorator, sevn.tools.paths
 
+Constants:
+    MAX_MATCH_LINE_CHARS — per-match line width cap applied to both search engines.
+
 Exports:
     search_in_file_tool — ``@sevn_tool`` callable registered by :func:`register_file_ops_tools`.
 """
@@ -32,8 +35,35 @@ from sevn.tools.paths import (
 )
 
 MAX_SEARCH_MATCHES: Final[int] = 500
+MAX_MATCH_LINE_CHARS: Final[int] = 1000
 _LLMIGNORE_GLOB: Final[str] = "!**/.llmignore/**"
 _python_fallback_logged: bool = False
+
+
+def _clip_match_text(text: str) -> str:
+    """Clip one matched line to :data:`MAX_MATCH_LINE_CHARS`.
+
+    ``MAX_SEARCH_MATCHES`` bounds the row count but not the width of any row, so a
+    single-line file (``.jsonl`` session transcript, minified asset) can contribute
+    hundreds of KB to one match. Ripgrep's ``--max-columns`` cannot do this for us:
+    it is ignored under ``--json``, which is the mode this tool parses.
+
+    Args:
+        text (str): Raw matched line.
+
+    Returns:
+        str: ``text`` unchanged, or a clipped prefix annotated with the full length.
+
+    Examples:
+        >>> _clip_match_text("short line")
+        'short line'
+        >>> clipped = _clip_match_text("x" * (MAX_MATCH_LINE_CHARS + 50))
+        >>> clipped.endswith("[line truncated, 1050 chars]")
+        True
+    """
+    if len(text) <= MAX_MATCH_LINE_CHARS:
+        return text
+    return f"{text[:MAX_MATCH_LINE_CHARS]}… [line truncated, {len(text)} chars]"
 
 
 def _rel_posix(workspace: Path, candidate: Path) -> str:
@@ -207,7 +237,7 @@ def _run_python_search_sync(
                 {
                     "path": display_path_for_tool(workspace, file_path),
                     "line": line_no,
-                    "text": line.rstrip("\n"),
+                    "text": _clip_match_text(line.rstrip("\n")),
                 },
             )
             if len(matches) >= max_matches:
@@ -358,7 +388,7 @@ def _parse_rg_match_line(
     if isinstance(lines_blob, dict):
         raw_text = lines_blob.get("text")
         if isinstance(raw_text, str):
-            text = raw_text.rstrip("\n")
+            text = _clip_match_text(raw_text.rstrip("\n"))
     matches.append(
         {
             "path": display_path_for_tool(workspace, candidate),
@@ -577,6 +607,7 @@ async def search_in_file_tool(
 
 
 __all__ = [
+    "MAX_MATCH_LINE_CHARS",
     "MAX_SEARCH_MATCHES",
     "_log_python_fallback_once",
     "_run_python_search",
