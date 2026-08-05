@@ -42,6 +42,14 @@ class ProxySettings(BaseSettings):
         validation_alias=AliasChoices("SEVN_PROXY_SHARED_SECRET", "proxy_shared_secret"),
     )
 
+    proxy_allow_unauthenticated: bool = Field(
+        default=False,
+        validation_alias=AliasChoices(
+            "SEVN_PROXY_ALLOW_UNAUTHENTICATED",
+            "proxy_allow_unauthenticated",
+        ),
+    )
+
     brave_api_key: str | None = Field(
         default=None,
         validation_alias=AliasChoices("BRAVE_API_KEY", "brave_api_key"),

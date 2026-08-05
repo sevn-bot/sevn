@@ -165,6 +165,7 @@ jobs:
       - name: Agent→proxy round-trip (integration)
         env:
           SEVN_CI_PROXY_URL: http://127.0.0.1:18787
+          SEVN_PROXY_SHARED_SECRET: ci-compose-proxy-secret
         run: uv run pytest tests/integration/test_proxy_transport_compose_roundtrip.py -v --tb=short --strict-markers -m integration
 
       - name: Tear down compose stack

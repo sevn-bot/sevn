@@ -80,8 +80,9 @@ Copy [`.env.example`](../.env.example) to `.env` in the repo root before
 
 When the egress proxy shared-secret guard is enabled, set matching
 `SEVN_PROXY_SHARED_SECRET` on **both** gateway and proxy (see
-[`docs/readmes/proxy-egress.md`](../docs/readmes/proxy-egress.md)). Empty/unset skips
-the guard (dev-only).
+[`docs/readmes/proxy-egress.md`](../docs/readmes/proxy-egress.md)). Onboarding
+generates and stores the secret automatically; without it, guarded routes return
+**503** unless `SEVN_PROXY_ALLOW_UNAUTHENTICATED=1` (dev-only, loudly logged).
 
 ## Image and compose files
 

@@ -73,6 +73,7 @@ services:
     environment:
       SEVN_HOME: /operator
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SEVN_PROXY_SHARED_SECRET: ${SEVN_PROXY_SHARED_SECRET:-}
     volumes:
       - sevn-state:/operator
     networks:
@@ -104,6 +105,7 @@ services:
       SEVN_HOME: /operator
       HOME: /operator/workspace
       SEVN_PROXY_URL: http://sevn-proxy:8787
+      SEVN_PROXY_SHARED_SECRET: ${SEVN_PROXY_SHARED_SECRET:-}
       SEVN_TELEGRAM_BOT_TOKEN: ${SEVN_TELEGRAM_BOT_TOKEN:-}
       SEVN_GATEWAY_TOKEN: ${SEVN_GATEWAY_TOKEN:-}
     volumes:

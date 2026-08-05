@@ -50,10 +50,12 @@ from sevn.security.secrets.factory import (
 
 # Keep in sync with ``sevn.gateway.runtime.gateway_token.GATEWAY_TOKEN_LOGICAL_KEY``.
 _GATEWAY_TOKEN_LOGICAL_KEY = "sevn.gateway.token"  # nosec B105
+_PROXY_SHARED_SECRET_LOGICAL_KEY = "SEVN_PROXY_SHARED_SECRET"  # nosec B105
 _GITHUB_TOKEN_LOGICAL_KEY = "integration.github.token"  # nosec B105
 
 WIZARD_SECRET_KEYS = (
     _GATEWAY_TOKEN_LOGICAL_KEY,
+    _PROXY_SHARED_SECRET_LOGICAL_KEY,
     _GITHUB_TOKEN_LOGICAL_KEY,
     "SEVN_TELEGRAM_BOT_TOKEN",
     "SEVN_TELEGRAM_API_ID",
@@ -64,11 +66,13 @@ WIZARD_SECRET_KEYS = (
 
 REQUIRED_FOR_HANDOFF = (
     _GATEWAY_TOKEN_LOGICAL_KEY,
+    _PROXY_SHARED_SECRET_LOGICAL_KEY,
     "SEVN_TELEGRAM_BOT_TOKEN",
 )
 
 READABLE_WIZARD_KEYS = (
     _GATEWAY_TOKEN_LOGICAL_KEY,
+    _PROXY_SHARED_SECRET_LOGICAL_KEY,
     "SEVN_TELEGRAM_BOT_TOKEN",
     "SEVN_TELEGRAM_API_ID",
     "SEVN_TELEGRAM_API_HASH",
@@ -498,6 +502,7 @@ async def store_wizard_credentials(
     content_root: Path,
     *,
     gateway_token: str | None = None,
+    proxy_shared_secret: str | None = None,
     github_token: str | None = None,
     openwiki_llm_api_key: str | None = None,
     bot_token: str | None = None,
@@ -519,6 +524,8 @@ async def store_wizard_credentials(
     Args:
         content_root (Path): Resolved workspace content root.
         gateway_token (str | None): Gateway bearer token (stored as ``sevn.gateway.token``).
+        proxy_shared_secret (str | None): Egress proxy guard token
+            (stored as ``SEVN_PROXY_SHARED_SECRET`` for gateway and proxy env resolution).
         github_token (str | None): GitHub OAuth/PAT (``integration.github.token``).
         openwiki_llm_api_key (str | None): OpenWiki LLM API key
             (``integration.openwiki.llm_api_key``).
@@ -591,6 +598,20 @@ async def store_wizard_credentials(
     if gw_tok:
         await chain.set(_GATEWAY_TOKEN_LOGICAL_KEY, gw_tok)
         written[_GATEWAY_TOKEN_LOGICAL_KEY] = True
+    proxy_secret = (proxy_shared_secret or "").strip()
+    if not proxy_secret and (
+        gw_tok
+        or (bot_token or "").strip()
+        or provider_api_keys
+        or (github_token or "").strip()
+        or (openwiki_llm_api_key or "").strip()
+    ):
+        from sevn.gateway.runtime.gateway_token import generate_gateway_token
+
+        proxy_secret = generate_gateway_token()
+    if proxy_secret:
+        await chain.set(_PROXY_SHARED_SECRET_LOGICAL_KEY, proxy_secret)
+        written[_PROXY_SHARED_SECRET_LOGICAL_KEY] = True
     gh_tok = (github_token or "").strip()
     if gh_tok:
         await chain.set(_GITHUB_TOKEN_LOGICAL_KEY, gh_tok)

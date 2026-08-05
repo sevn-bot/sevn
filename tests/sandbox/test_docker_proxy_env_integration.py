@@ -1,4 +1,4 @@
-"""Gated Docker contract: ``HTTP_PROXY`` parity with ``build_sandbox_child_env`` (§10.4)."""
+"""Gated Docker contract: ``SEVN_PROXY_URL`` parity with ``build_sandbox_child_env`` (§10.4)."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def _require_docker_gate() -> None:
         pytest.skip("Docker daemon not reachable")
 
 
-def test_docker_run_echoes_proxy_env_from_build_sandbox_child_env() -> None:
+def test_docker_run_echoes_sevn_proxy_url_from_build_sandbox_child_env() -> None:
     contract = json.loads((_ROOT / "child_env_contract.json").read_text(encoding="utf-8"))
     proxy = "http://127.0.0.1:19999"
     child = build_sandbox_child_env(
@@ -36,12 +36,14 @@ def test_docker_run_echoes_proxy_env_from_build_sandbox_child_env() -> None:
     )
     for key in contract["required_env_keys"]:
         assert key in child
+    for key in contract.get("forbidden_env_keys", []):
+        assert key not in child
     docker_bin = shutil.which("docker")
     assert docker_bin is not None
     cmd: list[str] = [docker_bin, "run", "--rm"]
     for key, val in child.items():
         cmd.extend(["-e", f"{key}={val}"])
-    cmd.extend([_BUSYBOX, "sh", "-c", 'printf %s "$HTTP_PROXY"'])
+    cmd.extend([_BUSYBOX, "sh", "-c", 'printf %s "$SEVN_PROXY_URL"'])
     proc = subprocess.run(
         cmd,
         check=False,

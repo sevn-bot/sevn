@@ -56,7 +56,8 @@ def build_runtime_tool_bindings(
         mcp_servers (Mapping[str, Mapping[str, Any]]): Effective MCP server map.
         integration (IntegrationProxyClient | None): Optional W2 proxy client override.
         proxy_url (str | None): Egress proxy URL (W2 integration + W3 sandbox net caps).
-        session_token (str | None, optional): Per-run ``SEVN_SESSION_TOKEN`` for proxy auth.
+        session_token (str | None, optional): Scoped per-run ``X-Sevn-Session-Token``
+            credential for sandbox/tool egress — not the gateway ``SEVN_PROXY_SHARED_SECRET``.
         proxy_shared_secret (str | None, optional): Optional ``SEVN_PROXY_SHARED_SECRET``.
         oauth_credentials (Mapping[str, Mapping[str, Any]] | None): Pre-loaded MCP OAuth blobs.
         registry_fingerprint (str | None): Digest for session-registry cache invalidation.

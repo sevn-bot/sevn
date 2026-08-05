@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver a single scanner subsystem that runs in the gateway process so hostile
   content is filtered before the Triager or any routing model sees user-visible text,
   transcripts, or selected tool output.
-last_updated: '2026-08-03'
-fingerprint: sha256:e947ce6d6a26d9e8e6ccee5f2b59d7f6a0a902e2dba261e486cb6cc929a2bcb9
+last_updated: '2026-08-04'
+fingerprint: sha256:b631d0cf2956c8f760f85d027f593dc802dbbab0f22feed3a1b0847c80161f85
 related: []
 sources:
 - src/sevn/security/**
@@ -439,6 +439,13 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Amendments (post-audit-0.0.1 W8 — #171)
+
+Sandbox egress enforcement telemetry (cross-ref spec-08 W8): Docker spawn emits
+``network_enforcement: "docker_internal"`` on ``sandbox.runtime`` events and
+**never** ``network_policy_path``. Enforcement is the ``--internal``
+``sevn-sandbox`` bridge, not a host rules file on the Docker path (D15).
 
 ## Amendments (open-issues-sweep Batch G W36 — ``scan_voice``)
 

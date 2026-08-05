@@ -2,22 +2,27 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
+from tests.proxy.conftest import proxy_auth_headers, proxy_test_settings
 
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.proxy.app import create_app
-from sevn.proxy.settings import ProxySettings
+
+if TYPE_CHECKING:
+    from sevn.proxy.settings import ProxySettings
 
 
 def _settings(**kwargs: str | None) -> ProxySettings:
-    return ProxySettings(
-        anthropic_api_key=kwargs.get("anthropic_api_key") or "ak",
-        openai_api_key=kwargs.get("openai_api_key") or "ok",
-        proxy_shared_secret=kwargs.get("proxy_shared_secret"),
-    )
+    data = {
+        "anthropic_api_key": kwargs.get("anthropic_api_key") or "ak",
+        "openai_api_key": kwargs.get("openai_api_key") or "ok",
+    }
+    if "proxy_shared_secret" in kwargs:
+        data["proxy_shared_secret"] = kwargs.get("proxy_shared_secret")
+    return proxy_test_settings(**data)
 
 
 @pytest.mark.anyio
@@ -27,7 +32,9 @@ async def test_integration_requires_cursor_key(monkeypatch: pytest.MonkeyPatch) 
     app = create_app(settings=_settings())
     app.state.secrets_cache = None
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+    ) as client:
         resp = await client.post(
             "/integration",
             json={
@@ -76,7 +83,9 @@ async def test_integration_agents_create_forwards(
 
     app = create_app(settings=_settings())
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+    ) as client:
         resp = await client.post(
             "/integration",
             json={
@@ -139,7 +148,9 @@ async def test_integration_mcp_profile_merge(monkeypatch: pytest.MonkeyPatch) ->
     )
     app = create_app(settings=_settings(), workspace_config=ws)
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+    ) as client:
         resp = await client.post(
             "/integration",
             json={

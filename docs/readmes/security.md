@@ -103,6 +103,27 @@ Public entry points:
 - `write_linux_iptables_ruleset`
 - `apply_namespace_egress_firewall`
 
+#### Docker sandbox network enforcement
+
+Docker spawn uses the dedicated **`--internal`** bridge **`sevn-sandbox`**
+([`ensure_sandbox_docker_network`](../../src/sevn/security/sandbox_runtime.py))
+— containers cannot reach the public internet directly; egress is only via
+[`SEVN_PROXY_URL`](../../src/sevn/security/sandbox_runtime.py) when configured.
+`sandbox.runtime` trace events emit **`network_enforcement: "docker_internal"`**
+(not a written-but-unapplied rules file).
+
+**Known tradeoff:** [`ensure_proxy_attached_to_sandbox_network`](../../src/sevn/security/sandbox_runtime.py)
+attaches the **whole** egress-proxy container to `sevn-sandbox` so sandbox
+containers can reach the reverse-proxy API. That proxy interface is therefore
+on the same internal bridge as sandboxes — not re-architected in post-audit
+0.0.1 (D15).
+
+Subprocess/namespace spawn paths use
+[`apply_namespace_egress_firewall`](../../src/sevn/security/egress_firewall.py)
+(optional apply via `SEVN_SANDBOX_IPTABLES_APPLY=1` on Linux). The
+[`_write_docker_network_policy`](../../src/sevn/security/sandbox_runtime.py)
+helper remains for operator reference but is **not** invoked on Docker spawn.
+
 ### Llm Guard Scanner (`src/sevn/security/llm_guard_scanner.py`)
 
 Public entry points:

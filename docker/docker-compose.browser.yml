@@ -15,6 +15,7 @@ services:
       SEVN_HOME: /operator
       HOME: /operator/workspace
       SEVN_PROXY_URL: http://sevn-proxy:8787
+      SEVN_PROXY_SHARED_SECRET: ${SEVN_PROXY_SHARED_SECRET:-}
       SEVN_TELEGRAM_BOT_TOKEN: ${SEVN_TELEGRAM_BOT_TOKEN:-}
       SEVN_GATEWAY_TOKEN: ${SEVN_GATEWAY_TOKEN:-}
       SEVN_CHROME_EXECUTABLE: /usr/bin/brave-browser

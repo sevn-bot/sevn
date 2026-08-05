@@ -39,6 +39,8 @@ services:
     environment:
       OPENAI_API_KEY: ci-mock-key
       OPENAI_BASE_URL: http://mock-openai:9090/v1
+      # Match host-side compose-ci pytest env (see .github/workflows/docker.yml).
+      SEVN_PROXY_SHARED_SECRET: ci-compose-proxy-secret
     ports:
       - "18787:8787"
     depends_on:
@@ -54,6 +56,7 @@ services:
       SEVN_HOME: /operator
       HOME: /operator/workspace
       SEVN_PROXY_URL: http://sevn-proxy:8787
+      SEVN_PROXY_SHARED_SECRET: ci-compose-proxy-secret
     volumes:
       # Gateway runs as uid 10001; seed from infra/ci-workspace into a writable volume.
       - sevn-ci-workspace:/operator

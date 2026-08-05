@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import httpx
 import pytest
+from tests.proxy.conftest import proxy_auth_headers, proxy_test_settings
 
 from sevn.config.defaults import DEFAULT_MINIMAX_ANTHROPIC_BASE_URL
 from sevn.config.model_resolution import resolve_wire_model_id
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.proxy.app import create_app
 from sevn.proxy.credentials import ProviderCredentialEntry, ProviderCredentials
-from sevn.proxy.settings import ProxySettings
 
 
 def _dual_provider_workspace() -> WorkspaceConfig:
@@ -74,7 +74,7 @@ async def test_mixed_providers_anthropic_route_sends_per_provider_keys(
 
     monkeypatch.setattr("sevn.proxy.app.post_json", capture_post_json)
     app = create_app(
-        settings=ProxySettings(
+        settings=proxy_test_settings(
             anthropic_api_key="sk-wrong-for-minimax",
             openai_api_key="sk-minimax-bucket",
         ),
@@ -83,7 +83,9 @@ async def test_mixed_providers_anthropic_route_sends_per_provider_keys(
     _attach_provider_credentials(app)
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+    ) as client:
         minimax_resp = await client.post(
             "/llm/anthropic/messages",
             json={"model": "minimax/MiniMax-M2", "messages": []},
@@ -136,7 +138,7 @@ async def test_mixed_providers_openai_chat_route_sends_per_provider_keys(
         },
     )
     app = create_app(
-        settings=ProxySettings(
+        settings=proxy_test_settings(
             openai_api_key="sk-wrong-for-minimax",
             anthropic_api_key="sk-openai-bucket-fallback",
             openai_base_url="https://api.openai.com/v1",
@@ -157,7 +159,9 @@ async def test_mixed_providers_openai_chat_route_sends_per_provider_keys(
     )
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+    ) as client:
         await client.post(
             "/llm/openai/chat/completions",
             json={"model": "minimax/MiniMax-M3", "messages": []},
@@ -192,7 +196,7 @@ async def test_two_bucket_fallback_without_provider_bindings(
 
     monkeypatch.setattr("sevn.proxy.app.post_json", capture_post_json)
     app = create_app(
-        settings=ProxySettings(
+        settings=proxy_test_settings(
             anthropic_api_key="sk-anthropic-bucket",
             openai_api_key="sk-openai-bucket",
         ),
@@ -202,7 +206,9 @@ async def test_two_bucket_fallback_without_provider_bindings(
     )
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+    ) as client:
         resp = await client.post(
             "/llm/anthropic/messages",
             json={"model": "anthropic/claude-3-5-sonnet", "messages": []},
@@ -227,7 +233,7 @@ async def test_minimax_wire_id_and_base_url_preserved(
     monkeypatch.setattr("sevn.proxy.app.post_json", capture_post_json)
     custom_base = "https://custom.minimax.example/anthropic/v1"
     app = create_app(
-        settings=ProxySettings(
+        settings=proxy_test_settings(
             anthropic_api_key="sk-mm",
             openai_api_key="sk-mm",
             anthropic_base_url=DEFAULT_MINIMAX_ANTHROPIC_BASE_URL,
@@ -246,7 +252,9 @@ async def test_minimax_wire_id_and_base_url_preserved(
     )
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+    ) as client:
         resp = await client.post(
             "/llm/anthropic/messages",
             json={"model": "minimax/MiniMax-M2", "messages": []},
@@ -275,14 +283,16 @@ async def test_openai_responses_unaffected_without_provider_registry(
 
     monkeypatch.setattr("sevn.proxy.app.post_json", capture_post_json)
     app = create_app(
-        settings=ProxySettings(
+        settings=proxy_test_settings(
             openai_api_key="sk-responses",
             openai_base_url="https://api.openai.com/v1",
         ),
     )
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+    ) as client:
         resp = await client.post("/llm/openai/responses", json={"model": "gpt-4o", "input": "hi"})
 
     assert resp.status_code == 200
@@ -294,13 +304,15 @@ async def test_openai_responses_unaffected_without_provider_registry(
 async def test_bedrock_converse_unaffected_without_provider_registry() -> None:
     """Contract 9: ``/llm/bedrock/converse`` still 503 without AWS creds (unchanged path)."""
     app = create_app(
-        settings=ProxySettings(
+        settings=proxy_test_settings(
             anthropic_api_key="sk-a",
             openai_api_key="sk-o",
         ),
     )
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+    ) as client:
         resp = await client.post("/llm/bedrock/converse", json={"modelId": "anthropic.claude-3"})
 
     assert resp.status_code == 503
@@ -310,7 +322,7 @@ async def test_bedrock_converse_unaffected_without_provider_registry() -> None:
 async def test_503_detail_names_provider_when_credential_unresolved() -> None:
     """Contract 10 (D7): unresolved provider credential returns 503 naming the provider."""
     app = create_app(
-        settings=ProxySettings(
+        settings=proxy_test_settings(
             anthropic_api_key=None,
             openai_api_key=None,
         ),
@@ -321,7 +333,9 @@ async def test_503_detail_names_provider_when_credential_unresolved() -> None:
     app.state.provider_credentials = ProviderCredentials(by_name={})
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+    ) as client:
         resp = await client.post(
             "/llm/anthropic/messages",
             json={"model": "minimax/MiniMax-M2", "messages": []},

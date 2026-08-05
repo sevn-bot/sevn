@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING
 
 import httpx
 import pytest
+from tests.proxy.conftest import proxy_auth_headers, proxy_test_settings
 from tests.security.oauth.conftest import fake_access_jwt
 
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.proxy.app import create_app
 from sevn.proxy.credentials import ProviderCredentialEntry, ProviderCredentials
-from sevn.proxy.settings import ProxySettings
 from sevn.security.oauth.credential import CodexOAuthCredential
 
 if TYPE_CHECKING:
@@ -97,13 +97,15 @@ async def test_truncated_codex_stream_retried_once_before_failure(
     monkeypatch.setattr("sevn.proxy.app.post_sse_stream", stub)
     access = fake_access_jwt(account_id="acct-retry")
     app = create_app(
-        settings=ProxySettings(openai_api_key=None, anthropic_api_key=None),
+        settings=proxy_test_settings(openai_api_key=None, anthropic_api_key=None),
         workspace_config=_oauth_workspace(),
     )
     _attach_oauth_state(app, access=access, account_id="acct-retry")
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+    ) as client:
         await client.post(
             "/llm/openai/chat/completions",
             json={"model": "openai/gpt-4o", "messages": [{"role": "user", "content": "hi"}]},
@@ -120,13 +122,15 @@ async def test_persistent_truncated_stream_returns_typed_error_not_bare_502(
     monkeypatch.setattr("sevn.proxy.app.post_sse_stream", stub)
     access = fake_access_jwt(account_id="acct-typed")
     app = create_app(
-        settings=ProxySettings(openai_api_key=None, anthropic_api_key=None),
+        settings=proxy_test_settings(openai_api_key=None, anthropic_api_key=None),
         workspace_config=_oauth_workspace(),
     )
     _attach_oauth_state(app, access=access, account_id="acct-typed")
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+    ) as client:
         resp = await client.post(
             "/llm/openai/chat/completions",
             json={"model": "openai/gpt-4o", "messages": [{"role": "user", "content": "hi"}]},
@@ -154,13 +158,15 @@ async def test_truncated_codex_stream_logs_warning_without_error_stack(
     errors, err_sink = _capture_loguru(level="ERROR")
     access = fake_access_jwt(account_id="acct-log")
     app = create_app(
-        settings=ProxySettings(openai_api_key=None, anthropic_api_key=None),
+        settings=proxy_test_settings(openai_api_key=None, anthropic_api_key=None),
         workspace_config=_oauth_workspace(),
     )
     _attach_oauth_state(app, access=access, account_id="acct-log")
     try:
         transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://test", headers=proxy_auth_headers()
+        ) as client:
             await client.post(
                 "/llm/openai/chat/completions",
                 json={"model": "openai/gpt-4o", "messages": [{"role": "user", "content": "hi"}]},
@@ -183,13 +189,15 @@ async def test_completed_codex_stream_aggregates_unchanged(
     monkeypatch.setattr("sevn.proxy.app.post_sse_stream", stub)
     access = fake_access_jwt(account_id="acct-ok")
     app = create_app(
-        settings=ProxySettings(openai_api_key=None, anthropic_api_key=None),
+        settings=proxy_test_settings(openai_api_key=None, anthropic_api_key=None),
         workspace_config=_oauth_workspace(),
     )
     _attach_oauth_state(app, access=access, account_id="acct-ok")
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+    ) as client:
         resp = await client.post(
             "/llm/openai/chat/completions",
             json={"model": "openai/gpt-4o", "messages": [{"role": "user", "content": "hi"}]},

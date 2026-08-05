@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import httpx
 import pytest
+from tests.proxy.conftest import proxy_auth_headers, proxy_test_settings
 
 from sevn.agent.providers import resolve_model
 from sevn.agent.triager.run import resolve_triager_transport_name
@@ -21,7 +22,6 @@ from sevn.proxy.credentials import (
     credential_unresolved_detail,
     resolve_request_credential,
 )
-from sevn.proxy.settings import ProxySettings
 
 _NOUS_MODEL = NOUS_PORTAL_DEEPSEEK_V4_FLASH_MODEL_ID
 _NOUS_BASE = DEFAULT_NOUS_INFERENCE_BASE_URL
@@ -74,7 +74,7 @@ def test_resolve_request_credential_uses_nous_base_url() -> None:
         "S",
         (),
         {
-            "settings": ProxySettings(openai_api_key="sk-env"),
+            "settings": proxy_test_settings(openai_api_key="sk-env"),
             "provider_credentials": ProviderCredentials(
                 by_name={
                     "nous": ProviderCredentialEntry(
@@ -117,7 +117,7 @@ async def test_nous_chat_completions_round_trip_smoke(monkeypatch: pytest.Monkey
     monkeypatch.setattr("sevn.proxy.app.post_json", capture_post_json)
     cfg = _nous_workspace()
     app = create_app(
-        settings=ProxySettings(openai_api_key="sk-env"),
+        settings=proxy_test_settings(openai_api_key="sk-env"),
         workspace_config=cfg,
     )
     app.state.provider_credentials = ProviderCredentials(
@@ -130,7 +130,9 @@ async def test_nous_chat_completions_round_trip_smoke(monkeypatch: pytest.Monkey
         },
     )
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+    ) as client:
         resp = await client.post(
             "/llm/openai/chat/completions",
             json={"model": _NOUS_MODEL, "messages": [{"role": "user", "content": "ping"}]},
@@ -159,7 +161,7 @@ async def test_nous_bad_key_returns_upstream_401(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr("sevn.proxy.app.post_json", capture_post_json)
     cfg = _nous_workspace()
     app = create_app(
-        settings=ProxySettings(openai_api_key="sk-env"),
+        settings=proxy_test_settings(openai_api_key="sk-env"),
         workspace_config=cfg,
     )
     app.state.provider_credentials = ProviderCredentials(
@@ -172,7 +174,9 @@ async def test_nous_bad_key_returns_upstream_401(monkeypatch: pytest.MonkeyPatch
         },
     )
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+    ) as client:
         resp = await client.post(
             "/llm/openai/chat/completions",
             json={"model": _NOUS_MODEL, "messages": []},
@@ -187,7 +191,7 @@ async def test_nous_missing_credential_returns_structured_503() -> None:
     """W17.5: unresolved nous secret yields operator-facing 503 detail."""
     cfg = _nous_workspace(with_key=True)
     app = create_app(
-        settings=ProxySettings(openai_api_key=None, anthropic_api_key=None),
+        settings=proxy_test_settings(openai_api_key=None, anthropic_api_key=None),
         workspace_config=cfg,
     )
     app.state.provider_credentials = ProviderCredentials(
@@ -200,7 +204,9 @@ async def test_nous_missing_credential_returns_structured_503() -> None:
         },
     )
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+    ) as client:
         resp = await client.post(
             "/llm/openai/chat/completions",
             json={"model": _NOUS_MODEL, "messages": []},

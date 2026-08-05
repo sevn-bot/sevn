@@ -425,38 +425,188 @@ def _emit_sink_blocking(sink: TraceSink | None, kind: str, attrs: Mapping[str, o
         logger.bind(kind=kind).debug("trace emit skipped inside running loop")
 
 
+_FORBIDDEN_SANDBOX_CHILD_ENV_KEYS: frozenset[str] = frozenset(
+    {
+        "SEVN_PROXY_SHARED_SECRET",
+        "X-SEVN-PROXY-TOKEN",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "NO_PROXY",
+    }
+)
+
+
+def _strip_forbidden_sandbox_env_keys(env: dict[str, str]) -> None:
+    """Remove keys that must never reach a sandbox child process or container.
+
+    Args:
+        env (dict[str, str]): Mutable spawn/exec env (updated in place).
+
+    Returns:
+        None: Always ``None``.
+
+    Examples:
+        >>> e = {"SEVN_PROXY_SHARED_SECRET": "x", "SEVN_PROXY_URL": "http://p"}
+        >>> _strip_forbidden_sandbox_env_keys(e)
+        >>> "SEVN_PROXY_SHARED_SECRET" in e
+        False
+    """
+    for key in _FORBIDDEN_SANDBOX_CHILD_ENV_KEYS:
+        env.pop(key, None)
+
+
+def _assert_sandbox_child_env_contract(env: Mapping[str, str]) -> None:
+    """Raise when ``env`` would violate the §2.2 child-env contract.
+
+    Args:
+        env (Mapping[str, str]): Candidate child env.
+
+    Raises:
+        SandboxConfigurationError: When a forbidden key or embedded secret is present.
+
+    Examples:
+        >>> _assert_sandbox_child_env_contract({"SEVN_PROXY_URL": "http://p"})
+        >>> isinstance(True, bool)
+        True
+    """
+    for key in _FORBIDDEN_SANDBOX_CHILD_ENV_KEYS:
+        if key in env:
+            msg = f"sandbox child env must not carry {key!r}"
+            raise SandboxConfigurationError(msg)
+    for value in env.values():
+        if "SEVN_PROXY_SHARED_SECRET" in value:
+            msg = "sandbox child env value embeds SEVN_PROXY_SHARED_SECRET"
+            raise SandboxConfigurationError(msg)
+
+
 def build_sandbox_child_env(
     *,
     proxy_url: str,
     session_token: str,
     workspace_mount_path: str | os.PathLike[str],
 ) -> dict[str, str]:
-    """Build §2.2 child environment (never injects raw provider keys).
+    """Build §2.2 child environment (never injects raw provider keys or service secret).
+
+    Emits ``SEVN_PROXY_URL``, scoped ``SEVN_SESSION_TOKEN``, and ``SEVN_WORKSPACE`` only.
+    Forward-proxy env vars (``HTTP_PROXY`` / ``HTTPS_PROXY`` / ``NO_PROXY``) are omitted —
+    the egress proxy is a reverse path-prefix API, not a CONNECT forward proxy (D13).
+
     Args:
         proxy_url (str): Base URL for unified egress proxy.
-        session_token (str): Opaque per-boot session token.
+        session_token (str): Scoped per-run ``X-Sevn-Session-Token`` credential.
         workspace_mount_path (str | os.PathLike[str]): Shadow or container path.
+
     Returns:
         dict[str, str]: Env vars to merge over a sanitized base.
+
+    Raises:
+        AssertionError: When a forbidden key would be emitted (regression guard, W6.2).
+
     Examples:
         >>> e = build_sandbox_child_env(
         ...     proxy_url="http://127.0.0.1:9",
         ...     session_token="t",
         ...     workspace_mount_path="/w",
         ... )
-        >>> e["NO_PROXY"]
-        'localhost,127.0.0.1'
+        >>> set(e.keys()) == {"SEVN_PROXY_URL", "SEVN_SESSION_TOKEN", "SEVN_WORKSPACE"}
+        True
     """
     p = str(proxy_url).strip()
     w = os.fspath(workspace_mount_path)
-    return {
+    env = {
         "SEVN_PROXY_URL": p,
         "SEVN_SESSION_TOKEN": session_token,
-        "HTTP_PROXY": p,
-        "HTTPS_PROXY": p,
-        "NO_PROXY": "localhost,127.0.0.1",
         "SEVN_WORKSPACE": w,
     }
+    _assert_sandbox_child_env_contract(env)
+    return env
+
+
+def _resolve_spawn_session_token(*, run_id: str, env: Mapping[str, str]) -> str:
+    """Return an existing ``SEVN_SESSION_TOKEN`` or mint a scoped per-run token.
+
+    Args:
+        run_id (str): Sandbox correlation id embedded in minted tokens.
+        env (Mapping[str, str]): Upstream spawn env (may already carry a token).
+
+    Returns:
+        str: Token text for ``build_sandbox_child_env`` (possibly empty).
+
+    Raises:
+        SandboxConfigurationError: When an existing token fails scope validation.
+
+    Examples:
+        >>> _resolve_spawn_session_token(run_id="r", env={"SEVN_SESSION_TOKEN": "keep"})
+        'keep'
+    """
+    existing = str(env.get("SEVN_SESSION_TOKEN", "")).strip()
+    secret = os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip()
+    if existing:
+        if secret:
+            from sevn.proxy.auth import validate_session_token
+
+            if not validate_session_token(
+                existing,
+                signing_key=secret,
+                path="/web/fetch",
+            ):
+                msg = "spawn env SEVN_SESSION_TOKEN is invalid or out of sandbox scope"
+                raise SandboxConfigurationError(msg)
+        return existing
+    if not secret:
+        return ""
+    from sevn.proxy.auth import SESSION_SCOPE_SANDBOX, mint_session_token
+
+    return mint_session_token(
+        signing_key=secret,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id=run_id,
+    )
+
+
+def _assemble_spawn_child_env(
+    *,
+    run_id: str,
+    env: Mapping[str, str],
+    workspace_mount_path: str | os.PathLike[str],
+    pre_env: Mapping[str, str] | None = None,
+) -> dict[str, str]:
+    """Build §2.2 child env for subprocess or Docker sandbox spawn.
+
+    Args:
+        run_id (str): Sandbox correlation id.
+        env (Mapping[str, str]): Upstream spawn env scaffolding.
+        workspace_mount_path (str | os.PathLike[str]): Shadow or container workspace path.
+        pre_env (Mapping[str, str] | None): Optional runtime ``pre_spawn_env`` overlay.
+
+    Returns:
+        dict[str, str]: Sanitized child env for exec or ``docker run -e``.
+
+    Examples:
+        >>> e = _assemble_spawn_child_env(
+        ...     run_id="r",
+        ...     env={"SEVN_PROXY_URL": "http://127.0.0.1:9"},
+        ...     workspace_mount_path="/w",
+        ... )
+        >>> set(e.keys()) == {"SEVN_PROXY_URL", "SEVN_SESSION_TOKEN", "SEVN_WORKSPACE"}
+        True
+    """
+    child_env = dict(env)
+    token = _resolve_spawn_session_token(run_id=run_id, env=child_env)
+    if token:
+        child_env["SEVN_SESSION_TOKEN"] = token
+    child_env.update(
+        build_sandbox_child_env(
+            proxy_url=child_env.get("SEVN_PROXY_URL", ""),
+            session_token=child_env.get("SEVN_SESSION_TOKEN", ""),
+            workspace_mount_path=workspace_mount_path,
+        )
+    )
+    if pre_env:
+        child_env.update(dict(pre_env))
+    _strip_forbidden_sandbox_env_keys(child_env)
+    _assert_sandbox_child_env_contract(child_env)
+    return child_env
 
 
 def _llmignore_excluded_relative(rel: str) -> bool:
@@ -808,15 +958,12 @@ class SubprocessSandboxRuntime:
             workspace, shadow_parent / f"sb-{uuid.uuid4().hex[:12]}"
         )
         sid = uuid.uuid4().hex
-        child_env = dict(env)
-        child_env.update(
-            build_sandbox_child_env(
-                proxy_url=child_env.get("SEVN_PROXY_URL", ""),
-                session_token=child_env.get("SEVN_SESSION_TOKEN", ""),
-                workspace_mount_path=shadow,
-            )
+        child_env = _assemble_spawn_child_env(
+            run_id=run_id,
+            env=env,
+            workspace_mount_path=shadow,
+            pre_env=self._pre_env,
         )
-        child_env.update(self._pre_env)
         self._records[sid] = {
             "run_id": run_id,
             "shadow": shadow,
@@ -899,6 +1046,7 @@ class SubprocessSandboxRuntime:
 
         merged_env = host_env_base_for_subprocess()
         merged_env.update(dict(rec["child_env"]))
+        _strip_forbidden_sandbox_env_keys(merged_env)
         merged_env.setdefault("PYTHONHASHSEED", "0")
         proc = await asyncio.create_subprocess_exec(
             *argv,
@@ -1166,7 +1314,7 @@ def rewrite_proxy_url_for_sandbox_network(proxy_url: str) -> str:
 
 
 def _apply_sandbox_proxy_env(child_env: dict[str, str], proxy_url: str) -> None:
-    """Set proxy-related env keys on ``child_env`` from a single origin.
+    """Set ``SEVN_PROXY_URL`` on ``child_env`` from a single origin.
     Args:
         child_env (dict[str, str]): Mutable spawn env (updated in place).
         proxy_url (str): Rewritten or original proxy origin.
@@ -1179,8 +1327,6 @@ def _apply_sandbox_proxy_env(child_env: dict[str, str], proxy_url: str) -> None:
         'http://host.docker.internal:8787'
     """
     child_env["SEVN_PROXY_URL"] = proxy_url
-    child_env["HTTP_PROXY"] = proxy_url
-    child_env["HTTPS_PROXY"] = proxy_url
 
 
 async def _find_running_container_matching(name_fragment: str) -> str | None:
@@ -1301,33 +1447,60 @@ def _docker_isolation_args() -> list[str]:
 
 
 async def _resolve_digest_pinned_image(image: str) -> str:
-    """Resolve a tag to a digest-pinned reference when inspect succeeds (§4.2).
+    """Pull (when tagged) and resolve to a registry digest reference (§4.2, D14).
+
+    When ``image`` already contains ``@sha256:``, verify it exists locally and
+    return unchanged (no pull). Otherwise ``docker pull`` the tag, inspect
+    ``RepoDigests``, and return ``repo@sha256:…``. Locally built images without
+    registry digests raise ``SandboxConfigurationError``.
+
     Args:
         image (str): Image tag or digest reference from config.
+
     Returns:
-        str: ``repo@sha256:…`` when available, else the original ``image``.
+        str: Digest-pinned ``repo@sha256:…`` reference for ``docker run``.
+
+    Raises:
+        SandboxConfigurationError: When pull/inspect fails or no ``RepoDigests``.
+
     Examples:
         >>> isinstance("@sha256:" in "x@sha256:abc", bool)
         True
     """
-    if "@sha256:" in image:
-        return image
     docker_bin = _docker_bin()
+    if "@sha256:" in image:
+        rc, _, err = await _docker_run(
+            [docker_bin, "image", "inspect", image],
+            timeout_s=60.0,
+        )
+        if rc != 0:
+            msg = (
+                f"configured sandbox image {image!r} is not present locally "
+                f"(docker image inspect exit {rc}): {err.strip()}"
+            )
+            raise SandboxConfigurationError(msg)
+        return image
+    pull_rc, pull_out, pull_err = await _docker_run(
+        [docker_bin, "pull", image],
+        timeout_s=600.0,
+    )
+    if pull_rc != 0:
+        msg = (
+            f"docker pull {image!r} failed (exit {pull_rc}): {pull_err.strip() or pull_out.strip()}"
+        )
+        raise SandboxConfigurationError(msg)
     rc, out, _ = await _docker_run(
         [docker_bin, "image", "inspect", "--format", "{{index .RepoDigests 0}}", image],
         timeout_s=60.0,
     )
     digest_ref = out.strip()
-    if rc == 0 and digest_ref:
-        return digest_ref
-    rc2, out2, _ = await _docker_run(
-        [docker_bin, "image", "inspect", "--format", "{{.Id}}", image],
-        timeout_s=60.0,
-    )
-    image_id = out2.strip()
-    if rc2 == 0 and image_id:
-        return image_id
-    return image
+    if rc != 0 or not digest_ref:
+        msg = (
+            f"sandbox image {image!r} has no RepoDigests after pull; "
+            "push the image to a registry or pin by digest (@sha256:…) in config"
+        )
+        raise SandboxConfigurationError(msg)
+    return digest_ref
 
 
 def _prepare_workspace_out_dir(workspace: Path, run_id: str) -> Path:
@@ -1648,8 +1821,12 @@ class DockerSandboxRuntime:
             return workspace.expanduser().resolve()
 
         ws = await asyncio.to_thread(_resolve_workspace)
-        child_env = dict(env)
-        child_env.update(self._pre_env)
+        child_env = _assemble_spawn_child_env(
+            run_id=run_id,
+            env=env,
+            workspace_mount_path=_DOCKER_WORKSPACE_MOUNT,
+            pre_env=self._pre_env,
+        )
         child_env.setdefault("SEVN_WORKSPACE", _DOCKER_WORKSPACE_MOUNT)
         proxy_raw = str(child_env.get("SEVN_PROXY_URL", "")).strip()
         if proxy_raw:
@@ -1657,26 +1834,11 @@ class DockerSandboxRuntime:
             rewritten = rewrite_proxy_url_for_sandbox_network(proxy_raw)
             if rewritten != proxy_raw:
                 _apply_sandbox_proxy_env(child_env, rewritten)
-        network_rules = await asyncio.to_thread(
-            _write_docker_network_policy,
-            ws,
-            child_env=child_env,
-        )
         network_name = await ensure_sandbox_docker_network()
         llmignore_mounts = await asyncio.to_thread(_discover_llmignore_mask_mounts, ws)
         out_dir = await asyncio.to_thread(_prepare_workspace_out_dir, ws, run_id)
         spawn_ts = int(time.time())
         pinned_image = await _resolve_digest_pinned_image(self._image)
-        pull_rc, pull_out, pull_err = await _docker_run(
-            [docker_bin, "pull", pinned_image],
-            timeout_s=600.0,
-        )
-        if pull_rc != 0:
-            msg = (
-                f"docker pull {pinned_image!r} failed (exit {pull_rc}): "
-                f"{pull_err.strip() or pull_out.strip()}"
-            )
-            raise SandboxConfigurationError(msg)
         name = f"sevn-sb-{uuid.uuid4().hex[:12]}"
         run_argv: list[str] = [
             docker_bin,
@@ -1729,9 +1891,8 @@ class DockerSandboxRuntime:
             "sandbox_max_lifetime_s": self._lifetime_s,
             "sandbox_id": sid,
             "network_mode": network_name,
+            "network_enforcement": "docker_internal",
         }
-        if network_rules is not None:
-            runtime_attrs["network_policy_path"] = str(network_rules)
         hp = _proxy_host_port_from_env(child_env)
         if hp is not None:
             runtime_attrs["proxy_host_port"] = hp

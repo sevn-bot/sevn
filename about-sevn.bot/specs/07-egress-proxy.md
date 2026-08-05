@@ -7,8 +7,8 @@ owner: Alex
 summary: Product pairing (v1). Deployment, paired daemon install, onboarding validation,
   and Mission Control management of the proxy are specified in prd-06-setup-and-operations
   and prd-07-mission-control §5.1
-last_updated: '2026-08-03'
-fingerprint: sha256:f67bdf96b0de62b378c2fda48e1a07b3247b972893801a2f6497ce9ef88747bc
+last_updated: '2026-08-04'
+fingerprint: sha256:86c93ed39251f5cc2bc1b95ec43665f814e224895221919595c616e7000b8410
 related: []
 sources:
 - src/sevn/proxy/**
@@ -29,6 +29,18 @@ interfaces:
 - name: llm_post_auth_failure
   file: src/sevn/proxy/auth.py
   symbol: llm_post_auth_failure
+- name: log_proxy_allow_unauthenticated_boot_warning
+  file: src/sevn/proxy/auth.py
+  symbol: log_proxy_allow_unauthenticated_boot_warning
+- name: mint_session_token
+  file: src/sevn/proxy/auth.py
+  symbol: mint_session_token
+- name: proxy_allow_unauthenticated
+  file: src/sevn/proxy/auth.py
+  symbol: proxy_allow_unauthenticated
+- name: validate_session_token
+  file: src/sevn/proxy/auth.py
+  symbol: validate_session_token
 - name: converse_via_bedrock
   file: src/sevn/proxy/bedrock_converse.py
   symbol: converse_via_bedrock
@@ -209,6 +221,30 @@ Map to existing tests under `tests/` that cover this subsystem; add Makefile-onl
 The egress proxy ASGI app (`src/sevn/proxy/app.py`) applies the same
 `IngressBodyLimitMiddleware` cap as the gateway (`DEFAULT_MAX_INGRESS_BODY_BYTES`).
 `POST /llm/*` and other proxy ingress routes return **413** before upstream forward.
+
+## Amendments (post-audit-0.0.1 W5 — #167)
+
+Guarded route prefixes (`/llm/`, `/web/`, `/integration/`) return **503**
+``{"detail":"proxy authentication not configured"}`` when
+``proxy_shared_secret`` / ``SEVN_PROXY_SHARED_SECRET`` is unset. The only escape
+is explicit ``SEVN_PROXY_ALLOW_UNAUTHENTICATED=1``, which logs a loud warning at
+proxy boot and on every guarded request. Onboarding stores
+``SEVN_PROXY_SHARED_SECRET`` in the workspace secrets chain; gateway and proxy
+resolve it at boot (``resolve_proxy_shared_secret`` reads process env unchanged).
+
+## Amendments (post-audit-0.0.1 W6 — #168)
+
+Two credentials authenticate guarded proxy routes (D12):
+
+| Header | Holder | Scope |
+|--------|--------|-------|
+| ``X-Sevn-Proxy-Token`` | Gateway → proxy | Long-lived ``SEVN_PROXY_SHARED_SECRET``; all guarded prefixes |
+| ``X-Sevn-Session-Token`` | Sandbox / tool → proxy | Per-run HMAC token minted by ``mint_session_token``; ``sandbox`` scope covers ``/web/*`` and ``/integration``; ``llm`` scope covers ``/llm/*`` |
+
+Session tokens carry ``exp`` (unix expiry) and ``run_id`` in a ``v1.<payload>.<sig>``
+envelope signed with the same ``SEVN_PROXY_SHARED_SECRET``. Either header alone
+satisfies the guard for its route family. The service secret is **never** injected
+into sandbox child env (``build_sandbox_child_env``).
 
 ## Human-input needed
 

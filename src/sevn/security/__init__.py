@@ -23,7 +23,7 @@ Exports:
     snapshot_tarball_format_supported — supported ``format_version`` predicate.
     prune_workspace_snapshots — retention-based snapshot pruning.
     egress_firewall_noop — dev egress shim.
-    apply_namespace_egress_firewall — namespace firewall (**NotImplemented**).
+    apply_namespace_egress_firewall — namespace firewall (Linux iptables when ``SEVN_SANDBOX_IPTABLES_APPLY=1``; not used on Docker spawn).
     SandboxRunRegistry — orphan sweeper gateway port.
     SandboxLabeledContainer — sweeper docker row stub.
     orphan_container_should_kill — orphan TTL predicate.

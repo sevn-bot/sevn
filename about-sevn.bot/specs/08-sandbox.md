@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / safebash
   (when routed through the execution sandbox), process when configured for sandbox
   routing, and skill subprocesses spawned b
-last_updated: '2026-08-03'
-fingerprint: sha256:e947ce6d6a26d9e8e6ccee5f2b59d7f6a0a902e2dba261e486cb6cc929a2bcb9
+last_updated: '2026-08-04'
+fingerprint: sha256:b631d0cf2956c8f760f85d027f593dc802dbbab0f22feed3a1b0847c80161f85
 related: []
 sources:
 - src/sevn/security/**
@@ -446,6 +446,30 @@ Initial draft for **Test Strategy** — grounded in extracted interfaces; confir
 <!-- HUMAN-INPUT[owner=operator]: Product/normative contract for Test Strategy — acceptance criteria and edge cases. -->
 
 Map to existing tests under `tests/` that cover this subsystem; add Makefile-only gates where applicable.
+
+## Amendments (post-audit-0.0.1 W8 — #171)
+
+Docker spawn enforces egress via the dedicated ``--internal`` network
+``sevn-sandbox`` (``ensure_sandbox_docker_network``). The spawn path does
+**not** write ``.sevn/sandbox-egress.*.rules`` files or emit
+``network_policy_path`` telemetry — ``sandbox.runtime`` carries
+``network_enforcement: "docker_internal"`` beside ``network_mode`` instead (D15).
+``_write_docker_network_policy`` and ``apply_namespace_egress_firewall`` remain
+for subprocess/namespace mode and operator reference.
+
+**Known tradeoff:** ``ensure_proxy_attached_to_sandbox_network`` attaches the
+**whole** egress-proxy container to ``sevn-sandbox`` so sandboxes can reach the
+reverse-proxy API; the proxy shares the internal bridge with sandboxes.
+
+## Amendments (post-audit-0.0.1 W6 — #168)
+
+``build_sandbox_child_env`` (§2.2) emits only ``SEVN_PROXY_URL``,
+``SEVN_SESSION_TOKEN``, and ``SEVN_WORKSPACE``. It **never** injects
+``SEVN_PROXY_SHARED_SECRET``, ``X-Sevn-Proxy-Token``, or forward-proxy env vars
+(``HTTP_PROXY`` / ``HTTPS_PROXY`` / ``NO_PROXY``) — the egress proxy is a reverse
+path-prefix API, not a CONNECT forward proxy (D13). ``SEVN_SESSION_TOKEN`` carries
+a scoped per-run ``X-Sevn-Session-Token`` minted at spawn (``mint_session_token``,
+``sandbox`` scope); see spec-07 W6 amendment for validation semantics.
 
 ## Human-input needed
 
