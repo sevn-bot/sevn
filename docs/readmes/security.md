@@ -71,6 +71,14 @@ Validate after edits: `sevn config validate`.
 
 Normative spec: [`about-sevn.bot/specs/09-security-scanner.md`](../../about-sevn.bot/specs/09-security-scanner.md).
 
+### Browser renderer sandbox vs container hardening (C8.1 / C8.4)
+
+Operator compose may set `cap_drop: ALL` and `security_opt: [no-new-privileges:true]` on gateway/proxy. Those are **container** hardening controls. They do **not** substitute for Chromium's **renderer sandbox**.
+
+- **Never** pass `--no-sandbox` via compose overlays or `SEVN_BROWSER_EXTRA_ARGS` in shipped files — including the production overlay. `make check-compose-default` rejects the token in every `docker/docker-compose*.yml`.
+- Login-grade spawn keeps `--disable-features=IsolateOrigins,site-per-process` as a **justified** tradeoff for operator-driven auth flows against operator-chosen destinations (`src/sevn/browser/chrome.py`). That flag relaxes site-per-process isolation; it is **not** a general untrusted-browsing posture. A future untrusted-browsing mode must **not** inherit it.
+- The Chromium/Brave renderer sandbox remains the primary process-isolation control for browser content; container caps only constrain the host namespace.
+
 ## Level 3 — Deep dive (low-level, technical)
 
 Primary source tree: `src/sevn/security/` (32 Python files). Normative design: `about-sevn.bot/specs/09-security-scanner.md`.

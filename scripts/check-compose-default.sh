@@ -134,6 +134,25 @@ _check_compose_file_set "default" "$compose_base"
 _check_compose_file_set "browser override" "$compose_base" "$compose_browser"
 _check_compose_file_set "gui override" "$compose_base" "$compose_gui"
 
+# C8.1 — no compose file or overlay may pass --no-sandbox (renderer sandbox stays on).
+# Strip YAML comment lines, then reject the token in active config (prod overlay included).
+_check_no_sandbox_in_compose() {
+  local compose_file="$1"
+  local active
+  active="$(grep -v '^\s*#' "$compose_file" || true)"
+  if printf '%s\n' "$active" | grep -q -- '--no-sandbox'; then
+    echo "error: ${compose_file##*/} must not pass --no-sandbox (Chromium renderer sandbox required)" >&2
+    return 1
+  fi
+  return 0
+}
+
+shopt -s nullglob
+for compose_file in "${repo_root}/docker"/docker-compose*.yml; do
+  _check_no_sandbox_in_compose "$compose_file" || exit 1
+done
+shopt -u nullglob
+
 for compose_file in "$compose_base" "$compose_browser" "$compose_gui"; do
   if grep -q '"!' "$compose_file"; then
     echo "negated compose profiles are not a thing ($compose_file)" >&2
