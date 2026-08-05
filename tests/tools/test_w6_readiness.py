@@ -84,7 +84,7 @@ async def test_web_search_brave_key_missing(ctx: ToolContext) -> None:
     with (
         patch(
             "sevn.tools.web._resolve_process_egress",
-            return_value=("http://127.0.0.1:8787", "tok", None),
+            return_value=("http://127.0.0.1:8787", "tok", "test-proxy-secret"),
         ),
         patch("sevn.tools.web.proxy_post_json", side_effect=_fake_proxy_post_json),
         patch(
@@ -106,7 +106,7 @@ async def test_web_search_brave_key_missing(ctx: ToolContext) -> None:
     with (
         patch(
             "sevn.tools.web._resolve_process_egress",
-            return_value=("http://127.0.0.1:8787", "tok", None),
+            return_value=("http://127.0.0.1:8787", "tok", "test-proxy-secret"),
         ),
         patch("sevn.tools.web.proxy_post_json", side_effect=_fake_proxy_post_json),
         patch("sevn.tools.web._HAS_DDGS", False),

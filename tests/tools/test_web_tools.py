@@ -210,7 +210,7 @@ async def test_get_page_content_extract_auto_omits_nav_noise(ctx: ToolContext) -
     with (
         patch(
             "sevn.tools.web._resolve_process_egress",
-            return_value=("http://127.0.0.1:8787", "tok", None),
+            return_value=("http://127.0.0.1:8787", "tok", "test-proxy-secret"),
         ),
         patch("sevn.tools.web.proxy_post_json", side_effect=_fake_proxy_post_json),
         patch("sevn.tools.web._extract_main_html", side_effect=_fake_extract),
@@ -263,7 +263,7 @@ async def test_get_page_content_extract_full_preserves_legacy_nav(ctx: ToolConte
     with (
         patch(
             "sevn.tools.web._resolve_process_egress",
-            return_value=("http://127.0.0.1:8787", "tok", None),
+            return_value=("http://127.0.0.1:8787", "tok", "test-proxy-secret"),
         ),
         patch("sevn.tools.web.proxy_post_json", side_effect=_fake_proxy_post_json),
         patch("sevn.tools.web._HAS_READABILITY", False),
@@ -310,7 +310,7 @@ async def test_get_page_content_markdownify(ctx: ToolContext) -> None:
     with (
         patch(
             "sevn.tools.web._resolve_process_egress",
-            return_value=("http://127.0.0.1:8787", "tok", None),
+            return_value=("http://127.0.0.1:8787", "tok", "test-proxy-secret"),
         ),
         patch("sevn.tools.web.proxy_post_json", side_effect=_fake_proxy_post_json),
     ):
@@ -350,7 +350,7 @@ async def test_get_page_content_large_html_does_not_report_empty_body(ctx: ToolC
     with (
         patch(
             "sevn.tools.web._resolve_process_egress",
-            return_value=("http://127.0.0.1:8787", "tok", None),
+            return_value=("http://127.0.0.1:8787", "tok", "test-proxy-secret"),
         ),
         patch("sevn.tools.web.proxy_post_json", side_effect=_fake_proxy_post_json),
     ):
@@ -384,7 +384,7 @@ async def test_get_page_content_no_max_length_uses_single_streaming_fetch(ctx: T
     with (
         patch(
             "sevn.tools.web._resolve_process_egress",
-            return_value=("http://127.0.0.1:8787", "tok", None),
+            return_value=("http://127.0.0.1:8787", "tok", "test-proxy-secret"),
         ),
         patch("sevn.tools.web.proxy_post_json", side_effect=_fake_proxy_post_json),
     ):
@@ -414,7 +414,7 @@ async def test_get_page_content_empty_body_still_errors(ctx: ToolContext) -> Non
     with (
         patch(
             "sevn.tools.web._resolve_process_egress",
-            return_value=("http://127.0.0.1:8787", "tok", None),
+            return_value=("http://127.0.0.1:8787", "tok", "test-proxy-secret"),
         ),
         patch("sevn.tools.web.proxy_post_json", side_effect=_fake_proxy_post_json),
     ):
@@ -446,7 +446,7 @@ async def test_web_fetch_large_body_spills(ctx: ToolContext) -> None:
     with (
         patch(
             "sevn.tools.web._resolve_process_egress",
-            return_value=("http://127.0.0.1:8787", "tok", None),
+            return_value=("http://127.0.0.1:8787", "tok", "test-proxy-secret"),
         ),
         patch("sevn.tools.web.proxy_post_json", side_effect=_fake_proxy_post_json),
     ):
@@ -590,7 +590,7 @@ async def test_streaming_web_fetch_single_proxy_call_assembles_html(ctx: ToolCon
     with (
         patch(
             "sevn.tools.web._resolve_process_egress",
-            return_value=("http://127.0.0.1:8787", "tok", None),
+            return_value=("http://127.0.0.1:8787", "tok", "test-proxy-secret"),
         ),
         patch("sevn.tools.web.proxy_post_json", side_effect=_fake_proxy_post_json),
     ):
@@ -630,7 +630,7 @@ async def test_streaming_web_fetch_truncates_at_one_million() -> None:
     with (
         patch(
             "sevn.tools.web._resolve_process_egress",
-            return_value=("http://127.0.0.1:8787", "tok", None),
+            return_value=("http://127.0.0.1:8787", "tok", "test-proxy-secret"),
         ),
         patch("sevn.tools.web.proxy_post_json", side_effect=_fake_proxy_post_json),
     ):
@@ -671,7 +671,7 @@ async def test_proxy_web_fetch_single_byte_offset_still_uses_chunk_api() -> None
     with (
         patch(
             "sevn.tools.web._resolve_process_egress",
-            return_value=("http://127.0.0.1:8787", "tok", None),
+            return_value=("http://127.0.0.1:8787", "tok", "test-proxy-secret"),
         ),
         patch("sevn.tools.web.proxy_post_json", side_effect=_fake_proxy_post_json),
     ):
@@ -708,7 +708,7 @@ async def test_get_page_content_passes_low_content_hint(ctx: ToolContext) -> Non
     with (
         patch(
             "sevn.tools.web._resolve_process_egress",
-            return_value=("http://127.0.0.1:8787", "tok", None),
+            return_value=("http://127.0.0.1:8787", "tok", "test-proxy-secret"),
         ),
         patch("sevn.tools.web.proxy_post_json", side_effect=_fake_proxy_post_json),
     ):

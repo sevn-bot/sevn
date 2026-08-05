@@ -14,8 +14,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-_XFAIL_W3 = pytest.mark.xfail(strict=True, reason="prod-ready W3")
-
 _SECRET_NAME = "SEVN_PROXY_SHARED_SECRET"
 _REMEDY_MARKERS = ("set", "configure", "generate", "secrets put", "onboard")
 
@@ -36,7 +34,6 @@ def _assert_actionable(exc: BaseException) -> None:
     )
 
 
-@_XFAIL_W3
 def test_proxy_shared_secret_unconfigured_error_is_exported() -> None:
     """W1.4: named exception is a public ``sevn.tools.web`` export."""
     exc_type = _import_unconfigured_error()
@@ -44,7 +41,6 @@ def test_proxy_shared_secret_unconfigured_error_is_exported() -> None:
     assert exc_type.__name__ == "ProxySharedSecretUnconfiguredError"
 
 
-@_XFAIL_W3
 def test_build_egress_web_headers_raises_on_empty_secret() -> None:
     """W1.4: header builder refuses to omit the token for a guarded call."""
     from sevn.tools.web import build_egress_web_headers
@@ -67,7 +63,6 @@ def test_build_egress_web_headers_raises_on_empty_secret() -> None:
     _assert_actionable(caught_empty.value)
 
 
-@_XFAIL_W3
 @pytest.mark.anyio
 async def test_web_process_egress_raises_when_secret_empty(
     monkeypatch: pytest.MonkeyPatch,
@@ -89,7 +84,6 @@ async def test_web_process_egress_raises_when_secret_empty(
     _assert_actionable(caught.value)
 
 
-@_XFAIL_W3
 @pytest.mark.anyio
 async def test_integration_proxy_client_raises_on_empty_secret() -> None:
     """W1.4 / tools/integration_proxy_client.py: live client refuses empty secret."""
@@ -125,7 +119,6 @@ async def test_integration_proxy_client_raises_on_empty_secret() -> None:
     _assert_actionable(caught.value)
 
 
-@_XFAIL_W3
 @pytest.mark.anyio
 async def test_integrations_proxy_client_raises_on_empty_secret(
     monkeypatch: pytest.MonkeyPatch,
@@ -146,7 +139,6 @@ async def test_integrations_proxy_client_raises_on_empty_secret(
     _assert_actionable(caught.value)
 
 
-@_XFAIL_W3
 @pytest.mark.anyio
 async def test_github_hooks_raise_on_empty_secret(
     monkeypatch: pytest.MonkeyPatch,
@@ -168,7 +160,6 @@ async def test_github_hooks_raise_on_empty_secret(
     _assert_actionable(caught.value)
 
 
-@_XFAIL_W3
 def test_build_integration_proxy_client_does_not_silently_fill_from_environ(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

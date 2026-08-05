@@ -1,4 +1,4 @@
-"""Wizard proxy shared-secret generation and gateway env priming (Batch B W5)."""
+"""Wizard proxy shared-secret generation and gateway priming (Batch B W5 / prod W3)."""
 
 from __future__ import annotations
 
@@ -38,6 +38,7 @@ def test_wizard_proxy_shared_secret_rejects_short_value() -> None:
 
 
 def test_store_wizard_credentials_writes_proxy_shared_secret(tmp_path: Path) -> None:
+    """Store still persists the secret; priming must not write it back to os.environ (D41)."""
     section = SecretsBackendSectionConfig(
         chain=[EncryptedFileBackendEntry(path=".sevn/secrets/store.enc")]
     )
@@ -69,12 +70,13 @@ def test_store_wizard_credentials_writes_proxy_shared_secret(tmp_path: Path) -> 
         ):
             os.environ.pop("SEVN_PROXY_SHARED_SECRET", None)
             await _prime_proxy_shared_secret_env(cfg, content_root=tmp_path)
-            assert os.environ.get("SEVN_PROXY_SHARED_SECRET") == proxy_secret
+            assert os.environ.get("SEVN_PROXY_SHARED_SECRET") is None
 
     asyncio.run(_run())
 
 
-def test_prime_proxy_shared_secret_env_skips_when_env_already_set(tmp_path: Path) -> None:
+def test_prime_proxy_shared_secret_env_is_noop(tmp_path: Path) -> None:
+    """Deprecated prime helper must not mutate environ or touch the secrets chain (D41)."""
     cfg = parse_workspace_config({"schema_version": 1, "gateway": {"token": "x" * 32}})
     os.environ["SEVN_PROXY_SHARED_SECRET"] = "already-set"
 
