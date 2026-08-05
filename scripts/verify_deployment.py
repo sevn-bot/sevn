@@ -768,10 +768,13 @@ async def _spawn_through_docker(image: str) -> tuple[str, str]:
     from sevn.config.workspace_config import WorkspaceConfig
     from sevn.security.sandbox_runtime import (
         DockerSandboxRuntime,
-        _resolve_digest_pinned_image,
+        ensure_sandbox_image_ready,
     )
 
-    resolved = await _resolve_digest_pinned_image(image)
+    # Use the product path (C5.1 cache + C4.2 digest pull-if-absent). Calling
+    # ``_resolve_digest_pinned_image`` first double-pulled tags and skipped the
+    # digest cold-start pull that ``ensure_sandbox_image_ready`` owns.
+    resolved = await ensure_sandbox_image_ready(image)
     runtime = DockerSandboxRuntime(trace_sink=None, cfg=WorkspaceConfig.minimal(), image=image)
     with tempfile.TemporaryDirectory(prefix="sevn-verify-ws-") as tmp:
         sandbox_id = await runtime.spawn(
@@ -844,9 +847,12 @@ def _is_d43_fail_closed(exc: BaseException, image: str) -> bool:
         return False
     empty, _ = _repo_digests_empty(image)
     if "has no RepoDigests" in msg:
-        return True
+        return empty
+    # Local builds are not registry-pullable; only empty RepoDigests makes that
+    # pull denial the intentional D43 refuse (not a transient network failure on
+    # a tagged image that already has digests).
     if f"docker pull {image!r} failed" in msg or f"docker pull '{image}' failed" in msg:
-        return empty or "@sha256:" not in image
+        return empty
     return False
 
 
@@ -909,7 +915,7 @@ def drive_sandbox_spawn() -> DriverResult:
                     name="fail-closed",
                     status=STATUS_PASS,
                     detail=f"{type(exc).__name__}: {exc}",
-                    command=f"_resolve_digest_pinned_image({image!r})",
+                    command=f"ensure_sandbox_image_ready({image!r})",
                 )
             )
             result.reason = (

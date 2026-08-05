@@ -121,3 +121,42 @@ def test_w6_3_schema_defines_or_documents_sandbox_docker_image() -> None:
     assert has_sandbox_key or documents_rlm_only, (
         "schema must define sandbox.docker_image or document that only rlm.docker_image is honoured"
     )
+
+
+def test_w6_3b_require_stamped_reads_assignment_not_substring(tmp_path: Path) -> None:
+    """Release ``--require-stamped`` must ignore comment/sentinel ``UNSTAMPED`` substrings."""
+    import importlib.util
+
+    script = _REPO / "scripts" / "check_sandbox_mutable_image_tags.py"
+    spec = importlib.util.spec_from_file_location("check_sandbox_mutable_image_tags", script)
+    assert spec is not None
+    assert spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    stamped = tmp_path / "sandbox_runtime.py"
+    digest = "sha256:" + ("ab" * 32)
+    stamped.write_text(
+        "\n".join(
+            [
+                "# still mentions sha256:UNSTAMPED in a comment",
+                '_UNSTAMPED_SANDBOX_DIGEST: Final[str] = "sha256:UNSTAMPED"',
+                f'_SANDBOX_IMAGE_DIGEST_STAMP: str = "{digest}"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkey_runtime = mod._RUNTIME_MODULE
+    mod._RUNTIME_MODULE = stamped
+    try:
+        assert not mod._stamp_is_missing()
+        unstamped = tmp_path / "unstamped.py"
+        unstamped.write_text(
+            '_SANDBOX_IMAGE_DIGEST_STAMP: str = "sha256:UNSTAMPED"\n',
+            encoding="utf-8",
+        )
+        mod._RUNTIME_MODULE = unstamped
+        assert mod._stamp_is_missing()
+    finally:
+        mod._RUNTIME_MODULE = monkey_runtime

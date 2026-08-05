@@ -35,6 +35,10 @@ _MUTABLE_TAG_RE = re.compile(
     r"""ghcr\.io/sevn-bot/sevn/sandbox:(?!@)(?P<tag>dev|latest|[A-Za-z0-9._-]+)""",
 )
 _UNSTAMPED = "sha256:UNSTAMPED"
+_STAMP_ASSIGN_RE = re.compile(
+    r'^_SANDBOX_IMAGE_DIGEST_STAMP:\s*str\s*=\s*"(?P<digest>sha256:[^"]+)"\s*$',
+    re.MULTILINE,
+)
 _RUNTIME_MODULE = REPO_ROOT / "src" / "sevn" / "security" / "sandbox_runtime.py"
 
 
@@ -67,10 +71,14 @@ def find_mutable_tag_hits(*, src_root: Path = SRC_ROOT) -> list[str]:
 
 
 def _stamp_is_missing() -> bool:
-    """Return True when the runtime module still carries the unstamped sentinel.
+    """Return True when ``_SANDBOX_IMAGE_DIGEST_STAMP`` is still the release sentinel.
+
+    Comments and the ``_UNSTAMPED_SANDBOX_DIGEST`` constant legitimately retain the
+    ``sha256:UNSTAMPED`` substring after a successful stamp — only the assignment
+    value decides whether the release digest was applied.
 
     Returns:
-        bool: ``True`` when ``sha256:UNSTAMPED`` remains in ``sandbox_runtime.py``.
+        bool: ``True`` when the stamp assignment is missing or still ``UNSTAMPED``.
 
     Examples:
         >>> isinstance(_stamp_is_missing(), bool)
@@ -78,7 +86,11 @@ def _stamp_is_missing() -> bool:
     """
     if not _RUNTIME_MODULE.is_file():
         return True
-    return _UNSTAMPED in _RUNTIME_MODULE.read_text(encoding="utf-8")
+    text = _RUNTIME_MODULE.read_text(encoding="utf-8")
+    match = _STAMP_ASSIGN_RE.search(text)
+    if match is None:
+        return True
+    return match.group("digest") == _UNSTAMPED
 
 
 def main(argv: list[str] | None = None) -> int:

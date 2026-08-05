@@ -239,6 +239,57 @@ async def test_w6_6_explicit_image_update_is_only_cache_refresh(
 
 
 @pytest.mark.asyncio
+async def test_w6_6b_config_change_does_not_reuse_prior_digest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """D43 — cache is keyed by configured ref; ``rlm.docker_image`` change must not mask."""
+    ensure, _refresh = _import_image_ready_api()
+    tag_a = "fresh-registry.example/sandbox:a"
+    tag_b = "fresh-registry.example/sandbox:b"
+    digest_a = (
+        "fresh-registry.example/sandbox@sha256:"
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    )
+    digest_b = (
+        "fresh-registry.example/sandbox@sha256:"
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    )
+    pull_targets: list[str] = []
+
+    async def fake_docker_run(
+        argv: list[str],
+        *,
+        timeout_s: float | None = None,
+        stdin: bytes | None = None,
+    ) -> tuple[int, str, str]:
+        _ = timeout_s, stdin
+        if "pull" in argv:
+            pull_targets.append(argv[-1])
+            return 0, "", ""
+        if "image" in argv and "inspect" in argv:
+            target = argv[-1]
+            if target in (tag_a, digest_a):
+                return 0, digest_a, ""
+            if target in (tag_b, digest_b):
+                return 0, digest_b, ""
+            return 1, "", "not found"
+        return 0, "", ""
+
+    monkeypatch.setattr("sevn.security.sandbox_runtime._docker_run", fake_docker_run)
+
+    pinned_a = await ensure(tag_a)
+    assert pinned_a == digest_a
+    assert pull_targets == [tag_a]
+
+    pinned_b = await ensure(tag_b)
+    assert pinned_b == digest_b, (
+        f"config change from {tag_a!r} to {tag_b!r} must not reuse cached {pinned_a!r}"
+    )
+    assert pull_targets == [tag_a, tag_b]
+    assert pinned_b != pinned_a
+
+
+@pytest.mark.asyncio
 async def test_w6_7_startup_refuses_when_release_digest_absent(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
