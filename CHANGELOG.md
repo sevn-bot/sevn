@@ -16,6 +16,7 @@ are cut into a dated, versioned section at release time.
 
 ### Changed
 - [2026-08-05] **Breaking:** Mission Control `local_open` on loopback now requires the boot-written `local_token` query parameter — tokenless loopback no longer grants owner session claims; set `dashboard.local_open_trust_address: true` to restore address-only trust (#169, post-audit Batch E)
+- [2026-08-05] CLI dashboard reads (`sevn models`, `sevn agent config`, `sevn channels status`, and related commands) append the boot `local_token` when calling loopback Mission Control with effective local-open (#169, post-audit Batch E W18)
 
 ### Security
 - [2026-08-04] Container supply chain: Trivy blocks CRITICAL/HIGH before cosign sign; time-boxed CVE allowlist in `security/trivy-allowlist.toml` (#173, post-audit Batch C W11)

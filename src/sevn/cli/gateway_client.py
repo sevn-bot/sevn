@@ -408,6 +408,18 @@ def gateway_json_request(
     ps = process or ProcessSettings()
     base = resolve_gateway_base_url(process=ps, workspace=workspace)
     url = base + (path if path.startswith("/") else f"/{path}")
+    if workspace is not None and path.startswith("/api/v1/"):
+        from sevn.ui.dashboard.services.auth import dashboard_local_open_configured
+        from sevn.ui.dashboard.services.local_token import (
+            DASHBOARD_LOCAL_TOKEN_QUERY,
+            read_dashboard_local_token,
+        )
+
+        if dashboard_local_open_configured(workspace):
+            local_token = read_dashboard_local_token()
+            if local_token:
+                sep = "&" if "?" in url else "?"
+                url = f"{url}{sep}{DASHBOARD_LOCAL_TOKEN_QUERY}={local_token}"
     auth_token = resolve_gateway_token(
         process=ps,
         workspace=workspace,
