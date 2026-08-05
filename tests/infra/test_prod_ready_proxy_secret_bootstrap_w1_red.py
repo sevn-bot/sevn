@@ -1,8 +1,8 @@
-"""Prod-ready Batch A W1.5 RED — generate proxy secret on first boot (C1.2; D37).
+"""Prod-ready Batch A W1.5 — generate proxy secret on first boot (C1.2; D37).
 
 Bootstrap contract: clean ``sevn-state`` gets ``/operator/.sevn/proxy-shared-secret``
 (mode ``0600``, uid ``10001``); not regenerated on next boot; explicit env wins;
-``.env.example`` has no blank ``SEVN_PROXY_SHARED_SECRET=`` line. Green after W4.
+``.env.example`` has no blank ``SEVN_PROXY_SHARED_SECRET=`` line.
 """
 
 from __future__ import annotations
@@ -13,10 +13,12 @@ import re
 import stat
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import pytest
 import yaml
+
+if TYPE_CHECKING:
+    import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _ENV_EXAMPLE = _REPO_ROOT / ".env.example"
@@ -26,8 +28,6 @@ _GUI_COMPOSE = _REPO_ROOT / "docker" / "docker-compose.gui.yml"
 _SECRET_REL = ".sevn/proxy-shared-secret"
 _SECRET_ABS = f"/operator/{_SECRET_REL}"
 _OPERATOR_UID = 10001
-
-_XFAIL_W4 = pytest.mark.xfail(strict=True, reason="prod-ready W4")
 
 _BLANK_SECRET_LINE_RE = re.compile(
     r"^SEVN_PROXY_SHARED_SECRET=\s*(?:#.*)?$",
@@ -81,7 +81,6 @@ def _load_ensure_helper() -> Any:
     return importlib.import_module("sevn.proxy.bootstrap_secret")
 
 
-@_XFAIL_W4
 def test_env_example_has_no_blank_proxy_shared_secret_assignment() -> None:
     """W1.5 / D37: blank placeholder recreates the silent-empty path — remove it."""
     text = _ENV_EXAMPLE.read_text(encoding="utf-8")
@@ -93,7 +92,6 @@ def test_env_example_has_no_blank_proxy_shared_secret_assignment() -> None:
     )
 
 
-@_XFAIL_W4
 def test_compose_mentions_generated_secret_path() -> None:
     """W1.5: one-shot init writes the agreed path under sevn-state."""
     corpus = _compose_corpus()
@@ -102,7 +100,6 @@ def test_compose_mentions_generated_secret_path() -> None:
     )
 
 
-@_XFAIL_W4
 def test_proxy_and_gateway_read_generated_secret_with_env_override() -> None:
     """W1.5: both services consume the generated file; explicit env interpolation still allowed."""
     services = _load_services(_BASE_COMPOSE)
@@ -122,7 +119,6 @@ def test_proxy_and_gateway_read_generated_secret_with_env_override() -> None:
     ), "compose stack must include a generate-once secret step"
 
 
-@_XFAIL_W4
 def test_ensure_helper_creates_secret_once_with_mode_and_owner(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -158,7 +154,6 @@ def test_ensure_helper_creates_secret_once_with_mode_and_owner(
     assert path.read_text(encoding="utf-8") == first_text, "must not regenerate on next boot"
 
 
-@_XFAIL_W4
 def test_explicit_env_takes_precedence_over_generated_file(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
