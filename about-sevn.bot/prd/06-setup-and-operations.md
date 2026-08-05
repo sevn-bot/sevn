@@ -7,7 +7,7 @@ owner: Alex
 summary: Local-first bots are judged in the first ten minutes—clone, three setup commands,
   and a Telegram reply, or the operator returns to a hosted assistant.
 last_updated: '2026-08-05'
-fingerprint: sha256:7d5a1360c530c67bdd5c87e137f208b12b47bd0fc86b60f62ee8fc465ce42b45
+fingerprint: sha256:8e54ef229363f58356ef676242533e003f79f8567af8da769bc55396880bc91e
 related:
 - prd-07-mission-control
 sources:
@@ -184,7 +184,6 @@ Downstream: **PRD → specify → plan → tasks** in spec-kit-wave for net-new 
 | --- | --- | --- | --- |
 | 0.9 | 2026-07-07 | Scaffolded six-section PRD from about-docs pipeline | — |
 | 1.0 | 2026-07-08 | Migrated to spec-kit-wave standard; onboarding, doctor, Docker, first-ten-minutes contract | MODIFIED prd-06-setup-and-operations (structure); traceability aligned to spec-02/07/22/23/24/25 |
-| 1.1 | 2026-08-04 | Advisory CI-quality tier scheduled on daily supplementary cron (#178, post-audit W13) | MODIFIED spec-25-cicd-full W13 amendment |
 
 ## Open Questions
 

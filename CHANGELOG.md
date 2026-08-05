@@ -14,6 +14,9 @@ are cut into a dated, versioned section at release time.
 - [2026-08-05] Stop tracking ``/.cursor`` (agents stay operator-local); add ``docs/cursor-local-setup.md`` and ``docs/templates/cursor/`` for hook and D1 rule bootstrap
 - [2026-08-04] Pre-commit blocks commits from the primary checkout unless `SEVN_ALLOW_PRIMARY_COMMIT=1`; `make check-git-guards` asserts `git` resolves to repo `bin/git` without direnv (D1 primary-checkout guard)
 
+### Changed
+- [2026-08-05] **Breaking:** Mission Control `local_open` on loopback now requires the boot-written `local_token` query parameter — tokenless loopback no longer grants owner session claims; set `dashboard.local_open_trust_address: true` to restore address-only trust (#169, post-audit Batch E)
+
 ### Security
 - [2026-08-04] Container supply chain: Trivy blocks CRITICAL/HIGH before cosign sign; time-boxed CVE allowlist in `security/trivy-allowlist.toml` (#173, post-audit Batch C W11)
 - [2026-08-04] Bump `cryptography` to 50.0.0 (CVE-2026-69247, CVE-2026-69248, CVE-2026-69249)
