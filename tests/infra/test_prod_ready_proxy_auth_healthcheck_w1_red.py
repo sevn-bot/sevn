@@ -11,7 +11,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-import pytest
 import yaml
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -23,8 +22,6 @@ _SECRET_HEADER_RE = re.compile(
     re.IGNORECASE,
 )
 _UNHEALTHY_STATUS_RE = re.compile(r"503|401|unhealthy|raise|sys\.exit|HTTPError")
-
-_XFAIL_W5 = pytest.mark.xfail(strict=True, reason="prod-ready W5")
 
 
 def _load_proxy_service() -> dict[str, Any]:
@@ -52,7 +49,6 @@ def test_healthz_liveness_probe_still_present() -> None:
     assert "/healthz" in blob or "/healthz" in corpus
 
 
-@_XFAIL_W5
 def test_proxy_healthcheck_probes_guarded_prefix_with_secret() -> None:
     """W1.7 / C1.4: authenticated probe hits a guarded family with the service secret."""
     blob = _healthcheck_blob(_load_proxy_service())
@@ -64,7 +60,6 @@ def test_proxy_healthcheck_probes_guarded_prefix_with_secret() -> None:
     )
 
 
-@_XFAIL_W5
 def test_proxy_healthcheck_treats_503_or_401_as_unhealthy() -> None:
     """W1.7 / D39: 503 (unconfigured) and 401 (bad secret) fail the healthcheck."""
     blob = _healthcheck_blob(_load_proxy_service())
@@ -73,7 +68,6 @@ def test_proxy_healthcheck_treats_503_or_401_as_unhealthy() -> None:
     )
 
 
-@_XFAIL_W5
 def test_authenticated_probe_does_not_target_provider_spend_path() -> None:
     """W1.7: probe must not consume provider quota (no chat/completions spend path)."""
     blob = _healthcheck_blob(_load_proxy_service())

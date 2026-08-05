@@ -30,8 +30,6 @@ _VARS = (
     "SEVN_SECRETS_PASSPHRASE",
 )
 
-_XFAIL_W5 = pytest.mark.xfail(strict=True, reason="prod-ready W5")
-
 
 def _load_python_preflight() -> Any:
     for path in _HELPER_CANDIDATES:
@@ -59,7 +57,6 @@ def _validate(env: Mapping[str, str]) -> None:
     fn(env)
 
 
-@_XFAIL_W5
 def test_preflight_helper_exists() -> None:
     """W1.6 / D38: dedicated operator-secret preflight artefact must exist."""
     py_helpers = [p for p in _HELPER_CANDIDATES if p.suffix == ".py" and p.is_file()]
@@ -70,7 +67,6 @@ def test_preflight_helper_exists() -> None:
     )
 
 
-@_XFAIL_W5
 @pytest.mark.parametrize("var", _VARS)
 @pytest.mark.parametrize(
     "bad_value",
@@ -95,7 +91,6 @@ def test_preflight_rejects_empty_placeholder_and_low_entropy(
     assert var in message or bad_value.strip() in message or "secret" in message.lower()
 
 
-@_XFAIL_W5
 def test_preflight_accepts_high_entropy_values() -> None:
     """W1.6 happy path: strong values for all three variables pass."""
     env = {
@@ -106,7 +101,6 @@ def test_preflight_accepts_high_entropy_values() -> None:
     _validate(env)
 
 
-@_XFAIL_W5
 def test_compose_up_runs_preflight_before_docker_compose() -> None:
     """W1.6: ``make compose-up`` invokes the preflight before starting services."""
     text = _MAKEFILE.read_text(encoding="utf-8")
@@ -146,7 +140,6 @@ def test_compose_up_runs_preflight_before_docker_compose() -> None:
     assert min(preflight_idxs) < compose_idx, "preflight must run before docker compose"
 
 
-@_XFAIL_W5
 def test_preflight_wired_into_ci_tier() -> None:
     """W1.6 / Global convention 9: operator-secret preflight is reachable from a ci-* tier."""
     text = _MAKEFILE.read_text(encoding="utf-8")
