@@ -82,6 +82,8 @@ _PROXY_FETCH_PATH: Final[str] = "/web/fetch"
 _PROXY_BRAVE_PATH: Final[str] = "/web/brave/search"
 _SESSION_TOKEN_HEADER: Final[str] = "X-Sevn-Session-Token"
 _PROXY_TOKEN_HEADER: Final[str] = "X-Sevn-Proxy-Token"
+_RUN_ID_HEADER: Final[str] = "X-Sevn-Run-Id"
+_CONTAINER_ID_HEADER: Final[str] = "X-Sevn-Container-Id"
 _TOOL_TO_PROXY_TIMEOUT: Final[httpx.Timeout] = httpx.Timeout(
     connect=PROXY_TOOL_TO_PROXY_TIMEOUT_CONNECT_S,
     read=PROXY_TOOL_TO_PROXY_TIMEOUT_READ_S,
@@ -125,6 +127,50 @@ class ProxySharedSecretUnconfiguredError(RuntimeError):
         super().__init__(message or _PROXY_SECRET_UNCONFIGURED_MSG)
 
 
+def _session_token_binding_headers(token: str) -> dict[str, str]:
+    """Extract ``X-Sevn-Run-Id`` / ``X-Sevn-Container-Id`` from a session-token payload.
+
+    Args:
+        token (str): ``v1.<payload>.<sig>`` session token (signature not re-checked here).
+
+    Returns:
+        dict[str, str]: Binding headers present in the payload, else empty.
+
+    Examples:
+        >>> from sevn.proxy.auth import mint_session_token
+        >>> t = mint_session_token(
+        ...     signing_key="k",
+        ...     scope="sandbox",
+        ...     run_id="r1",
+        ...     container_id="c1",
+        ...     expires_at=9999999999,
+        ... )
+        >>> _session_token_binding_headers(t)["X-Sevn-Run-Id"]
+        'r1'
+    """
+    import base64
+    import json
+
+    parts = token.strip().split(".")
+    if len(parts) != 3:
+        return {}
+    padded = parts[1] + "=" * (-len(parts[1]) % 4)
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
+    except (ValueError, json.JSONDecodeError):
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    out: dict[str, str] = {}
+    run_id = payload.get("run_id")
+    if isinstance(run_id, str) and run_id:
+        out[_RUN_ID_HEADER] = run_id
+    container_id = payload.get("container_id")
+    if isinstance(container_id, str) and container_id:
+        out[_CONTAINER_ID_HEADER] = container_id
+    return out
+
+
 def build_egress_web_headers(
     *,
     proxy_url: str | None,
@@ -132,6 +178,10 @@ def build_egress_web_headers(
     proxy_shared_secret: str | None,
 ) -> dict[str, str]:
     """Build auth headers for egress proxy ``/web/*`` / ``/integration`` routes.
+
+    After C7.2 the service shared secret alone is rejected on sandbox route families;
+    callers must present a scoped session token. When ``session_token`` is omitted,
+    a short-lived gateway sandbox-scoped token is minted from ``proxy_shared_secret``.
 
     Args:
         proxy_url (str | None): Resolved ``SEVN_PROXY_URL`` (must be non-empty to call).
@@ -162,8 +212,17 @@ def build_egress_web_headers(
     if not secret:
         raise ProxySharedSecretUnconfiguredError
     headers: dict[str, str] = {"Content-Type": "application/json"}
-    if session_token and session_token.strip():
-        headers[_SESSION_TOKEN_HEADER] = session_token.strip()
+    token = (session_token or "").strip()
+    if not token:
+        from sevn.proxy.auth import SESSION_SCOPE_SANDBOX, mint_session_token
+
+        token = mint_session_token(
+            signing_key=secret,
+            scope=SESSION_SCOPE_SANDBOX,
+            run_id="gateway-egress",
+        )
+    headers[_SESSION_TOKEN_HEADER] = token
+    headers.update(_session_token_binding_headers(token))
     headers[_PROXY_TOKEN_HEADER] = secret
     return headers
 

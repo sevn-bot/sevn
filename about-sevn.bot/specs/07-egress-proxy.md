@@ -8,7 +8,7 @@ summary: Product pairing (v1). Deployment, paired daemon install, onboarding val
   and Mission Control management of the proxy are specified in prd-06-setup-and-operations
   and prd-07-mission-control §5.1
 last_updated: '2026-08-06'
-fingerprint: sha256:3dbaf8e6cd2499656bcd811566b57cae5fec8d0790b8ad01ca4c7360c026176c
+fingerprint: sha256:168429187b8c9d65c3265314dfa8d46193e0abb70a0ac929100f5292f7a5e823
 related: []
 sources:
 - src/sevn/proxy/**
@@ -301,6 +301,24 @@ as liveness and additionally probes guarded ``GET /web/auth-check`` with
 ``X-Sevn-Proxy-Token`` resolved from env or ``/operator/.sevn/proxy-shared-secret``.
 HTTP **401** or **503** marks the container unhealthy. ``/web/auth-check`` is a
 guarded no-op (no provider upstream) so the probe consumes no quota.
+
+## Amendments (prod-readiness-0.0.1 W19 — C7.1, C7.2)
+
+**Run / container binding (C7.1).** ``mint_session_token`` embeds ``run_id`` (already
+present) and optional ``container_id`` (opaque spawn-bind id). ``validate_session_token``
+rejects when a caller-supplied ``run_id`` / ``container_id`` (from ``X-Sevn-Run-Id`` /
+``X-Sevn-Container-Id``) does not match the token claims. Binding mechanism: the spawn
+path generates a bind id **before** ``docker run`` (the Docker container hash is not
+yet known), embeds it in the token, and honest clients re-present it by decoding the
+token payload into those headers. Failure mode: mismatch or foreign run → **401**
+``{"detail":"unauthorized"}``.
+
+**Differentiated authority (C7.2 / D51).** The service shared secret
+(``X-Sevn-Proxy-Token``) authorizes gateway→proxy families (``/llm/*``) and the
+authenticated health probe (``/web/auth-check``). On sandbox-originated families
+(``/web/*`` except auth-check, ``/integration``) the service secret alone is
+**rejected**; those paths require a scoped session token. Gateway ``/web`` and
+``/integration`` callers mint or carry a session token via ``build_egress_web_headers``.
 
 ## Human-input needed
 

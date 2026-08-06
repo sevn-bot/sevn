@@ -6,7 +6,7 @@ Depends: starlette
 Exports:
     llm_post_auth_failure — return a JSON error response when blocked, else ``None``.
     mint_session_token — mint a scoped per-run ``X-Sevn-Session-Token``.
-    validate_session_token — verify signature, expiry, and route-family scope.
+    validate_session_token — verify signature, expiry, scope, and optional bindings.
     proxy_allow_unauthenticated — whether ``SEVN_PROXY_ALLOW_UNAUTHENTICATED=1`` is set.
     log_proxy_allow_unauthenticated_boot_warning — loud boot warning for the opt-in path.
 
@@ -33,8 +33,11 @@ from starlette.responses import JSONResponse
 
 _PROXY_TOKEN_HEADER = "x-sevn-proxy-token"  # nosec B105
 _SESSION_TOKEN_HEADER = "x-sevn-session-token"  # nosec B105
+_RUN_ID_HEADER = "x-sevn-run-id"
+_CONTAINER_ID_HEADER = "x-sevn-container-id"
 _SESSION_TOKEN_VERSION = "v1"  # nosec B105 — token format version label, not a credential
 _GUARDED_PREFIXES = ("/llm/", "/web/", "/integration/")
+_AUTH_CHECK_PATH = "/web/auth-check"
 PROXY_UNCONFIGURED_DETAIL = "proxy authentication not configured"
 SESSION_SCOPE_SANDBOX = "sandbox"
 SESSION_SCOPE_LLM = "llm"
@@ -105,6 +108,39 @@ def _is_guarded_path(path: str) -> bool:
     return any(normalized.startswith(prefix) for prefix in ("/llm/", "/web/", "/integration/"))
 
 
+def _is_sandbox_route_family(path: str) -> bool:
+    """Return whether ``path`` is a sandbox-originated route family (C7.2 / D51).
+
+    Gateway→proxy LLM routes and the authenticated health probe are excluded so the
+    service secret remains authoritative there. Sandbox families are ``/web/*``
+    (except ``/web/auth-check``) and ``/integration``.
+
+    Args:
+        path (str): Request URL path.
+
+    Returns:
+        bool: ``True`` when the service shared secret must not authorize the path.
+
+    Examples:
+        >>> _is_sandbox_route_family("/web/fetch")
+        True
+        >>> _is_sandbox_route_family("/integration")
+        True
+        >>> _is_sandbox_route_family("/web/auth-check")
+        False
+        >>> _is_sandbox_route_family("/llm/openai/chat/completions")
+        False
+    """
+    import posixpath
+
+    normalized = posixpath.normpath(path)
+    if normalized == _AUTH_CHECK_PATH:
+        return False
+    if normalized == "/integration" or normalized.startswith("/integration/"):
+        return True
+    return normalized == "/web" or normalized.startswith("/web/")
+
+
 def _scope_allows_path(scope: str, path: str) -> bool:
     """Return whether a session-token scope covers ``path``.
 
@@ -135,15 +171,17 @@ def mint_session_token(
     signing_key: str,
     scope: str,
     run_id: str,
+    container_id: str | None = None,
     expires_at: int | None = None,
     ttl_s: int = DEFAULT_SESSION_TOKEN_TTL_S,
 ) -> str:
-    """Mint a scoped per-run ``X-Sevn-Session-Token`` (D12).
+    """Mint a scoped per-run ``X-Sevn-Session-Token`` (D12 / C7.1).
 
     Args:
         signing_key (str): ``SEVN_PROXY_SHARED_SECRET`` used for HMAC signing.
         scope (str): Route-family scope (``sandbox`` or ``llm``).
         run_id (str): Correlation id embedded in the payload.
+        container_id (str | None): Optional spawning-container bind id (C7.1).
         expires_at (int | None): Unix expiry; defaults to ``now + ttl_s``.
         ttl_s (int): Seconds until expiry when ``expires_at`` is omitted.
 
@@ -161,7 +199,9 @@ def mint_session_token(
         True
     """
     exp = expires_at if expires_at is not None else int(time.time()) + ttl_s
-    payload = {"scope": scope, "exp": exp, "run_id": run_id}
+    payload: dict[str, object] = {"scope": scope, "exp": exp, "run_id": run_id}
+    if container_id is not None:
+        payload["container_id"] = container_id
     raw = json.dumps(payload, separators=(",", ":"), sort_keys=True)
     body = base64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
     sig = hmac.new(signing_key.encode(), body.encode(), hashlib.sha256).hexdigest()
@@ -174,17 +214,26 @@ def validate_session_token(
     signing_key: str,
     path: str,
     now: int | None = None,
+    run_id: str | None = None,
+    container_id: str | None = None,
 ) -> bool:
-    """Verify signature, expiry, and route-family scope for a session token.
+    """Verify signature, expiry, route-family scope, and optional run/container binds.
+
+    When ``run_id`` or ``container_id`` are passed (including from request headers),
+    they must match the corresponding claims in the token payload. Omitting a kwarg
+    skips that binding check (unit paths that only assert signature/scope/expiry).
 
     Args:
         token (str): ``X-Sevn-Session-Token`` header value.
         signing_key (str): Expected ``SEVN_PROXY_SHARED_SECRET``.
         path (str): Request URL path being authorized.
         now (int | None): Current unix time; defaults to ``time.time()``.
+        run_id (str | None): Request-attributed run id (``X-Sevn-Run-Id``).
+        container_id (str | None): Request-attributed container bind id
+            (``X-Sevn-Container-Id``).
 
     Returns:
-        bool: ``True`` when the token is valid for ``path``.
+        bool: ``True`` when the token is valid for ``path`` (and bindings).
 
     Examples:
         >>> tok = mint_session_token(
@@ -223,7 +272,15 @@ def validate_session_token(
     ts = int(time.time()) if now is None else now
     if exp < ts:
         return False
-    return _scope_allows_path(scope, path)
+    if not _scope_allows_path(scope, path):
+        return False
+    if run_id is not None and payload.get("run_id") != run_id:
+        return False
+    if container_id is not None:
+        token_cid = payload.get("container_id")
+        if token_cid is not None and token_cid != container_id:
+            return False
+    return True
 
 
 def llm_post_auth_failure(
@@ -235,8 +292,13 @@ def llm_post_auth_failure(
     """Enforce ``X-Sevn-Proxy-Token`` or scoped ``X-Sevn-Session-Token`` on guarded routes.
 
     ``X-Sevn-Proxy-Token`` carries the long-lived gateway→proxy service secret and
-    satisfies any guarded route. ``X-Sevn-Session-Token`` is a per-run scoped credential
-    (``sandbox`` → ``/web/*`` + ``/integration``; ``llm`` → ``/llm/*``).
+    authorizes gateway→proxy families (``/llm/*``) plus the ``/web/auth-check`` probe.
+    On sandbox-originated families (``/web/*`` except auth-check, ``/integration``) the
+    service secret is **rejected** (C7.2 / D51); those paths require a session token.
+
+    ``X-Sevn-Session-Token`` is a per-run scoped credential (``sandbox`` → ``/web/*`` +
+    ``/integration``; ``llm`` → ``/llm/*``) optionally bound to ``X-Sevn-Run-Id`` and
+    ``X-Sevn-Container-Id`` (C7.1).
 
     When ``proxy_shared_secret`` is unset or empty, guarded routes return **503**
     unless ``SEVN_PROXY_ALLOW_UNAUTHENTICATED=1`` (explicit dev-only opt-in).
@@ -269,13 +331,19 @@ def llm_post_auth_failure(
             return None
         return JSONResponse({"detail": PROXY_UNCONFIGURED_DETAIL}, status_code=503)
     proxy_token = request.headers.get(_PROXY_TOKEN_HEADER)
-    if hmac.compare_digest(proxy_token or "", proxy_shared_secret):
+    if hmac.compare_digest(proxy_token or "", proxy_shared_secret) and not _is_sandbox_route_family(
+        path
+    ):
         return None
+    # Sandbox families: service secret alone is not authority (D51). A concurrent
+    # session token (below) can still authorize the request.
     session_token = request.headers.get(_SESSION_TOKEN_HEADER)
     if session_token and validate_session_token(
         session_token,
         signing_key=proxy_shared_secret,
         path=path,
+        run_id=request.headers.get(_RUN_ID_HEADER),
+        container_id=request.headers.get(_CONTAINER_ID_HEADER),
     ):
         return None
     return JSONResponse({"detail": "unauthorized"}, status_code=401)

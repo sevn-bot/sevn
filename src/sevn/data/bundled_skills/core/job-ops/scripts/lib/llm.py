@@ -93,10 +93,13 @@ def _first_object(text: str) -> str:
 def _proxy_headers() -> dict[str, str]:
     """Build proxy auth headers from sandbox child env (not a gateway fallback).
 
-    Reads ``SEVN_PROXY_SHARED_SECRET`` / ``SEVN_SESSION_TOKEN`` from the child
-    process environment — the documented sandbox child-env seam for job-ops
-    scripts. Gateway code must inject the shared secret instead of re-reading env.
+    Reads ``SEVN_SESSION_TOKEN`` from the child process environment — the documented
+    sandbox child-env seam for job-ops scripts. Binding headers are derived from the
+    token payload (C7.1). Gateway code must inject credentials instead of re-reading env.
     """
+    import base64
+    import json
+
     headers: dict[str, str] = {}
     secret = os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip()
     if secret:
@@ -104,6 +107,20 @@ def _proxy_headers() -> dict[str, str]:
     session_token = os.environ.get("SEVN_SESSION_TOKEN", "").strip()
     if session_token:
         headers["X-Sevn-Session-Token"] = session_token
+        parts = session_token.split(".")
+        if len(parts) == 3:
+            padded = parts[1] + "=" * (-len(parts[1]) % 4)
+            try:
+                payload = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
+            except (ValueError, json.JSONDecodeError):
+                payload = None
+            if isinstance(payload, dict):
+                run_id = payload.get("run_id")
+                if isinstance(run_id, str) and run_id:
+                    headers["X-Sevn-Run-Id"] = run_id
+                container_id = payload.get("container_id")
+                if isinstance(container_id, str) and container_id:
+                    headers["X-Sevn-Container-Id"] = container_id
     return headers
 
 

@@ -840,6 +840,7 @@ def _resolve_spawn_session_token(
     run_id: str,
     env: Mapping[str, str],
     signing_key: str | None = None,
+    container_id: str | None = None,
 ) -> str:
     """Return an existing ``SEVN_SESSION_TOKEN`` or mint a scoped per-run token.
 
@@ -851,6 +852,11 @@ def _resolve_spawn_session_token(
             precedence over :func:`resolve_effective_proxy_shared_secret` so
             chain-only installs can mint without writing the secret into the
             process environ or the sandbox child env (D41).
+        container_id (str | None): Opaque spawn-bind id embedded as ``container_id``
+            when minting (C7.1). Callers generate this before ``docker run`` because
+            the Docker container hash is not known yet; clients present it as
+            ``X-Sevn-Container-Id``. Mismatch → 401. Not injected as a separate
+            child-env key (``build_sandbox_child_env`` stays three keys).
 
     Returns:
         str: Token text for ``build_sandbox_child_env``.
@@ -910,10 +916,12 @@ def _resolve_spawn_session_token(
         raise SandboxConfigurationError(msg)
     from sevn.proxy.auth import SESSION_SCOPE_SANDBOX, mint_session_token
 
+    bind_id = (container_id or "").strip() or None
     return mint_session_token(
         signing_key=secret,
         scope=SESSION_SCOPE_SANDBOX,
         run_id=run_id,
+        container_id=bind_id,
     )
 
 
@@ -949,10 +957,15 @@ def _assemble_spawn_child_env(
         True
     """
     child_env = dict(env)
+    # Opaque spawn-bind id (not the Docker container hash): minted into the session
+    # token before ``docker run`` returns. Clients that decode the token present it
+    # as ``X-Sevn-Container-Id``; a mismatch is 401 (C7.1 failure mode).
+    bind_id = f"sb-{uuid.uuid4().hex[:16]}"
     token = _resolve_spawn_session_token(
         run_id=run_id,
         env=child_env,
         signing_key=signing_key,
+        container_id=bind_id,
     )
     if token:
         child_env["SEVN_SESSION_TOKEN"] = token

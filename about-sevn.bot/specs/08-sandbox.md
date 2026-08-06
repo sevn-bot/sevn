@@ -538,6 +538,16 @@ path-prefix API, not a CONNECT forward proxy (D13). ``SEVN_SESSION_TOKEN`` carri
 a scoped per-run ``X-Sevn-Session-Token`` minted at spawn (``mint_session_token``,
 ``sandbox`` scope); see spec-07 W6 amendment for validation semantics.
 
+## Amendments (prod-readiness-0.0.1 W19 — C7.1, C7.2)
+
+Spawn mints a **run-bound, container-bound** session token (``run_id`` + opaque
+``container_id`` spawn-bind id) and places it in ``SEVN_SESSION_TOKEN`` only —
+the §2.2 three-key child-env contract is unchanged and still excludes the service
+shared secret. The bind id is chosen before ``docker run`` returns; clients present
+``X-Sevn-Run-Id`` / ``X-Sevn-Container-Id`` derived from the token. A sandbox that
+somehow obtains the service secret still cannot use it on ``/web/*`` or
+``/integration`` (spec-07 W19 / D51).
+
 ## Human-input needed
 
 Prose body not yet authored (W9 scope). Normative contract requires operator or
