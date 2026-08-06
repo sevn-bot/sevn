@@ -29,6 +29,10 @@ async def test_triager_stub_off_mocked_proxy_completes(
     """``SEVN_TRIAGER_STUB=0`` uses live pydantic-ai when the proxy transport is mocked."""
     monkeypatch.setenv("SEVN_TRIAGER_STUB", "0")
     monkeypatch.setenv("SEVN_PROXY_URL", "http://triager-integration.test")
+    monkeypatch.setenv(
+        "SEVN_PROXY_SHARED_SECRET",
+        "triager-integration-proxy-secret-32ch!",
+    )
     triage_payload = {
         "intent": "NEW_REQUEST",
         "complexity": "B",

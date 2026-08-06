@@ -41,12 +41,44 @@ _TRANSPORT_FACTORIES: dict[
 )
 
 
+def _merge_proxy_token_headers(
+    extra_headers: dict[str, str] | None,
+    proxy_shared_secret: str | None,
+) -> dict[str, str] | None:
+    """Merge an injected ``X-Sevn-Proxy-Token`` into transport ``extra_headers``.
+
+    Args:
+        extra_headers (dict[str, str] | None): Caller-supplied headers (session, etc.).
+        proxy_shared_secret (str | None): Already-resolved shared secret (env, generate-once
+            file, or workspace secrets chain). When set and the token header is absent,
+            it is injected so ``_ProxyTransport.auth_header`` does not re-resolve.
+
+    Returns:
+        dict[str, str] | None: Merged headers, or ``None`` when both inputs are empty.
+
+    Examples:
+        >>> _merge_proxy_token_headers(None, "  chain-secret  ")
+        {'X-Sevn-Proxy-Token': 'chain-secret'}
+        >>> _merge_proxy_token_headers({"X-Sevn-Proxy-Token": "keep"}, "other")
+        {'X-Sevn-Proxy-Token': 'keep'}
+    """
+    headers = dict(extra_headers or {})
+    existing = (headers.get("X-Sevn-Proxy-Token") or "").strip()
+    if existing:
+        return headers
+    secret = (proxy_shared_secret or "").strip()
+    if secret:
+        headers["X-Sevn-Proxy-Token"] = secret
+    return headers or None
+
+
 def resolve_model(
     *,
     model_id: str,
     transport_name: str,
     proxy_base_url: str | None = None,
     extra_headers: dict[str, str] | None = None,
+    proxy_shared_secret: str | None = None,
 ) -> tuple[str, Transport]:
     """Bind a model id to a transport implementation (spec 05 proxy-backed).
 
@@ -56,6 +88,8 @@ def resolve_model(
                 ``bedrock`` (case-insensitive).
     proxy_base_url (str | None): Egress proxy origin; default ``ProcessSettings.proxy_url``.
     extra_headers (dict[str, str] | None): Extra headers on every LLM call (e.g. session).
+    proxy_shared_secret (str | None): Resolved proxy guard token (chain/env/file). Injected
+                as ``X-Sevn-Proxy-Token`` when not already present in ``extra_headers``.
 
         Returns:
             tuple[str, Transport]: ``model_id`` and a fresh transport instance.
@@ -80,4 +114,5 @@ def resolve_model(
     if base is None:
         raw = ProcessSettings().proxy_url
         base = raw if raw else None
-    return model_id, cast("Transport", cls(proxy_base_url=base, extra_headers=extra_headers))
+    headers = _merge_proxy_token_headers(extra_headers, proxy_shared_secret)
+    return model_id, cast("Transport", cls(proxy_base_url=base, extra_headers=headers))

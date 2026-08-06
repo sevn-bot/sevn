@@ -278,9 +278,11 @@ async def test_agent_turn_tier_b_tool_context_and_model_slot(
         *,
         model_id: str,
         transport_name: str,
-        proxy_base_url: str,
+        proxy_base_url: str | None = None,
+        extra_headers: dict[str, str] | None = None,
+        proxy_shared_secret: str | None = None,
     ) -> tuple[Any, Any]:
-        _ = transport_name, proxy_base_url
+        _ = transport_name, proxy_base_url, extra_headers, proxy_shared_secret
 
         async def _unused(_req: dict[str, Any]) -> dict[str, Any]:
             return _openai_assistant_text("unused")

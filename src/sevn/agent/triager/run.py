@@ -475,6 +475,7 @@ async def structured_output_call(
     trace: TraceSink | None = None,
     session_id: str = "triager",
     turn_id: str = "triager",
+    proxy_shared_secret: str | None = None,
 ) -> StructuredOutputCallResult:
     """Run pydantic-ai structured output for ``TriageResult`` (`specs/13` §2.7).
     Args:
@@ -490,6 +491,7 @@ async def structured_output_call(
         trace (TraceSink | None): Optional trace sink for native-model checkpoints.
         session_id (str): Session id for native-model trace correlation.
         turn_id (str): Turn id for native-model trace correlation.
+        proxy_shared_secret (str | None): Resolved proxy guard token (env/file/chain).
     Returns:
         StructuredOutputCallResult: JSON payload plus segment timings for trace attrs.
     Examples:
@@ -498,7 +500,11 @@ async def structured_output_call(
         True
     """
     prep_started_at = monotonic()
-    _, transport = resolve_model(model_id=model_id, transport_name=transport_name)
+    _, transport = resolve_model(
+        model_id=model_id,
+        transport_name=transport_name,
+        proxy_shared_secret=proxy_shared_secret,
+    )
     effective_max_output_tokens = resolve_effective_max_output_tokens(
         "triager",
         model_id,
@@ -540,6 +546,7 @@ async def structured_output_call(
             seed=seed,
             max_output_tokens=effective_max_output_tokens,
             providers_obj=providers_obj,
+            shared_secret=proxy_shared_secret,
         )
         model = resolve_pydantic_model_for_slot(workspace=workspace, ctx=native_ctx)
     else:
@@ -1208,6 +1215,7 @@ async def triage_turn(
     scope_key: str | None = None,
     session_once_model: str | None = None,
     routing_profile_model: str | None = None,
+    proxy_shared_secret: str | None = None,
 ) -> TriageResult:
     """Run one structured routing pass (`specs/13` §2).
     Args:
@@ -1225,6 +1233,7 @@ async def triage_turn(
         scope_key (str | None): Session scope key for topic-level model overrides.
         session_once_model (str | None): One-turn session model override (**W10** hook).
         routing_profile_model (str | None): Named routing profile model (**W12** hook).
+        proxy_shared_secret (str | None): Resolved proxy guard token for LLM egress.
     Returns:
         TriageResult: Validated and finalised triage result (after caps,
             filtering, and coercion rules).
@@ -1484,6 +1493,7 @@ async def triage_turn(
             trace=trace,
             session_id=session_id,
             turn_id=turn_id,
+            proxy_shared_secret=proxy_shared_secret,
         )
         structured_call_timing = {
             "prep_ms": call_result.prep_ms,

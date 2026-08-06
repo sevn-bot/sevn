@@ -99,3 +99,21 @@ def test_auth_header_honors_extra_headers_without_resolving(
     )
     headers = t.auth_header("claude-test")
     assert headers.get("X-Sevn-Proxy-Token") == "injected-header-secret"
+
+
+def test_resolve_model_injects_chain_resolved_proxy_shared_secret(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Chain-only installs: resolve_model injects the token so auth_header skips env/file."""
+    monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path))
+    chain_secret = "chain-only-llm-transport-secret-32ch!"
+    _, t = resolve_model(
+        model_id="claude-test",
+        transport_name="anthropic",
+        proxy_base_url="http://proxy.test",
+        proxy_shared_secret=chain_secret,
+    )
+    headers = t.auth_header("claude-test")
+    assert headers.get("X-Sevn-Proxy-Token") == chain_secret

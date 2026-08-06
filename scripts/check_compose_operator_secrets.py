@@ -175,10 +175,10 @@ def _self_check() -> int:
                 validate_operator_secrets(trial)
             except ValueError:
                 continue
-            # Name-only: any use of ``bad`` (even len/empty checks) taints prints for
-            # CodeQL py/clear-text-logging-sensitive-data.
+            # Fixed message only: interpolating OPERATOR_SECRET_VARS names (or ``bad``)
+            # taints prints for CodeQL py/clear-text-logging-sensitive-data.
             print(
-                f"error: self-check expected rejection for {name}",
+                "error: self-check expected rejection for an operator secret",
                 file=sys.stderr,
             )
             return 1

@@ -1703,6 +1703,7 @@ def build_agent_run_turn(
                     routing_profile_model=(
                         routing_bundle.model if routing_bundle is not None else None
                     ),
+                    proxy_shared_secret=process.proxy_shared_secret,
                 )
                 triager_ms = max(1, int((time_ns() - triage_started_ns) / 1_000_000))
                 l1_state.triager_ms = triager_ms
@@ -2757,6 +2758,7 @@ def build_agent_run_turn(
                 content_root=layout.content_root,
                 trace=trace,
                 turn_span_id=turn_span_id,
+                proxy_shared_secret=process.proxy_shared_secret,
             )
         else:
             cd_triage = _synthetic_escalation_triage(esc)
@@ -4014,6 +4016,7 @@ def _resolve_cd_outer_models(
         model_id=outer_id,
         transport_name=outer_transport_name,
         proxy_base_url=process.proxy_url,
+        proxy_shared_secret=process.proxy_shared_secret,
     )
     outer_budget = ModelBudget(model_id=outer_id, regime=BudgetRegime.PER_TOKEN)
     sub_id = resolve_model_slot(workspace, sub_slot)
@@ -4022,6 +4025,7 @@ def _resolve_cd_outer_models(
         model_id=sub_id,
         transport_name=sub_transport_name,
         proxy_base_url=process.proxy_url,
+        proxy_shared_secret=process.proxy_shared_secret,
     )
     sub_budget = ModelBudget(model_id=sub_id, regime=BudgetRegime.PER_TOKEN)
     return ResolvedCdOuterModels(
@@ -4046,6 +4050,7 @@ async def _retriage_after_escalation(
     content_root: Path,
     trace: TraceSink,
     turn_span_id: str,
+    proxy_shared_secret: str | None = None,
 ) -> Any:
     """Re-run Triager after tier-B escalation (``specs/17-gateway.md`` §2.6 step 9).
 
@@ -4060,6 +4065,7 @@ async def _retriage_after_escalation(
         content_root (Path): Workspace content root for persona ``system_prompt``.
         trace (TraceSink): Gateway trace sink for second-pass ``triage.*`` spans.
         turn_span_id (str): Turn root span id for parent linkage.
+        proxy_shared_secret (str | None): Resolved proxy guard token for LLM egress.
 
     Returns:
         TriageResult: Second-pass routing row.
@@ -4084,6 +4090,7 @@ async def _retriage_after_escalation(
         content_root=content_root,
         trace=trace,
         turn_span_id=turn_span_id,
+        proxy_shared_secret=proxy_shared_secret,
     )
     # W4.1: union-merge the original tier-B tool list so the re-diagnosis never
     # silently drops the tool the user actually requested (e.g. ``serp``).
@@ -4539,6 +4546,7 @@ def _resolve_tier_b_bundle(
         model_id=model_id,
         transport_name=transport_name,
         proxy_base_url=process.proxy_url,
+        proxy_shared_secret=process.proxy_shared_secret,
     )
     return ResolvedTierBModel(
         model_id=model_id,

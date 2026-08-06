@@ -26,6 +26,7 @@ are cut into a dated, versioned section at release time.
 - [2026-08-05] CLI dashboard reads (`sevn models`, `sevn agent config`, `sevn channels status`, and related commands) append the boot `local_token` when calling loopback Mission Control with effective local-open (#169, post-audit Batch E W18)
 
 ### Fixed
+- [2026-08-06] Gateway LLM egress (triager / tier-B / C-D transports and native models) uses the boot-resolved proxy shared secret — including secrets-chain-only installs — so authenticated proxy calls no longer require env write-back (#237)
 - [2026-08-06] Compose operator-secret preflight self-check no longer feeds secret fixtures into print dataflow (CodeQL ``py/clear-text-logging-sensitive-data``); gateway sandbox spawn / dashboard terminal minting accept a chain-resolved ``proxy_shared_secret`` without writing it into process or child environ (D41)
 - [2026-08-06] Sandbox spawn-token doctest avoids literal ``os.environ`` get/set of ``SEVN_PROXY_SHARED_SECRET`` so the C3.2 source scan stays green after rebase
 - [2026-08-05] Stock Compose with a blank ``SEVN_PROXY_SHARED_SECRET`` now uses the generate-once file for LLM proxy auth, web egress, sandbox session minting, and dashboard terminals — not only the proxy healthcheck path
