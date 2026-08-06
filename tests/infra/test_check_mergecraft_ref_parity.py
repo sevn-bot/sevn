@@ -124,6 +124,8 @@ def test_check_mergecraft_ref_parity_detects_drift(tmp_path: Path) -> None:
 
 def test_check_mergecraft_ref_parity_reads_default_branch_not_worktree(tmp_path: Path) -> None:
     """The pin is read from the ref, not the checkout — a drifted worktree still passes."""
+    # WORKFLOW_STUB already matches the live Makefile pin via MAKEFILE_MERGECRAFT_REF,
+    # so leaving makefile_ref=None keeps both sides of the seeded repo in sync.
     _seed_repo(tmp_path)
     # Corrupt the working-tree copy: if the gate read the file from disk it would
     # report drift. It reads `main:` instead, so this must stay green.
