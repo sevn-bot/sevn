@@ -1,25 +1,34 @@
-# Active delivery pipeline: triggers on push to main, v* tags, and manual dispatch.
+# Active artifact-publication pipeline: triggers on push to main, v* tags, and
+# manual dispatch.
 #
 # SPDX-License-Identifier: MIT
 #
-# Container artifact publication pipeline (phases 2–5 deploy stubs).
-# Normative spec: specs/25-cicd-full.md (Phase 5 of the build).
+# Container artifact publication pipeline (phase4/phase5 production deploy stubs).
+# Normative spec: about-sevn.bot/specs/25-cicd-full.md.
 #
-# publish-ghcr: pushes sandbox/proxy/gateway images to GHCR on main, v* tags,
-# and workflow_dispatch (manual chain rehearsal). Digests are job outputs for
-# downstream phases and container-supply-chain (cosign, syft, trivy).
+# publish-ghcr: builds sandbox/proxy/gateway images and pushes a quarantine tag
+# only (`:quarantine-<sha>-<run_id>`). Digests are job outputs for
+# container-supply-chain (trivy → cosign → syft → promote SHA / version tags by
+# digest). No consumable tag exists before the scan (C12.3 / D45). `:latest` is
+# not written while phase4/5 are stubs (C13.1).
 #
-# Trigger → phase mapping (specs/25-cicd-full.md §2.3):
-#   push to main         → phase1 → publish-ghcr → supply-chain → phase2 → phase3
-#                          (Dev deploy/test stubs — phase2/3 fail until implemented)
+# Trigger → phase mapping (specs/25-cicd-full.md Workflow matrix):
+#   push to main         → phase1 → publish-ghcr → supply-chain
+#                          (phase4/5/6 skipped — Dev deploy/smoke deleted, D44)
 #   push tag 'v*'        → phase1 → publish-ghcr → supply-chain → phase4 → phase5 → phase6
-#                          (Production deploy/test stubs block release; phase6 is draft-only)
-#   workflow_dispatch    → full chain phase1…phase6        (manual / break-glass rehearsal)
+#                          (Production deploy/test stubs must succeed; phase6 is draft-only)
+#   workflow_dispatch    → phase1 → publish-ghcr → supply-chain → phase4 → phase5
+#                          (+ phase6 when ref is a v* tag; stub failures fail the required gate)
+#
+# Required check (branch protection): job id `delivery-chain`, display name
+# "Artifact publication gate (required)". A green check proves phase1 + GHCR
+# publish + supply-chain succeeded (and, on tags, that phase4/5 did not fail).
+# It does NOT prove Dev/Prod deploy readiness — those phases are stubs or absent.
 #
 # Pull requests are intentionally NOT triggered here. The single PR verify gate
 # is `.github/workflows/ci.yml` (Option A from the Phase 5 brief), which gates
 # main/develop/test-pre. Re-running Phase 1 on PRs in two workflows would just
-# double-charge runners. This delivery DAG keys on `main` / `v*` only, so
+# double-charge runners. This publication DAG keys on `main` / `v*` only, so
 # `test-pre` activity never triggers a deploy.
 #
 # Fork safety (specs/25-cicd-full.md §2.4):
@@ -33,9 +42,11 @@
 #   action's checkout target — that is a runtime concern, not a CI concern.
 #
 # Concurrency:
-#   One workflow-level group keyed on the ref so only one production deploy
-#   can run for a given tag/branch at a time. `cancel-in-progress: false` so
-#   a tag-push deploy is never killed by an overlapping main-push run.
+#   Group by commit SHA so a main push and a v* tag for the same SHA cannot
+#   overlap and fight over quarantine / promotion. `cancel-in-progress: false`
+#   so a tag-push deploy is never killed by an overlapping main-push run.
+#   Quarantine tags are also run-scoped (`quarantine-<sha>-<run_id>`) so failure
+#   cleanup cannot delete another run's package version.
 
 name: CI/CD (artifact publication)
 
@@ -46,7 +57,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: prod-${{ github.ref }}
+  group: prod-publish-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -104,6 +115,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Quarantine-only push (C12.3 / C13.1 / D45): no SHA, version, or :latest
+      # until container-supply-chain promotes by digest after scan → sign.
+      # Tags are run-scoped so overlapping publishes for the same SHA cannot
+      # delete each other's quarantine versions on failure cleanup.
       - name: Build and push sandbox image
         id: sandbox
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -114,9 +129,19 @@ jobs:
           cache-from: type=gha,scope=sandbox
           cache-to: type=gha,mode=max,scope=sandbox
           tags: |
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/sandbox:${{ github.sha }}
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/sandbox:latest
-            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/sandbox:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/sandbox:quarantine-${{ github.sha }}-${{ github.run_id }}
+
+      # Bake the sandbox digest into gateway artifacts before they COPY src/
+      # (C4.1 / W7.4). Without this, published gateway images keep sha256:UNSTAMPED
+      # and boot skips validation while first default spawn fails closed.
+      - name: Stamp sandbox digest into gateway source
+        env:
+          SEVN_SANDBOX_IMAGE_DIGEST: ${{ steps.sandbox.outputs.digest }}
+        run: |
+          set -euo pipefail
+          test -n "${SEVN_SANDBOX_IMAGE_DIGEST}"
+          python3 scripts/stamp_default_sandbox_image.py
+          python3 scripts/check_sandbox_mutable_image_tags.py --require-stamped
 
       - name: Build and push proxy image
         id: proxy
@@ -128,9 +153,7 @@ jobs:
           cache-from: type=gha,scope=proxy
           cache-to: type=gha,mode=max,scope=proxy
           tags: |
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/proxy:${{ github.sha }}
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/proxy:latest
-            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/proxy:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/proxy:quarantine-${{ github.sha }}-${{ github.run_id }}
 
       - name: Build and push gateway image
         id: gateway
@@ -139,12 +162,12 @@ jobs:
           context: .
           file: docker/Dockerfile.gateway
           push: true
+          build-args: |
+            SEVN_SANDBOX_IMAGE_DIGEST=${{ steps.sandbox.outputs.digest }}
           cache-from: type=gha,scope=gateway
           cache-to: type=gha,mode=max,scope=gateway
           tags: |
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway:${{ github.sha }}
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway:latest
-            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/gateway:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway:quarantine-${{ github.sha }}-${{ github.run_id }}
 
       - name: Build and push gateway browser image
         id: gateway_browser
@@ -154,12 +177,12 @@ jobs:
           file: docker/Dockerfile.gateway.browser
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            SEVN_SANDBOX_IMAGE_DIGEST=${{ steps.sandbox.outputs.digest }}
           cache-from: type=gha,scope=gateway-browser
           cache-to: type=gha,mode=max,scope=gateway-browser
           tags: |
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.browser:${{ github.sha }}
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.browser:latest
-            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/gateway.browser:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.browser:quarantine-${{ github.sha }}-${{ github.run_id }}
 
       - name: Build and push gateway GUI image
         id: gateway_gui
@@ -169,12 +192,25 @@ jobs:
           file: docker/Dockerfile.gateway.gui
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            SEVN_SANDBOX_IMAGE_DIGEST=${{ steps.sandbox.outputs.digest }}
           cache-from: type=gha,scope=gateway-gui
           cache-to: type=gha,mode=max,scope=gateway-gui
           tags: |
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.gui:${{ github.sha }}
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.gui:latest
-            ${{ startsWith(github.ref, 'refs/tags/v') && format('ghcr.io/{0}/gateway.gui:{1}', env.IMAGE_REPOSITORY, github.ref_name) || '' }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.gui:quarantine-${{ github.sha }}-${{ github.run_id }}
+
+      # Runs inside publish-ghcr so a mid-push failure still cleans partial
+      # quarantine tags (container-supply-chain is skipped when publish fails).
+      - name: Cleanup quarantine tags on failure
+        if: failure() || cancelled()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source scripts/ghcr_quarantine_cleanup.sh
+          delete_quarantine_tags "${IMAGE_REPOSITORY}" "${GITHUB_SHA}" "${GITHUB_RUN_ID}"
 
   container-supply-chain:
     name: Container supply chain (cosign, syft, trivy)
@@ -190,16 +226,28 @@ jobs:
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
       - name: Install cosign
         uses: sigstore/cosign-installer@dc72c7d5c4d10cd6bcb8cf6e3fd625a9e5e537da # v3.7.0
 
+      # C11.1 / D46: SHA-pinned installers (same pattern as cosign above). Versions
+      # stay at syft v1.18.1 / trivy v0.58.1 so scan_image() + allowlist tooling keep
+      # working against the same CLI surface.
       - name: Install syft
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/v1.18.1/install.sh | sh -s -- -b /usr/local/bin
+        id: syft
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          syft-version: v1.18.1
+
+      - name: Add syft to PATH
+        run: echo "$(dirname '${{ steps.syft.outputs.cmd }}')" >> "$GITHUB_PATH"
 
       - name: Install trivy
-        run: |
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/v0.58.1/contrib/install.sh | sh -s -- -b /usr/local/bin
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.58.1
+          cache: "true"
 
       - name: Log in to GHCR
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
@@ -241,6 +289,36 @@ jobs:
           scan_image gateway.browser "$GATEWAY_BROWSER_DIGEST"
           scan_image gateway.gui "$GATEWAY_GUI_DIGEST"
 
+      - name: Promote stable tags by digest
+        env:
+          SANDBOX_DIGEST: ${{ needs.publish-ghcr.outputs.sandbox_digest }}
+          PROXY_DIGEST: ${{ needs.publish-ghcr.outputs.proxy_digest }}
+          GATEWAY_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_digest }}
+          GATEWAY_BROWSER_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_browser_digest }}
+          GATEWAY_GUI_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_gui_digest }}
+        run: |
+          set -euo pipefail
+          # C12.3 / D45: promote SHA (and version on v* tags) by digest after scan→sign.
+          # :latest is not written while phase4/5 are stubs (C13.1).
+          promote_by_digest() {
+            local name="$1"
+            local digest="$2"
+            local src="ghcr.io/${IMAGE_REPOSITORY}/${name}@${digest}"
+            local sha_tag="ghcr.io/${IMAGE_REPOSITORY}/${name}:${GITHUB_SHA}"
+            echo "Promote by digest: ${src} → ${sha_tag}"
+            docker buildx imagetools create --tag "${sha_tag}" "${src}"
+            if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+              local ver_tag="ghcr.io/${IMAGE_REPOSITORY}/${name}:${GITHUB_REF_NAME}"
+              echo "Promote by digest: ${src} → ${ver_tag}"
+              docker buildx imagetools create --tag "${ver_tag}" "${src}"
+            fi
+          }
+          promote_by_digest sandbox "$SANDBOX_DIGEST"
+          promote_by_digest proxy "$PROXY_DIGEST"
+          promote_by_digest gateway "$GATEWAY_DIGEST"
+          promote_by_digest gateway.browser "$GATEWAY_BROWSER_DIGEST"
+          promote_by_digest gateway.gui "$GATEWAY_GUI_DIGEST"
+
       - name: Upload supply-chain reports
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -248,44 +326,19 @@ jobs:
           path: sboms/
           if-no-files-found: error
 
-  phase2:
-    name: Phase 2 — Build & Deploy → Dev (needs-implementation)
-    needs: [phase1, publish-ghcr, container-supply-chain]
-    environment: development
-    # Only on main push or manual dispatch; tag pushes skip Dev and go to prod.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
-    env:
-      IMAGE_REPOSITORY: ${{ needs.publish-ghcr.outputs.image_repository }}
-    steps:
-      - name: needs-implementation — build artefacts and deploy to Dev environment
+      - name: Cleanup quarantine tags on failure
+        if: failure() || cancelled()
+        continue-on-error: true
         env:
-          SANDBOX_DIGEST: ${{ needs.publish-ghcr.outputs.sandbox_digest }}
-          PROXY_DIGEST: ${{ needs.publish-ghcr.outputs.proxy_digest }}
-          GATEWAY_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_digest }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Pinned images for Dev deploy (digest, not :latest):"
-          echo "  sandbox:  ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}"
-          echo "  proxy:    ghcr.io/${IMAGE_REPOSITORY}/proxy@${PROXY_DIGEST}"
-          echo "  gateway:  ghcr.io/${IMAGE_REPOSITORY}/gateway@${GATEWAY_DIGEST}"
-          echo "::error title=needs-implementation::Phase 2 (Build & Deploy → Dev) is not implemented — see specs/25-cicd-full.md §2.1"
-          exit 1
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source scripts/ghcr_quarantine_cleanup.sh
+          delete_quarantine_tags "${IMAGE_REPOSITORY}" "${GITHUB_SHA}" "${GITHUB_RUN_ID}"
 
-  phase3:
-    name: Phase 3 — Test Dev (needs-implementation)
-    needs: [phase2]
-    environment: development
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
-    steps:
-      - name: needs-implementation — smoke Dev topology
-        run: |
-          echo "::error title=needs-implementation::Phase 3 (Test Dev) is not implemented — see specs/25-cicd-full.md §2.1"
-          exit 1
+  # Dev deploy/smoke (former phase2/phase3) deleted with needs_impl_ok (D44 / C2.2).
+  # Production stubs below remain so tag builds still require honest deploy/test success (C2.3).
 
   phase4:
     name: Phase 4 — Deploy → Production (needs-implementation)
@@ -369,13 +422,13 @@ jobs:
             Attached: Trivy JSON/SARIF reports and SPDX SBOMs from container-supply-chain.
 
   delivery-chain:
-    name: Delivery chain gate (required)
+    # Branch-protection required check name (C2.1). Job id stays `delivery-chain`
+    # for stable references; the display name is what GitHub status checks show.
+    name: Artifact publication gate (required)
     needs:
       - phase1
       - publish-ghcr
       - container-supply-chain
-      - phase2
-      - phase3
       - phase4
       - phase5
       - phase6
@@ -387,51 +440,30 @@ jobs:
           PHASE1: ${{ needs.phase1.result }}
           PUBLISH: ${{ needs.publish-ghcr.result }}
           SUPPLY: ${{ needs.container-supply-chain.result }}
-          PHASE2: ${{ needs.phase2.result }}
-          PHASE3: ${{ needs.phase3.result }}
           PHASE4: ${{ needs.phase4.result }}
           PHASE5: ${{ needs.phase5.result }}
           PHASE6: ${{ needs.phase6.result }}
-          EVENT_NAME: ${{ github.event_name }}
-          GITHUB_REF: ${{ github.ref }}
         run: |
           set -euo pipefail
+          # Accept success or skipped only. A failed needed job fails this gate (P3 / D44).
+          # main push: phase4/5/6 are skipped by their `if` → skipped is fine.
+          # tag push: phase4/5 must succeed (stubs currently fail → gate red).
+          # workflow_dispatch: phase4/5 run as stubs; a failed stub fails this gate.
           ok() { case "$1" in success|skipped) return 0;; *) return 1;; esac; }
-          needs_impl_ok() { case "$1" in success|skipped|failure) return 0;; *) return 1;; esac; }
-          is_tag_build() { case "$GITHUB_REF" in refs/tags/v*) return 0;; *) return 1;; esac; }
           fail=0
           require() {
             local label="$1" result="$2"
             if ok "$result"; then
               echo "OK  $label ($result)"
             else
-              echo "::error title=Delivery chain::$label result=$result"
-              fail=1
-            fi
-          }
-          require_needs_impl() {
-            local label="$1" result="$2"
-            if needs_impl_ok "$result"; then
-              echo "OK  $label ($result — needs-implementation stub allowed)"
-            else
-              echo "::error title=Delivery chain::$label result=$result"
+              echo "::error title=Artifact publication::$label result=$result"
               fail=1
             fi
           }
           require "phase1" "$PHASE1"
           require "publish-ghcr" "$PUBLISH"
           require "container-supply-chain" "$SUPPLY"
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            require_needs_impl "phase2" "$PHASE2"
-            require_needs_impl "phase3" "$PHASE3"
-            require_needs_impl "phase4" "$PHASE4"
-            require_needs_impl "phase5" "$PHASE5"
-          elif is_tag_build; then
-            require "phase4" "$PHASE4"
-            require "phase5" "$PHASE5"
-          else
-            require_needs_impl "phase2" "$PHASE2"
-            require_needs_impl "phase3" "$PHASE3"
-          fi
+          require "phase4" "$PHASE4"
+          require "phase5" "$PHASE5"
           require "phase6" "$PHASE6"
           exit "$fail"

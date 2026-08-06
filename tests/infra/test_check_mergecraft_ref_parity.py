@@ -16,31 +16,30 @@ REPO = Path(__file__).resolve().parents[2]
 SCRIPT = REPO / "scripts" / "check_mergecraft_ref_parity.py"
 WORKFLOW_PATH = ".github/workflows/mergecraft.yml"
 
-# Keep the fixture pin in lockstep with Makefile's MERGECRAFT_REF default so a
-# bump of the product pin cannot leave this stub stale (same failure mode as #223/#224).
-_MERGECRAFT_REF_DEFAULT_RE = re.compile(
+# Same Makefile pin regex as scripts/check_mergecraft_ref_parity.py — keep the
+# stub in lockstep with whatever MERGECRAFT_REF default the tree currently has.
+_MAKEFILE_RE = re.compile(
     r"MERGECRAFT_REF\s*\?=\s*\$\(if\s*\$\(SEVN_MERGECRAFT_REF\)\s*,\s*"
-    r"\$\(SEVN_MERGECRAFT_REF\)\s*,\s*([^),\s]+)\s*\)"
+    r"\$\(SEVN_MERGECRAFT_REF\)\s*,\s*(?P<ref>[^),\s]+)\s*\)"
 )
 
 
-def _makefile_default_mergecraft_ref() -> str:
-    """Return the SHA (or tag) used as Makefile's MERGECRAFT_REF default."""
-    makefile = (REPO / "Makefile").read_text(encoding="utf-8")
-    match = _MERGECRAFT_REF_DEFAULT_RE.search(makefile)
-    assert match is not None, "Makefile must define a MERGECRAFT_REF default"
-    return match.group(1)
+def _makefile_default_ref() -> str:
+    """Return the MERGECRAFT_REF default from the real repo Makefile."""
+    match = _MAKEFILE_RE.search((REPO / "Makefile").read_text(encoding="utf-8"))
+    assert match is not None, "test fixture must find MERGECRAFT_REF default in Makefile"
+    return match.group("ref")
 
-
-MAKEFILE_MERGECRAFT_REF = _makefile_default_mergecraft_ref()
 
 # A minimal stand-in for main's workflow: the gate only reads the `uses:` pin.
+# Built from the live Makefile pin so bumping MERGECRAFT_REF cannot desync the stub.
+_MAKEFILE_DEFAULT_REF = _makefile_default_ref()
 WORKFLOW_STUB = f"""name: mergecraft
 jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: alexhawat/mergeCraft@{MAKEFILE_MERGECRAFT_REF} # pre-0.0.1 (Codex MCP permission profiles)
+      - uses: alexhawat/mergeCraft@{_MAKEFILE_DEFAULT_REF} # pre-0.0.1 (Codex MCP permission profiles)
 """
 
 
@@ -124,13 +123,13 @@ def test_check_mergecraft_ref_parity_detects_drift(tmp_path: Path) -> None:
 
 def test_check_mergecraft_ref_parity_reads_default_branch_not_worktree(tmp_path: Path) -> None:
     """The pin is read from the ref, not the checkout — a drifted worktree still passes."""
-    # WORKFLOW_STUB already matches the live Makefile pin via MAKEFILE_MERGECRAFT_REF,
+    # WORKFLOW_STUB already matches the live Makefile pin via _MAKEFILE_DEFAULT_REF,
     # so leaving makefile_ref=None keeps both sides of the seeded repo in sync.
     _seed_repo(tmp_path)
     # Corrupt the working-tree copy: if the gate read the file from disk it would
     # report drift. It reads `main:` instead, so this must stay green.
     (tmp_path / ".github" / "workflows" / "mergecraft.yml").write_text(
-        WORKFLOW_STUB.replace(MAKEFILE_MERGECRAFT_REF, "worktree-only-ref"),
+        WORKFLOW_STUB.replace(_MAKEFILE_DEFAULT_REF, "worktree-only-ref"),
         encoding="utf-8",
     )
     proc = _run(tmp_path, {"SEVN_MERGECRAFT_WORKFLOW_REF": "main"})

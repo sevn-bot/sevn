@@ -313,3 +313,63 @@ async def test_w6_7_startup_refuses_when_release_digest_absent(
 
     with pytest.raises(SandboxConfigurationError, match=r"pull|digest|absent|not present|image"):
         await ensure(_RELEASE_DIGEST)
+
+
+@pytest.mark.asyncio
+async def test_w6_5c_concurrent_cold_resolve_single_flight_across_threads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cold resolves from separate asyncio.run loops must share one pull (thread-safe lock)."""
+    import asyncio
+    import concurrent.futures
+
+    ensure, _refresh = _import_image_ready_api()
+    pull_targets: list[str] = []
+    gate = asyncio.Event()
+    started = 0
+
+    async def fake_docker_run(
+        argv: list[str],
+        *,
+        timeout_s: float | None = None,
+        stdin: bytes | None = None,
+    ) -> tuple[int, str, str]:
+        nonlocal started
+        _ = timeout_s, stdin
+        if "pull" in argv:
+            pull_targets.append(argv[-1])
+            started += 1
+            # Hold the leader mid-pull so followers contend on the threading lock.
+            if started == 1:
+                await gate.wait()
+            return 0, "", ""
+        if "image" in argv and "inspect" in argv:
+            return 0, _DIGEST, ""
+        return 0, "", ""
+
+    monkeypatch.setattr("sevn.security.sandbox_runtime._docker_run", fake_docker_run)
+
+    def _run_in_fresh_loop() -> str:
+        return asyncio.run(ensure(_TAG))
+
+    async def _leader() -> tuple[str, list[str]]:
+        task = asyncio.create_task(ensure(_TAG))
+        for _ in range(50):
+            if started >= 1:
+                break
+            await asyncio.sleep(0.01)
+        assert started == 1, "leader must enter docker pull before followers start"
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            futs = [pool.submit(_run_in_fresh_loop) for _ in range(2)]
+            await asyncio.sleep(0.05)
+            gate.set()
+            pinned_leader = await task
+            pinned_followers = [f.result(timeout=30) for f in futs]
+        return pinned_leader, pinned_followers
+
+    pinned_leader, pinned_followers = await _leader()
+    assert pinned_leader == _DIGEST
+    assert pinned_followers == [_DIGEST, _DIGEST]
+    assert pull_targets == [_TAG], (
+        f"expected single-flight one pull across threads/loops; got {pull_targets!r}"
+    )

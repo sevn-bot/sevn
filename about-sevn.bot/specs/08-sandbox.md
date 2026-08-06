@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / safebash
   (when routed through the execution sandbox), process when configured for sandbox
   routing, and skill subprocesses spawned b
-last_updated: '2026-08-05'
-fingerprint: sha256:58378f0eac3180bb698f34fb5b1c646a42e7b4d8960bbe4577c1860b17198a01
+last_updated: '2026-08-06'
+fingerprint: sha256:683f3fad993b1eb692b47b445e99b90a5bdf368b2fba11fba30d83dcd175c781
 related: []
 sources:
 - src/sevn/security/**
@@ -511,7 +511,10 @@ tag.
 **Build stamp (W7.4):** release builds replace the ``sha256:UNSTAMPED`` literal on
 ``_SANDBOX_IMAGE_DIGEST_STAMP`` via ``scripts/stamp_default_sandbox_image.py``
 (after the sandbox image digest is known), or set ``SEVN_SANDBOX_IMAGE_DIGEST`` at
-gateway process start. **Failure mode when the stamp is missing:** spawn /
+gateway process start. ``publish-ghcr`` stamps from ``steps.sandbox.outputs.digest``
+before building gateway / gateway.browser / gateway.gui images and asserts with
+``--require-stamped``; those Dockerfiles also accept ``SEVN_SANDBOX_IMAGE_DIGEST`` as
+a build-arg. **Failure mode when the stamp is missing:** spawn /
 ``_resolve_digest_pinned_image`` raises ``SandboxConfigurationError`` and does
 **not** fall back to a mutable tag (D43 spirit). Release CI may also pass
 ``--require-stamped`` to ``scripts/check_sandbox_mutable_image_tags.py``.

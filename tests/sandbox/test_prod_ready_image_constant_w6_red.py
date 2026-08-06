@@ -160,3 +160,41 @@ def test_w6_3b_require_stamped_reads_assignment_not_substring(tmp_path: Path) ->
         assert mod._stamp_is_missing()
     finally:
         mod._RUNTIME_MODULE = monkey_runtime
+
+
+def test_w6_3c_publish_ghcr_stamps_sandbox_digest_before_gateway_builds() -> None:
+    """Release publish must stamp from sandbox digest before gateway artifacts COPY src/."""
+    import yaml
+
+    workflow = yaml.safe_load(
+        (_REPO / ".github" / "workflows" / "ci-cd.yml").read_text(encoding="utf-8")
+    )
+    steps = workflow["jobs"]["publish-ghcr"]["steps"]
+    names = [str(step.get("name", "")) for step in steps if isinstance(step, dict)]
+    sandbox_idx = next(i for i, name in enumerate(names) if name == "Build and push sandbox image")
+    stamp_idx = next(
+        i for i, name in enumerate(names) if name == "Stamp sandbox digest into gateway source"
+    )
+    gateway_idxs = [
+        i
+        for i, name in enumerate(names)
+        if name
+        in {
+            "Build and push gateway image",
+            "Build and push gateway browser image",
+            "Build and push gateway GUI image",
+        }
+    ]
+    assert stamp_idx > sandbox_idx, "stamp must run after sandbox build"
+    assert gateway_idxs, "expected gateway image build steps"
+    assert all(idx > stamp_idx for idx in gateway_idxs), (
+        "stamp must run before every gateway image build"
+    )
+    stamp = steps[stamp_idx]
+    assert "steps.sandbox.outputs.digest" in str(stamp.get("env", {}))
+    run = str(stamp.get("run", ""))
+    assert "stamp_default_sandbox_image.py" in run
+    assert "--require-stamped" in run
+    for idx in gateway_idxs:
+        build_args = str(steps[idx].get("with", {}).get("build-args", ""))
+        assert "SEVN_SANDBOX_IMAGE_DIGEST=${{ steps.sandbox.outputs.digest }}" in build_args

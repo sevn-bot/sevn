@@ -54,6 +54,7 @@ import subprocess  # nosec B404
 import sys
 import tarfile
 import tempfile
+import threading
 import time
 import uuid
 from enum import StrEnum
@@ -117,8 +118,11 @@ DEFAULT_SANDBOX_IMAGE: Final[str] = _resolve_default_sandbox_image()
 
 # Process-lifetime digest pin cache: configured image ref → ``repo@sha256:…`` (C5.1 / D43).
 # Keyed by the operator-configured ref so an ``rlm.docker_image`` change is not masked.
+# ``threading.Lock`` (not ``asyncio.Lock``): ``SevnDockerInterpreter.execute_python`` opens
+# fresh ``asyncio.run`` loops on worker threads; a process-global asyncio.Lock is not safe
+# across loops/threads and can hang or raise on concurrent cold resolves.
 _SANDBOX_IMAGE_DIGEST_CACHE: dict[str, str] = {}
-_SANDBOX_IMAGE_DIGEST_LOCK: asyncio.Lock = asyncio.Lock()
+_SANDBOX_IMAGE_DIGEST_LOCK = threading.Lock()
 
 
 def sandbox_image_stamp_missing(image: str | None = None) -> bool:
@@ -311,7 +315,8 @@ async def ensure_sandbox_image_ready(image: str) -> str:
     cached = _SANDBOX_IMAGE_DIGEST_CACHE.get(image)
     if cached is not None:
         return cached
-    async with _SANDBOX_IMAGE_DIGEST_LOCK:
+    await asyncio.to_thread(_SANDBOX_IMAGE_DIGEST_LOCK.acquire)
+    try:
         cached = _SANDBOX_IMAGE_DIGEST_CACHE.get(image)
         if cached is not None:
             return cached
@@ -322,6 +327,8 @@ async def ensure_sandbox_image_ready(image: str) -> str:
             pinned = await _resolve_digest_pinned_image(image)
         _cache_sandbox_image_digest(image, pinned)
         return pinned
+    finally:
+        _SANDBOX_IMAGE_DIGEST_LOCK.release()
 
 
 async def refresh_sandbox_image(image: str) -> str:
@@ -344,7 +351,8 @@ async def refresh_sandbox_image(image: str) -> str:
         >>> inspect.iscoroutinefunction(refresh_sandbox_image)
         True
     """
-    async with _SANDBOX_IMAGE_DIGEST_LOCK:
+    await asyncio.to_thread(_SANDBOX_IMAGE_DIGEST_LOCK.acquire)
+    try:
         prior = _SANDBOX_IMAGE_DIGEST_CACHE.pop(image, None)
         if prior is not None and prior != image:
             _SANDBOX_IMAGE_DIGEST_CACHE.pop(prior, None)
@@ -355,6 +363,8 @@ async def refresh_sandbox_image(image: str) -> str:
             pinned = await _resolve_digest_pinned_image(image)
         _cache_sandbox_image_digest(image, pinned)
         return pinned
+    finally:
+        _SANDBOX_IMAGE_DIGEST_LOCK.release()
 
 
 class SandboxDriver(StrEnum):

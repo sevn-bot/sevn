@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver a single scanner subsystem that runs in the gateway process so hostile
   content is filtered before the Triager or any routing model sees user-visible text,
   transcripts, or selected tool output.
-last_updated: '2026-08-05'
-fingerprint: sha256:58378f0eac3180bb698f34fb5b1c646a42e7b4d8960bbe4577c1860b17198a01
+last_updated: '2026-08-06'
+fingerprint: sha256:683f3fad993b1eb692b47b445e99b90a5bdf368b2fba11fba30d83dcd175c781
 related: []
 sources:
 - src/sevn/security/**
