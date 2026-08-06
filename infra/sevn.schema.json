@@ -196,8 +196,8 @@
     {
       "name": "SEVN_SESSION_TOKEN",
       "process_settings": true,
-      "description": "Per-run sandbox token minted by proxy; not a workspace file secret (the design docs).",
-      "long_description": "Short-lived opaque token minted by the proxy when the gateway starts a run; it binds to a frozen `PermissionConfig` ceiling for that sandbox lifetime. All LLM and `integration_call` traffic from the run presents this token. TTL and revoke-on-teardown semantics are in the design docs / egress-proxy specs. Not a field in `sevn.json`. Parsed by `ProcessSettings.session_token`."
+      "description": "Per-run scoped egress credential for sandbox→proxy; not a workspace file secret.",
+      "long_description": "Short-lived HMAC session token (`X-Sevn-Session-Token`) minted at sandbox spawn (or by the gateway for `/web`/`/integration` callers). Payload claims include `scope`, `exp`, `run_id`, optional `container_id`, and (when set) destination `allowlist` plus per-run `max_requests`/`max_bytes` budgets enforced proxy-side. The long-lived `SEVN_PROXY_SHARED_SECRET` alone does not authorize sandbox route families. Intent (not yet shipped): proxy-side minting API, frozen PermissionConfig ceiling, revoke-on-teardown. Not a field in `sevn.json`. Parsed by `ProcessSettings.session_token`."
     },
     {
       "name": "SEVN_TELEGRAM_BOT_TOKEN",

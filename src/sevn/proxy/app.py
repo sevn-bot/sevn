@@ -65,6 +65,12 @@ from sevn.proxy.forward import post_json, post_sse_stream
 from sevn.proxy.http_client import create_proxy_http_client
 from sevn.proxy.integration.router import integration_post
 from sevn.proxy.oauth_lifecycle import OauthCredentialMissingError
+from sevn.proxy.session_limits import (
+    BudgetExceeded,
+    DestinationNotAllowed,
+    consume_run_budget,
+    destination_allowed,
+)
 from sevn.proxy.settings import ProxySettings
 from sevn.proxy.web_forward import brave_search_json, web_fetch_json
 from sevn.security.secrets.cache import ResolvedSecretsCache
@@ -72,6 +78,47 @@ from sevn.security.secrets.factory import secrets_chain_from_workspace
 
 _CODEX_TRUNCATED_RETRY_BACKOFF_S = 0.25
 _CODEX_TRUNCATED_MAX_ATTEMPTS = 2
+
+
+def _enforce_session_egress_limits(
+    request: Request,
+    *,
+    settings: ProxySettings,
+    destination: str,
+    request_bytes: int,
+) -> JSONResponse | None:
+    """Apply allowlist + per-run budgets for session-token callers (C7.3).
+
+    Args:
+        request (Request): ASGI request (session token header).
+        settings (ProxySettings): Proxy settings with signing secret.
+        destination (str): Outbound URL for allowlist check.
+        request_bytes (int): Body size attributed to the request.
+
+    Returns:
+        JSONResponse | None: Error response when limited; ``None`` when ok.
+
+    Examples:
+        >>> _enforce_session_egress_limits.__name__
+        '_enforce_session_egress_limits'
+    """
+    session = (request.headers.get("x-sevn-session-token") or "").strip()
+    secret = (settings.proxy_shared_secret or "").strip()
+    if not session or not secret:
+        return None
+    try:
+        destination_allowed(session, signing_key=secret, destination=destination)
+    except DestinationNotAllowed as exc:
+        return JSONResponse({"detail": str(exc)}, status_code=403)
+    except ValueError:
+        return None
+    try:
+        consume_run_budget(session, signing_key=secret, request_bytes=request_bytes)
+    except BudgetExceeded as exc:
+        return JSONResponse({"detail": str(exc)}, status_code=429)
+    except ValueError:
+        return None
+    return None
 
 
 def _is_retryable_truncated_codex_stream(exc: BaseException) -> bool:
@@ -539,6 +586,16 @@ def create_app(
         raw_body = await request.json()
         if not isinstance(raw_body, dict):
             return JSONResponse({"detail": "expected JSON object body"}, status_code=422)
+        dest = str(raw_body.get("url") or "")
+        body_bytes = len(json.dumps(raw_body, separators=(",", ":")).encode())
+        limited = _enforce_session_egress_limits(
+            request,
+            settings=cfg,
+            destination=dest,
+            request_bytes=body_bytes,
+        )
+        if limited is not None:
+            return limited
         http_client = getattr(request.app.state, "http_client", None)
         status, payload = await web_fetch_json(raw_body, settings=cfg, client=http_client)
         return JSONResponse(payload, status_code=status)

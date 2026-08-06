@@ -108,8 +108,8 @@
     },
     "proxy-egress": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-06T12:17:10Z",
-      "digest": "3dbaf8e6cd2499656bcd811566b57cae5fec8d0790b8ad01ca4c7360c026176c",
+      "computed_at": "2026-08-06T15:44:19Z",
+      "digest": "f939331b5c89c553fbe6f5be86e41fbbd4419a4c86d322c410798d6e203013ff",
       "source_globs": [
         "src/sevn/proxy/**"
       ]

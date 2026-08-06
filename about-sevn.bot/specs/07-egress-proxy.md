@@ -8,7 +8,7 @@ summary: Product pairing (v1). Deployment, paired daemon install, onboarding val
   and Mission Control management of the proxy are specified in prd-06-setup-and-operations
   and prd-07-mission-control §5.1
 last_updated: '2026-08-06'
-fingerprint: sha256:168429187b8c9d65c3265314dfa8d46193e0abb70a0ac929100f5292f7a5e823
+fingerprint: sha256:ce5770ea0becbc41c49a75ea90958994451010878ee1ee9bbf8b37eb74f0f91b
 related: []
 sources:
 - src/sevn/proxy/**
@@ -319,6 +319,22 @@ authenticated health probe (``/web/auth-check``). On sandbox-originated families
 (``/web/*`` except auth-check, ``/integration``) the service secret alone is
 **rejected**; those paths require a scoped session token. Gateway ``/web`` and
 ``/integration`` callers mint or carry a session token via ``build_egress_web_headers``.
+
+## Amendments (prod-readiness-0.0.1 W20 — C7.3, C7.4)
+
+**Allowlist + budgets (C7.3).** Session-token payloads may carry ``allowlist`` (host
+list) and ``max_requests`` / ``max_bytes``. ``sevn.proxy.session_limits`` enforces them
+on ``POST /web/fetch`` before upstream forward: allowlist miss → **403** with
+destination/allowlist detail; budget exhaustion → **429** with budget detail (never
+confused with auth **401**).
+
+**Budget state (W20.3).** Counters are **in-process** on the proxy, keyed by
+``run_id``, under a per-run lock. A proxy restart clears counters — durable shared
+state is out of scope; the reset is explicit rather than silent-by-accident.
+
+**Honest schema (C7.4).** ``SEVN_SESSION_TOKEN`` in ``infra/sevn.schema.json`` describes
+shipped mint/bind/budget behaviour and marks proxy minting API, frozen
+``PermissionConfig`` ceiling, and revoke-on-teardown as **intent**.
 
 ## Human-input needed
 
