@@ -4,7 +4,7 @@ Contracts land in W20: allowlist and request/byte budgets live on the session-to
 payload and are enforced proxy-side before forward. Budget exhaustion must be
 distinguishable from auth failure (not a bare 401).
 
-xfail map: W18.4-W18.5 -> W20.
+Reconciliation: W18.4-W18.5 xfails removed after W20 (`92a6daff`).
 """
 
 from __future__ import annotations
@@ -68,11 +68,10 @@ def _proxy_app() -> Any:
 
 
 # ---------------------------------------------------------------------------
-# W18.4 — destination allowlist (xfail → W20, C7.3)
+# W18.4 — destination allowlist (C7.3; green after W20)
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W20: destination allowlist", strict=False)
 def test_w18_4_destination_allowed_when_host_in_allowlist() -> None:
     from sevn.proxy.session_limits import destination_allowed
 
@@ -91,7 +90,6 @@ def test_w18_4_destination_allowed_when_host_in_allowlist() -> None:
     )
 
 
-@pytest.mark.xfail(reason="green after W20: destination allowlist", strict=False)
 def test_w18_4_destination_rejected_when_host_not_in_allowlist() -> None:
     from sevn.proxy.session_limits import DestinationNotAllowed, destination_allowed
 
@@ -108,7 +106,6 @@ def test_w18_4_destination_rejected_when_host_not_in_allowlist() -> None:
         )
 
 
-@pytest.mark.xfail(reason="green after W20: destination allowlist", strict=False)
 @pytest.mark.anyio
 async def test_w18_4_http_rejects_out_of_allowlist_destination() -> None:
     token = _mint_budgeted_token(
@@ -144,11 +141,10 @@ async def test_w18_4_http_rejects_out_of_allowlist_destination() -> None:
 
 
 # ---------------------------------------------------------------------------
-# W18.5 — per-run request-count and byte budgets (xfail → W20, C7.3)
+# W18.5 — per-run request-count and byte budgets (C7.3; green after W20)
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W20: per-run request/byte budgets", strict=False)
 def test_w18_5_request_budget_exhausted_raises_distinguishable_error() -> None:
     from sevn.proxy.session_limits import BudgetExceeded, consume_run_budget
 
@@ -165,7 +161,6 @@ def test_w18_5_request_budget_exhausted_raises_distinguishable_error() -> None:
     assert "budget" in msg or "request" in msg
 
 
-@pytest.mark.xfail(reason="green after W20: per-run request/byte budgets", strict=False)
 def test_w18_5_byte_budget_exhausted_raises_distinguishable_error() -> None:
     from sevn.proxy.session_limits import BudgetExceeded, consume_run_budget
 
@@ -181,7 +176,6 @@ def test_w18_5_byte_budget_exhausted_raises_distinguishable_error() -> None:
     assert "budget" in msg or "byte" in msg
 
 
-@pytest.mark.xfail(reason="green after W20: per-run request/byte budgets", strict=False)
 @pytest.mark.anyio
 async def test_w18_5_http_budget_exhaustion_not_confused_with_auth_failure() -> None:
     token = _mint_budgeted_token(
@@ -215,7 +209,6 @@ async def test_w18_5_http_budget_exhaustion_not_confused_with_auth_failure() -> 
     assert "budget" in detail
 
 
-@pytest.mark.xfail(reason="green after W20: per-run request/byte budgets", strict=False)
 @pytest.mark.anyio
 async def test_w18_5_concurrent_same_token_budget_replies_consistent() -> None:
     """Same run-bound credential — concurrent consumes must not race-bypass the budget."""

@@ -83,10 +83,14 @@ def test_llm_post_auth_failure_accepts_correct_token() -> None:
 
 
 def test_llm_post_auth_failure_guarded_web_prefix() -> None:
-    assert llm_post_auth_failure(_request(path="/web/fetch", token="secret"), "secret") is None
-    resp = llm_post_auth_failure(_request(path="/web/fetch", token="bad"), "secret")
-    assert resp is not None
-    assert resp.status_code == 401
+    """D51 / C7.2: service secret alone must not authorize sandbox ``/web/*`` families."""
+    resp_secret = llm_post_auth_failure(_request(path="/web/fetch", token="secret"), "secret")
+    assert resp_secret is not None
+    assert resp_secret.status_code == 401
+    assert resp_secret.body == b'{"detail":"unauthorized"}'
+    resp_bad = llm_post_auth_failure(_request(path="/web/fetch", token="bad"), "secret")
+    assert resp_bad is not None
+    assert resp_bad.status_code == 401
 
 
 def test_llm_post_auth_failure_magic_mock_get_method() -> None:

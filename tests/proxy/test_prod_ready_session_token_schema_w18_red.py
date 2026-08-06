@@ -4,15 +4,13 @@
 (proxy minting, frozen ``PermissionConfig`` ceiling, revoke-on-teardown) as
 current. W20 must describe what ships and mark the rest as intent.
 
-xfail map: W18.6 → W20.
+Reconciliation: W18.6 xfail removed after W20 (`92a6daff`).
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-
-import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCHEMA_PATH = _REPO_ROOT / "infra" / "sevn.schema.json"
@@ -36,7 +34,6 @@ def _session_token_entry() -> dict[str, object]:
     raise AssertionError(msg)
 
 
-@pytest.mark.xfail(reason="green after W20: honest SEVN_SESSION_TOKEN schema (C7.4)", strict=False)
 def test_w18_6_session_token_schema_does_not_present_unimplemented_as_current() -> None:
     entry = _session_token_entry()
     description = str(entry.get("description", ""))

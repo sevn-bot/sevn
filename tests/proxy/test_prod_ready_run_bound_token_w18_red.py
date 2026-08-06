@@ -6,7 +6,7 @@ binding**, and **service-secret rejection** on sandbox route families. Landed si
 ``exp`` / route-family scope rejects stay green here (W18.7) — do not re-assert them as
 failing.
 
-xfail map: W18.1-W18.3 -> W19; W18.7 guards have no xfail.
+Reconciliation: W18.1-W18.3 xfails removed after W19 (`8a86aa95`); W18.7 stays green.
 """
 
 from __future__ import annotations
@@ -162,11 +162,10 @@ def test_w18_7_build_sandbox_child_env_excludes_service_secret() -> None:
 
 
 # ---------------------------------------------------------------------------
-# W18.1 — run_id claim enforcement across runs (xfail → W19, C7.1 remainder)
+# W18.1 — run_id claim enforcement across runs (C7.1 remainder; green after W19)
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W19: run_id claim enforcement", strict=False)
 def test_w18_1_validate_rejects_token_when_request_run_id_mismatches() -> None:
     """Token minted for run A must not authorize a request attributed to run B."""
     token = mint_session_token(
@@ -195,7 +194,6 @@ def test_w18_1_validate_rejects_token_when_request_run_id_mismatches() -> None:
     )
 
 
-@pytest.mark.xfail(reason="green after W19: run_id claim enforcement", strict=False)
 @pytest.mark.anyio
 async def test_w18_1_http_rejects_session_token_for_foreign_run() -> None:
     token = mint_session_token(
@@ -226,11 +224,10 @@ async def test_w18_1_http_rejects_session_token_for_foreign_run() -> None:
 
 
 # ---------------------------------------------------------------------------
-# W18.2 — spawning-container binding (xfail → W19, C7.1 remainder)
+# W18.2 — spawning-container binding (C7.1 remainder; green after W19)
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W19: container binding", strict=False)
 def test_w18_2_mint_embeds_container_id_claim() -> None:
     token = mint_session_token(
         signing_key=_SIGNING_KEY,
@@ -243,7 +240,6 @@ def test_w18_2_mint_embeds_container_id_claim() -> None:
     assert payload.get("container_id") == "ctr-spawn-1"
 
 
-@pytest.mark.xfail(reason="green after W19: container binding", strict=False)
 def test_w18_2_validate_rejects_token_from_different_container() -> None:
     token = _mint_bound_token(
         signing_key=_SIGNING_KEY,
@@ -273,7 +269,6 @@ def test_w18_2_validate_rejects_token_from_different_container() -> None:
     )
 
 
-@pytest.mark.xfail(reason="green after W19: container binding", strict=False)
 @pytest.mark.anyio
 async def test_w18_2_http_rejects_replay_from_different_container() -> None:
     token = _mint_bound_token(
@@ -309,10 +304,6 @@ async def test_w18_2_http_rejects_replay_from_different_container() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    reason="green after W19: service secret rejected on sandbox families (D51)",
-    strict=False,
-)
 @pytest.mark.parametrize(
     "path",
     ["/web/fetch", "/integration"],
@@ -339,10 +330,6 @@ def test_w18_3_service_secret_still_accepted_on_gateway_llm_family() -> None:
     )
 
 
-@pytest.mark.xfail(
-    reason="green after W19: service secret rejected on sandbox families (D51)",
-    strict=False,
-)
 @pytest.mark.anyio
 async def test_w18_3_http_service_secret_rejected_on_web_fetch() -> None:
     app = create_app(
