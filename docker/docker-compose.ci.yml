@@ -1,5 +1,8 @@
 # SPDX-License-Identifier: MIT
 # Compose stack for Phase 1 CI: mock upstream + egress proxy + gateway (specs/25-cicd-full.md §4.4).
+#
+# C9.4: ``sevn-ci-init`` uses the same scoped+marker ownership model as operator
+# ``sevn-operator-perms`` (C9.1 / C9.2) — no unconditional ``chown -R /operator``.
 volumes:
   sevn-ci-workspace:
 
@@ -14,10 +17,17 @@ services:
       - sh
       - -ec
       - |
-        mkdir -p /operator/workspace
+        mkdir -p /operator /operator/.sevn /operator/workspace /operator/workspace/logs /operator/workspace/.sevn
         cp -a /seed/sevn.json /operator/workspace/sevn.json
         if [ -d /seed/.sevn ]; then cp -a /seed/.sevn /operator/workspace/.sevn; fi
-        chown -R 10001:10001 /operator
+        # C9.1 / C9.2 / C9.4: scoped application-owned dirs; skip when marker present.
+        if [ ! -f /operator/.sevn/perms-v1 ]; then
+          find /operator/workspace ! -user 10001 -exec chown 10001:10001 {} +
+          find /operator/workspace/logs ! -user 10001 -exec chown 10001:10001 {} +
+          find /operator/workspace/.sevn ! -user 10001 -exec chown 10001:10001 {} +
+          printf '1\n' > /operator/.sevn/perms-v1
+          chown 10001:10001 /operator/.sevn /operator/.sevn/perms-v1
+        fi
     restart: "no"
 
   mock-openai:

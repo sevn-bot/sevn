@@ -95,6 +95,23 @@ the same path under `SEVN_HOME`. See
 secret, guarded routes return **503** unless `SEVN_PROXY_ALLOW_UNAUTHENTICATED=1`
 (dev-only, loudly logged).
 
+### Permissions init (C9)
+
+`sevn-operator-perms` (and CI’s `sevn-ci-init`) normalize ownership for **known
+application-owned directories only** — not a full-tree walk of `/operator`:
+
+| Path | Role |
+|------|------|
+| `/operator/workspace` (+ `logs`, `.sevn`, browser profile/session dirs) | Gateway workspace |
+| `/browser-profiles` | Browser-state volume (operator stack only) |
+| `/operator/.sevn/proxy-shared-secret` | Generate-once secret (always chowned) |
+
+A versioned marker `/operator/.sevn/perms-v1` records a completed migration. Because the
+init service uses `restart: "no"`, it re-runs on every fresh `compose up`; when the
+marker is present the scoped `find … chown` pass is skipped. Delete the marker (or bump
+to a future `perms-vN`) to force re-migration after an ownership-layout change.
+`sevn-ci-init` uses the same marker and scoped dirs (no unconditional `chown -R`).
+
 The proxy container healthcheck keeps `GET /healthz` as liveness and also probes
 authenticated `GET /web/auth-check` with `X-Sevn-Proxy-Token` (env or generate-once
 file). A **401** or **503** marks the container unhealthy; `/web/auth-check` is a

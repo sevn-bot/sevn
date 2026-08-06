@@ -16,14 +16,18 @@
 # Host-first headed browsing: run gateway on macOS with `uv sync --extra browser` instead.
 #
 # Gateway/proxy/browser images run as uid 10001 (`sevn`). Named volumes mount as root unless
-# normalized — ``sevn-operator-perms`` chowns only paths whose ownership is wrong (D25).
+# normalized — ``sevn-operator-perms`` chowns known application-owned directories only when
+# the versioned marker ``/operator/.sevn/perms-v1`` is absent (C9.1 / C9.2). It does not
+# walk arbitrary operator data on every ``up`` (restart: "no" re-runs the one-shot).
 #
-# Proxy shared secret (C1.2 / D37): ``sevn-operator-perms`` generates
-# ``/operator/.sevn/proxy-shared-secret`` (mode 0600) on first boot when absent, then the
-# scoped chown pass owns it as uid 10001. Gateway and proxy resolve that file when
-# ``SEVN_PROXY_SHARED_SECRET`` is unset; an explicitly set env value still wins.
-# Reuses sevn-operator-perms (not a sibling) so ``check-compose-default`` keeps the
-# three-service set and generation runs before ownership normalization.
+# Proxy shared secret (C1.2 / D37 / W15.5): ``sevn-operator-perms`` generates
+# ``/operator/.sevn/proxy-shared-secret`` (mode 0600) on first boot when absent, then
+# always chowns that path (and ``/operator/.sevn``) to uid 10001 — including when the
+# marker skips the scoped migration — so gateway/proxy can read it. Ordering is single-
+# service: generate → secret chown → marker-gated scoped migration. Gateway and proxy
+# resolve that file when ``SEVN_PROXY_SHARED_SECRET`` is unset; an explicitly set env
+# value still wins. Reuses sevn-operator-perms (not a sibling) so
+# ``check-compose-default`` keeps the three-service set.
 #
 # C1.3 / D38: ``make compose-up`` runs ``scripts/check_compose_operator_secrets.py``
 # before ``docker compose up``. Blank ``SEVN_PROXY_SHARED_SECRET`` is allowed so this
@@ -82,8 +86,19 @@ services:
           head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '=\n\r' > /operator/.sevn/proxy-shared-secret
           chmod 600 /operator/.sevn/proxy-shared-secret
         fi
-        find /operator ! -user 10001 -exec chown 10001:10001 {} +
-        find /browser-profiles ! -user 10001 -exec chown 10001:10001 {} +
+        # W15.5: secret must be uid 10001 even when the perms marker skips migration.
+        chown 10001:10001 /operator/.sevn /operator/.sevn/proxy-shared-secret
+        # C9.1 / C9.2: scoped application-owned dirs only; skip when /operator/.sevn/perms-v1 exists.
+        if [ ! -f /operator/.sevn/perms-v1 ]; then
+          find /operator/workspace ! -user 10001 -exec chown 10001:10001 {} +
+          find /operator/workspace/logs ! -user 10001 -exec chown 10001:10001 {} +
+          find /operator/workspace/.sevn ! -user 10001 -exec chown 10001:10001 {} +
+          find /operator/workspace/.sevn/browser-profiles ! -user 10001 -exec chown 10001:10001 {} +
+          find /operator/workspace/.sevn/browser-sessions ! -user 10001 -exec chown 10001:10001 {} +
+          find /browser-profiles ! -user 10001 -exec chown 10001:10001 {} +
+          printf '1\n' > /operator/.sevn/perms-v1
+          chown 10001:10001 /operator/.sevn/perms-v1
+        fi
     restart: "no"
 
   sevn-proxy:
