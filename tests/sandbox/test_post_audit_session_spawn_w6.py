@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -63,6 +64,49 @@ def test_resolve_spawn_session_token_mints_from_generate_once_file(
     token = _resolve_spawn_session_token(run_id="run-file", env={})
     assert token.startswith("v1.")
     assert validate_session_token(token, signing_key=_SIGNING_KEY, path="/web/fetch") is True
+
+
+def test_resolve_spawn_session_token_mints_with_injected_signing_key(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Chain-only installs: injected signing_key mints without env/file (D41)."""
+    monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path))
+    chain_secret = "chain-only-spawn-signing-key-32chars!"
+    token = _resolve_spawn_session_token(
+        run_id="run-chain",
+        env={},
+        signing_key=chain_secret,
+    )
+    assert token.startswith("v1.")
+    assert validate_session_token(token, signing_key=chain_secret, path="/web/fetch") is True
+    assert "SEVN_PROXY_SHARED_SECRET" not in os.environ
+
+
+def test_assemble_spawn_child_env_uses_injected_signing_key_without_leaking(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Injected chain secret mints a token and is not copied into child env."""
+    from sevn.security.sandbox_runtime import _assemble_spawn_child_env
+
+    monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path))
+    chain_secret = "assemble-chain-only-signing-key-32ch!"
+    env = _assemble_spawn_child_env(
+        run_id="run-assemble-chain",
+        env={"SEVN_PROXY_URL": "http://127.0.0.1:9"},
+        workspace_mount_path="/w",
+        signing_key=chain_secret,
+    )
+    assert set(env.keys()) == {"SEVN_PROXY_URL", "SEVN_SESSION_TOKEN", "SEVN_WORKSPACE"}
+    assert "SEVN_PROXY_SHARED_SECRET" not in env
+    assert validate_session_token(
+        env["SEVN_SESSION_TOKEN"],
+        signing_key=chain_secret,
+        path="/web/fetch",
+    )
 
 
 def test_resolve_spawn_session_token_embeds_run_id_in_minted_payload(

@@ -285,11 +285,16 @@ async def dashboard_terminal_ws_endpoint(websocket: WebSocket) -> None:
         return
 
     proxy_url = str(getattr(websocket.app.state, "proxy_public_url", "") or "")
+    proc = getattr(websocket.app.state, "process_settings", None)
+    proxy_secret = None
+    if proc is not None:
+        proxy_secret = getattr(proc, "proxy_shared_secret", None)
     try:
         session = await create_sandbox_terminal_session(
             layout=layout,
             cfg=workspace,
             proxy_url=proxy_url,
+            proxy_shared_secret=proxy_secret,
         )
     except SandboxTerminalError as exc:
         await websocket.send_text(

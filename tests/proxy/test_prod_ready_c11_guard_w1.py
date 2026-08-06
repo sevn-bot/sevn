@@ -43,6 +43,46 @@ def _git(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _rev_ok(ref: str) -> bool:
+    return _git("rev-parse", "--verify", f"{ref}^{{commit}}").returncode == 0
+
+
+def _resolve_c11_diff_base() -> str:
+    """Resolve a git base for the unmodified-suite guard (shallow CI safe).
+
+    Preference order: ``SEVN_CI_BASE``, ``GITHUB_BASE_SHA``, ``origin/$GITHUB_BASE_REF``,
+    then ``origin/pre-0.0.1``. When the preferred tip is missing (Actions shallow
+    checkout), fetch the base branch tip once and use ``FETCH_HEAD``.
+    """
+    candidates: list[str] = []
+    for key in ("SEVN_CI_BASE", "GITHUB_BASE_SHA"):
+        raw = (os.environ.get(key) or "").strip()
+        if raw:
+            candidates.append(raw)
+    base_ref = (os.environ.get("GITHUB_BASE_REF") or "").strip() or "pre-0.0.1"
+    if not base_ref.startswith("origin/"):
+        candidates.append(f"origin/{base_ref}")
+    candidates.append(base_ref)
+    if "origin/pre-0.0.1" not in candidates:
+        candidates.append("origin/pre-0.0.1")
+
+    for cand in candidates:
+        if _rev_ok(cand):
+            return cand
+
+    fetch_ref = base_ref.removeprefix("origin/")
+    fetch = _git("fetch", "--depth=1", "origin", fetch_ref)
+    assert fetch.returncode == 0, (
+        f"C1.1 guard could not resolve base ref (tried {candidates!r}); "
+        f"fetch origin {fetch_ref} failed:\n{fetch.stdout}{fetch.stderr}"
+    )
+    for cand in (f"origin/{fetch_ref}", "FETCH_HEAD"):
+        if _rev_ok(cand):
+            return cand
+    msg = f"C1.1 guard fetch succeeded but no usable tip for {fetch_ref!r}"
+    raise AssertionError(msg)
+
+
 def _request(*, path: str = "/web/fetch") -> Request:
     scope = {
         "type": "http",
@@ -58,7 +98,7 @@ def _request(*, path: str = "/web/fetch") -> Request:
 
 def test_c11_suite_files_unmodified_vs_ci_base() -> None:
     """D40: Batch A must not edit the landed C1.1 regression suites."""
-    base = os.environ.get("SEVN_CI_BASE", "origin/pre-0.0.1")
+    base = _resolve_c11_diff_base()
     proc = _git("diff", "--exit-code", base, "--", *_C11_SUITES)
     assert proc.returncode == 0, f"C1.1 suites modified vs {base}:\n{proc.stdout}{proc.stderr}"
 

@@ -835,12 +835,22 @@ def build_sandbox_child_env(
     return env
 
 
-def _resolve_spawn_session_token(*, run_id: str, env: Mapping[str, str]) -> str:
+def _resolve_spawn_session_token(
+    *,
+    run_id: str,
+    env: Mapping[str, str],
+    signing_key: str | None = None,
+) -> str:
     """Return an existing ``SEVN_SESSION_TOKEN`` or mint a scoped per-run token.
 
     Args:
         run_id (str): Sandbox correlation id embedded in minted tokens.
         env (Mapping[str, str]): Upstream spawn env (may already carry a token).
+        signing_key (str | None): Optional already-resolved shared secret (env,
+            generate-once file, or workspace secrets chain). When set, takes
+            precedence over :func:`resolve_effective_proxy_shared_secret` so
+            chain-only installs can mint without writing the secret into the
+            process environ or the sandbox child env (D41).
 
     Returns:
         str: Token text for ``build_sandbox_child_env``.
@@ -848,7 +858,7 @@ def _resolve_spawn_session_token(*, run_id: str, env: Mapping[str, str]) -> str:
     Raises:
         SandboxConfigurationError: When an existing token fails scope validation,
             or when no token is present and the shared secret cannot be resolved
-            (env or generate-once file) to mint one.
+            (injected key, env, or generate-once file) to mint one.
 
     Examples:
         Opaque env tokens are rejected when a signing key resolves (fail-closed):
@@ -871,10 +881,14 @@ def _resolve_spawn_session_token(*, run_id: str, env: Mapping[str, str]) -> str:
         True
     """
     existing = str(env.get("SEVN_SESSION_TOKEN", "")).strip()
-    from sevn.proxy.bootstrap_secret import resolve_effective_proxy_shared_secret
+    injected = (signing_key or "").strip()
+    if injected:
+        secret = injected
+    else:
+        from sevn.proxy.bootstrap_secret import resolve_effective_proxy_shared_secret
 
-    # ProcessSettings is env-only; Compose default uses the generate-once file.
-    secret = (resolve_effective_proxy_shared_secret() or "").strip()
+        # ProcessSettings is env-only; Compose default uses the generate-once file.
+        secret = (resolve_effective_proxy_shared_secret() or "").strip()
     if existing:
         if secret:
             from sevn.proxy.auth import validate_session_token
@@ -890,7 +904,8 @@ def _resolve_spawn_session_token(*, run_id: str, env: Mapping[str, str]) -> str:
     if not secret:
         msg = (
             "SEVN_PROXY_SHARED_SECRET is not configured; cannot mint a sandbox "
-            "session token (set env, generate-once file under SEVN_HOME, or onboard)"
+            "session token (set env, generate-once file under SEVN_HOME, secrets "
+            "chain, or onboard)"
         )
         raise SandboxConfigurationError(msg)
     from sevn.proxy.auth import SESSION_SCOPE_SANDBOX, mint_session_token
@@ -908,6 +923,7 @@ def _assemble_spawn_child_env(
     env: Mapping[str, str],
     workspace_mount_path: str | os.PathLike[str],
     pre_env: Mapping[str, str] | None = None,
+    signing_key: str | None = None,
 ) -> dict[str, str]:
     """Build §2.2 child env for subprocess or Docker sandbox spawn.
 
@@ -916,6 +932,8 @@ def _assemble_spawn_child_env(
         env (Mapping[str, str]): Upstream spawn env scaffolding.
         workspace_mount_path (str | os.PathLike[str]): Shadow or container workspace path.
         pre_env (Mapping[str, str] | None): Optional runtime ``pre_spawn_env`` overlay.
+        signing_key (str | None): Optional resolved proxy shared secret for minting
+            (not copied into the child env).
 
     Returns:
         dict[str, str]: Sanitized child env for exec or ``docker run -e``.
@@ -925,12 +943,17 @@ def _assemble_spawn_child_env(
         ...     run_id="r",
         ...     env={"SEVN_PROXY_URL": "http://127.0.0.1:9"},
         ...     workspace_mount_path="/w",
+        ...     signing_key="assemble-doctest-signing-key-32ch!",
         ... )
         >>> set(e.keys()) == {"SEVN_PROXY_URL", "SEVN_SESSION_TOKEN", "SEVN_WORKSPACE"}
         True
     """
     child_env = dict(env)
-    token = _resolve_spawn_session_token(run_id=run_id, env=child_env)
+    token = _resolve_spawn_session_token(
+        run_id=run_id,
+        env=child_env,
+        signing_key=signing_key,
+    )
     if token:
         child_env["SEVN_SESSION_TOKEN"] = token
     child_env.update(
@@ -1255,6 +1278,7 @@ class SubprocessSandboxRuntime:
         sandbox_max_lifetime_s: float | None = None,
         docker_image: str | None = None,
         pre_spawn_env: dict[str, str] | None = None,
+        proxy_shared_secret: str | None = None,
     ) -> None:
         """Bind workspace layout plus optional tracing/metadata hooks.
         Args:
@@ -1264,6 +1288,8 @@ class SubprocessSandboxRuntime:
             sandbox_max_lifetime_s (float | None): Override TTL for traces.
             docker_image (str | None): Only used for parity metadata strings.
             pre_spawn_env (dict[str, str] | None): Env merged after §2.2 shim.
+            proxy_shared_secret (str | None): Resolved shared secret for session-token
+                minting (not written into child env).
         Returns:
             None: Always ``None``.
         Examples:
@@ -1276,6 +1302,7 @@ class SubprocessSandboxRuntime:
         self._lifetime_s = float(sandbox_max_lifetime_s or _cfg_max_lifetime_s(cfg))
         self._docker_image = docker_image
         self._pre_env = dict(pre_spawn_env or {})
+        self._proxy_shared_secret = (proxy_shared_secret or "").strip() or None
         self._records: dict[str, dict[str, Any]] = {}
 
     async def spawn(self, *, run_id: str, workspace: Path, env: dict[str, str]) -> str:
@@ -1301,6 +1328,7 @@ class SubprocessSandboxRuntime:
             env=env,
             workspace_mount_path=shadow,
             pre_env=self._pre_env,
+            signing_key=self._proxy_shared_secret,
         )
         self._records[sid] = {
             "run_id": run_id,
@@ -2100,6 +2128,7 @@ class DockerSandboxRuntime:
         sandbox_max_lifetime_s: float | None = None,
         image: str = DEFAULT_SANDBOX_IMAGE,
         pre_spawn_env: dict[str, str] | None = None,
+        proxy_shared_secret: str | None = None,
     ) -> None:
         """Bind Docker image + workspace config for spawn/exec/teardown.
         Args:
@@ -2108,6 +2137,8 @@ class DockerSandboxRuntime:
             sandbox_max_lifetime_s (float | None): Optional override for traces.
             image (str): Sandbox base image (``rlm.docker_image`` or ``DEFAULT_SANDBOX_IMAGE``).
             pre_spawn_env (dict[str, str] | None): Extra env merged after §2.2 shim.
+            proxy_shared_secret (str | None): Resolved shared secret for session-token
+                minting (not written into child env).
         Returns:
             None: Always ``None``.
         Examples:
@@ -2119,6 +2150,7 @@ class DockerSandboxRuntime:
         self._lifetime_s = float(sandbox_max_lifetime_s or _cfg_max_lifetime_s(cfg))
         self._image = image
         self._pre_env = dict(pre_spawn_env or {})
+        self._proxy_shared_secret = (proxy_shared_secret or "").strip() or None
         self._records: dict[str, dict[str, Any]] = {}
 
     def active_run_ids(self) -> frozenset[str]:
@@ -2171,6 +2203,7 @@ class DockerSandboxRuntime:
             env=env,
             workspace_mount_path=_DOCKER_WORKSPACE_MOUNT,
             pre_env=self._pre_env,
+            signing_key=self._proxy_shared_secret,
         )
         child_env.setdefault("SEVN_WORKSPACE", _DOCKER_WORKSPACE_MOUNT)
         proxy_raw = str(child_env.get("SEVN_PROXY_URL", "")).strip()
@@ -2420,6 +2453,7 @@ def make_runtime_for_driver(
     trace_sink: TraceSink | None = None,
     pre_spawn_env: dict[str, str] | None = None,
     docker_image: str | None = None,
+    proxy_shared_secret: str | None = None,
 ) -> SandboxRuntime:
     """Factory for sandbox runtime implementations.
     Args:
@@ -2429,6 +2463,8 @@ def make_runtime_for_driver(
         trace_sink (TraceSink | None): Trace injection port.
         pre_spawn_env (dict[str, str] | None): Extra env layered on sandbox children.
         docker_image (str | None): Overrides default sandbox image reference.
+        proxy_shared_secret (str | None): Resolved shared secret for minting (not
+            copied into child env; covers chain-only installs after D41).
     Returns:
         SandboxRuntime: Concrete asyncio runtime.
     Examples:
@@ -2449,6 +2485,7 @@ def make_runtime_for_driver(
             sandbox_max_lifetime_s=_cfg_max_lifetime_s(cfg),
             image=rlm_img,
             pre_spawn_env=pre_spawn_env,
+            proxy_shared_secret=proxy_shared_secret,
         )
     return SubprocessSandboxRuntime(
         trace_sink=trace_sink,
@@ -2457,4 +2494,5 @@ def make_runtime_for_driver(
         sandbox_max_lifetime_s=_cfg_max_lifetime_s(cfg),
         docker_image=rlm_img,
         pre_spawn_env=pre_spawn_env,
+        proxy_shared_secret=proxy_shared_secret,
     )

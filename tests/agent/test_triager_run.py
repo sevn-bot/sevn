@@ -28,6 +28,13 @@ from sevn.config.workspace_config import TriagerWorkspaceConfig, parse_workspace
 from sevn.storage import apply_migrations, connect_sqlite
 
 _FIXTURE_TRIAGER = Path(__file__).resolve().parents[1] / "fixtures" / "triager"
+_PROXY_SECRET = "triager-run-proxy-secret-32chars!!!!!!"
+
+
+@pytest.fixture(autouse=True)
+def _provision_proxy_shared_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail-closed transport auth_header runs before mocked post_llm_json."""
+    monkeypatch.setenv("SEVN_PROXY_SHARED_SECRET", _PROXY_SECRET)
 
 
 def _stub_structured_output(json_payload: str) -> StructuredOutputCallResult:

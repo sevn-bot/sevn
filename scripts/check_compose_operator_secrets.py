@@ -138,15 +138,12 @@ def validate_operator_secrets(
             raise ValueError(msg)
         if value.casefold() in PLACEHOLDER_VALUES:
             msg = (
-                f"{name} is a known placeholder ({value!r}) — replace "
+                f"{name} is a known placeholder — replace "
                 f"`change-me` / similar before starting services"
             )
             raise ValueError(msg)
         if len(value) < MIN_SECRET_CHARS:
-            msg = (
-                f"{name} is below the minimum entropy length "
-                f"({len(value)} < {MIN_SECRET_CHARS}): {value!r}"
-            )
+            msg = f"{name} is below the minimum entropy length ({len(value)} < {MIN_SECRET_CHARS})"
             raise ValueError(msg)
 
 
@@ -178,7 +175,12 @@ def _self_check() -> int:
                 validate_operator_secrets(trial)
             except ValueError:
                 continue
-            print(f"error: self-check expected failure for {name}={bad!r}", file=sys.stderr)
+            # Do not echo ``bad`` — CodeQL py/clear-text-logging-sensitive-data.
+            kind = "empty" if not bad.strip() else ("placeholder" if len(bad) >= 5 else "short")
+            print(
+                f"error: self-check expected failure for {name} ({kind} fixture not rejected)",
+                file=sys.stderr,
+            )
             return 1
     print("check_compose_operator_secrets: self-check ok")
     return 0

@@ -701,7 +701,10 @@ async def _with_resolved_proxy_shared_secret(
     """Merge ``proxy_shared_secret`` from env, generate-once file, or secrets chain.
 
     Does **not** write ``os.environ`` (D41). Gateway callers inject the resolved
-    value via ``build_runtime_tool_bindings(proxy_shared_secret=…)``.
+    value via ``build_runtime_tool_bindings(proxy_shared_secret=…)`` and store it on
+    ``app.state.process_settings`` so server-side sandbox token minting (dashboard
+    terminal / spawn) can use the same chain-resolved secret without exposing it
+    to the child environ.
 
     Args:
         process (ProcessSettings): Env-derived process settings (possibly with URL merge).
