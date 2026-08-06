@@ -106,11 +106,15 @@ def test_check_mergecraft_ref_parity_detects_drift(tmp_path: Path) -> None:
 
 def test_check_mergecraft_ref_parity_reads_default_branch_not_worktree(tmp_path: Path) -> None:
     """The pin is read from the ref, not the checkout — a drifted worktree still passes."""
-    _seed_repo(tmp_path)
+    # Pin the Makefile to the stub's SHA so this fixture stays self-contained:
+    # leaving makefile_ref=None would copy the real MERGECRAFT_REF and break
+    # whenever trunk bumps the pin without also editing WORKFLOW_STUB.
+    stub_ref = "349f9489da34515a09997142ae75acbc24797227"
+    _seed_repo(tmp_path, makefile_ref=stub_ref)
     # Corrupt the working-tree copy: if the gate read the file from disk it would
     # report drift. It reads `main:` instead, so this must stay green.
     (tmp_path / ".github" / "workflows" / "mergecraft.yml").write_text(
-        WORKFLOW_STUB.replace("349f9489da34515a09997142ae75acbc24797227", "worktree-only-ref"),
+        WORKFLOW_STUB.replace(stub_ref, "worktree-only-ref"),
         encoding="utf-8",
     )
     proc = _run(tmp_path, {"SEVN_MERGECRAFT_WORKFLOW_REF": "main"})
