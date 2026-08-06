@@ -204,6 +204,7 @@ _register_builtin_cron_jobs()
 import sevn.gateway.channel_boot  # noqa: E402 — M1 multi-adapter boot
 import sevn.gateway.hooks.trajectory_ingest_hooks  # noqa: E402 — Batch C lane #3
 import sevn.gateway.replay.replay_worker_hooks  # noqa: E402 — Batch D lane #5
+import sevn.gateway.runtime.sandbox_image_boot  # noqa: E402 — C4.2 / C5.1 image pin at boot
 import sevn.gateway.runtime.telemetry_boot  # noqa: E402 — CW-2 lane #1 channel boot hooks
 import sevn.gateway.subagents.subagents_boot  # noqa: E402 — W3 sub-agent supervisor boot activation
 import sevn.gateway.turn.turn_bundle_hooks  # noqa: E402 — turn-bundle W1

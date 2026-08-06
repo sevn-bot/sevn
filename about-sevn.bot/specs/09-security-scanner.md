@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver a single scanner subsystem that runs in the gateway process so hostile
   content is filtered before the Triager or any routing model sees user-visible text,
   transcripts, or selected tool output.
-last_updated: '2026-08-04'
-fingerprint: sha256:b631d0cf2956c8f760f85d027f593dc802dbbab0f22feed3a1b0847c80161f85
+last_updated: '2026-08-06'
+fingerprint: sha256:fd9b9c4c2c9528ed29d76ee3ac7d6cca8e6849d98b5a5648eea49604f3577a46
 related: []
 sources:
 - src/sevn/security/**
@@ -168,6 +168,9 @@ interfaces:
 - name: check_self_preservation_argv
   file: src/sevn/security/sandbox_runtime.py
   symbol: check_self_preservation_argv
+- name: configured_sandbox_image
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: configured_sandbox_image
 - name: docker_daemon_reachable
   file: src/sevn/security/sandbox_runtime.py
   symbol: docker_daemon_reachable
@@ -177,6 +180,9 @@ interfaces:
 - name: ensure_sandbox_docker_network
   file: src/sevn/security/sandbox_runtime.py
   symbol: ensure_sandbox_docker_network
+- name: ensure_sandbox_image_ready
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: ensure_sandbox_image_ready
 - name: list_labeled_sandbox_containers
   file: src/sevn/security/sandbox_runtime.py
   symbol: list_labeled_sandbox_containers
@@ -198,12 +204,18 @@ interfaces:
 - name: reap_stale_sandbox_containers
   file: src/sevn/security/sandbox_runtime.py
   symbol: reap_stale_sandbox_containers
+- name: refresh_sandbox_image
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: refresh_sandbox_image
 - name: resolve_sandbox_driver
   file: src/sevn/security/sandbox_runtime.py
   symbol: resolve_sandbox_driver
 - name: rewrite_proxy_url_for_sandbox_network
   file: src/sevn/security/sandbox_runtime.py
   symbol: rewrite_proxy_url_for_sandbox_network
+- name: sandbox_image_stamp_missing
+  file: src/sevn/security/sandbox_runtime.py
+  symbol: sandbox_image_stamp_missing
 - name: snapshot_tarball_format_supported
   file: src/sevn/security/sandbox_runtime.py
   symbol: snapshot_tarball_format_supported

@@ -37,7 +37,7 @@ PIP_AUDIT_CACHE ?= $(CURDIR)/.cache/pip-audit
 MERGECRAFT_REF ?= $(if $(SEVN_MERGECRAFT_REF),$(SEVN_MERGECRAFT_REF),8d747f39d3d36d889e0a85c2dcf691d1bdb91536)
 PRE_COMMIT ?= $(UV) run pre-commit
 
-.PHONY: help setup ensure-uv install install-git-guards check-git-guards check-compose-default check-no-curl-pipe-sh snapshot-local install-snapshot-timer install-cli install-cli-browser sync-cli update-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover coverage-ratchet complexity-ratchet complexity-target stale-xfail-check md-links-check doctest trivy-allowlist-check security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check removed-browser-skills-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh storage-migration-rehearsal-check styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage mergecraft-ref-check review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-browser-up compose-gui-up compose-down compose-logs compose-restart verify-compose-profiles verify-stack-health verify-sandbox-spawn verify-runtime verify-deployment log-explore telegram-checks telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-curate readme-curate-prompt readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate spec-check prd-check spec-sync prd-sync logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve faq-generate faq-check
+.PHONY: help setup ensure-uv install install-git-guards check-git-guards check-compose-default check-no-curl-pipe-sh sandbox-image-check sandbox-image-pull snapshot-local install-snapshot-timer install-cli install-cli-browser sync-cli update-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover coverage-ratchet complexity-ratchet complexity-target stale-xfail-check md-links-check doctest trivy-allowlist-check security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check removed-browser-skills-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh storage-migration-rehearsal-check styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage mergecraft-ref-check review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-browser-up compose-gui-up compose-down compose-logs compose-restart verify-compose-profiles verify-stack-health verify-sandbox-spawn verify-runtime verify-deployment log-explore telegram-checks telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-curate readme-curate-prompt readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate spec-check prd-check spec-sync prd-sync logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve faq-generate faq-check
 
 
 PROXY_ENV_FILE ?= .env.proxy
@@ -79,6 +79,14 @@ check-compose-default: ## Assert operator compose default profile (#136, #137)
 check-no-curl-pipe-sh: ## Reject downloader-piped-to-shell under .github/ and Makefile (C11.3)
 	@chmod +x scripts/check_no_curl_pipe_sh.sh 2>/dev/null || true
 	@./scripts/check_no_curl_pipe_sh.sh
+
+sandbox-image-check: ## Reject mutable sandbox image tags under src/ (C4.3 / W7)
+	$(UV) run python scripts/check_sandbox_mutable_image_tags.py
+
+sandbox-image-pull: ## Pre-pull the release sandbox digest (C4.2 / W8); fails if absent
+	@img="$$($(UV) run python -c 'from sevn.security.sandbox_runtime import DEFAULT_SANDBOX_IMAGE; print(DEFAULT_SANDBOX_IMAGE)')"; \
+	  echo "Pulling sandbox image $$img"; \
+	  docker pull "$$img"
 
 snapshot-local: ## Back up local-only gitignored trees (.ignorelocal/spec-kit-wave/.cursor/.claude/docs/...) to ~/.sevn-local-backups
 	@chmod +x scripts/snapshot_local.sh 2>/dev/null || true
@@ -490,7 +498,7 @@ ci-static: lockcheck lint typecheck pyright doctest build artifact-integrity-che
 
 ci-core: lockcheck lint typecheck pyright test doctest security build artifact-integrity-check doctor-solutions-check ## Core verify tier (~tests + typecheck)
 
-ci-infra: config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards check-compose-default check-no-curl-pipe-sh agent-context-manifest-check storage-migration-rehearsal-check ## Schema / infra drift tier
+ci-infra: config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards check-compose-default check-no-curl-pipe-sh sandbox-image-check agent-context-manifest-check storage-migration-rehearsal-check ## Schema / infra drift tier
 
 ci-docs: telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema spec-kit-wave-test changelog-check faq-check ## Docs / menu HTML tier
 
@@ -503,7 +511,7 @@ ci: ci-core ci-infra ci-docs ci-skills ci-parity ## Full gate (same as CI)
 # Ordered expansion of `make ci`, consumed by the resumable runner (scripts/ci_resume.sh).
 # Tier↔CI_STEPS parity enforced by tests/infra/test_ci_steps_tier_parity.py.
 CI_STEPS := lockcheck lint typecheck pyright test doctest security build artifact-integrity-check doctor-solutions-check \
-	config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards check-compose-default check-no-curl-pipe-sh agent-context-manifest-check storage-migration-rehearsal-check \
+	config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards check-compose-default check-no-curl-pipe-sh sandbox-image-check agent-context-manifest-check storage-migration-rehearsal-check \
 	telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema spec-kit-wave-test changelog-check faq-check \
 	skills-core-check skillspector-check skills-index-check removed-browser-skills-check dreaming-allowlist-check \
 	code-index deploy-remote-report-check code-index-check mergecraft-ref-check

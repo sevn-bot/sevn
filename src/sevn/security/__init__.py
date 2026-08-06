@@ -17,6 +17,9 @@ Exports:
     make_runtime_for_driver — sandbox factory by driver.
     check_self_preservation_argv — denylist checker.
     build_sandbox_child_env — sandbox env bootstrap.
+    configured_sandbox_image — ``rlm.docker_image`` or default digest pin.
+    ensure_sandbox_image_ready — process-lifetime digest resolve/cache (C5.1).
+    refresh_sandbox_image — explicit digest cache refresh (C5.3).
     materialize_shadow_workspace — shadow symlink farm.
     write_workspace_snapshot_tarball — gzip snapshot helper.
     load_snapshot_manifest_version — manifest reader.
@@ -50,11 +53,14 @@ from sevn.security.sandbox_runtime import (
     SubprocessSandboxRuntime,
     build_sandbox_child_env,
     check_self_preservation_argv,
+    configured_sandbox_image,
     docker_daemon_reachable,
+    ensure_sandbox_image_ready,
     load_snapshot_manifest_version,
     make_runtime_for_driver,
     materialize_shadow_workspace,
     prune_workspace_snapshots,
+    refresh_sandbox_image,
     resolve_sandbox_driver,
     snapshot_tarball_format_supported,
     write_workspace_snapshot_tarball,
@@ -79,13 +85,16 @@ __all__ = [
     "apply_namespace_egress_firewall",
     "build_sandbox_child_env",
     "check_self_preservation_argv",
+    "configured_sandbox_image",
     "docker_daemon_reachable",
     "egress_firewall_noop",
+    "ensure_sandbox_image_ready",
     "load_snapshot_manifest_version",
     "make_runtime_for_driver",
     "materialize_shadow_workspace",
     "orphan_container_should_kill",
     "prune_workspace_snapshots",
+    "refresh_sandbox_image",
     "resolve_sandbox_driver",
     "snapshot_tarball_format_supported",
     "sweep_orphan_labels",

@@ -2,8 +2,8 @@
   "entries": {
     "agent": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-04T20:30:12Z",
-      "digest": "c92ca39549efcbfe502ae106f24d155abfc6910241249a139e3faaef018d8a00",
+      "computed_at": "2026-08-05T15:19:45Z",
+      "digest": "76fe32da3f256e50a91fe238ab73a25515a1e7c2deb5ad688669c8666ac480ed",
       "source_globs": [
         "src/sevn/agent/**"
       ]
@@ -26,8 +26,8 @@
     },
     "config-workspace": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-05T00:43:16Z",
-      "digest": "30f3b9a88d2cda4407aebaa67e0448eb0fe4761c715e26766f6013715c690be5",
+      "computed_at": "2026-08-05T15:19:50Z",
+      "digest": "c1eea7d9701d0212fad67bd957ee42ce268e4f48c3f7a7a42efe0c33df753d0e",
       "source_globs": [
         "src/sevn/config/**",
         "src/sevn/workspace/**",
@@ -57,8 +57,8 @@
     },
     "gateway": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-05T07:45:48Z",
-      "digest": "04e99eea4230c35be4be2c81a0cc0dd599b94dec42cfc55d5f2e641162809e2f",
+      "computed_at": "2026-08-05T15:19:43Z",
+      "digest": "5c27eb8029a5f60b91a99222198153003812b6c6c6dce19950e3020d5bcb8e72",
       "source_globs": [
         "src/sevn/gateway/**"
       ]
@@ -145,8 +145,8 @@
     },
     "security": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-04T20:30:12Z",
-      "digest": "b631d0cf2956c8f760f85d027f593dc802dbbab0f22feed3a1b0847c80161f85",
+      "computed_at": "2026-08-06T11:35:45Z",
+      "digest": "fd9b9c4c2c9528ed29d76ee3ac7d6cca8e6849d98b5a5648eea49604f3577a46",
       "source_globs": [
         "src/sevn/security/**"
       ]
@@ -161,8 +161,8 @@
     },
     "skills": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-03T00:50:28Z",
-      "digest": "02018f162dafeb676e0d1d9cb91c5e9f54fee73cb38819923a21303e5a0df7b5",
+      "computed_at": "2026-08-05T15:30:57Z",
+      "digest": "5aef6af061e58dc1c1028b291bbaf140a18874946f42a20b8a734f0522fbfc27",
       "source_globs": [
         "src/sevn/skills/**",
         "src/sevn/data/bundled_skills/**",

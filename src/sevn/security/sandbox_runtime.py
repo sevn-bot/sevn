@@ -23,6 +23,16 @@ Exports:
     rewrite_proxy_url_for_sandbox_network — loopback → docker-host gateway for containers.
     list_labeled_sandbox_containers — enumerate ``sevn.run_id`` docker rows.
     reap_stale_sandbox_containers — TTL reaper keyed on ``sevn.run_id`` labels.
+    sandbox_image_stamp_missing — True when the release digest stamp was never applied.
+    configured_sandbox_image — ``rlm.docker_image`` or ``DEFAULT_SANDBOX_IMAGE``.
+    ensure_sandbox_image_ready — resolve/validate once; process-lifetime digest cache (C5.1).
+    refresh_sandbox_image — explicit cache refresh / re-pull (C5.3).
+
+Module constant ``DEFAULT_SANDBOX_IMAGE`` (C4.1 / D42) is the single build-stamped
+digest-pinned default consumed by the Docker runtime, factory, and RLM REPL path.
+Process-lifetime digest cache (C5.1-C5.3 / D43) keys by configured image ref; spawn
+and gateway boot share ``ensure_sandbox_image_ready``; only ``refresh_sandbox_image``
+invalidates.
 Examples:
     >>> check_self_preservation_argv(["echo", "hi"]) is None
     True
@@ -44,6 +54,7 @@ import subprocess  # nosec B404
 import sys
 import tarfile
 import tempfile
+import threading
 import time
 import uuid
 from enum import StrEnum
@@ -75,6 +86,308 @@ _MANIFEST_NAME = "snapshot-manifest.json"
 _FORMAT_VERSION_KEY = "format_version"
 _SNAPSHOT_FORMAT_VERSION: Final[int] = 1
 SUPPORTED_SNAPSHOT_FORMAT_VERSIONS: Final[frozenset[int]] = frozenset({_SNAPSHOT_FORMAT_VERSION})
+
+# Default sandbox image — single source for the three former ``:dev`` literal sites (C4.1 / D42).
+# Release builds stamp a real digest via ``scripts/stamp_default_sandbox_image.py`` (replaces
+# ``sha256:UNSTAMPED``) or set ``SEVN_SANDBOX_IMAGE_DIGEST`` at gateway image build/runtime.
+# Never fall back to a mutable tag when the stamp is missing — spawn fails closed (W7.4).
+_SANDBOX_IMAGE_REPO: Final[str] = "ghcr.io/sevn-bot/sevn/sandbox"
+_UNSTAMPED_SANDBOX_DIGEST: Final[str] = "sha256:UNSTAMPED"
+# Literal replaced by ``scripts/stamp_default_sandbox_image.py`` at release build.
+_SANDBOX_IMAGE_DIGEST_STAMP: str = "sha256:UNSTAMPED"
+
+
+def _resolve_default_sandbox_image() -> str:
+    """Build the digest-pinned default image ref from stamp or env override.
+
+    Returns:
+        str: ``ghcr.io/sevn-bot/sevn/sandbox@sha256:…`` (may still be ``UNSTAMPED``).
+
+    Examples:
+        >>> _resolve_default_sandbox_image().startswith("ghcr.io/sevn-bot/sevn/sandbox@sha256:")
+        True
+    """
+    env_digest = os.environ.get("SEVN_SANDBOX_IMAGE_DIGEST", "").strip()
+    digest = env_digest or _SANDBOX_IMAGE_DIGEST_STAMP
+    if digest.startswith("sha256:"):
+        return f"{_SANDBOX_IMAGE_REPO}@{digest}"
+    return f"{_SANDBOX_IMAGE_REPO}@sha256:{digest}"
+
+
+DEFAULT_SANDBOX_IMAGE: Final[str] = _resolve_default_sandbox_image()
+
+# Process-lifetime digest pin cache: configured image ref → ``repo@sha256:…`` (C5.1 / D43).
+# Keyed by the operator-configured ref so an ``rlm.docker_image`` change is not masked.
+# ``threading.Lock`` (not ``asyncio.Lock``): ``SevnDockerInterpreter.execute_python`` opens
+# fresh ``asyncio.run`` loops on worker threads; a process-global asyncio.Lock is not safe
+# across loops/threads and can hang or raise on concurrent cold resolves.
+_SANDBOX_IMAGE_DIGEST_CACHE: dict[str, str] = {}
+_SANDBOX_IMAGE_DIGEST_LOCK = threading.Lock()
+_SANDBOX_IMAGE_LOCK_POLL_S: Final[float] = 0.01
+
+
+async def _acquire_sandbox_image_lock() -> None:
+    """Acquire ``_SANDBOX_IMAGE_DIGEST_LOCK`` without abandoning it on task cancel.
+
+    ``asyncio.to_thread(lock.acquire)`` is not cancellation-safe: cancelling the
+    waiter cancels only the asyncio wrapper while the worker may still acquire
+    later with no ``finally`` to release, permanently stalling ensure/refresh.
+    Non-blocking try-acquire + short sleep keeps ownership on the cancellable task.
+
+    Returns:
+        None: Always ``None`` once the lock is held by this task.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_acquire_sandbox_image_lock)
+        True
+    """
+    while True:
+        if _SANDBOX_IMAGE_DIGEST_LOCK.acquire(blocking=False):
+            return
+        await asyncio.sleep(_SANDBOX_IMAGE_LOCK_POLL_S)
+
+
+def sandbox_image_stamp_missing(image: str | None = None) -> bool:
+    """Return whether ``image`` still carries the unstamped release sentinel.
+
+    Args:
+        image (str | None): Image ref to inspect; defaults to ``DEFAULT_SANDBOX_IMAGE``.
+
+    Returns:
+        bool: ``True`` when the digest stamp was never applied at release build.
+
+    Examples:
+        >>> sandbox_image_stamp_missing("ghcr.io/sevn-bot/sevn/sandbox@sha256:UNSTAMPED")
+        True
+        >>> sandbox_image_stamp_missing("ghcr.io/sevn-bot/sevn/sandbox@sha256:" + ("a" * 64))
+        False
+    """
+    ref = DEFAULT_SANDBOX_IMAGE if image is None else image
+    return _UNSTAMPED_SANDBOX_DIGEST in ref
+
+
+def configured_sandbox_image(cfg: WorkspaceConfig | None = None) -> str:
+    """Return ``rlm.docker_image`` when set, else ``DEFAULT_SANDBOX_IMAGE``.
+
+    Args:
+        cfg (WorkspaceConfig | None): Workspace config; ``None`` uses the default image.
+
+    Returns:
+        str: Configured sandbox image ref (tag or digest pin).
+
+    Examples:
+        >>> configured_sandbox_image(None) == DEFAULT_SANDBOX_IMAGE
+        True
+    """
+    if cfg is None:
+        return DEFAULT_SANDBOX_IMAGE
+    blob = rlm_json_dict(cfg)
+    cand = blob.get("docker_image")
+    if isinstance(cand, str) and cand.strip():
+        return cand.strip()
+    return DEFAULT_SANDBOX_IMAGE
+
+
+def _cache_sandbox_image_digest(configured_ref: str, pinned: str) -> None:
+    """Store a process-lifetime mapping from configured ref to digest pin.
+
+    Args:
+        configured_ref (str): Operator / default image ref used as the cache key.
+        pinned (str): Digest-pinned ``repo@sha256:…`` result.
+
+    Returns:
+        None: Always ``None``.
+
+    Examples:
+        >>> _cache_sandbox_image_digest("x:tag", "x@sha256:abc")
+        >>> _SANDBOX_IMAGE_DIGEST_CACHE.pop("x:tag", None)
+        'x@sha256:abc'
+        >>> _SANDBOX_IMAGE_DIGEST_CACHE.pop("x@sha256:abc", None)
+        'x@sha256:abc'
+    """
+    _SANDBOX_IMAGE_DIGEST_CACHE[configured_ref] = pinned
+    if pinned != configured_ref:
+        _SANDBOX_IMAGE_DIGEST_CACHE.setdefault(pinned, pinned)
+
+
+async def _pull_sandbox_image(image: str) -> None:
+    """Run ``docker pull`` for ``image`` or raise ``SandboxConfigurationError``.
+
+    Args:
+        image (str): Tag or digest ref to pull.
+
+    Returns:
+        None: Always ``None``.
+
+    Raises:
+        SandboxConfigurationError: When ``docker pull`` exits non-zero.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_pull_sandbox_image)
+        True
+    """
+    docker_bin = _docker_bin()
+    pull_rc, pull_out, pull_err = await _docker_run(
+        [docker_bin, "pull", image],
+        timeout_s=600.0,
+    )
+    if pull_rc != 0:
+        msg = (
+            f"docker pull {image!r} failed (exit {pull_rc}): {pull_err.strip() or pull_out.strip()}"
+        )
+        raise SandboxConfigurationError(msg)
+
+
+async def _ensure_digest_ref_present(image: str, *, force_pull: bool) -> str:
+    """Ensure a digest-pinned ref is local, pulling only on cold start or refresh.
+
+    Args:
+        image (str): Digest-pinned ``repo@sha256:…`` reference.
+        force_pull (bool): When True, always ``docker pull`` before inspect (C5.3).
+
+    Returns:
+        str: The same ``image`` when present locally after optional pull.
+
+    Raises:
+        SandboxConfigurationError: When the image is absent and cannot be fetched.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_ensure_digest_ref_present)
+        True
+    """
+    docker_bin = _docker_bin()
+    if force_pull:
+        await _pull_sandbox_image(image)
+    rc, _, err = await _docker_run(
+        [docker_bin, "image", "inspect", image],
+        timeout_s=60.0,
+    )
+    if rc == 0:
+        return image
+    if force_pull:
+        msg = (
+            f"configured sandbox image {image!r} is not present locally "
+            f"(docker image inspect exit {rc}): {err.strip()}"
+        )
+        raise SandboxConfigurationError(msg)
+    # Cold start (C4.2 / C5.2): pull once, then re-inspect.
+    await _pull_sandbox_image(image)
+    rc2, _, err2 = await _docker_run(
+        [docker_bin, "image", "inspect", image],
+        timeout_s=60.0,
+    )
+    if rc2 != 0:
+        msg = (
+            f"configured sandbox image {image!r} is not present locally "
+            f"(docker image inspect exit {rc2}): {err2.strip()}"
+        )
+        raise SandboxConfigurationError(msg)
+    return image
+
+
+def _refuse_unstamped_sandbox_image(image: str) -> None:
+    """Raise when ``image`` still carries the release ``UNSTAMPED`` sentinel (W7.4).
+
+    Args:
+        image (str): Image ref to validate.
+
+    Returns:
+        None: Always ``None``.
+
+    Raises:
+        SandboxConfigurationError: When the digest stamp was never applied.
+
+    Examples:
+        >>> _refuse_unstamped_sandbox_image("ghcr.io/sevn-bot/sevn/sandbox@sha256:abcd")
+    """
+    if not sandbox_image_stamp_missing(image):
+        return
+    msg = (
+        f"sandbox image {image!r} is unstamped (digest sentinel "
+        f"{_UNSTAMPED_SANDBOX_DIGEST!r}); stamp via "
+        "scripts/stamp_default_sandbox_image.py or SEVN_SANDBOX_IMAGE_DIGEST "
+        "— refusing mutable-tag fallback"
+    )
+    raise SandboxConfigurationError(msg)
+
+
+async def ensure_sandbox_image_ready(image: str) -> str:
+    """Resolve and validate the sandbox image digest once for this process (C5.1).
+
+    Cache is keyed by the configured image ref so an ``rlm.docker_image`` change is
+    not masked. Digest-pinned refs that are already local skip ``docker pull``
+    (C5.2); tagged refs pull on first miss then pin via ``RepoDigests`` (D43).
+
+    Args:
+        image (str): Configured tag or digest-pinned image ref.
+
+    Returns:
+        str: Digest-pinned ``repo@sha256:…`` for ``docker run`` / traces.
+
+    Raises:
+        SandboxConfigurationError: When pull/inspect fails or the stamp is missing.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(ensure_sandbox_image_ready)
+        True
+    """
+    cached = _SANDBOX_IMAGE_DIGEST_CACHE.get(image)
+    if cached is not None:
+        return cached
+    await _acquire_sandbox_image_lock()
+    try:
+        cached = _SANDBOX_IMAGE_DIGEST_CACHE.get(image)
+        if cached is not None:
+            return cached
+        _refuse_unstamped_sandbox_image(image)
+        if "@sha256:" in image:
+            pinned = await _ensure_digest_ref_present(image, force_pull=False)
+        else:
+            pinned = await _resolve_digest_pinned_image(image)
+        _cache_sandbox_image_digest(image, pinned)
+        return pinned
+    finally:
+        _SANDBOX_IMAGE_DIGEST_LOCK.release()
+
+
+async def refresh_sandbox_image(image: str) -> str:
+    """Re-pull and refresh the process-lifetime digest cache for ``image`` (C5.3).
+
+    This is the **only** path that invalidates a cached digest. Spawn and
+    ``ensure_sandbox_image_ready`` never refresh implicitly.
+
+    Args:
+        image (str): Configured tag or digest-pinned image ref.
+
+    Returns:
+        str: Freshly resolved digest-pinned ``repo@sha256:…``.
+
+    Raises:
+        SandboxConfigurationError: When pull/inspect fails or the stamp is missing.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(refresh_sandbox_image)
+        True
+    """
+    await _acquire_sandbox_image_lock()
+    try:
+        prior = _SANDBOX_IMAGE_DIGEST_CACHE.pop(image, None)
+        if prior is not None and prior != image:
+            _SANDBOX_IMAGE_DIGEST_CACHE.pop(prior, None)
+        _refuse_unstamped_sandbox_image(image)
+        if "@sha256:" in image:
+            pinned = await _ensure_digest_ref_present(image, force_pull=True)
+        else:
+            pinned = await _resolve_digest_pinned_image(image)
+        _cache_sandbox_image_digest(image, pinned)
+        return pinned
+    finally:
+        _SANDBOX_IMAGE_DIGEST_LOCK.release()
 
 
 class SandboxDriver(StrEnum):
@@ -1461,14 +1774,18 @@ async def _resolve_digest_pinned_image(image: str) -> str:
         str: Digest-pinned ``repo@sha256:…`` reference for ``docker run``.
 
     Raises:
-        SandboxConfigurationError: When pull/inspect fails or no ``RepoDigests``.
+        SandboxConfigurationError: When pull/inspect fails, no ``RepoDigests``,
+            or the release digest stamp is still ``sha256:UNSTAMPED`` (W7.4).
 
     Examples:
         >>> isinstance("@sha256:" in "x@sha256:abc", bool)
         True
     """
+    _refuse_unstamped_sandbox_image(image)
     docker_bin = _docker_bin()
     if "@sha256:" in image:
+        # Digest-pinned config: verify local presence only (no pull). C4.2 pull-if-absent
+        # for digests lives in ``ensure_sandbox_image_ready`` / ``_ensure_digest_ref_present``.
         rc, _, err = await _docker_run(
             [docker_bin, "image", "inspect", image],
             timeout_s=60.0,
@@ -1480,6 +1797,9 @@ async def _resolve_digest_pinned_image(image: str) -> str:
             )
             raise SandboxConfigurationError(msg)
         return image
+    # Tag path: pull-then-pin (D43). Local short-circuit for already-pinned digests is
+    # via the process cache + digest branch above (C5.1 / C5.2); do not skip pull here
+    # for tags — cold-start after deploy still pulls once.
     pull_rc, pull_out, pull_err = await _docker_run(
         [docker_bin, "pull", image],
         timeout_s=600.0,
@@ -1753,7 +2073,7 @@ class DockerSandboxRuntime:
         trace_sink: TraceSink | None,
         cfg: WorkspaceConfig,
         sandbox_max_lifetime_s: float | None = None,
-        image: str = "ghcr.io/sevn-bot/sevn/sandbox:dev",
+        image: str = DEFAULT_SANDBOX_IMAGE,
         pre_spawn_env: dict[str, str] | None = None,
     ) -> None:
         """Bind Docker image + workspace config for spawn/exec/teardown.
@@ -1761,7 +2081,7 @@ class DockerSandboxRuntime:
             trace_sink (TraceSink | None): Telemetry injection port.
             cfg (WorkspaceConfig): Workspace configuration for lifetime knobs.
             sandbox_max_lifetime_s (float | None): Optional override for traces.
-            image (str): Sandbox base image tag (``rlm.docker_image`` override).
+            image (str): Sandbox base image (``rlm.docker_image`` or ``DEFAULT_SANDBOX_IMAGE``).
             pre_spawn_env (dict[str, str] | None): Extra env merged after §2.2 shim.
         Returns:
             None: Always ``None``.
@@ -1838,7 +2158,8 @@ class DockerSandboxRuntime:
         llmignore_mounts = await asyncio.to_thread(_discover_llmignore_mask_mounts, ws)
         out_dir = await asyncio.to_thread(_prepare_workspace_out_dir, ws, run_id)
         spawn_ts = int(time.time())
-        pinned_image = await _resolve_digest_pinned_image(self._image)
+        # Process-lifetime cache (C5.1): N spawns share one pull; digest-local skips pull (C5.2).
+        pinned_image = await ensure_sandbox_image_ready(self._image)
         name = f"sevn-sb-{uuid.uuid4().hex[:12]}"
         run_argv: list[str] = [
             docker_bin,
@@ -2095,12 +2416,7 @@ def make_runtime_for_driver(
     """
     rlm_img = docker_image
     if rlm_img is None:
-        blob = rlm_json_dict(cfg)
-        cand = blob.get("docker_image")
-        if isinstance(cand, str) and cand.strip():
-            rlm_img = cand.strip()
-        else:
-            rlm_img = "ghcr.io/sevn-bot/sevn/sandbox:dev"
+        rlm_img = configured_sandbox_image(cfg)
     if driver == SandboxDriver.docker:
         return DockerSandboxRuntime(
             trace_sink=trace_sink,

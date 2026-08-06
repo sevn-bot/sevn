@@ -131,6 +131,18 @@ jobs:
           tags: |
             ghcr.io/${{ env.IMAGE_REPOSITORY }}/sandbox:quarantine-${{ github.sha }}-${{ github.run_id }}
 
+      # Bake the sandbox digest into gateway artifacts before they COPY src/
+      # (C4.1 / W7.4). Without this, published gateway images keep sha256:UNSTAMPED
+      # and boot skips validation while first default spawn fails closed.
+      - name: Stamp sandbox digest into gateway source
+        env:
+          SEVN_SANDBOX_IMAGE_DIGEST: ${{ steps.sandbox.outputs.digest }}
+        run: |
+          set -euo pipefail
+          test -n "${SEVN_SANDBOX_IMAGE_DIGEST}"
+          python3 scripts/stamp_default_sandbox_image.py
+          python3 scripts/check_sandbox_mutable_image_tags.py --require-stamped
+
       - name: Build and push proxy image
         id: proxy
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -150,6 +162,8 @@ jobs:
           context: .
           file: docker/Dockerfile.gateway
           push: true
+          build-args: |
+            SEVN_SANDBOX_IMAGE_DIGEST=${{ steps.sandbox.outputs.digest }}
           cache-from: type=gha,scope=gateway
           cache-to: type=gha,mode=max,scope=gateway
           tags: |
@@ -163,6 +177,8 @@ jobs:
           file: docker/Dockerfile.gateway.browser
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            SEVN_SANDBOX_IMAGE_DIGEST=${{ steps.sandbox.outputs.digest }}
           cache-from: type=gha,scope=gateway-browser
           cache-to: type=gha,mode=max,scope=gateway-browser
           tags: |
@@ -176,6 +192,8 @@ jobs:
           file: docker/Dockerfile.gateway.gui
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            SEVN_SANDBOX_IMAGE_DIGEST=${{ steps.sandbox.outputs.digest }}
           cache-from: type=gha,scope=gateway-gui
           cache-to: type=gha,mode=max,scope=gateway-gui
           tags: |
