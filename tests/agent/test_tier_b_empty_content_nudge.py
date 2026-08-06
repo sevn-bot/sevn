@@ -30,6 +30,14 @@ from sevn.agent.triager.models import ComplexityTier, Intent
 from sevn.agent.triager.run import _is_empty_output_retry_error
 from sevn.config.workspace_config import parse_workspace_config
 
+_PROXY_SECRET = "tier-b-nudge-proxy-secret-32chars!!!!"
+
+
+@pytest.fixture(autouse=True)
+def _provision_proxy_shared_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail-closed transport auth_header runs before mocked post_llm_json."""
+    monkeypatch.setenv("SEVN_PROXY_SHARED_SECRET", _PROXY_SECRET)
+
 
 def _info() -> AgentInfo:
     return AgentInfo(

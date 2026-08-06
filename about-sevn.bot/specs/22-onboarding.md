@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the merge + validation + promotion pipeline every setup path shares
   so sevn.json stays the single source of truth (prd-06-setup-and-operations §5.4,
   spec-02-config-and-workspace): shipped pres'
-last_updated: '2026-08-05'
-fingerprint: sha256:6ff53230768217bf952377a24c15f50fbf8a1dd19562ffde3bd95c423f93edb4
+last_updated: '2026-08-06'
+fingerprint: sha256:c9f9709e793388fa1fd035453890f59ea5adab4b1b84f8e0bb284fe06f353730
 related: []
 sources:
 - src/sevn/onboarding/**
@@ -652,6 +652,15 @@ gateway bearer token (same seam as ``_wizard_gateway_token_plaintext``) and
 persist it through ``store_wizard_credentials`` under the logical id
 ``SEVN_PROXY_SHARED_SECRET``. Handoff requires the secret to be present before
 promote.
+
+## Amendments (prod-readiness-0.0.1 W4 — C1.2)
+
+``store_wizard_credentials`` also ensures
+``{SEVN_HOME}/.sevn/proxy-shared-secret`` (same path Compose
+``sevn-operator-perms`` generates on first boot). When the file already exists,
+its value is reused for the secrets-chain write so host onboarding and Compose
+converge (D37). Explicit ``SEVN_PROXY_SHARED_SECRET`` in the process environment
+still overrides the file at resolve time.
 
 ## Human-input needed
 

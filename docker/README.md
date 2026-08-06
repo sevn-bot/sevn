@@ -36,8 +36,15 @@ make compose-ci-smoke
 
 Default operator targets use `COMPOSE_FILES=-f docker/docker-compose.yml` (via
 `COMPOSE_FILE=docker/docker-compose.yml`) and fail fast when `.env` is missing
-(`cp .env.example .env` first). Variant targets pass the full `-f` set inline so
-exactly one gateway service binds `${SEVN_GATEWAY_PORT}`.
+(`cp .env.example .env` first). Variant targets (`compose-browser-up`,
+`compose-gui-up`) call `compose-up` with an overridden `COMPOSE_FILES` so the
+operator-secret preflight and `.env` gate run once for every file set.
+
+`make compose-up` runs `scripts/check_compose_operator_secrets.py` **before**
+`docker compose up`. It rejects empty, `change-me`, and short (<24 char) values
+for `SEVN_GATEWAY_TOKEN` and `SEVN_SECRETS_PASSPHRASE`. Leave
+`SEVN_PROXY_SHARED_SECRET` unset so generate-once can satisfy it; an explicit
+bad value still fails the preflight.
 
 ## Gateway variant override files
 
@@ -78,11 +85,20 @@ Copy [`.env.example`](../.env.example) to `.env` in the repo root before
 | `SEVN_SECRETS_PASSPHRASE` | Secrets-store passphrase fallback |
 | `SEVN_PROXY_URL` | Gateway → proxy base URL (compose sets `http://sevn-proxy:8787` internally) |
 
-When the egress proxy shared-secret guard is enabled, set matching
-`SEVN_PROXY_SHARED_SECRET` on **both** gateway and proxy (see
-[`docs/readmes/proxy-egress.md`](../docs/readmes/proxy-egress.md)). Onboarding
-generates and stores the secret automatically; without it, guarded routes return
-**503** unless `SEVN_PROXY_ALLOW_UNAUTHENTICATED=1` (dev-only, loudly logged).
+When the egress proxy shared-secret guard is enabled, Compose generates
+`/operator/.sevn/proxy-shared-secret` (mode `0600`, uid `10001`) on first boot via
+`sevn-operator-perms` when the file is absent. Gateway and proxy (including browser/gui
+overrides) resolve that file when `SEVN_PROXY_SHARED_SECRET` is unset; set the env var
+on both services only to **override** (external secret manager). Host onboarding writes
+the same path under `SEVN_HOME`. See
+[`docs/readmes/proxy-egress.md`](../docs/readmes/proxy-egress.md). Without a resolved
+secret, guarded routes return **503** unless `SEVN_PROXY_ALLOW_UNAUTHENTICATED=1`
+(dev-only, loudly logged).
+
+The proxy container healthcheck keeps `GET /healthz` as liveness and also probes
+authenticated `GET /web/auth-check` with `X-Sevn-Proxy-Token` (env or generate-once
+file). A **401** or **503** marks the container unhealthy; `/web/auth-check` is a
+guarded no-op and does not consume provider quota.
 
 **Mission Control on loopback:** opening `http://127.0.0.1:${SEVN_GATEWAY_PORT}/mission/…`
 without the boot `dashboard-local-token` is denied when local-open is effective.

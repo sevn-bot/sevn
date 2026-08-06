@@ -157,6 +157,7 @@
     "SEVN_GATEWAY_TOKEN",
     "SEVN_GATEWAY_URL",
     "SEVN_PROXY_URL",
+    "SEVN_PROXY_SHARED_SECRET",
     "SEVN_SESSION_TOKEN",
     "SEVN_WORKSPACE",
     "SEVN_UNSAFE_PARTIAL_HOOKS"
@@ -185,6 +186,12 @@
       "process_settings": true,
       "description": "Unified egress proxy base URL; gateway, sandboxes, and `sevn doctor` when set (the design docs).",
       "long_description": "Base URL of the separate proxy process that holds provider credentials, exposes `/llm/*`, and authenticates with per-run session tokens. The gateway and sandboxes use this URL with `SEVN_SESSION_TOKEN`. The CLI reads the same value via `ProcessSettings.proxy_url` for proxy `/healthz` in `sevn doctor` when set (the design docs). Infrastructure playbooks wire this into systemd and container boot scripts."
+    },
+    {
+      "name": "SEVN_PROXY_SHARED_SECRET",
+      "process_settings": true,
+      "description": "Gateway↔proxy shared secret for `X-Sevn-Proxy-Token`; also stored in the workspace secrets chain (the design docs).",
+      "long_description": "Long-lived service secret presented by the gateway (and other trusted callers) on guarded proxy prefixes (`/llm/`, `/web/`, `/integration/`). Parsed by `ProcessSettings.proxy_shared_secret` and `ProxySettings.proxy_shared_secret` (env alias). When unset in process env, both the gateway (`resolve_proxy_shared_secret`) and the proxy (`build_proxy_settings`) resolve the same logical id from the workspace secrets chain. External secret managers may still inject the env var; an explicit non-empty env value wins over the chain. Never commit literals."
     },
     {
       "name": "SEVN_SESSION_TOKEN",

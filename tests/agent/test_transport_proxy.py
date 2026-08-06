@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from sevn.agent.providers import AnthropicTransport, ChatCompletionsTransport, resolve_model
+from sevn.proxy.bootstrap_secret import ensure_proxy_shared_secret_file
+
+_TRANSPORT_SECRET = "transport-test-proxy-secret-32chars!!"
 
 
 @pytest.mark.asyncio
@@ -12,12 +17,16 @@ async def test_anthropic_complete_calls_proxy(monkeypatch: pytest.MonkeyPatch) -
     async def fake_post(**kwargs: object) -> dict[str, object]:
         assert kwargs["base_url"] == "http://proxy.test"
         assert kwargs["path"] == "/llm/anthropic/messages"
+        headers = kwargs.get("headers")
+        assert isinstance(headers, dict)
+        assert headers.get("X-Sevn-Proxy-Token") == _TRANSPORT_SECRET
         return {"id": "m1", "usage": {"input_tokens": 3, "output_tokens": 5}}
 
     monkeypatch.setattr(
         "sevn.agent.providers.transport.transport_http.post_llm_json",
         fake_post,
     )
+    monkeypatch.setenv("SEVN_PROXY_SHARED_SECRET", _TRANSPORT_SECRET)
     t = AnthropicTransport(proxy_base_url="http://proxy.test")
     out = await t.complete({"model": "claude-test", "max_tokens": 10})
     assert out["id"] == "m1"
@@ -46,6 +55,65 @@ async def test_resolve_model_uses_env_proxy(
         fake_post,
     )
     monkeypatch.setenv("SEVN_PROXY_URL", "http://from.env")
+    monkeypatch.setenv("SEVN_PROXY_SHARED_SECRET", _TRANSPORT_SECRET)
     _, t = resolve_model(model_id="openai/gpt-5-mini", transport_name="chat_completions")
     await t.complete({"model": "openai/gpt-5-mini"})
     assert seen == ["http://from.env"]
+
+
+def test_auth_header_raises_without_secret(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Fail-closed: auth_header must not omit X-Sevn-Proxy-Token (Thermos T1)."""
+    monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path))
+    t = AnthropicTransport(proxy_base_url="http://proxy.test")
+    with pytest.raises(RuntimeError, match="SEVN_PROXY_SHARED_SECRET"):
+        t.auth_header("claude-test")
+
+
+def test_auth_header_reads_generate_once_file_when_env_blank(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Compose default: blank ProcessSettings env + file under SEVN_HOME (T1)."""
+    monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path))
+    ensure_proxy_shared_secret_file(tmp_path, secret=_TRANSPORT_SECRET)
+    t = AnthropicTransport(proxy_base_url="http://proxy.test")
+    headers = t.auth_header("claude-test")
+    assert headers.get("X-Sevn-Proxy-Token") == _TRANSPORT_SECRET
+
+
+def test_auth_header_honors_extra_headers_without_resolving(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Caller-supplied token wins; no env/file required."""
+    monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path))
+    t = AnthropicTransport(
+        proxy_base_url="http://proxy.test",
+        extra_headers={"X-Sevn-Proxy-Token": "injected-header-secret"},
+    )
+    headers = t.auth_header("claude-test")
+    assert headers.get("X-Sevn-Proxy-Token") == "injected-header-secret"
+
+
+def test_resolve_model_injects_chain_resolved_proxy_shared_secret(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Chain-only installs: resolve_model injects the token so auth_header skips env/file."""
+    monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
+    monkeypatch.setenv("SEVN_HOME", str(tmp_path))
+    chain_secret = "chain-only-llm-transport-secret-32ch!"
+    _, t = resolve_model(
+        model_id="claude-test",
+        transport_name="anthropic",
+        proxy_base_url="http://proxy.test",
+        proxy_shared_secret=chain_secret,
+    )
+    headers = t.auth_header("claude-test")
+    assert headers.get("X-Sevn-Proxy-Token") == chain_secret

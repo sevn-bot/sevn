@@ -7,8 +7,8 @@ owner: Alex
 summary: Normalize provider-shaped JSON over async HTTP to a single egress base URL
   (SEVN_PROXY_URL / ProcessSettings.proxy_url), so tier executors bind once per turn
   and never touch raw secrets. LiteLLM may r
-last_updated: '2026-08-05'
-fingerprint: sha256:9f3bf9ce0598eea0e9af6d9a68cc4f1d9f0a402b4c5bb18b0dc5b4f2165f6e09
+last_updated: '2026-08-06'
+fingerprint: sha256:3dbaf8e6cd2499656bcd811566b57cae5fec8d0790b8ad01ca4c7360c026176c
 related: []
 sources:
 - src/sevn/proxy/**
@@ -42,6 +42,21 @@ interfaces:
 - name: converse_via_bedrock
   file: src/sevn/proxy/bedrock_converse.py
   symbol: converse_via_bedrock
+- name: ensure_proxy_shared_secret_file
+  file: src/sevn/proxy/bootstrap_secret.py
+  symbol: ensure_proxy_shared_secret_file
+- name: main
+  file: src/sevn/proxy/bootstrap_secret.py
+  symbol: main
+- name: proxy_shared_secret_path
+  file: src/sevn/proxy/bootstrap_secret.py
+  symbol: proxy_shared_secret_path
+- name: read_proxy_shared_secret_file
+  file: src/sevn/proxy/bootstrap_secret.py
+  symbol: read_proxy_shared_secret_file
+- name: resolve_effective_proxy_shared_secret
+  file: src/sevn/proxy/bootstrap_secret.py
+  symbol: resolve_effective_proxy_shared_secret
 - name: aggregate_responses_sse
   file: src/sevn/proxy/codex_translation.py
   symbol: aggregate_responses_sse

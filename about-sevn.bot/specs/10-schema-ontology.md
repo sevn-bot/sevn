@@ -8,7 +8,7 @@ summary: 'Define the runtime ontology for Triager output and related labels acro
   the agent core: canonical field names, closed enums, typing conventions, and how
   they compose with executor dispatch described '
 last_updated: '2026-08-05'
-fingerprint: sha256:410bc60454e3d961d7eb35cd53250ba68de92d7a5ac15d091b9ac561b779828d
+fingerprint: sha256:1b2ac7456b3c423d740ab1d1ef825e9a80fb7b01715c9b339531fea45b03d39b
 related: []
 sources:
 - src/sevn/config/**

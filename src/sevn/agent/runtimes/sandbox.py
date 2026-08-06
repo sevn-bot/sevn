@@ -29,7 +29,6 @@ from sevn.config.workspace_config import WorkspaceConfig, rlm_json_dict
 from sevn.security.sandbox_runtime import (
     DEFAULT_SANDBOX_IMAGE,
     DockerSandboxRuntime,
-    build_sandbox_child_env,
     docker_daemon_reachable,
 )
 
@@ -48,6 +47,7 @@ class SevnDockerInterpreter:
         workspace: Path | None = None,
         child_env: dict[str, str] | None = None,
         trace_sink: TraceSink | None = None,
+        proxy_shared_secret: str | None = None,
     ) -> None:
         """Bind image and optional workspace for ``DockerSandboxRuntime`` REPL exec.
 
@@ -57,6 +57,9 @@ class SevnDockerInterpreter:
             workspace (Path | None): Host workspace root; ephemeral dir when omitted.
             child_env (dict[str, str] | None): §2.2 env merged at spawn.
             trace_sink (TraceSink | None): Optional telemetry port.
+            proxy_shared_secret (str | None): Resolved shared secret for minting the
+                sandbox session token (not written into the child env). When omitted,
+                falls back to env / generate-once file resolution.
 
         Returns:
             None: Always ``None``.
@@ -69,10 +72,16 @@ class SevnDockerInterpreter:
         self._cfg = cfg or WorkspaceConfig.minimal()
         self._workspace = workspace
         self._child_env = dict(child_env or {})
+        secret = (proxy_shared_secret or "").strip() or None
+        if secret is None:
+            from sevn.proxy.bootstrap_secret import resolve_effective_proxy_shared_secret
+
+            secret = (resolve_effective_proxy_shared_secret() or "").strip() or None
         self._runtime = DockerSandboxRuntime(
             trace_sink=trace_sink,
             cfg=self._cfg,
             image=image,
+            proxy_shared_secret=secret,
         )
         self._sandbox_id: str | None = None
         self._ephemeral_workspace = False
@@ -108,14 +117,12 @@ class SevnDockerInterpreter:
             self._workspace = ws
             self._ephemeral_workspace = True
         env = dict(self._child_env)
+        # Leave SEVN_SESSION_TOKEN unset so spawn mints via signing_key (fail-closed
+        # rejects opaque placeholders like ``repl-session-token`` when a secret resolves).
         if "SEVN_PROXY_URL" not in env:
-            env.update(
-                build_sandbox_child_env(
-                    proxy_url="http://127.0.0.1:8787",
-                    session_token="repl-session-token",  # nosec B106 — harness-only placeholder token
-                    workspace_mount_path="/workspace",
-                )
-            )
+            env["SEVN_PROXY_URL"] = "http://127.0.0.1:8787"
+        if "SEVN_WORKSPACE" not in env:
+            env["SEVN_WORKSPACE"] = "/workspace"
         self._sandbox_id = await self._runtime.spawn(
             run_id=f"repl-{uuid.uuid4().hex[:12]}",
             workspace=ws,

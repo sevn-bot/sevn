@@ -11,15 +11,25 @@ are cut into a dated, versioned section at release time.
 ## [Unreleased]
 
 ### Added
+- [2026-08-05] ``make compose-up`` preflight rejects empty / ``change-me`` / short operator secrets; Compose proxy healthcheck probes authenticated ``GET /web/auth-check`` (keeps ``/healthz`` liveness)
 - [2026-08-05] Stop tracking ``/.cursor`` (agents stay operator-local); add ``docs/cursor-local-setup.md`` and ``docs/templates/cursor/`` for hook and D1 rule bootstrap
+- [2026-08-05] Compose ``sevn-operator-perms`` generates ``/operator/.sevn/proxy-shared-secret`` on first boot; gateway/proxy resolve it when ``SEVN_PROXY_SHARED_SECRET`` is unset (explicit env still wins); host onboarding writes the same path
 - [2026-08-04] Pre-commit blocks commits from the primary checkout unless `SEVN_ALLOW_PRIMARY_COMMIT=1`; `make check-git-guards` asserts `git` resolves to repo `bin/git` without direnv (D1 primary-checkout guard)
 
 ### Changed
 - [2026-08-06] GHCR quarantine tags are run-scoped (`quarantine-<sha>-<run_id>`) and publication concurrency keys on the commit SHA so overlapping `main` / `v*` publishes cannot delete each other's pre-scan images
 - [2026-08-05] GHCR publish pushes quarantine tags only; Trivy→cosign then promotes SHA (and version) tags by digest; `:latest` is not written from `main` while deploy stubs remain (C12.3, C13.1, C13.2)
 - [2026-08-05] CI/CD required check renamed to **Artifact publication gate (required)**; Dev deploy/smoke stubs and the `failure`-as-OK escape hatch removed so a green gate means GHCR publication + supply-chain only (C2.1, C2.2)
+- [2026-08-05] Guarded-route clients resolve ``SEVN_PROXY_SHARED_SECRET`` through one authority (gateway injects into tool bindings; proxy keeps ``settings.model_copy`` only) — no ``os.environ`` fallbacks or write-back; empty secret raises ``ProxySharedSecretUnconfiguredError`` instead of an opaque 401
+- [2026-08-05] `SEVN_PROXY_SHARED_SECRET` is a first-class `ProcessSettings` / schema process-settings variable; gateway `resolve_proxy_shared_secret` resolves the workspace secrets chain when process env is empty (env still wins for external secret managers)
 - [2026-08-05] **Breaking:** Mission Control `local_open` on loopback now requires the boot-written `local_token` query parameter — tokenless loopback no longer grants owner session claims; set `dashboard.local_open_trust_address: true` to restore address-only trust (#169, post-audit Batch E)
 - [2026-08-05] CLI dashboard reads (`sevn models`, `sevn agent config`, `sevn channels status`, and related commands) append the boot `local_token` when calling loopback Mission Control with effective local-open (#169, post-audit Batch E W18)
+
+### Fixed
+- [2026-08-06] Gateway LLM egress (triager / tier-B / C-D transports and native models) uses the boot-resolved proxy shared secret — including secrets-chain-only installs — so authenticated proxy calls no longer require env write-back (#237)
+- [2026-08-06] Compose operator-secret preflight self-check no longer feeds secret fixtures into print dataflow (CodeQL ``py/clear-text-logging-sensitive-data``); gateway sandbox spawn / dashboard terminal minting accept a chain-resolved ``proxy_shared_secret`` without writing it into process or child environ (D41)
+- [2026-08-06] Sandbox spawn-token doctest avoids literal ``os.environ`` get/set of ``SEVN_PROXY_SHARED_SECRET`` so the C3.2 source scan stays green after rebase
+- [2026-08-05] Stock Compose with a blank ``SEVN_PROXY_SHARED_SECRET`` now uses the generate-once file for LLM proxy auth, web egress, sandbox session minting, and dashboard terminals — not only the proxy healthcheck path
 
 ### Security
 - [2026-08-06] Failed or cancelled GHCR publishes clean their own quarantine tags (not only supply-chain failures); quarantine cleanup fails closed on non-404 GHCR probe/list errors; `make check-no-curl-pipe-sh` scans all `.github/` text files (not an extension allowlist) and rejects backslash-continued `curl|sh` spellings
@@ -48,6 +58,9 @@ are cut into a dated, versioned section at release time.
 - [2026-07-30] `/model --once <provider/model>` stages a one-turn tier-B model override in session metadata — consumed at the next agent turn (success or failure) without changing the persisted `providers.tier_default.B` setting; `/status` shows effective vs persisted model (#88)
 - [2026-07-30] Per-channel and per-topic model and system prompt overrides under `channels.<name>.model` / `channels.<name>.system_prompt` and `channels.telegram.topics.<id>.*` — turn-scoped resolution with session → channel → workspace precedence; `TopicConfig.system_prompt` wired from Telegram inbound metadata (#86)
 ### Fixed
+- [2026-08-05] ``make compose-browser-up`` / ``compose-gui-up`` keep inline ``docker compose -f …`` recipes (and run the operator-secrets preflight) so documented override-file invocations stay parseable
+- [2026-08-05] Explicit ``env={}`` on proxy shared-secret resolve no longer reads the host generate-once file (process environ and ``SEVN_HOME`` / ``state_root`` still do)
+- [2026-08-05] Proxy factory boot without a workspace loads ``{SEVN_HOME}/.sevn/proxy-shared-secret`` when ``SEVN_PROXY_SHARED_SECRET`` is unset (matches Compose healthcheck; still fails closed when both are absent)
 - [2026-08-05] OpenAI-compatible ephemeral session reap deletes `gateway_turn_metadata` before session rows, disposes in-memory process/terminal state, and drains cancelled turns before reap so real agent turns no longer 500 on FK violation (#174, post-audit Batch D D-Thermos)
 - [2026-08-05] OpenAI-compatible `POST /v1/chat/completions` uses a fresh ephemeral session per request so concurrent same-bearer clients no longer overwrite each other's history; `GET /v1/models` requires the gateway bearer and `/v1/health` stays a public liveness probe (#174, post-audit Batch D)
 - [2026-08-05] Background `process` jobs that ignore SIGTERM are SIGKILLed on TTL expiry and LRU eviction, matching explicit stop (#175, post-audit Batch D)

@@ -73,7 +73,11 @@ async def test_integration_call_round_trips_github_via_fake_proxy(
     """``integration_call`` POSTs to fake proxy and returns upstream JSON."""
     transport = httpx.ASGITransport(app=_fake_proxy_app())
     proxy_url = "http://fake-proxy"
-    client = build_integration_proxy_client(proxy_url=proxy_url, session_token="tok")
+    client = build_integration_proxy_client(
+        proxy_url=proxy_url,
+        session_token="tok",
+        proxy_shared_secret="test-proxy-secret",
+    )
     assert client is not None
     executor, _ts = build_session_registry(
         registry_version=exec_ctx.registry_version,
@@ -124,7 +128,10 @@ async def test_integration_call_needs_credential_envelope(
 ) -> None:
     """503 missing-token from proxy maps to PERMISSION_DENIED + needs_key readiness."""
     transport = httpx.ASGITransport(app=_fake_proxy_app())
-    client = build_integration_proxy_client(proxy_url="http://fake-proxy")
+    client = build_integration_proxy_client(
+        proxy_url="http://fake-proxy",
+        proxy_shared_secret="test-proxy-secret",
+    )
     assert client is not None
     executor, _ts = build_session_registry(
         registry_version=exec_ctx.registry_version,
@@ -187,7 +194,10 @@ async def test_gh_pr_skill_e2e_against_fake_integration() -> None:
 @pytest.mark.anyio
 async def test_load_tool_integration_call_ready_when_bound(exec_ctx: ToolContext) -> None:
     """Enabled ``integration_call`` exposes ``readiness.status == ready`` via load_tool."""
-    client = build_integration_proxy_client(proxy_url="http://127.0.0.1:8787")
+    client = build_integration_proxy_client(
+        proxy_url="http://127.0.0.1:8787",
+        proxy_shared_secret="test-proxy-secret",
+    )
     bindings = RuntimeToolBindings(integration=client)
     apply_readiness_from_bindings(
         bindings,

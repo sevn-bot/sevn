@@ -502,6 +502,7 @@ async def run_diagnostics_agent(
             content_root=layout.content_root,
             providers_obj=_providers_dict(workspace),
             tier="B",
+            shared_secret=proc.proxy_shared_secret,
         )
         model = resolve_pydantic_model_for_slot(workspace=workspace, ctx=ctx)
 

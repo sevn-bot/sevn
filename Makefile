@@ -37,7 +37,7 @@ PIP_AUDIT_CACHE ?= $(CURDIR)/.cache/pip-audit
 MERGECRAFT_REF ?= $(if $(SEVN_MERGECRAFT_REF),$(SEVN_MERGECRAFT_REF),88c6f41945b39754447bcb27566f624349d8e477)
 PRE_COMMIT ?= $(UV) run pre-commit
 
-.PHONY: help setup ensure-uv install install-git-guards check-git-guards check-compose-default check-no-curl-pipe-sh sandbox-image-check sandbox-image-pull snapshot-local install-snapshot-timer install-cli install-cli-browser sync-cli update-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover coverage-ratchet complexity-ratchet complexity-target stale-xfail-check md-links-check doctest trivy-allowlist-check security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check removed-browser-skills-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh storage-migration-rehearsal-check styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage mergecraft-ref-check review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-browser-up compose-gui-up compose-down compose-logs compose-restart verify-compose-profiles verify-stack-health verify-sandbox-spawn verify-runtime verify-deployment log-explore telegram-checks telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-curate readme-curate-prompt readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate spec-check prd-check spec-sync prd-sync logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve faq-generate faq-check
+.PHONY: help setup ensure-uv install install-git-guards check-git-guards check-compose-default check-compose-operator-secrets check-no-curl-pipe-sh sandbox-image-check sandbox-image-pull snapshot-local install-snapshot-timer install-cli install-cli-browser sync-cli update-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover coverage-ratchet complexity-ratchet complexity-target stale-xfail-check md-links-check doctest trivy-allowlist-check security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check removed-browser-skills-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh storage-migration-rehearsal-check styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage mergecraft-ref-check review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-browser-up compose-gui-up compose-down compose-logs compose-restart verify-compose-profiles verify-stack-health verify-sandbox-spawn verify-runtime verify-deployment log-explore telegram-checks telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-curate readme-curate-prompt readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate spec-check prd-check spec-sync prd-sync logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve faq-generate faq-check
 
 
 PROXY_ENV_FILE ?= .env.proxy
@@ -75,6 +75,9 @@ check-git-guards: ## Verify alias.clean blocks git clean -x/-X
 check-compose-default: ## Assert operator compose default profile (#136, #137)
 	@chmod +x scripts/check-compose-default.sh 2>/dev/null || true
 	@./scripts/check-compose-default.sh
+
+check-compose-operator-secrets: ## Assert operator-secret preflight logic (C1.3 / D38)
+	$(UV) run python scripts/check_compose_operator_secrets.py --self-check
 
 check-no-curl-pipe-sh: ## Reject downloader-piped-to-shell under .github/ and Makefile (C11.3)
 	@chmod +x scripts/check_no_curl_pipe_sh.sh 2>/dev/null || true
@@ -498,7 +501,7 @@ ci-static: lockcheck lint typecheck pyright doctest build artifact-integrity-che
 
 ci-core: lockcheck lint typecheck pyright test doctest security build artifact-integrity-check doctor-solutions-check ## Core verify tier (~tests + typecheck)
 
-ci-infra: config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards check-compose-default check-no-curl-pipe-sh sandbox-image-check agent-context-manifest-check storage-migration-rehearsal-check ## Schema / infra drift tier
+ci-infra: config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards check-compose-default check-compose-operator-secrets check-no-curl-pipe-sh sandbox-image-check agent-context-manifest-check storage-migration-rehearsal-check ## Schema / infra drift tier
 
 ci-docs: telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema spec-kit-wave-test changelog-check faq-check ## Docs / menu HTML tier
 
@@ -511,7 +514,7 @@ ci: ci-core ci-infra ci-docs ci-skills ci-parity ## Full gate (same as CI)
 # Ordered expansion of `make ci`, consumed by the resumable runner (scripts/ci_resume.sh).
 # Tier↔CI_STEPS parity enforced by tests/infra/test_ci_steps_tier_parity.py.
 CI_STEPS := lockcheck lint typecheck pyright test doctest security build artifact-integrity-check doctor-solutions-check \
-	config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards check-compose-default check-no-curl-pipe-sh sandbox-image-check agent-context-manifest-check storage-migration-rehearsal-check \
+	config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards check-compose-default check-compose-operator-secrets check-no-curl-pipe-sh sandbox-image-check agent-context-manifest-check storage-migration-rehearsal-check \
 	telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema spec-kit-wave-test changelog-check faq-check \
 	skills-core-check skillspector-check skills-index-check removed-browser-skills-check dreaming-allowlist-check \
 	code-index deploy-remote-report-check code-index-check mergecraft-ref-check
@@ -594,12 +597,17 @@ docker-build-ci: ## Build docker/Dockerfile.* images (sandbox, proxy, gateway, b
 	docker build -f docker/Dockerfile.gateway.browser -t sevn-gateway-browser:local .
 	docker build -f docker/Dockerfile.gateway.gui -t sevn-gateway-gui:local .
 
+COMPOSE_FILE ?= docker/docker-compose.yml
+COMPOSE_FILES = -f $(COMPOSE_FILE)
+
 compose-gui-up: ## Start operator stack with GUI gateway (noVNC on 6080)
 	@test -f .env || { printf 'Missing .env — copy .env.example and set tokens.\n' >&2; exit 1; }
+	$(UV) run python scripts/check_compose_operator_secrets.py
 	docker compose -f docker/docker-compose.yml -f docker/docker-compose.gui.yml up -d --build
 
 compose-browser-up: ## Start operator stack with browser CDP gateway (Brave)
 	@test -f .env || { printf 'Missing .env — copy .env.example and set tokens.\n' >&2; exit 1; }
+	$(UV) run python scripts/check_compose_operator_secrets.py
 	docker compose -f docker/docker-compose.yml -f docker/docker-compose.browser.yml up -d --build
 
 compose-ci-smoke: ## Build and smoke docker/docker-compose.ci.yml + proxy transport round-trip (needs Docker)
@@ -611,11 +619,9 @@ compose-ci-smoke: ## Build and smoke docker/docker-compose.ci.yml + proxy transp
 	SEVN_CI_PROXY_URL=http://127.0.0.1:18787 SEVN_PROXY_SHARED_SECRET=ci-compose-proxy-secret $(PYTEST) tests/integration/test_proxy_transport_compose_roundtrip.py -v --tb=short --strict-markers -m integration
 	docker compose -f docker/docker-compose.ci.yml down -v
 
-COMPOSE_FILE ?= docker/docker-compose.yml
-COMPOSE_FILES = -f $(COMPOSE_FILE)
-
 compose-up: ## Start operator sevn-proxy + sevn-gateway (plan/telegram-e2e-wave-plan.md TE-5)
 	@test -f .env || { printf 'Missing .env — copy .env.example and set tokens.\n' >&2; exit 1; }
+	$(UV) run python scripts/check_compose_operator_secrets.py
 	docker compose $(COMPOSE_FILES) up -d --build
 
 compose-down: ## Stop operator compose stack and remove containers

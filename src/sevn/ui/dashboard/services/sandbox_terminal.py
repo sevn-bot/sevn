@@ -250,6 +250,7 @@ async def create_sandbox_terminal_session(
     cfg: WorkspaceConfig,
     proxy_url: str = "",
     session_token: str = "",
+    proxy_shared_secret: str | None = None,
 ) -> SandboxTerminalSession:
     """Spawn sandbox runtime and attach an interactive PTY shell at ``content_root``.
 
@@ -262,6 +263,9 @@ async def create_sandbox_terminal_session(
         proxy_url (str): §2.2 proxy URL injected into sandbox child env.
         session_token (str): Scoped per-run ``X-Sevn-Session-Token`` for sandbox egress;
             minted at spawn when unset (not the gateway ``SEVN_PROXY_SHARED_SECRET``).
+        proxy_shared_secret (str | None): Already-resolved shared secret (env,
+            generate-once file, or secrets chain). Preferred over env/file lookup so
+            chain-only installs mint without writing the secret into process environ.
 
     Returns:
         SandboxTerminalSession: Live PTY session handle.
@@ -279,7 +283,19 @@ async def create_sandbox_terminal_session(
     except SandboxConfigurationError as exc:
         raise SandboxTerminalError(str(exc)) from exc
 
-    runtime = make_runtime_for_driver(driver, layout=layout, cfg=cfg, trace_sink=None)
+    secret = (proxy_shared_secret or "").strip() or None
+    if secret is None:
+        from sevn.proxy.bootstrap_secret import resolve_effective_proxy_shared_secret
+
+        secret = (resolve_effective_proxy_shared_secret() or "").strip() or None
+
+    runtime = make_runtime_for_driver(
+        driver,
+        layout=layout,
+        cfg=cfg,
+        trace_sink=None,
+        proxy_shared_secret=secret,
+    )
     workspace = layout.content_root.resolve()
     run_id = f"mc-terminal-{uuid.uuid4().hex[:12]}"
     if session_token.strip():
@@ -287,15 +303,16 @@ async def create_sandbox_terminal_session(
     else:
         from sevn.proxy.auth import SESSION_SCOPE_SANDBOX, mint_session_token
 
-        secret = os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip()
-        resolved_token = (
-            mint_session_token(
-                signing_key=secret,
-                scope=SESSION_SCOPE_SANDBOX,
-                run_id=run_id,
+        if not secret:
+            raise SandboxTerminalError(
+                "SEVN_PROXY_SHARED_SECRET is not configured; set env, generate-once "
+                "file under SEVN_HOME, secrets chain, or complete onboarding before "
+                "minting a sandbox terminal session token"
             )
-            if secret
-            else uuid.uuid4().hex
+        resolved_token = mint_session_token(
+            signing_key=secret,
+            scope=SESSION_SCOPE_SANDBOX,
+            run_id=run_id,
         )
     child_env = {
         "SEVN_PROXY_URL": proxy_url,

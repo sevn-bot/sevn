@@ -7,8 +7,8 @@ owner: Alex
 summary: Product pairing (v1). Deployment, paired daemon install, onboarding validation,
   and Mission Control management of the proxy are specified in prd-06-setup-and-operations
   and prd-07-mission-control §5.1
-last_updated: '2026-08-05'
-fingerprint: sha256:9f3bf9ce0598eea0e9af6d9a68cc4f1d9f0a402b4c5bb18b0dc5b4f2165f6e09
+last_updated: '2026-08-06'
+fingerprint: sha256:3dbaf8e6cd2499656bcd811566b57cae5fec8d0790b8ad01ca4c7360c026176c
 related: []
 sources:
 - src/sevn/proxy/**
@@ -44,6 +44,21 @@ interfaces:
 - name: converse_via_bedrock
   file: src/sevn/proxy/bedrock_converse.py
   symbol: converse_via_bedrock
+- name: ensure_proxy_shared_secret_file
+  file: src/sevn/proxy/bootstrap_secret.py
+  symbol: ensure_proxy_shared_secret_file
+- name: main
+  file: src/sevn/proxy/bootstrap_secret.py
+  symbol: main
+- name: proxy_shared_secret_path
+  file: src/sevn/proxy/bootstrap_secret.py
+  symbol: proxy_shared_secret_path
+- name: read_proxy_shared_secret_file
+  file: src/sevn/proxy/bootstrap_secret.py
+  symbol: read_proxy_shared_secret_file
+- name: resolve_effective_proxy_shared_secret
+  file: src/sevn/proxy/bootstrap_secret.py
+  symbol: resolve_effective_proxy_shared_secret
 - name: aggregate_responses_sse
   file: src/sevn/proxy/codex_translation.py
   symbol: aggregate_responses_sse
@@ -245,6 +260,47 @@ Session tokens carry ``exp`` (unix expiry) and ``run_id`` in a ``v1.<payload>.<s
 envelope signed with the same ``SEVN_PROXY_SHARED_SECRET``. Either header alone
 satisfies the guard for its route family. The service secret is **never** injected
 into sandbox child env (``build_sandbox_child_env``).
+
+## Amendments (prod-readiness-0.0.1 W3 — C3.2, C3.3)
+
+Exactly one configuration authority resolves ``SEVN_PROXY_SHARED_SECRET`` for
+in-process gateway and proxy clients:
+
+| Process | Authority |
+|---------|-----------|
+| Proxy | ``ProxySettings.proxy_shared_secret`` via env alias and/or secrets-chain merge in ``build_proxy_settings`` (``settings.model_copy`` only — **no** ``os.environ`` write-back) |
+| Gateway | ``ProcessSettings.proxy_shared_secret`` (env allowlist) then secrets chain via ``resolve_proxy_shared_secret``; value is injected into ``build_runtime_tool_bindings(proxy_shared_secret=…)`` |
+
+Guarded-route **clients** (``build_egress_web_headers``, web/integration callers) raise
+``ProxySharedSecretUnconfiguredError`` when the resolved shared secret is empty,
+naming ``SEVN_PROXY_SHARED_SECRET`` and a remedy (set env / ``sevn secrets put`` /
+generate / onboard). They must not send an empty ``X-Sevn-Proxy-Token`` and surface
+an opaque 401.
+
+The sole remaining ``os.environ.get("SEVN_PROXY_SHARED_SECRET")`` under ``src/`` is
+the sandbox child-env seam
+(``data/bundled_skills/core/job-ops/scripts/lib/llm.py``), which runs out-of-process.
+
+## Amendments (prod-readiness-0.0.1 W5 — C1.3, C1.4)
+
+**Preflight (C1.3 / D38).** ``make compose-up`` (and browser/GUI wrappers via
+``COMPOSE_FILES``) runs ``scripts/check_compose_operator_secrets.py`` before
+``docker compose up``. The check rejects empty, placeholder (``change-me`` and
+siblings), and below-minimum-length (<24) values for ``SEVN_PROXY_SHARED_SECRET``,
+``SEVN_GATEWAY_TOKEN``, and ``SEVN_SECRETS_PASSPHRASE``. CI reaches the same
+logic via ``make check-compose-operator-secrets`` (``--self-check``) in
+``ci-infra`` / ``CI_STEPS``.
+
+**W5.3 — generate-once interaction.** An unset/blank ``SEVN_PROXY_SHARED_SECRET``
+is allowed at compose-up so ``sevn-operator-perms`` generate-once can satisfy the
+gate; an *explicit* low-quality value still fails. Gateway token and secrets
+passphrase remain mandatory high-entropy values.
+
+**Authenticated healthcheck (C1.4 / D39).** ``sevn-proxy`` keeps ``GET /healthz``
+as liveness and additionally probes guarded ``GET /web/auth-check`` with
+``X-Sevn-Proxy-Token`` resolved from env or ``/operator/.sevn/proxy-shared-secret``.
+HTTP **401** or **503** marks the container unhealthy. ``/web/auth-check`` is a
+guarded no-op (no provider upstream) so the probe consumes no quota.
 
 ## Human-input needed
 

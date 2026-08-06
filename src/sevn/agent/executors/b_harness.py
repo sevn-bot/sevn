@@ -1404,6 +1404,11 @@ async def run_b_turn(
     if native_model_active:
         providers_obj = providers_section_dict(workspace.providers)
         proxy_base = ProcessSettings().proxy_url or "http://127.0.0.1:8787"
+        # Prefer the token already injected on the FunctionModel transport (chain-only
+        # installs resolve at gateway boot into ProcessSettings → resolve_model).
+        injected = ""
+        extra = getattr(transport_bundle.transport, "_extra_headers", None) or {}
+        injected = str(extra.get("X-Sevn-Proxy-Token") or "").strip()
         native_ctx = default_native_model_context(
             slot=ModelSlot.tier_b,
             model_id=transport_bundle.model_id,
@@ -1417,6 +1422,7 @@ async def run_b_turn(
             content_root=content_root,
             max_output_tokens=effective_max_output_tokens,
             providers_obj=providers_obj,
+            shared_secret=injected or None,
             user_id=tool_context.outbound_user_id or None,
             channel=tool_context.delivery_channel or None,
             workspace_id=tool_context.workspace_id or None,

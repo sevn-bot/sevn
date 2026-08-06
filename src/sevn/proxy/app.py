@@ -169,10 +169,14 @@ def create_app(
     When called with no arguments (uvicorn ``--factory``), resolves
     ``{SEVN_HOME}/workspace/sevn.json``, rotates ``proxy.log``, configures loguru,
     and builds settings from the secrets chain per ``specs/06-secrets.md`` §2.4.
+    When no workspace is present yet, falls back to process env and the
+    generate-once file at ``{SEVN_HOME}/.sevn/proxy-shared-secret`` (same order
+    as Compose healthcheck: non-empty env wins).
 
     Args:
         settings (ProxySettings | None): Explicit settings for tests; when omitted
-            with no workspace, reads process environment only.
+            with no workspace, reads process environment and the bootstrap secret
+            file when env is blank.
         workspace_config (WorkspaceConfig | None): When set with ``content_root``,
             wires ``ResolvedSecretsCache`` on ``app.state.secrets_cache``.
         content_root (Path | None): Workspace content anchor for encrypted file paths.
@@ -189,6 +193,8 @@ def create_app(
     resolved_settings = settings
     ws_cfg = workspace_config
     root = content_root
+    # Env-only path (no workspace yet): still load generate-once bootstrap secret.
+    env_only_fallback = False
 
     if resolved_settings is None and ws_cfg is None and root is None:
         booted = _bootstrap_from_operator_home()
@@ -197,8 +203,16 @@ def create_app(
             from sevn.tracing.otel_pipeline import configure_proxy_otel
 
             configure_proxy_otel(ws_cfg)
+        else:
+            env_only_fallback = True
 
     resolved = resolved_settings if resolved_settings is not None else ProxySettings()
+    if env_only_fallback and not (resolved.proxy_shared_secret or "").strip():
+        from sevn.proxy.bootstrap_secret import resolve_effective_proxy_shared_secret
+
+        file_secret = resolve_effective_proxy_shared_secret()
+        if file_secret:
+            resolved = resolved.model_copy(update={"proxy_shared_secret": file_secret})
 
     async def sse_or_json(
         *,
@@ -233,6 +247,24 @@ def create_app(
 
     async def healthz(_request: Request) -> JSONResponse:
         return JSONResponse({"status": "ok"})
+
+    async def web_auth_check(_request: Request) -> JSONResponse:
+        """Guarded no-op for Compose authenticated healthchecks (C1.4 / D39).
+
+        Auth middleware enforces ``X-Sevn-Proxy-Token`` on ``/web/*``. This route
+        returns 200 without calling providers so the probe consumes no quota.
+
+        Args:
+            _request (Request): ASGI request (auth already enforced upstream).
+
+        Returns:
+            JSONResponse: ``{"status": "ok", "probe": "auth-check"}``.
+
+        Examples:
+            >>> web_auth_check.__name__
+            'web_auth_check'
+        """
+        return JSONResponse({"status": "ok", "probe": "auth-check"})
 
     async def bedrock_converse(request: Request) -> JSONResponse:
         cfg: ProxySettings = request.app.state.settings
@@ -547,6 +579,8 @@ def create_app(
         Route("/llm/openai/chat/completions", openai_chat_completions, methods=["POST"]),
         Route("/llm/openai/responses", openai_responses, methods=["POST"]),
         Route("/llm/bedrock/converse", bedrock_converse, methods=["POST"]),
+        # C1.4 / D39: guarded no-op for authenticated Compose healthcheck (no provider quota).
+        Route("/web/auth-check", web_auth_check, methods=["GET"]),
         Route("/web/fetch", web_fetch, methods=["POST"]),
         Route("/web/brave/search", web_brave_search, methods=["POST"]),
         Route("/integration", integration_post, methods=["POST"]),

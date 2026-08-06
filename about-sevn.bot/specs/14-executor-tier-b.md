@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Tier B is the default “do work” executor for messages the Triager classifies
   as complexity == B (prd-04-getting-things-done §5.2): a single pydantic-ai Agent
   loop over the user’s incoming_text, with t'
-last_updated: '2026-08-05'
-fingerprint: sha256:76fe32da3f256e50a91fe238ab73a25515a1e7c2deb5ad688669c8666ac480ed
+last_updated: '2026-08-06'
+fingerprint: sha256:5563f2f82dee0e53aad5c545d527da20a0cc3cae86acc0a718af1abbe56404d8
 related: []
 sources:
 - src/sevn/agent/**

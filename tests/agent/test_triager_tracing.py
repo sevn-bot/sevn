@@ -17,6 +17,14 @@ from sevn.agent.triager.context import (
 from sevn.agent.triager.run import triage_turn
 from sevn.config.workspace_config import WorkspaceConfig
 
+_PROXY_SECRET = "triager-tracing-proxy-secret-32chars!!"
+
+
+@pytest.fixture(autouse=True)
+def _provision_proxy_shared_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail-closed transport auth_header runs on live LLM triage paths."""
+    monkeypatch.setenv("SEVN_PROXY_SHARED_SECRET", _PROXY_SECRET)
+
 
 class _RecordingTrace(TraceSink):
     """Capture ``emit`` calls for assertions."""

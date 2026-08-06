@@ -34,7 +34,6 @@ from pydantic_ai.providers.openai import OpenAIProvider
 from sevn.agent.adapters.egress_bridge import (
     build_sevn_anthropic_client,
     build_sevn_openai_client,
-    resolve_proxy_shared_secret,
 )
 from sevn.agent.adapters.minimax_wrapper_model import (
     MiniMaxHygieneContext,
@@ -673,7 +672,10 @@ def default_native_model_context(
         >>> ctx.model_id
         'minimax/MiniMax-M2'
     """
-    secret = shared_secret if shared_secret is not None else resolve_proxy_shared_secret()
+    from sevn.proxy.bootstrap_secret import resolve_effective_proxy_shared_secret
+
+    # Sync env → file only (never the chain coroutine path).
+    secret = shared_secret if shared_secret is not None else resolve_effective_proxy_shared_secret()
     return NativeModelContext(
         slot=slot,
         model_id=model_id,

@@ -40,6 +40,7 @@ from sevn.tools.context import ToolContext
 from sevn.tools.integration_gh_repo import GITHUB_INTEGRATION_SERVICE
 from sevn.tools.integration_proxy_client import IntegrationCredentialRequired
 from sevn.tools.mcp_naming import mcp_server_id_from_tool_name, upstream_mcp_tool_name
+from sevn.tools.web import ProxySharedSecretUnconfiguredError
 
 _UPSTREAM_STATUS_RE = re.compile(r"\bproxy status (\d{3})\b", re.IGNORECASE)
 _GITHUB_REPO_SLUG_RE = re.compile(
@@ -442,6 +443,16 @@ def make_integration_call_tool(bindings: RuntimeToolBindings) -> FunctionTool:
                     "service": service,
                     "method": method,
                     "readiness": "needs_key",
+                },
+            )
+        except ProxySharedSecretUnconfiguredError as exc:
+            return enveloped_failure(
+                str(exc),
+                code=ToolResultCode.PERMISSION_DENIED,
+                data={
+                    "service": service,
+                    "method": method,
+                    "readiness": "needs_proxy_secret",
                 },
             )
         except ValueError as exc:
