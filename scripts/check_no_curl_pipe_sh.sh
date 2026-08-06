@@ -9,14 +9,20 @@
 # surfaces (Makefile / .github/) — the scanner matches source text literally.
 # Physical backslash-continuations are joined before matching so
 # ``curl … \\`` / ``| sh`` cannot evade a line-oriented scan.
+#
+# Every regular file under ``.github/`` is considered (not an extension allowlist);
+# binaries (NUL in the first 8KiB) are skipped by content. Override the scan root
+# with ``SEVN_CURL_PIPE_SCAN_ROOT`` for tests.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+scan_root="${SEVN_CURL_PIPE_SCAN_ROOT:-${repo_root}}"
 
 offenders=()
 
 # Collapse backslash-newline continuations, then match with a Python regex that
 # mirrors W9.5 (any chars up to the pipe — quotes, $(), newlines after join).
+# Exit 0 = match (offender), 1 = clean/skip, 2 = unreadable.
 _file_matches_pipe_sh() {
   local path="$1"
   python3 - "$path" <<'PY'
@@ -25,19 +31,32 @@ import sys
 from pathlib import Path
 
 path = Path(sys.argv[1])
+try:
+    raw = path.read_bytes()
+except OSError as exc:
+    print(f"check_no_curl_pipe_sh: cannot read {path}: {exc}", file=sys.stderr)
+    sys.exit(2)
+# Skip binaries by content — extension allowlists miss install.bash / extensionless helpers.
+if b"\0" in raw[:8192]:
+    sys.exit(1)
+text = raw.decode("utf-8", errors="replace")
 pattern = re.compile(
     r"(?:curl|wget)\b[^|]*\|\s*(?:sudo\s+)?(?:ba)?sh\b",
     re.IGNORECASE,
 )
-logical = re.sub(r"\\\r?\n", "", path.read_text(encoding="utf-8", errors="replace"))
+logical = re.sub(r"\\\r?\n", "", text)
 sys.exit(0 if pattern.search(logical) else 1)
 PY
 }
 
 _scan_file() {
   local path="$1"
-  if _file_matches_pipe_sh "${path}"; then
-    offenders+=("${path#"${repo_root}"/}")
+  local rc=0
+  _file_matches_pipe_sh "${path}" || rc=$?
+  if ((rc == 0)); then
+    offenders+=("${path#"${scan_root}"/}")
+  elif ((rc == 2)); then
+    exit 2
   fi
 }
 
@@ -54,13 +73,14 @@ sys.exit(0 if pattern.search(logical) else 1)
 ' "${text}"
 }
 
-_scan_file "${repo_root}/Makefile"
-while IFS= read -r -d '' path; do
-  _scan_file "${path}"
-done < <(
-  find "${repo_root}/.github" \( -name '*.yml' -o -name '*.yaml' -o -name '*.sh' -o -name '*.md' -o -name 'Makefile' \) \
-    -type f -print0 2>/dev/null
-)
+_scan_file "${scan_root}/Makefile"
+if [[ -d "${scan_root}/.github" ]]; then
+  while IFS= read -r -d '' path; do
+    _scan_file "${path}"
+  done < <(
+    find "${scan_root}/.github" -type f -print0 2>/dev/null
+  )
+fi
 
 # Self-test: the gate must reject common pipe-to-shell spellings (including ones
 # that bypass a URL-charset-only pattern or a physical-line-only grep).

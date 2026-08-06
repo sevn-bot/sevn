@@ -133,17 +133,18 @@ def _ensure_uv_makefile_block() -> str:
 
 def _iter_github_and_makefile_texts() -> list[tuple[Path, str]]:
     texts: list[tuple[Path, str]] = [(_MAKEFILE, _MAKEFILE.read_text(encoding="utf-8"))]
-    allowed_suffixes = {".yml", ".yaml", ".sh", ".md"}
     for path in sorted(_GITHUB_DIR.rglob("*")):
         if not path.is_file():
             continue
-        # Workflows + shell helpers under .github/; skip binary / large blobs.
-        if path.suffix.lower() not in allowed_suffixes and path.name != "Makefile":
-            continue
         try:
-            texts.append((path, path.read_text(encoding="utf-8")))
-        except UnicodeDecodeError:
+            raw = path.read_bytes()
+        except OSError:
             continue
+        # Match scripts/check_no_curl_pipe_sh.sh: skip binaries by content, not
+        # by extension allowlist (install.bash / extensionless helpers).
+        if b"\0" in raw[:8192]:
+            continue
+        texts.append((path, raw.decode("utf-8", errors="replace")))
     return texts
 
 
