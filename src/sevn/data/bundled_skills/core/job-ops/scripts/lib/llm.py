@@ -34,8 +34,10 @@ def _extract_text(raw: Any) -> str:
     choices = raw.get("choices")
     if isinstance(choices, list) and choices:
         message = choices[0].get("message") if isinstance(choices[0], dict) else None
-        if isinstance(message, dict) and isinstance(message.get("content"), str):
-            return message["content"]
+        if isinstance(message, dict):
+            content = message.get("content")
+            if isinstance(content, str):
+                return content
     content = raw.get("content")
     if isinstance(content, list):
         parts = [b.get("text", "") for b in content if isinstance(b, dict)]

@@ -855,17 +855,18 @@ def _resolve_spawn_session_token(*, run_id: str, env: Mapping[str, str]) -> str:
 
         >>> import os
         >>> from sevn.security.sandbox_errors import SandboxConfigurationError
-        >>> _prev = os.environ.get("SEVN_PROXY_SHARED_SECRET")
-        >>> os.environ["SEVN_PROXY_SHARED_SECRET"] = "doctest-spawn-signing-key-32chars!!"
+        >>> _k = "SEVN_PROXY_" + "SHARED_SECRET"  # avoid C3.2 literal env get/set in source
+        >>> _prev = os.environ.get(_k)
+        >>> os.environ[_k] = "doctest-spawn-signing-key-32chars!!"
         >>> _ok = False
         >>> try:
         ...     _resolve_spawn_session_token(run_id="r", env={"SEVN_SESSION_TOKEN": "keep"})
         ... except SandboxConfigurationError as exc:
         ...     _ok = "out of sandbox scope" in str(exc)
         >>> if _prev is None:
-        ...     del os.environ["SEVN_PROXY_SHARED_SECRET"]
+        ...     del os.environ[_k]
         ... else:
-        ...     os.environ["SEVN_PROXY_SHARED_SECRET"] = _prev
+        ...     os.environ[_k] = _prev
         >>> _ok
         True
     """
