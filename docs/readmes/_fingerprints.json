@@ -2,8 +2,8 @@
   "entries": {
     "agent": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-06T12:17:19Z",
-      "digest": "1f33509e0766eb19674e9daa61f3073dcc0f4321950c6537ad0be0355fdd4b10",
+      "computed_at": "2026-08-06T15:06:23Z",
+      "digest": "5563f2f82dee0e53aad5c545d527da20a0cc3cae86acc0a718af1abbe56404d8",
       "source_globs": [
         "src/sevn/agent/**"
       ]
@@ -57,8 +57,8 @@
     },
     "gateway": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-06T13:45:22Z",
-      "digest": "42ee682a2601b8ef0f25558a1ec281e10aa373c18c29b7bbf9d15ff41ca84502",
+      "computed_at": "2026-08-06T15:06:21Z",
+      "digest": "4dd9268c9258fd1b166286403ee25381a688f4f41bdfdfd5605c014d0d40e98a",
       "source_globs": [
         "src/sevn/gateway/**"
       ]
