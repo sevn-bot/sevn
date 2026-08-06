@@ -114,7 +114,7 @@ lifecycle (C12.3 / C13.1 / D45):
 
 | Tag | When it appears | Operator use |
 |-----|-----------------|--------------|
-| `:quarantine-<sha>` | Immediately after build, before Trivy | **Not consumable** — pre-scan only |
+| `:quarantine-<sha>-<run_id>` | Immediately after build, before Trivy | **Not consumable** — pre-scan only (run-scoped) |
 | `:<sha>` | After supply-chain promotes by digest | Prefer this (or `@sha256:…`) |
 | `:vX.Y.Z` | Same promote step on `v*` tag builds | Prefer digest pin in prod |
 | `:latest` | **Not written** from `main` while phase4/5 are stubs | Treat any pre-existing `:latest` as **unverified** |

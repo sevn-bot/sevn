@@ -7,10 +7,10 @@
 # Normative spec: about-sevn.bot/specs/25-cicd-full.md.
 #
 # publish-ghcr: builds sandbox/proxy/gateway images and pushes a quarantine tag
-# only (`:quarantine-<sha>`). Digests are job outputs for container-supply-chain
-# (trivy → cosign → syft → promote SHA / version tags by digest). No consumable
-# tag exists before the scan (C12.3 / D45). `:latest` is not written while
-# phase4/5 are stubs (C13.1).
+# only (`:quarantine-<sha>-<run_id>`). Digests are job outputs for
+# container-supply-chain (trivy → cosign → syft → promote SHA / version tags by
+# digest). No consumable tag exists before the scan (C12.3 / D45). `:latest` is
+# not written while phase4/5 are stubs (C13.1).
 #
 # Trigger → phase mapping (specs/25-cicd-full.md Workflow matrix):
 #   push to main         → phase1 → publish-ghcr → supply-chain
@@ -42,9 +42,11 @@
 #   action's checkout target — that is a runtime concern, not a CI concern.
 #
 # Concurrency:
-#   One workflow-level group keyed on the ref so only one production deploy
-#   can run for a given tag/branch at a time. `cancel-in-progress: false` so
-#   a tag-push deploy is never killed by an overlapping main-push run.
+#   Group by commit SHA so a main push and a v* tag for the same SHA cannot
+#   overlap and fight over quarantine / promotion. `cancel-in-progress: false`
+#   so a tag-push deploy is never killed by an overlapping main-push run.
+#   Quarantine tags are also run-scoped (`quarantine-<sha>-<run_id>`) so failure
+#   cleanup cannot delete another run's package version.
 
 name: CI/CD (artifact publication)
 
@@ -55,7 +57,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: prod-${{ github.ref }}
+  group: prod-publish-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -115,6 +117,8 @@ jobs:
 
       # Quarantine-only push (C12.3 / C13.1 / D45): no SHA, version, or :latest
       # until container-supply-chain promotes by digest after scan → sign.
+      # Tags are run-scoped so overlapping publishes for the same SHA cannot
+      # delete each other's quarantine versions on failure cleanup.
       - name: Build and push sandbox image
         id: sandbox
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -125,7 +129,7 @@ jobs:
           cache-from: type=gha,scope=sandbox
           cache-to: type=gha,mode=max,scope=sandbox
           tags: |
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/sandbox:quarantine-${{ github.sha }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/sandbox:quarantine-${{ github.sha }}-${{ github.run_id }}
 
       - name: Build and push proxy image
         id: proxy
@@ -137,7 +141,7 @@ jobs:
           cache-from: type=gha,scope=proxy
           cache-to: type=gha,mode=max,scope=proxy
           tags: |
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/proxy:quarantine-${{ github.sha }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/proxy:quarantine-${{ github.sha }}-${{ github.run_id }}
 
       - name: Build and push gateway image
         id: gateway
@@ -149,7 +153,7 @@ jobs:
           cache-from: type=gha,scope=gateway
           cache-to: type=gha,mode=max,scope=gateway
           tags: |
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway:quarantine-${{ github.sha }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway:quarantine-${{ github.sha }}-${{ github.run_id }}
 
       - name: Build and push gateway browser image
         id: gateway_browser
@@ -162,7 +166,7 @@ jobs:
           cache-from: type=gha,scope=gateway-browser
           cache-to: type=gha,mode=max,scope=gateway-browser
           tags: |
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.browser:quarantine-${{ github.sha }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.browser:quarantine-${{ github.sha }}-${{ github.run_id }}
 
       - name: Build and push gateway GUI image
         id: gateway_gui
@@ -175,7 +179,20 @@ jobs:
           cache-from: type=gha,scope=gateway-gui
           cache-to: type=gha,mode=max,scope=gateway-gui
           tags: |
-            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.gui:quarantine-${{ github.sha }}
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}/gateway.gui:quarantine-${{ github.sha }}-${{ github.run_id }}
+
+      # Runs inside publish-ghcr so a mid-push failure still cleans partial
+      # quarantine tags (container-supply-chain is skipped when publish fails).
+      - name: Cleanup quarantine tags on failure
+        if: failure() || cancelled()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source scripts/ghcr_quarantine_cleanup.sh
+          delete_quarantine_tags "${IMAGE_REPOSITORY}" "${GITHUB_SHA}" "${GITHUB_RUN_ID}"
 
   container-supply-chain:
     name: Container supply chain (cosign, syft, trivy)
@@ -300,7 +317,7 @@ jobs:
           set -euo pipefail
           # shellcheck disable=SC1091
           source scripts/ghcr_quarantine_cleanup.sh
-          delete_quarantine_tags "${IMAGE_REPOSITORY}" "${GITHUB_SHA}"
+          delete_quarantine_tags "${IMAGE_REPOSITORY}" "${GITHUB_SHA}" "${GITHUB_RUN_ID}"
 
   # Dev deploy/smoke (former phase2/phase3) deleted with needs_impl_ok (D44 / C2.2).
   # Production stubs below remain so tag builds still require honest deploy/test success (C2.3).

@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Delete GHCR package versions that only carry quarantine-* tags for a given SHA.
+# Delete GHCR package versions that only carry quarantine-* tags for a given run.
 #
-# Used by container-supply-chain when the job fails or is cancelled (C12.3 / W11.5)
-# so unscanned quarantine tags do not accumulate. Safe against promoted digests:
-# a version that also carries a SHA or version tag is left alone.
+# Used by publish-ghcr / container-supply-chain when the job fails or is cancelled
+# (C12.3 / W11.5) so unscanned quarantine tags do not accumulate. Safe against
+# promoted digests: a version that also carries a SHA or version tag is left alone.
+#
+# Quarantine tags are run-scoped (`quarantine-<sha>-<run_id>`) so overlapping
+# main / v* publishes for the same commit cannot delete each other's versions.
 #
 # Usage (from Actions, with GH_TOKEN set):
 #   source scripts/ghcr_quarantine_cleanup.sh
-#   delete_quarantine_tags "<owner/repo>" "<github.sha>"
+#   delete_quarantine_tags "<owner/repo>" "<github.sha>" "<github.run_id>"
 #
 # SPDX-License-Identifier: MIT
 set -euo pipefail
@@ -15,10 +18,11 @@ set -euo pipefail
 delete_quarantine_tags() {
   local image_repository="${1:?image_repository (owner/repo) required}"
   local sha="${2:?git sha required}"
+  local run_id="${3:?github run_id required}"
   local owner="${image_repository%%/*}"
   local repo="${image_repository#*/}"
-  local qtag="quarantine-${sha}"
-  local name pkg enc api_base version_id tags
+  local qtag="quarantine-${sha}-${run_id}"
+  local name pkg enc api_base version_id tags versions_tsv
 
   if [[ -z "${GH_TOKEN:-}" && -z "${GITHUB_TOKEN:-}" ]]; then
     echo "ghcr_quarantine_cleanup: GH_TOKEN or GITHUB_TOKEN required" >&2
@@ -39,14 +43,9 @@ delete_quarantine_tags() {
       continue
     fi
 
-    while IFS=$'\t' read -r version_id tags; do
-      [[ -z "${version_id}" ]] && continue
-      echo "Deleting ${pkg} version ${version_id} (tags=${tags})"
-      gh api --method DELETE "${api_base}/versions/${version_id}" >/dev/null
-    done < <(
-      # Do not swallow API errors: a silent skip leaves unscanned quarantine tags
-      # (W11.5). The workflow step uses continue-on-error so cleanup noise cannot
-      # mask the original supply-chain failure.
+    # Capture API output first — process-substitution exit status is not
+    # propagated to the while loop even under set -euo pipefail.
+    versions_tsv="$(
       gh api --paginate "${api_base}/versions" \
         --jq ".[]
           | select(.metadata.container.tags != null)
@@ -54,6 +53,15 @@ delete_quarantine_tags() {
           | select([.metadata.container.tags[] | startswith(\"quarantine-\")] | all)
           | [.id, (.metadata.container.tags | join(\",\"))]
           | @tsv"
-    )
+    )" || {
+      echo "ghcr_quarantine_cleanup: failed to list versions for ${pkg}" >&2
+      return 1
+    }
+
+    while IFS=$'\t' read -r version_id tags; do
+      [[ -z "${version_id}" ]] && continue
+      echo "Deleting ${pkg} version ${version_id} (tags=${tags})"
+      gh api --method DELETE "${api_base}/versions/${version_id}" >/dev/null
+    done <<< "${versions_tsv}"
   done
 }

@@ -7,19 +7,51 @@
 #
 # Note: avoid writing the forbidden pattern as contiguous text in comments on scanned
 # surfaces (Makefile / .github/) — the scanner matches source text literally.
+# Physical backslash-continuations are joined before matching so
+# ``curl … \\`` / ``| sh`` cannot evade a line-oriented scan.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-# Align with W9.5 RED suite: any chars up to the pipe (quotes, $(), etc.), not a
-# narrow URL charset that missed ``curl "…" | sh`` and ``curl $(…) | sh``.
-pattern='(curl|wget)[^|]*\|[[:space:]]*(sudo[[:space:]]+)?(ba)?sh'
 
 offenders=()
+
+# Collapse backslash-newline continuations, then match with a Python regex that
+# mirrors W9.5 (any chars up to the pipe — quotes, $(), newlines after join).
+_file_matches_pipe_sh() {
+  local path="$1"
+  python3 - "$path" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+pattern = re.compile(
+    r"(?:curl|wget)\b[^|]*\|\s*(?:sudo\s+)?(?:ba)?sh\b",
+    re.IGNORECASE,
+)
+logical = re.sub(r"\\\r?\n", "", path.read_text(encoding="utf-8", errors="replace"))
+sys.exit(0 if pattern.search(logical) else 1)
+PY
+}
+
 _scan_file() {
   local path="$1"
-  if grep -nE "${pattern}" "${path}" >/dev/null 2>&1; then
+  if _file_matches_pipe_sh "${path}"; then
     offenders+=("${path#"${repo_root}"/}")
   fi
+}
+
+_text_matches_pipe_sh() {
+  local text="$1"
+  python3 -c '
+import re, sys
+pattern = re.compile(
+    r"(?:curl|wget)\b[^|]*\|\s*(?:sudo\s+)?(?:ba)?sh\b",
+    re.IGNORECASE,
+)
+logical = re.sub(r"\\\r?\n", "", sys.argv[1])
+sys.exit(0 if pattern.search(logical) else 1)
+' "${text}"
 }
 
 _scan_file "${repo_root}/Makefile"
@@ -31,15 +63,16 @@ done < <(
 )
 
 # Self-test: the gate must reject common pipe-to-shell spellings (including ones
-# that bypass a URL-charset-only pattern).
+# that bypass a URL-charset-only pattern or a physical-line-only grep).
 _self_test_samples=(
   $'curl -LsSf https://example.invalid/install.sh | sh\n'
   $'curl -LsSf "https://example.invalid/install.sh" | sh\n'
   $'curl -fsSL $(echo https://example.invalid/install.sh) | bash\n'
   $'wget -qO- https://example.invalid/install.sh | sudo sh\n'
+  $'curl -LsSf https://example.invalid/install.sh \\\n| sh\n'
 )
 for _sample in "${_self_test_samples[@]}"; do
-  if ! printf '%s' "${_sample}" | grep -nE "${pattern}" >/dev/null 2>&1; then
+  if ! _text_matches_pipe_sh "${_sample}"; then
     echo "check_no_curl_pipe_sh: self-test failed — pattern missed:" >&2
     printf '  %q\n' "${_sample}" >&2
     exit 1

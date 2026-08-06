@@ -30,7 +30,7 @@ _MAKEFILE = _REPO_ROOT / "Makefile"
 _GITHUB_DIR = _REPO_ROOT / ".github"
 
 _CURL_PIPE_SH_RE = re.compile(
-    r"(?:curl|wget)\b[^\n|]*\|\s*(?:sudo\s+)?(?:ba)?sh\b",
+    r"(?:curl|wget)\b[^|]*\|\s*(?:sudo\s+)?(?:ba)?sh\b",
     re.IGNORECASE,
 )
 _SHA_PINNED_ACTION_RE = re.compile(r"@[0-9a-f]{40}\b", re.IGNORECASE)
@@ -42,12 +42,22 @@ _UV_VERSION_PIN_RE = re.compile(
     r"(UV_VERSION\s*[:=]|astral\.sh/uv/(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*))",
     re.IGNORECASE,
 )
-_QUARANTINE_TAG_RE = re.compile(r"quarantine", re.IGNORECASE)
+_QUARANTINE_TAG_RE = re.compile(
+    r"quarantine-\$\{\{\s*github\.sha\s*\}\}-\$\{\{\s*github\.run_id\s*\}\}",
+    re.IGNORECASE,
+)
 _LATEST_TAG_RE = re.compile(r":latest\b")
 _DIGEST_PROMOTE_RE = re.compile(
     r"(crane\s+copy|docker\s+buildx\s+imagetools|cosign\s+copy|skopeo\s+copy|"
     r"retag|promote\s+.*digest|by\s+digest)",
     re.IGNORECASE,
+)
+_RUN_SCOPED_QUARANTINE_RE = re.compile(
+    r"quarantine-\$\{\{\s*github\.sha\s*\}\}-\$\{\{\s*github\.run_id\s*\}\}"
+)
+_CLEANUP_CALL_RE = re.compile(
+    r"delete_quarantine_tags\s+\"\$\{IMAGE_REPOSITORY\}\"\s+"
+    r"\"\$\{GITHUB_SHA\}\"\s+\"\$\{GITHUB_RUN_ID\}\""
 )
 
 _IMAGE_BUILD_STEP_IDS = (
@@ -137,6 +147,24 @@ def _iter_github_and_makefile_texts() -> list[tuple[Path, str]]:
     return texts
 
 
+def _logical_shell_text(text: str) -> str:
+    """Join backslash-newline continuations the same way the C11.3 gate does."""
+    return re.sub(r"\\\r?\n", "", text)
+
+
+def _cleanup_steps_for_job(job_key: str) -> list[dict[str, Any]]:
+    job = _load_ci_cd_workflow()["jobs"][job_key]
+    assert isinstance(job, dict)
+    found: list[dict[str, Any]] = []
+    for step in job.get("steps", []) or []:
+        if not isinstance(step, dict):
+            continue
+        name = str(step.get("name", ""))
+        if "cleanup quarantine" in name.lower():
+            found.append(step)
+    return found
+
+
 def _install_step(name_substr: str) -> dict[str, Any]:
     steps = _load_ci_cd_workflow()["jobs"]["container-supply-chain"]["steps"]
     for step in steps:
@@ -156,7 +184,7 @@ def _step_is_sha_pinned_action_or_checksum_verified(step: dict[str, Any]) -> boo
     return (
         isinstance(run, str)
         and bool(_CHECKSUM_VERIFY_RE.search(run))
-        and not bool(_CURL_PIPE_SH_RE.search(run))
+        and not bool(_CURL_PIPE_SH_RE.search(_logical_shell_text(run)))
     )
 
 
@@ -233,12 +261,13 @@ def test_publish_ghcr_pushes_quarantine_tags_only() -> None:
     """W9.4 / C12.3 / D45: build-push writes quarantine tags, not consumable stables."""
     blocks = _publish_tag_blocks()
     assert blocks, "publish-ghcr has no build-push tag blocks"
-    bare_sha_re = re.compile(r":\$\{\{\s*github\.sha\s*\}\}")
+    bare_sha_re = re.compile(r":\$\{\{\s*github\.sha\s*\}\}\s*$")
     for step_id, tags in blocks.items():
         tag_lines = [line.strip() for line in tags.splitlines() if line.strip()]
         assert tag_lines, f"{step_id} has empty tags block"
         assert any(_QUARANTINE_TAG_RE.search(line) for line in tag_lines), (
-            f"{step_id} must push a quarantine tag (C12.3 / D45); got:\n{tags}"
+            f"{step_id} must push a run-scoped quarantine tag "
+            f"(quarantine-<sha>-<run_id>; C12.3 / D45); got:\n{tags}"
         )
         for line in tag_lines:
             assert not _LATEST_TAG_RE.search(line), (
@@ -248,6 +277,47 @@ def test_publish_ghcr_pushes_quarantine_tags_only() -> None:
                 raise AssertionError(
                     f"{step_id} still pushes a bare SHA tag before scan: {line!r} (C12.3)"
                 )
+
+
+def test_quarantine_tags_are_run_scoped() -> None:
+    """Quarantine ownership includes run_id so overlapping SHA publishes cannot collide."""
+    blocks = _publish_tag_blocks()
+    assert blocks, "publish-ghcr has no build-push tag blocks"
+    for step_id, tags in blocks.items():
+        assert _RUN_SCOPED_QUARANTINE_RE.search(tags), (
+            f"{step_id} quarantine tag must include github.run_id; got:\n{tags}"
+        )
+
+
+def test_publish_concurrency_is_sha_keyed() -> None:
+    """Serialize main / v* publishes for the same commit (ref-keyed groups overlap)."""
+    concurrency = _load_ci_cd_workflow().get("concurrency")
+    assert isinstance(concurrency, dict), "ci-cd.yml concurrency missing"
+    group = concurrency.get("group")
+    assert isinstance(group, str), f"concurrency.group missing; got {group!r}"
+    assert "github.sha" in group, (
+        f"concurrency.group must key on github.sha to serialize same-SHA publishes; got {group!r}"
+    )
+    assert concurrency.get("cancel-in-progress") is False
+
+
+def test_quarantine_cleanup_runs_on_publish_and_supply_chain_failure() -> None:
+    """Partial publish failures must clean quarantine even when supply-chain is skipped."""
+    for job_key in ("publish-ghcr", "container-supply-chain"):
+        steps = _cleanup_steps_for_job(job_key)
+        assert steps, f"{job_key} missing Cleanup quarantine tags on failure step"
+        step = steps[0]
+        when = step.get("if")
+        assert isinstance(when, str), f"{job_key} cleanup missing if=; got {when!r}"
+        assert "failure()" in when or "cancelled()" in when, (
+            f"{job_key} cleanup must run on failure/cancel; if={when!r}"
+        )
+        run = step.get("run")
+        assert isinstance(run, str), f"{job_key} cleanup missing run script"
+        assert "delete_quarantine_tags" in run, f"{job_key} cleanup missing delete call"
+        assert _CLEANUP_CALL_RE.search(run), (
+            f"{job_key} cleanup must call delete_quarantine_tags with sha + run_id; got:\n{run}"
+        )
 
 
 def test_stable_tags_promoted_by_digest_after_scan() -> None:
@@ -280,10 +350,27 @@ def test_no_curl_pipe_sh_under_github_or_makefile() -> None:
     """W9.5 / C11.3: ``curl|sh`` / ``wget|sh`` must not appear in release installers."""
     offenders: list[str] = []
     for path, text in _iter_github_and_makefile_texts():
-        if _CURL_PIPE_SH_RE.search(text):
+        if _CURL_PIPE_SH_RE.search(_logical_shell_text(text)):
             offenders.append(str(path.relative_to(_REPO_ROOT)))
     assert offenders == [], (
         "curl|sh / wget|sh still present in: " + ", ".join(offenders) + " (C11.3)"
+    )
+
+
+def test_curl_pipe_gate_catches_backslash_continuations() -> None:
+    """C11.3 gate must reject curl … \\ / | sh split across physical lines."""
+    sample = "curl -LsSf https://example.invalid/install.sh \\\n| sh\n"
+    assert _CURL_PIPE_SH_RE.search(_logical_shell_text(sample)), (
+        "logical-line join must expose backslash-continued curl|sh"
+    )
+    # Line-oriented grep (one physical line at a time) never sees curl and | sh
+    # together when they are split by a backslash continuation.
+    physical_line_re = re.compile(
+        r"(?:curl|wget)\b[^\n|]*\|\s*(?:sudo\s+)?(?:ba)?sh\b",
+        re.IGNORECASE,
+    )
+    assert not any(physical_line_re.search(line) for line in sample.splitlines()), (
+        "sanity: per-physical-line scan must miss the continuation spelling"
     )
 
 
@@ -302,7 +389,7 @@ def test_syft_and_trivy_install_via_pinned_action_or_checksum() -> None:
         )
         run = step.get("run")
         if isinstance(run, str):
-            assert not _CURL_PIPE_SH_RE.search(run), (
+            assert not _CURL_PIPE_SH_RE.search(_logical_shell_text(run)), (
                 f"{tool} install still pipes curl/wget to sh (C11.1)"
             )
 
@@ -310,7 +397,7 @@ def test_syft_and_trivy_install_via_pinned_action_or_checksum() -> None:
 def test_uv_installer_is_version_pinned_and_checksum_verified() -> None:
     """W9.6 / C11.2 / D47: ``make ensure-uv`` must pin and verify before execution."""
     block = _ensure_uv_makefile_block()
-    assert not _CURL_PIPE_SH_RE.search(block), (
+    assert not _CURL_PIPE_SH_RE.search(_logical_shell_text(block)), (
         "ensure-uv still uses curl|sh without pin+verify (C11.2 / D47)"
     )
     assert _UV_VERSION_PIN_RE.search(block), "ensure-uv must pin a uv version (C11.2 / D47)"
@@ -322,7 +409,7 @@ def test_uv_installer_is_version_pinned_and_checksum_verified() -> None:
     installer = _REPO_ROOT / "scripts" / "install_uv_verified.sh"
     assert installer.is_file(), "scripts/install_uv_verified.sh missing (C11.2 / D47)"
     installer_text = installer.read_text(encoding="utf-8")
-    assert not _CURL_PIPE_SH_RE.search(installer_text), (
+    assert not _CURL_PIPE_SH_RE.search(_logical_shell_text(installer_text)), (
         "install_uv_verified.sh must not pipe curl/wget to sh (C11.2)"
     )
     assert re.search(r"\b(sha256sum|shasum)\b", installer_text), (

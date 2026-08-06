@@ -15,12 +15,14 @@ are cut into a dated, versioned section at release time.
 - [2026-08-04] Pre-commit blocks commits from the primary checkout unless `SEVN_ALLOW_PRIMARY_COMMIT=1`; `make check-git-guards` asserts `git` resolves to repo `bin/git` without direnv (D1 primary-checkout guard)
 
 ### Changed
+- [2026-08-06] GHCR quarantine tags are run-scoped (`quarantine-<sha>-<run_id>`) and publication concurrency keys on the commit SHA so overlapping `main` / `v*` publishes cannot delete each other's pre-scan images
 - [2026-08-05] GHCR publish pushes quarantine tags only; Trivy→cosign then promotes SHA (and version) tags by digest; `:latest` is not written from `main` while deploy stubs remain (C12.3, C13.1, C13.2)
 - [2026-08-05] CI/CD required check renamed to **Artifact publication gate (required)**; Dev deploy/smoke stubs and the `failure`-as-OK escape hatch removed so a green gate means GHCR publication + supply-chain only (C2.1, C2.2)
 - [2026-08-05] **Breaking:** Mission Control `local_open` on loopback now requires the boot-written `local_token` query parameter — tokenless loopback no longer grants owner session claims; set `dashboard.local_open_trust_address: true` to restore address-only trust (#169, post-audit Batch E)
 - [2026-08-05] CLI dashboard reads (`sevn models`, `sevn agent config`, `sevn channels status`, and related commands) append the boot `local_token` when calling loopback Mission Control with effective local-open (#169, post-audit Batch E W18)
 
 ### Security
+- [2026-08-06] Failed or cancelled GHCR publishes clean their own quarantine tags (not only supply-chain failures); quarantine cleanup fails closed when the GHCR version list errors; `make check-no-curl-pipe-sh` also rejects backslash-continued `curl|sh` spellings
 - [2026-08-05] Release tooling installers are pinned and verified: syft/trivy via SHA-pinned Actions, `make ensure-uv` verifies a pinned GitHub release against **in-repo** `UV_SHA256_*` pins, and `make check-no-curl-pipe-sh` rejects downloader-piped-to-shell patterns (including quoted/`$()` forms) under `.github/` and the Makefile (C11.1, C11.2, C11.3)
 - [2026-08-04] Bump `cryptography` to 50.0.0 (CVE-2026-69247, CVE-2026-69248, CVE-2026-69249)
 - [2026-08-03] `GET /capabilities` and `sevn capabilities` document OpenAI-compat limits (`streaming`, `usage_reporting`, `tool_messages`) alongside channel inventory (#151, release-audit C-Thermos)

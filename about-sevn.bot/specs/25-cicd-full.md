@@ -649,14 +649,17 @@ green when publication succeeds. No required-check path classifies ``failure`` a
 ## Amendments (prod-readiness-0.0.1 W11 — append-only)
 
 Quarantine → scan → sign → promote by digest (**C12.3**, **C13.1**, **C13.2**, plan
-**D45**). ``publish-ghcr`` pushes only ``:quarantine-<sha>``. ``container-supply-chain``
-keeps Trivy ``--exit-code 1`` before ``cosign sign``, then promotes SHA (and ``:v*``
-on tag builds) with ``docker buildx imagetools create`` **by digest**. ``:latest`` is
-not written from ``main`` while phase4/5 are stubs; pre-existing ``:latest`` is
-unverified. Operator default is a digest pin — Batch B owns ``DEFAULT_SANDBOX_IMAGE``
-(D42); this batch documents the coupling in ``docker/README.md`` rather than adding a
-second constant. Failed/cancelled supply-chain runs delete quarantine-only package
-versions via ``scripts/ghcr_quarantine_cleanup.sh``.
+**D45**). ``publish-ghcr`` pushes only ``:quarantine-<sha>-<run_id>`` (run-scoped so
+overlapping ``main`` / ``v*`` publishes for the same commit cannot delete each
+other's versions). Workflow concurrency is keyed on ``github.sha``.
+``container-supply-chain`` keeps Trivy ``--exit-code 1`` before ``cosign sign``,
+then promotes SHA (and ``:v*`` on tag builds) with ``docker buildx imagetools create``
+**by digest**. ``:latest`` is not written from ``main`` while phase4/5 are stubs;
+pre-existing ``:latest`` is unverified. Operator default is a digest pin — Batch B
+owns ``DEFAULT_SANDBOX_IMAGE`` (D42); this batch documents the coupling in
+``docker/README.md`` rather than adding a second constant. Failed/cancelled
+``publish-ghcr`` and ``container-supply-chain`` runs delete that run's
+quarantine-only package versions via ``scripts/ghcr_quarantine_cleanup.sh``.
 
 ## Amendments (prod-readiness-0.0.1 W12 — append-only)
 
@@ -675,6 +678,7 @@ both SHA-pinned like cosign. CLI versions remain ``syft v1.18.1`` and
 
 Hardened W12 installers after review: ``install_uv_verified.sh`` compares the
 archive to **in-repo** ``UV_SHA256_*`` pins (release ``sha256.sum`` alone is TOFU);
-``check_no_curl_pipe_sh.sh`` uses the W9.5 ``[^|]*`` charset so quoted URLs and
-``$()`` forms cannot bypass the gate; quarantine cleanup no longer swallows GHCR
-API errors with ``|| true``.
+``check_no_curl_pipe_sh.sh`` joins backslash-newline continuations and uses the
+W9.5 ``[^|]*`` charset so quoted URLs, ``$()`` forms, and
+``curl … \\`` / ``| sh`` cannot bypass the gate; quarantine cleanup captures
+``gh api`` output before the delete loop so a failed list call fails closed.
