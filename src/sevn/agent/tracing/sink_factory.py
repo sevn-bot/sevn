@@ -26,7 +26,11 @@ from sevn.agent.tracing.redacting_sink import RedactingSink, TraceRedactionPolic
 from sevn.agent.tracing.rotating_jsonl_sink import RotatingJSONLFileSink
 from sevn.agent.tracing.sink import JSONLFileSink, NullTraceSink, TraceSink
 from sevn.agent.tracing.sqlite_sink import SQLiteSink
-from sevn.agent.tracing.trace_event_bridge import TraceEventOtelBridge, set_trace_event_bridge
+from sevn.agent.tracing.trace_event_bridge import (
+    TraceEventOtelBridge,
+    TraceExportFilter,
+    set_trace_event_bridge,
+)
 from sevn.agent.tracing.trace_secrets_resolve import resolve_trace_sink_token
 from sevn.storage.paths import traces_sqlite_path
 
@@ -73,6 +77,25 @@ def _trace_redaction_policy(workspace: WorkspaceConfig) -> TraceRedactionPolicy:
         deny_value_patterns=tuple(redaction.deny_value_patterns),
         _compiled_patterns=(),
     )
+
+
+def _trace_export_filter(workspace: WorkspaceConfig) -> TraceExportFilter:
+    """Resolve ``tracing.export.exclude_kinds`` with shipped defaults when omitted.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed ``sevn.json`` workspace model.
+    Returns:
+        TraceExportFilter: Kind filter applied to the remote bridge only.
+    Examples:
+        >>> from sevn.config.workspace_config import WorkspaceConfig
+        >>> _trace_export_filter(WorkspaceConfig.minimal()).exclude_kinds
+        ('snapshot.checkpoint',)
+    """
+    tracing = workspace.tracing
+    export = tracing.export if tracing is not None else None
+    if export is None:
+        return TraceExportFilter()
+    return TraceExportFilter.from_kinds(export.exclude_kinds)
 
 
 def _wrap_with_redaction(sink: TraceSink, policy: TraceRedactionPolicy) -> TraceSink:
@@ -124,6 +147,8 @@ def build_gateway_trace_sink(
     ``NullTraceSink``.
     When ``tracing.redaction.enabled`` (default true), the composite sink is
     wrapped in ``RedactingSink`` so fan-out members share one redacted payload.
+    ``tracing.export.exclude_kinds`` narrows the remote bridge only — local sqlite
+    and JSONL sinks always receive the full event stream.
     SQLite paths default to ``traces_sqlite_path(layout.dot_sevn)`` when no
     ``path`` is set; optional ``path`` is resolved relative to ``content_root``.
     JSONL directory paths (trailing ``/`` or ``\\``) use ``RotatingJSONLFileSink``
@@ -146,7 +171,7 @@ def build_gateway_trace_sink(
         set_trace_event_bridge(None)
         return NullTraceSink()
 
-    bridge = TraceEventOtelBridge()
+    bridge = TraceEventOtelBridge(export_filter=_trace_export_filter(workspace))
     set_trace_event_bridge(bridge)
 
     local_sinks: list[TraceSink] = []

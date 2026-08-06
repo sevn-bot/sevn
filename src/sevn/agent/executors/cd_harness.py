@@ -464,7 +464,9 @@ async def _transport_complete_json(
 
     t = cast("Transport", transport)
     vendor = getattr(t, "name", "unknown")
-    provider_kind = f"provider.{vendor}.{model_id}"
+    # ``model_id`` rides in ``provider_attrs`` below — keeping it out of the kind
+    # bounds OTel span-name cardinality (see tier_b_model for the same rule).
+    provider_kind = f"provider.{vendor}"
     span_id = str(uuid.uuid4())
     start_ns = time_ns()
     provider_attrs: dict[str, object] = {

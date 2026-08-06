@@ -15,6 +15,7 @@ from sevn.tracing.otel_pipeline import (
     is_otel_export_configured,
     reset_otel_pipeline_for_tests,
     resolve_otlp_targets,
+    scrubbing_options,
 )
 
 __all__ = [
@@ -27,4 +28,5 @@ __all__ = [
     "is_otel_export_configured",
     "reset_otel_pipeline_for_tests",
     "resolve_otlp_targets",
+    "scrubbing_options",
 ]

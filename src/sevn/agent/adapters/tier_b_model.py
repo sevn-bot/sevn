@@ -2718,7 +2718,10 @@ def build_tier_b_function_model(
         agent, model_id, wire, content_root=content_root, seed=seed
     )
 
-    provider_kind = f"provider.{wire}.{model_id}"
+    # Model id stays an attribute, not part of the kind: the kind becomes the OTel
+    # span name, and interpolating a catalog id there gives unbounded span-name
+    # cardinality that breaks grouping in the trace backend.
+    provider_kind = f"provider.{wire}"
 
     def _effective_allowed() -> frozenset[str]:
         if allowed_tool_names is None:

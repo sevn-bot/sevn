@@ -8,7 +8,7 @@ summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / sa
   (when routed through the execution sandbox), process when configured for sandbox
   routing, and skill subprocesses spawned b
 last_updated: '2026-08-06'
-fingerprint: sha256:45ded6a88155f1cc887a0b8fa6436d1aefb0ae917b34cfd117b9ce48a9b94a73
+fingerprint: sha256:8fcad4b0e8f8f640e49e7b936c3b58fb5d91e3ab3ab0cf18cb0a1f4cdde484fa
 related: []
 sources:
 - src/sevn/security/**
@@ -385,6 +385,9 @@ interfaces:
 - name: redact_telegram_bot_token
   file: src/sevn/security/trigger_spawn_env.py
   symbol: redact_telegram_bot_token
+- name: redact_telegram_bot_url
+  file: src/sevn/security/trigger_spawn_env.py
+  symbol: redact_telegram_bot_url
 ---
 
 ## Purpose

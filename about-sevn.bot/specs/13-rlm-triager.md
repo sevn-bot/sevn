@@ -8,7 +8,7 @@ summary: 'The Triager is the routing brain (prd-04-getting-things-done §5.1–�
   a single, tool-less outbound generation step that emits validated TriageResult consumed
   by tier dispatch (A / B / C / D), MCP e'
 last_updated: '2026-08-06'
-fingerprint: sha256:5563f2f82dee0e53aad5c545d527da20a0cc3cae86acc0a718af1abbe56404d8
+fingerprint: sha256:3648c6c2fe8b81deee665e04693874f8f107c1e4c38932f89449fdf8afaf26ea
 related: []
 sources:
 - src/sevn/agent/**
@@ -1187,6 +1187,9 @@ interfaces:
 - name: TraceEventOtelBridge
   file: src/sevn/agent/tracing/trace_event_bridge.py
   symbol: TraceEventOtelBridge
+- name: TraceExportFilter
+  file: src/sevn/agent/tracing/trace_event_bridge.py
+  symbol: TraceExportFilter
 - name: attach_turn_trace_context
   file: src/sevn/agent/tracing/trace_event_bridge.py
   symbol: attach_turn_trace_context
