@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver the merge + validation + promotion pipeline every setup path shares
   so sevn.json stays the single source of truth (prd-06-setup-and-operations §5.4,
   spec-02-config-and-workspace): shipped pres'
-last_updated: '2026-08-05'
-fingerprint: sha256:2608f1e11478a72f66990c0223e10d7d462f26defe014db661c4c2811ff368d0
+last_updated: '2026-08-06'
+fingerprint: sha256:c9f9709e793388fa1fd035453890f59ea5adab4b1b84f8e0bb284fe06f353730
 related: []
 sources:
 - src/sevn/onboarding/**

@@ -7,8 +7,8 @@ owner: Alex
 summary: Product pairing (v1). Deployment, paired daemon install, onboarding validation,
   and Mission Control management of the proxy are specified in prd-06-setup-and-operations
   and prd-07-mission-control §5.1
-last_updated: '2026-08-05'
-fingerprint: sha256:3f99a93c0925e204a2cc98174b9dfc729ef71f63a0063d8967b81b67e103fd0e
+last_updated: '2026-08-06'
+fingerprint: sha256:3dbaf8e6cd2499656bcd811566b57cae5fec8d0790b8ad01ca4c7360c026176c
 related: []
 sources:
 - src/sevn/proxy/**
