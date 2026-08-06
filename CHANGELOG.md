@@ -11,6 +11,8 @@ are cut into a dated, versioned section at release time.
 ## [Unreleased]
 
 ### Added
+- [2026-08-06] `make verify-deployment` runs on the daily cron in `ci-supplementary.yml` (tolerates `driver_unavailable`, exit 2 → `::warning`) and on `refs/tags/v*` in `ci-cd.yml` (fails on `driver_unavailable`); captured `evidence/verify/*.json` is uploaded as the `deployment-verification-<sha>` artifact and bundled into the phase6 draft release (prod-readiness C14.1, C14.3, D52, Batch F W23)
+- [2026-08-06] Five new `scripts/verify_deployment.py` drivers registered in `DRIVERS`: `authenticated-proxy-roundtrip` (Batch A C1.2 path), `volume-upgrade` (state survives `compose up`), `browser-gui-boot` (gateway image flips to `Dockerfile.gateway.browser` / `.gui`), `cancellation-cleanup` (cancelled mid-flight spawn leaves no orphans), `sandbox-scoped-token` (Batch E C7.1/C7.2 — `scope=sandbox` accepts `/web/*`, refuses `/llm/*`, service secret still honoured) (prod-readiness C14.2, Batch F W23)
 - [2026-08-05] ``make compose-up`` preflight rejects empty / ``change-me`` / short operator secrets; Compose proxy healthcheck probes authenticated ``GET /web/auth-check`` (keeps ``/healthz`` liveness)
 - [2026-08-05] Stop tracking ``/.cursor`` (agents stay operator-local); add ``docs/cursor-local-setup.md`` and ``docs/templates/cursor/`` for hook and D1 rule bootstrap
 - [2026-08-05] Compose ``sevn-operator-perms`` generates ``/operator/.sevn/proxy-shared-secret`` on first boot; gateway/proxy resolve it when ``SEVN_PROXY_SHARED_SECRET`` is unset (explicit env still wins); host onboarding writes the same path

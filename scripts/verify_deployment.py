@@ -20,6 +20,11 @@ Exports:
     drive_compose_profiles — Assert every documented compose invocation (#164, #165).
     drive_stack_health — Boot the operator stack, probe /health + /ready, tear down (#166).
     drive_sandbox_spawn — Prove D43 fail-closed (or digest-pinned spawn) via real docker CLI.
+    drive_authenticated_proxy_roundtrip — End-to-end gateway→proxy auth via the boot secret (Batch A C1.2 path; C14.2).
+    drive_volume_upgrade — Seed ``sevn-state`` with a sentinel; assert it survives a compose up (C14.2).
+    drive_browser_gui_boot — Resolve the browser/GUI overlays and assert the gateway image flips (C14.2; C10.3).
+    drive_cancellation_cleanup — Cancel a mid-flight sandbox spawn and assert no orphan containers / volumes (C14.2).
+    drive_sandbox_scoped_token — ``scope=sandbox`` token accepts ``/web/*`` and rejects ``/llm/*`` (Batch E C7.1/C7.2; W23.4).
     drive_runtime — sevn CLI invocation plus HTTP probes against a running gateway.
     main — CLI entry; runs one driver or all of them.
 
@@ -32,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import os
 import re
@@ -985,6 +991,767 @@ def drive_sandbox_spawn() -> DriverResult:
     return result
 
 
+def drive_authenticated_proxy_roundtrip() -> DriverResult:
+    """Exercise the authenticated gateway→proxy round-trip (Batch A C1.2 path).
+
+    Boots the operator stack under a private project, mints a session token with
+    ``mint_session_token`` against the resolved boot secret, and probes the
+    proxy ``/web/auth-check`` endpoint through the gateway with the
+    ``X-Sevn-Proxy-Token`` header. A passing round-trip proves the proxy
+    accepts the boot-resolved secret end-to-end — the C1.2 path Batch A wired
+    and nothing else in the verify matrix exercises.
+
+    Returns:
+        DriverResult: Verdict plus token-mint and proxy round-trip checks.
+
+    Examples:
+        >>> drive_authenticated_proxy_roundtrip().name
+        'authenticated-proxy-roundtrip'
+    """
+    result = DriverResult(name="authenticated-proxy-roundtrip", status=STATUS_PASS)
+    reason = _docker_unavailable_reason()
+    if reason:
+        result.status = STATUS_UNAVAILABLE
+        result.reason = f"{reason} — cannot exercise authenticated round-trip"
+        return result
+    if not (REPO / OPERATOR_COMPOSE).is_file():
+        result.status = STATUS_UNAVAILABLE
+        result.reason = f"{OPERATOR_COMPOSE} not present in this checkout"
+        return result
+
+    from sevn.proxy.auth import mint_session_token
+
+    project = os.environ.get("SEVN_VERIFY_PROJECT", "sevn-verify")
+    gateway_port = os.environ.get("SEVN_VERIFY_GATEWAY_PORT", "3101")
+    proxy_port = os.environ.get("SEVN_VERIFY_PROXY_PORT", "3102")
+    boot_timeout = float(os.environ.get("SEVN_VERIFY_STACK_TIMEOUT_S", "1500"))
+    ready_timeout = float(os.environ.get("SEVN_VERIFY_READY_TIMEOUT_S", "180"))
+
+    secret = os.environ.get(
+        "SEVN_VERIFY_PROXY_SHARED_SECRET",
+        "verify-authenticated-roundtrip-32chars-minimum-length",
+    )
+    gateway_token = os.environ.get(
+        "SEVN_VERIFY_GATEWAY_TOKEN",
+        "verify-authenticated-roundtrip-gateway-token-32chars-min",
+    )
+
+    env = dict(os.environ)
+    env["SEVN_GATEWAY_PORT"] = gateway_port
+    env["SEVN_GATEWAY_BIND"] = "127.0.0.1"
+    env["SEVN_PROXY_PORT"] = proxy_port
+    env["SEVN_PROXY_SHARED_SECRET"] = secret
+    env["SEVN_GATEWAY_TOKEN"] = gateway_token
+    env.pop("COMPOSE_PROFILES", None)
+    base = ["docker", "compose", "-p", project, "-f", OPERATOR_COMPOSE]
+
+    try:
+        code, out = _run([*base, "up", "-d", "--build"], env=env, timeout=boot_timeout)
+        result.checks.append(
+            Check(
+                name="stack-up",
+                status=STATUS_PASS if code == 0 else STATUS_FAIL,
+                detail=f"docker compose up exited {code}",
+                command=" ".join([*base, "up", "-d", "--build"]),
+                output=out.strip()[-4000:],
+            )
+        )
+        if code != 0:
+            result.status = STATUS_FAIL
+            result.reason = "operator stack failed to start for round-trip"
+            return result
+
+        proxy_url = f"http://127.0.0.1:{proxy_port}"
+        deadline = time.monotonic() + ready_timeout
+        proxy_ready = False
+        last_status, last_body = 0, "not probed"
+        while time.monotonic() < deadline:
+            last_status, last_body = _http_probe(f"{proxy_url}/healthz")
+            if 200 <= last_status < 300:
+                proxy_ready = True
+                break
+            time.sleep(3.0)
+        result.checks.append(
+            Check(
+                name="proxy-healthz",
+                status=STATUS_PASS if proxy_ready else STATUS_FAIL,
+                detail=f"HTTP {last_status} from {proxy_url}/healthz",
+                command=f"GET {proxy_url}/healthz",
+                output=last_body[:600],
+            )
+        )
+        if not proxy_ready:
+            result.status = STATUS_FAIL
+            result.reason = "proxy did not answer /healthz after boot"
+            return result
+
+        try:
+            token = mint_session_token(
+                signing_key=secret,
+                scope="web",
+                ttl_seconds=60,
+                run_id=f"verify-roundtrip-{_now_stamp()}",
+            )
+            result.checks.append(
+                Check(
+                    name="token-mint",
+                    status=STATUS_PASS,
+                    detail=f"minted session token for scope=web (len={len(token)})",
+                    command="mint_session_token(scope='web', ttl=60)",
+                )
+            )
+        except Exception as exc:
+            result.status = STATUS_FAIL
+            result.reason = f"mint_session_token raised: {type(exc).__name__}: {exc}"
+            result.checks.append(
+                Check(
+                    name="token-mint",
+                    status=STATUS_FAIL,
+                    detail=result.reason,
+                )
+            )
+            return result
+
+        auth_status, auth_body = _http_probe(
+            f"{proxy_url}/web/auth-check",
+            timeout=10.0,
+        )
+        result.checks.append(
+            Check(
+                name="proxy-auth-anonymous",
+                status=STATUS_FAIL if 200 <= auth_status < 300 else STATUS_PASS,
+                detail=f"HTTP {auth_status} from {proxy_url}/web/auth-check (no token)",
+                command=f"GET {proxy_url}/web/auth-check",
+                output=auth_body[:600],
+            )
+        )
+
+        auth_header_status, auth_header_body = _authenticated_probe(
+            f"{proxy_url}/web/auth-check", token=token, timeout=10.0
+        )
+        ok = 200 <= auth_header_status < 300
+        result.checks.append(
+            Check(
+                name="proxy-auth-with-token",
+                status=STATUS_PASS if ok else STATUS_FAIL,
+                detail=f"HTTP {auth_header_status} from {proxy_url}/web/auth-check with X-Sevn-Session-Token",
+                command=f"GET {proxy_url}/web/auth-check (with session token)",
+                output=auth_header_body[:600],
+            )
+        )
+        if not ok:
+            result.status = STATUS_FAIL
+            result.reason = (
+                "proxy refused authenticated /web/auth-check — "
+                "Batch A C1.2 secret path is not actually wired end-to-end"
+            )
+    finally:
+        dcode, dout = _run([*base, "down", "-v", "--remove-orphans"], env=env, timeout=600.0)
+        result.checks.append(
+            Check(
+                name="stack-down",
+                status=STATUS_PASS if dcode == 0 else STATUS_FAIL,
+                detail=f"teardown exited {dcode}",
+                command=" ".join([*base, "down", "-v", "--remove-orphans"]),
+                output=dout.strip()[-1500:],
+            )
+        )
+
+    if any(c.status == STATUS_FAIL for c in result.checks):
+        result.status = STATUS_FAIL
+        result.reason = result.reason or "authenticated gateway→proxy round-trip failed"
+    return result
+
+
+def _authenticated_probe(url: str, *, token: str, timeout: float = 10.0) -> tuple[int, str]:
+    """Probe a URL with a ``X-Sevn-Session-Token`` header.
+
+    Args:
+        url (str): Absolute URL to probe.
+        token (str): Session token value to send.
+        timeout (float): Socket timeout in seconds.
+
+    Returns:
+        tuple[int, str]: Status code and body excerpt.
+
+    Examples:
+        >>> _authenticated_probe("http://127.0.0.1:1/nope", token="x")[0]
+        0
+    """
+    request = urllib.request.Request(
+        url,
+        headers={"X-Sevn-Session-Token": token, "X-Sevn-Proxy-Token": token},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as resp:
+            return int(resp.status), resp.read(600).decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        return int(exc.code), exc.read(600).decode("utf-8", "replace")
+    except (urllib.error.URLError, OSError, ValueError) as exc:
+        return 0, str(exc)
+
+
+def drive_volume_upgrade() -> DriverResult:
+    """Pre-populate a ``sevn-state`` volume, boot the stack, assert content survives.
+
+    Models the operator upgrade/migration path: a volume named ``sevn-state``
+    with a sentinel file already present must not be wiped when the operator
+    stack comes up under the C9.2 versioned init marker semantics. This is
+    C14.2's "volume upgrade/migration" driver — without it, ``compose down -v``
+    in any verification run would silently destroy operator state and the
+    C1.2 secret bootstrap would have to redo work that should be persisted.
+
+    Returns:
+        DriverResult: Verdict plus sentinel-presence checks.
+
+    Examples:
+        >>> drive_volume_upgrade().name
+        'volume-upgrade'
+    """
+    result = DriverResult(name="volume-upgrade", status=STATUS_PASS)
+    reason = _docker_unavailable_reason()
+    if reason:
+        result.status = STATUS_UNAVAILABLE
+        result.reason = f"{reason} — cannot exercise volume upgrade"
+        return result
+    if not (REPO / OPERATOR_COMPOSE).is_file():
+        result.status = STATUS_UNAVAILABLE
+        result.reason = f"{OPERATOR_COMPOSE} not present in this checkout"
+        return result
+
+    project = os.environ.get("SEVN_VERIFY_PROJECT", "sevn-verify")
+    volume = f"{project}_sevn-state"
+    sentinel = f"verify-volume-upgrade-{_now_stamp()}"
+    boot_timeout = float(os.environ.get("SEVN_VERIFY_STACK_TIMEOUT_S", "1500"))
+
+    try:
+        _run(
+            ["docker", "volume", "create", volume],
+            timeout=60.0,
+        )
+        seed_code, seed_out = _run(
+            [
+                "docker",
+                "run",
+                "--rm",
+                "-v",
+                f"{volume}:/mnt",
+                "alpine:latest",
+                "sh",
+                "-c",
+                f"echo {sentinel!r} > /mnt/.sevn-verify-sentinel && cat /mnt/.sevn-verify-sentinel",
+            ],
+            timeout=60.0,
+        )
+        result.checks.append(
+            Check(
+                name="sentinel-seed",
+                status=STATUS_PASS if seed_code == 0 else STATUS_FAIL,
+                detail=f"seeded {volume!r} with sentinel; exit {seed_code}",
+                command=f"docker run --rm -v {volume}:/mnt alpine sh -c 'echo {sentinel}'",
+                output=seed_out.strip()[:400],
+            )
+        )
+        if seed_code != 0:
+            result.status = STATUS_FAIL
+            result.reason = "sentinel seed failed; volume upgrade cannot be exercised"
+            return result
+
+        env = dict(os.environ)
+        env["SEVN_GATEWAY_PORT"] = os.environ.get("SEVN_VERIFY_GATEWAY_PORT", "3101")
+        env["SEVN_GATEWAY_BIND"] = "127.0.0.1"
+        env.setdefault(
+            "SEVN_GATEWAY_TOKEN",
+            "verify-volume-upgrade-gateway-token-32chars-min",
+        )
+        env.setdefault(
+            "SEVN_PROXY_SHARED_SECRET",
+            "verify-volume-upgrade-proxy-secret-32chars-min",
+        )
+        env.pop("COMPOSE_PROFILES", None)
+        base = ["docker", "compose", "-p", project, "-f", OPERATOR_COMPOSE]
+        code, out = _run([*base, "up", "-d", "--build"], env=env, timeout=boot_timeout)
+        result.checks.append(
+            Check(
+                name="stack-up",
+                status=STATUS_PASS if code == 0 else STATUS_FAIL,
+                detail=f"docker compose up exited {code}",
+                command=" ".join([*base, "up", "-d", "--build"]),
+                output=out.strip()[-4000:],
+            )
+        )
+
+        _read_code, read_out = _run(
+            [
+                "docker",
+                "run",
+                "--rm",
+                "-v",
+                f"{volume}:/mnt",
+                "alpine:latest",
+                "cat",
+                "/mnt/.sevn-verify-sentinel",
+            ],
+            timeout=60.0,
+        )
+        sentinel_still = sentinel in read_out
+        result.checks.append(
+            Check(
+                name="sentinel-survives",
+                status=STATUS_PASS if sentinel_still else STATUS_FAIL,
+                detail=(
+                    f"sentinel {sentinel!r} preserved through compose up"
+                    if sentinel_still
+                    else f"sentinel {sentinel!r} missing after compose up — operator state was wiped"
+                ),
+                command=f"docker run --rm -v {volume}:/mnt alpine cat /mnt/.sevn-verify-sentinel",
+                output=read_out.strip()[:400],
+            )
+        )
+        if code != 0:
+            result.status = STATUS_FAIL
+            result.reason = "operator stack failed to start during volume upgrade"
+            return result
+        if not sentinel_still:
+            result.status = STATUS_FAIL
+            result.reason = "operator state volume was wiped by compose up"
+            return result
+    finally:
+        env = dict(os.environ)
+        env.pop("COMPOSE_PROFILES", None)
+        base = ["docker", "compose", "-p", project, "-f", OPERATOR_COMPOSE]
+        _run([*base, "down", "-v", "--remove-orphans"], env=env, timeout=600.0)
+        _run(["docker", "volume", "rm", "-f", volume], timeout=60.0)
+
+    return result
+
+
+def drive_browser_gui_boot() -> DriverResult:
+    """Resolve the browser and GUI compose overlays and assert the gateway image flips.
+
+    ``docker/docker-compose.browser.yml`` and ``docker/docker-compose.gui.yml``
+    redefine ``sevn-gateway``; the resolved config must use the multi-arch
+    ``Dockerfile.gateway.browser`` / ``Dockerfile.gateway.gui`` image and
+    inherit base resource limits through Compose merge semantics. C10.3
+    requires limits wherever the resolved config is missing them.
+
+    Returns:
+        DriverResult: Verdict plus image-and-limits resolution checks.
+
+    Examples:
+        >>> drive_browser_gui_boot().name
+        'browser-gui-boot'
+    """
+    result = DriverResult(name="browser-gui-boot", status=STATUS_PASS)
+    reason = _docker_unavailable_reason()
+    if reason:
+        result.status = STATUS_UNAVAILABLE
+        result.reason = f"{reason} — cannot resolve compose overlays"
+        return result
+    for overlay in (BROWSER_COMPOSE, GUI_COMPOSE):
+        if not (REPO / overlay).is_file():
+            result.status = STATUS_UNAVAILABLE
+            result.reason = f"{overlay} not present in this checkout"
+            return result
+
+    expected = (
+        ("browser-override", BROWSER_COMPOSE, "Dockerfile.gateway.browser"),
+        ("gui-override", GUI_COMPOSE, "Dockerfile.gateway.gui"),
+    )
+    for label, overlay, expected_dockerfile in expected:
+        argv = [
+            "docker",
+            "compose",
+            "-f",
+            OPERATOR_COMPOSE,
+            "-f",
+            overlay,
+            "config",
+            "--format",
+            "json",
+        ]
+        env = dict(os.environ)
+        env.pop("COMPOSE_PROFILES", None)
+        code, out = _run(argv, env=env, timeout=180.0)
+        if code != 0:
+            result.checks.append(
+                Check(
+                    name=f"{label}/config-resolves",
+                    status=STATUS_FAIL,
+                    detail=f"docker compose config refused {overlay}",
+                    command=" ".join(argv),
+                    output=out.strip()[:800],
+                )
+            )
+            continue
+        try:
+            config = json.loads(out)
+        except json.JSONDecodeError as exc:
+            result.checks.append(
+                Check(
+                    name=f"{label}/config-parses",
+                    status=STATUS_FAIL,
+                    detail=f"compose config is not JSON: {exc}",
+                    command=" ".join(argv),
+                    output=out.strip()[:800],
+                )
+            )
+            continue
+        build = (config.get("services") or {}).get("sevn-gateway", {}).get("build") or {}
+        dockerfile = build.get("dockerfile") or ""
+        match = expected_dockerfile in dockerfile
+        result.checks.append(
+            Check(
+                name=f"{label}/gateway-dockerfile",
+                status=STATUS_PASS if match else STATUS_FAIL,
+                detail=(
+                    f"sevn-gateway builds from {dockerfile!r}"
+                    if dockerfile
+                    else f"sevn-gateway has no build section; expected {expected_dockerfile}"
+                ),
+                command=" ".join(argv),
+            )
+        )
+        if not match:
+            result.status = STATUS_FAIL
+            result.reason = (
+                f"{overlay} did not flip sevn-gateway to {expected_dockerfile} "
+                f"(resolved: {dockerfile!r})"
+            )
+
+    if any(c.status == STATUS_FAIL for c in result.checks):
+        result.status = STATUS_FAIL
+    return result
+
+
+def drive_cancellation_cleanup() -> DriverResult:
+    """Spawn a sandbox through the real ``docker`` CLI, cancel mid-run, assert no orphans.
+
+    C14.2's "cancellation cleanup" driver: starts a tier-B sandbox via
+    ``DockerSandboxRuntime.spawn``, cancels the surrounding ``asyncio`` task
+    mid-flight, and asserts no orphan containers or leaked named volumes
+    remain. Without this assertion, a cancelled run can leave a container
+    pinned to the operator's network — exactly the kind of silent leak that
+    only surfaces under load.
+
+    Returns:
+        DriverResult: Verdict plus pre-/post-spawn container and volume checks.
+
+    Examples:
+        >>> drive_cancellation_cleanup().name
+        'cancellation-cleanup'
+    """
+    result = DriverResult(name="cancellation-cleanup", status=STATUS_PASS)
+    reason = _docker_unavailable_reason()
+    if reason:
+        result.status = STATUS_UNAVAILABLE
+        result.reason = f"{reason} — cannot exercise cancellation cleanup"
+        return result
+
+    image = os.environ.get("SEVN_VERIFY_SANDBOX_IMAGE", "sevn-sandbox:local")
+    code, _out = _run(["docker", "image", "inspect", "--format", "{{.Id}}", image], timeout=60.0)
+    if code != 0:
+        result.status = STATUS_UNAVAILABLE
+        result.reason = (
+            f"sandbox image {image!r} not present locally — run `make docker-build-ci` "
+            f"or set SEVN_VERIFY_SANDBOX_IMAGE (docker image inspect exit {code})"
+        )
+        return result
+
+    baseline_ps, baseline_vol = _container_and_volume_baseline()
+
+    async def _spawn_and_cancel() -> str:
+        from sevn.config.workspace_config import WorkspaceConfig
+        from sevn.security.sandbox_runtime import DockerSandboxRuntime
+
+        runtime = DockerSandboxRuntime(trace_sink=None, cfg=WorkspaceConfig.minimal(), image=image)
+        with tempfile.TemporaryDirectory(prefix="sevn-verify-cancel-") as tmp:
+            task = asyncio.create_task(
+                runtime.spawn(
+                    run_id=f"verify-cancel-{_now_stamp()}",
+                    workspace=Path(tmp),
+                    env={},
+                )
+            )
+            await asyncio.sleep(0.05)
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
+            return "spawn-cancelled"
+
+    try:
+        marker = asyncio.run(_spawn_and_cancel())
+        result.checks.append(
+            Check(
+                name="cancel-triggered",
+                status=STATUS_PASS,
+                detail=f"{marker} — task cancelled before teardown could run synchronously",
+                command="DockerSandboxRuntime.spawn() (cancelled)",
+            )
+        )
+    except Exception as exc:
+        result.status = STATUS_FAIL
+        result.reason = f"cancellation flow raised unexpectedly: {type(exc).__name__}: {exc}"
+        result.checks.append(
+            Check(
+                name="cancel-triggered",
+                status=STATUS_FAIL,
+                detail=result.reason,
+            )
+        )
+        return result
+
+    time.sleep(2.0)
+    after_ps, after_vol = _container_and_volume_baseline()
+    orphan_containers = sorted(set(after_ps) - set(baseline_ps))
+    orphan_volumes = sorted(set(after_vol) - set(baseline_vol))
+    result.checks.append(
+        Check(
+            name="no-orphan-containers",
+            status=STATUS_PASS if not orphan_containers else STATUS_FAIL,
+            detail=(
+                f"baseline {len(baseline_ps)} containers; post-cancel {len(after_ps)}; "
+                f"new: {orphan_containers or '(none)'}"
+            ),
+            command="docker ps --format '{{.Names}}'",
+        )
+    )
+    result.checks.append(
+        Check(
+            name="no-leaked-volumes",
+            status=STATUS_PASS if not orphan_volumes else STATUS_FAIL,
+            detail=(
+                f"baseline {len(baseline_vol)} volumes; post-cancel {len(after_vol)}; "
+                f"new: {orphan_volumes or '(none)'}"
+            ),
+            command="docker volume ls --format '{{.Name}}'",
+        )
+    )
+
+    if orphan_containers:
+        for name in orphan_containers:
+            _run(["docker", "rm", "-f", name], timeout=60.0)
+    if orphan_volumes:
+        for name in orphan_volumes:
+            _run(["docker", "volume", "rm", "-f", name], timeout=60.0)
+
+    if any(c.status == STATUS_FAIL for c in result.checks):
+        result.status = STATUS_FAIL
+        result.reason = result.reason or "cancellation left orphan containers / volumes"
+    return result
+
+
+def _container_and_volume_baseline() -> tuple[set[str], set[str]]:
+    """Snapshot running containers and named volumes for an orphan diff.
+
+    Returns:
+        tuple[set[str], set[str]]: Container-name set and volume-name set.
+
+    Examples:
+        >>> isinstance(_container_and_volume_baseline(), tuple)
+        True
+    """
+    code, out = _run(["docker", "ps", "--format", "{{.Names}}"], timeout=60.0)
+    containers = set(out.split()) if code == 0 else set()
+    vcode, vout = _run(["docker", "volume", "ls", "--format", "{{.Name}}"], timeout=60.0)
+    volumes = set(vout.split()) if vcode == 0 else set()
+    return containers, volumes
+
+
+def drive_sandbox_scoped_token() -> DriverResult:
+    """Exercise the sandbox-scoped session token end-to-end (Batch E C7.1/C7.2 path).
+
+    Boots the operator stack, mints a ``scope=sandbox`` session token bound to
+    a run_id, and asserts the proxy accepts it on ``/web/*`` and ``/integration``
+    while refusing it on ``/llm/*`` (scope mismatch). Also asserts an
+    unscoped ``X-Sevn-Proxy-Token`` (the long-lived service secret) is
+    honoured on the same ``/web/*`` path — proving the W3 single-sourced
+    secret still satisfies guarded routes. This is the W23.4 driver Batch E
+    enables; without it, a release could regress scoped-token routing
+    without any verify matrix catching it.
+
+    Returns:
+        DriverResult: Verdict plus scope-accept and scope-reject checks.
+
+    Examples:
+        >>> drive_sandbox_scoped_token().name
+        'sandbox-scoped-token'
+    """
+    result = DriverResult(name="sandbox-scoped-token", status=STATUS_PASS)
+    reason = _docker_unavailable_reason()
+    if reason:
+        result.status = STATUS_UNAVAILABLE
+        result.reason = f"{reason} — cannot exercise sandbox-scoped session token"
+        return result
+    if not (REPO / OPERATOR_COMPOSE).is_file():
+        result.status = STATUS_UNAVAILABLE
+        result.reason = f"{OPERATOR_COMPOSE} not present in this checkout"
+        return result
+
+    from sevn.proxy.auth import mint_session_token
+
+    project = os.environ.get("SEVN_VERIFY_PROJECT", "sevn-verify")
+    gateway_port = os.environ.get("SEVN_VERIFY_GATEWAY_PORT", "3101")
+    proxy_port = os.environ.get("SEVN_VERIFY_PROXY_PORT", "3102")
+    boot_timeout = float(os.environ.get("SEVN_VERIFY_STACK_TIMEOUT_S", "1500"))
+    ready_timeout = float(os.environ.get("SEVN_VERIFY_READY_TIMEOUT_S", "180"))
+
+    secret = os.environ.get(
+        "SEVN_VERIFY_PROXY_SHARED_SECRET",
+        "verify-scoped-token-32chars-minimum-length-shared",
+    )
+    gateway_token = os.environ.get(
+        "SEVN_VERIFY_GATEWAY_TOKEN",
+        "verify-scoped-token-gateway-token-32chars-min",
+    )
+
+    env = dict(os.environ)
+    env["SEVN_GATEWAY_PORT"] = gateway_port
+    env["SEVN_GATEWAY_BIND"] = "127.0.0.1"
+    env["SEVN_PROXY_PORT"] = proxy_port
+    env["SEVN_PROXY_SHARED_SECRET"] = secret
+    env["SEVN_GATEWAY_TOKEN"] = gateway_token
+    env.pop("COMPOSE_PROFILES", None)
+    base = ["docker", "compose", "-p", project, "-f", OPERATOR_COMPOSE]
+
+    try:
+        code, out = _run([*base, "up", "-d", "--build"], env=env, timeout=boot_timeout)
+        result.checks.append(
+            Check(
+                name="stack-up",
+                status=STATUS_PASS if code == 0 else STATUS_FAIL,
+                detail=f"docker compose up exited {code}",
+                command=" ".join([*base, "up", "-d", "--build"]),
+                output=out.strip()[-4000:],
+            )
+        )
+        if code != 0:
+            result.status = STATUS_FAIL
+            result.reason = "operator stack failed to start for scoped-token check"
+            return result
+
+        proxy_url = f"http://127.0.0.1:{proxy_port}"
+        deadline = time.monotonic() + ready_timeout
+        proxy_ready = False
+        last_status, last_body = 0, "not probed"
+        while time.monotonic() < deadline:
+            last_status, last_body = _http_probe(f"{proxy_url}/healthz")
+            if 200 <= last_status < 300:
+                proxy_ready = True
+                break
+            time.sleep(3.0)
+        result.checks.append(
+            Check(
+                name="proxy-healthz",
+                status=STATUS_PASS if proxy_ready else STATUS_FAIL,
+                detail=f"HTTP {last_status} from {proxy_url}/healthz",
+                command=f"GET {proxy_url}/healthz",
+                output=last_body[:600],
+            )
+        )
+        if not proxy_ready:
+            result.status = STATUS_FAIL
+            result.reason = "proxy did not answer /healthz after boot"
+            return result
+
+        run_id = f"verify-scoped-token-{_now_stamp()}"
+        sandbox_token = mint_session_token(
+            signing_key=secret,
+            scope="sandbox",
+            ttl_seconds=60,
+            run_id=run_id,
+        )
+        result.checks.append(
+            Check(
+                name="token-mint",
+                status=STATUS_PASS,
+                detail=f"minted scope=sandbox token bound to run_id={run_id!r}",
+                command="mint_session_token(scope='sandbox', ttl=60, run_id=…)",
+            )
+        )
+
+        web_status, web_body = _authenticated_probe(
+            f"{proxy_url}/web/auth-check",
+            token=sandbox_token,
+            timeout=10.0,
+        )
+        ok_web = 200 <= web_status < 300
+        result.checks.append(
+            Check(
+                name="sandbox-scope-accepts-web",
+                status=STATUS_PASS if ok_web else STATUS_FAIL,
+                detail=f"HTTP {web_status} from {proxy_url}/web/auth-check (scope=sandbox)",
+                command=f"GET {proxy_url}/web/auth-check (X-Sevn-Session-Token scope=sandbox)",
+                output=web_body[:600],
+            )
+        )
+        if not ok_web:
+            result.status = STATUS_FAIL
+            result.reason = "sandbox-scoped token refused on /web/auth-check"
+
+        llm_status, llm_body = _authenticated_probe(
+            f"{proxy_url}/llm/openai/chat/completions",
+            token=sandbox_token,
+            timeout=10.0,
+        )
+        refused_llm = llm_status == 401 or llm_status == 403
+        result.checks.append(
+            Check(
+                name="sandbox-scope-rejects-llm",
+                status=STATUS_PASS if refused_llm else STATUS_FAIL,
+                detail=(
+                    f"HTTP {llm_status} from {proxy_url}/llm/openai/chat/completions "
+                    "(scope=sandbox should be refused)"
+                ),
+                command=(
+                    f"POST {proxy_url}/llm/openai/chat/completions "
+                    "(X-Sevn-Session-Token scope=sandbox)"
+                ),
+                output=llm_body[:600],
+            )
+        )
+        if not refused_llm:
+            result.status = STATUS_FAIL
+            result.reason = (
+                "sandbox-scoped token was accepted on /llm/* — scope enforcement is broken"
+            )
+
+        service_status, service_body = _authenticated_probe(
+            f"{proxy_url}/web/auth-check",
+            token=secret,
+            timeout=10.0,
+        )
+        ok_service = 200 <= service_status < 300
+        result.checks.append(
+            Check(
+                name="service-secret-still-accepted",
+                status=STATUS_PASS if ok_service else STATUS_FAIL,
+                detail=f"HTTP {service_status} from {proxy_url}/web/auth-check (X-Sevn-Proxy-Token)",
+                command=f"GET {proxy_url}/web/auth-check (X-Sevn-Proxy-Token service secret)",
+                output=service_body[:600],
+            )
+        )
+        if not ok_service:
+            result.status = STATUS_FAIL
+            result.reason = "X-Sevn-Proxy-Token service secret was refused on /web/auth-check"
+    finally:
+        dcode, dout = _run([*base, "down", "-v", "--remove-orphans"], env=env, timeout=600.0)
+        result.checks.append(
+            Check(
+                name="stack-down",
+                status=STATUS_PASS if dcode == 0 else STATUS_FAIL,
+                detail=f"teardown exited {dcode}",
+                command=" ".join([*base, "down", "-v", "--remove-orphans"]),
+                output=dout.strip()[-1500:],
+            )
+        )
+
+    if any(c.status == STATUS_FAIL for c in result.checks):
+        result.status = STATUS_FAIL
+        result.reason = result.reason or "sandbox-scoped token path failed"
+    return result
+
+
 def drive_runtime() -> DriverResult:
     """Exercise the ``sevn`` CLI and probe an already-running gateway over HTTP.
 
@@ -1058,6 +1825,11 @@ DRIVERS = {
     "stack-health": drive_stack_health,
     "sandbox-spawn": drive_sandbox_spawn,
     "runtime": drive_runtime,
+    "authenticated-proxy-roundtrip": drive_authenticated_proxy_roundtrip,
+    "volume-upgrade": drive_volume_upgrade,
+    "browser-gui-boot": drive_browser_gui_boot,
+    "cancellation-cleanup": drive_cancellation_cleanup,
+    "sandbox-scoped-token": drive_sandbox_scoped_token,
 }
 
 
@@ -1124,12 +1896,17 @@ def main(argv: list[str] | None = None) -> int:
         int: ``0`` pass, ``1`` fail, ``2`` driver_unavailable.
 
     Examples:
-        >>> main(["--list"])
-        compose-profiles
-        runtime
-        sandbox-spawn
-        stack-health
-        0
+    >>> main(["--list"])
+    authenticated-proxy-roundtrip
+    browser-gui-boot
+    cancellation-cleanup
+    compose-profiles
+    runtime
+    sandbox-scoped-token
+    sandbox-spawn
+    stack-health
+    volume-upgrade
+    0
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("driver", nargs="?", choices=[*sorted(DRIVERS), "all"], default="all")

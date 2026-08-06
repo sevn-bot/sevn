@@ -31,6 +31,39 @@ permissions:
   contents: read
 
 jobs:
+  verify-deployment:
+    name: Deployment drivers (tolerates driver_unavailable)
+    # Daily cron + manual dispatch. ``make verify-deployment`` returns exit 2
+    # (``driver_unavailable``) when Docker / a built image / a running gateway
+    # is missing — tolerated here. On the release tag path (ci-cd.yml) the same
+    # driver exits 2 are FAILED because a release that cannot run its own
+    # verification has not been verified (D52, prod-readiness W23.2).
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 5 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: ./.github/actions/bootstrap
+
+      - name: Run deployment drivers (tolerate driver_unavailable)
+        # The harness exits 2 (driver_unavailable) when Docker / sandbox image /
+        # running gateway is missing — that is a *known* state on a fresh cron
+        # runner and must not fail the gate. Real failures (exit 1) still do.
+        run: |
+          set +e
+          make verify-deployment
+          rc=$?
+          set -e
+          if [ "$rc" -eq 1 ]; then
+            echo "::error title=verify-deployment::driver verdict was fail (exit 1)"
+            exit 1
+          fi
+          if [ "$rc" -eq 2 ]; then
+            echo "::warning title=verify-deployment::driver reported driver_unavailable (exit 2) — tolerated on cron"
+            exit 0
+          fi
+          exit 0
+
   security:
     name: Dependency + static security audit (bandit + pip-audit)
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 5 * * *'

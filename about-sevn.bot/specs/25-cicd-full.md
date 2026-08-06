@@ -8,7 +8,7 @@ summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict de
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
 last_updated: '2026-08-06'
-fingerprint: sha256:ab17e742001eb56ca9b0033625968ffc5647c78a8bc52e3a573b10b67598ff61
+fingerprint: sha256:59032772865e076cd7b91a40e22cb81b974319ceaeee93431f70a801d0d27c8c
 related: []
 sources:
 - .github/workflows/**
@@ -464,8 +464,8 @@ Tier↔resume parity is enforced by `tests/infra/test_ci_steps_tier_parity.py` (
 | Workflow | Purpose |
 |----------|---------|
 | `ci.yml` | Main CI (invokes make targets) |
-| `ci-supplementary.yml` | Supplementary checks (daily security audit, advisory `ci-quality` / `ci-quality-coverage`, weekly image rebuild) |
-| `ci-cd.yml` | Container artifact publication + draft release on `v*` tags. Dev deploy/smoke jobs are **absent** (deleted with the `failure`-as-OK escape hatch). Production deploy/test (`phase4`/`phase5`) remain documented stubs that block tag releases. Images push a quarantine tag first; SHA/version tags are promoted **by digest** only after Trivy→cosign (no `:latest` from `main` while stubs remain). Release tooling (cosign / syft / trivy) installs via SHA-pinned Actions; `make ensure-uv` installs a version-pinned, checksum-verified GitHub release (no downloader-piped-to-shell). |
+| `ci-supplementary.yml` | Supplementary checks (daily security audit, advisory `ci-quality` / `ci-quality-coverage`, weekly image rebuild, daily `verify-deployment` that **tolerates** `driver_unavailable` — exit 2 downgrades to a `::warning` and the job still succeeds) |
+| `ci-cd.yml` | Container artifact publication + draft release on `v*` tags. Dev deploy/smoke jobs are **absent** (deleted with the `failure`-as-OK escape hatch). Production deploy/test (`phase4`/`phase5`) remain documented stubs that block tag releases. The `verify-deployment` job runs on `refs/tags/v*` and `workflow_dispatch` and **fails** on `driver_unavailable` (D52, C14.1); captured evidence `evidence/verify/*.json` is uploaded to the `deployment-verification-<sha>` artifact and bundled into the phase6 draft release (C14.3). Images push a quarantine tag first; SHA/version tags are promoted **by digest** only after Trivy→cosign (no `:latest` from `main` while stubs remain). Release tooling (cosign / syft / trivy) installs via SHA-pinned Actions; `make ensure-uv` installs a version-pinned, checksum-verified GitHub release (no downloader-piped-to-shell). |
 | `docker.yml` | Container build validation |
 | `style-guide-pages.yml` | Style guide site |
 
@@ -473,9 +473,9 @@ Tier↔resume parity is enforced by `tests/infra/test_ci_steps_tier_parity.py` (
 
 | Trigger | Jobs that run | Required gate (`delivery-chain` → **Artifact publication gate (required)**) |
 |---------|---------------|-----------------------------------------------------------------------------|
-| `push` to `main` | phase1 → publish-ghcr (quarantine tags) → container-supply-chain (scan→sign→promote SHA by digest); phase4/5/6 **skipped** | Green when publication + supply-chain succeed; skipped deploy/release jobs are OK; **no `:latest`** |
-| `push` tag `v*` | same, then promote version tag by digest → phase4 → phase5 → phase6 | phase4/5 must succeed (stubs currently fail → gate red); draft release only when they succeed |
-| `workflow_dispatch` | Same as tag path for phase4/5 when exercised; phase6 only on a `v*` ref | Stub `failure` fails the gate — no path classifies `failure` as OK |
+| `push` to `main` | phase1 → publish-ghcr (quarantine tags) → container-supply-chain (scan→sign→promote SHA by digest); phase4/5/6 + `verify-deployment` **skipped** | Green when publication + supply-chain succeed; skipped deploy/release/verify jobs are OK; **no `:latest`** |
+| `push` tag `v*` | same, then `verify-deployment` → promote version tag by digest → phase4 → phase5 → phase6 | phase4/5 + `verify-deployment` must succeed (stubs currently fail → gate red; `driver_unavailable` fails → gate red — D52); draft release only when they succeed |
+| `workflow_dispatch` | Same as tag path for phase4/5 + `verify-deployment` when exercised; phase6 only on a `v*` ref | Stub `failure` fails the gate; `driver_unavailable` fails the gate — no path classifies either as OK |
 
 ### Artefacts (GHCR tag lifecycle)
 
@@ -485,6 +485,7 @@ Tier↔resume parity is enforced by `tests/infra/test_ci_steps_tier_parity.py` (
 | `:<sha>` / `:v*` | `container-supply-chain` promote-by-digest step | Written **after** Trivy (`--exit-code 1`) and `cosign sign`. |
 | `:latest` | *(none while phase4/5 stubs)* | Pre-existing registry `:latest` tags are **unverified**. Operator default is a digest pin (Batch B `DEFAULT_SANDBOX_IMAGE` / `rlm.docker_image` — single source of truth; see `docker/README.md`). |
 | `sboms/` artifact | `container-supply-chain` | Trivy JSON/SARIF + SPDX; also attached to draft releases on `v*`. |
+| `deployment-verification-<sha>` artifact | `verify-deployment` (release path) | One JSON per driver under `evidence/verify/`; attached to draft releases on `v*` so "it works" is a downloadable artifact, not just a PR-body assertion (C14.3). |
 
 **Branch-protection expectation:** require the GitHub check named **Artifact publication gate (required)** (workflow job id `delivery-chain`). The previous display name was `Delivery chain gate (required)` — update any branch-protection / ruleset required-check list when this rename lands so the gate is not silently dropped.
 
@@ -535,6 +536,11 @@ Wave agents: mid-wave **`make ci-affected`** only; wave boundary **`make ci`** o
 | Failing Trivy scan | Job red before `cosign sign` and before digest promote — no SHA/version/`latest` tag is written |
 | Advisory quality tier member fails | `make ci-quality` runs every member target (non-short-circuit via `scripts/ci_quality.py`); job red on first failure but log shows all member results |
 | Coverage gate after install-action sync | `make ci-quality-coverage` requires W12 dev-extra preservation; `make coverage` exits 2 when optional `dev` is pruned mid-suite |
+| Deployment driver `fail` on daily cron | `verify-deployment` job in `ci-supplementary.yml` runs `set +e`; harness exit 1 propagates as a job error (real failure) |
+| Deployment driver `driver_unavailable` on daily cron | Tolerated — harness exits 2 and the job step downgrades it to a `::warning` annotation (D52) |
+| Deployment driver `driver_unavailable` on a release tag | `verify-deployment` job in `ci-cd.yml` does **not** tolerate exit 2 — the harness exit 2 fails the job and `delivery-chain` blocks phase6 (D52, C14.1) |
+| Deployment driver passes without running | A green job that skipped the drivers is worse than no job — `verify-deployment` runs `make verify-deployment` directly so every driver must print `VERIFY_OVERALL:` (W23.2) |
+| Release tag without evidence artifact | `evidence/verify/*.json` is uploaded to the `deployment-verification-<sha>` artifact and bundled into the phase6 draft release (C14.3); `if-no-files-found: error` blocks the upload step on missing files |
 
 ## Amendments (telegram-menu-redesign W9)
 
@@ -688,3 +694,47 @@ archive to **in-repo** ``UV_SHA256_*`` pins (release ``sha256.sum`` alone is TOF
 W9.5 ``[^|]*`` charset so quoted URLs, ``$()`` forms, and
 ``curl … \\`` / ``| sh`` cannot bypass the gate; quarantine cleanup captures
 ``gh api`` output before the delete loop so a failed list call fails closed.
+
+## Amendments (prod-readiness-0.0.1 W23 — C14.1, C14.2, C14.3, D52 — append-only)
+
+Dynamic evidence in CI (plan **C14.1**, **C14.2**, **C14.3**, **D52**).
+``make verify-deployment`` runs the ``scripts/verify_deployment.py`` driver
+harness on **two** invocation surfaces with different semantics:
+
+|| Invocation surface | Driver behaviour | Job |
+|---------------------|-------------------|------|
+| Daily cron (``ci-supplementary.yml``) | Real failure (exit 1) propagates as a job error; ``driver_unavailable`` (exit 2) downgrades to a ``::warning`` and the job still succeeds | ``verify-deployment`` |
+| Release tag (``refs/tags/v*`` in ``ci-cd.yml``) | All three non-zero codes (1 fail, 2 driver_unavailable) fail the job; a green job that skipped the drivers is worse than no job | ``verify-deployment`` |
+
+``verify-deployment`` is registered in the ``DRIVERS`` registry of
+``scripts/verify_deployment.py`` and runs as ``make verify-deployment all`` —
+the harness prints ``VERIFY_OVERALL: pass|fail|driver_unavailable (exit 0|1|2)``
+per driver and writes one ``evidence/verify/<driver>-<stamp>.json`` per
+driver. Each driver exits 2 with a documented ``reason`` when its
+preconditions (Docker daemon, sandbox image, running gateway) are absent —
+that is the contract the cron tolerates and the release path refuses.
+
+The release-path job also uploads ``evidence/verify/*.json`` as the
+``deployment-verification-<sha>`` artifact and the phase6 draft release
+bundles those files alongside the SBOM artifacts (C14.3). A green
+``delivery-chain`` required check on a tag build now proves:
+
+1. ``phase1`` (CI gate) succeeded
+2. ``publish-ghcr`` (quarantine tags) succeeded
+3. ``container-supply-chain`` (Trivy → cosign → promote by digest) succeeded
+4. ``phase4`` / ``phase5`` (deploy stubs) succeeded or ``workflow_dispatch``
+   explicitly tolerated the ``failure``
+5. ``verify-deployment`` (D52: real failures AND ``driver_unavailable``) succeeded
+
+The four new drivers register the previously-unexercised paths:
+
+|| Driver | Path exercised |
+|---------|----------------|
+| ``authenticated-proxy-roundtrip`` | C1.2 — boot-resolved shared secret signs a session token and the proxy accepts it on ``/web/auth-check`` |
+| ``volume-upgrade`` | Operator ``sevn-state`` volume survives a ``compose up`` cycle (sentinel file preserved) |
+| ``browser-gui-boot`` | ``docker/docker-compose.browser.yml`` / ``.gui.yml`` redefine ``sevn-gateway``; the resolved build points at ``Dockerfile.gateway.browser`` / ``.gui`` |
+| ``cancellation-cleanup`` | A cancelled mid-flight sandbox spawn leaves no orphan containers or leaked named volumes |
+| ``sandbox-scoped-token`` | Batch E C7.1/C7.2 — ``scope=sandbox`` token accepts ``/web/*`` and is refused on ``/llm/*``; ``X-Sevn-Proxy-Token`` service secret still satisfies guarded routes |
+
+Each new driver reports ``driver_unavailable`` (exit 2) when its preconditions
+are not met; the cron tolerates that, the release path refuses it.

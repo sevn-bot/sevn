@@ -57,8 +57,8 @@
     },
     "gateway": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-06T15:06:21Z",
-      "digest": "4dd9268c9258fd1b166286403ee25381a688f4f41bdfdfd5605c014d0d40e98a",
+      "computed_at": "2026-08-06T18:50:55Z",
+      "digest": "0dacfa4b94e011ea75f5e6b1a4a5607fd98ca1817aaab8a4118103273021d188",
       "source_globs": [
         "src/sevn/gateway/**"
       ]
@@ -218,8 +218,8 @@
     },
     "ui-mission-control": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-07T08:55:44Z",
-      "digest": "0f6bfb3a32a57e4811bf190388b649d0ead6335cd15cac6de28b31d4431f9679",
+      "computed_at": "2026-08-08T16:50:00Z",
+      "digest": "7a5a7f26fc29fd5f00f8f6c7f62f3097bf7c7090fb053bfdc44835dfc5c790e0",
       "source_globs": [
         "src/sevn/ui/**"
       ]

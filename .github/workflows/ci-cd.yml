@@ -14,11 +14,15 @@
 #
 # Trigger → phase mapping (specs/25-cicd-full.md Workflow matrix):
 #   push to main         → phase1 → publish-ghcr → supply-chain
-#                          (phase4/5/6 skipped — Dev deploy/smoke deleted, D44)
-#   push tag 'v*'        → phase1 → publish-ghcr → supply-chain → phase4 → phase5 → phase6
-#                          (Production deploy/test stubs must succeed; phase6 is draft-only)
-#   workflow_dispatch    → phase1 → publish-ghcr → supply-chain → phase4 → phase5
-#                          (+ phase6 when ref is a v* tag; stub failures fail the required gate)
+#                          (phase4/5/6 + verify-deployment skipped — Dev deploy/smoke deleted, D44)
+#   push tag 'v*'        → phase1 → publish-ghcr → supply-chain → verify-deployment
+#                          → phase4 → phase5 → phase6
+#                          (Production deploy/test stubs must succeed; phase6 is draft-only;
+#                           verify-deployment fails on driver_unavailable — D52)
+#   workflow_dispatch    → phase1 → publish-ghcr → supply-chain → verify-deployment
+#                          → phase4 → phase5
+#                          (+ phase6 when ref is a v* tag; stub failures + driver_unavailable
+#                          fail the required gate)
 #
 # Required check (branch protection): job id `delivery-chain`, display name
 # "Artifact publication gate (required)". A green check proves phase1 + GHCR
@@ -326,6 +330,47 @@ jobs:
           path: sboms/
           if-no-files-found: error
 
+  verify-deployment:
+    name: Deployment drivers (fails on driver_unavailable)
+    # Tag-path verification — a release that cannot run its own verification
+    # has not been verified (D52, prod-readiness W23.2). exit 0 pass,
+    # exit 1 fail, exit 2 driver_unavailable — ALL three are surfaced as
+    # job failures on the tag path. Drivers run against the published
+    # container images (no override required); a passing run here is the
+    # C14.1 / C14.2 / C14.3 evidence the release body cites.
+    needs: [phase1, publish-ghcr, container-supply-chain]
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: ./.github/actions/bootstrap
+
+      - name: Run deployment drivers (release path — fail on driver_unavailable)
+        # Exit 0 pass / exit 1 fail / exit 2 driver_unavailable; all three
+        # non-zero codes fail the job here. A green job that skipped the
+        # drivers would be worse than no job, so we let any non-zero exit
+        # propagate.
+        env:
+          IMAGE_REPOSITORY: ${{ needs.publish-ghcr.outputs.image_repository }}
+          SANDBOX_DIGEST: ${{ needs.publish-ghcr.outputs.sandbox_digest }}
+          PROXY_DIGEST: ${{ needs.publish-ghcr.outputs.proxy_digest }}
+          GATEWAY_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_digest }}
+          GATEWAY_BROWSER_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_browser_digest }}
+          GATEWAY_GUI_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_gui_digest }}
+        run: make verify-deployment
+
+      - name: Upload deployment evidence (evidence/verify/*.json)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: deployment-verification-${{ github.sha }}
+          path: evidence/verify/
+          if-no-files-found: error
+
       - name: Cleanup quarantine tags on failure
         if: failure() || cancelled()
         continue-on-error: true
@@ -404,6 +449,12 @@ jobs:
           name: container-supply-chain-${{ github.sha }}
           path: sboms
 
+      - name: Download deployment evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: deployment-verification-${{ github.sha }}
+          path: evidence/verify
+
       - name: Create GitHub Release (tagged build)
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         with:
@@ -411,7 +462,9 @@ jobs:
           name: ${{ github.ref_name }}
           generate_release_notes: true
           draft: true
-          files: sboms/**
+          files: |
+            sboms/**
+            evidence/verify/*.json
           body: |
             **Draft release — no production deploy occurred.**
 
@@ -419,7 +472,10 @@ jobs:
             Container images were published to GHCR; this release is for artifact
             tracking only until deploy phases land.
 
-            Attached: Trivy JSON/SARIF reports and SPDX SBOMs from container-supply-chain.
+            Attached: Trivy JSON/SARIF reports and SPDX SBOMs from container-supply-chain,
+            plus the deployment-verification JSON evidence (compose profiles, stack
+            health, sandbox spawn, runtime, authenticated round-trip, volume upgrade,
+            browser/GUI boot, cancellation cleanup, sandbox scoped-token).
 
   delivery-chain:
     # Branch-protection required check name (C2.1). Job id stays `delivery-chain`
@@ -432,6 +488,7 @@ jobs:
       - phase4
       - phase5
       - phase6
+      - verify-deployment
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -443,12 +500,15 @@ jobs:
           PHASE4: ${{ needs.phase4.result }}
           PHASE5: ${{ needs.phase5.result }}
           PHASE6: ${{ needs.phase6.result }}
+          VERIFY_DEPLOYMENT: ${{ needs.verify-deployment.result }}
         run: |
           set -euo pipefail
           # Accept success or skipped only. A failed needed job fails this gate (P3 / D44).
           # main push: phase4/5/6 are skipped by their `if` → skipped is fine.
           # tag push: phase4/5 must succeed (stubs currently fail → gate red).
           # workflow_dispatch: phase4/5 run as stubs; a failed stub fails this gate.
+          # verify-deployment runs only on tag + dispatch (C14.1, D52) — on a
+          # main push it is skipped, which the `ok` predicate accepts.
           ok() { case "$1" in success|skipped) return 0;; *) return 1;; esac; }
           fail=0
           require() {
@@ -466,4 +526,5 @@ jobs:
           require "phase4" "$PHASE4"
           require "phase5" "$PHASE5"
           require "phase6" "$PHASE6"
+          require "verify-deployment" "$VERIFY_DEPLOYMENT"
           exit "$fail"
