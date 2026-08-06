@@ -4,7 +4,7 @@ Contracts (``about-sevn.bot/specs/25-cicd-full.md``, ``prd/06-setup-and-operatio
 exactly one gateway per documented ``-f`` invocation; no duplicate ``SEVN_GATEWAY_PORT``
 publishers in a resolvable file set; Makefile compose targets resolve to a single-gateway
 file set; operator service hardening (W3 / D24); scoped ``sevn-operator-perms`` chown plus
-versioned init marker (prod-readiness C9.1-C9.3 / W13.1 -> green after W15). Parses compose
+versioned init marker (prod-readiness C9.1-C9.3 / W13.1 — green after W15). Parses compose
 YAML and the Makefile directly - no Docker daemon.
 """
 
@@ -331,10 +331,6 @@ def test_operator_perms_has_no_unconditional_chown() -> None:
     )
 
 
-@pytest.mark.xfail(
-    reason="green after W15: scoped dirs + versioned marker (C9.1/C9.2/C9.3)",
-    strict=False,
-)
 def test_operator_perms_scopes_chown_to_application_owned_dirs() -> None:
     """C9.3 / C9.1: no full-tree ``find /operator``; chown only known application dirs."""
     command = _operator_perms_command_text()
@@ -345,10 +341,6 @@ def test_operator_perms_scopes_chown_to_application_owned_dirs() -> None:
         assert path in command, f"scoped application path {path} missing from sevn-operator-perms"
 
 
-@pytest.mark.xfail(
-    reason="green after W15: scoped dirs + versioned marker (C9.1/C9.2/C9.3)",
-    strict=False,
-)
 def test_operator_perms_writes_versioned_init_marker() -> None:
     """C9.3 / C9.2: permissions init writes/checks ``/operator/.sevn/perms-v1``."""
     command = _operator_perms_command_text()

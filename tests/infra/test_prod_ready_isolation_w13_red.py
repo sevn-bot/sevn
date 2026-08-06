@@ -280,9 +280,6 @@ def test_site_isolation_flag_removed_or_documented() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    reason="green after W15: versioned perms marker gates migration (C9.2)", strict=False
-)
 def test_operator_perms_skips_broad_migration_when_marker_present() -> None:
     """W13.5 / C9.2: init checks the versioned marker before a broad ownership pass."""
     command = _service_command_text(_BASE_COMPOSE, "sevn-operator-perms")
@@ -296,9 +293,6 @@ def test_operator_perms_skips_broad_migration_when_marker_present() -> None:
     )
 
 
-@pytest.mark.xfail(
-    reason="green after W15: sevn-ci-init drops unconditional chown -R (C9.4)", strict=False
-)
 def test_ci_init_has_no_unconditional_chown() -> None:
     """W13.5 / C9.4: ``sevn-ci-init`` must not run unconditional ``chown -R`` on /operator."""
     command = _service_command_text(_CI_COMPOSE, "sevn-ci-init")
@@ -314,7 +308,6 @@ def test_ci_init_has_no_unconditional_chown() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="green after W16: documented Compose version floor (C10.1)", strict=False)
 def test_minimum_docker_compose_version_is_documented() -> None:
     """W13.6 / C10.1: a minimum Docker Compose version is pinned in operator docs/spec."""
     assert _docs_mention_compose_floor(), (
@@ -323,9 +316,6 @@ def test_minimum_docker_compose_version_is_documented() -> None:
     )
 
 
-@pytest.mark.xfail(
-    reason="green after W16: Compose version floor enforced in preflight (C10.1)", strict=False
-)
 def test_compose_preflight_enforces_minimum_version() -> None:
     """W13.6 / C10.1: preflight (check-compose-default or sibling) refuses older clients."""
     assert _preflight_enforces_compose_version(), (
@@ -338,15 +328,22 @@ def test_compose_preflight_enforces_minimum_version() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    reason="green after W16: HostConfig NanoCpus/Memory/PidsLimit check (C10.2)", strict=False
-)
+def _ci_image_present(docker: str, image: str) -> bool:
+    proc = subprocess.run(
+        [docker, "image", "inspect", image],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )  # nosec B603
+    return proc.returncode == 0
+
+
 def test_created_containers_hostconfig_matches_declared_limits() -> None:
     """W13.7 / C10.2: created containers expose non-zero HostConfig matching compose limits.
 
-    Uses the CI file set (W0.7: no resolved limits today). Declared-limits assertion runs
-    before ``compose create`` so the case stays red without local CI images; HostConfig
-    matching runs when create succeeds.
+    Declared-limits assertion always runs (C10.3 prerequisite). HostConfig matching runs
+    when local ``:ci`` images exist and create succeeds; otherwise skip (no build/pull).
     """
     if not docker_daemon_reachable():
         pytest.skip("Docker daemon not reachable")
@@ -374,6 +371,14 @@ def test_created_containers_hostconfig_matches_declared_limits() -> None:
             "pids_limit": svc.get("pids_limit"),
         }
 
+    required_images = ("sevn-proxy:ci", "sevn-gateway:ci")
+    missing_images = [img for img in required_images if not _ci_image_present(docker, img)]
+    if missing_images:
+        pytest.skip(
+            "CI images not present locally (skip HostConfig create; no build/pull): "
+            + ", ".join(missing_images)
+        )
+
     project = "sevn-w13-hostconfig-ci"
     compose_args = [
         docker,
@@ -384,14 +389,17 @@ def test_created_containers_hostconfig_matches_declared_limits() -> None:
         str(_CI_COMPOSE),
     ]
     try:
-        create = subprocess.run(
-            [*compose_args, "create", *service_names],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=180,
-            cwd=str(_REPO_ROOT),
-        )  # nosec B603
+        try:
+            create = subprocess.run(
+                [*compose_args, "create", "--pull", "never", *service_names],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=120,
+                cwd=str(_REPO_ROOT),
+            )  # nosec B603
+        except subprocess.TimeoutExpired as exc:
+            pytest.skip(f"compose create timed out (images/daemon): {exc}")
         if create.returncode != 0:
             pytest.skip(
                 "compose create failed (images may be absent): "
@@ -458,10 +466,6 @@ def test_created_containers_hostconfig_matches_declared_limits() -> None:
     ("label", "compose_paths"),
     [pytest.param(label, paths, id=label) for label, paths in _FILE_SETS],
 )
-@pytest.mark.xfail(
-    reason="green after W16: every resolved service declares limits (C10.3/D49)",
-    strict=False,
-)
 def test_resolved_compose_config_declares_limits_for_every_service(
     label: str,
     compose_paths: tuple[Path, ...],
@@ -484,7 +488,10 @@ def test_resolved_compose_config_declares_limits_for_every_service(
 
 
 @pytest.mark.xfail(
-    reason="green after W17: browser service split without sevn-state / gateway token (C8.3)",
+    reason=(
+        "deferred D50/#240: browser service split without sevn-state / gateway token (C8.3); "
+        "not green until follow-up PR"
+    ),
     strict=False,
 )
 def test_browser_runs_as_own_service_without_state_or_gateway_token() -> None:
