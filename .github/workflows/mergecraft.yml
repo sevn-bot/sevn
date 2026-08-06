@@ -350,7 +350,7 @@ jobs:
         # full-length commit SHA") before the review step runs. Bump this SHA and
         # `MERGECRAFT_REF` in the Makefile together — `make mergecraft-ref-check`
         # fails on one-sided bumps.
-        uses: alexhawat/mergeCraft@5d91dd1709746cbf7316d94395268ebf654b6c7b # pre-0.0.1
+        uses: alexhawat/mergeCraft@72a415dc78bac5cbed74c3e9dbd69a0eee18ea1f # pre-0.0.1
         with:
           prompt: ${{ steps.prompt.outputs.text }}
           # Must stay BELOW the job's timeout-minutes: when GitHub kills the job
@@ -431,7 +431,7 @@ jobs:
           )
         id: mergecraft_nous
         continue-on-error: true
-        uses: alexhawat/mergeCraft@5d91dd1709746cbf7316d94395268ebf654b6c7b # pre-0.0.1
+        uses: alexhawat/mergeCraft@72a415dc78bac5cbed74c3e9dbd69a0eee18ea1f # pre-0.0.1
         with:
           prompt: ${{ steps.prompt.outputs.text }}
           timeout: 25m
