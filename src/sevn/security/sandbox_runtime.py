@@ -123,6 +123,29 @@ DEFAULT_SANDBOX_IMAGE: Final[str] = _resolve_default_sandbox_image()
 # across loops/threads and can hang or raise on concurrent cold resolves.
 _SANDBOX_IMAGE_DIGEST_CACHE: dict[str, str] = {}
 _SANDBOX_IMAGE_DIGEST_LOCK = threading.Lock()
+_SANDBOX_IMAGE_LOCK_POLL_S: Final[float] = 0.01
+
+
+async def _acquire_sandbox_image_lock() -> None:
+    """Acquire ``_SANDBOX_IMAGE_DIGEST_LOCK`` without abandoning it on task cancel.
+
+    ``asyncio.to_thread(lock.acquire)`` is not cancellation-safe: cancelling the
+    waiter cancels only the asyncio wrapper while the worker may still acquire
+    later with no ``finally`` to release, permanently stalling ensure/refresh.
+    Non-blocking try-acquire + short sleep keeps ownership on the cancellable task.
+
+    Returns:
+        None: Always ``None`` once the lock is held by this task.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_acquire_sandbox_image_lock)
+        True
+    """
+    while True:
+        if _SANDBOX_IMAGE_DIGEST_LOCK.acquire(blocking=False):
+            return
+        await asyncio.sleep(_SANDBOX_IMAGE_LOCK_POLL_S)
 
 
 def sandbox_image_stamp_missing(image: str | None = None) -> bool:
@@ -315,7 +338,7 @@ async def ensure_sandbox_image_ready(image: str) -> str:
     cached = _SANDBOX_IMAGE_DIGEST_CACHE.get(image)
     if cached is not None:
         return cached
-    await asyncio.to_thread(_SANDBOX_IMAGE_DIGEST_LOCK.acquire)
+    await _acquire_sandbox_image_lock()
     try:
         cached = _SANDBOX_IMAGE_DIGEST_CACHE.get(image)
         if cached is not None:
@@ -351,7 +374,7 @@ async def refresh_sandbox_image(image: str) -> str:
         >>> inspect.iscoroutinefunction(refresh_sandbox_image)
         True
     """
-    await asyncio.to_thread(_SANDBOX_IMAGE_DIGEST_LOCK.acquire)
+    await _acquire_sandbox_image_lock()
     try:
         prior = _SANDBOX_IMAGE_DIGEST_CACHE.pop(image, None)
         if prior is not None and prior != image:

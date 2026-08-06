@@ -145,8 +145,8 @@
     },
     "security": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-06T11:04:57Z",
-      "digest": "683f3fad993b1eb692b47b445e99b90a5bdf368b2fba11fba30d83dcd175c781",
+      "computed_at": "2026-08-06T11:35:45Z",
+      "digest": "fd9b9c4c2c9528ed29d76ee3ac7d6cca8e6849d98b5a5648eea49604f3577a46",
       "source_globs": [
         "src/sevn/security/**"
       ]

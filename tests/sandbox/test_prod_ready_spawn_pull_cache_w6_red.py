@@ -373,3 +373,58 @@ async def test_w6_5c_concurrent_cold_resolve_single_flight_across_threads(
     assert pull_targets == [_TAG], (
         f"expected single-flight one pull across threads/loops; got {pull_targets!r}"
     )
+
+
+@pytest.mark.asyncio
+async def test_w6_5d_cancelled_waiter_does_not_abandon_digest_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cancelling a contending ensure must not leave the digest lock permanently held."""
+    import asyncio
+
+    ensure, _refresh = _import_image_ready_api()
+    pull_targets: list[str] = []
+    gate = asyncio.Event()
+    started = 0
+
+    async def fake_docker_run(
+        argv: list[str],
+        *,
+        timeout_s: float | None = None,
+        stdin: bytes | None = None,
+    ) -> tuple[int, str, str]:
+        nonlocal started
+        _ = timeout_s, stdin
+        if "pull" in argv:
+            pull_targets.append(argv[-1])
+            started += 1
+            if started == 1:
+                await gate.wait()
+            return 0, "", ""
+        if "image" in argv and "inspect" in argv:
+            return 0, _DIGEST, ""
+        return 0, "", ""
+
+    monkeypatch.setattr("sevn.security.sandbox_runtime._docker_run", fake_docker_run)
+
+    leader = asyncio.create_task(ensure(_TAG))
+    for _ in range(50):
+        if started >= 1:
+            break
+        await asyncio.sleep(0.01)
+    assert started == 1, "leader must hold the lock mid-pull before waiters start"
+
+    waiter = asyncio.create_task(ensure(_TAG))
+    await asyncio.sleep(0.05)
+    waiter.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiter
+
+    gate.set()
+    pinned_leader = await leader
+    assert pinned_leader == _DIGEST
+
+    # A later resolve must still complete — abandoned acquire would hang forever.
+    second = await asyncio.wait_for(ensure(_TAG), timeout=2.0)
+    assert second == _DIGEST
+    assert pull_targets == [_TAG]
