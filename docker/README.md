@@ -106,3 +106,22 @@ true` in `sevn.json` only when you intentionally want tokenless direct-loopback 
 | `docker-compose.improve-evals.yml` | Self-improve eval graph |
 
 Build context is always the repo root (`context: ..` in compose files).
+
+## GHCR image tags (operator default)
+
+CI (`ci-cd.yml`) publishes images with a **quarantine → scan → sign → promote by digest**
+lifecycle (C12.3 / C13.1 / D45):
+
+| Tag | When it appears | Operator use |
+|-----|-----------------|--------------|
+| `:quarantine-<sha>-<run_id>` | Immediately after build, before Trivy | **Not consumable** — pre-scan only (run-scoped) |
+| `:<sha>` | After supply-chain promotes by digest | Prefer this (or `@sha256:…`) |
+| `:vX.Y.Z` | Same promote step on `v*` tag builds | Prefer digest pin in prod |
+| `:latest` | **Not written** from `main` while phase4/5 are stubs | Treat any pre-existing `:latest` as **unverified** |
+
+**Operator default:** pin by digest (`ghcr.io/<owner>/<repo>/<image>@sha256:…`), never
+`:latest`. Compose / sandbox defaults that still say `:dev` / mutable tags are being
+replaced by Batch B's single build-stamped constant
+(`DEFAULT_SANDBOX_IMAGE` in `src/sevn/security/sandbox_runtime.py`, plan D42) — **do not**
+add a second pinned-digest constant here. Until Batch B merges, override with
+`rlm.docker_image` (schema) pointing at a digest you trust from a promoted SHA tag.

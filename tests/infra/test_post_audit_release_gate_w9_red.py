@@ -5,6 +5,11 @@ deploy phases are real; ``delivery-chain`` rejects phase4/phase5 ``failure`` on 
 workflow header does not advertise a full six-phase pipeline while phases 4-5 are stubs;
 optional ``dev`` extra (``coverage`` / ``pytest-cov``) survives in-test ``uv sync`` from
 skill install actions.
+
+Prod-readiness Batch C **W9.7** extends this file with landed C2.3 / C12.* regression
+guards (phase6 ``needs``, SBOM upload + release attach, trivy ``--exit-code 1`` before
+cosign). Forward-looking C2.1/C2.2/C11.*/C12.3/C13.* contracts live in
+``tests/infra/test_prod_ready_release_pipeline_w9_red.py``.
 """
 
 from __future__ import annotations
@@ -98,3 +103,58 @@ def test_uv_extra_install_sync_preserves_optional_dev_extra() -> None:
     block = _uv_extra_sync_block()
     assert '"--group", "dev"' in block or "'--group', 'dev'" in block
     assert '"--extra", "dev"' in block or "'--extra', 'dev'" in block
+
+
+# ---------------------------------------------------------------------------
+# Prod-readiness Batch C W9.7 — landed C2.3 / C12.* guards (extend, do not weaken)
+# ---------------------------------------------------------------------------
+
+
+def test_phase6_needs_includes_phase4_and_phase5() -> None:
+    """W9.7 / C2.3: tagged releases still require deploy/test phases before phase6."""
+    needs = _load_ci_cd_workflow()["jobs"]["phase6"]["needs"]
+    assert isinstance(needs, list)
+    assert "phase4" in needs, "phase6 must need phase4 (C2.3)"
+    assert "phase5" in needs, "phase6 must need phase5 (C2.3)"
+
+
+def test_container_supply_chain_uploads_sbom_artifact() -> None:
+    """W9.7 / C12.4: SBOM / trivy reports remain upload-artifact'd for phase6."""
+    steps = _load_ci_cd_workflow()["jobs"]["container-supply-chain"]["steps"]
+    upload_steps = [
+        step
+        for step in steps
+        if isinstance(step, dict) and "upload-artifact" in str(step.get("uses", ""))
+    ]
+    assert upload_steps, "container-supply-chain must upload SBOM artifacts (C12.4)"
+    paths = [step.get("with", {}).get("path") for step in upload_steps]
+    assert any(isinstance(p, str) and "sbom" in p.lower() for p in paths), (
+        f"upload-artifact path must include sboms/ (C12.4); got {paths}"
+    )
+
+
+def test_phase6_attaches_sbom_files_to_draft_release() -> None:
+    """W9.7 / C12.4: draft release continues to attach supply-chain reports."""
+    step = _phase6_release_step()
+    files = step.get("with", {}).get("files")
+    assert isinstance(files, str), f"phase6 release files missing (C12.4); got {files!r}"
+    assert "sbom" in files.lower(), (
+        f"phase6 release files must include sboms/** (C12.4); got {files!r}"
+    )
+
+
+def test_scan_image_trivy_exit_code_one_precedes_cosign_sign() -> None:
+    """W9.7 / C12.1+C12.2: blocking trivy remains ordered before cosign sign."""
+    text = _workflow_text()
+    match = re.search(r"scan_image\(\)\s*\{([^}]+)\}", text, re.DOTALL)
+    assert match is not None, "scan_image() shell function missing from ci-cd.yml"
+    body = match.group(1)
+    trivy_pos = body.find("trivy")
+    exit_pos = body.find("--exit-code 1")
+    cosign_pos = body.find("cosign sign")
+    assert trivy_pos != -1
+    assert exit_pos != -1
+    assert cosign_pos != -1
+    assert "--exit-code 0" not in body
+    assert trivy_pos < cosign_pos
+    assert exit_pos < cosign_pos
