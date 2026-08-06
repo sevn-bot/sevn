@@ -90,6 +90,47 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 0
 fi
 
+# C10.1 — minimum Docker Compose version (deploy.resources.limits applied on non-swarm).
+# Override with SEVN_COMPOSE_MIN_VERSION for local experiments only.
+SEVN_COMPOSE_MIN_VERSION="${SEVN_COMPOSE_MIN_VERSION:-2.20.0}"
+
+_compose_version_digits() {
+  # Strip leading v and any -/+ suffix (e.g. v2.38.2-desktop.1 → 2.38.2).
+  local raw="${1:-}"
+  raw="${raw#v}"
+  printf '%s' "${raw%%[-+]*}"
+}
+
+_compose_version_ge() {
+  # True when $1 >= $2 (dotted numeric). Uses sort -V.
+  local have min
+  have="$(_compose_version_digits "$1")"
+  min="$(_compose_version_digits "$2")"
+  [[ -n "$have" && -n "$min" ]] || return 1
+  [[ "$(printf '%s\n%s\n' "$min" "$have" | sort -V | head -n1)" == "$min" ]]
+}
+
+_require_min_compose_version() {
+  local raw short ver
+  raw="$(docker compose version 2>/dev/null || true)"
+  short="$(docker compose version --short 2>/dev/null || true)"
+  ver="$(_compose_version_digits "$short")"
+  if [[ -z "$ver" ]]; then
+    # Fallback: "Docker Compose version v2.38.2-desktop.1"
+    ver="$(printf '%s' "$raw" | sed -n 's/.*[Vv]\([0-9][0-9.]*\).*/\1/p' | head -n1)"
+  fi
+  if [[ -z "$ver" ]]; then
+    echo "error: could not parse Docker Compose version from: ${raw:-<empty>}" >&2
+    exit 1
+  fi
+  if ! _compose_version_ge "$ver" "$SEVN_COMPOSE_MIN_VERSION"; then
+    echo "error: Docker Compose version ${ver} is below minimum ${SEVN_COMPOSE_MIN_VERSION} (C10.1; deploy.resources.limits require Compose v2.20+)" >&2
+    exit 1
+  fi
+}
+
+_require_min_compose_version
+
 # Static compose validation only — not a runtime secret. Operator stacks must set
 # SEVN_GATEWAY_TOKEN in .env (see .env.example); bootstrap rejects known sentinels.
 export SEVN_GATEWAY_TOKEN="${SEVN_GATEWAY_TOKEN:-check-compose-default-placeholder-token-32chars}"
@@ -192,3 +233,39 @@ if _check_legacy_profile_without_override "gui" "$compose_base" 2>/dev/null; the
   echo "legacy profile guard broken: gui profile without override should be rejected" >&2
   exit 1
 fi
+
+# C10.3 — every resolved service in operator + CI file sets must declare limits.
+_check_resolved_service_limits() {
+  local label="$1"
+  shift
+  local -a compose_args=()
+  local file
+  for file in "$@"; do
+    compose_args+=(-f "$file")
+  done
+  local lacking
+  lacking="$(
+    docker compose "${compose_args[@]}" config --format json 2>/dev/null | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+lacking = []
+for name, svc in sorted((data.get("services") or {}).items()):
+    limits = ((svc.get("deploy") or {}).get("resources") or {}).get("limits") or {}
+    cpus, memory = limits.get("cpus"), limits.get("memory")
+    pids = limits.get("pids")
+    pids_limit = svc.get("pids_limit")
+    if not (cpus and memory and (pids is not None or pids_limit is not None)):
+        lacking.append(name)
+print(" ".join(lacking))
+'
+  )"
+  if [[ -n "${lacking// /}" ]]; then
+    echo "${label}: services missing deploy.resources.limits and/or pids_limit: ${lacking}" >&2
+    exit 1
+  fi
+}
+
+_check_resolved_service_limits "default" "$compose_base"
+_check_resolved_service_limits "browser override" "$compose_base" "$compose_browser"
+_check_resolved_service_limits "gui override" "$compose_base" "$compose_gui"
+_check_resolved_service_limits "ci" "${repo_root}/docker/docker-compose.ci.yml"

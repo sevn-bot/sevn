@@ -112,6 +112,22 @@ marker is present the scoped `find … chown` pass is skipped. Delete the marker
 to a future `perms-vN`) to force re-migration after an ownership-layout change.
 `sevn-ci-init` uses the same marker and scoped dirs (no unconditional `chown -R`).
 
+### Docker Compose version floor (C10.1)
+
+**Minimum Docker Compose version: 2.20** (Compose V2 plugin). Older
+`docker-compose` (v1) and Compose < 2.20 do not reliably apply
+`deploy.resources.limits` on non-Swarm stacks. `make check-compose-default` /
+`scripts/check-compose-default.sh` refuse clients below this floor
+(`SEVN_COMPOSE_MIN_VERSION`, default `2.20.0`).
+
+### Resource limits (C10.3)
+
+Every service in the resolved config (base, browser, GUI, and CI file sets) declares
+`deploy.resources.limits` (`cpus`, `memory`, `pids`) and/or `pids_limit`.
+`make verify-stack-health` inspects running containers' `HostConfig`
+(`NanoCpus`, `Memory`, `PidsLimit`) and requires them to match the declared values
+(C10.2).
+
 The proxy container healthcheck keeps `GET /healthz` as liveness and also probes
 authenticated `GET /web/auth-check` with `X-Sevn-Proxy-Token` (env or generate-once
 file). A **401** or **503** marks the container unhealthy; `/web/auth-check` is a

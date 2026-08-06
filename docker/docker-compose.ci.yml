@@ -3,11 +3,51 @@
 #
 # C9.4: ``sevn-ci-init`` uses the same scoped+marker ownership model as operator
 # ``sevn-operator-perms`` (C9.1 / C9.2) — no unconditional ``chown -R /operator``.
+# C10.3 / D49: every service declares deploy.resources.limits + pids_limit (resolved
+# config had none before W16).
+
+x-ci-resource-limits-proxy: &ci-resource-limits-proxy
+  pids_limit: 256
+  deploy:
+    resources:
+      limits:
+        cpus: "1.0"
+        memory: 512M
+        pids: 256
+
+x-ci-resource-limits-gateway: &ci-resource-limits-gateway
+  pids_limit: 256
+  deploy:
+    resources:
+      limits:
+        cpus: "2.0"
+        memory: 2G
+        pids: 256
+
+x-ci-resource-limits-init: &ci-resource-limits-init
+  pids_limit: 64
+  deploy:
+    resources:
+      limits:
+        cpus: "0.5"
+        memory: 256M
+        pids: 64
+
+x-ci-resource-limits-mock: &ci-resource-limits-mock
+  pids_limit: 64
+  deploy:
+    resources:
+      limits:
+        cpus: "0.5"
+        memory: 256M
+        pids: 64
+
 volumes:
   sevn-ci-workspace:
 
 services:
   sevn-ci-init:
+    <<: *ci-resource-limits-init
     image: busybox:1.36
     user: "0:0"
     volumes:
@@ -31,12 +71,14 @@ services:
     restart: "no"
 
   mock-openai:
+    <<: *ci-resource-limits-mock
     build:
       context: ../infra/ci-mock-openai
     expose:
       - "9090"
 
   sevn-proxy:
+    <<: *ci-resource-limits-proxy
     image: sevn-proxy:ci
     # pull_policy:never + a matching local tag lets jobs that pre-build the
     # image (load:true via build-push-action) run `up --no-build` and reuse it
@@ -57,6 +99,7 @@ services:
       - mock-openai
 
   sevn-gateway:
+    <<: *ci-resource-limits-gateway
     image: sevn-gateway:ci
     pull_policy: never
     build:

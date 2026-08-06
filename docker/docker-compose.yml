@@ -62,12 +62,24 @@ x-operator-resource-limits-gateway: &operator-resource-limits-gateway
         memory: 2G
         pids: 256
 
+# One-shot perms init — modest limits (C10.3 / D49); not merged with hardening
+# (hardening sets restart: unless-stopped; this service must stay restart: "no").
+x-operator-resource-limits-perms: &operator-resource-limits-perms
+  pids_limit: 64
+  deploy:
+    resources:
+      limits:
+        cpus: "0.5"
+        memory: 256M
+        pids: 64
+
 networks:
   sevn-operator:
     driver: bridge
 
 services:
   sevn-operator-perms:
+    <<: *operator-resource-limits-perms
     image: busybox:1.36
     user: "0:0"
     volumes:
