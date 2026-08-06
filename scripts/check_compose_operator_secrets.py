@@ -175,10 +175,10 @@ def _self_check() -> int:
                 validate_operator_secrets(trial)
             except ValueError:
                 continue
-            # Do not echo ``bad`` — CodeQL py/clear-text-logging-sensitive-data.
-            kind = "empty" if not bad.strip() else ("placeholder" if len(bad) >= 5 else "short")
+            # Name-only: any use of ``bad`` (even len/empty checks) taints prints for
+            # CodeQL py/clear-text-logging-sensitive-data.
             print(
-                f"error: self-check expected failure for {name} ({kind} fixture not rejected)",
+                f"error: self-check expected rejection for {name}",
                 file=sys.stderr,
             )
             return 1

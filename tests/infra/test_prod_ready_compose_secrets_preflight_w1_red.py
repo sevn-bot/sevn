@@ -88,7 +88,22 @@ def test_preflight_rejects_empty_placeholder_and_low_entropy(
     if isinstance(caught.value, SystemExit):
         assert caught.value.code not in (0, None)
     message = str(caught.value)
-    assert var in message or bad_value.strip() in message or "secret" in message.lower()
+    assert var in message or "secret" in message.lower() or "placeholder" in message.lower()
+    # CodeQL py/clear-text-logging-sensitive-data: never dump the rejected value
+    # as clear text (``{value!r}`` / ``=value``). Placeholder *names* like
+    # ``change-me`` may still appear as documentation in the hint.
+    assert f"{bad_value!r}" not in message
+    assert f"={bad_value}" not in message
+    if bad_value.strip() and bad_value.casefold() not in {
+        "change-me",
+        "changeme",
+        "password",
+        "secret",
+        "replace-me",
+        "todo",
+        "placeholder",
+    }:
+        assert bad_value not in message
 
 
 def test_preflight_accepts_high_entropy_values() -> None:
@@ -99,6 +114,25 @@ def test_preflight_accepts_high_entropy_values() -> None:
         "SEVN_SECRETS_PASSPHRASE": "high-entropy-secrets-passphrase-32b",
     }
     _validate(env)
+
+
+def test_self_check_and_source_never_echo_secret_fixtures() -> None:
+    """Guard CodeQL py/clear-text-logging-sensitive-data reintroduction.
+
+    Prior miss: ``bad!r`` was removed but ``kind`` still derived from ``bad`` and
+    was interpolated into ``print``, which CodeQL still flagged via dataflow.
+    """
+    helper = _REPO_ROOT / "scripts" / "check_compose_operator_secrets.py"
+    assert helper.is_file()
+    source = helper.read_text(encoding="utf-8")
+    # Fixture value must not appear in any print/format that CodeQL can taint.
+    assert "{bad" not in source
+    assert "bad!r" not in source
+    assert "={bad" not in source
+    module = _load_python_preflight()
+    self_check = getattr(module, "_self_check", None)
+    assert callable(self_check)
+    assert self_check() == 0
 
 
 def test_compose_up_runs_preflight_before_docker_compose() -> None:
