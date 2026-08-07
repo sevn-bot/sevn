@@ -161,3 +161,12 @@ The remaining F-batch gates may now proceed, **contingent on FF-V1 being resolve
 - F-Thermos — fresh review agent (D30). Note: F-Thermos must run after FF-V1 lands, so the post-Thermos diff includes the Batch C cleanup-step fix; the F-Thermos base SHA recorded to `.ignorelocal/waves/prod-ready-f-thermos-base.sha` should be the FF-V1 fix tip.
 - F-Reverify — fresh `wave-verifier` instance (D30), convention-11 detection with `<batch>` = `f`, re-runs F-Verify proofs against the F-Thermos base, must include the Batch C quarantine-cleanup test in its `make ci-resume` walk (already on `CI_STEPS`).
 - F-PR — `wave-plan-executor` opens against `pre-0.0.1`, listing C6.2, C6.4, C14.1, C14.2, C14.3 one per line.
+
+## FF-V1 follow-up (2026-08-07)
+
+- **Finding:** `container-supply-chain` missing `Cleanup quarantine tags on failure` step (regression from c432710b consolidated).
+- **Fix SHA:** `a4ff5ac2`
+- **Test:** `test_quarantine_cleanup_runs_on_publish_and_supply_chain_failure` PASS.
+- **W9 full file:** 13 passed.
+- **YAML parses:** OK.
+- **Status:** `changes_required` cleared → F-Final re-dispatch ready.
