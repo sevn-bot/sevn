@@ -11,6 +11,10 @@ Reconciliation follow-up after E-Verify gaps:
 - E-V3: D51 / C7.2 — the service shared secret alone must not authorize the
   sandbox ``/web/*`` families. This is the moved coverage for the assertion
   that the landed ``test_auth.py`` test cannot express without D40 violation.
+- E-V3 followup: tests deleted from landed C1.1 suites (``test_auth.py`` and
+  ``test_post_audit_proxy_auth_w4_red.py``) because they pinned pre-W19/W20
+  behavior the new implementation inverts — the post-W19/W20 assertion
+  lives here.
 
 These tests live alongside the W18 / W19 / W20 RED suites and exercise the
 production code path: ``mint_session_token`` (no test-only builders), the
@@ -331,3 +335,151 @@ def test_reverify_v3_service_secret_still_authorizes_auth_check_probe() -> None:
         )
         is None
     )
+
+
+# ---------------------------------------------------------------------------
+# E-V3/E-V1 followup — coverage of obsolete landed tests removed under D40
+# ---------------------------------------------------------------------------
+#
+# The wave-orchestrator landed the C1.1 regression suites (``test_auth.py``,
+# ``test_post_audit_proxy_auth_w4_red.py``) before W19/W20 inverted their
+# expectations. Restoring them unmodified (D40) makes their assertions
+# contradict the post-implementation proxy behavior. The same contracts are
+# restated here against the production mint path so a wave-author or reviewer
+# who inspects this file directly sees the post-W19/W20 contract.
+#
+# These tests do NOT exercise the ``mint_session_token`` internals — that is
+# already covered by ``test_reverify_v1_*`` and ``test_reverify_v2_*`` above —
+# but they do mirror the deleted tests' request shapes (POST ``/web/fetch``,
+# concurrent same-credential gather) so the regression intent is preserved.
+
+
+def test_reverify_v3_service_secret_rejected_on_post_web_route() -> None:
+    """E-V3 / C7.2: service secret alone does not authorize POST ``/web/fetch`` (D51).
+
+    Mirror of the deleted ``test_release_audit_ssrf_w1_red::
+    test_proxy_auth_accepts_post_with_correct_token_regression`` and the
+    pre-W19/W20 ``test_auth.py::test_llm_post_auth_failure_guarded_web_prefix``
+    form — both pinned the obsolete allow-secret assertion.
+    """
+    resp = llm_post_auth_failure(
+        _proxy_request(path="/web/fetch", proxy_token=_SERVICE_SECRET),
+        _SERVICE_SECRET,
+    )
+    assert resp is not None
+    assert resp.status_code == 401
+    assert resp.body == b'{"detail":"unauthorized"}'
+
+
+@pytest.mark.anyio
+async def test_reverify_v1_run_id_required_for_sandbox_web_route() -> None:
+    """E-V1: a sandbox session token missing ``X-Sevn-Run-Id`` is rejected.
+
+    Mirror of the deleted ``test_post_audit_proxy_auth_w4_red::
+    test_valid_sandbox_session_token_accepted_on_web_route`` — the landed
+    form pinned the pre-W19/W20 accept-without-binding behavior.
+    """
+    token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id="run-bind-required",
+        expires_at=int(time.time()) + 3600,
+    )
+    app = create_app(
+        settings=ProxySettings(
+            anthropic_api_key="ak",
+            openai_api_key="ok",
+            proxy_shared_secret=_SERVICE_SECRET,
+        ),
+    )
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/web/fetch",
+            json={"url": "https://example.com/"},
+            headers={"X-Sevn-Session-Token": token},
+        )
+    assert resp.status_code == 401
+
+
+@pytest.mark.anyio
+async def test_reverify_v1_run_id_binding_matches_when_present() -> None:
+    """E-V1: a sandbox session token + matching ``X-Sevn-Run-Id`` is accepted.
+
+    Companion of the deleted ``test_valid_sandbox_session_token_accepted_on_web_route``
+    — specifies the post-W19/W20 accept path so a regression that loosens
+    the binding requirement also breaks this test.
+    """
+    run_id = "run-binding-matches"
+    token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id=run_id,
+        expires_at=int(time.time()) + 3600,
+    )
+    app = create_app(
+        settings=ProxySettings(
+            anthropic_api_key="ak",
+            openai_api_key="ok",
+            proxy_shared_secret=_SERVICE_SECRET,
+        ),
+    )
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/web/fetch",
+            json={"url": "https://example.com/"},
+            headers={
+                "X-Sevn-Session-Token": token,
+                "X-Sevn-Run-Id": run_id,
+            },
+        )
+    assert resp.status_code != 401
+    assert resp.json().get("detail") != "unauthorized"
+
+
+@pytest.mark.anyio
+async def test_reverify_v1_concurrent_run_id_bound_requests_consistent() -> None:
+    """E-V1 / P4a: concurrent same-credential requests with binding agree (no race bypass).
+
+    Mirror of the deleted ``test_post_audit_proxy_auth_w4_red::
+    test_concurrent_same_session_token_requests_consistent`` — the landed
+    form issued two POSTs with the same token and no binding header and
+    asserted both replies were not 401. The new auth seam rejects tokens
+    without the binding header, so the symmetric post-W19/W20 assertion is
+    that *both* concurrent same-token replies are consistent and not 401
+    when the binding header is supplied.
+    """
+    import asyncio
+
+    run_id = "run-concurrent-binding"
+    token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id=run_id,
+        expires_at=int(time.time()) + 3600,
+    )
+    app = create_app(
+        settings=ProxySettings(
+            anthropic_api_key="ak",
+            openai_api_key="ok",
+            proxy_shared_secret=_SERVICE_SECRET,
+        ),
+    )
+    transport = httpx.ASGITransport(app=app)
+
+    async def _fetch() -> int:
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                "/web/fetch",
+                json={"url": "https://example.com/"},
+                headers={
+                    "X-Sevn-Session-Token": token,
+                    "X-Sevn-Run-Id": run_id,
+                },
+            )
+            return resp.status_code
+
+    codes = await asyncio.gather(_fetch(), _fetch())
+    assert codes[0] == codes[1]
+    assert codes[0] != 401

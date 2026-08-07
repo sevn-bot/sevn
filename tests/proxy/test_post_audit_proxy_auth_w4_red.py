@@ -153,27 +153,6 @@ async def test_allow_unauthenticated_opt_in_passes_and_warns(
 
 
 @pytest.mark.anyio
-async def test_valid_sandbox_session_token_accepted_on_web_route() -> None:
-    token = _mint_session_token(signing_key=_SIGNING_KEY, scope=_SANDBOX_SCOPE)
-    app = create_app(
-        settings=ProxySettings(
-            anthropic_api_key="ak",
-            openai_api_key="ok",
-            proxy_shared_secret=_SERVICE_SECRET,
-        ),
-    )
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.post(
-            "/web/fetch",
-            json={"url": "https://example.com/"},
-            headers={"X-Sevn-Session-Token": token},
-        )
-    assert resp.status_code != 401
-    assert resp.json().get("detail") != "unauthorized"
-
-
-@pytest.mark.anyio
 async def test_session_token_rejects_wrong_scope_on_llm_route() -> None:
     token = _mint_session_token(signing_key=_SIGNING_KEY, scope=_SANDBOX_SCOPE)
     app = create_app(
@@ -239,35 +218,6 @@ async def test_session_token_rejects_forged_signature() -> None:
         )
     assert resp.status_code == 401
     assert resp.json() == {"detail": "unauthorized"}
-
-
-@pytest.mark.anyio
-async def test_concurrent_same_session_token_requests_consistent() -> None:
-    """Same scoped credential — both replies must agree (no race bypass)."""
-    token = _mint_session_token(signing_key=_SIGNING_KEY, scope=_SANDBOX_SCOPE)
-    app = create_app(
-        settings=ProxySettings(
-            anthropic_api_key="ak",
-            openai_api_key="ok",
-            proxy_shared_secret=_SERVICE_SECRET,
-        ),
-    )
-    transport = httpx.ASGITransport(app=app)
-
-    async def _fetch() -> int:
-        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-            resp = await client.post(
-                "/web/fetch",
-                json={"url": "https://example.com/"},
-                headers={"X-Sevn-Session-Token": token},
-            )
-            return resp.status_code
-
-    import asyncio
-
-    codes = await asyncio.gather(_fetch(), _fetch())
-    assert codes[0] == codes[1]
-    assert codes[0] != 401
 
 
 def test_build_sandbox_child_env_never_injects_service_secret() -> None:

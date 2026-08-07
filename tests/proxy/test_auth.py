@@ -82,13 +82,6 @@ def test_llm_post_auth_failure_accepts_correct_token() -> None:
     assert llm_post_auth_failure(_request(token="secret"), "secret") is None
 
 
-def test_llm_post_auth_failure_guarded_web_prefix() -> None:
-    assert llm_post_auth_failure(_request(path="/web/fetch", token="secret"), "secret") is None
-    resp = llm_post_auth_failure(_request(path="/web/fetch", token="bad"), "secret")
-    assert resp is not None
-    assert resp.status_code == 401
-
-
 def test_llm_post_auth_failure_magic_mock_get_method() -> None:
     req = MagicMock(method="GET")
     assert llm_post_auth_failure(req, None) is None

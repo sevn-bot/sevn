@@ -108,11 +108,6 @@ async def test_proxy_app_get_web_fetch_requires_token() -> None:
     assert resp.json() == {"detail": "unauthorized"}
 
 
-def test_proxy_auth_accepts_post_with_correct_token_regression() -> None:
-    """R9 fix must not break existing POST guard."""
-    assert llm_post_auth_failure(_request(method="POST", token="secret"), "secret") is None
-
-
 def test_web_forward_validate_fetch_url_allows_public_https_regression() -> None:
     """Existing scheme/host validation must remain for public URLs."""
     from sevn.proxy.web_forward import _validate_fetch_url
