@@ -63,6 +63,8 @@ STATUS_UNAVAILABLE = "driver_unavailable"
 EXIT_CODES = {STATUS_PASS: 0, STATUS_FAIL: 1, STATUS_UNAVAILABLE: 2}
 
 OPERATOR_COMPOSE = "docker/docker-compose.yml"
+VERIFY_COMPOSE = "docker/docker-compose.verify.yml"
+VERIFY_PROXY_URL = "http://127.0.0.1:3102"
 BROWSER_COMPOSE = "docker/docker-compose.browser.yml"
 GUI_COMPOSE = "docker/docker-compose.gui.yml"
 PROD_COMPOSE = "docker/docker-compose.prod.yml"
@@ -1023,7 +1025,6 @@ def drive_authenticated_proxy_roundtrip() -> DriverResult:
 
     project = os.environ.get("SEVN_VERIFY_PROJECT", "sevn-verify")
     gateway_port = os.environ.get("SEVN_VERIFY_GATEWAY_PORT", "3101")
-    proxy_port = os.environ.get("SEVN_VERIFY_PROXY_PORT", "3102")
     boot_timeout = float(os.environ.get("SEVN_VERIFY_STACK_TIMEOUT_S", "1500"))
     ready_timeout = float(os.environ.get("SEVN_VERIFY_READY_TIMEOUT_S", "180"))
 
@@ -1039,11 +1040,10 @@ def drive_authenticated_proxy_roundtrip() -> DriverResult:
     env = dict(os.environ)
     env["SEVN_GATEWAY_PORT"] = gateway_port
     env["SEVN_GATEWAY_BIND"] = "127.0.0.1"
-    env["SEVN_PROXY_PORT"] = proxy_port
     env["SEVN_PROXY_SHARED_SECRET"] = secret
     env["SEVN_GATEWAY_TOKEN"] = gateway_token
     env.pop("COMPOSE_PROFILES", None)
-    base = ["docker", "compose", "-p", project, "-f", OPERATOR_COMPOSE]
+    base = ["docker", "compose", "-p", project, "-f", OPERATOR_COMPOSE, "-f", VERIFY_COMPOSE]
 
     try:
         code, out = _run([*base, "up", "-d", "--build"], env=env, timeout=boot_timeout)
@@ -1061,7 +1061,7 @@ def drive_authenticated_proxy_roundtrip() -> DriverResult:
             result.reason = "operator stack failed to start for round-trip"
             return result
 
-        proxy_url = f"http://127.0.0.1:{proxy_port}"
+        proxy_url = VERIFY_PROXY_URL
         deadline = time.monotonic() + ready_timeout
         proxy_ready = False
         last_status, last_body = 0, "not probed"
@@ -1088,16 +1088,16 @@ def drive_authenticated_proxy_roundtrip() -> DriverResult:
         try:
             token = mint_session_token(
                 signing_key=secret,
-                scope="web",
-                ttl_seconds=60,
+                scope="sandbox",
                 run_id=f"verify-roundtrip-{_now_stamp()}",
+                ttl_s=60,
             )
             result.checks.append(
                 Check(
                     name="token-mint",
                     status=STATUS_PASS,
-                    detail=f"minted session token for scope=web (len={len(token)})",
-                    command="mint_session_token(scope='web', ttl=60)",
+                    detail=f"minted session token for scope=sandbox (len={len(token)})",
+                    command="mint_session_token(scope='sandbox', ttl_s=60)",
                 )
             )
         except Exception as exc:
@@ -1592,7 +1592,6 @@ def drive_sandbox_scoped_token() -> DriverResult:
 
     project = os.environ.get("SEVN_VERIFY_PROJECT", "sevn-verify")
     gateway_port = os.environ.get("SEVN_VERIFY_GATEWAY_PORT", "3101")
-    proxy_port = os.environ.get("SEVN_VERIFY_PROXY_PORT", "3102")
     boot_timeout = float(os.environ.get("SEVN_VERIFY_STACK_TIMEOUT_S", "1500"))
     ready_timeout = float(os.environ.get("SEVN_VERIFY_READY_TIMEOUT_S", "180"))
 
@@ -1608,11 +1607,10 @@ def drive_sandbox_scoped_token() -> DriverResult:
     env = dict(os.environ)
     env["SEVN_GATEWAY_PORT"] = gateway_port
     env["SEVN_GATEWAY_BIND"] = "127.0.0.1"
-    env["SEVN_PROXY_PORT"] = proxy_port
     env["SEVN_PROXY_SHARED_SECRET"] = secret
     env["SEVN_GATEWAY_TOKEN"] = gateway_token
     env.pop("COMPOSE_PROFILES", None)
-    base = ["docker", "compose", "-p", project, "-f", OPERATOR_COMPOSE]
+    base = ["docker", "compose", "-p", project, "-f", OPERATOR_COMPOSE, "-f", VERIFY_COMPOSE]
 
     try:
         code, out = _run([*base, "up", "-d", "--build"], env=env, timeout=boot_timeout)
@@ -1630,7 +1628,7 @@ def drive_sandbox_scoped_token() -> DriverResult:
             result.reason = "operator stack failed to start for scoped-token check"
             return result
 
-        proxy_url = f"http://127.0.0.1:{proxy_port}"
+        proxy_url = VERIFY_PROXY_URL
         deadline = time.monotonic() + ready_timeout
         proxy_ready = False
         last_status, last_body = 0, "not probed"
@@ -1658,8 +1656,8 @@ def drive_sandbox_scoped_token() -> DriverResult:
         sandbox_token = mint_session_token(
             signing_key=secret,
             scope="sandbox",
-            ttl_seconds=60,
             run_id=run_id,
+            ttl_s=60,
         )
         result.checks.append(
             Check(

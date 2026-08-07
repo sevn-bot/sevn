@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: MIT
+# Verify-only host mapping for the internal egress proxy.
+#
+# This file is intentionally never included by the default operator stack.
+
+services:
+  sevn-proxy:
+    ports:
+      - "127.0.0.1:3102:8787"
