@@ -462,10 +462,10 @@ prd-check: ## Validate+score every PRD in about-sevn.bot/prd (skw docs validate)
 	fi
 
 spec-kit-wave-test: ## Run spec-kit-wave pytest suite (skw validators + sync contracts)
-	@if [ -d spec-kit-wave ]; then \
+	@if [ -d spec-kit-wave/src/skw ] && [ -d spec-kit-wave/tests ]; then \
 		$(MAKE) -C spec-kit-wave test REPO_ROOT="$(CURDIR)"; \
 	else \
-		echo "spec-kit-wave-test: skipped (spec-kit-wave not present)"; \
+		echo "spec-kit-wave-test: skipped (spec-kit-wave/src/skw or tests not present)"; \
 	fi
 
 subagents-chart: ## Regenerate deterministic sub-agents topology SVG (D14)
