@@ -1499,41 +1499,45 @@ def drive_cancellation_cleanup() -> DriverResult:
                 detail=result.reason,
             )
         )
-        return result
-
-    time.sleep(2.0)
-    after_ps, after_vol = _container_and_volume_baseline()
-    orphan_containers = sorted(set(after_ps) - set(baseline_ps))
-    orphan_volumes = sorted(set(after_vol) - set(baseline_vol))
-    result.checks.append(
-        Check(
-            name="no-orphan-containers",
-            status=STATUS_PASS if not orphan_containers else STATUS_FAIL,
-            detail=(
-                f"baseline {len(baseline_ps)} containers; post-cancel {len(after_ps)}; "
-                f"new: {orphan_containers or '(none)'}"
-            ),
-            command="docker ps --format '{{.Names}}'",
+    finally:
+        # F-THERMOS-5: orphan diff + cleanup must run even if the
+        # cancellation flow raised. Without this guard, a partially-
+        # completed spawn could leave containers / volumes pinned to the
+        # operator network; the mirror of ``drive_volume_upgrade``'s
+        # ``finally: docker compose down -v`` pattern.
+        time.sleep(2.0)
+        after_ps, after_vol = _container_and_volume_baseline()
+        orphan_containers = sorted(set(after_ps) - set(baseline_ps))
+        orphan_volumes = sorted(set(after_vol) - set(baseline_vol))
+        result.checks.append(
+            Check(
+                name="no-orphan-containers",
+                status=STATUS_PASS if not orphan_containers else STATUS_FAIL,
+                detail=(
+                    f"baseline {len(baseline_ps)} containers; post-cancel {len(after_ps)}; "
+                    f"new: {orphan_containers or '(none)'}"
+                ),
+                command="docker ps --format '{{.Names}}'",
+            )
         )
-    )
-    result.checks.append(
-        Check(
-            name="no-leaked-volumes",
-            status=STATUS_PASS if not orphan_volumes else STATUS_FAIL,
-            detail=(
-                f"baseline {len(baseline_vol)} volumes; post-cancel {len(after_vol)}; "
-                f"new: {orphan_volumes or '(none)'}"
-            ),
-            command="docker volume ls --format '{{.Name}}'",
+        result.checks.append(
+            Check(
+                name="no-leaked-volumes",
+                status=STATUS_PASS if not orphan_volumes else STATUS_FAIL,
+                detail=(
+                    f"baseline {len(baseline_vol)} volumes; post-cancel {len(after_vol)}; "
+                    f"new: {orphan_volumes or '(none)'}"
+                ),
+                command="docker volume ls --format '{{.Name}}'",
+            )
         )
-    )
 
-    if orphan_containers:
-        for name in orphan_containers:
-            _run(["docker", "rm", "-f", name], timeout=60.0)
-    if orphan_volumes:
-        for name in orphan_volumes:
-            _run(["docker", "volume", "rm", "-f", name], timeout=60.0)
+        if orphan_containers:
+            for name in orphan_containers:
+                _run(["docker", "rm", "-f", name], timeout=60.0)
+        if orphan_volumes:
+            for name in orphan_volumes:
+                _run(["docker", "volume", "rm", "-f", name], timeout=60.0)
 
     if any(c.status == STATUS_FAIL for c in result.checks):
         result.status = STATUS_FAIL
