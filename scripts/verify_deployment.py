@@ -64,6 +64,7 @@ EXIT_CODES = {STATUS_PASS: 0, STATUS_FAIL: 1, STATUS_UNAVAILABLE: 2}
 
 OPERATOR_COMPOSE = "docker/docker-compose.yml"
 VERIFY_COMPOSE = "docker/docker-compose.verify.yml"
+VERIFY_DIGESTS_COMPOSE = "docker/docker-compose.verify-digests.yml"
 VERIFY_PROXY_URL = "http://127.0.0.1:3102"
 BROWSER_COMPOSE = "docker/docker-compose.browser.yml"
 GUI_COMPOSE = "docker/docker-compose.gui.yml"
@@ -73,6 +74,14 @@ EVALS_COMPOSE = "docker/docker-compose.improve-evals.yml"
 
 DEFAULT_SERVICES = frozenset({"sevn-operator-perms", "sevn-proxy", "sevn-gateway"})
 COMPOSE_GUARD = "scripts/check-compose-default.sh"
+
+# ``SEVN_VERIFY_IMAGE_OVERLAY`` opts the drivers into the digest-pinned
+# overlay (docker-compose.verify-digests.yml) so they exercise the SHA-tagged
+# images promoted by ``container-supply-chain`` instead of locally-rebuilt
+# ones. Set on the ``verify-deployment`` job in ci-cd.yml so the C14.1
+# release-tag evidence actually tests what was published (mergecraft review
+# finding 3737950464 / F-Thermos-V1 follow-up).
+VERIFY_IMAGE_OVERLAY_ENV = "SEVN_VERIFY_IMAGE_OVERLAY"
 
 _DOCKER_TIME = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d+)?(Z|[+-]\d{2}:\d{2})?$")
 
@@ -280,6 +289,82 @@ def _docker_unavailable_reason() -> str | None:
     if code != 0:
         return f"docker daemon not reachable (exit {code}): {out.strip()[:400]}"
     return None
+
+
+def _verify_image_overlay_path() -> Path | None:
+    """Return the digest-overlay path when ``SEVN_VERIFY_IMAGE_OVERLAY`` opts in.
+
+    The overlay pins ``sevn-proxy`` and ``sevn-gateway`` ``image:`` to the
+    SHA-tagged images promoted by ``container-supply-chain`` (D45), so the
+    drivers actually exercise the published container images instead of
+    locally-rebuilt ones. The overlay is opt-in because local-dev stacks
+    have no published digest to pull from.
+
+    Returns:
+        Path | None: Resolved overlay path, or ``None`` when the opt-in is
+        unset, the overlay file is missing from the checkout, or the
+        required ``SEVN_VERIFY_IMAGE_TAG`` is empty (a malformed CI run).
+
+    Examples:
+        >>> import os
+        >>> _verify_image_overlay_path() is None
+        True
+    """
+    if os.environ.get(VERIFY_IMAGE_OVERLAY_ENV) != "1":
+        return None
+    if not os.environ.get("SEVN_VERIFY_IMAGE_TAG"):
+        return None
+    path = REPO / VERIFY_DIGESTS_COMPOSE
+    return path if path.is_file() else None
+
+
+def _compose_base(project: str, files: tuple[str, ...]) -> list[str]:
+    """Build a ``docker compose`` argv with the digest overlay appended when opted in.
+
+    Args:
+        project (str): Compose project name (keeps driver stacks isolated).
+        files (tuple[str, ...]): Compose files in merge order (base first).
+
+    Returns:
+        list[str]: ``docker compose -p <project> -f <a> -f <b> [-f <digest>]``.
+
+    Examples:
+        >>> _compose_base("p", ("docker/docker-compose.yml",))[:5]
+        ['docker', 'compose', '-p', 'p', '-f']
+    """
+    argv = ["docker", "compose", "-p", project]
+    for path in files:
+        argv.extend(["-f", path])
+    overlay = _verify_image_overlay_path()
+    if overlay is not None:
+        argv.extend(["-f", str(overlay)])
+    return argv
+
+
+def _compose_up_args(base: list[str], *extra: str) -> list[str]:
+    """Append ``up -d`` plus build/pull flags honoring the digest overlay.
+
+    With the digest overlay active, the merged config has ``build: !reset
+    null`` for the gateway/proxy services, so ``--build`` is a no-op for
+    those services and ``--no-build`` is the explicit, honest flag — it
+    forces compose to pull the published images rather than attempt to
+    build from source.
+
+    Args:
+        base (list[str]): The argv prefix returned by ``_compose_base``.
+        extra (str): Extra ``docker compose up`` flags after ``-d``.
+
+    Returns:
+        list[str]: Argv suitable for ``docker compose up``.
+
+    Examples:
+        >>> _compose_up_args(["docker", "compose"], "extra")[-3:]
+        ['-d', '--build', 'extra']
+    """
+    argv = [*base, "up", "-d"]
+    argv.append("--no-build" if _verify_image_overlay_path() is not None else "--build")
+    argv.extend(extra)
+    return argv
 
 
 def _parse_docker_time(value: str) -> datetime | None:
@@ -641,17 +726,17 @@ def drive_stack_health() -> DriverResult:
         "verify-stack-health-gateway-token-32chars-minimum-length",
     )
     env.pop("COMPOSE_PROFILES", None)
-    base = ["docker", "compose", "-p", project, "-f", OPERATOR_COMPOSE]
+    base = _compose_base(project, (OPERATOR_COMPOSE,))
 
     try:
         started = time.monotonic()
-        code, out = _run([*base, "up", "-d", "--build"], env=env, timeout=boot_timeout)
+        code, out = _run(_compose_up_args(base), env=env, timeout=boot_timeout)
         result.checks.append(
             Check(
                 name="stack-up",
                 status=STATUS_PASS if code == 0 else STATUS_FAIL,
                 detail=f"docker compose up exited {code} after {time.monotonic() - started:.1f}s",
-                command=" ".join([*base, "up", "-d", "--build"]),
+                command=" ".join(_compose_up_args(base)),
                 output=out.strip()[-4000:],
             )
         )
@@ -1043,16 +1128,16 @@ def drive_authenticated_proxy_roundtrip() -> DriverResult:
     env["SEVN_PROXY_SHARED_SECRET"] = secret
     env["SEVN_GATEWAY_TOKEN"] = gateway_token
     env.pop("COMPOSE_PROFILES", None)
-    base = ["docker", "compose", "-p", project, "-f", OPERATOR_COMPOSE, "-f", VERIFY_COMPOSE]
+    base = _compose_base(project, (OPERATOR_COMPOSE, VERIFY_COMPOSE))
 
     try:
-        code, out = _run([*base, "up", "-d", "--build"], env=env, timeout=boot_timeout)
+        code, out = _run(_compose_up_args(base), env=env, timeout=boot_timeout)
         result.checks.append(
             Check(
                 name="stack-up",
                 status=STATUS_PASS if code == 0 else STATUS_FAIL,
                 detail=f"docker compose up exited {code}",
-                command=" ".join([*base, "up", "-d", "--build"]),
+                command=" ".join(_compose_up_args(base)),
                 output=out.strip()[-4000:],
             )
         )
@@ -1269,14 +1354,14 @@ def drive_volume_upgrade() -> DriverResult:
             "verify-volume-upgrade-proxy-secret-32chars-min",
         )
         env.pop("COMPOSE_PROFILES", None)
-        base = ["docker", "compose", "-p", project, "-f", OPERATOR_COMPOSE]
-        code, out = _run([*base, "up", "-d", "--build"], env=env, timeout=boot_timeout)
+        base = _compose_base(project, (OPERATOR_COMPOSE,))
+        code, out = _run(_compose_up_args(base), env=env, timeout=boot_timeout)
         result.checks.append(
             Check(
                 name="stack-up",
                 status=STATUS_PASS if code == 0 else STATUS_FAIL,
                 detail=f"docker compose up exited {code}",
-                command=" ".join([*base, "up", "-d", "--build"]),
+                command=" ".join(_compose_up_args(base)),
                 output=out.strip()[-4000:],
             )
         )
@@ -1319,7 +1404,7 @@ def drive_volume_upgrade() -> DriverResult:
     finally:
         env = dict(os.environ)
         env.pop("COMPOSE_PROFILES", None)
-        base = ["docker", "compose", "-p", project, "-f", OPERATOR_COMPOSE]
+        base = _compose_base(project, (OPERATOR_COMPOSE,))
         _run([*base, "down", "-v", "--remove-orphans"], env=env, timeout=600.0)
         _run(["docker", "volume", "rm", "-f", volume], timeout=60.0)
 
@@ -1614,16 +1699,16 @@ def drive_sandbox_scoped_token() -> DriverResult:
     env["SEVN_PROXY_SHARED_SECRET"] = secret
     env["SEVN_GATEWAY_TOKEN"] = gateway_token
     env.pop("COMPOSE_PROFILES", None)
-    base = ["docker", "compose", "-p", project, "-f", OPERATOR_COMPOSE, "-f", VERIFY_COMPOSE]
+    base = _compose_base(project, (OPERATOR_COMPOSE, VERIFY_COMPOSE))
 
     try:
-        code, out = _run([*base, "up", "-d", "--build"], env=env, timeout=boot_timeout)
+        code, out = _run(_compose_up_args(base), env=env, timeout=boot_timeout)
         result.checks.append(
             Check(
                 name="stack-up",
                 status=STATUS_PASS if code == 0 else STATUS_FAIL,
                 detail=f"docker compose up exited {code}",
-                command=" ".join([*base, "up", "-d", "--build"]),
+                command=" ".join(_compose_up_args(base)),
                 output=out.strip()[-4000:],
             )
         )

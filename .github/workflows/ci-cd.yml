@@ -349,9 +349,12 @@ jobs:
     # Tag-path verification — a release that cannot run its own verification
     # has not been verified (D52, prod-readiness W23.2). exit 0 pass,
     # exit 1 fail, exit 2 driver_unavailable — ALL three are surfaced as
-    # job failures on the tag path. Drivers run against the published
-    # container images (no override required); a passing run here is the
-    # C14.1 / C14.2 / C14.3 evidence the release body cites.
+    # job failures on the tag path. Drivers opt into
+    # docker-compose.verify-digests.yml via SEVN_VERIFY_IMAGE_OVERLAY=1
+    # so they exercise the SHA-tagged images promoted by
+    # container-supply-chain (D45) — the C14.1 / C14.2 / C14.3 evidence
+    # the release body cites must test what was actually published, not
+    # a locally-rebuilt substitute (mergecraft review finding 3737950464).
     needs: [phase1, publish-ghcr, container-supply-chain]
     if: >-
       github.event_name == 'workflow_dispatch' ||
@@ -360,6 +363,16 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
+      # The `Cleanup quarantine tags on failure` step below calls
+      # `delete_quarantine_tags` → `gh api --method DELETE` against GHCR
+      # package versions (scripts/ghcr_quarantine_cleanup.sh:55-101). Package
+      # management requires the `packages` scope — both `publish-ghcr` (:93-95)
+      # and `container-supply-chain` (:224-227) declare `packages: write`. With
+      # only `contents: read`, the DELETE returns 403 and the script exits
+      # non-zero; `continue-on-error: true` swallows that exit and the cleanup
+      # silently no-ops, which is exactly the F-THERMOS-1 failure mode this
+      # step was added to close.
+      packages: write
     env:
       # Mirror the container-supply-chain job (:228-229) — IMAGE_REPOSITORY must
       # resolve at the job level so the cleanup step below sees it; the
@@ -375,13 +388,21 @@ jobs:
         # Exit 0 pass / exit 1 fail / exit 2 driver_unavailable; all three
         # non-zero codes fail the job here. A green job that skipped the
         # drivers would be worse than no job, so we let any non-zero exit
-        # propagate.
+        # propagate. ``SEVN_VERIFY_IMAGE_OVERLAY=1`` opts the drivers into
+        # docker-compose.verify-digests.yml so the stack pulls the
+        # SHA-tagged images promoted by container-supply-chain (D45) and
+        # the C14.1 release-tag evidence tests what was actually published
+        # — the mergecraft review caught that without the overlay the
+        # drivers ran ``docker compose up --build`` against the local
+        # checkout and the published digests were never exercised.
         env:
           SANDBOX_DIGEST: ${{ needs.publish-ghcr.outputs.sandbox_digest }}
           PROXY_DIGEST: ${{ needs.publish-ghcr.outputs.proxy_digest }}
           GATEWAY_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_digest }}
           GATEWAY_BROWSER_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_browser_digest }}
           GATEWAY_GUI_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_gui_digest }}
+          SEVN_VERIFY_IMAGE_OVERLAY: "1"
+          SEVN_VERIFY_IMAGE_TAG: ${{ github.sha }}
         run: make verify-deployment
 
       - name: Upload deployment evidence (evidence/verify/*.json)
@@ -453,8 +474,11 @@ jobs:
   phase6:
     name: Phase 6 — Release
     # Tag releases require successful deploy/test phases (D22). Phase6 stays draft-only
-    # until phases 4–5 are implemented (#172, D21).
-    needs: [phase1, publish-ghcr, container-supply-chain, phase4, phase5]
+    # until phases 4–5 are implemented (#172, D21). `verify-deployment` is in
+    # this list so the `download-artifact` step below cannot race the upload —
+    # GitHub Actions only guarantees job ordering via job-level `needs`, and
+    # `download-artifact@v4` fails hard when the artifact does not yet exist.
+    needs: [phase1, publish-ghcr, container-supply-chain, phase4, phase5, verify-deployment]
     environment: production
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest

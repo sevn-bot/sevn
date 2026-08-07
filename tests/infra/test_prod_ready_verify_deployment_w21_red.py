@@ -506,3 +506,144 @@ def test_no_dead_sevn_verify_proxy_port_reference() -> None:
         check=False,
     )
     assert completed.returncode == 1, completed.stdout or completed.stderr
+
+
+# ---------------------------------------------------------------------------
+# F-Thermos follow-up (mergecraft review 4885580594 / 3737950464) — drivers
+# must actually exercise the published container images, not locally-rebuilt
+# substitutes. The seam is opt-in via SEVN_VERIFY_IMAGE_OVERLAY=1 plus
+# SEVN_VERIFY_IMAGE_TAG=<sha>, so local-dev stacks with no published digest
+# stay on the local build path. Tests pin the topology so a regression to
+# "build from source on the tag path" is caught.
+# ---------------------------------------------------------------------------
+
+
+_VERIFY_DIGESTS_OVERLAY = _REPO_ROOT / "docker" / "docker-compose.verify-digests.yml"
+
+
+def test_verify_digests_overlay_exists_and_pins_images_to_tag() -> None:
+    """F-Thermos-V1 — the digest overlay must pin ``image:`` to ``<IMAGE_REPOSITORY>/<name>:<tag>``."""
+    assert _VERIFY_DIGESTS_OVERLAY.is_file(), (
+        "docker/docker-compose.verify-digests.yml must exist so the verify "
+        "drivers can exercise the published container images"
+    )
+    payload = yaml.safe_load(_VERIFY_DIGESTS_OVERLAY.read_text(encoding="utf-8"))
+    assert isinstance(payload, dict), "verify-digests overlay must be a YAML mapping"
+    services = payload.get("services")
+    assert isinstance(services, dict), "verify-digests overlay must declare services:"
+    for name in ("sevn-proxy", "sevn-gateway"):
+        service = services.get(name)
+        assert isinstance(service, dict), f"verify-digests overlay missing service {name!r}"
+        image = service.get("image")
+        assert isinstance(image, str), (
+            f"{name} must pin image: to a published-tag reference; got {image!r}"
+        )
+        assert "SEVN_VERIFY_IMAGE_TAG" in image, (
+            f"{name} image must interpolate SEVN_VERIFY_IMAGE_TAG (the SHA tag "
+            f"promoted by container-supply-chain); got {image!r}"
+        )
+        assert "IMAGE_REPOSITORY" in image, (
+            f"{name} image must interpolate IMAGE_REPOSITORY; got {image!r}"
+        )
+        # The overlay does not redeclare ``build:`` — the driver switches
+        # to ``--no-build`` when this overlay is active, so compose pulls
+        # the published image instead of rebuilding from source. Plain
+        # YAML works with the pre-commit ``check-yaml`` hook; ``!reset``
+        # (compose merge) does not.
+
+
+def test_ci_cd_exports_digest_overlay_env_to_verify_deployment() -> None:
+    """F-Thermos-V1 — the tag-path job must opt the drivers into the overlay."""
+    data = _load_yaml(_CI_CD)
+    job = data["jobs"]["verify-deployment"]
+    step_envs: list[dict[str, Any]] = []
+    for step in job.get("steps", []):
+        if not isinstance(step, dict):
+            continue
+        env = step.get("env")
+        if isinstance(env, dict):
+            step_envs.append(env)
+    # Step envs are unmerged; pull from job env too.
+    job_env = job.get("env") or {}
+    assert any(
+        str(env.get("SEVN_VERIFY_IMAGE_OVERLAY", "")) == "1" for env in (job_env, *step_envs)
+    ), (
+        "verify-deployment must set SEVN_VERIFY_IMAGE_OVERLAY=1 on the tag path "
+        "so the drivers actually exercise the published container images "
+        "(mergecraft review 3737950464)"
+    )
+    # The overlay image interpolates SEVN_VERIFY_IMAGE_TAG; the workflow
+    # must export github.sha into that env so the merged overlay pulls the
+    # SHA-tagged image promoted by container-supply-chain.
+    assert any(
+        "${{ github.sha }}" in str(env.get("SEVN_VERIFY_IMAGE_TAG", ""))
+        or str(env.get("SEVN_VERIFY_IMAGE_TAG", "")).startswith("github.sha")
+        for env in (job_env, *step_envs)
+    ), (
+        "verify-deployment must set SEVN_VERIFY_IMAGE_TAG=${{ github.sha }} "
+        "so the digest overlay references the SHA-tagged image"
+    )
+
+
+def test_verify_deployment_phase6_needs_include_verify_deployment() -> None:
+    """F-Thermos-V1 — phase6's download-artifact cannot race verify-deployment's upload.
+
+    Job-level ``needs`` is the only ordering guarantee in GitHub Actions; a
+    missing entry turns into a hard ``download-artifact`` failure the moment
+    the deploy phases land and phase6 actually runs.
+    """
+    data = _load_yaml(_CI_CD)
+    phase6 = data["jobs"]["phase6"]
+    needs = phase6.get("needs")
+    assert isinstance(needs, list), "phase6 must declare a list-form needs:"
+    assert "verify-deployment" in needs, (
+        "phase6 needs must include verify-deployment so the deployment "
+        "evidence download is ordered after the upload (mergecraft review "
+        "3737950458)"
+    )
+
+
+def test_verify_deployment_permissions_include_packages_write() -> None:
+    """F-Thermos-V1 — the cleanup step calls ghcr packages API; needs ``packages: write``."""
+    data = _load_yaml(_CI_CD)
+    job = data["jobs"]["verify-deployment"]
+    perms = job.get("permissions")
+    assert isinstance(perms, dict), "verify-deployment must declare permissions:"
+    assert perms.get("packages") == "write", (
+        "verify-deployment permissions must include packages: write so "
+        "delete_quarantine_tags (gh api DELETE on GHCR package versions) "
+        "is not silently 403'd under continue-on-error: true "
+        "(mergecraft review 3737950445)"
+    )
+
+
+def test_verify_digests_overlay_merges_to_pulled_image() -> None:
+    """F-Thermos-V1 — when the overlay env is set, the driver compose argv pulls the digest.
+
+    Source-level guard: ``_compose_base`` must append the overlay path and
+    ``_compose_up_args`` must switch from ``--build`` to ``--no-build`` so
+    compose pulls the published image instead of rebuilding from source.
+    """
+    source = _VERIFY_SCRIPT.read_text(encoding="utf-8")
+    assert "VERIFY_DIGESTS_COMPOSE" in source, (
+        "verify_deployment.py must declare VERIFY_DIGESTS_COMPOSE so the "
+        "drivers can find the digest overlay"
+    )
+    assert "_compose_base" in source, (
+        "verify_deployment.py must define _compose_base to append the "
+        "digest overlay when SEVN_VERIFY_IMAGE_OVERLAY=1 is set"
+    )
+    assert "_compose_up_args" in source, (
+        "verify_deployment.py must define _compose_up_args so the up "
+        "command switches from --build to --no-build when the overlay is "
+        "active (the overlay drops build: with !reset null)"
+    )
+    # Both helpers must read SEVN_VERIFY_IMAGE_OVERLAY to keep the seam
+    # opt-in (local dev has no published digest to pull).
+    overlay_window = source[
+        source.index("_verify_image_overlay_path") : source.index("_verify_image_overlay_path")
+        + 2400
+    ]
+    assert "SEVN_VERIFY_IMAGE_OVERLAY" in overlay_window, (
+        "_compose_base / _compose_up_args must read SEVN_VERIFY_IMAGE_OVERLAY"
+    )

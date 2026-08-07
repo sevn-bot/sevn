@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: MIT
+# Verify-only overlay that pins ``sevn-proxy`` and ``sevn-gateway`` to the
+# SHA-tagged images promoted by ``container-supply-chain`` (D45), so the
+# ``make verify-deployment`` drivers actually exercise the published
+# container images instead of locally-rebuilt ones.
+#
+# Drivers opt in via ``SEVN_VERIFY_IMAGE_OVERLAY=1`` (set by the
+# ``verify-deployment`` job on the tag + dispatch paths); without it the
+# overlay is not included and the local build path stays as the default.
+# The overlay is never used by the operator stack — the same convention
+# as ``docker/docker-compose.verify.yml`` (publishes the proxy host port).
+#
+# The drivers run ``docker compose up --no-build`` when this overlay is
+# active, so compose pulls the published image even though the merged
+# config still has the base ``build:`` directive. ``!reset null`` would
+# drop ``build:`` entirely, but ``check-yaml`` (the pre-commit
+# pre-commit-hooks default) does not recognise the docker-compose merge
+# tag; ``--no-build`` achieves the same outcome with plain YAML.
+
+services:
+  sevn-proxy:
+    image: ${IMAGE_REPOSITORY}/proxy:${SEVN_VERIFY_IMAGE_TAG}
+  sevn-gateway:
+    image: ${IMAGE_REPOSITORY}/gateway:${SEVN_VERIFY_IMAGE_TAG}
