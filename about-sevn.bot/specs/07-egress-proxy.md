@@ -8,7 +8,7 @@ summary: Product pairing (v1). Deployment, paired daemon install, onboarding val
   and Mission Control management of the proxy are specified in prd-06-setup-and-operations
   and prd-07-mission-control §5.1
 last_updated: '2026-08-07'
-fingerprint: sha256:a32a1b848d88afbe4effa901c05c5965b5bd4db6bf4c9995ae535bc65c7dc22d
+fingerprint: sha256:7511f7a40b8669625d96addbc2721a906cbacc1da620a789560842cef9516b67
 related: []
 sources:
 - src/sevn/proxy/**
@@ -149,6 +149,9 @@ interfaces:
 - name: DestinationNotAllowed
   file: src/sevn/proxy/session_limits.py
   symbol: DestinationNotAllowed
+- name: consume_response_bytes
+  file: src/sevn/proxy/session_limits.py
+  symbol: consume_response_bytes
 - name: consume_run_budget
   file: src/sevn/proxy/session_limits.py
   symbol: consume_run_budget

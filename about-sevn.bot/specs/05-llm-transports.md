@@ -8,7 +8,7 @@ summary: Normalize provider-shaped JSON over async HTTP to a single egress base 
   (SEVN_PROXY_URL / ProcessSettings.proxy_url), so tier executors bind once per turn
   and never touch raw secrets. LiteLLM may r
 last_updated: '2026-08-07'
-fingerprint: sha256:a32a1b848d88afbe4effa901c05c5965b5bd4db6bf4c9995ae535bc65c7dc22d
+fingerprint: sha256:7511f7a40b8669625d96addbc2721a906cbacc1da620a789560842cef9516b67
 related: []
 sources:
 - src/sevn/proxy/**
@@ -147,6 +147,9 @@ interfaces:
 - name: DestinationNotAllowed
   file: src/sevn/proxy/session_limits.py
   symbol: DestinationNotAllowed
+- name: consume_response_bytes
+  file: src/sevn/proxy/session_limits.py
+  symbol: consume_response_bytes
 - name: consume_run_budget
   file: src/sevn/proxy/session_limits.py
   symbol: consume_run_budget
