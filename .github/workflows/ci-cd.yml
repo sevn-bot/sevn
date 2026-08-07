@@ -330,6 +330,20 @@ jobs:
           path: sboms/
           if-no-files-found: error
 
+      # Runs inside container-supply-chain so a scan/sign/promote failure still
+      # cleans partial quarantine tags (C-9.5 / D52). Mirrors publish-ghcr's
+      # cleanup step at the head of the release path.
+      - name: Cleanup quarantine tags on failure
+        if: failure() || cancelled()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source scripts/ghcr_quarantine_cleanup.sh
+          delete_quarantine_tags "${IMAGE_REPOSITORY}" "${GITHUB_SHA}" "${GITHUB_RUN_ID}"
+
   verify-deployment:
     name: Deployment drivers (fails on driver_unavailable)
     # Tag-path verification — a release that cannot run its own verification
