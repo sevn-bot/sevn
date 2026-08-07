@@ -455,10 +455,10 @@ prd-sync: ## Refresh PRD frontmatter in about-sevn.bot/prd (skw docs sync)
 	fi
 
 prd-check: ## Validate+score every PRD in about-sevn.bot/prd (skw docs validate)
-	@if [ -d spec-kit-wave ]; then \
+	@if [ -d spec-kit-wave/src/skw ]; then \
 		$(MAKE) -C spec-kit-wave prd-check REPO_ROOT="$(CURDIR)"; \
 	else \
-		echo "prd-check: skipped (spec-kit-wave not present)"; \
+		echo "prd-check: skipped (spec-kit-wave/src/skw not present)"; \
 	fi
 
 spec-kit-wave-test: ## Run spec-kit-wave pytest suite (skw validators + sync contracts)
