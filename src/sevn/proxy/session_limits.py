@@ -7,11 +7,18 @@ Budget state lives **in-process** on the proxy, keyed by token ``run_id``. A pro
 restart clears counters (W20.3 tradeoff: durable budgets need shared storage the
 proxy does not yet have; silent reset is documented rather than pretended away).
 
+``_BUDGETS`` is lazily pruned: when a token is presented again, any entries whose
+``exp`` claim is in the past are dropped before the lookup. This bounds the
+dict's lifetime growth to the active token set (the prune-on-consume seam is
+the same lock-protected path used for state lookup, so concurrent callers
+serialise on the prune; it does not run on a background thread).
+
 Exports:
     DestinationNotAllowed — allowlist rejection.
     BudgetExceeded — request-count or byte budget exhaustion (not auth).
     destination_allowed — verify destination host against token allowlist.
     consume_run_budget — consume one request and ``request_bytes`` against the run.
+    consume_response_bytes — charge response bytes against the run (post-flight).
     reset_run_budgets_for_tests — clear in-process counters (tests only).
 
 Examples:
@@ -27,6 +34,7 @@ import hashlib
 import hmac
 import json
 import threading
+import time
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
@@ -49,10 +57,32 @@ class _RunBudgetState:
 
     requests: int = 0
     bytes_used: int = 0
+    exp: int | None = None
     lock: threading.Lock = field(default_factory=threading.Lock)
 
 
 _BUDGETS: dict[str, _RunBudgetState] = {}
+
+
+def _prune_expired_budgets(*, now: int | None = None) -> int:
+    """Drop ``_BUDGETS`` entries whose tracked ``exp`` claim is in the past.
+
+    Args:
+        now (int | None): Unix timestamp for the comparison (``time.time()`` default).
+
+    Returns:
+        int: Number of entries removed.
+
+    Examples:
+        >>> _prune_expired_budgets.__name__
+        '_prune_expired_budgets'
+    """
+    ts = int(time.time()) if now is None else int(now)
+    with _LOCK:
+        expired = [k for k, v in _BUDGETS.items() if v.exp is not None and v.exp < ts]
+        for k in expired:
+            _BUDGETS.pop(k, None)
+    return len(expired)
 
 
 def _verify_and_decode_payload(token: str, *, signing_key: str) -> dict[str, Any]:
@@ -191,6 +221,11 @@ def consume_run_budget(
     mint) are unlimited. Exhaustion raises :class:`BudgetExceeded` (distinct
     from auth ``401``).
 
+    The pre-flight ``request_bytes`` accounts for the request body that has
+    already been admitted past the ingress policy. Use :func:`consume_response_bytes`
+    post-flight to charge the bytes the proxy actually returns to the caller
+    so the byte budget bounds exfiltration volume, not just request size.
+
     Args:
         token (str): Signed session token carrying optional budget claims.
         signing_key (str): HMAC signing key.
@@ -223,6 +258,10 @@ def consume_run_budget(
     if max_bytes is None:
         max_bytes = payload.get("max_bytes")
     if max_requests is None and max_bytes is None:
+        state = _budget_state_for(run_id)
+        exp_claim = payload.get("exp")
+        if isinstance(exp_claim, int) and not isinstance(exp_claim, bool):
+            state.exp = exp_claim
         return
     if max_requests is not None and (
         not isinstance(max_requests, int) or isinstance(max_requests, bool) or max_requests < 0
@@ -235,7 +274,11 @@ def consume_run_budget(
         msg = "invalid max_bytes budget claim"
         raise BudgetExceeded(msg)
     nbytes = max(0, int(request_bytes))
+    _prune_expired_budgets()
     state = _budget_state_for(run_id)
+    exp_claim = payload.get("exp")
+    if isinstance(exp_claim, int) and not isinstance(exp_claim, bool):
+        state.exp = exp_claim
     with state.lock:
         if max_bytes is not None and state.bytes_used + nbytes > max_bytes:
             msg = (
@@ -250,6 +293,72 @@ def consume_run_budget(
             )
             raise BudgetExceeded(msg)
         state.requests += 1
+        state.bytes_used += nbytes
+
+
+def consume_response_bytes(
+    token: str,
+    *,
+    signing_key: str,
+    response_bytes: int,
+) -> None:
+    """Charge response bytes against the token's per-run byte budget (post-flight).
+
+    Called after the proxy has produced the response so the byte budget bounds
+    the volume actually returned to the caller (the egress payload, not the
+    request body). Tokens without a ``max_bytes`` / ``bytes`` claim are
+    unlimited; tokens that already exhausted the budget raise
+    :class:`BudgetExceeded` (distinct from auth ``401``).
+
+    Args:
+        token (str): Signed session token carrying optional byte budget.
+        signing_key (str): HMAC signing key.
+        response_bytes (int): Byte size attributed to the response payload.
+
+    Returns:
+        None: When the consume succeeds.
+
+    Raises:
+        BudgetExceeded: When the next response would exceed the byte limit.
+        ValueError: When the token cannot be verified.
+
+    Examples:
+        >>> consume_response_bytes.__name__
+        'consume_response_bytes'
+    """
+    payload = _verify_and_decode_payload(token, signing_key=signing_key)
+    run_id = payload.get("run_id")
+    if not isinstance(run_id, str) or not run_id:
+        msg = "session token missing run_id for budget tracking"
+        raise BudgetExceeded(msg)
+    limits = payload.get("limits")
+    max_bytes: object | None = None
+    if isinstance(limits, dict):
+        max_bytes = limits.get("bytes")
+    if max_bytes is None:
+        max_bytes = payload.get("max_bytes")
+    if max_bytes is None:
+        state = _budget_state_for(run_id)
+        exp_claim = payload.get("exp")
+        if isinstance(exp_claim, int) and not isinstance(exp_claim, bool):
+            state.exp = exp_claim
+        return
+    if not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes < 0:
+        msg = "invalid max_bytes budget claim"
+        raise BudgetExceeded(msg)
+    nbytes = max(0, int(response_bytes))
+    _prune_expired_budgets()
+    state = _budget_state_for(run_id)
+    exp_claim = payload.get("exp")
+    if isinstance(exp_claim, int) and not isinstance(exp_claim, bool):
+        state.exp = exp_claim
+    with state.lock:
+        if state.bytes_used + nbytes > max_bytes:
+            msg = (
+                f"byte budget exceeded for run {run_id!r}: "
+                f"used={state.bytes_used} response={nbytes} max={max_bytes}"
+            )
+            raise BudgetExceeded(msg)
         state.bytes_used += nbytes
 
 
@@ -269,6 +378,7 @@ def reset_run_budgets_for_tests() -> None:
 __all__ = [
     "BudgetExceeded",
     "DestinationNotAllowed",
+    "consume_response_bytes",
     "consume_run_budget",
     "destination_allowed",
     "reset_run_budgets_for_tests",

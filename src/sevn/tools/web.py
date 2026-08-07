@@ -36,6 +36,7 @@ import importlib.util
 import json
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlparse
+from uuid import uuid4
 
 import httpx
 from markdownify import markdownify as html_to_markdown
@@ -216,10 +217,14 @@ def build_egress_web_headers(
     if not token:
         from sevn.proxy.auth import SESSION_SCOPE_SANDBOX, mint_session_token
 
+        # Per-call random run id (was the constant ``"gateway-egress"``); the
+        # gateway holds the secret and could mint any token, but the constant
+        # made the run binding a no-op on this path and a leaked fallback
+        # token stayed usable for its full TTL under a known run id.
         token = mint_session_token(
             signing_key=secret,
             scope=SESSION_SCOPE_SANDBOX,
-            run_id="gateway-egress",
+            run_id=f"gateway-egress-{uuid4().hex[:12]}",
         )
     headers[_SESSION_TOKEN_HEADER] = token
     headers.update(_session_token_binding_headers(token))

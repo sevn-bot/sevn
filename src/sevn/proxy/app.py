@@ -68,6 +68,7 @@ from sevn.proxy.oauth_lifecycle import OauthCredentialMissingError
 from sevn.proxy.session_limits import (
     BudgetExceeded,
     DestinationNotAllowed,
+    consume_response_bytes,
     consume_run_budget,
     destination_allowed,
 )
@@ -114,6 +115,49 @@ def _enforce_session_egress_limits(
         return None
     try:
         consume_run_budget(session, signing_key=secret, request_bytes=request_bytes)
+    except BudgetExceeded as exc:
+        return JSONResponse({"detail": str(exc)}, status_code=429)
+    except ValueError:
+        return None
+    return None
+
+
+def _charge_session_response_bytes(
+    request: Request,
+    *,
+    settings: ProxySettings,
+    response_bytes: int,
+) -> JSONResponse | None:
+    """Charge response bytes against the session-token byte budget (post-flight).
+
+    The byte budget is enforced against the volume the proxy actually returns
+    to the caller (the egress payload), not the request body. A successful
+    request still drains the budget for the bytes it returned; an exhausted
+    budget surfaces as a ``429`` to the caller so a single over-egress call
+    cannot bypass the cap.
+
+    Args:
+        request (Request): ASGI request (session token header).
+        settings (ProxySettings): Proxy settings with signing secret.
+        response_bytes (int): Byte size attributed to the response payload.
+
+    Returns:
+        JSONResponse | None: ``429`` when budget exceeded; ``None`` when ok.
+
+    Examples:
+        >>> _charge_session_response_bytes.__name__
+        '_charge_session_response_bytes'
+    """
+    session = (request.headers.get("x-sevn-session-token") or "").strip()
+    secret = (settings.proxy_shared_secret or "").strip()
+    if not session or not secret or response_bytes <= 0:
+        return None
+    try:
+        consume_response_bytes(
+            session,
+            signing_key=secret,
+            response_bytes=response_bytes,
+        )
     except BudgetExceeded as exc:
         return JSONResponse({"detail": str(exc)}, status_code=429)
     except ValueError:
@@ -598,6 +642,20 @@ def create_app(
             return limited
         http_client = getattr(request.app.state, "http_client", None)
         status, payload = await web_fetch_json(raw_body, settings=cfg, client=http_client)
+        # Post-flight: charge the bytes the proxy actually pulled back from the
+        # upstream server (the ``text`` field is the egress payload the sandbox
+        # requested). When the budget is exhausted at this seam, return 429 so
+        # the caller knows the byte cap fired rather than receiving a 200 with
+        # truncated content.
+        response_text = payload.get("text") if isinstance(payload, dict) else None
+        response_bytes = len(response_text.encode("utf-8")) if isinstance(response_text, str) else 0
+        over_budget = _charge_session_response_bytes(
+            request,
+            settings=cfg,
+            response_bytes=response_bytes,
+        )
+        if over_budget is not None:
+            return over_budget
         return JSONResponse(payload, status_code=status)
 
     async def web_brave_search(request: Request) -> Response:
