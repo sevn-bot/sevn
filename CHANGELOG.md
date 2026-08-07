@@ -32,6 +32,7 @@ are cut into a dated, versioned section at release time.
 - [2026-08-05] Stock Compose with a blank ``SEVN_PROXY_SHARED_SECRET`` now uses the generate-once file for LLM proxy auth, web egress, sandbox session minting, and dashboard terminals — not only the proxy healthcheck path
 
 ### Security
+- [2026-08-07] Bump `h2` to 4.4.1 (CVE-2026-71554); pulls `hpack` 4.2.0 with it. `h2` arrives transitively via `httpx[http2]`, so the advisory failed `make security` on every branch until the lock was refreshed
 - [2026-08-06] Failed or cancelled GHCR publishes clean their own quarantine tags (not only supply-chain failures); quarantine cleanup fails closed on non-404 GHCR probe/list errors; `make check-no-curl-pipe-sh` scans all `.github/` text files (not an extension allowlist) and rejects backslash-continued `curl|sh` spellings
 - [2026-08-05] Release tooling installers are pinned and verified: syft/trivy via SHA-pinned Actions, `make ensure-uv` verifies a pinned GitHub release against **in-repo** `UV_SHA256_*` pins, and `make check-no-curl-pipe-sh` rejects downloader-piped-to-shell patterns (including quoted/`$()` forms) under `.github/` and the Makefile (C11.1, C11.2, C11.3)
 - [2026-08-05] Sandbox digest cache is keyed per configured image and locked across concurrent resolves; verify spawn uses the same ensure path and only treats empty-RepoDigests pull denial as D43 fail-closed (prod-readiness Batch B Thermos)
