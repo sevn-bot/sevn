@@ -405,7 +405,7 @@ about-docs-check: ## Validate about-docs + skw spec/prd folder gates
 	$(MAKE) prd-check
 
 spec-check: ## Validate+score every spec in about-sevn.bot/specs (skw docs validate)
-	@if [ -d spec-kit-wave ]; then \
+	@if [ -d spec-kit-wave/src/skw ]; then \
 		$(MAKE) -C spec-kit-wave spec-check REPO_ROOT="$(CURDIR)"; \
 	else \
 		echo "spec-check: skipped (spec-kit-wave not present)"; \
