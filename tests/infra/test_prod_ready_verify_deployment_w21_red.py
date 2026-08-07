@@ -19,6 +19,8 @@ from __future__ import annotations
 import ast
 import importlib.util
 import re
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -313,3 +315,114 @@ def test_release_attaches_verify_deployment_evidence() -> None:
     assert _release_attaches_verify_evidence(text, jobs), (
         "ci-cd.yml must attach evidence/verify/ on the release/tag path"
     )
+
+
+# ---------------------------------------------------------------------------
+# F-V3 - behavioural driver coverage (→ F-V4)
+# ---------------------------------------------------------------------------
+
+
+def _load_verify_module() -> Any:
+    spec = importlib.util.spec_from_file_location("verify_deployment_fv3", _VERIFY_SCRIPT)
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _healthy_driver_run(monkeypatch: pytest.MonkeyPatch, module: Any) -> Any:
+    monkeypatch.setattr(module, "_docker_unavailable_reason", lambda: None)
+    monkeypatch.setattr(module, "_run", lambda *args, **kwargs: (0, "stack ready"))
+
+    def http_probe(url: str, *args: Any, **kwargs: Any) -> tuple[int, str]:
+        if url.endswith("/healthz"):
+            return 200, "healthy"
+        return 401, "authentication required"
+
+    def authenticated_probe(url: str, *args: Any, **kwargs: Any) -> tuple[int, str]:
+        if "/llm/" in url:
+            return 403, "scope denied"
+        return 200, "authenticated"
+
+    monkeypatch.setattr(module, "_http_probe", http_probe)
+    monkeypatch.setattr(module, "_authenticated_probe", authenticated_probe)
+    monkeypatch.setattr(
+        "sevn.proxy.auth.mint_session_token",
+        lambda **kwargs: "test-session-token",
+    )
+    monkeypatch.setenv("SEVN_VERIFY_STACK_TIMEOUT_S", "1")
+    monkeypatch.setenv("SEVN_VERIFY_READY_TIMEOUT_S", "1")
+    return module
+
+
+@pytest.mark.xfail(reason="green after F-V1/F-V2: proxy driver topology", strict=False)
+def test_authenticated_proxy_roundtrip_driver_probes_via_live_stack(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-V3 - driver runtime must succeed under a healthy mocked stack."""
+    module = _healthy_driver_run(monkeypatch, _load_verify_module())
+    result = module.drive_authenticated_proxy_roundtrip()
+    assert result.name == "authenticated-proxy-roundtrip"
+    assert result.status not in {module.STATUS_FAIL, module.STATUS_UNAVAILABLE}
+    assert any(check.name == "proxy-healthz" for check in result.checks)
+
+
+@pytest.mark.xfail(reason="green after F-V1/F-V2: proxy driver topology", strict=False)
+def test_sandbox_scoped_token_driver_probes_via_live_stack(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-V3 - driver runtime must succeed under a healthy mocked stack."""
+    module = _healthy_driver_run(monkeypatch, _load_verify_module())
+    result = module.drive_sandbox_scoped_token()
+    assert result.name == "sandbox-scoped-token"
+    assert result.status not in {module.STATUS_FAIL, module.STATUS_UNAVAILABLE}
+    assert any(check.name == "proxy-healthz" for check in result.checks)
+
+
+@pytest.mark.xfail(
+    reason="green after F-V1/F-V2: proxy driver routes through a verify-compose overlay",
+    strict=False,
+)
+def test_no_driver_probes_unmapped_host_proxy_port() -> None:
+    """F-V3 - the proxy URL constant must be published by the verify compose overlay.
+
+    The F-V1/F-V2 fix introduced ``VERIFY_PROXY_URL`` and a verify-only compose
+    overlay that publishes the proxy port to the host. This test pins the
+    topology: the literal ``http://127.0.0.1:3102`` URL must be present **only**
+    as a single ``VERIFY_PROXY_URL`` constant, and the corresponding host:port
+    must be published by ``docker/docker-compose.verify.yml``. If anyone
+    re-introduces an inline ``f"http://127.0.0.1:{proxy_port}"`` interpolation
+    or drops the verify overlay, the topology breaks and this test fails.
+    """
+    source = _VERIFY_SCRIPT.read_text(encoding="utf-8")
+    inline = 'f"http://127.0.0.1:{proxy_port}"'
+    assert inline not in source, (
+        "no verify-deployment driver may inline the host proxy URL — "
+        "use the VERIFY_PROXY_URL constant backed by docker-compose.verify.yml"
+    )
+    assert source.count('VERIFY_PROXY_URL = "http://127.0.0.1:3102"') == 1, (
+        "VERIFY_PROXY_URL must be defined exactly once as http://127.0.0.1:3102"
+    )
+
+    verify_compose = _REPO_ROOT / "docker" / "docker-compose.verify.yml"
+    assert verify_compose.is_file(), (
+        "docker/docker-compose.verify.yml must publish the proxy host port for verify"
+    )
+    assert "127.0.0.1:3102:8787" in verify_compose.read_text(encoding="utf-8"), (
+        "docker-compose.verify.yml must publish 127.0.0.1:3102 → 8787 for verify probes"
+    )
+
+
+@pytest.mark.xfail(reason="green after F-V4: dead proxy environment variable removed", strict=False)
+def test_no_dead_sevn_verify_proxy_port_reference() -> None:
+    """F-V4 - keep the removed proxy-port environment variable out of shipped code."""
+    completed = subprocess.run(
+        ["git", "grep", "-n", "SEVN_VERIFY_PROXY_PORT", "--", "src/", "docker/", "scripts/"],
+        cwd=_REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 1, completed.stdout or completed.stderr
