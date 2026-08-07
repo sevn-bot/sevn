@@ -36,6 +36,10 @@ Multiple local sinks compose via [`MultiSink`](../../src/sevn/agent/tracing/mult
 
 Logfire operator toggles: [`logfire_config.py`](../../src/sevn/agent/tracing/logfire_config.py) (`apply_logfire_export_to_sevn_doc`, etc.).
 
+[`TraceExportFilter`](../../src/sevn/agent/tracing/trace_event_bridge.py) narrows what leaves the box: kinds in `tracing.export.exclude_kinds` are dropped on the bridge only, so local sqlite and JSONL sinks always keep the full stream and an excluded kind stays queryable on disk. Patterns match a kind exactly or as a prefix with a trailing `*`; turn-root spans are never filtered, since child spans resolve their parent through that bookkeeping.
+
+Export hygiene lives in [`otel_pipeline.py`](../../src/sevn/tracing/otel_pipeline.py): httpx spans capture headers (not bodies, which duplicate the pydantic-ai payloads), a request hook redacts the Telegram `/bot<token>/` URL segment because Logfire treats `url.full` as a safe key, and `scrubbing_options` allowlists `sevn.session_id` so traces stay groupable by session.
+
 ### Emit never throws
 
 In [`sink.py`](../../src/sevn/agent/tracing/sink.py), [`TraceSink.emit`](../../src/sevn/agent/tracing/sink.py#L135) implementations swallow I/O errors; [`redacting_sink.py`](../../src/sevn/agent/tracing/redacting_sink.py) [`RedactingSink`](../../src/sevn/agent/tracing/redacting_sink.py) wraps the composite once via [`_wrap_with_redaction`](../../src/sevn/agent/tracing/sink_factory.py#L78) in [`sink_factory.py`](../../src/sevn/agent/tracing/sink_factory.py). Subscribers hook through [`emit.py`](../../src/sevn/agent/tracing/emit.py) [`register_trace_subscriber`](../../src/sevn/agent/tracing/emit.py#L27).
@@ -44,6 +48,7 @@ In [`sink.py`](../../src/sevn/agent/tracing/sink.py), [`TraceSink.emit`](../../s
 
 - `sinks[]` — `{ sink_type, path?, token_ref? }` entries
 - `redaction.enabled`, `deny_keys`, `deny_value_patterns`
+- `export.exclude_kinds` — kinds dropped on the remote bridge only (default: `snapshot.checkpoint`)
 - Maintenance CLI: `sevn traces …` (see spec)
 
 Validate: `sevn config validate`.
