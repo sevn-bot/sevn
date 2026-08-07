@@ -360,6 +360,13 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
+    env:
+      # Mirror the container-supply-chain job (:228-229) — IMAGE_REPOSITORY must
+      # resolve at the job level so the cleanup step below sees it; the
+      # F-Thermos review caught this as a regression where the cleanup step's
+      # `${IMAGE_REPOSITORY}` expansion was empty and the cleanup script
+      # silently no-op'd under `continue-on-error: true`.
+      IMAGE_REPOSITORY: ${{ needs.publish-ghcr.outputs.image_repository }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: ./.github/actions/bootstrap
@@ -370,7 +377,6 @@ jobs:
         # drivers would be worse than no job, so we let any non-zero exit
         # propagate.
         env:
-          IMAGE_REPOSITORY: ${{ needs.publish-ghcr.outputs.image_repository }}
           SANDBOX_DIGEST: ${{ needs.publish-ghcr.outputs.sandbox_digest }}
           PROXY_DIGEST: ${{ needs.publish-ghcr.outputs.proxy_digest }}
           GATEWAY_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_digest }}
