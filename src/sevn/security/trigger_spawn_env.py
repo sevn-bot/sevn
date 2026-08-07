@@ -10,6 +10,7 @@ Exports:
     is_webhook_trigger_scope — detect trigger sessions spawned from webhooks.
     minimal_webhook_host_env — strip secret keys from a host env mapping.
     redact_telegram_bot_token — redact bot tokens from free-form error text.
+    redact_telegram_bot_url — redact ``/bot<token>/`` URL segments without the token.
 """
 
 from __future__ import annotations
@@ -199,6 +200,28 @@ def bind_webhook_minimal_host_env() -> Iterator[None]:
         _WEBHOOK_MINIMAL_HOST_ENV.reset(token)
 
 
+def redact_telegram_bot_url(text: str) -> str:
+    """Remove the token from any ``/bot<token>/`` Bot API URL segment.
+
+    Pattern-only counterpart to :func:`redact_telegram_bot_token` for callers that
+    never hold the token — notably the httpx span hook in
+    :mod:`sevn.tracing.otel_pipeline`, which sees only the outbound URL.
+
+    Args:
+        text (str): Raw URL or log line.
+
+    Returns:
+        str: Text with every Bot API token segment replaced.
+
+    Examples:
+        >>> redact_telegram_bot_url("https://api.telegram.org/bot123:ABC/getUpdates")
+        'https://api.telegram.org/bot<redacted>/getUpdates'
+        >>> redact_telegram_bot_url("https://example.test/health")
+        'https://example.test/health'
+    """
+    return _TELEGRAM_BOT_URL_RE.sub("/bot<redacted>/", text)
+
+
 def redact_telegram_bot_token(text: str, token: str) -> str:
     """Remove a Telegram bot token from free-form error text.
 
@@ -215,8 +238,7 @@ def redact_telegram_bot_token(text: str, token: str) -> str:
     """
     if not token:
         return text
-    cleaned = text.replace(token, "<redacted>")
-    return _TELEGRAM_BOT_URL_RE.sub("/bot<redacted>/", cleaned)
+    return redact_telegram_bot_url(text.replace(token, "<redacted>"))
 
 
 __all__ = [
@@ -226,4 +248,5 @@ __all__ = [
     "is_webhook_trigger_scope",
     "minimal_webhook_host_env",
     "redact_telegram_bot_token",
+    "redact_telegram_bot_url",
 ]

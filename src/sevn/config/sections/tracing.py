@@ -6,6 +6,7 @@ Depends: pydantic, sevn.config.defaults
 Exports:
     TraceSinkEntry — one sink in ``tracing.sinks``.
     TraceRedactionConfig — ``tracing.redaction`` deny rules (`specs/04-tracing.md` §2.5).
+    TraceExportConfig — ``tracing.export`` remote-only kind filter.
     TracingConfig — ``tracing`` block subset.
 """
 
@@ -14,6 +15,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from sevn.config.defaults import (
+    DEFAULT_TRACE_EXPORT_EXCLUDE_KINDS,
     DEFAULT_TRACE_REDACTION_DENY_KEYS,
     DEFAULT_TRACE_REDACTION_DENY_VALUE_PATTERNS,
     DEFAULT_TRACE_REDACTION_ENABLED,
@@ -45,6 +47,21 @@ class TraceRedactionConfig(BaseModel):
     )
 
 
+class TraceExportConfig(BaseModel):
+    """``tracing.export`` — kinds dropped on the remote bridge only.
+
+    Local ``sqlite`` / ``jsonl_file`` sinks always receive the full stream; this
+    filter applies solely to the OTel / Logfire bridge, so an excluded kind stays
+    queryable on-box while no longer costing egress or vendor span count.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    exclude_kinds: list[str] = Field(
+        default_factory=lambda: list(DEFAULT_TRACE_EXPORT_EXCLUDE_KINDS),
+    )
+
+
 class TracingConfig(BaseModel):
     """Trace retention and sink list."""
 
@@ -53,3 +70,4 @@ class TracingConfig(BaseModel):
     retention_days: int | None = None
     sinks: list[TraceSinkEntry] | None = None
     redaction: TraceRedactionConfig | None = None
+    export: TraceExportConfig | None = None

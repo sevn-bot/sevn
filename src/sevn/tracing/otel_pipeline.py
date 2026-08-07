@@ -11,6 +11,7 @@ Exports:
     is_otel_export_configured — whether OTLP processors are attached.
     reset_otel_pipeline_for_tests — test isolation hook.
     resolve_otlp_targets — parse otel/logfire sink entries into export targets.
+    scrubbing_options — Logfire scrubbing that keeps sevn correlation ids intact.
 Examples:
     >>> from sevn.tracing.otel_pipeline import is_otel_export_configured
     >>> isinstance(is_otel_export_configured(), bool)
@@ -31,13 +32,29 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter
 
 from sevn.security.secrets.value_expand import expand_env_refs
+from sevn.security.trigger_spawn_env import redact_telegram_bot_url
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from typing import Any
 
+    from logfire import ScrubbingOptions, ScrubMatch
+    from logfire.integrations.httpx import RequestInfo
+    from opentelemetry.trace import Span
     from pydantic_ai.capabilities.instrumentation import Instrumentation
 
     from sevn.config.workspace_config import TraceSinkEntry, WorkspaceConfig
+
+# Attribute keys the OTel httpx instrumentation writes the outbound URL to. Both are
+# in Logfire's ``BaseScrubber.SAFE_KEYS``, so the default scrubber never touches them
+# and a token embedded in the URL *path* (Telegram's ``/bot<token>/``) would ship
+# verbatim. OTel's own ``redact_url`` only covers userinfo and signed query params.
+_HTTPX_URL_ATTRIBUTE_KEYS: tuple[str, ...] = ("url.full", "http.url")
+
+# sevn correlation ids that collide with Logfire's default scrub patterns. Without
+# this allowlist ``sevn.session_id`` is redacted on every exported span and grouping
+# a Logfire trace by session becomes impossible.
+_SCRUB_ALLOWLIST_ATTRIBUTES: frozenset[str] = frozenset({"sevn.session_id"})
 
 
 class _OtlpExporterFactory(Protocol):
@@ -75,6 +92,96 @@ class OtlpExportTarget:
     endpoint: str
     headers: dict[str, str]
     service_name: str
+
+
+def _redact_span_url(span: Span, url: str) -> None:
+    """Overwrite a client span's URL attributes with a token-free URL.
+
+    Args:
+        span (Span): Live httpx client span, already carrying its URL attributes.
+        url (str): Outbound request URL as httpx will send it.
+
+    Examples:
+        >>> _redact_span_url(trace.NonRecordingSpan(trace.INVALID_SPAN_CONTEXT), "x") is None
+        True
+    """
+    safe = redact_telegram_bot_url(url)
+    if safe == url:
+        return
+    existing = getattr(span, "attributes", None) or {}
+    for key in _HTTPX_URL_ATTRIBUTE_KEYS:
+        if key in existing:
+            span.set_attribute(key, safe)
+
+
+def _httpx_request_hook(span: Span, request: RequestInfo) -> None:
+    """Strip Bot API tokens from sync httpx client spans.
+
+    Args:
+        span (Span): Span created for the outbound request.
+        request (RequestInfo): httpx request metadata.
+
+    Examples:
+        >>> import inspect
+        >>> list(inspect.signature(_httpx_request_hook).parameters)
+        ['span', 'request']
+    """
+    _redact_span_url(span, str(request.url))
+
+
+async def _httpx_async_request_hook(span: Span, request: RequestInfo) -> None:
+    """Strip Bot API tokens from async httpx client spans.
+
+    The gateway's Telegram transport uses ``httpx.AsyncClient``, so this is the hook
+    that actually fires for ``getUpdates`` — the sync one is registered for parity.
+
+    Args:
+        span (Span): Span created for the outbound request.
+        request (RequestInfo): httpx request metadata.
+
+    Examples:
+        >>> import inspect
+        >>> inspect.iscoroutinefunction(_httpx_async_request_hook)
+        True
+    """
+    _redact_span_url(span, str(request.url))
+
+
+def _keep_sevn_correlation_ids(match: ScrubMatch) -> Any:
+    """Preserve allowlisted sevn ids that Logfire's default patterns would redact.
+
+    Args:
+        match (ScrubMatch): One candidate redaction from Logfire's scrubber.
+
+    Returns:
+        Any: The original value to keep it, or ``None`` to let redaction proceed.
+
+    Examples:
+        >>> _keep_sevn_correlation_ids.__name__
+        '_keep_sevn_correlation_ids'
+    """
+    if match.path and str(match.path[-1]) in _SCRUB_ALLOWLIST_ATTRIBUTES:
+        return match.value
+    return None
+
+
+def scrubbing_options() -> ScrubbingOptions:
+    """Return Logfire scrubbing that keeps sevn correlation ids readable.
+
+    Every default pattern still applies; only :data:`_SCRUB_ALLOWLIST_ATTRIBUTES`
+    is exempted, so ``sevn.session_id`` survives export and Logfire traces stay
+    groupable by session.
+
+    Returns:
+        ScrubbingOptions: Options to pass to :func:`logfire.configure`.
+
+    Examples:
+        >>> scrubbing_options().callback is not None
+        True
+    """
+    import logfire
+
+    return logfire.ScrubbingOptions(callback=_keep_sevn_correlation_ids)
 
 
 def is_otel_export_configured() -> bool:
@@ -319,9 +426,17 @@ def configure_gateway_otel(
             token=logfire_token or None,
             send_to_logfire=True if logfire_token else "if-token-present",
             additional_span_processors=processors or None,
+            scrubbing=scrubbing_options(),
         )
         logfire.instrument_pydantic_ai()
-        logfire.instrument_httpx(capture_all=True)
+        # Headers only: ``capture_all=True`` also shipped full request/response bodies,
+        # which duplicated every LLM payload already captured by ``instrument_pydantic_ai``
+        # and mirrored all inbound Telegram message content into the export.
+        logfire.instrument_httpx(
+            capture_headers=True,
+            request_hook=_httpx_request_hook,
+            async_request_hook=_httpx_async_request_hook,
+        )
         provider = trace.get_tracer_provider()
         if isinstance(provider, TracerProvider):
             return provider
@@ -386,8 +501,12 @@ def configure_proxy_otel(
             token=logfire_token or None,
             send_to_logfire=True if logfire_token else "if-token-present",
             additional_span_processors=processors or None,
+            scrubbing=scrubbing_options(),
         )
-        logfire.instrument_httpx()
+        logfire.instrument_httpx(
+            request_hook=_httpx_request_hook,
+            async_request_hook=_httpx_async_request_hook,
+        )
         return
 
     resource = Resource.create({"service.name": "sevn-proxy"})
@@ -498,4 +617,5 @@ __all__ = [
     "is_otel_export_configured",
     "reset_otel_pipeline_for_tests",
     "resolve_otlp_targets",
+    "scrubbing_options",
 ]

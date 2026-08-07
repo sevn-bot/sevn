@@ -7,8 +7,8 @@ owner: Alex
 summary: Provide durable trace sinks that implement TraceSink without ever throwing
   through emit, so instrumentation stays off the critical path. SQLite layout matches
   Mission Control query patterns (prd-07-mi
-last_updated: '2026-07-31'
-fingerprint: sha256:1bc9a6c5b932151f3eaf40fdc9d56f40bcb6ff8806b9c7b6c230cb777ff58774
+last_updated: '2026-08-06'
+fingerprint: sha256:9ea210d39c5cf7d43c087492b624e6637bfec8cddf5831471dcb8511b4fd97a9
 related: []
 sources:
 - src/sevn/agent/tracing/**
@@ -173,6 +173,9 @@ interfaces:
 - name: TraceEventOtelBridge
   file: src/sevn/agent/tracing/trace_event_bridge.py
   symbol: TraceEventOtelBridge
+- name: TraceExportFilter
+  file: src/sevn/agent/tracing/trace_event_bridge.py
+  symbol: TraceExportFilter
 - name: attach_turn_trace_context
   file: src/sevn/agent/tracing/trace_event_bridge.py
   symbol: attach_turn_trace_context

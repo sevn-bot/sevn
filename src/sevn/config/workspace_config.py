@@ -146,7 +146,12 @@ from sevn.config.sections.subagents import (
 from sevn.config.sections.subagents import (
     resolve_limits as resolve_subagent_limits,
 )
-from sevn.config.sections.tracing import TraceRedactionConfig, TraceSinkEntry, TracingConfig
+from sevn.config.sections.tracing import (
+    TraceExportConfig,
+    TraceRedactionConfig,
+    TraceSinkEntry,
+    TracingConfig,
+)
 from sevn.config.sections.triager import TriagerTimeoutConfig, TriagerWorkspaceConfig
 
 rlm_json_dict = _accessors_section.rlm_json_dict
@@ -286,6 +291,7 @@ __all__ = [
     "TelemetryWorkspaceSectionConfig",
     "TierCdExecutorConfig",
     "TierCdLambdaRlmConfig",
+    "TraceExportConfig",
     "TraceRedactionConfig",
     "TraceSinkEntry",
     "TracingConfig",

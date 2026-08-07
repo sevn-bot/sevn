@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 import random
 import secrets
 import socket
@@ -32,6 +33,25 @@ from sevn.config.defaults import TELEGRAM_SET_MY_COMMANDS_DEBOUNCE_S
 _POLL_BACKOFF_SCHEDULE_S = (1.0, 2.0, 5.0, 15.0, 30.0)
 _POLL_BACKOFF_CAP_S = 30.0
 _GET_UPDATES_TIMEOUT = 30
+
+
+def _poll_cycle_tick_tracing_enabled() -> bool:
+    """Return whether every poll iteration should emit a ``poll.cycle`` span.
+
+    Off by default: at a 30s long-poll the per-iteration tick produced ~2,400
+    zero-duration, parentless spans per day — roughly half of all product spans —
+    while carrying no duration and no outcome. Transitions (offline / recovered)
+    are always traced; set ``SEVN_TRACE_POLL_CYCLE=1`` to restore per-tick spans
+    when debugging the loop itself.
+
+    Returns:
+        bool: ``True`` when the debug env flag is set.
+
+    Examples:
+        >>> isinstance(_poll_cycle_tick_tracing_enabled(), bool)
+        True
+    """
+    return os.environ.get("SEVN_TRACE_POLL_CYCLE", "").strip().lower() in ("1", "true", "yes")
 
 
 def core_bot_commands() -> list[dict[str, str]]:
@@ -325,12 +345,14 @@ class TelegramPollMixin(TelegramSendHost):
         poll_backoff_attempt = 0
         poll_was_offline = False
         poll_offline_detail_logged = False
+        trace_every_tick = _poll_cycle_tick_tracing_enabled()
         while not self._stop.is_set():
-            await self._emit_trace(
-                kind="channel.telegram.poll.cycle",
-                status="tick",
-                attrs={"offset": self._last_update_id + 1},
-            )
+            if trace_every_tick:
+                await self._emit_trace(
+                    kind="channel.telegram.poll.cycle",
+                    status="tick",
+                    attrs={"offset": self._last_update_id + 1},
+                )
             try:
                 res = await self._api(
                     "getUpdates",
@@ -363,6 +385,14 @@ class TelegramPollMixin(TelegramSendHost):
                         "telegram_poll_recovered host={}",
                         _TELEGRAM_API_HOST,
                     )
+                    await self._emit_trace(
+                        kind="channel.telegram.poll.cycle",
+                        status="recovered",
+                        attrs={
+                            "offset": self._last_update_id + 1,
+                            "offline_attempts": poll_backoff_attempt,
+                        },
+                    )
                     await self._probe_rich_capability(force=True)
                 poll_was_offline = False
                 poll_offline_detail_logged = False
@@ -380,6 +410,16 @@ class TelegramPollMixin(TelegramSendHost):
                             exc,
                         )
                         poll_offline_detail_logged = True
+                        # One span per outage, not per retry — the backoff loop can
+                        # spin for hours while the host is unreachable.
+                        await self._emit_trace(
+                            kind="channel.telegram.poll.cycle",
+                            status="offline",
+                            attrs={
+                                "offset": self._last_update_id + 1,
+                                "error": type(exc).__name__,
+                            },
+                        )
                     poll_was_offline = True
                     delay = _poll_backoff_delay_s(poll_backoff_attempt)
                     poll_backoff_attempt += 1

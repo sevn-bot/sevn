@@ -99,6 +99,8 @@ Exports:
     DEFAULT_TRACE_REDACTION_DENY_KEYS — default sensitive attribute key substrings (same).
     DEFAULT_TRACE_REDACTION_DENY_VALUE_PATTERNS — default value regexes (same).
     DEFAULT_TRACING_REDACTION — bundled ``tracing.redaction`` object for docs / seed parity.
+    DEFAULT_TRACE_EXPORT_EXCLUDE_KINDS — kinds dropped on the remote export bridge.
+    DEFAULT_TRACING_EXPORT — bundled ``tracing.export`` object for docs / seed parity.
     DEFAULT_TRACING_SINKS — default ``tracing.sinks[]`` (sqlite + daily JSONL dir).
     DEFAULT_TURN_BUNDLES_ENABLED — ``diagnostics.turn_bundles.enabled`` default (off).
     DEFAULT_DIAGNOSTICS_TURN_BUNDLES — bundled ``diagnostics.turn_bundles`` object.
@@ -624,6 +626,14 @@ DEFAULT_TRACING_REDACTION: Final[dict[str, object]] = {
     "enabled": DEFAULT_TRACE_REDACTION_ENABLED,
     "deny_keys": list(DEFAULT_TRACE_REDACTION_DENY_KEYS),
     "deny_value_patterns": list(DEFAULT_TRACE_REDACTION_DENY_VALUE_PATTERNS),
+}
+# Remote export (`tracing.export`) — kinds dropped on the OTel/Logfire bridge only.
+# Local sqlite/jsonl sinks always receive the full stream, so excluding a kind here
+# trims egress and vendor span count without losing local forensics. Entries match a
+# kind exactly, or as a prefix when they end with ``*``.
+DEFAULT_TRACE_EXPORT_EXCLUDE_KINDS: Final[tuple[str, ...]] = ("snapshot.checkpoint",)
+DEFAULT_TRACING_EXPORT: Final[dict[str, object]] = {
+    "exclude_kinds": list(DEFAULT_TRACE_EXPORT_EXCLUDE_KINDS),
 }
 DEFAULT_TRACING_SINKS: Final[list[dict[str, str]]] = [
     {"type": "sqlite"},
