@@ -32,6 +32,8 @@ are cut into a dated, versioned section at release time.
 - [2026-08-05] `SEVN_PROXY_SHARED_SECRET` is a first-class `ProcessSettings` / schema process-settings variable; gateway `resolve_proxy_shared_secret` resolves the workspace secrets chain when process env is empty (env still wins for external secret managers)
 - [2026-08-05] **Breaking:** Mission Control `local_open` on loopback now requires the boot-written `local_token` query parameter — tokenless loopback no longer grants owner session claims; set `dashboard.local_open_trust_address: true` to restore address-only trust (#169, post-audit Batch E)
 - [2026-08-05] CLI dashboard reads (`sevn models`, `sevn agent config`, `sevn channels status`, and related commands) append the boot `local_token` when calling loopback Mission Control with effective local-open (#169, post-audit Batch E W18)
+- [2026-08-05] **Security:** `dashboard.local_open_trust_address` is force-disabled when a tunnel (`tunnel.mode` configured) or a non-loopback `gateway.host` is in effect — the address-only escape hatch cannot be combined with a remote surface (prod-readiness C6.2, Batch F W22.1)
+- [2026-08-05] Dashboard boot logs a WARNING when `dashboard.local_open_trust_address: true` is enabled and the gateway is reachable, and the CLI dashboard help text no longer claims tokenless loopback grants owner session claims (prod-readiness C6.4, Batch F W22.2/W22.3)
 
 ### Fixed
 - [2026-08-08] Pre-commit `sevn-check-agents` hook now scans the worktree's own `.claude/agents`, `.cursor/agents`, and `spec-kit-wave/agents` content instead of the operator's main-checkout files, so commits from a worktree no longer fail on stale agent definitions copied from the main checkout (#249)
