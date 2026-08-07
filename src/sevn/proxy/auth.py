@@ -166,22 +166,72 @@ def _scope_allows_path(scope: str, path: str) -> bool:
     return False
 
 
+def _check_binding(
+    *,
+    claim_value: str,
+    request_value: str,
+    label: str,
+) -> bool:
+    """Return ``True`` when a token claim equals the request-attributed value.
+
+    Helper for the proxy seam: the request side is always a real string (the
+    proxy call site populates it from the header, falling back to an empty
+    string when the header is absent). A token with a ``claim_value`` presented
+    against a missing request-side binding is rejected — a missing header
+    means a missing claim, not a free pass.
+
+    Args:
+        claim_value (str): Value embedded in the token payload.
+        request_value (str): Request-attributed value resolved from headers.
+        label (str): Human label used for log/error context.
+
+    Returns:
+        bool: ``True`` when the values match.
+
+    Examples:
+        >>> _check_binding(claim_value="run-a", request_value="run-a", label="run_id")
+        True
+        >>> _check_binding(claim_value="run-a", request_value="run-b", label="run_id")
+        False
+        >>> _check_binding(claim_value="ctr-a", request_value="", label="container_id")
+        False
+    """
+    _ = label
+    if not request_value:
+        return False
+    return hmac.compare_digest(claim_value, request_value)
+
+
 def mint_session_token(
     *,
     signing_key: str,
     scope: str,
     run_id: str,
     container_id: str | None = None,
+    destination_allowed: list[str] | None = None,
+    request_budget: int | None = None,
+    byte_budget: int | None = None,
     expires_at: int | None = None,
     ttl_s: int = DEFAULT_SESSION_TOKEN_TTL_S,
 ) -> str:
-    """Mint a scoped per-run ``X-Sevn-Session-Token`` (D12 / C7.1).
+    """Mint a scoped per-run ``X-Sevn-Session-Token`` (D12 / C7.1, C7.3).
 
     Args:
         signing_key (str): ``SEVN_PROXY_SHARED_SECRET`` used for HMAC signing.
         scope (str): Route-family scope (``sandbox`` or ``llm``).
         run_id (str): Correlation id embedded in the payload.
         container_id (str | None): Optional spawning-container bind id (C7.1).
+            A token minted without a ``container_id`` claim is not container-bound.
+        destination_allowed (list[str] | None): Optional host allowlist claim
+            (C7.3). When present, the proxy rejects outbound destinations whose
+            host is not in this list. ``None`` (or omitted) emits no claim and
+            the proxy does not enforce an allowlist.
+        request_budget (int | None): Optional per-run request-count budget (C7.3).
+            ``None`` (or omitted) emits no claim and the proxy does not enforce
+            a request budget.
+        byte_budget (int | None): Optional per-run byte budget (C7.3). ``None``
+            (or omitted) emits no claim and the proxy does not enforce a byte
+            budget.
         expires_at (int | None): Unix expiry; defaults to ``now + ttl_s``.
         ttl_s (int): Seconds until expiry when ``expires_at`` is omitted.
 
@@ -202,6 +252,15 @@ def mint_session_token(
     payload: dict[str, object] = {"scope": scope, "exp": exp, "run_id": run_id}
     if container_id is not None:
         payload["container_id"] = container_id
+    limits: dict[str, object] = {}
+    if destination_allowed is not None:
+        limits["destinations"] = list(destination_allowed)
+    if request_budget is not None:
+        limits["requests"] = int(request_budget)
+    if byte_budget is not None:
+        limits["bytes"] = int(byte_budget)
+    if limits:
+        payload["limits"] = limits
     raw = json.dumps(payload, separators=(",", ":"), sort_keys=True)
     body = base64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
     sig = hmac.new(signing_key.encode(), body.encode(), hashlib.sha256).hexdigest()
@@ -217,11 +276,22 @@ def validate_session_token(
     run_id: str | None = None,
     container_id: str | None = None,
 ) -> bool:
-    """Verify signature, expiry, route-family scope, and optional run/container binds.
+    """Verify signature, expiry, route-family scope, and run/container binds.
 
-    When ``run_id`` or ``container_id`` are passed (including from request headers),
-    they must match the corresponding claims in the token payload. Omitting a kwarg
-    skips that binding check (unit paths that only assert signature/scope/expiry).
+    The ``run_id`` and ``container_id`` kwargs reflect the request-attributed
+    binding values (the proxy resolves them from headers, defaulting to ``""``
+    when a header is absent — never ``None``). When a binding is supplied:
+
+    - if the token has a claim for it, the values must match (mismatch → reject);
+    - if the token has no claim for it, the request still must not present a
+      non-empty binding value (otherwise the token is being used outside the
+      scope it was minted for).
+
+    Passing ``None`` for ``run_id`` / ``container_id`` skips the binding check
+    **only** on the low-level seam — unit paths that need to assert signature,
+    expiry, or scope without exercising bindings. The proxy call site must
+    always populate these kwargs with the resolved header (or ``""``), so a
+    missing header is treated as a binding mismatch, not a free pass.
 
     Args:
         token (str): ``X-Sevn-Session-Token`` header value.
@@ -274,11 +344,24 @@ def validate_session_token(
         return False
     if not _scope_allows_path(scope, path):
         return False
-    if run_id is not None and payload.get("run_id") != run_id:
-        return False
+    if run_id is not None:
+        token_run_id = payload.get("run_id")
+        if not isinstance(token_run_id, str) or not _check_binding(
+            claim_value=token_run_id,
+            request_value=run_id,
+            label="run_id",
+        ):
+            return False
     if container_id is not None:
         token_cid = payload.get("container_id")
-        if token_cid is not None and token_cid != container_id:
+        if token_cid is not None:
+            if not _check_binding(
+                claim_value=token_cid,
+                request_value=container_id,
+                label="container_id",
+            ):
+                return False
+        elif container_id:
             return False
     return True
 
@@ -342,8 +425,8 @@ def llm_post_auth_failure(
         session_token,
         signing_key=proxy_shared_secret,
         path=path,
-        run_id=request.headers.get(_RUN_ID_HEADER),
-        container_id=request.headers.get(_CONTAINER_ID_HEADER),
+        run_id=request.headers.get(_RUN_ID_HEADER) or "",
+        container_id=request.headers.get(_CONTAINER_ID_HEADER) or "",
     ):
         return None
     return JSONResponse({"detail": "unauthorized"}, status_code=401)

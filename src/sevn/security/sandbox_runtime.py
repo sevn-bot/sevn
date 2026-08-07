@@ -841,6 +841,9 @@ def _resolve_spawn_session_token(
     env: Mapping[str, str],
     signing_key: str | None = None,
     container_id: str | None = None,
+    destination_allowed: list[str] | None = None,
+    request_budget: int | None = None,
+    byte_budget: int | None = None,
 ) -> str:
     """Return an existing ``SEVN_SESSION_TOKEN`` or mint a scoped per-run token.
 
@@ -857,6 +860,14 @@ def _resolve_spawn_session_token(
             the Docker container hash is not known yet; clients present it as
             ``X-Sevn-Container-Id``. Mismatch → 401. Not injected as a separate
             child-env key (``build_sandbox_child_env`` stays three keys).
+        destination_allowed (list[str] | None): Optional host allowlist claim
+            forwarded to the mint (C7.3). When ``None``, the resulting token
+            carries no ``limits`` envelope and the proxy does not enforce an
+            allowlist.
+        request_budget (int | None): Optional per-run request-count budget
+            forwarded to the mint (C7.3). ``None`` emits no claim.
+        byte_budget (int | None): Optional per-run byte budget forwarded to the
+            mint (C7.3). ``None`` emits no claim.
 
     Returns:
         str: Token text for ``build_sandbox_child_env``.
@@ -922,6 +933,9 @@ def _resolve_spawn_session_token(
         scope=SESSION_SCOPE_SANDBOX,
         run_id=run_id,
         container_id=bind_id,
+        destination_allowed=destination_allowed,
+        request_budget=request_budget,
+        byte_budget=byte_budget,
     )
 
 
@@ -932,6 +946,9 @@ def _assemble_spawn_child_env(
     workspace_mount_path: str | os.PathLike[str],
     pre_env: Mapping[str, str] | None = None,
     signing_key: str | None = None,
+    destination_allowed: list[str] | None = None,
+    request_budget: int | None = None,
+    byte_budget: int | None = None,
 ) -> dict[str, str]:
     """Build §2.2 child env for subprocess or Docker sandbox spawn.
 
@@ -942,6 +959,12 @@ def _assemble_spawn_child_env(
         pre_env (Mapping[str, str] | None): Optional runtime ``pre_spawn_env`` overlay.
         signing_key (str | None): Optional resolved proxy shared secret for minting
             (not copied into the child env).
+        destination_allowed (list[str] | None): Optional host allowlist forwarded to
+            the session-token mint (C7.3). ``None`` emits no claim.
+        request_budget (int | None): Optional per-run request-count budget forwarded to
+            the mint (C7.3). ``None`` emits no claim.
+        byte_budget (int | None): Optional per-run byte budget forwarded to the mint
+            (C7.3). ``None`` emits no claim.
 
     Returns:
         dict[str, str]: Sanitized child env for exec or ``docker run -e``.
@@ -966,6 +989,9 @@ def _assemble_spawn_child_env(
         env=child_env,
         signing_key=signing_key,
         container_id=bind_id,
+        destination_allowed=destination_allowed,
+        request_budget=request_budget,
+        byte_budget=byte_budget,
     )
     if token:
         child_env["SEVN_SESSION_TOKEN"] = token

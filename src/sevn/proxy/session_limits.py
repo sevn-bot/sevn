@@ -106,12 +106,15 @@ def destination_allowed(
 ) -> bool:
     """Return ``True`` when ``destination`` is permitted by the token allowlist.
 
-    Tokens without an ``allowlist`` claim permit any destination (gateway-minted
-    tokens that omit the claim). When ``allowlist`` is present, the destination
-    host must match an entry exactly (case-insensitive).
+    Tokens without an allowlist claim permit any destination (gateway-minted
+    tokens that omit the claim). When the allowlist is present, the destination
+    host must match an entry exactly (case-insensitive). The allowlist may be
+    attached at the top level (``allowlist=[...]``) for backward compatibility
+    with W20 test tokens, or under the unified ``limits`` envelope produced by
+    the production mint (``limits.destinations=[...]``).
 
     Args:
-        token (str): Signed session token carrying optional ``allowlist``.
+        token (str): Signed session token carrying optional allowlist.
         signing_key (str): HMAC signing key.
         destination (str): Absolute URL whose host is checked.
 
@@ -132,7 +135,12 @@ def destination_allowed(
         True
     """
     payload = _verify_and_decode_payload(token, signing_key=signing_key)
-    allowlist = payload.get("allowlist")
+    limits = payload.get("limits")
+    allowlist: object | None = None
+    if isinstance(limits, dict):
+        allowlist = limits.get("destinations")
+    if allowlist is None:
+        allowlist = payload.get("allowlist")
     if allowlist is None:
         return True
     if not isinstance(allowlist, list) or not all(isinstance(x, str) for x in allowlist):
@@ -178,8 +186,10 @@ def consume_run_budget(
 ) -> None:
     """Consume one request and ``request_bytes`` against the token's per-run budgets.
 
-    Tokens without ``max_requests`` / ``max_bytes`` claims are unlimited. Exhaustion
-    raises :class:`BudgetExceeded` (distinct from auth ``401``).
+    Tokens without ``max_requests`` / ``max_bytes`` claims (or the unified
+    ``limits.requests`` / ``limits.bytes`` envelope produced by the production
+    mint) are unlimited. Exhaustion raises :class:`BudgetExceeded` (distinct
+    from auth ``401``).
 
     Args:
         token (str): Signed session token carrying optional budget claims.
@@ -202,8 +212,16 @@ def consume_run_budget(
     if not isinstance(run_id, str) or not run_id:
         msg = "session token missing run_id for budget tracking"
         raise BudgetExceeded(msg)
-    max_requests = payload.get("max_requests")
-    max_bytes = payload.get("max_bytes")
+    limits = payload.get("limits")
+    max_requests: object | None = None
+    max_bytes: object | None = None
+    if isinstance(limits, dict):
+        max_requests = limits.get("requests")
+        max_bytes = limits.get("bytes")
+    if max_requests is None:
+        max_requests = payload.get("max_requests")
+    if max_bytes is None:
+        max_bytes = payload.get("max_bytes")
     if max_requests is None and max_bytes is None:
         return
     if max_requests is not None and (

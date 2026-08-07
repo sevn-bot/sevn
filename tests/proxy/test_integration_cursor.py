@@ -6,7 +6,10 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
-from tests.proxy.conftest import proxy_auth_headers, proxy_test_settings
+from tests.proxy.conftest import (
+    integration_session_headers,
+    proxy_test_settings,
+)
 
 from sevn.config.workspace_config import WorkspaceConfig
 from sevn.proxy.app import create_app
@@ -33,7 +36,9 @@ async def test_integration_requires_cursor_key(monkeypatch: pytest.MonkeyPatch) 
     app.state.secrets_cache = None
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(
-        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+        transport=transport,
+        base_url="http://test",
+        headers=integration_session_headers(),
     ) as client:
         resp = await client.post(
             "/integration",
@@ -84,7 +89,9 @@ async def test_integration_agents_create_forwards(
     app = create_app(settings=_settings())
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(
-        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+        transport=transport,
+        base_url="http://test",
+        headers=integration_session_headers(),
     ) as client:
         resp = await client.post(
             "/integration",
@@ -149,7 +156,9 @@ async def test_integration_mcp_profile_merge(monkeypatch: pytest.MonkeyPatch) ->
     app = create_app(settings=_settings(), workspace_config=ws)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(
-        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+        transport=transport,
+        base_url="http://test",
+        headers=integration_session_headers(),
     ) as client:
         resp = await client.post(
             "/integration",

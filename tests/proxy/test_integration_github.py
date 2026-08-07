@@ -8,7 +8,10 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
-from tests.proxy.conftest import proxy_auth_headers, proxy_test_settings
+from tests.proxy.conftest import (
+    integration_session_headers,
+    proxy_test_settings,
+)
 
 from sevn.proxy.app import create_app
 from sevn.proxy.integration import github as github_module
@@ -36,7 +39,9 @@ async def test_integration_github_requires_token(monkeypatch: pytest.MonkeyPatch
     app.state.secrets_cache = None
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(
-        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+        transport=transport,
+        base_url="http://test",
+        headers=integration_session_headers(),
     ) as client:
         resp = await client.post(
             "/integration",
@@ -80,7 +85,9 @@ async def test_integration_github_pulls_list_forwards(
     app = create_app(settings=_settings())
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(
-        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+        transport=transport,
+        base_url="http://test",
+        headers=integration_session_headers(),
     ) as client:
         resp = await client.post(
             "/integration",
@@ -112,7 +119,9 @@ async def _post_github(method: str, args: dict[str, Any]) -> httpx.Response:
     app = create_app(settings=_settings())
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(
-        transport=transport, base_url="http://test", headers=proxy_auth_headers()
+        transport=transport,
+        base_url="http://test",
+        headers=integration_session_headers(),
     ) as client:
         return await client.post(
             "/integration",
