@@ -108,8 +108,8 @@
     },
     "proxy-egress": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-07T09:45:23Z",
-      "digest": "818c68c4346addec9797644b63da58627694b54b0a54dc4e5f3c8e9345768c55",
+      "computed_at": "2026-08-07T14:56:47Z",
+      "digest": "a32a1b848d88afbe4effa901c05c5965b5bd4db6bf4c9995ae535bc65c7dc22d",
       "source_globs": [
         "src/sevn/proxy/**"
       ]
@@ -145,8 +145,8 @@
     },
     "security": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-07T08:55:45Z",
-      "digest": "d30ff4b62428f6d9d5d2d15559eb58d1c59cab7ed5eb133d8bf343ad65a89207",
+      "computed_at": "2026-08-07T14:56:47Z",
+      "digest": "be9a9eacb4000313ad03a351e87a7f54dd51d7f37e203bb88ed73053e3af7ab1",
       "source_globs": [
         "src/sevn/security/**"
       ]
