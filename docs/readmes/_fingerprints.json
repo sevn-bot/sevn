@@ -26,8 +26,8 @@
     },
     "config-workspace": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-06T23:36:57Z",
-      "digest": "d982ee80b1b7075142bd7b8e4b7ca0d55612bf9cd8b11b5d66cd844c77da23e7",
+      "computed_at": "2026-08-07T08:55:48Z",
+      "digest": "3a075f07eaf8eb02060c5a4a46c319021a02a6c8957786711b7fa0f7ca4c1a02",
       "source_globs": [
         "src/sevn/config/**",
         "src/sevn/workspace/**",
@@ -108,8 +108,8 @@
     },
     "proxy-egress": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-06T15:44:19Z",
-      "digest": "f939331b5c89c553fbe6f5be86e41fbbd4419a4c86d322c410798d6e203013ff",
+      "computed_at": "2026-08-07T08:55:47Z",
+      "digest": "d7decb1345cc726d3df81c563c5a126d691a0fae5e227cf3472985a209633c6f",
       "source_globs": [
         "src/sevn/proxy/**"
       ]
@@ -145,8 +145,8 @@
     },
     "security": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-06T23:36:52Z",
-      "digest": "8fcad4b0e8f8f640e49e7b936c3b58fb5d91e3ab3ab0cf18cb0a1f4cdde484fa",
+      "computed_at": "2026-08-07T08:55:45Z",
+      "digest": "d30ff4b62428f6d9d5d2d15559eb58d1c59cab7ed5eb133d8bf343ad65a89207",
       "source_globs": [
         "src/sevn/security/**"
       ]
@@ -161,8 +161,8 @@
     },
     "skills": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-06T12:27:12Z",
-      "digest": "b1cf6cea868545d94f129c640867f9cea050bc7395432d80bcaba16c2b923ebc",
+      "computed_at": "2026-08-07T08:55:43Z",
+      "digest": "5e3c616b576716b3d035ce78872b4c30bdc0e3348000bc3f45b46901925662e0",
       "source_globs": [
         "src/sevn/skills/**",
         "src/sevn/data/bundled_skills/**",
@@ -193,8 +193,8 @@
     },
     "tools": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-06T12:17:21Z",
-      "digest": "d06055f945ba89464deb6891ce073ea1d3e2c0479e89fffe8a3caa59978bd10f",
+      "computed_at": "2026-08-07T08:55:41Z",
+      "digest": "87fda9ba31910bf49f0f729ef800f2e015ae424ea335b16c84bb3f0b31258b7b",
       "source_globs": [
         "src/sevn/tools/**"
       ]
@@ -218,8 +218,8 @@
     },
     "ui-mission-control": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-06T13:45:25Z",
-      "digest": "a1c2c5425166a2f1b66b177b89d25f82a3a161f696e6ec29c9d6b8e859ae0907",
+      "computed_at": "2026-08-07T08:55:44Z",
+      "digest": "0f6bfb3a32a57e4811bf190388b649d0ead6335cd15cac6de28b31d4431f9679",
       "source_globs": [
         "src/sevn/ui/**"
       ]

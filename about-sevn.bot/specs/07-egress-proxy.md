@@ -7,8 +7,8 @@ owner: Alex
 summary: Product pairing (v1). Deployment, paired daemon install, onboarding validation,
   and Mission Control management of the proxy are specified in prd-06-setup-and-operations
   and prd-07-mission-control §5.1
-last_updated: '2026-08-06'
-fingerprint: sha256:ce5770ea0becbc41c49a75ea90958994451010878ee1ee9bbf8b37eb74f0f91b
+last_updated: '2026-08-07'
+fingerprint: sha256:d7decb1345cc726d3df81c563c5a126d691a0fae5e227cf3472985a209633c6f
 related: []
 sources:
 - src/sevn/proxy/**
@@ -143,6 +143,21 @@ interfaces:
 - name: is_oauth_credential_fresh
   file: src/sevn/proxy/oauth_lifecycle.py
   symbol: is_oauth_credential_fresh
+- name: BudgetExceeded
+  file: src/sevn/proxy/session_limits.py
+  symbol: BudgetExceeded
+- name: DestinationNotAllowed
+  file: src/sevn/proxy/session_limits.py
+  symbol: DestinationNotAllowed
+- name: consume_run_budget
+  file: src/sevn/proxy/session_limits.py
+  symbol: consume_run_budget
+- name: destination_allowed
+  file: src/sevn/proxy/session_limits.py
+  symbol: destination_allowed
+- name: reset_run_budgets_for_tests
+  file: src/sevn/proxy/session_limits.py
+  symbol: reset_run_budgets_for_tests
 - name: ProxySettings
   file: src/sevn/proxy/settings.py
   symbol: ProxySettings
