@@ -218,8 +218,8 @@
     },
     "ui-mission-control": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-07T08:55:44Z",
-      "digest": "0f6bfb3a32a57e4811bf190388b649d0ead6335cd15cac6de28b31d4431f9679",
+      "computed_at": "2026-08-07T18:36:42Z",
+      "digest": "f004731b24f0aecd6d1dd418d2cf820f135f666ea67494f5344e5de5418ae527",
       "source_globs": [
         "src/sevn/ui/**"
       ]
