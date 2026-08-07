@@ -357,7 +357,6 @@ def _healthy_driver_run(monkeypatch: pytest.MonkeyPatch, module: Any) -> Any:
     return module
 
 
-@pytest.mark.xfail(reason="green after F-V1/F-V2: proxy driver topology", strict=False)
 def test_authenticated_proxy_roundtrip_driver_probes_via_live_stack(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -369,7 +368,6 @@ def test_authenticated_proxy_roundtrip_driver_probes_via_live_stack(
     assert any(check.name == "proxy-healthz" for check in result.checks)
 
 
-@pytest.mark.xfail(reason="green after F-V1/F-V2: proxy driver topology", strict=False)
 def test_sandbox_scoped_token_driver_probes_via_live_stack(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -381,10 +379,6 @@ def test_sandbox_scoped_token_driver_probes_via_live_stack(
     assert any(check.name == "proxy-healthz" for check in result.checks)
 
 
-@pytest.mark.xfail(
-    reason="green after F-V1/F-V2: proxy driver routes through a verify-compose overlay",
-    strict=False,
-)
 def test_no_driver_probes_unmapped_host_proxy_port() -> None:
     """F-V3 - the proxy URL constant must be published by the verify compose overlay.
 
@@ -415,7 +409,6 @@ def test_no_driver_probes_unmapped_host_proxy_port() -> None:
     )
 
 
-@pytest.mark.xfail(reason="green after F-V4: dead proxy environment variable removed", strict=False)
 def test_no_dead_sevn_verify_proxy_port_reference() -> None:
     """F-V4 - keep the removed proxy-port environment variable out of shipped code."""
     completed = subprocess.run(
