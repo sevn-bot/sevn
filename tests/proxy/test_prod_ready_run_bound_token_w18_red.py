@@ -300,6 +300,40 @@ async def test_w18_2_http_rejects_replay_from_different_container() -> None:
 
 
 # ---------------------------------------------------------------------------
+# E-THERMOS-2/3 — container_id non-str token claim must return False, not TypeError
+# ---------------------------------------------------------------------------
+
+
+def test_container_id_int_zero_rejected_returns_false_not_typeerror() -> None:
+    """A token whose ``container_id`` claim is int(0) must be rejected as False.
+
+    Regression: F-2/F-3 — without the isinstance guard, ``hmac.compare_digest(0, "0")``
+    raises ``TypeError`` and propagates as a 500 from Starlette. Returning ``False``
+    keeps the request on the 401 path.
+    """
+    exp = int(time.time()) + 3600
+    payload = {
+        "scope": SESSION_SCOPE_SANDBOX,
+        "exp": exp,
+        "run_id": "run-zero-ctr",
+        "container_id": 0,
+    }
+    raw = json.dumps(payload, separators=(",", ":"), sort_keys=True)
+    body = base64.urlsafe_b64encode(raw.encode()).decode().rstrip("=")
+    sig = hmac.new(_SIGNING_KEY.encode(), body.encode(), hashlib.sha256).hexdigest()
+    token = f"v1.{body}.{sig}"
+
+    result = validate_session_token(
+        token,
+        signing_key=_SIGNING_KEY,
+        path="/web/fetch",
+        run_id="run-zero-ctr",
+        container_id="0",
+    )
+    assert result is False
+
+
+# ---------------------------------------------------------------------------
 # W18.3 — C7.2 / D51: service secret rejected on sandbox families
 # ---------------------------------------------------------------------------
 

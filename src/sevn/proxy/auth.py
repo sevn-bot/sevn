@@ -252,6 +252,18 @@ def mint_session_token(
     payload: dict[str, object] = {"scope": scope, "exp": exp, "run_id": run_id}
     if container_id is not None:
         payload["container_id"] = container_id
+    if byte_budget is not None and (
+        not isinstance(byte_budget, int) or isinstance(byte_budget, bool) or byte_budget < 0
+    ):
+        msg = "byte_budget must be a non-negative int"
+        raise ValueError(msg)
+    if request_budget is not None and (
+        not isinstance(request_budget, int)
+        or isinstance(request_budget, bool)
+        or request_budget < 0
+    ):
+        msg = "request_budget must be a non-negative int"
+        raise ValueError(msg)
     limits: dict[str, object] = {}
     if destination_allowed is not None:
         limits["destinations"] = list(destination_allowed)
@@ -355,7 +367,7 @@ def validate_session_token(
     if container_id is not None:
         token_cid = payload.get("container_id")
         if token_cid is not None:
-            if not _check_binding(
+            if not isinstance(token_cid, str) or not _check_binding(
                 claim_value=token_cid,
                 request_value=container_id,
                 label="container_id",
