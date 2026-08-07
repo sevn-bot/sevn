@@ -239,3 +239,60 @@ async def test_w18_5_concurrent_same_token_budget_replies_consistent() -> None:
 
     results = await asyncio.gather(_consume(), _consume())
     assert sorted(results) == ["budget", "ok"]
+
+
+# ---------------------------------------------------------------------------
+# E-THERMOS-4 — empty destination_allowed deny-all semantics
+# ---------------------------------------------------------------------------
+
+
+def test_destination_allowed_empty_list_denies_all() -> None:
+    """Empty allowlist must deny every destination (fail-closed default).
+
+    Regression: F-4 — ``destination_allowed([])`` previously had no test pinning
+    the semantics. The mint function emits the claim only when the user passes
+    a non-empty list, so an explicit empty list is a deliberate "deny everything"
+    stance and must raise ``DestinationNotAllowed`` rather than fall open.
+    """
+    from sevn.proxy.session_limits import DestinationNotAllowed, destination_allowed
+
+    token = _mint_budgeted_token(
+        signing_key=_SIGNING_KEY,
+        run_id="run-empty-allowlist",
+        allowlist=[],
+    )
+    with pytest.raises(DestinationNotAllowed):
+        destination_allowed(
+            token,
+            signing_key=_SIGNING_KEY,
+            destination="https://any.example/",
+        )
+
+
+@pytest.mark.anyio
+async def test_destination_allowed_empty_list_http_returns_403() -> None:
+    """Empty allowlist must surface to the HTTP client as a 403, not a 401.
+
+    Regression: F-4 — fail-closed semantics reach the wire as 403 (the same
+    status code path as a non-empty allowlist miss), so an operator can
+    distinguish "token not authorized for this host" from "token not signed".
+    """
+    token = _mint_budgeted_token(
+        signing_key=_SIGNING_KEY,
+        run_id="run-empty-allowlist-http",
+        allowlist=[],
+    )
+    headers = {
+        "X-Sevn-Session-Token": token,
+        "X-Sevn-Run-Id": "run-empty-allowlist-http",
+        "X-Sevn-Container-Id": "ctr-budget-1",
+    }
+    transport = httpx.ASGITransport(app=_proxy_app())
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/web/fetch",
+            json={"url": "https://any.example/"},
+            headers=headers,
+        )
+    assert resp.status_code != 401
+    assert resp.status_code in (403, 422)

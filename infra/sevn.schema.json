@@ -197,7 +197,7 @@
       "name": "SEVN_SESSION_TOKEN",
       "process_settings": true,
       "description": "Per-run scoped egress credential for sandbox→proxy; not a workspace file secret.",
-      "long_description": "Short-lived HMAC session token (`X-Sevn-Session-Token`) minted at sandbox spawn (or by the gateway for `/web`/`/integration` callers). Payload claims include `scope`, `exp`, `run_id`, optional `container_id`, and (when set) destination `allowlist` plus per-run `max_requests`/`max_bytes` budgets enforced proxy-side. The long-lived `SEVN_PROXY_SHARED_SECRET` alone does not authorize sandbox route families. Intent (not yet shipped): proxy-side minting API, frozen PermissionConfig ceiling, revoke-on-teardown. Not a field in `sevn.json`. Parsed by `ProcessSettings.session_token`."
+      "long_description": "Short-lived HMAC session token (`X-Sevn-Session-Token`) minted at sandbox spawn (or by the gateway for `/web`/`/integration` callers). Payload claims include `scope`, `exp`, `run_id`, optional `container_id`, and (when set) destination `allowlist` plus per-run `max_requests`/`max_bytes` budgets enforced proxy-side. The long-lived `SEVN_PROXY_SHARED_SECRET` alone does not authorize sandbox route families. Empty `allowlist` denies every destination (fail-closed default); omit the field to allow any host. Intent (not yet shipped): proxy-side minting API, frozen PermissionConfig ceiling, revoke-on-teardown. Not a field in `sevn.json`. Parsed by `ProcessSettings.session_token`."
     },
     {
       "name": "SEVN_TELEGRAM_BOT_TOKEN",
