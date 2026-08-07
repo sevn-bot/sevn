@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Provide a single, testable configuration surface before storage, tracing,
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
-last_updated: '2026-08-06'
-fingerprint: sha256:ab869c822c8ddc211729bdbf07fb33fdb4938d077febac809fdd6b2ad30f2d2d
+last_updated: '2026-08-07'
+fingerprint: sha256:5042b19b30e123fe3ef27c2b1b2a4d99cad37be552839c626794393208c25e0b
 related: []
 sources:
 - src/sevn/config/**
