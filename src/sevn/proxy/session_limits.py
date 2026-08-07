@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
-_SESSION_TOKEN_VERSION = "v1"
+_SESSION_TOKEN_VERSION = "v1"  # nosec B105 — token format version label, not a credential
 _LOCK = threading.Lock()
 
 
