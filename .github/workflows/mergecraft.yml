@@ -350,7 +350,8 @@ jobs:
         # full-length commit SHA") before the review step runs. Bump this SHA and
         # `MERGECRAFT_REF` in the Makefile together — `make mergecraft-ref-check`
         # fails on one-sided bumps.
-        uses: alexhawat/mergeCraft@88c6f41945b39754447bcb27566f624349d8e477 # pre-0.0.1
+        # 2026-08-07: rolled back from 88c6f419 to 8d747f39 — Codex stdin hang regression. See PR #246.
+        uses: alexhawat/mergeCraft@8d747f39d3d36d889e0a85c2dcf691d1bdb91536 # pre-0.0.1
         with:
           prompt: ${{ steps.prompt.outputs.text }}
           # Must stay BELOW the job's timeout-minutes: when GitHub kills the job
@@ -431,7 +432,8 @@ jobs:
           )
         id: mergecraft_nous
         continue-on-error: true
-        uses: alexhawat/mergeCraft@88c6f41945b39754447bcb27566f624349d8e477 # pre-0.0.1
+        # 2026-08-07: rolled back from 88c6f419 to 8d747f39 — Codex stdin hang regression. See PR #246.
+        uses: alexhawat/mergeCraft@8d747f39d3d36d889e0a85c2dcf691d1bdb91536 # pre-0.0.1
         with:
           prompt: ${{ steps.prompt.outputs.text }}
           timeout: 25m
