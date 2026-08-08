@@ -342,7 +342,7 @@ def _healthy_driver_run(monkeypatch: pytest.MonkeyPatch, module: Any) -> Any:
     monkeypatch.setattr(module, "_run", lambda *args, **kwargs: (0, "stack ready"))
 
     def http_probe(url: str, *args: Any, **kwargs: Any) -> tuple[int, str]:
-        if url.endswith("/healthz"):
+        if url.endswith(("/healthz", "/ready")):
             return 200, "healthy"
         return 401, "authentication required"
 
@@ -370,7 +370,41 @@ def test_authenticated_proxy_roundtrip_driver_probes_via_live_stack(
     result = module.drive_authenticated_proxy_roundtrip()
     assert result.name == "authenticated-proxy-roundtrip"
     assert result.status not in {module.STATUS_FAIL, module.STATUS_UNAVAILABLE}
-    assert any(check.name == "proxy-healthz" for check in result.checks)
+    check_names = {check.name for check in result.checks}
+    assert "proxy-healthz" in check_names, (
+        f"authenticated-proxy-roundtrip must probe proxy /healthz; got {check_names!r}"
+    )
+
+
+def test_authenticated_proxy_roundtrip_probes_gateway_ready(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-PR-3 — driver must probe the gateway ``/ready``, not just the proxy directly.
+
+    The gateway ``/ready`` handler internally calls ``proxy_url/healthz``,
+    so a passing probe proves the gateway→proxy URL chain works end-to-end
+    (the SEVN_PROXY_URL wired into the gateway container is honoured).
+    Probing only the proxy directly (the prior shape) lets a broken
+    gateway→proxy wiring pass silently. This test asserts the driver
+    emits a ``gateway-ready`` check whose detail names the gateway URL
+    (mergecraft review 3740249071).
+    """
+    module = _healthy_driver_run(monkeypatch, _load_verify_module())
+    result = module.drive_authenticated_proxy_roundtrip()
+    check_names = {check.name for check in result.checks}
+    assert "gateway-ready" in check_names, (
+        f"authenticated-proxy-roundtrip must probe gateway /ready "
+        f"to exercise the gateway→proxy URL chain (F-PR-3); got {check_names!r}"
+    )
+    gateway_check = next(c for c in result.checks if c.name == "gateway-ready")
+    assert "/ready" in gateway_check.command, (
+        "gateway-ready check must probe the gateway's /ready endpoint; "
+        f"got command={gateway_check.command!r}"
+    )
+    assert gateway_check.status != module.STATUS_FAIL, (
+        "gateway-ready must pass under a healthy mocked stack; got "
+        f"status={gateway_check.status} detail={gateway_check.detail!r}"
+    )
 
 
 def test_sandbox_scoped_token_driver_probes_via_live_stack(
@@ -569,12 +603,16 @@ def test_ci_cd_exports_digest_overlay_env_to_verify_deployment() -> None:
     data = _load_yaml(_CI_CD)
     job = data["jobs"]["verify-deployment"]
     step_envs: list[dict[str, Any]] = []
+    step_runs: list[str] = []
     for step in job.get("steps", []):
         if not isinstance(step, dict):
             continue
         env = step.get("env")
         if isinstance(env, dict):
             step_envs.append(env)
+        run = step.get("run") or ""
+        if isinstance(run, str):
+            step_runs.append(run)
     # Step envs are unmerged; pull from job env too.
     job_env = job.get("env") or {}
     assert any(
@@ -587,13 +625,23 @@ def test_ci_cd_exports_digest_overlay_env_to_verify_deployment() -> None:
     # The overlay image interpolates SEVN_VERIFY_IMAGE_TAG; the workflow
     # must export github.sha into that env so the merged overlay pulls the
     # SHA-tagged image promoted by container-supply-chain.
-    assert any(
+    #
+    # F-PR-1 (mergecraft review 3740249068) allowed the value to live in
+    # either an env block or a ``$GITHUB_ENV`` export inside ``run:`` —
+    # accept both shapes.
+    direct_env_ok = any(
         "${{ github.sha }}" in str(env.get("SEVN_VERIFY_IMAGE_TAG", ""))
         or str(env.get("SEVN_VERIFY_IMAGE_TAG", "")).startswith("github.sha")
         for env in (job_env, *step_envs)
-    ), (
+    )
+    github_env_ok = any(
+        "SEVN_VERIFY_IMAGE_TAG=" in run and "${{ github.sha }}" in run and "GITHUB_ENV" in run
+        for run in step_runs
+    )
+    assert direct_env_ok or github_env_ok, (
         "verify-deployment must set SEVN_VERIFY_IMAGE_TAG=${{ github.sha }} "
-        "so the digest overlay references the SHA-tagged image"
+        "so the digest overlay references the SHA-tagged image (either "
+        "as a step/job env value or via a `>> $GITHUB_ENV` export)"
     )
 
 

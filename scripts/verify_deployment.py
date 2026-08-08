@@ -66,6 +66,16 @@ OPERATOR_COMPOSE = "docker/docker-compose.yml"
 VERIFY_COMPOSE = "docker/docker-compose.verify.yml"
 VERIFY_DIGESTS_COMPOSE = "docker/docker-compose.verify-digests.yml"
 VERIFY_PROXY_URL = "http://127.0.0.1:3102"
+# Host-published gateway URL. ``docker-compose.yml`` publishes the gateway
+# at ``${SEVN_GATEWAY_BIND:-127.0.0.1}:${SEVN_GATEWAY_PORT:-3001}:3001``
+# and the verify boot (drive_authenticated_proxy_roundtrip) overrides
+# ``SEVN_GATEWAY_PORT`` to ``3101`` via env, so the gateway host port
+# ends up at ``3101`` in the same publish range as the proxy (:3102).
+# Probing the gateway here — instead of the proxy directly — exercises
+# the gateway→proxy URL chain end-to-end (F-PR-3 / mergecraft review
+# 3740249071). Bypassing the gateway would let a broken
+# SEVN_PROXY_URL wiring in the gateway pass silently.
+VERIFY_GATEWAY_URL = "http://127.0.0.1:3101"
 BROWSER_COMPOSE = "docker/docker-compose.browser.yml"
 GUI_COMPOSE = "docker/docker-compose.gui.yml"
 PROD_COMPOSE = "docker/docker-compose.prod.yml"
@@ -1081,15 +1091,20 @@ def drive_sandbox_spawn() -> DriverResult:
 def drive_authenticated_proxy_roundtrip() -> DriverResult:
     """Exercise the authenticated gateway→proxy round-trip (Batch A C1.2 path).
 
-    Boots the operator stack under a private project, mints a session token with
-    ``mint_session_token`` against the resolved boot secret, and probes the
-    proxy ``/web/auth-check`` endpoint through the gateway with the
-    ``X-Sevn-Proxy-Token`` header. A passing round-trip proves the proxy
-    accepts the boot-resolved secret end-to-end — the C1.2 path Batch A wired
-    and nothing else in the verify matrix exercises.
+    Boots the operator stack under a private project, mints a session token
+    with ``mint_session_token`` against the resolved boot secret, and probes
+    the gateway ``/ready`` endpoint (which internally probes the proxy
+    ``/healthz``) **and** the proxy ``/web/auth-check`` endpoint directly
+    with the ``X-Sevn-Session-Token`` header. The gateway ``/ready`` probe
+    exercises the gateway→proxy URL chain end-to-end (F-PR-3 — a broken
+    ``SEVN_PROXY_URL`` wiring in the gateway would 503 ``/ready``); the
+    direct ``/web/auth-check`` probe then proves the proxy accepts the
+    boot-resolved secret. A passing round-trip closes both halves of the
+    C1.2 path Batch A wired and nothing else in the verify matrix
+    exercises.
 
     Returns:
-        DriverResult: Verdict plus token-mint and proxy round-trip checks.
+        DriverResult: Verdict plus gateway-ready, token-mint and proxy round-trip checks.
 
     Examples:
         >>> drive_authenticated_proxy_roundtrip().name
@@ -1147,6 +1162,7 @@ def drive_authenticated_proxy_roundtrip() -> DriverResult:
             return result
 
         proxy_url = VERIFY_PROXY_URL
+        gateway_url = VERIFY_GATEWAY_URL
         deadline = time.monotonic() + ready_timeout
         proxy_ready = False
         last_status, last_body = 0, "not probed"
@@ -1168,6 +1184,42 @@ def drive_authenticated_proxy_roundtrip() -> DriverResult:
         if not proxy_ready:
             result.status = STATUS_FAIL
             result.reason = "proxy did not answer /healthz after boot"
+            return result
+
+        # F-PR-3: probe the gateway ``/ready`` endpoint. The gateway
+        # internally calls ``proxy_url/healthz`` (see
+        # ``src/sevn/gateway/http_server.py`` ``/ready`` handler) — a 200
+        # proves the gateway can reach the proxy via its configured
+        # ``SEVN_PROXY_URL`` end-to-end. Without this probe, a broken
+        # gateway→proxy URL chain would not be detected (mergecraft
+        # review 3740249071).
+        deadline = time.monotonic() + ready_timeout
+        gateway_ready = False
+        gw_last_status, gw_last_body = 0, "not probed"
+        while time.monotonic() < deadline:
+            gw_last_status, gw_last_body = _http_probe(f"{gateway_url}/ready")
+            if 200 <= gw_last_status < 300:
+                gateway_ready = True
+                break
+            time.sleep(3.0)
+        result.checks.append(
+            Check(
+                name="gateway-ready",
+                status=STATUS_PASS if gateway_ready else STATUS_FAIL,
+                detail=(
+                    f"HTTP {gw_last_status} from {gateway_url}/ready "
+                    "(gateway internally probes proxy /healthz)"
+                ),
+                command=f"GET {gateway_url}/ready",
+                output=gw_last_body[:600],
+            )
+        )
+        if not gateway_ready:
+            result.status = STATUS_FAIL
+            result.reason = (
+                "gateway did not answer /ready after boot — "
+                "gateway→proxy URL chain is broken (F-PR-3)"
+            )
             return result
 
         try:
