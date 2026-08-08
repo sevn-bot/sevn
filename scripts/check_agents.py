@@ -38,12 +38,47 @@ Examples:
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
 import yaml
 
-REPO = Path(__file__).resolve().parents[1]
+
+def _resolve_repo_root() -> Path:
+    """Resolve the actual worktree root, never the symlinked main checkout.
+
+    Pre-commit runs each hook from the worktree checkout, so ``git rev-parse
+    --show-toplevel`` from CWD gives the worktree's own root. Falling back to
+    ``Path(__file__).resolve().parents[1]`` would re-introduce the
+    cross-worktree bleed that surfaced in PR #249 (the worktree's ``scripts/``
+    is symlinked to the main checkout, so ``__file__`` resolves through the
+    symlink and the scan would land on the operator's main-checkout agent
+    definitions).
+
+    Returns:
+        Path: Absolute path to the git toplevel of the current checkout, or
+            the resolved CWD when ``git`` is unavailable or the CWD is not
+            inside a work tree.
+
+    Examples:
+        >>> isinstance(_resolve_repo_root(), Path)
+        True
+    """
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            check=True,
+            capture_output=True,
+            text=True,
+            cwd=str(Path.cwd()),
+        )
+        return Path(out.stdout.strip())
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        return Path.cwd().resolve()
+
+
+REPO = _resolve_repo_root()
 
 #: Frontmatter keys each target understands. Unknown keys are usually a copy from
 #: the other IDE's dialect and are silently ignored by the host, so they are errors.
