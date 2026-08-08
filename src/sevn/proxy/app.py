@@ -165,6 +165,54 @@ def _charge_session_response_bytes(
     return None
 
 
+def _build_redirect_allowlist_check(
+    request: Request,
+    *,
+    settings: ProxySettings,
+) -> Callable[[str], None] | None:
+    """Return a per-redirect allowlist enforcement closure for ``web_fetch_json``.
+
+    The returned callable is invoked from :func:`web_fetch_json` with each
+    redirect target URL; raising ``ValueError`` from it blocks the redirect.
+    When no session token is presented (gateway mint fallback or unauthenticated
+    dev), no allowlist is enforced on the redirect path either — the proxy
+    rejects session-token-scoped routes without a session token via
+    :func:`llm_post_auth_failure` upstream of this hook.
+
+    Args:
+        request (Request): ASGI request carrying the session token header.
+        settings (ProxySettings): Proxy settings with signing secret.
+
+    Returns:
+        Callable[[str], None] | None: Enforcement closure, or ``None`` when the
+        request has no session token (no redirect allowlist enforcement needed).
+
+    Examples:
+        >>> from unittest.mock import MagicMock
+        >>> build = _build_redirect_allowlist_check(MagicMock(), settings=ProxySettings())
+        >>> build is None
+        True
+    """
+    session = (request.headers.get("x-sevn-session-token") or "").strip()
+    secret = (settings.proxy_shared_secret or "").strip()
+    if not session or not secret:
+        return None
+
+    def _check(target_url: str) -> None:
+        """Raise ``ValueError`` when ``target_url`` is outside the token allowlist."""
+        try:
+            destination_allowed(session, signing_key=secret, destination=target_url)
+        except DestinationNotAllowed as exc:
+            # Surface the allowlist reason through ``ValueError`` so
+            # ``_request_upstream`` / ``_fetch_upstream_streaming`` raise the
+            # same exception shape used for SSRF validation failures
+            # (``_egress_block_status`` then maps this to a 403).
+            msg = f"redirect target not on session allowlist: {exc}"
+            raise ValueError(msg) from exc
+
+    return _check
+
+
 def _is_retryable_truncated_codex_stream(exc: BaseException) -> bool:
     """Return whether ``exc`` indicates a Codex SSE stream ended without output.
 
@@ -641,7 +689,13 @@ def create_app(
         if limited is not None:
             return limited
         http_client = getattr(request.app.state, "http_client", None)
-        status, payload = await web_fetch_json(raw_body, settings=cfg, client=http_client)
+        redirect_check = _build_redirect_allowlist_check(request, settings=cfg)
+        status, payload = await web_fetch_json(
+            raw_body,
+            settings=cfg,
+            client=http_client,
+            allow_redirect_to=redirect_check,
+        )
         # Post-flight: charge the bytes the proxy actually pulled back from the
         # upstream server (the ``text`` field is the egress payload the sandbox
         # requested). When the budget is exhausted at this seam, return 429 so
