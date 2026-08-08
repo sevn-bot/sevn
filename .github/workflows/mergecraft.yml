@@ -7,8 +7,8 @@
 # confirmed "success" (outstanding feedback, no check posted at all, and an
 # unreachable check-runs API after retries all fail closed — see that step).
 #
-# Provider priority: OpenAI (Codex) is primary; DeepSeek V4 Flash via the Nous
-# Portal is the one-shot fallback when Codex is absent or its review posts no
+# Provider priority: DeepSeek V4 Flash via the Nous Portal is primary; OpenAI
+# (Codex) is the one-shot fallback when Nous is absent or its review posts no
 # verdict. Claude is not used.
 #
 # Codex reviews previously posted mergecraft-approval=neutral because every tool
@@ -222,8 +222,8 @@ jobs:
     timeout-minutes: 30
     env:
       IS_SAME_REPO: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
-      # Codex primary; Nous/DeepSeek fallback when Codex auth is absent or the
-      # Codex review does not post a mergecraft-approval verdict.
+      # Nous primary; Codex fallback when Nous auth is absent or the
+      # Nous review does not post a mergecraft-approval verdict.
       HAS_CODEX: ${{ (secrets.CODEX_AUTH_JSON != '' || secrets.OPENAI_API_KEY != '') && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
       HAS_NOUS: ${{ secrets.NOUS_API_KEY != '' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
       HAS_AUTH: ${{ (secrets.CODEX_AUTH_JSON != '' || secrets.OPENAI_API_KEY != '' || secrets.NOUS_API_KEY != '') && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository) }}
@@ -310,15 +310,15 @@ jobs:
             echo "MERGECRAFT_PROMPT_EOF"
           } >> "${GITHUB_OUTPUT}"
 
-      - name: Record mergecraft-approval baseline before the Codex review
+      - name: Record mergecraft-approval baseline before the Nous review
         id: approval_baseline
-        # The fallback below must judge THIS Codex attempt, not a verdict an
+        # The fallback below must judge THIS Nous attempt, not a verdict an
         # earlier run left on the same head SHA (a re-run, or the enforce step's
         # own retry loop). Capturing the newest check-run id first makes "did
-        # Codex post a verdict?" answerable by identity rather than by recency.
+        # Nous post a verdict?" answerable by identity rather than by recency.
         if: >-
-          env.HAS_CODEX == 'true' &&
           env.HAS_NOUS == 'true' &&
+          env.HAS_CODEX == 'true' &&
           github.event_name == 'pull_request_target'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -339,8 +339,88 @@ jobs:
           echo "baseline mergecraft-approval check-run: ${id:-none}"
           echo "id=${id}" >> "${GITHUB_OUTPUT}"
 
+      - name: mergeCraft PR review (Nous DeepSeek V4 Flash)
+        if: env.HAS_NOUS == 'true'
+        id: mergecraft_nous
+        continue-on-error: true
+        # 2026-08-07: rolled back from 88c6f419 to 8d747f39 — Codex stdin hang regression. See PR #246.
+        uses: alexhawat/mergeCraft@8d747f39d3d36d889e0a85c2dcf691d1bdb91536 # pre-0.0.1
+        with:
+          prompt: ${{ steps.prompt.outputs.text }}
+          timeout: 25m
+          # Provider prefix `nous/` selects the opencode harness and names the
+          # provider registered from the MERGECRAFT_CUSTOM_PROVIDER_* env vars.
+          model: nous/deepseek/deepseek-v4-flash
+          push: disabled
+          shell: disabled
+          status_checks: enabled
+        env:
+          MERGECRAFT_CUSTOM_PROVIDER_BASE_URL: https://inference-api.nousresearch.com/v1
+          MERGECRAFT_CUSTOM_PROVIDER_API_KEY: ${{ secrets.NOUS_API_KEY }}
+
+      - name: Decide Codex fallback after Nous
+        id: fallback
+        # Deliberately NOT gated on steps.mergecraft_nous.outcome. The failure
+        # this fallback exists for — mergecraft-approval=neutral, the MCP
+        # handshake symptom — leaves the action exiting 0 while posting no
+        # usable verdict. Gating on a non-success outcome would skip the
+        # fallback in exactly that case and hand the enforce step a
+        # fail-closed no-verdict. Route on the verdict itself instead.
+        if: >-
+          env.HAS_NOUS == 'true' &&
+          env.HAS_CODEX == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASELINE_ID: ${{ steps.approval_baseline.outputs.id }}
+          NOUS_OUTCOME: ${{ steps.mergecraft_nous.outcome }}
+        run: |
+          set -euo pipefail
+          need="false"
+          if [ "${EVENT_NAME}" = "pull_request_target" ]; then
+            latest=""
+            for attempt in $(seq 1 3); do
+              if latest="$(gh api "/repos/${REPO}/commits/${HEAD_SHA}/check-runs" \
+                  --jq '[.check_runs[]? | select(.name == "mergecraft-approval")]
+                        | sort_by(.completed_at // .started_at) | last
+                        | "\(.id // "")|\(.conclusion // "")"')"; then
+                break
+              fi
+              echo "check-runs query failed (attempt ${attempt}/3); retrying in 3s…" >&2
+              sleep 3
+            done
+            id="${latest%%|*}"
+            conclusion="${latest#*|}"
+            # A verdict only counts when the check-run is NOT the one that was
+            # already there before this Nous attempt ran.
+            if [ -n "${id}" ] && [ "${id}" = "${BASELINE_ID}" ]; then
+              echo "mergecraft-approval ${id} predates this Nous attempt — treating as no verdict."
+              conclusion=""
+            fi
+            case "${conclusion}" in
+              failure|success)
+                echo "mergecraft-approval=${conclusion} — Nous review posted a verdict; not falling back to Codex."
+                ;;
+              *)
+                need="true"
+                echo "::notice title=mergecraft Codex fallback::Nous review posted no verdict (action outcome: ${NOUS_OUTCOME}); retrying with openai/gpt-codex."
+                ;;
+            esac
+          elif [ "${NOUS_OUTCOME}" != "success" ]; then
+            need="true"
+            echo "::notice title=mergecraft Codex fallback::Nous review failed; retrying with openai/gpt-codex."
+          fi
+          echo "need=${need}" >> "${GITHUB_OUTPUT}"
+
       - name: mergeCraft PR review (Codex)
-        if: env.HAS_CODEX == 'true'
+        if: >-
+          env.HAS_CODEX == 'true' &&
+          (
+            env.HAS_NOUS != 'true' ||
+            steps.fallback.outputs.need == 'true'
+          )
         id: mergecraft_codex
         continue-on-error: true
         # mergeCraft — full SHA pinned to the alexhawat/mergeCraft `pre-0.0.1` head.
@@ -367,103 +447,23 @@ jobs:
           CODEX_AUTH_JSON: ${{ secrets.CODEX_AUTH_JSON }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-      - name: Decide Nous fallback after Codex
-        id: fallback
-        # Deliberately NOT gated on steps.mergecraft_codex.outcome. The failure
-        # this fallback exists for — mergecraft-approval=neutral, the MCP
-        # handshake symptom — leaves the action exiting 0 while posting no
-        # usable verdict. Gating on a non-success outcome would skip the
-        # fallback in exactly that case and hand the enforce step a
-        # fail-closed no-verdict. Route on the verdict itself instead.
-        if: >-
-          env.HAS_CODEX == 'true' &&
-          env.HAS_NOUS == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          EVENT_NAME: ${{ github.event_name }}
-          BASELINE_ID: ${{ steps.approval_baseline.outputs.id }}
-          CODEX_OUTCOME: ${{ steps.mergecraft_codex.outcome }}
-        run: |
-          set -euo pipefail
-          need="false"
-          if [ "${EVENT_NAME}" = "pull_request_target" ]; then
-            latest=""
-            for attempt in $(seq 1 3); do
-              if latest="$(gh api "/repos/${REPO}/commits/${HEAD_SHA}/check-runs" \
-                  --jq '[.check_runs[]? | select(.name == "mergecraft-approval")]
-                        | sort_by(.completed_at // .started_at) | last
-                        | "\(.id // "")|\(.conclusion // "")"')"; then
-                break
-              fi
-              echo "check-runs query failed (attempt ${attempt}/3); retrying in 3s…" >&2
-              sleep 3
-            done
-            id="${latest%%|*}"
-            conclusion="${latest#*|}"
-            # A verdict only counts when the check-run is NOT the one that was
-            # already there before this Codex attempt ran.
-            if [ -n "${id}" ] && [ "${id}" = "${BASELINE_ID}" ]; then
-              echo "mergecraft-approval ${id} predates this Codex attempt — treating as no verdict."
-              conclusion=""
-            fi
-            case "${conclusion}" in
-              failure|success)
-                echo "mergecraft-approval=${conclusion} — Codex review posted a verdict; not falling back to Nous."
-                ;;
-              *)
-                need="true"
-                echo "::notice title=mergecraft Nous fallback::Codex review posted no verdict (action outcome: ${CODEX_OUTCOME}); retrying with nous/deepseek/deepseek-v4-flash."
-                ;;
-            esac
-          elif [ "${CODEX_OUTCOME}" != "success" ]; then
-            need="true"
-            echo "::notice title=mergecraft Nous fallback::Codex review failed; retrying with nous/deepseek/deepseek-v4-flash."
-          fi
-          echo "need=${need}" >> "${GITHUB_OUTPUT}"
-
-      - name: mergeCraft PR review (Nous DeepSeek V4 Flash)
-        if: >-
-          env.HAS_NOUS == 'true' &&
-          (
-            env.HAS_CODEX != 'true' ||
-            steps.fallback.outputs.need == 'true'
-          )
-        id: mergecraft_nous
-        continue-on-error: true
-        # 2026-08-07: rolled back from 88c6f419 to 8d747f39 — Codex stdin hang regression. See PR #246.
-        uses: alexhawat/mergeCraft@8d747f39d3d36d889e0a85c2dcf691d1bdb91536 # pre-0.0.1
-        with:
-          prompt: ${{ steps.prompt.outputs.text }}
-          timeout: 25m
-          # Provider prefix `nous/` selects the opencode harness and names the
-          # provider registered from the MERGECRAFT_CUSTOM_PROVIDER_* env vars.
-          model: nous/deepseek/deepseek-v4-flash
-          push: disabled
-          shell: disabled
-          status_checks: enabled
-        env:
-          MERGECRAFT_CUSTOM_PROVIDER_BASE_URL: https://inference-api.nousresearch.com/v1
-          MERGECRAFT_CUSTOM_PROVIDER_API_KEY: ${{ secrets.NOUS_API_KEY }}
-
       - name: mergeCraft review incomplete (non-fatal)
         if: >-
           env.HAS_AUTH == 'true' &&
           (
             (
-              env.HAS_CODEX == 'true' &&
-              steps.mergecraft_codex.outcome != 'success' &&
+              env.HAS_NOUS == 'true' &&
+              steps.mergecraft_nous.outcome != 'success' &&
               steps.fallback.outputs.need != 'true'
             ) ||
             (
-              env.HAS_CODEX == 'true' &&
+              env.HAS_NOUS == 'true' &&
               steps.fallback.outputs.need == 'true' &&
-              steps.mergecraft_nous.outcome != 'success'
+              steps.mergecraft_codex.outcome != 'success'
             ) ||
             (
-              env.HAS_CODEX != 'true' &&
-              steps.mergecraft_nous.outcome != 'success'
+              env.HAS_NOUS != 'true' &&
+              steps.mergecraft_codex.outcome != 'success'
             )
           )
         run: |
