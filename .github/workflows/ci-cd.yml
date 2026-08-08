@@ -407,14 +407,22 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull published sandbox image
-        env:
-          SANDBOX_IMAGE_REF: ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}
+        # ``SANDBOX_IMAGE_REF`` is assembled in the shell here, not in
+        # ``env:``: GitHub Actions does not recursively expand POSIX
+        # variables inside an env value, so a literal
+        # ``ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}`` in
+        # ``env:`` would reach Python (and ``docker pull``) with the
+        # dollar-brace text intact (mergecraft review 3740249068).
+        # ``IMAGE_REPOSITORY`` / ``SANDBOX_DIGEST`` are inherited from
+        # the job-level ``env:`` (:387-:388), so the shell expands them
+        # here.
         run: |
           set -euo pipefail
           test -n "${SANDBOX_DIGEST}" || {
             echo "::error title=missing digest::SANDBOX_DIGEST must be set to the published sandbox image digest"
             exit 1
           }
+          SANDBOX_IMAGE_REF="ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}"
           docker pull "${SANDBOX_IMAGE_REF}"
 
       - name: Run deployment drivers (release path — fail on driver_unavailable)
@@ -435,11 +443,23 @@ jobs:
         # against the real docker CLI; without this override the driver
         # returns ``driver_unavailable`` and D52 fails the tag gate
         # (mergecraft review 3738385557 / 3738385601).
+        #
+        # The image-ref values for ``SEVN_VERIFY_IMAGE_TAG`` /
+        # ``SEVN_VERIFY_SANDBOX_IMAGE`` are exported via ``$GITHUB_ENV``
+        # rather than passed in ``env:``: GitHub Actions does not
+        # recursively expand POSIX variables inside an ``env:`` value, so
+        # the literal ``ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}``
+        # would otherwise reach Python verbatim and break the driver
+        # (mergecraft review 3740249068).
         env:
           SEVN_VERIFY_IMAGE_OVERLAY: "1"
-          SEVN_VERIFY_IMAGE_TAG: ${{ github.sha }}
-          SEVN_VERIFY_SANDBOX_IMAGE: ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}
-        run: make verify-deployment
+        run: |
+          set -euo pipefail
+          {
+            echo "SEVN_VERIFY_IMAGE_TAG=${{ github.sha }}"
+            echo "SEVN_VERIFY_SANDBOX_IMAGE=ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}"
+          } >> "$GITHUB_ENV"
+          make verify-deployment
 
       - name: Upload deployment evidence (evidence/verify/*.json)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

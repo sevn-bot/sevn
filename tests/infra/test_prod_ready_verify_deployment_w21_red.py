@@ -711,7 +711,7 @@ def test_verify_deployment_sandbox_pull_step_present() -> None:
 
 
 def test_verify_deployment_sandbox_image_env_override() -> None:
-    """Mergecraft review 3738385557 — driver must target the published image, not :local.
+    """Mergecraft review 3738385557 / 3740249068 — driver must target the published image.
 
     ``drive_sandbox_spawn`` defaults to ``sevn-sandbox:local``, which is
     only present after ``make docker-build-ci``; on a CI runner with no
@@ -719,17 +719,32 @@ def test_verify_deployment_sandbox_image_env_override() -> None:
     The job-level env must wire ``SEVN_VERIFY_SANDBOX_IMAGE`` to the
     promoted GHCR digest so the driver exercises the C14.1 evidence
     path against what was actually published.
+
+    F-PR-1 (mergecraft review 3740249068) relaxed the structural shape
+    of that override: GHA does not recursively expand POSIX variables
+    inside ``env:`` values, so the literal
+    ``ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}`` is no
+    longer allowed in a step ``env:``. The contract is now satisfied
+    when either (a) the value is exported via ``$GITHUB_ENV`` in a
+    preceding ``run:`` step, or (b) the consuming ``run:`` shell builds
+    the ref inline. Both are acceptable so long as no unexpanded
+    ``${...}`` substitution leaks into an env value (see
+    ``test_verify_deployment_env_values_have_no_unexpanded_shell_vars``).
     """
     data = _load_yaml(_CI_CD)
     job = data["jobs"]["verify-deployment"]
     job_env = job.get("env") or {}
     step_envs: list[dict[str, Any]] = []
+    step_runs: list[str] = []
     for step in job.get("steps", []):
         if not isinstance(step, dict):
             continue
         env = step.get("env")
         if isinstance(env, dict):
             step_envs.append(env)
+        run = step.get("run") or ""
+        if isinstance(run, str):
+            step_runs.append(run)
     merged = (job_env, *step_envs)
     # Job-level IMAGE_REPOSITORY + SANDBOX_DIGEST (set above for the pull
     # step) must be inherited so the SEVN_VERIFY_SANDBOX_IMAGE override
@@ -743,16 +758,26 @@ def test_verify_deployment_sandbox_image_env_override() -> None:
         "publish-ghcr.outputs.sandbox_digest so SEVN_VERIFY_SANDBOX_IMAGE "
         "expands to a real ref (mergecraft review 3738385557)"
     )
-    assert any(
+    direct_env_ok = any(
         "SEVN_VERIFY_SANDBOX_IMAGE" in env
         and "ghcr.io/" in str(env.get("SEVN_VERIFY_SANDBOX_IMAGE", ""))
         and "SANDBOX_DIGEST" in str(env.get("SEVN_VERIFY_SANDBOX_IMAGE", ""))
         for env in merged
-    ), (
+    )
+    github_env_ok = any(
+        "SEVN_VERIFY_SANDBOX_IMAGE=" in run
+        and "ghcr.io/" in run
+        and "${SANDBOX_DIGEST}" in run
+        and "GITHUB_ENV" in run
+        for run in step_runs
+    )
+    assert direct_env_ok or github_env_ok, (
         "verify-deployment must set SEVN_VERIFY_SANDBOX_IMAGE to the "
         "published GHCR digest (ghcr.io/.../sandbox@${SANDBOX_DIGEST}) so "
         "drive_sandbox_spawn has an inspectable image on the release runner "
-        "(mergecraft review 3738385557)"
+        "(mergecraft review 3738385557). Either export the value via "
+        "$GITHUB_ENV in a `run:` step (F-PR-1 shape) or keep it as a "
+        "literal step env value (the original shape)."
     )
 
 
@@ -784,4 +809,95 @@ def test_verify_deployment_does_not_export_dead_digest_vars() -> None:
             "verify-deployment step env must not export dead "
             f"{', '.join(dead_vars)} vars — no driver reads them "
             "(mergecraft review 3738385601); leaked: {leaked}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# F-PR-1 — IMAGE_REPOSITORY / SANDBOX_DIGEST must not leak as literal strings
+# into step env values. GitHub Actions does NOT recursively expand shell
+# syntax inside ``env:`` values, so a value like
+# ``ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}`` reaches Python
+# with the dollar-brace text intact and ``docker pull`` / the driver both
+# fail. The fix is to build the ref in ``run:`` and either export it into
+# $GITHUB_ENV or assign it into the shell command directly.
+# ---------------------------------------------------------------------------
+
+
+def _verify_deployment_step_env_strings() -> list[tuple[str, dict[str, Any]]]:
+    """Return ``(step_name, env_dict)`` pairs for every step in ``verify-deployment``."""
+    data = _load_yaml(_CI_CD)
+    job = data["jobs"]["verify-deployment"]
+    out: list[tuple[str, dict[str, Any]]] = []
+    for step in job.get("steps", []):
+        if not isinstance(step, dict):
+            continue
+        env = step.get("env")
+        if not isinstance(env, dict):
+            continue
+        out.append((str(step.get("name", "")), env))
+    return out
+
+
+def test_verify_deployment_env_values_have_no_unexpanded_shell_vars() -> None:
+    """F-PR-1 — no step env value may contain a literal ``${...}`` substitution.
+
+    GitHub Actions evaluates ``${{ ... }}`` expressions inside ``env:``
+    values once but does NOT then re-expand POSIX shell variables such
+    as ``${IMAGE_REPOSITORY}`` or ``${SANDBOX_DIGEST}``. The result is
+    passed verbatim into the consuming process — so a Python string
+    comparison against a real digest ref never matches and ``docker
+    pull`` is handed a non-existent ref. Any unexpanded shell variable
+    inside an env value is a bug (mergecraft review 3740249068).
+    """
+    bad: list[str] = []
+    shell_var_re = re.compile(r"\$\{[A-Z_][A-Z0-9_]*\}")
+    for step_name, env in _verify_deployment_step_env_strings():
+        for key, value in env.items():
+            if not isinstance(value, str):
+                continue
+            if shell_var_re.search(value):
+                bad.append(f"{step_name}.env.{key}={value!r}")
+    assert not bad, (
+        "verify-deployment step env values must not contain unexpanded "
+        "shell variables like ${IMAGE_REPOSITORY} / ${SANDBOX_DIGEST} — "
+        "GitHub Actions does not recursively expand $env values, so the "
+        "literal text leaks into Python and `docker pull` fails against "
+        "a non-existent ref (mergecraft review 3740249068); bad: " + "; ".join(bad)
+    )
+
+
+def test_verify_deployment_sandbox_image_ref_is_built_at_runtime() -> None:
+    """F-PR-1 — the sandbox-image ref must be assembled in ``run:`` shell, not env.
+
+    The ``SEVN_VERIFY_SANDBOX_IMAGE`` value the driver reads must be the
+    promoted GHCR digest ref, not a literal that Python sees as
+    ``ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}``. The clean
+    shape is to build it inside ``run:`` (exporting to ``$GITHUB_ENV`` or
+    inline) so the shell expands the variables. This test asserts that
+    whatever path the workflow takes, the consuming step runs a shell
+    command that contains the expanded variables (``docker pull
+    ${SANDBOX_IMAGE_REF}`` or ``make verify-deployment`` preceded by a
+    ``SANDBOX_IMAGE_REF=...`` export) — not just an env block with the
+    unsubstituted literal.
+    """
+    data = _load_yaml(_CI_CD)
+    job = data["jobs"]["verify-deployment"]
+    pull_steps = [
+        step
+        for step in job.get("steps", [])
+        if isinstance(step, dict) and "docker pull" in (step.get("run") or "")
+    ]
+    assert pull_steps, (
+        "verify-deployment must include a `docker pull` step for the "
+        "published sandbox image (see test_verify_deployment_sandbox_pull_step_present)"
+    )
+    # The sandbox pull must reference the SANDBOX_IMAGE_REF shell variable
+    # (built inside the same step) — not a literal $... leak.
+    for step in pull_steps:
+        run = step.get("run") or ""
+        assert "SANDBOX_IMAGE_REF" in run, (
+            "sandbox pull step must build and consume $SANDBOX_IMAGE_REF "
+            "via shell interpolation in `run:` (not via a literal "
+            "ghcr.io/${IMAGE_REPOSITORY}/... value in `env:`); got "
+            f"run={run[:200]!r}"
         )
