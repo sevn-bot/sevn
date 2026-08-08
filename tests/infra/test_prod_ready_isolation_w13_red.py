@@ -458,13 +458,78 @@ def _resolve_brave_smoke_image(docker: str) -> str | None:
     return None
 
 
+def test_brave_smoke_exercises_prod_security_context() -> None:
+    """D-PR-1: Brave smoke ``docker run`` must use the prod overlay's security context.
+
+    The prod overlay (``x-operator-service-hardening`` in
+    ``docker/docker-compose.yml``) sets ``security_opt: no-new-privileges:true``
+    and inherits Docker's default seccomp profile. The Brave smoke
+    previously passed ``--security-opt=seccomp=unconfined`` and omitted
+    ``no-new-privileges:true``, so it ran under **weaker** constraints than
+    the prod overlay it was meant to prove — a regression in either
+    prod-hardening dimension would not surface here.
+
+    The contract: every ``docker run`` invocation in the smoke must carry
+    ``--security-opt=no-new-privileges:true`` and must NOT pass
+    ``seccomp=unconfined`` (or any other seccomp override). The fix keeps
+    ``cap_drop: ALL`` and the non-root uid, which were already correct.
+    """
+    # Locate the ``docker run`` arg list for the Brave smoke. The test
+    # builds it inline rather than shelling out, so we read it from the
+    # test module itself.
+    source = Path(__file__).read_text(encoding="utf-8")
+    # Find the ``run_args = [`` block inside the brave-smoke test.
+    match = re.search(
+        r"def test_brave_runs_in_hardened_container_without_no_sandbox.*?run_args\s*=\s*\[(.*?)\]",
+        source,
+        re.DOTALL,
+    )
+    assert match, "could not locate the Brave smoke run_args block"
+    run_args_text = match.group(1)
+
+    # The smoke must add ``--security-opt=no-new-privileges:true`` so the
+    # container cannot regain privileges via setuid binaries (this is the
+    # prod hardening control). ``--security-opt no-new-privileges`` is also
+    # accepted as the YAML form, but the smoke passes flags directly.
+    assert re.search(
+        r"--security[-_]opt[= ]['\"]?no-new-privileges(?::true)?['\"]?",
+        run_args_text,
+    ), (
+        "D-PR-1: Brave smoke must pass --security-opt=no-new-privileges:true "
+        "so the container runs under the same hardening control as the prod "
+        "overlay (x-operator-service-hardening). The smoke previously omitted "
+        "this flag, silently relaxing the security context relative to prod."
+    )
+
+    # The smoke must NOT pass ``seccomp=unconfined`` (or any other seccomp
+    # override) so it runs under Docker's default seccomp profile — the same
+    # profile the prod overlay inherits.
+    seccomp_overrides = re.findall(
+        r"--security[-_]opt[= ]['\"]?seccomp[=]([^\s'\"]+)['\"]?",
+        run_args_text,
+    )
+    assert not seccomp_overrides, (
+        f"D-PR-1: Brave smoke must NOT pass a seccomp override; the prod "
+        f"overlay inherits Docker's default seccomp profile and the smoke "
+        f"must run under the same profile. Found overrides: {seccomp_overrides}"
+    )
+
+    # ``cap_drop: ALL`` and the non-root uid are still required.
+    assert "--cap-drop=ALL" in run_args_text, (
+        "Brave smoke must still drop all capabilities (cap_drop: ALL)"
+    )
+    assert "--user=10001:10001" in run_args_text, (
+        "Brave smoke must still run as the gateway service account (uid 10001)"
+    )
+
+
 def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
     """W13.4b / C8.1: dockerized Brave boots headless in a hardened container without ``--no-sandbox``.
 
     The static checks above prove the YAML config has no ``--no-sandbox``; this
     proves the dockerized browser actually starts in a hardened container
-    (``cap_drop: ALL`` + non-root uid ``10001``) when driven by the prod
-    overlay's environment. CDP readiness is the contract: we launch real
+    matching the **production** security context (D-PR-1) when driven by the
+    prod overlay's environment. CDP readiness is the contract: we launch real
     headless Brave (``--headless=new``) with ``--remote-debugging-port=0`` and a
     bind-mounted ``--user-data-dir``, then poll the user-data-dir for
     ``DevToolsActivePort`` (the file Chromium writes once the CDP endpoint is
@@ -472,25 +537,25 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
     an explicit fixed port). The launch must succeed and the renderer must
     remain running long enough to write that file.
 
-    The container hardening here matches the prod overlay on the dimensions
-    that the test can actually exercise in CI:
+    The container hardening here matches the prod overlay (``x-operator-service-hardening``)
+    exactly:
 
     - ``cap_drop: ALL`` — every capability dropped.
     - ``user=10001:10001`` — non-root (matches the gateway service account).
-    - ``--security-opt seccomp=unconfined`` — required so Chromium's
-      ``clone(CLONE_NEWPID|CLONE_NEWUSER)`` is not blocked by the default
-      seccomp policy on GHA ubuntu-latest.
+    - ``--security-opt no-new-privileges:true`` — matches the prod overlay
+      (D-PR-1: was previously omitted, which meant the smoke silently ran
+      with weaker constraints than prod).
+    - Docker's **default** seccomp profile (D-PR-1: the previous version
+      passed ``--security-opt seccomp=unconfined``, which lets Chromium's
+      renderer do ``clone(CLONE_NEWPID|CLONE_NEWUSER)`` without a seccomp
+      block but also disables a control the prod overlay inherits).
 
-    ``no-new-privileges:true`` is **deliberately omitted**: the Chromium
-    renderer sandbox needs to either run the setuid helper as root or create
-    an unprivileged user namespace; on a host whose AppArmor policy restricts
-    unprivileged user namespaces (Ubuntu 24.04 default) the smoke cannot
-    exercise the renderer path. This is the same tradeoff the prod overlay
-    must solve at compose level (W14.5: container hardening does **not**
-    substitute for the renderer sandbox — the renderer sandbox is the primary
-    control). The test proves the C8.1 contract (env must not contain
-    ``--no-sandbox``); the renderer-sandbox-vs-host-namespaces question is
-    answered by the host, not by this smoke.
+    Renderer-sandbox-vs-host-namespaces is a separate question: the GHA
+    runner host disables ``apparmor_restrict_unprivileged_userns`` via a
+    step in ``.github/workflows/docker.yml`` so Chromium can create the
+    user namespace under the default seccomp policy. The smoke proves
+    the C8.1 contract (env must not contain ``--no-sandbox``); the
+    renderer-sandbox hardening is the prod overlay's job, not this test's.
 
     The image is env-overridable via ``SEVN_BROWSER_SMOKE_IMAGE`` (default
     ``sevn-gateway-browser:ci``; falls back to ``sevn-gateway-browser:local``).
@@ -543,12 +608,16 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
             "--rm",
             "--name",
             _BRAVE_SMOKE_CONTAINER_NAME,
-            # Container hardening: cap-drop ALL, non-root uid, seccomp
-            # unconfined (so Chromium can create the user namespace the
-            # renderer sandbox needs). no-new-privileges is intentionally
-            # omitted — see the docstring.
+            # Container hardening: exercise the **production** security context
+            # (D-PR-1). The prod overlay inherits ``no-new-privileges:true`` from
+            # ``x-operator-service-hardening`` and uses Docker's default seccomp
+            # profile — the smoke must run under the same constraints so a
+            # regression in either dimension surfaces here as a red check, not
+            # a silent "works under relaxed flags" false negative on the
+            # operator's machine. Chromium's renderer sandbox then runs under
+            # the default seccomp policy the prod overlay will hand it.
             "--cap-drop=ALL",
-            "--security-opt=seccomp=unconfined",
+            "--security-opt=no-new-privileges:true",
             "--user=10001:10001",
             # Mirror the prod overlay environment exactly.
             "-e",
