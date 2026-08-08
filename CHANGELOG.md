@@ -17,6 +17,7 @@ are cut into a dated, versioned section at release time.
 - [2026-08-04] Pre-commit blocks commits from the primary checkout unless `SEVN_ALLOW_PRIMARY_COMMIT=1`; `make check-git-guards` asserts `git` resolves to repo `bin/git` without direnv (D1 primary-checkout guard)
 
 ### Changed
+- [2026-08-08] `make ci-resume` no longer runs `spec-kit-wave-test` (kit-local, gitignored, undeclared `langgraph` import); unblocks PRs #243, #244, #245 (spec-kit-wave-hygiene Wave 3 minimum)
 - [2026-08-07] Telegram long-poll traces state changes instead of every cycle: `channel.telegram.poll.cycle` now emits once per outage (`offline`) and once per recovery (`recovered`), removing ~2,400 zero-duration heartbeat spans per day (~half of all product spans); set `SEVN_TRACE_POLL_CYCLE=1` to restore per-iteration ticks when debugging the loop
 - [2026-08-07] Gateway httpx instrumentation captures headers only — `capture_all=True` also shipped full request and response bodies, duplicating every LLM payload already captured by `instrument_pydantic_ai` and mirroring all inbound Telegram message content into the trace export
 - [2026-08-07] New `tracing.export.exclude_kinds` drops chosen trace kinds on the OTel/Logfire bridge only, so local sqlite and JSONL sinks keep the full stream; defaults to excluding `snapshot.checkpoint`. Entries match a kind exactly or as a prefix with a trailing `*`; turn-root spans are never filtered
