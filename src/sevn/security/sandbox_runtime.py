@@ -910,12 +910,24 @@ def _resolve_spawn_session_token(
         if secret:
             from sevn.proxy.auth import validate_session_token
 
+            # PR #245 Codex finding 6: re-check the existing token's ``run_id``
+            # and ``container_id`` claims against the current spawn context so a
+            # token minted for a previous run / different sandbox cannot be
+            # replayed by a fresh spawn. The proxy also rejects mismatched
+            # binding headers (C7.1), but rejecting at spawn time stops the
+            # cross-spawn leak before it reaches the proxy request seam.
+            bind_id = (container_id or "").strip() or None
             if not validate_session_token(
                 existing,
                 signing_key=secret,
                 path="/web/fetch",
+                run_id=run_id,
+                container_id=bind_id,
             ):
-                msg = "spawn env SEVN_SESSION_TOKEN is invalid or out of sandbox scope"
+                msg = (
+                    "spawn env SEVN_SESSION_TOKEN is invalid, out of sandbox scope, "
+                    "or was minted for a different run/container"
+                )
                 raise SandboxConfigurationError(msg)
         return existing
     if not secret:

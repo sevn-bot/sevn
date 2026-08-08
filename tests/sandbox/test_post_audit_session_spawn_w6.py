@@ -15,7 +15,16 @@ from sevn.security.sandbox_runtime import _resolve_spawn_session_token
 _SIGNING_KEY = "spawn-test-signing-key-at-least-32-chars"
 
 
-def test_resolve_spawn_session_token_preserves_existing_env_token() -> None:
+def test_resolve_spawn_session_token_preserves_existing_env_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without a resolved signing key the function trusts the env token as-is.
+
+    PR #245 Codex finding 6 adds run/container binding checks when a secret
+    resolves; this test pins the no-secret branch (no ``SEVN_PROXY_SHARED_SECRET``
+    env, no ``SEVN_HOME`` generate-once file, no injected ``signing_key``).
+    """
+    monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
     assert (
         _resolve_spawn_session_token(
             run_id="run-keep",
@@ -121,3 +130,67 @@ def test_resolve_spawn_session_token_embeds_run_id_in_minted_payload(
         run_id=run_id,
     )
     assert token == expected
+
+
+def test_resolve_spawn_session_token_rejects_existing_token_for_other_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An existing token minted for a different ``run_id`` is rejected (PR #245 Codex finding 6).
+
+    Without the binding re-check, a sandbox could accept a session token left in
+    the spawn env by a previous run and emit its own claims, letting an old
+    credential extend into a fresh run's binding.
+    """
+    monkeypatch.setenv("SEVN_PROXY_SHARED_SECRET", _SIGNING_KEY)
+    other_run_token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id="run-other",
+        container_id="ctr-other",
+    )
+    with pytest.raises(SandboxConfigurationError, match="different run/container"):
+        _resolve_spawn_session_token(
+            run_id="run-current",
+            env={"SEVN_SESSION_TOKEN": other_run_token},
+            container_id="ctr-current",
+        )
+
+
+def test_resolve_spawn_session_token_rejects_existing_token_for_other_container(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An existing token minted for a different ``container_id`` is rejected."""
+    monkeypatch.setenv("SEVN_PROXY_SHARED_SECRET", _SIGNING_KEY)
+    other_container_token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id="run-shared",
+        container_id="ctr-other",
+    )
+    with pytest.raises(SandboxConfigurationError, match="different run/container"):
+        _resolve_spawn_session_token(
+            run_id="run-shared",
+            env={"SEVN_SESSION_TOKEN": other_container_token},
+            container_id="ctr-current",
+        )
+
+
+def test_resolve_spawn_session_token_accepts_existing_token_with_matching_bindings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An existing token whose ``run_id`` / ``container_id`` match the spawn is kept."""
+    monkeypatch.setenv("SEVN_PROXY_SHARED_SECRET", _SIGNING_KEY)
+    matching_token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id="run-shared",
+        container_id="ctr-shared",
+    )
+    assert (
+        _resolve_spawn_session_token(
+            run_id="run-shared",
+            env={"SEVN_SESSION_TOKEN": matching_token},
+            container_id="ctr-shared",
+        )
+        == matching_token
+    )
