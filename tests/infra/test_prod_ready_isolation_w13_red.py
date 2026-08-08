@@ -11,6 +11,7 @@ without a Docker daemon.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -379,9 +380,16 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
             "to run this test"
         )
 
-    with tempfile.TemporaryDirectory(
-        prefix="sevn-w13-brave-", ignore_cleanup_errors=True
-    ) as tmp_str:
+    # No ``ignore_cleanup_errors=True``: the W13 hard-context container runs as
+    # uid 10001, so any subdir Chromium creates under profile_host (e.g.
+    # ``segmentation_platform``) is mode 0700 owned by uid 10001. Python 3.12's
+    # ``TemporaryDirectory`` cleanup walks the tree and calls ``os.open`` on
+    # each entry; the runner can't read uid-10001 dirs, so the cleanup raises
+    # before the flag has a chance to catch the deeper ``os.open`` failure.
+    # Instead, stop the container and rmtree the bind-mount root inside the
+    # finally below — the ``TemporaryDirectory`` exit then finds nothing it
+    # can't read.
+    with tempfile.TemporaryDirectory(prefix="sevn-w13-brave-") as tmp_str:
         profile_host = Path(tmp_str) / "profile"
         profile_host.mkdir(parents=True, exist_ok=True)
         # Bind the host tmp dir into the container at /tmp/w13-profile so we can
@@ -593,6 +601,16 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
                 text=True,
                 timeout=15,
             )  # nosec B603
+            # Belt-and-suspenders cleanup of the bind-mount root. With the
+            # container stopped, uid-10001 is no longer holding any file
+            # descriptors open inside profile_host, so even though the
+            # subdirs remain mode 0700 the runner can ``rmtree`` them when
+            # we own the parent. ``ignore_errors=True`` swallows the
+            # ``PermissionError`` that some environments still raise on
+            # unlink, so the ``TemporaryDirectory`` exit finds either an
+            # empty tree or a tree it can delete itself.
+            with contextlib.suppress(OSError):
+                shutil.rmtree(profile_host, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------
