@@ -945,6 +945,103 @@ def test_verify_digests_overlay_merges_to_pulled_image() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("overlay_name", "gateway_image_name"),
+    [
+        ("docker-compose.verify-digests.browser.yml", "gateway.browser"),
+        ("docker-compose.verify-digests.gui.yml", "gateway.gui"),
+    ],
+    ids=["browser", "gui"],
+)
+def test_verify_digests_variant_overlays_pin_published_gateway_variant(
+    overlay_name: str,
+    gateway_image_name: str,
+) -> None:
+    """F-PR-8 — browser/GUI boots must pin their own published gateway image.
+
+    ``docker-compose.browser.yml`` / ``.gui.yml`` swap ``sevn-gateway``'s
+    ``build.dockerfile``. Layering the *base* digest overlay on top re-pins
+    ``sevn-gateway.image`` to ``gateway:<sha>``, so a ``--no-build`` boot runs
+    the base gateway while the ``gateway-dockerfile`` check (which reads
+    ``build.dockerfile`` from the merged config) still passes — release
+    evidence for a browser/GUI boot that never ran the published variant
+    (mergecraft review 3741260241).
+    """
+    overlay = _REPO_ROOT / "docker" / overlay_name
+    assert overlay.is_file(), (
+        f"{overlay_name} must exist so the browser/GUI boot can pin the "
+        f"published {gateway_image_name} image on the release path"
+    )
+    services = (yaml.safe_load(overlay.read_text(encoding="utf-8")) or {}).get("services")
+    assert isinstance(services, dict), f"{overlay_name} must declare services:"
+
+    gateway_image = (services.get("sevn-gateway") or {}).get("image")
+    assert isinstance(gateway_image, str), (
+        f"{overlay_name} must pin sevn-gateway.image; got {gateway_image!r}"
+    )
+    assert urlparse(f"https://{gateway_image}").hostname == "ghcr.io", (
+        f"{overlay_name} sevn-gateway image must be published to GHCR; got {gateway_image!r}"
+    )
+    assert f"/{gateway_image_name}:" in gateway_image, (
+        f"{overlay_name} must pin the published {gateway_image_name} variant, "
+        f"not the base gateway; got {gateway_image!r}"
+    )
+    for token in ("IMAGE_REPOSITORY", "SEVN_VERIFY_IMAGE_TAG"):
+        assert token in gateway_image, (
+            f"{overlay_name} sevn-gateway image must interpolate {token}; got {gateway_image!r}"
+        )
+
+    # The proxy pin must survive too: without it a ``--no-build`` boot has no
+    # published proxy image to pull and no permission to build one.
+    proxy_image = (services.get("sevn-proxy") or {}).get("image")
+    assert isinstance(proxy_image, str), (
+        f"{overlay_name} must keep the published proxy pin so a --no-build "
+        f"boot can pull it; got {proxy_image!r}"
+    )
+    assert "/proxy:" in proxy_image, (
+        f"{overlay_name} sevn-proxy must pin the published proxy image; got {proxy_image!r}"
+    )
+
+
+def test_compose_up_args_follows_the_argv_not_the_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-PR-8 — ``--no-build`` must track the actual overlay, not ``SEVN_VERIFY_IMAGE_OVERLAY``.
+
+    Reading the env var alone meant a stack assembled *without* a digest
+    overlay still booted with ``--no-build`` on the release path: compose had
+    no published ``image:`` to pull and no permission to build, so the boot
+    failed before its readiness probes (mergecraft review 3741260241).
+    """
+    module = _load_verify_module()
+    monkeypatch.setenv("SEVN_VERIFY_IMAGE_OVERLAY", "1")
+    monkeypatch.setenv("SEVN_VERIFY_IMAGE_TAG", "deadbeef")
+
+    with_overlay = module._compose_base(
+        "p", ("docker/docker-compose.yml",), digest_variant=module.DIGEST_VARIANT_BROWSER
+    )
+    assert any("verify-digests.browser.yml" in arg for arg in with_overlay), (
+        "the browser variant must append docker-compose.verify-digests.browser.yml; "
+        f"got {with_overlay!r}"
+    )
+    assert "--no-build" in module._compose_up_args(with_overlay), (
+        "a stack that carries a digest overlay must pull the published image"
+    )
+
+    # Same env, but an argv with no overlay in it (e.g. a checkout missing the
+    # file): compose must be allowed to build rather than boot nothing.
+    without_overlay = ["docker", "compose", "-p", "p", "-f", "docker/docker-compose.yml"]
+    up_args = module._compose_up_args(without_overlay)
+    assert "--no-build" not in up_args, (
+        "without a digest overlay there is no published image: to pull, so the "
+        f"boot must not be told to skip building; got {up_args!r}"
+    )
+    assert "--build" in up_args, (
+        "without a digest overlay the boot must build from source even when "
+        f"the opt-in env is set; got {up_args!r}"
+    )
+
+
 def test_verify_deployment_sandbox_pull_step_present() -> None:
     """Mergecraft review 3738385557 — sandbox image must be pullable on a fresh runner.
 
@@ -1287,4 +1384,207 @@ def test_cron_step_invokes_python_driver_directly() -> None:
         "alone collapses driver verdict to a single 0/1/2 with 2 "
         "ambiguous between `make` failure and `driver_unavailable` "
         "(mergecraft review 3740249070); got run: " + run[:400]
+    )
+
+
+_CRON_DRIVER_INVOCATION = "uv run python scripts/verify_deployment.py all"
+
+
+def _exec_cron_routing(stub: str) -> subprocess.CompletedProcess[str]:
+    """Execute the cron step's routing logic with the driver call stubbed.
+
+    The step's ``run:`` body is plain POSIX shell, so the exit-code routing
+    can be exercised for real by swapping only the driver invocation for a
+    stub that reproduces a chosen exit code and stdout.
+
+    Args:
+        stub (str): Shell command substituted for the driver invocation.
+
+    Returns:
+        subprocess.CompletedProcess[str]: Result of running the routing logic.
+    """
+    run = _cron_step_run()
+    assert _CRON_DRIVER_INVOCATION in run, (
+        "cron step must invoke the Python driver as "
+        f"{_CRON_DRIVER_INVOCATION!r} so this test can stub it; got: {run[:400]}"
+    )
+    return subprocess.run(
+        ["sh", "-c", run.replace(_CRON_DRIVER_INVOCATION, stub)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+@pytest.mark.parametrize(
+    ("stub", "expected_rc", "why"),
+    [
+        (
+            "printf 'VERIFY_OVERALL: pass (exit 0)\\n'",
+            0,
+            "a real pass must turn the cron job green",
+        ),
+        (
+            "printf 'VERIFY_OVERALL: fail (exit 1)\\n'; exit 1",
+            1,
+            "a driver verdict of fail must fail the cron job",
+        ),
+        (
+            "printf 'VERIFY_OVERALL: driver_unavailable (exit 2)\\n'; exit 2",
+            0,
+            "driver_unavailable is a known fresh-runner state and is tolerated",
+        ),
+        (
+            "exit 127",
+            1,
+            "an unexpected exit (interpreter missing) means the drivers never "
+            "ran and must not report green",
+        ),
+    ],
+    ids=["pass", "fail", "driver_unavailable", "unexpected-127"],
+)
+def test_cron_step_exit_routing(stub: str, expected_rc: int, why: str) -> None:
+    """F-PR-7 — only a real pass (0) or the tolerated ``driver_unavailable`` (2) may be green.
+
+    The prior shape ended in a bare ``exit 0``, so any code outside
+    ``{0, 1, 2}`` — notably ``127`` when ``uv run python`` cannot start —
+    fell through to success and reported a verified deployment for a run
+    whose drivers never executed. That contradicts the step's own W23.2
+    principle: a green job that skipped the drivers is worse than no job
+    (mergecraft review 3741145083).
+    """
+    completed = _exec_cron_routing(stub)
+    assert completed.returncode == expected_rc, (
+        f"{why}: expected exit {expected_rc}, got {completed.returncode}\n"
+        f"stdout: {completed.stdout[-800:]}\nstderr: {completed.stderr[-800:]}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# F-PR-9 (mergecraft review 3741296931) — the authenticated drivers must send
+# the binding headers the live proxy requires. ``_authenticated_probe`` sent
+# only the bearer token, but the drivers mint tokens carrying a ``run_id``
+# claim: ``validate_session_token`` treats a missing ``X-Sevn-Run-Id`` as a
+# binding *mismatch*, and ``llm_post_auth_failure`` additionally requires the
+# PoP ``X-Sevn-Binding-Signature``. Both driver probes therefore returned 401
+# against a real stack. The mocked driver tests could not catch that, so these
+# tests drive the probe's real header construction through the real auth seam.
+# ---------------------------------------------------------------------------
+
+
+_PROBE_SECRET = "verify-probe-shared-secret-32chars-minimum"
+
+
+def _probe_request(module: Any, **probe_kwargs: Any) -> Any:
+    """Return a Starlette ``Request`` carrying the headers ``_authenticated_probe`` sends.
+
+    Args:
+        module (Any): Loaded ``verify_deployment`` module.
+        probe_kwargs (Any): Keyword arguments forwarded to ``_authenticated_probe``.
+
+    Returns:
+        Any: ``starlette.requests.Request`` built from the captured headers.
+    """
+    import urllib.error
+    import urllib.request
+
+    from starlette.requests import Request
+
+    captured: dict[str, str] = {}
+
+    def fake_urlopen(request: Any, timeout: float | None = None) -> Any:
+        captured.update({name.lower(): value for name, value in request.header_items()})
+        raise urllib.error.URLError("captured by test")
+
+    original = urllib.request.urlopen
+    urllib.request.urlopen = fake_urlopen  # type: ignore[assignment]
+    try:
+        module._authenticated_probe("http://127.0.0.1:9/web/auth-check", **probe_kwargs)
+    finally:
+        urllib.request.urlopen = original  # type: ignore[assignment]
+
+    assert captured, "_authenticated_probe must issue a request carrying auth headers"
+    return Request(
+        {
+            "type": "http",
+            "http_version": "1.1",
+            "method": "GET",
+            "path": "/web/auth-check",
+            "headers": [(k.encode(), v.encode()) for k, v in captured.items()],
+            "query_string": b"",
+            "client": ("127.0.0.1", 12345),
+        }
+    )
+
+
+def test_authenticated_probe_headers_are_accepted_by_the_real_proxy_seam() -> None:
+    """F-PR-9 — a run-id-bound token must pass ``llm_post_auth_failure`` unchanged.
+
+    This is the check the mocked driver tests structurally cannot make: it
+    feeds the probe's own headers into the production auth seam, so a probe
+    that omits ``X-Sevn-Run-Id`` or the PoP signature fails here instead of
+    only on a live release runner.
+    """
+    from sevn.proxy.auth import llm_post_auth_failure, mint_session_token
+
+    run_id = "verify-roundtrip-probe"
+    token = mint_session_token(signing_key=_PROBE_SECRET, scope="sandbox", run_id=run_id, ttl_s=60)
+    request = _probe_request(
+        _load_verify_module(), token=token, run_id=run_id, signing_key=_PROBE_SECRET
+    )
+    blocked = llm_post_auth_failure(request, _PROBE_SECRET, allow_unauthenticated=False)
+    assert blocked is None, (
+        "the probe's headers must authorize /web/auth-check against the real "
+        "proxy seam; the drivers mint tokens with a run_id claim, so the probe "
+        "must send X-Sevn-Run-Id plus the X-Sevn-Binding-Signature PoP header "
+        f"(got HTTP {getattr(blocked, 'status_code', None)})"
+    )
+
+
+def test_authenticated_probe_without_binding_is_refused_by_the_real_proxy_seam() -> None:
+    """F-PR-9 — the bearer-only shape is exactly what the proxy rejects.
+
+    Pins the reason the fix was needed, and keeps the ``sandbox-scope-rejects-llm``
+    check honest: that probe is deliberately bearer-only because a sandbox
+    token *with* a valid PoP binding is admitted on ``/llm/*``.
+    """
+    from sevn.proxy.auth import llm_post_auth_failure, mint_session_token
+
+    token = mint_session_token(
+        signing_key=_PROBE_SECRET, scope="sandbox", run_id="verify-roundtrip-probe", ttl_s=60
+    )
+    request = _probe_request(_load_verify_module(), token=token)
+    blocked = llm_post_auth_failure(request, _PROBE_SECRET, allow_unauthenticated=False)
+    assert blocked is not None, (
+        "a bearer-only probe of a run-id-bound token must be refused — this is "
+        "the 401 the drivers hit before F-PR-9"
+    )
+    assert blocked.status_code == 401, (
+        f"bearer-only probe must be refused with 401; got {blocked.status_code}"
+    )
+
+
+def test_driver_probes_pass_run_id_and_signing_key() -> None:
+    """F-PR-9 — both authenticated driver checks must opt into the binding headers.
+
+    ``proxy-auth-with-token`` (round-trip) and ``sandbox-scope-accepts-web``
+    (scoped-token) assert a 2xx, so they must send the binding headers;
+    ``sandbox-scope-rejects-llm`` asserts a refusal and must not.
+    """
+    source = _VERIFY_SCRIPT.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    binding_calls = 0
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not isinstance(func, ast.Name) or func.id != "_authenticated_probe":
+            continue
+        kwargs = {kw.arg for kw in node.keywords}
+        if {"run_id", "signing_key"} <= kwargs:
+            binding_calls += 1
+    assert binding_calls >= 2, (
+        "both authenticated probes that assert a 2xx (proxy-auth-with-token, "
+        "sandbox-scope-accepts-web) must pass run_id= and signing_key= so the "
+        f"proxy accepts the run-id-bound token; found {binding_calls}"
     )

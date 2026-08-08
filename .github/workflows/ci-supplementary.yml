@@ -74,6 +74,17 @@ jobs:
             echo "::warning title=verify-deployment::driver reported driver_unavailable (exit $rc) — tolerated on cron"
             exit 0
           fi
+          # F-PR-7: only exit 0 (a real pass) and the tolerated exit 2 above may
+          # turn this job green. A bare terminal ``exit 0`` swallowed every other
+          # code — e.g. 127 when ``uv run python`` cannot start, or a future
+          # non-{0,1,2} code from the script — and reported a green daily
+          # verification for a run whose drivers never executed. That contradicts
+          # this step's own principle (W23.2): a green job that skipped the
+          # drivers is worse than no job (mergecraft review 3741145083).
+          if [ "$rc" -ne 0 ]; then
+            echo "::error title=verify-deployment::driver exited unexpectedly (exit $rc, overall=${overall:-unknown}) — drivers did not run to a verdict"
+            exit 1
+          fi
           exit 0
 
   security:

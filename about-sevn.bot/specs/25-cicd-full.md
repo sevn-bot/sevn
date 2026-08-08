@@ -8,7 +8,7 @@ summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict de
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
 last_updated: '2026-08-08'
-fingerprint: sha256:e6f19734af404df1c6dd2dce0145aaaec02067cefdf2530aca58cd4b05b80b73
+fingerprint: sha256:d8745fb4d1906e37dd3fc1fe2defd82520047fb348ea4c4f27e42b091a3870e8
 related: []
 sources:
 - .github/workflows/**
@@ -538,6 +538,7 @@ Wave agents: mid-wave **`make ci-affected`** only; wave boundary **`make ci`** o
 | Coverage gate after install-action sync | `make ci-quality-coverage` requires W12 dev-extra preservation; `make coverage` exits 2 when optional `dev` is pruned mid-suite |
 | Deployment driver `fail` on daily cron | `verify-deployment` job in `ci-supplementary.yml` runs `set +e`; harness exit 1 propagates as a job error (real failure) |
 | Deployment driver `driver_unavailable` on daily cron | Tolerated — harness exits 2 and the job step downgrades it to a `::warning` annotation (D52) |
+| Deployment driver exits outside `{0, 1, 2}` on daily cron | Fails the job — an unexpected code (e.g. `127` when the interpreter cannot start) means no driver reached a verdict, so it must not report green |
 | Deployment driver `driver_unavailable` on a release tag | `verify-deployment` job in `ci-cd.yml` does **not** tolerate exit 2 — the harness exit 2 fails the job and `delivery-chain` blocks phase6 (D52, C14.1) |
 | Deployment driver passes without running | A green job that skipped the drivers is worse than no job — `verify-deployment` runs `make verify-deployment` directly so every driver must print `VERIFY_OVERALL:` (W23.2) |
 | Release tag without evidence artifact | `evidence/verify/*.json` is uploaded to the `deployment-verification-<sha>` artifact and bundled into the phase6 draft release (C14.3); `if-no-files-found: error` blocks the upload step on missing files |
@@ -703,7 +704,7 @@ harness on **two** invocation surfaces with different semantics:
 
 || Invocation surface | Driver behaviour | Job |
 |---------------------|-------------------|------|
-| Daily cron (``ci-supplementary.yml``) | Real failure (exit 1) propagates as a job error; ``driver_unavailable`` (exit 2) downgrades to a ``::warning`` and the job still succeeds | ``verify-deployment`` |
+| Daily cron (``ci-supplementary.yml``) | Real failure (exit 1) propagates as a job error; ``driver_unavailable`` (exit 2) downgrades to a ``::warning`` and the job still succeeds; any other non-zero code (e.g. ``127``) fails the job — the drivers never reached a verdict | ``verify-deployment`` |
 | Release tag (``refs/tags/v*`` in ``ci-cd.yml``) | All three non-zero codes (1 fail, 2 driver_unavailable) fail the job; a green job that skipped the drivers is worse than no job | ``verify-deployment`` |
 
 ``verify-deployment`` is registered in the ``DRIVERS`` registry of
@@ -732,9 +733,44 @@ The four new drivers register the previously-unexercised paths:
 |---------|----------------|
 | ``authenticated-proxy-roundtrip`` | C1.2 — boot-resolved shared secret signs a session token and the proxy accepts it on ``/web/auth-check`` |
 | ``volume-upgrade`` | Operator ``sevn-state`` volume survives a ``compose up`` cycle (sentinel file preserved) |
-| ``browser-gui-boot`` | ``docker/docker-compose.browser.yml`` / ``.gui.yml`` redefine ``sevn-gateway``; the resolved build points at ``Dockerfile.gateway.browser`` / ``.gui`` |
+| ``browser-gui-boot`` | ``docker/docker-compose.browser.yml`` / ``.gui.yml`` redefine ``sevn-gateway``; the resolved build points at ``Dockerfile.gateway.browser`` / ``.gui``, and each variant is booted and probed at ``/ready`` |
 | ``cancellation-cleanup`` | A cancelled mid-flight sandbox spawn leaves no orphan containers or leaked named volumes |
-| ``sandbox-scoped-token`` | Batch E C7.1/C7.2 — ``scope=sandbox`` token accepts ``/web/*`` and is refused on ``/llm/*``; ``X-Sevn-Proxy-Token`` service secret still satisfies guarded routes |
+| ``sandbox-scoped-token`` | Batch E C7.1/C7.2 — ``scope=sandbox`` token accepts ``/web/*`` and a **bearer-only** token (no PoP binding) is refused on ``/llm/*``; ``X-Sevn-Proxy-Token`` service secret still satisfies guarded routes |
 
 Each new driver reports ``driver_unavailable`` (exit 2) when its preconditions
 are not met; the cron tolerates that, the release path refuses it.
+
+### F-PR review follow-ups (append-only)
+
+Three seams that let a driver report green without proving anything:
+
+**Cron exit routing.** The cron step's routing block ended in a bare
+``exit 0``, so any code outside ``{0, 1, 2}`` — notably ``127`` when
+``uv run python`` cannot start — fell through to success. Only a real pass
+(exit 0) and the explicitly tolerated ``driver_unavailable`` (exit 2) may turn
+the job green; every other code fails it, per this section's own rule that a
+green job which skipped the drivers is worse than no job.
+
+**Per-variant digest overlays.** ``docker-compose.verify-digests.yml`` pins
+``sevn-proxy`` / ``sevn-gateway`` to the SHA-tagged images promoted by
+``container-supply-chain``. The browser/GUI overlays swap ``sevn-gateway``'s
+``build.dockerfile``, so layering the *base* overlay on them would boot the
+base gateway under ``--no-build`` while the ``gateway-dockerfile`` check (which
+reads ``build.dockerfile`` from the merged config) still passed.
+``docker-compose.verify-digests.browser.yml`` / ``.gui.yml`` pin the matching
+published ``gateway.browser`` / ``gateway.gui`` image instead, and
+``browser-gui-boot`` records a ``{variant}/gateway-image`` check naming the
+image the boot actually resolved. ``--no-build`` is chosen from whether the
+assembled argv carries a digest overlay — not from ``SEVN_VERIFY_IMAGE_OVERLAY``
+alone, which previously left a no-overlay stack with nothing to pull and no
+permission to build.
+
+**Binding headers on authenticated probes.** The drivers mint session tokens
+carrying a ``run_id`` claim. ``validate_session_token`` treats a missing
+``X-Sevn-Run-Id`` as a binding *mismatch*, and ``llm_post_auth_failure`` also
+requires the PoP ``X-Sevn-Binding-Signature``, so a bearer-only probe draws
+HTTP 401 from a live proxy. ``_authenticated_probe`` sends both headers for the
+checks that assert a 2xx, and deliberately omits them for
+``sandbox-scope-rejects-llm`` — a sandbox-scoped token *is* admitted on
+``/llm/*`` when it presents a valid PoP binding, so the invariant worth proving
+is that a stolen bearer token alone buys nothing there.

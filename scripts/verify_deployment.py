@@ -38,6 +38,8 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -65,6 +67,23 @@ EXIT_CODES = {STATUS_PASS: 0, STATUS_FAIL: 1, STATUS_UNAVAILABLE: 2}
 OPERATOR_COMPOSE = "docker/docker-compose.yml"
 VERIFY_COMPOSE = "docker/docker-compose.verify.yml"
 VERIFY_DIGESTS_COMPOSE = "docker/docker-compose.verify-digests.yml"
+# Per-variant digest overlays. The browser/GUI compose overlays swap the
+# gateway's ``build.dockerfile``; pinning the *base* ``gateway:<sha>`` image on
+# top of them would boot the base gateway under ``--no-build`` while the
+# ``gateway-dockerfile`` check still passed, so each variant pins the matching
+# published image (``gateway.browser`` / ``gateway.gui``) instead — the images
+# ``container-supply-chain`` promotes alongside the base gateway (D45).
+VERIFY_DIGESTS_BROWSER_COMPOSE = "docker/docker-compose.verify-digests.browser.yml"
+VERIFY_DIGESTS_GUI_COMPOSE = "docker/docker-compose.verify-digests.gui.yml"
+# Digest-overlay variant ids accepted by ``_compose_base``.
+DIGEST_VARIANT_BASE = "base"
+DIGEST_VARIANT_BROWSER = "browser"
+DIGEST_VARIANT_GUI = "gui"
+_DIGEST_OVERLAY_BY_VARIANT = {
+    DIGEST_VARIANT_BASE: VERIFY_DIGESTS_COMPOSE,
+    DIGEST_VARIANT_BROWSER: VERIFY_DIGESTS_BROWSER_COMPOSE,
+    DIGEST_VARIANT_GUI: VERIFY_DIGESTS_GUI_COMPOSE,
+}
 VERIFY_PROXY_URL = "http://127.0.0.1:3102"
 # Host-published gateway URL. ``docker-compose.yml`` publishes the gateway
 # at ``${SEVN_GATEWAY_BIND:-127.0.0.1}:${SEVN_GATEWAY_PORT:-3001}:3001``
@@ -301,7 +320,7 @@ def _docker_unavailable_reason() -> str | None:
     return None
 
 
-def _verify_image_overlay_path() -> Path | None:
+def _verify_image_overlay_path(variant: str = DIGEST_VARIANT_BASE) -> Path | None:
     """Return the digest-overlay path when ``SEVN_VERIFY_IMAGE_OVERLAY`` opts in.
 
     The overlay pins ``sevn-proxy`` and ``sevn-gateway`` ``image:`` to the
@@ -309,6 +328,13 @@ def _verify_image_overlay_path() -> Path | None:
     drivers actually exercise the published container images instead of
     locally-rebuilt ones. The overlay is opt-in because local-dev stacks
     have no published digest to pull from.
+
+    Args:
+        variant (str): Which gateway image the overlay must pin —
+            ``base`` (default), ``browser``, or ``gui``. The browser/GUI
+            variants exist because their compose overlays swap the gateway's
+            ``build.dockerfile``; pinning the base ``gateway:<sha>`` on top
+            would boot the base image under ``--no-build``.
 
     Returns:
         Path | None: Resolved overlay path, or ``None`` when the opt-in is
@@ -324,7 +350,11 @@ def _verify_image_overlay_path() -> Path | None:
         return None
     if not os.environ.get("SEVN_VERIFY_IMAGE_TAG"):
         return None
-    path = REPO / VERIFY_DIGESTS_COMPOSE
+    relative = _DIGEST_OVERLAY_BY_VARIANT.get(variant)
+    if relative is None:
+        msg = f"unknown digest-overlay variant {variant!r}"
+        raise ValueError(msg)
+    path = REPO / relative
     return path if path.is_file() else None
 
 
@@ -332,24 +362,22 @@ def _compose_base(
     project: str,
     files: tuple[str, ...],
     *,
-    include_digest_overlay: bool = True,
+    digest_variant: str = DIGEST_VARIANT_BASE,
 ) -> list[str]:
     """Build a ``docker compose`` argv with the digest overlay appended when opted in.
 
     Args:
         project (str): Compose project name (keeps driver stacks isolated).
         files (tuple[str, ...]): Compose files in merge order (base first).
-        include_digest_overlay (bool): When ``True`` (default) and
-            ``SEVN_VERIFY_IMAGE_OVERLAY=1`` is set, append the SHA-pinned
-            ``docker-compose.verify-digests.yml`` overlay so the stack
-            runs the published container images. Browser/GUI overlays
-            rely on their own ``build: dockerfile: Dockerfile.gateway.browser``
-            / ``gui`` block to swap the gateway image; layering the
-            digest overlay on top would re-pin ``sevn-gateway.image`` to
-            the base ``gateway:<sha>`` and the C14.2 release evidence
-            would claim a browser/GUI boot that never ran the published
-            variant. Those drivers pass ``include_digest_overlay=False``
-            so they exercise the browser/GUI Dockerfile swap end-to-end.
+        digest_variant (str): Which digest overlay to append when
+            ``SEVN_VERIFY_IMAGE_OVERLAY=1`` is set — ``base`` (default),
+            ``browser``, or ``gui``. Stacks built on
+            ``docker-compose.browser.yml`` / ``.gui.yml`` must pass the
+            matching variant: those overlays swap ``sevn-gateway``'s
+            ``build.dockerfile``, so appending the base overlay would re-pin
+            ``sevn-gateway.image`` to ``gateway:<sha>`` and the C14.2 release
+            evidence would claim a browser/GUI boot that actually ran the base
+            gateway (mergecraft review 3741260241).
 
     Returns:
         list[str]: ``docker compose -p <project> -f <a> -f <b> [-f <digest>]``.
@@ -361,21 +389,40 @@ def _compose_base(
     argv = ["docker", "compose", "-p", project]
     for path in files:
         argv.extend(["-f", path])
-    if include_digest_overlay:
-        overlay = _verify_image_overlay_path()
-        if overlay is not None:
-            argv.extend(["-f", str(overlay)])
+    overlay = _verify_image_overlay_path(digest_variant)
+    if overlay is not None:
+        argv.extend(["-f", str(overlay)])
     return argv
+
+
+def _has_digest_overlay(base: list[str]) -> bool:
+    """Return whether ``base`` already includes one of the digest overlays.
+
+    Args:
+        base (list[str]): Argv prefix returned by :func:`_compose_base`.
+
+    Returns:
+        bool: ``True`` when a ``-f <digest overlay>`` pair is present.
+
+    Examples:
+        >>> _has_digest_overlay(["docker", "compose", "-f", "docker/docker-compose.yml"])
+        False
+    """
+    names = {Path(relative).name for relative in _DIGEST_OVERLAY_BY_VARIANT.values()}
+    return any(Path(arg).name in names for arg in base)
 
 
 def _compose_up_args(base: list[str], *extra: str) -> list[str]:
     """Append ``up -d`` plus build/pull flags honoring the digest overlay.
 
-    With the digest overlay active, the merged config has ``build: !reset
-    null`` for the gateway/proxy services, so ``--build`` is a no-op for
-    those services and ``--no-build`` is the explicit, honest flag — it
-    forces compose to pull the published images rather than attempt to
-    build from source.
+    ``--no-build`` is chosen from whether ``base`` actually carries a digest
+    overlay — not from ``SEVN_VERIFY_IMAGE_OVERLAY`` alone. Reading the env
+    var directly meant a stack assembled *without* an overlay still booted
+    with ``--no-build`` on the release path, leaving compose no published
+    ``image:`` to pull and no permission to build: the boot failed before its
+    readiness probes ever ran (mergecraft review 3741260241). With an overlay
+    present the merged config keeps its ``build:`` directive, so ``--no-build``
+    is what forces compose to pull the published image instead.
 
     Args:
         base (list[str]): The argv prefix returned by ``_compose_base``.
@@ -389,7 +436,7 @@ def _compose_up_args(base: list[str], *extra: str) -> list[str]:
         ['-d', '--build', 'extra']
     """
     argv = [*base, "up", "-d"]
-    argv.append("--no-build" if _verify_image_overlay_path() is not None else "--build")
+    argv.append("--no-build" if _has_digest_overlay(base) else "--build")
     argv.extend(extra)
     return argv
 
@@ -1239,11 +1286,12 @@ def drive_authenticated_proxy_roundtrip() -> DriverResult:
             )
             return result
 
+        roundtrip_run_id = f"verify-roundtrip-{_now_stamp()}"
         try:
             token = mint_session_token(
                 signing_key=secret,
                 scope="sandbox",
-                run_id=f"verify-roundtrip-{_now_stamp()}",
+                run_id=roundtrip_run_id,
                 ttl_s=60,
             )
             result.checks.append(
@@ -1281,7 +1329,11 @@ def drive_authenticated_proxy_roundtrip() -> DriverResult:
         )
 
         auth_header_status, auth_header_body = _authenticated_probe(
-            f"{proxy_url}/web/auth-check", token=token, timeout=10.0
+            f"{proxy_url}/web/auth-check",
+            token=token,
+            run_id=roundtrip_run_id,
+            signing_key=secret,
+            timeout=10.0,
         )
         ok = 200 <= auth_header_status < 300
         result.checks.append(
@@ -1289,7 +1341,10 @@ def drive_authenticated_proxy_roundtrip() -> DriverResult:
                 name="proxy-auth-with-token",
                 status=STATUS_PASS if ok else STATUS_FAIL,
                 detail=f"HTTP {auth_header_status} from {proxy_url}/web/auth-check with X-Sevn-Session-Token",
-                command=f"GET {proxy_url}/web/auth-check (with session token)",
+                command=(
+                    f"GET {proxy_url}/web/auth-check "
+                    "(session token + X-Sevn-Run-Id + X-Sevn-Binding-Signature)"
+                ),
                 output=auth_header_body[:600],
             )
         )
@@ -1317,12 +1372,60 @@ def drive_authenticated_proxy_roundtrip() -> DriverResult:
     return result
 
 
-def _authenticated_probe(url: str, *, token: str, timeout: float = 10.0) -> tuple[int, str]:
+def _binding_signature(*, run_id: str, container_id: str, signing_key: str) -> str:
+    """Return the proof-of-possession signature the proxy expects for a binding.
+
+    Mirrors ``sevn.proxy.auth._expected_binding_signature``: HMAC-SHA256 over
+    the canonical ``container_id=<cid>\\nrun_id=<rid>`` string, keyed by the
+    proxy shared secret. Recomputed here rather than imported because the
+    proxy helper is private to that module.
+
+    Args:
+        run_id (str): Run id sent in ``X-Sevn-Run-Id``.
+        container_id (str): Container bind id sent in ``X-Sevn-Container-Id``
+            (empty when the token carries no ``container_id`` claim).
+        signing_key (str): The resolved ``SEVN_PROXY_SHARED_SECRET``.
+
+    Returns:
+        str: Hex-encoded HMAC-SHA256.
+
+    Examples:
+        >>> len(_binding_signature(run_id="r", container_id="", signing_key="k"))
+        64
+    """
+    canonical = f"container_id={container_id}\nrun_id={run_id}".encode()
+    return hmac.new(signing_key.encode(), canonical, hashlib.sha256).hexdigest()
+
+
+def _authenticated_probe(
+    url: str,
+    *,
+    token: str,
+    run_id: str | None = None,
+    signing_key: str | None = None,
+    timeout: float = 10.0,
+) -> tuple[int, str]:
     """Probe a URL with a ``X-Sevn-Session-Token`` header.
+
+    When ``run_id`` and ``signing_key`` are supplied the probe also sends the
+    ``X-Sevn-Run-Id`` and ``X-Sevn-Binding-Signature`` headers. Both are
+    mandatory for a token minted with a ``run_id`` claim: ``validate_session_token``
+    treats a missing ``X-Sevn-Run-Id`` as a binding *mismatch* (not a free
+    pass), and ``llm_post_auth_failure`` additionally requires the PoP
+    signature — so a bearer-only probe gets HTTP 401 from a real proxy even
+    though the token is perfectly valid (mergecraft review 3741296931).
+
+    No ``X-Sevn-Container-Id`` is sent: the drivers mint tokens without a
+    ``container_id`` claim, and the proxy rejects a non-empty container header
+    against a token that carries no matching claim.
 
     Args:
         url (str): Absolute URL to probe.
-        token (str): Session token value to send.
+        token (str): Session token (or service secret) value to send.
+        run_id (str | None): Run id claimed by ``token``; omit to probe
+            bearer-only (used to assert the proxy *refuses* such a request).
+        signing_key (str | None): Proxy shared secret used to compute the
+            binding signature; required alongside ``run_id``.
         timeout (float): Socket timeout in seconds.
 
     Returns:
@@ -1332,10 +1435,13 @@ def _authenticated_probe(url: str, *, token: str, timeout: float = 10.0) -> tupl
         >>> _authenticated_probe("http://127.0.0.1:1/nope", token="x")[0]
         0
     """
-    request = urllib.request.Request(
-        url,
-        headers={"X-Sevn-Session-Token": token, "X-Sevn-Proxy-Token": token},
-    )
+    headers = {"X-Sevn-Session-Token": token, "X-Sevn-Proxy-Token": token}
+    if run_id and signing_key:
+        headers["X-Sevn-Run-Id"] = run_id
+        headers["X-Sevn-Binding-Signature"] = _binding_signature(
+            run_id=run_id, container_id="", signing_key=signing_key
+        )
+    request = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=timeout) as resp:
             return int(resp.status), resp.read(600).decode("utf-8", "replace")
@@ -1530,8 +1636,8 @@ def drive_browser_gui_boot() -> DriverResult:
             return result
 
     expected = (
-        ("browser-override", BROWSER_COMPOSE, "Dockerfile.gateway.browser"),
-        ("gui-override", GUI_COMPOSE, "Dockerfile.gateway.gui"),
+        ("browser-override", BROWSER_COMPOSE, "Dockerfile.gateway.browser", DIGEST_VARIANT_BROWSER),
+        ("gui-override", GUI_COMPOSE, "Dockerfile.gateway.gui", DIGEST_VARIANT_GUI),
     )
     base_project = os.environ.get("SEVN_VERIFY_PROJECT", "sevn-verify")
     boot_timeout = float(os.environ.get("SEVN_VERIFY_STACK_TIMEOUT_S", "1500"))
@@ -1545,7 +1651,7 @@ def drive_browser_gui_boot() -> DriverResult:
         "SEVN_VERIFY_GATEWAY_TOKEN",
         "verify-browser-gui-boot-gateway-token-32chars-min",
     )
-    for label, overlay, expected_dockerfile in expected:
+    for label, overlay, expected_dockerfile, digest_variant in expected:
         # Each overlay gets its own compose project so a browser boot
         # cannot collide with a gui boot on the operator network.
         project = f"{base_project}-{label}"
@@ -1621,14 +1727,55 @@ def drive_browser_gui_boot() -> DriverResult:
         overlay_env["SEVN_GATEWAY_TOKEN"] = browser_gateway_token
         overlay_env["COMPOSE_PROJECT_NAME"] = project
         # Browser/GUI overlays flip ``sevn-gateway`` to
-        # ``Dockerfile.gateway.browser`` / ``gui`` via their own
-        # ``build:`` block; layering the SHA-pinned digest overlay would
-        # re-pin ``sevn-gateway.image`` to the base ``gateway:<sha>`` and
-        # the C14.2 release evidence would claim a browser/GUI boot that
-        # never ran the published variant. F-PR-4 / mergecraft review
-        # 3740249080: boot the overlay as-authored so the C14.2 driver
-        # actually exercises the browser/GUI Dockerfile swap end-to-end.
-        base = _compose_base(project, (OPERATOR_COMPOSE, overlay), include_digest_overlay=False)
+        # ``Dockerfile.gateway.browser`` / ``gui`` via their own ``build:``
+        # block, so on the release path this stack must pin the matching
+        # published variant (``gateway.browser`` / ``gateway.gui``) — the
+        # *base* digest overlay would re-pin ``sevn-gateway.image`` to
+        # ``gateway:<sha>`` and the C14.2 evidence would claim a browser/GUI
+        # boot that actually ran the base gateway, while omitting the overlay
+        # entirely leaves the release runner with neither a published image to
+        # pull nor a local build (F-PR-4 / mergecraft reviews 3740249080,
+        # 3741260241). Off the release path no overlay resolves and the boot
+        # falls back to ``--build`` from the checked-out Dockerfile.
+        base = _compose_base(project, (OPERATOR_COMPOSE, overlay), digest_variant=digest_variant)
+        # On the release path the evidence must name the image the boot
+        # actually ran, otherwise a base-gateway pin (or a missing pin under
+        # ``--no-build``) is indistinguishable from a real browser/GUI boot in
+        # the attached C14.2 JSON (mergecraft review 3741260241).
+        if _has_digest_overlay(base):
+            boot_code, boot_out = _run(
+                [*base, "config", "--format", "json"], env=overlay_env, timeout=180.0
+            )
+            boot_image = ""
+            if boot_code == 0:
+                try:
+                    boot_config = json.loads(boot_out)
+                except json.JSONDecodeError:
+                    boot_config = {}
+                boot_image = (boot_config.get("services") or {}).get("sevn-gateway", {}).get(
+                    "image"
+                ) or ""
+            expected_image_name = f"gateway.{digest_variant}"
+            image_ok = f"/{expected_image_name}:" in boot_image
+            result.checks.append(
+                Check(
+                    name=f"{label}/gateway-image",
+                    status=STATUS_PASS if image_ok else STATUS_FAIL,
+                    detail=(
+                        f"boot config resolves sevn-gateway.image to {boot_image!r}; "
+                        f"expected the published {expected_image_name} variant"
+                    ),
+                    command=" ".join([*base, "config", "--format", "json"]),
+                )
+            )
+            if not image_ok:
+                result.status = STATUS_FAIL
+                result.reason = (
+                    f"{overlay} boot would run {boot_image!r} instead of the "
+                    f"published {expected_image_name} image — the release "
+                    "evidence would overstate what was tested (F-PR-4)"
+                )
+                continue
         try:
             up_code, up_out = _run(_compose_up_args(base), env=overlay_env, timeout=boot_timeout)
             result.checks.append(
@@ -2070,6 +2217,8 @@ def drive_sandbox_scoped_token() -> DriverResult:
         web_status, web_body = _authenticated_probe(
             f"{proxy_url}/web/auth-check",
             token=sandbox_token,
+            run_id=run_id,
+            signing_key=secret,
             timeout=10.0,
         )
         ok_web = 200 <= web_status < 300
@@ -2078,7 +2227,10 @@ def drive_sandbox_scoped_token() -> DriverResult:
                 name="sandbox-scope-accepts-web",
                 status=STATUS_PASS if ok_web else STATUS_FAIL,
                 detail=f"HTTP {web_status} from {proxy_url}/web/auth-check (scope=sandbox)",
-                command=f"GET {proxy_url}/web/auth-check (X-Sevn-Session-Token scope=sandbox)",
+                command=(
+                    f"GET {proxy_url}/web/auth-check "
+                    "(X-Sevn-Session-Token scope=sandbox + run-id + binding signature)"
+                ),
                 output=web_body[:600],
             )
         )
@@ -2086,23 +2238,29 @@ def drive_sandbox_scoped_token() -> DriverResult:
             result.status = STATUS_FAIL
             result.reason = "sandbox-scoped token refused on /web/auth-check"
 
+        # Deliberately bearer-only: no ``X-Sevn-Run-Id`` / binding signature.
+        # A sandbox-scoped token *is* admitted on ``/llm/*`` when it presents a
+        # valid PoP binding (the sandbox egress path needs that), so the
+        # invariant worth proving on a live stack is the other one — a stolen
+        # bearer token alone, without the secret needed to sign its binding,
+        # buys nothing on ``/llm/*``.
         llm_status, llm_body = _authenticated_probe(
             f"{proxy_url}/llm/openai/chat/completions",
             token=sandbox_token,
             timeout=10.0,
         )
-        refused_llm = llm_status == 401 or llm_status == 403
+        refused_llm = llm_status in {401, 403}
         result.checks.append(
             Check(
                 name="sandbox-scope-rejects-llm",
                 status=STATUS_PASS if refused_llm else STATUS_FAIL,
                 detail=(
                     f"HTTP {llm_status} from {proxy_url}/llm/openai/chat/completions "
-                    "(scope=sandbox should be refused)"
+                    "(scope=sandbox without PoP binding should be refused)"
                 ),
                 command=(
                     f"POST {proxy_url}/llm/openai/chat/completions "
-                    "(X-Sevn-Session-Token scope=sandbox)"
+                    "(X-Sevn-Session-Token scope=sandbox, no binding headers)"
                 ),
                 output=llm_body[:600],
             )
@@ -2110,7 +2268,8 @@ def drive_sandbox_scoped_token() -> DriverResult:
         if not refused_llm:
             result.status = STATUS_FAIL
             result.reason = (
-                "sandbox-scoped token was accepted on /llm/* — scope enforcement is broken"
+                "bearer-only sandbox-scoped token was accepted on /llm/* — "
+                "scope + proof-of-possession enforcement is broken"
             )
 
         service_status, service_body = _authenticated_probe(
