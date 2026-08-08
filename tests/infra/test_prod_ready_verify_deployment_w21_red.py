@@ -17,6 +17,7 @@ the impl wave.
 from __future__ import annotations
 
 import ast
+import asyncio
 import importlib.util
 import json
 import re
@@ -339,7 +340,22 @@ def _load_verify_module() -> Any:
 
 def _healthy_driver_run(monkeypatch: pytest.MonkeyPatch, module: Any) -> Any:
     monkeypatch.setattr(module, "_docker_unavailable_reason", lambda: None)
-    monkeypatch.setattr(module, "_run", lambda *args, **kwargs: (0, "stack ready"))
+
+    def fake_run(argv, *args, **kwargs):  # type: ignore[no-untyped-def]
+        # F-PR-5: the cancellation driver's readiness probe calls
+        # ``docker ps --filter label=sevn.run_id=<id>`` and expects a
+        # ``running`` row. Return one so the driver can synchronously
+        # cancel without spinning until the deadline.
+        if isinstance(argv, (list, tuple)) and len(argv) >= 2:
+            if argv[:2] == ["docker", "ps"] and any(
+                str(a).startswith("label=sevn.run_id=") for a in argv
+            ):
+                return 0, "sevn-sb-fake\trunning"
+            if argv[:2] == ["docker", "image"] and "inspect" in argv:
+                return 0, "sha256:fake"
+        return 0, "stack ready"
+
+    monkeypatch.setattr(module, "_run", fake_run)
 
     def http_probe(url: str, *args: Any, **kwargs: Any) -> tuple[int, str]:
         if url.endswith(("/healthz", "/ready")):
@@ -359,6 +375,7 @@ def _healthy_driver_run(monkeypatch: pytest.MonkeyPatch, module: Any) -> Any:
     )
     monkeypatch.setenv("SEVN_VERIFY_STACK_TIMEOUT_S", "1")
     monkeypatch.setenv("SEVN_VERIFY_READY_TIMEOUT_S", "1")
+    monkeypatch.setenv("SEVN_VERIFY_SPAWN_READY_TIMEOUT_S", "1")
     return module
 
 
@@ -534,7 +551,7 @@ def test_browser_gui_boot_driver_probes_via_live_stack(
 def test_cancellation_cleanup_driver_probes_via_live_stack(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """F-THERMOS-4 - driver must probe cancel-triggered + orphan diff checks."""
+    """F-THERMOS-4 / F-PR-5 - driver must probe cancel-triggered + orphan diff checks."""
     module = _healthy_driver_run(monkeypatch, _load_verify_module())
     result = module.drive_cancellation_cleanup()
     assert result.name == "cancellation-cleanup"
@@ -545,6 +562,77 @@ def test_cancellation_cleanup_driver_probes_via_live_stack(
         or "no-orphan-containers" in check_names
         or "no-leaked-volumes" in check_names
     ), f"cancellation-cleanup must emit cancel-triggered / orphan checks; got {check_names!r}"
+
+
+def test_cancellation_cleanup_polls_for_running_container(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-PR-5 — driver must poll for the run-labelled container to be ``running``.
+
+    The pre-F-PR-5 shape (``await asyncio.sleep(0.05)`` then cancel)
+    was not a real readiness probe: cancellation could happen before
+    ``docker run`` started or after the task completed, and the bare
+    ``contextlib.suppress(asyncio.CancelledError, Exception)`` would
+    still report ``cancel-triggered`` as pass. The fix must poll
+    ``docker ps --filter label=sevn.run_id=<run_id>`` for a
+    ``running`` row, with a generous timeout, before cancelling the
+    asyncio task (mergecraft review 3740249076). This test pins the
+    shape by intercepting the runtime's spawn and asserting the
+    driver polls for the run-labelled container state before issuing
+    ``cancel-triggered``.
+    """
+    module = _healthy_driver_run(monkeypatch, _load_verify_module())
+    docker_ps_calls: list[str] = []
+
+    real_module = module  # alias for clarity
+
+    async def fake_spawn(*, run_id, workspace, env):
+        # Mimic the contract of ``DockerSandboxRuntime.spawn``: emit a
+        # ``sandbox.runtime`` trace and return a sandbox id without
+        # actually starting a container (the F-PR-5 probe is the only
+        # thing under test). Sleep briefly to give the driver a chance
+        # to poll, but the driver must rely on ``docker ps`` rather
+        # than this sleep.
+        await asyncio.sleep(0.5)
+        return f"fake-sandbox-{run_id}"
+
+    async def fake_teardown(sandbox_id):
+        return None
+
+    fake_runtime = type(
+        "FakeRuntime",
+        (),
+        {"spawn": staticmethod(fake_spawn), "teardown": staticmethod(fake_teardown)},
+    )
+
+    monkeypatch.setattr(
+        "sevn.security.sandbox_runtime.DockerSandboxRuntime",
+        lambda *a, **kw: fake_runtime,
+    )
+
+    def fake_run(argv, *args, **kwargs):
+        joined = " ".join(str(x) for x in argv)
+        if argv[:2] == ["docker", "image"] and "inspect" in argv:
+            return 0, "sha256:fake"
+        if argv[:2] == ["docker", "ps"]:
+            docker_ps_calls.append(joined)
+            return 0, ""
+        return 0, ""
+
+    monkeypatch.setattr(real_module, "_run", fake_run)
+    real_module.drive_cancellation_cleanup()
+    # The driver must have called ``docker ps`` at least once with a
+    # ``label=sevn.run_id=<run_id>`` filter so it has evidence the
+    # container reached ``running`` before cancellation. The pre-fix
+    # shape only slept 50ms and never called docker ps for that
+    # purpose.
+    ps_with_label = [call for call in docker_ps_calls if "label=sevn.run_id=" in call]
+    assert ps_with_label, (
+        "cancellation-cleanup must poll docker ps for a running "
+        "container with `label=sevn.run_id=<run_id>` before cancelling "
+        "(F-PR-5 / mergecraft review 3740249076); got docker_ps_calls="
+        f"{docker_ps_calls!r}"
+    )
 
 
 def test_no_driver_probes_unmapped_host_proxy_port() -> None:

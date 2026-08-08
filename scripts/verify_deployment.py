@@ -1709,6 +1709,8 @@ def drive_cancellation_cleanup() -> DriverResult:
         return result
 
     baseline_ps, baseline_vol = _container_and_volume_baseline()
+    cancel_run_id = f"verify-cancel-{_now_stamp()}"
+    spawn_ready_timeout = float(os.environ.get("SEVN_VERIFY_SPAWN_READY_TIMEOUT_S", "30"))
 
     async def _spawn_and_cancel() -> str:
         from sevn.config.workspace_config import WorkspaceConfig
@@ -1718,12 +1720,62 @@ def drive_cancellation_cleanup() -> DriverResult:
         with tempfile.TemporaryDirectory(prefix="sevn-verify-cancel-") as tmp:
             task = asyncio.create_task(
                 runtime.spawn(
-                    run_id=f"verify-cancel-{_now_stamp()}",
+                    run_id=cancel_run_id,
                     workspace=Path(tmp),
                     env={},
                 )
             )
-            await asyncio.sleep(0.05)
+            # F-PR-5: poll ``docker ps --filter label=sevn.run_id=<id>``
+            # for a ``running`` row before cancelling. The pre-fix
+            # ``asyncio.sleep(0.05)`` was not a real readiness probe —
+            # cancellation could happen before ``docker run`` started or
+            # after the task completed, and the bare
+            # ``contextlib.suppress(asyncio.CancelledError, Exception)``
+            # would still report ``cancel-triggered`` as pass
+            # (mergecraft review 3740249076).
+            deadline = time.monotonic() + spawn_ready_timeout
+            spawn_ready = False
+            last_ps_status = "not probed"
+            while time.monotonic() < deadline:
+                # Run the docker-cli probe in a worker thread so the
+                # event loop stays unblocked while polling.
+                ps_code, ps_out = await asyncio.to_thread(
+                    _run,
+                    [
+                        "docker",
+                        "ps",
+                        "-a",
+                        "--filter",
+                        f"label=sevn.run_id={cancel_run_id}",
+                        "--format",
+                        "{{.Names}}\t{{.State}}",
+                    ],
+                    timeout=10.0,
+                )
+                last_ps_status = ps_out.strip() or "(empty)"
+                if ps_code == 0 and any(
+                    "\trunning" in line.lower() for line in ps_out.splitlines()
+                ):
+                    spawn_ready = True
+                    break
+                # If the task already finished (success or exception),
+                # there is nothing to cancel — break out so we do not
+                # spin until the deadline.
+                if task.done():
+                    break
+                await asyncio.sleep(0.5)
+            if not spawn_ready:
+                # Cancel the task and surface a useful detail so a CI
+                # failure does not look like a hang.
+                if not task.done():
+                    task.cancel()
+                    with contextlib.suppress(asyncio.CancelledError, Exception):
+                        await task
+                raise RuntimeError(
+                    f"spawn task did not reach `running` within "
+                    f"{spawn_ready_timeout:.0f}s for run_id={cancel_run_id} "
+                    f"(last docker ps status: {last_ps_status!r})"
+                )
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await task
@@ -1735,8 +1787,11 @@ def drive_cancellation_cleanup() -> DriverResult:
             Check(
                 name="cancel-triggered",
                 status=STATUS_PASS,
-                detail=f"{marker} — task cancelled before teardown could run synchronously",
-                command="DockerSandboxRuntime.spawn() (cancelled)",
+                detail=(
+                    f"{marker} — container reached `running` (sevn.run_id={cancel_run_id}) "
+                    "before task was cancelled"
+                ),
+                command="DockerSandboxRuntime.spawn() (cancelled after docker ps ready)",
             )
         )
     except Exception as exc:
