@@ -686,7 +686,7 @@
         "local_open_trust_address": {
           "type": "boolean",
           "default": false,
-          "description": "When true, allow tokenless direct loopback dashboard access (legacy behavior). Default false — loopback clients must present the boot dashboard-local-token."
+          "description": "Dangerous escape hatch: when true, allow tokenless direct-loopback dashboard access (legacy trust-by-address). Default false — loopback clients must present the boot dashboard-local-token. Forced false when a tunnel is active or gateway.host is not loopback-only; gateway logs a boot warning when enabled."
         },
         "login_password": {
           "type": "string",

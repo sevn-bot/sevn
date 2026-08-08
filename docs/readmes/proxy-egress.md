@@ -50,6 +50,10 @@ Gateway/agent code binds [`Transport`](../../src/sevn/agent/providers/transport.
 - Workspace pairing: `sevn.json` provider entries + secrets chain wired at proxy boot
 - Validate: `sevn doctor`; proxy factory reads `{SEVN_HOME}/workspace/sevn.json` when started via uvicorn `--factory`
 
+### Verify-only host port
+
+[`docker/docker-compose.verify.yml`](../../docker/docker-compose.verify.yml) maps the proxy's internal port `8787` to host `127.0.0.1:3102` **only** for `make verify-deployment` drivers. The override is never included by the default operator stack; without it, the proxy stays container-internal (`expose: ["8787"]`).
+
 ### Key modules
 
 - [`app.py`](../../src/sevn/proxy/app.py) — [`create_app`](../../src/sevn/proxy/app.py#L92), route table, auth middleware

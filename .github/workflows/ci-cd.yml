@@ -14,11 +14,15 @@
 #
 # Trigger → phase mapping (specs/25-cicd-full.md Workflow matrix):
 #   push to main         → phase1 → publish-ghcr → supply-chain
-#                          (phase4/5/6 skipped — Dev deploy/smoke deleted, D44)
-#   push tag 'v*'        → phase1 → publish-ghcr → supply-chain → phase4 → phase5 → phase6
-#                          (Production deploy/test stubs must succeed; phase6 is draft-only)
-#   workflow_dispatch    → phase1 → publish-ghcr → supply-chain → phase4 → phase5
-#                          (+ phase6 when ref is a v* tag; stub failures fail the required gate)
+#                          (phase4/5/6 + verify-deployment skipped — Dev deploy/smoke deleted, D44)
+#   push tag 'v*'        → phase1 → publish-ghcr → supply-chain → verify-deployment
+#                          → phase4 → phase5 → phase6
+#                          (Production deploy/test stubs must succeed; phase6 is draft-only;
+#                           verify-deployment fails on driver_unavailable — D52)
+#   workflow_dispatch    → phase1 → publish-ghcr → supply-chain → verify-deployment
+#                          → phase4 → phase5
+#                          (+ phase6 when ref is a v* tag; stub failures + driver_unavailable
+#                          fail the required gate)
 #
 # Required check (branch protection): job id `delivery-chain`, display name
 # "Artifact publication gate (required)". A green check proves phase1 + GHCR
@@ -326,6 +330,144 @@ jobs:
           path: sboms/
           if-no-files-found: error
 
+      # Runs inside container-supply-chain so a scan/sign/promote failure still
+      # cleans partial quarantine tags (C-9.5 / D52). Mirrors publish-ghcr's
+      # cleanup step at the head of the release path.
+      - name: Cleanup quarantine tags on failure
+        if: failure() || cancelled()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # shellcheck disable=SC1091
+          source scripts/ghcr_quarantine_cleanup.sh
+          delete_quarantine_tags "${IMAGE_REPOSITORY}" "${GITHUB_SHA}" "${GITHUB_RUN_ID}"
+
+  verify-deployment:
+    name: Deployment drivers (fails on driver_unavailable)
+    # Tag-path verification — a release that cannot run its own verification
+    # has not been verified (D52, prod-readiness W23.2). exit 0 pass,
+    # exit 1 fail, exit 2 driver_unavailable — ALL three are surfaced as
+    # job failures on the tag path. Drivers opt into
+    # docker-compose.verify-digests.yml via SEVN_VERIFY_IMAGE_OVERLAY=1
+    # so they exercise the SHA-tagged images promoted by
+    # container-supply-chain (D45) — the C14.1 / C14.2 / C14.3 evidence
+    # the release body cites must test what was actually published, not
+    # a locally-rebuilt substitute (mergecraft review finding 3737950464).
+    needs: [phase1, publish-ghcr, container-supply-chain]
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      # The `Cleanup quarantine tags on failure` step below calls
+      # `delete_quarantine_tags` → `gh api --method DELETE` against GHCR
+      # package versions (scripts/ghcr_quarantine_cleanup.sh:55-101). Package
+      # management requires the `packages` scope — both `publish-ghcr` (:93-95)
+      # and `container-supply-chain` (:224-227) declare `packages: write`. With
+      # only `contents: read`, the DELETE returns 403 and the script exits
+      # non-zero; `continue-on-error: true` swallows that exit and the cleanup
+      # silently no-ops, which is exactly the F-THERMOS-1 failure mode this
+      # step was added to close.
+      packages: write
+    env:
+      # Mirror the container-supply-chain job (:228-229) — IMAGE_REPOSITORY must
+      # resolve at the job level so the cleanup step below sees it; the
+      # F-Thermos review caught this as a regression where the cleanup step's
+      # `${IMAGE_REPOSITORY}` expansion was empty and the cleanup script
+      # silently no-op'd under `continue-on-error: true`. ``SANDBOX_DIGEST``
+      # is exported at the job level so the ``SEVN_VERIFY_SANDBOX_IMAGE``
+      # override below can interpolate the published digest; the same
+      # regression class (empty expansion in a step env) is what
+      # ``IMAGE_REPOSITORY`` was added to close (mergecraft review
+      # 3738385557).
+      IMAGE_REPOSITORY: ${{ needs.publish-ghcr.outputs.image_repository }}
+      SANDBOX_DIGEST: ${{ needs.publish-ghcr.outputs.sandbox_digest }}
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: ./.github/actions/bootstrap
+
+      # Pull the published sandbox image by digest before the drivers run.
+      # ``drive_sandbox_spawn`` does ``docker image inspect`` and exits
+      # ``driver_unavailable`` when the image is missing; the only path to
+      # an inspectable image on a fresh runner is ``docker pull``, since
+      # ``make docker-build-ci`` would rebuild from source instead of
+      # exercising the promoted image (C14.1 / D43 / mergecraft review
+      # 3738385557). Logging in requires ``packages: read``; the job-level
+      # ``packages: write`` (:375) covers that. Tag-promoted image digests
+      # never change, so a digest pull is reproducible across reruns.
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull published sandbox image
+        # ``SANDBOX_IMAGE_REF`` is assembled in the shell here, not in
+        # ``env:``: GitHub Actions does not recursively expand POSIX
+        # variables inside an env value, so a literal
+        # ``ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}`` in
+        # ``env:`` would reach Python (and ``docker pull``) with the
+        # dollar-brace text intact (mergecraft review 3740249068).
+        # ``IMAGE_REPOSITORY`` / ``SANDBOX_DIGEST`` are inherited from
+        # the job-level ``env:`` (:387-:388), so the shell expands them
+        # here.
+        run: |
+          set -euo pipefail
+          test -n "${SANDBOX_DIGEST}" || {
+            echo "::error title=missing digest::SANDBOX_DIGEST must be set to the published sandbox image digest"
+            exit 1
+          }
+          SANDBOX_IMAGE_REF="ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}"
+          docker pull "${SANDBOX_IMAGE_REF}"
+
+      - name: Run deployment drivers (release path — fail on driver_unavailable)
+        # Exit 0 pass / exit 1 fail / exit 2 driver_unavailable; all three
+        # non-zero codes fail the job here. A green job that skipped the
+        # drivers would be worse than no job, so we let any non-zero exit
+        # propagate. ``SEVN_VERIFY_IMAGE_OVERLAY=1`` opts the drivers into
+        # docker-compose.verify-digests.yml so the stack pulls the
+        # SHA-tagged images promoted by container-supply-chain (D45) and
+        # the C14.1 release-tag evidence tests what was actually published
+        # — the mergecraft review caught that without the overlay the
+        # drivers ran ``docker compose up --build`` against the local
+        # checkout and the published digests were never exercised.
+        #
+        # ``SEVN_VERIFY_SANDBOX_IMAGE`` overrides the driver's default
+        # ``sevn-sandbox:local`` (which only exists after ``make docker-build-ci``)
+        # so the sandbox-spawn driver exercises the published sandbox image
+        # against the real docker CLI; without this override the driver
+        # returns ``driver_unavailable`` and D52 fails the tag gate
+        # (mergecraft review 3738385557 / 3738385601).
+        #
+        # The image-ref values for ``SEVN_VERIFY_IMAGE_TAG`` /
+        # ``SEVN_VERIFY_SANDBOX_IMAGE`` are exported via ``$GITHUB_ENV``
+        # rather than passed in ``env:``: GitHub Actions does not
+        # recursively expand POSIX variables inside an ``env:`` value, so
+        # the literal ``ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}``
+        # would otherwise reach Python verbatim and break the driver
+        # (mergecraft review 3740249068).
+        env:
+          SEVN_VERIFY_IMAGE_OVERLAY: "1"
+        run: |
+          set -euo pipefail
+          {
+            echo "SEVN_VERIFY_IMAGE_TAG=${{ github.sha }}"
+            echo "SEVN_VERIFY_SANDBOX_IMAGE=ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}"
+          } >> "$GITHUB_ENV"
+          make verify-deployment
+
+      - name: Upload deployment evidence (evidence/verify/*.json)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: deployment-verification-${{ github.sha }}
+          path: evidence/verify/
+          if-no-files-found: error
+
       - name: Cleanup quarantine tags on failure
         if: failure() || cancelled()
         continue-on-error: true
@@ -388,8 +530,11 @@ jobs:
   phase6:
     name: Phase 6 — Release
     # Tag releases require successful deploy/test phases (D22). Phase6 stays draft-only
-    # until phases 4–5 are implemented (#172, D21).
-    needs: [phase1, publish-ghcr, container-supply-chain, phase4, phase5]
+    # until phases 4–5 are implemented (#172, D21). `verify-deployment` is in
+    # this list so the `download-artifact` step below cannot race the upload —
+    # GitHub Actions only guarantees job ordering via job-level `needs`, and
+    # `download-artifact@v4` fails hard when the artifact does not yet exist.
+    needs: [phase1, publish-ghcr, container-supply-chain, phase4, phase5, verify-deployment]
     environment: production
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -404,6 +549,12 @@ jobs:
           name: container-supply-chain-${{ github.sha }}
           path: sboms
 
+      - name: Download deployment evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: deployment-verification-${{ github.sha }}
+          path: evidence/verify
+
       - name: Create GitHub Release (tagged build)
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
         with:
@@ -411,7 +562,9 @@ jobs:
           name: ${{ github.ref_name }}
           generate_release_notes: true
           draft: true
-          files: sboms/**
+          files: |
+            sboms/**
+            evidence/verify/*.json
           body: |
             **Draft release — no production deploy occurred.**
 
@@ -419,7 +572,10 @@ jobs:
             Container images were published to GHCR; this release is for artifact
             tracking only until deploy phases land.
 
-            Attached: Trivy JSON/SARIF reports and SPDX SBOMs from container-supply-chain.
+            Attached: Trivy JSON/SARIF reports and SPDX SBOMs from container-supply-chain,
+            plus the deployment-verification JSON evidence (compose profiles, stack
+            health, sandbox spawn, runtime, authenticated round-trip, volume upgrade,
+            browser/GUI boot, cancellation cleanup, sandbox scoped-token).
 
   delivery-chain:
     # Branch-protection required check name (C2.1). Job id stays `delivery-chain`
@@ -432,6 +588,7 @@ jobs:
       - phase4
       - phase5
       - phase6
+      - verify-deployment
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -443,12 +600,15 @@ jobs:
           PHASE4: ${{ needs.phase4.result }}
           PHASE5: ${{ needs.phase5.result }}
           PHASE6: ${{ needs.phase6.result }}
+          VERIFY_DEPLOYMENT: ${{ needs.verify-deployment.result }}
         run: |
           set -euo pipefail
           # Accept success or skipped only. A failed needed job fails this gate (P3 / D44).
           # main push: phase4/5/6 are skipped by their `if` → skipped is fine.
           # tag push: phase4/5 must succeed (stubs currently fail → gate red).
           # workflow_dispatch: phase4/5 run as stubs; a failed stub fails this gate.
+          # verify-deployment runs only on tag + dispatch (C14.1, D52) — on a
+          # main push it is skipped, which the `ok` predicate accepts.
           ok() { case "$1" in success|skipped) return 0;; *) return 1;; esac; }
           fail=0
           require() {
@@ -466,4 +626,5 @@ jobs:
           require "phase4" "$PHASE4"
           require "phase5" "$PHASE5"
           require "phase6" "$PHASE6"
+          require "verify-deployment" "$VERIFY_DEPLOYMENT"
           exit "$fail"
