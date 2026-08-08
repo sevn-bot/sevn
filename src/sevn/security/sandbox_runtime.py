@@ -44,6 +44,8 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
+import hmac
 import io
 import json
 import os
@@ -797,6 +799,7 @@ def build_sandbox_child_env(
     proxy_url: str,
     session_token: str,
     workspace_mount_path: str | os.PathLike[str],
+    binding_signing_key: str | None = None,
 ) -> dict[str, str]:
     """Build §2.2 child environment (never injects raw provider keys or service secret).
 
@@ -804,10 +807,21 @@ def build_sandbox_child_env(
     Forward-proxy env vars (``HTTP_PROXY`` / ``HTTPS_PROXY`` / ``NO_PROXY``) are omitted —
     the egress proxy is a reverse path-prefix API, not a CONNECT forward proxy (D13).
 
+    When ``binding_signing_key`` is supplied (i.e. the gateway holds the proxy
+    shared secret at spawn time), the HMAC over ``container_id=<cid>\\nrun_id=<rid>``
+    is pre-computed here and emitted as ``SEVN_PROXY_BINDING_SIG``. The
+    sandbox child (which does not carry ``SEVN_PROXY_SHARED_SECRET``) reads
+    that env key verbatim and emits it as ``X-Sevn-Binding-Signature`` on
+    every proxy call (PR #245 mergecraft finding 4b0049b9840bcde02f488190).
+
     Args:
         proxy_url (str): Base URL for unified egress proxy.
         session_token (str): Scoped per-run ``X-Sevn-Session-Token`` credential.
         workspace_mount_path (str | os.PathLike[str]): Shadow or container path.
+        binding_signing_key (str | None): Optional ``SEVN_PROXY_SHARED_SECRET``
+            used to pre-compute the PoP binding signature. Only set at the
+            spawn seam (where the gateway holds the secret) — never copied
+            into the child env.
 
     Returns:
         dict[str, str]: Env vars to merge over a sanitized base.
@@ -831,8 +845,71 @@ def build_sandbox_child_env(
         "SEVN_SESSION_TOKEN": session_token,
         "SEVN_WORKSPACE": w,
     }
+    if binding_signing_key:
+        sig = _expected_sandbox_binding_signature(
+            session_token=session_token,
+            signing_key=binding_signing_key,
+        )
+        if sig:
+            env["SEVN_PROXY_BINDING_SIG"] = sig
     _assert_sandbox_child_env_contract(env)
     return env
+
+
+def _expected_sandbox_binding_signature(
+    *,
+    session_token: str,
+    signing_key: str,
+) -> str | None:
+    """Compute the PoP binding signature for the sandbox child env.
+
+    Decodes the session token's ``run_id`` and ``container_id`` claims and
+    returns ``HMAC-SHA256(signing_key, ``container_id=<cid>\\nrun_id=<rid>``)``.
+    Returns ``None`` when the token is malformed or carries no ``run_id``
+    claim — the child env omits ``SEVN_PROXY_BINDING_SIG`` in that case so
+    the proxy seam rejects the call with ``401`` (fail-closed).
+
+    Args:
+        session_token (str): ``v1.<payload>.<sig>`` session token.
+        signing_key (str): ``SEVN_PROXY_SHARED_SECRET`` (gateway-side only).
+
+    Returns:
+        str | None: Hex signature, or ``None`` when the token is unusable.
+
+    Examples:
+        >>> from sevn.proxy.auth import mint_session_token, SESSION_SCOPE_SANDBOX
+        >>> import time
+        >>> t = mint_session_token(
+        ...     signing_key="k",
+        ...     scope=SESSION_SCOPE_SANDBOX,
+        ...     run_id="r1",
+        ...     container_id="c1",
+        ...     expires_at=int(time.time()) + 3600,
+        ... )
+        >>> isinstance(_expected_sandbox_binding_signature(session_token=t, signing_key="k"), str)
+        True
+    """
+    import base64
+
+    text = (session_token or "").strip()
+    if not text:
+        return None
+    parts = text.split(".")
+    if len(parts) != 3:
+        return None
+    try:
+        padded = parts[1] + "=" * (-len(parts[1]) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
+    except (ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    run_id = payload.get("run_id")
+    container_id = payload.get("container_id")
+    run_id_str = run_id if isinstance(run_id, str) else ""
+    container_id_str = container_id if isinstance(container_id, str) else ""
+    canonical = f"container_id={container_id_str}\nrun_id={run_id_str}".encode()
+    return hmac.new(signing_key.encode(), canonical, hashlib.sha256).hexdigest()
 
 
 def _resolve_spawn_session_token(
@@ -988,7 +1065,12 @@ def _assemble_spawn_child_env(
         ...     workspace_mount_path="/w",
         ...     signing_key="assemble-doctest-signing-key-32ch!",
         ... )
-        >>> set(e.keys()) == {"SEVN_PROXY_URL", "SEVN_SESSION_TOKEN", "SEVN_WORKSPACE"}
+        >>> set(e.keys()) == {
+        ...     "SEVN_PROXY_URL",
+        ...     "SEVN_SESSION_TOKEN",
+        ...     "SEVN_WORKSPACE",
+        ...     "SEVN_PROXY_BINDING_SIG",
+        ... }
         True
     """
     child_env = dict(env)
@@ -1007,11 +1089,23 @@ def _assemble_spawn_child_env(
     )
     if token:
         child_env["SEVN_SESSION_TOKEN"] = token
+    # Resolve the shared secret for the pre-computed binding signature (PR #245
+    # mergecraft finding 4b0049b9840bcde02f488190). When ``signing_key`` is
+    # injected (chain-only installs) it takes precedence; otherwise we fall
+    # back to the env / generate-once file resolver so compose-default
+    # installs do not need to forward the secret explicitly. The signing key
+    # itself is **never** copied into the child env.
+    binding_key = (signing_key or "").strip()
+    if not binding_key:
+        from sevn.proxy.bootstrap_secret import resolve_effective_proxy_shared_secret
+
+        binding_key = (resolve_effective_proxy_shared_secret() or "").strip()
     child_env.update(
         build_sandbox_child_env(
             proxy_url=child_env.get("SEVN_PROXY_URL", ""),
             session_token=child_env.get("SEVN_SESSION_TOKEN", ""),
             workspace_mount_path=workspace_mount_path,
+            binding_signing_key=binding_key or None,
         )
     )
     if pre_env:

@@ -109,7 +109,12 @@ def test_assemble_spawn_child_env_uses_injected_signing_key_without_leaking(
         workspace_mount_path="/w",
         signing_key=chain_secret,
     )
-    assert set(env.keys()) == {"SEVN_PROXY_URL", "SEVN_SESSION_TOKEN", "SEVN_WORKSPACE"}
+    assert set(env.keys()) == {
+        "SEVN_PROXY_URL",
+        "SEVN_SESSION_TOKEN",
+        "SEVN_WORKSPACE",
+        "SEVN_PROXY_BINDING_SIG",
+    }
     assert "SEVN_PROXY_SHARED_SECRET" not in env
     assert validate_session_token(
         env["SEVN_SESSION_TOKEN"],
@@ -193,4 +198,129 @@ def test_resolve_spawn_session_token_accepts_existing_token_with_matching_bindin
             container_id="ctr-shared",
         )
         == matching_token
+    )
+
+
+def test_assemble_spawn_child_env_emits_precomputed_binding_signature(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """RED: sandbox child env carries the PoP binding signature so job-ops can emit it.
+
+    PR #245 mergecraft follow-up (4b0049b9840bcde02f488190): the E-PoP HMAC
+    signature over ``container_id=<cid>\\nrun_id=<rid>`` is keyed by
+    ``SEVN_PROXY_SHARED_SECRET``. ``build_sandbox_child_env`` deliberately
+    strips that secret from the child env, so the sandbox-side job-ops helper
+    cannot recompute the signature itself. Without the gateway pre-computing
+    the signature and shipping it in the child env, every sandbox-originated
+    egress call is rejected with ``401``. The gateway computes the signature
+    at spawn time and emits it as ``SEVN_PROXY_BINDING_SIG``; the job-ops
+    helper reads that key and emits ``X-Sevn-Binding-Signature`` directly.
+    """
+    import base64
+    import hashlib
+    import hmac
+    import json
+
+    from sevn.security.sandbox_runtime import _assemble_spawn_child_env
+
+    monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
+    chain_secret = "assemble-red-binding-sig-signing-key-32!"
+    run_id = "run-red-binding-sig"
+    env = _assemble_spawn_child_env(
+        run_id=run_id,
+        env={"SEVN_PROXY_URL": "http://127.0.0.1:9"},
+        workspace_mount_path="/w",
+        signing_key=chain_secret,
+    )
+    # The child env must carry the pre-computed binding signature so the
+    # sandbox child (no shared secret) can emit it as ``X-Sevn-Binding-Signature``.
+    assert "SEVN_PROXY_BINDING_SIG" in env
+    token = env["SEVN_SESSION_TOKEN"]
+    assert validate_session_token(token, signing_key=chain_secret, path="/web/fetch") is True
+    # Decode the minted token so the test pins the *pair* the signature
+    # was computed over (the gateway's auto-generated ``bind_id`` is
+    # embedded as ``container_id`` in the payload).
+    parts = token.split(".")
+    padded = parts[1] + "=" * (-len(parts[1]) % 4)
+    payload = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
+    container_id = payload["container_id"]
+    expected_sig = hmac.new(
+        chain_secret.encode(),
+        f"container_id={container_id}\nrun_id={run_id}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    assert env["SEVN_PROXY_BINDING_SIG"] == expected_sig
+
+
+@pytest.mark.anyio
+async def test_sandbox_child_egress_admitted_with_precomputed_binding_sig(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """RED end-to-end: a sandbox child egress call is admitted by the proxy.
+
+    The mergecraft review found that ``build_sandbox_child_env`` strips
+    ``SEVN_PROXY_SHARED_SECRET``, so the job-ops ``_proxy_headers`` helper
+    never emits ``X-Sevn-Binding-Signature`` and the proxy rejects the call
+    with ``401``. This test exercises the spawn→child-env→proxy path with a
+    sandbox-only child (no shared secret in env) and asserts the proxy admits
+    the request. Fails RED today; passes GREEN after the spawn seam emits
+    ``SEVN_PROXY_BINDING_SIG`` and job-ops reads it.
+    """
+    import httpx
+
+    from sevn.proxy.app import create_app
+    from sevn.proxy.settings import ProxySettings
+    from sevn.security.sandbox_runtime import build_sandbox_child_env
+
+    chain_secret = "sandbox-child-egress-red-binding-sig-32!!"
+    run_id = "run-sandbox-child-egress"
+    bind_id = "sb-red-binding-sig-0000000000000000"
+    monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
+    # Mint via the spawn seam so the token carries ``container_id=bind_id``.
+    token = _resolve_spawn_session_token(
+        run_id=run_id,
+        env={},
+        signing_key=chain_secret,
+        container_id=bind_id,
+    )
+    env = build_sandbox_child_env(
+        proxy_url="http://127.0.0.1:9",
+        session_token=token,
+        workspace_mount_path="/w",
+        binding_signing_key=chain_secret,
+    )
+    # Sanity: child env must not contain the shared secret.
+    assert "SEVN_PROXY_SHARED_SECRET" not in env
+    # RED gate: child env must carry the pre-computed binding signature.
+    assert "SEVN_PROXY_BINDING_SIG" in env
+
+    # End-to-end: the proxy (with the shared secret in its own settings)
+    # admits the sandbox child request when job-ops emits the pre-computed
+    # signature verbatim from ``SEVN_PROXY_BINDING_SIG``.
+    app = create_app(
+        settings=ProxySettings(
+            anthropic_api_key="ak",
+            openai_api_key="ok",
+            proxy_shared_secret=chain_secret,
+        ),
+    )
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        # Simulate the job-ops helper reading the pre-computed signature from
+        # the child env and emitting it as ``X-Sevn-Binding-Signature``.
+        resp = await client.post(
+            "/web/fetch",
+            json={"url": "https://example.com/"},
+            headers={
+                "X-Sevn-Session-Token": env["SEVN_SESSION_TOKEN"],
+                "X-Sevn-Run-Id": run_id,
+                "X-Sevn-Container-Id": bind_id,
+                "X-Sevn-Binding-Signature": env["SEVN_PROXY_BINDING_SIG"],
+            },
+        )
+    assert resp.status_code != 401, (
+        f"sandbox-originated egress must be admitted; got {resp.status_code}: "
+        f"{resp.text!r}. The PoP binding signature must be pre-computed by "
+        f"the gateway at spawn time and shipped via SEVN_PROXY_BINDING_SIG, "
+        f"not recomputed in the sandbox child (which has no shared secret)."
     )
