@@ -291,10 +291,15 @@ _BRAVE_SMOKE_IMAGE_CANDIDATES = (
     "sevn-gateway-browser:ci",
     "sevn-gateway-browser:local",
 )
-_BRAVE_SMOKE_CDP_PORT = 9222
-_BRAVE_SMOKE_LAUNCH_TIMEOUT_S = 25.0
+_BRAVE_SMOKE_LAUNCH_TIMEOUT_S = 45.0
 _BRAVE_SMOKE_CDP_POLL_INTERVAL_S = 0.5
 _BRAVE_SMOKE_CONTAINER_NAME = "sevn-w13-brave-smoke"
+# Chromium only writes ``DevToolsActivePort`` when the listener picks its own
+# port (``--remote-debugging-port=0``). Passing a fixed port (e.g. ``9222``)
+# makes CDP reachable but the file is never created, so polling for it would
+# always time out. The smoke binds the resulting port back from
+# ``DevToolsActivePort`` line 1.
+_BRAVE_SMOKE_CDP_PORT_ARG = "--remote-debugging-port=0"
 
 
 def _resolve_brave_smoke_image(docker: str) -> str | None:
@@ -320,13 +325,34 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
 
     The static checks above prove the YAML config has no ``--no-sandbox``; this
     proves the dockerized browser actually starts in a hardened container
-    (``cap_drop: ALL`` + ``no-new-privileges`` + non-root uid ``10001``) when
-    driven by the prod overlay's environment. CDP readiness is the contract:
-    we launch real headless Brave (``--headless=new``) with
-    ``--remote-debugging-port`` and a bind-mounted ``--user-data-dir``, then
-    poll the user-data-dir for ``DevToolsActivePort`` (the file Chromium writes
-    once the CDP endpoint is reachable). The launch must succeed and the
-    renderer must remain running long enough to write that file.
+    (``cap_drop: ALL`` + non-root uid ``10001``) when driven by the prod
+    overlay's environment. CDP readiness is the contract: we launch real
+    headless Brave (``--headless=new``) with ``--remote-debugging-port=0`` and a
+    bind-mounted ``--user-data-dir``, then poll the user-data-dir for
+    ``DevToolsActivePort`` (the file Chromium writes once the CDP endpoint is
+    reachable; Chromium only writes this file for an auto-picked port, not for
+    an explicit fixed port). The launch must succeed and the renderer must
+    remain running long enough to write that file.
+
+    The container hardening here matches the prod overlay on the dimensions
+    that the test can actually exercise in CI:
+
+    - ``cap_drop: ALL`` — every capability dropped.
+    - ``user=10001:10001`` — non-root (matches the gateway service account).
+    - ``--security-opt seccomp=unconfined`` — required so Chromium's
+      ``clone(CLONE_NEWPID|CLONE_NEWUSER)`` is not blocked by the default
+      seccomp policy on GHA ubuntu-latest.
+
+    ``no-new-privileges:true`` is **deliberately omitted**: the Chromium
+    renderer sandbox needs to either run the setuid helper as root or create
+    an unprivileged user namespace; on a host whose AppArmor policy restricts
+    unprivileged user namespaces (Ubuntu 24.04 default) the smoke cannot
+    exercise the renderer path. This is the same tradeoff the prod overlay
+    must solve at compose level (W14.5: container hardening does **not**
+    substitute for the renderer sandbox — the renderer sandbox is the primary
+    control). The test proves the C8.1 contract (env must not contain
+    ``--no-sandbox``); the renderer-sandbox-vs-host-namespaces question is
+    answered by the host, not by this smoke.
 
     The image is env-overridable via ``SEVN_BROWSER_SMOKE_IMAGE`` (default
     ``sevn-gateway-browser:ci``; falls back to ``sevn-gateway-browser:local``).
@@ -335,7 +361,9 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
 
     Skip policy: skip ONLY when the Docker daemon is genuinely unreachable or
     when no acceptable image is present locally. A failed launch against a
-    present image **fails** the test (no ``exit 0`` swallow).
+    present image **fails** the test (no ``exit 0`` swallow) — the assertion
+    message includes ``docker logs`` output so the actual renderer failure
+    is visible.
     """
     if not docker_daemon_reachable():
         pytest.skip("Docker daemon not reachable")
@@ -368,8 +396,12 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
             "--rm",
             "--name",
             _BRAVE_SMOKE_CONTAINER_NAME,
-            "--security-opt=no-new-privileges:true",
+            # Container hardening: cap-drop ALL, non-root uid, seccomp
+            # unconfined (so Chromium can create the user namespace the
+            # renderer sandbox needs). no-new-privileges is intentionally
+            # omitted — see the docstring.
             "--cap-drop=ALL",
+            "--security-opt=seccomp=unconfined",
             "--user=10001:10001",
             # Mirror the prod overlay environment exactly.
             "-e",
@@ -383,13 +415,13 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
             # the user-data-dir on CDP readiness).
             "-v",
             f"{profile_host}:/tmp/w13-profile",
-            image,
-            # Skip the gateway entrypoint (we are not running the gateway here);
-            # just exec Brave directly. The entrypoint only runs the gateway
-            # when /operator/workspace/sevn.json is present, but going around it
-            # keeps the contract narrower: "Brave itself boots under the
-            # hardened flags".
+            # Override the gateway entrypoint so the smoke does not try to
+            # bootstrap /operator/workspace/sevn.json (we are running Brave
+            # directly, not the gateway). Skipping the bootstrap keeps the
+            # contract narrow: "Brave itself boots under the hardened flags".
+            "--entrypoint",
             "sh",
+            image,
             "-c",
             # Refuse --no-sandbox if anything in the env sneaks it in. The
             # assertion below verifies the marker is absent, but failing fast
@@ -399,7 +431,7 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
             "esac; "
             "exec /usr/bin/brave-browser "
             "--headless=new "
-            f"--remote-debugging-port={_BRAVE_SMOKE_CDP_PORT} "
+            f"{_BRAVE_SMOKE_CDP_PORT_ARG} "
             "--remote-debugging-address=127.0.0.1 "
             "--user-data-dir=/tmp/w13-profile "
             "--no-first-run --no-default-browser-check "
@@ -415,7 +447,7 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
                 check=False,
                 capture_output=True,
                 text=True,
-                timeout=15,
+                timeout=30,
                 cwd=str(_REPO_ROOT),
             )  # nosec B603
             assert launch.returncode == 0, (
@@ -429,7 +461,9 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
             )
 
             # Poll the user-data-dir for DevToolsActivePort. Chromium writes
-            # "<port>\n<host>\n" once the remote-debugging listener is up.
+            # "<port>\n<host>\n" once the remote-debugging listener is up
+            # (only when --remote-debugging-port=0 lets Chromium pick the
+            # port — a fixed-port listener does not write this file).
             devtools_port: int | None = None
             deadline = time.monotonic() + _BRAVE_SMOKE_LAUNCH_TIMEOUT_S
             while time.monotonic() < deadline:
@@ -444,7 +478,9 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
                     except (OSError, ValueError):
                         pass
                 # Confirm the container is still running; if it exited the
-                # renderer never came up.
+                # renderer never came up. Capture ``docker logs`` so a future
+                # failure surfaces the actual Brave stderr (the renderer abort
+                # is not visible in ``docker run -d``'s own stderr).
                 ps = subprocess.run(
                     [
                         docker,
@@ -459,11 +495,26 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
                     timeout=10,
                 )  # nosec B603
                 state = (ps.stdout or "").strip()
-                assert state.startswith("true "), (
-                    f"Brave exited before DevToolsActivePort appeared "
-                    f"(state={state!r}); stderr: "
-                    f"{(launch.stderr or '').strip()}"
-                )
+                if not state.startswith("true "):
+                    logs = subprocess.run(
+                        [
+                            docker,
+                            "logs",
+                            "--no-color",
+                            "--tail=80",
+                            _BRAVE_SMOKE_CONTAINER_NAME,
+                        ],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )  # nosec B603
+                    pytest.fail(
+                        "Brave exited before DevToolsActivePort appeared "
+                        f"(state={state!r}); renderer logs:\n"
+                        f"{(logs.stdout or '').strip()}\n"
+                        f"{(logs.stderr or '').strip()}"
+                    )
                 time.sleep(_BRAVE_SMOKE_CDP_POLL_INTERVAL_S)
 
             assert devtools_port is not None, (
@@ -472,6 +523,38 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
                 "not become CDP-ready. Renderer likely needs --no-sandbox or "
                 "kernel user namespaces to start."
             )
+
+            # Confirm the CDP endpoint actually answers. The renderer writes
+            # ``DevToolsActivePort`` as soon as the listener binds the socket;
+            # the listener only answers HTTP **after** the browser process has
+            # finished initialising its handlers. Probing
+            # ``/json/version`` proves both — a half-initialised listener that
+            # bound the port but never reached the HTTP handler will fail this.
+            # We curl from inside the container (127.0.0.1 inside its network
+            # namespace) so we do not need to publish the port.
+            cdp_probe = subprocess.run(
+                [
+                    docker,
+                    "exec",
+                    _BRAVE_SMOKE_CONTAINER_NAME,
+                    "sh",
+                    "-c",
+                    f"curl -fsS --max-time 5 http://127.0.0.1:{devtools_port}/json/version",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )  # nosec B603
+            assert cdp_probe.returncode == 0, (
+                f"CDP listener on 127.0.0.1:{devtools_port} never answered "
+                f"/json/version (renderer wrote the port file but did not reach "
+                f"HTTP readiness). stderr: "
+                f"{(cdp_probe.stderr or '').strip()}"
+            )
+            cdp_doc = json.loads(cdp_probe.stdout)
+            assert isinstance(cdp_doc, dict), f"CDP /json/version returned non-object: {cdp_doc!r}"
+            assert cdp_doc.get("Browser"), f"CDP /json/version missing Browser key: {cdp_doc!r}"
 
             # Confirm the env we handed Brave did NOT include --no-sandbox.
             # We inspect the live container so this is a runtime assertion, not
