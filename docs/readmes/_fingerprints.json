@@ -108,8 +108,8 @@
     },
     "proxy-egress": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-07T19:37:55Z",
-      "digest": "7511f7a40b8669625d96addbc2721a906cbacc1da620a789560842cef9516b67",
+      "computed_at": "2026-08-08T14:19:59Z",
+      "digest": "3fedce065edfac41da9cda2b5418b4ac1b4385f5561e7c1588c5d96bd52c53b8",
       "source_globs": [
         "src/sevn/proxy/**"
       ]
@@ -145,8 +145,8 @@
     },
     "security": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-07T14:56:47Z",
-      "digest": "be9a9eacb4000313ad03a351e87a7f54dd51d7f37e203bb88ed73053e3af7ab1",
+      "computed_at": "2026-08-08T14:19:59Z",
+      "digest": "c1ea40368fb1b5e92f7b4f28473d6ea97318e9a943f7a819da1ce035b501883a",
       "source_globs": [
         "src/sevn/security/**"
       ]
@@ -161,8 +161,8 @@
     },
     "skills": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-07T08:55:43Z",
-      "digest": "5e3c616b576716b3d035ce78872b4c30bdc0e3348000bc3f45b46901925662e0",
+      "computed_at": "2026-08-08T14:19:58Z",
+      "digest": "7bb773af66c54214fd830add23d53bf320229eebc300015df2a6232d1f603d79",
       "source_globs": [
         "src/sevn/skills/**",
         "src/sevn/data/bundled_skills/**",
@@ -193,8 +193,8 @@
     },
     "tools": {
       "algorithm": "sha256_glob_aggregate",
-      "computed_at": "2026-08-07T19:37:50Z",
-      "digest": "e0f07db6171080d3848644c398c56a23ef3b5f223f784f74d045ef3c862a1a57",
+      "computed_at": "2026-08-08T14:19:58Z",
+      "digest": "0fffbeb2b2b433135aff9a429a2525b04c3234f7b9f642e1bac5c10654f3968a",
       "source_globs": [
         "src/sevn/tools/**"
       ]
