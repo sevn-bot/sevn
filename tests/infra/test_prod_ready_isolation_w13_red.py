@@ -379,7 +379,9 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
             "to run this test"
         )
 
-    with tempfile.TemporaryDirectory(prefix="sevn-w13-brave-") as tmp_str:
+    with tempfile.TemporaryDirectory(
+        prefix="sevn-w13-brave-", ignore_cleanup_errors=True
+    ) as tmp_str:
         profile_host = Path(tmp_str) / "profile"
         profile_host.mkdir(parents=True, exist_ok=True)
         # Bind the host tmp dir into the container at /tmp/w13-profile so we can
