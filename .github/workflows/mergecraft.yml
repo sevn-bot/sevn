@@ -39,11 +39,12 @@
 # prompt — no ~mergecraft JSON payload needed.
 #
 # Auth (same-repo only — forks skip):
-#   - CODEX_AUTH_JSON — ChatGPT/Codex subscription (`mergecraft auth codex`) — primary
+#   - NOUS_API_KEY — Nous Portal API key — primary (DeepSeek V4 Flash)
+#   - CODEX_AUTH_JSON — ChatGPT/Codex subscription (`mergecraft auth codex`) — fallback
 #   - OPENAI_API_KEY — OpenAI API key (same Codex harness as CODEX_AUTH_JSON)
-#   - NOUS_API_KEY — Nous Portal API key — fallback (DeepSeek V4 Flash)
 # The job skips gracefully when none are set (e.g. fork PRs). Without
-# NOUS_API_KEY the fallback is inert and Codex is the only reviewer.
+# NOUS_API_KEY the primary is inert and Codex is the only reviewer; without
+# CODEX_AUTH_JSON / OPENAI_API_KEY, Nous is the only reviewer.
 #
 # Trigger: pull_request_target (not pull_request). GitHub skips pull_request
 # workflows when refs/pull/N/merge cannot be built (merge conflicts), which
