@@ -49,17 +49,29 @@ jobs:
         # The harness exits 2 (driver_unavailable) when Docker / sandbox image /
         # running gateway is missing — that is a *known* state on a fresh cron
         # runner and must not fail the gate. Real failures (exit 1) still do.
+        #
+        # F-PR-2: the previous shape (``make verify-deployment``) routes the
+        # inner driver verdict through GNU make, which can collapse
+        # recipe errors to its own exit 2 (in addition to its recipe-fail
+        # exit 1). That made the ``$rc -eq 2`` branch swallow real driver
+        # failures and turn cron green when it shouldn't be. Invoke the
+        # Python driver directly so the script's own exit code (0=pass,
+        # 1=fail, 2=driver_unavailable) reaches the branch logic intact,
+        # and double-check by parsing the ``VERIFY_OVERALL:`` line the
+        # script emits on stdout (mergecraft review 3740249070).
         run: |
           set +e
-          make verify-deployment
+          log="$(uv run python scripts/verify_deployment.py all 2>&1)"
           rc=$?
           set -e
-          if [ "$rc" -eq 1 ]; then
-            echo "::error title=verify-deployment::driver verdict was fail (exit 1)"
+          printf '%s\n' "$log"
+          overall="$(printf '%s\n' "$log" | sed -n 's/^VERIFY_OVERALL:[[:space:]]*\([a-z_]*\)[[:space:]].*/\1/p' | tail -n 1)"
+          if [ "$rc" -eq 1 ] || [ "${overall:-}" = "fail" ]; then
+            echo "::error title=verify-deployment::driver verdict was fail (exit $rc, overall=${overall:-unknown})"
             exit 1
           fi
-          if [ "$rc" -eq 2 ]; then
-            echo "::warning title=verify-deployment::driver reported driver_unavailable (exit 2) — tolerated on cron"
+          if [ "$rc" -eq 2 ] || [ "${overall:-}" = "driver_unavailable" ]; then
+            echo "::warning title=verify-deployment::driver reported driver_unavailable (exit $rc) — tolerated on cron"
             exit 0
           fi
           exit 0

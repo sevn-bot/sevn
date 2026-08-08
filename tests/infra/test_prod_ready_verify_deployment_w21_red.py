@@ -44,7 +44,11 @@ REQUIRED_NEW_DRIVERS = frozenset(
     }
 )
 
-_VERIFY_MAKE_RE = re.compile(r"make\s+verify-deployment\b")
+_VERIFY_MAKE_RE = re.compile(
+    r"make\s+verify-deployment\b"
+    r"|verify_deployment\.py"
+    r"|VERIFY_OVERALL",
+)
 _EXIT_2_TOLERATE_RE = re.compile(
     r"continue-on-error\s*:\s*true"
     r"|driver_unavailable"
@@ -901,3 +905,64 @@ def test_verify_deployment_sandbox_image_ref_is_built_at_runtime() -> None:
             "ghcr.io/${IMAGE_REPOSITORY}/... value in `env:`); got "
             f"run={run[:200]!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# F-PR-2 — `make` exit-2 collision masks real driver failures as
+# `driver_unavailable` on the daily cron. The Python driver
+# (``scripts/verify_deployment.py``) emits ``VERIFY_OVERALL: <status> (exit
+# <n>)`` and exits 0/1/2. ``make verify-deployment`` can return 2 for its own
+# internal errors regardless of the underlying driver verdict, so a branch
+# like ``if [ $rc -eq 2 ]; then exit 0; fi`` cannot reliably distinguish
+# "cron runner without docker" (tolerated) from "driver verdict fail" (must
+# fail). The fix is to invoke the python driver directly (or capture both
+# ``make`` and ``python`` exit codes) so the cron path can route correctly.
+# ---------------------------------------------------------------------------
+
+
+def _cron_step_run() -> str:
+    """Return the ``run:`` text of the cron verify-deployment step."""
+    jobs = _jobs(_CI_SUPP)
+    for job in jobs.values():
+        if not isinstance(job, dict):
+            continue
+        if not _VERIFY_MAKE_RE.search(_job_blob(job)):
+            continue
+        for step in job.get("steps", []):
+            if not isinstance(step, dict):
+                continue
+            run = step.get("run")
+            if isinstance(run, str) and (
+                "verify-deployment" in run or "verify_deployment.py" in run
+            ):
+                return run
+    return ""
+
+
+def test_cron_step_invokes_python_driver_directly() -> None:
+    """F-PR-2 — cron path must inspect the driver verdict, not ``make``'s exit.
+
+    The Python driver emits ``VERIFY_OVERALL: pass|fail|driver_unavailable``
+    on stdout, and the cron routing logic must distinguish
+    ``driver_unavailable`` (tolerated) from ``fail`` (must fail the gate).
+    Going through ``make verify-deployment`` loses that distinction when
+    ``make`` returns 2 for any non-recipe error, so a literal ``make
+    verify-deployment`` invocation in the cron step is no longer
+    sufficient — the cron step must invoke
+    ``scripts/verify_deployment.py`` (or its runner) directly so its exit
+    code reaches the branch logic intact (mergecraft review 3740249070).
+    """
+    run = _cron_step_run()
+    assert run, (
+        "ci-supplementary.yml cron path must include a step that runs the "
+        "verify-deployment drivers (see test_ci_supplementary_runs_verify_deployment_on_daily_cron)"
+    )
+    has_python = "verify_deployment.py" in run
+    assert has_python or "VERIFY_OVERALL" in run, (
+        "cron step must invoke scripts/verify_deployment.py (or its "
+        "runner) directly so the underlying exit code is distinguishable "
+        "from `make`'s exit-2 recipe error. `make verify-deployment` "
+        "alone collapses driver verdict to a single 0/1/2 with 2 "
+        "ambiguous between `make` failure and `driver_unavailable` "
+        "(mergecraft review 3740249070); got run: " + run[:400]
+    )
