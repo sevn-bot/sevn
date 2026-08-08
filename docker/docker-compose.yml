@@ -101,15 +101,23 @@ services:
         # W15.5: secret must be uid 10001 even when the perms marker skips migration.
         chown 10001:10001 /operator/.sevn /operator/.sevn/proxy-shared-secret
         # C9.1 / C9.2: scoped application-owned dirs only; skip when /operator/.sevn/perms-v1 exists.
+        # D-PR-2: /browser-profiles lives on its own volume (sevn-browser-state),
+        # so it gets its own marker (/operator/.sevn/browser-profiles-perms-v1).
+        # If only the browser volume is recreated, the marker on sevn-state
+        # does not suppress normalization of /browser-profiles.
         if [ ! -f /operator/.sevn/perms-v1 ]; then
           find /operator/workspace ! -user 10001 -exec chown 10001:10001 {} +
           find /operator/workspace/logs ! -user 10001 -exec chown 10001:10001 {} +
           find /operator/workspace/.sevn ! -user 10001 -exec chown 10001:10001 {} +
           find /operator/workspace/.sevn/browser-profiles ! -user 10001 -exec chown 10001:10001 {} +
           find /operator/workspace/.sevn/browser-sessions ! -user 10001 -exec chown 10001:10001 {} +
-          find /browser-profiles ! -user 10001 -exec chown 10001:10001 {} +
           printf '1\n' > /operator/.sevn/perms-v1
           chown 10001:10001 /operator/.sevn/perms-v1
+        fi
+        if [ ! -f /operator/.sevn/browser-profiles-perms-v1 ]; then
+          find /browser-profiles ! -user 10001 -exec chown 10001:10001 {} +
+          printf '1\n' > /operator/.sevn/browser-profiles-perms-v1
+          chown 10001:10001 /operator/.sevn /operator/.sevn/browser-profiles-perms-v1
         fi
     restart: "no"
 

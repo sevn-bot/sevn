@@ -768,6 +768,73 @@ def test_operator_perms_skips_broad_migration_when_marker_present() -> None:
     )
 
 
+def test_operator_perms_browser_state_has_independent_marker() -> None:
+    """D-PR-2: ``/browser-profiles`` lives on its own volume and needs its own marker.
+
+    ``sevn-browser-state`` is a separate volume from ``sevn-state``: the
+    operator may legitimately recreate one without the other (e.g.
+    ``docker volume rm sevn-browser-state`` to wipe a stuck Chromium
+    profile). If the perms marker lived only on ``sevn-state`` and gated
+    the ``/browser-profiles`` chown pass, then recreating only the
+    browser volume would leave its mount owned by the docker default
+    uid (root), and the marker branch would silently skip the chown.
+
+    The contract: the chown over ``/browser-profiles`` is gated by a
+    marker that lives on ``sevn-state`` (``/operator/.sevn/...``) so it
+    survives a ``sevn-browser-state`` recreation, but the marker is
+    specific to the browser volume (not the global workspace marker).
+    """
+    command = _service_command_text(_BASE_COMPOSE, "sevn-operator-perms")
+    # The browser chown path needs a dedicated marker that survives
+    # recreation of ``sevn-browser-state``. We don't pin the exact
+    # filename (the implementation may evolve) but it must be a
+    # distinct token that is NOT the global ``perms-v1`` marker.
+    assert _PERMS_MARKER in command, f"global marker {_PERMS_MARKER} missing"
+
+    # Locate the /browser-profiles chown block, then walk backward to
+    # the nearest ``[ ! -f <marker> ]`` guard. The guard that the browser
+    # chown actually falls under must use a marker distinct from the
+    # global workspace marker.
+    browser_chown_block = re.search(
+        r"find\s+/browser-profiles\b",
+        command,
+    )
+    assert browser_chown_block, (
+        "sevn-operator-perms must still chown /browser-profiles (C9.2); "
+        "the previous block was removed and not replaced with a dedicated "
+        "browser-volume normalization pass"
+    )
+    preceding = command[: browser_chown_block.start()]
+    guard_match = re.findall(
+        r"\[ ! -f (/operator/\.sevn/[^\s\]]+)\s*\]",
+        preceding,
+    )
+    assert guard_match, (
+        "sevn-operator-perms must guard the /browser-profiles chown with "
+        "its own marker check ([ ! -f /operator/.sevn/<browser-marker> ])"
+    )
+    browser_marker = guard_match[-1]
+    assert browser_marker != _PERMS_MARKER, (
+        f"D-PR-2: the browser chown is gated by the global {_PERMS_MARKER} "
+        "marker, which lives on sevn-state. If only the sevn-browser-state "
+        "volume is recreated, the global marker survives and the browser "
+        "chown is skipped. Use a dedicated marker so the browser volume's "
+        "ownership is normalized independently."
+    )
+
+    # The browser marker must be created inside the gated branch so a
+    # cold boot writes it before any subsequent run can skip.
+    create_pattern = re.search(
+        rf"printf[^\n]*>\s*{re.escape(browser_marker)}",
+        command,
+    )
+    assert create_pattern, (
+        f"sevn-operator-perms must create the browser marker "
+        f"({browser_marker}) inside its own gated branch, not skip it on "
+        "a cold boot"
+    )
+
+
 def test_ci_init_has_no_unconditional_chown() -> None:
     """W13.5 / C9.4: ``sevn-ci-init`` must not run unconditional ``chown -R`` on /operator."""
     command = _service_command_text(_CI_COMPOSE, "sevn-ci-init")
