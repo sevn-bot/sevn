@@ -545,6 +545,14 @@ def test_verify_digests_overlay_exists_and_pins_images_to_tag() -> None:
         assert "IMAGE_REPOSITORY" in image, (
             f"{name} image must interpolate IMAGE_REPOSITORY; got {image!r}"
         )
+        # The tags actually promoted by ``container-supply-chain`` live on
+        # GHCR (``ghcr.io/${IMAGE_REPOSITORY}/<name>:${GITHUB_SHA}``); an
+        # unprefixed reference resolves to ``docker.io`` and pulls fail,
+        # which would block the C14.1 evidence job even though the images
+        # are correctly published (mergecraft review 4886108618).
+        assert image.startswith("ghcr.io/"), (
+            f"{name} image must be published to GHCR (prefix 'ghcr.io/'); got {image!r}"
+        )
         # The overlay does not redeclare ``build:`` — the driver switches
         # to ``--no-build`` when this overlay is active, so compose pulls
         # the published image instead of rebuilding from source. Plain
@@ -647,3 +655,133 @@ def test_verify_digests_overlay_merges_to_pulled_image() -> None:
     assert "SEVN_VERIFY_IMAGE_OVERLAY" in overlay_window, (
         "_compose_base / _compose_up_args must read SEVN_VERIFY_IMAGE_OVERLAY"
     )
+
+
+def test_verify_deployment_sandbox_pull_step_present() -> None:
+    """Mergecraft review 3738385557 — sandbox image must be pullable on a fresh runner.
+
+    ``drive_sandbox_spawn`` and ``drive_cancellation_cleanup`` do
+    ``docker image inspect`` and exit ``driver_unavailable`` (status 2)
+    when the image is missing; under D52 that fail-the-tag exit is the
+    exact silent-no-op failure mode this PR exists to close. The only
+    path to an inspectable image on a fresh release runner is a
+    ``docker pull`` step before ``make verify-deployment`` — building
+    from source would skip the published image and defeat C14.1.
+    """
+    data = _load_yaml(_CI_CD)
+    job = data["jobs"]["verify-deployment"]
+    steps = job.get("steps", [])
+    pull_steps = [
+        step
+        for step in steps
+        if isinstance(step, dict) and "docker pull" in (step.get("run") or "")
+    ]
+    assert pull_steps, (
+        "verify-deployment must include a `docker pull` step for the "
+        "published sandbox image; without it drive_sandbox_spawn exits "
+        "driver_unavailable on a fresh runner and D52 fails the tag gate "
+        "(mergecraft review 3738385557)"
+    )
+    # The pull must reference both IMAGE_REPOSITORY and SANDBOX_DIGEST so
+    # it pins the exact promoted digest, not a mutable tag. The refs can
+    # be interpolated in the step's ``env`` block (built into a local
+    # var like ``SANDBOX_IMAGE_REF``) or inlined in ``run``; accept either.
+    pull_runs = [(s.get("run") or "") for s in pull_steps]
+    pull_envs = [(s.get("env") or {}) for s in pull_steps if isinstance(s.get("env"), dict)]
+    pull_text = "\n".join(pull_runs + [str(e) for env in pull_envs for e in (env,)])
+    # Job-level env vars (set on the parent job env:) are inherited into
+    # every step's shell environment, so `${IMAGE_REPOSITORY}` and
+    # `${SANDBOX_DIGEST}` expand at runtime even if they are not spelled
+    # inside the pull step's own env block. Allow both forms.
+    job_env = job.get("env") or {}
+    repo_in_step = "IMAGE_REPOSITORY" in pull_text
+    repo_in_job = "IMAGE_REPOSITORY" in job_env
+    digest_in_step = "SANDBOX_DIGEST" in pull_text
+    digest_in_job = "SANDBOX_DIGEST" in job_env
+    assert repo_in_step or repo_in_job, (
+        "sandbox pull step (or its job-level env) must reference "
+        "IMAGE_REPOSITORY so the pulled ref is the promoted digest "
+        "(mergecraft review 3738385557)"
+    )
+    assert digest_in_step or digest_in_job, (
+        "sandbox pull step (or its job-level env) must reference "
+        "SANDBOX_DIGEST so the pulled ref is the promoted digest "
+        "(mergecraft review 3738385557)"
+    )
+
+
+def test_verify_deployment_sandbox_image_env_override() -> None:
+    """Mergecraft review 3738385557 — driver must target the published image, not :local.
+
+    ``drive_sandbox_spawn`` defaults to ``sevn-sandbox:local``, which is
+    only present after ``make docker-build-ci``; on a CI runner with no
+    local build it inspects absent and returns ``driver_unavailable``.
+    The job-level env must wire ``SEVN_VERIFY_SANDBOX_IMAGE`` to the
+    promoted GHCR digest so the driver exercises the C14.1 evidence
+    path against what was actually published.
+    """
+    data = _load_yaml(_CI_CD)
+    job = data["jobs"]["verify-deployment"]
+    job_env = job.get("env") or {}
+    step_envs: list[dict[str, Any]] = []
+    for step in job.get("steps", []):
+        if not isinstance(step, dict):
+            continue
+        env = step.get("env")
+        if isinstance(env, dict):
+            step_envs.append(env)
+    merged = (job_env, *step_envs)
+    # Job-level IMAGE_REPOSITORY + SANDBOX_DIGEST (set above for the pull
+    # step) must be inherited so the SEVN_VERIFY_SANDBOX_IMAGE override
+    # below expands to the published digest ref, not an empty string.
+    assert str(job_env.get("IMAGE_REPOSITORY", "")).startswith("${{"), (
+        "verify-deployment job env must export IMAGE_REPOSITORY from "
+        "publish-ghcr.outputs.image_repository (mergecraft review 3738385557)"
+    )
+    assert str(job_env.get("SANDBOX_DIGEST", "")).startswith("${{"), (
+        "verify-deployment job env must export SANDBOX_DIGEST from "
+        "publish-ghcr.outputs.sandbox_digest so SEVN_VERIFY_SANDBOX_IMAGE "
+        "expands to a real ref (mergecraft review 3738385557)"
+    )
+    assert any(
+        "SEVN_VERIFY_SANDBOX_IMAGE" in env
+        and "ghcr.io/" in str(env.get("SEVN_VERIFY_SANDBOX_IMAGE", ""))
+        and "SANDBOX_DIGEST" in str(env.get("SEVN_VERIFY_SANDBOX_IMAGE", ""))
+        for env in merged
+    ), (
+        "verify-deployment must set SEVN_VERIFY_SANDBOX_IMAGE to the "
+        "published GHCR digest (ghcr.io/.../sandbox@${SANDBOX_DIGEST}) so "
+        "drive_sandbox_spawn has an inspectable image on the release runner "
+        "(mergecraft review 3738385557)"
+    )
+
+
+def test_verify_deployment_does_not_export_dead_digest_vars() -> None:
+    """Mergecraft review 3738385601 — no driver reads SANDBOX_DIGEST / PROXY_DIGEST / GATEWAY_*.
+
+    ``scripts/verify_deployment.py`` only reads ``SEVN_VERIFY_IMAGE_OVERLAY``,
+    ``SEVN_VERIFY_IMAGE_TAG``, and ``SEVN_VERIFY_SANDBOX_IMAGE``. Exporting
+    the raw ``*_DIGEST`` outputs in the step env clutters the diff and
+    suggests the drivers use them; keeping them dead makes the seam
+    misleading. This test asserts the dead vars are gone from the step
+    that runs ``make verify-deployment`` (they were removed from the
+    container-supply-chain step earlier; this locks the same hygiene on
+    verify-deployment).
+    """
+    data = _load_yaml(_CI_CD)
+    job = data["jobs"]["verify-deployment"]
+    dead_vars = ("SANDBOX_DIGEST", "PROXY_DIGEST", "GATEWAY_DIGEST")
+    for step in job.get("steps", []):
+        if not isinstance(step, dict):
+            continue
+        env = step.get("env")
+        if not isinstance(env, dict):
+            continue
+        if "make verify-deployment" not in (step.get("run") or ""):
+            continue
+        leaked = [v for v in dead_vars if v in env]
+        assert not leaked, (
+            "verify-deployment step env must not export dead "
+            f"{', '.join(dead_vars)} vars — no driver reads them "
+            "(mergecraft review 3738385601); leaked: {leaked}"
+        )

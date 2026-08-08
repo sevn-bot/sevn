@@ -378,11 +378,44 @@ jobs:
       # resolve at the job level so the cleanup step below sees it; the
       # F-Thermos review caught this as a regression where the cleanup step's
       # `${IMAGE_REPOSITORY}` expansion was empty and the cleanup script
-      # silently no-op'd under `continue-on-error: true`.
+      # silently no-op'd under `continue-on-error: true`. ``SANDBOX_DIGEST``
+      # is exported at the job level so the ``SEVN_VERIFY_SANDBOX_IMAGE``
+      # override below can interpolate the published digest; the same
+      # regression class (empty expansion in a step env) is what
+      # ``IMAGE_REPOSITORY`` was added to close (mergecraft review
+      # 3738385557).
       IMAGE_REPOSITORY: ${{ needs.publish-ghcr.outputs.image_repository }}
+      SANDBOX_DIGEST: ${{ needs.publish-ghcr.outputs.sandbox_digest }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
       - uses: ./.github/actions/bootstrap
+
+      # Pull the published sandbox image by digest before the drivers run.
+      # ``drive_sandbox_spawn`` does ``docker image inspect`` and exits
+      # ``driver_unavailable`` when the image is missing; the only path to
+      # an inspectable image on a fresh runner is ``docker pull``, since
+      # ``make docker-build-ci`` would rebuild from source instead of
+      # exercising the promoted image (C14.1 / D43 / mergecraft review
+      # 3738385557). Logging in requires ``packages: read``; the job-level
+      # ``packages: write`` (:375) covers that. Tag-promoted image digests
+      # never change, so a digest pull is reproducible across reruns.
+      - name: Log in to GHCR
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull published sandbox image
+        env:
+          SANDBOX_IMAGE_REF: ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}
+        run: |
+          set -euo pipefail
+          test -n "${SANDBOX_DIGEST}" || {
+            echo "::error title=missing digest::SANDBOX_DIGEST must be set to the published sandbox image digest"
+            exit 1
+          }
+          docker pull "${SANDBOX_IMAGE_REF}"
 
       - name: Run deployment drivers (release path — fail on driver_unavailable)
         # Exit 0 pass / exit 1 fail / exit 2 driver_unavailable; all three
@@ -395,14 +428,17 @@ jobs:
         # — the mergecraft review caught that without the overlay the
         # drivers ran ``docker compose up --build`` against the local
         # checkout and the published digests were never exercised.
+        #
+        # ``SEVN_VERIFY_SANDBOX_IMAGE`` overrides the driver's default
+        # ``sevn-sandbox:local`` (which only exists after ``make docker-build-ci``)
+        # so the sandbox-spawn driver exercises the published sandbox image
+        # against the real docker CLI; without this override the driver
+        # returns ``driver_unavailable`` and D52 fails the tag gate
+        # (mergecraft review 3738385557 / 3738385601).
         env:
-          SANDBOX_DIGEST: ${{ needs.publish-ghcr.outputs.sandbox_digest }}
-          PROXY_DIGEST: ${{ needs.publish-ghcr.outputs.proxy_digest }}
-          GATEWAY_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_digest }}
-          GATEWAY_BROWSER_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_browser_digest }}
-          GATEWAY_GUI_DIGEST: ${{ needs.publish-ghcr.outputs.gateway_gui_digest }}
           SEVN_VERIFY_IMAGE_OVERLAY: "1"
           SEVN_VERIFY_IMAGE_TAG: ${{ github.sha }}
+          SEVN_VERIFY_SANDBOX_IMAGE: ghcr.io/${IMAGE_REPOSITORY}/sandbox@${SANDBOX_DIGEST}
         run: make verify-deployment
 
       - name: Upload deployment evidence (evidence/verify/*.json)

@@ -19,6 +19,6 @@
 
 services:
   sevn-proxy:
-    image: ${IMAGE_REPOSITORY}/proxy:${SEVN_VERIFY_IMAGE_TAG}
+    image: ghcr.io/${IMAGE_REPOSITORY}/proxy:${SEVN_VERIFY_IMAGE_TAG}
   sevn-gateway:
-    image: ${IMAGE_REPOSITORY}/gateway:${SEVN_VERIFY_IMAGE_TAG}
+    image: ghcr.io/${IMAGE_REPOSITORY}/gateway:${SEVN_VERIFY_IMAGE_TAG}
