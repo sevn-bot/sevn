@@ -133,13 +133,15 @@ no `--no-sandbox` anywhere in the shipped compose files. Two things make that wo
   aborts at startup with `Failed to move to new namespace`. `mount`, `pivot_root`,
   `setns`, `bpf` and `perf_event_open` remain gated, and the service keeps
   `cap_drop: ALL` + `no-new-privileges: true`.
-- **The host must permit unprivileged user namespaces.** On Ubuntu 23.10+,
-  `/proc/sys/kernel/apparmor_restrict_unprivileged_userns` defaults to `1` and blocks
-  them. `make compose-browser-up` / `make compose-gui-up` run
-  `scripts/check-browser-host.sh` first, which fails closed with the remediation (an
-  app-scoped AppArmor profile granting `userns`, or the host-wide sysctl) — see
-  `docs/readmes/security.md` §C8.1. `SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT=1` bypasses
-  the check. It is a host property, so it is *not* part of `make ci-infra`;
+- **The host must let the container create a user namespace.** `make compose-browser-up`
+  / `make compose-gui-up` run `scripts/check-browser-host.sh` first. It *probes* the
+  real condition — `unshare -U` in a throwaway container under the overlays' exact
+  security context — instead of inferring it from a sysctl, and fails closed only when
+  the namespace is actually denied. Note that Ubuntu 23.10+'s
+  `apparmor_restrict_unprivileged_userns=1` is **not** a blocker: it does not apply to
+  processes under Docker's own AppArmor profile, and the CI smoke passes on a stock
+  `ubuntu-24.04` runner with that sysctl set to `1`. `SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT=1`
+  bypasses the check. Being a host property, it is *not* part of `make ci-infra`;
   `make check-compose-default` covers only the committed compose files.
 
 Regenerating the profile after a Docker upgrade: take `profiles/seccomp/default.json`

@@ -85,9 +85,13 @@ Dropping `--no-sandbox` only buys isolation if Brave can build its namespace san
 
 1. **Container syscall policy.** Docker's *default* seccomp profile gates `clone(CLONE_NEW*)`, `clone3` and `unshare` behind `CAP_SYS_ADMIN`, and `chroot` behind `CAP_SYS_CHROOT`. Under the overlays' `cap_drop: ALL` those are all denied, so Brave cannot create the user namespace it sandboxes renderers in. The browser and GUI overlays therefore pin **`infra/docker/seccomp-browser.json`** — Docker's default profile with exactly those four syscalls ungated. `mount`, `pivot_root`, `setns`, `bpf` and `perf_event_open` stay gated, and the container keeps `cap_drop: ALL` + `no-new-privileges:true`. This is strictly stronger than `--no-sandbox`, and far narrower than `seccomp=unconfined` (which would discard the whole syscall filter).
 
-2. **Host user-namespace policy.** The kernel must permit unprivileged user namespaces. Ubuntu 23.10+ restricts them through `/proc/sys/kernel/apparmor_restrict_unprivileged_userns` (default `1` on 24.04). `scripts/check-browser-host.sh` (`make check-browser-host`, and automatically on `make compose-browser-up` / `make compose-gui-up`) **fails closed** when that sysctl is non-zero rather than letting `compose up` produce a browser that never starts. This is a property of the machine, not of the repo, which is why it runs on the deploy path and not in CI's static gates — `make check-compose-default` asserts only that the committed overlays pin the profile.
+2. **Host user-namespace policy.** The kernel and container runtime must let the container create a user namespace. `scripts/check-browser-host.sh` (`make check-browser-host`, and automatically on `make compose-browser-up` / `make compose-gui-up`) **proves** this rather than inferring it — it runs `unshare -U` in a throwaway container under the overlays' exact security context (`cap_drop: ALL` + `no-new-privileges` + the pinned profile) and fails closed if the namespace is denied. When the probe itself cannot run (no daemon, image unavailable) it warns and passes: an unreachable daemon is not evidence about the sandbox.
 
-   Preferred remediation is an app-scoped AppArmor profile rather than a host-wide switch:
+   This is a property of the machine, not the repo, which is why it runs on the deploy path and not in CI's static gates — `make check-compose-default` asserts only that the committed overlays pin the profile.
+
+   **`apparmor_restrict_unprivileged_userns=1` is not a blocker.** Ubuntu 23.10+ defaults that sysctl to `1`, and it is a tempting thing to gate on, but the restriction does not apply to processes running under Docker's own AppArmor profile. GitHub's `ubuntu-24.04` runners ship it set to `1` and the hardened Brave smoke passes there unmodified — the CI `docker-images` job records the value and boots Brave on a stock runner precisely so that claim keeps being re-proved. Gating on the sysctl would refuse to start on hosts that work fine, which is why the preflight probes instead.
+
+   Where a host genuinely does mediate userns for containers, prefer an app-scoped AppArmor profile over a host-wide switch:
 
    ```sh
    sudo tee /etc/apparmor.d/sevn-browser >/dev/null <<'EOF'
@@ -100,9 +104,7 @@ Dropping `--no-sandbox` only buys isolation if Brave can build its namespace san
    sudo apparmor_parser -r /etc/apparmor.d/sevn-browser
    ```
 
-   The host-wide alternative (`echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns`, persisted in `/etc/sysctl.d/`) relaxes the restriction for *every* process on the host. `SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT=1` bypasses the gate once another mitigation has been accepted.
-
-The CI `docker-images` job runs the hardened Brave smoke on a **stock** Ubuntu runner with no host tweak, so a green check means the shipped deployment starts as-is.
+   `SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT=1` bypasses the gate once another mitigation has been accepted.
 
 ## Level 3 — Deep dive (low-level, technical)
 

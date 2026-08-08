@@ -4,70 +4,126 @@
 # C8.1 — host preflight for the browser/GUI compose overlays.
 #
 # The overlays run Brave with the Chromium renderer sandbox ON (no
-# --no-sandbox anywhere in the shipped compose files). Two preconditions must
-# hold; both fail at runtime with the same opaque abort:
+# --no-sandbox anywhere in the shipped compose files). Brave builds that
+# sandbox by creating a user namespace and chroot-ing into it; if the host or
+# the container runtime refuses, Brave aborts at startup with an opaque
 #
 #     Failed to move to new namespace: … errno = Operation not permitted
 #     FATAL … zygote_host_impl_linux.cc
 #
-#   1. Container syscall policy — the overlays pin
-#      infra/docker/seccomp-browser.json. That is a property of the committed
-#      compose files, so `scripts/check-compose-default.sh` asserts it (and it
-#      runs in `make ci-infra`).
-#   2. Host user-namespace policy — THIS script. It is a property of the
-#      machine, which is why it runs on the `compose-browser-up` /
-#      `compose-gui-up` path and deliberately NOT in CI's static gates: a CI
-#      runner's host policy says nothing about whether the repo is correct.
+# which surfaces as "the browser silently doesn't work" long after `compose up`
+# reported success. This script proves the capability up front.
 #
-# Fails closed so an operator is told before `compose up` rather than
-# discovering a browser that never starts. Set
-# SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT=1 to bypass after accepting another
-# mitigation.
+# It probes the REAL condition rather than inferring it from a sysctl: it runs
+# `unshare -U` in a throwaway container under the exact security context the
+# overlays use (cap_drop:ALL + no-new-privileges + the pinned seccomp profile).
+# Inference from /proc/sys/kernel/apparmor_restrict_unprivileged_userns would be
+# wrong — GitHub's ubuntu-24.04 runners ship that sysctl set to 1 and Brave
+# still sandboxes correctly there, because the restriction does not apply to
+# processes under Docker's own AppArmor profile. A sysctl-based gate would
+# refuse to start on hosts that work fine.
+#
+# The complementary static assertion — that the overlays pin the profile at all
+# — lives in scripts/check-compose-default.sh, which runs in `make ci-infra`.
+# This script is about the machine, so it runs on the deploy path only.
+#
+# Fails closed when the probe runs and userns is denied. When the probe cannot
+# run at all (no daemon, image unavailable) it warns and exits 0 — an
+# unreachable Docker daemon is not evidence about the sandbox, and `compose up`
+# will fail on its own. Set SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT=1 to bypass.
 set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+seccomp_profile="${repo_root}/infra/docker/seccomp-browser.json"
+probe_image="${SEVN_BROWSER_PREFLIGHT_IMAGE:-busybox:1.36}"
 
 if [ "${SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT:-0}" = "1" ]; then
   echo "check-browser-host: skipped (SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT=1)"
   exit 0
 fi
 
-userns_sysctl=/proc/sys/kernel/apparmor_restrict_unprivileged_userns
-
-# Absent on macOS/Colima hosts and on kernels without the AppArmor restriction:
-# nothing to assert, and the container runtime's own VM governs the sandbox.
-if [ ! -r "$userns_sysctl" ]; then
-  echo "check-browser-host: ok (no AppArmor userns restriction on this host)"
+if ! command -v docker >/dev/null 2>&1; then
+  echo "check-browser-host: skipped (docker CLI not on PATH)" >&2
   exit 0
 fi
 
-value="$(cat "$userns_sysctl")"
-if [ "$value" = "0" ]; then
-  echo "check-browser-host: ok (unprivileged user namespaces permitted)"
+if ! docker info >/dev/null 2>&1; then
+  echo "check-browser-host: skipped (Docker daemon not reachable)" >&2
   exit 0
 fi
+
+if [ ! -f "$seccomp_profile" ]; then
+  echo "error: missing browser seccomp profile at ${seccomp_profile}" >&2
+  exit 1
+fi
+
+# Probe under the overlays' exact security context.
+probe_output=""
+probe_rc=0
+probe_output="$(
+  docker run --rm \
+    --cap-drop=ALL \
+    --security-opt=no-new-privileges:true \
+    --security-opt "seccomp=${seccomp_profile}" \
+    --user=10001:10001 \
+    --entrypoint sh \
+    "$probe_image" -c 'unshare -U true' 2>&1
+)" || probe_rc=$?
+
+if [ "$probe_rc" -eq 0 ]; then
+  echo "check-browser-host: ok (renderer sandbox can create user namespaces)"
+  exit 0
+fi
+
+# Distinguish "the sandbox is blocked" from "the probe itself could not run"
+# (missing image, no network to pull it, unrelated daemon error). Only the
+# former is evidence, and only the former may fail the deploy.
+case "$probe_output" in
+  *"Operation not permitted"* | *"operation not permitted"* | *"unshare"*)
+    : # genuine denial — fall through to the hard failure below
+    ;;
+  *)
+    echo "check-browser-host: skipped (probe could not run: ${probe_output})" >&2
+    exit 0
+    ;;
+esac
 
 cat >&2 <<EOF
-error: this host restricts unprivileged user namespaces
-       (${userns_sysctl} = ${value}).
+error: this host will not let the browser container create a user namespace.
 
-       Brave's renderer sandbox cannot start, and the browser/gui overlays no
-       longer fall back to --no-sandbox (C8.1). The container would come up and
-       the browser would abort before CDP binds.
+       Probe (the exact context the browser/gui overlays use):
+         docker run --rm --cap-drop=ALL --security-opt=no-new-privileges:true \\
+           --security-opt seccomp=${seccomp_profile} \\
+           --user=10001:10001 ${probe_image} unshare -U true
+       -> ${probe_output}
 
-       Remediation — prefer the app-scoped AppArmor policy:
+       Brave's renderer sandbox cannot start, and the overlays no longer fall
+       back to --no-sandbox (C8.1): the container would come up and the browser
+       would abort before CDP binds.
 
-         sudo tee /etc/apparmor.d/sevn-browser >/dev/null <<'PROFILE'
-         abi <abi/4.0>,
-         include <tunables/global>
-         profile sevn-browser flags=(unconfined) {
-           userns,
-         }
-         PROFILE
-         sudo apparmor_parser -r /etc/apparmor.d/sevn-browser
+       Common causes and remediations:
 
-       Host-wide alternative (weaker — affects every process on the host):
+       1. A custom Docker seccomp default that blocks clone(CLONE_NEWUSER).
+          Confirm 'seccomp' is not listed under 'Security Options' with a
+          non-default profile in \`docker info\`.
 
-         echo 0 | sudo tee ${userns_sysctl}
-         # persist via /etc/sysctl.d/60-apparmor-userns.conf
+       2. A hardened kernel with user namespaces disabled outright:
+            sysctl user.max_user_namespaces      # must be > 0
+            sysctl kernel.unprivileged_userns_clone  # must be 1 where present
+
+       3. AppArmor userns mediation applied to the container. Note the stock
+          Ubuntu 24.04 default (apparmor_restrict_unprivileged_userns=1) does
+          NOT cause this — Docker's own profile covers the container. If your
+          host does mediate it, prefer an app-scoped policy:
+
+            sudo tee /etc/apparmor.d/sevn-browser >/dev/null <<'PROFILE'
+            abi <abi/4.0>,
+            include <tunables/global>
+            profile sevn-browser flags=(unconfined) {
+              userns,
+            }
+            PROFILE
+            sudo apparmor_parser -r /etc/apparmor.d/sevn-browser
 
        See docker/README.md "Browser sandbox (C8.1)" and
        docs/readmes/security.md §C8.1.
