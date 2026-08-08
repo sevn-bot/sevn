@@ -513,7 +513,7 @@ ci-core: lockcheck lint typecheck pyright test doctest security build artifact-i
 
 ci-infra: config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards check-compose-default check-compose-operator-secrets check-no-curl-pipe-sh sandbox-image-check agent-context-manifest-check storage-migration-rehearsal-check ## Schema / infra drift tier
 
-ci-docs: telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema spec-kit-wave-test changelog-check faq-check ## Docs / menu HTML tier
+ci-docs: telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema changelog-check faq-check ## Docs / menu HTML tier
 
 ci-skills: skills-core-check skillspector-check skills-index-check removed-browser-skills-check dreaming-allowlist-check ## Skills inventory tier
 
@@ -525,7 +525,7 @@ ci: ci-core ci-infra ci-docs ci-skills ci-parity ## Full gate (same as CI)
 # Tier↔CI_STEPS parity enforced by tests/infra/test_ci_steps_tier_parity.py.
 CI_STEPS := lockcheck lint typecheck pyright test doctest security build artifact-integrity-check doctor-solutions-check \
 	config-schema onboarding-profiles-schema infra-check mission-control-schema-check check-git-guards check-compose-default check-compose-operator-secrets check-no-curl-pipe-sh sandbox-image-check agent-context-manifest-check storage-migration-rehearsal-check \
-	telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema spec-kit-wave-test changelog-check faq-check \
+	telegram-menu-check telegram-menu-docs-check cli-help-docs-check readme-check subagents-chart-check about-site-check about-docs-check about-docs-schema changelog-check faq-check \
 	skills-core-check skillspector-check skills-index-check removed-browser-skills-check dreaming-allowlist-check \
 	code-index deploy-remote-report-check code-index-check mergecraft-ref-check
 
