@@ -306,10 +306,6 @@ _check_resolved_service_limits "ci" "${repo_root}/docker/docker-compose.ci.yml"
 #      Ubuntu 23.10+ AppArmor restricts them via
 #      /proc/sys/kernel/apparmor_restrict_unprivileged_userns.
 #
-# Fails closed: an operator whose host refuses user namespaces is told before
-# `compose up` rather than discovering a browser that will not start.
-# Set SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT=1 to bypass (documented escape hatch
-# for hosts where the operator has accepted a different mitigation).
 # ---------------------------------------------------------------------------
 _seccomp_profile="${repo_root}/infra/docker/seccomp-browser.json"
 
@@ -337,32 +333,3 @@ fi
 
 _check_browser_seccomp_profile_pinned "browser override" "$compose_browser" || exit 1
 _check_browser_seccomp_profile_pinned "gui override" "$compose_gui" || exit 1
-
-if [ "${SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT:-0}" != "1" ]; then
-  _userns_sysctl=/proc/sys/kernel/apparmor_restrict_unprivileged_userns
-  if [ -r "$_userns_sysctl" ] && [ "$(cat "$_userns_sysctl")" != "0" ]; then
-    echo "error: this host restricts unprivileged user namespaces" >&2
-    echo "       (${_userns_sysctl} = $(cat "$_userns_sysctl"))." >&2
-    echo "       Brave's renderer sandbox cannot start, and the browser/gui" >&2
-    echo "       overlays no longer fall back to --no-sandbox (C8.1)." >&2
-    echo "" >&2
-    echo "       Remediation — prefer the app-scoped AppArmor policy:" >&2
-    echo "         sudo tee /etc/apparmor.d/sevn-browser >/dev/null <<'EOF'" >&2
-    echo "         abi <abi/4.0>," >&2
-    echo "         include <tunables/global>" >&2
-    echo "         profile sevn-browser flags=(unconfined) {" >&2
-    echo "           userns," >&2
-    echo "         }" >&2
-    echo "         EOF" >&2
-    echo "         sudo apparmor_parser -r /etc/apparmor.d/sevn-browser" >&2
-    echo "" >&2
-    echo "       Host-wide alternative (weaker, affects every process):" >&2
-    echo "         echo 0 | sudo tee ${_userns_sysctl}" >&2
-    echo "         # persist: /etc/sysctl.d/60-apparmor-userns.conf" >&2
-    echo "" >&2
-    echo "       See docker/README.md § Browser sandbox and docs/readmes/security.md §C8.1." >&2
-    echo "       Bypass (after accepting another mitigation):" >&2
-    echo "         SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT=1" >&2
-    exit 1
-  fi
-fi

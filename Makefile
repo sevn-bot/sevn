@@ -47,7 +47,7 @@ PIP_AUDIT_CACHE ?= $(CURDIR)/.cache/pip-audit
 MERGECRAFT_REF ?= $(if $(SEVN_MERGECRAFT_REF),$(SEVN_MERGECRAFT_REF),8d747f39d3d36d889e0a85c2dcf691d1bdb91536)
 PRE_COMMIT ?= $(UV) run pre-commit
 
-.PHONY: help setup ensure-uv install install-git-guards check-git-guards check-compose-default check-compose-operator-secrets check-no-curl-pipe-sh sandbox-image-check sandbox-image-pull snapshot-local install-snapshot-timer install-cli install-cli-browser sync-cli update-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover coverage-ratchet complexity-ratchet complexity-target stale-xfail-check md-links-check doctest trivy-allowlist-check security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check removed-browser-skills-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh storage-migration-rehearsal-check styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage mergecraft-ref-check review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-browser-up compose-gui-up compose-down compose-logs compose-restart verify-compose-profiles verify-stack-health verify-sandbox-spawn verify-runtime verify-deployment log-explore telegram-checks telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-curate readme-curate-prompt readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate spec-check prd-check spec-sync prd-sync logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve faq-generate faq-check
+.PHONY: help setup ensure-uv install install-git-guards check-git-guards check-compose-default check-browser-host check-compose-operator-secrets check-no-curl-pipe-sh sandbox-image-check sandbox-image-pull snapshot-local install-snapshot-timer install-cli install-cli-browser sync-cli update-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover coverage-ratchet complexity-ratchet complexity-target stale-xfail-check md-links-check doctest trivy-allowlist-check security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check removed-browser-skills-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh storage-migration-rehearsal-check styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage mergecraft-ref-check review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-browser-up compose-gui-up compose-down compose-logs compose-restart verify-compose-profiles verify-stack-health verify-sandbox-spawn verify-runtime verify-deployment log-explore telegram-checks telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-curate readme-curate-prompt readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate spec-check prd-check spec-sync prd-sync logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve faq-generate faq-check
 
 
 PROXY_ENV_FILE ?= .env.proxy
@@ -81,6 +81,10 @@ install-git-guards: ## Block git clean -x/-X; prepends bin/git (primary-checkout
 
 check-git-guards: ## Verify alias.clean blocks git clean -x/-X
 	$(UV) run python scripts/check_git_guards.py
+
+check-browser-host: ## C8.1 host preflight — unprivileged userns for the Brave renderer sandbox
+	@chmod +x scripts/check-browser-host.sh 2>/dev/null || true
+	@./scripts/check-browser-host.sh
 
 check-compose-default: ## Assert operator compose default profile (#136, #137)
 	@chmod +x scripts/check-compose-default.sh 2>/dev/null || true
@@ -613,11 +617,13 @@ COMPOSE_FILES = -f $(COMPOSE_FILE)
 compose-gui-up: ## Start operator stack with GUI gateway (noVNC on 6080)
 	@test -f .env || { printf 'Missing .env — copy .env.example and set tokens.\n' >&2; exit 1; }
 	$(UV) run python scripts/check_compose_operator_secrets.py
+	@./scripts/check-browser-host.sh
 	docker compose -f docker/docker-compose.yml -f docker/docker-compose.gui.yml up -d --build
 
 compose-browser-up: ## Start operator stack with browser CDP gateway (Brave)
 	@test -f .env || { printf 'Missing .env — copy .env.example and set tokens.\n' >&2; exit 1; }
 	$(UV) run python scripts/check_compose_operator_secrets.py
+	@./scripts/check-browser-host.sh
 	docker compose -f docker/docker-compose.yml -f docker/docker-compose.browser.yml up -d --build
 
 compose-ci-smoke: ## Build and smoke docker/docker-compose.ci.yml + proxy transport round-trip (needs Docker)

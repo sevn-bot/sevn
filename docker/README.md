@@ -135,10 +135,12 @@ no `--no-sandbox` anywhere in the shipped compose files. Two things make that wo
   `cap_drop: ALL` + `no-new-privileges: true`.
 - **The host must permit unprivileged user namespaces.** On Ubuntu 23.10+,
   `/proc/sys/kernel/apparmor_restrict_unprivileged_userns` defaults to `1` and blocks
-  them. `make check-compose-default` fails closed with the remediation (an app-scoped
-  AppArmor profile granting `userns`, or the host-wide sysctl) — see
+  them. `make compose-browser-up` / `make compose-gui-up` run
+  `scripts/check-browser-host.sh` first, which fails closed with the remediation (an
+  app-scoped AppArmor profile granting `userns`, or the host-wide sysctl) — see
   `docs/readmes/security.md` §C8.1. `SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT=1` bypasses
-  the check.
+  the check. It is a host property, so it is *not* part of `make ci-infra`;
+  `make check-compose-default` covers only the committed compose files.
 
 Regenerating the profile after a Docker upgrade: take `profiles/seccomp/default.json`
 from the matching moby tag, remove those four names from every existing group, and
