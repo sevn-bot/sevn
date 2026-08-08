@@ -34,7 +34,17 @@ PIP_AUDIT_CACHE ?= $(CURDIR)/.cache/pip-audit
 #
 # CI cannot track a branch here (sevn-bot enforces Actions SHA pinning). Override
 # with SEVN_MERGECRAFT_REF=pre-0.0.1 (or another ref) to track a branch locally.
-MERGECRAFT_REF ?= $(if $(SEVN_MERGECRAFT_REF),$(SEVN_MERGECRAFT_REF),88c6f41945b39754447bcb27566f624349d8e477)
+#
+# 2026-08-07: temporarily rolled back from 88c6f419 to 8d747f39 because the
+# Codex CLI under 88c6f419 hangs on "Reading additional input from stdin…"
+# in mergeCraft's `subprocess.run([codex, exec, …])` invocation (no
+# `stdin=subprocess.DEVNULL`), so the Codex step never posts a
+# mergecraft-approval check and the fail-closed gate fails closed on PR #243
+# (run 92976736439). 8d747f39 is the most recent known-good SHA — it was
+# merged in PR #235/#236 and was the production pin before the CODEX_HOME
+# outside /tmp bump in PR #238. Re-syncing main's mergecraft.yml pin to
+# 8d747f39 is a follow-up (the parity check reads origin/main).
+MERGECRAFT_REF ?= $(if $(SEVN_MERGECRAFT_REF),$(SEVN_MERGECRAFT_REF),8d747f39d3d36d889e0a85c2dcf691d1bdb91536)
 PRE_COMMIT ?= $(UV) run pre-commit
 
 .PHONY: help setup ensure-uv install install-git-guards check-git-guards check-compose-default check-compose-operator-secrets check-no-curl-pipe-sh sandbox-image-check sandbox-image-pull snapshot-local install-snapshot-timer install-cli install-cli-browser sync-cli update-cli pdf-native-libs lockcheck lint lint-imports format typecheck pyright test test-integration coverage diff-cover coverage-ratchet complexity-ratchet complexity-target stale-xfail-check md-links-check doctest trivy-allowlist-check security precommit commit-msg-check config-schema onboarding-capabilities-check onboarding-profiles-schema-check onboarding-profiles-schema infra-check schema-export skills-core-check skillspector-check skills-index-check tools-skills-inventory-check removed-browser-skills-check dreaming-allowlist-check telegram-menu-check telegram-menu-docs-check telegram-menu-docs-scaffold mission-control-docs-check mission-control-docs-scaffold mission-control-schema-check mission-control-schema-generate agent-context-manifest-check agent-context-manifest-generate about-site about-site-check subagents-chart subagents-chart-check changelog-check changelog-eval code-index code-index-check storage-golden-refresh storage-migration-rehearsal-check styles-build ui-style-check build ci ci-static ci-core ci-infra ci-docs ci-skills ci-parity ci-changed ci-affected ci-steps ci-resume ci-reset partial-ci ci-quality ruff-extra typecheck-strict deadcode complexity spell deps-check docstring-coverage mergecraft-ref-check review golden-llm-ci v1-smoke v2-smoke run proxy proxy-env dash-build dash-test sandbox-integration docker-build-ci compose-ci-smoke compose-up compose-browser-up compose-gui-up compose-down compose-logs compose-restart verify-compose-profiles verify-stack-health verify-sandbox-spawn verify-runtime verify-deployment log-explore telegram-checks telegram-e2e incomplete-tasks improve-evals find-stubs clean readme readme-check readme-scaffold readme-curate readme-curate-prompt readme-preview readme-render-fixtures printing-press-starter-pack printing-press-check wave-orchestrator-lint wave-orchestrator-typecheck wave-orchestrator-test wave-orchestrator-check about-docs-schema about-docs-check about-docs-migrate about-docs-index about-docs-extract about-docs-generate spec-check prd-check spec-sync prd-sync logo-mark-ascii logo-mark-animate logo-mark-ascii-dissolve faq-generate faq-check
