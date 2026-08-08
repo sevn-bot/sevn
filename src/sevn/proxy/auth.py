@@ -484,6 +484,18 @@ def llm_post_auth_failure(
     ``/integration``; ``llm`` → ``/llm/*``) optionally bound to ``X-Sevn-Run-Id`` and
     ``X-Sevn-Container-Id`` (C7.1).
 
+    The scope-strict ``sandbox``-scoped token does **not** authorize ``/llm/*``
+    paths on its own — a stolen bearer from a sandbox cannot reach the LLM
+    surface. The proxy additionally admits a ``sandbox``-scoped token on
+    ``/llm/*`` **only when paired with a valid ``X-Sevn-Binding-Signature``**
+    (PR #245 mergecraft follow-up Codex reviewId 4889131359, run 31264795983):
+    the binding signature is HMAC-SHA256 keyed by the shared secret, so a leaked
+    sandbox token cannot be re-bound to a different ``(run_id, container_id)``
+    pair without also holding the secret. This unblocks the production
+    ``complete_json`` egress path (``src/sevn/data/bundled_skills/core/job-ops/
+    scripts/lib/llm.py``), where the gateway pre-computes the signature at
+    spawn time and ships it via ``SEVN_PROXY_BINDING_SIG``.
+
     When ``proxy_shared_secret`` is unset or empty, guarded routes return **503**
     unless ``SEVN_PROXY_ALLOW_UNAUTHENTICATED=1`` (explicit dev-only opt-in).
 
@@ -544,7 +556,104 @@ def llm_post_auth_failure(
             run_id=run_id_header,
         ):
             return None
+    # PR #245 Codex reviewId 4889131359, run 31264795983: a ``sandbox``-scoped
+    # token alone does not authorize ``/llm/*`` (the strict scope check above
+    # rejects it), but the production ``complete_json`` sandbox egress path
+    # needs ``/llm/*`` to work end-to-end. Admit a ``sandbox``-scoped token on
+    # ``/llm/*`` **only** when paired with a valid PoP binding signature — the
+    # same defense-in-depth check applied to the sandbox family. The signature
+    # is HMAC-SHA256 keyed by ``proxy_shared_secret``, so a leaked sandbox
+    # token cannot be rebound to a different ``(run_id, container_id)`` pair
+    # without also holding the shared secret.
+    if session_token and isinstance(path, str) and path.startswith("/llm/"):
+        run_id_header = request.headers.get(_RUN_ID_HEADER) or ""
+        container_id_header = request.headers.get(_CONTAINER_ID_HEADER) or ""
+        if _session_token_is_sandbox_scoped(
+            session_token,
+            signing_key=proxy_shared_secret,
+            run_id=run_id_header,
+            container_id=container_id_header,
+        ) and _verify_binding_signature(
+            request=request,
+            signing_key=proxy_shared_secret,
+            container_id=container_id_header,
+            run_id=run_id_header,
+        ):
+            return None
     return JSONResponse({"detail": "unauthorized"}, status_code=401)
+
+
+def _session_token_is_sandbox_scoped(
+    token: str,
+    *,
+    signing_key: str,
+    run_id: str,
+    container_id: str,
+) -> bool:
+    """Return ``True`` when ``token`` is a structurally valid, unexpired sandbox token.
+
+    Verifies the HMAC signature, expiry, ``scope == "sandbox"`` claim, and the
+    ``run_id`` / ``container_id`` binding claims against the request-attributed
+    values — but **skips** the path-family scope check. The proxy seam
+    (``llm_post_auth_failure``) uses this to admit a sandbox-scoped token on
+    ``/llm/*`` paths **only** when the binding signature is valid
+    (PR #245 mergecraft follow-up Codex reviewId 4889131359, run 31264795983).
+
+    Args:
+        token (str): ``X-Sevn-Session-Token`` header value.
+        signing_key (str): Expected ``SEVN_PROXY_SHARED_SECRET``.
+        run_id (str): Request-attributed run id (``X-Sevn-Run-Id`` header).
+        container_id (str): Request-attributed container bind id (``X-Sevn-Container-Id``).
+
+    Returns:
+        bool: ``True`` only when signature, expiry, ``scope=sandbox``, and binding
+        claims all match.
+
+    Examples:
+        >>> from unittest.mock import MagicMock
+        >>> _session_token_is_sandbox_scoped("nope", signing_key="k", run_id="", container_id="")
+        False
+    """
+    text = token.strip()
+    if not text or not signing_key:
+        return False
+    parts = text.split(".")
+    if len(parts) != 3 or parts[0] != _SESSION_TOKEN_VERSION:
+        return False
+    body, sig = parts[1], parts[2]
+    expected = hmac.new(signing_key.encode(), body.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        return False
+    padded = body + "=" * (-len(body) % 4)
+    try:
+        raw = base64.urlsafe_b64decode(padded.encode()).decode()
+        payload = json.loads(raw)
+    except (ValueError, json.JSONDecodeError):
+        return False
+    if not isinstance(payload, dict):
+        return False
+    if payload.get("scope") != SESSION_SCOPE_SANDBOX:
+        return False
+    exp = payload.get("exp")
+    if not isinstance(exp, int) or exp < int(time.time()):
+        return False
+    # Mirror :func:`validate_session_token` binding checks: when the token
+    # carries a claim, the request value must match; when it carries no claim
+    # for a binding, the request must not present one either.
+    token_run_id = payload.get("run_id")
+    if not isinstance(token_run_id, str) or not _check_binding(
+        claim_value=token_run_id, request_value=run_id, label="run_id"
+    ):
+        return False
+    token_cid = payload.get("container_id")
+    if token_cid is not None:
+        if not isinstance(token_cid, str) or not _check_binding(
+            claim_value=token_cid, request_value=container_id, label="container_id"
+        ):
+            return False
+    elif container_id:
+        return False
+    return True
 
 
 __all__ = [
