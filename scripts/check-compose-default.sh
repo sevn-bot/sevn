@@ -194,10 +194,13 @@ _check_compose_file_set "gui override" "$compose_base" "$compose_gui"
 
 # C8.1 — no compose file or overlay may pass --no-sandbox (renderer sandbox stays on).
 # Strip YAML comment lines, then reject the token in active config (prod overlay included).
+# POSIX-portable: use [[:space:]] instead of GNU \s so the script behaves identically on
+# macOS / BSD grep. \s would be interpreted literally as backslash-s under BSD grep and
+# the comment-stripping pass would fail to drop lines like ``# --no-sandbox …``.
 _check_no_sandbox_in_compose() {
   local compose_file="$1"
   local active
-  active="$(grep -v '^\s*#' "$compose_file" || true)"
+  active="$(grep -v '^[[:space:]]*#' "$compose_file" || true)"
   if printf '%s\n' "$active" | grep -q -- '--no-sandbox'; then
     echo "error: ${compose_file##*/} must not pass --no-sandbox (Chromium renderer sandbox required)" >&2
     return 1

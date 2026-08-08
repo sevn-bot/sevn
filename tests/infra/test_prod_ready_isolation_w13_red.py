@@ -266,6 +266,143 @@ def test_browser_gui_overrides_drop_stale_no_sandbox_comments(path: Path) -> Non
     assert comment_hits == [], f"{path.name}: stale --no-sandbox comments remain: {comment_hits}"
 
 
+def test_check_no_sandbox_in_compose_strips_comments_under_posix_grep(tmp_path: Path) -> None:
+    r"""D-PR-4: comment-stripping regex in ``_check_no_sandbox_in_compose`` must be POSIX-portable.
+
+    The preflight runs on supported macOS hosts whose ``/usr/bin/grep`` is BSD
+    grep, and on minimal Linux containers where the ``grep`` in ``/usr/bin`` is
+    a strict-POSIX build that does not implement the GNU ``\s`` shorthand.
+    A regex like ``^\s*#`` is therefore interpreted literally as
+    ``^s*#`` and only matches lines whose first non-anchor character is
+    the literal letter ``s``; every comment line that does not start with
+    ``s`` leaks into the active-config window, and a compose file whose
+    ``--no-sandbox`` token lives only inside ``# --no-sandbox …`` comments
+    is wrongly rejected.
+
+    Two-part RED test:
+
+    1. **Static guard** — scan ``scripts/check-compose-default.sh`` for any
+       ``\s`` used as a regex whitespace class (the pattern that bit the
+       previous version). POSIX BRE / ERE do not define ``\s``; the script
+       must use ``[[:space:]]`` or an equivalent POSIX character class.
+       This is the assertion that catches a regression on a stripped
+       Linux image where ``/usr/bin/grep`` is genuinely strict-BSD.
+    2. **Runtime exercise** — invoke the helper in a subprocess with
+       ``PATH=/usr/bin:/bin`` (the documented supported-host baseline;
+       on macOS this resolves BSD grep, on Linux it resolves whatever
+       POSIX grep is on the bare PATH) and confirm a comment-only
+       ``--no-sandbox`` is stripped while an active ``--no-sandbox`` token
+       is still rejected (covered by the companion test below).
+    """
+    script_text = _CHECK_COMPOSE.read_text(encoding="utf-8")
+    # Static guard — no ``\s`` inside a basic-regex pattern in the script.
+    # Match ``grep ... `` followed by a quoted pattern that contains ``\s``.
+    grep_basic_quote_pattern = re.compile(
+        r"grep[^\n]*?['\"]([^'\"]*\\s[^'\"]*)['\"]",
+    )
+    hits = grep_basic_quote_pattern.findall(script_text)
+    assert not hits, (
+        "scripts/check-compose-default.sh still relies on the GNU grep "
+        r"\s extension; replace with POSIX [[:space:]] to stay portable "
+        f"across BSD / POSIX-only hosts. Hits: {hits}"
+    )
+
+    compose_with_commented_no_sandbox = (
+        "services:\n"
+        "  sevn-gateway:\n"
+        "    image: example\n"
+        # Leading-whitespace comment containing the token — the kind of
+        # comment a previous regex with \s would mishandle.
+        "    # --no-sandbox is forbidden; we run with the renderer sandbox on\n"
+        "# --no-sandbox in plain comment form\n"
+        "    environment:\n"
+        "      - SEVN_GATEWAY_TOKEN=placeholder-token-32chars\n"
+    )
+    fixture = tmp_path / "docker-compose.comment-only.yml"
+    fixture.write_text(compose_with_commented_no_sandbox, encoding="utf-8")
+
+    # Extract just the function definition from the script body so we can
+    # invoke it without the rest of the script (docker check, version
+    # comparison, etc.) firing. We grab the heredoc-safe region between the
+    # ``_check_no_sandbox_in_compose()`` opening and the closing brace of
+    # the function.
+    start = script_text.index("_check_no_sandbox_in_compose() {")
+    end = script_text.index("}\n", start) + 1
+    function_body = script_text[start:end]
+
+    runner = tmp_path / "run.sh"
+    runner.write_text(
+        "set -e\n" + function_body + '\n_check_no_sandbox_in_compose "$1"\n',
+        encoding="utf-8",
+    )
+    runner.chmod(0o755)
+
+    # PATH=/usr/bin:/bin forces the host's bare ``/usr/bin`` + ``/bin``
+    # greps, which on macOS is BSD grep and on minimal Linux containers is
+    # whatever POSIX grep happens to be present. The static guard above is
+    # what catches a regression on a strict-POSIX host; the runtime pass
+    # below catches any logic bug in the comment-stripping helper itself.
+    proc = subprocess.run(  # nosec B603
+        ["/bin/bash", str(runner), str(fixture)],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)},
+    )
+    assert proc.returncode == 0, (
+        "_check_no_sandbox_in_compose rejected a comment-only --no-sandbox "
+        "line. The comment-stripping regex must use a POSIX-portable "
+        "whitespace class (e.g. [[:space:]]) so strict-BSD / POSIX-only "
+        "greps handle it. "
+        f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
+    )
+
+
+def test_check_no_sandbox_in_compose_rejects_active_token(tmp_path: Path) -> None:
+    """D-PR-4 complement: an active (non-comment) ``--no-sandbox`` must still be rejected.
+
+    The POSIX-portable regex must not weaken the active-token detection:
+    a YAML whose ``--no-sandbox`` is *not* in a comment line must still
+    fail the preflight under the same POSIX PATH.
+    """
+    compose_with_active_no_sandbox = (
+        "services:\n"
+        "  sevn-gateway:\n"
+        "    image: example\n"
+        "    environment:\n"
+        '      - "SEVN_BROWSER_EXTRA_ARGS=--no-sandbox"\n'
+    )
+    fixture = tmp_path / "docker-compose.active.yml"
+    fixture.write_text(compose_with_active_no_sandbox, encoding="utf-8")
+
+    script_text = _CHECK_COMPOSE.read_text(encoding="utf-8")
+    start = script_text.index("_check_no_sandbox_in_compose() {")
+    end = script_text.index("}\n", start) + 1
+    function_body = script_text[start:end]
+
+    runner = tmp_path / "run.sh"
+    runner.write_text(
+        "set -e\n" + function_body + '\n_check_no_sandbox_in_compose "$1"\n',
+        encoding="utf-8",
+    )
+    runner.chmod(0o755)
+
+    proc = subprocess.run(  # nosec B603
+        ["/bin/bash", str(runner), str(fixture)],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        env={"PATH": "/usr/bin:/bin", "HOME": str(tmp_path)},
+    )
+    assert proc.returncode != 0, (
+        "_check_no_sandbox_in_compose accepted an active --no-sandbox token; "
+        "the POSIX regex rewrite must preserve the rejection semantics. "
+        f"stdout={proc.stdout!r} stderr={proc.stderr!r}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # W13.4 — C8.4: site-isolation decision recorded
 # ---------------------------------------------------------------------------
