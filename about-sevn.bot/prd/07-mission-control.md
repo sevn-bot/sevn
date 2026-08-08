@@ -7,7 +7,7 @@ owner: Alex
 summary: Operator dashboard for traces, spend, provider health, and in-flight runs—so
   a capable self-hosted bot stays livable instead of flying blind after each turn.
 last_updated: '2026-08-08'
-fingerprint: sha256:7a5a7f26fc29fd5f00f8f6c7f62f3097bf7c7090fb053bfdc44835dfc5c790e0
+fingerprint: sha256:d954bce49e6d17a4425f9bb36a836f4571173aa4bf348b1dbfde79a0cad483db
 related:
 - prd-05-cost-and-providers
 sources:
