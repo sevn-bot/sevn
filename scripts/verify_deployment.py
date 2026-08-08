@@ -328,12 +328,28 @@ def _verify_image_overlay_path() -> Path | None:
     return path if path.is_file() else None
 
 
-def _compose_base(project: str, files: tuple[str, ...]) -> list[str]:
+def _compose_base(
+    project: str,
+    files: tuple[str, ...],
+    *,
+    include_digest_overlay: bool = True,
+) -> list[str]:
     """Build a ``docker compose`` argv with the digest overlay appended when opted in.
 
     Args:
         project (str): Compose project name (keeps driver stacks isolated).
         files (tuple[str, ...]): Compose files in merge order (base first).
+        include_digest_overlay (bool): When ``True`` (default) and
+            ``SEVN_VERIFY_IMAGE_OVERLAY=1`` is set, append the SHA-pinned
+            ``docker-compose.verify-digests.yml`` overlay so the stack
+            runs the published container images. Browser/GUI overlays
+            rely on their own ``build: dockerfile: Dockerfile.gateway.browser``
+            / ``gui`` block to swap the gateway image; layering the
+            digest overlay on top would re-pin ``sevn-gateway.image`` to
+            the base ``gateway:<sha>`` and the C14.2 release evidence
+            would claim a browser/GUI boot that never ran the published
+            variant. Those drivers pass ``include_digest_overlay=False``
+            so they exercise the browser/GUI Dockerfile swap end-to-end.
 
     Returns:
         list[str]: ``docker compose -p <project> -f <a> -f <b> [-f <digest>]``.
@@ -345,9 +361,10 @@ def _compose_base(project: str, files: tuple[str, ...]) -> list[str]:
     argv = ["docker", "compose", "-p", project]
     for path in files:
         argv.extend(["-f", path])
-    overlay = _verify_image_overlay_path()
-    if overlay is not None:
-        argv.extend(["-f", str(overlay)])
+    if include_digest_overlay:
+        overlay = _verify_image_overlay_path()
+        if overlay is not None:
+            argv.extend(["-f", str(overlay)])
     return argv
 
 
@@ -1603,7 +1620,15 @@ def drive_browser_gui_boot() -> DriverResult:
         overlay_env["SEVN_PROXY_SHARED_SECRET"] = browser_secret
         overlay_env["SEVN_GATEWAY_TOKEN"] = browser_gateway_token
         overlay_env["COMPOSE_PROJECT_NAME"] = project
-        base = _compose_base(project, (OPERATOR_COMPOSE, overlay))
+        # Browser/GUI overlays flip ``sevn-gateway`` to
+        # ``Dockerfile.gateway.browser`` / ``gui`` via their own
+        # ``build:`` block; layering the SHA-pinned digest overlay would
+        # re-pin ``sevn-gateway.image`` to the base ``gateway:<sha>`` and
+        # the C14.2 release evidence would claim a browser/GUI boot that
+        # never ran the published variant. F-PR-4 / mergecraft review
+        # 3740249080: boot the overlay as-authored so the C14.2 driver
+        # actually exercises the browser/GUI Dockerfile swap end-to-end.
+        base = _compose_base(project, (OPERATOR_COMPOSE, overlay), include_digest_overlay=False)
         try:
             up_code, up_out = _run(_compose_up_args(base), env=overlay_env, timeout=boot_timeout)
             result.checks.append(
