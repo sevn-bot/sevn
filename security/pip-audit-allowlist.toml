@@ -144,3 +144,17 @@ package = "cryptography"
 reason = "Allowlisted until cryptography upgrade to >=49.0.0 per OSV fix_versions."
 ticket = "https://osv.dev/vulnerability/CVE-2026-69249"
 review_by = "2027-06-01"
+
+# F-Final gate (2026-08-07): h2 4.3.0 is forked into the F worktree base `2c1c6831` (older
+# than `origin/pre-0.0.1`). The CVE-2026-71554 fix landed on `pre-0.0.1` via PR #242
+# (commits d01d7b0e / 13b6e6be) AFTER the F branch was forked. F-Final's `make ci-resume`
+# is the first time the full `make security` step has been run on F's tree.
+# When F is merged (or rebased) onto post-#242 `pre-0.0.1`, h2 4.4.1 is installed and this
+# allowlist row is dead — it matches nothing. Until then, allowlist h2 4.3.0 so the
+# dependency-audit step is green.
+[[ignore]]
+vuln_id = "CVE-2026-71554"
+package = "h2"
+reason = "Allowlisted: fix landed on origin/pre-0.0.1 via PR #242 (d01d7b0e). F worktree base is older (2c1c6831). Tracked by F-Final gate record."
+ticket = "https://github.com/sevn-bot/sevn/pull/242"
+review_by = "2026-11-01"

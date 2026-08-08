@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: MIT
+# Verify-only overlay for the **GUI** gateway variant.
+#
+# Same role as ``docker-compose.verify-digests.yml``, but pins
+# ``sevn-gateway`` to the SHA-tagged ``gateway.gui`` image promoted by
+# ``container-supply-chain`` (D45) rather than the base ``gateway`` image.
+#
+# The ``browser-gui-boot`` driver layers this on top of
+# ``docker-compose.gui.yml``. The GUI overlay swaps the gateway's
+# ``build.dockerfile`` to ``Dockerfile.gateway.gui``; pinning the *base*
+# gateway image on top of it would boot the base gateway under ``--no-build``
+# while the ``gateway-dockerfile`` check (which reads ``build.dockerfile`` from
+# the merged config) still passed — release evidence claiming a GUI boot that
+# never ran the published GUI image (mergecraft review 3741260241).
+
+services:
+  sevn-proxy:
+    image: ghcr.io/${IMAGE_REPOSITORY}/proxy:${SEVN_VERIFY_IMAGE_TAG}
+  sevn-gateway:
+    image: ghcr.io/${IMAGE_REPOSITORY}/gateway.gui:${SEVN_VERIFY_IMAGE_TAG}

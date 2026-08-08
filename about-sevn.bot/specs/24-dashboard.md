@@ -675,6 +675,9 @@ interfaces:
 - name: local_open_effective
   file: src/sevn/ui/dashboard/services/auth.py
   symbol: local_open_effective
+- name: log_local_open_trust_address_boot_warning
+  file: src/sevn/ui/dashboard/services/auth.py
+  symbol: log_local_open_trust_address_boot_warning
 - name: sevn_json_path_from_request
   file: src/sevn/ui/dashboard/services/auth.py
   symbol: sevn_json_path_from_request

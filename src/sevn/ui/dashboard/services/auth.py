@@ -12,7 +12,8 @@ Exports:
     is_loopback_client_host — loopback client address check.
     local_open_effective — loopback no-login bypass gate.
     synthetic_owner_claims — owner claims without a JWT.
-    apply_tunnel_local_open_policy — lifespan tunnel safety for ``local_open``.
+    apply_tunnel_local_open_policy — lifespan tunnel safety for ``local_open`` + trust-address.
+    log_local_open_trust_address_boot_warning — loud boot warning for the trust-address escape.
     sevn_json_path_from_request — bound ``sevn.json`` path from a dashboard request.
 """
 
@@ -324,7 +325,11 @@ def synthetic_owner_claims(workspace: WorkspaceConfig) -> DashboardClaims:
 
 
 def apply_tunnel_local_open_policy(workspace: WorkspaceConfig) -> None:
-    """Force ``dashboard.local_open`` off when unsafe exposure is configured.
+    """Force ``local_open`` and ``local_open_trust_address`` off under unsafe exposure.
+
+    When a tunnel is active or ``gateway.host`` is not loopback-only, both the
+    normal local-open gate and the trust-address escape hatch are forced off.
+    The escape hatch is not an exception to tunnel / reverse-proxy refusal.
 
     Args:
         workspace (WorkspaceConfig): Parsed workspace config (mutated in place).
@@ -335,11 +340,17 @@ def apply_tunnel_local_open_policy(workspace: WorkspaceConfig) -> None:
     Examples:
         >>> from sevn.config.workspace_config import DashboardWorkspaceConfig
         >>> ws = WorkspaceConfig.minimal(
-        ...     dashboard=DashboardWorkspaceConfig(enabled=True, local_open=True),
+        ...     dashboard=DashboardWorkspaceConfig(
+        ...         enabled=True,
+        ...         local_open=True,
+        ...         local_open_trust_address=True,
+        ...     ),
         ...     infrastructure={"tunnel": {"mode": "cloudflare"}},
         ... )
         >>> apply_tunnel_local_open_policy(ws)
         >>> ws.dashboard is not None and ws.dashboard.local_open is False
+        True
+        >>> ws.dashboard.local_open_trust_address is False
         True
     """
 
@@ -347,28 +358,76 @@ def apply_tunnel_local_open_policy(workspace: WorkspaceConfig) -> None:
         section = _dashboard_section(workspace)
         if section is None:
             return
-        if getattr(section, "local_open", None) is True:
-            from loguru import logger
+        from loguru import logger
 
+        if getattr(section, "local_open", None) is True:
             logger.warning(
                 "dashboard.local_open=true ignored because infrastructure.tunnel.mode is active; "
                 "forcing dashboard.local_open=false",
             )
+        if bool(getattr(section, "local_open_trust_address", False)):
+            logger.warning(
+                "dashboard.local_open_trust_address=true ignored because "
+                "infrastructure.tunnel.mode is active; "
+                "forcing dashboard.local_open_trust_address=false",
+            )
         section.local_open = False
+        section.local_open_trust_address = False
         return
 
     if not _gateway_bind_loopback(workspace):
         section = _dashboard_section(workspace)
         if section is None:
             return
-        if getattr(section, "local_open", None) is True:
-            from loguru import logger
+        from loguru import logger
 
+        if getattr(section, "local_open", None) is True:
             logger.warning(
                 "dashboard.local_open=true ignored because gateway.host is not loopback-only; "
                 "forcing dashboard.local_open=false",
             )
+        if bool(getattr(section, "local_open_trust_address", False)):
+            logger.warning(
+                "dashboard.local_open_trust_address=true ignored because "
+                "gateway.host is not loopback-only; "
+                "forcing dashboard.local_open_trust_address=false",
+            )
         section.local_open = False
+        section.local_open_trust_address = False
+
+
+def log_local_open_trust_address_boot_warning(workspace: WorkspaceConfig) -> None:
+    """Log a loud warning when the trust-address escape hatch is enabled at boot.
+
+    Mirrors ``log_proxy_allow_unauthenticated_boot_warning``: noop when the key
+    is off; WARNING when ``dashboard.local_open_trust_address`` is true after
+    tunnel / bind policy has been applied.
+
+    Args:
+        workspace (WorkspaceConfig): Parsed workspace config (post-policy).
+
+    Returns:
+        None: Logs only.
+
+    Examples:
+        >>> from sevn.config.workspace_config import DashboardWorkspaceConfig
+        >>> log_local_open_trust_address_boot_warning(
+        ...     WorkspaceConfig.minimal(
+        ...         dashboard=DashboardWorkspaceConfig(local_open_trust_address=False),
+        ...     ),
+        ... )
+    """
+
+    section = _dashboard_section(workspace)
+    if section is None or not bool(getattr(section, "local_open_trust_address", False)):
+        return
+    from loguru import logger
+
+    logger.warning(
+        "dashboard.local_open_trust_address=true: Mission Control trusts direct "
+        "loopback by client address without a boot token — dangerous escape hatch; "
+        "refused when a tunnel or non-loopback gateway.host is configured",
+    )
 
 
 def _dashboard_section(workspace: WorkspaceConfig) -> DashboardWorkspaceConfig | None:
