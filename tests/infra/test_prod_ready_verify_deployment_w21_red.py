@@ -455,7 +455,19 @@ def test_volume_upgrade_driver_probes_via_live_stack(
 def test_browser_gui_boot_driver_probes_via_live_stack(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """F-THERMOS-4 - driver must probe browser + gui overlay config resolution."""
+    """F-THERMOS-4 / F-PR-4 - driver must boot each overlay and probe readiness.
+
+    The pre-F-PR-4 shape only ran ``docker compose config`` (which never
+    pulls/builds/starts anything) and asserted the resolved dockerfile
+    name; a broken published browser/gui image would still pass. F-PR-4
+    extended the driver so each overlay is actually booted under a
+    private compose project, the gateway's ``/ready`` (or ``/health``)
+    endpoint is polled, and the stack is torn down — mirroring the
+    working Brave smoke from PR #243 (W13.4b). This test pins the
+    topology: the driver's source must call ``docker compose up`` /
+    ``docker compose down`` *and* probe ``/ready`` / ``/health`` for
+    each overlay.
+    """
     module = _healthy_driver_run(monkeypatch, _load_verify_module())
 
     # ``docker compose config --format json`` must yield parseable JSON whose
@@ -464,6 +476,8 @@ def test_browser_gui_boot_driver_probes_via_live_stack(
     # echo a minimal valid config back so ``json.loads`` and the dockerfile
     # check succeed.
     dockerfile_re = re.compile(r"docker-compose\.(browser|gui)\.yml")
+    up_calls: list[str] = []
+    down_calls: list[str] = []
 
     def config_run(argv, *args, **kwargs):  # type: ignore[no-untyped-def]
         joined = " ".join(str(a) for a in argv)
@@ -473,9 +487,23 @@ def test_browser_gui_boot_driver_probes_via_live_stack(
             if match and match.group(1) == "browser"
             else "Dockerfile.gateway.gui"
         )
-        return 0, json.dumps(
-            {"services": {"sevn-gateway": {"build": {"dockerfile": dockerfile, "context": "."}}}}
-        )
+        if "config" in argv and "--format" in argv:
+            return 0, json.dumps(
+                {
+                    "services": {
+                        "sevn-gateway": {"build": {"dockerfile": dockerfile, "context": "."}}
+                    }
+                }
+            )
+        # F-PR-4: record up / down calls so the assertions below can
+        # confirm each overlay was actually booted and torn down.
+        if "up" in argv:
+            up_calls.append(joined)
+            return 0, "creating sevn-gateway ... done"
+        if "down" in argv:
+            down_calls.append(joined)
+            return 0, "removing sevn-gateway ... done"
+        return 0, "stack ready"
 
     monkeypatch.setattr(module, "_run", config_run)
     result = module.drive_browser_gui_boot()
@@ -485,6 +513,21 @@ def test_browser_gui_boot_driver_probes_via_live_stack(
     assert any(name.startswith(("browser-override/", "gui-override/")) for name in check_names), (
         "browser-gui-boot must emit browser-override/* / gui-override/* checks; "
         f"got {check_names!r}"
+    )
+    assert any("ready" in name or "health" in name for name in check_names), (
+        "browser-gui-boot must probe gateway /ready (or /health) per overlay "
+        "to prove the published browser/gui image actually boots "
+        "(F-PR-4 / mergecraft review 3740249073); "
+        f"got check names {check_names!r}"
+    )
+    assert len(up_calls) >= 2, (
+        "browser-gui-boot must boot BOTH the browser AND gui overlays "
+        "(F-PR-4 / mergecraft review 3740249073) — `docker compose up` "
+        f"was called {len(up_calls)} times; got up_calls={up_calls!r}"
+    )
+    assert len(down_calls) >= 2, (
+        "browser-gui-boot must tear down BOTH overlays after probing readiness "
+        f"(F-PR-4); got down_calls={down_calls!r}"
     )
 
 

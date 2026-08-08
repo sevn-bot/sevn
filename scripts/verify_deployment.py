@@ -1464,16 +1464,37 @@ def drive_volume_upgrade() -> DriverResult:
 
 
 def drive_browser_gui_boot() -> DriverResult:
-    """Resolve the browser and GUI compose overlays and assert the gateway image flips.
+    """Boot each browser/GUI compose overlay and probe gateway readiness.
 
     ``docker/docker-compose.browser.yml`` and ``docker/docker-compose.gui.yml``
-    redefine ``sevn-gateway``; the resolved config must use the multi-arch
-    ``Dockerfile.gateway.browser`` / ``Dockerfile.gateway.gui`` image and
-    inherit base resource limits through Compose merge semantics. C10.3
-    requires limits wherever the resolved config is missing them.
+    redefine ``sevn-gateway``; F-PR-4 (mergecraft review 3740249073) closed
+    the gap where the driver only inspected the resolved compose config
+    (``docker compose config``) without ever pulling, starting, or
+    health-checking the published image. The pre-fix shape returned
+    green without proving the browser/gui images actually boot, which
+    meant a broken published image would slip through the release
+    evidence gate.
+
+    The new shape, mirroring the working Brave smoke from PR #243 (W13.4b):
+
+    1. Resolve each overlay's compose config and assert the gateway
+       service flips to ``Dockerfile.gateway.browser`` /
+       ``Dockerfile.gateway.gui`` (the previous behaviour).
+    2. Bring the stack up under a private compose project (``up``,
+       not ``config``), with the gateway published at
+       ``${SEVN_GATEWAY_BIND:-127.0.0.1}:${SEVN_GATEWAY_PORT:-3101}``.
+       A separate project name per overlay keeps the two boots from
+       colliding on the operator network.
+    3. Poll the gateway's ``/ready`` endpoint until it returns 200
+       (or fall back to ``/health`` if the proxy dependency has not
+       booted yet) — a passing probe proves the published browser/gui
+       image actually boots and accepts traffic.
+    4. Tear the stack down (``down -v --remove-orphans``) regardless
+       of the probe outcome (a ``finally:`` mirrors the
+       cancellation-cleanup pattern from F-THERMOS-5).
 
     Returns:
-        DriverResult: Verdict plus image-and-limits resolution checks.
+        DriverResult: Verdict plus per-overlay config, up, readiness, and down checks.
 
     Examples:
         >>> drive_browser_gui_boot().name
@@ -1495,8 +1516,24 @@ def drive_browser_gui_boot() -> DriverResult:
         ("browser-override", BROWSER_COMPOSE, "Dockerfile.gateway.browser"),
         ("gui-override", GUI_COMPOSE, "Dockerfile.gateway.gui"),
     )
+    base_project = os.environ.get("SEVN_VERIFY_PROJECT", "sevn-verify")
+    boot_timeout = float(os.environ.get("SEVN_VERIFY_STACK_TIMEOUT_S", "1500"))
+    ready_timeout = float(os.environ.get("SEVN_VERIFY_READY_TIMEOUT_S", "180"))
+    browser_gateway_port = os.environ.get("SEVN_VERIFY_BROWSER_GATEWAY_PORT", "3101")
+    browser_secret = os.environ.get(
+        "SEVN_VERIFY_PROXY_SHARED_SECRET",
+        "verify-browser-gui-boot-32chars-minimum-length",
+    )
+    browser_gateway_token = os.environ.get(
+        "SEVN_VERIFY_GATEWAY_TOKEN",
+        "verify-browser-gui-boot-gateway-token-32chars-min",
+    )
     for label, overlay, expected_dockerfile in expected:
-        argv = [
+        # Each overlay gets its own compose project so a browser boot
+        # cannot collide with a gui boot on the operator network.
+        project = f"{base_project}-{label}"
+
+        config_argv = [
             "docker",
             "compose",
             "-f",
@@ -1509,14 +1546,14 @@ def drive_browser_gui_boot() -> DriverResult:
         ]
         env = dict(os.environ)
         env.pop("COMPOSE_PROFILES", None)
-        code, out = _run(argv, env=env, timeout=180.0)
+        code, out = _run(config_argv, env=env, timeout=180.0)
         if code != 0:
             result.checks.append(
                 Check(
                     name=f"{label}/config-resolves",
                     status=STATUS_FAIL,
                     detail=f"docker compose config refused {overlay}",
-                    command=" ".join(argv),
+                    command=" ".join(config_argv),
                     output=out.strip()[:800],
                 )
             )
@@ -1529,7 +1566,7 @@ def drive_browser_gui_boot() -> DriverResult:
                     name=f"{label}/config-parses",
                     status=STATUS_FAIL,
                     detail=f"compose config is not JSON: {exc}",
-                    command=" ".join(argv),
+                    command=" ".join(config_argv),
                     output=out.strip()[:800],
                 )
             )
@@ -1546,7 +1583,7 @@ def drive_browser_gui_boot() -> DriverResult:
                     if dockerfile
                     else f"sevn-gateway has no build section; expected {expected_dockerfile}"
                 ),
-                command=" ".join(argv),
+                command=" ".join(config_argv),
             )
         )
         if not match:
@@ -1554,6 +1591,82 @@ def drive_browser_gui_boot() -> DriverResult:
             result.reason = (
                 f"{overlay} did not flip sevn-gateway to {expected_dockerfile} "
                 f"(resolved: {dockerfile!r})"
+            )
+            continue
+
+        # F-PR-4: actually boot the overlay and probe readiness. Each
+        # overlay gets its own env so the gateway port / secrets do
+        # not collide with concurrent driver runs.
+        overlay_env = dict(env)
+        overlay_env["SEVN_GATEWAY_PORT"] = browser_gateway_port
+        overlay_env["SEVN_GATEWAY_BIND"] = "127.0.0.1"
+        overlay_env["SEVN_PROXY_SHARED_SECRET"] = browser_secret
+        overlay_env["SEVN_GATEWAY_TOKEN"] = browser_gateway_token
+        overlay_env["COMPOSE_PROJECT_NAME"] = project
+        base = _compose_base(project, (OPERATOR_COMPOSE, overlay))
+        try:
+            up_code, up_out = _run(_compose_up_args(base), env=overlay_env, timeout=boot_timeout)
+            result.checks.append(
+                Check(
+                    name=f"{label}/stack-up",
+                    status=STATUS_PASS if up_code == 0 else STATUS_FAIL,
+                    detail=f"docker compose up exited {up_code}",
+                    command=" ".join(_compose_up_args(base)),
+                    output=up_out.strip()[-4000:],
+                )
+            )
+            if up_code != 0:
+                result.status = STATUS_FAIL
+                result.reason = f"{overlay} failed to boot (exit {up_code})"
+                continue
+
+            ready_deadline = time.monotonic() + ready_timeout
+            ready_ok = False
+            last_status, last_body = 0, "not probed"
+            probe_urls = (
+                f"http://127.0.0.1:{browser_gateway_port}/ready",
+                f"http://127.0.0.1:{browser_gateway_port}/health",
+            )
+            while time.monotonic() < ready_deadline:
+                for probe_url in probe_urls:
+                    last_status, last_body = _http_probe(probe_url)
+                    if 200 <= last_status < 300:
+                        ready_ok = True
+                        break
+                if ready_ok:
+                    break
+                time.sleep(3.0)
+            result.checks.append(
+                Check(
+                    name=f"{label}/gateway-ready",
+                    status=STATUS_PASS if ready_ok else STATUS_FAIL,
+                    detail=(
+                        f"HTTP {last_status} from gateway /ready (or /health) "
+                        f"on port {browser_gateway_port}"
+                    ),
+                    command=f"GET http://127.0.0.1:{browser_gateway_port}/ready",
+                    output=last_body[:600],
+                )
+            )
+            if not ready_ok:
+                result.status = STATUS_FAIL
+                result.reason = (
+                    f"{overlay} booted but gateway did not answer /ready "
+                    f"within {ready_timeout:.0f}s — published browser/gui "
+                    "image may be broken (F-PR-4)"
+                )
+        finally:
+            down_code, down_out = _run(
+                [*base, "down", "-v", "--remove-orphans"], env=overlay_env, timeout=600.0
+            )
+            result.checks.append(
+                Check(
+                    name=f"{label}/stack-down",
+                    status=STATUS_PASS if down_code == 0 else STATUS_FAIL,
+                    detail=f"docker compose down exited {down_code}",
+                    command=" ".join([*base, "down", "-v", "--remove-orphans"]),
+                    output=down_out.strip()[-4000:],
+                )
             )
 
     if any(c.status == STATUS_FAIL for c in result.checks):
