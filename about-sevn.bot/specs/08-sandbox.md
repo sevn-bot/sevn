@@ -7,8 +7,8 @@ owner: Alex
 summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / safebash
   (when routed through the execution sandbox), process when configured for sandbox
   routing, and skill subprocesses spawned b
-last_updated: '2026-08-06'
-fingerprint: sha256:8fcad4b0e8f8f640e49e7b936c3b58fb5d91e3ab3ab0cf18cb0a1f4cdde484fa
+last_updated: '2026-08-08'
+fingerprint: sha256:783333918cd16452cd43ce4cbaeca92aee59691aaa0eb4308ede9033d5382809
 related: []
 sources:
 - src/sevn/security/**
@@ -537,6 +537,16 @@ a build-arg. **Failure mode when the stamp is missing:** spawn /
 path-prefix API, not a CONNECT forward proxy (D13). ``SEVN_SESSION_TOKEN`` carries
 a scoped per-run ``X-Sevn-Session-Token`` minted at spawn (``mint_session_token``,
 ``sandbox`` scope); see spec-07 W6 amendment for validation semantics.
+
+## Amendments (prod-readiness-0.0.1 W19 — C7.1, C7.2)
+
+Spawn mints a **run-bound, container-bound** session token (``run_id`` + opaque
+``container_id`` spawn-bind id) and places it in ``SEVN_SESSION_TOKEN`` only —
+the §2.2 three-key child-env contract is unchanged and still excludes the service
+shared secret. The bind id is chosen before ``docker run`` returns; clients present
+``X-Sevn-Run-Id`` / ``X-Sevn-Container-Id`` derived from the token. A sandbox that
+somehow obtains the service secret still cannot use it on ``/web/*`` or
+``/integration`` (spec-07 W19 / D51).
 
 ## Human-input needed
 

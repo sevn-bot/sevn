@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Own the Layer-3 tool callables and Layer-2 framework adapters that every
   executor tier uses: one implementation per tool name, registered in a session-scoped
   ToolSet, exposed to LLM frameworks without'
-last_updated: '2026-08-06'
-fingerprint: sha256:d06055f945ba89464deb6891ce073ea1d3e2c0479e89fffe8a3caa59978bd10f
+last_updated: '2026-08-08'
+fingerprint: sha256:0fffbeb2b2b433135aff9a429a2525b04c3234f7b9f642e1bac5c10654f3968a
 related: []
 sources:
 - src/sevn/tools/**
@@ -551,6 +551,9 @@ interfaces:
 - name: validate_json_schema_subset
   file: src/sevn/tools/validation.py
   symbol: validate_json_schema_subset
+- name: ProxySessionTokenRequiredError
+  file: src/sevn/tools/web.py
+  symbol: ProxySessionTokenRequiredError
 - name: ProxySharedSecretUnconfiguredError
   file: src/sevn/tools/web.py
   symbol: ProxySharedSecretUnconfiguredError

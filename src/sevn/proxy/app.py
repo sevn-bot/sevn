@@ -65,6 +65,13 @@ from sevn.proxy.forward import post_json, post_sse_stream
 from sevn.proxy.http_client import create_proxy_http_client
 from sevn.proxy.integration.router import integration_post
 from sevn.proxy.oauth_lifecycle import OauthCredentialMissingError
+from sevn.proxy.session_limits import (
+    BudgetExceeded,
+    DestinationNotAllowed,
+    consume_response_bytes,
+    consume_run_budget,
+    destination_allowed,
+)
 from sevn.proxy.settings import ProxySettings
 from sevn.proxy.web_forward import brave_search_json, web_fetch_json
 from sevn.security.secrets.cache import ResolvedSecretsCache
@@ -72,6 +79,138 @@ from sevn.security.secrets.factory import secrets_chain_from_workspace
 
 _CODEX_TRUNCATED_RETRY_BACKOFF_S = 0.25
 _CODEX_TRUNCATED_MAX_ATTEMPTS = 2
+
+
+def _enforce_session_egress_limits(
+    request: Request,
+    *,
+    settings: ProxySettings,
+    destination: str,
+    request_bytes: int,
+) -> JSONResponse | None:
+    """Apply allowlist + per-run budgets for session-token callers (C7.3).
+
+    Args:
+        request (Request): ASGI request (session token header).
+        settings (ProxySettings): Proxy settings with signing secret.
+        destination (str): Outbound URL for allowlist check.
+        request_bytes (int): Body size attributed to the request.
+
+    Returns:
+        JSONResponse | None: Error response when limited; ``None`` when ok.
+
+    Examples:
+        >>> _enforce_session_egress_limits.__name__
+        '_enforce_session_egress_limits'
+    """
+    session = (request.headers.get("x-sevn-session-token") or "").strip()
+    secret = (settings.proxy_shared_secret or "").strip()
+    if not session or not secret:
+        return None
+    try:
+        destination_allowed(session, signing_key=secret, destination=destination)
+    except DestinationNotAllowed as exc:
+        return JSONResponse({"detail": str(exc)}, status_code=403)
+    except ValueError:
+        return None
+    try:
+        consume_run_budget(session, signing_key=secret, request_bytes=request_bytes)
+    except BudgetExceeded as exc:
+        return JSONResponse({"detail": str(exc)}, status_code=429)
+    except ValueError:
+        return None
+    return None
+
+
+def _charge_session_response_bytes(
+    request: Request,
+    *,
+    settings: ProxySettings,
+    response_bytes: int,
+) -> JSONResponse | None:
+    """Charge response bytes against the session-token byte budget (post-flight).
+
+    The byte budget is enforced against the volume the proxy actually returns
+    to the caller (the egress payload), not the request body. A successful
+    request still drains the budget for the bytes it returned; an exhausted
+    budget surfaces as a ``429`` to the caller so a single over-egress call
+    cannot bypass the cap.
+
+    Args:
+        request (Request): ASGI request (session token header).
+        settings (ProxySettings): Proxy settings with signing secret.
+        response_bytes (int): Byte size attributed to the response payload.
+
+    Returns:
+        JSONResponse | None: ``429`` when budget exceeded; ``None`` when ok.
+
+    Examples:
+        >>> _charge_session_response_bytes.__name__
+        '_charge_session_response_bytes'
+    """
+    session = (request.headers.get("x-sevn-session-token") or "").strip()
+    secret = (settings.proxy_shared_secret or "").strip()
+    if not session or not secret or response_bytes <= 0:
+        return None
+    try:
+        consume_response_bytes(
+            session,
+            signing_key=secret,
+            response_bytes=response_bytes,
+        )
+    except BudgetExceeded as exc:
+        return JSONResponse({"detail": str(exc)}, status_code=429)
+    except ValueError:
+        return None
+    return None
+
+
+def _build_redirect_allowlist_check(
+    request: Request,
+    *,
+    settings: ProxySettings,
+) -> Callable[[str], None] | None:
+    """Return a per-redirect allowlist enforcement closure for ``web_fetch_json``.
+
+    The returned callable is invoked from :func:`web_fetch_json` with each
+    redirect target URL; raising ``ValueError`` from it blocks the redirect.
+    When no session token is presented (gateway mint fallback or unauthenticated
+    dev), no allowlist is enforced on the redirect path either — the proxy
+    rejects session-token-scoped routes without a session token via
+    :func:`llm_post_auth_failure` upstream of this hook.
+
+    Args:
+        request (Request): ASGI request carrying the session token header.
+        settings (ProxySettings): Proxy settings with signing secret.
+
+    Returns:
+        Callable[[str], None] | None: Enforcement closure, or ``None`` when the
+        request has no session token (no redirect allowlist enforcement needed).
+
+    Examples:
+        >>> from unittest.mock import MagicMock
+        >>> build = _build_redirect_allowlist_check(MagicMock(), settings=ProxySettings())
+        >>> build is None
+        True
+    """
+    session = (request.headers.get("x-sevn-session-token") or "").strip()
+    secret = (settings.proxy_shared_secret or "").strip()
+    if not session or not secret:
+        return None
+
+    def _check(target_url: str) -> None:
+        """Raise ``ValueError`` when ``target_url`` is outside the token allowlist."""
+        try:
+            destination_allowed(session, signing_key=secret, destination=target_url)
+        except DestinationNotAllowed as exc:
+            # Surface the allowlist reason through ``ValueError`` so
+            # ``_request_upstream`` / ``_fetch_upstream_streaming`` raise the
+            # same exception shape used for SSRF validation failures
+            # (``_egress_block_status`` then maps this to a 403).
+            msg = f"redirect target not on session allowlist: {exc}"
+            raise ValueError(msg) from exc
+
+    return _check
 
 
 def _is_retryable_truncated_codex_stream(exc: BaseException) -> bool:
@@ -539,8 +678,38 @@ def create_app(
         raw_body = await request.json()
         if not isinstance(raw_body, dict):
             return JSONResponse({"detail": "expected JSON object body"}, status_code=422)
+        dest = str(raw_body.get("url") or "")
+        body_bytes = len(json.dumps(raw_body, separators=(",", ":")).encode())
+        limited = _enforce_session_egress_limits(
+            request,
+            settings=cfg,
+            destination=dest,
+            request_bytes=body_bytes,
+        )
+        if limited is not None:
+            return limited
         http_client = getattr(request.app.state, "http_client", None)
-        status, payload = await web_fetch_json(raw_body, settings=cfg, client=http_client)
+        redirect_check = _build_redirect_allowlist_check(request, settings=cfg)
+        status, payload = await web_fetch_json(
+            raw_body,
+            settings=cfg,
+            client=http_client,
+            allow_redirect_to=redirect_check,
+        )
+        # Post-flight: charge the bytes the proxy actually pulled back from the
+        # upstream server (the ``text`` field is the egress payload the sandbox
+        # requested). When the budget is exhausted at this seam, return 429 so
+        # the caller knows the byte cap fired rather than receiving a 200 with
+        # truncated content.
+        response_text = payload.get("text") if isinstance(payload, dict) else None
+        response_bytes = len(response_text.encode("utf-8")) if isinstance(response_text, str) else 0
+        over_budget = _charge_session_response_bytes(
+            request,
+            settings=cfg,
+            response_bytes=response_bytes,
+        )
+        if over_budget is not None:
+            return over_budget
         return JSONResponse(payload, status_code=status)
 
     async def web_brave_search(request: Request) -> Response:

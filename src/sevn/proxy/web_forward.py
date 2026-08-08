@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import ipaddress
 import socket
+from collections.abc import Callable
 from typing import Any, Final
 from urllib.parse import urljoin, urlparse
 
@@ -476,6 +477,7 @@ async def _fetch_upstream_streaming(
     max_chars: int | None,
     client: httpx.AsyncClient,
     request_timeout: httpx.Timeout | None = None,
+    allow_redirect_to: Callable[[str], None] | None = None,
 ) -> tuple[int, str, str, bool, dict[str, str]]:
     """Stream a GET response until character cap or EOF.
 
@@ -485,6 +487,8 @@ async def _fetch_upstream_streaming(
         max_chars (int | None): Character cap; ``None`` uses ``MAX_HTML_FETCH_CHARS``.
         client (httpx.AsyncClient): Shared or short-lived httpx client.
         request_timeout (httpx.Timeout | None): Per-request timeout override for large pages.
+        allow_redirect_to (Callable[[str], None] | None): Per-redirect allowlist
+            enforcement closure; raising ``ValueError`` blocks the redirect.
 
     Returns:
         tuple[int, str, str, bool, dict[str, str]]: ``(status_code, content_type, text,
@@ -528,6 +532,12 @@ async def _fetch_upstream_streaming(
             if redirect_target is not None:
                 if redirect_count >= _MAX_FETCH_REDIRECTS:
                     raise ValueError("redirect limit exceeded")
+                if allow_redirect_to is not None:
+                    # Re-check the redirect target against the session token
+                    # allowlist before following (PR #245 Codex finding 4).
+                    # An allowed host can otherwise redirect to an unlisted
+                    # host and bypass the per-run allowlist.
+                    allow_redirect_to(redirect_target)
                 current_url = redirect_target
                 redirect_count += 1
                 continue
@@ -590,6 +600,7 @@ async def _request_upstream(
     headers: dict[str, str],
     content: str | None,
     request_timeout: httpx.Timeout,
+    allow_redirect_to: Callable[[str], None] | None = None,
 ) -> httpx.Response:
     """Issue one pinned upstream request with bounded redirect re-validation.
 
@@ -600,6 +611,8 @@ async def _request_upstream(
         headers (dict[str, str]): Outbound request headers.
         content (str | None): Optional request body.
         request_timeout (httpx.Timeout): Per-request timeout budget.
+        allow_redirect_to (Callable[[str], None] | None): Per-redirect allowlist
+            enforcement closure; raising ``ValueError`` blocks the redirect.
 
     Returns:
         httpx.Response: Final upstream response after redirect handling.
@@ -633,6 +646,12 @@ async def _request_upstream(
             return response
         if redirect_count >= _MAX_FETCH_REDIRECTS:
             raise ValueError("redirect limit exceeded")
+        if allow_redirect_to is not None:
+            # Re-check the redirect target against the session token
+            # allowlist before following (PR #245 Codex finding 4).
+            # An allowed host can otherwise redirect to an unlisted
+            # host and bypass the per-run allowlist.
+            allow_redirect_to(redirect_target)
         current_url = redirect_target
         redirect_count += 1
 
@@ -705,6 +724,7 @@ async def web_fetch_json(
     *,
     settings: ProxySettings | None = None,
     client: httpx.AsyncClient | None = None,
+    allow_redirect_to: Callable[[str], None] | None = None,
 ) -> tuple[int, dict[str, Any]]:
     """Perform an outbound HTTP request and return ``(status_code, body)``.
 
@@ -715,6 +735,9 @@ async def web_fetch_json(
         settings (ProxySettings | None): Reserved for future egress policy hooks.
         client (httpx.AsyncClient | None): Shared lifespan client; when omitted a
             short-lived client is created for this call only.
+        allow_redirect_to (Callable[[str], None] | None): Per-redirect allowlist
+            enforcement closure threaded into ``_request_upstream`` /
+            ``_fetch_upstream_streaming`` so every redirect target is re-validated.
 
     Returns:
         tuple[int, dict[str, Any]]: Starlette status and JSON body.
@@ -793,6 +816,7 @@ async def web_fetch_json(
                 max_chars=cap,
                 client=http,
                 request_timeout=request_timeout,
+                allow_redirect_to=allow_redirect_to,
             )
             low_content = False
             if _needs_low_content_retry(status_code, text, resp_headers):
@@ -814,6 +838,7 @@ async def web_fetch_json(
                     max_chars=cap,
                     client=http,
                     request_timeout=request_timeout,
+                    allow_redirect_to=allow_redirect_to,
                 )
                 if _is_still_low_content(status_code, text):
                     low_content = True
@@ -836,6 +861,7 @@ async def web_fetch_json(
                 headers=range_headers,
                 content=content,
                 request_timeout=request_timeout,
+                allow_redirect_to=allow_redirect_to,
             )
         except ValueError as exc:
             detail = str(exc)
@@ -855,6 +881,7 @@ async def web_fetch_json(
                         headers=headers,
                         content=content,
                         request_timeout=request_timeout,
+                        allow_redirect_to=allow_redirect_to,
                     )
                 except ValueError as exc:
                     detail = str(exc)

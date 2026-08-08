@@ -7,8 +7,8 @@ owner: Alex
 summary: Normalize provider-shaped JSON over async HTTP to a single egress base URL
   (SEVN_PROXY_URL / ProcessSettings.proxy_url), so tier executors bind once per turn
   and never touch raw secrets. LiteLLM may r
-last_updated: '2026-08-06'
-fingerprint: sha256:3dbaf8e6cd2499656bcd811566b57cae5fec8d0790b8ad01ca4c7360c026176c
+last_updated: '2026-08-08'
+fingerprint: sha256:611fc6871d25687856e277c4e5c9da93dea6ac1925dff00c776fa4897c14373c
 related: []
 sources:
 - src/sevn/proxy/**
@@ -141,6 +141,24 @@ interfaces:
 - name: is_oauth_credential_fresh
   file: src/sevn/proxy/oauth_lifecycle.py
   symbol: is_oauth_credential_fresh
+- name: BudgetExceeded
+  file: src/sevn/proxy/session_limits.py
+  symbol: BudgetExceeded
+- name: DestinationNotAllowed
+  file: src/sevn/proxy/session_limits.py
+  symbol: DestinationNotAllowed
+- name: consume_response_bytes
+  file: src/sevn/proxy/session_limits.py
+  symbol: consume_response_bytes
+- name: consume_run_budget
+  file: src/sevn/proxy/session_limits.py
+  symbol: consume_run_budget
+- name: destination_allowed
+  file: src/sevn/proxy/session_limits.py
+  symbol: destination_allowed
+- name: reset_run_budgets_for_tests
+  file: src/sevn/proxy/session_limits.py
+  symbol: reset_run_budgets_for_tests
 - name: ProxySettings
   file: src/sevn/proxy/settings.py
   symbol: ProxySettings

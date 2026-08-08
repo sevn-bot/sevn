@@ -19,7 +19,12 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 from sevn.tools.context import ToolContext
-from sevn.tools.web import build_egress_web_headers, proxy_post_json
+from sevn.tools.web import (
+    ProxySessionTokenRequiredError,
+    ProxySharedSecretUnconfiguredError,
+    build_egress_web_headers,
+    proxy_post_json,
+)
 
 _PROXY_INTEGRATION_PATH: Final[str] = "/integration"
 _CREDENTIAL_MARKERS: Final[tuple[str, ...]] = (
@@ -107,11 +112,24 @@ class EgressIntegrationProxyClient:
             "method": method.strip(),
             "args": dict(args),
         }
-        headers = build_egress_web_headers(
-            proxy_url=self.proxy_url,
-            session_token=self.session_token,
-            proxy_shared_secret=self.proxy_shared_secret,
-        )
+        try:
+            headers = build_egress_web_headers(
+                proxy_url=self.proxy_url,
+                session_token=self.session_token,
+                proxy_shared_secret=self.proxy_shared_secret,
+            )
+        except ProxySharedSecretUnconfiguredError as exc:
+            raise IntegrationCredentialRequired(
+                str(exc),
+                service=service,
+                method=method,
+            ) from exc
+        except ProxySessionTokenRequiredError as exc:
+            raise IntegrationCredentialRequired(
+                str(exc),
+                service=service,
+                method=method,
+            ) from exc
         status, data = await proxy_post_json(
             proxy_url=self.proxy_url,
             path=_PROXY_INTEGRATION_PATH,

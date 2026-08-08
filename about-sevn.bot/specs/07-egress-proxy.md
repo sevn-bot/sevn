@@ -7,8 +7,8 @@ owner: Alex
 summary: Product pairing (v1). Deployment, paired daemon install, onboarding validation,
   and Mission Control management of the proxy are specified in prd-06-setup-and-operations
   and prd-07-mission-control §5.1
-last_updated: '2026-08-06'
-fingerprint: sha256:3dbaf8e6cd2499656bcd811566b57cae5fec8d0790b8ad01ca4c7360c026176c
+last_updated: '2026-08-08'
+fingerprint: sha256:611fc6871d25687856e277c4e5c9da93dea6ac1925dff00c776fa4897c14373c
 related: []
 sources:
 - src/sevn/proxy/**
@@ -143,6 +143,24 @@ interfaces:
 - name: is_oauth_credential_fresh
   file: src/sevn/proxy/oauth_lifecycle.py
   symbol: is_oauth_credential_fresh
+- name: BudgetExceeded
+  file: src/sevn/proxy/session_limits.py
+  symbol: BudgetExceeded
+- name: DestinationNotAllowed
+  file: src/sevn/proxy/session_limits.py
+  symbol: DestinationNotAllowed
+- name: consume_response_bytes
+  file: src/sevn/proxy/session_limits.py
+  symbol: consume_response_bytes
+- name: consume_run_budget
+  file: src/sevn/proxy/session_limits.py
+  symbol: consume_run_budget
+- name: destination_allowed
+  file: src/sevn/proxy/session_limits.py
+  symbol: destination_allowed
+- name: reset_run_budgets_for_tests
+  file: src/sevn/proxy/session_limits.py
+  symbol: reset_run_budgets_for_tests
 - name: ProxySettings
   file: src/sevn/proxy/settings.py
   symbol: ProxySettings
@@ -301,6 +319,40 @@ as liveness and additionally probes guarded ``GET /web/auth-check`` with
 ``X-Sevn-Proxy-Token`` resolved from env or ``/operator/.sevn/proxy-shared-secret``.
 HTTP **401** or **503** marks the container unhealthy. ``/web/auth-check`` is a
 guarded no-op (no provider upstream) so the probe consumes no quota.
+
+## Amendments (prod-readiness-0.0.1 W19 — C7.1, C7.2)
+
+**Run / container binding (C7.1).** ``mint_session_token`` embeds ``run_id`` (already
+present) and optional ``container_id`` (opaque spawn-bind id). ``validate_session_token``
+rejects when a caller-supplied ``run_id`` / ``container_id`` (from ``X-Sevn-Run-Id`` /
+``X-Sevn-Container-Id``) does not match the token claims. Binding mechanism: the spawn
+path generates a bind id **before** ``docker run`` (the Docker container hash is not
+yet known), embeds it in the token, and honest clients re-present it by decoding the
+token payload into those headers. Failure mode: mismatch or foreign run → **401**
+``{"detail":"unauthorized"}``.
+
+**Differentiated authority (C7.2 / D51).** The service shared secret
+(``X-Sevn-Proxy-Token``) authorizes gateway→proxy families (``/llm/*``) and the
+authenticated health probe (``/web/auth-check``). On sandbox-originated families
+(``/web/*`` except auth-check, ``/integration``) the service secret alone is
+**rejected**; those paths require a scoped session token. Gateway ``/web`` and
+``/integration`` callers mint or carry a session token via ``build_egress_web_headers``.
+
+## Amendments (prod-readiness-0.0.1 W20 — C7.3, C7.4)
+
+**Allowlist + budgets (C7.3).** Session-token payloads may carry ``allowlist`` (host
+list) and ``max_requests`` / ``max_bytes``. ``sevn.proxy.session_limits`` enforces them
+on ``POST /web/fetch`` before upstream forward: allowlist miss → **403** with
+destination/allowlist detail; budget exhaustion → **429** with budget detail (never
+confused with auth **401**).
+
+**Budget state (W20.3).** Counters are **in-process** on the proxy, keyed by
+``run_id``, under a per-run lock. A proxy restart clears counters — durable shared
+state is out of scope; the reset is explicit rather than silent-by-accident.
+
+**Honest schema (C7.4).** ``SEVN_SESSION_TOKEN`` in ``infra/sevn.schema.json`` describes
+shipped mint/bind/budget behaviour and marks proxy minting API, frozen
+``PermissionConfig`` ceiling, and revoke-on-teardown as **intent**.
 
 ## Human-input needed
 

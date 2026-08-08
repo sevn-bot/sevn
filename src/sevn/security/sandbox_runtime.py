@@ -44,6 +44,8 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
+import hmac
 import io
 import json
 import os
@@ -797,6 +799,7 @@ def build_sandbox_child_env(
     proxy_url: str,
     session_token: str,
     workspace_mount_path: str | os.PathLike[str],
+    binding_signing_key: str | None = None,
 ) -> dict[str, str]:
     """Build §2.2 child environment (never injects raw provider keys or service secret).
 
@@ -804,10 +807,21 @@ def build_sandbox_child_env(
     Forward-proxy env vars (``HTTP_PROXY`` / ``HTTPS_PROXY`` / ``NO_PROXY``) are omitted —
     the egress proxy is a reverse path-prefix API, not a CONNECT forward proxy (D13).
 
+    When ``binding_signing_key`` is supplied (i.e. the gateway holds the proxy
+    shared secret at spawn time), the HMAC over ``container_id=<cid>\\nrun_id=<rid>``
+    is pre-computed here and emitted as ``SEVN_PROXY_BINDING_SIG``. The
+    sandbox child (which does not carry ``SEVN_PROXY_SHARED_SECRET``) reads
+    that env key verbatim and emits it as ``X-Sevn-Binding-Signature`` on
+    every proxy call (PR #245 mergecraft finding 4b0049b9840bcde02f488190).
+
     Args:
         proxy_url (str): Base URL for unified egress proxy.
         session_token (str): Scoped per-run ``X-Sevn-Session-Token`` credential.
         workspace_mount_path (str | os.PathLike[str]): Shadow or container path.
+        binding_signing_key (str | None): Optional ``SEVN_PROXY_SHARED_SECRET``
+            used to pre-compute the PoP binding signature. Only set at the
+            spawn seam (where the gateway holds the secret) — never copied
+            into the child env.
 
     Returns:
         dict[str, str]: Env vars to merge over a sanitized base.
@@ -831,8 +845,71 @@ def build_sandbox_child_env(
         "SEVN_SESSION_TOKEN": session_token,
         "SEVN_WORKSPACE": w,
     }
+    if binding_signing_key:
+        sig = _expected_sandbox_binding_signature(
+            session_token=session_token,
+            signing_key=binding_signing_key,
+        )
+        if sig:
+            env["SEVN_PROXY_BINDING_SIG"] = sig
     _assert_sandbox_child_env_contract(env)
     return env
+
+
+def _expected_sandbox_binding_signature(
+    *,
+    session_token: str,
+    signing_key: str,
+) -> str | None:
+    """Compute the PoP binding signature for the sandbox child env.
+
+    Decodes the session token's ``run_id`` and ``container_id`` claims and
+    returns ``HMAC-SHA256(signing_key, ``container_id=<cid>\\nrun_id=<rid>``)``.
+    Returns ``None`` when the token is malformed or carries no ``run_id``
+    claim — the child env omits ``SEVN_PROXY_BINDING_SIG`` in that case so
+    the proxy seam rejects the call with ``401`` (fail-closed).
+
+    Args:
+        session_token (str): ``v1.<payload>.<sig>`` session token.
+        signing_key (str): ``SEVN_PROXY_SHARED_SECRET`` (gateway-side only).
+
+    Returns:
+        str | None: Hex signature, or ``None`` when the token is unusable.
+
+    Examples:
+        >>> from sevn.proxy.auth import mint_session_token, SESSION_SCOPE_SANDBOX
+        >>> import time
+        >>> t = mint_session_token(
+        ...     signing_key="k",
+        ...     scope=SESSION_SCOPE_SANDBOX,
+        ...     run_id="r1",
+        ...     container_id="c1",
+        ...     expires_at=int(time.time()) + 3600,
+        ... )
+        >>> isinstance(_expected_sandbox_binding_signature(session_token=t, signing_key="k"), str)
+        True
+    """
+    import base64
+
+    text = (session_token or "").strip()
+    if not text:
+        return None
+    parts = text.split(".")
+    if len(parts) != 3:
+        return None
+    try:
+        padded = parts[1] + "=" * (-len(parts[1]) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
+    except (ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    run_id = payload.get("run_id")
+    container_id = payload.get("container_id")
+    run_id_str = run_id if isinstance(run_id, str) else ""
+    container_id_str = container_id if isinstance(container_id, str) else ""
+    canonical = f"container_id={container_id_str}\nrun_id={run_id_str}".encode()
+    return hmac.new(signing_key.encode(), canonical, hashlib.sha256).hexdigest()
 
 
 def _resolve_spawn_session_token(
@@ -840,6 +917,10 @@ def _resolve_spawn_session_token(
     run_id: str,
     env: Mapping[str, str],
     signing_key: str | None = None,
+    container_id: str | None = None,
+    destination_allowed: list[str] | None = None,
+    request_budget: int | None = None,
+    byte_budget: int | None = None,
 ) -> str:
     """Return an existing ``SEVN_SESSION_TOKEN`` or mint a scoped per-run token.
 
@@ -851,6 +932,19 @@ def _resolve_spawn_session_token(
             precedence over :func:`resolve_effective_proxy_shared_secret` so
             chain-only installs can mint without writing the secret into the
             process environ or the sandbox child env (D41).
+        container_id (str | None): Opaque spawn-bind id embedded as ``container_id``
+            when minting (C7.1). Callers generate this before ``docker run`` because
+            the Docker container hash is not known yet; clients present it as
+            ``X-Sevn-Container-Id``. Mismatch → 401. Not injected as a separate
+            child-env key (``build_sandbox_child_env`` stays three keys).
+        destination_allowed (list[str] | None): Optional host allowlist claim
+            forwarded to the mint (C7.3). When ``None``, the resulting token
+            carries no ``limits`` envelope and the proxy does not enforce an
+            allowlist.
+        request_budget (int | None): Optional per-run request-count budget
+            forwarded to the mint (C7.3). ``None`` emits no claim.
+        byte_budget (int | None): Optional per-run byte budget forwarded to the
+            mint (C7.3). ``None`` emits no claim.
 
     Returns:
         str: Token text for ``build_sandbox_child_env``.
@@ -893,12 +987,24 @@ def _resolve_spawn_session_token(
         if secret:
             from sevn.proxy.auth import validate_session_token
 
+            # PR #245 Codex finding 6: re-check the existing token's ``run_id``
+            # and ``container_id`` claims against the current spawn context so a
+            # token minted for a previous run / different sandbox cannot be
+            # replayed by a fresh spawn. The proxy also rejects mismatched
+            # binding headers (C7.1), but rejecting at spawn time stops the
+            # cross-spawn leak before it reaches the proxy request seam.
+            bind_id = (container_id or "").strip() or None
             if not validate_session_token(
                 existing,
                 signing_key=secret,
                 path="/web/fetch",
+                run_id=run_id,
+                container_id=bind_id,
             ):
-                msg = "spawn env SEVN_SESSION_TOKEN is invalid or out of sandbox scope"
+                msg = (
+                    "spawn env SEVN_SESSION_TOKEN is invalid, out of sandbox scope, "
+                    "or was minted for a different run/container"
+                )
                 raise SandboxConfigurationError(msg)
         return existing
     if not secret:
@@ -910,10 +1016,15 @@ def _resolve_spawn_session_token(
         raise SandboxConfigurationError(msg)
     from sevn.proxy.auth import SESSION_SCOPE_SANDBOX, mint_session_token
 
+    bind_id = (container_id or "").strip() or None
     return mint_session_token(
         signing_key=secret,
         scope=SESSION_SCOPE_SANDBOX,
         run_id=run_id,
+        container_id=bind_id,
+        destination_allowed=destination_allowed,
+        request_budget=request_budget,
+        byte_budget=byte_budget,
     )
 
 
@@ -924,6 +1035,9 @@ def _assemble_spawn_child_env(
     workspace_mount_path: str | os.PathLike[str],
     pre_env: Mapping[str, str] | None = None,
     signing_key: str | None = None,
+    destination_allowed: list[str] | None = None,
+    request_budget: int | None = None,
+    byte_budget: int | None = None,
 ) -> dict[str, str]:
     """Build §2.2 child env for subprocess or Docker sandbox spawn.
 
@@ -934,6 +1048,12 @@ def _assemble_spawn_child_env(
         pre_env (Mapping[str, str] | None): Optional runtime ``pre_spawn_env`` overlay.
         signing_key (str | None): Optional resolved proxy shared secret for minting
             (not copied into the child env).
+        destination_allowed (list[str] | None): Optional host allowlist forwarded to
+            the session-token mint (C7.3). ``None`` emits no claim.
+        request_budget (int | None): Optional per-run request-count budget forwarded to
+            the mint (C7.3). ``None`` emits no claim.
+        byte_budget (int | None): Optional per-run byte budget forwarded to the mint
+            (C7.3). ``None`` emits no claim.
 
     Returns:
         dict[str, str]: Sanitized child env for exec or ``docker run -e``.
@@ -945,22 +1065,47 @@ def _assemble_spawn_child_env(
         ...     workspace_mount_path="/w",
         ...     signing_key="assemble-doctest-signing-key-32ch!",
         ... )
-        >>> set(e.keys()) == {"SEVN_PROXY_URL", "SEVN_SESSION_TOKEN", "SEVN_WORKSPACE"}
+        >>> set(e.keys()) == {
+        ...     "SEVN_PROXY_URL",
+        ...     "SEVN_SESSION_TOKEN",
+        ...     "SEVN_WORKSPACE",
+        ...     "SEVN_PROXY_BINDING_SIG",
+        ... }
         True
     """
     child_env = dict(env)
+    # Opaque spawn-bind id (not the Docker container hash): minted into the session
+    # token before ``docker run`` returns. Clients that decode the token present it
+    # as ``X-Sevn-Container-Id``; a mismatch is 401 (C7.1 failure mode).
+    bind_id = f"sb-{uuid.uuid4().hex[:16]}"
     token = _resolve_spawn_session_token(
         run_id=run_id,
         env=child_env,
         signing_key=signing_key,
+        container_id=bind_id,
+        destination_allowed=destination_allowed,
+        request_budget=request_budget,
+        byte_budget=byte_budget,
     )
     if token:
         child_env["SEVN_SESSION_TOKEN"] = token
+    # Resolve the shared secret for the pre-computed binding signature (PR #245
+    # mergecraft finding 4b0049b9840bcde02f488190). When ``signing_key`` is
+    # injected (chain-only installs) it takes precedence; otherwise we fall
+    # back to the env / generate-once file resolver so compose-default
+    # installs do not need to forward the secret explicitly. The signing key
+    # itself is **never** copied into the child env.
+    binding_key = (signing_key or "").strip()
+    if not binding_key:
+        from sevn.proxy.bootstrap_secret import resolve_effective_proxy_shared_secret
+
+        binding_key = (resolve_effective_proxy_shared_secret() or "").strip()
     child_env.update(
         build_sandbox_child_env(
             proxy_url=child_env.get("SEVN_PROXY_URL", ""),
             session_token=child_env.get("SEVN_SESSION_TOKEN", ""),
             workspace_mount_path=workspace_mount_path,
+            binding_signing_key=binding_key or None,
         )
     )
     if pre_env:

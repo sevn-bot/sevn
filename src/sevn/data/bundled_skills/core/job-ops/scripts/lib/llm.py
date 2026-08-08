@@ -93,10 +93,17 @@ def _first_object(text: str) -> str:
 def _proxy_headers() -> dict[str, str]:
     """Build proxy auth headers from sandbox child env (not a gateway fallback).
 
-    Reads ``SEVN_PROXY_SHARED_SECRET`` / ``SEVN_SESSION_TOKEN`` from the child
-    process environment — the documented sandbox child-env seam for job-ops
-    scripts. Gateway code must inject the shared secret instead of re-reading env.
+    Reads ``SEVN_SESSION_TOKEN`` from the child process environment — the documented
+    sandbox child-env seam for job-ops scripts. Binding headers are derived from the
+    token payload (C7.1) and the binding signature is read verbatim from
+    ``SEVN_PROXY_BINDING_SIG`` (the gateway pre-computes it at spawn time and
+    ships it in the child env because the sandbox child does not carry
+    ``SEVN_PROXY_SHARED_SECRET`` — PR #245 mergecraft finding 4b0049b9840bcde02f488190).
+    Gateway code must inject credentials instead of re-reading env.
     """
+    import base64
+    import json
+
     headers: dict[str, str] = {}
     secret = os.environ.get("SEVN_PROXY_SHARED_SECRET", "").strip()
     if secret:
@@ -104,6 +111,42 @@ def _proxy_headers() -> dict[str, str]:
     session_token = os.environ.get("SEVN_SESSION_TOKEN", "").strip()
     if session_token:
         headers["X-Sevn-Session-Token"] = session_token
+        parts = session_token.split(".")
+        if len(parts) == 3:
+            padded = parts[1] + "=" * (-len(parts[1]) % 4)
+            try:
+                payload = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
+            except (ValueError, json.JSONDecodeError):
+                payload = None
+            if isinstance(payload, dict):
+                run_id = payload.get("run_id")
+                if isinstance(run_id, str) and run_id:
+                    headers["X-Sevn-Run-Id"] = run_id
+                container_id = payload.get("container_id")
+                if isinstance(container_id, str) and container_id:
+                    headers["X-Sevn-Container-Id"] = container_id
+        # The gateway pre-computes the PoP binding signature at spawn time
+        # and emits it in the child env as ``SEVN_PROXY_BINDING_SIG``. The
+        # sandbox child (which has no shared secret) transports it verbatim
+        # so the proxy can verify the (run_id, container_id) pair came from
+        # a holder of the shared secret (PR #245 Codex finding 5 + mergecraft
+        # follow-up 4b0049b9840bcde02f488190).
+        binding_sig = os.environ.get("SEVN_PROXY_BINDING_SIG", "").strip()
+        if binding_sig:
+            headers["X-Sevn-Binding-Signature"] = binding_sig
+        elif secret:
+            # Gateway-side fallback (rare on the job-ops path): re-derive the
+            # HMAC from the resolved secret. This keeps gateway callers that
+            # omit ``SEVN_PROXY_BINDING_SIG`` (older deployments) compatible.
+            import hashlib
+            import hmac as _hmac
+
+            run_id_str = headers.get("X-Sevn-Run-Id", "")
+            container_id_str = headers.get("X-Sevn-Container-Id", "")
+            canonical = f"container_id={container_id_str}\nrun_id={run_id_str}".encode()
+            headers["X-Sevn-Binding-Signature"] = _hmac.new(
+                secret.encode(), canonical, hashlib.sha256
+            ).hexdigest()
     return headers
 
 

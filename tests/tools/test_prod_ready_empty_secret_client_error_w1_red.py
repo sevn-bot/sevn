@@ -9,6 +9,7 @@ Green after W3.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -68,7 +69,14 @@ async def test_web_process_egress_raises_when_secret_empty(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """W1.4 / tools/web.py: call-time failure before any proxy POST."""
+    """W1.4 / tools/web.py: call-time failure before any proxy POST.
+
+    PR #245 Codex finding 3 — without a session token AND without a shared
+    secret the helper still surfaces a ``PERMISSION_DENIED`` envelope that
+    names the missing config; the previous direct-raise contract was relaxed
+    so the call path can map both missing-secret and missing-token into the
+    same operator-actionable failure envelope.
+    """
     monkeypatch.setenv("SEVN_PROXY_URL", "http://127.0.0.1:8787")
     monkeypatch.setenv("SEVN_HOME", str(tmp_path))
     monkeypatch.delenv("SEVN_PROXY_SHARED_SECRET", raising=False)
@@ -76,14 +84,14 @@ async def test_web_process_egress_raises_when_secret_empty(
 
     from sevn.tools import web as web_mod
 
-    exc_type = _import_unconfigured_error()
-    with (
-        patch.object(web_mod, "proxy_post_json", new_callable=AsyncMock) as post,
-        pytest.raises(exc_type) as caught,
-    ):
-        await web_mod._proxy_web_fetch_single(url="https://example.com/page")
+    with patch.object(web_mod, "proxy_post_json", new_callable=AsyncMock) as post:
+        err, _data = await web_mod._proxy_web_fetch_single(url="https://example.com/page")
     post.assert_not_awaited()
-    _assert_actionable(caught.value)
+    assert err is not None
+    # ``err`` is the JSON envelope string returned by ``enveloped_failure``.
+    envelope = json.loads(err) if isinstance(err, str) else err
+    assert envelope["code"] == "PERMISSION_DENIED", envelope
+    assert _SECRET_NAME in envelope["error"], envelope
 
 
 def test_resolve_process_egress_reads_generate_once_file_when_env_blank(
@@ -109,9 +117,21 @@ def test_resolve_process_egress_reads_generate_once_file_when_env_blank(
 
 @pytest.mark.anyio
 async def test_integration_proxy_client_raises_on_empty_secret() -> None:
-    """W1.4 / tools/integration_proxy_client.py: live client refuses empty secret."""
+    """W1.4 / tools/integration_proxy_client.py: live client refuses empty secret.
+
+    PR #245 Codex finding 3 — the integration client now raises
+    ``IntegrationCredentialRequired`` (a domain-level operator-actionable
+    failure that names ``SEVN_PROXY_SHARED_SECRET``) for both the missing-secret
+    and missing-session-token branches, since both indicate the operator has
+    not finished egress wiring. The previous direct-raise contract is
+    preserved at the ``build_egress_web_headers`` boundary and surfaced as
+    a domain error by ``integration_call``.
+    """
     from sevn.tools.context import ToolContext
-    from sevn.tools.integration_proxy_client import EgressIntegrationProxyClient
+    from sevn.tools.integration_proxy_client import (
+        EgressIntegrationProxyClient,
+        IntegrationCredentialRequired,
+    )
 
     exc_type = _import_unconfigured_error()
     client = EgressIntegrationProxyClient(
@@ -130,7 +150,7 @@ async def test_integration_proxy_client_raises_on_empty_secret() -> None:
             "sevn.tools.integration_proxy_client.proxy_post_json",
             new_callable=AsyncMock,
         ) as post,
-        pytest.raises(exc_type) as caught,
+        pytest.raises(IntegrationCredentialRequired) as caught,
     ):
         await client.integration_call(
             service="github",
@@ -139,7 +159,12 @@ async def test_integration_proxy_client_raises_on_empty_secret() -> None:
             ctx=ctx,
         )
     post.assert_not_awaited()
-    _assert_actionable(caught.value)
+    # The wrapped exception still references the secret envvar so the operator
+    # can act. ``IntegrationCredentialRequired`` chains the original
+    # ``ProxySharedSecretUnconfiguredError`` via ``__cause__`` so the deep
+    # actionable contract holds.
+    assert _SECRET_NAME in str(caught.value)
+    assert isinstance(caught.value.__cause__, exc_type)
 
 
 @pytest.mark.anyio

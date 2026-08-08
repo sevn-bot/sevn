@@ -298,26 +298,17 @@ async def create_sandbox_terminal_session(
     )
     workspace = layout.content_root.resolve()
     run_id = f"mc-terminal-{uuid.uuid4().hex[:12]}"
+    # Prefer caller-supplied token; otherwise leave unset so spawn mints a
+    # run+container-bound session token (C7.1) via ``_assemble_spawn_child_env``.
+    child_env: dict[str, str] = {"SEVN_PROXY_URL": proxy_url}
     if session_token.strip():
-        resolved_token = session_token.strip()
-    else:
-        from sevn.proxy.auth import SESSION_SCOPE_SANDBOX, mint_session_token
-
-        if not secret:
-            raise SandboxTerminalError(
-                "SEVN_PROXY_SHARED_SECRET is not configured; set env, generate-once "
-                "file under SEVN_HOME, secrets chain, or complete onboarding before "
-                "minting a sandbox terminal session token"
-            )
-        resolved_token = mint_session_token(
-            signing_key=secret,
-            scope=SESSION_SCOPE_SANDBOX,
-            run_id=run_id,
+        child_env["SEVN_SESSION_TOKEN"] = session_token.strip()
+    elif not secret:
+        raise SandboxTerminalError(
+            "SEVN_PROXY_SHARED_SECRET is not configured; set env, generate-once "
+            "file under SEVN_HOME, secrets chain, or complete onboarding before "
+            "minting a sandbox terminal session token"
         )
-    child_env = {
-        "SEVN_PROXY_URL": proxy_url,
-        "SEVN_SESSION_TOKEN": resolved_token,
-    }
     try:
         sandbox_id = await runtime.spawn(run_id=run_id, workspace=workspace, env=child_env)
     except SandboxConfigurationError as exc:
