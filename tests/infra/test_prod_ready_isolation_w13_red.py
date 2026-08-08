@@ -523,6 +523,93 @@ def test_brave_smoke_exercises_prod_security_context() -> None:
     )
 
 
+def test_brave_smoke_tempfile_cleanup_is_tolerated() -> None:
+    """Docker-images fix: Brave smoke must not crash on ``TemporaryDirectory`` cleanup.
+
+    The W13.4b Brave smoke bind-mounts a ``TemporaryDirectory`` into the
+    hardened container, which then creates ``segmentation_platform/`` and
+    similar subdirectories owned by uid 10001 with mode 0700. Python
+    3.12's ``TemporaryDirectory`` cleanup walks the tree and calls
+    ``os.chmod`` from the onerror fallback (``_resetperms``); in some CI
+    environments (notably the docker-images job on GHA ubuntu-latest)
+    that ``chmod`` returns EPERM and the cleanup raises before the
+    context exit returns control to the caller. The error propagates out
+    of the test, which then fails the docker-images check even though
+    the smoke itself was green.
+
+    The fix is a defense-in-depth cleanup:
+    1. ``TemporaryDirectory(..., ignore_cleanup_errors=True)`` so the
+       context-manager exit swallows any cleanup exception (the
+       ``shutil.rmtree`` in ``finally`` is the primary cleanup, so any
+       remaining failure is harmless — the directory will be GC'd by the
+       OS at next boot).
+    2. The ``finally`` block must run ``docker rm -f`` **before** the
+       ``TemporaryDirectory`` exits, so uid-10001 is no longer holding
+       file descriptors open inside ``profile_host`` when the cleanup
+       tries to traverse the tree.
+
+    This test reads the source and asserts both invariants are present.
+    """
+    source = Path(__file__).read_text(encoding="utf-8")
+    # Extract the function body for the smoke so we can assert on its
+    # shape without re-running it (which requires a Docker daemon).
+    # Match a line-anchored ``def test_brave_runs_in_hardened...`` so we
+    # don't accidentally hit the search pattern inside the D-PR-1 test
+    # (which references the smoke name as a literal string).
+    match = re.search(
+        r"^def test_brave_runs_in_hardened_container_without_no_sandbox.*?(?=^\ndef |\Z)",
+        source,
+        re.DOTALL | re.MULTILINE,
+    )
+    assert match, "could not locate the Brave smoke test body"
+    body = match.group(0)
+
+    # Invariant 1: ``TemporaryDirectory`` is constructed with
+    # ``ignore_cleanup_errors=True``. Without this flag, a PermissionError
+    # from cleanup propagates out of the test and turns a green smoke
+    # into a red docker-images check. Match the actual constructor call,
+    # not comments — the latter can mention ``ignore_cleanup_errors``
+    # without changing behavior.
+    td_call = re.search(r"tempfile\.TemporaryDirectory\(([^)]*)\)", body)
+    assert td_call, "Brave smoke must construct a tempfile.TemporaryDirectory"
+    td_args = td_call.group(1)
+    assert "ignore_cleanup_errors=True" in td_args, (
+        "Docker-images fix: Brave smoke must construct its "
+        "TemporaryDirectory with ignore_cleanup_errors=True so a "
+        "PermissionError during cleanup is swallowed instead of failing "
+        "the test (the bind-mount root is rmtree'd in the finally block). "
+        f"Found TemporaryDirectory args: {td_args!r}"
+    )
+
+    # Invariant 2: the ``finally`` block must ``docker rm -f`` the smoke
+    # container before the TemporaryDirectory exit runs. The cleanup
+    # walks the bind-mount root; if uid-10001 is still alive inside the
+    # container it can be holding descriptors that block the rmtree.
+    # The simplest invariant: there is a ``finally:`` clause and inside
+    # it the ``docker rm -f`` appears before any ``shutil.rmtree``.
+    finally_block = re.search(
+        r"\bfinally:\s*\n(.*?)(?=\n        try:|\n    [a-zA-Z]|\Z)", body, re.DOTALL
+    )
+    assert finally_block, "Brave smoke must have a finally block for cleanup"
+    finally_body = finally_block.group(1)
+    docker_rm_offset = finally_body.find('"rm", "-f"')
+    rmtree_offset = finally_body.find("shutil.rmtree")
+    assert docker_rm_offset != -1, (
+        "Brave smoke finally block must docker rm -f the smoke container "
+        "so uid-10001 is not holding file descriptors inside the bind "
+        "mount during the TemporaryDirectory exit"
+    )
+    assert rmtree_offset != -1, (
+        "Brave smoke finally block must rmtree the bind-mount root "
+        "before the TemporaryDirectory exit"
+    )
+    assert docker_rm_offset < rmtree_offset, (
+        "Brave smoke must stop the container (docker rm -f) BEFORE "
+        "rmtree'ing the bind-mount root; otherwise uid-10001 may still "
+        "hold descriptors that block the rmtree"
+    )
+
+
 def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
     """W13.4b / C8.1: dockerized Brave boots headless in a hardened container without ``--no-sandbox``.
 
@@ -582,16 +669,28 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
             "to run this test"
         )
 
-    # No ``ignore_cleanup_errors=True``: the W13 hard-context container runs as
-    # uid 10001, so any subdir Chromium creates under profile_host (e.g.
-    # ``segmentation_platform``) is mode 0700 owned by uid 10001. Python 3.12's
-    # ``TemporaryDirectory`` cleanup walks the tree and calls ``os.open`` on
-    # each entry; the runner can't read uid-10001 dirs, so the cleanup raises
-    # before the flag has a chance to catch the deeper ``os.open`` failure.
-    # Instead, stop the container and rmtree the bind-mount root inside the
-    # finally below — the ``TemporaryDirectory`` exit then finds nothing it
-    # can't read.
-    with tempfile.TemporaryDirectory(prefix="sevn-w13-brave-") as tmp_str:
+    # The W13 hard-context container runs as uid 10001, so any subdir
+    # Chromium creates under profile_host (e.g. ``segmentation_platform``)
+    # is mode 0700 owned by uid 10001. Python 3.12's ``TemporaryDirectory``
+    # cleanup walks the tree and calls ``os.open`` on each entry; the
+    # runner can't traverse uid-10001 dirs from a non-matching uid (or
+    # in CI, where the chmod / rmdir is blocked by EPERM rather than
+    # EACCES), so the cleanup raises before the rmtree has a chance to
+    # honor ``ignore_errors=True``.
+    #
+    # Cleanup strategy: pass ``ignore_cleanup_errors=True`` to the
+    # ``TemporaryDirectory`` so the context-manager exit swallows any
+    # cleanup exception (defensive — the bind-mount rmtree below is the
+    # primary mechanism). The container is stopped in the ``finally``
+    # before the TemporaryDirectory exits, and ``shutil.rmtree`` then
+    # removes the bind-mount root as root via ``ignore_errors=True``.
+    # The runner can delete uid-10001 subdirs when it owns the parent
+    # directory (root has CAP_DAC_OVERRIDE), so the rmtree succeeds and
+    # the TemporaryDirectory exits into an empty tree.
+    with tempfile.TemporaryDirectory(
+        prefix="sevn-w13-brave-",
+        ignore_cleanup_errors=True,
+    ) as tmp_str:
         profile_host = Path(tmp_str) / "profile"
         profile_host.mkdir(parents=True, exist_ok=True)
         # Bind the host tmp dir into the container at /tmp/w13-profile so we can
@@ -812,9 +911,11 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
             # descriptors open inside profile_host, so even though the
             # subdirs remain mode 0700 the runner can ``rmtree`` them when
             # we own the parent. ``ignore_errors=True`` swallows the
-            # ``PermissionError`` that some environments still raise on
-            # unlink, so the ``TemporaryDirectory`` exit finds either an
-            # empty tree or a tree it can delete itself.
+            # ``PermissionError`` / EPERM that some CI environments raise
+            # on unlink (e.g. when the runner is unprivileged inside a
+            # sandbox and ``chmod 0700`` from ``_resetperms`` returns
+            # EPERM). The ``TemporaryDirectory`` is constructed with
+            # ``ignore_cleanup_errors=True`` as a defense-in-depth backstop.
             with contextlib.suppress(OSError):
                 shutil.rmtree(profile_host, ignore_errors=True)
 
