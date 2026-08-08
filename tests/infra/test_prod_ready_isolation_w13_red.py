@@ -829,11 +829,23 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
                 )  # nosec B603
                 state = (ps.stdout or "").strip()
                 if not state.startswith("true "):
+                    # ``docker logs`` has no ``--no-color`` flag (the
+                    # standalone ``docker logs`` CLI only accepts
+                    # ``--details``, ``--follow``, ``--since``,
+                    # ``--tail``, ``--timestamps``, ``--until``; the
+                    # ``--no-color`` flag exists only on the
+                    # ``docker compose logs`` subcommand). On a freshly
+                    # rebuilt GHA ubuntu-latest image (Docker CLI 27+)
+                    # the bogus flag raises "unknown flag: --no-color"
+                    # and the diagnostic masks the actual renderer abort
+                    # we wanted to see — a green smoke was turning red
+                    # on the docker-images check for that reason alone
+                    # (PR #243-A verify run 31270304442). Drop the flag
+                    # so the renderer stderr reaches pytest.fail.
                     logs = subprocess.run(
                         [
                             docker,
                             "logs",
-                            "--no-color",
                             "--tail=80",
                             _BRAVE_SMOKE_CONTAINER_NAME,
                         ],
