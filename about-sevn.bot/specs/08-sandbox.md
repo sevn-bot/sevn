@@ -8,7 +8,7 @@ summary: Deliver a single tool-execution sandbox used by sandbox_exec, exec / sa
   (when routed through the execution sandbox), process when configured for sandbox
   routing, and skill subprocesses spawned b
 last_updated: '2026-08-08'
-fingerprint: sha256:c1ea40368fb1b5e92f7b4f28473d6ea97318e9a943f7a819da1ce035b501883a
+fingerprint: sha256:783333918cd16452cd43ce4cbaeca92aee59691aaa0eb4308ede9033d5382809
 related: []
 sources:
 - src/sevn/security/**
