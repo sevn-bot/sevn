@@ -648,17 +648,21 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
     - ``--security-opt no-new-privileges:true`` — matches the prod overlay
       (D-PR-1: was previously omitted, which meant the smoke silently ran
       with weaker constraints than prod).
-    - Docker's **default** seccomp profile (D-PR-1: the previous version
-      passed ``--security-opt seccomp=unconfined``, which lets Chromium's
-      renderer do ``clone(CLONE_NEWPID|CLONE_NEWUSER)`` without a seccomp
-      block but also disables a control the prod overlay inherits).
+    - ``--security-opt seccomp=infra/docker/seccomp-browser.json`` — the same
+      profile the browser/GUI overlays pin. Docker's **default** profile is
+      not the shipped context and would prove the opposite of what this test
+      claims: it gates ``clone(CLONE_NEW*)``/``clone3``/``unshare`` behind
+      ``CAP_SYS_ADMIN`` and ``chroot`` behind ``CAP_SYS_CHROOT``, so under
+      ``cap_drop: ALL`` Brave aborts with "Failed to move to new namespace"
+      before CDP binds. ``seccomp=unconfined`` (what this smoke used
+      originally) is the opposite error — weaker than prod.
 
-    Renderer-sandbox-vs-host-namespaces is a separate question: the GHA
-    runner host disables ``apparmor_restrict_unprivileged_userns`` via a
-    step in ``.github/workflows/docker.yml`` so Chromium can create the
-    user namespace under the default seccomp policy. The smoke proves
-    the C8.1 contract (env must not contain ``--no-sandbox``); the
-    renderer-sandbox hardening is the prod overlay's job, not this test's.
+    Host namespace policy is deliberately left alone. ``.github/workflows/docker.yml``
+    records ``apparmor_restrict_unprivileged_userns`` read-only and does not
+    relax it, so a green run proves Brave boots on a **stock** Ubuntu runner —
+    where that sysctl is ``1`` — rather than only after an undocumented host
+    tweak. The restriction does not apply to processes under Docker's own
+    AppArmor profile, which is why no host change is needed.
 
     The image is env-overridable via ``SEVN_BROWSER_SMOKE_IMAGE`` (default
     ``sevn-gateway-browser:ci``; falls back to ``sevn-gateway-browser:local``).

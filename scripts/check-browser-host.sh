@@ -111,19 +111,24 @@ error: this host will not let the browser container create a user namespace.
             sysctl user.max_user_namespaces      # must be > 0
             sysctl kernel.unprivileged_userns_clone  # must be 1 where present
 
-       3. AppArmor userns mediation applied to the container. Note the stock
-          Ubuntu 24.04 default (apparmor_restrict_unprivileged_userns=1) does
-          NOT cause this — Docker's own profile covers the container. If your
-          host does mediate it, prefer an app-scoped policy:
+       3. AppArmor userns mediation applied to the container itself. Note the
+          stock Ubuntu 24.04 default (apparmor_restrict_unprivileged_userns=1)
+          does NOT cause this: containers run under Docker's own profile, and
+          the hardened Brave smoke passes on a stock ubuntu-24.04 runner with
+          that sysctl set to 1.
 
-            sudo tee /etc/apparmor.d/sevn-browser >/dev/null <<'PROFILE'
-            abi <abi/4.0>,
-            include <tunables/global>
-            profile sevn-browser flags=(unconfined) {
-              userns,
-            }
-            PROFILE
-            sudo apparmor_parser -r /etc/apparmor.d/sevn-browser
+          If your host genuinely does mediate userns for containers, note that
+          loading a policy is not enough on its own — the container has to
+          SELECT it, otherwise Docker applies 'docker-default' regardless:
+
+            security_opt:
+              - apparmor=<your-profile>
+
+          sevn does not ship such a profile (no supported host has been
+          observed to need one), so this is operator-supplied: add the profile
+          to the host, then select it on sevn-gateway via your own compose
+          override alongside the shipped overlay. Please also report the host,
+          since it would mean the shipped overlays need a first-class option.
 
        See docker/README.md "Browser sandbox (C8.1)" and
        docs/readmes/security.md §C8.1.

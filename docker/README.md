@@ -140,9 +140,12 @@ no `--no-sandbox` anywhere in the shipped compose files. Two things make that wo
   the namespace is actually denied. Note that Ubuntu 23.10+'s
   `apparmor_restrict_unprivileged_userns=1` is **not** a blocker: it does not apply to
   processes under Docker's own AppArmor profile, and the CI smoke passes on a stock
-  `ubuntu-24.04` runner with that sysctl set to `1`. `SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT=1`
-  bypasses the check. Being a host property, it is *not* part of `make ci-infra`;
-  `make check-compose-default` covers only the committed compose files.
+  `ubuntu-24.04` runner with that sysctl set to `1`. No AppArmor profile ships with sevn
+  for this: none has been needed, and a policy file that no container selects
+  (`security_opt: apparmor=…`) would do nothing anyway.
+  `SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT=1` bypasses the check. Being a host property, it
+  is *not* part of `make ci-infra`; `make check-compose-default` covers only the
+  committed compose files.
 
 Regenerating the profile after a Docker upgrade: take `profiles/seccomp/default.json`
 from the matching moby tag, remove those four names from every existing group, and

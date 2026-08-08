@@ -91,18 +91,17 @@ Dropping `--no-sandbox` only buys isolation if Brave can build its namespace san
 
    **`apparmor_restrict_unprivileged_userns=1` is not a blocker.** Ubuntu 23.10+ defaults that sysctl to `1`, and it is a tempting thing to gate on, but the restriction does not apply to processes running under Docker's own AppArmor profile. GitHub's `ubuntu-24.04` runners ship it set to `1` and the hardened Brave smoke passes there unmodified — the CI `docker-images` job records the value and boots Brave on a stock runner precisely so that claim keeps being re-proved. Gating on the sysctl would refuse to start on hosts that work fine, which is why the preflight probes instead.
 
-   Where a host genuinely does mediate userns for containers, prefer an app-scoped AppArmor profile over a host-wide switch:
+   Where a host genuinely does mediate userns *for containers*, be aware that loading an AppArmor policy is not sufficient by itself — the container must **select** it, or Docker applies `docker-default` regardless:
 
-   ```sh
-   sudo tee /etc/apparmor.d/sevn-browser >/dev/null <<'EOF'
-   abi <abi/4.0>,
-   include <tunables/global>
-   profile sevn-browser flags=(unconfined) {
-     userns,
-   }
-   EOF
-   sudo apparmor_parser -r /etc/apparmor.d/sevn-browser
+   ```yaml
+   # operator-supplied compose override, alongside the shipped overlay
+   services:
+     sevn-gateway:
+       security_opt:
+         - apparmor=<your-profile>
    ```
+
+   sevn deliberately ships no such profile: no supported host has been observed to need one, and shipping an unselected policy file would be cargo-cult. If you hit a host that does require it, please report it — the shipped overlays would then need a first-class option rather than an operator override.
 
    `SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT=1` bypasses the gate once another mitigation has been accepted.
 
