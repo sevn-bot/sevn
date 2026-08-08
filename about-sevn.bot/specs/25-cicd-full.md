@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Grow spec-00-foundation’s minimal verify loop into a phase-strict delivery
   pipeline: broader CI matrices, checked-in Dockerfile validation for spec-08-sandbox
   (and any ASGI image built for spec-07-egr'
-last_updated: '2026-08-06'
-fingerprint: sha256:ab17e742001eb56ca9b0033625968ffc5647c78a8bc52e3a573b10b67598ff61
+last_updated: '2026-08-08'
+fingerprint: sha256:dceef9e284922b6e1b1d06df9f5729db9bc0ea8a0e533129906013ba9939b584
 related: []
 sources:
 - .github/workflows/**
@@ -596,6 +596,19 @@ D38). Makefile targets ``compose-up``, ``compose-browser-up``, and
 ``compose-up`` with ``COMPOSE_FILES`` overridden) and run the same preflight
 against ``.env`` before containers start;
 ``COMPOSE_PROFILES`` browser+gui mutual exclusion remains a regression net for legacy callers.
+
+## Amendments (prod-readiness-0.0.1 W16 — C10.1 / C10.2 / C10.3)
+
+**Minimum Docker Compose version: 2.20.** Operator and CI stacks declare
+``deploy.resources.limits`` (and ``pids_limit``) on every service so non-Swarm
+Compose applies CPU / memory / PID ceilings. ``scripts/check-compose-default.sh``
+refuses Compose clients below ``SEVN_COMPOSE_MIN_VERSION`` (default ``2.20.0``).
+``make verify-stack-health`` reads each running container's ``HostConfig``
+(``NanoCpus``, ``Memory``, ``PidsLimit``) and requires non-zero values that match
+the resolved compose limits (C10.2). Limits are added only where
+``docker compose … config`` lacked them (D49) — CI was the primary gap; browser/GUI
+inherit gateway/proxy limits from the base file; ``sevn-operator-perms`` /
+``sevn-ci-init`` carry modest one-shot limits.
 
 ## Amendments (post-audit-0.0.1 W10 — append-only)
 

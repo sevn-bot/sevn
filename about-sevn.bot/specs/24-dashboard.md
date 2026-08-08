@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver Mission Control: a same-process dashboard (prd-07-mission-control)
   so the owner can inspect traces, costs, provider health, in-flight runs, proxy status,
   and config without opening SQLite from'
-last_updated: '2026-08-07'
-fingerprint: sha256:0f6bfb3a32a57e4811bf190388b649d0ead6335cd15cac6de28b31d4431f9679
+last_updated: '2026-08-08'
+fingerprint: sha256:7fb73e8a539548a336e12cffcef2b2434cc09c79dafe3415646a96c6a9bb85f0
 related: []
 sources:
 - src/sevn/ui/**

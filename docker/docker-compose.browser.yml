@@ -13,7 +13,8 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.gateway.browser
-    # Brave runs with --no-sandbox (see SEVN_BROWSER_EXTRA_ARGS); no extra capabilities required.
+    # Brave runs as non-root with the Chromium renderer sandbox enabled
+    # (do not disable the sandbox via SEVN_BROWSER_EXTRA_ARGS).
     environment:
       SEVN_HOME: /operator
       HOME: /operator/workspace

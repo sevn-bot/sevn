@@ -1,10 +1,53 @@
 # SPDX-License-Identifier: MIT
 # Compose stack for Phase 1 CI: mock upstream + egress proxy + gateway (specs/25-cicd-full.md §4.4).
+#
+# C9.4: ``sevn-ci-init`` uses the same scoped+marker ownership model as operator
+# ``sevn-operator-perms`` (C9.1 / C9.2) — no unconditional ``chown -R /operator``.
+# C10.3 / D49: every service declares deploy.resources.limits + pids_limit (resolved
+# config had none before W16).
+
+x-ci-resource-limits-proxy: &ci-resource-limits-proxy
+  pids_limit: 256
+  deploy:
+    resources:
+      limits:
+        cpus: "1.0"
+        memory: 512M
+        pids: 256
+
+x-ci-resource-limits-gateway: &ci-resource-limits-gateway
+  pids_limit: 256
+  deploy:
+    resources:
+      limits:
+        cpus: "2.0"
+        memory: 2G
+        pids: 256
+
+x-ci-resource-limits-init: &ci-resource-limits-init
+  pids_limit: 64
+  deploy:
+    resources:
+      limits:
+        cpus: "0.5"
+        memory: 256M
+        pids: 64
+
+x-ci-resource-limits-mock: &ci-resource-limits-mock
+  pids_limit: 64
+  deploy:
+    resources:
+      limits:
+        cpus: "0.5"
+        memory: 256M
+        pids: 64
+
 volumes:
   sevn-ci-workspace:
 
 services:
   sevn-ci-init:
+    <<: *ci-resource-limits-init
     image: busybox:1.36
     user: "0:0"
     volumes:
@@ -14,19 +57,44 @@ services:
       - sh
       - -ec
       - |
-        mkdir -p /operator/workspace
-        cp -a /seed/sevn.json /operator/workspace/sevn.json
-        if [ -d /seed/.sevn ]; then cp -a /seed/.sevn /operator/workspace/.sevn; fi
-        chown -R 10001:10001 /operator
+        mkdir -p /operator /operator/.sevn /operator/workspace /operator/workspace/logs /operator/workspace/.sevn
+        # C9.1 / C9.2 / C9.4: scoped application-owned dirs; skip when marker present.
+        # The marker check runs BEFORE the seed copy so a warm boot cannot
+        # restore the seed's host/root ownership and then skip normalization
+        # (D-PR-3: cp -a would reseed workspace before the marker check, so
+        # a second boot restored root ownership and skipped the chown pass).
+        if [ ! -f /operator/.sevn/perms-v1 ]; then
+          # Cold boot: seed from the host fixture and chown the whole tree
+          # in one scoped pass. cp -an (no-clobber) so future boots that
+          # reach this branch (e.g. the volume was wiped) do not clobber
+          # any in-place operator edits.
+          cp -an /seed/sevn.json /operator/workspace/sevn.json
+          if [ -d /seed/.sevn ]; then cp -an /seed/.sevn /operator/workspace/.sevn; fi
+          find /operator/workspace ! -user 10001 -exec chown 10001:10001 {} +
+          find /operator/workspace/logs ! -user 10001 -exec chown 10001:10001 {} +
+          find /operator/workspace/.sevn ! -user 10001 -exec chown 10001:10001 {} +
+          printf '1\n' > /operator/.sevn/perms-v1
+          chown 10001:10001 /operator/.sevn /operator/.sevn/perms-v1
+        else
+          # Warm boot: the persistent volume is already owned by 10001.
+          # Re-chown anything that has drifted (e.g. a freshly mounted
+          # bind-mount that was created by a different uid). This is
+          # cheap and idempotent — it is a scoped find, not a chown -R.
+          find /operator/workspace ! -user 10001 -exec chown 10001:10001 {} +
+          find /operator/workspace/logs ! -user 10001 -exec chown 10001:10001 {} +
+          find /operator/workspace/.sevn ! -user 10001 -exec chown 10001:10001 {} +
+        fi
     restart: "no"
 
   mock-openai:
+    <<: *ci-resource-limits-mock
     build:
       context: ../infra/ci-mock-openai
     expose:
       - "9090"
 
   sevn-proxy:
+    <<: *ci-resource-limits-proxy
     image: sevn-proxy:ci
     # pull_policy:never + a matching local tag lets jobs that pre-build the
     # image (load:true via build-push-action) run `up --no-build` and reuse it
@@ -47,6 +115,7 @@ services:
       - mock-openai
 
   sevn-gateway:
+    <<: *ci-resource-limits-gateway
     image: sevn-gateway:ci
     pull_policy: never
     build:

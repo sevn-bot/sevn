@@ -405,7 +405,7 @@ about-docs-check: ## Validate about-docs + skw spec/prd folder gates
 	$(MAKE) prd-check
 
 spec-check: ## Validate+score every spec in about-sevn.bot/specs (skw docs validate)
-	@if [ -d spec-kit-wave ]; then \
+	@if [ -d spec-kit-wave/src/skw ]; then \
 		$(MAKE) -C spec-kit-wave spec-check REPO_ROOT="$(CURDIR)"; \
 	else \
 		echo "spec-check: skipped (spec-kit-wave not present)"; \
@@ -455,17 +455,17 @@ prd-sync: ## Refresh PRD frontmatter in about-sevn.bot/prd (skw docs sync)
 	fi
 
 prd-check: ## Validate+score every PRD in about-sevn.bot/prd (skw docs validate)
-	@if [ -d spec-kit-wave ]; then \
+	@if [ -d spec-kit-wave/src/skw ]; then \
 		$(MAKE) -C spec-kit-wave prd-check REPO_ROOT="$(CURDIR)"; \
 	else \
-		echo "prd-check: skipped (spec-kit-wave not present)"; \
+		echo "prd-check: skipped (spec-kit-wave/src/skw not present)"; \
 	fi
 
 spec-kit-wave-test: ## Run spec-kit-wave pytest suite (skw validators + sync contracts)
-	@if [ -d spec-kit-wave ]; then \
+	@if [ -d spec-kit-wave/src/skw ] && [ -d spec-kit-wave/tests ]; then \
 		$(MAKE) -C spec-kit-wave test REPO_ROOT="$(CURDIR)"; \
 	else \
-		echo "spec-kit-wave-test: skipped (spec-kit-wave not present)"; \
+		echo "spec-kit-wave-test: skipped (spec-kit-wave/src/skw or tests not present)"; \
 	fi
 
 subagents-chart: ## Regenerate deterministic sub-agents topology SVG (D14)

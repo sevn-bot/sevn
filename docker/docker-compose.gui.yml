@@ -13,7 +13,8 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.gateway.gui
-    # Xvfb + Brave headed: --no-sandbox / --disable-dev-shm-usage avoid extra capabilities.
+    # Xvfb + Brave headed: --disable-dev-shm-usage is enough; keep the renderer sandbox on
+    # (do not disable the Chromium sandbox via SEVN_BROWSER_EXTRA_ARGS).
     environment:
       SEVN_HOME: /operator
       HOME: /operator/workspace

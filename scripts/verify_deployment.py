@@ -598,11 +598,13 @@ def drive_stack_health() -> DriverResult:
     Runs under project ``SEVN_VERIFY_PROJECT`` (default ``sevn-verify``) on port
     ``SEVN_VERIFY_GATEWAY_PORT`` (default ``3101``) so it never collides with the
     operator's own stack, and always tears down with ``down -v``. Records how long
-    the boot-blocking ``sevn-operator-perms`` recursive ``chown`` takes — the #166
-    regression is only observable when the stack actually starts.
+    the boot-blocking ``sevn-operator-perms`` ownership pass takes — the #166
+    regression is only observable when the stack actually starts. After ready,
+    inspects ``HostConfig`` on gateway and proxy and requires ``NanoCpus``,
+    ``Memory``, and ``PidsLimit`` to match the resolved compose limits (C10.2).
 
     Returns:
-        DriverResult: Verdict plus boot, readiness, and perms-duration checks.
+        DriverResult: Verdict plus boot, readiness, perms-duration, and HostConfig checks.
 
     Examples:
         >>> drive_stack_health().name
@@ -710,7 +712,7 @@ def drive_stack_health() -> DriverResult:
                         name="operator-perms-duration",
                         status=STATUS_PASS if elapsed <= perms_budget else STATUS_FAIL,
                         detail=(
-                            f"boot-blocking recursive chown took {elapsed:.1f}s "
+                            f"boot-blocking perms init took {elapsed:.1f}s "
                             f"(budget {perms_budget:.1f}s, SEVN_VERIFY_PERMS_MAX_S)"
                         ),
                         command=f"docker inspect {container}",
@@ -731,6 +733,105 @@ def drive_stack_health() -> DriverResult:
                     status=STATUS_WARN,
                     detail=f"{container} not inspectable (exit {icode}) — chown cost unmeasured",
                     output=iout.strip()[:400],
+                )
+            )
+
+        # C10.2: HostConfig NanoCpus / Memory / PidsLimit must match declared compose limits.
+        cfg_code, cfg_out = _run(
+            [*base, "config", "--format", "json"],
+            env=env,
+            timeout=60.0,
+        )
+        if cfg_code == 0:
+            try:
+                cfg = json.loads(cfg_out)
+            except json.JSONDecodeError:
+                cfg = {}
+            services_cfg = cfg.get("services") or {}
+            for svc_name in ("sevn-proxy", "sevn-gateway"):
+                svc = services_cfg.get(svc_name) or {}
+                limits = ((svc.get("deploy") or {}).get("resources") or {}).get("limits") or {}
+                declared_cpus = limits.get("cpus")
+                declared_memory = limits.get("memory")
+                declared_pids = limits.get("pids") or svc.get("pids_limit")
+                cid_code, cid_out = _run(
+                    [*base, "ps", "-aq", svc_name],
+                    env=env,
+                    timeout=60.0,
+                )
+                cid = (cid_out or "").strip().splitlines()
+                if cid_code != 0 or not cid:
+                    result.checks.append(
+                        Check(
+                            name=f"hostconfig-{svc_name}",
+                            status=STATUS_FAIL,
+                            detail=f"{svc_name}: no container id for HostConfig inspect",
+                        )
+                    )
+                    continue
+                hc_code, hc_out = _run(
+                    ["docker", "inspect", cid[0], "--format", "{{json .HostConfig}}"],
+                    timeout=60.0,
+                )
+                if hc_code != 0:
+                    result.checks.append(
+                        Check(
+                            name=f"hostconfig-{svc_name}",
+                            status=STATUS_FAIL,
+                            detail=f"{svc_name}: docker inspect failed",
+                            output=hc_out.strip()[:400],
+                        )
+                    )
+                    continue
+                try:
+                    host = json.loads(hc_out)
+                except json.JSONDecodeError:
+                    result.checks.append(
+                        Check(
+                            name=f"hostconfig-{svc_name}",
+                            status=STATUS_FAIL,
+                            detail=f"{svc_name}: HostConfig JSON parse failed",
+                            output=hc_out.strip()[:400],
+                        )
+                    )
+                    continue
+                nano = int(host.get("NanoCpus") or 0)
+                memory = int(host.get("Memory") or 0)
+                pids = int(host.get("PidsLimit") or 0)
+                ok = nano > 0 and memory > 0 and pids > 0
+                detail_parts = [
+                    f"NanoCpus={nano}",
+                    f"Memory={memory}",
+                    f"PidsLimit={pids}",
+                ]
+                if declared_cpus is not None:
+                    expected_nano = int(float(declared_cpus) * 1_000_000_000)
+                    if nano != expected_nano:
+                        ok = False
+                        detail_parts.append(f"expected NanoCpus={expected_nano}")
+                if declared_memory is not None:
+                    expected_mem = int(declared_memory)
+                    if memory != expected_mem:
+                        ok = False
+                        detail_parts.append(f"expected Memory={expected_mem}")
+                if declared_pids is not None and pids != int(declared_pids):
+                    ok = False
+                    detail_parts.append(f"expected PidsLimit={declared_pids}")
+                result.checks.append(
+                    Check(
+                        name=f"hostconfig-{svc_name}",
+                        status=STATUS_PASS if ok else STATUS_FAIL,
+                        detail="; ".join(detail_parts),
+                        command=f"docker inspect {cid[0]} --format '{{{{json .HostConfig}}}}'",
+                    )
+                )
+        else:
+            result.checks.append(
+                Check(
+                    name="hostconfig-compose-config",
+                    status=STATUS_WARN,
+                    detail="could not load compose config for HostConfig comparison",
+                    output=cfg_out.strip()[:400],
                 )
             )
     finally:

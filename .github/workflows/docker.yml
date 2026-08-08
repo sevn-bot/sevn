@@ -90,6 +90,66 @@ jobs:
           cache-from: type=gha,scope=gateway-browser
           cache-to: type=gha,mode=max,scope=gateway-browser,ignore-error=true
 
+      # C8.1 / 243-A: prove the just-built browser image boots headless under
+      # the hardened prod-overlay flags (cap_drop:ALL + non-root uid 10001)
+      # and reaches CDP readiness without --no-sandbox. Without this step,
+      # the static "no --no-sandbox in compose YAML" check passes even when
+      # the dockerized browser refuses to start without --no-sandbox at
+      # runtime. Runs here so a broken image is a red PR check, not a silent
+      # skip on the operator's machine.
+      #
+      # The Brave renderer sandbox needs to call clone(CLONE_NEWUSER) to
+      # isolate the renderer process; on GHA ubuntu-latest (Ubuntu 24.04) the
+      # default AppArmor policy restricts unprivileged user namespaces via
+      # /proc/sys/kernel/apparmor_restrict_unprivileged_userns=1, which makes
+      # Chromium abort with "No usable sandbox!" before CDP can bind. Disable
+      # that restriction on the runner host for the duration of this step so
+      # the smoke can exercise the renderer path. The smoke itself runs with
+      # --cap-drop=ALL and user=10001:10001 so the C8.1 hardening claim is
+      # still asserted.
+      - name: Bootstrap uv for Brave smoke
+        uses: ./.github/actions/bootstrap
+
+      - name: Allow unprivileged user namespaces for Chromium renderer sandbox
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          # Idempotent: the sysctl may not exist on older runners; skip in
+          # that case (the sandbox will fail honestly on those hosts and
+          # that is a separate fix).
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+          fi
+
+      - name: Headless Brave smoke under hardened flags (C8.1 / 243-A)
+        env:
+          SEVN_BROWSER_SMOKE_IMAGE: sevn-gateway-browser:ci
+        run: |
+          set -euo pipefail
+          docker image inspect sevn-gateway-browser:ci >/dev/null
+          uv run pytest \
+            tests/infra/test_prod_ready_isolation_w13_red.py \
+            -v --tb=short --strict-markers \
+            -k test_brave_runs_in_hardened_container_without_no_sandbox
+
+      # W13.7 / C10.2 / 243-B: HostConfig integration check. Wires the test
+      # after the proxy/gateway :ci images are built so a NanoCpus / Memory /
+      # PidsLimit regression fails CI instead of being silently skipped on
+      # the operator's machine. The test renders a minimal Compose project
+      # containing only the two services under test (sevn-proxy:ci,
+      # sevn-gateway:ci) and runs ``docker compose create --pull never`` to
+      # exercise the HostConfig enforcement without spinning up the full
+      # stack.
+      - name: W13 HostConfig integration check (C10.2 / 243-B)
+        run: |
+          set -euo pipefail
+          docker image inspect sevn-proxy:ci >/dev/null
+          docker image inspect sevn-gateway:ci >/dev/null
+          uv run pytest \
+            tests/infra/test_prod_ready_isolation_w13_red.py \
+            -v --tb=short --strict-markers \
+            -k test_created_containers_hostconfig_matches_declared_limits
+
   compose-ci:
     runs-on: ubuntu-latest
     timeout-minutes: 60
