@@ -187,7 +187,10 @@ def register(app: typer.Typer) -> None:
 
         typer.echo(url)
         if local_open:
-            typer.echo("loopback access — no login required")
+            typer.echo(
+                "loopback access — Mission Control requires the boot "
+                "dashboard-local-token (this command appends it when available)"
+            )
         elif tunnel and _dashboard_login_password_configured(workspace):
             typer.echo(
                 "Tunnel is active: open the URL above and sign in at /mission/ with your "

@@ -304,7 +304,7 @@ def test_publish_concurrency_is_sha_keyed() -> None:
 
 def test_quarantine_cleanup_runs_on_publish_and_supply_chain_failure() -> None:
     """Partial publish failures must clean quarantine even when supply-chain is skipped."""
-    for job_key in ("publish-ghcr", "container-supply-chain"):
+    for job_key in ("publish-ghcr", "container-supply-chain", "verify-deployment"):
         steps = _cleanup_steps_for_job(job_key)
         assert steps, f"{job_key} missing Cleanup quarantine tags on failure step"
         step = steps[0]
@@ -319,6 +319,34 @@ def test_quarantine_cleanup_runs_on_publish_and_supply_chain_failure() -> None:
         assert _CLEANUP_CALL_RE.search(run), (
             f"{job_key} cleanup must call delete_quarantine_tags with sha + run_id; got:\n{run}"
         )
+
+
+def test_verify_deployment_image_repository_is_job_scoped() -> None:
+    """F-THERMOS-1: ``verify-deployment`` must declare IMAGE_REPOSITORY at the job level."""
+    jobs = _load_ci_cd_workflow()["jobs"]
+    job = jobs.get("verify-deployment")
+    assert isinstance(job, dict), "verify-deployment job missing from ci-cd.yml"
+    env = job.get("env")
+    assert isinstance(env, dict), (
+        "verify-deployment must declare job-level env: so cleanup step inherits IMAGE_REPOSITORY"
+    )
+    assert "IMAGE_REPOSITORY" in env, (
+        "verify-deployment job-level env must include IMAGE_REPOSITORY; otherwise "
+        "the cleanup step's `${IMAGE_REPOSITORY}` expansion is empty and the "
+        "quarantine cleanup script silently no-ops under continue-on-error: true"
+    )
+    assert "needs.publish-ghcr.outputs.image_repository" in str(env["IMAGE_REPOSITORY"]), (
+        "IMAGE_REPOSITORY must be sourced from publish-ghcr.outputs.image_repository; "
+        f"got {env['IMAGE_REPOSITORY']!r}"
+    )
+    cleanup_steps = _cleanup_steps_for_job("verify-deployment")
+    assert cleanup_steps, "verify-deployment missing cleanup step"
+    cleanup_env = cleanup_steps[0].get("env") or {}
+    assert "IMAGE_REPOSITORY" not in cleanup_env, (
+        "cleanup step must inherit IMAGE_REPOSITORY from the job-level env: "
+        "re-declaring it at the step level risks divergence; "
+        f"step-level env={cleanup_env!r}"
+    )
 
 
 def test_stable_tags_promoted_by_digest_after_scan() -> None:

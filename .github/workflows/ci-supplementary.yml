@@ -31,6 +31,51 @@ permissions:
   contents: read
 
 jobs:
+  verify-deployment:
+    name: Deployment drivers (tolerates driver_unavailable)
+    # Daily cron + manual dispatch. ``make verify-deployment`` returns exit 2
+    # (``driver_unavailable``) when Docker / a built image / a running gateway
+    # is missing — tolerated here. On the release tag path (ci-cd.yml) the same
+    # driver exits 2 are FAILED because a release that cannot run its own
+    # verification has not been verified (D52, prod-readiness W23.2).
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 5 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+      - uses: ./.github/actions/bootstrap
+
+      - name: Run deployment drivers (tolerate driver_unavailable)
+        # The harness exits 2 (driver_unavailable) when Docker / sandbox image /
+        # running gateway is missing — that is a *known* state on a fresh cron
+        # runner and must not fail the gate. Real failures (exit 1) still do.
+        #
+        # F-PR-2: the previous shape (``make verify-deployment``) routes the
+        # inner driver verdict through GNU make, which can collapse
+        # recipe errors to its own exit 2 (in addition to its recipe-fail
+        # exit 1). That made the ``$rc -eq 2`` branch swallow real driver
+        # failures and turn cron green when it shouldn't be. Invoke the
+        # Python driver directly so the script's own exit code (0=pass,
+        # 1=fail, 2=driver_unavailable) reaches the branch logic intact,
+        # and double-check by parsing the ``VERIFY_OVERALL:`` line the
+        # script emits on stdout (mergecraft review 3740249070).
+        run: |
+          set +e
+          log="$(uv run python scripts/verify_deployment.py all 2>&1)"
+          rc=$?
+          set -e
+          printf '%s\n' "$log"
+          overall="$(printf '%s\n' "$log" | sed -n 's/^VERIFY_OVERALL:[[:space:]]*\([a-z_]*\)[[:space:]].*/\1/p' | tail -n 1)"
+          if [ "$rc" -eq 1 ] || [ "${overall:-}" = "fail" ]; then
+            echo "::error title=verify-deployment::driver verdict was fail (exit $rc, overall=${overall:-unknown})"
+            exit 1
+          fi
+          if [ "$rc" -eq 2 ] || [ "${overall:-}" = "driver_unavailable" ]; then
+            echo "::warning title=verify-deployment::driver reported driver_unavailable (exit $rc) — tolerated on cron"
+            exit 0
+          fi
+          exit 0
+
   security:
     name: Dependency + static security audit (bandit + pip-audit)
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 5 * * *'

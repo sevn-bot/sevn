@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Deliver Mission Control: a same-process dashboard (prd-07-mission-control)
   so the owner can inspect traces, costs, provider health, in-flight runs, proxy status,
   and config without opening SQLite from'
-last_updated: '2026-08-07'
-fingerprint: sha256:0f6bfb3a32a57e4811bf190388b649d0ead6335cd15cac6de28b31d4431f9679
+last_updated: '2026-08-08'
+fingerprint: sha256:d954bce49e6d17a4425f9bb36a836f4571173aa4bf348b1dbfde79a0cad483db
 related: []
 sources:
 - src/sevn/ui/**
@@ -675,6 +675,9 @@ interfaces:
 - name: local_open_effective
   file: src/sevn/ui/dashboard/services/auth.py
   symbol: local_open_effective
+- name: log_local_open_trust_address_boot_warning
+  file: src/sevn/ui/dashboard/services/auth.py
+  symbol: log_local_open_trust_address_boot_warning
 - name: sevn_json_path_from_request
   file: src/sevn/ui/dashboard/services/auth.py
   symbol: sevn_json_path_from_request

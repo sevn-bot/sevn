@@ -8,7 +8,7 @@ summary: Run the long-lived gateway process that accepts channel ingress (Telegr
   poll/webhook, webchat WS), normalises messages, enforces trust boundaries (scanner,
   rate limits), persists session history, an
 last_updated: '2026-08-06'
-fingerprint: sha256:4dd9268c9258fd1b166286403ee25381a688f4f41bdfdfd5605c014d0d40e98a
+fingerprint: sha256:0dacfa4b94e011ea75f5e6b1a4a5607fd98ca1817aaab8a4118103273021d188
 related: []
 sources:
 - src/sevn/gateway/**

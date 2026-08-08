@@ -510,6 +510,16 @@ the boot ``dashboard-local-token`` for direct loopback clients unless
 Mission Control REST routes and ``/ws/dashboard`` the same way as password login
 would for remote clients.
 
+## Amendments (prod-readiness-0.0.1 W22 — C6.2, C6.4)
+
+``dashboard.local_open_trust_address`` is refused (forced ``false``) when a tunnel
+or non-loopback gateway bind is configured — same policy surface as
+``dashboard.local_open``. When the escape remains enabled on a safe bind, gateway
+boot emits ``log_local_open_trust_address_boot_warning``. The key name is retained
+(W22.3): ``trust_address`` already signals the hazard; refusal + boot warning
+cover C6.2 without a breaking rename. CLI ``sevn dashboard`` describes the boot
+token requirement instead of claiming ``no login required`` (C6.4).
+
 ## Human-input needed
 
 Prose body not yet authored (W9 scope). Normative contract requires operator or

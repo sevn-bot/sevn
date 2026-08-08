@@ -206,7 +206,10 @@ from sevn.triggers.settings import effective_max_concurrent
 from sevn.triggers.webhook_router import build_webhook_router
 from sevn.ui.dashboard import register_dashboard_routes
 from sevn.ui.dashboard.services import DashboardAuthService
-from sevn.ui.dashboard.services.auth import apply_tunnel_local_open_policy
+from sevn.ui.dashboard.services.auth import (
+    apply_tunnel_local_open_policy,
+    log_local_open_trust_address_boot_warning,
+)
 from sevn.ui.openui.bridge import OpenUIBridge, build_content_security_policy
 from sevn.ui.openui.callback import (
     build_openui_dispatch_payload,
@@ -1264,6 +1267,7 @@ def create_app(
         ws, ly = _bootstrap_config()
         await _prime_unlock_env_and_warn(ws, content_root=ly.content_root)
         apply_tunnel_local_open_policy(ws)
+        log_local_open_trust_address_boot_warning(ws)
         effective_process = _effective_process_settings(ws, resolved_process)
         effective_process = await _with_resolved_proxy_shared_secret(
             effective_process,

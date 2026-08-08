@@ -7,8 +7,8 @@ owner: Alex
 summary: 'Provide a single, testable configuration surface before storage, tracing,
   proxy, and gateway work: locate sevn.json, validate schema_version and structured
   subtrees needed by early boot, resolve the c'
-last_updated: '2026-08-06'
-fingerprint: sha256:ab869c822c8ddc211729bdbf07fb33fdb4938d077febac809fdd6b2ad30f2d2d
+last_updated: '2026-08-07'
+fingerprint: sha256:5042b19b30e123fe3ef27c2b1b2a4d99cad37be552839c626794393208c25e0b
 related: []
 sources:
 - src/sevn/config/**
@@ -1080,3 +1080,14 @@ parses into ``ProcessSettings.proxy_shared_secret`` (env alias
 ``x-sevn-env-allowlist`` row in ``infra/sevn.schema.json``. The variable remains
 valid outside ``sevn.json`` (runtime / Compose / secret managers); it is no longer
 beside the audited process-settings contract.
+
+## Amendments (prod-readiness-0.0.1 W22 — C6.2, C6.4)
+
+``dashboard.local_open_trust_address`` remains the config key (W22.3 naming:
+keep — ``trust_address`` reads as address-based trust; rename deferred to avoid
+a breaking schema migration for a default-false escape). Schema description and
+model ``Field`` mark it as a dangerous escape hatch. Runtime:
+``apply_tunnel_local_open_policy`` forces the key ``false`` under tunnel or
+non-loopback ``gateway.host``; ``log_local_open_trust_address_boot_warning``
+fires at gateway lifespan when the key is still ``true``. CLI copy no longer
+claims loopback needs no login (C6.4).
