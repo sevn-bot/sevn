@@ -58,15 +58,31 @@ services:
       - -ec
       - |
         mkdir -p /operator /operator/.sevn /operator/workspace /operator/workspace/logs /operator/workspace/.sevn
-        cp -a /seed/sevn.json /operator/workspace/sevn.json
-        if [ -d /seed/.sevn ]; then cp -a /seed/.sevn /operator/workspace/.sevn; fi
         # C9.1 / C9.2 / C9.4: scoped application-owned dirs; skip when marker present.
+        # The marker check runs BEFORE the seed copy so a warm boot cannot
+        # restore the seed's host/root ownership and then skip normalization
+        # (D-PR-3: cp -a would reseed workspace before the marker check, so
+        # a second boot restored root ownership and skipped the chown pass).
         if [ ! -f /operator/.sevn/perms-v1 ]; then
+          # Cold boot: seed from the host fixture and chown the whole tree
+          # in one scoped pass. cp -an (no-clobber) so future boots that
+          # reach this branch (e.g. the volume was wiped) do not clobber
+          # any in-place operator edits.
+          cp -an /seed/sevn.json /operator/workspace/sevn.json
+          if [ -d /seed/.sevn ]; then cp -an /seed/.sevn /operator/workspace/.sevn; fi
           find /operator/workspace ! -user 10001 -exec chown 10001:10001 {} +
           find /operator/workspace/logs ! -user 10001 -exec chown 10001:10001 {} +
           find /operator/workspace/.sevn ! -user 10001 -exec chown 10001:10001 {} +
           printf '1\n' > /operator/.sevn/perms-v1
           chown 10001:10001 /operator/.sevn /operator/.sevn/perms-v1
+        else
+          # Warm boot: the persistent volume is already owned by 10001.
+          # Re-chown anything that has drifted (e.g. a freshly mounted
+          # bind-mount that was created by a different uid). This is
+          # cheap and idempotent — it is a scoped find, not a chown -R.
+          find /operator/workspace ! -user 10001 -exec chown 10001:10001 {} +
+          find /operator/workspace/logs ! -user 10001 -exec chown 10001:10001 {} +
+          find /operator/workspace/.sevn ! -user 10001 -exec chown 10001:10001 {} +
         fi
     restart: "no"
 

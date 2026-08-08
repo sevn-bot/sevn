@@ -778,6 +778,71 @@ def test_ci_init_has_no_unconditional_chown() -> None:
     )
 
 
+def test_ci_init_marker_check_runs_before_seed_copy() -> None:
+    """D-PR-3: ``sevn-ci-init`` must gate the seed copy behind the marker check.
+
+    On a warm boot the persistent ``sevn-ci-workspace`` volume is already
+    populated and already owned by uid 10001. The previous init ran
+    ``cp -a /seed/sevn.json /operator/workspace/sevn.json`` (and the same
+    for ``/seed/.sevn``) **before** checking for the
+    ``/operator/.sevn/perms-v1`` marker. ``cp -a`` reseeds the workspace
+    from the host fixture, the host fixture is owned by the build-time
+    root user, and the marker check then sees the marker and skips
+    normalization — leaving the gateway container unable to read its
+    own ``sevn.json``.
+
+    The fix is to invert the order: check the marker first, and only
+    seed (with ``cp -an`` so an existing volume is never clobbered) on
+    cold boots. Warm boots still chown any drift that has accumulated
+    since the previous run.
+    """
+    command = _service_command_text(_CI_COMPOSE, "sevn-ci-init")
+    assert _PERMS_MARKER in command, f"marker {_PERMS_MARKER} missing from sevn-ci-init"
+
+    # Locate every ``cp -a[n]`` that copies a seed file/dir from /seed.
+    seed_copy_re = re.compile(r"\bcp\s+-a[n]?\s+/seed/\S+\s+/\S+")
+    seed_copies = seed_copy_re.findall(command)
+    assert seed_copies, (
+        "sevn-ci-init no longer seeds the workspace from /seed; if the seed "
+        "is genuinely optional, document the contract in a comment instead"
+    )
+
+    # Find the byte-offset of the marker check and the byte-offset of each
+    # seed copy. The marker check must precede every seed copy so a warm
+    # boot never reseeds the volume before normalization is decided.
+    marker_match = re.search(rf"\[ ! -f {_PERMS_MARKER.replace('.', r'\.')}\s*\]", command)
+    assert marker_match, (
+        "sevn-ci-init must guard the cold-boot path with [ ! -f /operator/.sevn/perms-v1 ]"
+    )
+    marker_offset = marker_match.start()
+    for copy in seed_copies:
+        copy_offset = command.find(copy)
+        assert copy_offset > marker_offset, (
+            f"D-PR-3: seed copy {copy!r} appears before the marker check "
+            f"({copy_offset} < {marker_offset}); cp -a would reseed the "
+            "workspace with host/root ownership and the marker branch "
+            "would then skip normalization. Move the seed copy inside "
+            "the marker-gated cold-boot branch (or use cp -an so warm "
+            "boots do not clobber the persistent volume)."
+        )
+
+    # Warm-boot safety net: even when the marker is present, the init must
+    # still chown any drift (the persistent volume could have been mounted
+    # under a different uid via a host bind-mount, etc.). The shape we
+    # require is a ``find ... ! -user 10001 -exec chown 10001:10001 {} +``
+    # scoped to a single app-owned subdir (no ``chown -R``).
+    scoped_drift_chown = re.search(
+        r"find\s+/operator/workspace(?:\S*)\s+!\s+-user\s+10001\s+-exec\s+chown\s+10001:10001",
+        command,
+    )
+    assert scoped_drift_chown, (
+        "sevn-ci-init must keep a scoped drift-recovery chown (find ... "
+        "! -user 10001 -exec chown 10001:10001 {}) on warm boots, so a "
+        "host bind-mount that landed a non-10001 owner is still "
+        "normalized without reseeding the workspace"
+    )
+
+
 # ---------------------------------------------------------------------------
 # W13.6 — C10.1: minimum Docker Compose version
 # ---------------------------------------------------------------------------
