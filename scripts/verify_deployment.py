@@ -1708,9 +1708,20 @@ def drive_cancellation_cleanup() -> DriverResult:
         )
         return result
 
-    baseline_ps, baseline_vol = _container_and_volume_baseline()
     cancel_run_id = f"verify-cancel-{_now_stamp()}"
     spawn_ready_timeout = float(os.environ.get("SEVN_VERIFY_SPAWN_READY_TIMEOUT_S", "30"))
+    # F-PR-6 (mergecraft review 3740249077): scope the baseline / after
+    # snapshots and the cleanup pass to a docker label the driver owns
+    # so concurrent local Docker work on a developer machine is never
+    # destroyed. ``sevn.run_id`` is stamped on every sandbox container
+    # by ``DockerSandboxRuntime.spawn``
+    # (``src/sevn/security/sandbox_runtime.py``), and the run_id is
+    # generated locally by this driver so no other project can collide.
+    # Volumes do not currently carry ``sevn.run_id``; the volume-ls
+    # snapshot will therefore return empty for this filter, which is
+    # the correct conservative behaviour for cleanup.
+    owned_label_filter = f"label=sevn.run_id={cancel_run_id}"
+    baseline_ps, baseline_vol = _owned_container_and_volume_baseline(owned_label_filter)
 
     async def _spawn_and_cancel() -> str:
         from sevn.config.workspace_config import WorkspaceConfig
@@ -1810,8 +1821,14 @@ def drive_cancellation_cleanup() -> DriverResult:
         # completed spawn could leave containers / volumes pinned to the
         # operator network; the mirror of ``drive_volume_upgrade``'s
         # ``finally: docker compose down -v`` pattern.
+        #
+        # F-PR-6 (mergecraft review 3740249077): the baseline / after
+        # snapshots and the cleanup pass are now scoped to a docker
+        # label the driver owns (``sevn.run_id=<cancel_run_id>``) so
+        # concurrent local Docker work on a developer machine is never
+        # in the orphan set and is never touched by the cleanup phase.
         time.sleep(2.0)
-        after_ps, after_vol = _container_and_volume_baseline()
+        after_ps, after_vol = _owned_container_and_volume_baseline(owned_label_filter)
         orphan_containers = sorted(set(after_ps) - set(baseline_ps))
         orphan_volumes = sorted(set(after_vol) - set(baseline_vol))
         result.checks.append(
@@ -1819,10 +1836,11 @@ def drive_cancellation_cleanup() -> DriverResult:
                 name="no-orphan-containers",
                 status=STATUS_PASS if not orphan_containers else STATUS_FAIL,
                 detail=(
-                    f"baseline {len(baseline_ps)} containers; post-cancel {len(after_ps)}; "
+                    f"baseline {len(baseline_ps)} containers (label={owned_label_filter}); "
+                    f"post-cancel {len(after_ps)}; "
                     f"new: {orphan_containers or '(none)'}"
                 ),
-                command="docker ps --format '{{.Names}}'",
+                command=f"docker ps -a --filter {owned_label_filter} --format '{{{{.Names}}}}'",
             )
         )
         result.checks.append(
@@ -1830,10 +1848,11 @@ def drive_cancellation_cleanup() -> DriverResult:
                 name="no-leaked-volumes",
                 status=STATUS_PASS if not orphan_volumes else STATUS_FAIL,
                 detail=(
-                    f"baseline {len(baseline_vol)} volumes; post-cancel {len(after_vol)}; "
+                    f"baseline {len(baseline_vol)} volumes (label={owned_label_filter}); "
+                    f"post-cancel {len(after_vol)}; "
                     f"new: {orphan_volumes or '(none)'}"
                 ),
-                command="docker volume ls --format '{{.Name}}'",
+                command=f"docker volume ls --filter {owned_label_filter} --format '{{{{.Name}}}}'",
             )
         )
 
@@ -1863,6 +1882,52 @@ def _container_and_volume_baseline() -> tuple[set[str], set[str]]:
     code, out = _run(["docker", "ps", "--format", "{{.Names}}"], timeout=60.0)
     containers = set(out.split()) if code == 0 else set()
     vcode, vout = _run(["docker", "volume", "ls", "--format", "{{.Name}}"], timeout=60.0)
+    volumes = set(vout.split()) if vcode == 0 else set()
+    return containers, volumes
+
+
+def _owned_container_and_volume_baseline(label_filter: str) -> tuple[set[str], set[str]]:
+    """Snapshot only the containers/volumes carrying the given docker label.
+
+    F-PR-6 (mergecraft review 3740249077) replaced the global
+    ``docker ps`` snapshot with a label-scoped one so the driver's
+    cleanup phase never touches unrelated Docker work on a developer
+    machine. ``label_filter`` is the full ``--filter label=<key>=<val>``
+    expression passed verbatim to ``docker ps`` / ``docker volume ls``;
+    ``docker ps -a`` is used so stopped / finished containers the
+    driver spawned are still visible.
+
+    Args:
+        label_filter (str): Full ``--filter label=<key>=<val>`` expression.
+
+    Returns:
+        tuple[set[str], set[str]]: Container-name set and volume-name set.
+
+    Examples:
+        >>> isinstance(_owned_container_and_volume_baseline("label=foo=bar"), tuple)
+        True
+    """
+    ps_argv = [
+        "docker",
+        "ps",
+        "-a",
+        "--filter",
+        label_filter,
+        "--format",
+        "{{.Names}}",
+    ]
+    code, out = _run(ps_argv, timeout=60.0)
+    containers = set(out.split()) if code == 0 else set()
+    vol_argv = [
+        "docker",
+        "volume",
+        "ls",
+        "--filter",
+        label_filter,
+        "--format",
+        "{{.Name}}",
+    ]
+    vcode, vout = _run(vol_argv, timeout=60.0)
     volumes = set(vout.split()) if vcode == 0 else set()
     return containers, volumes
 

@@ -635,6 +635,104 @@ def test_cancellation_cleanup_polls_for_running_container(
     )
 
 
+def test_cancellation_cleanup_scopes_to_owned_labels(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-PR-6 — cleanup must only touch containers/volumes this driver created.
+
+    The pre-F-PR-6 shape ``set(after_ps) - set(baseline_ps)`` diff'd
+    against the **global** ``docker ps`` snapshot, so any new
+    container that appeared during the driver run — including
+    unrelated work on a developer machine — would be on the cleanup
+    list. ``docker ps`` also missed stopped/finished containers.
+    The fix is to filter the snapshot and the cleanup to a label the
+    driver owns (``sevn.verify.created_by=cancellation-cleanup`` /
+    ``sevn.verify.run_id=<stamp>``) so concurrent local Docker work
+    is never destroyed (mergecraft review 3740249077).
+
+    This test pins the shape by intercepting every ``docker ps`` /
+    ``docker volume ls`` / ``docker rm`` / ``docker volume rm``
+    invocation and asserting (a) every ps/volume-ls call carries the
+    driver's ownership label filter, and (b) every cleanup call only
+    targets containers/volumes the driver itself labelled.
+    """
+    module = _healthy_driver_run(monkeypatch, _load_verify_module())
+    real_module = module
+    docker_calls: list[str] = []
+
+    async def fake_spawn(*, run_id, workspace, env):
+        await asyncio.sleep(0.5)
+        return f"fake-sandbox-{run_id}"
+
+    async def fake_teardown(sandbox_id):
+        return None
+
+    fake_runtime = type(
+        "FakeRuntime",
+        (),
+        {"spawn": staticmethod(fake_spawn), "teardown": staticmethod(fake_teardown)},
+    )
+
+    monkeypatch.setattr(
+        "sevn.security.sandbox_runtime.DockerSandboxRuntime",
+        lambda *a, **kw: fake_runtime,
+    )
+
+    owned_container = "sevn-sb-owned-by-driver"
+    unrelated_container = "redis-from-another-project"
+    owned_volume = "sevn-verify-cancel-owned-volume"
+    unrelated_volume = "redis-data-from-another-project"
+
+    def fake_run(argv, *args, **kwargs):
+        joined = " ".join(str(x) for x in argv)
+        docker_calls.append(joined)
+        if argv[:2] == ["docker", "image"] and "inspect" in argv:
+            return 0, "sha256:fake"
+        if argv[:2] == ["docker", "ps"]:
+            # Return only the containers matching the driver's label.
+            # Unrelated work never appears in the snapshot.
+            if any(str(a).startswith("label=sevn.verify.") for a in argv):
+                return 0, owned_container
+            return 0, unrelated_container
+        if argv[:2] == ["docker", "volume"] and "ls" in argv:
+            if any(str(a).startswith("label=sevn.verify.") for a in argv):
+                return 0, owned_volume
+            return 0, unrelated_volume
+        return 0, ""
+
+    monkeypatch.setattr(real_module, "_run", fake_run)
+    real_module.drive_cancellation_cleanup()
+
+    # Every snapshot (ps / volume ls) must carry a driver-owned label
+    # filter so concurrent local Docker work is never visible to the
+    # driver. The driver uses the existing ``sevn.run_id`` label
+    # stamped on every sandbox container by
+    # ``DockerSandboxRuntime.spawn`` — the ``run_id`` itself is
+    # generated locally by the driver (no other project can collide),
+    # so it acts as the ownership scope.
+    snapshot_calls = [c for c in docker_calls if c.startswith(("docker ps ", "docker volume ls "))]
+    assert snapshot_calls, (
+        "cancellation-cleanup must take docker ps / docker volume ls snapshots; got none"
+    )
+    for call in snapshot_calls:
+        assert "label=sevn.run_id=" in call, (
+            f"cancellation-cleanup snapshot must scope by the driver's "
+            f"ownership label (F-PR-6 / mergecraft review 3740249077); "
+            f"got call={call!r}"
+        )
+
+    # The cleanup phase must only target containers/volumes the
+    # driver itself labelled — never the unrelated ones.
+    rm_calls = [c for c in docker_calls if "docker rm" in c or "docker volume rm" in c]
+    for call in rm_calls:
+        assert unrelated_container not in call, (
+            f"cancellation-cleanup must not touch unrelated Docker work (F-PR-6); got call={call!r}"
+        )
+        assert unrelated_volume not in call, (
+            f"cancellation-cleanup must not touch unrelated Docker work (F-PR-6); got call={call!r}"
+        )
+
+
 def test_no_driver_probes_unmapped_host_proxy_port() -> None:
     """F-V3 - the proxy URL constant must be published by the verify compose overlay.
 
