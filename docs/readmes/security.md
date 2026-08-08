@@ -79,6 +79,31 @@ Operator compose may set `cap_drop: ALL` and `security_opt: [no-new-privileges:t
 - Login-grade spawn keeps `--disable-features=IsolateOrigins,site-per-process` as a **justified** tradeoff for operator-driven auth flows against operator-chosen destinations (`src/sevn/browser/chrome.py`). That flag relaxes site-per-process isolation; it is **not** a general untrusted-browsing posture. A future untrusted-browsing mode must **not** inherit it.
 - The Chromium/Brave renderer sandbox remains the primary process-isolation control for browser content; container caps only constrain the host namespace.
 
+#### What the renderer sandbox needs to actually start
+
+Dropping `--no-sandbox` only buys isolation if Brave can build its namespace sandbox. Two preconditions must hold, and both fail at runtime with the same opaque abort — `Failed to move to new namespace: … errno = Operation not permitted`, then `FATAL … zygote_host_impl_linux.cc`:
+
+1. **Container syscall policy.** Docker's *default* seccomp profile gates `clone(CLONE_NEW*)`, `clone3` and `unshare` behind `CAP_SYS_ADMIN`, and `chroot` behind `CAP_SYS_CHROOT`. Under the overlays' `cap_drop: ALL` those are all denied, so Brave cannot create the user namespace it sandboxes renderers in. The browser and GUI overlays therefore pin **`infra/docker/seccomp-browser.json`** — Docker's default profile with exactly those four syscalls ungated. `mount`, `pivot_root`, `setns`, `bpf` and `perf_event_open` stay gated, and the container keeps `cap_drop: ALL` + `no-new-privileges:true`. This is strictly stronger than `--no-sandbox`, and far narrower than `seccomp=unconfined` (which would discard the whole syscall filter).
+
+2. **Host user-namespace policy.** The kernel must permit unprivileged user namespaces. Ubuntu 23.10+ restricts them through `/proc/sys/kernel/apparmor_restrict_unprivileged_userns` (default `1` on 24.04). `make check-compose-default` **fails closed** when that sysctl is non-zero rather than letting `compose up` produce a browser that never starts.
+
+   Preferred remediation is an app-scoped AppArmor profile rather than a host-wide switch:
+
+   ```sh
+   sudo tee /etc/apparmor.d/sevn-browser >/dev/null <<'EOF'
+   abi <abi/4.0>,
+   include <tunables/global>
+   profile sevn-browser flags=(unconfined) {
+     userns,
+   }
+   EOF
+   sudo apparmor_parser -r /etc/apparmor.d/sevn-browser
+   ```
+
+   The host-wide alternative (`echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns`, persisted in `/etc/sysctl.d/`) relaxes the restriction for *every* process on the host. `SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT=1` bypasses the gate once another mitigation has been accepted.
+
+The CI `docker-images` job runs the hardened Brave smoke on a **stock** Ubuntu runner with no host tweak, so a green check means the shipped deployment starts as-is.
+
 ## Level 3 — Deep dive (low-level, technical)
 
 Primary source tree: `src/sevn/security/` (32 Python files). Normative design: `about-sevn.bot/specs/09-security-scanner.md`.

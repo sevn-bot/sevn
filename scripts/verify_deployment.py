@@ -53,6 +53,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
 EVIDENCE_DIR = REPO / "evidence" / "verify"
@@ -759,6 +760,40 @@ def drive_compose_profiles() -> DriverResult:
     return result
 
 
+def _parse_compose_config(raw: str) -> dict[str, Any] | None:
+    """Parse ``docker compose config --format json`` output, or ``None`` if unusable.
+
+    ``_run`` merges stderr into stdout, so a successful ``compose config`` that
+    also emitted a warning (a deprecated key, an unset variable) arrives with
+    non-JSON lines ahead of the document. Retry from the first ``{`` so that
+    noise does not masquerade as a config failure — but return ``None`` for
+    anything still unparsable, so callers fail closed rather than continue with
+    an empty config.
+
+    Args:
+        raw (str): Combined stdout/stderr of ``docker compose config``.
+
+    Returns:
+        dict[str, Any] | None: Parsed config, or ``None`` when unusable.
+
+    Examples:
+        >>> _parse_compose_config('WARN[0000] noise\\n{"services": {}}')
+        {'services': {}}
+        >>> _parse_compose_config("error: no configuration file provided") is None
+        True
+    """
+    for candidate in (raw, raw[raw.find("{") :] if "{" in raw else ""):
+        if not candidate.strip():
+            continue
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
 def drive_stack_health() -> DriverResult:
     """Boot the operator compose stack under a private project, probe health, tear down.
 
@@ -909,11 +944,31 @@ def drive_stack_health() -> DriverResult:
             env=env,
             timeout=60.0,
         )
-        if cfg_code == 0:
-            try:
-                cfg = json.loads(cfg_out)
-            except json.JSONDecodeError:
-                cfg = {}
+        # D-PR-6: this gate must fail closed. Its whole claim is "applied
+        # HostConfig matches the *declared* compose limits", so any path that
+        # loses the declared values (nonzero exit, unparsable output, a service
+        # or limit missing from the resolved config) can only be reported as a
+        # failure — degrading to "the values are merely nonzero" would let
+        # stack-health go green without ever proving the match.
+        cfg = _parse_compose_config(cfg_out) if cfg_code == 0 else None
+        if cfg is None:
+            reason = (
+                f"compose config exited {cfg_code}"
+                if cfg_code != 0
+                else "compose config output was not parsable JSON"
+            )
+            result.checks.append(
+                Check(
+                    name="hostconfig-compose-config",
+                    status=STATUS_FAIL,
+                    detail=(
+                        f"{reason} — declared limits unavailable, so the "
+                        "HostConfig match cannot be proven"
+                    ),
+                    output=cfg_out.strip()[:400],
+                )
+            )
+        else:
             services_cfg = cfg.get("services") or {}
             for svc_name in ("sevn-proxy", "sevn-gateway"):
                 svc = services_cfg.get(svc_name) or {}
@@ -921,6 +976,28 @@ def drive_stack_health() -> DriverResult:
                 declared_cpus = limits.get("cpus")
                 declared_memory = limits.get("memory")
                 declared_pids = limits.get("pids") or svc.get("pids_limit")
+                if declared_cpus is None or declared_memory is None or declared_pids is None:
+                    missing_limits = [
+                        label
+                        for label, value in (
+                            ("cpus", declared_cpus),
+                            ("memory", declared_memory),
+                            ("pids", declared_pids),
+                        )
+                        if value is None
+                    ]
+                    result.checks.append(
+                        Check(
+                            name=f"hostconfig-{svc_name}",
+                            status=STATUS_FAIL,
+                            detail=(
+                                f"{svc_name}: resolved compose config declares no "
+                                f"{', '.join(missing_limits)} limit — nothing to "
+                                "compare HostConfig against (C10.3)"
+                            ),
+                        )
+                    )
+                    continue
                 cid_code, cid_out = _run(
                     [*base, "ps", "-aq", svc_name],
                     env=env,
@@ -971,19 +1048,34 @@ def drive_stack_health() -> DriverResult:
                     f"Memory={memory}",
                     f"PidsLimit={pids}",
                 ]
-                if declared_cpus is not None:
+                # Every declared value is present here (missing ones already
+                # failed above), so each comparison is an exact-match proof.
+                try:
                     expected_nano = int(float(declared_cpus) * 1_000_000_000)
-                    if nano != expected_nano:
-                        ok = False
-                        detail_parts.append(f"expected NanoCpus={expected_nano}")
-                if declared_memory is not None:
                     expected_mem = int(declared_memory)
-                    if memory != expected_mem:
-                        ok = False
-                        detail_parts.append(f"expected Memory={expected_mem}")
-                if declared_pids is not None and pids != int(declared_pids):
+                    expected_pids = int(declared_pids)
+                except (TypeError, ValueError):
+                    result.checks.append(
+                        Check(
+                            name=f"hostconfig-{svc_name}",
+                            status=STATUS_FAIL,
+                            detail=(
+                                f"{svc_name}: declared limits are not numeric "
+                                f"(cpus={declared_cpus!r}, memory={declared_memory!r}, "
+                                f"pids={declared_pids!r})"
+                            ),
+                        )
+                    )
+                    continue
+                if nano != expected_nano:
                     ok = False
-                    detail_parts.append(f"expected PidsLimit={declared_pids}")
+                    detail_parts.append(f"expected NanoCpus={expected_nano}")
+                if memory != expected_mem:
+                    ok = False
+                    detail_parts.append(f"expected Memory={expected_mem}")
+                if pids != expected_pids:
+                    ok = False
+                    detail_parts.append(f"expected PidsLimit={expected_pids}")
                 result.checks.append(
                     Check(
                         name=f"hostconfig-{svc_name}",
@@ -992,15 +1084,6 @@ def drive_stack_health() -> DriverResult:
                         command=f"docker inspect {cid[0]} --format '{{{{json .HostConfig}}}}'",
                     )
                 )
-        else:
-            result.checks.append(
-                Check(
-                    name="hostconfig-compose-config",
-                    status=STATUS_WARN,
-                    detail="could not load compose config for HostConfig comparison",
-                    output=cfg_out.strip()[:400],
-                )
-            )
     finally:
         down = [*base, "down", "-v", "--remove-orphans"]
         dcode, dout = _run(down, env=env, timeout=600.0)

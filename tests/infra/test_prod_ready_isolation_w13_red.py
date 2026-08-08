@@ -37,6 +37,8 @@ _DOCKER_README = _REPO_ROOT / "docker" / "README.md"
 _ROOT_README = _REPO_ROOT / "README.md"
 _CICD_SPEC = _REPO_ROOT / "about-sevn.bot" / "specs" / "25-cicd-full.md"
 
+_BROWSER_SECCOMP_PROFILE = _REPO_ROOT / "infra" / "docker" / "seccomp-browser.json"
+
 _BASE_COMPOSE = _DOCKER_DIR / "docker-compose.yml"
 _BROWSER_OVERRIDE = _DOCKER_DIR / "docker-compose.browser.yml"
 _GUI_OVERRIDE = _DOCKER_DIR / "docker-compose.gui.yml"
@@ -501,17 +503,21 @@ def test_brave_smoke_exercises_prod_security_context() -> None:
         "this flag, silently relaxing the security context relative to prod."
     )
 
-    # The smoke must NOT pass ``seccomp=unconfined`` (or any other seccomp
-    # override) so it runs under Docker's default seccomp profile — the same
-    # profile the prod overlay inherits.
-    seccomp_overrides = re.findall(
-        r"--security[-_]opt[= ]['\"]?seccomp[=]([^\s'\"]+)['\"]?",
-        run_args_text,
+    # The smoke must run under the SAME seccomp profile the browser overlays
+    # pin (C8.1). Docker's stock default is not that profile: it gates the
+    # clone/unshare/chroot calls Brave needs to build its namespace sandbox
+    # behind capabilities the container drops, so a smoke on the stock profile
+    # proves the deployment cannot start rather than that it can. Equally, a
+    # smoke on ``seccomp=unconfined`` would be weaker than prod.
+    assert "seccomp=unconfined" not in run_args_text, (
+        "D-PR-1: Brave smoke must not run with seccomp=unconfined — that is a "
+        "weaker security context than the prod overlay and hides regressions"
     )
-    assert not seccomp_overrides, (
-        f"D-PR-1: Brave smoke must NOT pass a seccomp override; the prod "
-        f"overlay inherits Docker's default seccomp profile and the smoke "
-        f"must run under the same profile. Found overrides: {seccomp_overrides}"
+    assert "_BROWSER_SECCOMP_PROFILE" in run_args_text, (
+        "D-PR-1: Brave smoke must pin the same seccomp profile as the browser "
+        "overlays (infra/docker/seccomp-browser.json). Running under Docker's "
+        "stock default profile means the smoke is not exercising the shipped "
+        "deployment's security context."
     )
 
     # ``cap_drop: ALL`` and the non-root uid are still required.
@@ -722,7 +728,11 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
             docker,
             "run",
             "-d",
-            "--rm",
+            # Deliberately NOT --rm: when Brave aborts, --rm reaps the container
+            # before the poll loop can read `docker logs`, and the failure
+            # message degrades to "No such container: sevn-w13-brave-smoke"
+            # with no renderer stderr (docker-images run 31271155892). The
+            # finally: block force-removes the container instead.
             "--name",
             _BRAVE_SMOKE_CONTAINER_NAME,
             # Container hardening: exercise the **production** security context
@@ -735,6 +745,13 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
             # the default seccomp policy the prod overlay will hand it.
             "--cap-drop=ALL",
             "--security-opt=no-new-privileges:true",
+            # The browser/GUI overlays pin this profile on the gateway service
+            # (C8.1). Docker's default profile gates clone(CLONE_NEW*), clone3
+            # and unshare behind CAP_SYS_ADMIN and chroot behind CAP_SYS_CHROOT,
+            # so under cap_drop:ALL Brave cannot build its namespace sandbox and
+            # aborts with "Failed to move to new namespace" — the smoke has to
+            # carry the same profile or it is not exercising the deployment.
+            f"--security-opt=seccomp={_BROWSER_SECCOMP_PROFILE}",
             "--user=10001:10001",
             # Mirror the prod overlay environment exactly.
             "-e",
@@ -1028,58 +1045,46 @@ def test_operator_perms_skips_broad_migration_when_marker_present() -> None:
     )
 
 
-def test_operator_perms_browser_state_has_independent_marker() -> None:
-    """D-PR-2: ``/browser-profiles`` lives on its own volume and needs its own marker.
+def test_operator_perms_browser_state_marker_lives_on_browser_volume() -> None:
+    """D-PR-2: the ``/browser-profiles`` marker must live on the browser volume.
 
     ``sevn-browser-state`` is a separate volume from ``sevn-state``: the
     operator may legitimately recreate one without the other (e.g.
     ``docker volume rm sevn-browser-state`` to wipe a stuck Chromium
-    profile). If the perms marker lived only on ``sevn-state`` and gated
-    the ``/browser-profiles`` chown pass, then recreating only the
-    browser volume would leave its mount owned by the docker default
-    uid (root), and the marker branch would silently skip the chown.
+    profile). A marker stored under ``/operator/.sevn/`` lives on
+    ``sevn-state`` and therefore *survives* that recreation — the fresh,
+    root-owned ``/browser-profiles`` mount would then hit an already-set
+    marker and skip its chown, leaving uid 10001 unable to write profiles.
 
-    The contract: the chown over ``/browser-profiles`` is gated by a
-    marker that lives on ``sevn-state`` (``/operator/.sevn/...``) so it
-    survives a ``sevn-browser-state`` recreation, but the marker is
-    specific to the browser volume (not the global workspace marker).
+    The contract: the marker gating the ``/browser-profiles`` migration is
+    stored on ``/browser-profiles`` itself, so recreating the volume drops
+    the marker with it and the migration runs again.
     """
     command = _service_command_text(_BASE_COMPOSE, "sevn-operator-perms")
-    # The browser chown path needs a dedicated marker that survives
-    # recreation of ``sevn-browser-state``. We don't pin the exact
-    # filename (the implementation may evolve) but it must be a
-    # distinct token that is NOT the global ``perms-v1`` marker.
     assert _PERMS_MARKER in command, f"global marker {_PERMS_MARKER} missing"
 
-    # Locate the /browser-profiles chown block, then walk backward to
-    # the nearest ``[ ! -f <marker> ]`` guard. The guard that the browser
-    # chown actually falls under must use a marker distinct from the
-    # global workspace marker.
-    browser_chown_block = re.search(
-        r"find\s+/browser-profiles\b",
-        command,
-    )
+    browser_chown_block = re.search(r"find\s+/browser-profiles\b", command)
     assert browser_chown_block, (
         "sevn-operator-perms must still chown /browser-profiles (C9.2); "
         "the previous block was removed and not replaced with a dedicated "
         "browser-volume normalization pass"
     )
     preceding = command[: browser_chown_block.start()]
-    guard_match = re.findall(
-        r"\[ ! -f (/operator/\.sevn/[^\s\]]+)\s*\]",
-        preceding,
-    )
+    guard_match = re.findall(r"\[ ! -f ([^\s\]]+)\s*\]", preceding)
     assert guard_match, (
-        "sevn-operator-perms must guard the /browser-profiles chown with "
-        "its own marker check ([ ! -f /operator/.sevn/<browser-marker> ])"
+        "sevn-operator-perms must guard the /browser-profiles migration "
+        "with a marker check ([ ! -f <marker> ])"
     )
     browser_marker = guard_match[-1]
+    assert browser_marker.startswith("/browser-profiles/"), (
+        f"D-PR-2: the /browser-profiles migration is gated by {browser_marker}, "
+        "which does not live on the sevn-browser-state volume. Recreating only "
+        "that volume would leave the marker in place and skip the chown of the "
+        "fresh root-owned mount. Store the marker under /browser-profiles/ so "
+        "it shares the volume's lifecycle."
+    )
     assert browser_marker != _PERMS_MARKER, (
-        f"D-PR-2: the browser chown is gated by the global {_PERMS_MARKER} "
-        "marker, which lives on sevn-state. If only the sevn-browser-state "
-        "volume is recreated, the global marker survives and the browser "
-        "chown is skipped. Use a dedicated marker so the browser volume's "
-        "ownership is normalized independently."
+        f"the browser migration must not reuse the global {_PERMS_MARKER} marker"
     )
 
     # The browser marker must be created inside the gated branch so a
@@ -1093,6 +1098,137 @@ def test_operator_perms_browser_state_has_independent_marker() -> None:
         f"({browser_marker}) inside its own gated branch, not skip it on "
         "a cold boot"
     )
+
+
+def test_operator_perms_normalizes_dir_roots_on_every_boot() -> None:
+    """D-PR-4: warm boots must repair app dirs that ``mkdir -p`` recreated as root.
+
+    ``mkdir -p`` runs unconditionally on every ``compose up``. If an
+    operator deletes an application-owned directory (``workspace/logs``,
+    ``.sevn/browser-sessions``, …) on a warm volume, the next boot
+    recreates it owned by root — and a purely marker-gated chown pass is
+    skipped because the marker already exists, so uid 10001 can no longer
+    write it.
+
+    The contract: the known directory roots are chowned unconditionally on
+    every boot (a bounded list, not a recursive walk), with the marker
+    reserved for the recursive migration.
+    """
+    command = _service_command_text(_BASE_COMPOSE, "sevn-operator-perms")
+
+    # Strip every marker-gated block so what remains is the code that runs
+    # on *every* boot, warm or cold.
+    unconditional = re.sub(
+        r"if \[ ! -f [^\]]+\]; then.*?\n\s*fi\n",
+        "",
+        command,
+        flags=re.S,
+    )
+
+    app_dir_roots = (
+        "/operator/workspace",
+        "/operator/workspace/logs",
+        "/operator/workspace/.sevn",
+        "/operator/workspace/.sevn/browser-profiles",
+        "/operator/workspace/.sevn/browser-sessions",
+        "/browser-profiles",
+    )
+    chown_targets: set[str] = set()
+    for line in unconditional.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("chown 10001:10001 "):
+            continue
+        chown_targets.update(stripped.removeprefix("chown 10001:10001 ").split())
+
+    missing = [path for path in app_dir_roots if path not in chown_targets]
+    assert not missing, (
+        "D-PR-4: these application directory roots are never chowned outside a "
+        f"marker-gated branch: {missing}. mkdir -p recreates them as root on "
+        "every boot, so a warm-boot operator who deleted one is left with a "
+        "root-owned directory uid 10001 cannot write. Chown the known roots "
+        "unconditionally and reserve the marker for the recursive migration."
+    )
+
+    # Guard the cheapness claim: the always-run pass must not be recursive.
+    assert "chown -R" not in unconditional, (
+        "the unconditional normalization pass must not use chown -R (C9.1)"
+    )
+
+
+def test_browser_seccomp_profile_permits_only_the_sandbox_syscalls() -> None:
+    """C8.1: the browser seccomp profile is a *narrow* carve-out, not unconfined.
+
+    Removing ``--no-sandbox`` (C8.1) only buys real isolation if Brave can
+    actually build its namespace sandbox. Under Docker's default profile plus
+    ``cap_drop: ALL`` it cannot: ``clone(CLONE_NEW*)``, ``clone3`` and
+    ``unshare`` are gated behind ``CAP_SYS_ADMIN`` and ``chroot`` behind
+    ``CAP_SYS_CHROOT``, so Brave aborts with "Failed to move to new namespace".
+
+    The profile must therefore allow exactly those four syscalls and keep the
+    genuinely dangerous ones (``mount``, ``pivot_root``, ``setns``) gated — a
+    drift to ``seccomp=unconfined`` would trade the whole container filter away.
+    """
+    assert _BROWSER_SECCOMP_PROFILE.is_file(), (
+        f"missing browser seccomp profile at {_BROWSER_SECCOMP_PROFILE}"
+    )
+    profile = json.loads(_BROWSER_SECCOMP_PROFILE.read_text(encoding="utf-8"))
+
+    assert profile.get("defaultAction") == "SCMP_ACT_ERRNO", (
+        "the browser profile must keep a deny-by-default action; "
+        f"got {profile.get('defaultAction')!r}"
+    )
+
+    ungated_allows: set[str] = set()
+    for group in profile.get("syscalls") or []:
+        if group.get("action") != "SCMP_ACT_ALLOW":
+            continue
+        if group.get("includes") or group.get("excludes") or group.get("args"):
+            continue
+        ungated_allows.update(group.get("names") or [])
+
+    required = {"chroot", "clone", "clone3", "unshare"}
+    missing = sorted(required - ungated_allows)
+    assert not missing, (
+        f"the browser seccomp profile does not unconditionally allow {missing}; "
+        "Brave cannot build its namespace sandbox under cap_drop:ALL and will "
+        "abort at startup"
+    )
+
+    must_stay_gated = {"mount", "pivot_root", "setns", "bpf", "perf_event_open"}
+    leaked = sorted(must_stay_gated & ungated_allows)
+    assert not leaked, (
+        f"the browser seccomp profile ungates {leaked} — the carve-out must "
+        "stay limited to the namespace-sandbox syscalls"
+    )
+
+
+def test_browser_overlays_pin_the_seccomp_profile() -> None:
+    """C8.1: both browser-capable overlays must carry the sandbox seccomp profile.
+
+    Without it the overlay inherits the base ``cap_drop: ALL`` hardening and
+    Brave cannot start at all — the exact "CI green, production browsing
+    broken" gap that removing ``--no-sandbox`` would otherwise open.
+    """
+    for overlay in (_BROWSER_OVERRIDE, _GUI_OVERRIDE):
+        services = _load_services(overlay)
+        gateway = services.get("sevn-gateway") or {}
+        security_opt = [str(item) for item in (gateway.get("security_opt") or [])]
+        seccomp = [item for item in security_opt if item.startswith("seccomp")]
+        assert seccomp, (
+            f"{overlay.name}: sevn-gateway declares no seccomp profile, so it "
+            "inherits Docker's default and Brave aborts under cap_drop:ALL"
+        )
+        assert not any("unconfined" in item for item in seccomp), (
+            f"{overlay.name}: seccomp=unconfined disables the container syscall "
+            "filter wholesale; pin the narrow browser profile instead"
+        )
+        for item in seccomp:
+            rel = item.split("=", 1)[-1] if "=" in item else item.split(":", 1)[-1]
+            resolved = (overlay.parent / rel).resolve()
+            assert resolved == _BROWSER_SECCOMP_PROFILE.resolve(), (
+                f"{overlay.name}: seccomp profile {rel!r} resolves to {resolved}, "
+                f"expected {_BROWSER_SECCOMP_PROFILE}"
+            )
 
 
 def test_ci_init_has_no_unconditional_chown() -> None:
@@ -1168,6 +1304,69 @@ def test_ci_init_marker_check_runs_before_seed_copy() -> None:
         "host bind-mount that landed a non-10001 owner is still "
         "normalized without reseeding the workspace"
     )
+
+
+def test_ci_init_cold_boot_places_optional_sevn_seed_at_workspace_root() -> None:
+    """D-PR-5: an optional ``/seed/.sevn`` must land at ``workspace/.sevn``, not nested.
+
+    ``mkdir -p`` pre-creates ``/operator/workspace/.sevn``, so a plain
+    ``cp -an /seed/.sevn /operator/workspace/.sevn`` copies the *directory*
+    into the existing one and produces ``workspace/.sevn/.sevn/<files>``.
+    The gateway then boots without the seeded config it was given.
+
+    This runs the real init script under ``sh`` against temp directories so
+    the copy semantics are exercised, not just pattern-matched.
+    """
+    raw_command = _load_services(_CI_COMPOSE)["sevn-ci-init"]["command"]
+    assert isinstance(raw_command, list), (
+        f"expected sevn-ci-init command to be an argv list, got {raw_command!r}"
+    )
+    assert raw_command[:2] == ["sh", "-ec"], (
+        f"expected sevn-ci-init to be an `sh -ec <script>` argv, got {raw_command!r}"
+    )
+    command = str(raw_command[-1])
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        operator = root / "operator"
+        seed = root / "seed"
+        (seed / ".sevn").mkdir(parents=True)
+        (seed / "sevn.json").write_text("{}\n", encoding="utf-8")
+        (seed / ".sevn" / "secrets.json").write_text('{"seeded": true}\n', encoding="utf-8")
+
+        # Rewrite the container paths onto the temp tree and drop the chown
+        # calls (the test process is not root); everything else — the mkdir,
+        # the marker gate, and the seed copies — runs verbatim.
+        script = command.replace("/operator", str(operator)).replace("/seed", str(seed))
+        script = re.sub(r"^\s*(chown|find)\b.*$", ":", script, flags=re.M)
+
+        result = subprocess.run(  # nosec B603
+            ["/bin/sh", "-ec", script],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, (
+            f"sevn-ci-init cold-boot script failed ({result.returncode}): "
+            f"{result.stdout}\n{result.stderr}"
+        )
+
+        workspace_sevn = operator / "workspace" / ".sevn"
+        assert not (workspace_sevn / ".sevn").exists(), (
+            "D-PR-5: the optional /seed/.sevn seed was copied as a nested "
+            f"directory — {workspace_sevn / '.sevn'} exists. mkdir -p already "
+            "created the destination, so the copy must take the seed's "
+            "contents (e.g. `cp -an /seed/.sevn/. <dest>/`), not the directory."
+        )
+        assert (workspace_sevn / "secrets.json").read_text(encoding="utf-8") == (
+            '{"seeded": true}\n'
+        ), (
+            f"the seeded .sevn contents did not land at {workspace_sevn}; "
+            f"tree: {sorted(p.relative_to(operator).as_posix() for p in operator.rglob('*'))}"
+        )
+        assert (operator / "workspace" / "sevn.json").exists(), (
+            "the sevn.json seed did not land at workspace/sevn.json"
+        )
 
 
 # ---------------------------------------------------------------------------

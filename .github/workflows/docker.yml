@@ -98,28 +98,35 @@ jobs:
       # runtime. Runs here so a broken image is a red PR check, not a silent
       # skip on the operator's machine.
       #
-      # The Brave renderer sandbox needs to call clone(CLONE_NEWUSER) to
-      # isolate the renderer process; on GHA ubuntu-latest (Ubuntu 24.04) the
-      # default AppArmor policy restricts unprivileged user namespaces via
-      # /proc/sys/kernel/apparmor_restrict_unprivileged_userns=1, which makes
-      # Chromium abort with "No usable sandbox!" before CDP can bind. Disable
-      # that restriction on the runner host for the duration of this step so
-      # the smoke can exercise the renderer path. The smoke itself runs with
-      # --cap-drop=ALL and user=10001:10001 so the C8.1 hardening claim is
-      # still asserted.
+      # The Brave renderer sandbox calls clone(CLONE_NEWUSER) + chroot to
+      # isolate the renderer. Docker's DEFAULT seccomp profile gates those
+      # behind CAP_SYS_ADMIN / CAP_SYS_CHROOT, so under the overlay's
+      # `cap_drop: ALL` Brave aborts with "Failed to move to new namespace".
+      # That is why the browser/GUI overlays pin infra/docker/seccomp-browser.json,
+      # and the smoke pins the same profile.
+      #
+      # This job deliberately does NOT relax the runner's AppArmor
+      # `apparmor_restrict_unprivileged_userns` sysctl. An earlier revision did,
+      # which meant a green check could not distinguish "the shipped deployment
+      # works on a stock Ubuntu 24.04 host" from "it works only after an
+      # undocumented host tweak". Running on the stock runner makes this step a
+      # real proof of the operator's deployment path; `make check-compose-default`
+      # carries the fail-closed host preflight for operators.
       - name: Bootstrap uv for Brave smoke
         uses: ./.github/actions/bootstrap
 
-      - name: Allow unprivileged user namespaces for Chromium renderer sandbox
+      - name: Record host user-namespace policy (diagnostic only)
         if: runner.os == 'Linux'
         run: |
           set -euo pipefail
-          # Idempotent: the sysctl may not exist on older runners; skip in
-          # that case (the sandbox will fail honestly on those hosts and
-          # that is a separate fix).
-          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
-            echo 0 | sudo tee /proc/sys/kernel/apparmor_restrict_unprivileged_userns
-          fi
+          # Report-only: never mutate the host. If the smoke below fails, this
+          # output identifies whether the host policy (rather than the image or
+          # the compose security context) is responsible.
+          for f in /proc/sys/kernel/apparmor_restrict_unprivileged_userns \
+                   /proc/sys/user/max_user_namespaces \
+                   /proc/sys/kernel/unprivileged_userns_clone; do
+            [ -f "$f" ] && echo "$f = $(cat "$f")" || echo "$f = (absent)"
+          done
 
       - name: Headless Brave smoke under hardened flags (C8.1 / 243-A)
         env:

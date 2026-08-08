@@ -15,6 +15,19 @@ services:
       dockerfile: docker/Dockerfile.gateway.browser
     # Brave runs as non-root with the Chromium renderer sandbox enabled
     # (do not disable the sandbox via SEVN_BROWSER_EXTRA_ARGS).
+    #
+    # C8.1: keeping the renderer sandbox requires letting Brave build its own
+    # namespace sandbox. Docker's default seccomp profile gates clone(CLONE_NEW*),
+    # clone3 and unshare behind CAP_SYS_ADMIN and chroot behind CAP_SYS_CHROOT, so
+    # under the inherited `cap_drop: ALL` Brave aborts at startup with "Failed to
+    # move to new namespace". seccomp-browser.json is Docker's default profile with
+    # exactly those four syscalls allowed — mount/pivot_root/setns stay gated — so
+    # the container keeps cap_drop:ALL + no-new-privileges:true AND the browser
+    # sandboxes its own renderers. See docker/README.md § Browser sandbox.
+    # (no-new-privileges:true is inherited from the base service; Compose
+    # concatenates security_opt, so repeating it here is a config error.)
+    security_opt:
+      - seccomp=../infra/docker/seccomp-browser.json
     environment:
       SEVN_HOME: /operator
       HOME: /operator/workspace

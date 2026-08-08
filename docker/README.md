@@ -120,6 +120,32 @@ to a future `perms-vN`) to force re-migration after an ownership-layout change.
 `scripts/check-compose-default.sh` refuse clients below this floor
 (`SEVN_COMPOSE_MIN_VERSION`, default `2.20.0`).
 
+### Browser sandbox (C8.1)
+
+The browser and GUI overlays run Brave with the Chromium renderer sandbox **on** —
+no `--no-sandbox` anywhere in the shipped compose files. Two things make that work:
+
+- **`infra/docker/seccomp-browser.json`** is pinned on `sevn-gateway` in
+  `docker-compose.browser.yml` and `docker-compose.gui.yml`. It is Docker's default
+  seccomp profile (moby v28.3.0) with exactly four syscalls ungated — `clone`,
+  `clone3`, `unshare`, `chroot` — because the default profile gates them behind
+  `CAP_SYS_ADMIN` / `CAP_SYS_CHROOT`, which the overlays drop. Without it Brave
+  aborts at startup with `Failed to move to new namespace`. `mount`, `pivot_root`,
+  `setns`, `bpf` and `perf_event_open` remain gated, and the service keeps
+  `cap_drop: ALL` + `no-new-privileges: true`.
+- **The host must permit unprivileged user namespaces.** On Ubuntu 23.10+,
+  `/proc/sys/kernel/apparmor_restrict_unprivileged_userns` defaults to `1` and blocks
+  them. `make check-compose-default` fails closed with the remediation (an app-scoped
+  AppArmor profile granting `userns`, or the host-wide sysctl) — see
+  `docs/readmes/security.md` §C8.1. `SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT=1` bypasses
+  the check.
+
+Regenerating the profile after a Docker upgrade: take `profiles/seccomp/default.json`
+from the matching moby tag, remove those four names from every existing group, and
+append one `SCMP_ACT_ALLOW` group containing them.
+`tests/infra/test_prod_ready_isolation_w13_red.py` asserts the shape, and the CI
+`docker-images` job boots Brave under these exact flags on a stock runner.
+
 ### Resource limits (C10.3)
 
 Every service in the resolved config (base, browser, GUI, and CI file sets) declares
