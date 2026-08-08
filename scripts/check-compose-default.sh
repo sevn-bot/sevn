@@ -101,13 +101,30 @@ _compose_version_digits() {
   printf '%s' "${raw%%[-+]*}"
 }
 
+_compose_version_compare() {
+  # Compare two dotted numeric versions. Print -1/0/1 like strcmp.
+  # Portable: pure-bash field split on '.', no GNU sort -V or python.
+  local IFS=.
+  local -a a=($1) b=($2)
+  local i n max
+  max="${#a[@]}"
+  if (("${#b[@]}" > max)); then max="${#b[@]}"; fi
+  for ((i = 0; i < max; i++)); do
+    n="${a[i]:-0}"
+    if ((10#${n} < 10#${b[i]:-0})); then printf '%s' -1; return 0; fi
+    if ((10#${n} > 10#${b[i]:-0})); then printf '%s' 1; return 0; fi
+  done
+  printf '%s' 0
+}
+
 _compose_version_ge() {
-  # True when $1 >= $2 (dotted numeric). Uses sort -V.
-  local have min
+  # True when $1 >= $2 (dotted numeric; portable across GNU/BSD sort).
+  local have min cmp
   have="$(_compose_version_digits "$1")"
   min="$(_compose_version_digits "$2")"
   [[ -n "$have" && -n "$min" ]] || return 1
-  [[ "$(printf '%s\n%s\n' "$min" "$have" | sort -V | head -n1)" == "$min" ]]
+  cmp="$(_compose_version_compare "$have" "$min")"
+  [[ "$cmp" == "0" || "$cmp" == "1" ]]
 }
 
 _require_min_compose_version() {
