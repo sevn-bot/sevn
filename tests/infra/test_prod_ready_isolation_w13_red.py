@@ -524,29 +524,33 @@ def test_brave_smoke_exercises_prod_security_context() -> None:
 
 
 def test_brave_smoke_tempfile_cleanup_is_tolerated() -> None:
-    """Docker-images fix: Brave smoke must not crash on ``TemporaryDirectory`` cleanup.
+    """Docker-images fix: Brave smoke must not crash on tempdir cleanup under uid-10001 dirs.
 
-    The W13.4b Brave smoke bind-mounts a ``TemporaryDirectory`` into the
-    hardened container, which then creates ``segmentation_platform/`` and
-    similar subdirectories owned by uid 10001 with mode 0700. Python
-    3.12's ``TemporaryDirectory`` cleanup walks the tree and calls
-    ``os.chmod`` from the onerror fallback (``_resetperms``); in some CI
-    environments (notably the docker-images job on GHA ubuntu-latest)
-    that ``chmod`` returns EPERM and the cleanup raises before the
-    context exit returns control to the caller. The error propagates out
-    of the test, which then fails the docker-images check even though
-    the smoke itself was green.
+    The W13.4b Brave smoke bind-mounts a tmp dir into the hardened
+    container, which then creates ``segmentation_platform/`` and similar
+    subdirectories owned by uid 10001 with mode 0700. Python 3.12's
+    ``TemporaryDirectory`` cleanup walks the tree and calls ``os.chmod``
+    from the onerror fallback (``_resetperms``); in some CI environments
+    (notably the docker-images job on GHA ubuntu-latest, which runs as
+    the unprivileged ``runner`` user) that ``chmod`` returns EPERM and
+    the cleanup raises before the context exit returns control to the
+    caller. The error propagates out of the test, which then fails the
+    docker-images check even though the smoke itself was green.
 
     The fix is a defense-in-depth cleanup:
-    1. ``TemporaryDirectory(..., ignore_cleanup_errors=True)`` so the
-       context-manager exit swallows any cleanup exception (the
-       ``shutil.rmtree`` in ``finally`` is the primary cleanup, so any
-       remaining failure is harmless — the directory will be GC'd by the
-       OS at next boot).
-    2. The ``finally`` block must run ``docker rm -f`` **before** the
-       ``TemporaryDirectory`` exits, so uid-10001 is no longer holding
-       file descriptors open inside ``profile_host`` when the cleanup
-       tries to traverse the tree.
+
+    1. Use ``tempfile.mkdtemp()`` directly instead of ``TemporaryDirectory``
+       so the cleanup is fully under the test's control. The standard
+       ``TemporaryDirectory`` finalizer (``weakref.finalize``) cannot be
+       cleanly detached without changing the cleanup semantics we want.
+    2. Wrap the test body in ``try: … finally:`` where the ``finally``
+       runs ``docker rm -f`` (so uid-10001 is no longer holding file
+       descriptors inside the bind-mount) **and** clears the bind-mount
+       root with a one-shot ``alpine`` container running as ``--user=0``.
+       Root inside the container has ``CAP_DAC_OVERRIDE`` and unlinks
+       uid-10001 subdirs regardless of mode. The runner-owned mkdtemp
+       root is then removed with ``shutil.rmtree(..., ignore_errors=True)``
+       so any residual EPERM does not poison the test result.
 
     This test reads the source and asserts both invariants are present.
     """
@@ -564,44 +568,50 @@ def test_brave_smoke_tempfile_cleanup_is_tolerated() -> None:
     assert match, "could not locate the Brave smoke test body"
     body = match.group(0)
 
-    # Invariant 1: ``TemporaryDirectory`` is constructed with
-    # ``ignore_cleanup_errors=True``. Without this flag, a PermissionError
-    # from cleanup propagates out of the test and turns a green smoke
-    # into a red docker-images check. Match the actual constructor call,
-    # not comments — the latter can mention ``ignore_cleanup_errors``
-    # without changing behavior.
-    td_call = re.search(r"tempfile\.TemporaryDirectory\(([^)]*)\)", body)
-    assert td_call, "Brave smoke must construct a tempfile.TemporaryDirectory"
-    td_args = td_call.group(1)
-    assert "ignore_cleanup_errors=True" in td_args, (
-        "Docker-images fix: Brave smoke must construct its "
-        "TemporaryDirectory with ignore_cleanup_errors=True so a "
-        "PermissionError during cleanup is swallowed instead of failing "
-        "the test (the bind-mount root is rmtree'd in the finally block). "
-        f"Found TemporaryDirectory args: {td_args!r}"
+    # Invariant 1: the test creates the temp dir via ``tempfile.mkdtemp``
+    # (NOT ``TemporaryDirectory``, whose 3.12 ``_resetperms`` chmod would
+    # raise EPERM and fail the docker-images check even when the smoke
+    # itself was green). Match the actual call, not comments — the latter
+    # can mention ``mkdtemp`` without changing behavior.
+    mkdtemp_call = re.search(r"tempfile\.mkdtemp\(([^)]*)\)", body)
+    assert mkdtemp_call, (
+        "Docker-images fix: Brave smoke must use tempfile.mkdtemp(...) so "
+        "the test owns cleanup of the bind-mount (TemporaryDirectory's "
+        "3.12 _resetperms chmod raises EPERM on uid-10001 subdirs and "
+        "fails the docker-images check even on a green smoke)."
     )
 
-    # Invariant 2: the ``finally`` block must ``docker rm -f`` the smoke
-    # container before the TemporaryDirectory exit runs. The cleanup
-    # walks the bind-mount root; if uid-10001 is still alive inside the
-    # container it can be holding descriptors that block the rmtree.
-    # The simplest invariant: there is a ``finally:`` clause and inside
-    # it the ``docker rm -f`` appears before any ``shutil.rmtree``.
-    finally_block = re.search(
-        r"\bfinally:\s*\n(.*?)(?=\n        try:|\n    [a-zA-Z]|\Z)", body, re.DOTALL
-    )
-    assert finally_block, "Brave smoke must have a finally block for cleanup"
-    finally_body = finally_block.group(1)
-    docker_rm_offset = finally_body.find('"rm", "-f"')
-    rmtree_offset = finally_body.find("shutil.rmtree")
+    # Invariant 2: there must be at least one ``finally`` block that
+    # runs ``docker rm -f`` (so uid-10001 is not still holding file
+    # descriptors inside the bind-mount during the rmtree) AND clears
+    # the bind-mount via a one-shot ``alpine`` container running as
+    # ``--user=0`` so uid-10001 subdirs are unlinked regardless of
+    # mode (the GHA runner cannot chmod or unlink those entries from
+    # outside the container).
+    finally_blocks = re.findall(r"\bfinally:\s*\n((?:[ \t].*\n?)+)", body, re.DOTALL)
+    assert finally_blocks, "Brave smoke must have a finally block for cleanup"
+    docker_rm_offset = -1
+    rmtree_offset = -1
+    alpine_offset = -1
+    for finally_body in finally_blocks:
+        if '"rm", "-f"' in finally_body:
+            docker_rm_offset = finally_body.find('"rm", "-f"')
+            rmtree_offset = finally_body.find("shutil.rmtree")
+        if "alpine:" in finally_body:
+            alpine_offset = finally_body.find("alpine:")
     assert docker_rm_offset != -1, (
         "Brave smoke finally block must docker rm -f the smoke container "
         "so uid-10001 is not holding file descriptors inside the bind "
-        "mount during the TemporaryDirectory exit"
+        "mount during the rmtree"
     )
     assert rmtree_offset != -1, (
-        "Brave smoke finally block must rmtree the bind-mount root "
-        "before the TemporaryDirectory exit"
+        "Brave smoke finally block must rmtree the bind-mount root before the test exits"
+    )
+    assert alpine_offset != -1, (
+        "Docker-images fix: Brave smoke finally block must clear the "
+        "bind-mount via a root container (alpine:) so uid-10001 subdirs "
+        "are unlinked regardless of mode; the GHA runner cannot chmod "
+        "or unlink those entries from outside the container."
     )
     assert docker_rm_offset < rmtree_offset, (
         "Brave smoke must stop the container (docker rm -f) BEFORE "
@@ -671,33 +681,41 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
 
     # The W13 hard-context container runs as uid 10001, so any subdir
     # Chromium creates under profile_host (e.g. ``segmentation_platform``)
-    # is mode 0700 owned by uid 10001. Python 3.12's ``TemporaryDirectory``
-    # cleanup walks the tree and calls ``os.open`` on each entry; the
-    # runner can't traverse uid-10001 dirs from a non-matching uid (or
-    # in CI, where the chmod / rmdir is blocked by EPERM rather than
-    # EACCES), so the cleanup raises before the rmtree has a chance to
-    # honor ``ignore_errors=True``.
+    # is mode 0700 owned by uid 10001. The runner on GHA ubuntu-latest
+    # (``runner`` user, not root) cannot chmod or unlink those entries, so
+    # Python 3.12's ``TemporaryDirectory`` cleanup (which always attempts
+    # ``_resetperms`` → ``chmod 0o700`` in ``onexc`` regardless of the
+    # ``ignore_cleanup_errors`` flag — see cpython 3.12 ``Lib/tempfile.py``
+    # ``_rmtree``) raises ``PermissionError`` and the test reports red on
+    # the docker-images check even when the renderer behaved correctly.
     #
-    # Cleanup strategy: pass ``ignore_cleanup_errors=True`` to the
-    # ``TemporaryDirectory`` so the context-manager exit swallows any
-    # cleanup exception (defensive — the bind-mount rmtree below is the
-    # primary mechanism). The container is stopped in the ``finally``
-    # before the TemporaryDirectory exits, and ``shutil.rmtree`` then
-    # removes the bind-mount root as root via ``ignore_errors=True``.
-    # The runner can delete uid-10001 subdirs when it owns the parent
-    # directory (root has CAP_DAC_OVERRIDE), so the rmtree succeeds and
-    # the TemporaryDirectory exits into an empty tree.
-    with tempfile.TemporaryDirectory(
-        prefix="sevn-w13-brave-",
-        ignore_cleanup_errors=True,
-    ) as tmp_str:
-        profile_host = Path(tmp_str) / "profile"
-        profile_host.mkdir(parents=True, exist_ok=True)
-        # Bind the host tmp dir into the container at /tmp/w13-profile so we can
-        # read DevToolsActivePort from the host without docker exec gymnastics.
-        # The container runs as uid 10001; the dir must be writable by that uid.
-        os.chmod(profile_host, 0o777)
-
+    # Cleanup strategy:
+    #
+    # 1. **Bypass the TemporaryDirectory cleanup for the bind-mount root.**
+    #    Use ``tempfile.mkdtemp`` directly so we own the rmtree; the
+    #    ``TemporaryDirectory`` finalizer (registered via ``weakref.finalize``
+    #    on ``__init__``) cannot be detached cleanly without changing the
+    #    cleanup semantics we want. Instead we rmtree the root ourselves
+    #    with root-equivalent privileges (``sudo rm -rf``), then the parent
+    #    mkdtemp root is empty and a final ``shutil.rmtree`` succeeds.
+    # 2. **Use a side container to delete the bind-mount.** When sudo is
+    #    unavailable, mount the bind-mount into a throwaway ``--user=0``
+    #    ``alpine`` container and run ``rm -rf /data`` inside — root inside
+    #    the container has ``CAP_DAC_OVERRIDE`` and clears uid-10001 dirs
+    #    the runner cannot touch. This avoids relying on the GHA host's
+    #    sudo (which can be disabled by org policy) and keeps the fix
+    #    portable to local Colima where the host user already has root.
+    # 3. **Defense-in-depth: ``ignore_cleanup_errors=True``** on the
+    #    ``TemporaryDirectory`` so any remaining ``os.chmod`` EPERM during
+    #    ``__exit__`` is swallowed (the directory is already empty).
+    tmp_str = tempfile.mkdtemp(prefix="sevn-w13-brave-")
+    profile_host = Path(tmp_str) / "profile"
+    profile_host.mkdir(parents=True, exist_ok=True)
+    # Bind the host tmp dir into the container at /tmp/w13-profile so we can
+    # read DevToolsActivePort from the host without docker exec gymnastics.
+    # The container runs as uid 10001; the dir must be writable by that uid.
+    os.chmod(profile_host, 0o777)
+    try:
         # Detached so the renderer keeps running while we poll. --rm cleans up
         # on stop; we also force-rm in the finally below for safety.
         run_args = [
@@ -908,16 +926,76 @@ def test_brave_runs_in_hardened_container_without_no_sandbox() -> None:
             )  # nosec B603
             # Belt-and-suspenders cleanup of the bind-mount root. With the
             # container stopped, uid-10001 is no longer holding any file
-            # descriptors open inside profile_host, so even though the
-            # subdirs remain mode 0700 the runner can ``rmtree`` them when
-            # we own the parent. ``ignore_errors=True`` swallows the
-            # ``PermissionError`` / EPERM that some CI environments raise
-            # on unlink (e.g. when the runner is unprivileged inside a
-            # sandbox and ``chmod 0700`` from ``_resetperms`` returns
-            # EPERM). The ``TemporaryDirectory`` is constructed with
-            # ``ignore_cleanup_errors=True`` as a defense-in-depth backstop.
+            # descriptors open inside profile_host. The subdirs are still
+            # mode 0700 owned by uid 10001; the GHA ``runner`` user (and any
+            # unprivileged CI user) cannot chmod / unlink them, which is
+            # what was tripping Python 3.12's ``TemporaryDirectory``
+            # ``_resetperms`` chmod into EPERM.
+            #
+            # We work around that by deleting the bind-mount's contents via
+            # a one-shot root container (the throwaway ``alpine`` image is
+            # already pulled by every GHA runner). The bind-mount root is
+            # removed by root inside the container, so uid-10001 subdirs are
+            # unlinked regardless of their perms. After the bind-mount is
+            # empty, a regular ``shutil.rmtree`` of ``profile_host`` succeeds
+            # because the runner owns the (now-empty) dir. Finally the
+            # mkdtemp root (``tmp_str``) is removed too; if any leftover
+            # EPERM survives it does not affect the test result.
+            bind_profile = str(profile_host)
+            subprocess.run(  # nosec B603
+                [
+                    docker,
+                    "run",
+                    "--rm",
+                    "--user=0:0",
+                    "-v",
+                    f"{bind_profile}:/data:rw",
+                    "alpine:3.20",
+                    "sh",
+                    "-c",
+                    "rm -rf /data/* /data/.[!.]* 2>/dev/null; chmod -R u+rwX /data 2>/dev/null; true",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
             with contextlib.suppress(OSError):
                 shutil.rmtree(profile_host, ignore_errors=True)
+            # Mkdtemp cleanup — the parent ``tmp_str`` should now be empty
+            # after the bind-mount rmtree above; ``ignore_errors`` absorbs
+            # any remaining EPERM so the test result is not poisoned.
+            with contextlib.suppress(OSError):
+                shutil.rmtree(tmp_str, ignore_errors=True)
+    finally:
+        # Belt-and-suspenders outer cleanup: if the inner ``try`` raised
+        # before its own ``finally`` could run (or between the docker rm
+        # and the rmtree), we still need to free the bind-mount and the
+        # mkdtemp root. The same root-container trick is used so uid-10001
+        # subdirs do not poison a subsequent rerun or the GHA runner's /tmp.
+        if profile_host.exists():
+            subprocess.run(  # nosec B603
+                [
+                    docker,
+                    "run",
+                    "--rm",
+                    "--user=0:0",
+                    "-v",
+                    f"{profile_host}:/data:rw",
+                    "alpine:3.20",
+                    "sh",
+                    "-c",
+                    "rm -rf /data/* /data/.[!.]* 2>/dev/null; chmod -R u+rwX /data 2>/dev/null; true",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            with contextlib.suppress(OSError):
+                shutil.rmtree(profile_host, ignore_errors=True)
+        with contextlib.suppress(OSError):
+            shutil.rmtree(tmp_str, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------
