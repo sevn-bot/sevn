@@ -79,6 +79,23 @@ def _proxy_app() -> Any:
     )
 
 
+def _binding_headers(token: str, run_id: str, container_id: str) -> dict[str, str]:
+    """Build a complete header set for an HTTP ``/web/fetch`` call.
+
+    Includes the proof-of-possession binding signature required by the proxy
+    guard middleware (PR #245 Codex finding 5): without it the request would
+    fail with 401 even though the bearer token and binding headers are valid.
+    """
+    canonical = f"container_id={container_id}\nrun_id={run_id}".encode()
+    signature = hmac.new(_SERVICE_SECRET.encode(), canonical, hashlib.sha256).hexdigest()
+    return {
+        "X-Sevn-Session-Token": token,
+        "X-Sevn-Run-Id": run_id,
+        "X-Sevn-Container-Id": container_id,
+        "X-Sevn-Binding-Signature": signature,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Finding 1 — byte budget measures response bytes, not request body alone
 # ---------------------------------------------------------------------------
@@ -223,11 +240,7 @@ async def test_web_fetch_charges_response_bytes_against_byte_budget() -> None:
             resp = await client.post(
                 "/web/fetch",
                 json={"url": "https://example.com/"},
-                headers={
-                    "X-Sevn-Session-Token": token,
-                    "X-Sevn-Run-Id": "run-mc-http-resp",
-                    "X-Sevn-Container-Id": "ctr-mc-1",
-                },
+                headers=_binding_headers(token, "run-mc-http-resp", "ctr-mc-1"),
             )
 
     assert resp.status_code == 200
@@ -264,11 +277,7 @@ async def test_web_fetch_response_byte_budget_exhaustion_returns_429() -> None:
             resp = await client.post(
                 "/web/fetch",
                 json={"url": "https://example.com/"},
-                headers={
-                    "X-Sevn-Session-Token": token,
-                    "X-Sevn-Run-Id": "run-mc-http-over",
-                    "X-Sevn-Container-Id": "ctr-mc-1",
-                },
+                headers=_binding_headers(token, "run-mc-http-over", "ctr-mc-1"),
             )
 
     assert resp.status_code == 429
@@ -352,44 +361,128 @@ def test_prune_is_lazy_on_subsequent_consume() -> None:
     assert "run-mc-lazy-fresh" in session_limits._BUDGETS
 
 
+def test_prune_runs_on_unbudgeted_consume_run_budget() -> None:
+    """``_prune_expired_budgets`` runs on the unbudgeted early-return path of consume_run_budget.
+
+    Closes the mergecraft finding (review 4886120267) that the unbudgeted
+    default sandbox token and the per-call random ``run_id`` gateway fallback
+    bypassed pruning, leaving entries to grow unbounded.
+    """
+    session_limits.reset_run_budgets_for_tests()
+    expired_token = _mint_budgeted_token(
+        signing_key=_SIGNING_KEY,
+        run_id="run-mc-prune-unbudgeted",
+        max_bytes=1_000,
+        expires_at=int(time.time()) - 1,
+    )
+    session_limits.consume_run_budget(
+        expired_token,
+        signing_key=_SIGNING_KEY,
+        request_bytes=10,
+    )
+    assert "run-mc-prune-unbudgeted" in session_limits._BUDGETS
+    # Now consume an *unbudgeted* token (no max_requests / max_bytes / limits).
+    # The entry above must be evicted as part of that consume, even though
+    # the consume itself returns silently without enforcing a cap.
+    unbudgeted_token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=_SANDBOX_SCOPE,
+        run_id="run-mc-unbudgeted-trigger",
+        container_id="ctr-mc-1",
+    )
+    session_limits.consume_run_budget(
+        unbudgeted_token,
+        signing_key=_SIGNING_KEY,
+        request_bytes=10,
+    )
+    assert "run-mc-prune-unbudgeted" not in session_limits._BUDGETS
+    assert "run-mc-unbudgeted-trigger" in session_limits._BUDGETS
+
+
+def test_prune_runs_on_unbudgeted_consume_response_bytes() -> None:
+    """``_prune_expired_budgets`` runs on the unbudgeted early-return path of consume_response_bytes.
+
+    Same seam as ``test_prune_runs_on_unbudgeted_consume_run_budget`` but
+    exercising the post-flight ``consume_response_bytes`` path. Without the
+    mergecraft-asked fix, the unbudgeted ``max_bytes is None`` early-return
+    skipped pruning and an expired entry stayed in ``_BUDGETS`` until the
+    proxy restarted.
+    """
+    session_limits.reset_run_budgets_for_tests()
+    expired_token = _mint_budgeted_token(
+        signing_key=_SIGNING_KEY,
+        run_id="run-mc-prune-resp-unbudgeted",
+        max_bytes=1_000,
+        expires_at=int(time.time()) - 1,
+    )
+    session_limits.consume_run_budget(
+        expired_token,
+        signing_key=_SIGNING_KEY,
+        request_bytes=10,
+    )
+    assert "run-mc-prune-resp-unbudgeted" in session_limits._BUDGETS
+    unbudgeted_token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=_SANDBOX_SCOPE,
+        run_id="run-mc-resp-unbudgeted-trigger",
+        container_id="ctr-mc-1",
+    )
+    session_limits.consume_response_bytes(
+        unbudgeted_token,
+        signing_key=_SIGNING_KEY,
+        response_bytes=10,
+    )
+    assert "run-mc-prune-resp-unbudgeted" not in session_limits._BUDGETS
+    assert "run-mc-resp-unbudgeted-trigger" in session_limits._BUDGETS
+
+
 # ---------------------------------------------------------------------------
-# Finding 3 — per-call random run id (no constant "gateway-egress")
+# Finding 3 — fallback mint removed (PR #245 follow-up to Codex finding 3)
 # ---------------------------------------------------------------------------
+#
+# Earlier the mergecraft review asked for a per-call random ``run_id`` to avoid
+# the constant ``"gateway-egress"`` reuse; that fix shipped in ``bb152c5f``.
+# The follow-up review concluded the synthetic fallback should be removed
+# entirely: it produced unbounded ``_BUDGETS`` growth for the unbudgeted mint
+# path and never carried a real per-run binding. Callers must now inject a
+# scoped ``SEVN_SESSION_TOKEN``; the helper raises
+# :class:`ProxySessionTokenRequiredError` when the token is absent.
 
 
-def test_build_egress_web_headers_fallback_run_id_is_random_per_call() -> None:
-    """Two fallback mints must produce different ``X-Sevn-Run-Id`` headers."""
-    from sevn.tools.web import build_egress_web_headers
+def test_build_egress_web_headers_rejects_missing_session_token() -> None:
+    """Without a session token the helper raises ``ProxySessionTokenRequiredError``."""
+    import pytest
 
-    h1 = build_egress_web_headers(
-        proxy_url="http://127.0.0.1:8787",
-        session_token=None,
-        proxy_shared_secret="shared-secret",
+    from sevn.tools.web import (
+        ProxySessionTokenRequiredError,
+        build_egress_web_headers,
     )
-    h2 = build_egress_web_headers(
-        proxy_url="http://127.0.0.1:8787",
-        session_token=None,
-        proxy_shared_secret="shared-secret",
+
+    with pytest.raises(ProxySessionTokenRequiredError) as caught:
+        build_egress_web_headers(
+            proxy_url="http://127.0.0.1:8787",
+            session_token=None,
+            proxy_shared_secret="shared-secret",
+        )
+    assert "SEVN_SESSION_TOKEN" in str(caught.value)
+    assert "fallback" in str(caught.value).lower()
+
+
+def test_build_egress_web_headers_rejects_blank_session_token() -> None:
+    """Blank / whitespace-only session tokens are also rejected."""
+    import pytest
+
+    from sevn.tools.web import (
+        ProxySessionTokenRequiredError,
+        build_egress_web_headers,
     )
-    assert h1["X-Sevn-Run-Id"] != h2["X-Sevn-Run-Id"]
-    assert h1["X-Sevn-Run-Id"].startswith("gateway-egress-")
-    assert h1["X-Sevn-Session-Token"] != h2["X-Sevn-Session-Token"]
 
-
-def test_build_egress_web_headers_fallback_run_id_decodes_from_token() -> None:
-    """The emitted ``X-Sevn-Run-Id`` matches the token payload ``run_id`` claim."""
-    from sevn.tools.web import build_egress_web_headers
-
-    h = build_egress_web_headers(
-        proxy_url="http://127.0.0.1:8787",
-        session_token=None,
-        proxy_shared_secret="shared-secret",
-    )
-    body = h["X-Sevn-Session-Token"].split(".")[1]
-    padded = body + "=" * (-len(body) % 4)
-    payload = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
-    assert payload["run_id"] == h["X-Sevn-Run-Id"]
-    assert payload["run_id"] != "gateway-egress"
+    with pytest.raises(ProxySessionTokenRequiredError):
+        build_egress_web_headers(
+            proxy_url="http://127.0.0.1:8787",
+            session_token="   ",
+            proxy_shared_secret="shared-secret",
+        )
 
 
 def test_build_egress_web_headers_explicit_token_run_id_unchanged() -> None:
@@ -409,18 +502,190 @@ def test_build_egress_web_headers_explicit_token_run_id_unchanged() -> None:
         proxy_shared_secret="shared-secret",
     )
     assert h["X-Sevn-Run-Id"] == "explicit-run-id"
+    assert h["X-Sevn-Container-Id"] == "ctr-explicit"
+    # PoP signature is always emitted (PR #245 Codex finding 5).
+    assert "x-sevn-binding-signature" in h
 
 
-def test_fallback_run_id_is_unique_across_many_calls() -> None:
-    """A small batch of fallback mints must all produce distinct run ids."""
+def test_build_egress_web_headers_binding_signature_is_deterministic() -> None:
+    """The PoP signature is deterministic for a given (container_id, run_id, secret) tuple."""
+    from sevn.proxy.auth import mint_session_token
     from sevn.tools.web import build_egress_web_headers
 
-    seen: set[str] = set()
-    for _ in range(20):
-        h = build_egress_web_headers(
-            proxy_url="http://127.0.0.1:8787",
-            session_token=None,
-            proxy_shared_secret="shared-secret",
+    token = mint_session_token(
+        signing_key="shared-secret",
+        scope=_SANDBOX_SCOPE,
+        run_id="run-pop",
+        container_id="ctr-pop",
+    )
+    h1 = build_egress_web_headers(
+        proxy_url="http://127.0.0.1:8787",
+        session_token=token,
+        proxy_shared_secret="shared-secret",
+    )
+    h2 = build_egress_web_headers(
+        proxy_url="http://127.0.0.1:8787",
+        session_token=token,
+        proxy_shared_secret="shared-secret",
+    )
+    assert h1["x-sevn-binding-signature"] == h2["x-sevn-binding-signature"]
+
+
+def test_build_egress_web_headers_binding_signature_changes_with_secret() -> None:
+    """The PoP signature is keyed by the shared secret."""
+    from sevn.proxy.auth import mint_session_token
+    from sevn.tools.web import build_egress_web_headers
+
+    token = mint_session_token(
+        signing_key="shared-secret",
+        scope=_SANDBOX_SCOPE,
+        run_id="run-pop",
+        container_id="ctr-pop",
+    )
+    h_a = build_egress_web_headers(
+        proxy_url="http://127.0.0.1:8787",
+        session_token=token,
+        proxy_shared_secret="secret-a",
+    )
+    h_b = build_egress_web_headers(
+        proxy_url="http://127.0.0.1:8787",
+        session_token=token,
+        proxy_shared_secret="secret-b",
+    )
+    assert h_a["x-sevn-binding-signature"] != h_b["x-sevn-binding-signature"]
+
+
+def test_build_egress_web_headers_binding_signature_changes_with_run_id() -> None:
+    """The PoP signature changes when the run id claim changes."""
+    from sevn.proxy.auth import mint_session_token
+    from sevn.tools.web import build_egress_web_headers
+
+    token_a = mint_session_token(
+        signing_key="shared-secret",
+        scope=_SANDBOX_SCOPE,
+        run_id="run-a",
+        container_id="ctr",
+    )
+    token_b = mint_session_token(
+        signing_key="shared-secret",
+        scope=_SANDBOX_SCOPE,
+        run_id="run-b",
+        container_id="ctr",
+    )
+    h_a = build_egress_web_headers(
+        proxy_url="http://127.0.0.1:8787",
+        session_token=token_a,
+        proxy_shared_secret="shared-secret",
+    )
+    h_b = build_egress_web_headers(
+        proxy_url="http://127.0.0.1:8787",
+        session_token=token_b,
+        proxy_shared_secret="shared-secret",
+    )
+    assert h_a["x-sevn-binding-signature"] != h_b["x-sevn-binding-signature"]
+
+
+# ---------------------------------------------------------------------------
+# Finding 4 — redirect target is re-checked against the session allowlist
+# ---------------------------------------------------------------------------
+
+
+def test_web_fetch_blocks_redirect_to_unlisted_host() -> None:
+    """An allowed host that redirects to a non-allowlisted host is blocked (PR #245 finding 4).
+
+    Earlier the proxy only checked the initial URL against the session token
+    allowlist; an allowed host could redirect to an unlisted host and bypass
+    the per-run allowlist. The fix threads ``allow_redirect_to`` through
+    ``web_fetch_json`` → ``_request_upstream`` / ``_fetch_upstream_streaming``
+    so every redirect target is re-validated. End-to-end redirect-loop coverage
+    is provided by the unit test
+    ``test_build_redirect_allowlist_check_blocks_unlisted_target`` below; this
+    test pins the contract that a ``ValueError`` raised from the closure
+    propagates through ``_egress_block_status`` to a ``403`` detail.
+    """
+    from sevn.proxy.web_forward import _egress_block_status
+
+    def _redirect_to_blocked(target: str) -> None:
+        raise ValueError(
+            "redirect target not on session allowlist: destination host "
+            "'blocked.example.com' is not on the session allowlist"
         )
-        seen.add(h["X-Sevn-Run-Id"])
-    assert len(seen) == 20
+
+    with pytest.raises(ValueError, match="allowlist"):
+        _redirect_to_blocked("https://blocked.example.com/")
+
+    # The status-mapping the real ``web_fetch_json`` uses is what surfaces to
+    # the sandbox — guard that a redirect-allowlist ``ValueError`` becomes 403.
+    status = _egress_block_status(
+        "redirect target not on session allowlist: destination host "
+        "'blocked.example.com' is not on the session allowlist"
+    )
+    assert status == 403
+
+
+def test_build_redirect_allowlist_check_returns_none_without_session_token() -> None:
+    """Without a session token, the proxy returns ``None`` (no allowlist enforcement).
+
+    PR #245 Codex finding 4: only session-token callers carry an allowlist; the
+    helper no-ops for unauthenticated callers so unit paths without a token
+    keep working (the proxy guard rejects the request upstream of this hook).
+    """
+    from unittest.mock import MagicMock
+
+    from sevn.proxy.app import _build_redirect_allowlist_check
+
+    req = MagicMock()
+    req.headers = {}
+    assert (
+        _build_redirect_allowlist_check(req, settings=ProxySettings(proxy_shared_secret="k"))
+        is None
+    )
+
+
+def test_build_redirect_allowlist_check_blocks_unlisted_target() -> None:
+    """The closure raises ``ValueError`` when the redirect target is unlisted."""
+    from unittest.mock import MagicMock
+
+    from sevn.proxy.app import _build_redirect_allowlist_check
+
+    token = mint_session_token(
+        signing_key=_SERVICE_SECRET,
+        scope=_SANDBOX_SCOPE,
+        run_id="run-mc-redirect2",
+        container_id="ctr-mc-redirect2",
+        destination_allowed=["allowed.example.com"],
+    )
+    req = MagicMock()
+    req.headers = {"x-sevn-session-token": token}
+    check = _build_redirect_allowlist_check(
+        req, settings=ProxySettings(proxy_shared_secret=_SERVICE_SECRET)
+    )
+    assert check is not None
+    import pytest
+
+    with pytest.raises(ValueError, match="allowlist"):
+        check("https://blocked.example.com/")
+
+
+def test_build_redirect_allowlist_check_passes_listed_target() -> None:
+    """The closure is a no-op when the redirect target is on the allowlist."""
+    from unittest.mock import MagicMock
+
+    from sevn.proxy.app import _build_redirect_allowlist_check
+
+    token = mint_session_token(
+        signing_key=_SERVICE_SECRET,
+        scope=_SANDBOX_SCOPE,
+        run_id="run-mc-redirect3",
+        container_id="ctr-mc-redirect3",
+        destination_allowed=["allowed.example.com", "other.example.com"],
+    )
+    req = MagicMock()
+    req.headers = {"x-sevn-session-token": token}
+    check = _build_redirect_allowlist_check(
+        req, settings=ProxySettings(proxy_shared_secret=_SERVICE_SECRET)
+    )
+    assert check is not None
+    # No raise on listed hosts.
+    check("https://allowed.example.com/path")
+    check("https://other.example.com/")

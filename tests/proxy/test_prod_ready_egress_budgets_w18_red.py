@@ -67,6 +67,18 @@ def _proxy_app() -> Any:
     )
 
 
+def _binding_headers(token: str, run_id: str, container_id: str = "ctr-budget-1") -> dict[str, str]:
+    """Build a complete header set including the PoP binding signature (PR #245 finding 5)."""
+    canonical = f"container_id={container_id}\nrun_id={run_id}".encode()
+    signature = hmac.new(_SERVICE_SECRET.encode(), canonical, hashlib.sha256).hexdigest()
+    return {
+        "X-Sevn-Session-Token": token,
+        "X-Sevn-Run-Id": run_id,
+        "X-Sevn-Container-Id": container_id,
+        "X-Sevn-Binding-Signature": signature,
+    }
+
+
 # ---------------------------------------------------------------------------
 # W18.4 — destination allowlist (C7.3; green after W20)
 # ---------------------------------------------------------------------------
@@ -118,20 +130,12 @@ async def test_w18_4_http_rejects_out_of_allowlist_destination() -> None:
         ok = await client.post(
             "/web/fetch",
             json={"url": "https://allowed.example/"},
-            headers={
-                "X-Sevn-Session-Token": token,
-                "X-Sevn-Run-Id": "run-allow",
-                "X-Sevn-Container-Id": "ctr-budget-1",
-            },
+            headers=_binding_headers(token, "run-allow"),
         )
         denied = await client.post(
             "/web/fetch",
             json={"url": "https://evil.example/"},
-            headers={
-                "X-Sevn-Session-Token": token,
-                "X-Sevn-Run-Id": "run-allow",
-                "X-Sevn-Container-Id": "ctr-budget-1",
-            },
+            headers=_binding_headers(token, "run-allow"),
         )
     assert ok.status_code != 401
     assert denied.status_code in (403, 422)
@@ -185,11 +189,7 @@ async def test_w18_5_http_budget_exhaustion_not_confused_with_auth_failure() -> 
         max_requests=1,
         max_bytes=1_000_000,
     )
-    headers = {
-        "X-Sevn-Session-Token": token,
-        "X-Sevn-Run-Id": "run-http-budget",
-        "X-Sevn-Container-Id": "ctr-budget-1",
-    }
+    headers = _binding_headers(token, "run-http-budget")
     transport = httpx.ASGITransport(app=_proxy_app())
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         first = await client.post(
@@ -282,11 +282,7 @@ async def test_destination_allowed_empty_list_http_returns_403() -> None:
         run_id="run-empty-allowlist-http",
         allowlist=[],
     )
-    headers = {
-        "X-Sevn-Session-Token": token,
-        "X-Sevn-Run-Id": "run-empty-allowlist-http",
-        "X-Sevn-Container-Id": "ctr-budget-1",
-    }
+    headers = _binding_headers(token, "run-empty-allowlist-http")
     transport = httpx.ASGITransport(app=_proxy_app())
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         resp = await client.post(

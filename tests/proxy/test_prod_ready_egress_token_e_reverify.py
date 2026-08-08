@@ -24,6 +24,8 @@ proxy seam in ``llm_post_auth_failure``, and ``session_limits`` enforcement.
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import json
 import time
 from typing import Any
@@ -87,6 +89,12 @@ def _proxy_request(
         "client": ("127.0.0.1", 12345),
     }
     return Request(scope)
+
+
+def _binding_signature(*, container_id: str, run_id: str) -> str:
+    """Compute the PoP binding signature used by the proxy guard (PR #245 finding 5)."""
+    canonical = f"container_id={container_id}\nrun_id={run_id}".encode()
+    return hmac.new(_SERVICE_SECRET.encode(), canonical, hashlib.sha256).hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -425,6 +433,7 @@ async def test_reverify_v1_run_id_binding_matches_when_present() -> None:
         ),
     )
     transport = httpx.ASGITransport(app=app)
+    binding_sig = _binding_signature(container_id="", run_id=run_id)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         resp = await client.post(
             "/web/fetch",
@@ -432,6 +441,7 @@ async def test_reverify_v1_run_id_binding_matches_when_present() -> None:
             headers={
                 "X-Sevn-Session-Token": token,
                 "X-Sevn-Run-Id": run_id,
+                "X-Sevn-Binding-Signature": binding_sig,
             },
         )
     assert resp.status_code != 401
@@ -467,6 +477,7 @@ async def test_reverify_v1_concurrent_run_id_bound_requests_consistent() -> None
         ),
     )
     transport = httpx.ASGITransport(app=app)
+    binding_sig = _binding_signature(container_id="", run_id=run_id)
 
     async def _fetch() -> int:
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
@@ -476,6 +487,7 @@ async def test_reverify_v1_concurrent_run_id_bound_requests_consistent() -> None
                 headers={
                     "X-Sevn-Session-Token": token,
                     "X-Sevn-Run-Id": run_id,
+                    "X-Sevn-Binding-Signature": binding_sig,
                 },
             )
             return resp.status_code
@@ -483,3 +495,169 @@ async def test_reverify_v1_concurrent_run_id_bound_requests_consistent() -> None
     codes = await asyncio.gather(_fetch(), _fetch())
     assert codes[0] == codes[1]
     assert codes[0] != 401
+
+
+# ---------------------------------------------------------------------------
+# E-PoP — Binding-headers PoP signature (PR #245 Codex finding 5)
+# ---------------------------------------------------------------------------
+
+
+def _request_with_binding(
+    *,
+    token: str,
+    run_id: str,
+    container_id: str,
+    signing_key: str,
+    include_sig: bool = True,
+    wrong_sig: bool = False,
+    path: str = "/web/fetch",
+) -> Request:
+    """Synthesize an ASGI ``Request`` carrying the PoP binding headers.
+    Local helper (D40-safe: does not live in ``test_auth.py``).
+    """
+    binding_sig = ""
+    if include_sig:
+        canonical = f"container_id={container_id}\nrun_id={run_id}".encode()
+        binding_sig = hmac.new(signing_key.encode(), canonical, hashlib.sha256).hexdigest()
+        if wrong_sig:
+            binding_sig = "deadbeef" * 8
+    headers: list[tuple[bytes, bytes]] = [
+        (b"x-sevn-proxy-token", b"ignored"),
+        (b"x-sevn-session-token", token.encode()),
+        (b"x-sevn-run-id", run_id.encode()),
+        (b"x-sevn-container-id", container_id.encode()),
+    ]
+    if include_sig:
+        headers.append((b"x-sevn-binding-signature", binding_sig.encode()))
+    scope = {
+        "type": "http",
+        "http_version": "1.1",
+        "method": "POST",
+        "path": path,
+        "headers": headers,
+        "query_string": b"",
+        "client": ("127.0.0.1", 12345),
+    }
+    return Request(scope)
+
+
+def test_e_pop_verify_binding_signature_accepts_matching_signature() -> None:
+    """A correctly keyed binding signature is admitted by the verifier."""
+    from sevn.proxy.auth import _verify_binding_signature
+
+    run_id = "run-pop"
+    container_id = "ctr-pop"
+    token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id=run_id,
+        container_id=container_id,
+        expires_at=int(time.time()) + 3600,
+    )
+    req = _request_with_binding(
+        token=token,
+        run_id=run_id,
+        container_id=container_id,
+        signing_key=_SIGNING_KEY,
+    )
+    assert (
+        _verify_binding_signature(
+            request=req, signing_key=_SIGNING_KEY, container_id=container_id, run_id=run_id
+        )
+        is True
+    )
+
+
+def test_e_pop_verify_binding_signature_rejects_missing_header() -> None:
+    """An absent binding signature is rejected (fail-closed)."""
+    from sevn.proxy.auth import _verify_binding_signature
+
+    run_id = "run-pop"
+    container_id = "ctr-pop"
+    token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id=run_id,
+        container_id=container_id,
+        expires_at=int(time.time()) + 3600,
+    )
+    req = _request_with_binding(
+        token=token,
+        run_id=run_id,
+        container_id=container_id,
+        signing_key=_SIGNING_KEY,
+        include_sig=False,
+    )
+    assert (
+        _verify_binding_signature(
+            request=req, signing_key=_SIGNING_KEY, container_id=container_id, run_id=run_id
+        )
+        is False
+    )
+
+
+def test_e_pop_verify_binding_signature_rejects_mismatched_signature() -> None:
+    """A signature keyed by a different secret is rejected."""
+    from sevn.proxy.auth import _verify_binding_signature
+
+    run_id = "run-pop"
+    container_id = "ctr-pop"
+    token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id=run_id,
+        container_id=container_id,
+        expires_at=int(time.time()) + 3600,
+    )
+    req = _request_with_binding(
+        token=token,
+        run_id=run_id,
+        container_id=container_id,
+        signing_key="wrong-signing-key-32-chars!!",
+    )
+    assert (
+        _verify_binding_signature(
+            request=req, signing_key=_SIGNING_KEY, container_id=container_id, run_id=run_id
+        )
+        is False
+    )
+
+
+def test_e_pop_llm_post_auth_failure_rejects_session_token_without_binding_signature() -> None:
+    """Session tokens without a PoP binding signature are rejected at the guard."""
+    run_id = "run-pop"
+    container_id = "ctr-pop"
+    token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id=run_id,
+        container_id=container_id,
+        expires_at=int(time.time()) + 3600,
+    )
+    req = _request_with_binding(
+        token=token,
+        run_id=run_id,
+        container_id=container_id,
+        signing_key=_SIGNING_KEY,
+        include_sig=False,
+    )
+    resp = llm_post_auth_failure(req, _SIGNING_KEY, allow_unauthenticated=False)
+    assert resp is not None
+    assert resp.status_code == 401
+
+
+def test_e_pop_llm_post_auth_failure_accepts_session_token_with_binding_signature() -> None:
+    """A PoP-signed request is admitted."""
+    run_id = "run-pop"
+    container_id = "ctr-pop"
+    token = mint_session_token(
+        signing_key=_SIGNING_KEY,
+        scope=SESSION_SCOPE_SANDBOX,
+        run_id=run_id,
+        container_id=container_id,
+        expires_at=int(time.time()) + 3600,
+    )
+    req = _request_with_binding(
+        token=token, run_id=run_id, container_id=container_id, signing_key=_SIGNING_KEY
+    )
+    assert llm_post_auth_failure(req, _SIGNING_KEY, allow_unauthenticated=False) is None

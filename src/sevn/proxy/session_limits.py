@@ -7,11 +7,15 @@ Budget state lives **in-process** on the proxy, keyed by token ``run_id``. A pro
 restart clears counters (W20.3 tradeoff: durable budgets need shared storage the
 proxy does not yet have; silent reset is documented rather than pretended away).
 
-``_BUDGETS`` is lazily pruned: when a token is presented again, any entries whose
-``exp`` claim is in the past are dropped before the lookup. This bounds the
-dict's lifetime growth to the active token set (the prune-on-consume seam is
-the same lock-protected path used for state lookup, so concurrent callers
-serialise on the prune; it does not run on a background thread).
+``_BUDGETS`` is lazily pruned on **every** ``consume_*`` call, before the
+unbudgeted early-return. When a token is presented again, any entries whose
+``exp`` claim is in the past are dropped. This bounds the dict's lifetime
+growth to the active token set (the prune-on-consume seam is the same
+lock-protected path used for state lookup, so concurrent callers serialise on
+the prune; it does not run on a background thread). Unbudgeted tokens
+(default sandbox, gateway fallback) also trigger the prune, so the
+``build_egress_web_headers`` fallback's per-call random ``run_id`` does not
+leak entries that never see a budgeted consume.
 
 Exports:
     DestinationNotAllowed — allowlist rejection.
@@ -247,6 +251,13 @@ def consume_run_budget(
     if not isinstance(run_id, str) or not run_id:
         msg = "session token missing run_id for budget tracking"
         raise BudgetExceeded(msg)
+    # Prune expired _BUDGETS entries BEFORE the unbudgeted early-return so
+    # the default sandbox token and the per-call random ``run_id`` gateway
+    # fallback (web.py:227) do not leak entries that never see a budgeted
+    # consume. The C7.3 unbounded-growth finding from the mergecraft review
+    # (id 4886120267) is closed by this seam: expired entries are dropped on
+    # every consume, regardless of whether the token carries budgets.
+    _prune_expired_budgets()
     limits = payload.get("limits")
     max_requests: object | None = None
     max_bytes: object | None = None
@@ -274,7 +285,6 @@ def consume_run_budget(
         msg = "invalid max_bytes budget claim"
         raise BudgetExceeded(msg)
     nbytes = max(0, int(request_bytes))
-    _prune_expired_budgets()
     state = _budget_state_for(run_id)
     exp_claim = payload.get("exp")
     if isinstance(exp_claim, int) and not isinstance(exp_claim, bool):
@@ -331,6 +341,11 @@ def consume_response_bytes(
     if not isinstance(run_id, str) or not run_id:
         msg = "session token missing run_id for budget tracking"
         raise BudgetExceeded(msg)
+    # Prune expired _BUDGETS entries BEFORE the unbudgeted early-return so
+    # the default sandbox token and the per-call random ``run_id`` gateway
+    # fallback (web.py:227) do not leak entries that never see a budgeted
+    # consume. See consume_run_budget for the mergecraft-finding rationale.
+    _prune_expired_budgets()
     limits = payload.get("limits")
     max_bytes: object | None = None
     if isinstance(limits, dict):
@@ -347,7 +362,6 @@ def consume_response_bytes(
         msg = "invalid max_bytes budget claim"
         raise BudgetExceeded(msg)
     nbytes = max(0, int(response_bytes))
-    _prune_expired_budgets()
     state = _budget_state_for(run_id)
     exp_claim = payload.get("exp")
     if isinstance(exp_claim, int) and not isinstance(exp_claim, bool):

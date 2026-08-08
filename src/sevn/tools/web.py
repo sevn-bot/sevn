@@ -9,6 +9,7 @@ Depends: asyncio, httpx, markdownify, sevn.config.settings, sevn.tools.base,
 
 Exports:
     ProxySharedSecretUnconfiguredError — guarded-route client missing shared secret.
+    ProxySessionTokenRequiredError — guarded-route client missing session token.
     serp_tool — DuckDuckGo search via ``ddgs``.
     web_search_tool — Brave search via ``POST /web/brave/search`` on the egress proxy.
     get_page_content_tool — Fetch URL markdown via proxy + ``markdownify``.
@@ -32,11 +33,11 @@ Examples:
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import importlib.util
 import json
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlparse
-from uuid import uuid4
 
 import httpx
 from markdownify import markdownify as html_to_markdown
@@ -85,6 +86,7 @@ _SESSION_TOKEN_HEADER: Final[str] = "X-Sevn-Session-Token"
 _PROXY_TOKEN_HEADER: Final[str] = "X-Sevn-Proxy-Token"
 _RUN_ID_HEADER: Final[str] = "X-Sevn-Run-Id"
 _CONTAINER_ID_HEADER: Final[str] = "X-Sevn-Container-Id"
+_BINDING_SIG_HEADER: Final[str] = "x-sevn-binding-signature"
 _TOOL_TO_PROXY_TIMEOUT: Final[httpx.Timeout] = httpx.Timeout(
     connect=PROXY_TOOL_TO_PROXY_TIMEOUT_CONNECT_S,
     read=PROXY_TOOL_TO_PROXY_TIMEOUT_READ_S,
@@ -128,14 +130,66 @@ class ProxySharedSecretUnconfiguredError(RuntimeError):
         super().__init__(message or _PROXY_SECRET_UNCONFIGURED_MSG)
 
 
-def _session_token_binding_headers(token: str) -> dict[str, str]:
-    """Extract ``X-Sevn-Run-Id`` / ``X-Sevn-Container-Id`` from a session-token payload.
+_PROXY_SESSION_TOKEN_REQUIRED_MSG: Final[str] = (
+    "SEVN_SESSION_TOKEN is required for egress proxy calls; "
+    "the gateway fallback that minted a synthetic token was removed "
+    "(it produced unbounded _BUDGETS growth and a constant/replayable run binding — "
+    "mergecraft review #245 finding 3). Spawn the request through a sandbox "
+    "so a per-run scoped token is injected, or carry SEVN_SESSION_TOKEN in the process env."
+)
+
+
+class ProxySessionTokenRequiredError(RuntimeError):
+    """Raised when a guarded-route client has no resolved ``SEVN_SESSION_TOKEN``.
+
+    The earlier fallback that minted a short-lived sandbox-scoped token on the
+    caller's behalf was removed (PR #245 Codex finding 3): it either reused the
+    constant ``"gateway-egress"`` run id (every gateway call sharing one binding)
+    or minted a fresh per-call random ``run_id`` that leaked an unbounded
+    ``_BUDGETS`` entry on every request. Callers must now inject a real
+    per-run scoped token (sandbox spawn or ``SEVN_SESSION_TOKEN`` env).
+    """
+
+    def __init__(self, message: str | None = None) -> None:
+        """Name the missing variable and a concrete remedy.
+
+        Args:
+            message (str | None): Optional override; default names ``SEVN_SESSION_TOKEN``.
+
+        Returns:
+            None
+
+        Examples:
+            >>> err = ProxySessionTokenRequiredError()
+            >>> "SEVN_SESSION_TOKEN" in str(err)
+            True
+        """
+        super().__init__(message or _PROXY_SESSION_TOKEN_REQUIRED_MSG)
+
+
+def _session_token_binding_headers(token: str, *, signing_key: str) -> dict[str, str]:
+    """Extract ``X-Sevn-Run-Id`` / ``X-Sevn-Container-Id`` and a PoP signature from a session token.
+
+    The proof-of-possession (``X-Sevn-Binding-Signature``) is HMAC-SHA256 over the
+    canonical binding string ``"container_id=<cid>\\nrun_id=<rid>"`` keyed by the
+    proxy shared secret. The proxy re-derives the HMAC on receipt and compares it
+    before admitting the request (PR #245 Codex finding 5): anyone who obtains the
+    bearer token alone cannot re-bind it to a different ``container_id`` /
+    ``run_id`` pair because they would need the shared secret to recompute the
+    signature. The proxy's bearer-token check still rejects mismatched claim /
+    header values, so the HMAC is a defense-in-depth signal that the binding
+    headers were produced by a holder of the shared secret rather than a
+    replay of decoded headers.
 
     Args:
         token (str): ``v1.<payload>.<sig>`` session token (signature not re-checked here).
+        signing_key (str): HMAC key for the binding signature (the resolved
+            ``SEVN_PROXY_SHARED_SECRET``).
 
     Returns:
-        dict[str, str]: Binding headers present in the payload, else empty.
+        dict[str, str]: ``X-Sevn-Run-Id`` / ``X-Sevn-Container-Id`` (when present in
+            the payload) plus ``X-Sevn-Binding-Signature``. Returns an empty dict
+            when the token cannot be decoded.
 
     Examples:
         >>> from sevn.proxy.auth import mint_session_token
@@ -146,29 +200,44 @@ def _session_token_binding_headers(token: str) -> dict[str, str]:
         ...     container_id="c1",
         ...     expires_at=9999999999,
         ... )
-        >>> _session_token_binding_headers(t)["X-Sevn-Run-Id"]
+        >>> h = _session_token_binding_headers(t, signing_key="k")
+        >>> h["X-Sevn-Run-Id"]
         'r1'
+        >>> h["X-Sevn-Container-Id"]
+        'c1'
+        >>> "x-sevn-binding-signature" in h
+        True
     """
     import base64
-    import json
+    import hmac as _hmac
+    import json as _json
 
     parts = token.strip().split(".")
     if len(parts) != 3:
         return {}
     padded = parts[1] + "=" * (-len(parts[1]) % 4)
     try:
-        payload = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
+        payload = _json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
     except (ValueError, json.JSONDecodeError):
         return {}
     if not isinstance(payload, dict):
         return {}
     out: dict[str, str] = {}
     run_id = payload.get("run_id")
-    if isinstance(run_id, str) and run_id:
-        out[_RUN_ID_HEADER] = run_id
     container_id = payload.get("container_id")
-    if isinstance(container_id, str) and container_id:
-        out[_CONTAINER_ID_HEADER] = container_id
+    run_id_str = run_id if isinstance(run_id, str) and run_id else ""
+    container_id_str = container_id if isinstance(container_id, str) and container_id else ""
+    if run_id_str:
+        out[_RUN_ID_HEADER] = run_id_str
+    if container_id_str:
+        out[_CONTAINER_ID_HEADER] = container_id_str
+    # Always emit a binding signature: with empty ``container_id`` and ``run_id``
+    # the canonical string still binds the (empty, empty) pair, so a stolen token
+    # can never be rebound to a non-empty pair without the shared secret.
+    canonical = f"container_id={container_id_str}\nrun_id={run_id_str}".encode()
+    out[_BINDING_SIG_HEADER] = _hmac.new(
+        signing_key.encode(), canonical, hashlib.sha256
+    ).hexdigest()
     return out
 
 
@@ -181,8 +250,13 @@ def build_egress_web_headers(
     """Build auth headers for egress proxy ``/web/*`` / ``/integration`` routes.
 
     After C7.2 the service shared secret alone is rejected on sandbox route families;
-    callers must present a scoped session token. When ``session_token`` is omitted,
-    a short-lived gateway sandbox-scoped token is minted from ``proxy_shared_secret``.
+    callers must present a scoped session token. The earlier fallback that minted
+    a synthetic short-lived sandbox-scoped token on the caller's behalf when
+    ``session_token`` was omitted was removed (PR #245 Codex finding 3): it either
+    reused a constant ``"gateway-egress"`` run id (every call sharing one binding)
+    or minted a fresh per-call random ``run_id`` that leaked an unbounded
+    ``_BUDGETS`` entry on every request. The proxy now requires a real per-run
+    scoped token; without one the caller fails closed.
 
     Args:
         proxy_url (str | None): Resolved ``SEVN_PROXY_URL`` (must be non-empty to call).
@@ -196,6 +270,9 @@ def build_egress_web_headers(
 
     Raises:
         ProxySharedSecretUnconfiguredError: When ``proxy_shared_secret`` is missing/blank.
+        ProxySessionTokenRequiredError: When ``session_token`` is missing/blank — the
+            caller must inject a real per-run scoped token (sandbox spawn or
+            ``SEVN_SESSION_TOKEN`` env). The synthetic fallback was removed.
 
     Examples:
         >>> hdrs = build_egress_web_headers(
@@ -212,22 +289,15 @@ def build_egress_web_headers(
     secret = (proxy_shared_secret or "").strip()
     if not secret:
         raise ProxySharedSecretUnconfiguredError
-    headers: dict[str, str] = {"Content-Type": "application/json"}
     token = (session_token or "").strip()
     if not token:
-        from sevn.proxy.auth import SESSION_SCOPE_SANDBOX, mint_session_token
-
-        # Per-call random run id (was the constant ``"gateway-egress"``); the
-        # gateway holds the secret and could mint any token, but the constant
-        # made the run binding a no-op on this path and a leaked fallback
-        # token stayed usable for its full TTL under a known run id.
-        token = mint_session_token(
-            signing_key=secret,
-            scope=SESSION_SCOPE_SANDBOX,
-            run_id=f"gateway-egress-{uuid4().hex[:12]}",
-        )
+        # The synthetic fallback was removed (PR #245 Codex finding 3). Callers
+        # must inject a real per-run scoped token so the proxy can enforce the
+        # run/container binding and the session budget registry stays bounded.
+        raise ProxySessionTokenRequiredError
+    headers: dict[str, str] = {"Content-Type": "application/json"}
     headers[_SESSION_TOKEN_HEADER] = token
-    headers.update(_session_token_binding_headers(token))
+    headers.update(_session_token_binding_headers(token, signing_key=secret))
     headers[_PROXY_TOKEN_HEADER] = secret
     return headers
 
@@ -741,7 +811,7 @@ async def web_search_tool(
             session_token=session_token,
             proxy_shared_secret=shared_secret,
         )
-    except ProxySharedSecretUnconfiguredError as exc:
+    except (ProxySharedSecretUnconfiguredError, ProxySessionTokenRequiredError) as exc:
         return await _serp_fallback_or_error(
             ctx,
             query=needle,
@@ -831,11 +901,17 @@ async def _proxy_web_fetch_single(
     if not proxy_url:
         return _proxy_required_error(tool_name="web_fetch"), {}
 
-    req_headers = build_egress_web_headers(
-        proxy_url=proxy_url,
-        session_token=session_token,
-        proxy_shared_secret=shared_secret,
-    )
+    try:
+        req_headers = build_egress_web_headers(
+            proxy_url=proxy_url,
+            session_token=session_token,
+            proxy_shared_secret=shared_secret,
+        )
+    except (ProxySharedSecretUnconfiguredError, ProxySessionTokenRequiredError) as exc:
+        # Without a real per-run session token the proxy refuses the call (PR #245
+        # finding 3 — the synthetic fallback was removed). Surface the reason so
+        # operators can wire up a token instead of receiving a confusing 5xx.
+        return enveloped_failure(str(exc), code=ToolResultCode.PERMISSION_DENIED), {}
     payload: dict[str, Any] = {
         "url": target,
         "method": method.upper(),
@@ -1242,6 +1318,7 @@ __all__ = [
     "DEFAULT_WEB_FETCH_MAX_CHARS",
     "HTML_FETCH_CHUNK_CHARS",
     "MAX_HTML_FETCH_CHARS",
+    "ProxySessionTokenRequiredError",
     "ProxySharedSecretUnconfiguredError",
     "build_egress_web_headers",
     "get_page_content_tool",

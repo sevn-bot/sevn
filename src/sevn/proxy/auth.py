@@ -35,6 +35,7 @@ _PROXY_TOKEN_HEADER = "x-sevn-proxy-token"  # nosec B105
 _SESSION_TOKEN_HEADER = "x-sevn-session-token"  # nosec B105
 _RUN_ID_HEADER = "x-sevn-run-id"
 _CONTAINER_ID_HEADER = "x-sevn-container-id"
+_BINDING_SIG_HEADER = "x-sevn-binding-signature"
 _SESSION_TOKEN_VERSION = "v1"  # nosec B105 — token format version label, not a credential
 _GUARDED_PREFIXES = ("/llm/", "/web/", "/integration/")
 _AUTH_CHECK_PATH = "/web/auth-check"
@@ -200,6 +201,94 @@ def _check_binding(
     if not request_value:
         return False
     return hmac.compare_digest(claim_value, request_value)
+
+
+def _expected_binding_signature(
+    *,
+    container_id: str,
+    run_id: str,
+    signing_key: str,
+) -> str:
+    """Return the HMAC-SHA256 binding signature for a (container_id, run_id) pair.
+
+    Canonical string is ``"container_id=<cid>\\nrun_id=<rid>"`` (newline-separated,
+    sorted keys, both fields always emitted). Keyed by ``signing_key`` — the
+    resolved ``SEVN_PROXY_SHARED_SECRET`` — so a stolen bearer token cannot be
+    re-bound to a different ``container_id`` / ``run_id`` pair without also
+    holding the shared secret (PR #245 Codex finding 5).
+
+    Args:
+        container_id (str): Container bind id from the request header (may be empty).
+        run_id (str): Run id from the request header (may be empty).
+        signing_key (str): HMAC key (the proxy shared secret).
+
+    Returns:
+        str: Hex-encoded HMAC-SHA256.
+
+    Examples:
+        >>> sig = _expected_binding_signature(
+        ...     container_id="ctr-a", run_id="run-a", signing_key="k"
+        ... )
+        >>> len(sig) == 64
+        True
+        >>> _expected_binding_signature(
+        ...     container_id="ctr-a", run_id="run-a", signing_key="k"
+        ... ) == _expected_binding_signature(
+        ...     container_id="ctr-a", run_id="run-a", signing_key="k"
+        ... )
+        True
+        >>> _expected_binding_signature(
+        ...     container_id="ctr-a", run_id="run-a", signing_key="k"
+        ... ) != _expected_binding_signature(
+        ...     container_id="ctr-a", run_id="run-b", signing_key="k"
+        ... )
+        True
+    """
+    canonical = f"container_id={container_id}\nrun_id={run_id}".encode()
+    return hmac.new(signing_key.encode(), canonical, hashlib.sha256).hexdigest()
+
+
+def _verify_binding_signature(
+    *,
+    request: Request,
+    signing_key: str,
+    container_id: str,
+    run_id: str,
+) -> bool:
+    """Return ``True`` when ``X-Sevn-Binding-Signature`` matches the request's binding.
+
+    Proof-of-possession check (PR #245 Codex finding 5): the signature is HMAC-SHA256
+    over ``container_id=<cid>\\nrun_id=<rid>`` keyed by ``signing_key`` (the proxy
+    shared secret). An absent or non-matching header fails closed; the sandbox
+    family bearer-token check still rejects mismatched claim / header values, so
+    the HMAC is defense-in-depth against bearer-only token leaks.
+
+    Args:
+        request (Request): ASGI request carrying the binding headers.
+        signing_key (str): HMAC key (the proxy shared secret).
+        container_id (str): Resolved container bind id (header value, possibly empty).
+        run_id (str): Resolved run id (header value, possibly empty).
+
+    Returns:
+        bool: ``True`` when the signature is present and matches.
+
+    Examples:
+        >>> from unittest.mock import MagicMock
+        >>> req = MagicMock(); req.headers = {}
+        >>> _verify_binding_signature(
+        ...     request=req, signing_key="k", container_id="", run_id=""
+        ... )
+        False
+    """
+    provided = (request.headers.get(_BINDING_SIG_HEADER) or "").strip().lower()
+    if not provided:
+        return False
+    expected = _expected_binding_signature(
+        container_id=container_id,
+        run_id=run_id,
+        signing_key=signing_key,
+    )
+    return hmac.compare_digest(provided, expected)
 
 
 def mint_session_token(
@@ -440,7 +529,21 @@ def llm_post_auth_failure(
         run_id=request.headers.get(_RUN_ID_HEADER) or "",
         container_id=request.headers.get(_CONTAINER_ID_HEADER) or "",
     ):
-        return None
+        # PR #245 Codex finding 5: also require the PoP binding signature on
+        # the (run_id, container_id) pair. The signature is HMAC-SHA256 keyed by
+        # the shared secret; an attacker with a stolen bearer token alone cannot
+        # re-bind to a different pair without also holding the secret. Without
+        # this check the binding headers are decodable from the token itself and
+        # add no binding signal beyond the bearer-token claim check above.
+        run_id_header = request.headers.get(_RUN_ID_HEADER) or ""
+        container_id_header = request.headers.get(_CONTAINER_ID_HEADER) or ""
+        if _verify_binding_signature(
+            request=request,
+            signing_key=proxy_shared_secret,
+            container_id=container_id_header,
+            run_id=run_id_header,
+        ):
+            return None
     return JSONResponse({"detail": "unauthorized"}, status_code=401)
 
 

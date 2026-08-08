@@ -94,6 +94,12 @@ def _mint_bound_token(
     return f"v1.{body}.{sig}"
 
 
+def _binding_signature(*, container_id: str, run_id: str) -> str:
+    """Compute the PoP binding signature used by the proxy guard (PR #245 finding 5)."""
+    canonical = f"container_id={container_id}\nrun_id={run_id}".encode()
+    return hmac.new(_SERVICE_SECRET.encode(), canonical, hashlib.sha256).hexdigest()
+
+
 # ---------------------------------------------------------------------------
 # W18.7 — landed contracts (green on batch base; unmodified semantics)
 # ---------------------------------------------------------------------------
