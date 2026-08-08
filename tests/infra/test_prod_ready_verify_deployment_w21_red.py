@@ -25,6 +25,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import pytest
 import yaml
@@ -817,8 +818,14 @@ def test_verify_digests_overlay_exists_and_pins_images_to_tag() -> None:
         # unprefixed reference resolves to ``docker.io`` and pulls fail,
         # which would block the C14.1 evidence job even though the images
         # are correctly published (mergecraft review 4886108618).
-        assert image.startswith("ghcr.io/"), (
-            f"{name} image must be published to GHCR (prefix 'ghcr.io/'); got {image!r}"
+        # The host is the first path component of the docker ref; parsing
+        # via ``urlparse`` (after a ``https://`` prefix) avoids the
+        # ``py/incomplete-url-substring-sanitization`` CodeQL alert that
+        # fires on substring / startswith URL checks (PR #244 CodeQL alert).
+        parsed_host = urlparse(f"https://{image}").hostname
+        assert parsed_host == "ghcr.io", (
+            f"{name} image must be published to GHCR (hostname 'ghcr.io'); "
+            f"got {image!r} (parsed hostname={parsed_host!r})"
         )
         # The overlay does not redeclare ``build:`` — the driver switches
         # to ``--no-build`` when this overlay is active, so compose pulls
@@ -1041,15 +1048,25 @@ def test_verify_deployment_sandbox_image_env_override() -> None:
     )
     direct_env_ok = any(
         "SEVN_VERIFY_SANDBOX_IMAGE" in env
-        and "ghcr.io/" in str(env.get("SEVN_VERIFY_SANDBOX_IMAGE", ""))
+        and urlparse(f"https://{env.get('SEVN_VERIFY_SANDBOX_IMAGE', '')}").hostname == "ghcr.io"
         and "SANDBOX_DIGEST" in str(env.get("SEVN_VERIFY_SANDBOX_IMAGE", ""))
         for env in merged
     )
     github_env_ok = any(
         "SEVN_VERIFY_SANDBOX_IMAGE=" in run
-        and "ghcr.io/" in run
         and "${SANDBOX_DIGEST}" in run
         and "GITHUB_ENV" in run
+        and any(
+            # Parse the value assigned to SEVN_VERIFY_SANDBOX_IMAGE so we
+            # validate the docker registry hostname structurally (matches
+            # CodeQL's ``py/incomplete-url-substring-sanitization`` rule).
+            _extract_env_assignment(line, "SEVN_VERIFY_SANDBOX_IMAGE")
+            and urlparse(
+                f"https://{_extract_env_assignment(line, 'SEVN_VERIFY_SANDBOX_IMAGE')}"
+            ).hostname
+            == "ghcr.io"
+            for line in run.splitlines()
+        )
         for run in step_runs
     )
     assert direct_env_ok or github_env_ok, (
@@ -1102,6 +1119,34 @@ def test_verify_deployment_does_not_export_dead_digest_vars() -> None:
 # fail. The fix is to build the ref in ``run:`` and either export it into
 # $GITHUB_ENV or assign it into the shell command directly.
 # ---------------------------------------------------------------------------
+
+
+def _extract_env_assignment(line: str, var_name: str) -> str | None:
+    """Return the value assigned to ``var_name`` in a shell-style env line.
+
+    Matches both ``echo "VAR=value" >> $GITHUB_ENV`` (the F-PR-1 fix
+    shape) and a bare ``VAR=value`` assignment. Returns ``None`` if the
+    line does not assign ``var_name``. Used so docker-ref assertions
+    can parse the value out structurally instead of substring-matching
+    ``ghcr.io/`` (which trips the
+    ``py/incomplete-url-substring-sanitization`` CodeQL rule).
+    """
+    stripped = line.lstrip()
+    # Strip an optional ``echo `` prefix that wraps the assignment in
+    # quoted form (``echo "VAR=..."``).
+    if stripped.startswith("echo "):
+        stripped = stripped[len("echo ") :].lstrip()
+    # Strip a leading quote introduced by ``echo "VAR=..."``.
+    if stripped.startswith(('"', "'")):
+        stripped = stripped[1:]
+    if not stripped.startswith(f"{var_name}="):
+        return None
+    value = stripped.split("=", 1)[1].strip()
+    # Strip surrounding single or double quotes (the F-PR-1 export
+    # shape wraps the assignment in ``echo "VAR=..."``).
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        value = value[1:-1]
+    return value
 
 
 def _verify_deployment_step_env_strings() -> list[tuple[str, dict[str, Any]]]:
