@@ -8,16 +8,10 @@ on:
 
 jobs:
   probe-branch-ref:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Call the impl with a branch ref
-        uses: sevn-bot/sevn/.github/workflows/_w5-1-ref-probe-impl.yml@pre-0.0.1
-        with:
-          probe_ref: 'pre-0.0.1 (branch ref)'
+    uses: sevn-bot/sevn/.github/workflows/_w5-1-ref-probe-impl.yml@pre-0.0.1
+    with:
+      probe_ref: 'pre-0.0.1 (branch ref)'
   probe-sha-ref:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Call the impl with a SHA ref
-        uses: sevn-bot/sevn/.github/workflows/_w5-1-ref-probe-impl.yml@38452a93e232460ee677fb48d02fc1f047fb6571
-        with:
-          probe_ref: '38452a93e232460ee677fb48d02fc1f047fb6571 (full SHA)'
+    uses: sevn-bot/sevn/.github/workflows/_w5-1-ref-probe-impl.yml@38452a93e232460ee677fb48d02fc1f047fb6571
+    with:
+      probe_ref: '38452a93e232460ee677fb48d02fc1f047fb6571 (full SHA)'
