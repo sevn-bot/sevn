@@ -300,12 +300,14 @@ def _trace_sql(trace_id: str, *, offset: int = 0) -> str:
     Examples:
         >>> "LIMIT 10000 OFFSET 0" in _trace_sql("abc123")
         True
+        >>> "ORDER BY start_timestamp, span_id" in _trace_sql("abc123")
+        True
         >>> "OFFSET 10000" in _trace_sql("abc123", offset=10000)
         True
     """
     return (
         f"SELECT {RECORD_COLUMNS} FROM records "
-        f"WHERE trace_id = '{trace_id}' ORDER BY start_timestamp "
+        f"WHERE trace_id = '{trace_id}' ORDER BY start_timestamp, span_id "
         f"LIMIT {QUERY_ROW_LIMIT} OFFSET {offset}"
     )
 
@@ -402,6 +404,30 @@ def fetch_trace(
     return all_rows
 
 
+def _write_private_text(path: Path, text: str) -> None:
+    """Write sensitive export text with owner-only permissions.
+
+    Args:
+        path (Path): Destination file (created or replaced).
+        text (str): Full file body.
+
+    Examples:
+        >>> import tempfile
+        >>> with tempfile.TemporaryDirectory() as tmp:
+        ...     out = Path(tmp) / "trace.json"
+        ...     _write_private_text(out, "{}")
+        ...     oct(out.stat().st_mode & 0o777)
+        '0o600'
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        if sys.platform != "win32":
+            raise
+
+
 def build_document(
     trace_id: str,
     rows: list[dict[str, Any]],
@@ -487,11 +513,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     out_path = args.out or _repo_root() / ".ignorelocal" / f"trace-{args.trace_id}.json"
-    out_path.parent.mkdir(parents=True, exist_ok=True)
     document = build_document(args.trace_id, rows, project=args.project)
-    out_path.write_text(
+    _write_private_text(
+        out_path,
         json.dumps(document, indent=2, ensure_ascii=False),
-        encoding="utf-8",
     )
 
     size_mb = out_path.stat().st_size / 1_048_576

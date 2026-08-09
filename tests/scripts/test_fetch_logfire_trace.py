@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlparse
@@ -14,6 +15,7 @@ from scripts.fetch_logfire_trace import (
     _parse_env_file,
     _query_logfire,
     _rows_from_payload,
+    _write_private_text,
     build_document,
     fetch_trace,
     validate_base_url,
@@ -101,6 +103,7 @@ def test_fetch_trace_paginates_at_row_limit() -> None:
     assert len(rows) == QUERY_ROW_LIMIT + 1
     assert rows[-1]["span_name"] == "tail-span"
     assert query.call_count == 2
+    assert "ORDER BY start_timestamp, span_id" in query.call_args_list[0].args[2]
     assert "OFFSET 0" in query.call_args_list[0].args[2]
     assert f"OFFSET {QUERY_ROW_LIMIT}" in query.call_args_list[1].args[2]
 
@@ -166,3 +169,18 @@ def test_query_logfire_request_includes_response_limit() -> None:
     query = parse_qs(urlparse(captured_urls[0]).query)
     assert query["limit"] == [str(QUERY_ROW_LIMIT)]
     assert query["sql"] == ["SELECT 1"]
+
+
+def test_write_private_text_sets_mode_0600(tmp_path: Path) -> None:
+    out = tmp_path / "trace.json"
+    _write_private_text(out, "{}")
+    assert (out.stat().st_mode & 0o777) == 0o600
+
+
+def test_write_private_text_tightens_existing_file(tmp_path: Path) -> None:
+    out = tmp_path / "trace.json"
+    out.write_text("old", encoding="utf-8")
+    out.chmod(0o644)
+    _write_private_text(out, "new")
+    assert out.read_text(encoding="utf-8") == "new"
+    assert (out.stat().st_mode & 0o777) == 0o600
