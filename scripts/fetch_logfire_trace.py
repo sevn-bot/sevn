@@ -328,7 +328,7 @@ def _query_logfire(token: str, base_url: str, sql: str) -> Any:
         >>> _query_logfire("tok", "https://logfire-eu.pydantic.dev", "SELECT 1")  # doctest: +SKIP
         ...
     """
-    url = f"{base_url}/v1/query?{urllib.parse.urlencode({'sql': sql})}"
+    url = f"{base_url}/v1/query?{urllib.parse.urlencode({'sql': sql, 'limit': QUERY_ROW_LIMIT})}"
     request = urllib.request.Request(
         url,
         headers={"Authorization": token, "Accept": "application/json"},

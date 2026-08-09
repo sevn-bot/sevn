@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from io import BytesIO
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from scripts.fetch_logfire_trace import (
@@ -145,3 +146,23 @@ def test_query_logfire_http_error() -> None:
         pytest.raises(SystemExit, match="401"),
     ):
         _query_logfire("tok", "https://logfire-eu.pydantic.dev", "SELECT 1")
+
+
+def test_query_logfire_request_includes_response_limit() -> None:
+    captured_urls: list[str] = []
+
+    def fake_urlopen(request: object, timeout: int = 180) -> MagicMock:
+        captured_urls.append(getattr(request, "full_url", ""))
+        response = MagicMock()
+        response.read.return_value = b'{"rows": []}'
+        response.__enter__.return_value = response
+        response.__exit__.return_value = False
+        return response
+
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        _query_logfire("tok", "https://logfire-eu.pydantic.dev", "SELECT 1")
+
+    assert captured_urls
+    query = parse_qs(urlparse(captured_urls[0]).query)
+    assert query["limit"] == [str(QUERY_ROW_LIMIT)]
+    assert query["sql"] == ["SELECT 1"]
