@@ -21,6 +21,8 @@ Exports:
     fetch_trace — GET one trace's records from the Logfire query API.
     build_document — Wrap span rows in a trace-level metadata envelope.
     resolve_token — Find the read token in the environment or ``.env``.
+    validate_trace_id — Reject non-hex trace ids before SQL/path sinks.
+    validate_base_url — Allow only HTTPS Logfire region hosts.
     main — CLI entry.
 
 Examples:
@@ -286,7 +288,21 @@ def _inline_json(value: Any) -> Any:
 
 
 def _trace_sql(trace_id: str, *, offset: int = 0) -> str:
-    """Build the paginated SQL for one trace export page."""
+    """Build the paginated SQL for one trace export page.
+
+    Args:
+        trace_id (str): Hex trace identifier (already validated).
+        offset (int): Row offset for pagination.
+
+    Returns:
+        str: SQL selecting one page of span rows, oldest first.
+
+    Examples:
+        >>> "LIMIT 10000 OFFSET 0" in _trace_sql("abc123")
+        True
+        >>> "OFFSET 10000" in _trace_sql("abc123", offset=10000)
+        True
+    """
     return (
         f"SELECT {RECORD_COLUMNS} FROM records "
         f"WHERE trace_id = '{trace_id}' ORDER BY start_timestamp "
@@ -295,7 +311,23 @@ def _trace_sql(trace_id: str, *, offset: int = 0) -> str:
 
 
 def _query_logfire(token: str, base_url: str, sql: str) -> Any:
-    """Run one Logfire query and return the decoded JSON body."""
+    """Run one Logfire query and return the decoded JSON body.
+
+    Args:
+        token (str): Logfire read token.
+        base_url (str): Normalised region host.
+        sql (str): Query to execute.
+
+    Returns:
+        Any: Decoded JSON response body.
+
+    Raises:
+        SystemExit: When the API rejects the request or the host is unreachable.
+
+    Examples:
+        >>> _query_logfire("tok", "https://logfire-eu.pydantic.dev", "SELECT 1")  # doctest: +SKIP
+        ...
+    """
     url = f"{base_url}/v1/query?{urllib.parse.urlencode({'sql': sql})}"
     request = urllib.request.Request(
         url,
@@ -314,7 +346,17 @@ def _query_logfire(token: str, base_url: str, sql: str) -> Any:
 
 
 def _inline_row_json(rows: list[dict[str, Any]]) -> None:
-    """Decode JSON-encoded columns in place for one page of rows."""
+    """Decode JSON-encoded columns in place for one page of rows.
+
+    Args:
+        rows (list[dict[str, Any]]): Span rows to mutate in place.
+
+    Examples:
+        >>> page = [{"attributes": '{"a": 1}'}]
+        >>> _inline_row_json(page)
+        >>> page[0]["attributes"]
+        {'a': 1}
+    """
     for row in rows:
         for column in JSON_COLUMNS:
             if column in row:
