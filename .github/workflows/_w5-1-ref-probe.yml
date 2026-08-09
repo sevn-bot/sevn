@@ -19,6 +19,6 @@ jobs:
   probe-sha-ref:
     # Full SHA — GitHub docs: required when sha_pinning_required=true.
     # The impl exists at this SHA (the commit the impl landed in).
-    uses: sevn-bot/sevn/.github/workflows/_w5-1-ref-probe-impl.yml@a3ccb61a6fad49598c8abdd79931a6dd99adb693
+    uses: sevn-bot/sevn/.github/workflows/_w5-1-ref-probe-impl.yml@d277dbf2855aa5a66c07f426595ffca3280ea2a2
     with:
-      probe_ref: 'a3ccb61a (full SHA)'
+      probe_ref: 'd277dbf2855aa5a66c07f426595ffca3280ea2a2 (full SHA)'
