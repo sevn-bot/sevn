@@ -1,0 +1,17 @@
+name: W5.1 ref-shape probe — impl (workflow_call)
+on:
+  workflow_call:
+    inputs:
+      probe_ref:
+        description: 'The ref used by the caller (echoed back for the log)'
+        required: false
+        type: string
+        default: 'unset'
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo the input
+        run: |
+          echo "Probe completed via ref: ${{ inputs.probe_ref }}"
