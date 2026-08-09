@@ -34,12 +34,24 @@ from pathlib import Path
 import pytest
 from tests.infra.fixtures.ci_architecture_batch_a import (
     ANCHOR_FREEZE,
-    RULESET_PROTECT_MAIN,
     RULESET_REQUIRE_MERGECRAFT,
 )
 
 REPO = Path(__file__).resolve().parents[2]
 CODEOWNERS_PATH = ".github/CODEOWNERS"
+
+# W2 reconcile: read the *after* JSON recorded by the W2 executor
+# (ruleset state after D8 — Admin bypass removed, required status checks
+# added with strict: true, protect-trunk created). W1.2/W1.3 consult these
+# paths; W1.4 keeps reading the before-fixture (the mergecraft review
+# regression anchor is independent of W2's W2.3 swap).
+RULESET_PROTECT_MAIN_AFTER = (
+    REPO / "tests/infra/fixtures/ci_architecture_batch_a/ruleset-protect-main.after.json"
+)
+RULESET_REQUIRE_MERGECRAFT_AFTER = (
+    REPO
+    / "tests/infra/fixtures/ci_architecture_batch_a/ruleset-require-mergecraft-review.after.json"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -131,28 +143,21 @@ def test_codeowners_exists_on_origin_main() -> None:
 
 
 # ---------------------------------------------------------------------------
-# W1.2 — Recorded fixture: required status checks on the trunk (A1.3, xfail → W2)
+# W1.2 — Recorded fixture: required status checks on the trunk (A1.3)
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    reason=(
-        "W1.2 — green after W2 (A1.3): the recorded W0 fixture shows the "
-        "trunk has `required_status_checks: [mergecraft review]` only and "
-        "`strict_required_status_checks_policy: false`. W2.3 adds the CI "
-        "checks with `strict: true` and re-records the after-JSON."
-    ),
-    strict=False,
-)
 def test_required_status_checks_present_and_strict_on_trunk() -> None:
-    """The W0-recorded ``require-mergecraft-review`` fixture must declare
-    required status checks with ``strict_required_status_checks_policy: true``
+    """W2 after-record: ``require-mergecraft-review`` must declare the
+    full set of required status checks with ``strict_required_status_checks_policy: true``
     on every protected trunk ref.
 
     Per D4, this is a **fixture** assertion (the live read belongs to
-    A-Verify). Once W2 records the after-JSON, the same test is the gate.
+    A-Verify). The W2 executor recorded the after-JSON
+    (``ruleset-require-mergecraft-review.after.json``); this test is the
+    gate that proves the recorded state matches the W2 contract.
     """
-    ruleset = _load_ruleset(RULESET_REQUIRE_MERGECRAFT)
+    ruleset = _load_ruleset(RULESET_REQUIRE_MERGECRAFT_AFTER)
 
     rsc_rule = _rule(ruleset, "required_status_checks")
     assert rsc_rule is not None, (
@@ -169,13 +174,18 @@ def test_required_status_checks_present_and_strict_on_trunk() -> None:
         for check in params.get("required_status_checks", [])
         if isinstance(check, dict) and "context" in check
     ]
-    # W2's interim set is documented in D9 first-swap. We assert the
-    # shape, not the verbatim list — the after-record lands by W2.5.
+    # D9 first-swap interim set — same eight names as protect-main,
+    # plus ``mergecraft review`` which is what this ruleset was originally
+    # created for. The full eight CI names plus mergecraft review is the
+    # W2 contract; assert the set, not the order.
     expected_minimum = {
+        "mergecraft review",
         "Verify (static + build)",
         "Verify (drift gates)",
         "Verify (security audit)",
         "Verify (tests 1/4)",
+        "Verify (tests 2/4)",
+        "Verify (tests 3/4)",
         "Verify (tests 4/4)",
         "Analyze (python)",
     }
@@ -183,29 +193,61 @@ def test_required_status_checks_present_and_strict_on_trunk() -> None:
     assert not missing, "trunk required_status_checks missing contexts: " + ", ".join(
         sorted(missing)
     )
-    # ``mergecraft review`` must still be required (W1.4 guard test below
-    # also asserts this — repeated here so W1.2 fails for a clear reason).
+    # D8 outcome: the Admin bypass is removed. A test that breaks when
+    # the bypass is re-added (audit-escape-patterns rubric: a guard test
+    # must fail when the guard is deleted). The before-fixture's
+    # ``bypass_actors`` is intentionally NOT consulted here — that
+    # belongs to the bypass-decision gate below; this test pins the
+    # *after* state only.
     assert "mergecraft review" in contexts, (
         "Batch A adds gates; it must never drop the mergecraft review gate."
     )
 
 
-@pytest.mark.xfail(
-    reason=(
-        "W1.2 — green after W2 (A1.3): the recorded fixture's `main` ruleset "
-        "(`protect-main`) currently has **no** `required_status_checks` rule "
-        "at all (W0.1 verbatim). W2.3 adds a status-check rule on `main` so "
-        "the fork hole is closed (A1.4)."
-    ),
-    strict=False,
-)
+def test_admin_bypass_removed_from_status_check_ruleset() -> None:
+    """D8 outcome guard: the Admin bypass (``bypass_actors`` with
+    ``actor_id: 5, RepositoryRole: admin, bypass_mode: always``) must be
+    removed from ``require-mergecraft-review`` in the after-fixture.
+
+    This is the contract from W2.1's chosen shape (a) Gated. A test
+    that breaks if anyone re-adds the bypass — without this guard, the
+    status-check rule is decorative for the only person who merges.
+    """
+    ruleset = _load_ruleset(RULESET_REQUIRE_MERGECRAFT_AFTER)
+    bypass_actors = ruleset.get("bypass_actors", [])
+    # Empty list, OR a list that does not contain the Admin RepositoryRole
+    # bypass — both satisfy D8 (the GitHub shape writes an empty list
+    # when Admin is removed).
+    admin_bypass = [
+        actor
+        for actor in bypass_actors
+        if actor.get("actor_type") == "RepositoryRole"
+        and actor.get("actor_id") == 5
+        and actor.get("bypass_mode") == "always"
+    ]
+    assert not admin_bypass, (
+        "Admin bypass (actor_id: 5, RepositoryRole: admin, "
+        "bypass_mode: always) is still present in "
+        "require-mergecraft-review — D8 (a) Gated must hold: removing "
+        "the bypass is what makes required checks block the operator."
+    )
+    assert ruleset.get("current_user_can_bypass") != "always", (
+        "current_user_can_bypass must not be 'always' on the gated "
+        "ruleset — D8 outcome (a) requires Admin to be removed."
+    )
+
+
 def test_required_status_checks_present_on_main_ruleset() -> None:
-    """``protect-main`` must also gain a required-status-checks rule.
+    """W2 after-record: ``protect-main`` must declare a required-status-checks
+    rule on the default branch.
 
     The non-secret gates (ci.yml, codeql.yml, docker.yml) are the only ones
     that run on fork PRs; without this rule the fork hole is open (audit §4.3).
+    The W2 executor recorded the after-JSON
+    (``ruleset-protect-main.after.json``) which now contains the
+    ``required_status_checks`` rule with the eight CI contexts.
     """
-    ruleset = _load_ruleset(RULESET_PROTECT_MAIN)
+    ruleset = _load_ruleset(RULESET_PROTECT_MAIN_AFTER)
     rsc_rule = _rule(ruleset, "required_status_checks")
     assert rsc_rule is not None, (
         "protect-main has no required_status_checks rule — A1.4 requires "
@@ -219,41 +261,52 @@ def test_required_status_checks_present_on_main_ruleset() -> None:
         for check in params.get("required_status_checks", [])
         if isinstance(check, dict) and "context" in check
     }
-    # A1.4 demands the non-secret gates; this is the gate the fork path
-    # actually runs.
-    expected = {"Verify (static + build)", "Analyze (python)"}
-    assert expected.issubset(contexts), (
-        f"protect-main must require the fork-runnable checks {expected}; got {sorted(contexts)}."
+    # A1.4 demands the non-secret gates. The W2 after-record is the full
+    # eight-context set; assert every name is present, then specifically
+    # re-assert the two fork-runnable names so the failure message stays
+    # focused on the fork-hole invariant if anyone drops one.
+    expected_eight = {
+        "Verify (static + build)",
+        "Verify (drift gates)",
+        "Verify (security audit)",
+        "Verify (tests 1/4)",
+        "Verify (tests 2/4)",
+        "Verify (tests 3/4)",
+        "Verify (tests 4/4)",
+        "Analyze (python)",
+    }
+    missing = expected_eight - contexts
+    assert not missing, (
+        f"protect-main must require the eight CI contexts after W2.3; "
+        f"missing: {sorted(missing)}; got: {sorted(contexts)}."
+    )
+    # A1.4 invariant — explicitly: the fork-runnable checks must be a
+    # subset. If the message is hard to read on regression, this is the
+    # single most important line.
+    fork_runnable = {"Verify (static + build)", "Analyze (python)"}
+    assert fork_runnable.issubset(contexts), (
+        f"protect-main must require the fork-runnable checks {fork_runnable}; "
+        f"got {sorted(contexts)}."
     )
 
 
 # ---------------------------------------------------------------------------
-# W1.3 — Recorded fixture: trunk `deletion` + `non_fast_forward` (A1.1, xfail → W2)
+# W1.3 — Recorded fixture: trunk `deletion` + `non_fast_forward` (A1.1)
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.xfail(
-    reason=(
-        "W1.3 — green after W2 (A1.1): the W0 fixture shows the existing "
-        "`protect-main` only targets `~DEFAULT_BRANCH` (i.e. `main`) — the "
-        "trunk branches `pre-0.0.1`, `test-pre`, and `pre-*` are unprotected. "
-        "W2.2 adds a `protect-trunk` ruleset with `deletion` + "
-        "`non_fast_forward` on those refs."
-    ),
-    strict=False,
-)
 def test_protect_trunk_ruleset_covers_pre_branches() -> None:
-    """A new ``protect-trunk`` ruleset (A1.1) must protect the trunk branches.
+    """W2 after-record: a ``protect-trunk`` ruleset (A1.1) must protect the trunk branches.
 
     Implementation contract (W2.2): a ruleset that targets
     ``refs/heads/pre-0.0.1``, ``refs/heads/test-pre``, ``refs/heads/pre-*``
-    and declares ``deletion`` + ``non_fast_forward``. Until W2 lands, the
-    only ``branch``-targeted ruleset is ``protect-main``, which targets
-    ``~DEFAULT_BRANCH`` only.
+    and declares ``deletion`` + ``non_fast_forward``. The W2 executor
+    recorded the after-JSON
+    (``ruleset-protect-trunk.after.json``); this test is the gate that
+    proves the recorded state matches the W2 contract.
     """
-    # Walk every ruleset fixture in this directory; a protect-trunk fixture
-    # is the W2 after-record. Until it is added, the only branch ruleset is
-    # protect-main and its include list is exactly [~DEFAULT_BRANCH].
+    # Walk every ruleset fixture in this directory. A protect-trunk fixture
+    # is the W2 after-record; it must be present after W2.
     rulesets = sorted(REPO.glob("tests/infra/fixtures/ci_architecture_batch_a/ruleset-*.json"))
     assert rulesets, "no ruleset fixtures present — W0 evidence missing"
 
@@ -263,21 +316,46 @@ def test_protect_trunk_ruleset_covers_pre_branches() -> None:
         "refs/heads/pre-*",
     }
     protected: set[str] = set()
+    protect_trunk_seen = False
     for path in rulesets:
         ruleset = _load_ruleset(path)
         if ruleset.get("target") != "branch":
             continue
         if ruleset.get("name") == "protect-trunk":
+            protect_trunk_seen = True
             # The post-W2 fixture must declare both rules and the trunk
-            # ref patterns. The test stays RED until W2 records it.
+            # ref patterns.
             types = _rule_types(ruleset)
             assert {"deletion", "non_fast_forward"}.issubset(types), (
                 "protect-trunk must declare deletion and non_fast_forward "
                 f"rules; got {sorted(types)}."
             )
+            # protect-trunk is the *only* place these two rules are
+            # expected; the ruleset must NOT carry a `required_status_checks`
+            # block — that would be a different ruleset's job and would
+            # be a W11's stable-aggregator-names concern, not A1.1.
+            assert "required_status_checks" not in types, (
+                "protect-trunk must not carry a required_status_checks "
+                "rule — that belongs to the status-check ruleset; "
+                "A1.1 is deletion+non_fast_forward only."
+            )
             assert trunk_patterns.issubset(set(_include_patterns(ruleset))), (
                 f"protect-trunk must include {sorted(trunk_patterns)}; got "
                 f"{_include_patterns(ruleset)}."
+            )
+            # D8 outcome also applies here: Admin bypass must be absent.
+            bypass_actors = ruleset.get("bypass_actors", [])
+            admin_bypass = [
+                actor
+                for actor in bypass_actors
+                if actor.get("actor_type") == "RepositoryRole"
+                and actor.get("actor_id") == 5
+                and actor.get("bypass_mode") == "always"
+            ]
+            assert not admin_bypass, (
+                "protect-trunk must not grant the Admin bypass — D8 (a) "
+                "Gated removes the bypass from every ruleset created or "
+                "edited by W2."
             )
             protected |= trunk_patterns
         else:
@@ -286,6 +364,12 @@ def test_protect_trunk_ruleset_covers_pre_branches() -> None:
             # ~DEFAULT_BRANCH.
             protected |= set(_include_patterns(ruleset))
 
+    assert protect_trunk_seen, (
+        "no protect-trunk ruleset found in "
+        "tests/infra/fixtures/ci_architecture_batch_a/ — A1.1 demands a "
+        "dedicated ruleset for the trunk branches. The W2 executor must "
+        "have written ruleset-protect-trunk.after.json."
+    )
     missing = trunk_patterns - protected
     assert not missing, "trunk branches missing deletion+non_fast_forward protection: " + ", ".join(
         sorted(missing)
