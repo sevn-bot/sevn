@@ -32,7 +32,9 @@ try:
     )
 
     SKW_AVAILABLE = True
-except ModuleNotFoundError:  # spec-kit-wave not present — degrade to a no-op
+except ModuleNotFoundError as exc:  # spec-kit-wave not present — degrade to a no-op
+    if exc.name not in ("skw", "skw.changelog_validate"):
+        raise
     SKW_AVAILABLE = False
 
     _SKIP_NOTE = (

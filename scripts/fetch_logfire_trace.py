@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -44,6 +45,14 @@ TOKEN_VAR = "LOGFIRE_READ_TOKEN"
 DEFAULT_BASE_URL = "https://logfire-eu.pydantic.dev"
 DEFAULT_PROJECT = "sevn-testing"
 REQUEST_TIMEOUT = 180
+QUERY_ROW_LIMIT = 10_000
+_TRACE_ID_RE = re.compile(r"^[0-9a-fA-F]+$")
+ALLOWED_LOGFIRE_HOSTS = frozenset(
+    {
+        "logfire-eu.pydantic.dev",
+        "logfire-us.pydantic.dev",
+    }
+)
 
 #: Columns pulled for every span. Explicit rather than ``SELECT *`` so the
 #: export stays stable when Logfire adds columns.
@@ -200,6 +209,59 @@ def _rows_from_payload(payload: Any) -> list[dict[str, Any]]:
     raise SystemExit(f"Unexpected Logfire response shape: {type(payload).__name__}")
 
 
+def validate_trace_id(trace_id: str) -> None:
+    """Reject trace ids that are not hex (blocks SQL injection and path traversal).
+
+    Args:
+        trace_id (str): Raw CLI value.
+
+    Raises:
+        SystemExit: When the value is not a hex string.
+
+    Examples:
+        >>> validate_trace_id("019fe645e8b9059835f7a5b56c3cea0f")
+        >>> validate_trace_id("../../x")  # doctest: +SKIP
+        Traceback (most recent call last):
+        ...
+        SystemExit: ...
+    """
+    if not _TRACE_ID_RE.fullmatch(trace_id):
+        raise SystemExit(f"trace_id must be hex, got {trace_id!r}")
+
+
+def validate_base_url(base_url: str) -> str:
+    """Allow only HTTPS Logfire region hosts before sending the read token.
+
+    Args:
+        base_url (str): Configured region host.
+
+    Returns:
+        str: Normalised base URL without a trailing slash.
+
+    Raises:
+        SystemExit: When the host is not on the allowlist.
+
+    Examples:
+        >>> validate_base_url("https://logfire-eu.pydantic.dev")
+        'https://logfire-eu.pydantic.dev'
+        >>> validate_base_url("https://evil.example")  # doctest: +SKIP
+        Traceback (most recent call last):
+        ...
+        SystemExit: ...
+    """
+    parsed = urllib.parse.urlparse(base_url)
+    if parsed.scheme != "https":
+        raise SystemExit(f"base-url must use https, got {base_url!r}")
+    if parsed.netloc not in ALLOWED_LOGFIRE_HOSTS:
+        hosts = ", ".join(sorted(ALLOWED_LOGFIRE_HOSTS))
+        raise SystemExit(
+            f"base-url must be a supported Logfire region host ({hosts}), got {base_url!r}"
+        )
+    if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
+        raise SystemExit(f"base-url must be a host only, got {base_url!r}")
+    return f"https://{parsed.netloc}"
+
+
 def _inline_json(value: Any) -> Any:
     """Decode a JSON-encoded string column, leaving anything else untouched.
 
@@ -221,6 +283,42 @@ def _inline_json(value: Any) -> Any:
         except json.JSONDecodeError:
             return value
     return value
+
+
+def _trace_sql(trace_id: str, *, offset: int = 0) -> str:
+    """Build the paginated SQL for one trace export page."""
+    return (
+        f"SELECT {RECORD_COLUMNS} FROM records "
+        f"WHERE trace_id = '{trace_id}' ORDER BY start_timestamp "
+        f"LIMIT {QUERY_ROW_LIMIT} OFFSET {offset}"
+    )
+
+
+def _query_logfire(token: str, base_url: str, sql: str) -> Any:
+    """Run one Logfire query and return the decoded JSON body."""
+    url = f"{base_url}/v1/query?{urllib.parse.urlencode({'sql': sql})}"
+    request = urllib.request.Request(
+        url,
+        headers={"Authorization": token, "Accept": "application/json"},
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT) as response:
+            return json.loads(response.read())
+    except urllib.error.HTTPError as exc:  # pragma: no cover - network path
+        detail = exc.read().decode("utf-8", "replace")[:400]
+        hint = " (is the token a *read* token for this project?)" if exc.code == 401 else ""
+        raise SystemExit(f"Logfire API returned {exc.code}{hint}: {detail}") from exc
+    except urllib.error.URLError as exc:  # pragma: no cover - network path
+        raise SystemExit(f"Could not reach {base_url}: {exc.reason}") from exc
+
+
+def _inline_row_json(rows: list[dict[str, Any]]) -> None:
+    """Decode JSON-encoded columns in place for one page of rows."""
+    for row in rows:
+        for column in JSON_COLUMNS:
+            if column in row:
+                row[column] = _inline_json(row[column])
 
 
 def fetch_trace(
@@ -246,32 +344,20 @@ def fetch_trace(
         >>> fetch_trace("tok", "019fe645")[0]["span_name"]  # doctest: +SKIP
         'gateway.turn.start'
     """
-    sql = (
-        f"SELECT {RECORD_COLUMNS} FROM records "
-        f"WHERE trace_id = '{trace_id}' ORDER BY start_timestamp"
-    )
-    url = f"{base_url.rstrip('/')}/v1/query?{urllib.parse.urlencode({'sql': sql})}"
-    request = urllib.request.Request(
-        url,
-        headers={"Authorization": token, "Accept": "application/json"},
-    )
+    validate_trace_id(trace_id)
+    host = validate_base_url(base_url)
 
-    try:
-        with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT) as response:
-            payload = json.loads(response.read())
-    except urllib.error.HTTPError as exc:  # pragma: no cover - network path
-        detail = exc.read().decode("utf-8", "replace")[:400]
-        hint = " (is the token a *read* token for this project?)" if exc.code == 401 else ""
-        raise SystemExit(f"Logfire API returned {exc.code}{hint}: {detail}") from exc
-    except urllib.error.URLError as exc:  # pragma: no cover - network path
-        raise SystemExit(f"Could not reach {base_url}: {exc.reason}") from exc
-
-    rows = _rows_from_payload(payload)
-    for row in rows:
-        for column in JSON_COLUMNS:
-            if column in row:
-                row[column] = _inline_json(row[column])
-    return rows
+    all_rows: list[dict[str, Any]] = []
+    offset = 0
+    while True:
+        payload = _query_logfire(token, host, _trace_sql(trace_id, offset=offset))
+        page = _rows_from_payload(payload)
+        _inline_row_json(page)
+        all_rows.extend(page)
+        if len(page) < QUERY_ROW_LIMIT:
+            break
+        offset += QUERY_ROW_LIMIT
+    return all_rows
 
 
 def build_document(
@@ -349,8 +435,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    validate_trace_id(args.trace_id)
+    base_url = validate_base_url(args.base_url)
+
     token = resolve_token()
-    rows = fetch_trace(token, args.trace_id, base_url=args.base_url)
+    rows = fetch_trace(token, args.trace_id, base_url=base_url)
     if not rows:
         print(f"No spans found for trace {args.trace_id}", file=sys.stderr)
         return 1
