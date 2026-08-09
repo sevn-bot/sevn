@@ -1,0 +1,8 @@
+origin/pre-0.0.1	39988e953976929f96b9e58004940254ea2b7bf3
+origin/main	4273990195b555105cd930fbf0e8771a223d54b1
+HEAD	0270cb88aacbf9a454b76a9d2cf83e0d49afd218
+HEAD_branch	pre-0.0.1
+HEAD_subject	(local W0 primary checkout — no commit yet)
+make_check_git_guards	ok
+recorded	2026-08-09
+recorded_by	wave-plan-executor W0 (github-actions-ci-architecture-wave-plan)

@@ -1,0 +1,32 @@
+{
+  "id": 19238611,
+  "name": "require-mergecraft-review",
+  "target": "branch",
+  "source_type": "Repository",
+  "source": "sevn-bot/sevn",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "exclude": [],
+      "include": [
+        "refs/heads/main",
+        "refs/heads/pre-0.0.1",
+        "refs/heads/test-pre"
+      ]
+    }
+  },
+  "rules": [
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": false,
+        "do_not_enforce_on_create": false,
+        "required_status_checks": [{"context": "mergecraft review"}]
+      }
+    }
+  ],
+  "bypass_actors": [
+    {"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}
+  ],
+  "current_user_can_bypass": "always"
+}
