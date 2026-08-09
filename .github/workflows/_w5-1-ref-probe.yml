@@ -7,11 +7,18 @@ on:
       - '.github/workflows/_w5-1-ref-probe-impl.yml'
 
 jobs:
+  # Three shapes, three jobs.
+  # All three reference the same impl file. Differences are only in the ref suffix.
   probe-branch-ref:
-    uses: sevn-bot/sevn/.github/workflows/_w5-1-ref-probe-impl.yml@pre-0.0.1
+    # Branch ref (the original W5.1 question). The impl exists on this
+    # branch (the probe branch). GitHub resolves `uses: owner/repo/.github/...
+    # @branch` against the branch ref.
+    uses: sevn-bot/sevn/.github/workflows/_w5-1-ref-probe-impl.yml@wave/ci-b-w5-1-ref-probe
     with:
-      probe_ref: 'pre-0.0.1 (branch ref)'
+      probe_ref: 'wave/ci-b-w5-1-ref-probe (branch ref)'
   probe-sha-ref:
-    uses: sevn-bot/sevn/.github/workflows/_w5-1-ref-probe-impl.yml@38452a93e232460ee677fb48d02fc1f047fb6571
+    # Full SHA — GitHub docs: required when sha_pinning_required=true.
+    # The impl exists at this SHA (the commit the impl landed in).
+    uses: sevn-bot/sevn/.github/workflows/_w5-1-ref-probe-impl.yml@a3ccb61a6fad49598c8abdd79931a6dd99adb693
     with:
-      probe_ref: '38452a93e232460ee677fb48d02fc1f047fb6571 (full SHA)'
+      probe_ref: 'a3ccb61a (full SHA)'
