@@ -1,5 +1,6 @@
 name: W5.1 ref-shape probe — caller
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - '.github/workflows/_w5-1-ref-probe.yml'
