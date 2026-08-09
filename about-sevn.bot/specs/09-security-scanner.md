@@ -469,6 +469,21 @@ Sandbox egress enforcement telemetry (cross-ref spec-08 W8): Docker spawn emits
 (``src/sevn/voice/activation.py``); ambient wake-word frames are never scanned (D24). Do
 not add a second voice-scan config key.
 
+## Amendments (prod-readiness-0.0.1 W14 — C8.1 / C8.2 / C8.4)
+
+Browser isolation vs container hardening (cross-ref compose + ``src/sevn/browser/chrome.py``):
+
+- **C8.1** — No shipped compose file or overlay may pass ``--no-sandbox``. The production
+  overlay keeps ``SEVN_BROWSER_EXTRA_ARGS: "--disable-dev-shm-usage"`` only.
+  ``scripts/check-compose-default.sh`` rejects ``--no-sandbox`` in every
+  ``docker/docker-compose*.yml`` (comment lines stripped).
+- **C8.2** — Browser/GUI override comments must not claim Brave runs with ``--no-sandbox``.
+- **C8.4** — Login-grade args retain ``--disable-features=IsolateOrigins,site-per-process``
+  as a documented threat-model tradeoff for operator-driven login sessions against
+  operator-chosen destinations. It must not be applied to a future untrusted-browsing
+  mode. Container ``cap_drop: ALL`` / ``no-new-privileges`` does **not** substitute for
+  the Chromium renderer sandbox.
+
 ## Human-input needed
 
 Prose body not yet authored (W9 scope). Normative contract requires operator or

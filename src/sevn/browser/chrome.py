@@ -60,6 +60,13 @@ _PASSWORD_STORE_ENV: Final[str] = "SEVN_BROWSER_PASSWORD_STORE"
 # ``--password-store=basic`` is appended only when ``resolve_password_store`` returns
 # ``basic`` (default) — CI/Docker-safe. Set ``skills.browser.password_store`` to
 # ``system`` (or ``SEVN_BROWSER_PASSWORD_STORE=system``) to use the OS keychain.
+#
+# IsolateOrigins / site-per-process (C8.4): kept for login-grade operator sessions
+# only. Disabling site isolation is a deliberate threat-model tradeoff for
+# operator-driven auth flows against operator-chosen destinations; it must not
+# be copied into a future untrusted-browsing mode. Container hardening
+# (``cap_drop: ALL``, ``no-new-privileges``) does not substitute for the
+# Chromium renderer sandbox — that sandbox stays enabled (no ``--no-sandbox``).
 _LOGIN_GRADE_CHROME_ARGS: Final[tuple[str, ...]] = (
     "--remote-allow-origins=*",
     "--no-service-autorun",

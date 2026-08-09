@@ -95,6 +95,72 @@ the same path under `SEVN_HOME`. See
 secret, guarded routes return **503** unless `SEVN_PROXY_ALLOW_UNAUTHENTICATED=1`
 (dev-only, loudly logged).
 
+### Permissions init (C9)
+
+`sevn-operator-perms` (and CI’s `sevn-ci-init`) normalize ownership for **known
+application-owned directories only** — not a full-tree walk of `/operator`:
+
+| Path | Role |
+|------|------|
+| `/operator/workspace` (+ `logs`, `.sevn`, browser profile/session dirs) | Gateway workspace |
+| `/browser-profiles` | Browser-state volume (operator stack only) |
+| `/operator/.sevn/proxy-shared-secret` | Generate-once secret (always chowned) |
+
+A versioned marker `/operator/.sevn/perms-v1` records a completed migration. Because the
+init service uses `restart: "no"`, it re-runs on every fresh `compose up`; when the
+marker is present the scoped `find … chown` pass is skipped. Delete the marker (or bump
+to a future `perms-vN`) to force re-migration after an ownership-layout change.
+`sevn-ci-init` uses the same marker and scoped dirs (no unconditional `chown -R`).
+
+### Docker Compose version floor (C10.1)
+
+**Minimum Docker Compose version: 2.20** (Compose V2 plugin). Older
+`docker-compose` (v1) and Compose < 2.20 do not reliably apply
+`deploy.resources.limits` on non-Swarm stacks. `make check-compose-default` /
+`scripts/check-compose-default.sh` refuse clients below this floor
+(`SEVN_COMPOSE_MIN_VERSION`, default `2.20.0`).
+
+### Browser sandbox (C8.1)
+
+The browser and GUI overlays run Brave with the Chromium renderer sandbox **on** —
+no `--no-sandbox` anywhere in the shipped compose files. Two things make that work:
+
+- **`infra/docker/seccomp-browser.json`** is pinned on `sevn-gateway` in
+  `docker-compose.browser.yml` and `docker-compose.gui.yml`. It is Docker's default
+  seccomp profile (moby v28.3.0) with exactly four syscalls ungated — `clone`,
+  `clone3`, `unshare`, `chroot` — because the default profile gates them behind
+  `CAP_SYS_ADMIN` / `CAP_SYS_CHROOT`, which the overlays drop. Without it Brave
+  aborts at startup with `Failed to move to new namespace`. `mount`, `pivot_root`,
+  `setns`, `bpf` and `perf_event_open` remain gated, and the service keeps
+  `cap_drop: ALL` + `no-new-privileges: true`.
+- **The host must let the container create a user namespace.** `make compose-browser-up`
+  / `make compose-gui-up` run `scripts/check-browser-host.sh` first. It *probes* the
+  real condition — `unshare -U` in a throwaway container under the overlays' exact
+  security context — instead of inferring it from a sysctl, and fails closed only when
+  the namespace is actually denied. Note that Ubuntu 23.10+'s
+  `apparmor_restrict_unprivileged_userns=1` is **not** a blocker: it does not apply to
+  processes under Docker's own AppArmor profile, and the CI smoke passes on a stock
+  `ubuntu-24.04` runner with that sysctl set to `1`. No AppArmor profile ships with sevn
+  for this: none has been needed, and a policy file that no container selects
+  (`security_opt: apparmor=…`) would do nothing anyway.
+  `SEVN_SKIP_BROWSER_SANDBOX_PREFLIGHT=1` bypasses the check. Being a host property, it
+  is *not* part of `make ci-infra`; `make check-compose-default` covers only the
+  committed compose files.
+
+Regenerating the profile after a Docker upgrade: take `profiles/seccomp/default.json`
+from the matching moby tag, remove those four names from every existing group, and
+append one `SCMP_ACT_ALLOW` group containing them.
+`tests/infra/test_prod_ready_isolation_w13_red.py` asserts the shape, and the CI
+`docker-images` job boots Brave under these exact flags on a stock runner.
+
+### Resource limits (C10.3)
+
+Every service in the resolved config (base, browser, GUI, and CI file sets) declares
+`deploy.resources.limits` (`cpus`, `memory`, `pids`) and/or `pids_limit`.
+`make verify-stack-health` inspects running containers' `HostConfig`
+(`NanoCpus`, `Memory`, `PidsLimit`) and requires them to match the declared values
+(C10.2).
+
 The proxy container healthcheck keeps `GET /healthz` as liveness and also probes
 authenticated `GET /web/auth-check` with `X-Sevn-Proxy-Token` (env or generate-once
 file). A **401** or **503** marks the container unhealthy; `/web/auth-check` is a

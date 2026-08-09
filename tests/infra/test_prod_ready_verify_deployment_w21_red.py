@@ -1588,3 +1588,156 @@ def test_driver_probes_pass_run_id_and_signing_key() -> None:
         "sandbox-scope-accepts-web) must pass run_id= and signing_key= so the "
         f"proxy accepts the run-id-bound token; found {binding_calls}"
     )
+
+
+# ---------------------------------------------------------------------------
+# D-PR-6 - stack-health HostConfig comparison must fail closed
+# ---------------------------------------------------------------------------
+
+
+def _stack_health_with_compose_config(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    cfg_code: int,
+    cfg_out: str,
+) -> Any:
+    """Run ``drive_stack_health`` with ``compose config`` stubbed to a given result.
+
+    Every other subprocess call returns a benign success so the driver reaches
+    the HostConfig block; only the ``config --format json`` call is steered.
+    """
+    module = _load_verify_module()
+
+    def fake_run(args: list[str], **_kwargs: Any) -> tuple[int, str]:
+        argv = [str(a) for a in args]
+        if "config" in argv and "--format" in argv:
+            return cfg_code, cfg_out
+        if "ps" in argv and "-aq" in argv:
+            return 0, "deadbeefcafe\n"
+        if argv[:2] == ["docker", "inspect"]:
+            # Nonzero-but-unverified limits: exactly the shape that must NOT
+            # be enough to pass once the declared limits are unavailable.
+            return 0, json.dumps({"NanoCpus": 500000000, "Memory": 268435456, "PidsLimit": 64})
+        return 0, ""
+
+    monkeypatch.setattr(module, "_run", fake_run)
+    monkeypatch.setattr(module, "_docker_unavailable_reason", lambda: None)
+    monkeypatch.setattr(module, "_http_probe", lambda *a, **k: (200, "ok"))
+    return module.drive_stack_health()
+
+
+def _hostconfig_checks(result: Any) -> list[Any]:
+    return [c for c in result.checks if str(c.name).startswith("hostconfig")]
+
+
+@pytest.mark.parametrize(
+    ("cfg_code", "cfg_out", "label"),
+    [
+        (1, "error: no configuration file provided\n", "nonzero exit"),
+        (0, "WARN[0000] the attribute `version` is obsolete\nnot json at all\n", "unparsable"),
+    ],
+)
+def test_stack_health_hostconfig_fails_closed_without_declared_limits(
+    monkeypatch: pytest.MonkeyPatch,
+    cfg_code: int,
+    cfg_out: str,
+    label: str,
+) -> None:
+    """D-PR-6: no declared limits means the HostConfig match is unproven, so FAIL.
+
+    The pre-fix shape set ``cfg = {}`` on a parse error and only WARNed on a
+    nonzero exit, then checked that the applied values were merely nonzero --
+    so ``stack-health`` could go green while proving nothing about the claimed
+    exact match against the compose limits.
+    """
+    result = _stack_health_with_compose_config(monkeypatch, cfg_code=cfg_code, cfg_out=cfg_out)
+    checks = _hostconfig_checks(result)
+    assert checks, f"stack-health recorded no hostconfig check at all ({label})"
+    assert any(c.status == "fail" for c in checks), (
+        f"D-PR-6: compose config {label} produced no failing hostconfig check "
+        f"-- the limits comparison silently degraded to a nonzero-value check. "
+        f"Got: {[(c.name, c.status, c.detail) for c in checks]}"
+    )
+    assert result.status == "fail", (
+        f"stack-health must not report {result.status!r} when the declared "
+        f"limits could not be loaded ({label})"
+    )
+
+
+def test_stack_health_hostconfig_fails_closed_on_missing_declared_limits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """D-PR-6: a service whose resolved config declares no limits cannot pass.
+
+    ``compose config`` parses fine here, but ``sevn-gateway`` carries no
+    ``deploy.resources.limits`` -- there is nothing to compare against, so the
+    check must fail rather than accept the applied values as self-evidently
+    correct.
+    """
+    cfg = {
+        "services": {
+            "sevn-proxy": {
+                "deploy": {
+                    "resources": {"limits": {"cpus": "0.5", "memory": "268435456", "pids": 64}}
+                }
+            },
+            "sevn-gateway": {},
+        }
+    }
+    result = _stack_health_with_compose_config(monkeypatch, cfg_code=0, cfg_out=json.dumps(cfg))
+    gateway = [c for c in result.checks if c.name == "hostconfig-sevn-gateway"]
+    assert gateway, "no hostconfig check recorded for sevn-gateway"
+    assert gateway[0].status == "fail", (
+        "D-PR-6: sevn-gateway declares no resource limits, so the HostConfig "
+        f"match is unprovable and must fail; got {gateway[0].status!r} "
+        f"({gateway[0].detail})"
+    )
+
+
+def test_stack_health_hostconfig_passes_on_exact_match(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Counterpart to the fail-closed cases: an exact match still passes.
+
+    Guards against 'fail closed' being implemented as 'always fail'.
+    """
+    limits = {"cpus": "0.5", "memory": "268435456", "pids": 64}
+    cfg = {
+        "services": {
+            "sevn-proxy": {"deploy": {"resources": {"limits": limits}}},
+            "sevn-gateway": {"deploy": {"resources": {"limits": limits}}},
+        }
+    }
+    result = _stack_health_with_compose_config(monkeypatch, cfg_code=0, cfg_out=json.dumps(cfg))
+    checks = _hostconfig_checks(result)
+    assert checks, "no hostconfig checks recorded"
+    assert all(c.status == "pass" for c in checks), (
+        "an exact NanoCpus/Memory/PidsLimit match must still pass; got "
+        f"{[(c.name, c.status, c.detail) for c in checks]}"
+    )
+
+
+def test_stack_health_hostconfig_tolerates_warning_prefixed_config_json(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A compose warning ahead of the JSON must not be treated as a config failure.
+
+    ``_run`` merges stderr into stdout, so ``compose config`` legitimately
+    returns ``WARN[0000] ...`` lines before the document. Failing closed on
+    that would make the gate flaky, so the parser retries from the first ``{``.
+    """
+    limits = {"cpus": "0.5", "memory": "268435456", "pids": 64}
+    cfg = {
+        "services": {
+            "sevn-proxy": {"deploy": {"resources": {"limits": limits}}},
+            "sevn-gateway": {"deploy": {"resources": {"limits": limits}}},
+        }
+    }
+    noisy = "WARN[0000] /docker/docker-compose.yml: `version` is obsolete\n" + json.dumps(cfg)
+    result = _stack_health_with_compose_config(monkeypatch, cfg_code=0, cfg_out=noisy)
+    checks = _hostconfig_checks(result)
+    assert checks, "no hostconfig checks recorded"
+    assert all(c.status == "pass" for c in checks), (
+        "a warning line ahead of valid config JSON must still be parsed; got "
+        f"{[(c.name, c.status, c.detail) for c in checks]}"
+    )

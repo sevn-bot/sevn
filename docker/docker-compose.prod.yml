@@ -16,7 +16,8 @@ services:
 
   sevn-gateway:
     environment:
-      SEVN_BROWSER_EXTRA_ARGS: "--no-sandbox --disable-dev-shm-usage"
+      # Keep Chromium's renderer sandbox enabled in prod.
+      SEVN_BROWSER_EXTRA_ARGS: "--disable-dev-shm-usage"
     deploy:
       resources:
         limits:

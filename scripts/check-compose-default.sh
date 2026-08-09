@@ -90,6 +90,64 @@ if ! command -v docker >/dev/null 2>&1; then
   exit 0
 fi
 
+# C10.1 — minimum Docker Compose version (deploy.resources.limits applied on non-swarm).
+# Override with SEVN_COMPOSE_MIN_VERSION for local experiments only.
+SEVN_COMPOSE_MIN_VERSION="${SEVN_COMPOSE_MIN_VERSION:-2.20.0}"
+
+_compose_version_digits() {
+  # Strip leading v and any -/+ suffix (e.g. v2.38.2-desktop.1 → 2.38.2).
+  local raw="${1:-}"
+  raw="${raw#v}"
+  printf '%s' "${raw%%[-+]*}"
+}
+
+_compose_version_compare() {
+  # Compare two dotted numeric versions. Print -1/0/1 like strcmp.
+  # Portable: pure-bash field split on '.', no GNU sort -V or python.
+  local IFS=.
+  local -a a=($1) b=($2)
+  local i n max
+  max="${#a[@]}"
+  if (("${#b[@]}" > max)); then max="${#b[@]}"; fi
+  for ((i = 0; i < max; i++)); do
+    n="${a[i]:-0}"
+    if ((10#${n} < 10#${b[i]:-0})); then printf '%s' -1; return 0; fi
+    if ((10#${n} > 10#${b[i]:-0})); then printf '%s' 1; return 0; fi
+  done
+  printf '%s' 0
+}
+
+_compose_version_ge() {
+  # True when $1 >= $2 (dotted numeric; portable across GNU/BSD sort).
+  local have min cmp
+  have="$(_compose_version_digits "$1")"
+  min="$(_compose_version_digits "$2")"
+  [[ -n "$have" && -n "$min" ]] || return 1
+  cmp="$(_compose_version_compare "$have" "$min")"
+  [[ "$cmp" == "0" || "$cmp" == "1" ]]
+}
+
+_require_min_compose_version() {
+  local raw short ver
+  raw="$(docker compose version 2>/dev/null || true)"
+  short="$(docker compose version --short 2>/dev/null || true)"
+  ver="$(_compose_version_digits "$short")"
+  if [[ -z "$ver" ]]; then
+    # Fallback: "Docker Compose version v2.38.2-desktop.1"
+    ver="$(printf '%s' "$raw" | sed -n 's/.*[Vv]\([0-9][0-9.]*\).*/\1/p' | head -n1)"
+  fi
+  if [[ -z "$ver" ]]; then
+    echo "error: could not parse Docker Compose version from: ${raw:-<empty>}" >&2
+    exit 1
+  fi
+  if ! _compose_version_ge "$ver" "$SEVN_COMPOSE_MIN_VERSION"; then
+    echo "error: Docker Compose version ${ver} is below minimum ${SEVN_COMPOSE_MIN_VERSION} (C10.1; deploy.resources.limits require Compose v2.20+)" >&2
+    exit 1
+  fi
+}
+
+_require_min_compose_version
+
 # Static compose validation only — not a runtime secret. Operator stacks must set
 # SEVN_GATEWAY_TOKEN in .env (see .env.example); bootstrap rejects known sentinels.
 export SEVN_GATEWAY_TOKEN="${SEVN_GATEWAY_TOKEN:-check-compose-default-placeholder-token-32chars}"
@@ -134,6 +192,28 @@ _check_compose_file_set "default" "$compose_base"
 _check_compose_file_set "browser override" "$compose_base" "$compose_browser"
 _check_compose_file_set "gui override" "$compose_base" "$compose_gui"
 
+# C8.1 — no compose file or overlay may pass --no-sandbox (renderer sandbox stays on).
+# Strip YAML comment lines, then reject the token in active config (prod overlay included).
+# POSIX-portable: use [[:space:]] instead of GNU \s so the script behaves identically on
+# macOS / BSD grep. \s would be interpreted literally as backslash-s under BSD grep and
+# the comment-stripping pass would fail to drop lines like ``# --no-sandbox …``.
+_check_no_sandbox_in_compose() {
+  local compose_file="$1"
+  local active
+  active="$(grep -v '^[[:space:]]*#' "$compose_file" || true)"
+  if printf '%s\n' "$active" | grep -q -- '--no-sandbox'; then
+    echo "error: ${compose_file##*/} must not pass --no-sandbox (Chromium renderer sandbox required)" >&2
+    return 1
+  fi
+  return 0
+}
+
+shopt -s nullglob
+for compose_file in "${repo_root}/docker"/docker-compose*.yml; do
+  _check_no_sandbox_in_compose "$compose_file" || exit 1
+done
+shopt -u nullglob
+
 for compose_file in "$compose_base" "$compose_browser" "$compose_gui"; do
   if grep -q '"!' "$compose_file"; then
     echo "negated compose profiles are not a thing ($compose_file)" >&2
@@ -173,3 +253,83 @@ if _check_legacy_profile_without_override "gui" "$compose_base" 2>/dev/null; the
   echo "legacy profile guard broken: gui profile without override should be rejected" >&2
   exit 1
 fi
+
+# C10.3 — every resolved service in operator + CI file sets must declare limits.
+_check_resolved_service_limits() {
+  local label="$1"
+  shift
+  local -a compose_args=()
+  local file
+  for file in "$@"; do
+    compose_args+=(-f "$file")
+  done
+  local lacking
+  lacking="$(
+    docker compose "${compose_args[@]}" config --format json 2>/dev/null | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+lacking = []
+for name, svc in sorted((data.get("services") or {}).items()):
+    limits = ((svc.get("deploy") or {}).get("resources") or {}).get("limits") or {}
+    cpus, memory = limits.get("cpus"), limits.get("memory")
+    pids = limits.get("pids")
+    pids_limit = svc.get("pids_limit")
+    if not (cpus and memory and (pids is not None or pids_limit is not None)):
+        lacking.append(name)
+print(" ".join(lacking))
+'
+  )"
+  if [[ -n "${lacking// /}" ]]; then
+    echo "${label}: services missing deploy.resources.limits and/or pids_limit: ${lacking}" >&2
+    exit 1
+  fi
+}
+
+_check_resolved_service_limits "default" "$compose_base"
+_check_resolved_service_limits "browser override" "$compose_base" "$compose_browser"
+_check_resolved_service_limits "gui override" "$compose_base" "$compose_gui"
+_check_resolved_service_limits "ci" "${repo_root}/docker/docker-compose.ci.yml"
+
+# ---------------------------------------------------------------------------
+# C8.1 — browser renderer-sandbox preflight.
+#
+# Removing --no-sandbox only buys isolation if Brave can actually build its
+# namespace sandbox. Two preconditions have to hold, and both fail *at runtime*
+# with an opaque "Failed to move to new namespace" abort, so check them here.
+#
+#   1. Container syscall policy: Docker's default seccomp profile gates
+#      clone(CLONE_NEW*) / clone3 / unshare behind CAP_SYS_ADMIN and chroot
+#      behind CAP_SYS_CHROOT. Under the overlays' `cap_drop: ALL` that means no
+#      sandbox at all, so the browser/GUI overlays must pin
+#      infra/docker/seccomp-browser.json.
+#   2. Host policy: the kernel must permit unprivileged user namespaces. On
+#      Ubuntu 23.10+ AppArmor restricts them via
+#      /proc/sys/kernel/apparmor_restrict_unprivileged_userns.
+#
+# ---------------------------------------------------------------------------
+_seccomp_profile="${repo_root}/infra/docker/seccomp-browser.json"
+
+_check_browser_seccomp_profile_pinned() {
+  local label="$1" compose_file="$2"
+  if ! grep -q 'seccomp=.*seccomp-browser\.json' "$compose_file"; then
+    echo "error: ${label} (${compose_file##*/}) must pin the browser seccomp profile" >&2
+    echo "       (security_opt: - seccomp=../infra/docker/seccomp-browser.json)." >&2
+    echo "       Without it Docker's default profile blocks clone(CLONE_NEWUSER)/chroot" >&2
+    echo "       under cap_drop:ALL and Brave aborts before CDP binds." >&2
+    return 1
+  fi
+  if grep -q 'seccomp[=:]unconfined' "$compose_file"; then
+    echo "error: ${label} (${compose_file##*/}) sets seccomp=unconfined; pin the" >&2
+    echo "       narrow browser profile instead of disabling the syscall filter." >&2
+    return 1
+  fi
+  return 0
+}
+
+if [ ! -f "$_seccomp_profile" ]; then
+  echo "error: missing browser seccomp profile at ${_seccomp_profile}" >&2
+  exit 1
+fi
+
+_check_browser_seccomp_profile_pinned "browser override" "$compose_browser" || exit 1
+_check_browser_seccomp_profile_pinned "gui override" "$compose_gui" || exit 1

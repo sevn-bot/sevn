@@ -53,6 +53,7 @@ import urllib.request
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
 EVIDENCE_DIR = REPO / "evidence" / "verify"
@@ -759,17 +760,53 @@ def drive_compose_profiles() -> DriverResult:
     return result
 
 
+def _parse_compose_config(raw: str) -> dict[str, Any] | None:
+    """Parse ``docker compose config --format json`` output, or ``None`` if unusable.
+
+    ``_run`` merges stderr into stdout, so a successful ``compose config`` that
+    also emitted a warning (a deprecated key, an unset variable) arrives with
+    non-JSON lines ahead of the document. Retry from the first ``{`` so that
+    noise does not masquerade as a config failure — but return ``None`` for
+    anything still unparsable, so callers fail closed rather than continue with
+    an empty config.
+
+    Args:
+        raw (str): Combined stdout/stderr of ``docker compose config``.
+
+    Returns:
+        dict[str, Any] | None: Parsed config, or ``None`` when unusable.
+
+    Examples:
+        >>> _parse_compose_config('WARN[0000] noise\\n{"services": {}}')
+        {'services': {}}
+        >>> _parse_compose_config("error: no configuration file provided") is None
+        True
+    """
+    for candidate in (raw, raw[raw.find("{") :] if "{" in raw else ""):
+        if not candidate.strip():
+            continue
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
 def drive_stack_health() -> DriverResult:
     """Boot the operator compose stack under a private project, probe health, tear down.
 
     Runs under project ``SEVN_VERIFY_PROJECT`` (default ``sevn-verify``) on port
     ``SEVN_VERIFY_GATEWAY_PORT`` (default ``3101``) so it never collides with the
     operator's own stack, and always tears down with ``down -v``. Records how long
-    the boot-blocking ``sevn-operator-perms`` recursive ``chown`` takes — the #166
-    regression is only observable when the stack actually starts.
+    the boot-blocking ``sevn-operator-perms`` ownership pass takes — the #166
+    regression is only observable when the stack actually starts. After ready,
+    inspects ``HostConfig`` on gateway and proxy and requires ``NanoCpus``,
+    ``Memory``, and ``PidsLimit`` to match the resolved compose limits (C10.2).
 
     Returns:
-        DriverResult: Verdict plus boot, readiness, and perms-duration checks.
+        DriverResult: Verdict plus boot, readiness, perms-duration, and HostConfig checks.
 
     Examples:
         >>> drive_stack_health().name
@@ -877,7 +914,7 @@ def drive_stack_health() -> DriverResult:
                         name="operator-perms-duration",
                         status=STATUS_PASS if elapsed <= perms_budget else STATUS_FAIL,
                         detail=(
-                            f"boot-blocking recursive chown took {elapsed:.1f}s "
+                            f"boot-blocking perms init took {elapsed:.1f}s "
                             f"(budget {perms_budget:.1f}s, SEVN_VERIFY_PERMS_MAX_S)"
                         ),
                         command=f"docker inspect {container}",
@@ -900,6 +937,153 @@ def drive_stack_health() -> DriverResult:
                     output=iout.strip()[:400],
                 )
             )
+
+        # C10.2: HostConfig NanoCpus / Memory / PidsLimit must match declared compose limits.
+        cfg_code, cfg_out = _run(
+            [*base, "config", "--format", "json"],
+            env=env,
+            timeout=60.0,
+        )
+        # D-PR-6: this gate must fail closed. Its whole claim is "applied
+        # HostConfig matches the *declared* compose limits", so any path that
+        # loses the declared values (nonzero exit, unparsable output, a service
+        # or limit missing from the resolved config) can only be reported as a
+        # failure — degrading to "the values are merely nonzero" would let
+        # stack-health go green without ever proving the match.
+        cfg = _parse_compose_config(cfg_out) if cfg_code == 0 else None
+        if cfg is None:
+            reason = (
+                f"compose config exited {cfg_code}"
+                if cfg_code != 0
+                else "compose config output was not parsable JSON"
+            )
+            result.checks.append(
+                Check(
+                    name="hostconfig-compose-config",
+                    status=STATUS_FAIL,
+                    detail=(
+                        f"{reason} — declared limits unavailable, so the "
+                        "HostConfig match cannot be proven"
+                    ),
+                    output=cfg_out.strip()[:400],
+                )
+            )
+        else:
+            services_cfg = cfg.get("services") or {}
+            for svc_name in ("sevn-proxy", "sevn-gateway"):
+                svc = services_cfg.get(svc_name) or {}
+                limits = ((svc.get("deploy") or {}).get("resources") or {}).get("limits") or {}
+                declared_cpus = limits.get("cpus")
+                declared_memory = limits.get("memory")
+                declared_pids = limits.get("pids") or svc.get("pids_limit")
+                if declared_cpus is None or declared_memory is None or declared_pids is None:
+                    missing_limits = [
+                        label
+                        for label, value in (
+                            ("cpus", declared_cpus),
+                            ("memory", declared_memory),
+                            ("pids", declared_pids),
+                        )
+                        if value is None
+                    ]
+                    result.checks.append(
+                        Check(
+                            name=f"hostconfig-{svc_name}",
+                            status=STATUS_FAIL,
+                            detail=(
+                                f"{svc_name}: resolved compose config declares no "
+                                f"{', '.join(missing_limits)} limit — nothing to "
+                                "compare HostConfig against (C10.3)"
+                            ),
+                        )
+                    )
+                    continue
+                cid_code, cid_out = _run(
+                    [*base, "ps", "-aq", svc_name],
+                    env=env,
+                    timeout=60.0,
+                )
+                cid = (cid_out or "").strip().splitlines()
+                if cid_code != 0 or not cid:
+                    result.checks.append(
+                        Check(
+                            name=f"hostconfig-{svc_name}",
+                            status=STATUS_FAIL,
+                            detail=f"{svc_name}: no container id for HostConfig inspect",
+                        )
+                    )
+                    continue
+                hc_code, hc_out = _run(
+                    ["docker", "inspect", cid[0], "--format", "{{json .HostConfig}}"],
+                    timeout=60.0,
+                )
+                if hc_code != 0:
+                    result.checks.append(
+                        Check(
+                            name=f"hostconfig-{svc_name}",
+                            status=STATUS_FAIL,
+                            detail=f"{svc_name}: docker inspect failed",
+                            output=hc_out.strip()[:400],
+                        )
+                    )
+                    continue
+                try:
+                    host = json.loads(hc_out)
+                except json.JSONDecodeError:
+                    result.checks.append(
+                        Check(
+                            name=f"hostconfig-{svc_name}",
+                            status=STATUS_FAIL,
+                            detail=f"{svc_name}: HostConfig JSON parse failed",
+                            output=hc_out.strip()[:400],
+                        )
+                    )
+                    continue
+                nano = int(host.get("NanoCpus") or 0)
+                memory = int(host.get("Memory") or 0)
+                pids = int(host.get("PidsLimit") or 0)
+                ok = nano > 0 and memory > 0 and pids > 0
+                detail_parts = [
+                    f"NanoCpus={nano}",
+                    f"Memory={memory}",
+                    f"PidsLimit={pids}",
+                ]
+                # Every declared value is present here (missing ones already
+                # failed above), so each comparison is an exact-match proof.
+                try:
+                    expected_nano = int(float(declared_cpus) * 1_000_000_000)
+                    expected_mem = int(declared_memory)
+                    expected_pids = int(declared_pids)
+                except (TypeError, ValueError):
+                    result.checks.append(
+                        Check(
+                            name=f"hostconfig-{svc_name}",
+                            status=STATUS_FAIL,
+                            detail=(
+                                f"{svc_name}: declared limits are not numeric "
+                                f"(cpus={declared_cpus!r}, memory={declared_memory!r}, "
+                                f"pids={declared_pids!r})"
+                            ),
+                        )
+                    )
+                    continue
+                if nano != expected_nano:
+                    ok = False
+                    detail_parts.append(f"expected NanoCpus={expected_nano}")
+                if memory != expected_mem:
+                    ok = False
+                    detail_parts.append(f"expected Memory={expected_mem}")
+                if pids != expected_pids:
+                    ok = False
+                    detail_parts.append(f"expected PidsLimit={expected_pids}")
+                result.checks.append(
+                    Check(
+                        name=f"hostconfig-{svc_name}",
+                        status=STATUS_PASS if ok else STATUS_FAIL,
+                        detail="; ".join(detail_parts),
+                        command=f"docker inspect {cid[0]} --format '{{{{json .HostConfig}}}}'",
+                    )
+                )
     finally:
         down = [*base, "down", "-v", "--remove-orphans"]
         dcode, dout = _run(down, env=env, timeout=600.0)

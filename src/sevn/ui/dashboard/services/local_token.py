@@ -4,7 +4,7 @@ Module: sevn.ui.dashboard.services.local_token
 Depends: os, pathlib, secrets, sevn.config.loader, sevn.gateway.auth
 
 Exports:
-    dashboard_local_token_path — ``{SEVN_HOME}/dashboard-local-token``.
+    dashboard_local_token_path — ``{SEVN_HOME}/.sevn/dashboard-local-token``.
     write_dashboard_local_token — mint + persist boot token (mode 0600).
     read_dashboard_local_token — read persisted token text.
     dashboard_local_token_from_request — extract token from HTTP/WS handshake.
@@ -29,7 +29,10 @@ if TYPE_CHECKING:
 
 DASHBOARD_LOCAL_TOKEN_HEADER = "X-Sevn-Dashboard-Local-Token"  # nosec B105
 DASHBOARD_LOCAL_TOKEN_QUERY = "local_token"  # nosec B105
-_DASHBOARD_LOCAL_TOKEN_FILENAME = "dashboard-local-token"  # nosec B105
+# Land inside ``{SEVN_HOME}/.sevn`` so compose's scoped perms init (which
+# chowns ``/operator/.sevn`` to uid 10001) makes the boot token writable
+# without needing an unconditional ``chown -R /operator``.
+_DASHBOARD_LOCAL_TOKEN_REL_PATH = (".sevn", "dashboard-local-token")  # nosec B105
 
 
 def dashboard_local_token_path(*, home: Path | None = None) -> Path:
@@ -39,14 +42,14 @@ def dashboard_local_token_path(*, home: Path | None = None) -> Path:
         home (Path | None): Override ``SEVN_HOME`` root (tests).
 
     Returns:
-        Path: ``{operator_home}/dashboard-local-token``.
+        Path: ``{operator_home}/.sevn/dashboard-local-token``.
 
     Examples:
         >>> dashboard_local_token_path().name
         'dashboard-local-token'
     """
     root = home if home is not None else operator_home_dir()
-    return root / _DASHBOARD_LOCAL_TOKEN_FILENAME
+    return root.joinpath(*_DASHBOARD_LOCAL_TOKEN_REL_PATH)
 
 
 def write_dashboard_local_token(*, home: Path | None = None) -> str:
