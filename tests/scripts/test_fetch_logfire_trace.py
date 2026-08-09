@@ -40,7 +40,9 @@ def test_validate_trace_id_rejects_unsafe_values(trace_id: str) -> None:
 
 def test_validate_base_url_accepts_supported_regions() -> None:
     assert validate_base_url("https://logfire-eu.pydantic.dev") == "https://logfire-eu.pydantic.dev"
-    assert validate_base_url("https://logfire-us.pydantic.dev/") == "https://logfire-us.pydantic.dev"
+    assert (
+        validate_base_url("https://logfire-us.pydantic.dev/") == "https://logfire-us.pydantic.dev"
+    )
 
 
 @pytest.mark.parametrize(

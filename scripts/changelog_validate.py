@@ -20,6 +20,7 @@ from typing import Any
 
 _ROOT = Path(__file__).resolve().parents[1]
 _SKW_SRC = _ROOT / "spec-kit-wave" / "src"
+_KIT_PRESENT = _SKW_SRC.is_dir()
 if str(_SKW_SRC) not in sys.path:
     sys.path.insert(0, str(_SKW_SRC))
 
@@ -33,7 +34,7 @@ try:
 
     SKW_AVAILABLE = True
 except ModuleNotFoundError as exc:  # spec-kit-wave not present — degrade to a no-op
-    if exc.name not in ("skw", "skw.changelog_validate"):
+    if _KIT_PRESENT or exc.name != "skw":
         raise
     SKW_AVAILABLE = False
 
