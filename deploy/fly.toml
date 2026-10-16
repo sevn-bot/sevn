@@ -1,0 +1,27 @@
+# Skeleton only. Plan 0080 deploys this app. Replace <name> before fly launch.
+# Set SEVN_ALLOWED_HOSTS to the public host before clients use /ws or /auth.
+# /health is not origin-guarded.
+
+app = "sevn-<name>"
+primary_region = "iad"
+
+[build]
+dockerfile = "deploy/Dockerfile"
+
+[mounts]
+source = "sevn_data"
+destination = "/data"
+
+[http_service]
+internal_port = 8787
+force_https = true
+auto_stop_machines = "off"
+auto_start_machines = true
+min_machines_running = 1
+
+[[http_service.checks]]
+grace_period = "20s"
+interval = "15s"
+method = "GET"
+path = "/health"
+timeout = "2s"

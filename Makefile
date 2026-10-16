@@ -1,7 +1,7 @@
 # W0 toolchain. Later waves append targets; they do not rename these.
 # pytest exits 5 when it collects nothing. The empty skeleton treats that as success.
 
-.PHONY: setup format lint typecheck test test-host test-web test-link test-edge test-apple db-heads ci-fast ci contracts contracts-check e2e dev build-web
+.PHONY: setup format lint typecheck test test-host test-web test-link test-edge test-apple db-heads ci-fast ci contracts contracts-check e2e dev build-web build
 
 PYTEST_ARGS ?=
 RUN_MARKED ?=
@@ -101,4 +101,7 @@ e2e:
 	pnpm --dir web run build
 	cd web && SEVN_RUN_MARKED="$(RUN_MARKED)" pnpm exec playwright test --config e2e/playwright.config.ts
 
-ci: ci-fast test
+build: build-web
+
+# Full pre-merge gate: ci-fast, unit tests, e2e, and the web build.
+ci: ci-fast test e2e build
