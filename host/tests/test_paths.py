@@ -1,4 +1,4 @@
-"""D15 path defaults. Green after W2."""
+"""D15 path defaults."""
 
 from __future__ import annotations
 
@@ -6,8 +6,6 @@ import sys
 from pathlib import Path
 
 import pytest
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W2")
 
 
 def _patch_platform(monkeypatch: pytest.MonkeyPatch, name: str) -> None:

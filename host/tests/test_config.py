@@ -1,12 +1,10 @@
-"""Settings toml source and the session queue default. Green after W2."""
+"""Settings toml source and the session queue default."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W2")
 
 
 def test_config_toml_overrides_default(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

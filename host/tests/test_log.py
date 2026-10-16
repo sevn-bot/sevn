@@ -1,4 +1,4 @@
-"""Redacting loguru setup (D17, spec §12). Green after W2."""
+"""Redacting loguru setup (D17, spec §12)."""
 
 from __future__ import annotations
 
@@ -9,8 +9,6 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W2")
 
 
 @pytest.fixture

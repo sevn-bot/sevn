@@ -1,4 +1,4 @@
-"""Secret backends and host identity (D16, D13). Green after W2."""
+"""Secret backends and host identity (D16, D13)."""
 
 from __future__ import annotations
 
@@ -11,8 +11,6 @@ import sys
 from pathlib import Path
 
 import pytest
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W2")
 
 
 def _host_id(pubkey: bytes) -> str:
