@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -45,7 +46,8 @@ _EXAMPLES: dict[str, dict[str, object]] = {
 }
 
 
-def main() -> None:
+def render_vectors() -> str:
+    """Canonical ``frames.json`` body, including the trailing newline."""
     rendered: dict[str, object] = {}
     for key in sorted(_EXAMPLES):
         raw = json.dumps(
@@ -55,11 +57,16 @@ def main() -> None:
             ensure_ascii=False,
         )
         rendered[key] = json.loads(dump(parse(raw)))
-    _OUT.parent.mkdir(parents=True, exist_ok=True)
-    _OUT.write_text(
-        json.dumps(rendered, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
+    return json.dumps(rendered, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Write frame test vectors")
+    parser.add_argument("--out", type=Path, default=_OUT)
+    args = parser.parse_args()
+    out = args.out if isinstance(args.out, Path) else Path(str(args.out))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(render_vectors(), encoding="utf-8")
 
 
 if __name__ == "__main__":

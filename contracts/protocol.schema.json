@@ -1,0 +1,548 @@
+{
+  "$defs": {
+    "AuthDevice": {
+      "properties": {
+        "device_sig": {
+          "title": "Device Sig",
+          "type": "string"
+        },
+        "t": {
+          "const": "auth",
+          "title": "T",
+          "type": "string"
+        }
+      },
+      "required": [
+        "t",
+        "device_sig"
+      ],
+      "title": "AuthDevice",
+      "type": "object"
+    },
+    "AuthToken": {
+      "properties": {
+        "t": {
+          "const": "auth",
+          "title": "T",
+          "type": "string"
+        },
+        "token": {
+          "title": "Token",
+          "type": "string"
+        }
+      },
+      "required": [
+        "t",
+        "token"
+      ],
+      "title": "AuthToken",
+      "type": "object"
+    },
+    "Challenge": {
+      "properties": {
+        "host": {
+          "title": "Host",
+          "type": "string"
+        },
+        "host_sig": {
+          "title": "Host Sig",
+          "type": "string"
+        },
+        "nonce": {
+          "title": "Nonce",
+          "type": "string"
+        },
+        "t": {
+          "const": "challenge",
+          "title": "T",
+          "type": "string"
+        }
+      },
+      "required": [
+        "t",
+        "nonce",
+        "host",
+        "host_sig"
+      ],
+      "title": "Challenge",
+      "type": "object"
+    },
+    "ErrorBody": {
+      "description": "`res.e` object: code, message, and optional data.",
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JsonObject"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ErrorBody",
+      "type": "object"
+    },
+    "Evt": {
+      "properties": {
+        "d": {
+          "$ref": "#/$defs/JsonObject"
+        },
+        "k": {
+          "title": "K",
+          "type": "string"
+        },
+        "s": {
+          "title": "S",
+          "type": "integer"
+        },
+        "t": {
+          "const": "evt",
+          "title": "T",
+          "type": "string"
+        }
+      },
+      "required": [
+        "t",
+        "s",
+        "k",
+        "d"
+      ],
+      "title": "Evt",
+      "type": "object"
+    },
+    "Hello": {
+      "properties": {
+        "caps": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Caps",
+          "type": "array"
+        },
+        "client": {
+          "title": "Client",
+          "type": "string"
+        },
+        "device": {
+          "title": "Device",
+          "type": "string"
+        },
+        "last_seq": {
+          "title": "Last Seq",
+          "type": "integer"
+        },
+        "proto": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Proto",
+          "type": "array"
+        },
+        "t": {
+          "const": "hello",
+          "title": "T",
+          "type": "string"
+        }
+      },
+      "required": [
+        "t",
+        "proto",
+        "client",
+        "device",
+        "last_seq",
+        "caps"
+      ],
+      "title": "Hello",
+      "type": "object"
+    },
+    "JsonObject": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+    },
+    "JsonValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "Req": {
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "m": {
+          "title": "M",
+          "type": "string"
+        },
+        "p": {
+          "$ref": "#/$defs/JsonObject"
+        },
+        "t": {
+          "const": "req",
+          "title": "T",
+          "type": "string"
+        }
+      },
+      "required": [
+        "t",
+        "id",
+        "m",
+        "p"
+      ],
+      "title": "Req",
+      "type": "object"
+    },
+    "Res": {
+      "properties": {
+        "e": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ErrorBody"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "r": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JsonObject"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "t": {
+          "const": "res",
+          "title": "T",
+          "type": "string"
+        }
+      },
+      "required": [
+        "t",
+        "id"
+      ],
+      "title": "Res",
+      "type": "object"
+    },
+    "SyncSinceParams": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "title": "Seq",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seq"
+      ],
+      "title": "SyncSinceParams",
+      "type": "object"
+    },
+    "SyncSinceResult": {
+      "additionalProperties": false,
+      "description": "Cursor after durable events have been replayed as `evt` frames.",
+      "properties": {
+        "host_seq": {
+          "title": "Host Seq",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host_seq"
+      ],
+      "title": "SyncSinceResult",
+      "type": "object"
+    },
+    "SystemInfoParams": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "SystemInfoParams",
+      "type": "object"
+    },
+    "SystemInfoResult": {
+      "additionalProperties": false,
+      "properties": {
+        "caps": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Caps",
+          "type": "array"
+        },
+        "host_id": {
+          "title": "Host Id",
+          "type": "string"
+        },
+        "host_pubkey_fp": {
+          "title": "Host Pubkey Fp",
+          "type": "string"
+        },
+        "proto": {
+          "title": "Proto",
+          "type": "integer"
+        },
+        "version": {
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "host_id",
+        "version",
+        "proto",
+        "caps",
+        "host_pubkey_fp"
+      ],
+      "title": "SystemInfoResult",
+      "type": "object"
+    },
+    "SystemPingParams": {
+      "additionalProperties": false,
+      "description": "`op_id` is optional here; dispatch requires it when `mutating` is set (D11).",
+      "properties": {
+        "note": {
+          "title": "Note",
+          "type": "string"
+        },
+        "op_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Op Id"
+        }
+      },
+      "required": [
+        "note"
+      ],
+      "title": "SystemPingParams",
+      "type": "object"
+    },
+    "SystemPingResult": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "title": "Seq",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seq"
+      ],
+      "title": "SystemPingResult",
+      "type": "object"
+    },
+    "Tick": {
+      "properties": {
+        "d": {
+          "$ref": "#/$defs/JsonObject"
+        },
+        "k": {
+          "title": "K",
+          "type": "string"
+        },
+        "t": {
+          "const": "tick",
+          "title": "T",
+          "type": "string"
+        }
+      },
+      "required": [
+        "t",
+        "k",
+        "d"
+      ],
+      "title": "Tick",
+      "type": "object"
+    },
+    "Welcome": {
+      "properties": {
+        "caps": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Caps",
+          "type": "array"
+        },
+        "host_seq": {
+          "title": "Host Seq",
+          "type": "integer"
+        },
+        "proto": {
+          "title": "Proto",
+          "type": "integer"
+        },
+        "t": {
+          "const": "welcome",
+          "title": "T",
+          "type": "string"
+        }
+      },
+      "required": [
+        "t",
+        "proto",
+        "host_seq",
+        "caps"
+      ],
+      "title": "Welcome",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "events": {
+    "bot.updated": {
+      "durable": true
+    },
+    "job.done": {
+      "durable": true
+    },
+    "job.queued": {
+      "durable": true
+    },
+    "job.started": {
+      "durable": true
+    },
+    "memory.changed": {
+      "durable": true
+    },
+    "message.created": {
+      "durable": true
+    },
+    "pending.created": {
+      "durable": true
+    },
+    "pending.resolved": {
+      "durable": true
+    },
+    "routine.run": {
+      "durable": true
+    },
+    "system.ping": {
+      "durable": true
+    },
+    "turn.delta": {
+      "durable": false
+    },
+    "turn.finished": {
+      "durable": true
+    },
+    "turn.started": {
+      "durable": true
+    },
+    "turn.step": {
+      "durable": true
+    },
+    "turn.waiting": {
+      "durable": true
+    },
+    "ui.surface": {
+      "durable": true
+    }
+  },
+  "methods": {
+    "sync.since": {
+      "mutating": false,
+      "params": "SyncSinceParams",
+      "result": "SyncSinceResult"
+    },
+    "system.info": {
+      "mutating": false,
+      "params": "SystemInfoParams",
+      "result": "SystemInfoResult"
+    },
+    "system.ping": {
+      "mutating": true,
+      "params": "SystemPingParams",
+      "result": "SystemPingResult"
+    }
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Hello"
+    },
+    {
+      "$ref": "#/$defs/Challenge"
+    },
+    {
+      "$ref": "#/$defs/AuthToken"
+    },
+    {
+      "$ref": "#/$defs/AuthDevice"
+    },
+    {
+      "$ref": "#/$defs/Welcome"
+    },
+    {
+      "$ref": "#/$defs/Req"
+    },
+    {
+      "$ref": "#/$defs/Res"
+    },
+    {
+      "$ref": "#/$defs/Evt"
+    },
+    {
+      "$ref": "#/$defs/Tick"
+    }
+  ],
+  "title": "Frame"
+}

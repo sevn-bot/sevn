@@ -21,7 +21,9 @@ from sevn.probe import ProbeError, call_method, events_since, parse_params
 
 app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 probe_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
+contracts_app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 app.add_typer(probe_app, name="probe")
+app.add_typer(contracts_app, name="contracts")
 
 _LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1", "[::1]"})
 
@@ -92,6 +94,16 @@ def probe_events(
     except ProbeError as exc:
         _fail(exc)
     typer.echo(json.dumps(result))
+
+
+@contracts_app.command("export")
+def contracts_export(
+    root: Annotated[Path | None, typer.Option("--root")] = None,
+) -> None:
+    """Write ``protocol.schema.json`` and the TypeScript method table (D18)."""
+    from sevn.contracts.export import export_contracts
+
+    export_contracts(Path.cwd() if root is None else root)
 
 
 @app.command()

@@ -1,7 +1,7 @@
 # W0 toolchain. Later waves append targets; they do not rename these.
 # pytest exits 5 when it collects nothing. The empty skeleton treats that as success.
 
-.PHONY: setup format lint typecheck test test-host test-web test-link test-edge test-apple db-heads ci-fast ci
+.PHONY: setup format lint typecheck test test-host test-web test-link test-edge test-apple db-heads ci-fast ci contracts contracts-check e2e dev build-web
 
 PYTEST_ARGS ?=
 RUN_MARKED ?=
@@ -75,6 +75,30 @@ db-heads:
 		exit 1; \
 	fi
 
-ci-fast: lint typecheck db-heads
+ci-fast: lint typecheck db-heads contracts-check
+
+contracts:
+	uv run sevn contracts export
+	uv run python scripts/gen_frame_vectors.py
+	uv run python scripts/check_contracts.py --write-ts
+
+contracts-check:
+	uv run python scripts/check_contracts.py
+
+dev:
+	@pid=; \
+	SEVN_DEV=1 uv run sevn serve & pid=$$!; \
+	trap 'kill $$pid 2>/dev/null || true' EXIT INT TERM; \
+	pnpm --dir web dev
+
+build-web:
+	pnpm --dir web run build
+	rm -rf host/src/sevn/_web
+	mkdir -p host/src/sevn/_web
+	cp -R web/dist/. host/src/sevn/_web/
+
+e2e:
+	pnpm --dir web run build
+	cd web && SEVN_RUN_MARKED="$(RUN_MARKED)" pnpm exec playwright test --config e2e/playwright.config.ts
 
 ci: ci-fast test

@@ -26,6 +26,9 @@ htmlcov/
 node_modules/
 web/dist/
 
+# SPA packaged into the host by `make build-web`
+host/src/sevn/_web/
+
 # Local databases
 *.db
 
