@@ -4,6 +4,7 @@
 or ``"ignored"``. Ignored events set ``native_type``, and that value is a member of
 ``IGNORED_NATIVE[runtime]``. Each ``fixtures/<runtime>/*.jsonl`` line is one native
 object. Claude, Codex, and OpenCode transcripts are unmarked after W3.R.
+Joined Claude ``text_delta`` text must equal the assistant reply once (F3).
 """
 
 from __future__ import annotations
@@ -146,3 +147,78 @@ def test_turn_has_session_bound_then_finished(runtime: str, transcript: Path) ->
     assert "session_bound" in kinds
     assert "turn_finished" in kinds
     assert kinds.index("session_bound") < kinds.index("turn_finished")
+
+
+def _claude_transcripts() -> list[object]:
+    root = FIXTURES / "claude"
+    found = sorted(root.glob("*.jsonl")) if root.is_dir() else []
+    paths = found or [root / "_pending.jsonl"]
+    return [pytest.param(path, id=path.name) for path in paths]
+
+
+def _assistant_reply(natives: list[object]) -> str:
+    parts: list[str] = []
+    for native in natives:
+        if not isinstance(native, Mapping) or native.get("type") != "assistant":
+            continue
+        block = native.get("block")
+        if (
+            isinstance(block, Mapping)
+            and block.get("type") == "text"
+            and isinstance(block.get("text"), str)
+        ):
+            parts.append(block["text"])
+    return "".join(parts)
+
+
+def _stream_text(natives: list[object]) -> str:
+    parts: list[str] = []
+    for native in natives:
+        if not isinstance(native, Mapping) or native.get("type") != "stream_event":
+            continue
+        event = native.get("event")
+        if not isinstance(event, Mapping) or event.get("type") != "content_block_delta":
+            continue
+        delta = event.get("delta")
+        if (
+            isinstance(delta, Mapping)
+            and delta.get("type") == "text_delta"
+            and isinstance(delta.get("text"), str)
+        ):
+            parts.append(delta["text"])
+    return "".join(parts)
+
+
+def _compare(left: str, right: str) -> tuple[bool, int, int]:
+    return left == right, len(left), len(right)
+
+
+@pytest.mark.parametrize("transcript", _claude_transcripts())
+def test_joined_text_delta_equals_reply_once(transcript: Path) -> None:
+    """A consumer that joins ``text_delta`` sees the assistant reply once.
+
+    On these transcripts the stream chunks and the final assistant text blocks
+    are the same reply. Mapping both native forms to ``text_delta`` repeats it.
+    """
+
+    natives = _events(transcript)
+    reply = _assistant_reply(natives)
+    if not reply:
+        pytest.fail(f"{transcript.name}: assistant reply is empty")
+    stream_same, stream_len, reply_len = _compare(_stream_text(natives), reply)
+    if not stream_same:
+        pytest.fail(
+            f"{transcript.name}: stream text is {stream_len} chars; "
+            f"the reply once is {reply_len} chars"
+        )
+    joined = "".join(
+        event.text  # type: ignore[attr-defined]
+        for event in _map_all("claude", natives)
+        if event.kind == "text_delta"  # type: ignore[attr-defined]
+    )
+    same, joined_len, once_len = _compare(joined, reply)
+    if not same:
+        pytest.fail(
+            f"{transcript.name}: joined text_delta is {joined_len} chars; "
+            f"the reply once is {once_len} chars"
+        )
