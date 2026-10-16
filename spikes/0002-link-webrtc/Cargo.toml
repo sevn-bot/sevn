@@ -12,3 +12,8 @@ name = "spike-0002-link-webrtc"
 version = "0.0.0"
 edition = "2024"
 publish = false
+
+[dev-dependencies]
+common = { path = "crates/common" }
+signal = { path = "crates/signal" }
+sha2 = "0.10"

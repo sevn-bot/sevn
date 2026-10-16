@@ -4,6 +4,6 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test tests/chrome.spec.ts tests/webkit.spec.ts tests/video.spec.ts tests/measure.spec.ts"
   }
 }
