@@ -2,7 +2,7 @@
 
 import { createElement, type ComponentType } from "react";
 import { cleanup, render, type RenderResult } from "@testing-library/react";
-import { expect, vi } from "vitest";
+import { expect, test, vi } from "vitest";
 import {
   applyData,
   changedLeaves,
@@ -15,7 +15,6 @@ import {
   surfaceId,
   type JsonObject,
 } from "./support/payload.ts";
-import { red } from "./support/red.ts";
 import {
   buttonNamed,
   chooseChoice,
@@ -78,7 +77,7 @@ function flat(args: unknown[]): string {
     .join(" ");
 }
 
-red("W2")("renders p1 form fields by role", async () => {
+test("renders p1 form fields by role", async () => {
   const payload = readPayload("p1-form");
   const messages = messagesOf(payload, false);
   const App = await loadApp();
@@ -97,7 +96,7 @@ red("W2")("renders p1 form fields by role", async () => {
   }
 });
 
-red("W2")("submit emits ui.action with the form data", async () => {
+test("submit emits ui.action with the form data", async () => {
   const payload = readPayload("p1-form");
   const messages = messagesOf(payload, false);
   const choice = firstChoiceValue(messages);
@@ -130,7 +129,7 @@ red("W2")("submit emits ui.action with the form data", async () => {
   }
 });
 
-red("W2")("p2 incremental update adds a row without remounting the table", async () => {
+test("p2 incremental update adds a row without remounting the table", async () => {
   const payload = readPayload("p2-table-update");
   expect(payload.update && payload.update.length > 0).toBe(true);
   const initial = messagesOf(payload, false);
@@ -170,7 +169,7 @@ red("W2")("p2 incremental update adds a row without remounting the table", async
   }
 });
 
-red("W2")(
+test(
   "p3 secret input is type=password and the value is passed only to onSecret",
   async () => {
     const payload = readPayload("p3-secret");
@@ -237,7 +236,7 @@ red("W2")(
   },
 );
 
-red("W2")("p4 approve and deny emit distinct actions", async () => {
+test("p4 approve and deny emit distinct actions", async () => {
   const payload = readPayload("p4-approval");
   const messages = messagesOf(payload, true);
   const onAction = vi.fn<(action: UiAction) => void>();
@@ -264,7 +263,7 @@ red("W2")("p4 approve and deny emit distinct actions", async () => {
   }
 });
 
-red("W2")("p5 assist emits the Open Computer panel action", async () => {
+test("p5 assist emits the Open Computer panel action", async () => {
   const payload = readPayload("p5-assist");
   const messages = messagesOf(payload, true);
   const onAction = vi.fn<(action: UiAction) => void>();
@@ -288,7 +287,7 @@ red("W2")("p5 assist emits the Open Computer panel action", async () => {
   }
 });
 
-red("W2")("unknown component shows fallback text", async () => {
+test("unknown component shows fallback text", async () => {
   const messages: JsonObject[] = [
     {
       version: "v0.9",

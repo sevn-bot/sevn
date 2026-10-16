@@ -1,7 +1,8 @@
-"""RED payload contracts for spike S3 (green after W2).
+"""Payload contracts for spike S3.
 
-Payloads are JSON objects at ``spikes/0004-a2ui/payloads/<id>.json`` with
-camelCase A2UI v0.9 messages. ``p2-table-update`` also has a non-empty
+W2.R removed the ``green after W2`` xfail markers. These cases run as ordinary
+pytest tests. Payloads are JSON objects at ``spikes/0004-a2ui/payloads/<id>.json``
+with camelCase A2UI v0.9 messages. ``p2-table-update`` also has a non-empty
 ``update`` list. ``sevn_catalog.json`` is a catalog document whose components
 include ``sevn.SecretField``, ``sevn.ApprovalCard``, ``sevn.AssistCard``, and
 ``Table``.
@@ -266,9 +267,6 @@ def _assert_no_value_key(node: object, path: str) -> None:
 
 
 @pytest.mark.parametrize("payload_id", PAYLOAD_IDS)
-@pytest.mark.xfail(
-    strict=False, reason="green after W2: payload validates against the catalog"
-)
 def test_payload_validates(payload_id: str) -> None:
     doc = _payload(payload_id)
     messages = _messages(doc, include_update=True)
@@ -287,9 +285,6 @@ def test_payload_validates(payload_id: str) -> None:
         raise AssertionError(f"{payload_id} failed catalog validation: {exc}") from exc
 
 
-@pytest.mark.xfail(
-    strict=False, reason="green after W2: p3 data model has no value key"
-)
 def test_secret_payload_has_no_value_field() -> None:
     doc = _payload("p3-secret")
     messages = _messages(doc, include_update=True)
