@@ -109,6 +109,24 @@ def test_dev_origin_only_with_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPat
         assert allowed.status_code == 401
 
 
+def test_dev_proxy_host_allowed_when_sevn_dev(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Vite forwards the browser Host. SEVN_DEV=1 must let that request through."""
+    with running_app(
+        tmp_path,
+        monkeypatch,
+        dev="1",
+        base_url="http://localhost:5173",
+    ) as (_app, _token, client):
+        response = client.get(  # type: ignore[attr-defined]
+            "/auth/login?token=not-the-token",
+            headers={"host": "localhost:5173", "origin": "http://localhost:5173"},
+        )
+        assert response.status_code == 401
+        assert response.text.strip() == "unauthorized"
+
+
 def test_allowed_hosts_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     with running_app(tmp_path / "closed", monkeypatch, base_url="http://sevn.internal:8787") as (
         _app,
