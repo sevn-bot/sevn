@@ -1,4 +1,4 @@
-"""Loopback MCP echo server (D2). Green after W2.
+"""Loopback MCP echo server (D2). W2 markers removed in W2.R.
 
 ``with spike_rt.mcp_server.echo_server(session_id) as server`` binds
 ``127.0.0.1`` on a free port and yields:
@@ -23,8 +23,6 @@ import httpx2
 import pytest
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
-
-_W2 = pytest.mark.xfail(strict=False, reason="green after W2")
 
 
 class _Call(Protocol):
@@ -90,7 +88,6 @@ def _text_schema(schema: object) -> None:
     assert "text" in required
 
 
-@_W2
 def test_echo_tool_listed() -> None:
     asyncio.run(_echo_tool_listed())
 
@@ -108,7 +105,6 @@ async def _echo_tool_listed() -> None:
         _text_schema(listed.tools[0].input_schema)
 
 
-@_W2
 def test_echo_returns_session() -> None:
     asyncio.run(_echo_returns_session())
 
@@ -128,7 +124,6 @@ async def _echo_returns_session() -> None:
         assert recorded.bearer == server.bearer
 
 
-@_W2
 def test_wrong_bearer_401() -> None:
     wrong = secrets.token_urlsafe(32)
     with _open("sess-a") as first, _open("sess-b") as second:

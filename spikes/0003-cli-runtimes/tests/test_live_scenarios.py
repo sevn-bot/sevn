@@ -9,7 +9,8 @@ the process. ``session.bearer`` is the raw MCP token; ``session.mcp_calls`` reco
 each ``sevn_echo`` call (``name``, ``arguments``, ``bearer``). ``session.session_ref``
 is the CLI resume id from ``session_bound``.
 
-Claude is green after W2. Codex and OpenCode are green after W3. Cursor is bonus D6.
+Claude markers were removed in W2.R. Codex and OpenCode are green after W3.
+Cursor is bonus D6.
 A missing login skips with ``skipped: no live gate``.
 """
 
@@ -28,7 +29,7 @@ _TURN_TIMEOUT_S = 300.0
 _INTERRUPT_DEADLINE_S = 10.0
 
 _RUNTIMES = [
-    pytest.param("claude", marks=pytest.mark.xfail(strict=False, reason="green after W2")),
+    "claude",
     pytest.param("codex", marks=pytest.mark.xfail(strict=False, reason="green after W3")),
     pytest.param("opencode", marks=pytest.mark.xfail(strict=False, reason="green after W3")),
     pytest.param("cursor", marks=pytest.mark.xfail(strict=False, reason="bonus D6")),
