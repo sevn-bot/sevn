@@ -3,3 +3,8 @@ name = "common"
 version = "0.0.0"
 edition = "2024"
 publish = false
+
+[dependencies]
+peer-str0m = { path = "../peer-str0m" }
+peer-webrtcrs = { path = "../peer-webrtcrs" }
+serde = { version = "1", features = ["derive"] }

@@ -13,6 +13,14 @@ version = "0.0.0"
 edition = "2024"
 publish = false
 
+[[bin]]
+name = "spike-peer"
+path = "src/bin/spike-peer.rs"
+
+[dependencies]
+common = { path = "crates/common" }
+signal = { path = "crates/signal" }
+
 [dev-dependencies]
 common = { path = "crates/common" }
 signal = { path = "crates/signal" }

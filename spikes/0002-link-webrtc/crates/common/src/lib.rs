@@ -1,24 +1,17 @@
 //! Shared spike contracts for the two S1 peers.
-//!
-//! Signatures only. `peer_by_name` and every `Peer` method stay unimplemented
-//! until the peer wave fills them in. Valid names are `webrtcrs` and `str0m`.
 
 use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
 
-pub const CHANNEL_RPC: u16 = 0;
-pub const CHANNEL_EVENTS: u16 = 1;
-pub const CHANNEL_FILES: u16 = 2;
+use serde::{Deserialize, Serialize};
 
-/// D2: files payload size, not counting the 24-byte header.
-pub const FILE_CHUNK_PAYLOAD: usize = 16 * 1024;
-/// D2: 16-byte transfer id followed by an 8-byte big-endian offset.
-pub const FILE_CHUNK_HEADER_LEN: usize = 24;
-/// Sender pauses while buffered bytes are above this.
-pub const PAUSE_ABOVE_BUFFERED: usize = 1024 * 1024;
-/// Sender resumes once buffered bytes fall below this.
-pub const RESUME_BELOW_BUFFERED: usize = 256 * 1024;
+mod chunk;
+
+pub use chunk::{
+    CHANNEL_EVENTS, CHANNEL_FILES, CHANNEL_RPC, CHANNEL_SPECS, FILE_CHUNK_HEADER_LEN,
+    FILE_CHUNK_PAYLOAD, PAUSE_ABOVE_BUFFERED, PauseGate, RESUME_BELOW_BUFFERED, chunk_blob,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Channel {
@@ -32,7 +25,7 @@ pub struct Incoming {
     pub bytes: Vec<u8>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Metrics {
     pub connect_ms: u64,
     pub ice_restart_ms: u64,
@@ -40,6 +33,19 @@ pub struct Metrics {
     pub first_frame_ms: u64,
     pub rss_mb: f64,
     pub cpu_pct: f64,
+}
+
+impl Metrics {
+    pub fn empty() -> Self {
+        Self {
+            connect_ms: 0,
+            ice_restart_ms: 0,
+            backpressure_pauses: 0,
+            first_frame_ms: 0,
+            rss_mb: 0.0,
+            cpu_pct: 0.0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -85,6 +91,140 @@ pub trait Peer: Send + Sync {
     }
 }
 
+struct Adapted<T> {
+    inner: T,
+}
+
+fn from_peer(err: impl fmt::Display) -> PeerError {
+    let message = err.to_string();
+    if message == "timed out" {
+        PeerError::Timeout
+    } else {
+        PeerError::Failed(message)
+    }
+}
+
+fn map_channels(channels: Vec<(u16, String)>) -> Vec<Channel> {
+    channels
+        .into_iter()
+        .map(|(id, label)| Channel { id, label })
+        .collect()
+}
+
+fn map_incoming(channel: u16, bytes: Vec<u8>) -> Incoming {
+    Incoming { channel, bytes }
+}
+
+fn map_metrics(stats: peer_webrtcrs::Stats) -> Metrics {
+    Metrics {
+        connect_ms: stats.connect_ms,
+        ice_restart_ms: stats.ice_restart_ms,
+        backpressure_pauses: stats.backpressure_pauses,
+        first_frame_ms: stats.first_frame_ms,
+        rss_mb: stats.rss_mb,
+        cpu_pct: stats.cpu_pct,
+    }
+}
+
+fn map_str0m_metrics(stats: peer_str0m::Stats) -> Metrics {
+    Metrics {
+        connect_ms: stats.connect_ms,
+        ice_restart_ms: stats.ice_restart_ms,
+        backpressure_pauses: stats.backpressure_pauses,
+        first_frame_ms: stats.first_frame_ms,
+        rss_mb: stats.rss_mb,
+        cpu_pct: stats.cpu_pct,
+    }
+}
+
+impl Peer for Adapted<peer_webrtcrs::Peer> {
+    fn connect(&self, signal_url: &str) -> Result<(), PeerError> {
+        self.inner.connect(signal_url).map_err(from_peer)
+    }
+
+    fn open_channels(&self) -> Result<Vec<Channel>, PeerError> {
+        self.inner
+            .open_channels()
+            .map(map_channels)
+            .map_err(from_peer)
+    }
+
+    fn send(&self, channel: u16, bytes: &[u8]) -> Result<(), PeerError> {
+        self.inner.send(channel, bytes).map_err(from_peer)
+    }
+
+    fn recv_timeout(&self, timeout: Duration) -> Result<Incoming, PeerError> {
+        self.inner
+            .recv_timeout(timeout)
+            .map(|(channel, bytes)| map_incoming(channel, bytes))
+            .map_err(from_peer)
+    }
+
+    fn ice_restart(&self) -> Result<(), PeerError> {
+        self.inner.ice_restart().map_err(from_peer)
+    }
+
+    fn metrics(&self) -> Metrics {
+        map_metrics(self.inner.metrics())
+    }
+
+    fn enable_test_video(&self) -> Result<(), PeerError> {
+        self.inner.enable_test_video().map_err(from_peer)
+    }
+
+    fn local_description(&self) -> String {
+        self.inner.local_description()
+    }
+}
+
+impl Peer for Adapted<peer_str0m::Peer> {
+    fn connect(&self, signal_url: &str) -> Result<(), PeerError> {
+        self.inner.connect(signal_url).map_err(from_peer)
+    }
+
+    fn open_channels(&self) -> Result<Vec<Channel>, PeerError> {
+        self.inner
+            .open_channels()
+            .map(map_channels)
+            .map_err(from_peer)
+    }
+
+    fn send(&self, channel: u16, bytes: &[u8]) -> Result<(), PeerError> {
+        self.inner.send(channel, bytes).map_err(from_peer)
+    }
+
+    fn recv_timeout(&self, timeout: Duration) -> Result<Incoming, PeerError> {
+        self.inner
+            .recv_timeout(timeout)
+            .map(|(channel, bytes)| map_incoming(channel, bytes))
+            .map_err(from_peer)
+    }
+
+    fn ice_restart(&self) -> Result<(), PeerError> {
+        self.inner.ice_restart().map_err(from_peer)
+    }
+
+    fn metrics(&self) -> Metrics {
+        map_str0m_metrics(self.inner.metrics())
+    }
+
+    fn enable_test_video(&self) -> Result<(), PeerError> {
+        self.inner.enable_test_video().map_err(from_peer)
+    }
+
+    fn local_description(&self) -> String {
+        self.inner.local_description()
+    }
+}
+
 pub fn peer_by_name(name: &str) -> Result<Arc<dyn Peer>, PeerError> {
-    unimplemented!("peer_by_name({name})")
+    match name {
+        "webrtcrs" => Ok(Arc::new(Adapted {
+            inner: peer_webrtcrs::Peer::new(),
+        })),
+        "str0m" => Ok(Arc::new(Adapted {
+            inner: peer_str0m::Peer::new(),
+        })),
+        other => Err(PeerError::UnknownPeer(other.to_owned())),
+    }
 }
