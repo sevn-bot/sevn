@@ -21,7 +21,7 @@
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " permission again, then"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " create the file.\n\n"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "The working directory is"}}
-{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " /private/var/f"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " <TMP>/f"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "olders/2p"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "/9stl57"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "x50yv7"}}
@@ -29,7 +29,7 @@
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "fs2zn_lzch"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "h0000gn"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "/T/pytest-of"}}
-{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "-alex/pytest"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "-<USER>/pytest"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "-26/test_permission_d"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "eny_then_appr2\n\nLet me"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " first check the current"}}
@@ -151,7 +151,7 @@
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " **File:** `"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "out.txt`\n-"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " **Location:** `/"}}
-{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "private/var/folders"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "private<TMP>/folders"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "/2p/"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "9stl57x"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "50yv7z"}}

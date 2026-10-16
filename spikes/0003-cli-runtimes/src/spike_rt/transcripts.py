@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import os
 import re
 import uuid
 from collections.abc import Callable
@@ -22,6 +23,12 @@ _SCRUBBERS = (
     (re.compile(r"sk-[A-Za-z0-9_-]{8,}"), "sk-x"),
     (re.compile(r"Bearer [A-Za-z0-9._~+/=-]{8,}"), "Bearer x"),
     (re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}"), "gh-x"),
+)
+# Longer prefix first so /private/var does not leave a second /var behind.
+_TEMP_FRAGMENTS = (
+    (re.compile(r"/private/var"), "<TMP>"),
+    (re.compile(r"/private"), "<TMP>"),
+    (re.compile(r"/var"), "<TMP>"),
 )
 
 GUIDE = (
@@ -42,13 +49,34 @@ def write_guide(workspace: Path) -> None:
         path.write_text(GUIDE + "\n", encoding="utf-8")
 
 
+def _account_names() -> tuple[str, ...]:
+    """Account names the fixture scrub test rejects. Never log these."""
+
+    names: list[str] = []
+    for candidate in (
+        os.environ.get("USER", ""),
+        os.environ.get("LOGNAME", ""),
+        Path.home().name,
+    ):
+        cleaned = candidate.strip()
+        if len(cleaned) < 3 or cleaned in names:
+            continue
+        names.append(cleaned)
+    names.sort(key=len, reverse=True)
+    return tuple(names)
+
+
 def scrub(
     text: str,
     *,
     secrets: tuple[str, ...] = (),
     paths: tuple[str, ...] = (),
 ) -> str:
-    """Replace home paths, the workspace, and known secret shapes."""
+    """Replace home paths, temp-dir fragments, account names, and secret shapes.
+
+    Stream chunks often hold only a slice of a workspace path, so a contiguous
+    replace of that path leaves ``/private``, ``/var``, and the account name.
+    """
 
     home = Path.home().as_posix()
     if home:
@@ -59,14 +87,18 @@ def scrub(
         text = text.replace(path, "<WS>")
         if path.startswith("/private"):
             text = text.replace(path.removeprefix("/private"), "<WS>")
-    user = Path.home().name
-    if user:
-        text = text.replace(f"/{user}/", "/<USER>/")
-        text = text.replace(f"pytest-of-{user}", "pytest-of-<USER>")
+    home_name = Path.home().name
+    if home_name and len(home_name) < 3:
+        text = text.replace(f"/{home_name}/", "/<USER>/")
+        text = text.replace(f"pytest-of-{home_name}", "pytest-of-<USER>")
     for secret in secrets:
         if len(secret) >= 8:
             text = text.replace(secret, "<TOKEN>")
     for pattern, replacement in _SCRUBBERS:
+        text = pattern.sub(replacement, text)
+    for name in _account_names():
+        text = text.replace(name, "<USER>")
+    for pattern, replacement in _TEMP_FRAGMENTS:
         text = pattern.sub(replacement, text)
     return text
 

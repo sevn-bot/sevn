@@ -1,7 +1,7 @@
 {"type": "session", "subtype": "new", "session_id": "ses_eb9a46ea3ffe0os8MCiz712bZn"}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "Simple"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " task"}}
-{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": ": create out.txt with content \"ok\". Working directory is /private/var/folders/..."}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": ": create out.txt with content \"ok\". Working directory is <TMP>/folders/..."}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "/spike-rt"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "-653u"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "7tie"}}

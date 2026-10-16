@@ -19,7 +19,7 @@
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " dedicated tool for creating files"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": ". The working"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " directory is /"}}
-{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "private/var/f"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "private<TMP>/f"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "olders/2"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "p/9"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "stl57x50"}}
@@ -128,7 +128,7 @@
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "out.txt`"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " in the working"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " directory (`/"}}
-{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "private/var/folders"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "private<TMP>/folders"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "/2p/"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "9stl57"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "x50yv"}}

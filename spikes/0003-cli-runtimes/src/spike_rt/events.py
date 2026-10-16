@@ -159,7 +159,8 @@ def _map_block(block: object) -> RuntimeEvent:
         return _ignored("assistant")
     block_type = block.get("type")
     if block_type == "text" and isinstance(block.get("text"), str):
-        return RuntimeEvent(kind="text_delta", text=block["text"])
+        # include_partial_messages already streamed this reply as text_delta.
+        return _ignored("assistant")
     if block_type == "thinking" and isinstance(block.get("thinking"), str):
         return RuntimeEvent(kind="thinking_delta", text=block["thinking"])
     if block_type == "tool_use":

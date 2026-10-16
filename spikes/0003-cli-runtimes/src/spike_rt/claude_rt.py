@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import inspect
 import json
-import re
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
@@ -33,6 +32,7 @@ from claude_agent_sdk.types import ContentBlock, ConversationResetMessage, RateL
 
 from spike_rt.events import RuntimeEvent, map_native_event
 from spike_rt.mcp_server import BoundServer, echo_server
+from spike_rt.transcripts import scrub
 
 _FIXTURE_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "claude"
 _SYSTEM_APPEND = (
@@ -42,14 +42,6 @@ _SYSTEM_APPEND = (
     "retry the same tool. When asked to create out.txt, create that file in the working "
     "directory with the contents ok and no other files. When told not to use tools, do "
     "not use tools."
-)
-_SCRUBBERS = (
-    (re.compile(r"/Users/[^/\s\"]+"), "<HOME>"),
-    (re.compile(r"/home/[^/\s\"]+"), "<HOME>"),
-    (re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"), "<EMAIL>"),
-    (re.compile(r"sk-[A-Za-z0-9_-]{8,}"), "sk-x"),
-    (re.compile(r"Bearer [A-Za-z0-9._~+/=-]{8,}"), "Bearer x"),
-    (re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}"), "gh-x"),
 )
 
 PermissionCallback = Callable[[RuntimeEvent], str | Awaitable[str]]
@@ -353,9 +345,4 @@ def _plain(value: object) -> object:
 
 
 def _scrub(text: str) -> str:
-    home = Path.home().as_posix()
-    if home:
-        text = text.replace(home, "<HOME>")
-    for pattern, replacement in _SCRUBBERS:
-        text = pattern.sub(replacement, text)
-    return text
+    return scrub(text)

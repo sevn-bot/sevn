@@ -4,23 +4,23 @@
 {"type": "stream_event", "event": {"type": "message_start", "message": {"model": "claude-opus-5-5", "id": "msg_011Cg6YE5NXGvDHoQmBTKRn1", "type": "message", "role": "assistant", "content": [], "container": null, "stop_reason": null, "stop_sequence": null, "stop_details": null, "usage": {"input_tokens": 2, "cache_creation_input_tokens": 3565, "cache_read_input_tokens": 10196, "cache_creation": {"ephemeral_5m_input_tokens": 0, "ephemeral_1h_input_tokens": 3565}, "output_tokens": 16, "service_tier": "standard", "inference_geo": "global", "speed": "standard"}, "input_transformations": [], "diagnostics": null, "context_management": null}}}
 {"type": "stream_event", "event": {"type": "content_block_start", "index": 0, "content_block": {"type": "tool_use", "id": "toolu_015FAQFKkyvAmA8TZkQQwNTe", "name": "Write", "input": {}, "caller": {"type": "direct"}}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": ""}}}
-{"type": "stream_event", "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "{\"file_path\": \"/private/var"}}}
+{"type": "stream_event", "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "{\"file_path\": \"<TMP>"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "/folders/2p/9"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "stl57x50yv7"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "zfs2zn_l"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "zchh0000gn/"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "T/pytest-of-"}}}
-{"type": "stream_event", "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "alex/pytest-26"}}}
+{"type": "stream_event", "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "<USER>/pytest-26"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "/test_permission_deny"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "_then_appr0/out"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": ".txt"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "\", \"content\": \"ok"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "\"}"}}}
-{"type": "assistant", "block": {"type": "tool_use", "name": "Write", "input": {"file_path": "/private/var/folders/2p/9stl57x50yv7zfs2zn_lzchh0000gn/T/pytest-of-alex/pytest-26/test_permission_deny_then_appr0/out.txt", "content": "ok"}, "id": "toolu_015FAQFKkyvAmA8TZkQQwNTe"}}
+{"type": "assistant", "block": {"type": "tool_use", "name": "Write", "input": {"file_path": "<TMP>/folders/2p/9stl57x50yv7zfs2zn_lzchh0000gn/T/pytest-of-<USER>/pytest-26/test_permission_deny_then_appr0/out.txt", "content": "ok"}, "id": "toolu_015FAQFKkyvAmA8TZkQQwNTe"}}
 {"type": "stream_event", "event": {"type": "content_block_stop", "index": 0}}
 {"type": "stream_event", "event": {"type": "message_delta", "delta": {"stop_reason": "tool_use", "stop_sequence": null, "stop_details": null, "container": null}, "usage": {"input_tokens": 2, "cache_creation_input_tokens": 3565, "cache_read_input_tokens": 10196, "output_tokens": 140, "output_tokens_details": {"thinking_tokens": 0}, "iterations": [{"input_tokens": 2, "output_tokens": 140, "cache_read_input_tokens": 10196, "cache_creation_input_tokens": 3565, "cache_creation": {"ephemeral_5m_input_tokens": 0, "ephemeral_1h_input_tokens": 3565}, "type": "message"}]}, "context_management": {"applied_edits": []}}}
 {"type": "stream_event", "event": {"type": "message_stop"}}
-{"type": "permission_request", "tool": "Write", "args": {"file_path": "/private/var/folders/2p/9stl57x50yv7zfs2zn_lzchh0000gn/T/pytest-of-alex/pytest-26/test_permission_deny_then_appr0/out.txt", "content": "ok"}, "request_id": "toolu_015FAQFKkyvAmA8TZkQQwNTe"}
+{"type": "permission_request", "tool": "Write", "args": {"file_path": "<TMP>/folders/2p/9stl57x50yv7zfs2zn_lzchh0000gn/T/pytest-of-<USER>/pytest-26/test_permission_deny_then_appr0/out.txt", "content": "ok"}, "request_id": "toolu_015FAQFKkyvAmA8TZkQQwNTe"}
 {"type": "user", "block": {"type": "tool_result", "name": "Write", "is_error": true}}
 {"type": "system", "subtype": "status"}
 {"type": "stream_event", "event": {"type": "message_start", "message": {"model": "claude-opus-5-5", "id": "msg_011Cg6YEGjdQdvZAo69reRAB", "type": "message", "role": "assistant", "content": [], "container": null, "stop_reason": null, "stop_sequence": null, "stop_details": null, "usage": {"input_tokens": 2, "cache_creation_input_tokens": 194, "cache_read_input_tokens": 13761, "cache_creation": {"ephemeral_5m_input_tokens": 0, "ephemeral_1h_input_tokens": 194}, "output_tokens": 4, "service_tier": "standard", "inference_geo": "global", "speed": "standard"}, "input_transformations": [], "diagnostics": null, "context_management": null}}}
@@ -42,20 +42,20 @@
 {"type": "stream_event", "event": {"type": "content_block_start", "index": 2, "content_block": {"type": "tool_use", "id": "toolu_01FdHyt6d1URfEQgQBQ6snaF", "name": "Write", "input": {}, "caller": {"type": "direct"}}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": ""}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": "{\"file_path\": \"/"}}}
-{"type": "stream_event", "event": {"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": "private/var/folders/2"}}}
+{"type": "stream_event", "event": {"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": "private<TMP>/folders/2"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": "p/9stl57x50"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": "yv7zfs2z"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": "n_lzchh0000"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": "gn/T/pytest"}}}
-{"type": "stream_event", "event": {"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": "-of-alex/pyt"}}}
+{"type": "stream_event", "event": {"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": "-of-<USER>/pyt"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": "est-26/test_permission"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": "_deny_then_appr"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": "0/out.txt"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": "\", \"content\": \"ok"}}}
 {"type": "stream_event", "event": {"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": "\"}"}}}
-{"type": "assistant", "block": {"type": "tool_use", "name": "Write", "input": {"file_path": "/private/var/folders/2p/9stl57x50yv7zfs2zn_lzchh0000gn/T/pytest-of-alex/pytest-26/test_permission_deny_then_appr0/out.txt", "content": "ok"}, "id": "toolu_01FdHyt6d1URfEQgQBQ6snaF"}}
+{"type": "assistant", "block": {"type": "tool_use", "name": "Write", "input": {"file_path": "<TMP>/folders/2p/9stl57x50yv7zfs2zn_lzchh0000gn/T/pytest-of-<USER>/pytest-26/test_permission_deny_then_appr0/out.txt", "content": "ok"}, "id": "toolu_01FdHyt6d1URfEQgQBQ6snaF"}}
 {"type": "stream_event", "event": {"type": "content_block_stop", "index": 2}}
-{"type": "permission_request", "tool": "Write", "args": {"file_path": "/private/var/folders/2p/9stl57x50yv7zfs2zn_lzchh0000gn/T/pytest-of-alex/pytest-26/test_permission_deny_then_appr0/out.txt", "content": "ok"}, "request_id": "toolu_01FdHyt6d1URfEQgQBQ6snaF"}
+{"type": "permission_request", "tool": "Write", "args": {"file_path": "<TMP>/folders/2p/9stl57x50yv7zfs2zn_lzchh0000gn/T/pytest-of-<USER>/pytest-26/test_permission_deny_then_appr0/out.txt", "content": "ok"}, "request_id": "toolu_01FdHyt6d1URfEQgQBQ6snaF"}
 {"type": "stream_event", "event": {"type": "message_delta", "delta": {"stop_reason": "tool_use", "stop_sequence": null, "stop_details": null, "container": null}, "usage": {"input_tokens": 2, "cache_creation_input_tokens": 194, "cache_read_input_tokens": 13761, "output_tokens": 190, "output_tokens_details": {"thinking_tokens": 22}, "iterations": [{"input_tokens": 2, "output_tokens": 190, "cache_read_input_tokens": 13761, "cache_creation_input_tokens": 194, "cache_creation": {"ephemeral_5m_input_tokens": 0, "ephemeral_1h_input_tokens": 194}, "type": "message"}]}, "context_management": {"applied_edits": []}}}
 {"type": "stream_event", "event": {"type": "message_stop"}}
 {"type": "user", "block": {"type": "tool_result", "name": "Write", "is_error": false}}

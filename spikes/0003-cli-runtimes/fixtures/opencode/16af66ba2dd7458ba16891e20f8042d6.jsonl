@@ -10,7 +10,7 @@
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": ". Do not create"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " any other file.\n\n"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "The working directory is"}}
-{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " /private/var/f"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " <TMP>/f"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "olders/.../test"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "_permission_deny_then"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "_appr0"}}
@@ -71,7 +71,7 @@
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " is correct and the"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " file exists.\n\nThe"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " working directory is"}}
-{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " /private/var/f"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": " <TMP>/f"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "olders/2p"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "/9stl57"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "x50"}}
@@ -79,7 +79,7 @@
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "2zn_lz"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "chh000"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "0gn/T/pytest-of"}}
-{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "-alex"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "-<USER>"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "/pytest-24"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "/test_permission_deny"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_thought_chunk", "text": "_then_appr0\n\nThe file out"}}
@@ -110,15 +110,15 @@
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": ", but shell access"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " worked).\n\n**Result"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": ":**\n- **File"}}
-{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " created:** `/private"}}
-{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "/var/folders/"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": " created:** `<TMP>"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "<TMP>/folders/"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "2p/9"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "stl57x50"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "yv7zfs"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "2zn_lz"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "chh0000"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "gn/T/pytest"}}
-{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "-of-alex/"}}
+{"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "-of-<USER>/"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "pytest-24/test"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "_permission_deny_then"}}
 {"type": "session_update", "update": {"sessionUpdate": "agent_message_chunk", "text": "_appr0"}}
