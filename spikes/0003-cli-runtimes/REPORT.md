@@ -72,13 +72,15 @@ are not recorded. A `account/chatgptAuthTokens/refresh` request is answered
 with JSON-RPC `-32601`. The token file is not read.
 
 OpenCode `session/request_permission` offers `allow_once`, `allow_always`, and
-`reject_once`. Selecting `reject_once` ends the prompt with `stopReason:
-cancelled` (the turn aborts instead of letting the model retry). A denial is
-therefore enforced by making the workspace read-only and selecting
-`allow_once`, so the write fails and the model asks again. The approve path
-restores write permission and selects `allow_once`. The process-local config
-directory sets every permission to `ask` and
-`experimental.continue_loop_on_deny`. The user's config is not modified.
+`reject_once`. A denial selects `reject_once`, so the write does not run and
+the file stays absent. OpenCode 2.0.15 ends that prompt (`stopReason:
+cancelled`, or the prompt request fails) instead of letting the model retry in
+the same prompt. `experimental.continue_loop_on_deny` does not change that.
+When a turn denied a call and never approved one, the adapter sends up to
+two follow-up prompts telling the model to invoke the tool again. A prose
+reply does not raise a new permission request, so the second prompt says so.
+The approve path selects `allow_once`. The process-local config directory sets every
+permission to `ask`. The user's config is not modified.
 `OPENCODE_DISABLE_FILEWATCHER` and `OPENCODE_FAST_BOOT` keep this process from
 indexing other projects. `session/load` resumes after the process exits.
 `session/cancel` is the interrupt.

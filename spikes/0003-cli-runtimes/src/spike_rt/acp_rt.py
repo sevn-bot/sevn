@@ -40,6 +40,17 @@ _COMMANDS = {
 }
 _ALLOW = ("allow_once", "allow_always")
 _REJECT = ("reject_once", "reject_always")
+# OpenCode 2.0.15 ends the prompt on reject_once. Follow-ups must be tool calls:
+# a prose "please grant permission" does not raise session/request_permission.
+_DENY_RETRY = (
+    "Permission was rejected. Invoke the same tool again right now with the "
+    "arguments the user asked for. Do not ask the user to grant permission and "
+    "do not describe the plan. The tool call is what requests permission."
+)
+_DENY_RETRY_AGAIN = (
+    "You replied with text and did not call a tool. Call the tool now, before "
+    "any other text. Do not ask the user a question."
+)
 
 PermissionCallback = Callable[[RuntimeEvent], str | Awaitable[str]]
 EventCallback = Callable[[RuntimeEvent], Awaitable[None] | None]
@@ -70,6 +81,9 @@ class AcpSession:
         self._tool_names: dict[str, str] = {}
         self._on_permission: PermissionCallback | None = None
         self._on_event: EventCallback | None = None
+        self._saw_deny = False
+        self._saw_approve = False
+        self._permission_count = 0
         self._events: list[RuntimeEvent] = []
         self._natives: list[dict[str, object]] = []
         self._turn_started = 0.0
@@ -122,6 +136,9 @@ class AcpSession:
         self._on_event = on_event
         self._events = []
         self._natives = []
+        self._saw_deny = False
+        self._saw_approve = False
+        self._permission_count = 0
         self._interrupt_sent = False
         self._in_turn = True
         self._turn_started = time.monotonic()
@@ -134,24 +151,18 @@ class AcpSession:
                     "session_id": self.session_ref,
                 }
             )
-            try:
-                response = await conn.prompt(
-                    self.session_ref,
-                    [TextContentBlock(type="text", text=prompt)],
-                )
-            except Exception as exc:
-                if not self._interrupt_sent:
-                    raise RuntimeError(self._scrub(f"{self.runtime} prompt failed: {exc}")) from exc
-                await self._push({"type": "prompt_response", "stopReason": "cancelled"})
-            else:
-                usage = _usage(response.usage)
-                native: dict[str, object] = {
-                    "type": "prompt_response",
-                    "stopReason": response.stop_reason,
-                }
-                if usage is not None:
-                    native["usage"] = usage
-                await self._push(native)
+            await self._complete_prompt(conn, prompt, recover_deny=True)
+            # A rejected OpenCode call ends the prompt. Nudge until a tool call
+            # raises a new permission request, at most twice.
+            nudge = _DENY_RETRY
+            for _ in range(2):
+                if not self._needs_deny_retry():
+                    break
+                before = self._permission_count
+                await self._complete_prompt(conn, nudge, recover_deny=False)
+                if self._permission_count > before:
+                    break
+                nudge = _DENY_RETRY_AGAIN
         finally:
             self._in_turn = False
             self._on_permission = None
@@ -174,6 +185,45 @@ class AcpSession:
             )
         return list(self._events)
 
+    async def _complete_prompt(
+        self,
+        conn: ClientSideConnection,
+        prompt: str,
+        *,
+        recover_deny: bool,
+    ) -> None:
+        session_id = self.session_ref
+        if not session_id:
+            raise RuntimeError(f"{self.runtime} session is not bound")
+        try:
+            response = await conn.prompt(
+                session_id,
+                [TextContentBlock(type="text", text=prompt)],
+            )
+        except Exception as exc:
+            retry = recover_deny and self._needs_deny_retry()
+            if not self._interrupt_sent and not retry:
+                message = self._scrub(f"{self.runtime} prompt failed: {exc}")
+                raise RuntimeError(message) from exc
+            await self._push({"type": "prompt_response", "stopReason": "cancelled"})
+            return
+        usage = _usage(response.usage)
+        native: dict[str, object] = {
+            "type": "prompt_response",
+            "stopReason": response.stop_reason,
+        }
+        if usage is not None:
+            native["usage"] = usage
+        await self._push(native)
+
+    def _needs_deny_retry(self) -> bool:
+        return (
+            self.runtime == "opencode"
+            and self._saw_deny
+            and not self._saw_approve
+            and not self._interrupt_sent
+        )
+
     async def interrupt(self) -> None:
         self._interrupt_sent = True
         conn = self._conn
@@ -185,7 +235,6 @@ class AcpSession:
         if self._closed:
             return
         self._closed = True
-        _thaw(self._workspace)
         self._conn = None
         cm = self._cm
         self._cm = None
@@ -257,17 +306,20 @@ class _AcpClient:
                 "request_id": tool_id,
             }
         )
+        self._session._permission_count += 1
         decision = await invoke(self._session._on_permission, event)
-        # OpenCode 2.0.15 aborts the turn on reject. A denied write is blocked
-        # by making the workspace read-only, then allowed once so the model retries.
-        if self._session.runtime == "opencode":
-            if decision == "approve":
-                _thaw(self._session._workspace)
-            else:
-                _freeze(self._session._workspace)
-            kinds = _ALLOW
+        # No callback means allow for OpenCode (resume turns omit one). An explicit
+        # deny selects reject_once so the tool does not run.
+        reject = decision == "deny" or (
+            self._session.runtime != "opencode" and decision != "approve"
+        )
+        if reject:
+            self._session._saw_deny = True
+            kinds = _REJECT
         else:
-            kinds = _ALLOW if decision == "approve" else _REJECT
+            if decision == "approve":
+                self._session._saw_approve = True
+            kinds = _ALLOW
         option = _pick(options, kinds)
         if option is None:
             return RequestPermissionResponse(outcome=DeniedOutcome(outcome="cancelled"))
@@ -322,14 +374,6 @@ def _child_env(runtime: str, workspace: Path) -> dict[str, str]:
         _write_opencode_config(config_dir)
         env["OPENCODE_CONFIG_DIR"] = str(config_dir)
     return env
-
-
-def _freeze(workspace: Path) -> None:
-    workspace.chmod(0o555)
-
-
-def _thaw(workspace: Path) -> None:
-    workspace.chmod(0o755)
 
 
 def _write_opencode_config(config_dir: Path) -> None:
