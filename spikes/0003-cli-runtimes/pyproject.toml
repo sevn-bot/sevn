@@ -1,0 +1,32 @@
+# D1 pins recorded in W0. Python SDKs are the dependencies below.
+# CLI binaries (on PATH, not installed by this project):
+#   claude 2.1.296
+#   codex 0.146.0
+#   opencode 2.0.15
+#   cursor-agent 2026.08.04-aaa8809
+
+[project]
+name = "spike-rt"
+version = "0.1.0"
+description = "Spike S2: subscription CLI runtimes calling a sevn MCP tool"
+requires-python = ">=3.13"
+dependencies = [
+    "agent-client-protocol==0.12.1",
+    "claude-agent-sdk==0.2.168",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "live: requires a logged-in subscription CLI",
+]
+addopts = ["-m", "not live"]
