@@ -24,6 +24,10 @@ htmlcov/
 
 # Node
 node_modules/
+web/dist/
+
+# Local databases
+*.db
 
 # Local-only notes and plans
 .ignorelocal/

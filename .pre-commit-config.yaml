@@ -1,0 +1,19 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check
+        language: system
+        types_or: [python, pyi]
+      - id: biome-check
+        name: biome check
+        entry: pnpm --dir web exec biome check --write --no-errors-on-unmatched
+        language: system
+        files: ^web/
+        pass_filenames: false
