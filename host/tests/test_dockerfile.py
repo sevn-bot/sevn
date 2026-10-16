@@ -1,14 +1,11 @@
-"""Image, fly skeleton, and CI workflow (D19, D20). Green after W7."""
+"""Image, fly skeleton, and CI workflow (D19, D20)."""
 
 from __future__ import annotations
 
 import re
 import tomllib
 
-import pytest
 from support.repo import repo_root
-
-pytestmark = pytest.mark.xfail(strict=False, reason="green after W7")
 
 
 def test_dockerfile_user_and_healthcheck() -> None:
