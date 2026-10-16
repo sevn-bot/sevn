@@ -3,8 +3,7 @@
 ``map_native_event(runtime, native) -> RuntimeEvent`` where ``kind`` is a D4 kind
 or ``"ignored"``. Ignored events set ``native_type``, and that value is a member of
 ``IGNORED_NATIVE[runtime]``. Each ``fixtures/<runtime>/*.jsonl`` line is one native
-object. Claude transcripts are unmarked after W2.R. Codex and OpenCode stay
-marked until W3.
+object. Claude, Codex, and OpenCode transcripts are unmarked after W3.R.
 """
 
 from __future__ import annotations
@@ -31,8 +30,6 @@ EVENT_KINDS = frozenset(
     }
 )
 
-_W3 = frozenset({"codex", "opencode"})
-
 
 def _transcripts() -> list[object]:
     params: list[object] = []
@@ -41,12 +38,8 @@ def _transcripts() -> list[object]:
         found = sorted(root.glob("*.jsonl")) if root.is_dir() else []
         # Stand-in so the test still runs, and fails, before that wave records transcripts.
         paths = found or [root / "_pending.jsonl"]
-        mark = pytest.mark.xfail(strict=False, reason="green after W3") if runtime in _W3 else None
         for path in paths:
-            if mark is None:
-                params.append(pytest.param(runtime, path, id=f"{runtime}:{path.name}"))
-            else:
-                params.append(pytest.param(runtime, path, marks=mark, id=f"{runtime}:{path.name}"))
+            params.append(pytest.param(runtime, path, id=f"{runtime}:{path.name}"))
     return params
 
 
